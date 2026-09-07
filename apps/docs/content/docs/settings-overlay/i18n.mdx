@@ -1,0 +1,61 @@
+---
+title: i18n
+description: Override or localize the settings overlay admin strings.
+---
+
+Every admin-facing string the plugin draws, the close and back labels, the search placeholder, the discard confirmation, the empty and no-results states, is a typed translation under the `settingsOverlay:` namespace. Several locales ship built in; the `translations` export names the current set.
+
+Override or add one through the `translations` option:
+
+```ts title="payload.config.ts"
+import { settingsOverlay } from '@10x-media/settings-overlay'
+import { keys } from '@10x-media/settings-overlay/i18n'
+
+settingsOverlay({
+  overlays: [...],
+  translations: {
+    en: { [keys.searchPlaceholder]: 'Find a setting' },
+    ja: {
+      [keys.close]: '閉じる',
+      [keys.back]: '戻る',
+    },
+  },
+})
+```
+
+Overrides are merged per key, so naming one leaves the rest of that locale alone. A locale nobody shipped is simply added.
+
+`@10x-media/settings-overlay/i18n` exports `keys`, the built-in `translations`, `labelFromKey`, and the `TranslationKey` / `TranslationsOption` types. Misspell a key and the build fails.
+
+## Labels you write are not translations
+
+An overlay's `label`, an item's `label` and its `group` are config values, so they take Payload's own localized-label shape:
+
+```ts
+{
+  id: 'system',
+  label: { en: 'Settings', de: 'Einstellungen', uk: 'Налаштування' },
+  items: [
+    { type: 'collection', slug: 'tags', group: { en: 'Content', de: 'Inhalte' } },
+  ],
+}
+```
+
+A collection or global with no `label` inherits the one it already declares, so most rows need nothing here. A label declared as a **function** resolves to the slug: the rail is built without the request a label function expects.
+
+To reuse one of the plugin's own strings as a label, `labelFromKey` turns a key into the full per-locale record:
+
+```ts
+import { labelFromKey } from '@10x-media/settings-overlay/i18n'
+import { keys } from '@10x-media/settings-overlay/i18n'
+
+{ ...appearanceItem(), label: labelFromKey(keys.appearanceLabel) }
+```
+
+`appearanceItem()` does this by default, so its row follows the reader's locale without you naming any of them.
+
+## The appearance row borrows Payload's strings
+
+`appearanceItem()` draws the theme and language controls, and labels them with Payload's own `general:` strings. The same controls exist on `/admin/account`, and this way the two screens cannot name the same thing differently.
+
+For merge order, adding locales, and app-level overrides, see [Translations](/concepts/translations). The pattern is identical in every plugin here.

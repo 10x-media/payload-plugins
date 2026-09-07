@@ -1,0 +1,114 @@
+---
+title: Quick start
+description: Install the plugin, open the panel from your own button, and deep-link into it.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/settings-overlay@beta
+```
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { settingsOverlay } from '@10x-media/settings-overlay'
+
+export default buildConfig({
+  collections: [tags, redirects],
+  globals: [branding],
+  plugins: [
+    settingsOverlay({
+      overlays: [
+        {
+          id: 'system',
+          label: 'Settings',
+          items: [
+            { type: 'collection', slug: 'tags' },
+            { type: 'collection', slug: 'redirects' },
+            { type: 'global', slug: 'branding' },
+          ],
+        },
+      ],
+    }),
+  ],
+})
+```
+
+Then regenerate the import map:
+
+```bash
+pnpm payload generate:importmap
+```
+
+Without it the provider resolves to nothing and no panel appears.
+
+`tags`, `redirects` and `branding` keep their nav entries and their own routes; the panel is a second way in, not a replacement. Set `hideEntities: true` on the overlay to make it the only way in, once you have read [what drawer mode leaves out](/settings-overlay/items).
+
+## Open it
+
+The plugin ships no button. Where a settings button belongs depends on your admin, so it gives you the hook and you place it:
+
+```tsx title="components/SettingsButton.tsx"
+'use client'
+import { useSettingsOverlay } from '@10x-media/settings-overlay/client'
+
+export const SettingsButton = () => {
+  const { toggle } = useSettingsOverlay()
+  return (
+    <button onClick={() => toggle('system')} type="button">
+      Settings
+    </button>
+  )
+}
+```
+
+```ts title="payload.config.ts"
+admin: {
+  components: {
+    beforeNavLinks: ['./components/SettingsButton#SettingsButton'],
+  },
+}
+```
+
+There is also a ready-made button for the common case of opening the panel on something specific, from a field or a list action:
+
+```tsx
+import { SettingsOverlayButton } from '@10x-media/settings-overlay/client'
+
+<SettingsOverlayButton overlay="system" item="tags" id="abc">
+  Edit this tag
+</SettingsOverlayButton>
+```
+
+## Link to it
+
+Every overlay is addressable by default:
+
+```
+?settings=system                 the panel, on its first row
+?settings=system/tags            the tags list
+?settings=system/tags/abc        one tag
+?settings=system/tags/new        the create form
+```
+
+A filtered list carries its query in a second parameter, `?settingsQuery=`, so the page underneath keeps its own `where[...]` parameters untouched.
+
+The panel is opened with the History API rather than the router, so it does not refetch the page under it, and the back button closes it in one step. A stale link (an item or document that no longer exists) lands on the first row the reader can open rather than on an error.
+
+Set `addressable: false` on an overlay to keep it out of the URL entirely.
+
+## Try the rest
+
+```ts
+import { appearanceItem } from '@10x-media/settings-overlay/items'
+
+items: [
+  appearanceItem(),
+  { type: 'collection', slug: 'tags' },
+  { type: 'component', slug: 'about', label: 'About', component: './About#About' },
+  { type: 'view', slug: 'audit', label: 'Audit log', viewKey: 'auditLogs' },
+  { type: 'link', slug: 'account', label: 'Account', href: '/account' },
+]
+```
+
+`appearanceItem()` is a bundled row for theme and language, the two controls Payload otherwise offers only on `/admin/account`. See [Items](/settings-overlay/items) for what each type is for.

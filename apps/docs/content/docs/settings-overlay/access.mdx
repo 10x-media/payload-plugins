@@ -1,0 +1,68 @@
+---
+title: Access
+description: Who sees which row, and why the rest never reaches the browser.
+---
+
+The rail each reader sees is computed on the server, for them. Rows they cannot open are not filtered out in the browser: they never leave the server in any form. There is no client-side list of what exists.
+
+## The two doors
+
+```ts
+settingsOverlay({
+  overlays: [
+    {
+      id: 'system',
+      label: 'Settings',
+      access: ({ overlay, req }) => canSeeModule('settings', req.user),
+      items: [
+        { type: 'collection', slug: 'tags' },
+        {
+          type: 'link',
+          slug: 'billing',
+          label: 'Billing',
+          href: '/billing',
+          access: ({ item, req }) => req.user?.role === 'owner',
+        },
+      ],
+    },
+  ],
+})
+```
+
+`access` on the overlay is the door to the whole panel. `access` on an item is the door to one row. Both take `{ req }`, so one project-level predicate can gate this panel and whatever else you already gate, with no wrapper in between.
+
+A missing function means open. A function that **throws** denies, and logs.
+
+## The order of checks
+
+Every path into the plugin runs the same sequence:
+
+1. `req.user` exists
+2. `canAccessAdmin({ req })`, the same first check Payload's own `render-list` and `render-document` make, so a signed-in user of a non-admin auth collection is refused before any door is consulted
+3. the overlay's `access`
+4. the item's `access`
+5. the collection's or global's own `read` permission
+6. the entity's own `admin.hidden`, when it was declared as a function
+
+Step six matters when a collection gates itself with a function-valued `admin.hidden`. The plugin overwrites that with `true` to hide the entity from the nav, and lifts the predicate out at boot so it still applies inside the panel. Payload's semantics hold: `true` means hidden, and a predicate that throws hides.
+
+## What reaches the browser
+
+The full configuration is parked under `config.custom`, which is in Payload's `serverOnlyConfigProperties` and is never serialised into the client config. That covers every access function, every `resolveDocID`, and every component path.
+
+What the browser receives is:
+
+- the closed panel's own properties: `id`, `label`, `layout`, `className`, `searchable`, `addressable`
+- a manifest per overlay: only the rows this reader may open, with labels already translated
+
+There is no `items` array in the client props to leak: the panel is not built from one.
+
+## The request the provider builds
+
+The `req` your access function receives while the rail is built is assembled by the plugin, not handed to it by Payload.
+
+Its headers are the real ones, so a `resolveDocID` can read a cookie. Everything else is local: `req.payloadAPI` is `'local'` and there is no response to write to. Lazy items are rendered through a different path and get Payload's own request.
+
+## The one thing to check yourself
+
+`hideEntities`, when you turn it on, removes a collection from the nav and from its route, but it is **not** access control. Payload's own access rules still decide whether the API will serve the document, and they should: a hidden route is not a locked one. Give the collection real `access` rules as you would anyway.

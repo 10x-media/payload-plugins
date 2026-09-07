@@ -13,6 +13,7 @@
 		"undo-redo",
 		"audit-logs",
 		"automations",
-		"dual-session"
+		"dual-session",
+		"settings-overlay"
 	]
 }
