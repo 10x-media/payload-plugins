@@ -12,5 +12,5 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.loadFailed]: '加载失败，请重试。',
 	[keys.noResults]: '没有匹配项。',
 	[keys.searchPlaceholder]: '搜索',
-	[keys.widgetNotice]: '此小组件无法显示。您可以将其从仪表板中移除。',
+	[keys.widgetNotice]: '此小组件并非用于展示。您可以将其从仪表板中移除。',
 }

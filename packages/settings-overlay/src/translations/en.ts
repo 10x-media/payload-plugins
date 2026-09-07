@@ -17,5 +17,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.loadFailed]: 'Could not load this. Please try again.',
 	[keys.noResults]: 'No matches.',
 	[keys.searchPlaceholder]: 'Search',
-	[keys.widgetNotice]: 'This widget cannot be displayed. You can remove it from your dashboard.',
+	[keys.widgetNotice]:
+		'This widget is not intended for display. You can remove it from your dashboard.',
 }

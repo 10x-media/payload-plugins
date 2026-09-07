@@ -12,5 +12,5 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.loadFailed]: 'Não foi possível carregar. Tente novamente.',
 	[keys.noResults]: 'Sem correspondências.',
 	[keys.searchPlaceholder]: 'Pesquisar',
-	[keys.widgetNotice]: 'Este widget não pode ser exibido. Você pode removê-lo do painel.',
+	[keys.widgetNotice]: 'Este widget não se destina a ser exibido. Você pode removê-lo do painel.',
 }

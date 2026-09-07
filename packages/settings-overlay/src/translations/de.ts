@@ -13,5 +13,5 @@ export const de: Record<TranslationKey, string> = {
 	[keys.noResults]: 'Keine Treffer.',
 	[keys.searchPlaceholder]: 'Suchen',
 	[keys.widgetNotice]:
-		'Dieses Widget kann nicht angezeigt werden. Sie können es vom Dashboard entfernen.',
+		'Dieses Widget ist nicht zur Anzeige gedacht. Sie können es vom Dashboard entfernen.',
 }

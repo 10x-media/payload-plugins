@@ -12,5 +12,5 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.loadFailed]: '불러오지 못했습니다. 다시 시도해 주세요.',
 	[keys.noResults]: '일치하는 항목이 없습니다.',
 	[keys.searchPlaceholder]: '검색',
-	[keys.widgetNotice]: '이 위젯은 표시할 수 없습니다. 대시보드에서 제거할 수 있습니다.',
+	[keys.widgetNotice]: '이 위젯은 표시용이 아닙니다. 대시보드에서 제거할 수 있습니다.',
 }
