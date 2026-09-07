@@ -99,6 +99,9 @@ export type ConsentMode = 'none' | 'required'
 /** Per-slot consent decision, evaluated against the slot's resolved adapter. */
 export type ConsentResolver = (args: { slot: CaptureSlot; adapterId: string }) => ConsentMode
 
+/** An adapter id to fill a capture slot with, or `false` to leave it deliberately empty. */
+export type CaptureSlotOption = string | false
+
 /**
  * A bare mode applies to every slot; a resolver decides per request-resolved adapter; the
  * object form maps ids and slots, with an adapter entry winning over a slot entry. Every
@@ -144,8 +147,11 @@ export type AnalyticsCaptureOptions = {
 	 * configured; `tenant` is the resolved scope's default adapter. A `global` id must
 	 * name a config adapter; a `tenant` id may also name a runtime provider instance,
 	 * so it is resolved per request rather than validated at config time.
+	 *
+	 * `false` disables a slot outright: it fills with nothing, its proxy mount 404s, and
+	 * the tracker config omits it. Use it to keep a default from filling a slot at all.
 	 */
-	slots?: { global?: string; tenant?: string }
+	slots?: { global?: CaptureSlotOption; tenant?: CaptureSlotOption }
 	/**
 	 * Mount each slot's snippet points at. Defaults to the runtime proxy endpoint
 	 * (`<routes.api>/analytics/p/<slot>`); set it when the slot is served through Next
@@ -261,7 +267,7 @@ export type AnalyticsPluginOptions = {
 }
 
 export interface ResolvedCapture {
-	slots: { global?: string; tenant?: string }
+	slots: { global?: CaptureSlotOption; tenant?: CaptureSlotOption }
 	paths: { global?: string; tenant?: string }
 	consent: ConsentPolicy
 	autoCapture: ResolvedAutoCapture
@@ -408,8 +414,17 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 	) {
 		throw new Error(`analytics: unknown platform adapter "${options.platformAdapter}"`)
 	}
+	for (const [slot, value] of Object.entries(options.capture?.slots ?? {})) {
+		if (value !== false && typeof value !== 'string' && value !== undefined) {
+			throw new Error(
+				`analytics: capture slot "${slot}" must be an adapter id or false, got ${typeof value}`
+			)
+		}
+	}
 	const globalSlot = options.capture?.slots?.global
-	if (globalSlot !== undefined && !options.adapters.some((a) => a.id === globalSlot)) {
+	// A tenant id may name a runtime provider instance, which only exists once a scope
+	// resolves; a global one can only come from the config registry, so it is checked here.
+	if (typeof globalSlot === 'string' && !options.adapters.some((a) => a.id === globalSlot)) {
 		throw new Error(`analytics: unknown global capture slot adapter "${globalSlot}"`)
 	}
 	const widgets =

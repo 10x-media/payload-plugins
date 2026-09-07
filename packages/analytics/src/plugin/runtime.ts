@@ -1,6 +1,6 @@
 import type { Payload, PayloadRequest } from 'payload'
 import type { ResolvedBinding } from '../binding/types'
-import type { ConsentPolicy, ResolvedAutoCapture } from '../core/options'
+import type { CaptureSlotOption, ConsentPolicy, ResolvedAutoCapture } from '../core/options'
 import type { AdapterRegistry, RegistryResolver, ResolveRegistryArgs } from '../core/registry'
 import type { Goal } from '../goals/types'
 import type { Engine } from '../surfacing/engine'
@@ -17,7 +17,7 @@ export interface AnalyticsRuntime {
 	/** Id of the config adapter shared by every scope, when one is designated. */
 	platformAdapterId?: string
 	/** `capture.slots` overrides naming the adapter that fills each capture slot. */
-	captureSlots?: { global?: string; tenant?: string }
+	captureSlots?: { global?: CaptureSlotOption; tenant?: CaptureSlotOption }
 	/**
 	 * `capture.paths` overrides for a slot's mount. Unset, the tracker config derives the
 	 * runtime proxy mount; set when the slot is served through Next rewrites instead.

@@ -154,6 +154,23 @@ describe('registerWidgets', () => {
 		expect(validate('')).not.toBe(true)
 	})
 
+	it('defaults the goals breakdown to conversions and every other breakdown to pageviews', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+		})
+		const defaultOf = (slug: string) => {
+			const field = metricFieldOf(config, slug)
+			return field && 'defaultValue' in field ? field.defaultValue : undefined
+		}
+		expect(defaultOf('analytics-breakdown-goals')).toBe('conversions')
+		expect(defaultOf('analytics-breakdown-pages')).toBe('pageviews')
+	})
+
 	it('renders the metric field through MetricSelectField, passing extra requirements as clientProps', () => {
 		const config = bareConfig()
 		registerWidgets(config, {

@@ -390,6 +390,21 @@ describe('resolveOptions capture.slots', () => {
 			.capture.slots
 		expect(slots.tenant).toBe('posthog:abc123')
 	})
+	it('carries false through as an explicit disable rather than an adapter id', () => {
+		const slots = resolveOptions({
+			adapters,
+			capture: { slots: { global: false, tenant: false } },
+		}).capture.slots
+		expect(slots).toEqual({ global: false, tenant: false })
+	})
+	it('rejects a slot value that is neither an adapter id nor false', () => {
+		expect(() =>
+			resolveOptions({
+				adapters,
+				capture: { slots: { tenant: true as unknown as string } },
+			})
+		).toThrow(/capture slot "tenant"/i)
+	})
 })
 
 describe('resolveOptions capture.autoCapture', () => {

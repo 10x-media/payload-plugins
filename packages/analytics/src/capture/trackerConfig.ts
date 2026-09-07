@@ -55,6 +55,12 @@ export const emptyTrackerConfig = (req: PayloadRequest): TrackerConfig => ({
  * unknown id, a throwing scope resolver) is simply absent, as is one whose snippet throws;
  * this runs on a public, unauthenticated path, so every failure degrades a slot away
  * rather than surfacing an error.
+ *
+ * One adapter fills at most one slot. A scoped install whose tenant registry defaults to
+ * the same adapter the global slot names would otherwise hand the tracker two sinks for
+ * it and send every event twice; the native adapter in particular resolves its scope from
+ * the request, so one sink already covers both. The global slot iterates first and keeps
+ * the entry.
  */
 export const resolveTrackerConfig = async (args: {
 	runtime: AnalyticsRuntime
@@ -63,10 +69,11 @@ export const resolveTrackerConfig = async (args: {
 	const { runtime, req } = args
 	const base = apiRoute(req)
 	const slots: TrackerSlotConfig[] = []
+	const filled = new Set<string>()
 	for (const slot of CAPTURE_SLOTS) {
 		const adapter = await resolveSlotAdapter(runtime, req, slot)
 		const capture = adapter?.capture
-		if (!adapter || !capture) {
+		if (!adapter || !capture || filled.has(adapter.id)) {
 			continue
 		}
 		const override = runtime.capturePaths?.[slot]
@@ -83,6 +90,7 @@ export const resolveTrackerConfig = async (args: {
 				requiresConsent:
 					(runtime.consentFor?.(slot, adapter.id, kind) ?? defaultConsentFor(kind)) === 'required',
 			})
+			filled.add(adapter.id)
 		} catch (err) {
 			req.payload?.logger?.warn(
 				`analytics: capture snippet for "${adapter.id}" failed, dropping the ${slot} slot: ${String(err)}`

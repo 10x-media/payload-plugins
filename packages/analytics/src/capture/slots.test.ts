@@ -75,6 +75,11 @@ describe('resolveSlotAdapter - global', () => {
 		expect(await resolveSlotAdapter(runtime, reqWith(), 'global')).toBeNull()
 	})
 
+	it('resolves nothing for a slot disabled with false, ahead of every default', async () => {
+		const runtime = runtimeWith({ platformAdapterId: 'native', captureSlots: { global: false } })
+		expect(await resolveSlotAdapter(runtime, reqWith(), 'global')).toBeNull()
+	})
+
 	it('never consults the per-scope registry for the platform slot', async () => {
 		const resolveRegistry = vi.fn()
 		const runtime = runtimeWith({
@@ -123,6 +128,18 @@ describe('resolveSlotAdapter - tenant', () => {
 			captureSlots: { tenant: 'plausible:1' },
 		})
 		expect((await resolveSlotAdapter(runtime, reqWith(), 'tenant'))?.id).toBe('plausible:1')
+	})
+
+	it('resolves nothing for a tenant slot disabled with false, without resolving a scope', async () => {
+		const resolveScope = vi.fn(async () => 'tenant-a')
+		const runtime = runtimeWith({
+			scoped: true,
+			resolveScope,
+			resolveRegistry: async () => createRegistry([adapter('native')]),
+			captureSlots: { tenant: false },
+		})
+		expect(await resolveSlotAdapter(runtime, reqWith(), 'tenant')).toBeNull()
+		expect(resolveScope).not.toHaveBeenCalled()
 	})
 
 	it('resolves nothing when the scope resolver throws', async () => {

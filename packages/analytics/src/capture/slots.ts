@@ -18,6 +18,9 @@ export const isCaptureSlot = (value: string): value is CaptureSlot =>
  * request's own per-scope registry (which includes that scope's runtime providers) and
  * is null whenever no scope resolves. Any resolution failure degrades to null, so the
  * proxy 404s instead of throwing.
+ *
+ * A slot configured `false` is null before any of that runs: an explicit disable outranks
+ * every default, and nothing happens on its behalf, not even a scope lookup.
  */
 export const resolveSlotAdapter = async (
 	runtime: AnalyticsRuntime,
@@ -25,6 +28,9 @@ export const resolveSlotAdapter = async (
 	slot: CaptureSlot
 ): Promise<AnalyticsAdapter | null> => {
 	const configured = runtime.captureSlots?.[slot]
+	if (configured === false) {
+		return null
+	}
 	try {
 		if (slot === 'global') {
 			if (configured) {

@@ -70,11 +70,10 @@ export const tenancyFragment: DevConfigFragment = {
 			sync: { hidden: false },
 			reportingTimezone: DEV_REPORTING_TIMEZONE,
 			collections: sharedBindings,
-			// No capture.slots override here: the tenant slot already resolves to the scope's
-			// default adapter (native) on a recognized host, and naming native for the global
-			// slot too would give the tracker two native sinks posting the same event twice.
-			// The global slot stays empty because `platformAdapter` (the memory demo source)
-			// declares no capture support, so an unrecognized host captures nothing.
+			// No capture.slots override here: the tenant slot resolves to the scope's default
+			// adapter (native) on a recognized host, and the global slot stays empty because it
+			// falls to `platformAdapter`, the memory demo source, which declares no capture
+			// support. So an unrecognized host captures nothing at all.
 			goals: sharedGoals,
 			providers: { collection: { scopeField: 'tenant' } },
 			widgets: sharedWidgets,
@@ -84,7 +83,8 @@ export const tenancyFragment: DevConfigFragment = {
 			// Public tracker and ingest requests carry no session at all, so those resolve by
 			// hostname label (alpha.localhost -> the tenant whose slug is "alpha") and fail
 			// closed to the null scope; a real install resolves them by hostname or site key
-			// the same way.
+			// the same way. A session always wins: an admin browsing alpha.localhost is still
+			// attributed by their own selector, never by the host they happen to be on.
 			scopeResolver: async ({ req }) => {
 				if (!req.user) {
 					return await tenantIdForHost(req)

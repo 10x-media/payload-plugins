@@ -99,6 +99,24 @@ describe('resolveTrackerConfig slots', () => {
 		expect(config.slots.map((s) => s.slot)).toEqual(['global'])
 	})
 
+	// Two entries for one adapter means two sinks posting the same event twice. Global
+	// iterates first, so it is the entry that survives.
+	it('emits one slot when both resolve to the same adapter', async () => {
+		const runtime = scopedRuntime([native()], {}, { captureSlots: { global: 'native' } })
+		const config = await resolveTrackerConfig({ runtime, req: scopedReq('tenant-a') })
+		expect(config.slots.map((s) => [s.slot, s.adapterId])).toEqual([['global', 'native']])
+	})
+
+	it('omits a slot disabled with false', async () => {
+		const runtime = scopedRuntime(
+			[native()],
+			{ 'tenant-a': [posthogSlot()] },
+			{ captureSlots: { global: false, tenant: 'posthog' }, platformAdapterId: 'native' }
+		)
+		const config = await resolveTrackerConfig({ runtime, req: scopedReq('tenant-a') })
+		expect(config.slots.map((s) => s.slot)).toEqual(['tenant'])
+	})
+
 	it('omits a slot whose adapter declares no capture support', async () => {
 		const runtime = runtimeWith([
 			ga4({ propertyId: '1', credentials: { client_email: 'a@b.test', private_key: 'k' } }),
