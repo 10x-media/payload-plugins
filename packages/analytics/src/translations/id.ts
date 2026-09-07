@@ -67,6 +67,12 @@ export const id: Record<TranslationKey, string> = {
 	[keys.providerFieldClientEmail]: 'Email klien',
 	[keys.providerFieldPrivateKey]: 'Kunci privat',
 	[keys.providerFieldProjectId]: 'ID proyek',
+	[keys.providerFieldProjectToken]: 'Token proyek',
+	[keys.providerFieldRegion]: 'Wilayah',
+	[keys.providerFieldDomain]: 'Domain situs',
+	[keys.providerFieldScriptId]: 'ID skrip',
+	[keys.providerFieldCaptureHelp]:
+		'Konfigurasi publik browser. Perekaman hanya berjalan bila diisi.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

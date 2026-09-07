@@ -67,6 +67,12 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.providerFieldClientEmail]: 'Email клиента',
 	[keys.providerFieldPrivateKey]: 'Приватный ключ',
 	[keys.providerFieldProjectId]: 'ID проекта',
+	[keys.providerFieldProjectToken]: 'Токен проекта',
+	[keys.providerFieldRegion]: 'Регион',
+	[keys.providerFieldDomain]: 'Домен сайта',
+	[keys.providerFieldScriptId]: 'ID скрипта',
+	[keys.providerFieldCaptureHelp]:
+		'Публичная конфигурация для браузера. Сбор работает, только если она задана.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

@@ -113,6 +113,50 @@ describeForDb('analytics providers collection', { dbs: ['mongo'] }, (db) => {
 		}
 	})
 
+	// The capture fields are public config, so unlike the credentials they survive an
+	// ordinary read and are what make the document's adapter declare capture at all.
+	it('keeps the public capture fields readable and turns them into adapter capture', async () => {
+		const created = await booted.payload.create({
+			collection: SLUG as never,
+			data: {
+				name: 'PH capture',
+				provider: 'posthog',
+				enabled: true,
+				posthog: {
+					projectId: '123',
+					apiKey: 'phx_secret_for_capture',
+					projectToken: 'phc_public_token',
+					region: 'eu',
+				},
+			} as never,
+			overrideAccess: true,
+		})
+		const docId = (created as ProviderRow).id
+		try {
+			const read = (await booted.payload.findByID({
+				collection: SLUG as never,
+				id: docId,
+				overrideAccess: true,
+			})) as { posthog?: { projectToken?: string; region?: string; apiKey?: unknown } }
+			expect(read.posthog?.projectToken).toBe('phc_public_token')
+			expect(read.posthog?.region).toBe('eu')
+			expect(read.posthog?.apiKey).toBeUndefined()
+
+			const registry = await registryFor(null)
+			const adapter = registry.all().find((a) => a.id === `posthog:${docId}`)
+			expect(adapter?.capture?.client).toEqual({ kind: 'posthog', token: 'phc_public_token' })
+			expect(adapter?.capture?.proxy.routes[0]?.upstream).toBe(
+				'https://eu-assets.i.posthog.com/static/:p*'
+			)
+		} finally {
+			await booted.payload.delete({
+				collection: SLUG as never,
+				where: { provider: { equals: 'posthog' } },
+				overrideAccess: true,
+			})
+		}
+	})
+
 	it("resolves the scope's healthy providers when another document's ciphertext is corrupted", async () => {
 		const scope = 'corrupt-test'
 		const healthy = await booted.payload.create({

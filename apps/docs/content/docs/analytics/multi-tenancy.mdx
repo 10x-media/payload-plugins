@@ -136,7 +136,7 @@ The `scopeProperty: 'tenant'` on the platform adapter (step 1) closes the loop: 
 
 A scoped install fills two [capture slots](/analytics/capture#capture-slots) per request: `global` from the config registry (the `platformAdapter`, or `capture.slots.global`), and `tenant` from the request's own resolved scope's registry, which includes that scope's runtime providers. So one page can send to the platform's PostHog and to the tenant's own Plausible at once. When both slots resolve to the same adapter, only the global entry survives, so a scoped native install never posts every event twice.
 
-The `tenant` slot is empty whenever no scope resolves, and nothing is captured for it.
+The `tenant` slot is empty whenever no scope resolves, and nothing is captured for it. A provider document fills it only once its **public** capture fields are set, since an adapter declares capture support from those alone: `projectToken` (plus the optional `region`) for PostHog, `domain` or `scriptId` for Plausible, `websiteId` for Umami. They sit beside the sealed credentials in the provider document, unencrypted because the tracker serves them to the browser; a document holding only query credentials reads dashboards and captures nothing.
 
 <Callout type="warn">
 The tracker endpoint and the capture proxy are **public and unauthenticated**: a visitor's browser calls them with no admin session. Your `scopeResolver` runs on those requests too.

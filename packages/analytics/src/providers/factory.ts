@@ -14,7 +14,13 @@ export type ProviderDoc = {
 	provider?: string | null
 	enabled?: boolean | null
 	scope?: string | null
-	plausible?: { siteId?: string | null; apiKey?: string | null; host?: string | null } | null
+	plausible?: {
+		siteId?: string | null
+		apiKey?: string | null
+		host?: string | null
+		domain?: string | null
+		scriptId?: string | null
+	} | null
 	umami?: {
 		websiteId?: string | null
 		apiKey?: string | null
@@ -27,10 +33,20 @@ export type ProviderDoc = {
 		privateKey?: string | null
 		projectId?: string | null
 	} | null
-	posthog?: { projectId?: string | null; apiKey?: string | null; host?: string | null } | null
+	posthog?: {
+		projectId?: string | null
+		apiKey?: string | null
+		host?: string | null
+		projectToken?: string | null
+		region?: string | null
+	} | null
 }
 
 const orUndefined = (value: string | null | undefined): string | undefined => value || undefined
+
+/** An unset or unrecognized stored region falls back to host-derived detection. */
+const posthogRegion = (value: string | null | undefined): 'us' | 'eu' | undefined =>
+	value === 'us' || value === 'eu' ? value : undefined
 
 /**
  * Keys pasted from a service-account JSON often carry escaped newlines; the gRPC
@@ -60,6 +76,8 @@ const buildBaseAdapter = (doc: ProviderDoc): AnalyticsAdapter | null => {
 				siteId: cfg.siteId ?? '',
 				apiKey: cfg.apiKey ?? '',
 				host: orUndefined(cfg.host),
+				domain: orUndefined(cfg.domain),
+				scriptId: orUndefined(cfg.scriptId),
 			})
 		}
 		case 'umami': {
@@ -88,6 +106,8 @@ const buildBaseAdapter = (doc: ProviderDoc): AnalyticsAdapter | null => {
 				projectId: cfg.projectId ?? '',
 				apiKey: cfg.apiKey ?? '',
 				host: orUndefined(cfg.host),
+				projectToken: orUndefined(cfg.projectToken),
+				region: posthogRegion(cfg.region),
 			})
 		}
 		default:

@@ -93,6 +93,43 @@ describe('buildProvidersCollection', () => {
 		})
 	})
 
+	// Public capture config, not credentials: they reach the browser in the snippet, so they
+	// must stay plain text (a sealed field would be unreadable to the tracker config).
+	it('carries the public capture fields as plain text on posthog and plausible', () => {
+		const inGroup = (provider: string, name: string): Field | undefined => {
+			const group = named(collection.fields, provider)
+			const fields = group && 'fields' in group ? group.fields : []
+			const direct = named(fields, name)
+			if (direct) {
+				return direct
+			}
+			for (const field of fields) {
+				const nested = 'fields' in field ? named(field.fields, name) : undefined
+				if (nested) {
+					return nested
+				}
+			}
+			return undefined
+		}
+
+		const projectToken = inGroup('posthog', 'projectToken')
+		expect(projectToken?.type).toBe('text')
+		expect((projectToken as TaggedField | undefined)?.custom?.fake).toBeUndefined()
+
+		const region = inGroup('posthog', 'region')
+		expect(region?.type).toBe('select')
+		expect((region as { options?: Array<{ value: string }> } | undefined)?.options).toEqual([
+			{ label: 'US', value: 'us' },
+			{ label: 'EU', value: 'eu' },
+		])
+
+		for (const name of ['domain', 'scriptId']) {
+			const field = inGroup('plausible', name)
+			expect(field?.type).toBe('text')
+			expect((field as TaggedField | undefined)?.custom?.fake).toBeUndefined()
+		}
+	})
+
 	it('keeps SECRET_PATHS in parity with the collection secret fields', () => {
 		const taggedPaths = collectTaggedPaths(collection.fields)
 		expect(new Set(taggedPaths)).toEqual(new Set(SECRET_PATHS.map((s) => s.path)))

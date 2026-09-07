@@ -200,6 +200,8 @@ export interface AnalyticsProvider {
     apiKey?: string;
     apiKey_set?: boolean | null;
     apiKey_hint?: string | null;
+    domain?: string | null;
+    scriptId?: string | null;
     host?: string | null;
   };
   umami?: {
@@ -224,6 +226,8 @@ export interface AnalyticsProvider {
     apiKey?: string;
     apiKey_set?: boolean | null;
     apiKey_hint?: string | null;
+    projectToken?: string | null;
+    region?: ('us' | 'eu') | null;
     host?: string | null;
   };
   updatedAt: string;
@@ -573,6 +577,8 @@ export interface AnalyticsProvidersSelect<T extends boolean = true> {
         apiKey?: T;
         apiKey_set?: T;
         apiKey_hint?: T;
+        domain?: T;
+        scriptId?: T;
         host?: T;
       };
   umami?:
@@ -603,6 +609,8 @@ export interface AnalyticsProvidersSelect<T extends boolean = true> {
         apiKey?: T;
         apiKey_set?: T;
         apiKey_hint?: T;
+        projectToken?: T;
+        region?: T;
         host?: T;
       };
   updatedAt?: T;

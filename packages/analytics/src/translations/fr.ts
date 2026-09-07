@@ -67,6 +67,12 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.providerFieldClientEmail]: 'E-mail du client',
 	[keys.providerFieldPrivateKey]: 'Clé privée',
 	[keys.providerFieldProjectId]: 'ID du projet',
+	[keys.providerFieldProjectToken]: 'Jeton du projet',
+	[keys.providerFieldRegion]: 'Région',
+	[keys.providerFieldDomain]: 'Domaine du site',
+	[keys.providerFieldScriptId]: 'ID du script',
+	[keys.providerFieldCaptureHelp]:
+		"Configuration publique du navigateur. La capture ne s'exécute que si elle est définie.",
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

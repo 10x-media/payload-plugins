@@ -67,6 +67,12 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.providerFieldClientEmail]: 'Email клієнта',
 	[keys.providerFieldPrivateKey]: 'Приватний ключ',
 	[keys.providerFieldProjectId]: 'ID проєкту',
+	[keys.providerFieldProjectToken]: 'Токен проєкту',
+	[keys.providerFieldRegion]: 'Регіон',
+	[keys.providerFieldDomain]: 'Домен сайту',
+	[keys.providerFieldScriptId]: 'ID скрипта',
+	[keys.providerFieldCaptureHelp]:
+		'Публічна конфігурація для браузера. Збір працює, лише якщо її задано.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',
