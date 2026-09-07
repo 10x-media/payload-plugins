@@ -4,6 +4,7 @@ import { proxyEndpoints } from './capture/proxyEndpoint'
 import { trackerEndpoint } from './capture/trackerEndpoint'
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
+import type { Goal } from './goals/types'
 import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
 import { isModuleNotFoundError } from './plugin/peerImportError'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
@@ -127,8 +128,17 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				return DEFAULT_TIMEZONE
 			}
 		}
+		// Config goals are install-wide, so scope is accepted and ignored here; a collection
+		// source resolves per scope behind the same signature.
+		const resolveGoals = async (_req: PayloadRequest, _scope?: string | null): Promise<Goal[]> =>
+			resolved.goals
 		for (const adapter of resolved.adapters) {
-			adapter.register?.(config, { scoped: resolved.scoped, resolveScope, resolveTimezone })
+			adapter.register?.(config, {
+				scoped: resolved.scoped,
+				resolveScope,
+				resolveTimezone,
+				resolveGoals,
+			})
 		}
 		if (
 			resolved.adapters.some((a) => a.capabilities.realtime && typeof a.realtime === 'function') ||

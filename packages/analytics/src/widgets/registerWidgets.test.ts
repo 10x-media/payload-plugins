@@ -18,7 +18,7 @@ describe('widgetIsSupported', () => {
 		expect(widgetIsSupported({ metrics: ['pageviews'] }, [native()])).toBe(true)
 	})
 	it('drops a widget when no adapter satisfies its requirement', () => {
-		expect(widgetIsSupported({ metrics: ['scrollDepth'] }, [native()])).toBe(false)
+		expect(widgetIsSupported({ metrics: ['bounceRate'] }, [native()])).toBe(false)
 	})
 	it('keeps a widget with no requirement', () => {
 		expect(widgetIsSupported(undefined, [native()])).toBe(true)

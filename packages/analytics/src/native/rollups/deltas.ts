@@ -20,10 +20,30 @@ export type RollupMetric =
 	| 'samples'
 	| 'visitors'
 	| 'sessions'
+	| 'conversions'
+	| 'revenue'
+	| 'scrollDepthSum'
+	| 'scrollSamples'
+
+/**
+ * `samples` counts every event in the bucket, so it cannot be the scroll-depth denominator:
+ * `scrollSamples` counts only the pageviews that actually reported a depth, which is what
+ * keeps the `scrollDepth` average honest when the tracker never got to send one.
+ */
+export type RollupInc = {
+	pageviews: number
+	events: number
+	durationMs: number
+	samples: number
+	conversions: number
+	revenue: number
+	scrollDepthSum: number
+	scrollSamples: number
+}
 
 export interface RollupDelta {
 	key: RollupKey
-	inc: { pageviews: number; events: number; durationMs: number; samples: number }
+	inc: RollupInc
 }
 
 /**
@@ -34,20 +54,33 @@ export interface RollupDelta {
  * reads use, and once more in the exact-hostname family that a hostname-scoped read uses.
  * Both families stay per-bucket exact at the cost of one extra bucket set per distinct
  * hostname a site sees.
+ *
+ * Goal completions add one `('', 'goal', slug)` bucket each, carrying that goal's own single
+ * conversion, while every other bucket carries the event's whole conversion count, so a
+ * site-wide or per-page total never has to scan the goal buckets.
  */
 export function computeRollupDeltas(event: StoredEvent): RollupDelta[] {
 	// Bucket into the event's reporting-timezone day (UTC when unset), fixing the day
 	// boundary at ingest. Existing rollups are not re-bucketed if the timezone changes.
 	const period = startOfDayInTz(event.timestamp, event.timezone)
-	const inc = {
+	const completions = event.goals ?? []
+	const reportedDepth = event.scrollDepth !== undefined
+	const inc: RollupInc = {
 		pageviews: event.type === 'pageview' ? 1 : 0,
-		events: event.type === 'event' ? 1 : 0,
+		// A `goal` event is a non-pageview hit like a custom event; it stays out of the
+		// `event` dimension breakdown, which reports named custom events only.
+		events: event.type === 'pageview' ? 0 : 1,
 		durationMs: event.durationMs ?? 0,
 		samples: 1,
+		conversions: completions.length,
+		revenue: completions.reduce((sum, goal) => sum + goal.value, 0),
+		scrollDepthSum: reportedDepth ? (event.scrollDepth ?? 0) : 0,
+		scrollSamples: reportedDepth ? 1 : 0,
 	}
 	const make = (
 		bucket: [path: string, dimension: string, dimvalue: string],
-		hostname: string
+		hostname: string,
+		over?: Partial<RollupInc>
 	): RollupDelta => ({
 		key: {
 			granularity: 'day',
@@ -58,7 +91,7 @@ export function computeRollupDeltas(event: StoredEvent): RollupDelta[] {
 			hostname,
 			...(event.scope !== undefined ? { scope: event.scope } : {}),
 		},
-		inc: { ...inc },
+		inc: { ...inc, ...over },
 	})
 	const buckets: Array<[path: string, dimension: string, dimvalue: string]> = [
 		[event.path, '', ''],
@@ -76,9 +109,20 @@ export function computeRollupDeltas(event: StoredEvent): RollupDelta[] {
 	if (event.source) {
 		buckets.push(['', 'source', event.source])
 	}
-	const deltas = buckets.map((bucket) => make(bucket, ''))
-	if (event.hostname) {
-		deltas.push(...buckets.map((bucket) => make(bucket, event.hostname)))
+	const families = event.hostname ? ['', event.hostname] : ['']
+	const deltas: RollupDelta[] = []
+	for (const hostname of families) {
+		deltas.push(...buckets.map((bucket) => make(bucket, hostname)))
+	}
+	for (const hostname of families) {
+		for (const completion of completions) {
+			deltas.push(
+				make(['', 'goal', completion.slug], hostname, {
+					conversions: 1,
+					revenue: completion.value,
+				})
+			)
+		}
 	}
 	return deltas
 }

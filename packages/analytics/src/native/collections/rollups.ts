@@ -39,6 +39,12 @@ export const rollupsCollection = (scoped = false): CollectionConfig => ({
 		{ name: 'visitors', type: 'number', required: true, defaultValue: 0 },
 		{ name: 'sessions', type: 'number', required: true, defaultValue: 0 },
 		{ name: 'samples', type: 'number', required: true, defaultValue: 0 },
+		{ name: 'conversions', type: 'number', required: true, defaultValue: 0 },
+		// Revenue is stored in the event's own currency and never converted, so a bucket
+		// spanning several currencies sums figures that are not comparable.
+		{ name: 'revenue', type: 'number', required: true, defaultValue: 0 },
+		{ name: 'scrollDepthSum', type: 'number', required: true, defaultValue: 0 },
+		{ name: 'scrollSamples', type: 'number', required: true, defaultValue: 0 },
 	],
 	indexes: [
 		scoped

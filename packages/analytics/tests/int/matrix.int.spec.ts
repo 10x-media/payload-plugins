@@ -2,6 +2,7 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import type { Config, Endpoint, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { readForField } from '../../src/fields/readForDocument'
+import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { ROLLUPS_SLUG, rollupsCollection } from '../../src/native/collections/rollups'
@@ -14,7 +15,7 @@ import { native } from '../../src/native/nativeAdapter'
 import { applyDistinctDeltas } from '../../src/native/rollups/applyDistinctDeltas'
 import { applyRollupDeltas } from '../../src/native/rollups/applyRollupDeltas'
 import { bumpRollup } from '../../src/native/rollups/bumpRollup'
-import { computeRollupDeltas } from '../../src/native/rollups/deltas'
+import { computeRollupDeltas, type RollupInc } from '../../src/native/rollups/deltas'
 import { insertIfNew } from '../../src/native/rollups/insertIfNew'
 import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
 import { type MemoryAnalyticsAdapter, memoryAdapter } from '../../src/testing/memoryAdapter'
@@ -36,6 +37,18 @@ describeForDb('analytics cross-db', {}, (db) => {
 		expect(booted.payload).toBeDefined()
 		expect(booted.db).toBe(db)
 	})
+})
+
+const rollupInc = (over: Partial<RollupInc> = {}): RollupInc => ({
+	pageviews: 0,
+	events: 0,
+	durationMs: 0,
+	samples: 0,
+	conversions: 0,
+	revenue: 0,
+	scrollDepthSum: 0,
+	scrollSamples: 0,
+	...over,
 })
 
 const rollupsOnly = (config: Config): Config => {
@@ -93,7 +106,7 @@ describeForDb('native rollup atomic apply', {}, (db) => {
 			dimvalue: '',
 			hostname: '',
 		}
-		const delta = { key, inc: { pageviews: 1, events: 0, durationMs: 100, samples: 1 } }
+		const delta = { key, inc: rollupInc({ pageviews: 1, durationMs: 100, samples: 1 }) }
 		await applyRollupDeltas(booted.payload, [delta])
 		await applyRollupDeltas(booted.payload, [delta])
 		const { docs } = await booted.payload.find({
@@ -284,6 +297,99 @@ describeForDb('native flushBatch coalescing', {}, (db) => {
 		const row = docs[0] as { pageviews: number; visitors: number } | undefined
 		expect(row?.pageviews).toBe(2)
 		expect(row?.visitors).toBe(1)
+	})
+})
+
+describeForDb('native goal rollups', {}, (db) => {
+	const goals: Goal[] = [
+		{ slug: 'purchase', name: 'Purchase', match: { kind: 'goal' } },
+		{ slug: 'thanks', name: 'Thanks', match: { kind: 'path', pattern: '/thank-you' } },
+	]
+	const adapter = native()
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [adapter], goals }), db })
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const ingest = async (body: Record<string, unknown>): Promise<void> => {
+		const endpoint = (booted.payload.config.endpoints ?? []).find(
+			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		)
+		if (!endpoint || typeof endpoint.handler !== 'function') {
+			throw new Error('ingest endpoint not registered')
+		}
+		const res = await endpoint.handler({
+			payload: booted.payload,
+			headers: new Headers({ 'content-type': 'application/json', 'user-agent': 'UA' }),
+			json: async () => ({ hostname: 'h', ...body }),
+		} as never)
+		expect(res.status).toBe(202)
+	}
+
+	const rollupRow = async (where: Record<string, unknown>) => {
+		const { docs } = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: where as never,
+			pagination: false,
+			overrideAccess: true,
+		})
+		return docs[0] as unknown as { conversions: number; revenue: number } | undefined
+	}
+
+	it(`counts conversions and revenue site-wide and per goal on ${db}`, async () => {
+		await ingest({ type: 'pageview', path: '/thank-you' })
+		await ingest({
+			type: 'goal',
+			name: 'purchase',
+			path: '/checkout',
+			value: 25.5,
+			currency: 'EUR',
+		})
+
+		const site = await rollupRow({
+			path: { equals: '' },
+			dimension: { equals: '' },
+			hostname: { equals: '' },
+		})
+		expect(site?.conversions).toBe(2)
+		expect(site?.revenue).toBe(25.5)
+
+		const purchase = await rollupRow({
+			dimension: { equals: 'goal' },
+			dimvalue: { equals: 'purchase' },
+			hostname: { equals: '' },
+		})
+		expect(purchase?.conversions).toBe(1)
+		expect(purchase?.revenue).toBe(25.5)
+
+		const thanks = await rollupRow({
+			dimension: { equals: 'goal' },
+			dimvalue: { equals: 'thanks' },
+			hostname: { equals: '' },
+		})
+		expect(thanks?.conversions).toBe(1)
+		expect(thanks?.revenue).toBe(0)
+	})
+
+	it(`returns one breakdown row per goal through the adapter on ${db}`, async () => {
+		const now = new Date()
+		const result = await adapter.query(
+			{
+				metrics: ['conversions', 'revenue'],
+				dimensions: ['goal'],
+				dateRange: { start: new Date(now.getTime() - 86_400_000), end: now },
+			},
+			{}
+		)
+		const byGoal = Object.fromEntries(result.rows.map((row) => [row.dimensions?.goal, row.metrics]))
+		expect(byGoal.purchase).toEqual({ conversions: 1, revenue: 25.5 })
+		expect(byGoal.thanks).toEqual({ conversions: 1, revenue: 0 })
+		expect(result.totals).toEqual({ conversions: 2, revenue: 25.5 })
 	})
 })
 

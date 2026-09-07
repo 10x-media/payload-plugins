@@ -1,4 +1,5 @@
 import type { Config, PayloadRequest } from 'payload'
+import type { Goal } from '../goals/types'
 import type { CaptureSupport } from './capture'
 
 /**
@@ -38,6 +39,7 @@ export type DimensionKey =
 	| 'city'
 	| 'language'
 	| 'event'
+	| 'goal'
 
 export type Granularity = 'minute' | 'hour' | 'day' | 'week' | 'month'
 
@@ -151,6 +153,12 @@ export interface AdapterRegisterContext {
 	 * rollups at ingest). Resolves to `'UTC'` when no reportingTimezone is set.
 	 */
 	resolveTimezone: (req: PayloadRequest, scope?: string | null) => Promise<string>
+	/**
+	 * The install's goals for a request's scope, for adapters that match completions
+	 * themselves (the native engine, at ingest). Config goals today; a collection source
+	 * merges in behind the same call.
+	 */
+	resolveGoals: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>
 }
 
 export interface AnalyticsAdapter {

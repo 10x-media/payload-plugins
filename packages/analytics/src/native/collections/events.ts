@@ -13,7 +13,13 @@ export const eventsCollection = (scoped = false): CollectionConfig => ({
 	access: { read: () => false, create: () => true, update: () => false, delete: () => false },
 	fields: [
 		{ name: 'timestamp', type: 'date', required: true, index: true },
-		{ name: 'type', type: 'select', required: true, options: ['pageview', 'event'], index: true },
+		{
+			name: 'type',
+			type: 'select',
+			required: true,
+			options: ['pageview', 'event', 'goal'],
+			index: true,
+		},
 		{ name: 'name', type: 'text' },
 		{ name: 'path', type: 'text', required: true, index: true },
 		{ name: 'hostname', type: 'text', required: true },
@@ -27,6 +33,13 @@ export const eventsCollection = (scoped = false): CollectionConfig => ({
 		{ name: 'sessionId', type: 'text', required: true, index: true },
 		{ name: 'durationMs', type: 'number' },
 		{ name: 'props', type: 'json' },
+		{ name: 'value', type: 'number' },
+		{ name: 'currency', type: 'text' },
+		{ name: 'scrollDepth', type: 'number' },
+		// The completions matched at ingest, so a raw-event read (filtered or hourly) reports
+		// the same conversions the rollups hold instead of re-matching against goals that may
+		// since have changed.
+		{ name: 'goals', type: 'json' },
 		...(scoped ? [{ name: 'scope', type: 'text', index: true } satisfies Field] : []),
 	],
 	indexes: [{ fields: ['path', 'timestamp'] }, { fields: ['type', 'timestamp'] }],

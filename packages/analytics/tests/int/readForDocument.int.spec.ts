@@ -98,16 +98,16 @@ describeForDb('analytics readForField', { dbs: ['mongo'] }, (db) => {
 			req: req(),
 			collectionSlug: 'pages',
 			data: { slug: '/p' },
-			metrics: ['pageviews', 'bounceRate', 'scrollDepth'],
+			metrics: ['pageviews', 'bounceRate', 'visits'],
 			timeframe: 'last30days',
 			now: new Date(),
 		})
 		expect(result.status).toBe('ok')
 		expect(result.supportedMetrics).toEqual(['pageviews'])
-		expect(result.droppedMetrics).toEqual(['bounceRate', 'scrollDepth'])
+		expect(result.droppedMetrics).toEqual(['bounceRate', 'visits'])
 		expect(result.metrics.pageviews).toBe(2)
 		expect(warn).toHaveBeenCalledTimes(1)
-		expect(warn).toHaveBeenCalledWith(expect.stringMatching(/native.*bounceRate, scrollDepth/s))
+		expect(warn).toHaveBeenCalledWith(expect.stringMatching(/native.*bounceRate, visits/s))
 		warn.mockRestore()
 	})
 

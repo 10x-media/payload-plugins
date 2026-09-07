@@ -127,7 +127,7 @@ describeForDb('analytics stat field render', { dbs: ['mongo'] }, (db) => {
 			data: { slug: '/mixed' },
 			collectionSlug: 'pages',
 			i18n: i18nStub,
-			metrics: ['bounceRate', 'scrollDepth'],
+			metrics: ['bounceRate', 'visits'],
 			timeframe: 'last30days',
 			variant: 'row',
 		})

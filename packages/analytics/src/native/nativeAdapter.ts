@@ -50,6 +50,9 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 	'sessions',
 	'events',
 	'avgDuration',
+	'conversions',
+	'revenue',
+	'scrollDepth',
 ])
 const dimensions: ReadonlySet<DimensionKey> = new Set([
 	'page',
@@ -57,6 +60,7 @@ const dimensions: ReadonlySet<DimensionKey> = new Set([
 	'source',
 	'device',
 	'event',
+	'goal',
 ])
 
 const REALTIME_EVENT_LIMIT = 50_000
@@ -212,6 +216,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 					handler: makeIngestHandler(geoResolver, () => buffer, {
 						scope: scoped ? context?.resolveScope : undefined,
 						timezone: context?.resolveTimezone,
+						goals: context?.resolveGoals,
 					}),
 				},
 			]
