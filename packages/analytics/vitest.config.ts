@@ -34,6 +34,10 @@ export default mergeConfig(
 					test: {
 						name: 'jsdom',
 						environment: 'jsdom',
+						// The vendor snippets are scripts: proving one self-sequences means letting
+						// jsdom actually run it. No test loads a remote resource (`resources` stays
+						// off), so only plugin-authored inline code ever executes.
+						environmentOptions: { jsdom: { runScripts: 'dangerously' } },
 						include: JSDOM_TESTS,
 						exclude: ['node_modules', 'dist', '.next'],
 					},

@@ -25,6 +25,18 @@ export interface PlausibleConfig {
 	scriptId?: string
 }
 
+/**
+ * Plausible's official per-site stub, as served on plausible.io's own pages: `plausible.q`
+ * queues calls the tracker replays on load, and `plausible.init` parks the options on
+ * `plausible.o` for it to read. It makes the inline safe next to the async loader in either
+ * order, which the bare `plausible.init(...)` call was not. `init` is guarded with `||`
+ * (the official one assigns unconditionally) because here the tracker is a separate async
+ * tag and may win the race, and overwriting the real `init` with the stub would lose the
+ * endpoint.
+ */
+const PLAUSIBLE_STUB =
+	'window.plausible=window.plausible||function(){(window.plausible.q=window.plausible.q||[]).push(arguments)},window.plausible.init=window.plausible.init||function(e){window.plausible.o=e||{}};'
+
 function buildCapture(config: PlausibleConfig): CaptureSupport {
 	const base = config.host ?? 'https://plausible.io'
 	const scripts = (path: string) => {
@@ -40,7 +52,9 @@ function buildCapture(config: PlausibleConfig): CaptureSupport {
 		if (config.scriptId) {
 			return [
 				{ src: `${path}/js/pa-${config.scriptId}.js`, async: true },
-				{ inline: `plausible.init({endpoint:${JSON.stringify(`${path}/api/event`)}})` },
+				{
+					inline: `${PLAUSIBLE_STUB}plausible.init({endpoint:${JSON.stringify(`${path}/api/event`)}})`,
+				},
 			]
 		}
 		return []

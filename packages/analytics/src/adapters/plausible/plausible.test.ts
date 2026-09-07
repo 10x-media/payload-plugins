@@ -229,14 +229,19 @@ describe('plausible capture', () => {
 		})
 	})
 
-	it('renders the per-site script plus init when scriptId is set and domain is absent', () => {
+	it('renders the per-site script plus the official stub and init', () => {
 		const capture = plausible({ siteId: 'example.com', apiKey: 'k', scriptId: 'abc123' }).capture
-		expect(capture?.snippet({ path: '/pl' })).toEqual({
-			scripts: [
-				{ src: '/pl/js/pa-abc123.js', async: true },
-				{ inline: 'plausible.init({endpoint:"/pl/api/event"})' },
-			],
-		})
+		const scripts = capture?.snippet({ path: '/pl' }).scripts ?? []
+		expect(scripts).toHaveLength(2)
+		expect(scripts[0]).toEqual({ src: '/pl/js/pa-abc123.js', async: true })
+		const inline = scripts[1]?.inline ?? ''
+		// The stub queues calls made before the tracker lands and parks the options for it,
+		// which is what makes the inline safe as a sibling of an async loader.
+		expect(inline).toContain(
+			'window.plausible=window.plausible||function(){(window.plausible.q=window.plausible.q||[]).push(arguments)}'
+		)
+		expect(inline).toContain('window.plausible.o=e||{}')
+		expect(inline.endsWith('plausible.init({endpoint:"/pl/api/event"})')).toBe(true)
 	})
 
 	it('prefers the legacy tag when both domain and scriptId are set', () => {

@@ -45,21 +45,34 @@ const render = (props: { config: TrackerConfig; nonce?: string }) =>
 	renderToStaticMarkup(createElement(AnalyticsScripts, props))
 
 describe('AnalyticsScripts', () => {
+	/** A slot carrying both script forms, since a given vendor only uses one of them. */
+	const bothForms = (): TrackerConfig => {
+		const mixed = config()
+		const tenant = mixed.slots[1]
+		if (tenant) {
+			tenant.snippet = {
+				scripts: [{ src: '/pl/js/pa-abc.js', async: true }, { inline: 'plausible.init({})' }],
+			}
+		}
+		return mixed
+	}
+
 	it("renders each slot's snippet scripts, src and inline alike", () => {
-		const html = render({ config: config() })
-		expect(html).toContain('src="/api/analytics/p/tenant/static/array.js"')
+		const html = render({ config: bothForms() })
+		expect(html).toContain('src="/pl/js/pa-abc.js"')
 		expect(html).toContain('async=""')
-		expect(html).toContain('window.posthog.init("phc_public"')
+		expect(html).toContain('plausible.init({})')
 	})
 
 	it('leaves the inline init unescaped, so the snippet still parses', () => {
 		const html = render({ config: config() })
+		expect(html).toContain('posthog.init("phc_public"')
 		expect(html).toContain('{api_host:"/api/analytics/p/tenant"')
 		expect(html).toContain('ui_host:"https://us.posthog.com"')
 	})
 
 	it('puts the nonce on every script it renders', () => {
-		const html = render({ config: config(), nonce: 'n0nce' })
+		const html = render({ config: bothForms(), nonce: 'n0nce' })
 		const scripts = html.match(/<script/g) ?? []
 		const nonced = html.match(/nonce="n0nce"/g) ?? []
 		expect(scripts.length).toBeGreaterThanOrEqual(2)

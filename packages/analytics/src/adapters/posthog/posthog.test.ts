@@ -560,19 +560,26 @@ describe('posthog capture', () => {
 		expect(capture?.proxy.routes[0]?.upstream).toBe('https://eu-assets.i.posthog.com/static/:p*')
 	})
 
-	it('renders the array.js loader plus an init snippet with the project token and host', () => {
+	it('renders one self-sequencing inline snippet: the stub, then init', () => {
 		const capture = posthog({
 			projectId: '123',
 			apiKey: 'phx_k',
 			projectToken: 'phc_abc',
 		}).capture
-		const snippet = capture?.snippet({ path: '/ph' })
-		expect(snippet?.scripts).toEqual([
-			{ src: '/ph/static/array.js', async: true },
-			{
-				inline: 'window.posthog.init("phc_abc",{api_host:"/ph",ui_host:"https://us.posthog.com"})',
-			},
-		])
+		const scripts = capture?.snippet({ path: '/ph' }).scripts ?? []
+		expect(scripts).toHaveLength(1)
+		expect(scripts[0]?.src).toBeUndefined()
+		const inline = scripts[0]?.inline ?? ''
+		// The official stub publishes the queueing globals and injects array.js itself,
+		// deriving the URL from api_host, so nothing depends on tag order.
+		expect(inline).toContain('e.__SV')
+		expect(inline).toContain(
+			'p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js"'
+		)
+		expect(inline).toContain('"init capture register')
+		expect(
+			inline.endsWith('posthog.init("phc_abc",{api_host:"/ph",ui_host:"https://us.posthog.com"})')
+		).toBe(true)
 	})
 
 	it('renders the eu ui_host in the init snippet', () => {
@@ -583,14 +590,14 @@ describe('posthog capture', () => {
 			projectToken: 'phc_abc',
 		}).capture
 		const snippet = capture?.snippet({ path: '/ph' })
-		expect(snippet?.scripts[1]?.inline).toContain('ui_host:"https://eu.posthog.com"')
+		expect(snippet?.scripts[0]?.inline).toContain('ui_host:"https://eu.posthog.com"')
 	})
 
 	it('still declares capture with an empty token when projectToken is absent', () => {
 		const capture = posthog({ projectId: '123', apiKey: 'phx_k' }).capture
 		expect(capture).toBeDefined()
 		const snippet = capture?.snippet({ path: '/ph' })
-		expect(snippet?.scripts[1]?.inline).toContain('window.posthog.init("",')
+		expect(snippet?.scripts[0]?.inline).toContain('posthog.init("",')
 	})
 
 	it('client carries only the public project token, never the private apiKey', () => {

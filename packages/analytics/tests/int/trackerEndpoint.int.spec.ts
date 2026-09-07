@@ -105,7 +105,7 @@ describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
 			path: '/api/analytics/p/tenant',
 			requiresConsent: true,
 		})
-		expect(tenant?.snippet.scripts[0]?.src).toBe('/api/analytics/p/tenant/static/array.js')
+		expect(tenant?.snippet.scripts[0]?.inline).toContain('api_host:"/api/analytics/p/tenant"')
 	})
 
 	it("omits the tenant slot when the scope's adapter declares no capture", async () => {

@@ -46,6 +46,17 @@ const resolveRegion = (config: PosthogConfig): 'us' | 'eu' => {
 	return config.host?.includes('eu.posthog.com') ? 'eu' : 'us'
 }
 
+/**
+ * PostHog's official install stub (https://posthog.com/docs/libraries/js), trimmed to the
+ * methods this plugin and a host are likely to call before the SDK lands. It has to be one
+ * self-sequencing script: `init` is what injects `array.js`, deriving the URL from
+ * `api_host` (the `.i.posthog.com` rewrite is a no-op on a first-party proxy path, so it
+ * resolves to `<path>/static/array.js`, exactly the route the proxy declares). Every call
+ * made before the SDK arrives is queued on the stub and replayed by it.
+ */
+const POSTHOG_STUB =
+	'!function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],o="init capture register register_once identify group alias reset setPersonProperties captureException opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing getFeatureFlag isFeatureEnabled reloadFeatureFlags onFeatureFlags on debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);'
+
 function buildCapture(config: PosthogConfig): CaptureSupport {
 	const region = resolveRegion(config)
 	const token = config.projectToken ?? ''
@@ -66,9 +77,8 @@ function buildCapture(config: PosthogConfig): CaptureSupport {
 		},
 		snippet: ({ path }) => ({
 			scripts: [
-				{ src: `${path}/static/array.js`, async: true },
 				{
-					inline: `window.posthog.init(${JSON.stringify(token)},{api_host:${JSON.stringify(path)},ui_host:${JSON.stringify(`https://${region}.posthog.com`)}})`,
+					inline: `${POSTHOG_STUB}posthog.init(${JSON.stringify(token)},{api_host:${JSON.stringify(path)},ui_host:${JSON.stringify(`https://${region}.posthog.com`)}})`,
 				},
 			],
 		}),

@@ -81,7 +81,9 @@ describe('resolveTrackerConfig slots', () => {
 		])
 		expect(config.slots[1]?.path).toBe('/api/analytics/p/tenant')
 		expect(config.slots[1]?.requiresConsent).toBe(true)
-		expect(config.slots[1]?.snippet.scripts[0]?.src).toBe('/api/analytics/p/tenant/static/array.js')
+		expect(config.slots[1]?.snippet.scripts[0]?.inline).toContain(
+			'api_host:"/api/analytics/p/tenant"'
+		)
 	})
 
 	it('omits the tenant slot when no scope resolves', async () => {
@@ -144,7 +146,7 @@ describe('resolveTrackerConfig paths', () => {
 		const runtime = runtimeWith([posthogSlot()], { capturePaths: { global: '/ph' } })
 		const config = await resolveTrackerConfig({ runtime, req: req() })
 		expect(config.slots[0]?.path).toBe('/ph')
-		expect(config.slots[0]?.snippet.scripts[0]?.src).toBe('/ph/static/array.js')
+		expect(config.slots[0]?.snippet.scripts[0]?.inline).toContain('api_host:"/ph"')
 	})
 
 	it('normalizes an override the way the Next rewrites helper mounts it', async () => {
