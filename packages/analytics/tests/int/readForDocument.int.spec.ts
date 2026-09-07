@@ -6,17 +6,16 @@ import { analytics } from '../../src/index'
 import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { native } from '../../src/native/nativeAdapter'
+import { ingestRequest } from './ingestRequest'
 
 const ingest = (booted: BootedPayload, path: string) =>
-	makeIngestHandler(platformHeaderResolver)({
-		payload: booted.payload,
-		headers: new Headers({
-			'content-type': 'application/json',
-			'user-agent': 'UA',
-			'x-vercel-ip-country': 'US',
-		}),
-		json: async () => ({ type: 'pageview', path, hostname: 'h', durationMs: 400 }),
-	} as never)
+	makeIngestHandler(platformHeaderResolver)(
+		ingestRequest(
+			booted.payload,
+			{ type: 'pageview', path, hostname: 'h', durationMs: 400 },
+			{ 'x-vercel-ip-country': 'US' }
+		)
+	)
 
 describeForDb('analytics readForField', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
@@ -98,16 +97,16 @@ describeForDb('analytics readForField', { dbs: ['mongo'] }, (db) => {
 			req: req(),
 			collectionSlug: 'pages',
 			data: { slug: '/p' },
-			metrics: ['pageviews', 'bounceRate', 'scrollDepth'],
+			metrics: ['pageviews', 'bounceRate', 'visits'],
 			timeframe: 'last30days',
 			now: new Date(),
 		})
 		expect(result.status).toBe('ok')
 		expect(result.supportedMetrics).toEqual(['pageviews'])
-		expect(result.droppedMetrics).toEqual(['bounceRate', 'scrollDepth'])
+		expect(result.droppedMetrics).toEqual(['bounceRate', 'visits'])
 		expect(result.metrics.pageviews).toBe(2)
 		expect(warn).toHaveBeenCalledTimes(1)
-		expect(warn).toHaveBeenCalledWith(expect.stringMatching(/native.*bounceRate, scrollDepth/s))
+		expect(warn).toHaveBeenCalledWith(expect.stringMatching(/native.*bounceRate, visits/s))
 		warn.mockRestore()
 	})
 

@@ -2,17 +2,19 @@ import type { Payload } from 'payload'
 import { SEEN_SLUG } from '../collections/seen'
 import { bucketKey } from '../rollups/applyDistinctDeltas'
 import { bumpRollup } from '../rollups/bumpRollup'
-import { computeRollupDeltas, type RollupKey, type RollupMetric } from '../rollups/deltas'
+import {
+	computeRollupDeltas,
+	type RollupInc,
+	type RollupKey,
+	type RollupMetric,
+} from '../rollups/deltas'
 import { insertIfNew } from '../rollups/insertIfNew'
 import type { StoredEvent } from './normalizeEvent'
 import { writeEvent } from './writeEvent'
 
 interface BaseAgg {
 	key: RollupKey
-	pageviews: number
-	events: number
-	durationMs: number
-	samples: number
+	inc: RollupInc
 }
 
 interface DistinctCandidate {
@@ -38,12 +40,11 @@ export async function flushBatch(payload: Payload, events: StoredEvent[]): Promi
 			const bk = bucketKey(delta.key)
 			const agg = base.get(bk)
 			if (agg) {
-				agg.pageviews += delta.inc.pageviews
-				agg.events += delta.inc.events
-				agg.durationMs += delta.inc.durationMs
-				agg.samples += delta.inc.samples
+				for (const metric of Object.keys(agg.inc) as Array<keyof RollupInc>) {
+					agg.inc[metric] += delta.inc[metric]
+				}
 			} else {
-				base.set(bk, { key: delta.key, ...delta.inc })
+				base.set(bk, { key: delta.key, inc: { ...delta.inc } })
 			}
 			candidates.set(`${bk}|visitor|${event.visitorHash}`, {
 				key: delta.key,
@@ -59,12 +60,7 @@ export async function flushBatch(payload: Payload, events: StoredEvent[]): Promi
 	}
 
 	for (const agg of base.values()) {
-		await bumpRollup(payload, agg.key, {
-			pageviews: agg.pageviews,
-			events: agg.events,
-			durationMs: agg.durationMs,
-			samples: agg.samples,
-		})
+		await bumpRollup(payload, agg.key, agg.inc)
 	}
 
 	const distinct = new Map<string, { key: RollupKey; metric: RollupMetric; count: number }>()

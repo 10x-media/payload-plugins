@@ -219,3 +219,86 @@ describe('aggregateEvents hour/day series', () => {
 		expect(result.totals).toEqual({ pageviews: 0 })
 	})
 })
+
+describe('aggregateEvents goal metrics', () => {
+	const converted = (over: Partial<EventLike> = {}): EventLike =>
+		pageview({ goals: [{ slug: 'thanks', value: 5 }], ...over })
+
+	it('totals conversions and revenue from the goals stamped at ingest', () => {
+		const events: EventLike[] = [
+			converted(),
+			converted({
+				goals: [
+					{ slug: 'thanks', value: 5 },
+					{ slug: 'purchase', value: 20 },
+				],
+			}),
+			pageview(),
+		]
+		const result = aggregateEvents(events, { metrics: ['conversions', 'revenue'] })
+		expect(result.totals).toEqual({ conversions: 3, revenue: 30 })
+	})
+
+	it('breaks conversions down by goal, one row per slug', () => {
+		const events: EventLike[] = [
+			converted(),
+			converted({ goals: [{ slug: 'purchase', value: 20 }] }),
+			converted({ goals: [{ slug: 'purchase', value: 10 }] }),
+			pageview(),
+		]
+		const result = aggregateEvents(events, {
+			metrics: ['conversions', 'revenue'],
+			dimension: 'goal',
+			order: { metric: 'conversions', direction: 'desc' },
+		})
+		expect(result.rows).toEqual([
+			{ dimensions: { goal: 'purchase' }, metrics: { conversions: 2, revenue: 30 } },
+			{ dimensions: { goal: 'thanks' }, metrics: { conversions: 1, revenue: 5 } },
+		])
+	})
+
+	it('keeps a goal event out of the event-name breakdown', () => {
+		const events: EventLike[] = [
+			{ ...pageview(), type: 'goal', name: 'purchase', goals: [{ slug: 'purchase', value: 0 }] },
+			{ ...pageview(), type: 'event', name: 'signup' },
+		]
+		const result = aggregateEvents(events, { metrics: ['events'], dimension: 'event' })
+		expect(result.rows.map((r) => r.dimensions?.event)).toEqual(['signup'])
+	})
+
+	it('counts a goal event under events, not pageviews', () => {
+		const events: EventLike[] = [
+			{ ...pageview(), type: 'goal', name: 'purchase', goals: [{ slug: 'purchase', value: 0 }] },
+		]
+		expect(aggregateEvents(events, { metrics: ['pageviews', 'events'] }).totals).toEqual({
+			pageviews: 0,
+			events: 1,
+		})
+	})
+})
+
+describe('aggregateEvents scroll depth', () => {
+	it('averages over the pageviews that reported a depth', () => {
+		const events: EventLike[] = [
+			pageview({ scrollDepth: 75 }),
+			pageview({ scrollDepth: 25 }),
+			pageview(),
+		]
+		expect(aggregateEvents(events, { metrics: ['scrollDepth'] }).totals).toEqual({
+			scrollDepth: 50,
+		})
+	})
+
+	it('is 0 when no pageview reported a depth', () => {
+		expect(aggregateEvents([pageview()], { metrics: ['scrollDepth'] }).totals).toEqual({
+			scrollDepth: 0,
+		})
+	})
+
+	it('counts a zero depth as a sample', () => {
+		const events: EventLike[] = [pageview({ scrollDepth: 0 }), pageview({ scrollDepth: 50 })]
+		expect(aggregateEvents(events, { metrics: ['scrollDepth'] }).totals).toEqual({
+			scrollDepth: 25,
+		})
+	})
+})

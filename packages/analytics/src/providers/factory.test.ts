@@ -48,6 +48,59 @@ describe('adapterFromProviderDoc', () => {
 		expect(adapter?.isConfigured()).toBe(true)
 	})
 
+	// Capture is declared only from public config, so these fields are what let a provider
+	// document fill a tenant capture slot at all.
+	it('passes the public posthog capture fields through to the adapter', () => {
+		const adapter = adapterFromProviderDoc({
+			provider: 'posthog',
+			posthog: { projectId: '1', apiKey: 'phx_x', projectToken: 'phc_public', region: 'eu' },
+		})
+		expect(adapter?.capture?.client).toEqual({ kind: 'posthog', token: 'phc_public' })
+		expect(adapter?.capture?.proxy.routes[0]?.upstream).toBe(
+			'https://eu-assets.i.posthog.com/static/:p*'
+		)
+	})
+
+	it('declares no posthog capture when the document carries no projectToken', () => {
+		const adapter = adapterFromProviderDoc({
+			provider: 'posthog',
+			posthog: { projectId: '1', apiKey: 'phx_x' },
+		})
+		expect(adapter?.capture).toBeUndefined()
+	})
+
+	it('passes the public plausible capture fields through to the adapter', () => {
+		const domain = adapterFromProviderDoc({
+			provider: 'plausible',
+			plausible: { siteId: 's', apiKey: 'k', domain: 'site.test' },
+		})
+		expect(domain?.capture?.snippet({ path: '/pl' }).scripts[0]?.attrs).toEqual({
+			'data-domain': 'site.test',
+			'data-api': '/pl/api/event',
+		})
+		const scripted = adapterFromProviderDoc({
+			provider: 'plausible',
+			plausible: { siteId: 's', apiKey: 'k', scriptId: 'abc123' },
+		})
+		expect(scripted?.capture?.snippet({ path: '/pl' }).scripts[0]?.src).toBe('/pl/js/pa-abc123.js')
+	})
+
+	it('declares no plausible capture without a domain or scriptId', () => {
+		const adapter = adapterFromProviderDoc({
+			provider: 'plausible',
+			plausible: { siteId: 's', apiKey: 'k' },
+		})
+		expect(adapter?.capture).toBeUndefined()
+	})
+
+	it('treats empty-string capture fields as unset', () => {
+		const adapter = adapterFromProviderDoc({
+			provider: 'posthog',
+			posthog: { projectId: '1', apiKey: 'k', projectToken: '', region: '' },
+		})
+		expect(adapter?.capture).toBeUndefined()
+	})
+
 	it('returns null for unknown or missing provider values', () => {
 		expect(adapterFromProviderDoc({ provider: 'nope' })).toBeNull()
 		expect(adapterFromProviderDoc({})).toBeNull()

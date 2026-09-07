@@ -1,4 +1,5 @@
 import type { Config, Payload } from 'payload'
+import type { CaptureSupport } from '../core/capture'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -9,6 +10,7 @@ import type {
 	DimensionKey,
 	MetricKey,
 } from '../core/contract'
+import { INGEST_PATH } from '../plugin/paths'
 import { EVENTS_SLUG, eventsCollection } from './collections/events'
 import { ROLLUPS_SLUG, rollupsCollection } from './collections/rollups'
 import { seenCollection } from './collections/seen'
@@ -48,6 +50,9 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 	'sessions',
 	'events',
 	'avgDuration',
+	'conversions',
+	'revenue',
+	'scrollDepth',
 ])
 const dimensions: ReadonlySet<DimensionKey> = new Set([
 	'page',
@@ -55,6 +60,7 @@ const dimensions: ReadonlySet<DimensionKey> = new Set([
 	'source',
 	'device',
 	'event',
+	'goal',
 ])
 
 const REALTIME_EVENT_LIMIT = 50_000
@@ -76,6 +82,14 @@ const baseCapabilities: AnalyticsCapabilities = {
 }
 
 const DAY_MS = 86_400_000
+
+// The tracker itself is the client (an RSC renders TrackerBoot), so there is nothing to
+// proxy or inject; the ingest path is carried by the tracker config resolver instead.
+const nativeCapture: CaptureSupport = {
+	proxy: { routes: [] },
+	snippet: () => ({ scripts: [] }),
+	client: { kind: 'native' },
+}
 
 interface QueryEventsContext {
 	retentionDays?: number
@@ -173,10 +187,14 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 		return docs as unknown as RollupDoc[]
 	}
 
+	const ingest = { path: options.ingestPath ?? INGEST_PATH }
+
 	return {
 		id: 'native',
 		label: 'Native (Payload)',
 		capabilities,
+		capture: nativeCapture,
+		ingest,
 		isConfigured: () => true,
 		flush: () => buffer?.flush() ?? Promise.resolve(),
 		register(config: Config, context) {
@@ -194,10 +212,11 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				...(config.endpoints ?? []),
 				{
 					method: 'post',
-					path: options.ingestPath ?? '/analytics/ingest',
+					path: ingest.path,
 					handler: makeIngestHandler(geoResolver, () => buffer, {
 						scope: scoped ? context?.resolveScope : undefined,
 						timezone: context?.resolveTimezone,
+						goals: context?.resolveGoals,
 					}),
 				},
 			]

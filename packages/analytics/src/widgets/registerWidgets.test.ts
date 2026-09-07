@@ -18,7 +18,7 @@ describe('widgetIsSupported', () => {
 		expect(widgetIsSupported({ metrics: ['pageviews'] }, [native()])).toBe(true)
 	})
 	it('drops a widget when no adapter satisfies its requirement', () => {
-		expect(widgetIsSupported({ metrics: ['scrollDepth'] }, [native()])).toBe(false)
+		expect(widgetIsSupported({ metrics: ['bounceRate'] }, [native()])).toBe(false)
 	})
 	it('keeps a widget with no requirement', () => {
 		expect(widgetIsSupported(undefined, [native()])).toBe(true)
@@ -154,6 +154,23 @@ describe('registerWidgets', () => {
 		expect(validate('')).not.toBe(true)
 	})
 
+	it('defaults the goals breakdown to conversions and every other breakdown to pageviews', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+		})
+		const defaultOf = (slug: string) => {
+			const field = metricFieldOf(config, slug)
+			return field && 'defaultValue' in field ? field.defaultValue : undefined
+		}
+		expect(defaultOf('analytics-breakdown-goals')).toBe('conversions')
+		expect(defaultOf('analytics-breakdown-pages')).toBe('pageviews')
+	})
+
 	it('renders the metric field through MetricSelectField, passing extra requirements as clientProps', () => {
 		const config = bareConfig()
 		registerWidgets(config, {
@@ -238,16 +255,18 @@ describe('registerWidgets', () => {
 	})
 
 	it('skips a widget whose metric select would have no options', () => {
-		const scrollOnly: AnalyticsAdapter = {
-			id: 'scroll-only',
-			label: 'Scroll only',
-			capabilities: { ...native().capabilities, metrics: new Set<MetricKey>(['scrollDepth']) },
+		// `visits` is a contract metric the widget pickers deliberately do not offer, so an
+		// adapter serving only it leaves the select empty.
+		const visitsOnly: AnalyticsAdapter = {
+			id: 'visits-only',
+			label: 'Visits only',
+			capabilities: { ...native().capabilities, metrics: new Set<MetricKey>(['visits']) },
 			isConfigured: () => true,
-			query: async () => ({ rows: [], meta: { provider: 'scroll-only', fetchedAt: '' } }),
+			query: async () => ({ rows: [], meta: { provider: 'visits-only', fetchedAt: '' } }),
 		}
 		const config = bareConfig()
 		registerWidgets(config, {
-			adapters: [scrollOnly],
+			adapters: [visitsOnly],
 			multiProvider: false,
 			providersEnabled: false,
 			disabled: [],
@@ -368,6 +387,7 @@ describe('registerWidgets', () => {
 				'analytics-breakdown-sources',
 				'analytics-breakdown-devices',
 				'analytics-breakdown-countries',
+				'analytics-breakdown-goals',
 				'analytics-realtime',
 			],
 			register: [{ slug: 'myapp-only', component: 'x#y', label: 'Mine' }],

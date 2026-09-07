@@ -34,10 +34,10 @@ describeForDb('custom widget registration', { dbs: ['mongo'] }, (db) => {
 				widgets: {
 					register: [
 						{
-							slug: 'myapp-revenue',
+							slug: 'myapp-bounce',
 							component: '@/x#default',
-							label: 'Revenue',
-							requires: { metrics: ['revenue'] },
+							label: 'Bounce rate',
+							requires: { metrics: ['bounceRate'] },
 						},
 					],
 				},
@@ -54,6 +54,6 @@ describeForDb('custom widget registration', { dbs: ['mongo'] }, (db) => {
 		expect(slugs(supported)).toContain('myapp-sources')
 	})
 	it('does not register a custom widget gated out by capabilities', () => {
-		expect(slugs(gatedOut)).not.toContain('myapp-revenue')
+		expect(slugs(gatedOut)).not.toContain('myapp-bounce')
 	})
 })

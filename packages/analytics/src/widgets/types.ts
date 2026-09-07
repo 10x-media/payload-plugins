@@ -21,4 +21,7 @@ export const WIDGET_METRICS: MetricKey[] = [
 	'avgDuration',
 	'bounceRate',
 	'events',
+	'conversions',
+	'revenue',
+	'scrollDepth',
 ]

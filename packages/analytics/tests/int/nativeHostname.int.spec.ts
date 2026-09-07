@@ -4,6 +4,7 @@ import { analytics } from '../../src/index'
 import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { native } from '../../src/native/nativeAdapter'
+import { ingestRequest } from './ingestRequest'
 
 interface IngestOpts {
 	path: string
@@ -12,11 +13,13 @@ interface IngestOpts {
 }
 
 const ingest = (booted: BootedPayload, opts: IngestOpts) =>
-	makeIngestHandler(platformHeaderResolver)({
-		payload: booted.payload,
-		headers: new Headers({ 'content-type': 'application/json', 'user-agent': opts.ua }),
-		json: async () => ({ type: 'pageview', path: opts.path, hostname: opts.hostname }),
-	} as never)
+	makeIngestHandler(platformHeaderResolver)(
+		ingestRequest(
+			booted.payload,
+			{ type: 'pageview', path: opts.path, hostname: opts.hostname },
+			{ 'user-agent': opts.ua }
+		)
+	)
 
 const RANGE = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
 // The visitor hash is salted with the hostname, so the same UA on two hostnames is two

@@ -27,6 +27,7 @@ export const BREAKDOWN_SPECS: BreakdownSpec[] = [
 		dimension: 'country',
 		label: keys.widgetBreakdownCountries,
 	},
+	{ slug: 'analytics-breakdown-goals', dimension: 'goal', label: keys.widgetBreakdownGoals },
 ]
 
 export const breakdownSpecBySlug = (slug: string): BreakdownSpec | undefined =>

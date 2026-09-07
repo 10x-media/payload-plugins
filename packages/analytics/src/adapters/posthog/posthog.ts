@@ -1,3 +1,4 @@
+import type { CaptureSupport } from '../../core/capture'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -14,7 +15,7 @@ import { dayIso, hourIso } from '../series'
 export interface PosthogConfig {
 	/** PostHog project id (numeric). */
 	projectId: string
-	/** Personal API key with the "Query Read" scope (phx_...). */
+	/** Personal API key with the "Query Read" scope (phx_...). Never exposed to the browser. */
 	apiKey: string
 	/** API host. Defaults to US Cloud; EU is https://eu.posthog.com, self-host is your instance URL. */
 	host?: string
@@ -26,9 +27,70 @@ export interface PosthogConfig {
 	 * read filters on it. Both the property name and value are escaped literals.
 	 */
 	scopeProperty?: string
+	/** Cloud region for the proxied capture routes. Derived from `host` when omitted. */
+	region?: 'us' | 'eu'
+	/**
+	 * The public browser key (phc_...) sent to `posthog.init`. Distinct from `apiKey`, the
+	 * private Query API key, which must never reach the client. The adapter declares
+	 * `capture` only when this is set: without it the install reads dashboards and captures
+	 * nothing, so it gets no public proxy and no snippet.
+	 */
+	projectToken?: string
 }
 
 const US_CLOUD = 'https://us.posthog.com'
+
+const resolveRegion = (config: PosthogConfig): 'us' | 'eu' => {
+	if (config.region) {
+		return config.region
+	}
+	return config.host?.includes('eu.posthog.com') ? 'eu' : 'us'
+}
+
+/**
+ * PostHog's official install stub (https://posthog.com/docs/libraries/js), trimmed to the
+ * methods this plugin and a host are likely to call before the SDK lands. It has to be one
+ * self-sequencing script: `init` is what injects `array.js`, deriving the URL from
+ * `api_host` (the `.i.posthog.com` rewrite is a no-op on a first-party proxy path, so it
+ * resolves to `<path>/static/array.js`, exactly the route the proxy declares). Every call
+ * made before the SDK arrives is queued on the stub and replayed by it.
+ *
+ * One addition to the official code: the injected tag inherits the nonce of the inline that
+ * injected it, or a nonce CSP without `strict-dynamic` would pass the inline and block the
+ * bundle. `document.currentScript` is the inline itself during its own synchronous run, on
+ * the server-rendered path and the loader's path alike. The IDL property is read first
+ * because browsers blank the content attribute once the document is parsed.
+ */
+const POSTHOG_STUB =
+	'!function(t,e){var o,n,p,r,c;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(c=t.currentScript&&(t.currentScript.nonce||t.currentScript.getAttribute("nonce")))&&(p.nonce=c,p.setAttribute("nonce",c)),(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],o="init capture register register_once identify group alias reset setPersonProperties captureException opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing getFeatureFlag isFeatureEnabled reloadFeatureFlags onFeatureFlags on debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);'
+
+function buildCapture(config: PosthogConfig, token: string): CaptureSupport {
+	const region = resolveRegion(config)
+	return {
+		proxy: {
+			trailingSlashes: true,
+			routes: [
+				{
+					source: '/static/:p*',
+					upstream: `https://${region}-assets.i.posthog.com/static/:p*`,
+				},
+				{
+					source: '/array/:p*',
+					upstream: `https://${region}-assets.i.posthog.com/array/:p*`,
+				},
+				{ source: '/:p*', upstream: `https://${region}.i.posthog.com/:p*` },
+			],
+		},
+		snippet: ({ path }) => ({
+			scripts: [
+				{
+					inline: `${POSTHOG_STUB}posthog.init(${JSON.stringify(token)},{api_host:${JSON.stringify(path)},ui_host:${JSON.stringify(`https://${region}.posthog.com`)}})`,
+				},
+			],
+		}),
+		client: { kind: 'posthog', token },
+	}
+}
 
 // Pageview-scoped expressions, used when the read filters the WHERE to `$pageview`.
 // visits and sessions share the distinct-session expression and are deduped before the
@@ -104,6 +166,7 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		id: 'posthog',
 		label: 'PostHog',
 		capabilities,
+		...(config.projectToken ? { capture: buildCapture(config, config.projectToken) } : {}),
 		isConfigured: () => Boolean(config.projectId && config.apiKey),
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()

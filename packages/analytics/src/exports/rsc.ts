@@ -1,3 +1,5 @@
+export { getTrackerConfig } from '../capture/getTrackerConfig'
+export type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
 export type { CapabilityRequirement } from '../core/capabilities'
 export type { AnalyticsFilter, DateRange, DimensionKey, MetricKey } from '../core/contract'
 export { AnalyticsPanelField } from '../fields/AnalyticsPanelField'
@@ -9,6 +11,7 @@ export type {
 	ReadForFieldArgs,
 } from '../fields/readForDocument'
 export { readForField } from '../fields/readForDocument'
+export { AnalyticsScripts, type AnalyticsScriptsProps } from '../rsc/AnalyticsScripts'
 export { default as AnalyticsBreakdownWidget } from '../widgets/AnalyticsBreakdownWidget'
 export { default as AnalyticsMetricWidget } from '../widgets/AnalyticsMetricWidget'
 export { default as AnalyticsRealtimeWidget } from '../widgets/AnalyticsRealtimeWidget'

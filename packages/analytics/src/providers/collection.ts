@@ -38,6 +38,21 @@ const secretField = (
 		...(opts.width ? { admin: { width: opts.width } } : {}),
 	})
 
+/**
+ * Public capture config: plain text, never a sealed secret, because the tracker config
+ * serves it to the browser. An adapter declares `capture` only when its public field is
+ * filled, so these are what let a provider document fill a capture slot.
+ */
+const captureField = (name: string, label: TranslationKey, width?: string): Field => ({
+	name,
+	type: 'text',
+	label: labelForKey(label),
+	admin: {
+		description: labelForKey(keys.providerFieldCaptureHelp),
+		...(width ? { width } : {}),
+	},
+})
+
 const hostField = (): Field => ({
 	name: 'host',
 	type: 'text',
@@ -143,6 +158,13 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 						...secretField(args, { name: 'apiKey', label: keys.providerFieldApiKey, width: '50%' }),
 					],
 				},
+				{
+					type: 'row',
+					fields: [
+						captureField('domain', keys.providerFieldDomain, '50%'),
+						captureField('scriptId', keys.providerFieldScriptId, '50%'),
+					],
+				},
 				hostField(),
 			]),
 			providerGroup('umami', keys.providerNameUmami, [
@@ -177,6 +199,22 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 					fields: [
 						textField('projectId', keys.providerFieldProjectId, '50%'),
 						...secretField(args, { name: 'apiKey', label: keys.providerFieldApiKey, width: '50%' }),
+					],
+				},
+				{
+					type: 'row',
+					fields: [
+						captureField('projectToken', keys.providerFieldProjectToken, '50%'),
+						{
+							name: 'region',
+							type: 'select',
+							label: labelForKey(keys.providerFieldRegion),
+							options: [
+								{ label: 'US', value: 'us' },
+								{ label: 'EU', value: 'eu' },
+							],
+							admin: { width: '50%' },
+						},
 					],
 				},
 				hostField(),

@@ -115,6 +115,9 @@ const flushSeedEvents = async (payload: Payload, events: StoredEvent[]): Promise
 }
 
 const SEED_PAGES = [
+	// `home` is the site root through `pagePath`, so the CTA's conversions have a document
+	// to surface on.
+	{ title: 'Home', slug: 'home' },
 	{ title: 'About', slug: 'about' },
 	{ title: 'Pricing', slug: 'pricing' },
 	{ title: 'Blog', slug: 'blog' },

@@ -1,0 +1,126 @@
+---
+title: Goals
+description: Mark conversions with a data attribute or a trackGoal call, configure how they match, and read conversions and revenue back.
+---
+
+A goal is a named conversion. Tag the thing a visitor does, declare the goal in config, and `conversions` and `revenue` become readable metrics alongside pageviews.
+
+## Tag the element
+
+The simplest hookup is an attribute. The tracker's `goalAttribute` auto-capture (on by default) fires on click for any element and on submit for any form:
+
+```html
+<button data-analytics-goal="book-demo">Book a demo</button>
+
+<form data-analytics-goal="newsletter-signup">
+  <input name="email" type="email" />
+  <button type="submit">Subscribe</button>
+</form>
+```
+
+Add revenue on the element itself when the amount is per-instance:
+
+```html
+<button
+  data-analytics-goal="purchase"
+  data-analytics-value="49.00"
+  data-analytics-currency="EUR"
+>
+  Buy
+</button>
+```
+
+The attribute is read from the nearest ancestor carrying it, so wrapping a whole card works. A blank or non-numeric `data-analytics-value` is treated as absent rather than zero, so an unfilled template slot never books a zero-revenue conversion.
+
+## Track it by hand
+
+```ts
+import { useAnalytics } from '@10x-media/analytics/react'
+
+const { trackGoal } = useAnalytics()
+trackGoal('book-demo')
+trackGoal('purchase', { value: 49, currency: 'EUR' })
+```
+
+`trackGoal` is on the tracker itself too (`@10x-media/analytics/tracker`), for hosts that boot it without React. An unknown slug is still sent: the browser config is a server-rendered snapshot, and the server may know goals it predates.
+
+## Declare the goals
+
+```ts title="payload.config.ts"
+analytics({
+  adapters: [native()],
+  goals: [
+    { slug: 'book-demo', name: 'Book a demo', match: { kind: 'goal' }, value: { fixed: 500 }, currency: 'EUR' },
+    { slug: 'signup', name: 'Signup', match: { kind: 'event', name: 'signup' } },
+    { slug: 'thank-you', name: 'Thank-you page', match: { kind: 'path', pattern: '/thank-you' } },
+    { slug: 'purchase', name: 'Purchase', match: { kind: 'goal' }, value: { prop: 'total' }, currency: 'USD' },
+  ],
+})
+```
+
+`goals` also accepts the object form `{ defaults: [...] }`. Slugs must be unique and kebab-case, so a slug is safe in a URL, a data attribute, and a rollup bucket key; a duplicate or a non-kebab slug throws at config time, as does a negative or non-finite `value.fixed`. `name` is admin-facing and never reaches the browser.
+
+### Match kinds
+
+| Kind | Completes on |
+|---|---|
+| `{ kind: 'goal' }` | An explicit `trackGoal('<slug>')`, which is what the attribute hookup emits. |
+| `{ kind: 'event', name }` | A `track(name, props)` custom event with that exact name. |
+| `{ kind: 'path', pattern }` | A pageview whose path matches the glob. |
+
+The kinds never cross: a custom event named `signup` does not complete a `{ kind: 'goal' }` goal whose slug is `signup`, and a `trackGoal('signup')` does not complete a `{ kind: 'event', name: 'signup' }` goal.
+
+### Path globs
+
+Anchored and case-sensitive. `*` is exactly one non-empty segment, `**` is one or more segments at any depth. A trailing slash is insignificant on both sides, a query string and a hash are cut off both the path and the pattern, and every other regex metacharacter is matched literally.
+
+| Pattern | Matches | Does not match |
+|---|---|---|
+| `/thank-you` | `/thank-you`, `/thank-you/`, `/thank-you?ref=x` | `/thank-you/deep` |
+| `/docs/**` | `/docs/intro`, `/docs/a/b/c` | `/docs` |
+| `/checkout/*/done` | `/checkout/abc/done` | `/checkout/done`, `/checkout/a/b/done` |
+
+### Value precedence
+
+The event's own `value` wins (an explicit `0` included), then the goal's `value.fixed`, then `Number(props[value.prop])`, else `0`. A value that is not a finite number `>= 0` falls through to the next source, so a negative amount can never subtract from a bucket's revenue.
+
+One event can complete several goals, and each completion carries its own value.
+
+## How native reports them
+
+Goals are matched at ingest, against the same sanitized fields that get stored, and the completions are stamped onto the event. Editing a goal later never rewrites history.
+
+The [native engine](/analytics/native) then serves three metrics and one dimension:
+
+| Key | What it is |
+|---|---|
+| `conversions` | Completions in the bucket. Every bucket carries them, so a breakdown by country or device can report conversions too. |
+| `revenue` | Summed completion values. See the currency note below. |
+| `scrollDepth` | Average deepest scroll, over the pageviews that actually reported one. |
+| `goal` (dimension) | Groups by goal slug. Groupable, not filterable. |
+
+All three metrics appear in the widget metric, trend, and breakdown pickers, and the built-in `analytics-breakdown-goals` widget lists completions per goal (defaulting its metric to `conversions`). See [Dashboard widgets](/analytics/widgets).
+
+A `goal` event counts under the `events` metric, not `pageviews`, and is deliberately kept out of the `event` dimension breakdown: its name is a goal slug and belongs to the `goal` dimension instead.
+
+<Callout type="warn">
+Revenue is stored and summed as a plain number in the event's own currency. There is no FX conversion and no `currency` dimension, so a bucket spanning currencies sums figures that are not comparable. Widgets and stat fields render the result as a bare number too, with no currency symbol and nothing marking which currencies went into it. Keep one currency per install, or read revenue per goal.
+</Callout>
+
+Existing native installs need the goal-counter migration before any of this reads correctly. See [Upgrading for goal metrics](/analytics/native#upgrading-for-goal-metrics).
+
+## How providers report them
+
+A goal travels to a vendor as an ordinary event named by its slug, so it shows up wherever that vendor lists event names. The plugin does not create the vendor's own goal or conversion definitions for you.
+
+| Adapter | Call | Revenue |
+|---|---|---|
+| PostHog | `posthog.capture(slug, { ...props, value, currency })` | As the `value` and `currency` properties, which PostHog's revenue analytics reads. |
+| Plausible | `plausible(slug, { props, revenue: { amount, currency } })` | Plausible's documented ecommerce shape. |
+| Umami | `umami.track(slug, { ...props, value, currency })` | Umami has no revenue field; both ride along as event data. |
+
+Reading `conversions` and `revenue` back still depends on the adapter's own capabilities: native and GA4 serve both, Plausible serves `revenue`, PostHog and Umami serve neither. That is what the [capability gate](/analytics/adapters#the-capabilities-model) enforces, so a widget whose active source cannot answer degrades rather than reporting a wrong number.
+
+## Roadmap
+
+A goals collection, so editors can add and edit goals from the admin without a deploy, is planned for a later release. Config goals stay supported either way.

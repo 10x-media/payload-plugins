@@ -1,7 +1,10 @@
 import { type Config, definePlugin, type PayloadRequest } from 'payload'
 
+import { proxyEndpoints } from './capture/proxyEndpoint'
+import { trackerEndpoint } from './capture/trackerEndpoint'
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
+import type { Goal } from './goals/types'
 import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
 import { isModuleNotFoundError } from './plugin/peerImportError'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
@@ -125,8 +128,17 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				return DEFAULT_TIMEZONE
 			}
 		}
+		// Config goals are install-wide, so scope is accepted and ignored here; a collection
+		// source resolves per scope behind the same signature.
+		const resolveGoals = async (_req: PayloadRequest, _scope?: string | null): Promise<Goal[]> =>
+			resolved.goals
 		for (const adapter of resolved.adapters) {
-			adapter.register?.(config, { scoped: resolved.scoped, resolveScope, resolveTimezone })
+			adapter.register?.(config, {
+				scoped: resolved.scoped,
+				resolveScope,
+				resolveTimezone,
+				resolveGoals,
+			})
 		}
 		if (
 			resolved.adapters.some((a) => a.capabilities.realtime && typeof a.realtime === 'function') ||
@@ -147,6 +159,11 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			...(config.endpoints ?? []),
 			{ method: 'get', path: SOURCES_PATH, handler: makeSourcesHandler() },
 		]
+		// A runtime provider's capture support is unknown at config time, so providers
+		// alone are enough to mount the proxy; every slot is still resolved per request.
+		if (resolved.adapters.some((a) => a.capture) || providersEnabled) {
+			config.endpoints = [...config.endpoints, ...proxyEndpoints(), trackerEndpoint()]
+		}
 		if (resolved.widgets.enabled) {
 			const multiProvider = registry.isMultiProvider() || providersEnabled
 			registerWidgets(config, {
@@ -215,6 +232,13 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				resolveScope,
 				resolveTimezone,
 				platformAdapterId: resolved.platformAdapter,
+				captureSlots: resolved.capture.slots,
+				capturePaths: resolved.capture.paths,
+				captureProxy: resolved.capture.proxy,
+				consentFor: resolved.capture.consent,
+				autoCapture: resolved.capture.autoCapture,
+				goals: resolved.goals,
+				ingestPath: resolved.adapters.find((a) => a.ingest)?.ingest?.path,
 				scoped: resolved.scoped,
 				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,
@@ -238,8 +262,14 @@ export type {
 export { PLATFORM_SCOPE } from './core/contract'
 export type {
 	AnalyticsAccessOptions,
+	AnalyticsCaptureOptions,
+	AnalyticsGoalsOptions,
 	AnalyticsPluginOptions,
 	AnalyticsPluginOptions as PluginOptions,
+	AutoCaptureOptions,
+	CaptureConsentOption,
+	ConsentMode,
+	ConsentResolver,
 	PlatformReadAccess,
 	ProvidersCollectionOptions,
 	ProvidersOptions,
@@ -263,6 +293,7 @@ export {
 	analyticsTab,
 	analyticsTabsField,
 } from './fields/factories'
+export type { Goal, GoalMatch, TrackerGoal } from './goals/types'
 export type { TimeframePreset } from './timeframe/presets'
 export type { CustomWidgetDef } from './widgets/customWidget'
 export { analyticsDefaultWidgets } from './widgets/defaults'

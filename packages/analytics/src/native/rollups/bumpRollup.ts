@@ -48,6 +48,10 @@ const ZERO: Record<RollupMetric, number> = {
 	samples: 0,
 	visitors: 0,
 	sessions: 0,
+	conversions: 0,
+	revenue: 0,
+	scrollDepthSum: 0,
+	scrollSamples: 0,
 }
 
 // Always seed every metric on insert: Payload's defaultValue is applied app-side, not as

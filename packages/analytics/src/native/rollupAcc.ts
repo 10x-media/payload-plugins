@@ -10,6 +10,11 @@ export interface RollupDoc {
 	durationMs: number
 	visitors: number
 	sessions: number
+	/** Optional: rows written before the goal-counter migration carry none of these. */
+	conversions?: number
+	revenue?: number
+	scrollDepthSum?: number
+	scrollSamples?: number
 }
 
 export interface Acc {
@@ -18,6 +23,11 @@ export interface Acc {
 	durationMs: number
 	visitors: number
 	sessions: number
+	conversions: number
+	revenue: number
+	scrollDepthSum: number
+	/** Pageviews that reported a scroll depth; the `scrollDepth` average's denominator. */
+	scrollSamples: number
 }
 
 export const emptyAcc = (): Acc => ({
@@ -26,14 +36,22 @@ export const emptyAcc = (): Acc => ({
 	durationMs: 0,
 	visitors: 0,
 	sessions: 0,
+	conversions: 0,
+	revenue: 0,
+	scrollDepthSum: 0,
+	scrollSamples: 0,
 })
 
-export const add = (acc: Acc, d: Acc): void => {
+export const add = (acc: Acc, d: RollupDoc | Acc): void => {
 	acc.pageviews += d.pageviews
 	acc.events += d.events
 	acc.durationMs += d.durationMs
 	acc.visitors += d.visitors
 	acc.sessions += d.sessions
+	acc.conversions += d.conversions ?? 0
+	acc.revenue += d.revenue ?? 0
+	acc.scrollDepthSum += d.scrollDepthSum ?? 0
+	acc.scrollSamples += d.scrollSamples ?? 0
 }
 
 export const selectMetrics = (
@@ -45,8 +63,15 @@ export const selectMetrics = (
 	if (wanted.includes('events')) out.events = acc.events
 	if (wanted.includes('visitors')) out.visitors = acc.visitors
 	if (wanted.includes('sessions')) out.sessions = acc.sessions
+	if (wanted.includes('conversions')) out.conversions = acc.conversions
+	if (wanted.includes('revenue')) out.revenue = acc.revenue
 	if (wanted.includes('avgDuration')) {
 		out.avgDuration = acc.pageviews > 0 ? Math.round(acc.durationMs / acc.pageviews) : 0
+	}
+	if (wanted.includes('scrollDepth')) {
+		// Averaged over the pageviews that reported a depth, never over every pageview: a
+		// tracker that never got to send one must not drag the average down.
+		out.scrollDepth = acc.scrollSamples > 0 ? Math.round(acc.scrollDepthSum / acc.scrollSamples) : 0
 	}
 	return out
 }

@@ -194,3 +194,81 @@ describe('plausible adapter', () => {
 		expect(result.totals).toEqual({ pageviews: 35, visitors: 20, avgDuration: 35000 })
 	})
 })
+
+describe('plausible capture', () => {
+	it('builds the two proxy routes against the cloud host by default', () => {
+		const capture = plausible({ siteId: 'example.com', apiKey: 'k', domain: 'example.com' }).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/js/:script*', upstream: 'https://plausible.io/js/:script*' },
+			{ source: '/api/event', upstream: 'https://plausible.io/api/event' },
+		])
+	})
+
+	it('builds the two proxy routes against a self-hosted host', () => {
+		const capture = plausible({
+			siteId: 'example.com',
+			apiKey: 'k',
+			host: 'https://p.acme.io',
+			domain: 'example.com',
+		}).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/js/:script*', upstream: 'https://p.acme.io/js/:script*' },
+			{ source: '/api/event', upstream: 'https://p.acme.io/api/event' },
+		])
+	})
+
+	it('renders the legacy script tag when domain is set', () => {
+		const capture = plausible({ siteId: 'example.com', apiKey: 'k', domain: 'example.com' }).capture
+		expect(capture?.snippet({ path: '/pl' })).toEqual({
+			scripts: [
+				{
+					src: '/pl/js/script.js',
+					defer: true,
+					attrs: { 'data-domain': 'example.com', 'data-api': '/pl/api/event' },
+				},
+			],
+		})
+	})
+
+	it('renders the per-site script plus the official stub and init', () => {
+		const capture = plausible({ siteId: 'example.com', apiKey: 'k', scriptId: 'abc123' }).capture
+		const scripts = capture?.snippet({ path: '/pl' }).scripts ?? []
+		expect(scripts).toHaveLength(2)
+		expect(scripts[0]).toEqual({ src: '/pl/js/pa-abc123.js', async: true })
+		const inline = scripts[1]?.inline ?? ''
+		// The stub queues calls made before the tracker lands and parks the options for it,
+		// which is what makes the inline safe as a sibling of an async loader.
+		expect(inline).toContain(
+			'window.plausible=window.plausible||function(){(window.plausible.q=window.plausible.q||[]).push(arguments)}'
+		)
+		expect(inline).toContain('window.plausible.o=e||{}')
+		expect(inline.endsWith('plausible.init({endpoint:"/pl/api/event"})')).toBe(true)
+	})
+
+	it('prefers the legacy tag when both domain and scriptId are set', () => {
+		const capture = plausible({
+			siteId: 'example.com',
+			apiKey: 'k',
+			domain: 'example.com',
+			scriptId: 'abc123',
+		}).capture
+		expect(capture?.snippet({ path: '/pl' }).scripts).toHaveLength(1)
+		expect(capture?.snippet({ path: '/pl' }).scripts[0]?.src).toBe('/pl/js/script.js')
+	})
+
+	// Capture is public config: without a public script identity there is nothing to capture
+	// with, so a read-only install gets no proxy and no snippet rather than an empty one.
+	it('declares no capture when neither domain nor scriptId is set', () => {
+		expect(plausible({ siteId: 'example.com', apiKey: 'k' }).capture).toBeUndefined()
+	})
+
+	it('client carries only the kind, no site credentials', () => {
+		const capture = plausible({
+			siteId: 'example.com',
+			apiKey: 'secret-key',
+			domain: 'example.com',
+		}).capture
+		expect(capture?.client).toEqual({ kind: 'plausible' })
+		expect(JSON.parse(JSON.stringify(capture?.client))).toEqual({ kind: 'plausible' })
+	})
+})

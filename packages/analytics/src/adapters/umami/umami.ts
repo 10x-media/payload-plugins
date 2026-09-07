@@ -1,3 +1,4 @@
+import type { CaptureSupport } from '../../core/capture'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -17,13 +18,43 @@ export interface UmamiConfig {
 	apiKey?: string
 	/** Self-hosted bearer token (from POST /api/auth/login). */
 	token?: string
-	/** API base URL. Defaults to Umami Cloud (https://api.umami.is/v1). Self-hosted is e.g. https://site/api. */
+	/**
+	 * API base URL. Defaults to Umami Cloud (https://api.umami.is/v1). Self-hosted is
+	 * e.g. https://site/api. Capture derives the app origin from this (a trailing `/api`
+	 * is stripped), so one `host` value serves both the Stats API and the tracker.
+	 */
 	host?: string
 	/** Maximum days of historical data. Defaults to 730. Pass null to disable clamping. */
 	maxLookbackDays?: number | null
 }
 
 const CLOUD_BASE = 'https://api.umami.is/v1'
+const CLOUD_SCRIPT = 'https://cloud.umami.is/script.js'
+const CLOUD_SEND = 'https://gateway.umami.is/api/send'
+
+function buildCapture(config: UmamiConfig): CaptureSupport {
+	const origin = config.host ? config.host.replace(/\/api\/?$/, '').replace(/\/+$/, '') : null
+	const scriptUpstream = origin ? `${origin}/script.js` : CLOUD_SCRIPT
+	const sendUpstream = origin ? `${origin}/api/send` : CLOUD_SEND
+	return {
+		proxy: {
+			routes: [
+				{ source: '/script.js', upstream: scriptUpstream },
+				{ source: '/api/send', upstream: sendUpstream },
+			],
+		},
+		snippet: ({ path }) => ({
+			scripts: [
+				{
+					src: `${path}/script.js`,
+					defer: true,
+					attrs: { 'data-website-id': config.websiteId, 'data-host-url': path },
+				},
+			],
+		}),
+		client: { kind: 'umami' },
+	}
+}
 
 const umamiMetrics: ReadonlySet<MetricKey> = new Set<MetricKey>([
 	'pageviews',
@@ -87,6 +118,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		id: 'umami',
 		label: 'Umami',
 		capabilities,
+		capture: buildCapture(config),
 		isConfigured: () => Boolean(config.websiteId && (config.apiKey || config.token)),
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()

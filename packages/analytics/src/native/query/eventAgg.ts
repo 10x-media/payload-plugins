@@ -4,7 +4,7 @@ import { DEFAULT_TIMEZONE, startOfDayInTz } from '../../timeframe/tz'
 /** Raw event shape aggregateEvents/filtersToWhere operate on; matches StoredEvent as read back from the events collection (timestamp comes back as an ISO string). */
 export interface EventLike {
 	timestamp: string | Date
-	type: 'pageview' | 'event'
+	type: 'pageview' | 'event' | 'goal'
 	name?: string
 	path: string
 	device?: string
@@ -15,6 +15,9 @@ export interface EventLike {
 	visitorHash: string
 	sessionId: string
 	durationMs?: number
+	scrollDepth?: number
+	/** Goal completions stamped at ingest; the source of conversions/revenue on this path. */
+	goals?: Array<{ slug: string; value: number }>
 }
 
 const HOUR_MS = 3_600_000
@@ -66,6 +69,10 @@ interface Bucket {
 	durationMs: number
 	visitors: Set<string>
 	sessions: Set<string>
+	conversions: number
+	revenue: number
+	scrollDepthSum: number
+	scrollSamples: number
 }
 
 const emptyBucket = (): Bucket => ({
@@ -74,14 +81,31 @@ const emptyBucket = (): Bucket => ({
 	durationMs: 0,
 	visitors: new Set(),
 	sessions: new Set(),
+	conversions: 0,
+	revenue: 0,
+	scrollDepthSum: 0,
+	scrollSamples: 0,
 })
 
-const addEvent = (bucket: Bucket, event: EventLike): void => {
+/**
+ * `completions` narrows what the event contributes to conversions/revenue: a goal breakdown
+ * row counts only its own goal, every other bucket counts all of them. Mirrors how
+ * computeRollupDeltas fills a `goal` bucket versus a site or page bucket.
+ */
+const addEvent = (bucket: Bucket, event: EventLike, completions = event.goals ?? []): void => {
 	if (event.type === 'pageview') {
 		bucket.pageviews++
 		bucket.durationMs += event.durationMs ?? 0
 	} else {
 		bucket.events++
+	}
+	if (event.scrollDepth !== undefined) {
+		bucket.scrollDepthSum += event.scrollDepth
+		bucket.scrollSamples++
+	}
+	bucket.conversions += completions.length
+	for (const completion of completions) {
+		bucket.revenue += completion.value
 	}
 	bucket.visitors.add(event.visitorHash)
 	bucket.sessions.add(event.sessionId)
@@ -93,8 +117,14 @@ const selectMetrics = (bucket: Bucket, wanted: MetricKey[]): Partial<Record<Metr
 	if (wanted.includes('events')) out.events = bucket.events
 	if (wanted.includes('visitors')) out.visitors = bucket.visitors.size
 	if (wanted.includes('sessions')) out.sessions = bucket.sessions.size
+	if (wanted.includes('conversions')) out.conversions = bucket.conversions
+	if (wanted.includes('revenue')) out.revenue = bucket.revenue
 	if (wanted.includes('avgDuration')) {
 		out.avgDuration = bucket.pageviews > 0 ? Math.round(bucket.durationMs / bucket.pageviews) : 0
+	}
+	if (wanted.includes('scrollDepth')) {
+		out.scrollDepth =
+			bucket.scrollSamples > 0 ? Math.round(bucket.scrollDepthSum / bucket.scrollSamples) : 0
 	}
 	return out
 }
@@ -151,19 +181,33 @@ export const aggregateEvents = (
 	const totals = selectMetrics(totalsBucket, metrics)
 
 	const field = dimension ? EVENT_FIELD[dimension] : undefined
-	if (dimension && field) {
+	if (dimension && (field || dimension === 'goal')) {
 		const groups = new Map<string, Bucket>()
-		for (const event of events) {
-			const value = event[field]
-			if (!value) {
-				continue
-			}
+		const bucketFor = (value: string): Bucket => {
 			let bucket = groups.get(value)
 			if (!bucket) {
 				bucket = emptyBucket()
 				groups.set(value, bucket)
 			}
-			addEvent(bucket, event)
+			return bucket
+		}
+		for (const event of events) {
+			if (dimension === 'goal') {
+				for (const completion of event.goals ?? []) {
+					addEvent(bucketFor(completion.slug), event, [completion])
+				}
+				continue
+			}
+			// The event dimension reports named custom events only: a goal event's name is a
+			// goal slug and belongs to the goal dimension instead.
+			if (!field || (field === 'name' && event.type !== 'event')) {
+				continue
+			}
+			const value = event[field]
+			if (!value) {
+				continue
+			}
+			addEvent(bucketFor(value), event)
 		}
 		let rows: AnalyticsRow[] = [...groups].map(([value, bucket]) => ({
 			dimensions: { [dimension]: value } as Partial<Record<DimensionKey, string>>,

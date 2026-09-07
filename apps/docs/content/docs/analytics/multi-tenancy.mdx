@@ -15,7 +15,8 @@ description: Per-tenant analytics providers, a shared platform provider, and sco
 | `platformAdapter` | Names one config adapter shared by every scope: the platform's own analytics. |
 | `access.platformRead` | Gates cross-scope reads. Defaults to deny once `scopeResolver` is set; defaults to any authenticated admin user without it. |
 | `posthog({ scopeProperty })` | Lets one PostHog project serve per-scope reads by filtering on an event property. |
-| `posthogProxyRewrites` | Next.js rewrites for a first-party PostHog reverse proxy. |
+| `capture.slots` | Which adapter captures for the platform (`global`) and for the request's tenant (`tenant`). See [Capture slots per tenant](#capture-slots-per-tenant). |
+| `captureRewrites` | Next.js rewrites for a first-party vendor proxy, when you would rather not serve it from the app. |
 | `reportingTimezone` | Aligns daily boundaries to a timezone, per install or per tenant. See [Reporting timezone](/analytics/timezone). |
 
 ## 1. Resolve the tenant as the scope
@@ -58,7 +59,7 @@ With a `scopeResolver` configured, the native engine adds an indexed `scope` col
 
 The tenant-selector cookie is set client-side, so a `scopeResolver` must never trust it alone: validate it against `req.user`'s own tenant assignments (`getUserTenantIDs`, shown above) before treating it as that request's scope, and throw when it names a tenant the user does not belong to, the same fail-closed handling every scopeResolver failure gets (reads degrade to unavailable, provider access denies, provider writes reject). A platform admin bypasses the check, since they are allowed to select any tenant.
 
-The same resolver also runs on the native ingest endpoint, which a visitor's browser calls with no admin session and no `plugin-multi-tenant` cookie at all. A real install must resolve the ingest scope from something the request itself carries independent of any admin cookie, typically the request's hostname (one domain per tenant) or a site key embedded in the tracking snippet. Resolving scope from an admin's tenant-selector cookie, as the recipe above and the plugin's dev app do, only works for admin-authenticated requests (dashboard reads, and the dev app's own seed traffic); it is a shortcut for generating tenant-attributed data in development, not a pattern for a real install's ingest path.
+The same resolver also runs on the three public endpoints a visitor's browser calls with no admin session and no `plugin-multi-tenant` cookie at all: the native ingest endpoint, the tracker config endpoint, and the capture proxy. A real install must resolve those from something the request itself carries independent of any admin cookie, typically the request's hostname (one domain per tenant). The recipe above resolves from the tenant-selector cookie alone, which only works for admin-authenticated requests (dashboard reads, and seeding tenant-attributed data in development); it is not a pattern for a real install's capture path. The plugin's dev app resolves anonymous traffic by hostname and falls back to the selector only for `req.user`, which is the shape to copy (see [Dev app: TENANCY=on](#dev-app-tenancyon)). [Capture slots per tenant](#capture-slots-per-tenant) has the resolver, and what goes wrong with the alternatives.
 
 ## 2. Register the provider collection per tenant
 
@@ -99,29 +100,75 @@ await encryptExistingData(payload, { collections: ['analytics-providers'] })
 
 The platform (host) project captures events from **all** tenant pages through the app's own domain, which also survives ad blockers. Wire PostHog's recommended reverse proxy with the exported helper:
 
+The plugin's [runtime proxy](/analytics/proxy#runtime-endpoint) already serves the platform's slot at `/api/analytics/p/global` with no config, and `<AnalyticsScripts />` renders PostHog's snippet pointed at it. Use Next rewrites instead when you would rather the beacons never touched your app server:
+
 ```ts
 // next.config.ts
-import { posthogProxyRewrites } from '@10x-media/analytics/next'
+import { captureRewrites } from '@10x-media/analytics/next'
+import { posthog } from '@10x-media/analytics/adapters/posthog'
 
 const nextConfig = {
   skipTrailingSlashRedirect: true, // PostHog capture endpoints use trailing slashes
   async rewrites() {
-    return posthogProxyRewrites({ path: '/ph', region: 'eu' })
+    return captureRewrites([
+      // projectToken is what makes the adapter declare capture; the read
+      // credentials are unused here.
+      { path: '/ph', adapter: posthog({ projectId: '', apiKey: '', region: 'eu', projectToken: 'phc_...' }) },
+    ])
   },
 }
 ```
 
-Point the snippet at the proxied path and stamp every event with the tenant:
+Then point the slot at that path so its snippet stops using the runtime mount, and stamp every event with the tenant:
 
 ```ts
-posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY, {
-  api_host: '/ph',
-  ui_host: 'https://eu.posthog.com',
-})
+analytics({ capture: { paths: { global: '/ph' } } })
+
+// in the browser, once the SDK has loaded
 posthog.register({ tenant: currentTenantId })
 ```
 
+`posthogProxyRewrites` still works and is now a deprecated wrapper over `captureRewrites`.
+
 The `scopeProperty: 'tenant'` on the platform adapter (step 1) closes the loop: a tenant admin's dashboard reads through the shared PostHog project, and the adapter filters `properties['tenant']` to their scope. Tenants see their slice; nobody needs per-tenant PostHog credentials.
+
+### Capture slots per tenant
+
+A scoped install fills two [capture slots](/analytics/capture#capture-slots) per request: `global` from the config registry (the `platformAdapter`, or `capture.slots.global`), and `tenant` from the request's own resolved scope's registry, which includes that scope's runtime providers. So one page can send to the platform's PostHog and to the tenant's own Plausible at once. When both slots resolve to the same adapter, only the global entry survives, so a scoped native install never posts every event twice.
+
+The `tenant` slot is empty whenever no scope resolves, and nothing is captured for it. A provider document fills it only once its **public** capture fields are set, since an adapter declares capture support from those alone: `projectToken` (plus the optional `region`) for PostHog, `domain` or `scriptId` for Plausible, `websiteId` for Umami. They sit beside the sealed credentials in the provider document, unencrypted because the tracker serves them to the browser; a document holding only query credentials reads dashboards and captures nothing.
+
+<Callout type="warn">
+The tracker endpoint and the capture proxy are **public and unauthenticated**: a visitor's browser calls them with no admin session. Your `scopeResolver` runs on those requests too.
+
+Two consequences. A resolver that derives the scope from something a client controls, a header or a query parameter, is attacker-reachable there: anyone can attribute traffic (and revenue) to any tenant. And a resolver that needs `req.user` resolves nothing for a visitor, so the tenant slot is simply always empty and the install captures nothing per tenant.
+
+**The hostname is a request header too.** `Host` is as forgeable as any other header, so hostname resolution is only trustworthy when something upstream guarantees it: the deployment rejects unknown hosts at the edge (a platform that routes by verified domain, or an explicit `server_name` allowlist), or the resolver itself matches the host against domains it already knows. Do both if you can. A resolver that looks a tenant up by whatever label the header happens to carry is the same spoof with extra steps.
+
+So: resolve public traffic from the hostname, match it against the tenant's own stored domain rather than parsing a label out of it, and fail closed to the null scope on no match. The admin-session path can still win where it applies, so an admin browsing a tenant's own domain is attributed by their selector rather than by the host.
+</Callout>
+
+```ts
+scopeResolver: async ({ req }) => {
+  if (req.user) {
+    return resolveFromSelector(req) // the admin path from step 1
+  }
+  // Matched against a stored domain, never a parsed label: an unknown Host
+  // finds no tenant and falls through to the null scope.
+  const host = req.headers.get('host')?.split(':')[0].toLowerCase() ?? ''
+  const { docs } = await req.payload.find({
+    collection: 'tenants',
+    where: { domain: { equals: host } },
+    limit: 1,
+    overrideAccess: true,
+  })
+  return docs[0] ? String(docs[0].id) : null
+}
+```
+
+Pair that with an edge that refuses requests for hosts you do not serve. Without it, an attacker who can reach your origin directly sets `Host: alpha.example.com` and books conversions against alpha, and the resolver above cannot tell the difference: it is matching a value the deployment was supposed to have already vouched for.
+
+`capture.slots.<slot>: false` opts a slot out entirely: it fills with nothing, its proxy mount 404s, and the tracker config omits it.
 
 ## 4. Who sees what
 
@@ -170,6 +217,8 @@ The plugin's dev app (`packages/analytics/dev`) is the reference wiring for this
 | `beta@10xmedia.de` / `password` | The `beta` tenant's own dashboard and its own `Beta Plausible` provider, at 1x scale. |
 
 The dev app's `platformAdapter` is the in-memory config adapter, which declares no `scopedQueries`, so alpha and beta cannot read it as a data source: it is gated behind `access.platformRead` like any other non-scope-filtering config adapter (see [Who sees what](#4-who-sees-what)), and only `dev@10xmedia.de` passes that gate. A real platform adapter needs a `scopeProperty` (PostHog) or to be `native` to serve tenants directly, the same requirement called out there.
+
+The dev app's tenancy resolver is the two-branch shape above: an admin session resolves through the tenant selector, and anonymous frontend traffic resolves from the first hostname label, so `alpha.localhost:<port>` fills the tenant slot with alpha's native adapter. Plain `localhost` matches no tenant and captures nothing. The global slot is always empty: the dev `platformAdapter` is the in-memory demo source, which declares no capture support. The label parsing is a playground shortcut, not the pattern to copy; a real install matches the host against a stored domain, as [above](#capture-slots-per-tenant).
 
 Both tenant admins' "Analytics providers" nav link redirects straight to their own tenant's document rather than a list, and so does the platform admin's, to whichever tenant is currently selected: the `isGlobal: true` behavior from [step 2](#2-register-the-provider-collection-per-tenant) applies uniformly.
 

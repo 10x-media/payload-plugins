@@ -1,6 +1,8 @@
 import type { Payload, PayloadRequest } from 'payload'
 import type { ResolvedBinding } from '../binding/types'
+import type { CaptureSlotOption, ConsentPolicy, ResolvedAutoCapture } from '../core/options'
 import type { AdapterRegistry, RegistryResolver, ResolveRegistryArgs } from '../core/registry'
+import type { Goal } from '../goals/types'
 import type { Engine } from '../surfacing/engine'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 
@@ -14,6 +16,33 @@ export interface AnalyticsRuntime {
 	resolveTimezone?: (req: PayloadRequest, scope?: string | null) => Promise<string>
 	/** Id of the config adapter shared by every scope, when one is designated. */
 	platformAdapterId?: string
+	/** `capture.slots` overrides naming the adapter that fills each capture slot. */
+	captureSlots?: { global?: CaptureSlotOption; tenant?: CaptureSlotOption }
+	/**
+	 * `capture.paths` overrides for a slot's mount. Unset, the tracker config derives the
+	 * runtime proxy mount; set when the slot is served through Next rewrites instead.
+	 */
+	capturePaths?: { global?: string; tenant?: string }
+	/**
+	 * Whether a slot's tracker waits for consent, evaluated per request-resolved adapter.
+	 * Absent runtimes fall back to the default: no gate for native, one for a vendor.
+	 */
+	consentFor?: ConsentPolicy
+	/** Browser auto-capture toggles handed to the tracker; absent runtimes default all on. */
+	autoCapture?: ResolvedAutoCapture
+	/** Config goals; the tracker receives their slug and match only. */
+	goals?: Goal[]
+	/**
+	 * Where the ingest endpoint listens, relative to `routes.api`, lifted at init from the
+	 * adapter that registered one. Absent runtimes fall back to the default mount.
+	 */
+	ingestPath?: string
+	/**
+	 * `capture.proxy` limits for the runtime capture proxy. Deliberately separate from
+	 * `cache.timeoutMs`: that is a per-read provider deadline for authenticated dashboard
+	 * queries, this is a public request path with entirely different traffic.
+	 */
+	captureProxy?: { timeoutMs: number; maxBodyBytes: number }
 	/** True when the app configured a scopeResolver (scoped install); mirrors `resolved.scoped`. */
 	scoped?: boolean
 	/**

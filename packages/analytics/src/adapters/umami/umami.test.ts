@@ -140,3 +140,68 @@ describe('umami adapter', () => {
 		expect(result.totals?.visitors).toBe(20)
 	})
 })
+
+describe('umami capture', () => {
+	it('builds the two proxy routes against the cloud script/collector hosts by default', () => {
+		const capture = umami({ websiteId: 'w', apiKey: 'k' }).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/script.js', upstream: 'https://cloud.umami.is/script.js' },
+			{ source: '/api/send', upstream: 'https://gateway.umami.is/api/send' },
+		])
+	})
+
+	it('builds the two proxy routes against the self-hosted app origin, stripping the /api suffix', () => {
+		const capture = umami({
+			websiteId: 'w',
+			token: 't',
+			host: 'https://analytics.example.com/api',
+		}).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js' },
+			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send' },
+		])
+	})
+
+	it('derives the same origin from a host without the /api suffix', () => {
+		const capture = umami({
+			websiteId: 'w',
+			token: 't',
+			host: 'https://analytics.example.com',
+		}).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js' },
+			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send' },
+		])
+	})
+
+	it('derives the same origin from a host with a trailing slash', () => {
+		const capture = umami({
+			websiteId: 'w',
+			token: 't',
+			host: 'https://analytics.example.com/api/',
+		}).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js' },
+			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send' },
+		])
+	})
+
+	it('renders the tracker script tag with the website id and proxy path', () => {
+		const capture = umami({ websiteId: 'w', apiKey: 'k' }).capture
+		expect(capture?.snippet({ path: '/um' })).toEqual({
+			scripts: [
+				{
+					src: '/um/script.js',
+					defer: true,
+					attrs: { 'data-website-id': 'w', 'data-host-url': '/um' },
+				},
+			],
+		})
+	})
+
+	it('client carries only the kind, no api key or token', () => {
+		const capture = umami({ websiteId: 'w', apiKey: 'secret', token: 'also-secret' }).capture
+		expect(capture?.client).toEqual({ kind: 'umami' })
+		expect(JSON.parse(JSON.stringify(capture?.client))).toEqual({ kind: 'umami' })
+	})
+})

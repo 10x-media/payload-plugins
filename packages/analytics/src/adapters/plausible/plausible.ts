@@ -1,3 +1,4 @@
+import type { CaptureSupport } from '../../core/capture'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -18,6 +19,62 @@ export interface PlausibleConfig {
 	host?: string
 	/** Maximum days of historical data. Defaults to 730. Pass null to disable clamping. */
 	maxLookbackDays?: number | null
+	/**
+	 * Site domain for the legacy script tag (`data-domain`). Takes priority over `scriptId`.
+	 * The adapter declares `capture` only when one of the two is set.
+	 */
+	domain?: string
+	/**
+	 * Per-site tracker id (`pa-<id>.js`) for the newer per-site script model. The adapter
+	 * declares `capture` only when one of it and `domain` is set.
+	 */
+	scriptId?: string
+}
+
+/**
+ * Plausible's official per-site stub, as served on plausible.io's own pages: `plausible.q`
+ * queues calls the tracker replays on load, and `plausible.init` parks the options on
+ * `plausible.o` for it to read. It makes the inline safe next to the async loader in either
+ * order, which the bare `plausible.init(...)` call was not. `init` is guarded with `||`
+ * (the official one assigns unconditionally) because here the tracker is a separate async
+ * tag and may win the race, and overwriting the real `init` with the stub would lose the
+ * endpoint.
+ */
+const PLAUSIBLE_STUB =
+	'window.plausible=window.plausible||function(){(window.plausible.q=window.plausible.q||[]).push(arguments)},window.plausible.init=window.plausible.init||function(e){window.plausible.o=e||{}};'
+
+function buildCapture(config: PlausibleConfig): CaptureSupport {
+	const base = config.host ?? 'https://plausible.io'
+	const scripts = (path: string) => {
+		if (config.domain) {
+			return [
+				{
+					src: `${path}/js/script.js`,
+					defer: true,
+					attrs: { 'data-domain': config.domain, 'data-api': `${path}/api/event` },
+				},
+			]
+		}
+		if (config.scriptId) {
+			return [
+				{ src: `${path}/js/pa-${config.scriptId}.js`, async: true },
+				{
+					inline: `${PLAUSIBLE_STUB}plausible.init({endpoint:${JSON.stringify(`${path}/api/event`)}})`,
+				},
+			]
+		}
+		return []
+	}
+	return {
+		proxy: {
+			routes: [
+				{ source: '/js/:script*', upstream: `${base}/js/:script*` },
+				{ source: '/api/event', upstream: `${base}/api/event` },
+			],
+		},
+		snippet: ({ path }) => ({ scripts: scripts(path) }),
+		client: { kind: 'plausible' },
+	}
 }
 
 const METRIC_MAP: Partial<Record<MetricKey, string>> = {
@@ -83,6 +140,7 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 		id: 'plausible',
 		label: 'Plausible',
 		capabilities,
+		...(config.domain || config.scriptId ? { capture: buildCapture(config) } : {}),
 		isConfigured: () => Boolean(config.siteId && config.apiKey),
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()

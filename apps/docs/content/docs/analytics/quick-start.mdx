@@ -51,33 +51,44 @@ Then regenerate the import map so the admin resolves the plugin's server compone
 payload generate:importmap
 ```
 
-## Send events
+## Capture events
 
-The native engine registers a public beacon endpoint at `POST /api/analytics/ingest`. Call it from your frontend on navigation:
+Boot the browser tracker from your root layout. It sends pageviews (including SPA route changes), outbound-link and file-download events, and any goal you tag:
 
-```ts title="track.ts"
-navigator.sendBeacon(
-  '/api/analytics/ingest',
-  JSON.stringify({
-    type: 'pageview',
-    path: location.pathname,
-    hostname: location.hostname,
-    referrer: document.referrer || undefined,
-  })
-)
+```tsx title="app/layout.tsx"
+import { AnalyticsScripts, getTrackerConfig } from '@10x-media/analytics/rsc'
+import config from '@payload-config'
+import { headers } from 'next/headers'
+import { getPayload } from 'payload'
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const payload = await getPayload({ config })
+  const tracker = await getTrackerConfig(payload, { headers: await headers() })
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <AnalyticsScripts config={tracker} />
+      </body>
+    </html>
+  )
+}
 ```
 
-`type`, `path`, and `hostname` are required; see [Native engine](/analytics/native#the-ingest-endpoint) for the full event shape.
+Outside Next, `initTracker()` from `@10x-media/analytics/tracker` does the same from the browser. Full setup, including consent and the vendor slots, is on [Capture](/analytics/capture).
+
+The native engine's beacon endpoint (`POST /api/analytics/ingest`) stays public, so a host that would rather post events itself still can; see [Native engine](/analytics/native#the-ingest-endpoint) for the event shape.
 
 ## Verify
 
-1. Hit a few frontend pages (or POST to the ingest endpoint by hand).
+1. Hit a few frontend pages.
 2. Open the admin dashboard: the trend, metric, and breakdown widgets show the traffic.
 3. Open a `pages` document whose slug matches a tracked path: the stat row shows that document's numbers.
 
 ## Where to go next
 
-- Point the plugin at an existing provider instead: [Adapters](/analytics/adapters).
+- Point the plugin at an existing provider instead: [Adapters](/analytics/adapters), and serve its tracker from your own origin with the [first-party proxy](/analytics/proxy).
+- Mark conversions and read revenue: [Goals](/analytics/goals).
 - Bind more collections and tune the fields: [Display fields](/analytics/display-fields).
 - Configure the dashboard: [Widgets](/analytics/widgets).
 - Production concerns: [geo resolution](/analytics/geo), [caching and warming](/analytics/cache), [retention](/analytics/native#retention-pruning), and the Mongo `ensureIndexes` note in [Native engine](/analytics/native#production-note-mongo).

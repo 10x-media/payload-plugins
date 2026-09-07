@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { RollupDoc } from './rollupAcc'
-import { selectMetrics, seriesFromRollups } from './rollupAcc'
+import type { Acc, RollupDoc } from './rollupAcc'
+import { emptyAcc, selectMetrics, seriesFromRollups } from './rollupAcc'
 
 const doc = (over: Partial<RollupDoc>): RollupDoc => ({
 	path: '',
@@ -14,18 +14,37 @@ const doc = (over: Partial<RollupDoc>): RollupDoc => ({
 	...over,
 })
 
+const acc = (over: Partial<Acc> = {}): Acc => ({ ...emptyAcc(), ...over })
+
 describe('selectMetrics', () => {
 	it('projects only the requested metrics and derives avgDuration', () => {
-		const acc = { pageviews: 4, events: 1, durationMs: 8000, visitors: 2, sessions: 3 }
-		expect(selectMetrics(acc, ['pageviews', 'avgDuration'])).toEqual({
-			pageviews: 4,
-			avgDuration: 2000,
-		})
+		expect(
+			selectMetrics(acc({ pageviews: 4, events: 1, durationMs: 8000, visitors: 2, sessions: 3 }), [
+				'pageviews',
+				'avgDuration',
+			])
+		).toEqual({ pageviews: 4, avgDuration: 2000 })
 	})
 
 	it('avgDuration is 0 when there are no pageviews', () => {
-		const acc = { pageviews: 0, events: 0, durationMs: 0, visitors: 0, sessions: 0 }
-		expect(selectMetrics(acc, ['avgDuration'])).toEqual({ avgDuration: 0 })
+		expect(selectMetrics(acc(), ['avgDuration'])).toEqual({ avgDuration: 0 })
+	})
+
+	it('serves conversions and revenue straight from the accumulator', () => {
+		expect(
+			selectMetrics(acc({ conversions: 3, revenue: 41.5 }), ['conversions', 'revenue'])
+		).toEqual({ conversions: 3, revenue: 41.5 })
+	})
+
+	it('averages scrollDepth over the pageviews that reported one', () => {
+		// 75 + 25 over two reporting pageviews, with a third pageview that never reported.
+		expect(
+			selectMetrics(acc({ pageviews: 3, scrollDepthSum: 100, scrollSamples: 2 }), ['scrollDepth'])
+		).toEqual({ scrollDepth: 50 })
+	})
+
+	it('scrollDepth is 0 when no pageview reported a depth', () => {
+		expect(selectMetrics(acc({ pageviews: 5 }), ['scrollDepth'])).toEqual({ scrollDepth: 0 })
 	})
 })
 

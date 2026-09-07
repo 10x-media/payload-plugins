@@ -1,6 +1,14 @@
+import { AnalyticsScripts, getTrackerConfig } from '@10x-media/analytics/rsc'
+import config from '@payload-config'
+import { headers } from 'next/headers'
+import { getPayload } from 'payload'
 import type { ReactNode } from 'react'
 
-export default function AppLayout({ children }: { children: ReactNode }) {
+export default async function AppLayout({ children }: { children: ReactNode }) {
+	const payload = await getPayload({ config })
+	// The incoming headers go in so the install's scopeResolver sees the same request it
+	// would over the public tracker endpoint; the dev app sets no CSP, so there is no nonce.
+	const tracker = await getTrackerConfig(payload, { headers: await headers() })
 	return (
 		// Canvas/CanvasText follow the declared color-scheme, so the demo stays legible
 		// in a dark-mode browser without a media query.
@@ -17,6 +25,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
 				}}
 			>
 				{children}
+				<AnalyticsScripts config={tracker} />
 			</body>
 		</html>
 	)

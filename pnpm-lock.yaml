@@ -346,6 +346,10 @@ importers:
         version: 5.9.3
 
   packages/analytics:
+    dependencies:
+      path-to-regexp:
+        specifier: 6.3.0
+        version: 6.3.0
     devDependencies:
       '@10x-media/fields':
         specifier: workspace:*
@@ -377,6 +381,9 @@ importers:
       '@playwright/test':
         specifier: 'catalog:'
         version: 1.60.0
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.19
@@ -386,6 +393,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.15)
+      jsdom:
+        specifier: 'catalog:'
+        version: 25.0.1
       maxmind:
         specifier: ^4.3.24
         version: 4.3.29
