@@ -23,7 +23,7 @@ Every type also takes `label`, `group`, `icon`, `order`, `keywords`, `badge` and
 
 Renders Payload's list view in drawer mode, and its edit view when a row is picked. Creating, filtering, sorting, bulk actions, drafts, uploads and relationship drawers all work as they do on a page.
 
-Delete, duplicate, restore from trash and "create new" sit in a dots menu on the edit view, as they do on a page, and act on the panel rather than navigating away from it. The plugin appends the menu to the collection's `admin.components.edit.beforeDocumentControls`; if the collection already sets that, the plugin's entry is added after yours.
+Delete, duplicate, restore from trash and "create new" sit in a dots menu on the edit view, as they do on a page, and act on the panel rather than navigating away from it. Delete honours trash when the collection has it, including the "delete permanently" option. The plugin appends the menu to the collection's `admin.components.edit.beforeDocumentControls`; if the collection already sets that, the plugin's entry is added after yours. Duplicating into selected locales is the one action the panel does not carry.
 
 The collection is hidden from the nav and from `/admin/collections/tags` unless the overlay sets `hideEntities: false`.
 

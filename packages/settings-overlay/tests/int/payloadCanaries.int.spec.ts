@@ -34,25 +34,27 @@ describe('payload canaries', () => {
 		expect(clientExports).not.toContain('DocumentDrawerContextProvider')
 	})
 
-	it('the action components the pane borrows are still reachable by subpath', async () => {
-		// `client/documentActions.tsx` imports these four from `@payloadcms/ui/elements/*` rather
-		// than reimplementing them, so their logic stays Payload's. A rename breaks the build; a
-		// dropped export map entry would not, which is what this checks.
-		const exportMap = JSON.parse(await readDist('@payloadcms/ui/package.json')) as {
-			exports: Record<string, unknown>
-		}
+	it('the action components are still absent from the client barrel', async () => {
+		const clientExports = await readDist('@payloadcms/ui/dist/exports/client/index.d.ts')
 
-		expect(exportMap.exports['./elements/*']).toBeDefined()
+		// `client/documentActions.tsx` rewrites delete, duplicate and restore rather than reusing
+		// Payload's components. Not by preference: `exports/client` is a bundled artifact with its
+		// own copy of every provider, so a component pulled in through `@payloadcms/ui/elements/*`
+		// reads a second, never-mounted context and throws. Exporting them from the barrel is what
+		// would let that file shrink to a menu.
+		expect(clientExports).toContain('DocumentControls')
+		expect(clientExports).not.toContain('DeleteDocument')
+		expect(clientExports).not.toContain('RestoreButton')
+	})
 
-		for (const element of [
-			'DeleteDocument',
-			'DuplicateDocument',
-			'PermanentlyDeleteButton',
-			'RestoreButton',
-		]) {
-			await expect(
-				readDist(`@payloadcms/ui/dist/elements/${element}/index.d.ts`)
-			).resolves.toContain(element)
-		}
+	it('the client barrel is still a bundle, which is why subpath imports cannot be used', async () => {
+		const barrel = await readDist('@payloadcms/ui/dist/exports/client/index.js')
+		const unbundled = await readDist('@payloadcms/ui/dist/elements/DeleteDocument/index.js')
+
+		// Two builds of the same code. The barrel inlines its providers into local chunks; the
+		// unbundled tree imports `dist/providers/*` by relative path. The admin mounts the former,
+		// so the latter's hooks answer from contexts nothing ever provided.
+		expect(barrel).toMatch(/from"\.\/chunk-[A-Z0-9]+\.js"/)
+		expect(unbundled).toContain("from '../../providers/Config/index.js'")
 	})
 })

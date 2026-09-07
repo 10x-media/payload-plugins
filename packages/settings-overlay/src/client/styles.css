@@ -514,6 +514,11 @@
 	order: 1;
 }
 
+/* Matches the spacing Payload gives the same checkbox in its own delete and restore modals. */
+.settings-overlay__doc-actions__checkbox {
+	margin-top: var(--base);
+}
+
 /*
  * `disableActions` gates only the dots menu. Payload's restore and permanent-delete buttons
  * render beside it, wired to a drawer context the pane cannot provide, so the panel replaces
