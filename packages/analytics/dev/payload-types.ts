@@ -114,6 +114,7 @@ export interface Config {
     'analytics-breakdown-sources': AnalyticsBreakdownSourcesWidget;
     'analytics-breakdown-devices': AnalyticsBreakdownDevicesWidget;
     'analytics-breakdown-countries': AnalyticsBreakdownCountriesWidget;
+    'analytics-breakdown-goals': AnalyticsBreakdownGoalsWidget;
     'dev-custom-sources': DevCustomSourcesWidget;
     collections: CollectionsWidget;
   };
@@ -235,7 +236,7 @@ export interface AnalyticsProvider {
 export interface AnalyticsEvent {
   id: string;
   timestamp: string;
-  type: 'pageview' | 'event';
+  type: 'pageview' | 'event' | 'goal';
   name?: string | null;
   path: string;
   hostname: string;
@@ -249,6 +250,18 @@ export interface AnalyticsEvent {
   sessionId: string;
   durationMs?: number | null;
   props?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  value?: number | null;
+  currency?: string | null;
+  scrollDepth?: number | null;
+  goals?:
     | {
         [k: string]: unknown;
       }
@@ -278,6 +291,10 @@ export interface AnalyticsRollup {
   visitors: number;
   sessions: number;
   samples: number;
+  conversions: number;
+  revenue: number;
+  scrollDepthSum: number;
+  scrollSamples: number;
   updatedAt: string;
   createdAt: string;
 }
@@ -611,6 +628,10 @@ export interface AnalyticsEventsSelect<T extends boolean = true> {
   sessionId?: T;
   durationMs?: T;
   props?: T;
+  value?: T;
+  currency?: T;
+  scrollDepth?: T;
+  goals?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -631,6 +652,10 @@ export interface AnalyticsRollupsSelect<T extends boolean = true> {
   visitors?: T;
   sessions?: T;
   samples?: T;
+  conversions?: T;
+  revenue?: T;
+  scrollDepthSum?: T;
+  scrollSamples?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -771,7 +796,16 @@ export interface PayloadJobsStatsSelect<T extends boolean = true> {
 export interface AnalyticsMetricWidget {
   data?: {
     title?: string | null;
-    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'bounceRate' | 'events';
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
     timeframe:
       | 'today'
       | 'last7days'
@@ -797,7 +831,16 @@ export interface AnalyticsMetricWidget {
 export interface AnalyticsTrendWidget {
   data?: {
     title?: string | null;
-    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'bounceRate' | 'events';
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
     timeframe:
       | 'today'
       | 'last7days'
@@ -836,7 +879,16 @@ export interface AnalyticsRealtimeWidget {
 export interface AnalyticsBreakdownPagesWidget {
   data?: {
     title?: string | null;
-    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'bounceRate' | 'events';
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
     timeframe:
       | 'today'
       | 'last7days'
@@ -863,7 +915,16 @@ export interface AnalyticsBreakdownPagesWidget {
 export interface AnalyticsBreakdownSourcesWidget {
   data?: {
     title?: string | null;
-    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'events';
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
     timeframe:
       | 'today'
       | 'last7days'
@@ -890,7 +951,16 @@ export interface AnalyticsBreakdownSourcesWidget {
 export interface AnalyticsBreakdownDevicesWidget {
   data?: {
     title?: string | null;
-    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'bounceRate' | 'events';
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
     timeframe:
       | 'today'
       | 'last7days'
@@ -917,7 +987,52 @@ export interface AnalyticsBreakdownDevicesWidget {
 export interface AnalyticsBreakdownCountriesWidget {
   data?: {
     title?: string | null;
-    metric: 'pageviews' | 'visitors' | 'sessions' | 'avgDuration' | 'bounceRate' | 'events';
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-goals_widget".
+ */
+export interface AnalyticsBreakdownGoalsWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
     timeframe:
       | 'today'
       | 'last7days'

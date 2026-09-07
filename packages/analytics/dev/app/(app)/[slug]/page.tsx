@@ -2,7 +2,6 @@ import config from '@payload-config'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
-import { TrackPageview } from '../../../components/TrackPageview'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +19,6 @@ export default async function DevPage({ params }: { params: Promise<{ slug: stri
 	}
 	return (
 		<main>
-			<TrackPageview />
 			<p>
 				<Link href="/">&larr; All pages</Link>
 			</p>
