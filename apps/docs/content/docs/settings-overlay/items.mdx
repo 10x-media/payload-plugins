@@ -1,0 +1,165 @@
+---
+title: Items
+description: The five row types, what each is for, and when each is fetched.
+---
+
+An overlay is a list of items. Each item is one row in the rail and one thing the pane can show. There is one source field per type and no mutually exclusive branches inside a type.
+
+| Type | Source | Own URL | Fetched |
+|---|---|---|---|
+| `collection` | `slug` | no, the plugin hides it | on open |
+| `global` | `slug` | no, the plugin hides it | on open |
+| `component` | `component` | no | with the page, or on open with `lazy: true` |
+| `view` | `viewKey` | yes | on open |
+| `link` | `href` | n/a | n/a |
+
+Every type also takes `label`, `group`, `icon`, `order`, `keywords`, `badge` and `access`. A collection or global with no `label` or `group` inherits the ones it already declares.
+
+## `collection`
+
+```ts
+{ type: 'collection', slug: 'tags' }
+```
+
+Renders Payload's list view in drawer mode, and its edit view when a row is picked. Creating, filtering, sorting, bulk actions, drafts, uploads and relationship drawers all work as they do on a page.
+
+The collection is hidden from the nav and from `/admin/collections/tags` unless the overlay sets `hideEntities: false`. An entity may live in one overlay only; listing it twice is a boot error.
+
+### `resolveDocID`
+
+A collection that holds one document per something, rather than a list, can skip the list entirely:
+
+```ts
+{
+  type: 'collection',
+  slug: 'site-settings',
+  resolveDocID: async ({ item, req }) => {
+    const found = await req.payload.find({
+      collection: item.slug,
+      where: { owner: { equals: req.user?.id } },
+      limit: 1,
+      select: { id: true },
+    })
+    return found.docs[0]?.id ?? 'create'
+  },
+}
+```
+
+Return a document id to open it, `'create'` for the create form, or `null` to fall back to the ordinary list. The row then leads straight into the document and the back chevron is not drawn.
+
+The id is resolved on every open and is **not** written into the URL: "the current tenant's document" or "my profile" changes with who or what is selected, so a pinned id goes stale. A resolver that throws falls back to the list rather than removing the row.
+
+`tenantGlobalItem` is the ready-made version for `@payloadcms/plugin-multi-tenant` globals:
+
+```ts
+import { tenantGlobalItem } from '@10x-media/settings-overlay/items'
+
+items: [tenantGlobalItem({ slug: 'site-settings' })]
+```
+
+It reads the tenant cookie, finds that tenant's document, and creates the draft first when the collection has autosave enabled, because an autosave collection has no usable create form. The multi-tenant plugin is an optional peer dependency needed only by this helper; the plugin core knows nothing about tenants, only about `resolveDocID`.
+
+## `global`
+
+```ts
+{ type: 'global', slug: 'branding' }
+```
+
+The same edit view a global gets on its own route. Hidden from the nav on the same terms as a collection.
+
+## `component`
+
+```ts
+{ type: 'component', slug: 'about', label: 'About', component: './About#About' }
+```
+
+A component that exists only inside the panel. It may be a server or a client component: the plugin renders it the way Payload renders any custom component and hands server props only to the former.
+
+By default it is rendered on the server with the rest of the page, so opening the row costs no request. That is right for anything that reads cookies, config or nothing at all. A component that reads the **database** should say so:
+
+```ts
+{ type: 'component', slug: 'usage', label: 'Usage', component: './Usage#Usage', lazy: true }
+```
+
+A lazy component is fetched when the row is opened, with a real request, and never runs on a page load where nobody opened the panel.
+
+Both forms receive `settingsOverlayEmbed`: a client component reads it with `useSettingsOverlayEmbed()`, a server component gets it as a prop. See [Customization](/settings-overlay/customization).
+
+## `view`
+
+```ts
+{ type: 'view', slug: 'audit', label: 'Audit log', viewKey: 'auditLogs' }
+```
+
+A view already registered in `admin.components.views`, by yours or by another plugin. It receives the page props it was written for, so it works unchanged.
+
+Because it has a route of its own, the "one way in" rule does not apply and the plugin does not hide it. The key must exist when this plugin runs, so `settingsOverlay` goes **after** whatever registers the view; a missing key is a boot error naming both.
+
+A view that wraps itself in `DefaultTemplate` draws a second sidebar inside the panel unless it is told where it is. See [Embedded views](/settings-overlay/embedded-views).
+
+## `link`
+
+```ts
+{ type: 'link', slug: 'account', label: 'Account', href: '/account' }
+```
+
+Closes the panel and navigates, asking first if the open document has unsaved edits. `href` is relative to the admin route.
+
+## Groups
+
+A row with a `group` joins that heading; rows without one form the ungrouped block, which always renders first.
+
+Groups are collapsible, like the admin's own nav groups. The reader's choice is stored per overlay under this plugin's own preference key, so a panel group called "Content" and a sidebar group of the same name do not collapse each other. It is read back on the server, so the rail arrives in the state they left it.
+
+The ungrouped block has no heading, so there is nothing to collapse it by and it always renders open.
+
+To change how a group renders, or to stop it collapsing, replace the [`RailGroup` slot](/settings-overlay/customization):
+
+```tsx
+'use client'
+import { SettingsRailItems } from '@10x-media/settings-overlay/client'
+
+export const Group = ({ group }: { group: { label: null | string } }) => (
+  <section>
+    {group.label && <h4>{group.label}</h4>}
+    <SettingsRailItems group={group.label} />
+  </section>
+)
+```
+
+## Ordering
+
+Items and groups keep the order they were declared in, with the ungrouped block first. `order` moves a single row:
+
+```ts
+{ type: 'link', slug: 'account', label: 'Account', href: '/account', order: 100 }
+```
+
+For anything more, the overlay takes sort functions:
+
+```ts
+sort: {
+  groups: (group) => group.label ?? undefined,
+  items: (item, group, { locale }) => item.slug,
+}
+```
+
+Returning `undefined` means "leave it where it was", which is what makes the sort stable: only rows the function has an opinion about move, and keyed rows sort before unkeyed ones.
+
+## Badges
+
+```ts
+{ type: 'collection', slug: 'imports', badge: { type: 'collection-count' } }
+{ type: 'link', slug: 'queue', href: '/queue', label: 'Queue', badge: { type: 'api', endpoint: '/api/queue/pending', responseKey: 'count' } }
+{ type: 'component', slug: 'inbox', label: 'Inbox', component: './Inbox#Inbox', badge: { type: 'provider', slug: 'inbox' } }
+```
+
+`collection-count` and `api` are fetched by the plugin and cached for a minute; a rail badge is a hint, not a live counter. `provider` reads a value you publish yourself:
+
+```tsx
+import { BadgeProvider } from '@10x-media/settings-overlay/client'
+
+<BadgeProvider values={{ inbox: unreadCount }}>{children}</BadgeProvider>
+```
+
+A host value always wins over one the plugin fetched.

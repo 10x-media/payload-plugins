@@ -1,0 +1,92 @@
+---
+title: Configuration
+description: Every option the plugin takes, in one place.
+---
+
+## Plugin options
+
+```ts
+settingsOverlay({
+  overlays: [...],
+  defaults: { layout: 'compact', searchable: false },
+  disabled: process.env.NODE_ENV === 'test',
+  translations: { de: { 'settingsOverlay:close': 'Zu' } },
+})
+```
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `overlays` | `SettingsOverlayConfig[]` | required | The panels. |
+| `defaults` | `Pick<SettingsOverlayConfig, 'addressable' \| 'components' \| 'hideEntities' \| 'layout' \| 'mergeListHeader' \| 'searchable'>` | `{}` | Applied under each overlay's own settings. `components` merges per slot. |
+| `disabled` | `boolean` | `false` | Returns the incoming config untouched. |
+| `lazyTransport` | `'widget' \| 'server-function'` | `'widget'` | How a `view` or `lazy` item reaches the server. See [Lazy items](/settings-overlay/embedded-views#how-a-lazy-item-reaches-the-server). |
+| `translations` | `TranslationsOption` | | Per-locale string overrides. See [i18n](/settings-overlay/i18n). |
+
+## Overlay
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `id` | `string` | required | Unique. Appears in the URL and in the CSS class. |
+| `label` | `LocalizedLabel` | required | The rail's heading. |
+| `items` | `SettingsOverlayItem[]` | required | The rows. See [Items](/settings-overlay/items). |
+| `icon` | `PayloadComponent` | | Drawn beside the rail heading. |
+| `access` | `({ overlay, req }) => boolean` | open | The door to the whole panel. See [Access](/settings-overlay/access). |
+| `addressable` | `boolean` | `true` | Whether the panel is reachable by URL. |
+| `layout` | `'compact' \| 'wide'` | `'compact'` | Width preset. |
+| `searchable` | `boolean` | `false` | Adds a search box that filters the rail. |
+| `hideEntities` | `boolean` | `true` | Hides listed collections and globals from the nav and their routes. |
+| `mergeListHeader` | `boolean` | `true` | Folds a collection list's title row into the pane header and lifts its Create button up beside Close. `false` leaves Payload's list header as it renders on a page. |
+| `className` | `string` | | Extra class beside `settings-overlay` and `settings-overlay--<id>`. |
+| `components` | `SettingsOverlayComponents` | | Slot replacements. See [Customization](/settings-overlay/customization). |
+| `sort` | `SettingsSortConfig` | | Group and item ordering functions. |
+
+## Item
+
+Shared by every type:
+
+| Option | Type | What it does |
+|---|---|---|
+| `slug` | `string` | Unique within the overlay. Appears in the URL. |
+| `label` | `LocalizedLabel` | Required for `component`, `view` and `link`; inherited from the entity otherwise. |
+| `group` | `LocalizedLabel` | Rail heading. Overrides the entity's own `admin.group`. |
+| `icon` | `PayloadComponent` | Drawn in the row. |
+| `order` | `number` | Sugar for the common ordering case. |
+| `keywords` | `string[]` | Extra terms the search box matches. |
+| `badge` | `BadgeConfig` | A count or value beside the label. |
+| `access` | `({ item, req }) => boolean` | The door to this row. |
+
+Per type:
+
+| Type | Extra |
+|---|---|
+| `collection` | `slug: CollectionSlug`, `resolveDocID?` |
+| `global` | `slug: GlobalSlug` |
+| `component` | `component: PayloadComponent`, `lazy?: boolean` |
+| `view` | `viewKey: string` |
+| `link` | `href`, a template-literal type pinned to a leading slash |
+
+## Plugin order
+
+`settingsOverlay` goes **after** anything that registers an admin view you list as a `view` item, and after anything that rewrites a collection you list, such as `@payloadcms/plugin-multi-tenant`. A `viewKey` that is not registered when this plugin runs is a boot error naming the overlay, the item and the key.
+
+## URL parameters
+
+| Parameter | Holds |
+|---|---|
+| `settings` | `<overlay>/<item>[/<id>]` |
+| `settingsQuery` | The open list's filters, search, sort, page and limit, as JSON |
+
+The list query travels as one opaque value rather than as Payload's `where[...]` names, so it cannot collide with a list view on the page underneath. A half-built filter row is kept in memory but never written to the URL, so a reload does not drop the finished rows beside it.
+
+## Installation surface
+
+The plugin registers, on your config:
+
+- `admin.components.providers`: one entry
+- `admin.dependencies`: one entry per component path it needs to resolve, including the ones inside your overlays
+- `admin.dashboard.widgets`: one internal entry, and **only** when the config holds a `view` item or a `lazy` component *and* `lazyTransport` is left at `'widget'`. It appears in the dashboard's "Add widget" drawer while a reader is editing their dashboard.
+- `admin.hidden` and `admin.components.edit.beforeDocumentControls` on each listed collection and global
+- `config.custom`, under `@10x-media/settings-overlay`
+- `i18n.translations`
+
+Nothing in `app/(payload)/layout.tsx` changes, unless you choose `lazyTransport: 'server-function'`.

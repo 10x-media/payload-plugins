@@ -1,0 +1,20 @@
+import { keys, type TranslationKey } from './keys'
+
+export const zh: Record<TranslationKey, string> = {
+	[keys.pluginName]: '设置面板',
+	[keys.appearanceLabel]: '外观',
+	[keys.back]: '返回',
+	[keys.close]: '关闭',
+	[keys.delete]: '删除',
+	[keys.deleteBody]: '此文档将被永久删除，且无法恢复。',
+	[keys.deleteConfirm]: '删除',
+	[keys.deleteHeading]: '删除该文档？',
+	[keys.deleted]: '文档已删除',
+	[keys.discardBody]: '有未保存的更改。现在离开将会丢弃它们。',
+	[keys.discardConfirm]: '放弃更改',
+	[keys.discardHeading]: '放弃更改？',
+	[keys.empty]: '这里还没有内容。',
+	[keys.loadFailed]: '加载失败，请重试。',
+	[keys.noResults]: '没有匹配项。',
+	[keys.searchPlaceholder]: '搜索',
+}

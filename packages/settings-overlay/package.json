@@ -1,7 +1,7 @@
 {
 	"name": "@10x-media/settings-overlay",
 	"version": "0.0.0",
-	"description": "",
+	"description": "Files any Payload collection, global, admin view or component behind a deep-linkable floating panel",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -10,7 +10,16 @@
 	},
 	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/settings-overlay",
 	"bugs": "https://github.com/10x-media/payload-plugins/issues",
-	"keywords": ["payload", "payloadcms", "plugin"],
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin",
+		"admin",
+		"settings",
+		"modal",
+		"overlay",
+		"deep-link"
+	],
 	"author": "10x-media",
 	"engines": {
 		"node": ">=22.18.0"
@@ -37,9 +46,29 @@
 			"development": "./src/exports/i18n.ts",
 			"types": "./src/exports/i18n.ts",
 			"default": "./dist/exports/i18n.js"
+		},
+		"./rsc": {
+			"development": "./src/exports/rsc.ts",
+			"types": "./src/exports/rsc.ts",
+			"default": "./dist/exports/rsc.js"
+		},
+		"./items": {
+			"development": "./src/exports/items.ts",
+			"types": "./src/exports/items.ts",
+			"default": "./dist/exports/items.js"
+		},
+		"./embed": {
+			"development": "./src/exports/embed.ts",
+			"types": "./src/exports/embed.ts",
+			"default": "./dist/exports/embed.js"
 		}
 	},
-	"files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
 	"scripts": {
 		"build": "tsdown",
 		"lint": "biome check src tests dev",
@@ -66,8 +95,12 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@payloadcms/ui": "^3.83.0",
-		"payload": "^3.83.0",
+		"@payloadcms/next": "^3.85.0",
+		"@payloadcms/plugin-multi-tenant": "^3.85.0",
+		"@payloadcms/translations": "^3.85.0",
+		"@payloadcms/ui": "^3.85.0",
+		"next": "^15.0.0 || ^16.0.0",
+		"payload": "^3.85.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},
@@ -78,11 +111,15 @@
 		"@10x-media/vitest-config": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/next": "catalog:",
+		"@payloadcms/plugin-multi-tenant": "catalog:",
+		"@payloadcms/translations": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
+		"next": "catalog:",
 		"payload": "catalog:",
 		"playwright": "catalog:",
 		"react": "catalog:",
@@ -113,7 +150,36 @@
 				"types": "./dist/exports/i18n.d.ts",
 				"import": "./dist/exports/i18n.js",
 				"default": "./dist/exports/i18n.js"
+			},
+			"./rsc": {
+				"types": "./dist/exports/rsc.d.ts",
+				"import": "./dist/exports/rsc.js",
+				"default": "./dist/exports/rsc.js"
+			},
+			"./items": {
+				"types": "./dist/exports/items.d.ts",
+				"import": "./dist/exports/items.js",
+				"default": "./dist/exports/items.js"
+			},
+			"./embed": {
+				"types": "./dist/exports/embed.d.ts",
+				"import": "./dist/exports/embed.js",
+				"default": "./dist/exports/embed.js"
 			}
 		}
+	},
+	"peerDependenciesMeta": {
+		"@payloadcms/next": {
+			"optional": true
+		},
+		"@payloadcms/plugin-multi-tenant": {
+			"optional": true
+		},
+		"next": {
+			"optional": true
+		}
+	},
+	"dependencies": {
+		"@tanstack/react-query": "catalog:"
 	}
 }

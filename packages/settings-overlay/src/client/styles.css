@@ -1,0 +1,600 @@
+/*
+ * The floating panel. Sits in Payload's modal container like any other modal, so it is a fixed,
+ * full-viewport layer with the panel centred inside it.
+ *
+ * Styling contract: the plugin ships a neutral Payload look, and a host restyles it by setting
+ * the `--settings-overlay-*` properties below on `.settings-overlay` (or on
+ * `.settings-overlay--<id>` / the overlay's `className` to scope it to one panel), and by
+ * targeting the `settings-overlay__*` class names, which are stable. The defaults are declared
+ * under `:where()` so they carry zero specificity: a host rule wins regardless of which
+ * stylesheet the bundler emits first.
+ *
+ * Every default is a Payload theme variable, which is what keeps dark mode honest, and every
+ * metric is a multiple of `--base` rather than a rem: the admin's 1rem is 13px, so a panel sized
+ * in rem drifts out of step with the fields inside it.
+ */
+:where(.settings-overlay) {
+	--settings-overlay-width: min(54rem, 100%);
+	--settings-overlay-height: min(44rem, 100%);
+	--settings-overlay-rail-width: minmax(170px, 13.5rem);
+	--settings-overlay-header-height: calc(var(--base) * 2.4);
+	--settings-overlay-radius: var(--style-radius-l);
+	--settings-overlay-shadow: 0 1.5rem 3rem rgb(0 0 0 / 0.25);
+	--settings-overlay-transition: 150ms linear;
+
+	--settings-overlay-surface: var(--theme-elevation-0);
+	--settings-overlay-rail-surface: var(--theme-elevation-50);
+	--settings-overlay-border: var(--theme-elevation-100);
+	--settings-overlay-text: var(--theme-text);
+	--settings-overlay-muted: var(--theme-elevation-500);
+	--settings-overlay-group-color: var(--theme-elevation-400);
+	--settings-overlay-item-color: var(--theme-elevation-750);
+	--settings-overlay-hover-bg: var(--theme-elevation-100);
+	--settings-overlay-active-bg: var(--theme-elevation-150);
+	--settings-overlay-backdrop: var(--theme-overlay, rgb(0 0 0 / 0.5));
+	/* Payload's page gutter is base(3), sized for a full window. In a panel this narrow that is
+	   most of the measure, so the pane borrows the value the admin itself uses at its smallest
+	   breakpoint rather than inventing one. */
+	--settings-overlay-pane-gutter: calc(var(--base) * 0.8);
+}
+
+/* Wider, for panels holding a list view or a form rather than a stack of settings rows. */
+:where(.settings-overlay--wide) {
+	--settings-overlay-width: min(88rem, 100%);
+	--settings-overlay-height: min(56rem, 100%);
+	--settings-overlay-rail-width: minmax(190px, 15rem);
+}
+
+/*
+ * The faceless modal renders a <dialog>, which arrives with a UA border, `width: fit-content`
+ * and centring margins. All of it has to go before the panel can be laid out.
+ */
+.settings-overlay {
+	position: fixed;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 100%;
+	max-width: none;
+	height: 100%;
+	max-height: none;
+	margin: 0;
+	padding: var(--gutter-h);
+	border: 0;
+	background: transparent;
+	color: var(--settings-overlay-text);
+}
+
+.settings-overlay:not([open]) {
+	display: none;
+}
+
+.settings-overlay__backdrop {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: var(--settings-overlay-backdrop);
+	cursor: pointer;
+	opacity: 0;
+	transition: opacity var(--settings-overlay-transition);
+}
+
+.settings-overlay__panel {
+	position: relative;
+	z-index: 1;
+	display: grid;
+	grid-template-columns: var(--settings-overlay-rail-width) minmax(0, 1fr);
+	width: var(--settings-overlay-width);
+	height: var(--settings-overlay-height);
+	overflow: hidden;
+	border: 1px solid var(--settings-overlay-border);
+	border-radius: var(--settings-overlay-radius);
+	background: var(--settings-overlay-surface);
+	box-shadow: var(--settings-overlay-shadow);
+	opacity: 0;
+	transform: translateY(calc(var(--base) * 0.4));
+	transition: all var(--settings-overlay-transition);
+}
+
+/* It only holds focus so the dialog has a landing spot; it is not a control. */
+.settings-overlay__panel:focus {
+	outline: none;
+}
+
+.settings-overlay--is-open .settings-overlay__backdrop {
+	opacity: 1;
+}
+
+.settings-overlay--is-open .settings-overlay__panel {
+	opacity: 1;
+	transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.settings-overlay__backdrop,
+	.settings-overlay__panel {
+		transition: none;
+	}
+}
+
+/* Rail
+   ------------------------------------------------------------------ */
+
+.settings-overlay__rail {
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	border-inline-end: 1px solid var(--settings-overlay-border);
+	background: var(--settings-overlay-rail-surface);
+}
+
+/*
+ * The rail title and the pane header share one height, so their bottom borders meet as a single
+ * line across the panel. Both are flex children of a column whose other child scrolls, so
+ * `flex: none` keeps the overflow from squeezing them to their content height.
+ */
+.settings-overlay__rail-title {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: calc(var(--base) * 0.4);
+	box-sizing: border-box;
+	height: var(--settings-overlay-header-height);
+	margin: 0;
+	padding: 0 calc(var(--base) * 0.7);
+	border-bottom: 1px solid var(--settings-overlay-border);
+	font-size: calc(var(--base) * 0.8);
+	font-weight: 600;
+}
+
+.settings-overlay__rail-scroll {
+	flex-grow: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: calc(var(--base) * 0.6);
+}
+
+.settings-overlay__rail-group + .settings-overlay__rail-group {
+	margin-top: calc(var(--base) * 0.7);
+}
+
+/* The whole heading is the toggle, so the target is the width of the rail rather than the text. */
+.settings-overlay__rail-group-toggle {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: calc(var(--base) * 0.3);
+	width: 100%;
+	margin: 0 0 calc(var(--base) * 0.25);
+	padding: calc(var(--base) * 0.15) calc(var(--base) * 0.4);
+	border: 0;
+	border-radius: var(--style-radius-m);
+	background: transparent;
+	cursor: pointer;
+	font: inherit;
+	text-align: start;
+}
+
+.settings-overlay__rail-group-toggle:hover {
+	background: var(--settings-overlay-hover-bg);
+}
+
+.settings-overlay__rail-group-toggle:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: -2px;
+}
+
+/*
+ * A hair under body size and a step heavier: enough separation from the rows below that the rail
+ * reads as grouped, without the shouty uppercase micro-type that separation usually gets.
+ */
+.settings-overlay__rail-group-label {
+	color: var(--settings-overlay-group-color);
+	font-size: calc(var(--base) * 0.6);
+	font-weight: 600;
+}
+
+.settings-overlay__rail-group-indicator {
+	flex-shrink: 0;
+	width: calc(var(--base) * 0.6);
+	height: calc(var(--base) * 0.6);
+	color: var(--settings-overlay-group-color);
+}
+
+.settings-overlay__rail-items {
+	display: flex;
+	flex-direction: column;
+	/* Just enough that two hovered or active rows never share an edge. */
+	gap: 2px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.settings-overlay__rail-item {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.4);
+	width: 100%;
+	padding: calc(var(--base) * 0.3) calc(var(--base) * 0.4);
+	border: 0;
+	border-radius: var(--style-radius-m);
+	background: transparent;
+	color: var(--settings-overlay-item-color);
+	cursor: pointer;
+	font-family: var(--font-body);
+	/* A touch over the admin's body size: these are navigation, not form copy. */
+	font-size: calc(var(--base) * 0.7);
+	text-align: start;
+}
+
+.settings-overlay__rail-item:hover {
+	background: var(--settings-overlay-hover-bg);
+	color: var(--theme-elevation-1000);
+}
+
+.settings-overlay__rail-item:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: -2px;
+}
+
+.settings-overlay__rail-item--active,
+.settings-overlay__rail-item--active:hover {
+	background: var(--settings-overlay-active-bg);
+	color: var(--theme-elevation-1000);
+	font-weight: 600;
+}
+
+.settings-overlay__rail-icon {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+}
+
+.settings-overlay__rail-icon svg {
+	width: calc(var(--base) * 0.75);
+	height: calc(var(--base) * 0.75);
+}
+
+/* `min-width: 0` is what lets a flex child ellipsis at all: its default `auto` refuses to
+   shrink below the text, so the badge beside it would be pushed out of the row instead. */
+.settings-overlay__rail-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.settings-overlay__badge {
+	flex-shrink: 0;
+	padding: 0 calc(var(--base) * 0.3);
+	border-radius: 999px;
+	background: var(--theme-elevation-150);
+	color: var(--theme-elevation-700);
+	font-size: calc(var(--base) * 0.55);
+	line-height: calc(var(--base) * 0.85);
+}
+
+.settings-overlay__search {
+	position: relative;
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	padding: calc(var(--base) * 0.5) calc(var(--base) * 0.6) calc(var(--base) * 0.3);
+}
+
+/*
+ * Both affordances sit over the input rather than beside it, so the field keeps the full width
+ * of the rail. The icon is decoration and must not swallow a click aimed at the field.
+ */
+.settings-overlay__search-icon {
+	position: absolute;
+	inset-inline-start: calc(var(--base) * 0.95);
+	display: inline-flex;
+	color: var(--settings-overlay-muted);
+	pointer-events: none;
+}
+
+.settings-overlay__search-icon svg {
+	width: calc(var(--base) * 0.85);
+	height: calc(var(--base) * 0.85);
+}
+
+.settings-overlay__search-input {
+	width: 100%;
+	/* Room for the icon, as a logical offset so it follows under RTL. */
+	padding: calc(var(--base) * 0.35) calc(var(--base) * 0.4);
+	padding-inline-start: calc(var(--base) * 1.75);
+	border: 1px solid var(--theme-border-color);
+	border-radius: var(--style-radius-m);
+	background: var(--theme-input-bg);
+	color: var(--settings-overlay-text);
+	font-family: var(--font-body);
+	font-size: calc(var(--base) * 0.7);
+}
+
+.settings-overlay__search-input::placeholder {
+	color: var(--settings-overlay-muted);
+}
+
+.settings-overlay__search-input:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: -1px;
+}
+
+.settings-overlay__rail-empty {
+	margin: calc(var(--base) * 0.4);
+	color: var(--settings-overlay-muted);
+	font-size: calc(var(--base) * 0.7);
+}
+
+/* Pane
+   ------------------------------------------------------------------ */
+
+.settings-overlay__pane {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+}
+
+.settings-overlay__pane-header {
+	display: flex;
+	flex: none;
+	align-items: center;
+	gap: calc(var(--base) * 0.4);
+	box-sizing: border-box;
+	height: var(--settings-overlay-header-height);
+	padding: 0 calc(var(--base) * 0.5) 0 calc(var(--base) * 0.7);
+	border-bottom: 1px solid var(--settings-overlay-border);
+}
+
+.settings-overlay__pane-title {
+	flex: 1;
+	margin: 0;
+	overflow: hidden;
+	font-size: calc(var(--base) * 0.8);
+	font-weight: 600;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.settings-overlay__pane-header .settings-overlay__delete {
+	margin-inline-end: calc(var(--base) * 0.2);
+}
+
+.settings-overlay__icon-button {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
+	width: calc(var(--base) * 1.4);
+	height: calc(var(--base) * 1.4);
+	padding: 0;
+	border: 0;
+	border-radius: var(--style-radius-m);
+	background: transparent;
+	color: var(--theme-elevation-600);
+	cursor: pointer;
+}
+
+.settings-overlay__icon-button svg {
+	width: 1.1rem;
+	height: 1.1rem;
+}
+
+/*
+ * The back chevron is rotated here rather than through `ChevronIcon`'s `direction` prop, which
+ * writes an inline transform a stylesheet cannot flip. "Back" points the other way under RTL,
+ * and no amount of specificity beats an inline style.
+ */
+.settings-overlay__back-icon {
+	transform: rotate(90deg);
+}
+
+[dir="rtl"] .settings-overlay__back-icon {
+	transform: rotate(-90deg);
+}
+
+.settings-overlay__icon-button:hover {
+	background: var(--settings-overlay-hover-bg);
+	color: var(--theme-elevation-1000);
+}
+
+.settings-overlay__icon-button:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: -2px;
+}
+
+.settings-overlay__pane-body {
+	position: relative;
+	flex-grow: 1;
+	min-height: 0;
+	overflow: auto;
+}
+
+/* Payload's own views, hosted
+   ------------------------------------------------------------------ */
+
+/*
+ * These rules are unlayered while Payload's live in `@layer payload-default`, so an unlayered
+ * declaration outranks a layered one whatever its specificity. That is what lets every override
+ * below stay a plain class selector with no `!important`.
+ */
+
+/* They expect to own the page. Give them the room and nothing else. */
+.settings-overlay__pane-body .collection-list,
+.settings-overlay__pane-body .collection-edit,
+.settings-overlay__pane-body .global-edit {
+	min-height: 100%;
+}
+
+/*
+ * The gutter is redefined rather than the paddings that read it. `.gutter--negative-left` and
+ * `--negative-right` are the matching negative margins for content that deliberately breaks out
+ * of the gutter, and they read the same variable: overriding only the padding would leave the
+ * pair out of step and push that content past the panel's edge.
+ *
+ * `--spacing-view-bottom` is set apart from `--gutter-h`, so it does not follow on its own.
+ */
+.settings-overlay__pane-body {
+	--gutter-h: var(--settings-overlay-pane-gutter);
+	--spacing-view-bottom: calc(var(--base) * 1.5);
+}
+
+/*
+ * Payload gives the drawer list header `margin-top: base(2.5)` to clear the drawer's own close
+ * button and chrome. In the panel the pane header already occupies that band, so most of it is
+ * an empty strip at the top of every list.
+ *
+ * The margin goes entirely and the space comes back as padding one level up. `__wrap` has no top
+ * padding or border of its own, so a top margin on its first child collapses straight through it
+ * and out to `.collection-list`, which this stylesheet gives `min-height: 100%`. The list then
+ * measures a full pane tall *and* sits a margin lower, so the pane scrolls even when the rows
+ * fit. Padding cannot collapse, so the same gap costs nothing.
+ */
+.settings-overlay__pane-body .list-drawer__header {
+	margin-top: 0;
+}
+
+.settings-overlay__pane-body .collection-list__wrap {
+	padding-top: var(--settings-overlay-pane-gutter);
+}
+
+/*
+ * With `mergeListHeader` on, the list's title row is folded into the pane header: its title
+ * repeats the pane title one line below it, and its Create button is re-rendered up there
+ * instead. Only `__content` goes, so the collection's description and anything else in
+ * `__after-header-content` stays exactly where Payload put it.
+ */
+.settings-overlay--merged-list-header .settings-overlay__pane-body
+	.list-drawer__header
+	.list-header__content {
+	display: none;
+}
+
+/* The pane title takes the free space, so the button lands against the header's right edge. */
+.settings-overlay__create {
+	flex-shrink: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+}
+
+/*
+ * In drawer mode Payload's list header draws its own close button for the drawer slug, which here
+ * is the panel itself. The pane header already has one, and two X marks is one too many.
+ */
+.settings-overlay__pane-body .list-drawer__header-close,
+.settings-overlay__pane-body .doc-drawer__header-close {
+	display: none;
+}
+
+/*
+ * Inside the pane the edit view has no app header to clear: its sticky controls bar starts at the
+ * top of the scroll area, where the page would have put the header.
+ */
+.settings-overlay__pane-body .doc-controls {
+	top: 0;
+}
+
+/* A component item brings its own spacing; everything else is Payload's. */
+.settings-overlay__empty {
+	margin: 0;
+	padding: var(--base);
+	color: var(--settings-overlay-muted);
+}
+
+/* Skeletons
+   ------------------------------------------------------------------ */
+
+.settings-overlay__shimmer {
+	display: block;
+	height: calc(var(--base) * 0.7);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-elevation-100);
+	animation: settings-overlay-pulse 1.4s ease-in-out infinite;
+}
+
+.settings-overlay__skeleton-rail,
+.settings-overlay__skeleton-list,
+.settings-overlay__skeleton-document,
+.settings-overlay__skeleton-item {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) * 0.5);
+	padding: var(--base);
+}
+
+.settings-overlay__skeleton-document .settings-overlay__shimmer,
+.settings-overlay__skeleton-item .settings-overlay__shimmer {
+	height: calc(var(--base) * 2);
+}
+
+@keyframes settings-overlay-pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.45;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.settings-overlay__shimmer {
+		animation: none;
+	}
+}
+
+/* Narrow viewports
+   ------------------------------------------------------------------ */
+
+/*
+ * The panel is only ~700px wide to begin with, so the two-pane layout survives every tablet and
+ * only has to break when the viewport itself is narrower. Payload's own small breakpoint.
+ */
+@media (max-width: 768px) {
+	.settings-overlay__panel {
+		grid-template-columns: minmax(0, 1fr);
+		/* `auto` for the rail, not a share of the panel: a percentage leaves it both too short for
+		   its own content and followed by a band of dead space. */
+		grid-template-rows: auto minmax(0, 1fr);
+		width: 100%;
+		height: 100%;
+	}
+
+	.settings-overlay__rail {
+		border-inline-end: 0;
+		border-bottom: 1px solid var(--settings-overlay-border);
+	}
+
+	.settings-overlay__rail-title {
+		border-bottom: 0;
+	}
+
+	/* A filter box costs a whole row here, and the list it filters is one swipe away. */
+	.settings-overlay__search {
+		display: none;
+	}
+
+	/*
+	 * The rail becomes a short scrolling band above the pane rather than a strip of chips.
+	 * Flattening the groups would take their headings with them, and a heading is the only
+	 * thing a collapsed group can be reopened by.
+	 */
+	.settings-overlay__rail-scroll {
+		flex-grow: 0;
+		max-height: 40vh;
+		padding: calc(var(--base) * 0.5);
+	}
+}

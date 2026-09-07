@@ -1,0 +1,20 @@
+import { keys, type TranslationKey } from './keys'
+
+export const ar: Record<TranslationKey, string> = {
+	[keys.pluginName]: 'لوحة الإعدادات',
+	[keys.appearanceLabel]: 'المظهر',
+	[keys.back]: 'رجوع',
+	[keys.close]: 'إغلاق',
+	[keys.delete]: 'حذف',
+	[keys.deleteBody]: 'سيتم حذف هذا المستند نهائيًا. لا يمكن التراجع عن ذلك.',
+	[keys.deleteConfirm]: 'حذف',
+	[keys.deleteHeading]: 'حذف المستند؟',
+	[keys.deleted]: 'تم حذف المستند',
+	[keys.discardBody]: 'لديك تغييرات غير محفوظة. المغادرة الآن ستتجاهلها.',
+	[keys.discardConfirm]: 'تجاهل التغييرات',
+	[keys.discardHeading]: 'تجاهل التغييرات؟',
+	[keys.empty]: 'لا يوجد شيء لعرضه هنا بعد.',
+	[keys.loadFailed]: 'تعذر تحميل هذا. يرجى المحاولة مرة أخرى.',
+	[keys.noResults]: 'لا توجد نتائج.',
+	[keys.searchPlaceholder]: 'بحث',
+}
