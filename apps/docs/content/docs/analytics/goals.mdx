@@ -104,7 +104,7 @@ All three metrics appear in the widget metric, trend, and breakdown pickers, and
 A `goal` event counts under the `events` metric, not `pageviews`, and is deliberately kept out of the `event` dimension breakdown: its name is a goal slug and belongs to the `goal` dimension instead.
 
 <Callout type="warn">
-Revenue is stored and summed as a plain number in the event's own currency. There is no FX conversion and no `currency` dimension, so a bucket spanning currencies sums figures that are not comparable. Keep one currency per install, or read revenue per goal.
+Revenue is stored and summed as a plain number in the event's own currency. There is no FX conversion and no `currency` dimension, so a bucket spanning currencies sums figures that are not comparable. Widgets and stat fields render the result as a bare number too, with no currency symbol and nothing marking which currencies went into it. Keep one currency per install, or read revenue per goal.
 </Callout>
 
 Existing native installs need the goal-counter migration before any of this reads correctly. See [Upgrading for goal metrics](/analytics/native#upgrading-for-goal-metrics).

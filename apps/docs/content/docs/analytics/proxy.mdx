@@ -56,8 +56,10 @@ const nextConfig = {
   // PostHog's capture endpoints use trailing slashes.
   skipTrailingSlashRedirect: true,
   async rewrites() {
+    // Only the capture descriptor's routes are read here, so the read credentials can
+    // be left empty; the capture config (projectToken, domain) is what must be real.
     return captureRewrites([
-      { path: '/ph', adapter: posthog({ projectId: '', apiKey: '', region: 'eu' }) },
+      { path: '/ph', adapter: posthog({ projectId: '', apiKey: '', region: 'eu', projectToken: 'phc_...' }) },
       { path: '/pa', adapter: plausible({ siteId: '', apiKey: '', domain: 'example.com' }) },
     ])
   },
@@ -82,7 +84,7 @@ Notes:
 
 ## Per-vendor routes
 
-Each row is the adapter's own descriptor, relative to the mount path.
+Each row is the adapter's own descriptor, relative to the mount path. An adapter declares one only when the public config that capture needs is present, so a read-only PostHog (no `projectToken`) or a Plausible with neither `domain` nor `scriptId` contributes no routes here and nothing to `captureRewrites`.
 
 ### PostHog
 
@@ -94,7 +96,7 @@ Each row is the adapter's own descriptor, relative to the mount path.
 | `/array/:p*` | `https://<region>-assets.i.posthog.com/array/:p*` |
 | `/:p*` | `https://<region>.i.posthog.com/:p*` |
 
-`<region>` is `us` or `eu`, from `posthog({ region })`, else derived from `host` (an `eu.posthog.com` host means `eu`, everything else `us`). Capture needs `projectToken`, the public `phc_...` browser key; the private `apiKey` used for reads never reaches the browser. The snippet is PostHog's official install stub plus `posthog.init(token, { api_host: <path>, ui_host: 'https://<region>.posthog.com' })`. The stub injects `array.js` itself, deriving the URL from `api_host` (the `.i.posthog.com` rewrite is a no-op on a first-party path), so it lands on `<path>/static/array.js`, exactly the route above.
+`<region>` is `us` or `eu`, from `posthog({ region })`, else derived from `host` (an `eu.posthog.com` host means `eu`, everything else `us`). Capture requires `projectToken`, the public `phc_...` browser key: without it the adapter declares no capture and these routes do not exist. The private `apiKey` used for reads never reaches the browser. The snippet is PostHog's official install stub plus `posthog.init(token, { api_host: <path>, ui_host: 'https://<region>.posthog.com' })`. The stub injects `array.js` itself, deriving the URL from `api_host` (the `.i.posthog.com` rewrite is a no-op on a first-party path), so it lands on `<path>/static/array.js`, exactly the route above.
 
 ### Plausible
 
@@ -108,7 +110,7 @@ Each row is the adapter's own descriptor, relative to the mount path.
 - `domain` (the legacy tag): one deferred `<path>/js/script.js` tag with `data-domain` and `data-api="<path>/api/event"`.
 - `scriptId` (the per-site model): an async `<path>/js/pa-<scriptId>.js` tag plus the official stub and `plausible.init({ endpoint: '<path>/api/event' })`.
 
-`domain` wins when both are set, and with neither, Plausible contributes no snippet. `siteId` is the Stats API id for reads and is unrelated to either.
+`domain` wins when both are set, and with neither, the adapter declares no capture at all. `siteId` is the Stats API id for reads and is unrelated to either.
 
 ### Umami
 

@@ -44,6 +44,8 @@ Reading and capturing are separate concerns. An adapter that declares `capture` 
 | Umami | Yes | None beyond `websiteId`. `host` doubles as the app origin for capture: a trailing `/api` is stripped, so one value serves the Stats API and the tracker. |
 | GA4 | No | Google's collection domains and consent mode make a clean first-party proxy impractical. Reads are unaffected. |
 
+Capture support is declared only when the public capture config it needs is actually present, so a PostHog adapter configured for reads alone (no `projectToken`) or a Plausible one with neither `domain` nor `scriptId` declares no `capture` at all: no proxy route, no snippet, and it fills no slot. Reads are unaffected either way.
+
 The exact routes and snippets each one declares are on the [proxy page](/analytics/proxy#per-vendor-routes).
 
 ## Filters

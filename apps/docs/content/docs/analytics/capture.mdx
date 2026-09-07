@@ -52,7 +52,7 @@ An install fills at most two slots, in this order:
 | Slot | Filled by |
 |---|---|
 | `global` | `capture.slots.global`, else the designated `platformAdapter`, else the single config adapter when only one is configured. |
-| `tenant` | The request's resolved scope's default adapter, or `capture.slots.tenant`. Empty whenever no scope resolves. |
+| `tenant` | `capture.slots.tenant`, else the resolved scope's default adapter. Empty whenever no scope resolves. |
 
 One slot, one adapter, and one adapter fills at most one slot: when both slots resolve to the same adapter the global entry keeps it, so a scoped native install never posts every event twice. An adapter that declares no `capture` (GA4) fills nothing.
 
@@ -132,7 +132,13 @@ export const SignupButton = () => {
 
 The tracker is resolved per call, not per render, so a component that renders before the boot effect runs still works. A call that finds neither a provider nor a booted tracker throws, because a silently dead `track` is worse than a build-time mistake.
 
-Wrap the tree in `<AnalyticsProvider config={tracker}>` when you want the api to come from context instead, for example to pass a custom `loadScript`. Both take a lease on the same per-window tracker, so rendering `AnalyticsScripts` and `AnalyticsProvider` together never double counts, and neither does React StrictMode's double mount.
+Wrap the tree in `<AnalyticsProvider config={tracker}>` when you want the api to come from context instead. Both take a lease on the same per-window tracker, so rendering `AnalyticsScripts` and `AnalyticsProvider` together never double counts, and neither does React StrictMode's double mount.
+
+<Callout type="warn">
+That single tracker is created by whichever component boots first, and only its options stick. `AnalyticsScripts` renders `TrackerBoot` inside itself, and React runs effects bottom-up, so it wins over any provider above it: the provider becomes a later holder of a tracker that already exists, and its `loadScript` is never called.
+
+`AnalyticsScripts` takes no `loadScript` (it is a server component, and a function prop cannot cross that boundary), so the seam and the RSC path are mutually exclusive. If you need a custom loader, render `<AnalyticsProvider config={tracker} loadScript={...}>` and do not render `AnalyticsScripts`; pass the same server-resolved config, and the provider's tracker injects the slot snippets itself. `nonce` is the exception: both accept it, so the RSC path stays fine under a nonce CSP.
+</Callout>
 
 `<TrackerBoot config nonce />` is the bare boot component `AnalyticsScripts` renders after the snippets. Render it directly when your app already emits the vendor snippets itself.
 
