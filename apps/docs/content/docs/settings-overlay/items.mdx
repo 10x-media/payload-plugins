@@ -34,7 +34,7 @@ A panel is not a replacement for the collection's own views. Payload renders les
 | Missing | Why |
 |---|---|
 | Trash tab | The list's view tabs render only outside a drawer, so a trashed document cannot be found from the panel. Open one by URL and restore and permanent delete are both offered. |
-| Bulk delete, bulk edit | The list's selection actions render only outside a drawer. |
+| Bulk delete, bulk edit | The list's selection actions render only outside a drawer, so the panel does not draw the selection column either. |
 | API, Versions, Live Preview | The document header carries those tabs, and Payload skips the header when a `drawerSlug` is set. The Live Preview toggle is hidden in a drawer too. |
 | Copy to locale | It lives in Payload's own document menu, which the panel replaces. |
 | Duplicate into selected locales | Plain duplicate is there; the locale picker is not. |

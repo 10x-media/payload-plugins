@@ -51,11 +51,14 @@ export const listQuery = (
 				name: 'render-list',
 				args: {
 					collectionSlug: args.collectionSlug,
-					disableBulkDelete: false,
-					disableBulkEdit: false,
+					// Payload renders the list's selection actions only outside a drawer, so there is
+					// nothing a selection could be used for here. Asking for row selections anyway
+					// would add a checkbox column that selects and then offers nothing.
+					disableBulkDelete: true,
+					disableBulkEdit: true,
 					disableQueryPresets: true,
 					drawerSlug: args.panelSlug,
-					enableRowSelections: true,
+					enableRowSelections: false,
 					overrideEntityVisibility: true,
 					query: args.query ?? {},
 				},
