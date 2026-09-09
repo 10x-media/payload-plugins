@@ -1,8 +1,8 @@
-import type { Payload, PayloadRequest } from 'payload'
+import type { CollectionSlug, JsonObject, Payload, PayloadRequest } from 'payload'
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import type { CodeSubscription } from '../options'
-import { resolveSubscriptionById } from '../plugin/resolveSubscriptions'
+import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
 import { sendDelivery } from './sendDelivery'
 
 /** Dependencies for re-dispatching a stored delivery. */
@@ -23,8 +23,10 @@ export const redeliverDelivery = async (args: {
 	req: PayloadRequest
 }): Promise<{ id: string }> => {
 	const { deps, deliveryId, payload, req } = args
-	const original = await payload.findByID({
-		collection: deps.deliveriesSlug,
+	// The slug is a runtime option, so Payload cannot resolve a document type from it; `JsonObject`
+	// is its own shape for exactly that case.
+	const original: JsonObject = await payload.findByID({
+		collection: deps.deliveriesSlug as CollectionSlug,
 		id: deliveryId,
 		overrideAccess: true,
 		req,
@@ -39,7 +41,7 @@ export const redeliverDelivery = async (args: {
 		req,
 	})
 	const created = await payload.create({
-		collection: deps.deliveriesSlug,
+		collection: deps.deliveriesSlug as CollectionSlug,
 		data: {
 			subscriptionId: original.subscriptionId,
 			endpoint: subscription?.url ?? original.endpoint,
@@ -64,21 +66,19 @@ export const redeliverDelivery = async (args: {
 		return { id: newId }
 	}
 
-	if (!subscription?.enabled) {
+	const decision = decideDelivery(subscription)
+	if (!decision.deliverable) {
 		await payload.update({
-			collection: deps.deliveriesSlug,
+			collection: deps.deliveriesSlug as CollectionSlug,
 			id: newId,
-			data: {
-				status: 'dead',
-				error: subscription ? 'subscription disabled' : 'subscription not found',
-			},
+			data: { status: 'dead', error: decision.reason },
 			overrideAccess: true,
 			req,
 		})
 		return { id: newId }
 	}
 	const result = await sendDelivery({
-		subscription,
+		subscription: decision.subscription,
 		deliveryId: newId,
 		event: String(original.event),
 		body: JSON.stringify(original.payload),
@@ -86,7 +86,7 @@ export const redeliverDelivery = async (args: {
 		now: Date.now(),
 	})
 	await payload.update({
-		collection: deps.deliveriesSlug,
+		collection: deps.deliveriesSlug as CollectionSlug,
 		id: newId,
 		data: {
 			status: result.ok ? 'success' : 'dead',

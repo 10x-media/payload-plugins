@@ -20,6 +20,7 @@
 		"migrate:fresh": "bash ../../../scripts/payload.sh . migrate:fresh"
 	},
 	"dependencies": {
+		"@10x-media/fields": "workspace:*",
 		"@10x-media/webhooks": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
