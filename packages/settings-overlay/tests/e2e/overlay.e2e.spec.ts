@@ -113,8 +113,7 @@ test.describe('opening and addressing', () => {
 		await page.goBack()
 		await page.goForward()
 		await expect(panel(page)).toBeVisible()
-		// Payload closes every modal when the pathname changes; the panel must not take that for
-		// Escape and strip its own address.
+		// Payload closes all modals on a route change; that is not Escape, so the address stays.
 		await page.waitForTimeout(500)
 		await expect(panel(page)).toBeVisible()
 		await expect(page).toHaveURL(/settings=workspace/)

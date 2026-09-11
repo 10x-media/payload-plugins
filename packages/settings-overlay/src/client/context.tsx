@@ -28,7 +28,8 @@ export type SettingsOverlayContextValue = {
 	manifests: Record<string, Manifest>
 	/**
 	 * Closes the panel and navigates, as a `link` row does. Takes an admin URL, already formatted.
-	 * Always a push, so the back button returns the reader to the panel exactly as they left it.
+	 * Always a push, so for an addressable overlay the back button returns the reader to the panel
+	 * exactly as they left it. A panel kept out of the URL has no address to come back to.
 	 */
 	navigate: (url: string) => void
 	open: (overlayId: string, target?: Target) => void

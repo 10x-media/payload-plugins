@@ -192,9 +192,9 @@ export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 	/**
 	 * Leaves the panel for a page, which is what selecting a `link` row does.
 	 *
-	 * A push in either history mode, because the destination is a page. The entry being left keeps
-	 * the panel's address, so the back button returns the reader to the panel exactly as they left
-	 * it.
+	 * A push in either history mode, because the destination is a page. For an addressable overlay
+	 * the entry being left keeps the panel's address, so the back button returns the reader to the
+	 * panel exactly as they left it; a panel kept out of the URL has no address to return to.
 	 */
 	const navigate = useCallback<SettingsOverlayContextValue['navigate']>(
 		(url) => {
