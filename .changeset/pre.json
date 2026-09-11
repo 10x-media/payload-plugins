@@ -169,6 +169,7 @@
 		"plugin-translations-option",
 		"readme-restructure",
 		"readme-root-docs-urls",
+		"settings-overlay-history",
 		"settings-overlay-initial",
 		"unbundled-plugin-builds",
 		"undo-redo-initial-controls",

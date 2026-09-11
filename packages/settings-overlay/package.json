@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/settings-overlay",
-	"version": "0.1.0-beta.0",
+	"version": "0.1.0-beta.1",
 	"description": "Files any Payload collection, global, admin view or component behind a deep-linkable floating panel",
 	"license": "MIT",
 	"repository": {
