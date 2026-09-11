@@ -73,8 +73,11 @@ Standard formatting, lists, quotes, and links work as expected.
 An inline block sits in the sentence: this feature is {{chip:new:New}} and the old
 one is {{chip:deprecated:Deprecated}}, both rendered by the dev app's own component.
 
-Links render through the dev app's own converter, so [this one](https://payloadcms.com/docs/rich-text/converters)
+Links render through the dev app's own converter, so [this one]({{wiki:guide:publishing-a-post}})
 carries an arrow the plugin never puts there.
+
+An ordinary link renders through the dev app's own converter too, so
+[this one](https://payloadcms.com/docs/rich-text/converters) carries an arrow.
 
 ## Video
 
