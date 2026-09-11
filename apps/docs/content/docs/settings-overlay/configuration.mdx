@@ -17,7 +17,7 @@ settingsOverlay({
 | Option | Type | Default | What it does |
 |---|---|---|---|
 | `overlays` | `SettingsOverlayConfig[]` | required | The panels. |
-| `defaults` | `Pick<SettingsOverlayConfig, 'addressable' \| 'components' \| 'hideEntities' \| 'layout' \| 'mergeListHeader' \| 'searchable'>` | `{}` | Applied under each overlay's own settings. `components` merges per slot. |
+| `defaults` | `Pick<SettingsOverlayConfig, 'addressable' \| 'components' \| 'hideEntities' \| 'history' \| 'layout' \| 'mergeListHeader' \| 'searchable'>` | `{}` | Applied under each overlay's own settings. `components` merges per slot. |
 | `disabled` | `boolean` | `false` | Returns the incoming config untouched. |
 | `lazyTransport` | `'widget' \| 'server-function'` | `'widget'` | How a `view` or `lazy` item reaches the server. See [Lazy items](/settings-overlay/embedded-views#how-a-lazy-item-reaches-the-server). |
 | `translations` | `TranslationsOption` | | Per-locale string overrides. See [i18n](/settings-overlay/i18n). |
@@ -32,6 +32,7 @@ settingsOverlay({
 | `icon` | `PayloadComponent` | | Drawn beside the rail heading. |
 | `access` | `({ overlay, req }) => boolean` | open | The door to the whole panel. See [Access](/settings-overlay/access). |
 | `addressable` | `boolean` | `true` | Whether the panel is reachable by URL. |
+| `history` | `'push' \| 'replace'` | `'push'` | `'push'` makes every navigation in the panel a history entry, closing included, so the back button walks it like pages. `'replace'` adds none, and the back button leaves the page. No effect when `addressable` is `false`. See [Link to it](/settings-overlay/quick-start#link-to-it). |
 | `layout` | `'compact' \| 'wide'` | `'compact'` | Width preset. |
 | `searchable` | `boolean` | `false` | Adds a search box that filters the rail. |
 | `hideEntities` | `boolean` | `false` | Sets `admin.hidden` on every collection and global the overlay lists, removing it from the nav and from its own route. Off by default because [drawer mode leaves things out](/settings-overlay/items). Overlays listing the same entity must agree on this. |

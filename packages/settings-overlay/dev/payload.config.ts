@@ -188,8 +188,9 @@ export default buildConfig({
 					],
 					label: 'Workspace',
 					layout: 'wide',
-					// The escape hatch: this panel keeps Payload's own list header, so the two overlays
-					// show both behaviours side by side.
+					// The escape hatches: this panel keeps Payload's own list header and adds nothing to
+					// the history, so the two overlays show both behaviours side by side.
+					history: 'replace',
 					mergeListHeader: false,
 					searchable: true,
 				},

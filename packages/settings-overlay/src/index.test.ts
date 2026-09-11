@@ -93,6 +93,23 @@ describe('settingsOverlay factory', () => {
 		expect(b?.mergeListHeader).toBe(true)
 	})
 
+	it('pushes history by default, and takes replace from defaults or the overlay', () => {
+		expect(
+			registryOf(run({ overlays: [{ id: 'a', items: [], label: 'A' }] })).overlays[0]?.history
+		).toBe('push')
+
+		const replaced = run({
+			defaults: { history: 'replace' },
+			overlays: [
+				{ id: 'a', items: [], label: 'A' },
+				{ history: 'push', id: 'b', items: [], label: 'B' },
+			],
+		})
+		const [a, b] = registryOf(replaced).overlays
+		expect(a?.history).toBe('replace')
+		expect(b?.history).toBe('push')
+	})
+
 	it('hides listed entities when asked, and always adds the plugin document controls', () => {
 		const out = run({
 			overlays: [

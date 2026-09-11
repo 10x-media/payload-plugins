@@ -13,7 +13,6 @@ import {
 	useTranslation as usePayloadTranslation,
 	XIcon,
 } from '@payloadcms/ui'
-import { useRouter } from 'next/navigation'
 import type { ListQuery } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 import type React from 'react'
@@ -64,7 +63,6 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 }) => {
 	const settings = useSettingsOverlay()
 	const { closeModal, modalState, openModal } = useModal()
-	const router = useRouter()
 	const { config } = useConfig()
 	const { t } = useTranslation()
 	const [search, setSearch] = useState('')
@@ -80,6 +78,7 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 	const facelessOpen = Boolean(modalState[slug]?.isOpen)
 	const manifest = settings.manifests[overlay.id]
 	const wasOpen = useRef(false)
+	const escapePressed = useRef(false)
 
 	// This plugin's state is the source of truth; faceless-ui follows it.
 	useEffect(() => {
@@ -121,15 +120,14 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 		if (!isOpen || targetItem !== undefined || !activeSlug) {
 			return
 		}
-		setTarget({ item: activeSlug })
+		setTarget({ item: activeSlug }, { replace: true })
 	}, [activeSlug, isOpen, setTarget, targetItem])
 
 	const select = useCallback(
 		(item: ManifestItem) => {
 			if (item.type === 'link' && item.href) {
 				settings.guard(() => {
-					settings.close()
-					router.push(
+					settings.navigate(
 						formatAdminURL({ adminRoute: config.routes.admin, path: item.href as `/${string}` })
 					)
 				})
@@ -145,7 +143,7 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 				})
 			})
 		},
-		[activeItem?.slug, config.routes.admin, router, settings]
+		[activeItem?.slug, config.routes.admin, settings]
 	)
 
 	const requestClose = useCallback(() => {
@@ -154,10 +152,42 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 		})
 	}, [settings])
 
-	// Escape (faceless-ui closes the latest modal) must not lose unsaved edits silently: reopen
-	// and ask.
+	// faceless-ui closes its latest modal on Escape from a document listener of its own. The flag
+	// marks that keypress, and only while it is being handled, so the effect below can tell it from
+	// every other way faceless-ui closes modals. It listens in the capture phase: the browser runs
+	// React's render between two bubbling listeners, so a flag set after faceless-ui's would arrive
+	// too late for the effect it is meant for.
 	useEffect(() => {
-		if (wasOpen.current && !facelessOpen && isOpen) {
+		if (!isOpen) {
+			return
+		}
+		const onKeyDown = (event: KeyboardEvent) => {
+			if (event.key !== 'Escape') {
+				return
+			}
+			escapePressed.current = true
+			window.setTimeout(() => {
+				escapePressed.current = false
+			}, 0)
+		}
+		document.addEventListener('keydown', onKeyDown, true)
+		return () => {
+			document.removeEventListener('keydown', onKeyDown, true)
+		}
+	}, [isOpen])
+
+	/**
+	 * faceless-ui closed the panel while the plugin still has it open.
+	 *
+	 * Only Escape is the reader asking to close, and it must not lose unsaved edits silently: reopen
+	 * and ask. Anything else is not a request at all. Payload's `CloseModalOnRouteChange` closes
+	 * every modal whenever the pathname changes, which includes the back button returning to an
+	 * address that names this panel; closing here would then strip that address a moment after it
+	 * opened. The plugin's state stays the source of truth, and the sync effect above reopens it.
+	 */
+	useEffect(() => {
+		if (wasOpen.current && !facelessOpen && isOpen && escapePressed.current) {
+			escapePressed.current = false
 			if (settings.formModified) {
 				openModal(slug)
 				settings.guard(() => {
@@ -429,8 +459,10 @@ const Pane: React.FC<{
 				entity="collection"
 				id={settings.target.id}
 				key={`doc-${activeItem.slug}-${settings.target.id}`}
+				// Only called when the document cannot be shown, so the list corrects the address in
+				// place. Pushed, the back button would return to the broken address and bounce again.
 				onBack={() => {
-					settings.setTarget({ item: activeItem.slug })
+					settings.setTarget({ item: activeItem.slug }, { replace: true })
 				}}
 				onCreated={(id) => {
 					settings.setTarget({ id, item: activeItem.slug })

@@ -26,6 +26,11 @@ export type SettingsOverlayContextValue = {
 	/** Which channel a lazy item is fetched through. See the plugin's `lazyTransport` option. */
 	lazyTransport: 'server-function' | 'widget'
 	manifests: Record<string, Manifest>
+	/**
+	 * Closes the panel and navigates, as a `link` row does. Takes an admin URL, already formatted.
+	 * Always a push, so the back button returns the reader to the panel exactly as they left it.
+	 */
+	navigate: (url: string) => void
 	open: (overlayId: string, target?: Target) => void
 	overlays: ClientOverlay[]
 	panelSlug: (overlayId: string) => string
@@ -34,7 +39,12 @@ export type SettingsOverlayContextValue = {
 	setFormModified: (modified: boolean) => void
 	/** Replaces the list query of the current target; `undefined` clears it. */
 	setListQuery: (query: ListQuery | undefined) => void
-	setTarget: (target: Target) => void
+	/**
+	 * Points the open panel somewhere else. A navigation, so a new history entry under the overlay's
+	 * `history: 'push'`; pass `replace` for a change that corrects the address instead of moving the
+	 * reader, such as a target that turned out not to exist.
+	 */
+	setTarget: (target: Target, options?: { replace?: boolean }) => void
 	target: Target
 	toggle: (overlayId: string, target?: Target) => void
 }

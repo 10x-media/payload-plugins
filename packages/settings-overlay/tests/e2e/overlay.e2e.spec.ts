@@ -2,7 +2,7 @@ import { expect, type Page, test } from '@playwright/test'
 
 /**
  * The cases a panel gets wrong quietly: what a stale link does, what Escape does over unsaved
- * edits, whether the back button closes the panel in one step, whether a hosted list still
+ * edits, whether the back button walks the panel and nothing else, whether a hosted list still
  * filters into the URL. None of them shows up in a unit test, and all of them are what somebody
  * hits on their second day.
  */
@@ -55,6 +55,69 @@ test.describe('opening and addressing', () => {
 		await expect(panel(page)).toBeVisible()
 		await page.goBack()
 		await expect(panel(page)).toBeHidden()
+	})
+
+	test('back after closing reopens the panel, with no dead press on the way', async ({ page }) => {
+		await page.goto('/admin')
+		await page.goto('/admin/collections/tags')
+		await page.getByRole('button', { name: 'Open system settings' }).click()
+		await expect(panel(page)).toBeVisible()
+		await page.locator('.settings-overlay__pane-header button[aria-label="Close"]').click()
+		await expect(page).not.toHaveURL(/settings=/)
+		await page.goBack()
+		await expect(panel(page)).toBeVisible()
+		await page.goBack()
+		await expect(panel(page)).toBeHidden()
+		await expect(page).toHaveURL(/\/admin\/collections\/tags$/)
+		await page.goBack()
+		await expect(page).toHaveURL(/\/admin$/)
+	})
+
+	test('back walks every step taken inside the panel', async ({ page }) => {
+		await page.goto('/admin')
+		await page.getByRole('button', { name: 'Open system settings' }).click()
+		await expect(page).toHaveURL(/settings=system%2Fappearance/)
+		await row(page, 'Tags').click()
+		await page
+			.locator('.settings-overlay__pane-body .row-1 a, .settings-overlay__pane-body tbody tr')
+			.first()
+			.click()
+		await expect(page).toHaveURL(/settings=system%2Ftags%2F|settings=system\/tags\//)
+		await page.goBack()
+		await expect(page).toHaveURL(/settings=system(%2F|\/)tags($|&)/)
+		await page.goBack()
+		await expect(page).toHaveURL(/settings=system%2Fappearance/)
+		await page.goBack()
+		await expect(panel(page)).toBeHidden()
+		await expect(page).toHaveURL(/\/admin$/)
+	})
+
+	test("history: 'replace' leaves the back button to the page", async ({ page }) => {
+		await page.goto('/admin')
+		await page.goto('/admin/collections/tags')
+		await page.getByRole('button', { name: 'Open workspace (wide, searchable)' }).click()
+		await row(page, 'Notes').click()
+		await expect(page).toHaveURL(/settings=workspace%2Fnotes/)
+		await page.locator('.settings-overlay__pane-header button[aria-label="Close"]').click()
+		await expect(page).toHaveURL(/\/admin\/collections\/tags$/)
+		await page.goBack()
+		await expect(page).toHaveURL(/\/admin$/)
+	})
+
+	test('returning to an address that names the panel opens it and keeps it open', async ({
+		page,
+	}) => {
+		await page.goto('/admin/collections/tags')
+		await page.getByRole('button', { name: 'Open workspace (wide, searchable)' }).click()
+		await expect(page).toHaveURL(/settings=workspace/)
+		await page.goBack()
+		await page.goForward()
+		await expect(panel(page)).toBeVisible()
+		// Payload closes every modal when the pathname changes; the panel must not take that for
+		// Escape and strip its own address.
+		await page.waitForTimeout(500)
+		await expect(panel(page)).toBeVisible()
+		await expect(page).toHaveURL(/settings=workspace/)
 	})
 
 	test('a filtered list survives a reload', async ({ page }) => {

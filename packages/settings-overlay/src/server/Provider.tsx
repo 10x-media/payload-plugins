@@ -108,6 +108,7 @@ export const SettingsOverlayServer = async (
 
 		clientOverlays.push({
 			addressable: overlay.addressable,
+			history: overlay.history,
 			id: overlay.id,
 			label: overlay.label,
 			layout: overlay.layout,
