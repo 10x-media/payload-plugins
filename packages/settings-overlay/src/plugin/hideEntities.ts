@@ -49,9 +49,9 @@ const withReporterGlobal = (global: GlobalConfig, hide: boolean): GlobalConfig =
 }
 
 /**
- * Hides every listed collection and global from the nav and its own route, and appends the
- * plugin's own `beforeDocumentControls` components: the form-modified reporter everywhere, and
- * the document actions on collections.
+ * Appends the plugin's own `beforeDocumentControls` components to every listed collection and
+ * global (the form-modified reporter everywhere, and the document actions on collections), and
+ * hides the entity from the nav and its own route when the overlay listing it sets `hideEntities`.
  *
  * An entity may already gate itself with a function-valued `admin.hidden`. Overwriting that
  * with `true` would lose the rule, so the predicate is lifted out and returned for the

@@ -15,5 +15,6 @@ Fixed along the way:
 - Returning with back or forward to an address that names a panel opens it and keeps it open. Payload closes every modal when the pathname changes, and the panel used to take that for Escape and strip its own address a moment after opening.
 - A `link` row now pushes its destination, so the back button returns the reader to the panel exactly as they left it.
 - On phone-width screens the close button sits in the panel's top corner, sized as a touch target, instead of below the stacked rail.
+- The README, the type docs and the docs site no longer say a listed collection or global is hidden from the nav. It is not, unless the overlay sets `hideEntities`, which is off by default.
 
 `useSettingsOverlay()` gains `navigate(url)`, which closes the panel and pushes an admin URL, and `setTarget` takes an optional `{ replace: true }` for a change that corrects the address rather than moving the reader. The `OverlayHistory` type is exported from `@10x-media/settings-overlay/types`.

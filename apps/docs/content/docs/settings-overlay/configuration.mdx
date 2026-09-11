@@ -90,7 +90,8 @@ The plugin registers, on your config:
 - `admin.components.providers`: one entry
 - `admin.dependencies`: one entry per component path it needs to resolve, including the ones inside your overlays
 - `admin.dashboard.widgets`: one internal entry, and **only** when the config holds a `view` item or a `lazy` component *and* `lazyTransport` is left at `'widget'`. It appears in the dashboard's "Add widget" drawer while a reader is editing their dashboard.
-- `admin.hidden` and `admin.components.edit.beforeDocumentControls` on each listed collection and global
+- `admin.components.edit.beforeDocumentControls` on each listed collection (the form-modified reporter and the document actions) and `admin.components.elements.beforeDocumentControls` on each listed global (the reporter alone)
+- `admin.hidden: true` on each listed collection and global, only under `hideEntities`
 - `config.custom`, under `@10x-media/settings-overlay`
 - `i18n.translations`
 

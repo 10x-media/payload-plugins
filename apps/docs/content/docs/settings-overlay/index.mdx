@@ -43,13 +43,13 @@ This plugin files them behind one panel instead, addressable by a URL you can se
 
 | Type | Source | Own URL | When it is fetched |
 |---|---|---|---|
-| `collection` | `slug` | no, the plugin hides it | on open |
-| `global` | `slug` | no, the plugin hides it | on open |
+| `collection` | `slug` | yes, unless `hideEntities` is on | on open |
+| `global` | `slug` | yes, unless `hideEntities` is on | on open |
 | `component` | `component` | no | with the page, or on open with `lazy: true` |
 | `view` | `viewKey` in `admin.components.views` | yes | on open |
 | `link` | `href` | n/a | n/a |
 
-Collections and globals render through Payload's own list and edit views, so filtering, sorting, drafts, uploads, relationship drawers and field customisation all behave as they do on a page.
+Collections and globals render through Payload's own list and edit views, so filtering, sorting, drafts, uploads, relationship drawers and field customisation all behave as they do on a page. They render in drawer mode, which leaves a few page-only features out; see [what drawer mode leaves out](/settings-overlay/items#what-drawer-mode-leaves-out).
 
 A `component` may be a server or a client component. The plugin renders it the way Payload renders any custom component and hands server props only to the former.
 

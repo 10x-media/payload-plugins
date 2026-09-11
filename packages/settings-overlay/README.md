@@ -72,8 +72,8 @@ export const SettingsButton = () => {
 
 | Type | Source field | Own URL | Fetched |
 |---|---|---|---|
-| `collection` | `slug` | no, the plugin hides it | on open |
-| `global` | `slug` | no, the plugin hides it | on open |
+| `collection` | `slug` | yes, unless `hideEntities` is on | on open |
+| `global` | `slug` | yes, unless `hideEntities` is on | on open |
 | `component` | `component` | no | with the page, or on open with `lazy: true` |
 | `view` | `viewKey` in `admin.components.views` | yes | on open |
 | `link` | `href` | n/a | n/a |

@@ -123,8 +123,7 @@ export type LinkItem = {
  * A registered admin view, mounted inside the panel by its key in `admin.components.views`.
  *
  * The view receives the page props it was written for, so it works unchanged. It has a URL of
- * its own, which is why the "one way in" rule does not apply to it and the plugin does not
- * hide it. Views that wrap themselves in `DefaultTemplate` need either the `settingsOverlayEmbed`
+ * its own, and `hideEntities` does not apply to it: the plugin never hides a view. Views that wrap themselves in `DefaultTemplate` need either the `settingsOverlayEmbed`
  * server prop (yours) or the `@10x-media/settings-overlay/embed` shim (somebody else's).
  */
 export type ViewItem = {
@@ -196,9 +195,9 @@ export type SettingsOverlayConfig = {
 	components?: SettingsOverlayComponents
 	/**
 	 * Hides every collection and global this overlay lists from the nav and from its own admin
-	 * route, so the panel is the only way in. It sets `admin.hidden` on the entity, which is all
-	 * it does; a function-valued `admin.hidden` the entity already had is kept and applied per
-	 * reader instead of being overwritten.
+	 * route, so the panel is the only way in. It sets `admin.hidden: true` on the entity, which is
+	 * all it does. A function-valued `admin.hidden` the entity already had is not lost: it keeps
+	 * deciding, per reader, whether the row shows in the panel.
 	 *
 	 * Off by default, because the panel is not a replacement for the collection's own views. It
 	 * renders the list and the edit view in drawer mode, and Payload leaves several things out of
