@@ -1,4 +1,6 @@
-import { WikiCustomHelp } from '../../src/exports/client'
+// The package name, as a consumer writes it: in a production build a `src` import is a second
+// copy of the module, whose context no provider fills.
+import { WikiCustomHelp } from '@10x-media/admin-wiki/client'
 
 /**
  * A custom admin view at `/admin/dashboard`, standing in for the screens a

@@ -76,6 +76,9 @@ one is {{chip:deprecated:Deprecated}}, both rendered by the dev app's own compon
 Links render through the dev app's own converter, so [this one]({{wiki:guide:publishing-a-post}})
 carries an arrow the plugin never puts there.
 
+An ordinary link renders through the dev app's own converter too, so
+[this one](https://payloadcms.com/docs/rich-text/converters) carries an arrow.
+
 ## Video
 
 {{embed:https://www.youtube.com/watch?v=dQw4w9WgXcQ}}
