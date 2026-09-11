@@ -615,7 +615,29 @@
 	}
 
 	.settings-overlay__rail-title {
+		/* Room for the close button, which moves up into this row below. */
+		padding-inline-end: var(--settings-overlay-header-height);
 		border-bottom: 0;
+	}
+
+	/*
+	 * Stacked, the pane header sits under the rail, most of a screen down, and the close button
+	 * with it. It moves to the panel's top corner, where a full-screen sheet keeps it, sized as a
+	 * touch target rather than a pointer one. It stays in the header's markup, so focus order and
+	 * a replaced `Header` are untouched; only its box moves, which is why the pane stops being the
+	 * box it is positioned against.
+	 */
+	.settings-overlay__pane {
+		position: static;
+	}
+
+	.settings-overlay__close {
+		position: absolute;
+		top: 0;
+		inset-inline-end: 0;
+		z-index: 1;
+		width: var(--settings-overlay-header-height);
+		height: var(--settings-overlay-header-height);
 	}
 
 	/* A filter box costs a whole row here, and the list it filters is one swipe away. */

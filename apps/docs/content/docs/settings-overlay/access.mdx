@@ -35,16 +35,18 @@ A missing function means open. A function that **throws** denies, and logs.
 
 ## The order of checks
 
-Every path into the plugin runs the same sequence:
+The rail is built inside the admin, which Payload has already gated, for a signed-in reader. Each row passes, in order:
 
-1. `req.user` exists
-2. `canAccessAdmin({ req })`, the same first check Payload's own `render-list` and `render-document` make, so a signed-in user of a non-admin auth collection is refused before any door is consulted
-3. the overlay's `access`
-4. the item's `access`
-5. the collection's or global's own `read` permission
-6. the entity's own `admin.hidden`, when it was declared as a function
+1. the overlay's `access`
+2. the collection's or global's own `read` permission
+3. the item's `access`
+4. the entity's own `admin.hidden`, when it was declared as a function
 
-Step six matters when a collection gates itself with a function-valued `admin.hidden`. The plugin overwrites that with `true` to hide the entity from the nav, and lifts the predicate out at boot so it still applies inside the panel. Payload's semantics hold: `true` means hidden, and a predicate that throws hides.
+Step four matters when a collection gates itself with a function-valued `admin.hidden`. The plugin lifts the predicate out at boot and applies it to the rail per reader, whether or not `hideEntities` is on. With `hideEntities` on, the entity's own `admin.hidden` becomes `true` to take it out of the nav, and the predicate is what still decides who sees the row in the panel. Payload's semantics hold: `true` means hidden, and a predicate that throws hides.
+
+A `view` or `lazy` component is rendered on demand through a server function, which anybody who can call one could reach, so that path checks again from the start: `req.user`, then `canAccessAdmin({ req })`, the same first check Payload's own `render-list` and `render-document` make, then the overlay's `access` and the item's `access`.
+
+Lists and documents are rendered by Payload's own `render-list` and `render-document`, under Payload's own rules. See below.
 
 ## What reaches the browser
 
@@ -52,7 +54,7 @@ The full configuration is parked under `config.custom`, which is in Payload's `s
 
 What the browser receives is:
 
-- the closed panel's own properties: `id`, `label`, `layout`, `className`, `searchable`, `addressable`
+- the closed panel's own properties: `id`, `label`, `layout`, `className`, `searchable`, `addressable`, `history`, `mergeListHeader`
 - a manifest per overlay: only the rows this reader may open, with labels already translated
 
 There is no `items` array in the client props to leak: the panel is not built from one.
@@ -66,3 +68,5 @@ Its headers are the real ones, so a `resolveDocID` can read a cookie. Everything
 ## The one thing to check yourself
 
 `hideEntities`, when you turn it on, removes a collection from the nav and from its route, but it is **not** access control. Payload's own access rules still decide whether the API will serve the document, and they should: a hidden route is not a locked one. Give the collection real `access` rules as you would anyway.
+
+The same holds for the two doors. They decide which rows the rail offers a reader; they do not stand between that reader and the collection's API, and a list or document opened in the panel is served under the collection's own access rules.

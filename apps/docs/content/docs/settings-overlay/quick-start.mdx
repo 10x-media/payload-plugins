@@ -93,7 +93,11 @@ Every overlay is addressable by default:
 
 A filtered list carries its query in a second parameter, `?settingsQuery=`, so the page underneath keeps its own `where[...]` parameters untouched.
 
-The panel is opened with the History API rather than the router, so it does not refetch the page under it, and the back button closes it in one step. A stale link (an item or document that no longer exists) lands on the first row the reader can open rather than on an error.
+The panel writes the URL with the History API rather than the router, so it does not refetch the page under it.
+
+By default every navigation in the panel is a history entry, as it would be between pages: opening it, switching rows, opening a document, returning to its list, and closing it again. The back button walks all of that in reverse, so pressing it after a close reopens the panel where you left it. A list's filters, search, sort and paging replace the current entry instead, as Payload's own list does on a page. Set `history: 'replace'` on an overlay and it adds no entries at all: the URL still names the panel, so a link keeps working, but the back button leaves the page, the way it does over one of Payload's drawers.
+
+A stale link lands on something the reader can open rather than on an error: an item that no longer exists falls back to the first row, and a document that no longer exists to its list.
 
 Set `addressable: false` on an overlay to keep it out of the URL entirely.
 

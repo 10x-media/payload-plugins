@@ -19,9 +19,8 @@ declare module 'payload' {
  * panels, and makes each panel addressable by URL.
  *
  * Composable on purpose: only the entities you list are touched. A listed collection or
- * global is hidden from the nav and its own route, so there is one way in rather than two,
- * and gets an invisible form-modified reporter so the panel can confirm before discarding
- * edits. Access functions, component paths and `resolveDocID` stay on the server: the full
+ * global gets an invisible form-modified reporter so the panel can confirm before discarding
+ * edits, and keeps its nav entry and its own route unless the overlay sets `hideEntities`. Access functions, component paths and `resolveDocID` stay on the server: the full
  * config is parked under `config.custom`, which Payload never sends to the browser, and the
  * rail each reader sees is computed server-side.
  */

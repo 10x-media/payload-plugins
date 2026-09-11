@@ -24,7 +24,14 @@ export default defineConfig({
 		trace: 'on-first-retry',
 		actionTimeout: 15_000,
 	},
-	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+	// Wider than Payload's 1440px large breakpoint, below which the nav starts closed and the
+	// launchers the specs click sit underneath the page.
+	projects: [
+		{
+			name: 'chromium',
+			use: { ...devices['Desktop Chrome'], viewport: { height: 900, width: 1600 } },
+		},
+	],
 	webServer: {
 		command: 'pnpm --filter @10x-media/settings-overlay-dev start',
 		cwd: path.resolve(dirname, '..', '..'),

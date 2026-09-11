@@ -7,8 +7,8 @@ An overlay is a list of items. Each item is one row in the rail and one thing th
 
 | Type | Source | Own URL | Fetched |
 |---|---|---|---|
-| `collection` | `slug` | no, the plugin hides it | on open |
-| `global` | `slug` | no, the plugin hides it | on open |
+| `collection` | `slug` | yes, unless `hideEntities` is on | on open |
+| `global` | `slug` | yes, unless `hideEntities` is on | on open |
 | `component` | `component` | no | with the page, or on open with `lazy: true` |
 | `view` | `viewKey` | yes | on open |
 | `link` | `href` | n/a | n/a |
@@ -25,7 +25,7 @@ Every type also takes `label`, `group`, `icon`, `order`, `keywords`, `badge` and
 
 Renders Payload's list view in drawer mode, and its edit view when a row is picked. Creating, filtering, sorting, grouping, drafts, uploads and relationship drawers all work as they do on a page.
 
-Delete, duplicate, restore from trash and "create new" sit in a dots menu on the edit view, as they do on a page, and act on the panel rather than navigating away from it. Delete honours trash when the collection has it, including the "delete permanently" option. The plugin appends the menu to the collection's `admin.components.edit.beforeDocumentControls`; if the collection already sets that, the plugin's entry is added after yours. Duplicating into selected locales is the one action the panel does not carry.
+Delete, duplicate and "create new" sit in a dots menu on the edit view, as they do on a page, and a trashed document gets Restore and Delete permanently buttons instead. All of them act on the panel rather than navigating away from it. Delete honours trash when the collection has it, including the "delete permanently" option. The plugin appends these actions to the collection's `admin.components.edit.beforeDocumentControls` whether or not `hideEntities` is on; if the collection already sets that, the plugin's entry is added after yours. Duplicating into selected locales is the one action the panel does not carry.
 
 The same collection can appear in more than one overlay. Each panel has its own rail, its own URL and its own render cache, so they do not interfere. The one thing they must agree on is `hideEntities`: hiding belongs to the entity rather than to the panel, and two overlays asking for opposite things is a boot error naming both.
 
@@ -63,7 +63,7 @@ A collection that holds one document per something, rather than a list, can skip
 }
 ```
 
-Return a document id to open it, `'create'` for the create form, or `null` to fall back to the ordinary list. The row then leads straight into the document and the back chevron is not drawn.
+Return a document id to open it, `'create'` for the create form, or `null` to fall back to the ordinary list. The row then leads straight into the document, and neither the back chevron nor the dots menu is drawn: the row stands in for a global, which has no list to return to and nothing to delete or duplicate.
 
 The id is resolved on every open and is **not** written into the URL: "the current tenant's document" or "my profile" changes with who or what is selected, so a pinned id goes stale. A resolver that throws falls back to the list rather than removing the row.
 
@@ -83,7 +83,7 @@ It reads the tenant cookie, finds that tenant's document, and creates the draft 
 { type: 'global', slug: 'branding' }
 ```
 
-The same edit view a global gets on its own route, minus the document tabs, which Payload skips in drawer mode. Hidden from the nav on the same terms as a collection, and listable in several overlays on the same terms too.
+The same edit view a global gets on its own route, minus the document tabs, which Payload skips in drawer mode. Hidden from the nav only when `hideEntities` is on, as a collection is, and listable in several overlays on the same terms too.
 
 ## `component`
 
@@ -121,7 +121,7 @@ A view that wraps itself in `DefaultTemplate` draws a second sidebar inside the 
 { type: 'link', slug: 'account', label: 'Account', href: '/account' }
 ```
 
-Closes the panel and navigates, asking first if the open document has unsaved edits. `href` is relative to the admin route.
+Closes the panel and navigates, asking first if the open document has unsaved edits. `href` is relative to the admin route. The destination is a new history entry whatever the overlay's `history` option says, so the back button returns the reader to the panel as they left it.
 
 ## Groups
 

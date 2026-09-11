@@ -17,7 +17,7 @@ settingsOverlay({
 | Option | Type | Default | What it does |
 |---|---|---|---|
 | `overlays` | `SettingsOverlayConfig[]` | required | The panels. |
-| `defaults` | `Pick<SettingsOverlayConfig, 'addressable' \| 'components' \| 'hideEntities' \| 'layout' \| 'mergeListHeader' \| 'searchable'>` | `{}` | Applied under each overlay's own settings. `components` merges per slot. |
+| `defaults` | `Pick<SettingsOverlayConfig, 'addressable' \| 'components' \| 'hideEntities' \| 'history' \| 'layout' \| 'mergeListHeader' \| 'searchable'>` | `{}` | Applied under each overlay's own settings. `components` merges per slot. |
 | `disabled` | `boolean` | `false` | Returns the incoming config untouched. |
 | `lazyTransport` | `'widget' \| 'server-function'` | `'widget'` | How a `view` or `lazy` item reaches the server. See [Lazy items](/settings-overlay/embedded-views#how-a-lazy-item-reaches-the-server). |
 | `translations` | `TranslationsOption` | | Per-locale string overrides. See [i18n](/settings-overlay/i18n). |
@@ -32,6 +32,7 @@ settingsOverlay({
 | `icon` | `PayloadComponent` | | Drawn beside the rail heading. |
 | `access` | `({ overlay, req }) => boolean` | open | The door to the whole panel. See [Access](/settings-overlay/access). |
 | `addressable` | `boolean` | `true` | Whether the panel is reachable by URL. |
+| `history` | `'push' \| 'replace'` | `'push'` | `'push'` makes every navigation in the panel a history entry, closing included, so the back button walks it like pages. `'replace'` adds none, and the back button leaves the page. No effect when `addressable` is `false`. See [Link to it](/settings-overlay/quick-start#link-to-it). |
 | `layout` | `'compact' \| 'wide'` | `'compact'` | Width preset. |
 | `searchable` | `boolean` | `false` | Adds a search box that filters the rail. |
 | `hideEntities` | `boolean` | `false` | Sets `admin.hidden` on every collection and global the overlay lists, removing it from the nav and from its own route. Off by default because [drawer mode leaves things out](/settings-overlay/items). Overlays listing the same entity must agree on this. |
@@ -89,7 +90,8 @@ The plugin registers, on your config:
 - `admin.components.providers`: one entry
 - `admin.dependencies`: one entry per component path it needs to resolve, including the ones inside your overlays
 - `admin.dashboard.widgets`: one internal entry, and **only** when the config holds a `view` item or a `lazy` component *and* `lazyTransport` is left at `'widget'`. It appears in the dashboard's "Add widget" drawer while a reader is editing their dashboard.
-- `admin.hidden` and `admin.components.edit.beforeDocumentControls` on each listed collection and global
+- `admin.components.edit.beforeDocumentControls` on each listed collection (the form-modified reporter and the document actions) and `admin.components.elements.beforeDocumentControls` on each listed global (the reporter alone)
+- `admin.hidden: true` on each listed collection and global, only under `hideEntities`
 - `config.custom`, under `@10x-media/settings-overlay`
 - `i18n.translations`
 

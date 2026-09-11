@@ -47,13 +47,14 @@ Replacing `Header` also means taking over what the default one draws: the back b
 Create button under [`mergeListHeader`](/settings-overlay/configuration).
 `useSettingsPanel()` gives you `canGoBack`, `goBack` and `requestClose`; the rest is yours to
 include or leave out. Document actions are not in the header, so a replacement does not lose
-them: they render inside the edit view itself.
+them: they render inside the edit view itself. On phone-width screens the default header's close
+button moves up to the panel's top corner, clear of the stacked rail; a replacement places its own.
 
 ## Hooks
 
 | Hook | Available in | Gives |
 |---|---|---|
-| `useSettingsOverlay()` | anywhere in the admin | `open`, `close`, `toggle`, `target`, `setTarget`, `isOpen`, `manifests` |
+| `useSettingsOverlay()` | anywhere in the admin | `open`, `close`, `toggle`, `navigate`, `target`, `setTarget`, `isOpen`, `manifests` |
 | `useSettingsPanel()` | inside a panel | `activeItem`, `manifest`, `visibleGroups`, `overlay`, `search`, `setSearch`, `filtering`, `goBack`, `canGoBack`, `requestClose` |
 | `useSettingsItemState(slug)` | inside a rail | `item`, `icon`, `isActive`, `select` |
 | `useSettingsBadge(slug)` | anywhere | the badge value for one row |
@@ -122,7 +123,7 @@ export const MyField = () => {
 }
 ```
 
-It returns `null` outside a panel, and `{ overlayId, itemSlug, itemType, layout, docID?, close, setTarget }` inside one. It answers for the pane, not for the admin: a component elsewhere on the page gets `null` even while a panel is open.
+It returns `null` outside a panel, and `{ overlayId, itemSlug, itemType, layout, docID?, directDocID?, close, setTarget }` inside one. `directDocID` is set when `resolveDocID` pointed the row straight at one document. It answers for the pane, not for the admin: a component elsewhere on the page gets `null` even while a panel is open.
 
 A server component gets the same object minus the two functions, as a `settingsOverlayEmbed` prop:
 

@@ -13,6 +13,7 @@ export type {
 	ManifestGroup,
 	ManifestItem,
 	OverlayAccess,
+	OverlayHistory,
 	OverlayLayout,
 	ResolveDocID,
 	SettingsOverlayComponents,
