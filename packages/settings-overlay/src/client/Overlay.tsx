@@ -327,7 +327,7 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 														) : null}
 														<button
 															aria-label={t(keys.close)}
-															className={`${base}__icon-button`}
+															className={`${base}__icon-button ${base}__close`}
 															onClick={requestClose}
 															type="button"
 														>
