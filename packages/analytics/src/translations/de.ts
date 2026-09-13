@@ -107,4 +107,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fieldGoalManage]: 'Ziele verwalten',
 	[keys.fieldGoalInvalid]: 'Nur Kleinbuchstaben, Ziffern und Bindestriche, zum Beispiel book-demo.',
 	[keys.fieldGoalError]: 'Ziele konnten nicht geladen werden.',
+	[keys.actionGoalLabel]: 'Analytics-Ziel erfassen',
+	[keys.actionGoalFieldValueFrom]: 'Wert aus Feld',
+	[keys.actionGoalFieldValueFromHelp]: 'Formularfeld, dessen numerische Antwort zum Zielwert wird.',
+	[keys.actionGoalErrorGoal]: 'Wählen Sie das Ziel, das diese Übermittlung erfüllt.',
 }

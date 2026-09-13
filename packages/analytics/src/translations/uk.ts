@@ -106,4 +106,8 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.fieldGoalManage]: 'Керування цілями',
 	[keys.fieldGoalInvalid]: 'Використовуйте малі літери, цифри та дефіси, наприклад book-demo.',
 	[keys.fieldGoalError]: 'Не вдалося завантажити цілі.',
+	[keys.actionGoalLabel]: 'Реєструвати ціль аналітики',
+	[keys.actionGoalFieldValueFrom]: 'Значення з поля',
+	[keys.actionGoalFieldValueFromHelp]: 'Поле форми, числова відповідь якого стає значенням цілі.',
+	[keys.actionGoalErrorGoal]: 'Виберіть ціль, яку виконує ця відправка.',
 }

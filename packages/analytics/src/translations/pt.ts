@@ -106,4 +106,9 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.fieldGoalManage]: 'Gerir objetivos',
 	[keys.fieldGoalInvalid]: 'Use minúsculas, números e hifens, por exemplo book-demo.',
 	[keys.fieldGoalError]: 'Não foi possível carregar os objetivos.',
+	[keys.actionGoalLabel]: 'Registar objetivo de analítica',
+	[keys.actionGoalFieldValueFrom]: 'Valor a partir do campo',
+	[keys.actionGoalFieldValueFromHelp]:
+		'Campo do envio cuja resposta numérica passa a ser o valor do objetivo.',
+	[keys.actionGoalErrorGoal]: 'Escolha o objetivo que este envio cumpre.',
 }

@@ -109,4 +109,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fieldGoalManage]: 'Manage goals',
 	[keys.fieldGoalInvalid]: 'Use lowercase letters, numbers and hyphens, for example book-demo.',
 	[keys.fieldGoalError]: 'Goals could not be loaded.',
+	[keys.actionGoalLabel]: 'Track analytics goal',
+	[keys.actionGoalFieldValueFrom]: 'Value from field',
+	[keys.actionGoalFieldValueFromHelp]:
+		'Submission field whose numeric answer becomes the goal value.',
+	[keys.actionGoalErrorGoal]: 'Choose the goal this submission completes.',
 }

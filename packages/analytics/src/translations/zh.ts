@@ -103,4 +103,8 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.fieldGoalManage]: '管理目标',
 	[keys.fieldGoalInvalid]: '仅使用小写字母、数字和连字符，例如 book-demo。',
 	[keys.fieldGoalError]: '无法加载目标。',
+	[keys.actionGoalLabel]: '记录分析目标',
+	[keys.actionGoalFieldValueFrom]: '取值字段',
+	[keys.actionGoalFieldValueFromHelp]: '提交中该字段的数字答案将作为目标值。',
+	[keys.actionGoalErrorGoal]: '请选择本次提交所完成的目标。',
 }

@@ -17,6 +17,12 @@ export type {
 	AnalyticsStatRowOptions,
 	AnalyticsTabOptions,
 } from '../fields/factories'
+export type {
+	GoalActionDefinition,
+	GoalActionRunArgs,
+	GoalActionValidateArgs,
+	TrackGoalActionOptions,
+} from '../goals/trackGoalAction'
 export type { Goal, GoalMatch, TrackerGoal } from '../goals/types'
 export type { AnalyticsPluginOptions } from '../index'
 export type {

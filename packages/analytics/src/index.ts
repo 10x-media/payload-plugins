@@ -328,6 +328,13 @@ export {
 export type { GoalFieldOptions } from './goals/goalField'
 export { goalField, goalSlug } from './goals/goalField'
 export type { GoalsResponse, WireGoal } from './goals/goalsEndpoint'
+export type {
+	GoalActionDefinition,
+	GoalActionRunArgs,
+	GoalActionValidateArgs,
+	TrackGoalActionOptions,
+} from './goals/trackGoalAction'
+export { GOAL_ACTION_TYPE, trackGoalAction } from './goals/trackGoalAction'
 export type { Goal, GoalMatch, TrackerGoal } from './goals/types'
 export type { ServerEventInput, ServerTrackOptions } from './native/ingest/serverTrack'
 export { AnalyticsTrackError, trackServerEvent } from './native/ingest/serverTrack'

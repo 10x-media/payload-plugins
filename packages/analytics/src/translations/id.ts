@@ -105,4 +105,9 @@ export const id: Record<TranslationKey, string> = {
 	[keys.fieldGoalManage]: 'Kelola sasaran',
 	[keys.fieldGoalInvalid]: 'Gunakan huruf kecil, angka, dan tanda hubung, misalnya book-demo.',
 	[keys.fieldGoalError]: 'Sasaran tidak dapat dimuat.',
+	[keys.actionGoalLabel]: 'Catat sasaran analitik',
+	[keys.actionGoalFieldValueFrom]: 'Nilai dari bidang',
+	[keys.actionGoalFieldValueFromHelp]:
+		'Bidang kiriman yang jawaban numeriknya menjadi nilai sasaran.',
+	[keys.actionGoalErrorGoal]: 'Pilih sasaran yang diselesaikan kiriman ini.',
 }

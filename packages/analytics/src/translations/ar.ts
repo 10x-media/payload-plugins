@@ -103,4 +103,8 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.fieldGoalManage]: 'إدارة الأهداف',
 	[keys.fieldGoalInvalid]: 'استخدم أحرفًا صغيرة وأرقامًا وشرطات، مثل book-demo.',
 	[keys.fieldGoalError]: 'تعذّر تحميل الأهداف.',
+	[keys.actionGoalLabel]: 'تسجيل هدف التحليلات',
+	[keys.actionGoalFieldValueFrom]: 'القيمة من حقل',
+	[keys.actionGoalFieldValueFromHelp]: 'حقل الإرسال الذي تصبح إجابته الرقمية قيمة الهدف.',
+	[keys.actionGoalErrorGoal]: 'اختر الهدف الذي يحققه هذا الإرسال.',
 }

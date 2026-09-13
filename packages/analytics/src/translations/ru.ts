@@ -106,4 +106,9 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.fieldGoalManage]: 'Управление целями',
 	[keys.fieldGoalInvalid]: 'Используйте строчные буквы, цифры и дефисы, например book-demo.',
 	[keys.fieldGoalError]: 'Не удалось загрузить цели.',
+	[keys.actionGoalLabel]: 'Регистрировать цель аналитики',
+	[keys.actionGoalFieldValueFrom]: 'Значение из поля',
+	[keys.actionGoalFieldValueFromHelp]:
+		'Поле формы, числовой ответ которого становится значением цели.',
+	[keys.actionGoalErrorGoal]: 'Выберите цель, которую выполняет эта отправка.',
 }

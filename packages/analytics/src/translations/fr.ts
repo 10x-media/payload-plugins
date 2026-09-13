@@ -108,4 +108,9 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.fieldGoalInvalid]:
 		"Utilisez des minuscules, des chiffres et des traits d'union, par exemple book-demo.",
 	[keys.fieldGoalError]: 'Impossible de charger les objectifs.',
+	[keys.actionGoalLabel]: 'Enregistrer un objectif analytique',
+	[keys.actionGoalFieldValueFrom]: 'Valeur depuis le champ',
+	[keys.actionGoalFieldValueFromHelp]:
+		"Champ de la soumission dont la réponse numérique devient la valeur de l'objectif.",
+	[keys.actionGoalErrorGoal]: "Choisissez l'objectif que cette soumission valide.",
 }

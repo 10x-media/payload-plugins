@@ -103,4 +103,8 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.fieldGoalManage]: '목표 관리',
 	[keys.fieldGoalInvalid]: '소문자, 숫자, 하이픈만 사용하세요. 예: book-demo',
 	[keys.fieldGoalError]: '목표를 불러오지 못했습니다.',
+	[keys.actionGoalLabel]: '분석 목표 기록',
+	[keys.actionGoalFieldValueFrom]: '값을 가져올 필드',
+	[keys.actionGoalFieldValueFromHelp]: '제출된 답변 중 숫자 값을 목표 값으로 사용할 필드입니다.',
+	[keys.actionGoalErrorGoal]: '이 제출이 완료하는 목표를 선택하세요.',
 }
