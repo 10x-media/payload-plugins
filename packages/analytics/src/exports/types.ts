@@ -19,4 +19,9 @@ export type {
 } from '../fields/factories'
 export type { Goal, GoalMatch, TrackerGoal } from '../goals/types'
 export type { AnalyticsPluginOptions } from '../index'
+export type {
+	ServerEventInput,
+	ServerTrack,
+	ServerTrackOptions,
+} from '../native/ingest/serverTrack'
 export type { TimeframePreset } from '../timeframe/presets'

@@ -4,6 +4,7 @@ import type { CaptureSlotOption, ConsentPolicy, ResolvedAutoCapture } from '../c
 import type { AdapterRegistry, RegistryResolver, ResolveRegistryArgs } from '../core/registry'
 import type { GoalsResolver, ResolvedGoal } from '../goals/resolver'
 import type { Goal } from '../goals/types'
+import type { ServerTrack } from '../native/ingest/serverTrack'
 import type { Engine } from '../surfacing/engine'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 
@@ -42,6 +43,11 @@ export interface AnalyticsRuntime {
 	resolveGoalsDetailed?: GoalsResolver['resolveDetailed']
 	/** Slug of the goals collection when the install enabled it; the picker links to it. */
 	goalsCollectionSlug?: string
+	/**
+	 * Records an event from server code, through whichever registered adapter accepts
+	 * server events. Rejects with an `AnalyticsTrackError` when none does.
+	 */
+	track?: ServerTrack
 	/**
 	 * Where the ingest endpoint listens, relative to `routes.api`, lifted at init from the
 	 * adapter that registered one. Absent runtimes fall back to the default mount.

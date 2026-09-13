@@ -7,6 +7,7 @@ import { createRegistry, staticRegistryResolver } from './core/registry'
 import { buildGoalsCollection } from './goals/collection'
 import { GOALS_PATH, makeGoalsHandler } from './goals/goalsEndpoint'
 import { configGoalsResolver, createGoalsResolver } from './goals/resolver'
+import { trackServerEvent } from './native/ingest/serverTrack'
 import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
 import { isModuleNotFoundError } from './plugin/peerImportError'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
@@ -268,6 +269,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 					? { goalsCollectionSlug: resolved.goalsCollection.slug }
 					: {}),
 				ingestPath: resolved.adapters.find((a) => a.ingest)?.ingest?.path,
+				track: (event, opts) => trackServerEvent(payload, event, opts),
 				scoped: resolved.scoped,
 				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,
@@ -327,6 +329,8 @@ export type { GoalFieldOptions } from './goals/goalField'
 export { goalField, goalSlug } from './goals/goalField'
 export type { GoalsResponse, WireGoal } from './goals/goalsEndpoint'
 export type { Goal, GoalMatch, TrackerGoal } from './goals/types'
+export type { ServerEventInput, ServerTrackOptions } from './native/ingest/serverTrack'
+export { AnalyticsTrackError, trackServerEvent } from './native/ingest/serverTrack'
 export type { TimeframePreset } from './timeframe/presets'
 export type { CustomWidgetDef } from './widgets/customWidget'
 export { analyticsDefaultWidgets } from './widgets/defaults'
