@@ -156,8 +156,8 @@ export interface AdapterRegisterContext {
 	resolveTimezone: (req: PayloadRequest, scope?: string | null) => Promise<string>
 	/**
 	 * The install's goals for a request's scope, for adapters that match completions
-	 * themselves (the native engine, at ingest). Config goals today; a collection source
-	 * merges in behind the same call.
+	 * themselves (the native engine, at ingest). Config goals, with the goals collection
+	 * merged over them per scope once the install enables it.
 	 */
 	resolveGoals: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>
 }

@@ -153,6 +153,10 @@ trackGoal('book-demo', { value: 500, currency: 'EUR' })
 
 Both calls fan out to every filled slot. Vendor sinks drop pageviews, because each vendor's own script tracks them.
 
+## Server-side tracking
+
+Not every event has a browser behind it. `trackServerEvent(payload, event, { req })` records a pageview, an event, or a goal completion from server code (a webhook, a job, a server action) through the native engine's own ingest pipeline, with no HTTP round trip and the same sanitizers this page describes. Pass the request it belongs to and the event inherits that request's attribution, scope, and reporting timezone. See [Track from server code](/analytics/goals#4-track-from-server-code) for the signature and what changes when there is no request.
+
 ## Content Security Policy
 
 Pass your request nonce and every script the tracker renders or injects carries it:
