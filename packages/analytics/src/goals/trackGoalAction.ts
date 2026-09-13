@@ -1,16 +1,13 @@
-import type { Field, Payload, PayloadRequest, TextFieldSingleValidation } from 'payload'
+import type { Field, Payload, PayloadRequest } from 'payload'
 import { AnalyticsTrackError } from '../core/serverEvent'
 import { trackServerEvent } from '../native/ingest/serverTrack'
-import { de } from '../translations/de'
-import { en } from '../translations/en'
 import { keys } from '../translations/keys'
-import { asTranslate, labelForKey } from '../translations/server'
+import { labelForKey } from '../translations/server'
+import { validateCurrency } from './currency'
 import { goalField, goalSlug } from './goalField'
 
-/** The action type form-builder stores on a form's `actions` block. */
-export const GOAL_ACTION_TYPE = 'analytics-goal'
-
-const CURRENCY_PATTERN = /^[A-Z]{3}$/
+/** The action type form-builder stores as the block slug on a form's `actions` array. */
+export const GOAL_ACTION_TYPE = 'analyticsGoal'
 
 /**
  * The run context form-builder hands a post-submit action, narrowed to what goal tracking
@@ -24,13 +21,11 @@ export interface GoalActionRunArgs {
 	values: Array<{ field: string; value: unknown }>
 	config: Record<string, unknown>
 	payload: Payload
+	/**
+	 * The request the action runs under. On a queued dispatch this is the job runner's own
+	 * request, not the visitor's, so it carries neither the submitting host nor the tenant.
+	 */
 	req?: PayloadRequest
-}
-
-/** The validation context form-builder passes when a form carrying this action is saved. */
-export interface GoalActionValidateArgs {
-	data: Record<string, unknown>
-	req: PayloadRequest
 }
 
 /**
@@ -41,22 +36,26 @@ export interface GoalActionDefinition {
 	type: typeof GOAL_ACTION_TYPE
 	label: string | Record<string, string>
 	config: Field[]
-	validateConfig?: (
-		config: Record<string, unknown>,
-		ctx: GoalActionValidateArgs
-	) => string | true | Promise<string | true>
 	run: (args: GoalActionRunArgs) => Promise<void>
 }
 
 export interface TrackGoalActionOptions {
-	/** Site the completion belongs to. Defaults to the submitting request's host. */
+	/**
+	 * Site the completion belongs to. Falls back to the submitting request's host, then to
+	 * the host of `serverURL`. Set it whenever a jobs runner queues actions: the runner's
+	 * request carries the CMS host at best, and often no host at all.
+	 */
 	hostname?: string | ((args: GoalActionRunArgs) => string)
 	/** Page the completion is attributed to. Defaults to `/forms/<form id>`. */
 	path?: string | ((args: GoalActionRunArgs) => string)
+	/**
+	 * Analytics boundary to stamp; `null` is install-wide. Leave unset and the scope resolves
+	 * from the action's request, which on a queued dispatch is the runner's rather than the
+	 * submitter's and so usually lands install-wide. Set it on any scoped install whose
+	 * actions are queued, since the submitter's tenant cannot be recovered there.
+	 */
+	scope?: string | null | ((args: GoalActionRunArgs) => string | null | Promise<string | null>)
 }
-
-const validateCurrency: TextFieldSingleValidation = (value, { req }) =>
-	!value || CURRENCY_PATTERN.test(value) ? true : asTranslate(req.t)(keys.goalErrorCurrency)
 
 const configFields = (): Field[] => [
 	goalField({ name: 'goal', required: true }),
@@ -105,17 +104,55 @@ const fromOption = (
 ): string | undefined =>
 	nonEmpty(typeof option === 'function' ? option(args) : (option ?? undefined))
 
+/**
+ * The host out of a `Host` header. An IPv6 literal keeps its brackets, which is what the URL
+ * spec and every other hostname in the pipeline use; only a bracketed or single-colon host
+ * can carry a port, so a bare `::1` is left whole rather than truncated at its last colon.
+ */
+const stripPort = (host: string): string => {
+	const bracketed = /^(\[[^\]]+\])(?::\d+)?$/.exec(host)
+	if (bracketed?.[1]) {
+		return bracketed[1]
+	}
+	if (host.indexOf(':') !== host.lastIndexOf(':')) {
+		return host
+	}
+	return host.replace(/:\d+$/, '')
+}
+
+const serverUrlHost = (payload: Payload): string | undefined => {
+	const serverURL = nonEmpty(payload.config?.serverURL)
+	if (!serverURL) {
+		return undefined
+	}
+	try {
+		return nonEmpty(new URL(serverURL).hostname)
+	} catch {
+		return undefined
+	}
+}
+
+/**
+ * The option, then the submitting request, then the install's own `serverURL`. The queued
+ * dispatch path reaches the last two with the runner's request, so an install that queues
+ * actions and serves more than one site has to say which site in the option.
+ */
 const hostnameFor = (options: TrackGoalActionOptions, args: GoalActionRunArgs): string => {
 	const configured = fromOption(options.hostname, args)
 	if (configured) {
-		return configured
+		return configured.toLowerCase()
 	}
-	const host = nonEmpty(args.req?.headers.get('host'))?.replace(/:\d+$/, '')
-	if (host) {
-		return host
+	const header = nonEmpty(args.req?.headers.get('host'))
+	const fromHeader = header ? nonEmpty(stripPort(header)) : undefined
+	if (fromHeader) {
+		return fromHeader.toLowerCase()
+	}
+	const fromServerUrl = serverUrlHost(args.payload)
+	if (fromServerUrl) {
+		return fromServerUrl.toLowerCase()
 	}
 	throw new AnalyticsTrackError(
-		'analytics: trackGoalAction needs a hostname; set the `hostname` option or submit through a request carrying a Host header'
+		'analytics: trackGoalAction could not resolve a hostname; set the `hostname` option, or configure `serverURL`, since a queued run has no submitting request'
 	)
 }
 
@@ -144,21 +181,34 @@ const propsFor = (args: GoalActionRunArgs): Record<string, unknown> => {
 	return props
 }
 
+const scopeFor = async (
+	options: TrackGoalActionOptions,
+	args: GoalActionRunArgs
+): Promise<{ scope?: string | null }> => {
+	if (options.scope === undefined) {
+		return {}
+	}
+	return { scope: typeof options.scope === 'function' ? await options.scope(args) : options.scope }
+}
+
 /**
  * A form-builder post-submit action that completes an analytics goal, authored per form in
  * the admin: pick the goal, optionally a revenue value (fixed, or read from a submission
- * field) and its currency. Register it through form-builder's `actions` option.
+ * field) and its currency. Register it through form-builder's `actions` option under
+ * {@link GOAL_ACTION_TYPE}.
  *
  * Needs the native adapter, since it records through {@link trackServerEvent}. `essential`
  * is deliberately unset: a goal is a measurement, so a failed write is logged and the
  * submission still succeeds.
+ *
+ * On any install with a jobs runner, form-builder queues non-essential actions, and the
+ * queued run carries the runner's request rather than the visitor's. Set `hostname` (and
+ * `scope`, on a scoped install) there, since neither can be recovered from that request.
  */
 export const trackGoalAction = (options: TrackGoalActionOptions = {}): GoalActionDefinition => ({
 	type: GOAL_ACTION_TYPE,
-	label: { en: en[keys.actionGoalLabel], de: de[keys.actionGoalLabel] },
+	label: keys.actionGoalLabel,
 	config: configFields(),
-	validateConfig: (config, ctx) =>
-		goalSlug(config.goal) ? true : asTranslate(ctx.req.t)(keys.actionGoalErrorGoal),
 	run: async (args) => {
 		const slug = goalSlug(args.config.goal)
 		if (!slug) {
@@ -174,6 +224,7 @@ export const trackGoalAction = (options: TrackGoalActionOptions = {}): GoalActio
 				value: valueFor(args),
 				currency: nonEmpty(args.config.currency),
 				props: propsFor(args),
+				...(await scopeFor(options, args)),
 			},
 			{ req: args.req }
 		)

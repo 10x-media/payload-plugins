@@ -13,6 +13,7 @@ import { providerCreateAccess, providerRowAccess } from '../providers/access'
 import { stampScope } from '../providers/stampScope'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
+import { validateCurrency } from './currency'
 import { goalScopeWhere } from './resolver'
 import { GOAL_SLUG_PATTERN } from './types'
 
@@ -26,15 +27,10 @@ export interface BuildGoalsCollectionArgs extends ProviderAccessArgs {
 	onChange: () => void
 }
 
-const CURRENCY_PATTERN = /^[A-Z]{3}$/
-
 const validateSlug: TextFieldSingleValidation = (value, { req }) =>
 	typeof value === 'string' && GOAL_SLUG_PATTERN.test(value)
 		? true
 		: asTranslate(req.t)(keys.goalErrorSlug)
-
-const validateCurrency: TextFieldSingleValidation = (value, { req }) =>
-	!value || CURRENCY_PATTERN.test(value) ? true : asTranslate(req.t)(keys.goalErrorCurrency)
 
 const asScope = (value: unknown): string | null =>
 	value === null || value === undefined || value === '' ? null : String(value)

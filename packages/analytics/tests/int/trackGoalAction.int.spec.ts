@@ -3,11 +3,12 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { MetricKey } from '../../src/core/contract'
 import { GOALS_SLUG } from '../../src/goals/collection'
 import type { GoalActionRunArgs } from '../../src/goals/trackGoalAction'
-import { trackGoalAction } from '../../src/goals/trackGoalAction'
+import { GOAL_ACTION_TYPE, trackGoalAction } from '../../src/goals/trackGoalAction'
 import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { native } from '../../src/native/nativeAdapter'
+import { ACTION_HOST_SLUG, actionHost } from './actionHost'
 
 const DAY_MS = 86_400_000
 const HOST = 'shop.example'
@@ -38,6 +39,7 @@ describeForDb('analytics trackGoalAction', { dbs: ['mongo'] }, (db) => {
 	beforeAll(async () => {
 		booted = await bootPayload({
 			db,
+			collections: [actionHost()],
 			plugin: analytics({
 				adapters: [adapter],
 				goals: { collection: true, defaults: configGoals },
@@ -95,5 +97,36 @@ describeForDb('analytics trackGoalAction', { dbs: ['mongo'] }, (db) => {
 			conversions: 1,
 			revenue: 1500,
 		})
+	})
+
+	it('stores the action config as a block under the action type', async () => {
+		const created = await booted.payload.create({
+			collection: ACTION_HOST_SLUG as never,
+			data: {
+				actions: [{ blockType: GOAL_ACTION_TYPE, goal: 'book-demo', value: 40, currency: 'EUR' }],
+			} as never,
+		})
+
+		const read = await booted.payload.findByID({
+			collection: ACTION_HOST_SLUG as never,
+			id: (created as { id: string | number }).id,
+		})
+		expect((read as { actions?: Array<Record<string, unknown>> }).actions?.[0]).toMatchObject({
+			blockType: GOAL_ACTION_TYPE,
+			goal: 'book-demo',
+			value: 40,
+			currency: 'EUR',
+		})
+	})
+
+	it('refuses an action block whose goal slug is not a slug', async () => {
+		await expect(
+			booted.payload.create({
+				collection: ACTION_HOST_SLUG as never,
+				data: {
+					actions: [{ blockType: GOAL_ACTION_TYPE, goal: 'Not A Slug' }],
+				} as never,
+			})
+		).rejects.toThrow()
 	})
 })

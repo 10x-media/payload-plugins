@@ -109,5 +109,4 @@ export const id: Record<TranslationKey, string> = {
 	[keys.actionGoalFieldValueFrom]: 'Nilai dari bidang',
 	[keys.actionGoalFieldValueFromHelp]:
 		'Bidang kiriman yang jawaban numeriknya menjadi nilai sasaran.',
-	[keys.actionGoalErrorGoal]: 'Pilih sasaran yang diselesaikan kiriman ini.',
 }

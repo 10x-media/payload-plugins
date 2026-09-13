@@ -110,5 +110,4 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.actionGoalFieldValueFrom]: 'Valor a partir do campo',
 	[keys.actionGoalFieldValueFromHelp]:
 		'Campo do envio cuja resposta numérica passa a ser o valor do objetivo.',
-	[keys.actionGoalErrorGoal]: 'Escolha o objetivo que este envio cumpre.',
 }

@@ -15,6 +15,7 @@ import {
 } from '../core/serverEvent'
 import { keys } from '../translations/keys'
 import {
+	GOAL_ACTION_TYPE,
 	type GoalActionDefinition,
 	type GoalActionRunArgs,
 	trackGoalAction,
@@ -36,7 +37,10 @@ vi.mock('../native/ingest/serverTrack', async (importActual) => {
 	}
 })
 
-const payload = {} as Payload
+const payloadWith = (serverURL?: string): Payload =>
+	({ config: { serverURL } }) as unknown as Payload
+
+const payload = payloadWith()
 
 const fieldNamed = (fields: Field[], name: string): Field => {
 	const field = fields.find((candidate) => 'name' in candidate && candidate.name === name)
@@ -69,18 +73,16 @@ beforeEach(() => {
 })
 
 describe('trackGoalAction: shape', () => {
-	it('is a non-essential action of its own type', () => {
+	it('is a non-essential action of its own camelCase type', () => {
 		const action = trackGoalAction()
 
-		expect(action.type).toBe('analytics-goal')
+		expect(GOAL_ACTION_TYPE).toBe('analyticsGoal')
+		expect(action.type).toBe('analyticsGoal')
 		expect('essential' in action).toBe(false)
 	})
 
-	it('labels itself from the translation bundles', () => {
-		expect(trackGoalAction().label).toEqual({
-			en: 'Track analytics goal',
-			de: 'Analytics-Ziel erfassen',
-		})
+	it('labels itself with a translation key so every locale applies', () => {
+		expect(trackGoalAction().label).toBe(keys.actionGoalLabel)
 	})
 
 	it('authors a required goal picker plus value, valueFrom and currency', () => {
@@ -133,23 +135,7 @@ describe('trackGoalAction: shape', () => {
 		expectTypeOf<GoalActionDefinition>().toExtend<ActionDefinition<Record<string, unknown>>>()
 
 		const registered: ActionDefinition<Record<string, unknown>> = trackGoalAction()
-		expect(registered.type).toBe('analytics-goal')
-	})
-})
-
-describe('trackGoalAction: validateConfig', () => {
-	const ctx = { data: {}, req: { t: (key: string) => key } } as unknown as Parameters<
-		NonNullable<GoalActionDefinition['validateConfig']>
-	>[1]
-
-	it('accepts a configured goal', async () => {
-		expect(await trackGoalAction().validateConfig?.({ goal: 'book-demo' }, ctx)).toBe(true)
-	})
-
-	it('refuses a missing or blank goal with a translated message', async () => {
-		const validate = trackGoalAction().validateConfig
-		expect(await validate?.({}, ctx)).toBe(keys.actionGoalErrorGoal)
-		expect(await validate?.({ goal: '   ' }, ctx)).toBe(keys.actionGoalErrorGoal)
+		expect(registered.type).toBe(GOAL_ACTION_TYPE)
 	})
 })
 
@@ -211,9 +197,80 @@ describe('trackGoalAction: hostname', () => {
 		expect(tracked[0]?.event.hostname).toBe('localhost')
 	})
 
-	it('throws when there is no option and no request host', async () => {
+	it('keeps the brackets around an IPv6 request host', async () => {
+		await trackGoalAction().run(runArgs(withHost('[::1]:3000')))
+		expect(tracked[0]?.event.hostname).toBe('[::1]')
+
+		tracked.length = 0
+		await trackGoalAction().run(runArgs(withHost('[2001:db8::1]')))
+		expect(tracked[0]?.event.hostname).toBe('[2001:db8::1]')
+	})
+
+	it('does not truncate a bracketless IPv6 request host at its last colon', async () => {
+		await trackGoalAction().run(runArgs(withHost('2001:db8::1')))
+		expect(tracked[0]?.event.hostname).toBe('2001:db8::1')
+	})
+
+	it('falls back to the serverURL host when the queued run has no request', async () => {
+		await trackGoalAction().run(runArgs({ payload: payloadWith('https://Shop.Example:8443/cms') }))
+		expect(tracked[0]?.event.hostname).toBe('shop.example')
+	})
+
+	it('prefers the request host over the serverURL', async () => {
+		await trackGoalAction().run(
+			runArgs({ payload: payloadWith('https://cms.example'), ...withHost('shop.example') })
+		)
+		expect(tracked[0]?.event.hostname).toBe('shop.example')
+	})
+
+	it('lowercases the resolved host on every branch', async () => {
+		await trackGoalAction({ hostname: 'Shop.EXAMPLE' }).run(runArgs())
+		expect(tracked[0]?.event.hostname).toBe('shop.example')
+
+		tracked.length = 0
+		await trackGoalAction({ hostname: () => 'Form.EXAMPLE' }).run(runArgs())
+		expect(tracked[0]?.event.hostname).toBe('form.example')
+
+		tracked.length = 0
+		await trackGoalAction().run(runArgs(withHost('Shop.EXAMPLE:3000')))
+		expect(tracked[0]?.event.hostname).toBe('shop.example')
+	})
+
+	it('throws when there is no option, no request host and no serverURL', async () => {
 		await expect(trackGoalAction().run(runArgs())).rejects.toBeInstanceOf(AnalyticsTrackError)
 		expect(tracked).toHaveLength(0)
+	})
+
+	it('throws when the serverURL is not a parsable URL', async () => {
+		await expect(
+			trackGoalAction().run(runArgs({ payload: payloadWith('not a url') }))
+		).rejects.toBeInstanceOf(AnalyticsTrackError)
+		expect(tracked).toHaveLength(0)
+	})
+})
+
+describe('trackGoalAction: scope', () => {
+	it('leaves scope to trackServerEvent when the option is unset', async () => {
+		await trackGoalAction({ hostname: 'shop.example' }).run(runArgs())
+		expect('scope' in (tracked[0]?.event ?? {})).toBe(false)
+	})
+
+	it('stamps a literal scope the queued run could not recover from its request', async () => {
+		await trackGoalAction({ hostname: 'shop.example', scope: 'alpha' }).run(runArgs())
+		expect(tracked[0]?.event.scope).toBe('alpha')
+	})
+
+	it('stamps an explicit install-wide scope', async () => {
+		await trackGoalAction({ hostname: 'shop.example', scope: null }).run(runArgs())
+		expect(tracked[0]?.event.scope).toBeNull()
+	})
+
+	it('awaits a scope resolved from the run args', async () => {
+		await trackGoalAction({
+			hostname: 'shop.example',
+			scope: async (args) => `tenant-${args.form.id}`,
+		}).run(runArgs())
+		expect(tracked[0]?.event.scope).toBe('tenant-7')
 	})
 })
 

@@ -113,5 +113,4 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionGoalFieldValueFrom]: 'Value from field',
 	[keys.actionGoalFieldValueFromHelp]:
 		'Submission field whose numeric answer becomes the goal value.',
-	[keys.actionGoalErrorGoal]: 'Choose the goal this submission completes.',
 }

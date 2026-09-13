@@ -112,5 +112,4 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.actionGoalFieldValueFrom]: 'Valeur depuis le champ',
 	[keys.actionGoalFieldValueFromHelp]:
 		"Champ de la soumission dont la réponse numérique devient la valeur de l'objectif.",
-	[keys.actionGoalErrorGoal]: "Choisissez l'objectif que cette soumission valide.",
 }

@@ -21,7 +21,6 @@ export type {
 export type {
 	GoalActionDefinition,
 	GoalActionRunArgs,
-	GoalActionValidateArgs,
 	TrackGoalActionOptions,
 } from '../goals/trackGoalAction'
 export type { Goal, GoalMatch, TrackerGoal } from '../goals/types'

@@ -110,5 +110,4 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.actionGoalFieldValueFrom]: 'Значение из поля',
 	[keys.actionGoalFieldValueFromHelp]:
 		'Поле формы, числовой ответ которого становится значением цели.',
-	[keys.actionGoalErrorGoal]: 'Выберите цель, которую выполняет эта отправка.',
 }

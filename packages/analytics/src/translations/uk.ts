@@ -109,5 +109,4 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.actionGoalLabel]: 'Реєструвати ціль аналітики',
 	[keys.actionGoalFieldValueFrom]: 'Значення з поля',
 	[keys.actionGoalFieldValueFromHelp]: 'Поле форми, числова відповідь якого стає значенням цілі.',
-	[keys.actionGoalErrorGoal]: 'Виберіть ціль, яку виконує ця відправка.',
 }

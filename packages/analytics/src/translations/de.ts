@@ -110,5 +110,4 @@ export const de: Record<TranslationKey, string> = {
 	[keys.actionGoalLabel]: 'Analytics-Ziel erfassen',
 	[keys.actionGoalFieldValueFrom]: 'Wert aus Feld',
 	[keys.actionGoalFieldValueFromHelp]: 'Formularfeld, dessen numerische Antwort zum Zielwert wird.',
-	[keys.actionGoalErrorGoal]: 'Wählen Sie das Ziel, das diese Übermittlung erfüllt.',
 }

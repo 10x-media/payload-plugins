@@ -106,5 +106,4 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.actionGoalLabel]: 'تسجيل هدف التحليلات',
 	[keys.actionGoalFieldValueFrom]: 'القيمة من حقل',
 	[keys.actionGoalFieldValueFromHelp]: 'حقل الإرسال الذي تصبح إجابته الرقمية قيمة الهدف.',
-	[keys.actionGoalErrorGoal]: 'اختر الهدف الذي يحققه هذا الإرسال.',
 }

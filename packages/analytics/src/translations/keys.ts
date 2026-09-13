@@ -109,7 +109,6 @@ export const keys = {
 	actionGoalLabel: 'analytics:actionGoalLabel',
 	actionGoalFieldValueFrom: 'analytics:actionGoalFieldValueFrom',
 	actionGoalFieldValueFromHelp: 'analytics:actionGoalFieldValueFromHelp',
-	actionGoalErrorGoal: 'analytics:actionGoalErrorGoal',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
