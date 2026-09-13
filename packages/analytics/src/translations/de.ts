@@ -106,4 +106,5 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fieldGoalEmpty]: 'Noch keine Ziele konfiguriert.',
 	[keys.fieldGoalManage]: 'Ziele verwalten',
 	[keys.fieldGoalInvalid]: 'Nur Kleinbuchstaben, Ziffern und Bindestriche, zum Beispiel book-demo.',
+	[keys.fieldGoalError]: 'Ziele konnten nicht geladen werden.',
 }

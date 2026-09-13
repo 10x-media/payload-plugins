@@ -105,4 +105,5 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.fieldGoalEmpty]: 'Цели ещё не настроены.',
 	[keys.fieldGoalManage]: 'Управление целями',
 	[keys.fieldGoalInvalid]: 'Используйте строчные буквы, цифры и дефисы, например book-demo.',
+	[keys.fieldGoalError]: 'Не удалось загрузить цели.',
 }

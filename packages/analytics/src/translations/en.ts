@@ -108,4 +108,5 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fieldGoalEmpty]: 'No goals configured yet.',
 	[keys.fieldGoalManage]: 'Manage goals',
 	[keys.fieldGoalInvalid]: 'Use lowercase letters, numbers and hyphens, for example book-demo.',
+	[keys.fieldGoalError]: 'Goals could not be loaded.',
 }

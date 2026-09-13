@@ -102,4 +102,5 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.fieldGoalEmpty]: 'لم يتم إعداد أي أهداف بعد.',
 	[keys.fieldGoalManage]: 'إدارة الأهداف',
 	[keys.fieldGoalInvalid]: 'استخدم أحرفًا صغيرة وأرقامًا وشرطات، مثل book-demo.',
+	[keys.fieldGoalError]: 'تعذّر تحميل الأهداف.',
 }

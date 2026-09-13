@@ -107,4 +107,5 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.fieldGoalManage]: 'Gérer les objectifs',
 	[keys.fieldGoalInvalid]:
 		"Utilisez des minuscules, des chiffres et des traits d'union, par exemple book-demo.",
+	[keys.fieldGoalError]: 'Impossible de charger les objectifs.',
 }

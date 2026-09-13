@@ -102,4 +102,5 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.fieldGoalEmpty]: '아직 구성된 목표가 없습니다.',
 	[keys.fieldGoalManage]: '목표 관리',
 	[keys.fieldGoalInvalid]: '소문자, 숫자, 하이픈만 사용하세요. 예: book-demo',
+	[keys.fieldGoalError]: '목표를 불러오지 못했습니다.',
 }

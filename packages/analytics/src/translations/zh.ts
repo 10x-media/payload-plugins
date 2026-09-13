@@ -102,4 +102,5 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.fieldGoalEmpty]: '尚未配置任何目标。',
 	[keys.fieldGoalManage]: '管理目标',
 	[keys.fieldGoalInvalid]: '仅使用小写字母、数字和连字符，例如 book-demo。',
+	[keys.fieldGoalError]: '无法加载目标。',
 }

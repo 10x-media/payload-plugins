@@ -15,10 +15,12 @@ import { useAnalyticsSources } from './useAnalyticsSources'
  * emptying the picker.
  */
 export const SourceSelectField = (props: SelectFieldClientProps) => {
-	const { field, path, readOnly } = props
+	const { field, path: pathFromProps, readOnly } = props
 	const { i18n } = useTranslation()
 	const locale = i18n.language
-	const { setValue, showError, value } = useField<string>({ path })
+	const { path, setValue, showError, value } = useField<string>({
+		potentiallyStalePath: pathFromProps,
+	})
 	const { sources } = useAnalyticsSources()
 
 	const staticOptions = useMemo(

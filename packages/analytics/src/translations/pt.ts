@@ -105,4 +105,5 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.fieldGoalEmpty]: 'Ainda não há objetivos configurados.',
 	[keys.fieldGoalManage]: 'Gerir objetivos',
 	[keys.fieldGoalInvalid]: 'Use minúsculas, números e hifens, por exemplo book-demo.',
+	[keys.fieldGoalError]: 'Não foi possível carregar os objetivos.',
 }

@@ -14,6 +14,8 @@ const scopeByEmail: Record<string, string | null> = {
 	'b@t.dev': 'tenant-b',
 }
 
+const BROKEN_EMAIL = 'broken@t.dev'
+
 const login = async (payload: Payload, email: string) => {
 	const password = 'test-pass-1234'
 	await payload.create({ collection: 'access-users', data: { email, password } })
@@ -36,6 +38,7 @@ describeForDb('analytics goals endpoint', { dbs: ['mongo'] }, (db) => {
 	let userA: Awaited<ReturnType<typeof login>>
 	let userB: Awaited<ReturnType<typeof login>>
 	let platformUser: Awaited<ReturnType<typeof login>>
+	let brokenUser: Awaited<ReturnType<typeof login>>
 
 	beforeAll(async () => {
 		booted = await bootPayload({
@@ -45,6 +48,7 @@ describeForDb('analytics goals endpoint', { dbs: ['mongo'] }, (db) => {
 				adapters: [memoryAdapter()],
 				scopeResolver: ({ req }) => {
 					const email = (req.user as { email?: string })?.email ?? ''
+					if (email === BROKEN_EMAIL) throw new Error('scope resolution boom')
 					return scopeByEmail[email] ?? null
 				},
 				access: {
@@ -57,6 +61,7 @@ describeForDb('analytics goals endpoint', { dbs: ['mongo'] }, (db) => {
 		userA = await login(booted.payload, 'a@t.dev')
 		userB = await login(booted.payload, 'b@t.dev')
 		platformUser = await login(booted.payload, 'platform@t.dev')
+		brokenUser = await login(booted.payload, BROKEN_EMAIL)
 	}, 240_000)
 
 	afterAll(async () => {
@@ -169,6 +174,13 @@ describeForDb('analytics goals endpoint', { dbs: ['mongo'] }, (db) => {
 	it('answers empty for a user whose scope does not resolve and who cannot read across scopes', async () => {
 		const stranger = await login(booted.payload, 'stranger@t.dev')
 		const body = await bodyFor(stranger)
+
+		expect(body.goals).toEqual([])
+		expect(body.collection).toEqual({ slug: GOALS })
+	})
+
+	it('answers empty when scope resolution throws, rather than falling back to the config goals', async () => {
+		const body = await bodyFor(brokenUser)
 
 		expect(body.goals).toEqual([])
 		expect(body.collection).toEqual({ slug: GOALS })

@@ -31,7 +31,7 @@ export const fetchGoals = (
 	const key = `${userKey}:${url}`
 	const hit = cache.get(key)
 	if (hit) return hit
-	const pending = fetch(url, { credentials: 'same-origin' })
+	const pending = fetch(url, { credentials: 'include' })
 		.then((res) => {
 			if (!res.ok) throw new Error(`goals ${res.status}`)
 			return res.json() as Promise<GoalsResponse>

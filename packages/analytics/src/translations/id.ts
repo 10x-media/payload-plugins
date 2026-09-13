@@ -104,4 +104,5 @@ export const id: Record<TranslationKey, string> = {
 	[keys.fieldGoalEmpty]: 'Belum ada sasaran yang dikonfigurasi.',
 	[keys.fieldGoalManage]: 'Kelola sasaran',
 	[keys.fieldGoalInvalid]: 'Gunakan huruf kecil, angka, dan tanda hubung, misalnya book-demo.',
+	[keys.fieldGoalError]: 'Sasaran tidak dapat dimuat.',
 }
