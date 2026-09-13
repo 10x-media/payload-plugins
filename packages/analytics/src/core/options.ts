@@ -445,7 +445,7 @@ const resolveGoalsCollection = (
 			'analytics: goals.collection.scopeField must be a top-level field name (no dots); the scope stamp writes it as a flat key'
 		)
 	}
-	return resolved
+	return { ...resolved, slug: resolved.slug.trim() }
 }
 
 const resolveBindings = (

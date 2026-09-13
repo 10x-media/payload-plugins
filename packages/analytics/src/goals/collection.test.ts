@@ -1,4 +1,12 @@
-import type { CheckboxField, Field, NumberField, SelectField, TextField, Where } from 'payload'
+import type {
+	CheckboxField,
+	CollectionConfig,
+	Field,
+	NumberField,
+	SelectField,
+	TextField,
+	Where,
+} from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import type { BuildGoalsCollectionArgs } from './collection'
 import { buildGoalsCollection, GOALS_SLUG } from './collection'
@@ -95,6 +103,20 @@ describe('buildGoalsCollection', () => {
 		expect(validate('EURO', { req: fakeReq() })).toBe('analytics:goalErrorCurrency')
 	})
 
+	it('pins uniqueness in the database where the plugin owns the scope field', () => {
+		expect(build().indexes).toEqual([{ fields: ['slug'], unique: true }])
+		expect(build({ scoped: true }).indexes).toEqual([{ fields: ['slug', 'scope'], unique: true }])
+		expect(build({ scoped: true, scopeField: 'tenant' }).indexes).toBeUndefined()
+	})
+
+	it('indexes the slug field only when no compound index covers it', () => {
+		const slugIndex = (c: CollectionConfig) => (deep(c.fields, 'slug') as TextField).index
+		// Both at once is an index-name conflict mongoose refuses at connect time.
+		expect(slugIndex(build())).toBe(false)
+		expect(slugIndex(build({ scoped: true }))).toBe(false)
+		expect(slugIndex(build({ scoped: true, scopeField: 'tenant' }))).toBe(true)
+	})
+
 	it('keeps the scope field hidden, indexed text', () => {
 		const scope = named(collection.fields, 'scope') as TextField | undefined
 		expect(scope?.type).toBe('text')
@@ -179,6 +201,47 @@ describe('goals collection slug uniqueness', () => {
 		} as never)
 		const where = find.mock.calls[0]?.[0]?.where
 		expect(JSON.stringify(where)).toContain('tenant-a')
+	})
+
+	it('ignores a scope declared in the body by an ordinary tenant user', async () => {
+		const find = vi.fn(async (_args: { where: Where }) => ({ docs: [] }))
+		await hookFor({ scoped: true, resolveScope: async () => 'tenant-a' })({
+			data: { slug: 'demo', scope: 'tenant-b' },
+			operation: 'create',
+			req: fakeReq(find),
+		} as never)
+		// Otherwise the answer ("slug taken" or not) reports whether another tenant owns the slug.
+		const where = JSON.stringify(find.mock.calls[0]?.[0]?.where)
+		expect(where).toContain('tenant-a')
+		expect(where).not.toContain('tenant-b')
+	})
+
+	it('honours the scope a platform admin declares', async () => {
+		const find = vi.fn(async (_args: { where: Where }) => ({ docs: [] }))
+		await hookFor({
+			scoped: true,
+			resolveScope: async () => 'tenant-a',
+			platformRead: async () => true,
+		})({
+			data: { slug: 'demo', scope: 'tenant-b' },
+			operation: 'create',
+			req: fakeReq(find),
+		} as never)
+		const where = JSON.stringify(find.mock.calls[0]?.[0]?.where)
+		expect(where).toContain('tenant-b')
+		expect(where).not.toContain('tenant-a')
+	})
+
+	it('checks the install-wide neighbourhood for a platform write carrying no scope', async () => {
+		const find = vi.fn(async (_args: { where: Where }) => ({ docs: [] }))
+		await hookFor({
+			scoped: true,
+			resolveScope: async () => 'tenant-a',
+			platformRead: async () => true,
+		})({ data: { slug: 'demo' }, operation: 'create', req: fakeReq(find) } as never)
+		const where = JSON.stringify(find.mock.calls[0]?.[0]?.where)
+		expect(where).not.toContain('tenant-a')
+		expect(where).toContain('"scope":{"equals":null}')
 	})
 
 	it('does not query at all when the write carries no slug', async () => {

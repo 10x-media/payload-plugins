@@ -514,6 +514,10 @@ describe('resolveOptions goals collection', () => {
 		).toEqual({ enabled: true, slug: 'conversions', scopeField: 'tenant', access, overrides })
 	})
 
+	it('stores the slug trimmed', () => {
+		expect(collectionOf({ collection: { slug: '  conversions  ' } }).slug).toBe('conversions')
+	})
+
 	it('throws on an empty slug or an unusable scope field', () => {
 		expect(() => collectionOf({ collection: { slug: '  ' } })).toThrow(/non-empty collection slug/i)
 		expect(() => collectionOf({ collection: { scopeField: '' } })).toThrow(/non-empty field name/i)

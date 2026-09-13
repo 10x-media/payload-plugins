@@ -123,8 +123,15 @@ const accessUsers: CollectionConfig = { slug: 'access-users', auth: true, fields
 const scopeByEmail: Record<string, string | null> = {
 	'a@t.dev': 'tenant-a',
 	'b@t.dev': 'tenant-b',
+	// The platform admin resolves to a tenant of its own, so an install-wide write cannot
+	// quietly borrow that scope.
+	'admin@t.dev': 'tenant-a',
 	'root@t.dev': null,
 }
+
+const PLATFORM_EMAILS = new Set(['root@t.dev', 'admin@t.dev'])
+
+const emailOf = (req: { user?: unknown }): string => (req.user as { email?: string })?.email ?? ''
 
 const login = async (payload: Payload, email: string) => {
 	const password = 'test-pass-1234'
@@ -138,7 +145,19 @@ describeForDb('analytics goals collection: scoped', { dbs: ['mongo'] }, (db) => 
 	let userA: Awaited<ReturnType<typeof login>>
 	let userB: Awaited<ReturnType<typeof login>>
 	let userRoot: Awaited<ReturnType<typeof login>>
+	let userAdmin: Awaited<ReturnType<typeof login>>
 	let goalA: { id: string | number }
+
+	const createAs = (
+		user: Awaited<ReturnType<typeof login>>,
+		data: Record<string, unknown>
+	): Promise<{ id: string | number; scope?: string | null }> =>
+		booted.payload.create({
+			collection: GOALS_SLUG as never,
+			data: data as never,
+			user,
+			overrideAccess: false,
+		}) as unknown as Promise<{ id: string | number; scope?: string | null }>
 
 	beforeAll(async () => {
 		booted = await bootPayload({
@@ -146,33 +165,27 @@ describeForDb('analytics goals collection: scoped', { dbs: ['mongo'] }, (db) => 
 			db,
 			plugin: analytics({
 				adapters: [native()],
-				scopeResolver: ({ req }) =>
-					scopeByEmail[(req.user as { email?: string })?.email ?? ''] ?? null,
-				access: {
-					platformRead: ({ req }) => (req.user as { email?: string })?.email === 'root@t.dev',
-				},
+				scopeResolver: ({ req }) => scopeByEmail[emailOf(req)] ?? null,
+				access: { platformRead: ({ req }) => PLATFORM_EMAILS.has(emailOf(req)) },
 				goals: { collection: true },
 			}),
 		})
 		userA = await login(booted.payload, 'a@t.dev')
 		userB = await login(booted.payload, 'b@t.dev')
 		userRoot = await login(booted.payload, 'root@t.dev')
-		goalA = (await booted.payload.create({
-			collection: GOALS_SLUG as never,
-			data: { name: 'Signup', slug: 'signup', match: { kind: 'goal' } } as never,
-			user: userA,
-			overrideAccess: false,
-		})) as unknown as { id: string | number }
-		await booted.payload.create({
-			collection: GOALS_SLUG as never,
-			data: {
-				name: 'Signup B',
-				slug: 'signup',
-				match: { kind: 'goal' },
-				scope: 'tenant-b',
-			} as never,
-			user: userRoot,
-			overrideAccess: false,
+		userAdmin = await login(booted.payload, 'admin@t.dev')
+		goalA = await createAs(userA, { name: 'Signup', slug: 'signup', match: { kind: 'goal' } })
+		await createAs(userRoot, {
+			name: 'Signup B',
+			slug: 'signup',
+			match: { kind: 'goal' },
+			scope: 'tenant-b',
+		})
+		await createAs(userRoot, {
+			name: 'B only',
+			slug: 'b-only',
+			match: { kind: 'goal' },
+			scope: 'tenant-b',
 		})
 	}, 240_000)
 
@@ -181,34 +194,37 @@ describeForDb('analytics goals collection: scoped', { dbs: ['mongo'] }, (db) => 
 	})
 
 	it('stamps the creating tenant’s scope', () => {
-		expect((goalA as unknown as { scope?: string }).scope).toBe('tenant-a')
+		expect((goalA as { scope?: string }).scope).toBe('tenant-a')
 	})
 
 	it('refuses a scope forged in the request body', async () => {
 		await expect(
-			booted.payload.create({
-				collection: GOALS_SLUG as never,
-				data: {
-					name: 'Sneaky',
-					slug: 'sneaky',
-					match: { kind: 'goal' },
-					scope: 'tenant-b',
-				} as never,
-				user: userA,
-				overrideAccess: false,
+			createAs(userA, {
+				name: 'Sneaky',
+				slug: 'sneaky',
+				match: { kind: 'goal' },
+				scope: 'tenant-b',
 			})
 		).rejects.toThrow()
 	})
 
+	it('answers a forged scope with the stamp, never with a slug-taken verdict', async () => {
+		// 'b-only' exists in tenant-b and nowhere else. Checking uniqueness under the forged
+		// scope would answer "slug taken" here, telling tenant A what tenant B owns.
+		await expect(
+			createAs(userA, {
+				name: 'Probe',
+				slug: 'b-only',
+				match: { kind: 'goal' },
+				scope: 'tenant-b',
+			})
+		).rejects.toThrow(/cannot create a provider for another scope/)
+	})
+
 	it('keeps the same slug usable once per scope', async () => {
 		await expect(
-			booted.payload.create({
-				collection: GOALS_SLUG as never,
-				data: { name: 'Signup again', slug: 'signup', match: { kind: 'goal' } } as never,
-				user: userA,
-				overrideAccess: false,
-			})
-		).rejects.toThrow()
+			createAs(userA, { name: 'Signup again', slug: 'signup', match: { kind: 'goal' } })
+		).rejects.toMatchObject({ data: { errors: [{ path: 'slug' }] } })
 	})
 
 	it('hides a tenant’s goals from another tenant', async () => {
@@ -236,26 +252,64 @@ describeForDb('analytics goals collection: scoped', { dbs: ['mongo'] }, (db) => 
 		).rejects.toThrow()
 	})
 
+	it('refuses a cross-tenant update or delete', async () => {
+		await expect(
+			booted.payload.update({
+				collection: GOALS_SLUG as never,
+				id: goalA.id,
+				data: { name: 'Hijacked' } as never,
+				user: userB,
+				overrideAccess: false,
+			})
+		).rejects.toThrow()
+		await expect(
+			booted.payload.delete({
+				collection: GOALS_SLUG as never,
+				id: goalA.id,
+				user: userB,
+				overrideAccess: false,
+			})
+		).rejects.toThrow()
+	})
+
 	it('lets the platform admin read every scope', async () => {
 		const { docs } = await booted.payload.find({
 			collection: GOALS_SLUG as never,
 			user: userRoot,
 			overrideAccess: false,
 		})
-		expect(new Set(docs.map((d) => (d as { scope?: string }).scope))).toEqual(
-			new Set(['tenant-a', 'tenant-b'])
-		)
+		const scopes = docs.map((d) => (d as { scope?: string }).scope)
+		expect(scopes).toContain('tenant-a')
+		expect(scopes).toContain('tenant-b')
 	})
 
 	it('resolves each scope only its own goals', async () => {
 		const runtime = getRuntime(booted.payload)
 		const req = { payload: booted.payload } as unknown as PayloadRequest
 		expect((await runtime?.resolveGoals?.(req, 'tenant-a'))?.map((g) => g.name)).toEqual(['Signup'])
-		expect((await runtime?.resolveGoals?.(req, 'tenant-b'))?.map((g) => g.name)).toEqual([
-			'Signup B',
-		])
+		expect(new Set((await runtime?.resolveGoals?.(req, 'tenant-b'))?.map((g) => g.name))).toEqual(
+			new Set(['Signup B', 'B only'])
+		)
 		expect(await runtime?.resolveGoalsDetailed?.(req, 'tenant-a')).toEqual([
 			{ goal: expect.objectContaining({ slug: 'signup' }), source: 'collection' },
 		])
+	})
+
+	it('checks a platform admin’s install-wide write against install-wide goals only', async () => {
+		// The admin resolves to tenant-a, which already owns 'signup'; an install-wide write
+		// is a different neighbourhood and must be accepted.
+		const installWide = await createAs(userAdmin, {
+			name: 'Signup (install-wide)',
+			slug: 'signup',
+			match: { kind: 'goal' },
+		})
+		expect(installWide.scope ?? null).toBeNull()
+		await expect(
+			createAs(userAdmin, {
+				name: 'Signup (install-wide again)',
+				slug: 'signup',
+				match: { kind: 'goal' },
+			})
+		).rejects.toMatchObject({ data: { errors: [{ path: 'slug' }] } })
 	})
 })

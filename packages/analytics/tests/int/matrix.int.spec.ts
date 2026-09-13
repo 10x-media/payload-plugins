@@ -2,6 +2,7 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import type { Config, Endpoint, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { readForField } from '../../src/fields/readForDocument'
+import { GOALS_SLUG } from '../../src/goals/collection'
 import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
@@ -312,7 +313,10 @@ describeForDb('native goal rollups', {}, (db) => {
 	// Both assertions read the same two events, so they are ingested once here rather than
 	// by the first test, which would leave the second unable to run on its own.
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [adapter], goals }), db })
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [adapter], goals: { defaults: goals, collection: true } }),
+			db,
+		})
 		await ingest({ type: 'pageview', path: '/thank-you' })
 		await ingest({
 			type: 'goal',
@@ -372,6 +376,15 @@ describeForDb('native goal rollups', {}, (db) => {
 		})
 		expect(thanks?.conversions).toBe(1)
 		expect(thanks?.revenue).toBe(0)
+	})
+
+	it(`keeps one goal document per slug on ${db}`, async () => {
+		const demo = { name: 'Demo', slug: 'demo', match: { kind: 'goal' } }
+		await booted.payload.create({ collection: GOALS_SLUG, data: demo as never })
+		// The hook answers first; the collection's unique index is the storage-level backstop.
+		await expect(
+			booted.payload.create({ collection: GOALS_SLUG, data: { ...demo, name: 'Demo 2' } as never })
+		).rejects.toMatchObject({ data: { errors: [{ path: 'slug' }] } })
 	})
 
 	it(`returns one breakdown row per goal through the adapter on ${db}`, async () => {

@@ -1,6 +1,7 @@
 import type {
 	CollectionBeforeValidateHook,
 	CollectionConfig,
+	CompoundIndex,
 	Field,
 	PayloadRequest,
 	TextFieldSingleValidation,
@@ -39,9 +40,10 @@ const asScope = (value: unknown): string | null =>
 	value === null || value === undefined || value === '' ? null : String(value)
 
 /**
- * The scope the write lands in: what the body carries (a platform admin writing another
- * tenant's goal), else the stored one, else the requester's own. A forged body scope is
- * still refused by stampScope, so the lookup can trust it to name the right neighbourhood.
+ * The scope the stamp will land the write in, resolved with stampScope's precedence. Only a
+ * platform admin's declared scope is honoured: taking an ordinary tenant's body scope on
+ * trust would turn "slug taken" into an oracle for what another tenant owns, since the stamp
+ * refuses the write either way.
  */
 const writeScope = async (
 	args: BuildGoalsCollectionArgs,
@@ -52,11 +54,12 @@ const writeScope = async (
 	}
 ): Promise<string | null> => {
 	const { data, originalDoc, req } = write
-	const declared = asScope(data?.[args.scopeField]) ?? asScope(originalDoc?.[args.scopeField])
-	if (declared !== null) {
-		return declared
-	}
 	try {
+		if (await args.platformRead({ req })) {
+			// No declared scope means an install-wide goal, not one in whatever scope the
+			// admin's own request happens to resolve to.
+			return asScope(data?.[args.scopeField]) ?? asScope(originalDoc?.[args.scopeField])
+		}
 		return asScope(await args.resolveScope(req))
 	} catch {
 		return null
@@ -64,9 +67,9 @@ const writeScope = async (
 }
 
 /**
- * Slugs stay editable, so uniqueness is checked on every write rather than pinned by a
- * database index: the same slug may exist once per scope, and the tracker and the rollups
- * key on it.
+ * Slugs stay editable, so uniqueness is checked on every write: the same slug may exist once
+ * per scope, and the tracker and the rollups key on it. The compound index backs this up
+ * where it can, but it cannot cover install-wide rows on Postgres or a host-owned scope field.
  */
 const uniqueSlug = (args: BuildGoalsCollectionArgs): CollectionBeforeValidateHook => {
 	return async ({ data, originalDoc, req }) => {
@@ -109,6 +112,18 @@ const uniqueSlug = (args: BuildGoalsCollectionArgs): CollectionBeforeValidateHoo
 		}
 		return data
 	}
+}
+
+/**
+ * Database-level backstop for the hook, and only where the plugin owns the scope field: a
+ * host-owned one (a tenant plugin's relationship) is not ours to index. Postgres treats a
+ * NULL scope as distinct from every other, so install-wide rows stay hook-guarded.
+ */
+const uniqueSlugIndex = (args: BuildGoalsCollectionArgs): CompoundIndex | undefined => {
+	if (!args.scoped) {
+		return { fields: ['slug'], unique: true }
+	}
+	return args.scopeField === 'scope' ? { fields: ['slug', 'scope'], unique: true } : undefined
 }
 
 const matchField = (): Field => ({
@@ -182,8 +197,10 @@ const valueField = (): Field => ({
  * so slugs, labels, fields, and access all stay overridable.
  */
 export const buildGoalsCollection = (args: BuildGoalsCollectionArgs): CollectionConfig => {
+	const unique = uniqueSlugIndex(args)
 	const collection: CollectionConfig = {
 		slug: args.slug,
+		...(unique ? { indexes: [unique] } : {}),
 		labels: {
 			singular: labelForKey(keys.goalsCollectionSingular),
 			plural: labelForKey(keys.goalsCollectionPlural),
@@ -232,7 +249,9 @@ export const buildGoalsCollection = (args: BuildGoalsCollectionArgs): Collection
 						name: 'slug',
 						type: 'text',
 						required: true,
-						index: true,
+						// Mongoose refuses a field index and a compound index that share a key
+						// spec, and the compound one already covers a lookup by slug.
+						index: unique === undefined,
 						label: labelForKey(keys.goalFieldSlug),
 						validate: validateSlug,
 						admin: {
