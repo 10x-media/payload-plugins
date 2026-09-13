@@ -3,6 +3,7 @@ import type { CollectionConfig, CollectionSlug, Payload, PayloadRequest } from '
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
 import { DEFAULT_PROXY_MAX_BODY_BYTES, DEFAULT_PROXY_TIMEOUT_MS } from '../capture/proxyEndpoint'
 import type { CaptureSlot } from '../capture/slots'
+import { GOALS_SLUG } from '../goals/collection'
 import { GOAL_SLUG_PATTERN, type Goal } from '../goals/types'
 import { PROVIDERS_SLUG } from '../providers/collection'
 import type { TranslationsOption } from '../translations'
@@ -137,8 +138,25 @@ export type AutoCaptureOptions = {
 
 export type ResolvedAutoCapture = Required<AutoCaptureOptions>
 
-/** Goals as config: the array form, or the object form 1b grows a collection source on. */
-export type AnalyticsGoalsOptions = { defaults?: Goal[] }
+export type AnalyticsGoalsCollectionOptions = {
+	/** Set false to keep the object form's other settings while leaving the collection off. */
+	enabled?: boolean
+	slug?: string
+	/**
+	 * Field matched against the resolved scope when looking up a scope's goals. Point it at
+	 * a tenant plugin's field (e.g. 'tenant') when that plugin manages scoping.
+	 */
+	scopeField?: string
+	overrides?: (collection: CollectionConfig) => CollectionConfig
+	access?: Partial<CollectionConfig['access']>
+}
+
+/** Goals as config, plus the opt-in collection editors manage their own goals through. */
+export type AnalyticsGoalsOptions = {
+	defaults?: Goal[]
+	/** Opt-in admin collection whose goals merge over `defaults`, by slug, per scope. */
+	collection?: boolean | AnalyticsGoalsCollectionOptions
+}
 
 export type AnalyticsCaptureOptions = {
 	/**
@@ -287,8 +305,15 @@ export interface ResolvedOptions {
 	platformAdapter?: string
 	access: { platformRead: PlatformReadAccess }
 	capture: ResolvedCapture
-	/** Config goals, validated; 1b layers collection-sourced goals on top of these. */
+	/** Config goals, validated; the goals collection layers its own on top of these. */
 	goals: Goal[]
+	goalsCollection: {
+		enabled: boolean
+		slug: string
+		scopeField: string
+		overrides?: (collection: CollectionConfig) => CollectionConfig
+		access?: Partial<CollectionConfig['access']>
+	}
 	providers: {
 		collection: {
 			enabled: boolean
@@ -386,6 +411,41 @@ const resolveGoals = (option: AnalyticsPluginOptions['goals']): Goal[] => {
 		seen.add(goal.slug)
 	}
 	return goals
+}
+
+const resolveGoalsCollection = (
+	option: AnalyticsPluginOptions['goals']
+): ResolvedOptions['goalsCollection'] => {
+	const off = { enabled: false, slug: GOALS_SLUG, scopeField: DEFAULT_SCOPE_FIELD }
+	const collection = Array.isArray(option) ? undefined : option?.collection
+	if (!collection) {
+		return off
+	}
+	const resolved =
+		collection === true
+			? { ...off, enabled: true }
+			: {
+					enabled: collection.enabled ?? true,
+					slug: collection.slug ?? GOALS_SLUG,
+					scopeField: collection.scopeField ?? DEFAULT_SCOPE_FIELD,
+					overrides: collection.overrides,
+					access: collection.access,
+				}
+	if (!resolved.enabled) {
+		return off
+	}
+	if (typeof resolved.slug !== 'string' || resolved.slug.trim() === '') {
+		throw new Error('analytics: goals.collection.slug must be a non-empty collection slug')
+	}
+	if (resolved.scopeField.trim() === '') {
+		throw new Error('analytics: goals.collection.scopeField must be a non-empty field name')
+	}
+	if (resolved.scopeField.includes('.')) {
+		throw new Error(
+			'analytics: goals.collection.scopeField must be a top-level field name (no dots); the scope stamp writes it as a flat key'
+		)
+	}
+	return resolved
 }
 
 const resolveBindings = (
@@ -541,6 +601,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 			},
 		},
 		goals: resolveGoals(options.goals),
+		goalsCollection: resolveGoalsCollection(options.goals),
 		providers,
 		bindings: resolveBindings(options.collections),
 		cache: {

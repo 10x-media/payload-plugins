@@ -4,7 +4,8 @@ import { proxyEndpoints } from './capture/proxyEndpoint'
 import { trackerEndpoint } from './capture/trackerEndpoint'
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
-import type { Goal } from './goals/types'
+import { buildGoalsCollection } from './goals/collection'
+import { configGoalsResolver, createGoalsResolver } from './goals/resolver'
 import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
 import { isModuleNotFoundError } from './plugin/peerImportError'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
@@ -110,6 +111,31 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				withEncryptedQueryRewrite(providersCollection),
 			]
 		}
+		// Config goals are install-wide; the collection resolves per scope and merges over
+		// them behind the same signature, so ingest and the tracker config read one source.
+		const goalsResolver = resolved.goalsCollection.enabled
+			? createGoalsResolver({
+					slug: resolved.goalsCollection.slug,
+					scopeField: resolved.goalsCollection.scopeField,
+					scoped: resolved.scoped,
+					config: resolved.goals,
+				})
+			: configGoalsResolver(resolved.goals)
+		if (resolved.goalsCollection.enabled) {
+			config.collections = [
+				...(config.collections ?? []),
+				buildGoalsCollection({
+					slug: resolved.goalsCollection.slug,
+					access: resolved.goalsCollection.access,
+					overrides: resolved.goalsCollection.overrides,
+					onChange: () => goalsResolver.invalidate(),
+					scoped: resolved.scoped,
+					scopeField: resolved.goalsCollection.scopeField,
+					resolveScope,
+					platformRead: resolved.access.platformRead,
+				}),
+			]
+		}
 		const resolveTimezone = async (req: PayloadRequest, scope?: string | null): Promise<string> => {
 			const opt = resolved.reportingTimezone
 			if (opt === undefined) {
@@ -128,16 +154,12 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				return DEFAULT_TIMEZONE
 			}
 		}
-		// Config goals are install-wide, so scope is accepted and ignored here; a collection
-		// source resolves per scope behind the same signature.
-		const resolveGoals = async (_req: PayloadRequest, _scope?: string | null): Promise<Goal[]> =>
-			resolved.goals
 		for (const adapter of resolved.adapters) {
 			adapter.register?.(config, {
 				scoped: resolved.scoped,
 				resolveScope,
 				resolveTimezone,
-				resolveGoals,
+				resolveGoals: goalsResolver.resolve,
 			})
 		}
 		if (
@@ -238,6 +260,8 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				consentFor: resolved.capture.consent,
 				autoCapture: resolved.capture.autoCapture,
 				goals: resolved.goals,
+				resolveGoals: goalsResolver.resolve,
+				resolveGoalsDetailed: goalsResolver.resolveDetailed,
 				ingestPath: resolved.adapters.find((a) => a.ingest)?.ingest?.path,
 				scoped: resolved.scoped,
 				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
@@ -263,6 +287,7 @@ export { PLATFORM_SCOPE } from './core/contract'
 export type {
 	AnalyticsAccessOptions,
 	AnalyticsCaptureOptions,
+	AnalyticsGoalsCollectionOptions,
 	AnalyticsGoalsOptions,
 	AnalyticsPluginOptions,
 	AnalyticsPluginOptions as PluginOptions,

@@ -1,6 +1,8 @@
+import type { CollectionConfig } from 'payload'
 import { describe, expect, it } from 'vitest'
 import type { Goal } from '../goals/types'
 import { memoryAdapter } from '../testing/memoryAdapter'
+import type { AnalyticsPluginOptions } from './options'
 import { resolveOptions } from './options'
 
 describe('resolveOptions widgets.register', () => {
@@ -450,7 +452,7 @@ describe('resolveOptions goals', () => {
 			purchase,
 		])
 	})
-	it('accepts the object form, whose collection source arrives later', () => {
+	it('accepts the object form alongside the collection source', () => {
 		expect(resolveOptions({ adapters, goals: { defaults: [signup] } }).goals).toEqual([signup])
 	})
 	it('throws on a duplicate slug', () => {
@@ -476,5 +478,45 @@ describe('resolveOptions goals', () => {
 		expect(
 			resolveOptions({ adapters, goals: [{ ...signup, value: { fixed: 0 } }] }).goals[0]?.value
 		).toEqual({ fixed: 0 })
+	})
+})
+
+describe('resolveOptions goals collection', () => {
+	const adapters = [memoryAdapter()]
+	const collectionOf = (goals: AnalyticsPluginOptions['goals']) =>
+		resolveOptions({ adapters, goals }).goalsCollection
+
+	it('is off unless asked for, in every goals form', () => {
+		expect(collectionOf(undefined).enabled).toBe(false)
+		expect(collectionOf([]).enabled).toBe(false)
+		expect(collectionOf({ defaults: [] }).enabled).toBe(false)
+		expect(collectionOf({ collection: false }).enabled).toBe(false)
+		expect(collectionOf({ collection: { enabled: false, slug: 'custom' } })).toEqual({
+			enabled: false,
+			slug: 'analytics-goals',
+			scopeField: 'scope',
+		})
+	})
+
+	it('defaults the slug and the scope field when enabled', () => {
+		expect(collectionOf({ collection: true })).toEqual({
+			enabled: true,
+			slug: 'analytics-goals',
+			scopeField: 'scope',
+		})
+	})
+
+	it('carries the slug, scope field, access and overrides through', () => {
+		const overrides = (c: CollectionConfig) => c
+		const access = { read: () => true }
+		expect(
+			collectionOf({ collection: { slug: 'conversions', scopeField: 'tenant', access, overrides } })
+		).toEqual({ enabled: true, slug: 'conversions', scopeField: 'tenant', access, overrides })
+	})
+
+	it('throws on an empty slug or an unusable scope field', () => {
+		expect(() => collectionOf({ collection: { slug: '  ' } })).toThrow(/non-empty collection slug/i)
+		expect(() => collectionOf({ collection: { scopeField: '' } })).toThrow(/non-empty field name/i)
+		expect(() => collectionOf({ collection: { scopeField: 'tenant.id' } })).toThrow(/no dots/i)
 	})
 })
