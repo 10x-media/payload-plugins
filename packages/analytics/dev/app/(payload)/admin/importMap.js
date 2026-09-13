@@ -1,3 +1,4 @@
+import { GoalSelectField as GoalSelectField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
 import { AnalyticsPanelField as AnalyticsPanelField_e33bd2cebc5cb3736daaf4c0c56bb68c } from '@10x-media/analytics/rsc'
 import { WatchTenantCollection as WatchTenantCollection_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
 import { TenantField as TenantField_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
@@ -19,6 +20,7 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 
 /** @type import('payload').ImportMap */
 export const importMap = {
+  "@10x-media/analytics/client#GoalSelectField": GoalSelectField_cf3604008f3ebbc369f9463262b1f9eb,
   "@10x-media/analytics/rsc#AnalyticsPanelField": AnalyticsPanelField_e33bd2cebc5cb3736daaf4c0c56bb68c,
   "@payloadcms/plugin-multi-tenant/client#WatchTenantCollection": WatchTenantCollection_1d0591e3cf4f332c83a86da13a0de59a,
   "@payloadcms/plugin-multi-tenant/client#TenantField": TenantField_1d0591e3cf4f332c83a86da13a0de59a,

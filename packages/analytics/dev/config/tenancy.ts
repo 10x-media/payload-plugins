@@ -74,7 +74,7 @@ export const tenancyFragment: DevConfigFragment = {
 			// adapter (native) on a recognized host, and the global slot stays empty because it
 			// falls to `platformAdapter`, the memory demo source, which declares no capture
 			// support. So an unrecognized host captures nothing at all.
-			goals: sharedGoals,
+			goals: { defaults: sharedGoals, collection: true },
 			providers: { collection: { scopeField: 'tenant' } },
 			widgets: sharedWidgets,
 			// Two branches, because the two callers look nothing alike. A signed-in admin is
