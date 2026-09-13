@@ -5,6 +5,7 @@ import { trackerEndpoint } from './capture/trackerEndpoint'
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
 import { buildGoalsCollection } from './goals/collection'
+import { GOALS_PATH, makeGoalsHandler } from './goals/goalsEndpoint'
 import { configGoalsResolver, createGoalsResolver } from './goals/resolver'
 import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
 import { isModuleNotFoundError } from './plugin/peerImportError'
@@ -180,6 +181,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		config.endpoints = [
 			...(config.endpoints ?? []),
 			{ method: 'get', path: SOURCES_PATH, handler: makeSourcesHandler() },
+			{ method: 'get', path: GOALS_PATH, handler: makeGoalsHandler() },
 		]
 		// A runtime provider's capture support is unknown at config time, so providers
 		// alone are enough to mount the proxy; every slot is still resolved per request.
@@ -262,6 +264,9 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				goals: resolved.goals,
 				resolveGoals: goalsResolver.resolve,
 				resolveGoalsDetailed: goalsResolver.resolveDetailed,
+				...(resolved.goalsCollection.enabled
+					? { goalsCollectionSlug: resolved.goalsCollection.slug }
+					: {}),
 				ingestPath: resolved.adapters.find((a) => a.ingest)?.ingest?.path,
 				scoped: resolved.scoped,
 				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
@@ -318,6 +323,9 @@ export {
 	analyticsTab,
 	analyticsTabsField,
 } from './fields/factories'
+export type { GoalFieldOptions } from './goals/goalField'
+export { goalField, goalSlug } from './goals/goalField'
+export type { GoalsResponse, WireGoal } from './goals/goalsEndpoint'
 export type { Goal, GoalMatch, TrackerGoal } from './goals/types'
 export type { TimeframePreset } from './timeframe/presets'
 export type { CustomWidgetDef } from './widgets/customWidget'

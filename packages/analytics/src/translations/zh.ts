@@ -98,4 +98,8 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.goalErrorSlug]: '仅使用小写字母、数字和连字符，例如 book-demo。',
 	[keys.goalErrorSlugTaken]: '已有其他目标使用该标识。',
 	[keys.goalErrorCurrency]: '请使用三位 ISO 4217 代码，例如 EUR。',
+	[keys.fieldGoalLabel]: '目标',
+	[keys.fieldGoalEmpty]: '尚未配置任何目标。',
+	[keys.fieldGoalManage]: '管理目标',
+	[keys.fieldGoalInvalid]: '仅使用小写字母、数字和连字符，例如 book-demo。',
 }

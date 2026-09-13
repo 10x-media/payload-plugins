@@ -101,6 +101,10 @@ export const keys = {
 	goalErrorSlug: 'analytics:goalErrorSlug',
 	goalErrorSlugTaken: 'analytics:goalErrorSlugTaken',
 	goalErrorCurrency: 'analytics:goalErrorCurrency',
+	fieldGoalLabel: 'analytics:fieldGoalLabel',
+	fieldGoalEmpty: 'analytics:fieldGoalEmpty',
+	fieldGoalManage: 'analytics:fieldGoalManage',
+	fieldGoalInvalid: 'analytics:fieldGoalInvalid',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

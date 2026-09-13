@@ -104,4 +104,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.goalErrorSlug]: 'Use lowercase letters, numbers and hyphens, for example book-demo.',
 	[keys.goalErrorSlugTaken]: 'Another goal already uses this slug.',
 	[keys.goalErrorCurrency]: 'Use a three-letter ISO 4217 code, for example EUR.',
+	[keys.fieldGoalLabel]: 'Goal',
+	[keys.fieldGoalEmpty]: 'No goals configured yet.',
+	[keys.fieldGoalManage]: 'Manage goals',
+	[keys.fieldGoalInvalid]: 'Use lowercase letters, numbers and hyphens, for example book-demo.',
 }

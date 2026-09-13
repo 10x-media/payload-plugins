@@ -98,4 +98,8 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.goalErrorSlug]: 'استخدم أحرفًا صغيرة وأرقامًا وشرطات، مثل book-demo.',
 	[keys.goalErrorSlugTaken]: 'هناك هدف آخر يستخدم هذا المعرّف بالفعل.',
 	[keys.goalErrorCurrency]: 'استخدم رمز ISO 4217 من ثلاثة أحرف، مثل EUR.',
+	[keys.fieldGoalLabel]: 'هدف',
+	[keys.fieldGoalEmpty]: 'لم يتم إعداد أي أهداف بعد.',
+	[keys.fieldGoalManage]: 'إدارة الأهداف',
+	[keys.fieldGoalInvalid]: 'استخدم أحرفًا صغيرة وأرقامًا وشرطات، مثل book-demo.',
 }

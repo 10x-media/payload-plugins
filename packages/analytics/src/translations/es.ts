@@ -101,4 +101,8 @@ export const es: Record<TranslationKey, string> = {
 	[keys.goalErrorSlug]: 'Usa minúsculas, números y guiones, por ejemplo book-demo.',
 	[keys.goalErrorSlugTaken]: 'Otro objetivo ya usa este slug.',
 	[keys.goalErrorCurrency]: 'Usa un código ISO 4217 de tres letras, por ejemplo EUR.',
+	[keys.fieldGoalLabel]: 'Objetivo',
+	[keys.fieldGoalEmpty]: 'Aún no hay objetivos configurados.',
+	[keys.fieldGoalManage]: 'Gestionar objetivos',
+	[keys.fieldGoalInvalid]: 'Usa minúsculas, números y guiones, por ejemplo book-demo.',
 }

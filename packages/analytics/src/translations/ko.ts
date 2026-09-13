@@ -98,4 +98,8 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.goalErrorSlug]: '소문자, 숫자, 하이픈만 사용하세요. 예: book-demo',
 	[keys.goalErrorSlugTaken]: '다른 목표가 이미 이 슬러그를 사용합니다.',
 	[keys.goalErrorCurrency]: 'ISO 4217 세 자리 코드를 사용하세요. 예: EUR',
+	[keys.fieldGoalLabel]: '목표',
+	[keys.fieldGoalEmpty]: '아직 구성된 목표가 없습니다.',
+	[keys.fieldGoalManage]: '목표 관리',
+	[keys.fieldGoalInvalid]: '소문자, 숫자, 하이픈만 사용하세요. 예: book-demo',
 }

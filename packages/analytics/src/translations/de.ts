@@ -102,4 +102,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.goalErrorSlug]: 'Nur Kleinbuchstaben, Ziffern und Bindestriche, zum Beispiel book-demo.',
 	[keys.goalErrorSlugTaken]: 'Ein anderes Ziel verwendet diesen Slug bereits.',
 	[keys.goalErrorCurrency]: 'Dreibuchstabiger ISO-4217-Code, zum Beispiel EUR.',
+	[keys.fieldGoalLabel]: 'Ziel',
+	[keys.fieldGoalEmpty]: 'Noch keine Ziele konfiguriert.',
+	[keys.fieldGoalManage]: 'Ziele verwalten',
+	[keys.fieldGoalInvalid]: 'Nur Kleinbuchstaben, Ziffern und Bindestriche, zum Beispiel book-demo.',
 }

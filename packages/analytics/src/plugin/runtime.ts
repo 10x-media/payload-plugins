@@ -40,6 +40,8 @@ export interface AnalyticsRuntime {
 	resolveGoals?: GoalsResolver['resolve']
 	/** The same merge, each goal tagged with where it came from. */
 	resolveGoalsDetailed?: GoalsResolver['resolveDetailed']
+	/** Slug of the goals collection when the install enabled it; the picker links to it. */
+	goalsCollectionSlug?: string
 	/**
 	 * Where the ingest endpoint listens, relative to `routes.api`, lifted at init from the
 	 * adapter that registered one. Absent runtimes fall back to the default mount.

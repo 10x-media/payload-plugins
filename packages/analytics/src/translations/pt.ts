@@ -101,4 +101,8 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.goalErrorSlug]: 'Use minúsculas, números e hifens, por exemplo book-demo.',
 	[keys.goalErrorSlugTaken]: 'Outro objetivo já usa este slug.',
 	[keys.goalErrorCurrency]: 'Use um código ISO 4217 de três letras, por exemplo EUR.',
+	[keys.fieldGoalLabel]: 'Objetivo',
+	[keys.fieldGoalEmpty]: 'Ainda não há objetivos configurados.',
+	[keys.fieldGoalManage]: 'Gerir objetivos',
+	[keys.fieldGoalInvalid]: 'Use minúsculas, números e hifens, por exemplo book-demo.',
 }

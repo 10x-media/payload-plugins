@@ -101,4 +101,8 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.goalErrorSlug]: 'Используйте строчные буквы, цифры и дефисы, например book-demo.',
 	[keys.goalErrorSlugTaken]: 'Другая цель уже использует этот слаг.',
 	[keys.goalErrorCurrency]: 'Укажите трёхбуквенный код ISO 4217, например EUR.',
+	[keys.fieldGoalLabel]: 'Цель',
+	[keys.fieldGoalEmpty]: 'Цели ещё не настроены.',
+	[keys.fieldGoalManage]: 'Управление целями',
+	[keys.fieldGoalInvalid]: 'Используйте строчные буквы, цифры и дефисы, например book-demo.',
 }

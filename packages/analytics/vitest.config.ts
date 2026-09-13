@@ -8,7 +8,7 @@ import { defineConfig, mergeConfig } from 'vitest/config'
 const isMatrixRun = Boolean(process.env.DB_MATRIX)
 
 /** Browser-only modules; everything else runs in the node project. */
-const JSDOM_TESTS = ['src/tracker/**/*.test.ts', 'src/react/**/*.test.tsx']
+const JSDOM_TESTS = ['src/tracker/**/*.test.ts', 'src/**/*.test.tsx']
 
 // Test selection is controlled by package.json scripts that pass explicit
 // paths. Default `test` runs everything below; `test:unit`/`test:int`/

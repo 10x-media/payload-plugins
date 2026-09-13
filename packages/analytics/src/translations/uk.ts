@@ -101,4 +101,8 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.goalErrorSlug]: 'Використовуйте малі літери, цифри та дефіси, наприклад book-demo.',
 	[keys.goalErrorSlugTaken]: 'Інша ціль уже використовує цей слаг.',
 	[keys.goalErrorCurrency]: 'Вкажіть трилітерний код ISO 4217, наприклад EUR.',
+	[keys.fieldGoalLabel]: 'Ціль',
+	[keys.fieldGoalEmpty]: 'Цілі ще не налаштовані.',
+	[keys.fieldGoalManage]: 'Керування цілями',
+	[keys.fieldGoalInvalid]: 'Використовуйте малі літери, цифри та дефіси, наприклад book-demo.',
 }

@@ -102,4 +102,9 @@ export const fr: Record<TranslationKey, string> = {
 		'Utilisez des minuscules, des chiffres et des tirets, par exemple book-demo.',
 	[keys.goalErrorSlugTaken]: 'Un autre objectif utilise déjà ce slug.',
 	[keys.goalErrorCurrency]: 'Utilisez un code ISO 4217 à trois lettres, par exemple EUR.',
+	[keys.fieldGoalLabel]: 'Objectif',
+	[keys.fieldGoalEmpty]: 'Aucun objectif configuré pour le moment.',
+	[keys.fieldGoalManage]: 'Gérer les objectifs',
+	[keys.fieldGoalInvalid]:
+		"Utilisez des minuscules, des chiffres et des traits d'union, par exemple book-demo.",
 }

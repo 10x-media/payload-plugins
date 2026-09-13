@@ -100,4 +100,8 @@ export const id: Record<TranslationKey, string> = {
 	[keys.goalErrorSlug]: 'Gunakan huruf kecil, angka, dan tanda hubung, misalnya book-demo.',
 	[keys.goalErrorSlugTaken]: 'Sasaran lain sudah memakai slug ini.',
 	[keys.goalErrorCurrency]: 'Gunakan kode ISO 4217 tiga huruf, misalnya EUR.',
+	[keys.fieldGoalLabel]: 'Sasaran',
+	[keys.fieldGoalEmpty]: 'Belum ada sasaran yang dikonfigurasi.',
+	[keys.fieldGoalManage]: 'Kelola sasaran',
+	[keys.fieldGoalInvalid]: 'Gunakan huruf kecil, angka, dan tanda hubung, misalnya book-demo.',
 }
