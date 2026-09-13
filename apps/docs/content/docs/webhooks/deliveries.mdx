@@ -59,6 +59,10 @@ The **Webhook Deliveries** collection (slug `webhook-deliveries` by default) is 
 
 Every delivery row has a **Redeliver** button, backed by `POST /api/webhook-deliveries/:id/redeliver` (requires a logged-in user; returns `202` with the new delivery id). Redelivery creates a fresh row and replays the original payload to the subscription's current URL through the configured mode, so a corrected endpoint receives the replay. A disabled or deleted subscription is not sent to; the new row lands as `dead`.
 
+<Callout>
+A redelivery is a **new** delivery: the fresh row means a fresh `webhook-id`, so a receiver deduplicating on that id treats it as a distinct message rather than a repeat, and will process the payload again. Retries of a *failed* delivery keep the original `webhook-id`, so those do deduplicate. If replaying must not double-process, make your handler idempotent on something inside the body (`data.id`, a version field) rather than on `webhook-id` alone.
+</Callout>
+
 ## The body
 
 ```json
