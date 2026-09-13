@@ -6,7 +6,7 @@ import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { syncTask } from '../../src/sync/syncTask'
 import { startOfDayInTz } from '../../src/timeframe/tz'
 import { DEV_REPORTING_TIMEZONE } from '../config/shared'
-import { tenancyScopes } from '../config/tenancy'
+import { GOAL_SCOPE_FIELD, tenancyScopes } from '../config/tenancy'
 import { devMemoryAdapter } from './adapters'
 
 const DEV_EMAIL = 'dev@10xmedia.de'
@@ -279,14 +279,20 @@ const SEED_TENANT_GOAL_PAGES: Array<SeedGoalPage & { tenantKey: 'alpha' | 'beta'
 
 /**
  * A goal document and its CTA page, both guarded by slug so a re-boot against a populated
- * database adds neither twice. Stamped as the platform admin for the same reason the
- * provider seed is: the hook that stamps the scope only honours an explicit one from a
- * request it recognizes as platform-wide, and the seed carries no tenant cookie.
+ * database adds neither twice. The scope is written under whatever field the install points
+ * `scopeField` at (`GOAL_SCOPE_FIELD` for the tenancy fragment), never a hard-coded key:
+ * writing `scope` to a collection scoped by a tenant plugin's own relationship field would
+ * land every seeded goal install-wide instead. Stamped as the platform admin for the same
+ * reason the provider seed is: the hook that stamps the scope only honours an explicit one
+ * from a request it recognizes as platform-wide, and the seed carries no tenant cookie.
  */
 const seedGoalPage = async (
 	payload: Payload,
 	entry: SeedGoalPage,
-	opts: { platformAdmin: { id: string | number }; scope?: string }
+	opts: {
+		platformAdmin: { id: string | number }
+		scope?: { field: string; value: string | number }
+	}
 ): Promise<void> => {
 	const { platformAdmin, scope } = opts
 	const existingGoal = await payload.count({
@@ -303,7 +309,7 @@ const seedGoalPage = async (
 				match: { kind: 'goal' },
 				value: { fixed: GOAL_VALUE },
 				currency: GOAL_CURRENCY,
-				...(scope !== undefined ? { scope } : {}),
+				...(scope ? { [scope.field]: scope.value } : {}),
 			} as never,
 			overrideAccess: true,
 			user: platformAdmin as never,
@@ -401,7 +407,7 @@ export const seedDev = async (
 		for (const entry of SEED_TENANT_GOAL_PAGES) {
 			await seedGoalPage(payload, entry, {
 				platformAdmin,
-				scope: String(tenants[entry.tenantKey].id),
+				scope: { field: GOAL_SCOPE_FIELD, value: String(tenants[entry.tenantKey].id) },
 			})
 		}
 	} else {
