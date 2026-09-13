@@ -310,6 +310,8 @@ export type {
 	ScopesResolver,
 	TimezoneResolver,
 } from './core/options'
+export type { ServerEventInput, ServerTrack, ServerTrackOptions } from './core/serverEvent'
+export { AnalyticsTrackError } from './core/serverEvent'
 export type {
 	AnalyticsFieldsOptions,
 	AnalyticsMetricLabel,
@@ -336,8 +338,7 @@ export type {
 } from './goals/trackGoalAction'
 export { GOAL_ACTION_TYPE, trackGoalAction } from './goals/trackGoalAction'
 export type { Goal, GoalMatch, TrackerGoal } from './goals/types'
-export type { ServerEventInput, ServerTrackOptions } from './native/ingest/serverTrack'
-export { AnalyticsTrackError, trackServerEvent } from './native/ingest/serverTrack'
+export { trackServerEvent } from './native/ingest/serverTrack'
 export type { TimeframePreset } from './timeframe/presets'
 export type { CustomWidgetDef } from './widgets/customWidget'
 export { analyticsDefaultWidgets } from './widgets/defaults'

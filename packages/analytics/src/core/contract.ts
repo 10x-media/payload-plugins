@@ -1,7 +1,7 @@
 import type { Config, PayloadRequest } from 'payload'
 import type { Goal } from '../goals/types'
-import type { ServerTrack } from '../native/ingest/serverTrack'
 import type { CaptureSupport } from './capture'
+import type { ServerTrack } from './serverEvent'
 
 /**
  * Explicit cross-scope read marker: pass as a read's `scope` to aggregate over every

@@ -9,6 +9,7 @@ export type { SerializedCapabilities } from '../core/capabilities'
 export * from '../core/capture'
 export * from '../core/contract'
 export type { ResolvedAutoCapture } from '../core/options'
+export type { ServerEventInput, ServerTrack, ServerTrackOptions } from '../core/serverEvent'
 export type {
 	AnalyticsFieldsOptions,
 	AnalyticsMetricLabel,
@@ -25,9 +26,4 @@ export type {
 } from '../goals/trackGoalAction'
 export type { Goal, GoalMatch, TrackerGoal } from '../goals/types'
 export type { AnalyticsPluginOptions } from '../index'
-export type {
-	ServerEventInput,
-	ServerTrack,
-	ServerTrackOptions,
-} from '../native/ingest/serverTrack'
 export type { TimeframePreset } from '../timeframe/presets'

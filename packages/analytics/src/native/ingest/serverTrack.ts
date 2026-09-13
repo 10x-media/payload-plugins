@@ -1,60 +1,19 @@
 import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
+import {
+	AnalyticsTrackError,
+	type ServerEventInput,
+	type ServerTrack,
+	type ServerTrackOptions,
+} from '../../core/serverEvent'
 import { getRuntime } from '../../plugin/runtime'
 import type { GeoResolver } from '../geo/geoResolver'
+import { SERVER_USER_AGENT } from './device'
 import type { IngestResolvers } from './endpoint'
 import { flushBatch } from './flushBatch'
-import { type EventType, normalizeEvent, type StoredEvent } from './normalizeEvent'
+import { normalizeEvent, type StoredEvent } from './normalizeEvent'
 import { dailySalt } from './salt'
 import { rawEventError } from './validate'
 import type { WriteBuffer } from './writeBuffer'
-
-/**
- * The user agent an event with no attribution inputs is hashed under. Every such event in a
- * day therefore shares one visitor hash per site, so server-side tracking reports at most
- * one extra unique visitor per day per site rather than inflating the count per call.
- */
-export const SERVER_USER_AGENT = 'analytics-server'
-
-export interface ServerEventInput {
-	type: EventType
-	/** Event name, or the goal slug on a `goal`. Absent on pageviews. */
-	name?: string
-	path: string
-	hostname: string
-	referrer?: string
-	props?: Record<string, unknown>
-	/** Revenue for a goal completion, in `currency`. */
-	value?: number
-	currency?: string
-	/**
-	 * Attribution inputs, forwarded from the originating request when there is one. Absent
-	 * means the synthetic server visitor, which never inflates uniques beyond one visitor
-	 * per day per site. No IP is ever fabricated.
-	 */
-	ip?: string
-	userAgent?: string
-	/** Analytics boundary to stamp; null is install-wide. Unset resolves from `opts.req`. */
-	scope?: string | null
-	/** IANA reporting timezone the rollup day bucket is computed in. */
-	timezone?: string
-	/** Event time; defaults to now. */
-	now?: Date
-}
-
-export interface ServerTrackOptions {
-	/** The request the event belongs to; its scope and reporting timezone resolve from it. */
-	req?: PayloadRequest
-}
-
-export type ServerTrack = (event: ServerEventInput, opts?: ServerTrackOptions) => Promise<void>
-
-/** Thrown instead of dropping the event: a server caller can handle a rejected promise. */
-export class AnalyticsTrackError extends Error {
-	constructor(message: string) {
-		super(message)
-		this.name = 'AnalyticsTrackError'
-	}
-}
 
 export interface ServerTrackDeps {
 	/** Null until the adapter's onInit has run. */
@@ -65,10 +24,24 @@ export interface ServerTrackDeps {
 	getResolvers: () => IngestResolvers
 }
 
-const attributionHeaders = (event: ServerEventInput): Headers => {
-	const headers = new Headers({ 'user-agent': event.userAgent ?? SERVER_USER_AGENT })
+/**
+ * The originating request's own headers, so a server event attributes exactly like the
+ * browser event it stands in for: the platform's geo headers reach the geo resolver and the
+ * visitor hashes to the same person. Explicit `ip` / `userAgent` overlay them.
+ *
+ * With no request and no user agent the synthetic server agent stands in, which hashes every
+ * such event in a day to one visitor per site and reports no device at all.
+ */
+const attributionHeaders = (event: ServerEventInput, req?: PayloadRequest): Headers => {
+	const headers = new Headers(req?.headers)
 	if (event.ip) {
 		headers.set('x-forwarded-for', event.ip)
+	}
+	if (event.userAgent) {
+		headers.set('user-agent', event.userAgent)
+	}
+	if (!headers.get('user-agent')) {
+		headers.set('user-agent', SERVER_USER_AGENT)
 	}
 	return headers
 }
@@ -140,7 +113,7 @@ export const makeServerTrack =
 				value: event.value,
 				currency: event.currency,
 			},
-			headers: attributionHeaders(event),
+			headers: attributionHeaders(event, opts?.req),
 			geoResolver: deps.geoResolver,
 			salt: await dailySalt(payload, now),
 			now,
@@ -149,16 +122,24 @@ export const makeServerTrack =
 			goals,
 		})
 		const buffer = deps.getBuffer()
-		if (buffer) {
-			buffer.add(stored)
-		} else {
+		if (!buffer) {
 			await flushBatch(payload, [stored])
+			return
+		}
+		buffer.add(stored)
+		if (opts?.flush) {
+			await buffer.flush()
 		}
 	}
 
 /**
  * Records an analytics event from server code: a webhook, a job, a server action. The event
  * goes through the same normalization, sanitization and goal matching a browser event does.
+ * Pass `opts.req` whenever there is a request behind the event, so it inherits that request's
+ * attribution, scope and reporting timezone.
+ *
+ * `event.scope` overrides the request's scope; it is ignored on an unscoped install and is
+ * never checked against the scopes that exist, so the caller owns what it stamps.
  *
  * Needs the native adapter: a provider slot (Plausible, GA4) has no server ingestion seam
  * here yet, so an install without the native adapter throws rather than dropping the event.

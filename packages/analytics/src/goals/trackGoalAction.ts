@@ -1,5 +1,6 @@
 import type { Field, Payload, PayloadRequest, TextFieldSingleValidation } from 'payload'
-import { AnalyticsTrackError, trackServerEvent } from '../native/ingest/serverTrack'
+import { AnalyticsTrackError } from '../core/serverEvent'
+import { trackServerEvent } from '../native/ingest/serverTrack'
 import { de } from '../translations/de'
 import { en } from '../translations/en'
 import { keys } from '../translations/keys'

@@ -12,7 +12,7 @@ import {
 	AnalyticsTrackError,
 	type ServerEventInput,
 	type ServerTrackOptions,
-} from '../native/ingest/serverTrack'
+} from '../core/serverEvent'
 import { keys } from '../translations/keys'
 import {
 	type GoalActionDefinition,

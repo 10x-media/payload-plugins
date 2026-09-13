@@ -1,16 +1,18 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import type { MetricKey } from '../../src/core/contract'
+import type { DimensionKey, MetricKey } from '../../src/core/contract'
+import { AnalyticsTrackError } from '../../src/core/serverEvent'
 import { GOALS_SLUG } from '../../src/goals/collection'
 import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
-import { AnalyticsTrackError, trackServerEvent } from '../../src/native/ingest/serverTrack'
+import { trackServerEvent } from '../../src/native/ingest/serverTrack'
 import { native } from '../../src/native/nativeAdapter'
 import { getRuntime } from '../../src/plugin/runtime'
 
 const DAY_MS = 86_400_000
 const HOST = 'shop.example'
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148'
 
 const configGoals: Goal[] = [
 	{ slug: 'purchase', name: 'Purchase', match: { kind: 'goal' } },
@@ -36,6 +38,17 @@ describeForDb('analytics server track: unscoped', { dbs: ['mongo'] }, (db) => {
 	const totalsFor = async (path: string): Promise<Partial<Record<MetricKey, number>>> => {
 		const result = await adapter.query({ path, metrics, dateRange: range }, {})
 		return result.totals ?? {}
+	}
+
+	/** Pageviews per value of one dimension, install-wide. */
+	const breakdown = async (dimension: DimensionKey): Promise<Record<string, number>> => {
+		const result = await adapter.query(
+			{ metrics: ['pageviews'], dimensions: [dimension], dateRange: range },
+			{}
+		)
+		return Object.fromEntries(
+			result.rows.map((row) => [String(row.dimensions?.[dimension]), row.metrics.pageviews ?? 0])
+		)
 	}
 
 	beforeAll(async () => {
@@ -77,6 +90,22 @@ describeForDb('analytics server track: unscoped', { dbs: ['mongo'] }, (db) => {
 			hostname: HOST,
 		})
 		expect(await totalsFor('/welcome')).toMatchObject({ events: 1, conversions: 1 })
+	})
+
+	it('attributes geo and device from the request it is given, and abstains without one', async () => {
+		// Every event so far came from a script with no request, so none of them is a device.
+		expect(await breakdown('device')).toEqual({})
+		const req = {
+			payload: booted.payload,
+			headers: new Headers({ 'x-vercel-ip-country': 'US', 'user-agent': IPHONE_UA }),
+		} as unknown as PayloadRequest
+		await trackServerEvent(
+			booted.payload,
+			{ type: 'pageview', path: '/from-browser', hostname: HOST },
+			{ req }
+		)
+		expect(await breakdown('device')).toEqual({ mobile: 1 })
+		expect(await breakdown('country')).toEqual({ US: 1 })
 	})
 
 	it('refuses an invalid event instead of writing a broken one', async () => {

@@ -1,20 +1,19 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter } from '../../core/contract'
+import {
+	AnalyticsTrackError,
+	type ServerEventInput,
+	type ServerTrack,
+} from '../../core/serverEvent'
 import type { Goal } from '../../goals/types'
 import { type AnalyticsRuntime, setRuntime } from '../../plugin/runtime'
-import { noopResolver } from '../geo/geoResolver'
+import { type GeoResolver, noopResolver, platformHeaderResolver } from '../geo/geoResolver'
+import { SERVER_USER_AGENT } from './device'
 import type { IngestResolvers } from './endpoint'
 import { flushBatch } from './flushBatch'
 import type { StoredEvent } from './normalizeEvent'
-import {
-	AnalyticsTrackError,
-	makeServerTrack,
-	SERVER_USER_AGENT,
-	type ServerEventInput,
-	type ServerTrack,
-	trackServerEvent,
-} from './serverTrack'
+import { makeServerTrack, trackServerEvent } from './serverTrack'
 import { dailyVisitorHash } from './visitorHash'
 import type { WriteBuffer } from './writeBuffer'
 
@@ -27,32 +26,42 @@ const fakePayload = (): Payload =>
 		kv: { get: async () => ({ salt: 'salt' }), set: async () => undefined },
 	}) as unknown as Payload
 
-const fakeReq = (): PayloadRequest => ({ headers: new Headers() }) as unknown as PayloadRequest
+const fakeReq = (headers: Record<string, string> = {}): PayloadRequest =>
+	({ headers: new Headers(headers) }) as unknown as PayloadRequest
 
 interface Harness {
 	track: ServerTrack
 	events: StoredEvent[]
 	payload: Payload
+	drain: ReturnType<typeof vi.fn>
 }
 
-const setup = (resolvers: IngestResolvers = {}, buffered = true): Harness => {
+const setup = (
+	resolvers: IngestResolvers = {},
+	buffered = true,
+	geoResolver: GeoResolver = noopResolver
+): Harness => {
 	const events: StoredEvent[] = []
+	const drain = vi.fn(async () => undefined)
 	const buffer = {
 		add: (event: StoredEvent) => events.push(event),
-		flush: async () => undefined,
+		flush: drain,
 	} as unknown as WriteBuffer<StoredEvent>
 	const payload = fakePayload()
 	return {
 		events,
 		payload,
+		drain,
 		track: makeServerTrack({
 			getPayload: () => payload,
-			geoResolver: noopResolver,
+			geoResolver,
 			getBuffer: () => (buffered ? buffer : null),
 			getResolvers: () => resolvers,
 		}),
 	}
 }
+
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148'
 
 const pageview: ServerEventInput = { type: 'pageview', path: '/p', hostname: 'h' }
 
@@ -92,6 +101,45 @@ describe('makeServerTrack attribution', () => {
 		await track(pageview)
 		await track({ ...pageview, hostname: 'other.example' })
 		expect(events[1]?.visitorHash).not.toBe(events[0]?.visitorHash)
+	})
+
+	it('files an unattributed event under no device at all', async () => {
+		const { track, events } = setup()
+		await track(pageview)
+		expect(events[0]?.device).toBeUndefined()
+	})
+
+	it('inherits the whole header set of the request it is given', async () => {
+		const { track, events } = setup({}, true, platformHeaderResolver)
+		const req = fakeReq({
+			'x-vercel-ip-country': 'US',
+			'x-forwarded-for': '9.9.9.9',
+			'user-agent': IPHONE_UA,
+		})
+		await track(pageview, { req })
+		expect(events[0]?.country).toBe('US')
+		expect(events[0]?.device).toBe('mobile')
+		expect(events[0]?.visitorHash).toBe(
+			dailyVisitorHash({ ip: '9.9.9.9', ua: IPHONE_UA, site: 'h', salt: 'salt' })
+		)
+	})
+
+	it('overlays an explicit ip and user agent over the request’s own', async () => {
+		const { track, events } = setup()
+		const req = fakeReq({ 'x-forwarded-for': '9.9.9.9', 'user-agent': IPHONE_UA })
+		await track({ ...pageview, ip: '1.2.3.4', userAgent: 'curl/8' }, { req })
+		expect(events[0]?.visitorHash).toBe(
+			dailyVisitorHash({ ip: '1.2.3.4', ua: 'curl/8', site: 'h', salt: 'salt' })
+		)
+	})
+
+	it('falls back to the synthetic user agent for a request that carries none', async () => {
+		const { track, events } = setup()
+		await track(pageview, { req: fakeReq({ 'x-forwarded-for': '9.9.9.9' }) })
+		expect(events[0]?.visitorHash).toBe(
+			dailyVisitorHash({ ip: '9.9.9.9', ua: SERVER_USER_AGENT, site: 'h', salt: 'salt' })
+		)
+		expect(events[0]?.device).toBeUndefined()
 	})
 })
 
@@ -196,6 +244,16 @@ describe('makeServerTrack resolvers', () => {
 		expect(events[0]?.currency).toBeUndefined()
 	})
 
+	it('leaves the caller’s request untouched', async () => {
+		// createLocalReq mutates what it is handed; a caller's req must not come back
+		// carrying payload, i18n or a data loader it never had.
+		const req = { headers: new Headers() } as unknown as PayloadRequest
+		const before = Object.keys(req)
+		const { track } = setup({ scope: async () => 'alpha', timezone: async () => 'UTC' })
+		await track(pageview, { req })
+		expect(Object.keys(req)).toEqual(before)
+	})
+
 	it('honours an injected now', async () => {
 		const now = new Date('2026-01-02T03:04:05.000Z')
 		const { track, events } = setup()
@@ -206,10 +264,17 @@ describe('makeServerTrack resolvers', () => {
 
 describe('makeServerTrack write path', () => {
 	it('buffers the event when the adapter runs a write buffer', async () => {
-		const { track, events } = setup()
+		const { track, events, drain } = setup()
 		await track(pageview)
 		expect(events).toHaveLength(1)
 		expect(flushed).not.toHaveBeenCalled()
+		expect(drain).not.toHaveBeenCalled()
+	})
+
+	it('drains the buffer before resolving when the caller asks it to', async () => {
+		const { track, drain } = setup()
+		await track(pageview, { flush: true })
+		expect(drain).toHaveBeenCalledTimes(1)
 	})
 
 	it('flushes a single-event batch when there is no buffer', async () => {
