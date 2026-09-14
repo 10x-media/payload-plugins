@@ -37,6 +37,11 @@ export interface ReadForWidgetBreakdownArgs {
 	range?: DateRange
 	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
 	scope?: string | null
+	/**
+	 * Reporting timezone the caller already resolved, reused rather than resolved again so
+	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+	 */
+	timezone?: string
 	filters?: AnalyticsFilter[]
 }
 
@@ -56,7 +61,7 @@ export const readForWidgetBreakdown = async (
 		return {
 			status: 'unavailable',
 			adapterId: adapterId ?? '',
-			dateRange: range ?? resolveTimeframe(timeframe, now),
+			dateRange: range ?? resolveTimeframe(timeframe, now, args.timezone),
 			rows: emptyRows,
 		}
 	}
@@ -65,11 +70,11 @@ export const readForWidgetBreakdown = async (
 		return {
 			status: 'unavailable',
 			adapterId: adapterId ?? '',
-			dateRange: range ?? resolveTimeframe(timeframe, now),
+			dateRange: range ?? resolveTimeframe(timeframe, now, args.timezone),
 			rows: emptyRows,
 		}
 	}
-	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
+	const tz = args.timezone ?? (await resolveTimezoneFor(runtime, req, ctx.scope))
 	const dateRange = range ?? resolveTimeframe(timeframe, now, tz)
 	const base = { dateRange, rows: emptyRows }
 	const adapter: AnalyticsAdapter = ctx.adapter

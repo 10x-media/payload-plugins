@@ -29,6 +29,7 @@ import { createEngine } from './surfacing/engine'
 import { syncCollection } from './sync/collection'
 import { syncTask } from './sync/syncTask'
 import { DEFAULT_TIMEZONE, isValidTimeZone } from './timeframe/tz'
+import { registerView } from './view/registerView'
 import { registerWidgets } from './widgets/registerWidgets'
 
 declare module 'payload' {
@@ -204,6 +205,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				defaultId: resolved.defaultAdapter,
 			})
 		}
+		registerView(config, { view: resolved.view, pluginOptions: options })
 		if (resolved.cache.warm.enabled) {
 			config.jobs = {
 				...config.jobs,
@@ -319,6 +321,8 @@ export type {
 	AnalyticsPluginOptions,
 	AnalyticsPluginOptions as PluginOptions,
 	AnalyticsReadAccess,
+	AnalyticsViewAccess,
+	AnalyticsViewOptions,
 	AutoCaptureOptions,
 	CaptureConsentOption,
 	ConsentMode,

@@ -2,7 +2,7 @@
 
 # @10x-media/analytics
 
-Adapter-based analytics for Payload v3. One adapter contract covers a self-hosted native engine and the major providers (GA4, Plausible, Umami, PostHog), surfaced through dashboard widgets and per-document stat fields, with cached reads, an opt-in sync tier, and capability gating so unsupported surfaces never appear.
+Adapter-based analytics for Payload v3. One adapter contract covers a self-hosted native engine and the major providers (GA4, Plausible, Umami, PostHog), surfaced through an admin analytics view, dashboard widgets and per-document stat fields, with cached reads, an opt-in sync tier, and capability gating so unsupported surfaces never appear.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/analytics?style=flat-square)](https://www.npmjs.com/package/@10x-media/analytics)
 
@@ -14,6 +14,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Native engine**: self-hosted, cookieless analytics in your own database, with atomic rollups, exact daily uniques, geo resolution (platform headers or MaxMind), retention pruning, and opt-in write batching.
 - **Capture**: a dependency-free browser tracker (`@10x-media/analytics/tracker`) with SPA pageviews, consent gating, auto-capture, and goals, booted from React (`@10x-media/analytics/react`) or a server component; capture-capable adapters are served through a first-party proxy so a vendor's SDK loads from your own origin.
 - **Goals**: conversions and revenue, completed from a `data-analytics-goal` attribute, a `goalField()` picker in your own blocks, a `@10x-media/form-builder` action, or `trackServerEvent` from server code (webhooks, jobs), and declared in config or in an opt-in collection editors manage per scope.
+- **Analytics view** at `/admin/analytics`: overview cards, a trend, capability-gated breakdown tabs with click-to-filter, goals and realtime, with range, source, metric, tab and filters in the URL so a report is a shareable link.
 - **Dashboard widgets** for Payload's Modular Dashboard: metric, trend, four breakdowns, and realtime, all capability-gated, plus a public API for custom widgets.
 - **Display fields**: `analyticsStat`, `analyticsStatRow`, `analyticsFields`, `analyticsTab`, `analyticsTabsField` place per-document stats on your collections; typed per-collection bindings resolve each document's URL path.
 - **Query endpoint**: an authenticated `GET /api/analytics/query` over any configured source, capability-validated and scope-gated, with coded errors and a `fetchQuery` helper for admin code.
@@ -60,6 +61,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/analytics):
 - [Quick start](https://docs.10xmedia.de/analytics/quick-start)
 - [Adapters](https://docs.10xmedia.de/analytics/adapters)
 - [Data sources and the query endpoint](https://docs.10xmedia.de/analytics/data-sources)
+- [Analytics view](https://docs.10xmedia.de/analytics/analytics-view)
 - [Native engine](https://docs.10xmedia.de/analytics/native)
 - [Capture](https://docs.10xmedia.de/analytics/capture)
 - [Goals](https://docs.10xmedia.de/analytics/goals)

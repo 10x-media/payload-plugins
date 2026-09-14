@@ -2,6 +2,8 @@ export interface BarDatum {
 	label: string
 	value: number
 	display?: string
+	/** A second, unbarred column (the view's `visitors` beside the charted metric). */
+	secondary?: string
 }
 
 export interface BarRow {
@@ -9,6 +11,7 @@ export interface BarRow {
 	value: number
 	fraction: number
 	display?: string
+	secondary?: string
 }
 
 /**
@@ -23,5 +26,6 @@ export const toBarRows = (data: BarDatum[]): BarRow[] => {
 		value: d.value,
 		fraction: max > 0 ? d.value / max : 0,
 		display: d.display,
+		secondary: d.secondary,
 	}))
 }

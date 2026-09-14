@@ -1,5 +1,6 @@
 import type { Payload, PayloadRequest } from 'payload'
 import type { ResolvedBinding } from '../binding/types'
+import { PLATFORM_SCOPE } from '../core/contract'
 import type { CaptureSlotOption, ConsentPolicy, ResolvedAutoCapture } from '../core/options'
 import type { AdapterRegistry, RegistryResolver, ResolveRegistryArgs } from '../core/registry'
 import type { ServerTrack } from '../core/serverEvent'
@@ -107,6 +108,27 @@ export const resolveTimezoneFor = (
 	req: PayloadRequest,
 	scope?: string | null
 ): Promise<string> => runtime.resolveTimezone?.(req, scope) ?? Promise.resolve(DEFAULT_TIMEZONE)
+
+/**
+ * The reporting timezone of a request, resolving its scope first and falling back to UTC
+ * when the plugin is not booted or resolution throws. Callers that must interpret a
+ * client-supplied or stored calendar day before the read begins use this; a read path
+ * already holding a resolved scope calls {@link resolveTimezoneFor} directly.
+ */
+export const requestTimezone = async (req: PayloadRequest): Promise<string> => {
+	const runtime = getRuntime(req.payload)
+	if (!runtime) {
+		return DEFAULT_TIMEZONE
+	}
+	try {
+		// The cross-scope marker is not a scope a reporting timezone can be resolved for;
+		// `resolveReadContext` narrows it to null the same way.
+		const scope = await resolveScopeFor(runtime, req)
+		return await resolveTimezoneFor(runtime, req, scope === PLATFORM_SCOPE ? null : scope)
+	} catch {
+		return DEFAULT_TIMEZONE
+	}
+}
 
 export const resolveRegistryFor = (
 	runtime: AnalyticsRuntime,

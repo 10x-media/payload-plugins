@@ -2,10 +2,11 @@ import type { CollectionSlug, PayloadHandler } from 'payload'
 import type { BindingDoc } from '../binding/types'
 import type { DateRange, MetricKey } from '../core/contract'
 import { readForField } from '../fields/readForDocument'
+import { parseDayOrInstant } from '../query/dates'
 import { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 import { METRIC_KEYS } from '../translations/metricKeys'
 import { DOCUMENT_PATH } from './paths'
-import { getRuntime, readAccessFor } from './runtime'
+import { getRuntime, readAccessFor, requestTimezone } from './runtime'
 
 export { DOCUMENT_PATH }
 
@@ -23,13 +24,20 @@ const parseMetrics = (raw: string | null): MetricKey[] | null => {
 	return metrics.length > 0 ? metrics.slice(0, MAX_METRICS) : null
 }
 
-const parseRange = (from: string | null, to: string | null): DateRange | null => {
+/**
+ * A custom window from the query string, read exactly like the query endpoint's: a
+ * `YYYY-MM-DD` day is the whole calendar day in the reporting timezone (`to` inclusive of
+ * its final instant), a datetime must carry `Z` or a `±HH:MM` offset, and anything else,
+ * including an offset-less datetime, is rejected. `from` equal to `to` is one whole day for
+ * day strings and a zero-width window for two instants, so only the latter is rejected.
+ */
+const parseRange = (from: string | null, to: string | null, timezone: string): DateRange | null => {
 	if (!from || !to) {
 		return null
 	}
-	const start = new Date(from)
-	const end = new Date(to)
-	if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) {
+	const start = parseDayOrInstant(from, { timezone, edge: 'start' })
+	const end = parseDayOrInstant(to, { timezone, edge: 'end' })
+	if (!start || !end || end.getTime() <= start.getTime()) {
 		return null
 	}
 	return { start, end }
@@ -62,8 +70,11 @@ export const makeDocumentHandler = (): PayloadHandler => async (req) => {
 		return Response.json({ error: 'not found' }, { status: 404 })
 	}
 	const rawTimeframe = params.get('timeframe') ?? 'last30days'
+	// Custom bounds name calendar days, so the reporting timezone has to be resolved before
+	// they can be read; a preset resolves its window inside `readForField` as before.
+	const timezone = rawTimeframe === 'custom' ? await requestTimezone(req) : undefined
 	const range =
-		rawTimeframe === 'custom' ? parseRange(params.get('from'), params.get('to')) : undefined
+		timezone !== undefined ? parseRange(params.get('from'), params.get('to'), timezone) : undefined
 	const timeframe: TimeframePreset = TIMEFRAME_PRESETS.includes(rawTimeframe as TimeframePreset)
 		? (rawTimeframe as TimeframePreset)
 		: 'last30days'
@@ -96,6 +107,7 @@ export const makeDocumentHandler = (): PayloadHandler => async (req) => {
 		metrics,
 		timeframe,
 		range: range ?? undefined,
+		...(timezone !== undefined ? { timezone } : {}),
 		adapterId: params.get('dataSource') ?? undefined,
 		now: new Date(),
 		compare: params.get('compare') === '1',

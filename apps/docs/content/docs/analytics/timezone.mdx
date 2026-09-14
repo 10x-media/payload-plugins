@@ -51,6 +51,7 @@ The resolver runs on every ingest request and widget read, so cache anything tha
 ## What it controls
 
 - Timeframe presets resolve their window in the timezone (`today` starts at that zone's midnight).
+- A custom range, whether picked in a [widget](/analytics/widgets) or in the [analytics view](/analytics/analytics-view), is the two calendar days the admin picked, read whole in this timezone: the `to` day is included in full, and the caption names the picked days. Where the admin's browser sits changes nothing.
 - The daily trend series buckets and labels each point by the zone's day.
 - The surfacing cache key partitions by timezone, so a Berlin read and a UTC read never share a cached result.
 - Native rollups are bucketed into the zone's day **at ingest** (see below).

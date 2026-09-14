@@ -524,3 +524,65 @@ describe('resolveOptions goals collection', () => {
 		expect(() => collectionOf({ collection: { scopeField: 'tenant.id' } })).toThrow(/no dots/i)
 	})
 })
+
+describe('resolveOptions view', () => {
+	const adapters = [memoryAdapter()]
+
+	it('fills the defaults when the option is absent', () => {
+		expect(resolveOptions({ adapters }).view).toEqual({
+			path: '/analytics',
+			defaultRange: 'last30days',
+			defaultMetric: 'pageviews',
+		})
+	})
+
+	it('keeps false so nothing is registered', () => {
+		expect(resolveOptions({ adapters, view: false }).view).toBe(false)
+	})
+
+	it('carries path, range, metric and navLabel through', () => {
+		expect(
+			resolveOptions({
+				adapters,
+				view: {
+					path: '/insights',
+					defaultRange: 'last7days',
+					defaultMetric: 'visitors',
+					navLabel: 'Traffic',
+				},
+			}).view
+		).toEqual({
+			path: '/insights',
+			defaultRange: 'last7days',
+			defaultMetric: 'visitors',
+			navLabel: 'Traffic',
+		})
+	})
+
+	it('rejects a path that is not rooted', () => {
+		expect(() => resolveOptions({ adapters, view: { path: 'insights' as `/${string}` } })).toThrow(
+			/view\.path/i
+		)
+	})
+
+	it('rejects an unknown timeframe preset or metric', () => {
+		expect(() =>
+			resolveOptions({ adapters, view: { defaultRange: '30d' as 'last30days' } })
+		).toThrow(/view\.defaultRange/i)
+		expect(() =>
+			resolveOptions({ adapters, view: { defaultMetric: 'clicks' as 'pageviews' } })
+		).toThrow(/view\.defaultMetric/i)
+	})
+
+	it('defaults access.view to the resolved read gate', () => {
+		const resolved = resolveOptions({ adapters })
+		expect(resolved.access.view).toBe(resolved.access.read)
+	})
+
+	it('keeps an explicit access.view separate from access.read', () => {
+		const view = () => false
+		const resolved = resolveOptions({ adapters, access: { view } })
+		expect(resolved.access.view).toBe(view)
+		expect(resolved.access.read).not.toBe(view)
+	})
+})

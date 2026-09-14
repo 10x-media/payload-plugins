@@ -13,9 +13,8 @@ import {
 	MAX_QUERY_METRICS,
 	MAX_QUERY_PATH_LENGTH,
 	MAX_QUERY_RANGE_DAYS,
-	type ParsedQuery,
-	parseQueryParams,
-} from './parse'
+} from './limits'
+import { type ParsedQuery, parseQueryParams } from './parse'
 
 const caps: SerializedCapabilities = {
 	metrics: ['pageviews', 'visitors', 'sessions', 'conversions'],

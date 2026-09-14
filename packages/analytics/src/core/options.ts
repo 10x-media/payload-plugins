@@ -6,10 +6,12 @@ import type { CaptureSlot } from '../capture/slots'
 import { GOALS_SLUG } from '../goals/collection'
 import { GOAL_SLUG_PATTERN, type Goal } from '../goals/types'
 import { PROVIDERS_SLUG } from '../providers/collection'
+import { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 import type { TranslationsOption } from '../translations'
+import { METRIC_KEYS } from '../translations/metricKeys'
 import type { CustomWidgetDef } from '../widgets/customWidget'
 import type { CaptureClientKind } from './capture'
-import type { AnalyticsAdapter } from './contract'
+import type { AnalyticsAdapter, MetricKey } from './contract'
 
 const DEFAULT_WARM_CRON = '*/30 * * * *'
 const DEFAULT_SYNC_CRON = '0 */6 * * *'
@@ -87,6 +89,9 @@ export type PlatformReadAccess = (args: { req: PayloadRequest }) => boolean | Pr
 /** Access checker for authenticated analytics reads. */
 export type AnalyticsReadAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 
+/** Access checker for the analytics admin view. */
+export type AnalyticsViewAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
+
 export type AnalyticsAccessOptions = {
 	/**
 	 * Gates every authenticated read endpoint: query, document panel, realtime, sources
@@ -103,6 +108,12 @@ export type AnalyticsAccessOptions = {
 	 * providers. Unscoped installs default to any authenticated admin-panel user.
 	 */
 	platformRead?: PlatformReadAccess
+	/**
+	 * Gates the analytics admin view. Defaults to `read`, so one gate covers the view and
+	 * the endpoints behind it. A reader this denies still sees the nav link (it is a client
+	 * component with no access context) and lands on the view's no-access message.
+	 */
+	view?: AnalyticsViewAccess
 }
 
 export type ConsentMode = 'none' | 'required'
@@ -205,6 +216,27 @@ export type AnalyticsCaptureOptions = {
 	}
 }
 
+export type AnalyticsViewOptions = {
+	/** Admin path the view mounts at, under `routes.admin`. Default `/analytics`. */
+	path?: `/${string}`
+	/** Timeframe the view opens on before the URL says otherwise. Default `last30days`. */
+	defaultRange?: TimeframePreset
+	/** Metric the cards and the trend open on. Default `pageviews`. */
+	defaultMetric?: MetricKey
+	/**
+	 * Nav link label. A string is used as-is; a map is keyed by admin language code and
+	 * falls back to `en`. Unset, the plugin's own translated label applies.
+	 */
+	navLabel?: string | Record<string, string>
+}
+
+export interface ResolvedView {
+	path: `/${string}`
+	defaultRange: TimeframePreset
+	defaultMetric: MetricKey
+	navLabel?: string | Record<string, string>
+}
+
 export type AnalyticsPluginOptions = {
 	disabled?: boolean
 	/**
@@ -241,6 +273,11 @@ export type AnalyticsPluginOptions = {
 	 */
 	platformAdapter?: string
 	access?: AnalyticsAccessOptions
+	/**
+	 * The analytics admin view and its nav link, on by default. `false` registers neither;
+	 * the read endpoints stay mounted either way, so a custom surface keeps working.
+	 */
+	view?: false | AnalyticsViewOptions
 	capture?: AnalyticsCaptureOptions
 	/**
 	 * Conversion goals the tracker and the native ingest match events against. Slugs must
@@ -313,7 +350,13 @@ export interface ResolvedOptions {
 	/** Raw reportingTimezone option; normalized into a resolver at init. */
 	reportingTimezone?: string | TimezoneResolver
 	platformAdapter?: string
-	access: { platformRead: PlatformReadAccess; read: AnalyticsReadAccess }
+	access: {
+		platformRead: PlatformReadAccess
+		read: AnalyticsReadAccess
+		view: AnalyticsViewAccess
+	}
+	/** The admin view, filled with its defaults, or false when the app turned it off. */
+	view: false | ResolvedView
 	capture: ResolvedCapture
 	/** Config goals, validated; the goals collection layers its own on top of these. */
 	goals: Goal[]
@@ -458,6 +501,36 @@ const resolveGoalsCollection = (
 	return { ...resolved, slug: resolved.slug.trim() }
 }
 
+export const DEFAULT_VIEW: ResolvedView = {
+	path: '/analytics',
+	defaultRange: 'last30days',
+	defaultMetric: 'pageviews',
+}
+
+const resolveView = (option: AnalyticsPluginOptions['view']): false | ResolvedView => {
+	if (option === false) {
+		return false
+	}
+	const path = option?.path ?? DEFAULT_VIEW.path
+	if (typeof path !== 'string' || !path.startsWith('/')) {
+		throw new Error(`analytics: view.path must start with "/", got "${String(path)}"`)
+	}
+	const defaultRange = option?.defaultRange ?? DEFAULT_VIEW.defaultRange
+	if (!TIMEFRAME_PRESETS.includes(defaultRange)) {
+		throw new Error(`analytics: unknown view.defaultRange "${String(defaultRange)}"`)
+	}
+	const defaultMetric = option?.defaultMetric ?? DEFAULT_VIEW.defaultMetric
+	if (!(defaultMetric in METRIC_KEYS)) {
+		throw new Error(`analytics: unknown view.defaultMetric "${String(defaultMetric)}"`)
+	}
+	return {
+		path,
+		defaultRange,
+		defaultMetric,
+		...(option?.navLabel !== undefined ? { navLabel: option.navLabel } : {}),
+	}
+}
+
 const resolveBindings = (
 	collections: AnalyticsPluginOptions['collections']
 ): Record<string, ResolvedBinding> => {
@@ -582,6 +655,8 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 						hidden: true,
 					}
 	const scoped = options.scopeResolver !== undefined
+	// The view gate defaults to this exact function, so one `access.read` covers both.
+	const read: AnalyticsReadAccess = options.access?.read ?? (({ req }) => Boolean(req.user))
 	return {
 		adapters: options.adapters,
 		defaultAdapter: options.defaultAdapter,
@@ -593,8 +668,10 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 		access: {
 			platformRead:
 				options.access?.platformRead ?? (scoped ? () => false : ({ req }) => Boolean(req.user)),
-			read: options.access?.read ?? (({ req }) => Boolean(req.user)),
+			read,
+			view: options.access?.view ?? read,
 		},
+		view: resolveView(options.view),
 		capture: {
 			slots: {
 				global: options.capture?.slots?.global,

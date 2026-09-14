@@ -1,14 +1,16 @@
 import type { PayloadRequest, TaskConfig, WidgetInstance } from 'payload'
-import type { DateRange, DimensionKey, MetricKey } from '../core/contract'
+import type { DimensionKey, MetricKey } from '../core/contract'
 import type { ScopesResolver } from '../core/options'
 import { resolveScopeList } from '../core/scopeList'
 import { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
+import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { breakdownSpecBySlug } from '../widgets/breakdownTypes'
 import { resolveCustomRange } from '../widgets/range'
 import { readForWidget, type WidgetReadStatus } from '../widgets/readForWidget'
 import { readForWidgetBreakdown } from '../widgets/readForWidgetBreakdown'
 import { readForWidgetSeries } from '../widgets/readForWidgetSeries'
 import { WIDGET_METRICS, type WidgetRange } from '../widgets/types'
+import { getRuntime, resolveTimezoneFor } from './runtime'
 
 /** Minimal shape of a dashboard widget instance the warm job reads. */
 export interface WarmWidgetInstance {
@@ -21,14 +23,14 @@ export type WarmTarget =
 			kind: 'metric'
 			metric: MetricKey
 			timeframe: TimeframePreset
-			range?: DateRange
+			range?: WidgetRange
 			adapterId?: string
 	  }
 	| {
 			kind: 'series'
 			metric: MetricKey
 			timeframe: TimeframePreset
-			range?: DateRange
+			range?: WidgetRange
 			adapterId?: string
 	  }
 	| {
@@ -37,7 +39,7 @@ export type WarmTarget =
 			dimension: DimensionKey
 			timeframe: TimeframePreset
 			limit: number
-			range?: DateRange
+			range?: WidgetRange
 			adapterId?: string
 	  }
 
@@ -69,7 +71,7 @@ const asRange = (v: unknown): WidgetRange | undefined => {
 }
 
 const targetKey = (t: WarmTarget): string => {
-	const range = t.range ? `${t.range.start.toISOString()}:${t.range.end.toISOString()}` : ''
+	const range = t.range ? `${t.range.from ?? ''}:${t.range.to ?? ''}` : ''
 	const dimension = t.kind === 'breakdown' ? t.dimension : ''
 	const limit = t.kind === 'breakdown' ? String(t.limit) : ''
 	return `${t.kind}:${t.metric}:${dimension}:${t.timeframe}:${limit}:${t.adapterId ?? ''}:${range}`
@@ -80,8 +82,11 @@ const targetKey = (t: WarmTarget): string => {
  * metric, trend, and breakdown widgets become targets; the realtime widget is skipped
  * (its short-TTL key is kept warm by the live poller) and any other slug is a custom app
  * widget whose read shape the plugin does not know. A `custom` timeframe is kept only when
- * its range resolves (the read takes an explicit range; `timeframe` is then unused).
- * Identical targets are de-duplicated so a repeated widget warms its tuple once.
+ * its range resolves (the read takes an explicit range; `timeframe` is then unused), and
+ * the stored bounds travel with the target rather than concrete instants: which instants
+ * two picked days span depends on the reporting timezone, which is per scope and so only
+ * known inside the warm loop. Identical targets are de-duplicated so a repeated widget
+ * warms its tuple once.
  */
 export const deriveWarmTargets = (widgets: readonly WarmWidgetInstance[]): WarmTarget[] => {
 	const out: WarmTarget[] = []
@@ -96,13 +101,15 @@ export const deriveWarmTargets = (widgets: readonly WarmWidgetInstance[]): WarmT
 		const adapterId = asString(data.dataSource)
 		const timeframeRaw = asTimeframe(data.timeframe)
 		let timeframe: TimeframePreset = 'last30days'
-		let range: DateRange | undefined
+		let range: WidgetRange | undefined
 		if (timeframeRaw === 'custom') {
-			const resolved = resolveCustomRange('custom', asRange(data.range))
-			if (!resolved) {
+			const stored = asRange(data.range)
+			// Whether the bounds name real days is timezone-independent, so the skip decision
+			// can be taken here even though the window itself cannot.
+			if (!resolveCustomRange('custom', stored, DEFAULT_TIMEZONE)) {
 				continue
 			}
-			range = resolved
+			range = stored
 		} else {
 			timeframe = timeframeRaw
 		}
@@ -167,14 +174,20 @@ interface TargetRunResult {
 	adapterId: string
 }
 
-/** Run one target's read for one scope; the caller decides how to count/log the status. */
+/**
+ * Run one target's read for one scope; the caller decides how to count/log the status. The
+ * stored custom bounds resolve here, in that scope's reporting timezone, so the warmed key
+ * is the one the rendered widget will ask for.
+ */
 const runTarget = async (args: {
 	target: WarmTarget
 	req: PayloadRequest
 	now: Date
 	scope: string | null
+	timezone: string
 }): Promise<TargetRunResult> => {
-	const { target, req, now, scope } = args
+	const { target, req, now, scope, timezone } = args
+	const range = resolveCustomRange('custom', target.range, timezone)
 	if (target.kind === 'metric') {
 		const result = await readForWidget({
 			req,
@@ -182,8 +195,9 @@ const runTarget = async (args: {
 			timeframe: target.timeframe,
 			adapterId: target.adapterId,
 			now,
-			range: target.range,
+			range,
 			scope,
+			timezone,
 		})
 		return { status: result.status, adapterId: result.adapterId }
 	}
@@ -194,8 +208,9 @@ const runTarget = async (args: {
 			timeframe: target.timeframe,
 			adapterId: target.adapterId,
 			now,
-			range: target.range,
+			range,
 			scope,
+			timezone,
 		})
 		return { status: result.status, adapterId: result.adapterId }
 	}
@@ -207,8 +222,9 @@ const runTarget = async (args: {
 		limit: target.limit,
 		adapterId: target.adapterId,
 		now,
-		range: target.range,
+		range,
 		scope,
+		timezone,
 	})
 	return { status: result.status, adapterId: result.adapterId }
 }
@@ -241,10 +257,12 @@ export const warmTask = (
 		// that scope) is not a failure, but a silent one leaves `warmed` unexplainably
 		// short of `scopes x targets`; warn once per (scope, adapter) so it is visible.
 		const warnedGated = new Set<string>()
+		const runtime = getRuntime(req.payload)
 		for (const scope of scopeList) {
+			const timezone = runtime ? await resolveTimezoneFor(runtime, req, scope) : DEFAULT_TIMEZONE
 			for (const target of targets) {
 				try {
-					const result = await runTarget({ target, req, now, scope })
+					const result = await runTarget({ target, req, now, scope, timezone })
 					if (result.status === 'ok') {
 						warmed++
 					} else if (scope !== null) {

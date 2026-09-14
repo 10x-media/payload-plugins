@@ -22,6 +22,7 @@ import { insertIfNew } from '../../src/native/rollups/insertIfNew'
 import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
 import { type MemoryAnalyticsAdapter, memoryAdapter } from '../../src/testing/memoryAdapter'
 import { startOfDayInTz } from '../../src/timeframe/tz'
+import { resolveCustomRange } from '../../src/widgets/range'
 import { readForWidget } from '../../src/widgets/readForWidget'
 import { ACTION_HOST_SLUG, actionHost } from './actionHost'
 import { ingestRequest } from './ingestRequest'
@@ -628,6 +629,63 @@ describeForDb('native reporting timezone bucketing', {}, (db) => {
 		})
 		const period = new Date((rollups.docs[0] as unknown as { period: string }).period)
 		expect(period.toISOString()).toBe(startOfDayInTz(eventTs, TZ).toISOString())
+	})
+})
+
+describeForDb('custom range end bound', {}, (db) => {
+	const TZ = 'Europe/Berlin'
+	let booted: BootedPayload
+
+	// Jun 23 in Berlin ends at 2026-06-23T21:59:59.999Z, so 23:30 local is the last event
+	// inside the picked window and 00:30 the next morning is the first one outside it.
+	const pageview = (timestamp: string, visitor: string): StoredEvent => ({
+		timestamp: new Date(timestamp),
+		type: 'pageview',
+		path: '/cr',
+		hostname: 'h',
+		visitorHash: visitor,
+		sessionId: `${visitor}-s`,
+		timezone: TZ,
+	})
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native()], reportingTimezone: TZ }),
+			db,
+		})
+		await flushBatch(booted.payload, [
+			pageview('2026-06-23T21:30:00.000Z', 'in'),
+			pageview('2026-06-23T22:30:00.000Z', 'out'),
+		])
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it(`includes the final picked day up to its last instant on ${db}`, async () => {
+		const range = resolveCustomRange('custom', { from: '2026-06-01', to: '2026-06-23' }, TZ)
+		expect(range?.end.toISOString()).toBe('2026-06-23T21:59:59.999Z')
+		const req = { payload: booted.payload } as unknown as PayloadRequest
+		const args = {
+			req,
+			metrics: ['pageviews' as const],
+			timeframe: 'last30days' as const,
+			now: new Date(),
+			range,
+			timezone: TZ,
+		}
+		// Day rollups, whose period is bucketed on the reporting timezone's day.
+		const rollups = await readForWidget(args)
+		expect(rollups.status).toBe('ok')
+		expect(rollups.metrics.pageviews).toBe(1)
+		// And raw events, where the adapter compares the end instant itself.
+		const raw = await readForWidget({
+			...args,
+			filters: [{ dimension: 'page', operator: 'eq', value: '/cr' }],
+		})
+		expect(raw.status).toBe('ok')
+		expect(raw.metrics.pageviews).toBe(1)
 	})
 })
 

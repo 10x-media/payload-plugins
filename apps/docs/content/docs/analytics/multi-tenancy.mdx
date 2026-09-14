@@ -263,6 +263,8 @@ Both modes enable the goals collection and seed a CTA page whose block points at
 
 Contributors regenerating the dev app's own output should run both commands as `TENANCY=on pnpm generate:types analytics` and `TENANCY=on pnpm generate:importmap analytics`. The tenancy config is the superset, and the committed `dev/payload-types.ts` and `dev/app/(payload)/admin/importMap.js` are generated from it: a default-env run silently drops the multi-tenant import map entries and the `Tenant` type along with every `tenant` and `scope` field, which breaks the tenancy admin. A local `pnpm dev analytics` with auto-generation on rewrites both files the same way.
 
+The dev app boots Payload from `dev/instrumentation.ts` rather than waiting for the first request. Next's dev app-page runtime installs a process-wide `async_hooks` hook that builds and stack-parses an `Error` per promise, and a seed running from `onInit` after that hook loads pays the tax on every write: tenancy mode, at roughly five times single-tenant's volume, spent minutes pinned at 100% CPU answering nothing. `register` runs first, so the same seed is cheap. This is dev-app wiring, not plugin behavior.
+
 Switching `TENANCY` on a **persistent** database (a `DATABASE_URI_MONGO`/`DATABASE_URI_POSTGRES` you point at yourself, or `DEV_DB=postgres`) after it already booted once in the other mode needs a reseed and the `scope` column migration from the [native engine's upgrade note](/analytics/native#upgrading-an-existing-install): the rows and schema from the first boot don't retroactively match the new mode's shape. The default in-memory database is immune, since every boot starts from an empty one.
 
 ## Custom provider stores
