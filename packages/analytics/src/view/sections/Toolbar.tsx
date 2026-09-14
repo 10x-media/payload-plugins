@@ -26,6 +26,12 @@ export interface ToolbarProps {
 	/** Any section read a shorter window than the one that was asked for. */
 	clamped: boolean
 	now: Date
+	/**
+	 * The committed state as one string. Any change to it, not just to the days, drops a
+	 * pending day edit: a click elsewhere cancels that edit, so the next one must start
+	 * from what was committed rather than from the state the cancelled edit was built on.
+	 */
+	stateKey: string
 	onChange: (next: ViewState) => void
 	/** Committed after a pause: the day inputs fire on every keystroke. */
 	onChangeDeferred: (next: ViewState) => void
@@ -56,18 +62,20 @@ export function Toolbar({
 	stale,
 	clamped,
 	now,
+	stateKey,
 	onChange,
 	onChangeDeferred,
 }: ToolbarProps) {
 	const { t } = useTranslation()
 	const uncommitted = useRef<ViewState | null>(null)
 
-	// The URL has caught up with the pending edit (or moved somewhere else entirely), so the
-	// next edit starts from the state again.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: the reset keys on the committed days, not the callback
+	// The URL has caught up with the pending edit, or the reader committed anything else at
+	// all (a card, a tab, a row, which also cancels the pending edit), so the next edit
+	// starts from the committed state again.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the reset keys on the committed state, not the callback
 	useEffect(() => {
 		uncommitted.current = null
-	}, [state.from, state.to])
+	}, [stateKey])
 
 	const presets = VIEW_RANGE_PRESETS.filter((preset) => {
 		if (gate.maxRangeDays === null) {

@@ -8,9 +8,9 @@ import {
 	getRuntime,
 	type PlatformReadGate,
 	platformReadGate,
+	requestTimezone,
 	resolveGoalsDetailedFor,
 	resolveScopeFor,
-	resolveTimezoneFor,
 } from '../plugin/runtime'
 import type { TimeframePreset } from '../timeframe/presets'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
@@ -86,17 +86,6 @@ const resolveScopeKey = async (runtime: AnalyticsRuntime, req: PayloadRequest): 
 	}
 }
 
-const resolveViewTimezone = async (
-	runtime: AnalyticsRuntime,
-	req: PayloadRequest
-): Promise<string> => {
-	try {
-		return await resolveTimezoneFor(runtime, req)
-	} catch {
-		return DEFAULT_TIMEZONE
-	}
-}
-
 /**
  * Resolves the client shell's props for one request. Split from the server component so the
  * whole resolution (access, scope gating, sources, goals, timezone) is testable without a
@@ -135,7 +124,10 @@ export const resolveViewProps = async (
 	const [sources, goals, timezone, scopeKey] = await Promise.all([
 		resolveSourcesForRequest(req, { platformRead: allowed }),
 		resolveGoalsList(runtime, req, allowed),
-		resolveViewTimezone(runtime, req),
+		// The same helper every read path uses, so the caption and the numbers agree: it
+		// narrows the cross-scope marker to null before resolving, which resolving through
+		// the runtime directly would not.
+		requestTimezone(req),
 		resolveScopeKey(runtime, req),
 	])
 	return {

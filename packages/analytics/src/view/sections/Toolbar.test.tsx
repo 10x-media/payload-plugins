@@ -122,6 +122,7 @@ const renderToolbar = (
 			sources={overrides.sources ?? [source('native', caps)]}
 			stale={overrides.stale ?? false}
 			state={state}
+			stateKey={JSON.stringify(state)}
 			timezone="Europe/Berlin"
 		/>
 	)

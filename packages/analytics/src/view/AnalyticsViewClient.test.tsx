@@ -225,6 +225,29 @@ describe('AnalyticsViewClient', () => {
 		expect(screen.getAllByText(/\/pricing/).length).toBeGreaterThan(1)
 	})
 
+	it('bases a later day edit on the click that cancelled the earlier one', async () => {
+		mocks.search = 'range=custom&from=2026-06-01&to=2026-06-10'
+		const { rerender } = await renderView()
+		fireEvent.change(screen.getByLabelText(keys.viewFrom), { target: { value: '2026-06-05' } })
+		const cards = within(screen.getByRole('group', { name: keys.viewOverview }))
+		fireEvent.click(cards.getByRole('button', { name: new RegExp(METRIC_KEYS.visitors) }))
+
+		const url = String(mocks.push.mock.calls[0]?.[0])
+		expect(url).toContain('metric=visitors')
+		mocks.search = url.slice(url.indexOf('?') + 1)
+		rerender(<AnalyticsViewClient {...props()} />)
+		await act(async () => {})
+
+		fireEvent.change(screen.getByLabelText(keys.viewTo), { target: { value: '2026-06-08' } })
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 600))
+		})
+		const replaced = String(mocks.replace.mock.calls.at(-1)?.[0])
+		expect(replaced).toContain('metric=visitors')
+		expect(replaced).toContain('from=2026-06-01')
+		expect(replaced).toContain('to=2026-06-08')
+	})
+
 	it('badges a read served from an expired cache', async () => {
 		mocks.fetchQueryMock.mockImplementation((_route, request) =>
 			Promise.resolve(answer(request, true))

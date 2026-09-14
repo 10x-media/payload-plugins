@@ -46,12 +46,17 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 	const state = served ? coerceState(parsed, served) : parsed
 	const queries = useViewQueries(props, state)
 
+	const query = useCallback(
+		(next: ViewState) => serializeViewState(next, props.defaults).toString(),
+		[props.defaults]
+	)
+
 	const href = useCallback(
 		(next: ViewState) => {
-			const query = serializeViewState(next, props.defaults).toString()
-			return query === '' ? pathname : `${pathname}?${query}`
+			const search = query(next)
+			return search === '' ? pathname : `${pathname}?${search}`
 		},
-		[pathname, props.defaults]
+		[pathname, query]
 	)
 
 	const pending = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -151,6 +156,7 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 				sources={props.sources.sources}
 				stale={sections.some((section) => section.data?.result.meta.stale === true)}
 				state={state}
+				stateKey={query(state)}
 				timezone={props.timezone}
 			/>
 			<OverviewCards
