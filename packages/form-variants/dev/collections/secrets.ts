@@ -18,8 +18,25 @@ export const secrets: CollectionConfig = {
 					key: 'quick',
 					label: 'Quick form',
 					access: ({ user }) => isAdmin(user),
-					steps: [{ key: 'secret', label: 'Secret', fields: ['label', 'value'] }],
-					ui: { width: 'half', align: 'center' },
+					steps: [
+						{
+							key: 'secret',
+							label: 'Secret',
+							fields: [
+								{
+									type: 'field',
+									path: 'label',
+									admin: {
+										width: '70%',
+									},
+								},
+								'value',
+							],
+						},
+					],
+					// A centred reading column on the page, and the drawer's own width in a drawer,
+					// which is narrow enough already.
+					ui: { align: 'center', width: { page: 'half' } },
 				},
 				{ key: 'native', label: 'Full form', access: ({ user }) => isAdmin(user) },
 			],

@@ -24,6 +24,7 @@ import { DefaultLayout } from './chrome/Layout'
 import {
 	type BeforeNextHandler,
 	type PrimaryAction,
+	type SaveOptions,
 	useFormVariants,
 	WizardContext,
 	type WizardContextValue,
@@ -90,6 +91,14 @@ type StepOverride = {
 /** Joins step keys into one selector result so the runner re-renders only when the set changes. */
 const STEP_KEY_SEPARATOR = '\n'
 
+/**
+ * The document's own endpoint with `draft=true` on it. Sending `_status: 'draft'` without that
+ * parameter is what Payload's Unpublish button does: it writes the document itself. The
+ * parameter is what makes the same body a new draft version over the published one instead.
+ */
+const draftAction = (action: string | undefined): string | undefined =>
+	action ? `${action}${action.includes('?') ? '&' : '?'}draft=true` : undefined
+
 const setByPath = (target: JsonObject, path: string, value: unknown): void => {
 	const segments = path.split('.')
 	let cursor: Record<string, unknown> = target
@@ -130,7 +139,17 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 		getEntityConfig,
 	} = useConfig()
 	const collectionConfig = getEntityConfig({ collectionSlug })
-	const { id, docPermissions, getDocPreferences, hasPublishPermission } = useDocumentInfo()
+	const drafts = collectionConfig ? hasDraftsEnabled(collectionConfig) : false
+	const {
+		action,
+		id,
+		docPermissions,
+		getDocPreferences,
+		hasPublishPermission,
+		setHasPublishedDoc,
+		setMostRecentVersionIsAutosaved,
+		setUnpublishedVersionCount,
+	} = useDocumentInfo()
 	const { dispatchFields, getData, getFields, setModified, setSubmitted, submit } = useForm()
 	const { getFormState } = useServerFunctions()
 	const { setPreference } = usePreferences()
@@ -595,28 +614,59 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 		save: variant.save,
 	})
 
-	const save = useCallback(async () => {
-		if (!guard.allowed) {
-			return
-		}
-		if (collectionConfig && hasDraftsEnabled(collectionConfig)) {
-			if (hasPublishPermission) {
-				await submit({ overrides: { _status: 'published' } })
-			} else {
-				await submit({ overrides: { _status: 'draft' }, skipValidation: true })
+	/**
+	 * Saves through the guard. On a drafts collection a save publishes, unless it is asked for a
+	 * draft or the account may not publish, in which case it goes to the draft endpoint the way
+	 * Payload's own Save draft does: `_status: 'draft'` alone, on the document's usual endpoint,
+	 * is what Unpublish sends, so the `draft=true` parameter is what separates the two.
+	 */
+	const save = useCallback(
+		async (options?: SaveOptions) => {
+			if (!guard.allowed) {
+				return
 			}
-			return
-		}
-		await submit()
-	}, [collectionConfig, guard.allowed, hasPublishPermission, submit])
+			if (!drafts) {
+				await submit()
+				return
+			}
+			if (options?.draft || !hasPublishPermission) {
+				const result = await submit({
+					action: draftAction(action),
+					overrides: { _status: 'draft' },
+					skipValidation: true,
+				})
+				if (result?.res.ok) {
+					setUnpublishedVersionCount((count) => count + 1)
+				}
+				return
+			}
+			const result = await submit({ overrides: { _status: 'published' } })
+			if (result?.res.ok) {
+				setUnpublishedVersionCount(0)
+				setMostRecentVersionIsAutosaved(false)
+				setHasPublishedDoc(true)
+			}
+		},
+		[
+			action,
+			drafts,
+			guard.allowed,
+			hasPublishPermission,
+			setHasPublishedDoc,
+			setMostRecentVersionIsAutosaved,
+			setUnpublishedVersionCount,
+			submit,
+		]
+	)
 
 	// Ctrl+S saves wherever the guard allows it and is swallowed elsewhere, so the browser's
-	// own save dialog never opens over the form.
+	// own save dialog never opens over the form. On a drafts collection it saves a draft, as it
+	// does on Payload's own form: a keystroke is not how anyone means to publish.
 	useHotkey({ cmdCtrlKey: true, editDepth, keyCodes: ['s'] }, (event) => {
 		event.preventDefault()
 		event.stopPropagation()
 		if (guard.allowed && !busy && (modified || !id)) {
-			void save()
+			void save({ draft: drafts })
 		}
 	})
 

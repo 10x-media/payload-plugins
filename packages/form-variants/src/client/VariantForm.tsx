@@ -35,7 +35,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BASE_CLASS, VARIANT_PARAM } from '../plugin/constants'
 import type { AfterSaveAction } from '../types'
 import { Header } from './chrome/Header'
-import { SaveButton } from './chrome/SaveButton'
+import { SaveControls } from './chrome/SaveControls'
 import { VariantSwitcher } from './chrome/VariantSwitcher'
 import { useFormVariants } from './context'
 import { evaluate } from './evaluate'
@@ -549,6 +549,9 @@ export const VariantForm: React.FC<Props> = (props) => {
 	 */
 	const titleFallback = (depth <= 1 ? id?.toString() : undefined) as string
 
+	/** The variant's presentation for the surface it is on. The server answered both already. */
+	const ui = variant.ui[inDrawer ? 'drawer' : 'page']
+
 	/** Take-over from the locked-document modal; the read-only state has no take-over button here. */
 	const takeOver = (): void => {
 		if (!id) {
@@ -577,7 +580,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 		<Header>
 			{documentSlots.BeforeDocumentControls}
 			{switcher}
-			{variant.save === 'always' && !readOnly && <SaveButton />}
+			{variant.save === 'always' && !readOnly && <SaveControls />}
 		</Header>
 	)
 
@@ -601,8 +604,8 @@ export const VariantForm: React.FC<Props> = (props) => {
 				id && 'collection-edit--is-editing',
 				collectionSlug && `collection-edit--${collectionSlug}`,
 				`${BASE_CLASS}--${variant.key}`,
-				`${BASE_CLASS}--width-${variant.ui.width}`,
-				`${BASE_CLASS}--align-${variant.ui.align}`,
+				`${BASE_CLASS}--width-${ui.width}`,
+				`${BASE_CLASS}--align-${ui.align}`,
 			]
 				.filter(Boolean)
 				.join(' ')}

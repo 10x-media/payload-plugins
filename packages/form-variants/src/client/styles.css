@@ -385,9 +385,21 @@
 :where(.form-variants__actions) {
 	display: flex;
 	flex-wrap: wrap;
+	align-items: center;
 	justify-content: flex-end;
 	gap: calc(var(--base) * 0.5);
 	margin-inline-start: auto;
+}
+
+/*
+ * Payload gives every button a vertical margin of its own and takes it back where buttons sit
+ * in a row, which its document controls bar does with this same rule. Without it the row is as
+ * tall as that margin and anything not carrying it, such as Back, stretches to match. Not
+ * `:where()`: it has to outweigh `.btn`, as Payload's own does.
+ */
+.form-variants__actions button {
+	margin: 0;
+	white-space: nowrap;
 }
 
 :where(.form-variants__actions .btn__label) {

@@ -1,17 +1,49 @@
 import type { CollectionConfig, CollectionSlug } from 'payload'
 
-import type { FieldItem, FormVariantsCollections, FormVariantsConfig, Step } from '../types'
+import type {
+	BySurface,
+	FieldItem,
+	FormVariantsCollections,
+	FormVariantsConfig,
+	Step,
+	Surface,
+	VariantUI,
+} from '../types'
 import { COLLECTION_CUSTOM_KEY, NATIVE_KEY } from './constants'
 import type {
 	ResolvedCollection,
 	ResolvedFieldItem,
 	ResolvedStep,
+	ResolvedSurfaceUI,
 	ResolvedUI,
 	ResolvedVariant,
 } from './registry'
 
 /** Payload's own form is full width and starts at the left, so that is where a variant starts. */
-const DEFAULT_UI: ResolvedUI = { align: 'left', width: 'full' }
+const DEFAULT_UI: ResolvedSurfaceUI = { align: 'left', width: 'full' }
+
+/** One option's value on one surface. A plain value is the answer for both of them. */
+const bySurface = <T extends string>(
+	value: BySurface<T> | undefined,
+	surface: Surface,
+	fallback: T
+): T => {
+	if (value === undefined) {
+		return fallback
+	}
+	if (typeof value === 'string') {
+		return value
+	}
+	return value[surface] ?? fallback
+}
+
+const resolveUI = (ui: VariantUI | undefined): ResolvedUI => {
+	const forSurface = (surface: Surface): ResolvedSurfaceUI => ({
+		align: bySurface(ui?.align, surface, DEFAULT_UI.align),
+		width: bySurface(ui?.width, surface, DEFAULT_UI.width),
+	})
+	return { drawer: forSurface('drawer'), page: forSurface('page') }
+}
 
 const fail = (message: string): never => {
 	throw new Error(`[form-variants] ${message}`)
@@ -86,7 +118,7 @@ export const resolveCollection = (slug: string, config: FormVariantsConfig): Res
 				navigation: 'linear',
 				save: 'always',
 				steps: [],
-				ui: DEFAULT_UI,
+				ui: resolveUI(undefined),
 			}
 		}
 		const steps = (variant.steps ?? []).map(resolveStep)
@@ -102,10 +134,7 @@ export const resolveCollection = (slug: string, config: FormVariantsConfig): Res
 			// saves and only the button's place differs. `always` puts it where Payload puts it.
 			save: variant.save ?? (steps.length === 1 ? 'always' : 'final-step'),
 			steps,
-			ui: {
-				align: variant.ui?.align ?? DEFAULT_UI.align,
-				width: variant.ui?.width ?? DEFAULT_UI.width,
-			},
+			ui: resolveUI(variant.ui),
 		}
 	})
 
@@ -116,7 +145,7 @@ export const resolveCollection = (slug: string, config: FormVariantsConfig): Res
 			navigation: 'linear',
 			save: 'always',
 			steps: [],
-			ui: DEFAULT_UI,
+			ui: resolveUI(undefined),
 		})
 	}
 

@@ -8,9 +8,11 @@ import type {
 	SlotComponents,
 	StepContext,
 	StepSlotComponents,
+	Surface,
 	VariantAccess,
+	VariantAlign,
 	VariantLabel,
-	VariantUI,
+	VariantWidth,
 } from '../types'
 import { REGISTRY_KEY } from './constants'
 
@@ -44,8 +46,17 @@ export type ResolvedStep = {
 	label?: VariantLabel
 }
 
-/** A variant's presentation with every default filled in. */
-export type ResolvedUI = Required<VariantUI>
+/** One surface's presentation with every default filled in. */
+export type ResolvedSurfaceUI = {
+	align: VariantAlign
+	width: VariantWidth
+}
+
+/**
+ * A variant's presentation, answered for each surface here rather than in the browser, so the
+ * manifest carries two small objects instead of the option shapes and the rules for reading them.
+ */
+export type ResolvedUI = Record<Surface, ResolvedSurfaceUI>
 
 export type ResolvedVariant = {
 	access?: VariantAccess

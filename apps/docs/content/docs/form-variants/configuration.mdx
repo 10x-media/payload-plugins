@@ -33,8 +33,26 @@ The plugin only sees collections present in `config.collections` when it runs, s
 | `save` | `'final-step' \| 'always'` | When the save guard allows a save. Default `final-step` |
 | `components` | slot map | Per-variant slot replacements or `false` to hide a part, see [Customization](./customization) |
 | `afterSave` | `(ctx & { savedDoc }) => AfterSaveAction` | See [Saving](./saving) |
+| `ui` | `{ width, align }` | How wide the variant's column is and where it sits, see below |
 
 `native` accepts only `key`, `label` and `access`. It always exists: a collection that does not list it gets `native` available to everyone, and listing it is how its access is restricted.
+
+### Presentation
+
+`ui` is how the variant sits in the room it has.
+
+| Option | Type | Notes |
+|---|---|---|
+| `width` | `'full' \| 'half'` | `full` is the width Payload's own form takes. `half` is a reading-width column, which suits a short form and a wizard. Default `full` |
+| `align` | `'left' \| 'center' \| 'right'` | Where a `half` column sits. Ignored at `full` width. Default `left` |
+
+Either option also takes an object naming the surface it applies to, `page` or `drawer`, since a drawer has far less room than the page. A surface the object leaves out takes the default rather than the other surface's value.
+
+```ts
+ui: { align: 'center', width: { page: 'half' } }
+```
+
+That is a centred reading column on the page and Payload's full width inside a drawer, which is narrow to begin with.
 
 ## Step
 

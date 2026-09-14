@@ -14,10 +14,10 @@ export type SaveGuardResult = {
 }
 
 /**
- * The one save guard. Autosave never passes through it (an autosaved draft is not a publish);
- * every other save is allowed only when the document is not read-only, the wizard has not
- * ended with an outcome, no step has blocked saving, and the policy is `always` or the user is
- * on the last visible step.
+ * The one save guard. A save is allowed only when the document is not read-only, the wizard
+ * has not ended with an outcome, no step has blocked saving, and the policy is `always` or the
+ * user is on the last visible step. A draft save answers to it as a publish does: the step that
+ * blocked saving blocked writing the document at all.
  */
 export const computeSaveGuard = (args: SaveGuardArgs): SaveGuardResult => {
 	if (args.readOnly) {

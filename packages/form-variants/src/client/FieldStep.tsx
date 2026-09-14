@@ -81,7 +81,7 @@ export const FieldStep: React.FC<{ readOnly: boolean; step: ClientStep }> = ({
 	)
 
 	const renderItems = (items: ClientFieldItem[], prefix: string): React.ReactNode[] =>
-		items.flatMap((item, i) => {
+		items.flatMap<React.ReactNode>((item, i) => {
 			const key = prefix === '' ? String(i) : `${prefix}.${i}`
 			switch (item.type) {
 				case 'collapsible':

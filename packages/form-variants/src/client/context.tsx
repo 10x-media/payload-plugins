@@ -44,6 +44,15 @@ export type BeforeNextHandler = (args: {
 	step: ClientStep
 }) => boolean | Promise<boolean | undefined> | undefined
 
+/** What a `save()` call asks for beyond the guard's answer. */
+export type SaveOptions = {
+	/**
+	 * Save as a draft rather than publish. Only a collection with drafts enabled has the two,
+	 * and an account without publish permission saves a draft either way.
+	 */
+	draft?: boolean
+}
+
 /**
  * A step's replacement for the footer's primary button, so a component step drives the same
  * footer as every other step instead of drawing buttons of its own.
@@ -88,7 +97,7 @@ export type WizardContextValue = {
 	primaryAction: null | PrimaryAction
 	readOnly: boolean
 	/** Saves through the guard: a refused save resolves without submitting. */
-	save: () => Promise<void>
+	save: (options?: SaveOptions) => Promise<void>
 	saveAllowed: boolean
 	/** Why the guard refuses, when it does. */
 	saveBlockedReason: 'blocked' | 'finished' | 'not-final-step' | 'read-only' | null

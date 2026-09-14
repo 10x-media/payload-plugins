@@ -206,14 +206,28 @@ export type Step<TSlug extends CollectionSlug> = ComponentStep | FieldStep<TSlug
  * Presentation of a variant's form, everything that is a matter of looks rather than of what
  * the form does. More may land here; today it is how wide the form is and where it sits.
  */
+/** Where a variant renders. A drawer has far less room than the page, so options may differ. */
+export type Surface = 'drawer' | 'page'
+
+/**
+ * An option that may differ by surface. A plain value applies wherever the variant renders; an
+ * object names the surfaces it applies to, and any surface it leaves out takes the default.
+ */
+export type BySurface<T> = Partial<Record<Surface, T>> | T
+
+export type VariantAlign = 'center' | 'left' | 'right'
+export type VariantWidth = 'full' | 'half'
+
+/** A variant's presentation. Both options take a surface object as well as a plain value. */
 export type VariantUI = {
-	/** Where a `half` column sits on the page. Ignored at `full` width. Default `left`. */
-	align?: 'center' | 'left' | 'right'
+	/** Where a `half` column sits in the room it has. Ignored at `full` width. Default `left`. */
+	align?: BySurface<VariantAlign>
 	/**
 	 * `full` takes the width Payload's own form takes. `half` is a reading-width column, which
-	 * suits a short form and a wizard. Default `full`.
+	 * suits a short form and a wizard. Default `full`. A drawer is narrow to begin with, so
+	 * `width: { page: 'half' }` is the usual way to ask for the column and leave the drawer alone.
 	 */
-	width?: 'full' | 'half'
+	width?: BySurface<VariantWidth>
 }
 
 /** Which accounts may see a variant. */

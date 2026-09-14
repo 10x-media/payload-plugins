@@ -7,8 +7,9 @@ import {
 	useEditDepth,
 	usePreferences,
 } from '@payloadcms/ui'
+import { useRouter } from 'next/navigation'
 import type React from 'react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 
 import { BASE_CLASS, preferenceKeyFor, VARIANT_PARAM } from '../plugin/constants'
 import { keys } from '../translations/keys'
@@ -46,6 +47,7 @@ export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
 		props
 	const { drawerSlug } = useDocumentDrawerContext()
 	const depth = useEditDepth()
+	const router = useRouter()
 	const { setPreference } = usePreferences()
 
 	const inDrawer = Boolean(drawerSlug) || depth > 1
@@ -70,29 +72,62 @@ export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
 	const [state, setState] = useState<WizardState>({})
 	const [outcome, setOutcome] = useState<null | Outcome>(null)
 	const [stepKey, setStepKey] = useState<null | string>(() => rememberedStep(initial[surface]))
+	const [crossing, setCrossing] = useState<null | string>(null)
+	const [refreshing, startRefresh] = useTransition()
 
-	const switchTo = useCallback(
-		(key: string, options?: SwitchOptions) => {
-			if (!available.some((variant) => variant.key === key)) {
-				return
-			}
+	const active = useMemo(
+		() => variants.find((variant) => variant.key === activeKey) ?? null,
+		[activeKey, variants]
+	)
+
+	const apply = useCallback(
+		(key: string) => {
 			setActiveKey(key)
 			setOutcome(null)
 			setStepKey(rememberedStep(key))
 			if (!inDrawer) {
 				replaceParam(VARIANT_PARAM, key)
 			}
+		},
+		[inDrawer, rememberedStep]
+	)
+
+	/**
+	 * Crossing between `native` and a variant leaves one form for another, and the form being
+	 * mounted starts from the state the server rendered with the page. That state is as old as
+	 * the page: anything saved since, by either form, is not in it, so the new form would open
+	 * on the values the document had when it was opened. The server render is what holds it, so
+	 * the route is refreshed first and the switch waits for the answer.
+	 *
+	 * A drawer has no route of its own: its document is rendered once by `renderDocument` when
+	 * the drawer opens and only the drawer itself can ask for it again, so there the switch
+	 * crosses with the state the drawer opened on.
+	 */
+	const switchTo = useCallback(
+		(key: string, options?: SwitchOptions) => {
+			const target = available.find((variant) => variant.key === key)
+			if (!target) {
+				return
+			}
 			if (options?.persist !== false) {
 				void setPreference(preferenceKeyFor(collectionSlug), { variant: key })
 			}
+			if (!inDrawer && active && target.native !== active.native) {
+				setCrossing(key)
+				startRefresh(() => router.refresh())
+				return
+			}
+			apply(key)
 		},
-		[available, collectionSlug, inDrawer, rememberedStep, setPreference]
+		[active, apply, available, collectionSlug, inDrawer, router, setPreference]
 	)
 
-	const active = useMemo(
-		() => variants.find((variant) => variant.key === activeKey) ?? null,
-		[activeKey, variants]
-	)
+	useEffect(() => {
+		if (crossing && !refreshing) {
+			apply(crossing)
+			setCrossing(null)
+		}
+	}, [apply, crossing, refreshing])
 
 	const value = useMemo<FormVariantsContextValue>(
 		() => ({

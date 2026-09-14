@@ -7,19 +7,19 @@ description: The save guard, what happens after a save, autosave and drafts, and
 
 `native` is Payload's `DefaultEditView`, untouched, with the switcher in its controls bar.
 
-Every other variant renders inside one `<Form>` the plugin owns, composed from the same pieces Payload's view is built from (`Form`, `DocumentControls`, the locking, stale-data and leave-without-saving modals, the upload area). Owning the form is what makes the guard, `afterSave` and value-preserving switching possible. Switching between two step variants keeps every value; switching to or from `native` crosses into another form, so with unsaved changes the switcher asks first.
+Every other variant renders inside one `<Form>` the plugin owns, composed from the same pieces Payload's view is built from (`Form`, `DocumentControls`, the locking, stale-data and leave-without-saving modals, the upload area). Owning the form is what makes the guard, `afterSave` and value-preserving switching possible. Switching between two step variants keeps every value; switching to or from `native` crosses into another form, so with unsaved changes the switcher asks first. That crossing also refreshes the route first, since the form being mounted starts from the state the server rendered with the page, and anything saved since is not in it. A drawer has no route of its own and cannot, so there the switch crosses with the state the drawer opened on.
 
 Two things the plugin's form does not carry from `DefaultEditView`: the live preview window, and the auth fields (email, password) of an auth collection. Put those on `native`.
 
 ## The guard
 
-Every save path on a document page ends in the form's `submit`: the header buttons, Ctrl+S, Enter in an input, and autosave. The guard always lets autosave through, since an autosaved draft is not a publish, and allows every other save only when:
+Every save path on a document page ends in the form's `submit`: the header buttons, Ctrl+S, and Enter in an input. The guard allows a save only when:
 
 - `save` is `always`, or the user is on the last visible step, and
 - no step has called `blockSave()`, and
 - the document is not read-only.
 
-The header buttons render the guard's state: while it refuses, they are disabled with the reason as a tooltip, and no Ctrl+S hotkey is registered. `useWizard().save()` goes through the same guard.
+The save controls render the guard's state: while it refuses, they are disabled. `useWizard().save()` goes through the same guard, and so does Ctrl+S.
 
 Switching to `native` and saving there is not a bypass: access to `native` is the trust decision.
 
@@ -36,11 +36,21 @@ Switching to `native` and saving there is not a bypass: access to `native` is th
 
 The plugin owns `onSave` for its variants, so on a full-page create the action is applied before Payload's redirect would run. Autosave never triggers `afterSave`.
 
-## Autosave and drafts
+## Drafts
 
-On a collection with autosave the document exists from the moment the form opens, and autosaves write the values of every step as the user goes. `save: 'final-step'` gates publishing, not the existence of the document. When a component step calls `finish(outcome)` instead of saving, the autosaved draft stays in the database; removing it is the consumer's call, made in the same code that calls `finish`, which has the document id through `useDocumentInfo()`.
+The save controls are Payload's own buttons, under Payload's own rules: `Save` on a collection without drafts, `Save Draft` beside `Publish changes` on one with them, the same component, labels and enabled state, with the guard on top. They render wherever the variant saves, which is the top bar under `save: 'always'` and the last step under `save: 'final-step'`.
 
-On a drafts collection the built-in Navigation's final button publishes when the account may publish and saves a draft otherwise.
+A draft save sends the same values to the document's `?draft=true` endpoint, which leaves the published version standing and skips validation, so a half-filled wizard can be put down and picked up later. `_status: 'draft'` without that parameter is what Payload's Unpublish sends, which is a different thing entirely. Publish stays enabled while there is something to publish, which an unpublished draft is, and a document that was never published always is. An account without publish permission gets the one button, and it saves a draft. Ctrl+S saves a draft rather than publishing, as it does on Payload's own form.
+
+Scheduled publishing and per-locale publishing hang off Payload's publish button; they are document controls and stay on `native`.
+
+## Autosave
+
+A variant form does not autosave. Payload's `Autosave` lives in the document controls bar, which a variant replaces with its own, so nothing is written until a save. Payload still creates the document the moment `/create` opens on an autosave collection, so the variant runs as an update from the first render, but that document stays empty until the user saves.
+
+This is the one place the save controls differ from `native`: Payload drops `Save Draft` when autosave is what writes the drafts, and a variant keeps it, since without it an autosave collection could only ever be published from a variant.
+
+`save: 'final-step'` therefore holds the values out of the database until the last step, on an autosave collection as on any other. When a component step calls `finish(outcome)` instead of saving, the document Payload created stays in the database; removing it is the consumer's call, made in the same code that calls `finish`, which has the document id through `useDocumentInfo()`.
 
 ## Drawers
 

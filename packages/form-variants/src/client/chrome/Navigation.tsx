@@ -8,7 +8,7 @@ import { BASE_CLASS } from '../../plugin/constants'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
 import { type PrimaryAction, useWizard } from '../context'
-import { useSaveLabel } from './SaveButton'
+import { SaveControls } from './SaveControls'
 
 /**
  * The footer: one line for whatever the user needs to know (a validation or gate refusal, a
@@ -29,13 +29,10 @@ export const Navigation: React.FC = () => {
 		next,
 		primaryAction,
 		readOnly,
-		save,
-		saveAllowed,
 		saveBlockedMessage,
 		saveBlockedReason,
 		variant,
 	} = useWizard()
-	const saveLabel = useSaveLabel()
 	const processing = useFormProcessing()
 	const [pending, setPending] = useState(false)
 
@@ -46,15 +43,16 @@ export const Navigation: React.FC = () => {
 		(readOnly ? t(keys.readOnly) : null)
 
 	let primary: null | PrimaryAction = primaryAction
+	// The last step of a `final-step` variant is where that variant saves, so it carries the
+	// same controls the top bar carries on `always` rather than a primary button of its own.
+	const savesHere = !primary && isLast && variant.save === 'final-step' && !readOnly
 	if (!primary && !isLast) {
 		primary = { label: t(keys.next), onClick: next }
-	} else if (!primary && variant.save === 'final-step' && !readOnly) {
-		primary = { disabled: !saveAllowed, label: saveLabel, onClick: save }
 	}
 
 	// Nothing to say and nowhere to go: a one-step variant that saves from the top bar would
 	// otherwise leave an empty bar stuck to the bottom of the form.
-	if (!status && isFirst && !primary) {
+	if (!status && isFirst && !primary && !savesHere) {
 		return null
 	}
 
@@ -94,6 +92,7 @@ export const Navigation: React.FC = () => {
 							{t(keys.back)}
 						</Button>
 					)}
+					{savesHere && <SaveControls />}
 					{primary && (
 						<Button
 							buttonStyle="primary"
