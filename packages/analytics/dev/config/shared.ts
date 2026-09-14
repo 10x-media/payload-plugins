@@ -141,9 +141,11 @@ export const sharedDashboardLayout: DashboardLayout = [
 		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
 	},
 	{
+		// The one widget on a window other than the view's own default, so its "Open in
+		// Analytics" link carries a range rather than serializing away to the default.
 		widgetSlug: 'analytics-breakdown-events',
 		width: 'medium',
-		data: { metric: 'events', timeframe: 'last30days', limit: 5 },
+		data: { metric: 'events', timeframe: 'last7days', limit: 5 },
 	},
 	{ widgetSlug: 'dev-custom-sources', width: 'medium', data: {} },
 ]

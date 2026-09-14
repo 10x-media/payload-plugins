@@ -5,7 +5,7 @@ import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { syncTask } from '../../src/sync/syncTask'
 import { startOfDayInTz } from '../../src/timeframe/tz'
-import { DEV_REPORTING_TIMEZONE } from '../config/shared'
+import { DEV_REPORTING_TIMEZONE, pagePath } from '../config/shared'
 import { GOAL_SCOPE_FIELD, tenancyScopes } from '../config/tenancy'
 import { devMemoryAdapter } from './adapters'
 
@@ -20,6 +20,15 @@ const SEED_DEVICES = ['desktop', 'mobile', 'tablet'] as const
 const SEED_SOURCES = ['google.com', 'Direct', 't.co', 'news.ycombinator.com']
 const SEED_VISITOR_COUNT = 6
 const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Named custom events, so the events breakdown widget has rows on a fresh boot. */
+const SEED_EVENT_NAMES = ['signup', 'download', 'video-play']
+
+/**
+ * One conversion every third dense day, so the goals widget shows a table on a fresh boot and
+ * every preset compares against a previous window that also converted.
+ */
+const CONVERSION_EVERY_DAYS = 3
 
 /**
  * Two years, so every preset compares against a populated previous window and the widgets
@@ -51,17 +60,26 @@ const pageviewsForDay = (day: number): number =>
 			: 0
 
 /**
- * Builds a deterministic span of pageview events. `scale` multiplies the daily volume
- * (alpha and beta get different scales in tenancy mode); `scope` stamps every event.
- * A scoped install has no scope-less bucket family (rollups make `scope` required,
- * '' = null scope), so omitting it is only correct for a genuinely unscoped install.
+ * Builds a deterministic span of pageview events, plus the named custom events and goal
+ * completions the events and goals surfaces read. `scale` multiplies the daily pageview
+ * volume (alpha and beta get different scales in tenancy mode); `scope` stamps every event;
+ * `goal` names the goal the seeded conversions complete (the install's own collection goal,
+ * per tenant in tenancy mode) and the path they happen on, which is that goal's own CTA page
+ * rather than the site root: `/` carries the conversions the e2e specs fire by hand, and one
+ * of them asserts the other tenant's root has none. A scoped install has no scope-less bucket
+ * family (rollups make `scope` required, '' = null scope), so omitting `scope` is only
+ * correct for a genuinely unscoped install.
+ *
+ * Seeded events bypass the ingest endpoint, so goal matching never runs on them: a
+ * conversion has to carry its completion explicitly, at the value the goal document states.
  */
 const buildSeedEvents = (
 	now: Date,
-	opts: { scale?: number; scope?: string } = {}
+	opts: { scale?: number; scope?: string; goal?: { slug: string; path: string } } = {}
 ): StoredEvent[] => {
 	const scale = opts.scale ?? 1
 	const events: StoredEvent[] = []
+	const scoped = opts.scope !== undefined ? { scope: opts.scope } : {}
 	for (let day = 0; day < SEED_DAYS; day++) {
 		const pageviewsToday = Math.max(0, Math.round(pageviewsForDay(day) * scale))
 		for (let i = 0; i < pageviewsToday; i++) {
@@ -80,7 +98,40 @@ const buildSeedEvents = (
 				device: SEED_DEVICES[(day + i) % SEED_DEVICES.length],
 				source: SEED_SOURCES[(day + i) % SEED_SOURCES.length],
 				timezone: DEV_REPORTING_TIMEZONE,
-				...(opts.scope !== undefined ? { scope: opts.scope } : {}),
+				...scoped,
+			})
+		}
+		if (day >= SEED_DENSE_DAYS) {
+			continue
+		}
+		const visitorHash = `seed-visitor-${day % SEED_VISITOR_COUNT}`
+		const attribution = {
+			hostname: 'localhost',
+			visitorHash,
+			sessionId: `${visitorHash}-d${day}`,
+			country: SEED_COUNTRIES[day % SEED_COUNTRIES.length],
+			device: SEED_DEVICES[day % SEED_DEVICES.length],
+			source: SEED_SOURCES[day % SEED_SOURCES.length],
+			timezone: DEV_REPORTING_TIMEZONE,
+			...scoped,
+		}
+		events.push({
+			timestamp: new Date(now.getTime() - day * DAY_MS + 60_000),
+			type: 'event',
+			name: SEED_EVENT_NAMES[day % SEED_EVENT_NAMES.length] ?? 'signup',
+			path: SEED_PATHS[day % SEED_PATHS.length] ?? '/',
+			...attribution,
+		})
+		if (opts.goal && day % CONVERSION_EVERY_DAYS === 0) {
+			events.push({
+				timestamp: new Date(now.getTime() - day * DAY_MS + 120_000),
+				type: 'goal',
+				name: opts.goal.slug,
+				path: opts.goal.path,
+				value: GOAL_VALUE,
+				currency: GOAL_CURRENCY,
+				goals: [{ slug: opts.goal.slug, value: GOAL_VALUE }],
+				...attribution,
 			})
 		}
 	}
@@ -125,9 +176,16 @@ const SEED_PAGES = [
 	{ title: 'Contact', slug: 'contact' },
 ]
 
-/** Mirror the native seed into the memory provider so multi-provider reads have data. */
+/**
+ * Mirror the native seed into the memory provider so multi-provider reads have data. The
+ * provider counts pageviews only, so the seeded custom events and conversions stay out of it
+ * rather than arriving there as extra pageviews.
+ */
 const seedMemoryAdapter = (events: StoredEvent[]): void => {
 	for (const event of events) {
+		if (event.type !== 'pageview') {
+			continue
+		}
 		devMemoryAdapter.record({
 			path: event.path,
 			timestamp: event.timestamp,
@@ -384,22 +442,49 @@ export const seedDev = async (
 		await seedTenantUsers(payload, tenants)
 	}
 
+	// Each scope converts its own goal on that goal's own CTA page, so a tenant's goals
+	// widget lists that tenant's goal and never the other one.
+	const conversionsFor = (entry: SeedGoalPage): { slug: string; path: string } => {
+		const path = pagePath(entry.page)
+		if (!path) {
+			throw new Error(`analytics dev seed: goal page "${entry.goal.slug}" has no path`)
+		}
+		return { slug: entry.goal.slug, path }
+	}
+	const tenantGoal = (tenantKey: 'alpha' | 'beta'): SeedGoalPage => {
+		const entry = SEED_TENANT_GOAL_PAGES.find((e) => e.tenantKey === tenantKey)
+		if (!entry) {
+			throw new Error(`analytics dev seed: no goal page for tenant "${tenantKey}"`)
+		}
+		return entry
+	}
 	const events = [
 		// Tenancy mode is a scoped install, so even the install-wide pass needs the
 		// explicit null-scope stamp ('') rather than an absent scope key.
-		...buildSeedEvents(new Date(), tenants ? { scope: '' } : {}),
+		...buildSeedEvents(
+			new Date(),
+			tenants ? { scope: '' } : { goal: conversionsFor(SEED_GOAL_PAGE) }
+		),
 		...(tenants
-			? buildSeedEvents(new Date(), { scale: ALPHA_SCALE, scope: String(tenants.alpha.id) })
+			? buildSeedEvents(new Date(), {
+					scale: ALPHA_SCALE,
+					scope: String(tenants.alpha.id),
+					goal: conversionsFor(tenantGoal('alpha')),
+				})
 			: []),
 		...(tenants
-			? buildSeedEvents(new Date(), { scale: BETA_SCALE, scope: String(tenants.beta.id) })
+			? buildSeedEvents(new Date(), {
+					scale: BETA_SCALE,
+					scope: String(tenants.beta.id),
+					goal: conversionsFor(tenantGoal('beta')),
+				})
 			: []),
 	]
 	seedMemoryAdapter(events)
 	const eventCount = await payload.count({ collection: EVENTS_SLUG as never })
 	if (eventCount.totalDocs === 0) {
 		await flushSeedEvents(payload, events)
-		payload.logger.info(`Seeded ${events.length} analytics pageview events`)
+		payload.logger.info(`Seeded ${events.length} analytics events`)
 	}
 
 	if (tenants) {
