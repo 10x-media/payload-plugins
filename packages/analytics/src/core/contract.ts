@@ -21,26 +21,30 @@ export type MetricKey =
 	| 'conversions'
 	| 'revenue'
 
-export type DimensionKey =
-	| 'page'
-	| 'referrer'
-	| 'source'
-	| 'medium'
-	| 'campaign'
-	| 'utmSource'
-	| 'utmMedium'
-	| 'utmCampaign'
-	| 'utmContent'
-	| 'utmTerm'
-	| 'device'
-	| 'browser'
-	| 'os'
-	| 'country'
-	| 'region'
-	| 'city'
-	| 'language'
-	| 'event'
-	| 'goal'
+/** Every breakdown key the contract defines; the registry request parsers validate against. */
+export const DIMENSION_KEYS = [
+	'page',
+	'referrer',
+	'source',
+	'medium',
+	'campaign',
+	'utmSource',
+	'utmMedium',
+	'utmCampaign',
+	'utmContent',
+	'utmTerm',
+	'device',
+	'browser',
+	'os',
+	'country',
+	'region',
+	'city',
+	'language',
+	'event',
+	'goal',
+] as const
+
+export type DimensionKey = (typeof DIMENSION_KEYS)[number]
 
 export type Granularity = 'minute' | 'hour' | 'day' | 'week' | 'month'
 
@@ -49,7 +53,10 @@ export interface DateRange {
 	end: Date
 }
 
-export type FilterOperator = 'eq' | 'contains' | 'matches'
+/** Every filter operator the contract defines; the registry request parsers validate against. */
+export const FILTER_OPERATORS = ['eq', 'contains', 'matches'] as const
+
+export type FilterOperator = (typeof FILTER_OPERATORS)[number]
 
 export interface AnalyticsFilter {
 	dimension: DimensionKey

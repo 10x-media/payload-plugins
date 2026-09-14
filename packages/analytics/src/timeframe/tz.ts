@@ -80,7 +80,10 @@ const sameLocalDay = (
  * offsets, so the candidate that still falls on `ymd` (the transition instant, local
  * 01:00) is taken instead of the refined one that fell back onto the previous day.
  */
-const zonedMidnight = (ymd: { year: number; month: number; day: number }, tz: string): Date => {
+export const startOfCalendarDayInTz = (
+	ymd: { year: number; month: number; day: number },
+	tz: string = DEFAULT_TIMEZONE
+): Date => {
 	const asUtc = Date.UTC(ymd.year, ymd.month - 1, ymd.day)
 	const guess = new Date(asUtc - offsetMs(new Date(asUtc), tz))
 	const refined = new Date(asUtc - offsetMs(guess, tz))
@@ -93,25 +96,25 @@ const zonedMidnight = (ymd: { year: number; month: number; day: number }, tz: st
 	// Neither candidate lands on ymd (the calendar date was skipped entirely, e.g. a
 	// dateline change): fall forward to the later candidate's day start.
 	const later = refined.getTime() > guess.getTime() ? refined : guess
-	return zonedMidnight(zonedParts(later, tz), tz)
+	return startOfCalendarDayInTz(zonedParts(later, tz), tz)
 }
 
 /** Start of `date`'s local day in `tz`. */
 export const startOfDayInTz = (date: Date, tz: string = DEFAULT_TIMEZONE): Date => {
 	const p = zonedParts(date, tz)
-	return zonedMidnight(p, tz)
+	return startOfCalendarDayInTz(p, tz)
 }
 
 /** Start of `date`'s local month in `tz`. */
 export const startOfMonthInTz = (date: Date, tz: string = DEFAULT_TIMEZONE): Date => {
 	const p = zonedParts(date, tz)
-	return zonedMidnight({ year: p.year, month: p.month, day: 1 }, tz)
+	return startOfCalendarDayInTz({ year: p.year, month: p.month, day: 1 }, tz)
 }
 
 /** Start of `date`'s local year in `tz`. */
 export const startOfYearInTz = (date: Date, tz: string = DEFAULT_TIMEZONE): Date => {
 	const p = zonedParts(date, tz)
-	return zonedMidnight({ year: p.year, month: 1, day: 1 }, tz)
+	return startOfCalendarDayInTz({ year: p.year, month: 1, day: 1 }, tz)
 }
 
 /**
