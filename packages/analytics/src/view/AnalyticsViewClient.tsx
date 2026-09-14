@@ -54,15 +54,24 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 		[pathname, props.defaults]
 	)
 
-	/** A click is a step the reader took, so Back undoes it rather than leaving the view. */
+	const pending = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+	/**
+	 * A click is a step the reader took, so Back undoes it rather than leaving the view. It
+	 * also drops any day edit still waiting out its debounce, whose later `replace` would
+	 * otherwise overwrite the click with the state as it stood before it.
+	 */
 	const write = useCallback(
 		(next: ViewState) => {
+			if (pending.current !== null) {
+				clearTimeout(pending.current)
+				pending.current = null
+			}
 			router.push(href(next), { scroll: false })
 		},
 		[router, href]
 	)
 
-	const pending = useRef<ReturnType<typeof setTimeout> | null>(null)
 	/**
 	 * Typing in a day input is one edit, not a history of them: the committed value replaces
 	 * the entry the picker already wrote rather than stacking one per keystroke pause.
@@ -73,6 +82,7 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 				clearTimeout(pending.current)
 			}
 			pending.current = setTimeout(() => {
+				pending.current = null
 				router.replace(href(next), { scroll: false })
 			}, COMMIT_DELAY_MS)
 		},

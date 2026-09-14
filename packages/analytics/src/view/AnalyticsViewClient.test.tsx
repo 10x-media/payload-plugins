@@ -205,6 +205,26 @@ describe('AnalyticsViewClient', () => {
 		expect(mocks.push).not.toHaveBeenCalled()
 	})
 
+	it('drops a pending day edit when a click lands inside the debounce window', async () => {
+		const filters = JSON.stringify([{ dimension: 'page', operator: 'eq', value: '/pricing' }])
+		mocks.search = new URLSearchParams({
+			range: 'custom',
+			from: '2026-06-01',
+			to: '2026-06-10',
+			filters,
+		}).toString()
+		await renderView()
+		fireEvent.change(screen.getByLabelText(keys.viewFrom), { target: { value: '2026-06-05' } })
+		fireEvent.click(screen.getByRole('button', { name: new RegExp(keys.viewFilterRemove) }))
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 600))
+		})
+		expect(mocks.push).toHaveBeenCalledTimes(1)
+		expect(String(mocks.push.mock.calls[0]?.[0])).not.toContain('filters=')
+		expect(mocks.replace).not.toHaveBeenCalled()
+		expect(screen.getAllByText(/\/pricing/).length).toBeGreaterThan(1)
+	})
+
 	it('badges a read served from an expired cache', async () => {
 		mocks.fetchQueryMock.mockImplementation((_route, request) =>
 			Promise.resolve(answer(request, true))
