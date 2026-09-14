@@ -3,7 +3,7 @@ title: Analytics view
 description: The admin report at /admin/analytics, with overview cards, a trend, breakdown tabs with click-to-filter, goals and realtime, all addressable by URL.
 ---
 
-The plugin registers one admin view at `/admin/analytics`, with a nav link beside your collections. It is the full report the [dashboard widgets](/analytics/widgets) summarize: pick a source, pick a window, drill into a dimension, and share the result as a link. It reads through the same authenticated [query endpoint](/analytics/data-sources#query-endpoint) your own code would use, so it shows exactly what that endpoint would answer for the signed-in reader.
+The plugin registers one admin view at `/admin/analytics`, with a nav link beside your collections. It is the full report the [dashboard widgets](/analytics/widgets) summarize: pick a source, pick a window, drill into a dimension, and share the result as a link. Every panel but the realtime strip reads through the same authenticated [query endpoint](/analytics/data-sources#query-endpoint) your own code would use, so it shows exactly what that endpoint would answer for the signed-in reader; the strip polls `GET /api/analytics/realtime`, and the server shell resolves the sources and the goal names before the page renders.
 
 ![The analytics view: a toolbar with data source, date range and a Compare toggle, a row of metric cards (pageviews, visitors, sessions, avg. time, scroll depth, events, conversions, revenue), a pageviews area chart over 30 days, a Pages breakdown with a bar per path and a hover tooltip, a goals table with conversions, revenue and conversion rate, and an active-now strip](/images/analytics/analytics-view.png)
 
@@ -13,7 +13,7 @@ It is on by default. Set `view: false` to remove the route and the nav link.
 
 **Toolbar.** The data source (only when the request resolves more than one), the date range (the presets plus **Custom range**, which reveals two day pickers), and a **Compare** toggle for the previous period. Beside them sit the window caption, the [reporting timezone](/analytics/timezone) the numbers are cut on, and any filter chips.
 
-**Overview cards.** One card per metric the source serves, with a period-over-period delta when comparison is on. Clicking a card charts that metric in the trend and sorts the breakdown by it.
+**Overview cards.** One card per metric the source serves, with a period-over-period delta when comparison is on. Clicking a card charts that metric in the trend and sorts the breakdown by it. A source serving both `visitors` and `visits` (Plausible does) gets a card each, labelled **Visitors** and **Visits**; `visits` used to carry the visitors label, wherever a metric label is rendered.
 
 **Trend.** The selected metric over the window, bucketed by hour, day, week or month. The bucket is picked from the window length (hours up to two days, weeks past four months, days in between) and never finer than the source serves. With comparison on, the previous period renders as its own chart below, captioned "Previous period".
 
@@ -26,6 +26,8 @@ It is on by default. Set `view: false` to remove the route and the nav link.
 ## URL state and shareable links
 
 Every control writes to the query string, and every read comes from it. A view is its URL: copy the address bar and the person you send it to opens the same report, Back undoes the last change, and a reload changes nothing.
+
+One exception to Back: the two day pickers replace the current history entry rather than adding one, so typing a date leaves a single entry rather than one per keystroke pause. Back from a custom range therefore skips the whole picking step and returns to whatever preceded it.
 
 | Parameter | Values |
 |---|---|
@@ -42,7 +44,7 @@ Every control writes to the query string, and every read comes from it. A view i
 
 Anything equal to the install's default is left out, so an untouched view has a clean URL. The parser is total: a value that names no metric, tab, operator or calendar day falls back to the default instead of failing, so a truncated or hand-edited link still opens a working view.
 
-A link built for one source keeps working when it is opened against another. Values the selected source cannot serve (a metric it lacks, a filter it cannot apply, a comparison it cannot answer) are coerced for the reads but left in the address bar, so switching back to the source the link was built for restores it exactly.
+A link built for one source keeps working when it is opened against another. Values the selected source cannot serve (a metric it lacks, a filter it cannot apply, a comparison it cannot answer) are coerced for the reads but left in the address bar, so the link itself is not rewritten by being opened. That only lasts until the next control writes: the URL it writes carries the coerced values, and the originals are gone from the address bar. Back, or opening the link again, brings them back.
 
 ## Capability gating
 
@@ -57,7 +59,8 @@ Every control reads the selected source's [capabilities](/analytics/adapters#the
 | A breakdown tab | the source serves at least one dimension in that tab's group |
 | Row click, filter chips | the tab's dimension is in `capabilities.filters`. Otherwise rows are inert and a caption says so |
 | Trend granularity | never finer than `capabilities.minGranularity`, and never finer than an hour |
-| Goals panel and tab | `conversions` in the metrics and `goal` in the dimensions |
+| Goals breakdown tab | `goal` is in `capabilities.dimensions`, like any other tab |
+| Goals panel | `goal` in the dimensions and `conversions` in the metrics |
 | Conversion rate column | the source serves `visitors` for both the goal rows and the range total |
 | Realtime strip | `capabilities.realtime` |
 
@@ -78,6 +81,8 @@ analytics({
 })
 ```
 
+`defaultRange` takes one of the five presets the toolbar offers: `today`, `last7days`, `last30days`, `last90days`, `lastYear`. `allTime` is not among them, because the query endpoint refuses any window longer than a year; a config that names it opens on `last30days`.
+
 `view: false` removes the route and the nav link entirely. `navLabel` takes a plain string or a map keyed by admin language code (falling back to `en`); unset, the plugin's own translated label applies, localizable through the [`translations` option](/analytics/i18n).
 
 `access.view` gates the view and defaults to `access.read`, so one gate covers the view and the endpoints behind it. A reader it denies still sees the nav link (it is a client component with no access context) and lands on the view's no-access message. Narrowing `access.view` alone hides the report while leaving the widgets and display fields readable; narrowing `access.read` closes both.
@@ -96,14 +101,14 @@ The source select lists that request's sources, so a tenant's own [runtime provi
 
 ## Keyboard
 
-The breakdown tabs are a proper tab strip: one tab stop, then <kbd>Left</kbd> and <kbd>Right</kbd> to move between tabs (wrapping at both ends), <kbd>Home</kbd> and <kbd>End</kbd> for the first and last. Every other control is a native select, button or date input.
+The breakdown tabs are a proper tab strip: one tab stop, then <kbd>Left</kbd> and <kbd>Right</kbd> to move between tabs (wrapping at both ends), <kbd>Home</kbd> and <kbd>End</kbd> for the first and last. The source, range and row-count selects are Payload's own select inputs, which are react-select comboboxes rather than native `<select>` elements; the two day pickers are native date inputs, and everything else is a button.
 
 ## Cached and clamped reads
 
 Two notes can appear beside the range caption:
 
-- **Cached.** At least one section was served from an expired cache entry because the provider could not be reached. The numbers are the last good answer, not a failure; see [Caching](/analytics/cache).
-- **Clamped.** At least one section read a shorter window than the one you asked for, because the source cannot look back that far. The cards and the chart describe the narrower window.
+- A **Cached** pill: at least one section was served from an expired cache entry because the provider could not be reached. The numbers are the last good answer, not a failure; see [Caching](/analytics/cache).
+- "Showing the maximum range the provider supports": at least one section read a shorter window than the one you asked for, because the source cannot look back that far. The cards and the chart describe the narrower window.
 
 A section that fails on its own keeps whatever it was showing and adds a retry: a transient `503` dims a panel rather than blanking the page, and a source that cannot answer one section at all leaves that section empty while the rest of the view carries on.
 
