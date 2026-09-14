@@ -1,6 +1,8 @@
 import type { ClientField, ClientTab, SanitizedFieldsPermissions } from 'payload'
 import { getFieldPaths, tabHasName } from 'payload/shared'
 
+import { tabAsGroup } from '../plugin/namedTab'
+
 /** Where one data field sits in the tree, in the terms `RenderFields` takes. */
 export type IndexedField = {
 	field: ClientField
@@ -33,6 +35,9 @@ const permissionsBelow = (
  * that field on its own: the parent paths and the permissions of its level. Mirrors how
  * Payload's own container fields pass paths down, so a field rendered by a step lands on the
  * same form state entry and schema path it has on the native form.
+ *
+ * A named tab is indexed at its own path too, as the group it is in the data, so a step can
+ * take the whole tab the way it takes a whole group.
  *
  * Paths stop at `array` and `blocks`, which are rendered whole.
  */
@@ -91,6 +96,15 @@ export const buildFieldIndex = (
 							parentPath: path,
 							parentSchemaPath: fieldSchemaPath,
 						})
+						if (named) {
+							index.set(tabPaths.path, {
+								field: tabAsGroup(tab) as unknown as ClientField,
+								parentIndexPath: indexPath,
+								parentPath: path,
+								parentSchemaPath: fieldSchemaPath,
+								permissions: level.permissions,
+							})
+						}
 						walk(tab.fields, {
 							parentIndexPath: tabPaths.indexPath,
 							parentPath: tabPaths.path,

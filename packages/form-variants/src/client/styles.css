@@ -270,12 +270,19 @@
 	}
 }
 
-/* Footer: sticks to the bottom of the viewport or drawer while the step scrolls under it. */
+/*
+ * Footer: sticks to the bottom of the viewport or drawer while the step scrolls under it.
+ *
+ * The stacking order has a ceiling. Payload opens a field's popovers inside the form, and they
+ * have to clear the footer: a select menu sits at 4, a tooltip at 3, a date picker at 10. So
+ * the footer stays above the fields themselves, which are not positioned, and below every one
+ * of those.
+ */
 
 :where(.form-variants__footer) {
 	position: sticky;
 	bottom: 0;
-	z-index: 5;
+	z-index: 2;
 	background: var(--theme-bg);
 }
 

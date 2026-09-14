@@ -1,6 +1,8 @@
 import type { Field, Tab } from 'payload'
 import { fieldAffectsData, tabHasName } from 'payload/shared'
 
+import { tabAsGroup } from './namedTab'
+
 /**
  * Every data path a step may list, mapped to the field it names.
  *
@@ -15,6 +17,7 @@ export const collectDataPaths = (fields: Field[], prefix = ''): Map<string, Fiel
 		for (const tab of tabs) {
 			if (tabHasName(tab)) {
 				const path = `${parentPrefix}${tab.name}`
+				out.set(path, tabAsGroup(tab) as unknown as Field)
 				for (const [childPath, child] of collectDataPaths(tab.fields, `${path}.`)) {
 					out.set(childPath, child)
 				}

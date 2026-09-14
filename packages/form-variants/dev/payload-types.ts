@@ -73,6 +73,7 @@ export interface Config {
     events: Event;
     articles: Article;
     secrets: Secret;
+    containers: Container;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -86,6 +87,7 @@ export interface Config {
     events: EventsSelect<false> | EventsSelect<true>;
     articles: ArticlesSelect<false> | ArticlesSelect<true>;
     secrets: SecretsSelect<false> | SecretsSelect<true>;
+    containers: ContainersSelect<false> | ContainersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -297,6 +299,59 @@ export interface Secret {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "containers".
+ */
+export interface Container {
+  id: string;
+  reference: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  nickname?: string | null;
+  height?: number | null;
+  weight?: number | null;
+  contact?: {
+    email?: string | null;
+    phone?: string | null;
+    postal?: {
+      street?: string | null;
+      city?: string | null;
+    };
+  };
+  note?: string | null;
+  summary?: string | null;
+  startsOn?: string | null;
+  endsOn?: string | null;
+  meta?: {
+    slug?: string | null;
+    keywords?: string | null;
+  };
+  seo?: {
+    title?: string | null;
+    canonical?: string | null;
+  };
+  items?:
+    | {
+        label: string;
+        amount?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  sections?:
+    | {
+        text: string;
+        author?: string | null;
+        id?: string | null;
+        blockName?: string | null;
+        blockType: 'quote';
+      }[]
+    | null;
+  status?: ('draft' | 'review' | 'done') | null;
+  owner?: (string | null) | User;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -342,6 +397,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'secrets';
         value: string | Secret;
+      } | null)
+    | ({
+        relationTo: 'containers';
+        value: string | Container;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -516,6 +575,69 @@ export interface SecretsSelect<T extends boolean = true> {
   label?: T;
   value?: T;
   notes?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "containers_select".
+ */
+export interface ContainersSelect<T extends boolean = true> {
+  reference?: T;
+  firstName?: T;
+  lastName?: T;
+  nickname?: T;
+  height?: T;
+  weight?: T;
+  contact?:
+    | T
+    | {
+        email?: T;
+        phone?: T;
+        postal?:
+          | T
+          | {
+              street?: T;
+              city?: T;
+            };
+      };
+  note?: T;
+  summary?: T;
+  startsOn?: T;
+  endsOn?: T;
+  meta?:
+    | T
+    | {
+        slug?: T;
+        keywords?: T;
+      };
+  seo?:
+    | T
+    | {
+        title?: T;
+        canonical?: T;
+      };
+  items?:
+    | T
+    | {
+        label?: T;
+        amount?: T;
+        id?: T;
+      };
+  sections?:
+    | T
+    | {
+        quote?:
+          | T
+          | {
+              text?: T;
+              author?: T;
+              id?: T;
+              blockName?: T;
+            };
+      };
+  status?: T;
+  owner?: T;
   updatedAt?: T;
   createdAt?: T;
 }

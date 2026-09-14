@@ -1,5 +1,6 @@
 export { articles } from './articles'
 export { companies } from './companies'
+export { containers } from './containers'
 export { events } from './events'
 export { people } from './people'
 export { secrets } from './secrets'
