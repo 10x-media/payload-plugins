@@ -27,6 +27,7 @@ export type {
 export type { Goal, GoalMatch, TrackerGoal } from '../goals/types'
 export type { AnalyticsPluginOptions } from '../index'
 export type { QueryError, QueryErrorCode } from '../query/errors'
+export type { QueryRequest } from '../query/fetchQuery'
 export type { ParsedQuery, ParseResult } from '../query/parse'
 export type {
 	QueryErrorResponse,
