@@ -27,7 +27,7 @@ export const singleFragment: DevConfigFragment = {
 			// Two config adapters, so the global slot has to name one: the memory provider is a
 			// read-only demo source with nothing to capture.
 			capture: { slots: { global: nativeAdapter.id } },
-			goals: sharedGoals,
+			goals: { defaults: sharedGoals, collection: true },
 			providers: { collection: true },
 			widgets: sharedWidgets,
 		}),

@@ -16,6 +16,16 @@ import {
 
 const PLATFORM_EMAIL = 'dev@10xmedia.de'
 
+/** The multi-tenant plugin's own relationship field, which scopes `analytics-providers`. */
+const TENANT_SCOPE_FIELD = 'tenant'
+
+/**
+ * The field `analytics-goals` scopes on: the plugin's own, since that collection is not
+ * registered with the multi-tenant plugin. Exported so the seed stamps the same key the
+ * resolver reads instead of hard-coding one.
+ */
+export const GOAL_SCOPE_FIELD = 'scope'
+
 const tenants: CollectionConfig = {
 	slug: 'tenants',
 	admin: { useAsTitle: 'name' },
@@ -74,8 +84,10 @@ export const tenancyFragment: DevConfigFragment = {
 			// adapter (native) on a recognized host, and the global slot stays empty because it
 			// falls to `platformAdapter`, the memory demo source, which declares no capture
 			// support. So an unrecognized host captures nothing at all.
-			goals: sharedGoals,
-			providers: { collection: { scopeField: 'tenant' } },
+			// The plugin's own `scope` field, not the multi-tenant `tenant` relationship the
+			// providers collection uses: see the multiTenantPlugin note below.
+			goals: { defaults: sharedGoals, collection: { scopeField: GOAL_SCOPE_FIELD } },
+			providers: { collection: { scopeField: TENANT_SCOPE_FIELD } },
 			widgets: sharedWidgets,
 			// Two branches, because the two callers look nothing alike. A signed-in admin is
 			// attributed by the tenant-selector cookie, validated against the user's own
@@ -109,6 +121,25 @@ export const tenancyFragment: DevConfigFragment = {
 		}),
 		// Must run after analytics() so the analytics-providers collection it adds
 		// already exists when this plugin scans config.collections for its target slug.
+		//
+		// Only providers are registered here, on purpose.
+		//
+		// `analytics-goals` was tried with `scopeField: 'tenant'` and reverted: with it
+		// registered, a tenant user's `/admin` never finished loading and both @tenancy specs
+		// that open the admin as one timed out, including `tenancy.e2e.spec.ts` "dashboard
+		// pageviews are isolated per tenant", which this change does not otherwise touch;
+		// removing the entry made them pass again. The likely path is that goals then resolve
+		// through this plugin's access and base filter on a first render that has no
+		// `payload-tenant` cookie yet, which makes the scope resolver below throw, but that
+		// mechanism is unconfirmed. Goals therefore scope on the plugin's own `scope` field,
+		// which is the shape any scoped install without a tenant plugin gets anyway.
+		//
+		// `pages` is not registered either: this plugin's tenant field is required, and the dev
+		// seed shares one set of pages across both tenants so the same five paths carry alpha's
+		// and beta's traffic. Registering it makes every page tenant-owned, which the boot seed
+		// cannot satisfy ("The following field is invalid: Assigned Tenant") and which the
+		// capture and tenancy e2e specs, both reading the single `home` document under either
+		// scope, depend on not being true.
 		multiTenantPlugin({
 			collections: { 'analytics-providers': { isGlobal: true } },
 			userHasAccessToAllTenants: (user) => user?.email === PLATFORM_EMAIL,

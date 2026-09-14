@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Goal } from '../../goals/types'
 import { noopResolver, platformHeaderResolver } from '../geo/geoResolver'
+import { SERVER_USER_AGENT } from './device'
 import { normalizeEvent } from './normalizeEvent'
 
 const headers = (h: Record<string, string>) => new Headers(h)
@@ -55,6 +56,17 @@ describe('normalizeEvent', () => {
 		})
 		expect(event.device).toBe('mobile')
 		expect(event.source).toBe('google.com')
+	})
+
+	it('omits device entirely for a user agent that is not a device', async () => {
+		const event = await normalizeEvent({
+			raw: { type: 'pageview', path: '/p', hostname: 'example.com' },
+			headers: new Headers({ 'user-agent': SERVER_USER_AGENT }),
+			geoResolver: async () => ({}),
+			salt: 'salt',
+			now: new Date('2026-06-01T00:00:00.000Z'),
+		})
+		expect('device' in event).toBe(false)
 	})
 })
 

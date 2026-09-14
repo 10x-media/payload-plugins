@@ -267,6 +267,95 @@ describe('resolveTrackerConfig autoCapture and goals', () => {
 		])
 		expect(JSON.stringify(config.goals)).not.toContain('Signup')
 	})
+
+	it('serves the goals merged for the request, not the config snapshot', async () => {
+		const runtime = runtimeWith([native()], {
+			goals: [signup],
+			resolveGoals: async () => [
+				signup,
+				{ slug: 'newsletter', name: 'Newsletter', match: { kind: 'event', name: 'subscribed' } },
+			],
+		})
+		const config = await resolveTrackerConfig({ runtime, req: req() })
+		expect(config.goals).toEqual([
+			{ slug: 'signup', match: { kind: 'goal' } },
+			{ slug: 'newsletter', match: { kind: 'event', name: 'subscribed' } },
+		])
+	})
+
+	it("carries a collection goal's value where it overrides the config goal's slug", async () => {
+		const runtime = runtimeWith([native()], {
+			goals: [signup],
+			resolveGoals: async () => [
+				{ ...signup, name: 'Signup (edited)', value: { fixed: 42 }, currency: 'EUR' },
+			],
+		})
+		const config = await resolveTrackerConfig({ runtime, req: req() })
+		expect(config.goals).toEqual([
+			{ slug: 'signup', match: { kind: 'goal' }, value: { fixed: 42 }, currency: 'EUR' },
+		])
+		expect(JSON.stringify(config.goals)).not.toContain('edited')
+	})
+
+	it('falls back to the config goals when the resolver fails', async () => {
+		const warn = vi.fn()
+		const runtime = runtimeWith([native()], {
+			goals: [signup],
+			resolveGoals: async () => {
+				throw new Error('goals are down')
+			},
+		})
+		const config = await resolveTrackerConfig({
+			runtime,
+			req: req({
+				payload: { config: { routes: { api: '/api' } }, logger: { warn } },
+			} as unknown as Partial<PayloadRequest>),
+		})
+		expect(config.goals).toEqual([{ slug: 'signup', match: { kind: 'goal' } }])
+		expect(warn).toHaveBeenCalledTimes(1)
+	})
+
+	it('resolves the scope once and hands the same one to the goals and the tenant slot', async () => {
+		const resolveScope = vi.fn(async () => 'tenant-a')
+		const seen: Array<string | null | undefined> = []
+		const runtime = scopedRuntime(
+			[native()],
+			{ 'tenant-a': [posthogSlot()] },
+			{
+				captureSlots: { tenant: 'posthog' },
+				platformAdapterId: 'native',
+				resolveScope,
+				resolveGoals: async (_req, scope) => {
+					seen.push(scope)
+					return [signup]
+				},
+			}
+		)
+		const config = await resolveTrackerConfig({ runtime, req: scopedReq('tenant-a') })
+		expect(resolveScope).toHaveBeenCalledTimes(1)
+		expect(seen).toEqual(['tenant-a'])
+		expect(config.slots.map((s) => s.slot)).toEqual(['global', 'tenant'])
+	})
+
+	it('degrades a throwing scope resolver to an unscoped config', async () => {
+		const warn = vi.fn()
+		const runtime = runtimeWith([native()], {
+			scoped: true,
+			resolveScope: async () => {
+				throw new Error('scope exploded')
+			},
+			goals: [signup],
+			resolveGoals: async (_req, scope) => (scope === null ? [signup] : []),
+		})
+		const config = await resolveTrackerConfig({
+			runtime,
+			req: req({
+				payload: { config: { routes: { api: '/api' } }, logger: { warn } },
+			} as unknown as Partial<PayloadRequest>),
+		})
+		expect(config.goals).toEqual([{ slug: 'signup', match: { kind: 'goal' } }])
+		expect(config.slots.map((s) => s.slot)).toEqual(['global'])
+	})
 })
 
 describe('resolveTrackerConfig secrets', () => {

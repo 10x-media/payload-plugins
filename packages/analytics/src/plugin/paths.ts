@@ -5,6 +5,8 @@
  */
 export const DOCUMENT_PATH = '/analytics/document'
 export const SOURCES_PATH = '/analytics/sources'
+/** Authenticated goal list for the admin goal picker, per-request scope. */
+export const GOALS_PATH = '/analytics/goals'
 export const REALTIME_PATH = '/analytics/realtime'
 /** Mount of the public capture proxy; each slot is served under `${PROXY_PATH}/<slot>`. */
 export const PROXY_PATH = '/analytics/p'

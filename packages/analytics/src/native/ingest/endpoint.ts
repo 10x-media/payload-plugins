@@ -3,13 +3,9 @@ import { readCappedBody } from '../../capture/requestBody'
 import type { Goal } from '../../goals/types'
 import type { GeoResolver } from '../geo/geoResolver'
 import { flushBatch } from './flushBatch'
-import {
-	type EventType,
-	normalizeEvent,
-	type RawEventInput,
-	type StoredEvent,
-} from './normalizeEvent'
+import { normalizeEvent, type RawEventInput, type StoredEvent } from './normalizeEvent'
 import { dailySalt } from './salt'
+import { validateRawEvent } from './validate'
 import type { WriteBuffer } from './writeBuffer'
 
 export interface IngestResolvers {
@@ -17,8 +13,6 @@ export interface IngestResolvers {
 	timezone?: (req: PayloadRequest, scope?: string | null) => Promise<string>
 	goals?: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>
 }
-
-const TYPES: ReadonlySet<string> = new Set<EventType>(['pageview', 'event', 'goal'])
 
 /** One event, not a session replay: far above any legitimate payload, far below a DoS. */
 export const MAX_INGEST_BODY_BYTES = 64 * 1024
@@ -35,23 +29,6 @@ const parseBody = (bytes: ArrayBuffer): RawEventInput | undefined => {
 	} catch {
 		return undefined
 	}
-}
-
-/**
- * An event is rejected only on its required fields: a known `type`, a `path`, a `hostname`,
- * and a `name` (the event name, or the goal slug on a `goal`) for everything but a pageview.
- * Optional fields are sanitized in `normalizeEvent` and dropped when malformed, so one bad
- * attribute costs an attribute rather than the whole event.
- */
-const nonEmptyString = (value: unknown): boolean => typeof value === 'string' && value.length > 0
-
-const isValid = (raw: RawEventInput | undefined): raw is RawEventInput => {
-	// Types are checked, not just truthiness: a non-string path would otherwise reach goal
-	// matching and throw there rather than answering 400 here.
-	if (!raw || !TYPES.has(raw.type) || !nonEmptyString(raw.path) || !nonEmptyString(raw.hostname)) {
-		return false
-	}
-	return raw.type === 'pageview' || nonEmptyString(raw.name)
 }
 
 export const makeIngestHandler =
@@ -73,7 +50,7 @@ export const makeIngestHandler =
 			)
 		}
 		const raw = parseBody(read.body)
-		if (!isValid(raw)) {
+		if (!validateRawEvent(raw)) {
 			return Response.json({ error: 'invalid payload' }, { status: 400 })
 		}
 		const now = new Date()

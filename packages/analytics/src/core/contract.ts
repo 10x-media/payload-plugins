@@ -1,6 +1,7 @@
 import type { Config, PayloadRequest } from 'payload'
 import type { Goal } from '../goals/types'
 import type { CaptureSupport } from './capture'
+import type { ServerTrack } from './serverEvent'
 
 /**
  * Explicit cross-scope read marker: pass as a read's `scope` to aggregate over every
@@ -155,8 +156,8 @@ export interface AdapterRegisterContext {
 	resolveTimezone: (req: PayloadRequest, scope?: string | null) => Promise<string>
 	/**
 	 * The install's goals for a request's scope, for adapters that match completions
-	 * themselves (the native engine, at ingest). Config goals today; a collection source
-	 * merges in behind the same call.
+	 * themselves (the native engine, at ingest). Config goals, with the goals collection
+	 * merged over them per scope once the install enables it.
 	 */
 	resolveGoals: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>
 }
@@ -169,10 +170,11 @@ export interface AnalyticsAdapter {
 	readonly capture?: CaptureSupport
 	/**
 	 * Where this adapter's own ingest endpoint listens, relative to `routes.api`, for the
-	 * adapters that register one (the native engine). Server-side only: the tracker learns
-	 * the path from `TrackerConfig.ingestPath`, and this object is never serialized.
+	 * adapters that register one (the native engine), and how server code reaches the same
+	 * pipeline without an HTTP round trip. Server-side only: the tracker learns the path
+	 * from `TrackerConfig.ingestPath`, and this object is never serialized.
 	 */
-	readonly ingest?: { path: string }
+	readonly ingest?: { path: string; track?: ServerTrack }
 	isConfigured(): boolean
 	query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
 	realtime?(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>

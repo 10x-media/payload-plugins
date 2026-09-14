@@ -7,4 +7,7 @@ export { MetricSelectField, type MetricSelectFieldProps } from '../fields/config
 export { SourceSelectField } from '../fields/config/SourceSelectField'
 export { useAnalyticsSources } from '../fields/config/useAnalyticsSources'
 export { DateRangeField } from '../fields/dateRange/ui'
+export type { GoalsResponse, WireGoal } from '../goals/fetchGoals'
+export { GoalSelectField } from '../goals/GoalSelectField'
+export { useAnalyticsGoals } from '../goals/useAnalyticsGoals'
 export { RealtimeCounter } from '../widgets/RealtimeCounter'

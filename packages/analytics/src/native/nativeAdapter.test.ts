@@ -42,7 +42,11 @@ describe('native capture', () => {
 	})
 
 	it('declares where its ingest endpoint listens, default and overridden', () => {
-		expect(native().ingest).toEqual({ path: '/analytics/ingest' })
-		expect(native({ ingestPath: '/custom/ingest' }).ingest).toEqual({ path: '/custom/ingest' })
+		expect(native().ingest?.path).toBe('/analytics/ingest')
+		expect(native({ ingestPath: '/custom/ingest' }).ingest?.path).toBe('/custom/ingest')
+	})
+
+	it('accepts server events alongside the endpoint', () => {
+		expect(typeof native().ingest?.track).toBe('function')
 	})
 })

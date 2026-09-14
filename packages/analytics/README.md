@@ -13,6 +13,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **One adapter contract** with a capabilities model; adapters ship as code-split subpaths (`@10x-media/analytics/adapters/*`) plus a `memoryAdapter` for tests.
 - **Native engine**: self-hosted, cookieless analytics in your own database, with atomic rollups, exact daily uniques, geo resolution (platform headers or MaxMind), retention pruning, and opt-in write batching.
 - **Capture**: a dependency-free browser tracker (`@10x-media/analytics/tracker`) with SPA pageviews, consent gating, auto-capture, and goals, booted from React (`@10x-media/analytics/react`) or a server component; capture-capable adapters are served through a first-party proxy so a vendor's SDK loads from your own origin.
+- **Goals**: conversions and revenue, completed from a `data-analytics-goal` attribute, a `goalField()` picker in your own blocks, a `@10x-media/form-builder` action, or `trackServerEvent` from server code (webhooks, jobs), and declared in config or in an opt-in collection editors manage per scope.
 - **Dashboard widgets** for Payload's Modular Dashboard: metric, trend, four breakdowns, and realtime, all capability-gated, plus a public API for custom widgets.
 - **Display fields**: `analyticsStat`, `analyticsStatRow`, `analyticsFields`, `analyticsTab`, `analyticsTabsField` place per-document stats on your collections; typed per-collection bindings resolve each document's URL path.
 - **Caching** through `payload.kv` with request coalescing, plus an opt-in scheduled warm job.
@@ -67,6 +68,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/analytics):
 - [Caching and warming](https://docs.10xmedia.de/analytics/cache)
 - [Reporting timezone](https://docs.10xmedia.de/analytics/timezone)
 - [Sync tier](https://docs.10xmedia.de/analytics/sync)
+- [Multi-tenancy](https://docs.10xmedia.de/analytics/multi-tenancy)
 - [i18n](https://docs.10xmedia.de/analytics/i18n)
 
 ## License

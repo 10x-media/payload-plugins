@@ -2,6 +2,8 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import type { Config, Endpoint, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { readForField } from '../../src/fields/readForDocument'
+import { GOALS_SLUG } from '../../src/goals/collection'
+import { GOAL_ACTION_TYPE } from '../../src/goals/trackGoalAction'
 import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
@@ -21,6 +23,7 @@ import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
 import { type MemoryAnalyticsAdapter, memoryAdapter } from '../../src/testing/memoryAdapter'
 import { startOfDayInTz } from '../../src/timeframe/tz'
 import { readForWidget } from '../../src/widgets/readForWidget'
+import { ACTION_HOST_SLUG, actionHost } from './actionHost'
 import { ingestRequest } from './ingestRequest'
 
 describeForDb('analytics cross-db', {}, (db) => {
@@ -39,6 +42,8 @@ describeForDb('analytics cross-db', {}, (db) => {
 		expect(booted.db).toBe(db)
 	})
 })
+
+const actionGoals: Goal[] = [{ slug: 'book-demo', name: 'Book a demo', match: { kind: 'goal' } }]
 
 const rollupInc = (over: Partial<RollupInc> = {}): RollupInc => ({
 	pageviews: 0,
@@ -312,7 +317,10 @@ describeForDb('native goal rollups', {}, (db) => {
 	// Both assertions read the same two events, so they are ingested once here rather than
 	// by the first test, which would leave the second unable to run on its own.
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [adapter], goals }), db })
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [adapter], goals: { defaults: goals, collection: true } }),
+			db,
+		})
 		await ingest({ type: 'pageview', path: '/thank-you' })
 		await ingest({
 			type: 'goal',
@@ -372,6 +380,15 @@ describeForDb('native goal rollups', {}, (db) => {
 		})
 		expect(thanks?.conversions).toBe(1)
 		expect(thanks?.revenue).toBe(0)
+	})
+
+	it(`keeps one goal document per slug on ${db}`, async () => {
+		const demo = { name: 'Demo', slug: 'demo', match: { kind: 'goal' } }
+		await booted.payload.create({ collection: GOALS_SLUG, data: demo as never })
+		// The hook answers first; the collection's unique index is the storage-level backstop.
+		await expect(
+			booted.payload.create({ collection: GOALS_SLUG, data: { ...demo, name: 'Demo 2' } as never })
+		).rejects.toMatchObject({ data: { errors: [{ path: 'slug' }] } })
 	})
 
 	it(`returns one breakdown row per goal through the adapter on ${db}`, async () => {
@@ -1161,5 +1178,40 @@ describeForDb('analytics sync tier: per-scope resolution isolation', {}, (db) =>
 			overrideAccess: true,
 		})
 		expect(docs.docs.length).toBeGreaterThanOrEqual(1)
+	})
+})
+
+describeForDb('form-builder action block composition', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native()], goals: { defaults: actionGoals } }),
+			collections: [actionHost()],
+			db,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it(`stores the action config under the action block slug on ${db}`, async () => {
+		const created = await booted.payload.create({
+			collection: ACTION_HOST_SLUG as never,
+			data: {
+				actions: [{ blockType: GOAL_ACTION_TYPE, goal: 'book-demo', value: 40, currency: 'EUR' }],
+			} as never,
+		})
+		const read = await booted.payload.findByID({
+			collection: ACTION_HOST_SLUG as never,
+			id: (created as { id: string | number }).id,
+		})
+		expect((read as { actions?: Array<Record<string, unknown>> }).actions?.[0]).toMatchObject({
+			blockType: GOAL_ACTION_TYPE,
+			goal: 'book-demo',
+			value: 40,
+			currency: 'EUR',
+		})
 	})
 })
