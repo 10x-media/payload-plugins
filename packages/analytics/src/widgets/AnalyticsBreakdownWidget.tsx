@@ -2,6 +2,7 @@ import type { WidgetServerProps } from 'payload'
 import { BarList } from '../charts/BarList'
 import type { MetricKey } from '../core/contract'
 import { formatMetricValue } from '../fields/format'
+import { requestTimezone } from '../plugin/runtime'
 import type { TimeframePreset } from '../timeframe/presets'
 import { keys, type TranslationKey } from '../translations/keys'
 import { TIMEFRAME_KEYS } from '../translations/metricKeys'
@@ -23,7 +24,8 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps)
 	const data = (props.widgetData ?? {}) as BreakdownWidgetData
 	const metric: MetricKey = data.metric ?? 'pageviews'
 	const rawTimeframe = data.timeframe ?? 'last30days'
-	const customRange = resolveCustomRange(rawTimeframe, data.range)
+	const timezone = await requestTimezone(props.req)
+	const customRange = resolveCustomRange(rawTimeframe, data.range, timezone)
 	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
 	const limit = data.limit ?? 5
 	const title = data.title?.trim() || (spec ? t(spec.label) : '')
@@ -45,11 +47,12 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps)
 		adapterId: data.dataSource,
 		now: new Date(),
 		range: customRange,
+		timezone,
 	})
 
 	const locale = props.req.i18n.language ?? 'en-US'
 	const caption = customRange
-		? formatRangeCaption(customRange, locale)
+		? formatRangeCaption(customRange, locale, timezone)
 		: t(TIMEFRAME_KEYS[timeframe])
 	return (
 		<div className="analytics-breakdown-widget" style={cardStyle}>

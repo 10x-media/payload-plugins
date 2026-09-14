@@ -45,6 +45,11 @@ export interface ReadForWidgetSeriesArgs {
 	range?: DateRange
 	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
 	scope?: string | null
+	/**
+	 * Reporting timezone the caller already resolved, reused rather than resolved again so
+	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+	 */
+	timezone?: string
 	filters?: AnalyticsFilter[]
 }
 
@@ -99,8 +104,8 @@ export const readForWidgetSeries = async (
 	const fallback = (status: WidgetReadStatus, id: string): WidgetSeriesResult => ({
 		status,
 		adapterId: id,
-		dateRange: range ?? resolveTimeframe(timeframe, now),
-		timezone: DEFAULT_TIMEZONE,
+		dateRange: range ?? resolveTimeframe(timeframe, now, args.timezone),
+		timezone: args.timezone ?? DEFAULT_TIMEZONE,
 		points: [],
 		total: 0,
 	})
@@ -113,7 +118,7 @@ export const readForWidgetSeries = async (
 	if (!ctx.ok) {
 		return fallback('unavailable', adapterId ?? '')
 	}
-	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
+	const tz = args.timezone ?? (await resolveTimezoneFor(runtime, req, ctx.scope))
 	const dateRange = range ?? resolveTimeframe(timeframe, now, tz)
 	const base = { dateRange, timezone: tz, points: [] as SeriesPoint[], total: 0 }
 	const adapter: AnalyticsAdapter = ctx.adapter

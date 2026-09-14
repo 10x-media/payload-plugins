@@ -1,6 +1,7 @@
 import type { WidgetServerProps } from 'payload'
 import type { MetricKey } from '../core/contract'
 import { formatMetricValue } from '../fields/format'
+import { requestTimezone } from '../plugin/runtime'
 import type { TimeframePreset } from '../timeframe/presets'
 import { keys, type TranslationKey } from '../translations/keys'
 import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
@@ -20,13 +21,14 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps) {
 	const data = (props.widgetData ?? {}) as MetricWidgetData
 	const metric: MetricKey = data.metric ?? 'pageviews'
 	const rawTimeframe = data.timeframe ?? 'last30days'
-	const customRange = resolveCustomRange(rawTimeframe, data.range)
+	const timezone = await requestTimezone(props.req)
+	const customRange = resolveCustomRange(rawTimeframe, data.range, timezone)
 	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
 	const t = asTranslate(props.req.i18n.t)
 	const locale = props.req.i18n.language ?? 'en-US'
 	const title = data.title?.trim() || t(METRIC_KEYS[metric])
 	const caption = customRange
-		? formatRangeCaption(customRange, locale)
+		? formatRangeCaption(customRange, locale, timezone)
 		: t(TIMEFRAME_KEYS[timeframe])
 
 	const result = await readForWidget({
@@ -36,6 +38,7 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps) {
 		adapterId: data.dataSource,
 		now: new Date(),
 		range: customRange,
+		timezone,
 	})
 
 	if (result.status !== 'ok') {
