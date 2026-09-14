@@ -226,7 +226,6 @@ export interface AnalyticsProvider {
   name: string;
   provider: 'plausible' | 'umami' | 'ga4' | 'posthog';
   enabled?: boolean | null;
-  scope?: string | null;
   plausible?: {
     siteId?: string | null;
     apiKey?: string;
@@ -664,7 +663,6 @@ export interface AnalyticsProvidersSelect<T extends boolean = true> {
   name?: T;
   provider?: T;
   enabled?: T;
-  scope?: T;
   plausible?:
     | T
     | {

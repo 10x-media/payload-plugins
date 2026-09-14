@@ -43,7 +43,7 @@ await initTracker()
 
 The package ships ES modules, so bundle that entry into your site (or serve it from a CDN and import it in a `<script type="module">`). `initTracker` defaults to `GET /api/analytics/tracker`; pass `endpoint` when the app moved Payload's `routes.api`. A failed fetch or a non-ok response yields a tracker whose calls do nothing, so a missing analytics config never breaks the page that awaited it. The `/tracker` subpath has zero runtime dependencies: no React, no Payload, no Node built-ins.
 
-`GET /api/analytics/tracker` is public, answers `Cache-Control: private, max-age=60` with `Vary: Host`, sets no cookie, and carries only what an adapter declared as public (`capture.client` and `capture.snippet`), never a query credential and never a goal's admin-facing name.
+`GET /api/analytics/tracker` is public, answers `Cache-Control: private, max-age=60` with `Vary: Host, Cookie`, sets no cookie, and carries only what an adapter declared as public (`capture.client` and `capture.snippet`), never a query credential and never a goal's admin-facing name. Its payload is resolved per request, so a scoped install serves each scope its own slots and its own [goals](/analytics/goals#5-let-editors-manage-goals); both `Vary` keys are load-bearing for exactly that reason.
 
 ## Capture slots
 
