@@ -20,6 +20,8 @@ export interface WidgetReadResult {
 	dateRange: DateRange
 	metrics: Partial<Record<MetricKey, number>>
 	clamped?: boolean
+	/** True when the engine served a stale cache entry after a failed provider read. */
+	stale?: boolean
 	/** Previous-window totals, present only when the adapter supports comparison. */
 	previousMetrics?: Partial<Record<MetricKey, number>>
 	/** The previous comparable window, present only when comparison ran. */
@@ -122,6 +124,7 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		dateRange,
 		metrics: result.totals ?? {},
 		clamped: result.meta.clamped ?? false,
+		stale: result.meta.stale ?? false,
 		previousMetrics,
 		comparisonRange,
 	}

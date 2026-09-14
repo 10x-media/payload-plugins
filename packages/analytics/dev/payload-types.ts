@@ -112,6 +112,7 @@ export interface Config {
     'analytics-metric': AnalyticsMetricWidget;
     'analytics-trend': AnalyticsTrendWidget;
     'analytics-realtime': AnalyticsRealtimeWidget;
+    'analytics-goals': AnalyticsGoalsWidget;
     'analytics-breakdown-pages': AnalyticsBreakdownPagesWidget;
     'analytics-breakdown-sources': AnalyticsBreakdownSourcesWidget;
     'analytics-breakdown-devices': AnalyticsBreakdownDevicesWidget;
@@ -963,6 +964,33 @@ export interface AnalyticsRealtimeWidget {
     dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-goals_widget".
+ */
+export interface AnalyticsGoalsWidget {
+  data?: {
+    title?: string | null;
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: ('10' | '25' | '50') | null;
+    compare?: boolean | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

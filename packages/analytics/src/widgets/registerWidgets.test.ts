@@ -426,6 +426,7 @@ describe('registerWidgets', () => {
 				'analytics-breakdown-campaigns',
 				'analytics-breakdown-events',
 				'analytics-realtime',
+				'analytics-goals',
 			],
 			register: [{ slug: 'myapp-only', component: 'x#y', label: 'Mine' }],
 		})
@@ -600,5 +601,87 @@ describe('registerWidgets', () => {
 				'analytics-breakdown-countries',
 			])
 		)
+	})
+})
+
+describe('registerWidgets: goals widget', () => {
+	const register = (args: Partial<Parameters<typeof registerWidgets>[1]> = {}): Config => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+			...args,
+		})
+		return config
+	}
+
+	const goalsWidget = (config: Config) =>
+		config.admin?.dashboard?.widgets?.find((w) => w.slug === 'analytics-goals')
+
+	it('registers the goals widget with its own RSC component and label', () => {
+		const widget = goalsWidget(register())
+		expect(widget?.Component).toBe('@10x-media/analytics/rsc#AnalyticsGoalsWidget')
+		expect(
+			widget?.label && (widget.label as (args: never) => string)({ t: (k: string) => k } as never)
+		).toBe(keys.widgetGoals)
+	})
+
+	it('gives it a timeframe, custom range, limit and compare field', () => {
+		const names = fieldNames(register(), 'analytics-goals')
+		expect(names).toEqual(['title', 'timeframe', 'range', 'limit', 'compare'])
+	})
+
+	it('offers 10, 25 and 50 rows, defaulting to 10', () => {
+		const limit = goalsWidget(register())?.fields?.find((f) => 'name' in f && f.name === 'limit')
+		expect(limit?.type).toBe('select')
+		expect(limit && 'options' in limit ? limit.options : []).toEqual([
+			{ value: '10', label: '10' },
+			{ value: '25', label: '25' },
+			{ value: '50', label: '50' },
+		])
+		expect(limit && 'defaultValue' in limit ? limit.defaultValue : undefined).toBe('10')
+	})
+
+	it('drops the compare checkbox when the host turned comparison off', () => {
+		expect(fieldNames(register({ comparison: false }), 'analytics-goals')).not.toContain('compare')
+	})
+
+	it('adds the data-source field in a multi-provider install', () => {
+		const names = fieldNames(
+			register({ adapters: [native(), memoryAdapter()], multiProvider: true }),
+			'analytics-goals'
+		)
+		expect(names).toContain('dataSource')
+	})
+
+	it('skips the widget when no config adapter serves conversions by goal', () => {
+		const noGoals: AnalyticsAdapter = {
+			id: 'limited',
+			label: 'Limited',
+			capabilities: { ...native().capabilities, dimensions: new Set<DimensionKey>(['page']) },
+			isConfigured: () => true,
+			query: async () => ({ rows: [], meta: { provider: 'limited', fetchedAt: '' } }),
+		}
+		const slugs = register({ adapters: [noGoals] }).admin?.dashboard?.widgets?.map((w) => w.slug)
+		expect(slugs).not.toContain('analytics-goals')
+		const withProviders = register({ adapters: [noGoals], providersEnabled: true })
+		expect(withProviders.admin?.dashboard?.widgets?.map((w) => w.slug)).toContain('analytics-goals')
+	})
+
+	it('skips the widget when no config adapter serves conversions at all', () => {
+		const noConversions: AnalyticsAdapter = {
+			id: 'limited',
+			label: 'Limited',
+			capabilities: { ...native().capabilities, metrics: new Set<MetricKey>(['pageviews']) },
+			isConfigured: () => true,
+			query: async () => ({ rows: [], meta: { provider: 'limited', fetchedAt: '' } }),
+		}
+		const slugs = register({ adapters: [noConversions] }).admin?.dashboard?.widgets?.map(
+			(w) => w.slug
+		)
+		expect(slugs).not.toContain('analytics-goals')
 	})
 })

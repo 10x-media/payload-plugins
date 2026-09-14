@@ -1,0 +1,155 @@
+import type { WidgetServerProps } from 'payload'
+import type { CSSProperties } from 'react'
+import { formatMetricValue } from '../fields/format'
+import { requestTimezone } from '../plugin/runtime'
+import type { TimeframePreset } from '../timeframe/presets'
+import { keys, type TranslationKey } from '../translations/keys'
+import { TIMEFRAME_KEYS } from '../translations/metricKeys'
+import { asTranslate } from '../translations/server'
+import { ComparisonDelta } from './ComparisonDelta'
+import { cardStyle, labelStyle } from './cardChrome'
+import { formatRangeCaption, resolveCustomRange } from './range'
+import type { WidgetReadStatus } from './readForWidget'
+import { readForWidgetGoals } from './readForWidgetGoals'
+import { type GoalsWidgetData, resolveGoalRowLimit } from './types'
+
+const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
+	'not-configured': keys.stateNotConfigured,
+	unavailable: keys.stateUnavailable,
+}
+
+const tableStyle: CSSProperties = {
+	width: '100%',
+	borderCollapse: 'collapse',
+	fontSize: '0.8125rem',
+	color: 'var(--theme-elevation-800)',
+}
+
+const headStyle: CSSProperties = {
+	...labelStyle,
+	textAlign: 'left',
+	padding: '0 0 0.25rem',
+	borderBottom: '1px solid var(--theme-elevation-150)',
+}
+
+const cellStyle: CSSProperties = {
+	padding: '0.375rem 0',
+	borderBottom: '1px solid var(--theme-elevation-100)',
+	textAlign: 'left',
+}
+
+const numericStyle: CSSProperties = { ...cellStyle, textAlign: 'right' }
+const numericHeadStyle: CSSProperties = { ...headStyle, textAlign: 'right' }
+const captionStyle: CSSProperties = { fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }
+const noteStyle: CSSProperties = { fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }
+
+/**
+ * Conversions per goal over the widget's window, with the period-over-period delta, the
+ * share of the site's visitors each goal converted, and revenue as a bare number: a goal's
+ * currency is its own, so one formatted column would state a currency the rows do not
+ * share. Columns the source cannot fill are left out rather than rendered empty.
+ */
+export default async function AnalyticsGoalsWidget(props: WidgetServerProps) {
+	const t = asTranslate(props.req.i18n.t)
+	const data = (props.widgetData ?? {}) as GoalsWidgetData
+	const rawTimeframe = data.timeframe ?? 'last30days'
+	// Only a custom range needs the reporting timezone before the read; a preset window
+	// resolves inside the read path, which resolves the timezone there as it always has.
+	const timezone = rawTimeframe === 'custom' ? await requestTimezone(props.req) : undefined
+	const customRange = timezone ? resolveCustomRange(rawTimeframe, data.range, timezone) : undefined
+	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
+	const title = data.title?.trim() || t(keys.widgetGoals)
+
+	const result = await readForWidgetGoals({
+		req: props.req,
+		timeframe,
+		limit: resolveGoalRowLimit(data.limit),
+		compare: data.compare === true,
+		adapterId: data.dataSource,
+		now: new Date(),
+		range: customRange,
+		...(timezone ? { timezone } : {}),
+	})
+
+	const locale = props.req.i18n.language ?? 'en-US'
+	const caption =
+		customRange && timezone
+			? formatRangeCaption(customRange, locale, timezone)
+			: t(TIMEFRAME_KEYS[timeframe])
+	const percent = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 })
+	const showsRate = result.rows.some((row) => row.rate !== undefined)
+	const showsRevenue = result.rows.some((row) => row.revenue !== undefined)
+
+	return (
+		<div className="analytics-goals-widget" style={cardStyle}>
+			<span style={labelStyle}>{title}</span>
+			{result.status !== 'ok' ? (
+				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
+			) : result.rows.length === 0 ? (
+				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(keys.stateNoBreakdown)}</span>
+			) : (
+				<table style={tableStyle}>
+					<thead>
+						<tr>
+							<th scope="col" style={headStyle}>
+								{t(keys.widgetGoalsGoal)}
+							</th>
+							<th scope="col" style={numericHeadStyle}>
+								{t(keys.widgetGoalsConversions)}
+							</th>
+							{showsRate ? (
+								<th scope="col" style={numericHeadStyle}>
+									{t(keys.widgetGoalsRate)}
+								</th>
+							) : null}
+							{showsRevenue ? (
+								<th scope="col" style={numericHeadStyle}>
+									{t(keys.widgetGoalsRevenue)}
+								</th>
+							) : null}
+						</tr>
+					</thead>
+					<tbody>
+						{result.rows.map((row) => (
+							<tr key={row.slug}>
+								<td style={cellStyle}>{row.name}</td>
+								<td style={numericStyle}>
+									<span
+										style={{
+											display: 'inline-flex',
+											alignItems: 'center',
+											gap: '0.5rem',
+											justifyContent: 'flex-end',
+										}}
+									>
+										{formatMetricValue('conversions', row.conversions, locale)}
+										<ComparisonDelta
+											current={row.conversions}
+											previous={row.previousConversions}
+											metric="conversions"
+											locale={locale}
+											t={t}
+										/>
+									</span>
+								</td>
+								{showsRate ? (
+									<td style={numericStyle}>
+										{row.rate === undefined ? '-' : percent.format(row.rate)}
+									</td>
+								) : null}
+								{showsRevenue ? (
+									<td style={numericStyle}>
+										{formatMetricValue('revenue', row.revenue ?? 0, locale)}
+									</td>
+								) : null}
+							</tr>
+						))}
+					</tbody>
+				</table>
+			)}
+			<span style={captionStyle}>{caption}</span>
+			{result.stale ? <span style={noteStyle}>{t(keys.viewStale)}</span> : null}
+			{result.clamped ? <span style={noteStyle}>{t(keys.stateClamped)}</span> : null}
+		</div>
+	)
+}

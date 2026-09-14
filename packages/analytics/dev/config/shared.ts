@@ -86,6 +86,11 @@ export const sharedDashboardLayout: DashboardLayout = [
 		data: { metric: 'visitors', timeframe: 'last30days' },
 	},
 	{
+		widgetSlug: 'analytics-goals',
+		width: 'large',
+		data: { timeframe: 'last30days', limit: '10', compare: true },
+	},
+	{
 		widgetSlug: 'analytics-metric',
 		width: 'small',
 		data: { metric: 'pageviews', timeframe: 'last30days' },

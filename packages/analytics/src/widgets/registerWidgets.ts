@@ -18,7 +18,7 @@ import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { labelForKey } from '../translations/server'
 import { BREAKDOWN_SPECS, type BreakdownSpec } from './breakdownTypes'
 import { buildCustomWidgets, type CustomWidgetDef } from './customWidget'
-import { WIDGET_METRICS } from './types'
+import { GOAL_ROW_LIMITS, WIDGET_METRICS } from './types'
 
 /**
  * Select options must carry static labels: `filterOptions` results are serialized
@@ -46,7 +46,7 @@ export interface RegisterWidgetsArgs {
 	localizeText?: boolean
 	/** The plugin's configured defaultAdapter, when set; falls back to the first adapter. */
 	defaultId?: string
-	/** `widgets.comparison`; false hides the trend widget's compare checkbox. Defaults to on. */
+	/** `widgets.comparison`; false hides every compare checkbox. Defaults to on. */
 	comparison?: boolean
 }
 
@@ -149,7 +149,7 @@ const timeframeSelectField = (): Field => ({
 	],
 })
 
-/** Trend widget only: the chart overlays the previous period when this is on. */
+/** Reads the previous period too: the trend overlays it, the goals table deltas against it. */
 const compareField = (): Field => ({
 	name: 'compare',
 	type: 'checkbox',
@@ -222,6 +222,25 @@ const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): 
 	...(args.multiProvider ? [dataSourceField(args)] : []),
 ]
 
+/** A select, not the breakdown's free number: the goals table is a summary, not a report. */
+const goalLimitField = (): Field => ({
+	name: 'limit',
+	type: 'select',
+	defaultValue: String(GOAL_ROW_LIMITS[0]),
+	label: labelForKey(keys.widgetFieldLimit),
+	admin: { isClearable: false },
+	options: GOAL_ROW_LIMITS.map((limit) => ({ value: String(limit), label: String(limit) })),
+})
+
+const goalsWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
+	titleField(args, en[keys.widgetGoals]),
+	timeframeSelectField(),
+	customRangeField(),
+	goalLimitField(),
+	...(args.comparison === false ? [] : [compareField()]),
+	...(args.multiProvider ? [dataSourceField(args)] : []),
+]
+
 const realtimeWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
 	titleField(args, en[keys.widgetFieldTitlePlaceholder]),
 	metricSelectField(['visitors', 'pageviews'], args, {
@@ -270,6 +289,15 @@ const WIDGET_DEFS: WidgetDef[] = [
 		minWidth: 'small' as WidgetWidth,
 		maxWidth: 'medium' as WidgetWidth,
 		fields: realtimeWidgetFields,
+	},
+	{
+		slug: 'analytics-goals',
+		component: '@10x-media/analytics/rsc#AnalyticsGoalsWidget',
+		label: keys.widgetGoals,
+		requires: { metrics: ['conversions'], dimensions: ['goal'] },
+		minWidth: 'small' as WidgetWidth,
+		maxWidth: 'large' as WidgetWidth,
+		fields: goalsWidgetFields,
 	},
 	...BREAKDOWN_SPECS.map(
 		(spec): WidgetDef => ({
