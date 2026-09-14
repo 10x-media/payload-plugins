@@ -1,7 +1,7 @@
 {
 	"name": "@10x-media/form-variants",
 	"version": "0.0.0",
-	"description": "",
+	"description": "Alternative edit forms for Payload collections: simplified and step-by-step variants over the native form state",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -10,7 +10,14 @@
 	},
 	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/form-variants",
 	"bugs": "https://github.com/10x-media/payload-plugins/issues",
-	"keywords": ["payload", "payloadcms", "plugin"],
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin",
+		"form",
+		"wizard",
+		"steps"
+	],
 	"author": "10x-media",
 	"engines": {
 		"node": ">=22.18.0"
@@ -37,9 +44,19 @@
 			"development": "./src/exports/i18n.ts",
 			"types": "./src/exports/i18n.ts",
 			"default": "./dist/exports/i18n.js"
+		},
+		"./rsc": {
+			"development": "./src/exports/rsc.ts",
+			"types": "./src/exports/rsc.ts",
+			"default": "./dist/exports/rsc.js"
 		}
 	},
-	"files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
 	"scripts": {
 		"build": "tsdown",
 		"lint": "biome check src tests dev",
@@ -66,8 +83,10 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@payloadcms/ui": "^3.83.0",
-		"payload": "^3.83.0",
+		"@payloadcms/translations": "^3.85.0",
+		"@payloadcms/ui": "^3.85.0",
+		"next": "^15.0.0 || ^16.0.0",
+		"payload": "^3.85.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},
@@ -78,11 +97,14 @@
 		"@10x-media/vitest-config": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/richtext-lexical": "catalog:",
+		"@payloadcms/translations": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
+		"next": "catalog:",
 		"payload": "catalog:",
 		"playwright": "catalog:",
 		"react": "catalog:",
@@ -113,6 +135,11 @@
 				"types": "./dist/exports/i18n.d.ts",
 				"import": "./dist/exports/i18n.js",
 				"default": "./dist/exports/i18n.js"
+			},
+			"./rsc": {
+				"types": "./dist/exports/rsc.d.ts",
+				"import": "./dist/exports/rsc.js",
+				"default": "./dist/exports/rsc.js"
 			}
 		}
 	}

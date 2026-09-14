@@ -3,22 +3,22 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { buildConfig, type CollectionConfig } from 'payload'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { buildConfig } from 'payload'
+
+// Source imports, not the package name: the payload bin runs this file through tsx, which does
+// not apply the `development` export condition, so the package name would resolve to `dist`.
+// Dev components are bundled by Next and import the package name as a consumer would.
 import { formVariants } from '../src/index'
+import { articles, companies, events, people, secrets, users } from './collections'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
+import { articleVariants } from './variants/articles'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
 const useDb = process.env.DEV_DB === 'postgres' ? 'postgres' : 'mongo'
 const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
-
-const users: CollectionConfig = {
-	slug: 'users',
-	auth: true,
-	admin: { useAsTitle: 'email' },
-	fields: [],
-}
 
 const db =
 	useDb === 'postgres'
@@ -39,8 +39,11 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users],
-	plugins: [formVariants({})],
+	collections: [users, people, companies, events, articles, secrets],
+	editor: lexicalEditor(),
+	// Last, so it sees every collection. Most collections carry their own variants; articles
+	// are configured here, as a collection owned by another plugin would be.
+	plugins: [formVariants({ collections: { articles: articleVariants } })],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
@@ -51,5 +54,6 @@ export default buildConfig({
 			autoGenerate,
 			baseDir: path.resolve(dirname),
 		},
+		user: users.slug,
 	},
 })

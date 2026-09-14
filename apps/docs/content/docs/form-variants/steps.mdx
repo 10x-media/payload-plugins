@@ -1,0 +1,70 @@
+---
+title: Steps
+description: Field steps, component steps, conditions, gates, and the wizard API a component reads.
+---
+
+## Field steps
+
+A field step renders the listed paths with Payload's own field rendering against the form state. A field that carries custom components gets them. Fields not listed on any step stay in form state with their values and are submitted with the document.
+
+On a forward move, only the current step's paths are validated (server-side, nested paths included). Invalid fields show their errors and the move is refused. Payload's `submitted` flag is form-wide and is not reset, so after the first refused move any invalid field shows its error as soon as it appears on screen.
+
+If the save itself returns an error for a field on no step, Payload shows it as a toast. The plugin does not check at config time that required fields are covered, because a component step may cover them.
+
+## Component steps
+
+A component step is a Payload component rendered on the server with `{ collection, variant, step }` as props. A server component is a static frame rendered once at page load; anything live inside it is a client child reading the hooks below. The same holds for slots.
+
+```tsx title="components/DuplicateCheckStep.tsx"
+'use client'
+
+import { useWizard, useWizardState } from '@10x-media/form-variants/client'
+import { useFormFields } from '@payloadcms/ui'
+
+export const DuplicateCheckStep = () => {
+  const { back, finish, save } = useWizard()
+  const [checked, setChecked] = useWizardState<boolean>('duplicateCheckPassed')
+  const lastName = useFormFields(([fields]) => fields.lastName?.value)
+  // search, then either save() or finish({ title: 'Request sent' })
+}
+```
+
+## Conditions
+
+A step's `condition` runs on the server with the current values and wizard state. It is evaluated at page render against the saved document, and again on every step change (forward, back, or a direct jump), so the progress count can change as the user moves. On a new document the first render has empty values, so a condition that depends on them is false until the first move.
+
+## Gates
+
+A `gate` runs on the server when the user leaves the step forwards, after the step's validation passed. It answers one of:
+
+| Result | Effect |
+|---|---|
+| `{ result: 'continue' }` | Move on |
+| `{ result: 'block', message }` | Stay, show the message |
+| `{ result: 'patch', values?, state? }` | Apply, then move on |
+
+`patch.values` replaces the value at each given path without deep merging. Paths are not limited to the current step: setting a field that is on no step (a value derived from a lookup) is a reason to have a gate. An `array` or `blocks` field is replaced whole, which rebuilds the form state from the server. `patch.state` shallow-merges into wizard state.
+
+Anything richer (show the matches, offer a request to admins) is a component step.
+
+## Wizard state
+
+A JSON object scoped to the document page or drawer, shared by the steps and never saved to the document. It survives switching variants; a reload or a locale change clears it, while `?step=` survives both. Steps must work with it empty. It is sent to the evaluate endpoint with every call, so server logic sees it, and must not treat it as proof of anything: `duplicateCheckPassed: true` in wizard state guarantees nothing.
+
+## The hooks
+
+From `@10x-media/form-variants/client`:
+
+| Hook | Gives |
+|---|---|
+| `useWizard()` | `step`, `steps`, `index`, `count`, `isFirst`, `isLast`, `next()`, `back()`, `goTo(key)`, `save()`, `finish(outcome)`, `blockSave(reason)` / `allowSave()`, `saveAllowed`, `saveBlockedReason`, `onBeforeNext(fn)`, `busy`, `error`, `readOnly` |
+| `useWizardState<T>(key)` | `[value, setValue]` over one key of wizard state |
+| `useOutcome()` | The data `finish()` or an `outcome` after-save action left behind |
+| `useFormVariants()` | `active`, `available`, `switchTo(key)`, `inDrawer` |
+| Payload's `useForm`, `useField`, `useFormFields`, `useDocumentInfo` | The form and the document, unchanged |
+
+`finish(outcome)` ends the wizard without a native save and shows the `Outcome` slot. `onBeforeNext` is the client-side counterpart of `gate`; returning `false` refuses the move.
+
+## Read-only documents
+
+When the document is locked by another user or otherwise read-only, the runner is read-only too: Back and Next still move between steps so the document can be read, no validation runs, the evaluate endpoint is not called, and saving is disabled.

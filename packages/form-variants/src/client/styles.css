@@ -1,0 +1,337 @@
+/*
+ * The plugin's own edit form. Sizes follow Payload's baseline grid (`--base` is 20px; `rem`
+ * is 13px in the admin and is not used here), colours are theme variables so dark mode holds,
+ * and the top bar reuses Payload's `doc-controls` classes. Defaults sit under `:where()` so a
+ * host rule wins regardless of order; the `form-variants__*` class names are stable.
+ */
+:where(.form-variants) {
+	--form-variants-column: none;
+	--form-variants-column-margin: 0 auto;
+	--form-variants-muted: var(--theme-elevation-500);
+	--form-variants-rail: var(--theme-elevation-100);
+	--form-variants-done: var(--theme-elevation-400);
+	--form-variants-current: var(--theme-text);
+}
+
+:where(.form-variants__body) {
+	padding-top: calc(var(--base) * 1.5);
+	padding-bottom: calc(var(--base) * 2);
+}
+
+/*
+ * Width and placement of the form, from the variant's `ui`. Full width is Payload's own, so
+ * these two custom properties are all a variant changes; both the step column and the footer
+ * follow them, so the buttons stay under the fields.
+ */
+
+:where(.form-variants--width-half) {
+	--form-variants-column: calc(var(--base) * 40);
+}
+
+:where(.form-variants--align-center) {
+	--form-variants-column-margin: auto;
+}
+
+:where(.form-variants--align-right) {
+	--form-variants-column-margin: auto 0;
+}
+
+:where(.form-variants__column) {
+	max-width: var(--form-variants-column);
+	margin-inline: var(--form-variants-column-margin);
+}
+
+/* Switcher: one select-like button in the top bar, on `native` and ours alike. */
+
+:where(.form-variants__switcher) {
+	display: flex;
+	align-items: center;
+}
+
+:where(.form-variants__switcher-trigger) {
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.25);
+	height: auto;
+	padding: calc(var(--base) * 0.2) calc(var(--base) * 0.25) calc(var(--base) * 0.2)
+		calc(var(--base) * 0.6);
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-elevation-50);
+	color: var(--theme-text);
+	font-size: var(--base-body-size);
+	line-height: calc(var(--base) * 1.1);
+	white-space: nowrap;
+	transition:
+		border-color 100ms,
+		background-color 100ms;
+}
+
+:where(.form-variants__switcher-trigger:hover),
+:where(.popup--active .form-variants__switcher-trigger) {
+	border-color: var(--theme-elevation-250);
+	background: var(--theme-elevation-100);
+}
+
+:where(.form-variants__switcher-trigger:focus-visible) {
+	outline: var(--accessibility-outline);
+	outline-offset: var(--accessibility-outline-offset);
+}
+
+:where(.form-variants__switcher-label) {
+	color: var(--form-variants-muted);
+}
+
+:where(.form-variants__switcher-current) {
+	font-weight: 500;
+}
+
+:where(.form-variants__switcher-chevron) {
+	width: calc(var(--base) * 0.9);
+	height: calc(var(--base) * 0.9);
+	transition: transform 100ms;
+}
+
+:where(.popup--active .form-variants__switcher-chevron) {
+	transform: rotate(180deg);
+}
+
+/* Progress: a row of tabs. Free: the current tab is underlined. Linear: the rail fills up to the current step. */
+
+:where(.form-variants__progress) {
+	margin-bottom: calc(var(--base) * 0.75);
+	overflow-x: auto;
+	overflow-y: hidden;
+	scrollbar-width: none;
+}
+
+:where(.form-variants__progress-list) {
+	display: inline-flex;
+	min-width: 100%;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	border-bottom: 1px solid var(--form-variants-rail);
+	vertical-align: bottom;
+}
+
+:where(.form-variants__progress-item) {
+	position: relative;
+	flex-shrink: 0;
+	margin: 0;
+	padding-inline-end: calc(var(--base) * 1.2);
+}
+
+:where(.form-variants__progress-item:last-child) {
+	padding-inline-end: 0;
+}
+
+:where(.form-variants__progress-tab) {
+	position: relative;
+	display: block;
+	margin: 0;
+	padding: 0 0 calc(var(--base) * 0.75);
+	border: 0;
+	background: none;
+	color: var(--form-variants-muted);
+	font-family: var(--font-body);
+	font-size: calc(var(--base) * 0.8);
+	font-weight: 500;
+	line-height: var(--base);
+	letter-spacing: -0.375px;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: color 100ms;
+}
+
+:where(.form-variants__progress-tab)::after,
+:where(.form-variants__progress--linear .form-variants__progress-item--done)::after {
+	content: "";
+	position: absolute;
+	right: 0;
+	bottom: -1px;
+	left: 0;
+	height: 2px;
+	background: transparent;
+}
+
+:where(.form-variants__progress-tab:hover) {
+	color: var(--theme-elevation-800);
+}
+
+:where(.form-variants__progress-tab:focus-visible) {
+	outline: var(--accessibility-outline);
+	outline-offset: var(--accessibility-outline-offset);
+}
+
+:where(.form-variants__progress-tab:disabled) {
+	color: var(--theme-elevation-300);
+	cursor: default;
+}
+
+:where(.form-variants__progress-item--current .form-variants__progress-tab) {
+	color: var(--form-variants-current);
+	cursor: default;
+}
+
+:where(.form-variants__progress-item--current .form-variants__progress-tab)::after {
+	background: var(--form-variants-current);
+}
+
+:where(
+	.form-variants__progress--free .form-variants__progress-tab:not([aria-current]):hover
+)::after {
+	height: 1px;
+	background: var(--theme-elevation-250);
+}
+
+:where(
+	.form-variants__progress--linear .form-variants__progress-item--done .form-variants__progress-tab
+) {
+	color: var(--theme-elevation-800);
+}
+
+:where(.form-variants__progress--linear .form-variants__progress-item--done)::after {
+	background: var(--form-variants-done);
+}
+
+/* Step header and body. */
+
+:where(.form-variants__step-header) {
+	margin-bottom: calc(var(--base) * 1.2);
+}
+
+:where(.form-variants__step-title) {
+	margin: 0 0 calc(var(--base) * 0.25);
+	font-size: var(--base);
+	line-height: calc(var(--base) * 1.2);
+	font-weight: 500;
+}
+
+:where(.form-variants__step-description) {
+	margin: 0;
+	color: var(--form-variants-muted);
+}
+
+/*
+ * Each field renders through its own `RenderFields`, which zeroes the margin of its only
+ * child, so the spacing between them is the native `--spacing-field` restated here, and the
+ * extra room Payload gives groups, arrays, blocks, collapsibles and rich text is kept.
+ */
+:where(.form-variants__fields) {
+	--form-variants-field-gap: var(--base);
+	display: flex;
+	flex-direction: column;
+	gap: var(--form-variants-field-gap);
+}
+
+:where(.form-variants__fields > .render-fields:empty) {
+	display: none;
+}
+
+:where(.form-variants__fields > .render-fields):has(
+	> .group-field,
+	> .array-field,
+	> .blocks-field,
+	> .collapsible-field,
+	> .rich-text
+) {
+	margin-block: var(--form-variants-field-gap);
+}
+
+:where(.form-variants__fields > :first-child) {
+	margin-top: 0;
+}
+
+:where(.form-variants__fields > :last-child) {
+	margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+	:where(.form-variants__fields) {
+		--form-variants-field-gap: calc(var(--base) / 2);
+	}
+}
+
+/* Footer: sticks to the bottom of the viewport or drawer while the step scrolls under it. */
+
+:where(.form-variants__footer) {
+	position: sticky;
+	bottom: 0;
+	z-index: 5;
+	background: var(--theme-bg);
+}
+
+:where(.form-variants__footer-inner) {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: calc(var(--base) * 0.5) var(--base);
+	max-width: var(--form-variants-column);
+	margin-inline: var(--form-variants-column-margin);
+	padding-block: calc(var(--base) * 0.8);
+	border-top: 1px solid var(--theme-elevation-100);
+}
+
+:where(.form-variants__status) {
+	flex: 1 1 calc(var(--base) * 10);
+	min-width: 0;
+}
+
+:where(.form-variants__status-text) {
+	margin: 0;
+	color: var(--form-variants-muted);
+}
+
+:where(.form-variants__status-text--error) {
+	color: var(--theme-error-500);
+}
+
+:where(.form-variants__actions) {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: calc(var(--base) * 0.5);
+	margin-inline-start: auto;
+}
+
+:where(.form-variants__actions .btn__label) {
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.4);
+}
+
+/* While a move or save is in flight the primary button keeps its colour and shows a spinner. */
+:where(.form-variants__primary--working.btn--disabled) {
+	--bg-color: var(--theme-elevation-800);
+	--color: var(--theme-elevation-0);
+	--hover-bg: var(--bg-color);
+	cursor: progress;
+}
+
+:where(.form-variants__spinner) {
+	width: calc(var(--base) * 0.6);
+	height: calc(var(--base) * 0.6);
+	border: 2px solid currentColor;
+	border-right-color: transparent;
+	border-radius: 50%;
+	animation: form-variants-spin 700ms linear infinite;
+}
+
+@keyframes form-variants-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	:where(.form-variants__spinner) {
+		animation-duration: 2s;
+	}
+}
+
+:where(.form-variants__empty) {
+	margin: 0;
+	padding-block: calc(var(--base) * 2);
+	color: var(--form-variants-muted);
+}

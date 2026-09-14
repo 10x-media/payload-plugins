@@ -6,5 +6,20 @@ import { keys, type TranslationKey } from './keys'
  * unknown key a type error. `translations/index.ts` nests these for Payload.
  */
 export const en: Record<TranslationKey, string> = {
+	[keys.back]: 'Back',
+	[keys.done]: 'Done',
+	[keys.next]: 'Next',
+	[keys.noVariants]: 'There is no form available for your account on this collection.',
 	[keys.pluginName]: 'Form Variants',
+	[keys.progress]: 'Steps',
+	[keys.publish]: 'Publish',
+	[keys.readOnly]: 'This document is read-only.',
+	[keys.save]: 'Save',
+	[keys.saveDraft]: 'Save draft',
+	[keys.stepCompleted]: 'completed',
+	[keys.stepInvalid]: 'Fix the highlighted fields to continue.',
+	[keys.switchConfirm]: 'Switch',
+	[keys.switcherLabel]: 'Form',
+	[keys.unsavedSwitchBody]: 'Unsaved changes will be lost when switching to another form.',
+	[keys.unsavedSwitchHeading]: 'Switch form?',
 }

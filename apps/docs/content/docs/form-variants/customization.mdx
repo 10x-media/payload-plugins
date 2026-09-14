@@ -1,0 +1,95 @@
+---
+title: Customization
+description: Slots for the chrome, the headless mode, and translations.
+---
+
+## Slots
+
+The chrome is slots. A slot is a Payload component rendered on the server with serializable props (`collection`, `variant`, and `step` for step-level slots); the live half (current step, guard state) reaches its client parts through the hooks in `@10x-media/form-variants/client`. That keeps a replacement from being a fork.
+
+| Slot | Default |
+|---|---|
+| `Layout` | Wraps everything a variant renders |
+| `Progress` | Step n of m, step labels |
+| `StepHeader` | Label and description of the current step |
+| `Navigation` | Back, Next, and Save on the final step |
+| `VariantSwitcher` | Shown when two or more variants are available, including on `native` |
+| `Outcome` | Shown after `finish(outcome)` or an `outcome` after-save action |
+
+Slots can be set plugin-wide (`formVariants({ components })`), per collection (`components` next to `variants`), per variant, and per step (`Progress`, `StepHeader`, `Navigation` only). The most specific wins. `native` has no slots of its own; the switcher shown on it comes from the collection or plugin level.
+
+Setting `Progress`, `StepHeader`, `Navigation` or `VariantSwitcher` to `false` hides that part at that level, and a more specific level can still bring it back with a component. A one-step variant usually wants `components: { Progress: false }`; a component step that draws its own buttons wants `components: { Navigation: false }`. A custom `Layout` built from `ProgressSlot`, `StepHeaderSlot` and `NavigationSlot` respects `false` the same way.
+
+```ts
+formVariants({
+  components: {
+    Progress: '/components/Dots#Dots',
+  },
+})
+```
+
+```tsx title="components/Dots.tsx"
+'use client'
+
+import { useWizard } from '@10x-media/form-variants/client'
+
+export const Dots = () => {
+  const { index, steps } = useWizard()
+  return <ol>{steps.map((step, i) => <li key={step.key} aria-current={i === index}>{step.label}</li>)}</ol>
+}
+```
+
+## Headless
+
+Replacing `Layout` and building from the hooks is the headless mode. The pieces are exported so a custom layout does not restate them:
+
+| Export | Renders |
+|---|---|
+| `StepBody` | The current step's fields or component |
+| `ProgressSlot`, `StepHeaderSlot`, `NavigationSlot`, `OutcomeSlot` | The resolved slot at that level, falling back to the built-in |
+| `Progress`, `StepHeader`, `Navigation`, `Outcome`, `VariantSwitcher` | The built-ins themselves |
+
+```tsx title="components/TwoColumnLayout.tsx"
+'use client'
+
+import { NavigationSlot, ProgressSlot, StepBody, useFormVariants, OutcomeSlot } from '@10x-media/form-variants/client'
+
+export const TwoColumnLayout = () => {
+  const { outcome } = useFormVariants()
+  if (outcome) return <OutcomeSlot />
+  return (
+    <div className="two-column">
+      <aside><ProgressSlot /></aside>
+      <main><StepBody /><NavigationSlot /></main>
+    </div>
+  )
+}
+```
+
+Payload's document controls bar (save buttons, actions) always renders above the layout; it is Payload's, not the plugin's chrome.
+
+## Styling
+
+Every class is stable and prefixed `form-variants__`. Defaults are declared with zero specificity, so a host rule wins regardless of stylesheet order, and every colour and metric is a Payload theme variable:
+
+```css
+.form-variants {
+  --form-variants-border: var(--theme-elevation-150);
+}
+```
+
+## Translations
+
+The plugin ships English. Override or add a locale through the plugin option:
+
+```ts
+import { keys } from '@10x-media/form-variants/i18n'
+
+formVariants({
+  translations: {
+    de: { [keys.next]: 'Weiter', [keys.back]: 'Zurück' },
+  },
+})
+```
+
+Variant, step and field labels are Payload label types (a string, a per-locale record, or a `LabelFunction`), resolved per request. A `LabelFunction`'s `t` is typed on Payload's own keys, so a label from a consumer namespace needs the consumer's typed translator or a cast.

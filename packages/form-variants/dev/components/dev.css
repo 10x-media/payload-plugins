@@ -1,0 +1,65 @@
+/* Styles for the dev app's own example components, on Payload's tokens. */
+.dev-muted {
+	color: var(--theme-elevation-500);
+}
+
+.dev-stack {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) * 0.75);
+}
+
+.dev-stack > p {
+	margin: 0;
+}
+
+.dev-list {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-m);
+}
+
+.dev-list > li {
+	display: flex;
+	justify-content: space-between;
+	gap: var(--base);
+	padding: calc(var(--base) * 0.5) calc(var(--base) * 0.75);
+}
+
+.dev-list > li + li {
+	border-top: 1px solid var(--theme-elevation-150);
+}
+
+.dev-hint {
+	padding: calc(var(--base) * 0.6) calc(var(--base) * 0.75);
+	border-left: 2px solid var(--theme-elevation-400);
+	background: var(--theme-elevation-50);
+	color: var(--theme-elevation-800);
+}
+
+.dev-outcome {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) * 0.5);
+	max-width: calc(var(--base) * 30);
+}
+
+.dev-outcome h2,
+.dev-outcome p {
+	margin: 0;
+}
+
+.dev-outcome__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) * 0.5);
+	margin-top: calc(var(--base) * 0.5);
+}
+
+.dev-outcome__actions .btn {
+	margin: 0;
+}

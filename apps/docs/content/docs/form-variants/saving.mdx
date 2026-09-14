@@ -1,0 +1,58 @@
+---
+title: Saving
+description: The save guard, what happens after a save, autosave and drafts, and document drawers.
+---
+
+## Where the variants render
+
+`native` is Payload's `DefaultEditView`, untouched, with the switcher in its controls bar.
+
+Every other variant renders inside one `<Form>` the plugin owns, composed from the same pieces Payload's view is built from (`Form`, `DocumentControls`, the locking, stale-data and leave-without-saving modals, the upload area). Owning the form is what makes the guard, `afterSave` and value-preserving switching possible. Switching between two step variants keeps every value; switching to or from `native` crosses into another form, so with unsaved changes the switcher asks first.
+
+Two things the plugin's form does not carry from `DefaultEditView`: the live preview window, and the auth fields (email, password) of an auth collection. Put those on `native`.
+
+## The guard
+
+Every save path on a document page ends in the form's `submit`: the header buttons, Ctrl+S, Enter in an input, and autosave. The guard always lets autosave through, since an autosaved draft is not a publish, and allows every other save only when:
+
+- `save` is `always`, or the user is on the last visible step, and
+- no step has called `blockSave()`, and
+- the document is not read-only.
+
+The header buttons render the guard's state: while it refuses, they are disabled with the reason as a tooltip, and no Ctrl+S hotkey is registered. `useWizard().save()` goes through the same guard.
+
+Switching to `native` and saving there is not a bypass: access to `native` is the trust decision.
+
+## After a save
+
+`afterSave`, if set, runs on the server through the evaluate endpoint. It receives the usual context plus `savedDoc`, the document as the server reads it after the save (never the browser's copy), and `operation` is `create` when that save created the document. It returns one of:
+
+| Action | Effect |
+|---|---|
+| `null` | Payload's behaviour: on a full-page create, redirect to `/:id`, where `defaultVariant` picks again; in a drawer, close and hand the document back |
+| `{ redirect: string }` | Navigate |
+| `{ outcome: { ... } }` | Show the variant's `Outcome` slot, which reads the data through `useOutcome()` |
+| `{ switchTo: string }` | Switch to another available variant. On a full-page create this redirects to `/:id?variant=<key>` |
+
+The plugin owns `onSave` for its variants, so on a full-page create the action is applied before Payload's redirect would run. Autosave never triggers `afterSave`.
+
+## Autosave and drafts
+
+On a collection with autosave the document exists from the moment the form opens, and autosaves write the values of every step as the user goes. `save: 'final-step'` gates publishing, not the existence of the document. When a component step calls `finish(outcome)` instead of saving, the autosaved draft stays in the database; removing it is the consumer's call, made in the same code that calls `finish`, which has the document id through `useDocumentInfo()`.
+
+On a drafts collection the built-in Navigation's final button publishes when the account may publish and saves a draft otherwise.
+
+## Drawers
+
+Drawers use the same view resolution as the page, so the `edit.default` override applies inside a relationship field's "create new" drawer, and the user who never sees the full form on the page does not see it there either.
+
+In a drawer, `?variant=` and `?step=` do not exist (the drawer has no URL). The current step lives in memory, `inDrawer` is resolved on the client, and the saved document goes back to the relationship field as it does now.
+
+## Security
+
+Variants change what a person is shown, not what the API accepts:
+
+- REST, GraphQL, the Local API and scripts ignore variants. Restricting which fields an account may write is field access on the collection.
+- Gates are UX. A check that must hold for the data, such as duplicate detection, lives in a collection hook.
+- On autosave collections, `save: 'final-step'` does not keep values out of the database.
+- `values` and `state` sent to the evaluate endpoint are client input. On every call the endpoint loads the document with access enforced, answers 403 when the account lacks update access to it (create access when there is no id yet, or for `afterSave` after a create), and re-checks the variant's `access`. `afterSave` sees the document as the server reads it, not the copy the browser holds.
