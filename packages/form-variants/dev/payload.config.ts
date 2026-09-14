@@ -10,7 +10,16 @@ import { buildConfig } from 'payload'
 // not apply the `development` export condition, so the package name would resolve to `dist`.
 // Dev components are bundled by Next and import the package name as a consumer would.
 import { formVariants } from '../src/index'
-import { articles, companies, containers, events, people, secrets, users } from './collections'
+import {
+	articles,
+	companies,
+	containers,
+	events,
+	pages,
+	people,
+	secrets,
+	users,
+} from './collections'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 import { articleVariants } from './variants/articles'
@@ -39,8 +48,19 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users, people, companies, events, articles, secrets, containers],
+	collections: [users, people, companies, events, articles, secrets, containers, pages],
 	editor: lexicalEditor(),
+	// `pages` is the localized collection; the rest ignore locales, so the switcher is only
+	// meaningful there.
+	localization: {
+		defaultLocale: 'en',
+		fallback: true,
+		locales: [
+			{ code: 'en', label: 'English' },
+			{ code: 'de', label: 'Deutsch' },
+			{ code: 'uk', label: 'Українська' },
+		],
+	},
 	// Last, so it sees every collection. Most collections carry their own variants; articles
 	// are configured here, as a collection owned by another plugin would be.
 	plugins: [formVariants({ collections: { articles: articleVariants } })],

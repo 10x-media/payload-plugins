@@ -13,7 +13,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 - **Steps over the real form**: a step lists paths of the collection's own fields, so custom components, conditions and validation apply. A simplified form and a guided wizard are the same mechanism.
 - **`native` is Payload's own view**, untouched, with a switcher. Restricting who sees it is one `access` function.
-- **One save guard**: the save controls, Ctrl+S and Enter all respect it. Saving happens on the last step unless a variant says `save: 'always'`. On a drafts collection a Save Draft button stands beside the one that publishes.
+- **One save guard**: the save controls and Ctrl+S both respect it. Saving happens on the last step unless a variant says `save: 'always'`. On a drafts collection a Save Draft button stands beside the one that publishes.
 - **Server-side step logic**: `access`, `defaultVariant`, `condition`, `gate` and `afterSave` run with `req`, first at page render and then through the plugin's endpoint.
 - **Component steps** with the full wizard API (`useWizard`, `useWizardState`, `finish`), and slots for every piece of chrome down to a headless layout.
 - **Drawers too**: a document created from a relationship field's drawer gets the same variant.

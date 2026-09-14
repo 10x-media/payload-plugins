@@ -68,7 +68,7 @@ The usual workaround is a wizard built as a separate admin view with its own for
 ## What the plugin does
 
 - **Steps over the real form.** A field step lists paths of the collection's own fields. They render through Payload's `RenderFields`, so custom components, conditions and validation apply. Fields on no step keep their values and are submitted with the document.
-- **One save guard.** Saving is allowed on the last step (or anywhere with `save: 'always'`), never while a step has blocked it, never on a read-only document. The save controls, Ctrl+S and Enter all respect it. On a drafts collection a Save draft button stands beside the one that publishes.
+- **One save guard.** Saving is allowed on the last step (or anywhere with `save: 'always'`), never while a step has blocked it, never on a read-only document. The save controls and Ctrl+S both respect it. On a drafts collection a Save draft button stands beside the one that publishes.
 - **Server-side step logic.** `access`, `defaultVariant`, step `condition`, `gate` and `afterSave` run on the server with `req`, first at page render and then through the plugin's own endpoint.
 - **`native` is Payload's own view.** Untouched, with a switcher in its controls bar. Restricting who sees it is one `access` function.
 - **Drawers too.** A person created from a relationship field's "create new" drawer gets the same variant.

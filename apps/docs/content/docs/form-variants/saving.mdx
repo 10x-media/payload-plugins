@@ -15,7 +15,7 @@ Two things a variant does not carry from the native form: the live preview windo
 
 ## The guard
 
-Every save goes through one guard, whether it came from the save controls, Ctrl+S or Enter in an input. It allows a save only when:
+Every save the variant offers goes through one guard, the save controls and Ctrl+S alike. It allows a save only when:
 
 - `save` is `always`, or the user is on the last visible step, and
 - no step has called `blockSave()`, and

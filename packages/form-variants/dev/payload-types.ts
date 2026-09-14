@@ -74,6 +74,7 @@ export interface Config {
     articles: Article;
     secrets: Secret;
     containers: Container;
+    pages: Page;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -88,6 +89,7 @@ export interface Config {
     articles: ArticlesSelect<false> | ArticlesSelect<true>;
     secrets: SecretsSelect<false> | SecretsSelect<true>;
     containers: ContainersSelect<false> | ContainersSelect<true>;
+    pages: PagesSelect<false> | PagesSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -96,10 +98,10 @@ export interface Config {
   db: {
     defaultIDType: string;
   };
-  fallbackLocale: null;
+  fallbackLocale: ('false' | 'none' | 'null') | false | null | ('en' | 'de' | 'uk') | ('en' | 'de' | 'uk')[];
   globals: {};
   globalsSelect: {};
-  locale: null;
+  locale: 'en' | 'de' | 'uk';
   widgets: {
     collections: CollectionsWidget;
   };
@@ -352,6 +354,42 @@ export interface Container {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pages".
+ */
+export interface Page {
+  id: string;
+  title: string;
+  /**
+   * Shared by every language.
+   */
+  slug?: string | null;
+  audience?: ('everyone' | 'customers' | 'partners') | null;
+  intro?: string | null;
+  body?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  legalNote?: string | null;
+  seo?: {
+    title?: string | null;
+    description?: string | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -401,6 +439,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'containers';
         value: string | Container;
+      } | null)
+    | ({
+        relationTo: 'pages';
+        value: string | Page;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -638,6 +680,26 @@ export interface ContainersSelect<T extends boolean = true> {
       };
   status?: T;
   owner?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "pages_select".
+ */
+export interface PagesSelect<T extends boolean = true> {
+  title?: T;
+  slug?: T;
+  audience?: T;
+  intro?: T;
+  body?: T;
+  legalNote?: T;
+  seo?:
+    | T
+    | {
+        title?: T;
+        description?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
 }

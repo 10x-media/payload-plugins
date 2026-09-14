@@ -48,6 +48,7 @@ Replacing `Layout` and building from the hooks is the headless mode. The pieces 
 | `StepBody` | The current step's fields or component |
 | `ProgressSlot`, `StepHeaderSlot`, `NavigationSlot`, `OutcomeSlot` | The resolved slot at that level, falling back to the built-in |
 | `Progress`, `StepHeader`, `Navigation`, `Outcome`, `VariantSwitcher` | The built-ins themselves |
+| `SaveControls` | The save buttons, so a replaced `Navigation` does not restate them |
 
 ```tsx title="components/TwoColumnLayout.tsx"
 'use client'

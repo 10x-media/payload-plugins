@@ -17,6 +17,7 @@ import {
 	useDocumentEvents,
 	useDocumentInfo,
 	useEditDepth,
+	useLocale,
 	useRouteCache,
 	useRouteTransition,
 	useServerFunctions,
@@ -113,6 +114,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 	const depth = useEditDepth()
 	const router = useRouter()
 	const params = useSearchParams()
+	const { code: localeCode } = useLocale()
 	const { reportUpdate } = useDocumentEvents()
 	const { resetUploadEdits } = useUploadEdits()
 	const { getFormState } = useServerFunctions()
@@ -260,6 +262,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 						state: wizardStateRef.current,
 						variant: variant.key,
 					},
+					locale: localeCode,
 					serverURL,
 				})
 				return response.action ?? null
@@ -268,7 +271,16 @@ export const VariantForm: React.FC<Props> = (props) => {
 				return null
 			}
 		},
-		[apiRoute, collectionSlug, id, inDrawer, serverURL, variant.hasAfterSave, variant.key]
+		[
+			apiRoute,
+			collectionSlug,
+			id,
+			inDrawer,
+			localeCode,
+			serverURL,
+			variant.hasAfterSave,
+			variant.key,
+		]
 	)
 
 	const onSave = useCallback<NonNullable<FormProps['onSuccess']>>(

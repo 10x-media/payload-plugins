@@ -91,6 +91,8 @@ Paths are typed against the collection's generated type and validated at config 
 
 Every server function receives `ctx = { req, user, doc, operation, hasPublishedDoc, inDrawer }`. `doc` is the document being edited, or the initial data on create. Step functions additionally receive `values` (the current form values, this locale only) and `state` (wizard state); both come from the browser and are untrusted.
 
+On a localized collection every call runs in the locale being edited, the page render and each later re-evaluation alike, so `doc` and any query the function makes answer in that locale.
+
 `inDrawer` cannot be known on the server, so `access` and `defaultVariant` are called once for each value and the browser takes the answer for where it is. Both are called on every document render; keep them cheap and free of side effects.
 
 On a collection with autosave, Payload creates the document the moment `/create` opens and redirects to `/:id`, so `operation` is `update` from the first render. `hasPublishedDoc` is the flag for "a draft that was never published still counts as new".

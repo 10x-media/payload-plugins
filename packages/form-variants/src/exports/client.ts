@@ -11,6 +11,7 @@ export {
 export { Navigation } from '../client/chrome/Navigation'
 export { Outcome } from '../client/chrome/Outcome'
 export { Progress } from '../client/chrome/Progress'
+export { SaveControls } from '../client/chrome/SaveControls'
 export { StepHeader } from '../client/chrome/StepHeader'
 export { VariantSwitcher } from '../client/chrome/VariantSwitcher'
 export {

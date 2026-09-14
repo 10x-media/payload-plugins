@@ -8,6 +8,7 @@ import {
 	useFormFields,
 	useFormModified,
 	useHotkey,
+	useLocale,
 	usePreferences,
 	useServerFunctions,
 } from '@payloadcms/ui'
@@ -91,6 +92,9 @@ type StepOverride = {
 /** Joins step keys into one selector result so the runner re-renders only when the set changes. */
 const STEP_KEY_SEPARATOR = '\n'
 
+/** Inputs Enter acts on itself, where swallowing it would break the control. */
+const BUTTON_INPUT_TYPES = new Set(['button', 'image', 'reset', 'submit'])
+
 /**
  * The document's own endpoint with `draft=true` on it. Sending `_status: 'draft'` without that
  * parameter is what Payload's Unpublish button does: it writes the document itself. The
@@ -150,9 +154,11 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 		setMostRecentVersionIsAutosaved,
 		setUnpublishedVersionCount,
 	} = useDocumentInfo()
-	const { dispatchFields, getData, getFields, setModified, setSubmitted, submit } = useForm()
+	const { dispatchFields, formRef, getData, getFields, setModified, setSubmitted, submit } =
+		useForm()
 	const { getFormState } = useServerFunctions()
 	const { setPreference } = usePreferences()
+	const { code: locale } = useLocale()
 	const editDepth = useEditDepth()
 	const modified = useFormModified()
 
@@ -320,10 +326,11 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 					values: getData() as JsonObject,
 					variant: variant.key,
 				},
+				locale,
 				serverURL,
 				signal,
 			}),
-		[apiRoute, collectionSlug, getData, id, inDrawer, serverURL, variant.key]
+		[apiRoute, collectionSlug, getData, id, inDrawer, locale, serverURL, variant.key]
 	)
 
 	/**
@@ -658,6 +665,41 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 			submit,
 		]
 	)
+
+	/**
+	 * Enter in a field submits the form itself: a form with no submit button, which this one is,
+	 * is submitted implicitly when it holds exactly one field that can do it, and a step of one
+	 * text field is exactly that. Payload's form answers that event with its own `submit`, which
+	 * is outside the guard, so an early step could write the document the guard is holding back.
+	 *
+	 * The listener sits on the form element and leaves an event a field already consumed alone,
+	 * so a select menu or a date picker keeps its own Enter. Everything else Enter would have
+	 * submitted goes through `save` instead, which the guard answers as it answers a button.
+	 */
+	useEffect(() => {
+		const form = formRef.current
+		if (!form) {
+			return
+		}
+		const onKeyDown = (event: KeyboardEvent): void => {
+			if (event.key !== 'Enter' || event.defaultPrevented) {
+				return
+			}
+			if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+				return
+			}
+			const target = event.target
+			if (!(target instanceof HTMLInputElement) || BUTTON_INPUT_TYPES.has(target.type)) {
+				return
+			}
+			event.preventDefault()
+			if (guard.allowed && !busy) {
+				void save()
+			}
+		}
+		form.addEventListener('keydown', onKeyDown)
+		return () => form.removeEventListener('keydown', onKeyDown)
+	}, [busy, formRef, guard.allowed, save])
 
 	// Ctrl+S saves wherever the guard allows it and is swallowed elsewhere, so the browser's
 	// own save dialog never opens over the form. On a drafts collection it saves a draft, as it
