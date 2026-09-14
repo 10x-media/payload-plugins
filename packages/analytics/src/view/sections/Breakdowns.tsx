@@ -176,6 +176,7 @@ export function Breakdowns({
 								}
 							})}
 							emptyLabel={t(keys.stateNoBreakdown)}
+							fill="soft"
 							{...(canFilter
 								? {
 										onSelect: (index: number) => {

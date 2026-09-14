@@ -57,6 +57,7 @@ describeForDb('analytics view props: unscoped install', { dbs: ['mongo'] }, (db)
 		expect(props.adminRoute).toBe(booted.payload.config.routes.admin)
 		expect(props.timezone).toBe('Europe/Berlin')
 		expect(props.locale).toBe('de')
+		expect(props.scopeKey).toBe('')
 	})
 
 	it('lists a collection goal alongside the config goals', async () => {
@@ -103,10 +104,24 @@ describeForDb('analytics view props: scoped install', { dbs: ['mongo'] }, (db) =
 		await booted.stop()
 	})
 
+	it('keys the client on the scope the request resolved to', async () => {
+		const tenant = await booted.payload.login({
+			collection: 'viewers',
+			data: { email: 'a@t.dev', password: 'test-pass-1234' },
+		})
+		const result = await resolveViewProps(
+			reqFor(booted.payload, tenant.user),
+			resolveOptions(options)
+		)
+		if (result.denied) throw new Error('expected access')
+		expect(result.props.scopeKey).toBe('tenant-a')
+	})
+
 	it('yields no sources and no goals when the scope does not resolve', async () => {
 		const result = await resolveViewProps(reqFor(booted.payload, stranger), resolveOptions(options))
 		if (result.denied) throw new Error('expected access')
 		expect(result.props.sources).toEqual({ defaultId: null, sources: [] })
 		expect(result.props.goals).toEqual([])
+		expect(result.props.scopeKey).toBe('')
 	})
 })

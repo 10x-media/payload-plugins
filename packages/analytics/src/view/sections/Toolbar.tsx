@@ -1,6 +1,7 @@
 'use client'
 
 import { Button, Pill, SelectInput } from '@payloadcms/ui'
+import { useEffect, useRef } from 'react'
 import type { WireSource } from '../../fields/config/fetchSources'
 import type { TimeframePreset } from '../../timeframe/presets'
 import { keys } from '../../translations/keys'
@@ -59,6 +60,14 @@ export function Toolbar({
 	onChangeDeferred,
 }: ToolbarProps) {
 	const { t } = useTranslation()
+	const uncommitted = useRef<ViewState | null>(null)
+
+	// The URL has caught up with the pending edit (or moved somewhere else entirely), so the
+	// next edit starts from the state again.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the reset keys on the committed days, not the callback
+	useEffect(() => {
+		uncommitted.current = null
+	}, [state.from, state.to])
 
 	const presets = VIEW_RANGE_PRESETS.filter((preset) => {
 		if (gate.maxRangeDays === null) {
@@ -87,15 +96,20 @@ export function Toolbar({
 		if (value === '') {
 			return
 		}
+		// Both inputs share one debounce, so a second edit inside the window merges into the
+		// first rather than rebuilding from a URL that has not caught up with it yet.
+		const base = uncommitted.current ?? state
 		const picked = clampDayRange(
 			{
-				from: edited === 'from' ? value : (state.from ?? range.from),
-				to: edited === 'to' ? value : (state.to ?? range.to),
+				from: edited === 'from' ? value : (base.from ?? range.from),
+				to: edited === 'to' ? value : (base.to ?? range.to),
 			},
 			edited,
 			gate.maxRangeDays
 		)
-		onChangeDeferred({ ...state, range: CUSTOM, from: picked.from, to: picked.to })
+		const next: ViewState = { ...base, range: CUSTOM, from: picked.from, to: picked.to }
+		uncommitted.current = next
+		onChangeDeferred(next)
 	}
 
 	return (

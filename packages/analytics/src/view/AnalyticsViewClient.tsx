@@ -46,23 +46,37 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 	const state = served ? coerceState(parsed, served) : parsed
 	const queries = useViewQueries(props, state)
 
-	const write = useCallback(
+	const href = useCallback(
 		(next: ViewState) => {
 			const query = serializeViewState(next, props.defaults).toString()
-			router.replace(query === '' ? pathname : `${pathname}?${query}`, { scroll: false })
+			return query === '' ? pathname : `${pathname}?${query}`
 		},
-		[router, pathname, props.defaults]
+		[pathname, props.defaults]
+	)
+
+	/** A click is a step the reader took, so Back undoes it rather than leaving the view. */
+	const write = useCallback(
+		(next: ViewState) => {
+			router.push(href(next), { scroll: false })
+		},
+		[router, href]
 	)
 
 	const pending = useRef<ReturnType<typeof setTimeout> | null>(null)
+	/**
+	 * Typing in a day input is one edit, not a history of them: the committed value replaces
+	 * the entry the picker already wrote rather than stacking one per keystroke pause.
+	 */
 	const writeLater = useCallback(
 		(next: ViewState) => {
 			if (pending.current !== null) {
 				clearTimeout(pending.current)
 			}
-			pending.current = setTimeout(() => write(next), COMMIT_DELAY_MS)
+			pending.current = setTimeout(() => {
+				router.replace(href(next), { scroll: false })
+			}, COMMIT_DELAY_MS)
 		},
-		[write]
+		[router, href]
 	)
 	useEffect(
 		() => () => {

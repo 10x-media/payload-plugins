@@ -12,6 +12,13 @@ export interface BarListProps {
 	 * cannot filter by the dimension must not offer a click that would do nothing.
 	 */
 	onSelect?: (index: number) => void
+	/**
+	 * `solid` (the default) fills the bar with the chart color and puts a white label inside
+	 * it, which reads as long as every row has a bar to sit on. `soft` pales the fill and
+	 * moves the label onto the elevation ramp, for a list whose rows can be zero-valued (a
+	 * goal with no pageviews), where a zero-width bar leaves a white label on bare track.
+	 */
+	fill?: 'solid' | 'soft'
 }
 
 interface Hover {
@@ -39,7 +46,7 @@ const RowContent = ({ row }: { row: BarRow }): ReactNode => (
  * it and shows a tooltip with the full label and value (useful when the label is
  * truncated). Dependency-free; styling comes from the shared chart stylesheet.
  */
-export function BarList({ data, emptyLabel, onSelect }: BarListProps) {
+export function BarList({ data, emptyLabel, onSelect, fill = 'solid' }: BarListProps) {
 	const rows = toBarRows(data)
 	const [hover, setHover] = useState<Hover | null>(null)
 	if (rows.length === 0) {
@@ -51,7 +58,7 @@ export function BarList({ data, emptyLabel, onSelect }: BarListProps) {
 	return (
 		<div className="analytics-chart">
 			<ChartStyles />
-			<div className="analytics-bars">
+			<div className={`analytics-bars${fill === 'soft' ? ' analytics-bars--soft' : ''}`}>
 				{rows.map((row, i) =>
 					onSelect ? (
 						<button

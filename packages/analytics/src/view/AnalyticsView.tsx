@@ -50,7 +50,11 @@ export async function AnalyticsView({
 			req={req}
 		>
 			<Gutter>
-				{result.denied ? <p>{t(keys.viewNoAccess)}</p> : <AnalyticsViewClient {...result.props} />}
+				{result.denied ? (
+					<p>{t(keys.viewNoAccess)}</p>
+				) : (
+					<AnalyticsViewClient key={result.props.scopeKey} {...result.props} />
+				)}
 			</Gutter>
 		</DefaultTemplate>
 	)

@@ -206,6 +206,19 @@ describe('Toolbar controls', () => {
 		expect(dayRangeDays({ from: String(next.from), to: String(next.to) })).toBe(90)
 	})
 
+	it('merges a second day edit into the first when both land inside the debounce', () => {
+		const onChangeDeferred = vi.fn()
+		renderToolbar({
+			onChangeDeferred,
+			state: { ...baseState, range: 'custom', from: '2026-06-01', to: '2026-06-10' },
+		})
+		fireEvent.change(screen.getByLabelText(keys.viewFrom), { target: { value: '2026-05-01' } })
+		fireEvent.change(screen.getByLabelText(keys.viewTo), { target: { value: '2026-05-20' } })
+		expect(onChangeDeferred).toHaveBeenLastCalledWith(
+			expect.objectContaining({ range: 'custom', from: '2026-05-01', to: '2026-05-20' })
+		)
+	})
+
 	it('captions the window and the reporting timezone', () => {
 		renderToolbar()
 		expect(screen.getByText('Aug 16, 2026 - Sep 14, 2026')).toBeDefined()

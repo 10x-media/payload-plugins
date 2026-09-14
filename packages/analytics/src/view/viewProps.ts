@@ -36,6 +36,13 @@ export interface AnalyticsViewClientProps {
 	timezone: string
 	/** Admin UI language (`req.i18n.language`), for number and date formatting. */
 	locale: string
+	/**
+	 * The analytics scope this render resolved to, `''` when there is none. The tenant
+	 * selector sets its cookie and calls `router.refresh()`, which re-renders this shell but
+	 * keeps client state, and the reads are identical strings for two tenants sharing an
+	 * adapter id. Keying the client body on this remounts it instead, so a switch refetches.
+	 */
+	scopeKey: string
 }
 
 /**
@@ -67,6 +74,15 @@ const resolveGoalsList = async (
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: view goals listing failed: ${String(err)}`)
 		return runtime.scoped ? [] : configGoals()
+	}
+}
+
+/** The resolved scope as a render key; a resolver that throws keys as the scope-less render. */
+const resolveScopeKey = async (runtime: AnalyticsRuntime, req: PayloadRequest): Promise<string> => {
+	try {
+		return (await resolveScopeFor(runtime, req)) ?? ''
+	} catch {
+		return ''
 	}
 }
 
@@ -111,14 +127,16 @@ export const resolveViewProps = async (
 				sources: { defaultId: null, sources: [] },
 				goals: [],
 				timezone: DEFAULT_TIMEZONE,
+				scopeKey: '',
 			},
 		}
 	}
 	const allowed = platformReadGate(runtime, req)
-	const [sources, goals, timezone] = await Promise.all([
+	const [sources, goals, timezone, scopeKey] = await Promise.all([
 		resolveSourcesForRequest(req, { platformRead: allowed }),
 		resolveGoalsList(runtime, req, allowed),
 		resolveViewTimezone(runtime, req),
+		resolveScopeKey(runtime, req),
 	])
 	return {
 		denied: false,
@@ -127,6 +145,7 @@ export const resolveViewProps = async (
 			sources: { defaultId: sources.defaultId, sources: sources.sources },
 			goals,
 			timezone,
+			scopeKey,
 		},
 	}
 }

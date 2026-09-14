@@ -24,6 +24,9 @@ const CHART_CSS = `
 .analytics-bars__row:hover .analytics-bars__fill { filter: brightness(1.12); }
 .analytics-bars__label { position: relative; padding: 0 0.6rem; color: var(--theme-base-800, #fff); font-size: 0.8125rem; line-height: 1.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .analytics-bars__value { flex: none; font-size: 0.8125rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--theme-elevation-800); }
+.analytics-bars--soft .analytics-bars__track { background: var(--theme-elevation-100); }
+.analytics-bars--soft .analytics-bars__fill { background: color-mix(in srgb, var(--analytics-chart-1) 25%, transparent); }
+.analytics-bars--soft .analytics-bars__label { color: var(--theme-elevation-800); }
 .analytics-bars__secondary { flex: none; font-size: 0.8125rem; font-variant-numeric: tabular-nums; color: var(--theme-elevation-500); }
 .analytics-bars__row--action { appearance: none; background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; width: 100%; text-align: start; cursor: pointer; }
 .analytics-bars__row--action:focus-visible { outline: var(--accessibility-outline, 2px solid var(--theme-elevation-800)); outline-offset: 2px; }

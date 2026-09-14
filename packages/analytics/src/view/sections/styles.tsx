@@ -1,5 +1,9 @@
 'use client'
 
+import { CARD_CHROME, CARD_LABEL } from '../../widgets/cardChrome'
+
+const card = `padding: ${CARD_CHROME.padding}; background: ${CARD_CHROME.background}; border: ${CARD_CHROME.border}; border-radius: ${CARD_CHROME.radius}; box-sizing: border-box;`
+
 const VIEW_CSS = `
 .analytics-view { display: flex; flex-direction: column; gap: 1.25rem; padding-bottom: 1.5rem; }
 .analytics-view__title { margin: 0; }
@@ -17,13 +21,13 @@ const VIEW_CSS = `
 .analytics-view__chip-remove { display: inline-flex; align-items: center; justify-content: center; margin-inline-start: 0.15rem; padding: 0; background: none; border: 0; color: inherit; cursor: pointer; }
 .analytics-view__chip-remove:focus-visible { outline: var(--accessibility-outline, 2px solid var(--theme-elevation-800)); outline-offset: 2px; }
 .analytics-view__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 0.75rem; }
-.analytics-view__card { display: flex; flex-direction: column; gap: 0.375rem; padding: 1rem; text-align: start; font: inherit; color: inherit; background: var(--theme-elevation-50); border: 1px solid var(--theme-elevation-150); border-radius: var(--style-radius-m, 6px); box-sizing: border-box; cursor: pointer; transition: border-color 100ms cubic-bezier(0, 0.2, 0.2, 1); }
+.analytics-view__card { display: flex; flex-direction: column; gap: ${CARD_CHROME.gap}; text-align: start; font: inherit; color: inherit; cursor: pointer; transition: border-color 100ms cubic-bezier(0, 0.2, 0.2, 1); ${card} }
 .analytics-view__card:hover { border-color: var(--theme-elevation-250); }
 .analytics-view__card[aria-pressed='true'] { border-color: var(--theme-elevation-400); background: var(--theme-elevation-100); }
 .analytics-view__card:focus-visible { outline: var(--accessibility-outline, 2px solid var(--theme-elevation-800)); outline-offset: 2px; }
-.analytics-view__label { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--theme-elevation-500); }
+.analytics-view__label { font-size: ${CARD_LABEL.fontSize}; font-weight: ${CARD_LABEL.fontWeight}; letter-spacing: ${CARD_LABEL.letterSpacing}; text-transform: ${CARD_LABEL.textTransform}; color: ${CARD_LABEL.color}; }
 .analytics-view__value { font-size: 1.5rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--theme-elevation-800); }
-.analytics-view__panel { display: flex; flex-direction: column; gap: 0.625rem; padding: 1rem; background: var(--theme-elevation-50); border: 1px solid var(--theme-elevation-150); border-radius: var(--style-radius-m, 6px); box-sizing: border-box; }
+.analytics-view__panel { display: flex; flex-direction: column; gap: 0.625rem; ${card} }
 .analytics-view__error { display: flex; flex-direction: column; align-items: flex-start; gap: 0.5rem; }
 .analytics-view__caption { font-size: 0.75rem; color: var(--theme-elevation-400); }
 .analytics-view__section[aria-busy='true'] { opacity: 0.6; transition: opacity 100ms ease-out; }
@@ -39,11 +43,6 @@ const VIEW_CSS = `
 .analytics-view__sort:focus-visible { outline: var(--accessibility-outline, 2px solid var(--theme-elevation-800)); outline-offset: 2px; }
 .analytics-view__sort--metric { min-width: 5.5rem; text-align: end; }
 .analytics-view__sort--secondary { min-width: 4.5rem; text-align: end; }
-/* A widget's top bar always fills its track, so ChartStyles can put a white label inside it.
-   A view row can be a goal with no pageviews, where that label would sit on bare track. */
-.analytics-view__breakdown .analytics-bars__track { background: var(--theme-elevation-100); }
-.analytics-view__breakdown .analytics-bars__fill { background: color-mix(in srgb, var(--analytics-chart-1) 25%, transparent); }
-.analytics-view__breakdown .analytics-bars__label { color: var(--theme-elevation-800); }
 .analytics-view__breakdown .analytics-bars__value { min-width: 5.5rem; text-align: end; }
 .analytics-view__breakdown .analytics-bars__secondary { min-width: 4.5rem; text-align: end; }
 .analytics-view__table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }

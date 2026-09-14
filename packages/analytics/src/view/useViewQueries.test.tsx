@@ -55,6 +55,7 @@ const propsFor = (capabilities: SerializedCapabilities): AnalyticsViewClientProp
 	adminRoute: '/admin',
 	timezone: 'Europe/Berlin',
 	locale: 'en',
+	scopeKey: '',
 })
 
 const baseState: ViewState = {

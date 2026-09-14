@@ -14,12 +14,13 @@ import type { AnalyticsViewClientProps } from './viewProps'
 const mocks = vi.hoisted(() => ({
 	search: '',
 	replace: vi.fn<(url: string) => void>(),
+	push: vi.fn<(url: string) => void>(),
 	fetchQueryMock: vi.fn<(apiRoute: string, request: QueryRequest) => Promise<unknown>>(),
 }))
 
 vi.mock('next/navigation', () => ({
 	usePathname: () => '/admin/analytics',
-	useRouter: () => ({ replace: mocks.replace }),
+	useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
 	useSearchParams: () => new URLSearchParams(mocks.search),
 }))
 
@@ -94,6 +95,7 @@ const props = (overrides: Partial<AnalyticsViewClientProps> = {}): AnalyticsView
 	adminRoute: '/admin',
 	timezone: 'Europe/Berlin',
 	locale: 'en',
+	scopeKey: '',
 	...overrides,
 })
 
@@ -130,6 +132,7 @@ class ResizeObserverStub {
 beforeEach(() => {
 	mocks.search = ''
 	mocks.replace.mockReset()
+	mocks.push.mockReset()
 	mocks.fetchQueryMock.mockReset()
 	mocks.fetchQueryMock.mockImplementation((_route, request) => Promise.resolve(answer(request)))
 	vi.stubGlobal('ResizeObserver', ResizeObserverStub)
@@ -168,15 +171,14 @@ describe('AnalyticsViewClient', () => {
 		await renderView()
 		const cards = within(screen.getByRole('group', { name: keys.viewOverview }))
 		fireEvent.click(cards.getByRole('button', { name: new RegExp(METRIC_KEYS.visitors) }))
-		expect(mocks.replace).toHaveBeenCalledWith('/admin/analytics?metric=visitors', {
-			scroll: false,
-		})
+		expect(mocks.push).toHaveBeenCalledWith('/admin/analytics?metric=visitors', { scroll: false })
+		expect(mocks.replace).not.toHaveBeenCalled()
 	})
 
 	it('adds an eq filter chip and rewrites the URL when a breakdown row is clicked', async () => {
 		const { rerender } = await renderView()
 		fireEvent.click(screen.getByRole('button', { name: /\/pricing/ }))
-		const url = mocks.replace.mock.calls[0]?.[0] as string
+		const url = mocks.push.mock.calls[0]?.[0] as string
 		expect(url).toContain('filters=')
 		const written = new URLSearchParams(url.slice(url.indexOf('?') + 1))
 		expect(JSON.parse(String(written.get('filters')))).toEqual([
@@ -189,6 +191,18 @@ describe('AnalyticsViewClient', () => {
 		expect(screen.getAllByText(/\/pricing/).length).toBeGreaterThan(1)
 		const filtered = mocks.fetchQueryMock.mock.calls.at(-1)?.[1]
 		expect(filtered?.filters).toEqual([{ dimension: 'page', operator: 'eq', value: '/pricing' }])
+	})
+
+	it('replaces history for a day edit, so the range picker leaves one entry behind', async () => {
+		mocks.search = 'range=custom&from=2026-06-01&to=2026-06-10'
+		await renderView()
+		fireEvent.change(screen.getByLabelText(keys.viewFrom), { target: { value: '2026-06-05' } })
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 600))
+		})
+		expect(mocks.replace).toHaveBeenCalledTimes(1)
+		expect(String(mocks.replace.mock.calls[0]?.[0])).toContain('from=2026-06-05')
+		expect(mocks.push).not.toHaveBeenCalled()
 	})
 
 	it('badges a read served from an expired cache', async () => {

@@ -23,6 +23,8 @@ interface Reading {
 	series: RealtimePoint[]
 }
 
+type FirstRead = { status: 'loading' } | { status: 'ok'; reading: Reading } | { status: 'error' }
+
 /**
  * Visitors in the last half hour, polled. The counter needs a first reading to mount with
  * (it is server-rendered in the widget), so the strip takes one itself and hands it over;
@@ -31,7 +33,7 @@ interface Reading {
  */
 export function RealtimeStrip({ apiRoute, sourceId, locale }: RealtimeStripProps) {
 	const { t } = useTranslation()
-	const [reading, setReading] = useState<Reading | null>(null)
+	const [first, setFirst] = useState<FirstRead>({ status: 'loading' })
 	const endpoint = buildRealtimeEndpoint(undefined, apiRoute)
 
 	useEffect(() => {
@@ -41,16 +43,28 @@ export function RealtimeStrip({ apiRoute, sourceId, locale }: RealtimeStripProps
 			windowMinutes: WINDOW_MINUTES,
 			dataSource: sourceId,
 		})
+		setFirst({ status: 'loading' })
 		fetch(path, { credentials: 'same-origin', signal: controller.signal })
 			.then((res) => (res.ok ? res.json() : null))
 			.then((data: { status?: string; activeNow?: number; series?: RealtimePoint[] } | null) => {
-				if (data?.status === 'ok') {
-					setReading({ activeNow: data.activeNow ?? 0, series: data.series ?? [] })
+				if (controller.signal.aborted) {
+					return
 				}
+				setFirst(
+					data?.status === 'ok'
+						? {
+								status: 'ok',
+								reading: { activeNow: data.activeNow ?? 0, series: data.series ?? [] },
+							}
+						: { status: 'error' }
+				)
 			})
 			.catch(() => {
-				// A failed first reading leaves the strip in its placeholder; the view's own
-				// sections already report an unreachable endpoint.
+				// A refused or unreachable first read says so, rather than pulsing forever:
+				// without a reading the counter has nothing to mount with and never polls.
+				if (!controller.signal.aborted) {
+					setFirst({ status: 'error' })
+				}
 			})
 		return () => {
 			controller.abort()
@@ -60,15 +74,17 @@ export function RealtimeStrip({ apiRoute, sourceId, locale }: RealtimeStripProps
 	return (
 		<section className="analytics-view__panel">
 			<span className="analytics-view__label">{t(keys.widgetRealtimeLabel)}</span>
-			{reading === null ? (
+			{first.status === 'loading' ? (
 				<Skeleton rows={1} variant="chart" />
+			) : first.status === 'error' ? (
+				<span className="analytics-view__empty">{t(keys.stateUnavailable)}</span>
 			) : (
 				<RealtimeCounter
 					caption={t(keys.widgetRealtimeCaption)}
 					dataSource={sourceId}
 					endpoint={endpoint}
-					initialActiveNow={reading.activeNow}
-					initialSeries={reading.series}
+					initialActiveNow={first.reading.activeNow}
+					initialSeries={first.reading.series}
 					intervalMs={POLL_MS}
 					key={sourceId}
 					locale={locale}
