@@ -5,7 +5,7 @@ import { requestTimezone } from '../plugin/runtime'
 import type { TimeframePreset } from '../timeframe/presets'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { keys, type TranslationKey } from '../translations/keys'
-import { TIMEFRAME_KEYS } from '../translations/metricKeys'
+import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { ComparisonDelta } from './ComparisonDelta'
 import { cardStyle, labelStyle } from './cardChrome'
@@ -43,6 +43,9 @@ const cellStyle: CSSProperties = {
 
 const numericStyle: CSSProperties = { ...cellStyle, textAlign: 'right' }
 const numericHeadStyle: CSSProperties = { ...headStyle, textAlign: 'right' }
+/** Stands in for a cell the source served no number for, in a column other rows fill. */
+const MISSING = '-'
+
 const captionStyle: CSSProperties = { fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }
 const noteStyle: CSSProperties = { fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }
 
@@ -102,19 +105,19 @@ export default async function AnalyticsGoalsWidget(props: WidgetServerProps & Wi
 					<thead>
 						<tr>
 							<th scope="col" style={headStyle}>
-								{t(keys.widgetGoalsGoal)}
+								{t(keys.fieldGoalLabel)}
 							</th>
 							<th scope="col" style={numericHeadStyle}>
-								{t(keys.widgetGoalsConversions)}
+								{t(METRIC_KEYS.conversions)}
 							</th>
-							{showsRate ? (
-								<th scope="col" style={numericHeadStyle}>
-									{t(keys.widgetGoalsRate)}
-								</th>
-							) : null}
 							{showsRevenue ? (
 								<th scope="col" style={numericHeadStyle}>
-									{t(keys.widgetGoalsRevenue)}
+									{t(METRIC_KEYS.revenue)}
+								</th>
+							) : null}
+							{showsRate ? (
+								<th scope="col" style={numericHeadStyle}>
+									{t(keys.viewConversionRate)}
 								</th>
 							) : null}
 						</tr>
@@ -142,14 +145,16 @@ export default async function AnalyticsGoalsWidget(props: WidgetServerProps & Wi
 										/>
 									</span>
 								</td>
-								{showsRate ? (
-									<td style={numericStyle}>
-										{row.rate === undefined ? '-' : percent.format(row.rate)}
-									</td>
-								) : null}
 								{showsRevenue ? (
 									<td style={numericStyle}>
-										{formatMetricValue('revenue', row.revenue ?? 0, locale)}
+										{row.revenue === undefined
+											? MISSING
+											: formatMetricValue('revenue', row.revenue, locale)}
+									</td>
+								) : null}
+								{showsRate ? (
+									<td style={numericStyle}>
+										{row.rate === undefined ? MISSING : percent.format(row.rate)}
 									</td>
 								) : null}
 							</tr>

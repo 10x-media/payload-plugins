@@ -135,6 +135,23 @@ describe('readForWidget', () => {
 		expect(result.previousMetrics?.pageviews).toBe(1)
 	})
 
+	it('skips the previous-window read when the caller asks for no comparison', async () => {
+		const adapter = memoryAdapter()
+		adapter.record({ path: '/c', timestamp: new Date('2026-05-30T12:00:00Z') })
+		adapter.record({ path: '/c', timestamp: new Date('2026-05-24T12:00:00Z') })
+		const result = await readForWidget({
+			req: reqWith([adapter]),
+			metrics: ['pageviews'],
+			timeframe: 'last7days',
+			now: NOW,
+			comparison: false,
+		})
+		expect(result.status).toBe('ok')
+		expect(result.metrics.pageviews).toBe(1)
+		expect(result.comparisonRange).toBeUndefined()
+		expect(result.previousMetrics).toBeUndefined()
+	})
+
 	it('omits comparison data when the adapter does not support it', async () => {
 		const base = memoryAdapter()
 		const adapter: AnalyticsAdapter = {

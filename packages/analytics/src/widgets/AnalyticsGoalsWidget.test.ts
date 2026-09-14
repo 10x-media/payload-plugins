@@ -37,20 +37,46 @@ const render = async (widgetData: GoalsWidgetData = {}, view?: WidgetView): Prom
 const hrefIn = (html: string): string | undefined =>
 	html.match(/<a[^>]+href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&')
 
+/** The rendered column headers, in order. */
+const headers = (html: string): string[] =>
+	Array.from(html.matchAll(/<th[^>]*>([^<]*)<\/th>/g), (m) => m[1] ?? '')
+
 describe('AnalyticsGoalsWidget', () => {
 	beforeEach(() => {
 		vi.mocked(readForWidgetGoals).mockReset()
 	})
 
-	it('renders one row per goal with its conversions, rate and revenue', async () => {
+	it('renders one row per goal with its conversions, revenue and rate', async () => {
 		vi.mocked(readForWidgetGoals).mockResolvedValue(result())
 		const html = await render()
 		expect(html).toContain('Newsletter')
 		expect(html).toContain('Purchase')
 		expect(html).toMatch(/>250<\/td>/)
 		expect(html).toContain('8.3%')
-		expect(html).toContain('analytics:widgetGoalsRate')
-		expect(html).toContain('analytics:widgetGoalsRevenue')
+	})
+
+	it('heads the columns with the labels the view uses, in the same order', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(result())
+		const html = await render()
+		expect(headers(html)).toEqual([
+			'analytics:fieldGoalLabel',
+			'analytics:metricConversions',
+			'analytics:metricRevenue',
+			'analytics:viewConversionRate',
+		])
+	})
+
+	it('dashes a row the source served no revenue for', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(
+			result({
+				rows: [
+					{ slug: 'purchase', name: 'Purchase', conversions: 5, revenue: 250, rate: 0.04 },
+					{ slug: 'newsletter', name: 'Newsletter', conversions: 9, rate: 0.083 },
+				],
+			})
+		)
+		const html = await render()
+		expect(html).toMatch(/>-<\/td>/)
 	})
 
 	it('reads the row limit and comparison from the widget data', async () => {
@@ -77,8 +103,11 @@ describe('AnalyticsGoalsWidget', () => {
 			})
 		)
 		const html = await render()
-		expect(html).not.toContain('analytics:widgetGoalsRate')
-		expect(html).toContain('analytics:widgetGoalsRevenue')
+		expect(headers(html)).toEqual([
+			'analytics:fieldGoalLabel',
+			'analytics:metricConversions',
+			'analytics:metricRevenue',
+		])
 	})
 
 	it('omits the revenue column when the source serves no revenue', async () => {
@@ -86,8 +115,11 @@ describe('AnalyticsGoalsWidget', () => {
 			result({ rows: [{ slug: 'purchase', name: 'Purchase', conversions: 5, rate: 0.04 }] })
 		)
 		const html = await render()
-		expect(html).not.toContain('analytics:widgetGoalsRevenue')
-		expect(html).toContain('analytics:widgetGoalsRate')
+		expect(headers(html)).toEqual([
+			'analytics:fieldGoalLabel',
+			'analytics:metricConversions',
+			'analytics:viewConversionRate',
+		])
 	})
 
 	it('shows the period-over-period delta on conversions when the read compared', async () => {

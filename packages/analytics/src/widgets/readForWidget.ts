@@ -43,6 +43,11 @@ export interface ReadForWidgetArgs {
 	 */
 	timezone?: string
 	filters?: AnalyticsFilter[]
+	/**
+	 * Read the previous window too, where the install and the source both allow it. Defaults
+	 * to on; a caller that never renders a delta passes false to save the second read.
+	 */
+	comparison?: boolean
 }
 
 export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetReadResult> => {
@@ -88,7 +93,7 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
 	const comparisonRange =
-		runtime.comparison && adapter.capabilities.comparison
+		args.comparison !== false && runtime.comparison && adapter.capabilities.comparison
 			? (previousWindow(dateRange, tz) ?? undefined)
 			: undefined
 	let result: AnalyticsResult

@@ -7,6 +7,7 @@ import {
 	resolveGoalsDetailedFor,
 	resolveTimezoneFor,
 } from '../plugin/runtime'
+import { MAX_QUERY_LIMIT } from '../query/limits'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { conversionRate } from '../view/conversionRate'
@@ -54,6 +55,17 @@ export interface ReadForWidgetGoalsArgs {
 	 */
 	timezone?: string
 }
+
+/**
+ * How much wider than the table the previous window is read. Both windows rank by their own
+ * conversions, so a goal in today's top rows may sit well below them in the previous window;
+ * reading only as many rows as the table shows would drop exactly those deltas. Capped at
+ * the bound every analytics query is held to.
+ */
+const PREVIOUS_LIMIT_FACTOR = 4
+
+const previousLimit = (limit: number): number =>
+	Math.min(limit * PREVIOUS_LIMIT_FACTOR, MAX_QUERY_LIMIT)
 
 /**
  * Goal names for the read's own scope. A resolver that throws must not cost the widget its
@@ -123,7 +135,9 @@ export const readForWidgetGoals = async (
 			extraMetrics: ['revenue', 'visitors'],
 		}),
 		adapter.capabilities.metrics.has('visitors')
-			? readForWidget({ ...shared, range: dateRange, metrics: ['visitors'] })
+			? // The site total is a denominator, never a delta: its own previous window would
+				// be a second read nothing renders.
+				readForWidget({ ...shared, range: dateRange, metrics: ['visitors'], comparison: false })
 			: undefined,
 		comparisonRange
 			? readForWidgetBreakdown({
@@ -131,7 +145,7 @@ export const readForWidgetGoals = async (
 					range: comparisonRange,
 					metric: 'conversions',
 					dimension: 'goal',
-					limit,
+					limit: previousLimit(limit),
 				})
 			: undefined,
 		goalNames(runtime, req, ctx.scope),

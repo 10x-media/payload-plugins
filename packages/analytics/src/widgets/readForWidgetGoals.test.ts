@@ -42,9 +42,13 @@ const CURRENT: GoalMetrics = {
 	thanks: { conversions: 2, revenue: 0, visitors: 2 },
 }
 
+// `purchase` sits below two goals that have since gone quiet, so a previous window read
+// under the widget's own row cap would rank it out and cost the row its delta.
 const PREVIOUS: GoalMetrics = {
 	purchase: { conversions: 3, revenue: 100, visitors: 3 },
 	newsletter: { conversions: 12, revenue: 0, visitors: 11 },
+	'legacy-a': { conversions: 11, revenue: 0, visitors: 10 },
+	'legacy-b': { conversions: 10, revenue: 0, visitors: 9 },
 }
 
 const goals: Goal[] = [
@@ -79,13 +83,13 @@ const goalsAdapter = (opts: AdapterOptions = {}): AnalyticsAdapter => ({
 		}
 		if (q.dimensions?.includes('goal')) {
 			const source = q.dateRange.start < RANGE.start ? PREVIOUS : CURRENT
-			return {
-				rows: Object.entries(source).map(([goal, values]) => ({
-					dimensions: { goal },
-					metrics: pick(values),
-				})),
-				meta,
-			}
+			// Ranks and caps like a real source, so a row the query's own limit excludes is
+			// genuinely absent from the answer.
+			const rows = Object.entries(source)
+				.sort(([, a], [, b]) => (b.conversions ?? 0) - (a.conversions ?? 0))
+				.slice(0, q.limit ?? Number.POSITIVE_INFINITY)
+				.map(([goal, values]) => ({ dimensions: { goal }, metrics: pick(values) }))
+			return { rows, meta }
 		}
 		return {
 			rows: [],
@@ -177,6 +181,29 @@ describe('readForWidgetGoals', () => {
 			// Absent from the previous window: no baseline, so no delta.
 			['thanks', undefined],
 		])
+	})
+
+	it('reads the previous window past the row cap so a new entrant keeps its delta', async () => {
+		const queries: AnalyticsQuery[] = []
+		const result = await read(reqWith(goalsAdapter({ queries })), { limit: 2, compare: true })
+		expect(result.rows.map((r) => [r.slug, r.previousConversions])).toEqual([
+			['newsletter', 12],
+			// Fourth by previous conversions: a limit-2 previous read would have missed it.
+			['purchase', 3],
+		])
+		const previousQuery = queries.find(
+			(q) => q.dimensions?.includes('goal') && q.dateRange.start < RANGE.start
+		)
+		expect(previousQuery?.limit).toBe(8)
+	})
+
+	it('issues one read per window: two uncompared, three compared', async () => {
+		const uncompared: AnalyticsQuery[] = []
+		await read(reqWith(goalsAdapter({ queries: uncompared })))
+		expect(uncompared).toHaveLength(2)
+		const compared: AnalyticsQuery[] = []
+		await read(reqWith(goalsAdapter({ queries: compared })), { compare: true })
+		expect(compared).toHaveLength(3)
 	})
 
 	it('skips the previous window when the source cannot compare', async () => {
