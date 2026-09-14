@@ -106,4 +106,8 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.actionGoalLabel]: '분석 목표 기록',
 	[keys.actionGoalFieldValueFrom]: '값을 가져올 필드',
 	[keys.actionGoalFieldValueFromHelp]: '제출된 답변 중 숫자 값을 목표 값으로 사용할 필드입니다.',
+	[keys.viewTitle]: 'Analytics',
+	[keys.viewNavLabel]: 'Analytics',
+	[keys.viewNoAccess]: 'You do not have access to analytics.',
+	[keys.viewLoading]: 'Loading analytics…',
 }

@@ -106,4 +106,8 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.actionGoalLabel]: 'تسجيل هدف التحليلات',
 	[keys.actionGoalFieldValueFrom]: 'القيمة من حقل',
 	[keys.actionGoalFieldValueFromHelp]: 'حقل الإرسال الذي تصبح إجابته الرقمية قيمة الهدف.',
+	[keys.viewTitle]: 'Analytics',
+	[keys.viewNavLabel]: 'Analytics',
+	[keys.viewNoAccess]: 'You do not have access to analytics.',
+	[keys.viewLoading]: 'Loading analytics…',
 }

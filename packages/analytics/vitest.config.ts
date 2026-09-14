@@ -27,6 +27,10 @@ export default mergeConfig(
 						dangerouslyIgnoreUnhandledErrors: isMatrixRun,
 						include: ['tests/int/**/*.int.spec.ts', 'src/**/*.test.ts'],
 						exclude: ['node_modules', 'dist', '.next', 'tests/e2e/**', ...JSDOM_TESTS],
+						// The admin view's server shell pulls in Payload's own admin chrome, whose
+						// dist imports stylesheets. Externalized, Node's loader chokes on the first
+						// `.css`; inlined, vite transforms them away.
+						server: { deps: { inline: [/@payloadcms\/next/, /@payloadcms\/ui/] } },
 					},
 				},
 				{

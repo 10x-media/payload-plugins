@@ -106,4 +106,8 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.actionGoalLabel]: '记录分析目标',
 	[keys.actionGoalFieldValueFrom]: '取值字段',
 	[keys.actionGoalFieldValueFromHelp]: '提交中该字段的数字答案将作为目标值。',
+	[keys.viewTitle]: 'Analytics',
+	[keys.viewNavLabel]: 'Analytics',
+	[keys.viewNoAccess]: 'You do not have access to analytics.',
+	[keys.viewLoading]: 'Loading analytics…',
 }

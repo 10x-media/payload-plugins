@@ -113,4 +113,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.actionGoalFieldValueFrom]: 'Value from field',
 	[keys.actionGoalFieldValueFromHelp]:
 		'Submission field whose numeric answer becomes the goal value.',
+	[keys.viewTitle]: 'Analytics',
+	[keys.viewNavLabel]: 'Analytics',
+	[keys.viewNoAccess]: 'You do not have access to analytics.',
+	[keys.viewLoading]: 'Loading analytics…',
 }

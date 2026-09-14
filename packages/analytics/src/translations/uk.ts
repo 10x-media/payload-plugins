@@ -109,4 +109,8 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.actionGoalLabel]: 'Реєструвати ціль аналітики',
 	[keys.actionGoalFieldValueFrom]: 'Значення з поля',
 	[keys.actionGoalFieldValueFromHelp]: 'Поле форми, числова відповідь якого стає значенням цілі.',
+	[keys.viewTitle]: 'Analytics',
+	[keys.viewNavLabel]: 'Analytics',
+	[keys.viewNoAccess]: 'You do not have access to analytics.',
+	[keys.viewLoading]: 'Loading analytics…',
 }

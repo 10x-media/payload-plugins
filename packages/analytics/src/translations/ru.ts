@@ -110,4 +110,8 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.actionGoalFieldValueFrom]: 'Значение из поля',
 	[keys.actionGoalFieldValueFromHelp]:
 		'Поле формы, числовой ответ которого становится значением цели.',
+	[keys.viewTitle]: 'Analytics',
+	[keys.viewNavLabel]: 'Analytics',
+	[keys.viewNoAccess]: 'You do not have access to analytics.',
+	[keys.viewLoading]: 'Loading analytics…',
 }

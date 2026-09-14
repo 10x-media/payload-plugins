@@ -8,7 +8,11 @@ export type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
 export type { SerializedCapabilities } from '../core/capabilities'
 export * from '../core/capture'
 export * from '../core/contract'
-export type { ResolvedAutoCapture } from '../core/options'
+export type {
+	AnalyticsViewAccess,
+	AnalyticsViewOptions,
+	ResolvedAutoCapture,
+} from '../core/options'
 export type { ServerEventInput, ServerTrack, ServerTrackOptions } from '../core/serverEvent'
 export type {
 	AnalyticsFieldsOptions,
@@ -36,3 +40,4 @@ export type {
 	SerializedAnalyticsQuery,
 } from '../query/response'
 export type { TimeframePreset } from '../timeframe/presets'
+export type { AnalyticsViewClientProps, ViewGoal } from '../view/viewProps'

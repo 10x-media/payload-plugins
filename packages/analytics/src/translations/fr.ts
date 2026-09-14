@@ -112,4 +112,8 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.actionGoalFieldValueFrom]: 'Valeur depuis le champ',
 	[keys.actionGoalFieldValueFromHelp]:
 		"Champ de la soumission dont la réponse numérique devient la valeur de l'objectif.",
+	[keys.viewTitle]: 'Analytics',
+	[keys.viewNavLabel]: 'Analytics',
+	[keys.viewNoAccess]: 'You do not have access to analytics.',
+	[keys.viewLoading]: 'Loading analytics…',
 }
