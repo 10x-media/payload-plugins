@@ -13,6 +13,7 @@ description: Per-tenant analytics providers, a shared platform provider, and sco
 | `scopes` | Enumerates every tenant scope so the cache-warm and sync cron tiers fan out per tenant. See [Cron tiers](#5-cron-tiers). |
 | `providers.collection` | Opt-in admin collection where providers are configured at runtime (per scope). |
 | `platformAdapter` | Names one config adapter shared by every scope: the platform's own analytics. |
+| `access.read` | Gates every authenticated read endpoint (query, document panel, realtime, sources, goals). Defaults to any signed-in user, so it changes nothing until you set it. |
 | `access.platformRead` | Gates cross-scope reads. Defaults to deny once `scopeResolver` is set; defaults to any authenticated admin user without it. |
 | `posthog({ scopeProperty })` | Lets one PostHog project serve per-scope reads by filtering on an event property. |
 | `capture.slots` | Which adapter captures for the platform (`global`) and for the request's tenant (`tenant`). See [Capture slots per tenant](#capture-slots-per-tenant). |
@@ -187,6 +188,14 @@ analytics({
 
 - A scoped read through any shared config adapter that cannot filter by scope, not only the one designated `platformAdapter`, would expose cross-scope data, so it fails closed behind the same `platformRead` gate. A tenant's own runtime providers (from `providers.collection` or `providers.resolve`) are never gated, since their credentials are the tenant's own. Give the platform adapter a `scopeProperty` (or use native) to serve tenants without the gate.
 - A platform admin's own request resolves no scope at all when no tenant is selected (`scopeResolver` returns `null`, the same value an unscoped install always reads with). The native adapter applies no `scope` filter for a `null`/`undefined` scope, so that read is a genuine cross-tenant total, every tenant's data summed, not an isolated "unscoped-only" bucket that happens to exclude tenant data.
+
+### Query endpoint
+
+The authenticated [query endpoint](/analytics/data-sources#query-endpoint) follows exactly these rules, and it is the one place they are visible as status codes. Scope comes from the request; an explicit `scope` parameter is honored only for platform readers (`400 untrusted_scope` for anyone else) and `scope=*` reads every scope behind the same `platformRead` gate; a scoped install whose request resolves no scope fails closed with `404 unknown_source`, as does a `scopeResolver` answering `*` for a caller `platformRead` denies; and a listed shared config adapter that cannot filter by scope answers `403` with `param: 'source'` rather than returning another tenant's totals.
+
+That last rule cuts both ways. A platform reader passing `scope=<tenant>` for a config adapter without `scopedQueries` is allowed through, since `platformRead` grants it, but the adapter still cannot narrow the query: the answer is install-wide totals, not that tenant's. The echoed `query` carries no `scope` key when that happens, which is how a client tells the two apart before captioning the numbers with a tenant's name.
+
+`access.read` is the gate in front of all of that. It covers every authenticated read endpoint (query, document panel, realtime, sources, goals) and defaults to allowing any signed-in user, so an install that does not set it behaves as before. Narrow it to a role check to keep analytics away from admins who should not see them. It is independent of scope: granting `read` never widens which scope a user reads.
 
 ## 5. Cron tiers
 

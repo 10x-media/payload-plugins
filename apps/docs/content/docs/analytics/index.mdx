@@ -33,6 +33,8 @@ Getting the events in is part of the package too: a dependency-free browser [tra
 
 The numbers surface in two places. [Dashboard widgets](/analytics/widgets) (metric, trend, breakdown, and realtime, plus a public API for your own) render on Payload's Modular Dashboard. [Display fields](/analytics/display-fields) put per-document stats on your own collections through factories such as `analyticsStat` and `analyticsTab`; nothing is auto-injected into your schema.
 
+Anything else you want to build reads through the same contract: an authenticated `GET /api/analytics/query` endpoint over any configured [data source](/analytics/data-sources), capability-validated, scope-gated, with coded errors and a `fetchQuery` helper for admin code.
+
 Underneath, reads are [cached](/analytics/cache) in `payload.kv` with request coalescing and optional scheduled warming, and an opt-in [sync tier](/analytics/sync) persists provider daily metrics into a queryable Payload collection. Admin strings are [typed translations](/analytics/i18n) following the shared plugin pattern.
 
 ## When to use it

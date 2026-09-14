@@ -2,8 +2,9 @@ import type { PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
 import type { AnalyticsRuntime } from '../plugin/runtime'
 import { memoryAdapter } from '../testing/memoryAdapter'
+import { PLATFORM_SCOPE } from './contract'
 import { createRegistry } from './registry'
-import { resolveReadContext } from './scopedRead'
+import { resolveQueryScope, resolveReadContext } from './scopedRead'
 
 const runtimeWith = (overrides: Partial<AnalyticsRuntime> = {}): AnalyticsRuntime => ({
 	registry: createRegistry([memoryAdapter()]),
@@ -180,5 +181,76 @@ describe('resolveReadContext scoped-install null-scope gating', () => {
 		const runtime = runtimeWith({ platformRead: () => false })
 		const ctx = await resolveReadContext({ runtime, req: userReq })
 		expect(ctx.ok).toBe(true)
+	})
+})
+
+describe('resolveQueryScope', () => {
+	const userReq = { payload: {}, user: { id: 1 } } as unknown as PayloadRequest
+	const adapter = memoryAdapter()
+	const scopedAdapter = {
+		...adapter,
+		capabilities: { ...adapter.capabilities, scopedQueries: true },
+	}
+
+	it('stamps nothing for an install-wide read', async () => {
+		const decision = await resolveQueryScope({
+			runtime: runtimeWith(),
+			req: userReq,
+			scope: null,
+			adapter,
+		})
+		expect(decision).toEqual({ ok: true })
+	})
+
+	it('gates the platform scope marker behind platformRead', async () => {
+		const denied = await resolveQueryScope({
+			runtime: runtimeWith({ platformRead: () => false }),
+			req: userReq,
+			scope: PLATFORM_SCOPE,
+			adapter,
+		})
+		expect(denied.ok).toBe(false)
+		const granted = await resolveQueryScope({
+			runtime: runtimeWith({ platformRead: () => true }),
+			req: userReq,
+			scope: PLATFORM_SCOPE,
+			adapter,
+		})
+		expect(granted).toEqual({ ok: true })
+	})
+
+	it('gates a scoped read through a shared config adapter that cannot filter by scope', async () => {
+		const configAdapterIds = new Set(['memory'])
+		const denied = await resolveQueryScope({
+			runtime: runtimeWith({ configAdapterIds, platformRead: () => false }),
+			req: userReq,
+			scope: 'tenant-a',
+			adapter,
+		})
+		expect(denied.ok).toBe(false)
+		const granted = await resolveQueryScope({
+			runtime: runtimeWith({ configAdapterIds, platformRead: () => true }),
+			req: userReq,
+			scope: 'tenant-a',
+			adapter,
+		})
+		expect(granted).toEqual({ ok: true })
+	})
+
+	it('stamps the scope on an adapter that can narrow to it, config or runtime', async () => {
+		const shared = await resolveQueryScope({
+			runtime: runtimeWith({ configAdapterIds: new Set(['memory']), platformRead: () => false }),
+			req: userReq,
+			scope: 'tenant-a',
+			adapter: scopedAdapter,
+		})
+		expect(shared).toEqual({ ok: true, queryScope: 'tenant-a' })
+		const runtimeOwned = await resolveQueryScope({
+			runtime: runtimeWith({ platformRead: () => false }),
+			req: userReq,
+			scope: 'tenant-a',
+			adapter,
+		})
+		expect(runtimeOwned).toEqual({ ok: true, queryScope: 'tenant-a' })
 	})
 })

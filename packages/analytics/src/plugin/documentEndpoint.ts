@@ -5,7 +5,7 @@ import { readForField } from '../fields/readForDocument'
 import { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 import { METRIC_KEYS } from '../translations/metricKeys'
 import { DOCUMENT_PATH } from './paths'
-import { getRuntime } from './runtime'
+import { getRuntime, readAccessFor } from './runtime'
 
 export { DOCUMENT_PATH }
 
@@ -36,8 +36,9 @@ const parseRange = (from: string | null, to: string | null): DateRange | null =>
 }
 
 /**
- * Authenticated GET handler behind the interactive document analytics panel. The
- * caller must be able to read the target document (enforced through `findByID`
+ * Authenticated GET handler behind the interactive document analytics panel, gated
+ * by `access.read` like every other read endpoint. The caller must also be able to
+ * read the target document (enforced through `findByID`
  * without `overrideAccess`), so analytics never leak for content the user cannot
  * see; an unreadable or missing document is a uniform 404. Timeframe, metrics, and
  * data source are whitelist-validated; `timeframe=custom` requires a parseable
@@ -50,6 +51,9 @@ export const makeDocumentHandler = (): PayloadHandler => async (req) => {
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
 		return Response.json({ error: 'unavailable' }, { status: 503 })
+	}
+	if (!(await readAccessFor(runtime, req))) {
+		return Response.json({ error: 'forbidden' }, { status: 403 })
 	}
 	const params = new URL(req.url ?? '', 'http://localhost').searchParams
 	const collection = params.get('collection') ?? ''

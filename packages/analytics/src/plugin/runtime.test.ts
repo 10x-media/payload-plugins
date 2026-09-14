@@ -2,7 +2,7 @@ import type { PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
 import type { Goal } from '../goals/types'
 import type { AnalyticsRuntime } from './runtime'
-import { resolveGoalsDetailedFor, resolveGoalsFor } from './runtime'
+import { platformReadGate, resolveGoalsDetailedFor, resolveGoalsFor } from './runtime'
 
 const goal: Goal = { slug: 'demo', name: 'Demo', match: { kind: 'goal' } }
 const req = {} as PayloadRequest
@@ -34,5 +34,20 @@ describe('resolveGoalsDetailedFor', () => {
 		const detailed = [{ goal, source: 'collection' as const }]
 		const runtime = runtimeWith({ goals: [], resolveGoalsDetailed: async () => detailed })
 		expect(await resolveGoalsDetailedFor(runtime, req)).toBe(detailed)
+	})
+})
+
+describe('platformReadGate', () => {
+	it('evaluates the access check once however many gates consult it', async () => {
+		let calls = 0
+		const runtime = runtimeWith({
+			platformRead: () => {
+				calls += 1
+				return true
+			},
+		})
+		const gate = platformReadGate(runtime, req)
+		expect(await Promise.all([gate(), gate(), gate()])).toEqual([true, true, true])
+		expect(calls).toBe(1)
 	})
 })

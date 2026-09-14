@@ -2,6 +2,7 @@ import type { PayloadHandler } from 'payload'
 import type { MetricKey } from '../core/contract'
 import { readForWidgetRealtime } from '../widgets/readForWidgetRealtime'
 import { REALTIME_PATH } from './paths'
+import { getRuntime, readAccessFor } from './runtime'
 
 export { REALTIME_PATH }
 
@@ -11,13 +12,18 @@ const DEFAULT_WINDOW = 30
 
 /**
  * Authenticated GET handler for the realtime widget poller. Reads + clamps the query
- * params, then delegates to readForWidgetRealtime. Returns 401 for an anonymous request.
- * The gate is any authenticated user (not admin-panel access specifically); the response
- * is integer counts only. Tightening to admin-only is a post-v1 option.
+ * params, then delegates to readForWidgetRealtime. Returns 401 for an anonymous request
+ * and 403 when `access.read` denies, which defaults to any authenticated user (not
+ * admin-panel access specifically); the response is integer counts only.
  */
 export const makeRealtimeHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
 		return Response.json({ error: 'unauthorized' }, { status: 401 })
+	}
+	const runtime = getRuntime(req.payload)
+	// No runtime means no adapter to read, so the skipped gate protects no data.
+	if (runtime && !(await readAccessFor(runtime, req))) {
+		return Response.json({ error: 'forbidden' }, { status: 403 })
 	}
 	const params = new URL(req.url ?? '', 'http://localhost').searchParams
 	const rawMetric = params.get('metric')

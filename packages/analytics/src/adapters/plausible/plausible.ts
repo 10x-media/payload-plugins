@@ -9,6 +9,7 @@ import type {
 	DimensionKey,
 	MetricKey,
 } from '../../core/contract'
+import { DEFAULT_TIMEZONE, zonedCalendarDay } from '../../timeframe/tz'
 import { fetchJson } from '../http/fetchJson'
 import { dayIso } from '../series'
 
@@ -184,8 +185,8 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 						site_id: config.siteId,
 						metrics: providerMetrics,
 						date_range: [
-							q.dateRange.start.toISOString().slice(0, 10),
-							q.dateRange.end.toISOString().slice(0, 10),
+							zonedCalendarDay(q.dateRange.start, q.timezone ?? DEFAULT_TIMEZONE),
+							zonedCalendarDay(q.dateRange.end, q.timezone ?? DEFAULT_TIMEZONE),
 						],
 						...(filters.length ? { filters } : {}),
 						...extra,

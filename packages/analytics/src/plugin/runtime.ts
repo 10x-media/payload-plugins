@@ -69,6 +69,8 @@ export interface AnalyticsRuntime {
 	configAdapterIds: ReadonlySet<string>
 	/** Gate for cross-scope reads; absent runtimes require an authenticated user. */
 	platformRead?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>
+	/** Gate for the query endpoint; absent runtimes require an authenticated user. */
+	readAccess?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 	bindings: Record<string, ResolvedBinding>
 	engine: Engine
 	/** Explicit TTL overrides; when a value is unset the adapter's recommendedTtl applies. */
@@ -125,8 +127,27 @@ export const resolveGoalsDetailedFor = (
 	runtime.resolveGoalsDetailed?.(req, scope) ??
 	Promise.resolve((runtime.goals ?? []).map((goal) => ({ goal, source: 'config' as const })))
 
+export const readAccessFor = async (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest
+): Promise<boolean> => (runtime.readAccess ? await runtime.readAccess({ req }) : Boolean(req.user))
+
 export const platformReadFor = async (
 	runtime: AnalyticsRuntime,
 	req: PayloadRequest
 ): Promise<boolean> =>
 	runtime.platformRead ? await runtime.platformRead({ req }) : Boolean(req.user)
+
+/** A `platformRead` decision evaluated at most once, however many gates consult it. */
+export type PlatformReadGate = () => Promise<boolean>
+
+export const platformReadGate = (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest
+): PlatformReadGate => {
+	let pending: Promise<boolean> | undefined
+	return () => {
+		pending ??= platformReadFor(runtime, req)
+		return pending
+	}
+}
