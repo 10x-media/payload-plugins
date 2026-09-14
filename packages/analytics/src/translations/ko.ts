@@ -108,6 +108,6 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.actionGoalFieldValueFromHelp]: '제출된 답변 중 숫자 값을 목표 값으로 사용할 필드입니다.',
 	[keys.viewTitle]: 'Analytics',
 	[keys.viewNavLabel]: 'Analytics',
-	[keys.viewNoAccess]: 'You do not have access to analytics.',
-	[keys.viewLoading]: 'Loading analytics…',
+	[keys.viewNoAccess]: '분석에 접근할 권한이 없습니다.',
+	[keys.viewLoading]: '분석을 불러오는 중…',
 }

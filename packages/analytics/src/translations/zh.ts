@@ -108,6 +108,6 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.actionGoalFieldValueFromHelp]: '提交中该字段的数字答案将作为目标值。',
 	[keys.viewTitle]: 'Analytics',
 	[keys.viewNavLabel]: 'Analytics',
-	[keys.viewNoAccess]: 'You do not have access to analytics.',
-	[keys.viewLoading]: 'Loading analytics…',
+	[keys.viewNoAccess]: '您没有访问分析的权限。',
+	[keys.viewLoading]: '正在加载分析…',
 }

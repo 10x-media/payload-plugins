@@ -112,6 +112,6 @@ export const es: Record<TranslationKey, string> = {
 		'Campo del envío cuya respuesta numérica se usa como valor del objetivo.',
 	[keys.viewTitle]: 'Analytics',
 	[keys.viewNavLabel]: 'Analytics',
-	[keys.viewNoAccess]: 'You do not have access to analytics.',
-	[keys.viewLoading]: 'Loading analytics…',
+	[keys.viewNoAccess]: 'No tienes acceso a la analítica.',
+	[keys.viewLoading]: 'Cargando analítica…',
 }

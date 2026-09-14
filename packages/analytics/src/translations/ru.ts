@@ -112,6 +112,6 @@ export const ru: Record<TranslationKey, string> = {
 		'Поле формы, числовой ответ которого становится значением цели.',
 	[keys.viewTitle]: 'Analytics',
 	[keys.viewNavLabel]: 'Analytics',
-	[keys.viewNoAccess]: 'You do not have access to analytics.',
-	[keys.viewLoading]: 'Loading analytics…',
+	[keys.viewNoAccess]: 'У вас нет доступа к аналитике.',
+	[keys.viewLoading]: 'Загрузка аналитики…',
 }

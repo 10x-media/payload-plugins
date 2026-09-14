@@ -35,7 +35,7 @@ export async function AnalyticsView({
 	}
 
 	const resolved = resolveOptions(pluginOptions)
-	const result = await resolveViewProps(req, resolved, { locale: initPageResult.locale?.code })
+	const result = await resolveViewProps(req, resolved)
 
 	return (
 		<DefaultTemplate

@@ -34,7 +34,7 @@ export interface AnalyticsViewClientProps {
 	adminRoute: string
 	/** IANA reporting timezone the day boundaries align to. */
 	timezone: string
-	/** Admin UI language, for number and date formatting. */
+	/** Admin UI language (`req.i18n.language`), for number and date formatting. */
 	locale: string
 }
 
@@ -44,11 +44,6 @@ export interface AnalyticsViewClientProps {
  * already signed in.
  */
 export type ViewPropsResult = { denied: true } | { denied: false; props: AnalyticsViewClientProps }
-
-export interface ResolveViewPropsArgs {
-	/** Locale to report when the request carries no i18n (page-result fallback). */
-	locale?: string
-}
 
 /**
  * The goals the request's scope may see, mirroring the goals endpoint exactly: no scope
@@ -93,8 +88,7 @@ const resolveViewTimezone = async (
  */
 export const resolveViewProps = async (
 	req: PayloadRequest,
-	resolved: ResolvedOptions,
-	args: ResolveViewPropsArgs = {}
+	resolved: ResolvedOptions
 ): Promise<ViewPropsResult> => {
 	if (!(await resolved.access.view({ req }))) {
 		return { denied: true }
@@ -106,7 +100,7 @@ export const resolveViewProps = async (
 		defaults: { range: view.defaultRange, metric: view.defaultMetric },
 		apiRoute: req.payload.config.routes?.api ?? '/api',
 		adminRoute: req.payload.config.routes?.admin ?? '/admin',
-		locale: req.i18n?.language ?? args.locale ?? 'en',
+		locale: req.i18n.language,
 	}
 	// No runtime means onInit has not run (or the plugin is disabled): nothing is readable.
 	if (!runtime) {

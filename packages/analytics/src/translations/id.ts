@@ -111,6 +111,6 @@ export const id: Record<TranslationKey, string> = {
 		'Bidang kiriman yang jawaban numeriknya menjadi nilai sasaran.',
 	[keys.viewTitle]: 'Analytics',
 	[keys.viewNavLabel]: 'Analytics',
-	[keys.viewNoAccess]: 'You do not have access to analytics.',
-	[keys.viewLoading]: 'Loading analytics…',
+	[keys.viewNoAccess]: 'Anda tidak memiliki akses ke analitik.',
+	[keys.viewLoading]: 'Memuat analitik…',
 }

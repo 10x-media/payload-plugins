@@ -38,6 +38,5 @@ export const loginRedirectUrl = ({
 		adminRoute: config.routes.admin,
 		path: config.admin.routes.login,
 	})
-	const returnTo = returnPath(config, params, searchParams)
-	return returnTo ? `${target}?redirect=${encodeURIComponent(returnTo)}` : target
+	return `${target}?redirect=${encodeURIComponent(returnPath(config, params, searchParams))}`
 }

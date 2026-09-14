@@ -14,6 +14,10 @@ export interface AnalyticsNavLinkProps {
 
 const baseClass = 'nav'
 
+/** A blank override is an unset one: an empty nav entry is worse than the default label. */
+const usable = (value: string | undefined): string | undefined =>
+	value && value.trim() !== '' ? value : undefined
+
 /**
  * The analytics entry in the admin nav, styled with Payload's own nav classes so it sits
  * with the collection links rather than beside them. Mounted through `afterNavLinks`,
@@ -23,12 +27,13 @@ export function AnalyticsNavLink({ href, label }: AnalyticsNavLinkProps) {
 	const { i18n, t } = useTranslation()
 	const pathname = usePathname()
 
-	const text =
+	const override =
 		typeof label === 'string'
-			? label
-			: (label?.[i18n.language] ?? label?.en ?? t(keys.viewNavLabel))
+			? usable(label)
+			: (usable(label?.[i18n.language]) ?? usable(label?.en))
+	const text = override ?? t(keys.viewNavLabel)
 
-	const isActive = pathname === href || pathname?.startsWith(`${href}/`)
+	const isActive = pathname === href || Boolean(pathname?.startsWith(`${href}/`))
 	const content = (
 		<>
 			{isActive && <div className={`${baseClass}__link-indicator`} />}

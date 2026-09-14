@@ -114,6 +114,6 @@ export const fr: Record<TranslationKey, string> = {
 		"Champ de la soumission dont la réponse numérique devient la valeur de l'objectif.",
 	[keys.viewTitle]: 'Analytics',
 	[keys.viewNavLabel]: 'Analytics',
-	[keys.viewNoAccess]: 'You do not have access to analytics.',
-	[keys.viewLoading]: 'Loading analytics…',
+	[keys.viewNoAccess]: "Vous n'avez pas accès aux analytics.",
+	[keys.viewLoading]: 'Chargement des analytics…',
 }
