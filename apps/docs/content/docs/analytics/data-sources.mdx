@@ -247,11 +247,11 @@ export const TopPages = () => {
 }
 ```
 
-- `buildQueryUrl(apiRoute, request)` returns the same URL without fetching it, written in a fixed field order so two requests with identical values always produce the same string.
+- `buildQueryUrl(apiRoute, request)` returns the same URL without fetching it, written in a fixed field order so two requests with identical values always produce the same string. A trailing slash on `apiRoute` is normalized, so `routes.api` in either form produces one URL and one dedupe key.
 - Concurrent calls for one URL share a single fetch; the entry clears on settle, so a later call refetches and a failed one retries. A caller's `AbortSignal` (`fetchQuery(api, request, { signal })`) rejects that caller alone and deliberately leaves the shared fetch running for everyone else waiting on it.
-- Any non-2xx throws `QueryFetchError` with `status`, the parsed `error` (`code`, `message`, `param`) when the body matched the endpoint's shape, and `retryAfter` in seconds when the response carried the header. A network-level failure propagates as itself.
+- Any non-2xx throws `QueryFetchError` with `status` always set. `error` is set only when the body is the query endpoint's own shape, an `error` object carrying a string `code` and a string `message` (plus `param` when one applies). The plugin's other read endpoints answer a flat `{ "error": "forbidden" }`, which deliberately leaves `error` undefined rather than putting a bare string where a `QueryError` is declared, so branch on `status` for those. `retryAfter` is a whole number of seconds: a fractional header floors, and the HTTP-date form of `Retry-After` yields no value at all. A network-level failure propagates as itself.
 
-`QueryRequest` carries no `scope` field: the helper reads the caller's own scope, which is what an admin surface wants. A platform reader deliberately reading another scope builds that URL itself.
+`QueryRequest` takes an optional `scope`. Omit it and the helper reads the caller's own scope, which is what an admin surface wants. Set it and the endpoint honors it only for platform readers; everyone else gets `400 untrusted_scope`.
 
 `QueryRequest` and the response types are exported from `@10x-media/analytics/types`, along with `DIMENSION_KEYS` and `FILTER_OPERATORS` for building pickers of your own.
 
