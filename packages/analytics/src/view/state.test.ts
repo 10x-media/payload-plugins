@@ -306,6 +306,44 @@ describe('rangeFor', () => {
 		})
 	})
 
+	it('resolves calendar presets in the reporting timezone', () => {
+		expect(rangeFor(at('thisMonth'), 'Europe/Berlin', now)).toEqual({
+			from: '2026-03-01',
+			to: '2026-03-01',
+		})
+		expect(rangeFor(at('thisMonth'), 'America/New_York', now)).toEqual({
+			from: '2026-02-01',
+			to: '2026-02-28',
+		})
+		expect(rangeFor(at('thisYear'), 'Europe/Berlin', now)).toEqual({
+			from: '2026-01-01',
+			to: '2026-03-01',
+		})
+		expect(rangeFor(at('thisYear'), 'America/New_York', now)).toEqual({
+			from: '2026-01-01',
+			to: '2026-02-28',
+		})
+	})
+
+	it('counts whole days across both Berlin DST transitions', () => {
+		// Berlin springs forward on 2026-03-29 and falls back on 2026-10-25; a 23 or 25 hour
+		// day must not shift the window by one.
+		const autumn = new Date('2026-11-01T12:00:00.000Z')
+		expect(rangeFor(at('lastYear'), 'Europe/Berlin', autumn)).toEqual({
+			from: '2025-11-02',
+			to: '2026-11-01',
+		})
+		expect(rangeFor(at('last90days'), 'Europe/Berlin', autumn)).toEqual({
+			from: '2026-08-04',
+			to: '2026-11-01',
+		})
+		const spring = new Date('2026-03-30T12:00:00.000Z')
+		expect(rangeFor(at('last7days'), 'Europe/Berlin', spring)).toEqual({
+			from: '2026-03-24',
+			to: '2026-03-30',
+		})
+	})
+
 	it('passes a custom range through untouched', () => {
 		expect(rangeFor(at('custom', '2026-01-01', '2026-01-31'), 'Europe/Berlin', now)).toEqual({
 			from: '2026-01-01',

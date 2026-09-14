@@ -75,13 +75,21 @@ export interface ViewGate {
 	dimensionsFor: (tab: BreakdownTab) => DimensionKey[]
 	canFilter: (dimension: DimensionKey) => boolean
 	operators: FilterOperator[]
-	/** Buckets the source serves, coarsest-inclusive, in contract order. */
+	/** Buckets the view offers, coarsest-inclusive, in contract order. Never finer than an hour. */
 	granularities: Granularity[]
+	/**
+	 * Days the source can look back, or null for no limit. The engine clamps a longer read
+	 * and marks it `meta.clamped`, so this only lets the toolbar hide a range that would
+	 * silently answer for a shorter window than its label promises.
+	 */
+	maxRangeDays: number | null
 	canCompare: boolean
 	canHour: boolean
 	realtime: boolean
 	goals: boolean
 }
+
+const HOUR_INDEX = GRANULARITY_ORDER.indexOf('hour')
 
 export const gate = (caps: SerializedCapabilities): ViewGate => {
 	const metricSet = new Set<string>(caps.metrics)
@@ -91,8 +99,10 @@ export const gate = (caps: SerializedCapabilities): ViewGate => {
 	const served = Object.fromEntries(
 		BREAKDOWN_TABS.map((tab) => [tab, TAB_DIMENSIONS[tab].filter((d) => dimensionSet.has(d))])
 	) as Record<BreakdownTab, DimensionKey[]>
-	const finest = GRANULARITY_ORDER.indexOf(caps.minGranularity)
-	const granularities = GRANULARITY_ORDER.slice(finest === -1 ? 0 : finest)
+	// Floored at the hour: a minute-granular source over a year is hundreds of thousands of
+	// buckets, and the endpoint only checks that a granularity is no finer than the source's.
+	const finest = Math.max(GRANULARITY_ORDER.indexOf(caps.minGranularity), HOUR_INDEX)
+	const granularities = GRANULARITY_ORDER.slice(finest)
 	return {
 		metrics: VIEW_METRIC_ORDER.filter((metric) => metricSet.has(metric)),
 		tabs: BREAKDOWN_TABS.filter((tab) => served[tab].length > 0),
@@ -100,6 +110,7 @@ export const gate = (caps: SerializedCapabilities): ViewGate => {
 		canFilter: (dimension) => filterSet.has(dimension),
 		operators: FILTER_OPERATORS.filter((operator) => operatorSet.has(operator)),
 		granularities,
+		maxRangeDays: caps.maxLookbackDays,
 		canCompare: caps.comparison,
 		canHour: granularities.includes('hour'),
 		realtime: caps.realtime,

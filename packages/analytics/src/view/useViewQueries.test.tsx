@@ -7,7 +7,7 @@ import { QueryFetchError } from '../query/fetchQuery'
 import type { QueryResponse } from '../query/response'
 import { VIEW_METRIC_ORDER } from './gating'
 import { DEFAULT_VIEW_LIMIT, rangeFor, type ViewState } from './state'
-import { useViewQueries, type ViewQueries } from './useViewQueries'
+import { SECTION_UNAVAILABLE, useViewQueries, type ViewQueries } from './useViewQueries'
 import type { AnalyticsViewClientProps } from './viewProps'
 
 const { fetchQueryMock } = vi.hoisted(() => ({
@@ -28,7 +28,7 @@ const nativeCaps: SerializedCapabilities = {
 	realtime: true,
 	perPageQuery: true,
 	comparison: true,
-	minGranularity: 'minute',
+	minGranularity: 'hour',
 	maxLookbackDays: null,
 }
 
@@ -254,6 +254,39 @@ describe('useViewQueries', () => {
 			refetch?.()
 		})
 		expect(latest?.cards.status).toBe('ok')
+	})
+
+	it('keeps the rendered data while the next read is in flight', async () => {
+		const payload = response()
+		fetchQueryMock.mockImplementation(() => Promise.resolve(payload))
+		const { rerender } = render(<Probe props={propsFor(nativeCaps)} state={baseState} />)
+		await act(async () => {})
+		expect(latest?.trend.isRefetching).toBe(false)
+
+		fetchQueryMock.mockImplementation(() => new Promise(() => {}))
+		rerender(<Probe props={propsFor(nativeCaps)} state={{ ...baseState, metric: 'visitors' }} />)
+		expect(latest?.trend.status).toBe('loading')
+		expect(latest?.trend.data).toBe(payload)
+		expect(latest?.trend.isRefetching).toBe(true)
+		// The cards did not move, so they are neither reloading nor blanked.
+		expect(latest?.cards.status).toBe('ok')
+		expect(latest?.cards.isRefetching).toBe(false)
+	})
+
+	it('reports no data and no refetch on a first read', () => {
+		render(<Probe props={propsFor(nativeCaps)} state={baseState} />)
+		expect(latest?.cards.status).toBe('loading')
+		expect(latest?.cards.data).toBeUndefined()
+		expect(latest?.cards.isRefetching).toBe(false)
+	})
+
+	it('reports the breakdown unavailable when the source serves no dimension', () => {
+		const noDimensions: SerializedCapabilities = { ...narrowCaps, dimensions: [] }
+		render(<Probe props={propsFor(noDimensions)} state={baseState} />)
+		expect(fetchQueryMock).toHaveBeenCalledTimes(2)
+		expect(latest?.breakdown.status).toBe('error')
+		expect(latest?.breakdown.error?.message).toBe(SECTION_UNAVAILABLE)
+		expect(latest?.cards.status).toBe('loading')
 	})
 
 	it('reports an error for a scope with no readable source', () => {

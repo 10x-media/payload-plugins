@@ -12,7 +12,7 @@ import {
 	MAX_QUERY_FILTER_VALUE_LENGTH,
 	MAX_QUERY_FILTERS,
 	MAX_QUERY_RANGE_DAYS,
-} from '../query/parse'
+} from '../query/limits'
 import { resolveTimeframe, TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 import { zonedCalendarDay } from '../timeframe/tz'
 import {

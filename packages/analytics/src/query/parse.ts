@@ -13,17 +13,18 @@ import { GRANULARITY_ORDER } from '../core/granularity'
 import { addDaysInTz, isValidTimeZone, startOfCalendarDayInTz } from '../timeframe/tz'
 import { METRIC_KEYS } from '../translations/metricKeys'
 import { type QueryError, queryError } from './errors'
-
-export const MAX_QUERY_METRICS = 10
-export const MAX_QUERY_DIMENSIONS = 2
-export const MAX_QUERY_FILTERS = 10
-export const MIN_QUERY_LIMIT = 1
-export const MAX_QUERY_LIMIT = 500
-export const DEFAULT_QUERY_LIMIT = 50
-export const MAX_QUERY_RANGE_DAYS = 366
-export const MAX_QUERY_FILTER_VALUE_LENGTH = 256
-export const MAX_QUERY_PATH_LENGTH = 512
-export const MAX_QUERY_HOSTNAME_LENGTH = 253
+import {
+	DEFAULT_QUERY_LIMIT,
+	MAX_QUERY_DIMENSIONS,
+	MAX_QUERY_FILTER_VALUE_LENGTH,
+	MAX_QUERY_FILTERS,
+	MAX_QUERY_HOSTNAME_LENGTH,
+	MAX_QUERY_LIMIT,
+	MAX_QUERY_METRICS,
+	MAX_QUERY_PATH_LENGTH,
+	MAX_QUERY_RANGE_DAYS,
+	MIN_QUERY_LIMIT,
+} from './limits'
 
 /**
  * A validated read request. `source` and `scope` are absent by design: the handler must

@@ -11,7 +11,7 @@ import {
 	VIEW_METRIC_ORDER,
 } from './gating'
 
-/** The native engine: everything the contract defines. */
+/** The native engine: everything the contract defines, hour buckets included. */
 const nativeCaps: SerializedCapabilities = {
 	metrics: [...VIEW_METRIC_ORDER],
 	dimensions: [...DIMENSION_KEYS],
@@ -20,7 +20,7 @@ const nativeCaps: SerializedCapabilities = {
 	realtime: true,
 	perPageQuery: true,
 	comparison: true,
-	minGranularity: 'minute',
+	minGranularity: 'hour',
 	maxLookbackDays: null,
 }
 
@@ -125,6 +125,18 @@ describe('gate', () => {
 		expect(g.realtime).toBe(false)
 		expect(g.goals).toBe(false)
 		expect(g.granularities).toEqual(['day', 'week', 'month'])
+	})
+
+	it('never offers minute buckets, whatever the source could serve', () => {
+		const minuteCaps: SerializedCapabilities = { ...nativeCaps, minGranularity: 'minute' }
+		expect(gate(minuteCaps).granularities).toEqual(['hour', 'day', 'week', 'month'])
+		expect(gate(minuteCaps).canHour).toBe(true)
+	})
+
+	it('reports the lookback the source allows, so the toolbar can hide longer ranges', () => {
+		expect(gate(narrowCaps).maxRangeDays).toBe(90)
+		expect(gate(posthogCaps).maxRangeDays).toBe(365)
+		expect(gate(nativeCaps).maxRangeDays).toBeNull()
 	})
 
 	it('needs both conversions and the goal dimension for the goals panel', () => {

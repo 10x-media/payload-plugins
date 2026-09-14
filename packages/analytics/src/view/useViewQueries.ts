@@ -8,11 +8,20 @@ import { autoGranularity, gate, resolveSource } from './gating'
 import { coerceState, rangeFor, type ViewState } from './state'
 import type { AnalyticsViewClientProps } from './viewProps'
 
-/** One section's read. `error` is a `QueryFetchError` whenever the endpoint answered. */
+/**
+ * One section's read. `error` is a `QueryFetchError` whenever the endpoint answered.
+ *
+ * `data` survives into the next `loading`, so changing the range or the metric dims the
+ * chart it already shows instead of blanking it; `isRefetching` is that state, and is the
+ * flag to render a subtle busy affordance on. `status === 'loading'` with no `data` is the
+ * only real empty load, and the only one that earns a skeleton.
+ */
 export interface QueryState<T> {
 	status: 'loading' | 'ok' | 'error'
+	/** May be the previous read's answer while `status` is `loading`. */
 	data?: T
 	error?: Error
+	isRefetching: boolean
 	refetch: () => void
 }
 
@@ -117,7 +126,7 @@ export const buildViewRequests = (
 
 const asError = (err: unknown): Error => (err instanceof Error ? err : new Error(String(err)))
 
-type SectionState = Omit<QueryState<QueryResponse>, 'refetch'>
+type SectionState = Omit<QueryState<QueryResponse>, 'isRefetching' | 'refetch'>
 
 /**
  * Runs one section's read. The request is keyed by its serialized form, so a state change
@@ -142,7 +151,13 @@ const useQuerySection = (
 			}
 			const controller = new AbortController()
 			pending.current = controller
-			setSection({ status: 'loading' })
+			// Returning `prev` unchanged makes the first read a no-op update rather than a
+			// second render; any later one keeps what is on screen until the answer lands.
+			setSection((prev) =>
+				prev.status === 'loading'
+					? prev
+					: { status: 'loading', ...(prev.data === undefined ? {} : { data: prev.data }) }
+			)
 			fetchQuery(apiRoute, JSON.parse(serialized) as QueryRequest, {
 				signal: controller.signal,
 			}).then(
@@ -168,7 +183,11 @@ const useQuerySection = (
 		}
 	}, [run, key])
 
-	return { ...section, refetch }
+	return {
+		...section,
+		isRefetching: section.status === 'loading' && section.data !== undefined,
+		refetch,
+	}
 }
 
 /**
