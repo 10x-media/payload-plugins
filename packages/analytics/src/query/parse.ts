@@ -37,12 +37,6 @@ export type ParseResult = { ok: true; value: ParsedQuery } | { ok: false; error:
 
 export interface ParseQueryArgs {
 	capabilities: SerializedCapabilities
-	/**
-	 * Request instant, injected so the parser stays deterministic. Absolute `from`/`to`
-	 * need no clock, so it is the seam for relative ranges and future-bound policy; the
-	 * engine, not the parser, clamps to `maxLookbackDays`.
-	 */
-	now: Date
 	/** Reporting timezone the plugin resolved for this request; the `timezone` param overrides it. */
 	timezone: string
 }
@@ -53,6 +47,7 @@ const KNOWN_OPERATORS = new Set<string>(FILTER_OPERATORS)
 const KNOWN_GRANULARITIES = new Set<string>(GRANULARITY_ORDER)
 const DAY_MS = 86_400_000
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
+const DATE_TIME = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?([Zz]|[+-]\d{2}:\d{2})$/
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 const fail = (code: QueryError['code'], message: string, param: string): ParseResult => ({
@@ -98,8 +93,10 @@ const calendarParts = (raw: string): { year: number; month: number; day: number 
 /**
  * A range bound. `YYYY-MM-DD` is the whole calendar day in `tz`: the start bound is its
  * first instant, the end bound its last, matching the inclusive `end` every adapter reads
- * (`less_than_equal`, `timestamp <=`, GA4's inclusive `endDate`). Anything else is parsed
- * as an instant and taken as given.
+ * (`less_than_equal`, `timestamp <=`, GA4's inclusive `endDate`). The only other accepted
+ * form is a full datetime carrying `Z` or a `±HH:MM` offset, taken as the instant it names.
+ * A datetime without an offset is rejected rather than silently read in the server's own
+ * zone, and so are the loose forms `Date` would otherwise accept (`2026`, `Sep 1 2026`).
  */
 const parseBound = (raw: string, tz: string, bound: 'start' | 'end'): Date | null => {
 	if (DATE_ONLY.test(raw)) {
@@ -109,6 +106,10 @@ const parseBound = (raw: string, tz: string, bound: 'start' | 'end'): Date | nul
 		}
 		const dayStart = startOfCalendarDayInTz(ymd, tz)
 		return bound === 'start' ? dayStart : new Date(addDaysInTz(dayStart, 1, tz).getTime() - 1)
+	}
+	const datePart = DATE_TIME.exec(raw)?.[1]
+	if (datePart === undefined || !calendarParts(datePart)) {
+		return null
 	}
 	const parsed = new Date(raw)
 	return Number.isNaN(parsed.getTime()) ? null : parsed

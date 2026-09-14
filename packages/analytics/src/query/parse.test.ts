@@ -17,8 +17,6 @@ import {
 	parseQueryParams,
 } from './parse'
 
-const NOW = new Date('2026-09-14T12:00:00.000Z')
-
 const caps: SerializedCapabilities = {
 	metrics: ['pageviews', 'visitors', 'sessions', 'conversions'],
 	dimensions: ['page', 'referrer', 'country'],
@@ -45,11 +43,10 @@ const BASE = 'metrics=pageviews&from=2026-09-01&to=2026-09-07'
 
 const run = (
 	search: string,
-	overrides: Partial<{ capabilities: SerializedCapabilities; now: Date; timezone: string }> = {}
+	overrides: Partial<{ capabilities: SerializedCapabilities; timezone: string }> = {}
 ) =>
 	parseQueryParams(new URLSearchParams(search), {
 		capabilities: caps,
-		now: NOW,
 		timezone: 'UTC',
 		...overrides,
 	})
@@ -230,6 +227,69 @@ describe('parseQueryParams, date range', () => {
 		).query
 		expect(dateRange.start.toISOString()).toBe('2026-09-01T06:30:00.000Z')
 		expect(dateRange.end.toISOString()).toBe('2026-09-01T18:00:00.000Z')
+	})
+
+	it('honors an explicit UTC offset without shifting it again', () => {
+		const { dateRange } = ok(
+			'metrics=pageviews&from=2026-09-01T08:30:00%2B02:00&to=2026-09-01T20:00:00%2B02:00',
+			{ timezone: 'Europe/Berlin' }
+		).query
+		expect(dateRange.start.toISOString()).toBe('2026-09-01T06:30:00.000Z')
+		expect(dateRange.end.toISOString()).toBe('2026-09-01T18:00:00.000Z')
+	})
+
+	it('rejects a datetime with no offset, which would be read in the server zone', () => {
+		expect(err('metrics=pageviews&from=2026-09-01T00:00:00&to=2026-09-07')).toMatchObject({
+			code: 'invalid_param',
+			param: 'from',
+		})
+	})
+
+	it.each([
+		'2026',
+		'2026-09',
+		'Sep 1 2026',
+		'2026/09/01',
+		'2026-09-01 00:00:00Z',
+	])('rejects the loose date form %s', (raw) => {
+		expect(err(`metrics=pageviews&from=${encodeURIComponent(raw)}&to=2026-09-07`)).toMatchObject({
+			code: 'invalid_param',
+			param: 'from',
+		})
+	})
+
+	it('rejects a datetime whose calendar day does not exist', () => {
+		expect(err('metrics=pageviews&from=2026-02-30T00:00:00Z&to=2026-09-07')).toMatchObject({
+			code: 'invalid_param',
+			param: 'from',
+		})
+	})
+
+	it('keeps whole days across a spring-forward 23-hour day', () => {
+		const { dateRange } = ok('metrics=pageviews&from=2026-03-29&to=2026-03-29', {
+			timezone: 'Europe/Berlin',
+		}).query
+		expect(dateRange.start.toISOString()).toBe('2026-03-28T23:00:00.000Z')
+		expect(dateRange.end.toISOString()).toBe('2026-03-29T21:59:59.999Z')
+		expect(dateRange.end.getTime() - dateRange.start.getTime()).toBe(23 * 3_600_000 - 1)
+	})
+
+	it('spans a range that crosses a transition', () => {
+		const { dateRange } = ok('metrics=pageviews&from=2026-03-28&to=2026-03-30', {
+			timezone: 'Europe/Berlin',
+		}).query
+		expect(dateRange.start.toISOString()).toBe('2026-03-27T23:00:00.000Z')
+		expect(dateRange.end.toISOString()).toBe('2026-03-30T21:59:59.999Z')
+		expect(dateRange.end.getTime() - dateRange.start.getTime()).toBe(71 * 3_600_000 - 1)
+	})
+
+	it('accepts a maximum-length window that crosses DST in both directions', () => {
+		const { dateRange } = ok('metrics=pageviews&from=2026-03-01&to=2027-03-01', {
+			timezone: 'Europe/Berlin',
+		}).query
+		expect(dateRange.end.getTime() - dateRange.start.getTime()).toBe(
+			MAX_QUERY_RANGE_DAYS * 86_400_000 - 1
+		)
 	})
 
 	it('accepts a single day and a future range', () => {

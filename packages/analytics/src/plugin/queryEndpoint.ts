@@ -117,7 +117,7 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			req,
 			context.scope === PLATFORM_SCOPE ? null : context.scope
 		)
-		const parsed = parseQueryParams(params, { capabilities, now: new Date(), timezone })
+		const parsed = parseQueryParams(params, { capabilities, timezone })
 		if (!parsed.ok) {
 			return errorResponse(400, parsed.error)
 		}

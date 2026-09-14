@@ -143,6 +143,18 @@ export const startOfWeekInTz = (date: Date, tz: string = DEFAULT_TIMEZONE): Date
 export const zonedDayIso = (date: Date, tz: string = DEFAULT_TIMEZONE): string =>
 	startOfDayInTz(date, tz).toISOString()
 
+/**
+ * `date`'s local calendar date in `tz` as `YYYY-MM-DD`, the form day-granular provider APIs
+ * take. Not `zonedDayIso(...).slice(0, 10)`: that returns the UTC spelling of the local day
+ * start, which names the previous calendar day for every zone east of UTC.
+ */
+export const zonedCalendarDay = (date: Date, tz: string = DEFAULT_TIMEZONE): string => {
+	const p = zonedParts(date, tz)
+	const month = String(p.month).padStart(2, '0')
+	const day = String(p.day).padStart(2, '0')
+	return `${String(p.year).padStart(4, '0')}-${month}-${day}`
+}
+
 /** True when `tz` is a resolvable IANA identifier. */
 export const isValidTimeZone = (tz: string): boolean => {
 	try {
