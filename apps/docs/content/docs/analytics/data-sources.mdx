@@ -61,7 +61,7 @@ Validation is always against the selected source, never against the union of the
 
 ## Query endpoint
 
-`GET /api/analytics/query` is the authenticated read primitive: one audited path through access control, scope gating, capability validation and the [cached surfacing engine](/analytics/cache). Build your own dashboard on it, script a report against it, or read it from an admin component.
+`GET /api/analytics/query` is the authenticated read primitive: one audited path through access control, scope gating, capability validation and the [cached surfacing engine](/analytics/cache). Build your own dashboard on it, script a report against it, or read it from an admin component. The [analytics view](/analytics/analytics-view) is built on it and nothing else, so whatever the view can show, your own code can read the same way.
 
 It requires a signed-in user and `access.read`. Every answer, success or failure, carries `Cache-Control: private, no-store`: the engine already caches, and the scope of an answer depends on the caller's cookies, so no shared cache may ever hold one.
 

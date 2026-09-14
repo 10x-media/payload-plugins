@@ -1,0 +1,112 @@
+---
+title: Analytics view
+description: The admin report at /admin/analytics, with overview cards, a trend, breakdown tabs with click-to-filter, goals and realtime, all addressable by URL.
+---
+
+The plugin registers one admin view at `/admin/analytics`, with a nav link beside your collections. It is the full report the [dashboard widgets](/analytics/widgets) summarize: pick a source, pick a window, drill into a dimension, and share the result as a link. It reads through the same authenticated [query endpoint](/analytics/data-sources#query-endpoint) your own code would use, so it shows exactly what that endpoint would answer for the signed-in reader.
+
+![The analytics view: a toolbar with data source, date range and a Compare toggle, a row of metric cards (pageviews, visitors, sessions, avg. time, scroll depth, events, conversions, revenue), a pageviews area chart over 30 days, a Pages breakdown with a bar per path and a hover tooltip, a goals table with conversions, revenue and conversion rate, and an active-now strip](/images/analytics/analytics-view.png)
+
+It is on by default. Set `view: false` to remove the route and the nav link.
+
+## What it shows
+
+**Toolbar.** The data source (only when the request resolves more than one), the date range (the presets plus **Custom range**, which reveals two day pickers), and a **Compare** toggle for the previous period. Beside them sit the window caption, the [reporting timezone](/analytics/timezone) the numbers are cut on, and any filter chips.
+
+**Overview cards.** One card per metric the source serves, with a period-over-period delta when comparison is on. Clicking a card charts that metric in the trend and sorts the breakdown by it.
+
+**Trend.** The selected metric over the window, bucketed by hour, day, week or month. The bucket is picked from the window length (hours up to two days, weeks past four months, days in between) and never finer than the source serves. With comparison on, the previous period renders as its own chart below, captioned "Previous period".
+
+**Breakdowns.** A tab per dimension group the source serves: pages, sources, technology, geography, events and goals. Each tab is a ranked bar list with the selected metric, a visitors column where the source serves one, sortable columns and a row limit of 10, 25, 50 or 100. Clicking a row adds an `eq` filter for that value and every section re-reads through it; the chip above removes it again.
+
+**Goals.** Conversions per [goal](/analytics/goals) over the window, with revenue and a conversion rate against the range's visitors. Goal names come from your config and from the goals collection; revenue is a bare number, because currency is per goal rather than per read.
+
+**Realtime.** An active-now count with a per-minute sparkline, for a source that serves realtime.
+
+## URL state and shareable links
+
+Every control writes to the query string, and every read comes from it. A view is its URL: copy the address bar and the person you send it to opens the same report, Back undoes the last change, and a reload changes nothing.
+
+| Parameter | Values |
+|---|---|
+| `range` | `today`, `last7days`, `last30days`, `last90days`, `lastYear`, or `custom` |
+| `from`, `to` | `YYYY-MM-DD`, inclusive calendar days in the reporting timezone. Custom range only |
+| `compare` | `1` to compare against the previous period |
+| `source` | a source id from the [sources endpoint](/analytics/data-sources#sources-endpoint) |
+| `metric` | the charted metric, and the breakdown's first column |
+| `granularity` | `hour`, `day`, `week`, `month`. Unset, the window picks one |
+| `tab` | `pages`, `sources`, `technology`, `geography`, `events`, `goals` |
+| `filters` | JSON array of `{ dimension, operator, value }`, up to 10 |
+| `limit` | `10`, `25`, `50`, `100` |
+| `order` | `<metric>:asc` or `<metric>:desc` |
+
+Anything equal to the install's default is left out, so an untouched view has a clean URL. The parser is total: a value that names no metric, tab, operator or calendar day falls back to the default instead of failing, so a truncated or hand-edited link still opens a working view.
+
+A link built for one source keeps working when it is opened against another. Values the selected source cannot serve (a metric it lacks, a filter it cannot apply, a comparison it cannot answer) are coerced for the reads but left in the address bar, so switching back to the source the link was built for restores it exactly.
+
+## Capability gating
+
+Every control reads the selected source's [capabilities](/analytics/adapters#the-capabilities-model) rather than the contract, so a provider that serves less gets a smaller view instead of controls that fail at the endpoint.
+
+| Control | Appears when |
+|---|---|
+| Data source select | the request resolves more than one readable source |
+| A metric card | the metric is in `capabilities.metrics` |
+| Compare | `capabilities.comparison` |
+| A range preset | its window fits `capabilities.maxLookbackDays` |
+| A breakdown tab | the source serves at least one dimension in that tab's group |
+| Row click, filter chips | the tab's dimension is in `capabilities.filters`. Otherwise rows are inert and a caption says so |
+| Trend granularity | never finer than `capabilities.minGranularity`, and never finer than an hour |
+| Goals panel and tab | `conversions` in the metrics and `goal` in the dimensions |
+| Conversion rate column | the source serves `visitors` for both the goal rows and the range total |
+| Realtime strip | `capabilities.realtime` |
+
+## Options
+
+```ts title="payload.config.ts"
+analytics({
+  adapters: [native()],
+  view: {
+    path: '/analytics',          // admin path, under routes.admin
+    defaultRange: 'last30days',  // timeframe the view opens on
+    defaultMetric: 'pageviews',  // metric the cards and trend open on
+    navLabel: { en: 'Analytics', de: 'Statistiken' },
+  },
+  access: {
+    view: ({ req }) => req.user?.role === 'admin',
+  },
+})
+```
+
+`view: false` removes the route and the nav link entirely. `navLabel` takes a plain string or a map keyed by admin language code (falling back to `en`); unset, the plugin's own translated label applies, localizable through the [`translations` option](/analytics/i18n).
+
+`access.view` gates the view and defaults to `access.read`, so one gate covers the view and the endpoints behind it. A reader it denies still sees the nav link (it is a client component with no access context) and lands on the view's no-access message. Narrowing `access.view` alone hides the report while leaving the widgets and display fields readable; narrowing `access.read` closes both.
+
+After enabling or moving the view, regenerate the import map so the admin resolves its components:
+
+```bash
+payload generate:importmap
+```
+
+## Multi-tenancy
+
+The view sends no scope of its own. It reads whatever the request resolves, exactly as every other read surface does, so a tenant user sees their tenant and nothing else, and the tenant selector in the nav is what a platform admin switches with. Switching tenants re-reads every section in place: the view is keyed on the resolved scope, so a `router.refresh()` that lands on a different tenant cannot leave the previous tenant's numbers on screen.
+
+The source select lists that request's sources, so a tenant's own [runtime provider](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) appears under its document name next to the config adapters, and another tenant's never does. Goal names are resolved per scope too. See [Multi-tenancy](/analytics/multi-tenancy) for how the scope itself is resolved.
+
+## Keyboard
+
+The breakdown tabs are a proper tab strip: one tab stop, then <kbd>Left</kbd> and <kbd>Right</kbd> to move between tabs (wrapping at both ends), <kbd>Home</kbd> and <kbd>End</kbd> for the first and last. Every other control is a native select, button or date input.
+
+## Cached and clamped reads
+
+Two notes can appear beside the range caption:
+
+- **Cached.** At least one section was served from an expired cache entry because the provider could not be reached. The numbers are the last good answer, not a failure; see [Caching](/analytics/cache).
+- **Clamped.** At least one section read a shorter window than the one you asked for, because the source cannot look back that far. The cards and the chart describe the narrower window.
+
+A section that fails on its own keeps whatever it was showing and adds a retry: a transient `503` dims a panel rather than blanking the page, and a source that cannot answer one section at all leaves that section empty while the rest of the view carries on.
+
+## Composing it yourself
+
+The view is a normal Payload admin view, so an app that wants a different shell can mount the pieces itself: `AnalyticsView` (the server shell, from `@10x-media/analytics/rsc`), `AnalyticsViewClient` and `AnalyticsNavLink` (from `@10x-media/analytics/client`), with `AnalyticsViewClientProps` and `ViewGoal` from `@10x-media/analytics/types`. Anything further reads through the [query endpoint](/analytics/data-sources#query-endpoint) and `fetchQuery`, the same way the view does.
