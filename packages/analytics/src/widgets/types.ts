@@ -1,9 +1,20 @@
-import type { MetricKey } from '../core/contract'
+import type { DimensionKey, FilterOperator, MetricKey } from '../core/contract'
 import type { TimeframePreset } from '../timeframe/presets'
 
 export interface WidgetRange {
 	from?: string
 	to?: string
+}
+
+/**
+ * The optional one-filter group a widget stores. Every part is optional because the group
+ * is only ever partly filled while it is being configured; a filter counts as set once it
+ * has a dimension and a value.
+ */
+export interface WidgetFilter {
+	dimension?: DimensionKey
+	operator?: FilterOperator
+	value?: string
 }
 
 export interface MetricWidgetData {
@@ -14,6 +25,7 @@ export interface MetricWidgetData {
 	dataSource?: string
 	/** Trend widget only: overlay the previous period on the chart. */
 	compare?: boolean
+	filter?: WidgetFilter
 }
 
 export interface GoalsWidgetData {

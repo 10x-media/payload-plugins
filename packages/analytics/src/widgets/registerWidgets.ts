@@ -18,6 +18,7 @@ import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { labelForKey } from '../translations/server'
 import { BREAKDOWN_SPECS, type BreakdownSpec } from './breakdownTypes'
 import { buildCustomWidgets, type CustomWidgetDef } from './customWidget'
+import { filterField } from './filterField'
 import { GOAL_ROW_LIMITS, WIDGET_METRICS } from './types'
 import type { WidgetView } from './viewLink'
 
@@ -207,6 +208,7 @@ const metricWidgetFields = (args: RegisterWidgetsArgs, extra: Field[] = []): Fie
 	customRangeField(),
 	...extra,
 	...(args.multiProvider ? [dataSourceField(args)] : []),
+	filterField(),
 ]
 
 const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): Field[] => [
@@ -226,6 +228,7 @@ const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): 
 		label: labelForKey(keys.widgetFieldLimit),
 	},
 	...(args.multiProvider ? [dataSourceField(args)] : []),
+	filterField(),
 ]
 
 /** A select, not the breakdown's free number: the goals table is a summary, not a report. */

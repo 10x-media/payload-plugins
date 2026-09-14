@@ -14,6 +14,8 @@ import { AnalyticsMetricWidget as AnalyticsMetricWidget_e33bd2cebc5cb3736daaf4c0
 import { MetricSelectField as MetricSelectField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
 import { DateRangeField as DateRangeField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
 import { SourceSelectField as SourceSelectField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
+import { FilterDimensionSelectField as FilterDimensionSelectField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
+import { FilterOperatorSelectField as FilterOperatorSelectField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
 import { AnalyticsTrendWidget as AnalyticsTrendWidget_e33bd2cebc5cb3736daaf4c0c56bb68c } from '@10x-media/analytics/rsc'
 import { AnalyticsRealtimeWidget as AnalyticsRealtimeWidget_e33bd2cebc5cb3736daaf4c0c56bb68c } from '@10x-media/analytics/rsc'
 import { AnalyticsGoalsWidget as AnalyticsGoalsWidget_e33bd2cebc5cb3736daaf4c0c56bb68c } from '@10x-media/analytics/rsc'
@@ -39,6 +41,8 @@ export const importMap = {
   "@10x-media/analytics/client#MetricSelectField": MetricSelectField_cf3604008f3ebbc369f9463262b1f9eb,
   "@10x-media/analytics/client#DateRangeField": DateRangeField_cf3604008f3ebbc369f9463262b1f9eb,
   "@10x-media/analytics/client#SourceSelectField": SourceSelectField_cf3604008f3ebbc369f9463262b1f9eb,
+  "@10x-media/analytics/client#FilterDimensionSelectField": FilterDimensionSelectField_cf3604008f3ebbc369f9463262b1f9eb,
+  "@10x-media/analytics/client#FilterOperatorSelectField": FilterOperatorSelectField_cf3604008f3ebbc369f9463262b1f9eb,
   "@10x-media/analytics/rsc#AnalyticsTrendWidget": AnalyticsTrendWidget_e33bd2cebc5cb3736daaf4c0c56bb68c,
   "@10x-media/analytics/rsc#AnalyticsRealtimeWidget": AnalyticsRealtimeWidget_e33bd2cebc5cb3736daaf4c0c56bb68c,
   "@10x-media/analytics/rsc#AnalyticsGoalsWidget": AnalyticsGoalsWidget_e33bd2cebc5cb3736daaf4c0c56bb68c,

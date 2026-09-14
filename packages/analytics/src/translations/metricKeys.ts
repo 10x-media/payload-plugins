@@ -1,4 +1,4 @@
-import type { MetricKey } from '../core/contract'
+import type { FilterOperator, MetricKey } from '../core/contract'
 import type { TimeframePreset } from '../timeframe/presets'
 import type { TranslationKey } from './keys'
 import { keys } from './keys'
@@ -14,6 +14,13 @@ export const METRIC_KEYS: Record<MetricKey, TranslationKey> = {
 	scrollDepth: keys.metricScrollDepth,
 	conversions: keys.metricConversions,
 	revenue: keys.metricRevenue,
+}
+
+/** Read as a sentence next to the dimension: "country is DE", "page contains /blog". */
+export const FILTER_OPERATOR_KEYS: Record<FilterOperator, TranslationKey> = {
+	eq: keys.filterOperatorEq,
+	contains: keys.filterOperatorContains,
+	matches: keys.filterOperatorMatches,
 }
 
 export const TIMEFRAME_KEYS: Record<TimeframePreset, TranslationKey> = {
