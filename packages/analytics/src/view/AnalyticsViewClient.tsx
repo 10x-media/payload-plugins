@@ -26,7 +26,8 @@ const COMMIT_DELAY_MS = 400
 /**
  * The analytics dashboard. Its whole state is the URL, so a link is a view: the query
  * string is parsed on every render, coerced to what the selected source serves, and
- * written back through `router.replace` as the reader works. A coerced value is applied to
+ * written back through `router.push` as the reader works (a debounced day edit uses
+ * `replace`, so Back skips the typing). A coerced value is applied to
  * the reads but deliberately not written back, so a link built for a richer source still
  * opens as intended once that source is selected again.
  */
