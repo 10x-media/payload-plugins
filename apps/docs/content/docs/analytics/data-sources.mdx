@@ -1,0 +1,270 @@
+---
+title: Data sources
+description: What a source is, the sources endpoint, and the authenticated query endpoint every read surface is built on.
+---
+
+A **source** is one readable analytics backend for one request: a config adapter, or a provider a tenant configured at runtime. Every widget, display field and dashboard reads through one, and two authenticated endpoints expose the same resolution to your own code: `GET /api/analytics/sources` lists what the request may read, and `GET /api/analytics/query` reads it.
+
+## What a source is
+
+Sources come from two places, and they behave identically once resolved:
+
+- **Config adapters.** Whatever `analytics({ adapters: [...] })` declares. Their ids are the adapter ids: `native`, `plausible`, `umami`, `ga4`, `posthog`. Every scope sees them; `kind` is `config`.
+- **Runtime providers.** Documents in the [providers collection](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant), or whatever `providers.resolve` returns, resolved per scope. `kind` is `runtime`.
+
+A runtime provider carries a per-document **instance id**, `<provider>:<docId>` (`posthog:68f3a1...`), so one scope can run two projects of the same provider type without their ids colliding. Its label is the document's `name`, falling back to the adapter label plus a short id. Config adapters keep their plain ids.
+
+Both layers are merged into one registry per scope: the config adapters in config order, then that scope's runtime providers. The registry names a **default source**, which a read that omits `source` uses, and it is always a config adapter: `defaultAdapter` when set, otherwise the first one configured.
+
+## Sources endpoint
+
+`GET /api/analytics/sources` answers the sources the request itself resolves, which is what the widget data-source and metric pickers are built from:
+
+```jsonc
+{
+  "defaultId": "native",
+  "sources": [
+    {
+      "id": "native",
+      "label": "Native",
+      "kind": "config",
+      "capabilities": { "metrics": ["pageviews", "visitors"], "...": "..." }
+    },
+    { "id": "plausible:68f3a1", "label": "Alpha Plausible", "kind": "runtime", "capabilities": { "...": "..." } }
+  ]
+}
+```
+
+It requires a signed-in user (`401` otherwise) and passes `access.read` (`403` otherwise); both answer a flat `{ "error": "unauthorized" }` string rather than the query endpoint's coded errors. It takes **no scope parameter**, deliberately, so a tenant can never enumerate another tenant's sources. A request whose scope cannot be resolved, or whose resolution throws, gets `{ "defaultId": null, "sources": [] }` rather than a fallback list.
+
+## Capability gating
+
+Each row carries the adapter's `SerializedCapabilities`, a deliberate allowlist so adapter internals (credentials, rate limits, TTLs) never become client contract:
+
+| Field | Shape | What gates on it |
+|---|---|---|
+| `metrics` | metric keys the source serves | the `metrics` parameter, and which metric a picker offers |
+| `dimensions` | dimension keys it can break down by | the `dimensions` parameter, and which breakdown tabs exist |
+| `filters` | dimensions it can filter on | the `dimension` of each `filters` entry |
+| `filterOperators` | `eq` / `contains` / `matches` | the `operator` of each `filters` entry |
+| `realtime`, `realtimeWindowMinutes` | boolean, plus the window it reports over | whether a realtime surface renders at all |
+| `perPageQuery` | boolean | whether per-document [display fields](/analytics/display-fields) can read it |
+| `comparison` | boolean | the `compare` parameter |
+| `minGranularity` | the finest bucket it can return | the `granularity` parameter |
+| `maxLookbackDays` | days, or `null` for unbounded | how far back a read is narrowed, visibly |
+
+The pickers use it to hide what a source cannot answer; the query endpoint uses the **selected** source's own copy to reject what it was asked for anyway. That is one gate, applied twice, so a request built by hand is validated exactly like one a picker produced.
+
+<Callout type="info">
+Validation is always against the selected source, never against the union of the configured adapters. An install with [runtime providers](/analytics/multi-tenancy) enabled is open-world: a tenant's own adapter serving `revenue` reads it through this endpoint even when no config adapter declares that metric.
+</Callout>
+
+## Query endpoint
+
+`GET /api/analytics/query` is the authenticated read primitive: one audited path through access control, scope gating, capability validation and the [cached surfacing engine](/analytics/cache). Build your own dashboard on it, script a report against it, or read it from an admin component.
+
+It requires a signed-in user and `access.read`. Every answer, success or failure, carries `Cache-Control: private, no-store`: the engine already caches, and the scope of an answer depends on the caller's cookies, so no shared cache may ever hold one.
+
+### Parameters
+
+| Parameter | Shape | Default | Validation |
+|---|---|---|---|
+| `metrics` | comma list of metric keys | required | 1 to 10 after dedupe; every entry a known metric, and one the source serves |
+| `dimensions` | comma list of dimension keys | none (totals only) | at most 2 after dedupe; every entry in `capabilities.dimensions` |
+| `from` | `YYYY-MM-DD`, or an ISO datetime carrying `Z` or an offset | required | a real calendar day |
+| `to` | same as `from` | required | not before `from`; the window must not exceed 366 days |
+| `granularity` | `minute`, `hour`, `day`, `week`, `month` | none (no time series) | not finer than `capabilities.minGranularity` |
+| `filters` | JSON array of `{ dimension, operator, value }` | none | at most 10; each dimension in `capabilities.filters`, each operator in `capabilities.filterOperators`, each value 1 to 256 characters |
+| `limit` | integer | `50` | 1 to 500 |
+| `order` | `<metric>:asc` or `<metric>:desc` | the adapter's own order | the metric must be one of `metrics` |
+| `compare` | `previous` | none | only when `capabilities.comparison`, and only for a range with a comparable previous window |
+| `source` | a source id from the sources endpoint | the request's default source | must be a source this request resolves |
+| `path` | string | none | at most 512 characters |
+| `hostname` | string | none | at most 253 characters |
+| `timezone` | IANA zone | the request's resolved [reporting timezone](/analytics/timezone) | must be a zone the runtime knows |
+| `scope` | string, or `*` for every scope | the request's own scope | honored only for platform readers |
+
+Unknown parameters are ignored, and a parameter that is present but blank is treated as absent. Rules are evaluated in a fixed order and the first failure wins, so a request with two problems is told about the first one: timezone, metrics, dimensions, `from`/`to`, granularity, filters, limit, order, compare, path, hostname.
+
+A value outside the contract's own union is `invalid_param`; a contract-valid value the selected source does not serve gets its own `unsupported_*` code. Asking for a `limit` above 500 is a rejection, not a clamp.
+
+### Dates and the reporting timezone
+
+A date-only bound (`2026-09-01`) means the **whole calendar day in the effective timezone**: `from` is that day's first instant, `to` is its last, so the `to` day is included in full. The effective timezone is the `timezone` parameter when given, otherwise whatever `reportingTimezone` resolves for this request.
+
+A datetime bound must carry `Z` or a `±HH:MM` offset (`2026-09-01T06:00:00+02:00`) and is taken as the instant it names. An offset-less datetime is rejected rather than read in the server process's own zone, and so are the loose forms `Date` would otherwise accept (`2026`, `Sep 1 2026`).
+
+Windows longer than 366 days answer `range_too_long`. Shorter ones can still be narrowed: the engine clamps the range's start to the source's `maxLookbackDays` and sets `result.meta.clamped: true`. The echoed `query` is what you **asked** for, before that clamp, so `meta.clamped` is how a client learns the read covered less than the request named.
+
+### Response
+
+```jsonc
+{
+  "result": {
+    "rows": [{ "dimensions": { "page": "/pricing" }, "metrics": { "pageviews": 812 } }],
+    "totals": { "pageviews": 4120 },
+    "meta": {
+      "provider": "native",
+      "fetchedAt": "2026-09-07T23:59:59.999Z"
+      // "clamped": true  the range was narrowed to the source's maxLookbackDays
+      // "sampled": true  the adapter hit its own row cap
+      // "stale": true    an expired cache entry was served because the refresh failed
+    }
+  },
+  "comparison": { "...": "..." },  // an AnalyticsResult over the previous window, only with compare=previous
+  "source": { "id": "native", "label": "Native", "kind": "config" },
+  "capabilities": { "metrics": ["pageviews"], "...": "..." },
+  "query": {
+    "metrics": ["pageviews"],
+    "dateRange": { "start": "2026-09-01T00:00:00.000Z", "end": "2026-09-07T23:59:59.999Z" },
+    "limit": 50,
+    "timezone": "UTC"
+  }
+}
+```
+
+`query` is the request after validation and defaulting, with the date range as ISO instants, so a client renders the window it actually got rather than the one it typed. `meta` is passed through from the engine untouched: `meta.stale` is `true` when a cache entry expired, the refresh failed, and the expired value was served instead (see [stale-while-error](/analytics/cache)), which is worth surfacing as a badge rather than an error.
+
+`comparison` is the equal-length window immediately preceding the range, aligned to whole reporting-timezone days, and is present only for `compare=previous`.
+
+### Errors
+
+Every non-2xx answer is an `{ error }` object carrying a `code`, a `message`, and a `param` naming the query parameter at fault when one is. Messages are safe to show: adapter configuration and upstream error text never reach the response.
+
+| Status | `error.code` | `param` | When |
+|---|---|---|---|
+| `400` | `invalid_param` | the parameter at fault | any malformed parameter, including `compare=previous` on a source without `capabilities.comparison` or on a range with no comparable previous window |
+| `400` | `unsupported_metric` | `metrics` | a known metric this source does not serve |
+| `400` | `unsupported_dimension` | `dimensions` | a known dimension this source cannot break down by |
+| `400` | `unsupported_filter` | `filters` | a dimension outside `capabilities.filters` |
+| `400` | `unsupported_operator` | `filters` | an operator outside `capabilities.filterOperators` |
+| `400` | `unsupported_granularity` | `granularity` | finer than `capabilities.minGranularity` |
+| `400` | `range_too_long` | `to` | the window exceeds 366 days |
+| `400` | `untrusted_scope` | `scope` | a `scope` parameter from a caller `access.platformRead` denies |
+| `401` | `unauthorized` | | no signed-in user |
+| `403` | `forbidden` | | `access.read` denied the request |
+| `403` | `forbidden` | `source` | a listed shared source that cannot filter by scope, read under a scope, without `platformRead` |
+| `404` | `unknown_source` | | no source resolves for this request at all |
+| `404` | `unknown_source` | `source` | a `source` id outside this request's own registry |
+| `503` | `unavailable` | | the source is down and no cached entry survived; carries `Retry-After: 30` |
+| `503` | `unavailable` | | the plugin is not installed on this Payload instance (no `Retry-After`) |
+| `500` | `internal` | | an unexpected failure; the detail is logged with the adapter id, never returned |
+
+<Callout type="warn">
+`403` with `param: 'source'` is not an error state to shout about. The sources endpoint lists a shared config adapter for every scope (it always has), but **reading** it under a tenant scope would be a cross-scope read, so it fails closed behind `access.platformRead`. The picker and the endpoint agree on which sources exist, not on which are readable; treat it as "this source is not readable for your scope" and let the user pick another.
+</Callout>
+
+### Examples
+
+Top pages over a week, busiest first:
+
+```http
+GET /api/analytics/query?metrics=pageviews,visitors&dimensions=page&from=2026-09-01&to=2026-09-07&order=pageviews:desc&limit=10
+```
+
+```jsonc
+{
+  "result": {
+    "rows": [
+      { "dimensions": { "page": "/pricing" }, "metrics": { "pageviews": 812, "visitors": 604 } },
+      { "dimensions": { "page": "/blog/launch" }, "metrics": { "pageviews": 455, "visitors": 402 } }
+    ],
+    "totals": { "pageviews": 4120, "visitors": 2980 },
+    "meta": { "provider": "native", "fetchedAt": "2026-09-07T23:59:59.999Z" }
+  },
+  "source": { "id": "native", "label": "Native", "kind": "config" },
+  "capabilities": { "...": "..." },
+  "query": { "...": "..." }
+}
+```
+
+Conversions and revenue per [goal](/analytics/goals) for August, against July:
+
+```http
+GET /api/analytics/query?metrics=conversions,revenue&dimensions=goal&from=2026-08-01&to=2026-08-31&compare=previous
+```
+
+`comparison` then carries the same shape over `2026-07-01` to `2026-07-31`, ready to diff row by row.
+
+Daily pageviews from Germany only. `filters` is a JSON array, so URL-encode it:
+
+```http
+GET /api/analytics/query?metrics=pageviews&granularity=day&from=2026-09-01&to=2026-09-07&filters=%5B%7B%22dimension%22%3A%22country%22%2C%22operator%22%3A%22eq%22%2C%22value%22%3A%22DE%22%7D%5D
+```
+
+```ts
+// the same filter, built rather than typed
+const filters = JSON.stringify([{ dimension: 'country', operator: 'eq', value: 'DE' }])
+const url = `/api/analytics/query?metrics=pageviews&granularity=day&from=2026-09-01&to=2026-09-07&filters=${encodeURIComponent(filters)}`
+```
+
+A source whose `capabilities.filters` does not list `country` answers `unsupported_filter` instead, which is the signal to drop the filter chip rather than to retry.
+
+### From admin code
+
+`fetchQuery` wraps the endpoint for client components, with the credentials, the JSON handling and an in-flight dedupe already done:
+
+```tsx title="TopPages.tsx"
+'use client'
+
+import { fetchQuery, QueryFetchError } from '@10x-media/analytics/client'
+import type { AnalyticsRow } from '@10x-media/analytics/types'
+import { useConfig } from '@payloadcms/ui'
+import { useEffect, useState } from 'react'
+
+export const TopPages = () => {
+  const {
+    config: {
+      routes: { api },
+    },
+  } = useConfig()
+  const [rows, setRows] = useState<AnalyticsRow[]>([])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchQuery(
+      api,
+      {
+        metrics: ['pageviews', 'visitors'],
+        dimensions: ['page'],
+        from: '2026-09-01',
+        to: '2026-09-07',
+        order: { metric: 'pageviews', direction: 'desc' },
+        limit: 10,
+      },
+      { signal: controller.signal },
+    )
+      .then(({ result }) => setRows(result.rows))
+      .catch((err: unknown) => {
+        if (err instanceof QueryFetchError) {
+          // err.status, err.error?.code, err.error?.param, err.retryAfter
+        }
+      })
+    return () => controller.abort()
+  }, [api])
+
+  return <ul>{rows.map((row) => <li key={row.dimensions?.page}>{row.dimensions?.page}</li>)}</ul>
+}
+```
+
+- `buildQueryUrl(apiRoute, request)` returns the same URL without fetching it, written in a fixed field order so two requests with identical values always produce the same string.
+- Concurrent calls for one URL share a single fetch; the entry clears on settle, so a later call refetches and a failed one retries. A caller's `AbortSignal` (`fetchQuery(api, request, { signal })`) rejects that caller alone and deliberately leaves the shared fetch running for everyone else waiting on it.
+- Any non-2xx throws `QueryFetchError` with `status`, the parsed `error` (`code`, `message`, `param`) when the body matched the endpoint's shape, and `retryAfter` in seconds when the response carried the header. A network-level failure propagates as itself.
+
+`QueryRequest` carries no `scope` field: the helper reads the caller's own scope, which is what an admin surface wants. A platform reader deliberately reading another scope builds that URL itself.
+
+`QueryRequest` and the response types are exported from `@10x-media/analytics/types`, along with `DIMENSION_KEYS` and `FILTER_OPERATORS` for building pickers of your own.
+
+## Multi-tenancy
+
+Scope comes from the request, exactly as it does everywhere else: the plugin's `scopeResolver` decides it, and the endpoint reads the sources that scope resolves. There is no way for a tenant to read another tenant's numbers by asking.
+
+- An explicit `scope` parameter is honored **only** for platform readers. Anyone else gets `400 untrusted_scope`, whatever the value.
+- `scope=*` reads every scope at once, behind the same `access.platformRead` gate.
+- On a scoped install, a request resolving no scope at all is ambiguous rather than install-wide (it usually means no tenant is selected), so it fails closed: `404 unknown_source`.
+- A `scopeResolver` that answers the platform wildcard (`*`) for a given request is itself a cross-scope resolution, so it too requires `access.platformRead`. Without it, that request resolves no sources at all, on this endpoint and on the sources endpoint.
+- A shared config adapter that cannot filter by scope is listed for a tenant but not readable by one: see the `403` note above.
+
+Granting `access.read` never widens which scope a user reads. The two gates are independent, and scope gating always applies.
+
+See [Multi-tenancy](/analytics/multi-tenancy) for the full recipe.

@@ -72,3 +72,12 @@ Providers that accept a timezone are told the resolved zone:
 - **PostHog** buckets the daily series with `toStartOfDay(timestamp, '<zone>')` in HogQL.
 
 **GA4** and **Plausible** bucket in their own property / site timezone; the plugin cannot override that per read, so align the provider's own configured timezone with `reportingTimezone` for consistent daily boundaries.
+
+<Callout type="warn">
+**Their range bounds changed.** Both adapters ask for whole calendar days (`startDate` / `endDate`), and both used to name those days by the UTC spelling of the range's instants. They now name the calendar day in the resolved `reportingTimezone`, which corrects two off-by-a-day errors. Numbers move on any install reading GA4 or Plausible with a non-UTC `reportingTimezone`; `native`, PostHog and Umami are unaffected, since none of them projects a range onto a calendar day.
+
+- **East of UTC** (say `Europe/Berlin`), the start bound was one calendar day early: a window starting at Berlin midnight on the 1st is `08-31T22:00Z`, which named the 31st. Every read silently included the preceding day, so a 30-day widget was really querying 31, and its totals drop once this lands.
+- **West of UTC** (say `America/New_York`), the end bound named the following day whenever local time was past the UTC rollover: at 20:00 on the 7th the range end is `09-08T00:00Z`, which named the 8th. A trailing partial day is no longer included.
+
+If a dashboard's numbers shift after upgrading, this is why, and the new numbers are the correct ones for the zone you configured.
+</Callout>

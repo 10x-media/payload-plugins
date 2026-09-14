@@ -16,6 +16,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Goals**: conversions and revenue, completed from a `data-analytics-goal` attribute, a `goalField()` picker in your own blocks, a `@10x-media/form-builder` action, or `trackServerEvent` from server code (webhooks, jobs), and declared in config or in an opt-in collection editors manage per scope.
 - **Dashboard widgets** for Payload's Modular Dashboard: metric, trend, four breakdowns, and realtime, all capability-gated, plus a public API for custom widgets.
 - **Display fields**: `analyticsStat`, `analyticsStatRow`, `analyticsFields`, `analyticsTab`, `analyticsTabsField` place per-document stats on your collections; typed per-collection bindings resolve each document's URL path.
+- **Query endpoint**: an authenticated `GET /api/analytics/query` over any configured source, capability-validated and scope-gated, with coded errors and a `fetchQuery` helper for admin code.
 - **Caching** through `payload.kv` with request coalescing, plus an opt-in scheduled warm job.
 - **Sync tier**: persist provider daily metrics into a queryable Payload collection.
 - **Typed translations** with per-key overrides via `@10x-media/analytics/i18n`.
@@ -58,6 +59,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/analytics):
 - [Overview](https://docs.10xmedia.de/analytics)
 - [Quick start](https://docs.10xmedia.de/analytics/quick-start)
 - [Adapters](https://docs.10xmedia.de/analytics/adapters)
+- [Data sources and the query endpoint](https://docs.10xmedia.de/analytics/data-sources)
 - [Native engine](https://docs.10xmedia.de/analytics/native)
 - [Capture](https://docs.10xmedia.de/analytics/capture)
 - [Goals](https://docs.10xmedia.de/analytics/goals)
