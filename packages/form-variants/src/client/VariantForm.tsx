@@ -154,6 +154,9 @@ export const VariantForm: React.FC<Props> = (props) => {
 	const schemaPathSegments = useMemo(() => [collectionSlug ?? ''], [collectionSlug])
 	const validateBeforeSubmit = Boolean(operation === 'create' && auth && !auth.disableLocalStrategy)
 	const nextHrefRef = useRef<null | string>(null)
+	// Filled in by the runner. Payload debounces `onChange` and only fires it on a real change,
+	// so it is the cheapest place to tell the step engine that the values moved.
+	const onFormChangeRef = useRef<(() => void) | null>(null)
 	const wizardStateRef = useRef(wizardState)
 	wizardStateRef.current = wizardState
 
@@ -420,6 +423,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 
 	const onChange = useCallback<NonNullable<FormProps['onChange']>[number]>(
 		async ({ formState: prevFormState, submitted }) => {
+			onFormChangeRef.current?.()
 			const controller = handleAbortRef(abortOnChangeRef as React.RefObject<AbortController>)
 			const saveCounterAtStart = saveCounterRef.current
 			const isSavingAtStart = isSavingRef.current
@@ -536,6 +540,14 @@ export const VariantForm: React.FC<Props> = (props) => {
 
 	const readOnly = isReadOnlyForIncomingUser || !hasSavePermission || isTrashed === true
 	const isFolderCollection = Boolean(config.folders && collectionSlug === config.folders?.slug)
+
+	/**
+	 * Payload's own edit view passes `undefined` here, against the prop's declared `string`, and
+	 * that is the point: `formatDocTitle` takes the fallback only when it is not a string, so an
+	 * empty one becomes the document's title. An empty title then reads to `RenderTitle` as a
+	 * document shown by its id, which on create is an empty `ID:` label where `[Untitled]` belongs.
+	 */
+	const titleFallback = (depth <= 1 ? id?.toString() : undefined) as string
 
 	/** Take-over from the locked-document modal; the read-only state has no take-over button here. */
 	const takeOver = (): void => {
@@ -669,13 +681,14 @@ export const VariantForm: React.FC<Props> = (props) => {
 					<SetDocumentTitle
 						collectionConfig={collectionConfig ?? undefined}
 						config={config}
-						fallback={depth <= 1 ? (id?.toString() ?? '') : ''}
+						fallback={titleFallback}
 					/>
 					<Runner
 						{...props}
 						beforeSteps={beforeSteps}
 						header={header}
 						key={variant.key}
+						onFormChange={onFormChangeRef}
 						readOnly={readOnly}
 						variant={variant}
 					/>

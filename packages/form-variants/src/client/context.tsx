@@ -61,9 +61,19 @@ export type WizardContextValue = {
 	blockSave: (reason: string) => void
 	/** True while a move is validating, evaluating a gate, or waiting for the server. */
 	busy: boolean
+	/**
+	 * Whether `goTo` would open that step: any of them under `free`, and under `linear` the ones
+	 * behind the current step plus the ones already visited.
+	 */
+	canGoTo: (key: string) => boolean
 	count: number
 	/** The last gate refusal, validation or server message, cleared on the next successful move. */
 	error: null | string
+	/**
+	 * How many fields of that step are failing validation. Zero until a move or a save was
+	 * refused, since that is when Payload starts reporting field errors at all.
+	 */
+	errorCount: (key: string) => number
 	/** Ends the wizard without a native save and shows the `Outcome` slot. */
 	finish: (outcome: Outcome) => void
 	goTo: (key: string) => Promise<void>

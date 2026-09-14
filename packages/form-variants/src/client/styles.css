@@ -128,7 +128,9 @@
 
 :where(.form-variants__progress-tab) {
 	position: relative;
-	display: block;
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.35);
 	margin: 0;
 	padding: 0 0 calc(var(--base) * 0.75);
 	border: 0;
@@ -193,6 +195,21 @@
 
 :where(.form-variants__progress--linear .form-variants__progress-item--done)::after {
 	background: var(--form-variants-done);
+}
+
+/*
+ * A step whose fields are failing, in Payload's own error colour and with its own error pill.
+ * Last of the progress rules on purpose: every one of them is a `:where()` with no specificity,
+ * so an error has to come after `current` and `done` to win over them.
+ */
+
+:where(.form-variants__progress-item--has-error .form-variants__progress-tab) {
+	color: var(--theme-error-500);
+}
+
+:where(.form-variants__progress-item--has-error .form-variants__progress-tab)::after,
+:where(.form-variants__progress--linear .form-variants__progress-item--has-error)::after {
+	background: var(--theme-error-500);
 }
 
 /* Step header and body. */

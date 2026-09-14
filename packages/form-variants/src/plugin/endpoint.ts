@@ -99,6 +99,14 @@ const getHasPublishedDoc = async (
  * without update access (create access when there is no id yet, or after a save that created
  * the document), re-checks the variant's `access`, and only then runs the step logic the
  * phase names. `afterSave` gets the document as the server reads it, never the browser's copy.
+ *
+ * What a call reads from the database depends only on whether the document exists yet. On
+ * create there is no id: `docAccessOperation` runs with `fetchData: false`, no document is
+ * loaded and `getHasPublishedDoc` returns before querying, so a call reads nothing. On a saved
+ * document it is two reads, the permission check's own fetch and the `findByID` here, and a
+ * third on a drafts collection for the published version. The browser re-evaluates visibility
+ * after every settled edit, so those reads are what live conditions cost while editing a saved
+ * document; on create, which is what guided variants are for, they cost nothing.
  */
 export const buildEvaluateEndpoint = (): Endpoint => ({
 	handler: async (req) => {

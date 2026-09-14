@@ -36,7 +36,7 @@ test.describe('editor', () => {
 
 		await expect(current).toContainText('How to reach them')
 		await expect(page.locator('#field-email')).toBeVisible()
-		await expect(page.url()).toContain('step=contact')
+		await expect(page).not.toHaveURL(/step=/)
 	})
 
 	test('gets the empty state on a collection with no form for editors', async ({ page }) => {

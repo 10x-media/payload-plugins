@@ -106,10 +106,11 @@ export const formVariants = definePlugin<FormVariantsPluginOptions>({
 
 export {
 	COLLECTION_CUSTOM_KEY,
+	DOC_PREFERENCE_PROPERTY,
+	docPreferenceKeyFor,
 	EVALUATE_PATH,
 	NATIVE_KEY,
 	preferenceKeyFor,
-	STEP_PARAM,
 	VARIANT_PARAM,
 } from './plugin/constants'
 export {

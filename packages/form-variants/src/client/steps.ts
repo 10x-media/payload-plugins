@@ -44,9 +44,17 @@ export const stepPaths = (step: ClientStep, formState: FormState): string[] => {
 	)
 }
 
+/**
+ * How many fields of the step are failing validation in the given state. Form state carries
+ * `valid` only once the form has been submitted once, so this is zero until a move or a save
+ * was refused, which is when Payload starts showing field errors too.
+ */
+export const stepErrorCount = (step: ClientStep, formState: FormState): number =>
+	stepPaths(step, formState).filter((path) => {
+		const field = formState[path]
+		return Boolean(field) && field?.passesCondition !== false && field?.valid === false
+	}).length
+
 /** Whether every field of the step passed validation in the given state. */
 export const stepIsValid = (step: ClientStep, formState: FormState): boolean =>
-	stepPaths(step, formState).every((path) => {
-		const field = formState[path]
-		return !field || field.passesCondition === false || field.valid !== false
-	})
+	stepErrorCount(step, formState) === 0

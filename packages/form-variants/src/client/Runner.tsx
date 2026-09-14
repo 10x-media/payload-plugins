@@ -8,6 +8,7 @@ import {
 	useFormFields,
 	useFormModified,
 	useHotkey,
+	usePreferences,
 	useServerFunctions,
 } from '@payloadcms/ui'
 import type { FormState, JsonObject } from 'payload'
@@ -15,7 +16,7 @@ import { hasDraftsEnabled } from 'payload/shared'
 import type React from 'react'
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
-import { STEP_PARAM } from '../plugin/constants'
+import { DOC_PREFERENCE_PROPERTY, docPreferenceKeyFor } from '../plugin/constants'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { GateResult } from '../types'
@@ -30,13 +31,25 @@ import {
 import { evaluate } from './evaluate'
 import { computeSaveGuard } from './guard'
 import { resolveSlot } from './slots'
-import { resolveStepKey, stepIsRenderable, stepIsValid, stepPaths, visibleSteps } from './steps'
+import {
+	resolveStepKey,
+	stepErrorCount,
+	stepIsRenderable,
+	stepIsValid,
+	stepPaths,
+	visibleSteps,
+} from './steps'
 import type { ClientVariant, Outcome, RenderedSlots, VariantProviderProps } from './types'
-import { replaceParam } from './url'
 
 type RunnerProps = VariantProviderProps & {
 	/** Rendered above the steps: the upload area on upload collections. */
 	beforeSteps: React.ReactNode
+	/**
+	 * Filled in by the runner with a function the form calls after every settled edit. A ref
+	 * rather than a prop callback because the form owns `onChange` and the step engine lives
+	 * here, and neither should re-render the other for it.
+	 */
+	onFormChange: React.RefObject<(() => void) | null>
 	/** The variant's top bar, rendered inside the wizard context so its save button can read the guard. */
 	header: React.ReactNode
 	readOnly: boolean
@@ -97,7 +110,7 @@ const setByPath = (target: JsonObject, path: string, value: unknown): void => {
  * variants resets the engine while the form underneath keeps its values.
  */
 export const Runner: React.FC<RunnerProps> = (props) => {
-	const { beforeSteps, header, readOnly, rendered, slots, variant } = props
+	const { beforeSteps, header, onFormChange, readOnly, rendered, slots, variant } = props
 	const { t } = useTranslation()
 	const {
 		collectionSlug,
@@ -120,12 +133,14 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 	const { id, docPermissions, getDocPreferences, hasPublishPermission } = useDocumentInfo()
 	const { dispatchFields, getData, getFields, setModified, setSubmitted, submit } = useForm()
 	const { getFormState } = useServerFunctions()
+	const { setPreference } = usePreferences()
 	const editDepth = useEditDepth()
 	const modified = useFormModified()
 
 	const [visibleKeys, setVisibleKeys] = useState<ReadonlySet<string>>(
 		() => new Set(variant.steps.filter((step) => step.initiallyVisible).map((step) => step.key))
 	)
+	const [visited, setVisited] = useState<ReadonlySet<string>>(() => new Set())
 	const [busy, setBusy] = useState(false)
 	const [error, setError] = useState<null | string>(null)
 	const [blockedMessage, setBlockedMessage] = useState<null | string>(null)
@@ -135,6 +150,11 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 		stepKey: null,
 	})
 	const handlersRef = useRef(new Set<BeforeNextHandler>())
+	const refreshAbortRef = useRef<AbortController | null>(null)
+	// The step already stored, so restoring one on open does not write it straight back.
+	const writtenStepRef = useRef<null | string>(props.storedSteps[variant.key] ?? null)
+	const busyRef = useRef(false)
+	busyRef.current = busy
 	const wizardStateRef = useRef(wizardState)
 	wizardStateRef.current = wizardState
 
@@ -148,6 +168,20 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 		() => new Set(renderableJoined.split(STEP_KEY_SEPARATOR).filter(Boolean)),
 		[renderableJoined]
 	)
+
+	/**
+	 * Failing fields per step, so the progress tabs can say where the error is. Joined into one
+	 * string, as the renderable set is, so the runner re-renders when a count changes and not on
+	 * every keystroke.
+	 */
+	const errorsJoined = useFormFields(([fields]) =>
+		variant.steps.map((step) => stepErrorCount(step, fields ?? {})).join(STEP_KEY_SEPARATOR)
+	)
+	const errorCounts = useMemo(() => {
+		const counts = errorsJoined.split(STEP_KEY_SEPARATOR)
+		return new Map(variant.steps.map((step, i) => [step.key, Number(counts[i]) || 0]))
+	}, [errorsJoined, variant.steps])
+	const errorCount = useCallback((key: string) => errorCounts.get(key) ?? 0, [errorCounts])
 
 	const steps = useMemo(
 		() => visibleSteps(variant.steps, visibleKeys, renderableKeys),
@@ -184,10 +218,43 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 		if (currentKey !== stepKey) {
 			setStepKey(currentKey)
 		}
-		if (!inDrawer) {
-			replaceParam(STEP_PARAM, currentKey)
+	}, [currentKey, setStepKey, stepKey])
+
+	/**
+	 * Remembers the open section of a sections variant in the document's own Payload
+	 * preferences, beside the tab and collapsible state of the same document, so a save or a
+	 * reload comes back to it. A guided variant is a sequence and always starts at its first
+	 * step, and a document that does not exist yet has nothing to remember it by.
+	 *
+	 * `setPreference` merges, so Payload's own properties on that document are left alone and
+	 * each variant keeps its own step.
+	 */
+	useEffect(() => {
+		if (
+			variant.navigation !== 'free' ||
+			!id ||
+			!currentKey ||
+			currentKey === writtenStepRef.current
+		) {
+			return
 		}
-	}, [currentKey, inDrawer, setStepKey, stepKey])
+		writtenStepRef.current = currentKey
+		void setPreference(
+			docPreferenceKeyFor(collectionSlug, id),
+			{ [DOC_PREFERENCE_PROPERTY]: { steps: { [variant.key]: currentKey } } },
+			true
+		)
+	}, [collectionSlug, currentKey, id, setPreference, variant.key, variant.navigation])
+
+	// Every step the user has stood on stays open to them, so a look back at an earlier answer
+	// does not cost a click through everything in between.
+	useEffect(() => {
+		if (currentKey) {
+			setVisited((previous) =>
+				previous.has(currentKey) ? previous : new Set(previous).add(currentKey)
+			)
+		}
+	}, [currentKey])
 
 	const needsServer = useMemo(
 		() => variant.steps.some((candidate) => candidate.hasCondition),
@@ -221,7 +288,7 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 	)
 
 	const callEvaluate = useCallback(
-		(phase: 'gate' | 'visibility', gateStep?: string) =>
+		(phase: 'gate' | 'visibility', gateStep?: string, signal?: AbortSignal) =>
 			evaluate({
 				apiRoute,
 				body: {
@@ -235,9 +302,54 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 					variant: variant.key,
 				},
 				serverURL,
+				signal,
 			}),
 		[apiRoute, collectionSlug, getData, id, inDrawer, serverURL, variant.key]
 	)
+
+	/**
+	 * Re-evaluates which steps are visible against the values as they stand, so a condition
+	 * shows or hides its step as soon as the field it reads changes rather than at the next
+	 * move. Payload debounces `onChange` and fires it only when form state really changed, so
+	 * this costs one request per settled edit and no render work. On an existing document that
+	 * request also costs the reads the evaluate endpoint makes; see `buildEvaluateEndpoint`.
+	 *
+	 * The step the user is standing on stays visible whatever the answer, since a condition
+	 * turning false underneath them would otherwise move them off it mid-edit. The next move
+	 * takes the server's answer as it comes and drops the step then.
+	 */
+	const refreshVisibility = useCallback(async () => {
+		if (!needsServer || readOnly || busyRef.current) {
+			return
+		}
+		refreshAbortRef.current?.abort()
+		const controller = new AbortController()
+		refreshAbortRef.current = controller
+		try {
+			const response = await callEvaluate('visibility', undefined, controller.signal)
+			if (controller.signal.aborted) {
+				return
+			}
+			const next = new Set(response.visible)
+			if (currentKeyRef.current) {
+				next.add(currentKeyRef.current)
+			}
+			setVisibleKeys(next)
+		} catch {
+			// A background refresh is nobody's click; the next move is where a failure belongs.
+		}
+	}, [callEvaluate, needsServer, readOnly])
+
+	useEffect(() => {
+		onFormChange.current = () => {
+			void refreshVisibility()
+		}
+		return () => {
+			onFormChange.current = null
+		}
+	}, [onFormChange, refreshVisibility])
+
+	useEffect(() => () => refreshAbortRef.current?.abort(), [])
 
 	/**
 	 * Server-side validation of the current step only. Payload validates the whole form and
@@ -451,16 +563,28 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 		}
 	}, [moveFreely, step])
 
+	/**
+	 * Whether a step opens on a click. `free` opens any of them; `linear` opens the ones behind
+	 * the current step and the ones already visited, whose validation and gate have run.
+	 */
+	const canGoTo = useCallback(
+		(key: string): boolean => {
+			const target = steps.findIndex((candidate) => candidate.key === key)
+			if (target < 0 || key === currentKey) {
+				return false
+			}
+			return variant.navigation === 'free' || target < index || visited.has(key)
+		},
+		[currentKey, index, steps, variant.navigation, visited]
+	)
+
 	const goTo = useCallback(
 		async (key: string) => {
-			if (
-				step &&
-				(variant.navigation === 'free' || steps.findIndex((s) => s.key === key) < index)
-			) {
+			if (step && canGoTo(key)) {
 				await moveFreely(key, step.key, 1)
 			}
 		},
-		[index, moveFreely, step, steps, variant.navigation]
+		[canGoTo, moveFreely, step]
 	)
 
 	const guard = computeSaveGuard({
@@ -520,9 +644,11 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 			allowSave,
 			back,
 			blockSave,
+			canGoTo,
 			busy,
 			count: steps.length,
 			error,
+			errorCount,
 			finish,
 			goTo,
 			index,
@@ -548,8 +674,10 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 			back,
 			blockSave,
 			blockedMessage,
+			canGoTo,
 			busy,
 			error,
+			errorCount,
 			finish,
 			goTo,
 			guard.allowed,

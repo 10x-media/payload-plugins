@@ -59,8 +59,8 @@ export type VariantProviderProps = {
 	/** Payload's own view props and document slots (custom buttons, description), passed through to both surfaces. */
 	documentSlots: DocumentViewClientProps
 	initial: { drawer: null | string; page: null | string }
-	/** `?step=` from the full page, validated by the runner. */
-	initialStep: null | string
+	/** The step each sections variant was last left on, by variant key. Empty on a new document. */
+	storedSteps: Record<string, string>
 	/** Component steps and component items, keyed `<variant>/<step>` and `<variant>/<step>/<index>`. */
 	rendered: Record<string, React.ReactNode>
 	slots: {

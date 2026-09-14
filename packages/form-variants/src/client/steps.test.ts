@@ -1,7 +1,14 @@
 import type { FormState } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { resolveStepKey, stepIsRenderable, stepIsValid, stepPaths, visibleSteps } from './steps'
+import {
+	resolveStepKey,
+	stepErrorCount,
+	stepIsRenderable,
+	stepIsValid,
+	stepPaths,
+	visibleSteps,
+} from './steps'
 import type { ClientStep } from './types'
 
 const step = (
@@ -70,6 +77,16 @@ describe('stepPaths and stepIsValid', () => {
 			'address.street',
 			'firstName',
 		])
+	})
+
+	it('counts every failing field of the step, for the progress badge', () => {
+		const both = step('both', [
+			{ path: 'address', type: 'field' },
+			{ path: 'salary', type: 'field' },
+		])
+		expect(stepErrorCount(both, state)).toBe(2)
+		expect(stepErrorCount(identity, state)).toBe(1)
+		expect(stepErrorCount(step('names', [{ path: 'firstName', type: 'field' }]), state)).toBe(0)
 	})
 
 	it('judges only the step, ignoring fields whose condition failed', () => {

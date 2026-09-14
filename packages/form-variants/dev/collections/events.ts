@@ -4,9 +4,9 @@ import { defineFormVariants } from '../../src/index'
 
 /**
  * Two variants of our own and no native form for anyone. A new event opens the guided
- * `wizard`, whose venue or stream step depends on the format chosen in the first step; an
- * existing one opens `edit`, which works as tabs and saves on any step. Switching between the
- * two keeps every value, since they share one form.
+ * `wizard`, whose venue or stream step depends on the format chosen in the first step, and
+ * which exists only while the event is being created. Saving on its last step leaves the
+ * create page, so the saved event opens on `edit`, which works as tabs and saves on any step.
  */
 export const events: CollectionConfig = {
 	slug: 'events',
@@ -18,6 +18,9 @@ export const events: CollectionConfig = {
 				{
 					key: 'wizard',
 					label: 'Guided',
+					// Creating an event is a guided sequence; editing a saved one is not, so the
+					// variant leaves with the create operation and the switcher drops to one entry.
+					access: ({ operation }) => operation === 'create',
 					steps: [
 						{
 							key: 'basics',

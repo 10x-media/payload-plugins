@@ -8,11 +8,11 @@ import type {
 import type React from 'react'
 import type { Availability, RenderedVariantSlots, VariantProviderProps } from '../client/types'
 import { VariantProvider } from '../client/VariantProvider'
-import { STEP_PARAM, VARIANT_PARAM } from '../plugin/constants'
+import { VARIANT_PARAM } from '../plugin/constants'
 import { getCollectionVariants, getRegistry } from '../plugin/registry'
 import { buildContext, evaluateVisibility, filterAvailable, withValues } from './evaluate'
 import { buildClientVariant } from './manifest'
-import { getStoredChoice } from './preferences'
+import { getStoredPreferences } from './preferences'
 import { renderSlots, renderVariant } from './render'
 import { selectVariant } from './select'
 
@@ -75,7 +75,7 @@ export const VariantEditView = async (props: DocumentViewServerProps): Promise<R
 	const operation = docID ? 'update' : 'create'
 	const document = (doc ?? null) as JsonObject | null
 	const requested = firstParam(searchParams?.[VARIANT_PARAM])
-	const stored = await getStoredChoice(req, collectionConfig.slug)
+	const stored = await getStoredPreferences(req, collectionConfig.slug, docID)
 
 	const availability: Availability = { drawer: [], page: [] }
 	const initial: VariantProviderProps['initial'] = { drawer: null, page: null }
@@ -100,7 +100,7 @@ export const VariantEditView = async (props: DocumentViewServerProps): Promise<R
 			available,
 			defaultKey,
 			requested: surface === 'page' ? requested : null,
-			stored,
+			stored: stored.variant,
 		})
 	}
 
@@ -138,6 +138,16 @@ export const VariantEditView = async (props: DocumentViewServerProps): Promise<R
 		variantSlots[variant.key] = result.slots
 	}
 
+	// Only a variant navigated as sections resumes where it was left. A guided one is a
+	// sequence, and dropping someone back into the middle of it would skip what came before.
+	const storedSteps: Record<string, string> = {}
+	for (const variant of union) {
+		const step = stored.steps[variant.key]
+		if (step && !variant.native && variant.navigation === 'free') {
+			storedSteps[variant.key] = step
+		}
+	}
+
 	const shared = { collection: collectionConfig.slug }
 
 	return (
@@ -146,7 +156,7 @@ export const VariantEditView = async (props: DocumentViewServerProps): Promise<R
 			collectionSlug={collectionConfig.slug}
 			documentSlots={documentSlots}
 			initial={initial}
-			initialStep={firstParam(searchParams?.[STEP_PARAM])}
+			storedSteps={storedSteps}
 			rendered={rendered}
 			slots={{
 				collection: renderSlots(renderArgs, collection.components, shared),

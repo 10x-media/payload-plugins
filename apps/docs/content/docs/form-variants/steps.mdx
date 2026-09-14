@@ -31,7 +31,19 @@ export const DuplicateCheckStep = () => {
 
 ## Conditions
 
-A step's `condition` runs on the server with the current values and wizard state. It is evaluated at page render against the saved document, and again on every step change (forward, back, or a direct jump), so the progress count can change as the user moves. On a new document the first render has empty values, so a condition that depends on them is false until the first move.
+A step's `condition` runs on the server with the current values and wizard state. It is evaluated at page render against the saved document, on every step change, and again after each edit the form settles on, so a step appears or disappears as soon as the field its condition reads changes rather than at the next move. On a new document the first render has empty values, so a condition that depends on them is false until the first edit.
+
+The step the user is on is the one exception: it stays on screen even when its condition turns false under them, so that typing cannot move them off the step they are filling in. It goes away on the next move.
+
+Re-evaluation rides on Payload's own `onChange`, which is debounced and fires only when form state really changed, so it is one request per settled edit. What that request costs depends on whether the document exists yet:
+
+| | Reads per call |
+|---|---|
+| Create, no document yet | none |
+| Existing document | 2 |
+| Existing document, drafts enabled | 3 |
+
+On create, the permission check runs without fetching, there is no document to load and `hasPublishedDoc` answers `false` outright, so re-evaluation reads nothing at all. On a saved document it is the permission check's own fetch plus the document the endpoint loads with access enforced, and on a drafts collection one more for the published version. Guided variants are meant for creating a document, where this is free; a `save: 'always'` sections variant with conditions pays the reads above while it is edited.
 
 ## Gates
 
@@ -49,7 +61,7 @@ Anything richer (show the matches, offer a request to admins) is a component ste
 
 ## Wizard state
 
-A JSON object scoped to the document page or drawer, shared by the steps and never saved to the document. It survives switching variants; a reload or a locale change clears it, while `?step=` survives both. Steps must work with it empty. It is sent to the evaluate endpoint with every call, so server logic sees it, and must not treat it as proof of anything: `duplicateCheckPassed: true` in wizard state guarantees nothing.
+A JSON object scoped to the document page or drawer, shared by the steps and never saved to the document. It survives switching variants; a reload or a locale change clears it. Steps must work with it empty. It is sent to the evaluate endpoint with every call, so server logic sees it, and must not treat it as proof of anything: `duplicateCheckPassed: true` in wizard state guarantees nothing.
 
 ## The hooks
 

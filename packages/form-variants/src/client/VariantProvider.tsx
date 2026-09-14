@@ -10,7 +10,7 @@ import {
 import type React from 'react'
 import { useCallback, useMemo, useState } from 'react'
 
-import { BASE_CLASS, preferenceKeyFor, STEP_PARAM, VARIANT_PARAM } from '../plugin/constants'
+import { BASE_CLASS, preferenceKeyFor, VARIANT_PARAM } from '../plugin/constants'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { WizardState } from '../types'
@@ -42,7 +42,7 @@ const EmptyState: React.FC = () => {
  * `native` crosses into another form and asks first when there are unsaved changes.
  */
 export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
-	const { availability, collectionSlug, documentSlots, initial, initialStep, slots, variants } =
+	const { availability, collectionSlug, documentSlots, initial, slots, storedSteps, variants } =
 		props
 	const { drawerSlug } = useDocumentDrawerContext()
 	const depth = useEditDepth()
@@ -60,10 +60,16 @@ export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
 		[availability, surface, variants]
 	)
 
+	/** The remembered step of a sections variant, which the server left out for a guided one. */
+	const rememberedStep = useCallback(
+		(key: null | string): null | string => (key ? (storedSteps[key] ?? null) : null),
+		[storedSteps]
+	)
+
 	const [activeKey, setActiveKey] = useState<null | string>(() => initial[surface])
 	const [state, setState] = useState<WizardState>({})
 	const [outcome, setOutcome] = useState<null | Outcome>(null)
-	const [stepKey, setStepKey] = useState<null | string>(inDrawer ? null : initialStep)
+	const [stepKey, setStepKey] = useState<null | string>(() => rememberedStep(initial[surface]))
 
 	const switchTo = useCallback(
 		(key: string, options?: SwitchOptions) => {
@@ -72,16 +78,15 @@ export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
 			}
 			setActiveKey(key)
 			setOutcome(null)
-			setStepKey(null)
+			setStepKey(rememberedStep(key))
 			if (!inDrawer) {
 				replaceParam(VARIANT_PARAM, key)
-				replaceParam(STEP_PARAM, null)
 			}
 			if (options?.persist !== false) {
 				void setPreference(preferenceKeyFor(collectionSlug), { variant: key })
 			}
 		},
-		[available, collectionSlug, inDrawer, setPreference]
+		[available, collectionSlug, inDrawer, rememberedStep, setPreference]
 	)
 
 	const active = useMemo(

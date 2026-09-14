@@ -186,7 +186,11 @@ export type Variant<TSlug extends CollectionSlug> = {
 	components?: SlotComponents
 	key: string
 	label?: VariantLabel
-	/** `free` lets any step be opened directly. Default `linear`. */
+	/**
+	 * `free` opens any step directly. `linear` opens the steps behind the current one and the
+	 * ones already visited, so looking back at an earlier answer costs one click either way.
+	 * Default `linear`.
+	 */
 	navigation?: 'free' | 'linear'
 	/**
 	 * When the save guard allows a save, and with it where the save button sits: `final-step`
