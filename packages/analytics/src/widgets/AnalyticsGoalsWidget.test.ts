@@ -181,13 +181,29 @@ describe('AnalyticsGoalsWidget', () => {
 		vi.mocked(readForWidgetGoals).mockResolvedValue(result({ adapterId: 'tenant-7' }))
 		const html = await render({ timeframe: 'last7days', dataSource: 'plausible' }, view)
 		expect(html).toContain('analytics:widgetOpenInView')
-		expect(hrefIn(html)).toBe('/admin/x?range=last7days&source=tenant-7&tab=goals')
+		expect(hrefIn(html)).toBe(
+			'/admin/x?range=last7days&source=tenant-7&metric=conversions&tab=goals'
+		)
+	})
+
+	// The goals tab ranks by the view's metric, so a link without one opens the tab ranked by
+	// the install default rather than by the conversions the card is ranked by.
+	it('carries the metric it ranks by and the comparison it was configured with', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(result())
+		const params = new URLSearchParams(
+			(hrefIn(await render({ compare: true }, view)) ?? '').split('?')[1]
+		)
+		expect(params.get('metric')).toBe('conversions')
+		expect(params.get('compare')).toBe('1')
+		expect(
+			new URLSearchParams((hrefIn(await render({}, view)) ?? '').split('?')[1]).has('compare')
+		).toBe(false)
 	})
 
 	it('omits a range the install already defaults to', async () => {
 		vi.mocked(readForWidgetGoals).mockResolvedValue(result())
 		const html = await render({ timeframe: 'last7days' }, { ...view, defaultRange: 'last7days' })
-		expect(hrefIn(html)).toBe('/admin/x?source=native&tab=goals')
+		expect(hrefIn(html)).toBe('/admin/x?source=native&metric=conversions&tab=goals')
 	})
 
 	it('renders no link when the app turned the view off', async () => {

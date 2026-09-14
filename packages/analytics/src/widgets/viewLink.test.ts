@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { DIMENSION_KEYS } from '../core/contract'
+import { MAX_QUERY_RANGE_DAYS } from '../query/limits'
 import { TAB_DIMENSIONS } from '../view/gating'
 import { viewHref, viewTabForDimension } from './viewLink'
 
@@ -83,6 +84,42 @@ describe('viewHref', () => {
 
 	it('falls back to the view default when a custom timeframe carries no range', () => {
 		expect(query(viewHref({ ...base, timeframe: 'custom' })).has('range')).toBe(false)
+	})
+
+	it('clamps a custom range wider than the view can hold to its last 366 days', () => {
+		const params = query(
+			viewHref({
+				...base,
+				timezone: 'UTC',
+				timeframe: 'custom',
+				range: {
+					start: new Date('2024-01-01T00:00:00.000Z'),
+					end: new Date('2026-06-22T23:59:59.999Z'),
+				},
+			})
+		)
+		expect(params.get('range')).toBe('custom')
+		expect(params.get('to')).toBe('2026-06-22')
+		// 366 days counted inclusively, which is exactly what parseViewState accepts.
+		expect(params.get('from')).toBe('2025-06-22')
+		const from = Date.parse(`${params.get('from')}T00:00:00.000Z`)
+		const to = Date.parse(`${params.get('to')}T00:00:00.000Z`)
+		expect(Math.round((to - from) / 86_400_000) + 1).toBe(MAX_QUERY_RANGE_DAYS)
+	})
+
+	it('leaves a custom range inside the cap alone', () => {
+		const params = query(
+			viewHref({
+				...base,
+				timezone: 'UTC',
+				timeframe: 'custom',
+				range: {
+					start: new Date('2026-06-01T00:00:00.000Z'),
+					end: new Date('2026-06-22T23:59:59.999Z'),
+				},
+			})
+		)
+		expect(params.get('from')).toBe('2026-06-01')
 	})
 
 	it('spells the comparison the way the view reads it', () => {

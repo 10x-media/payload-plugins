@@ -65,23 +65,27 @@ export default async function AnalyticsGoalsWidget(props: WidgetServerProps & Wi
 	const customRange = timezone ? resolveCustomRange(rawTimeframe, data.range, timezone) : undefined
 	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
 	const title = data.title?.trim() || t(keys.widgetGoals)
+	const compare = data.compare === true
 	const result = await readForWidgetGoals({
 		req: props.req,
 		timeframe,
 		limit: resolveGoalRowLimit(data.limit),
-		compare: data.compare === true,
+		compare,
 		adapterId: data.dataSource,
 		now: new Date(),
 		range: customRange,
 		...(timezone ? { timezone } : {}),
 	})
 	// The adapter that answered, which on a scoped or runtime-provider install is not the
-	// id the widget asked for.
+	// id the widget asked for. The metric rides along because the view's goals tab ranks by
+	// it: without it the tab opens ranked by the view's default rather than by conversions.
 	const href = widgetViewHref(props.view, props.req, {
 		timeframe: rawTimeframe,
 		timezone: timezone ?? DEFAULT_TIMEZONE,
 		...(customRange ? { range: customRange } : {}),
 		...(result.adapterId ? { source: result.adapterId } : {}),
+		metric: 'conversions',
+		compare,
 		tab: 'goals',
 	})
 

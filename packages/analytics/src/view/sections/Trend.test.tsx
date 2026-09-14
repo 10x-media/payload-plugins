@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AnalyticsResult } from '../../core/contract'
 import type { QueryResponse } from '../../query/response'
 import type { QueryState } from '../useViewQueries'
-import { Trend } from './Trend'
+import { comparisonPointsOf, Trend } from './Trend'
 
 vi.mock('@payloadcms/ui', () => ({
 	Banner: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
@@ -74,5 +74,63 @@ describe('Trend section', () => {
 		const { container } = renderTrend(false)
 		expect(container.querySelectorAll('.analytics-chart')).toHaveLength(1)
 		expect(container.querySelector('.analytics-chart__legend')).toBeNull()
+	})
+})
+
+describe('comparisonPointsOf', () => {
+	const bucket = { granularity: 'month' as const, locale: 'en', timezone: 'UTC' }
+
+	/** Monthly rows, so the two windows can land on different boundary counts. */
+	const monthly = (count: number, from: number): AnalyticsResult => ({
+		rows: Array.from({ length: count }, (_, i) => ({
+			timestamp: new Date(Date.UTC(2025, from + i, 1)).toISOString(),
+			metrics: { pageviews: i + 1 },
+		})),
+		totals: { pageviews: count },
+		meta: { provider: 'native', fetchedAt: '2026-06-03T00:00:00.000Z' },
+	})
+
+	it('keeps the primary axis when the comparison comes back a bucket longer', () => {
+		const primary = monthly(13, 0)
+		const points = comparisonPointsOf({
+			comparison: monthly(14, 0),
+			primary,
+			metric: 'pageviews',
+			bucket,
+		})
+		expect(points).toHaveLength(13)
+		expect(points.map((p) => p.label)).toEqual(
+			primary.rows.map((_, i) =>
+				new Intl.DateTimeFormat('en', {
+					month: 'short',
+					year: 'numeric',
+					timeZone: 'UTC',
+				}).format(new Date(Date.UTC(2025, i, 1)))
+			)
+		)
+		// The 14th previous-window bucket has no current bucket to sit under and is dropped.
+		expect(points.at(-1)?.value).toBe(13)
+	})
+
+	it('zero-fills the tail when the comparison comes back a bucket shorter', () => {
+		const points = comparisonPointsOf({
+			comparison: monthly(13, 0),
+			primary: monthly(14, 0),
+			metric: 'pageviews',
+			bucket,
+		})
+		expect(points).toHaveLength(14)
+		expect(points.at(-1)?.value).toBe(0)
+	})
+
+	it('returns nothing when there is no comparison at all', () => {
+		expect(
+			comparisonPointsOf({
+				comparison: undefined,
+				primary: monthly(3, 0),
+				metric: 'pageviews',
+				bucket,
+			})
+		).toEqual([])
 	})
 })

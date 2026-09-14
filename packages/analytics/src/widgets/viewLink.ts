@@ -1,7 +1,7 @@
 import type { PayloadRequest } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 import type { DateRange, DimensionKey, MetricKey } from '../core/contract'
-
+import { MAX_QUERY_RANGE_DAYS } from '../query/limits'
 import type { TimeframePreset } from '../timeframe/presets'
 import { zonedCalendarDay } from '../timeframe/tz'
 import { BREAKDOWN_TABS, type BreakdownTab, TAB_DIMENSIONS } from '../view/gating'
@@ -49,6 +49,25 @@ export interface ViewHrefArgs {
 const fallbackRange = (defaults: ViewDefaults): TimeframePreset =>
 	defaults.range === 'allTime' ? DEFAULT_VIEW_RANGE : defaults.range
 
+const DAY_MS = 86_400_000
+
+/**
+ * The widest custom window the view will accept, as a start day. `parseViewState` drops a
+ * wider one and opens on the default range instead, silently, so a widget on a longer
+ * window links to the last `MAX_QUERY_RANGE_DAYS` days of it: the most of what the widget
+ * shows that the view can show back.
+ */
+const clampStartDay = (from: string, to: string): string => {
+	const start = Date.parse(`${from}T00:00:00.000Z`)
+	const end = Date.parse(`${to}T00:00:00.000Z`)
+	if (Number.isNaN(start) || Number.isNaN(end)) {
+		return from
+	}
+	// Both days are read whole, so the cap counts them inclusively.
+	const earliest = end - (MAX_QUERY_RANGE_DAYS - 1) * DAY_MS
+	return start < earliest ? new Date(earliest).toISOString().slice(0, 10) : from
+}
+
 /**
  * The widget's window as the view's toolbar can hold it. A preset the toolbar does not
  * offer (`allTime`, `thisMonth`, `thisYear`) would select nothing there, so the link drops
@@ -62,10 +81,11 @@ const rangeOf = (
 		if (!args.range) {
 			return { range: fallbackRange(defaults) }
 		}
+		const to = zonedCalendarDay(args.range.end, args.timezone)
 		return {
 			range: 'custom',
-			from: zonedCalendarDay(args.range.start, args.timezone),
-			to: zonedCalendarDay(args.range.end, args.timezone),
+			from: clampStartDay(zonedCalendarDay(args.range.start, args.timezone), to),
+			to,
 		}
 	}
 	return VIEW_RANGE_PRESETS.includes(args.timeframe)
