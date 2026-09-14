@@ -84,7 +84,17 @@ export type ProvidersOptions = {
 /** Access checker for cross-scope (platform) analytics reads. */
 export type PlatformReadAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 
+/** Access checker for authenticated analytics reads. */
+export type AnalyticsReadAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
+
 export type AnalyticsAccessOptions = {
+	/**
+	 * Gates the query endpoint (`GET /analytics/query`). Defaults to any authenticated
+	 * user, the same bar the other read endpoints apply; narrow it to a role check to keep
+	 * analytics away from admins who should not see them. Scope gating is separate and
+	 * always applies: granting `read` never widens which scope a user reads.
+	 */
+	read?: AnalyticsReadAccess
 	/**
 	 * Gates cross-scope reads: explicit `scope: '*'` reads, and scoped reads through
 	 * a shared config adapter that cannot filter by scope. Scoped installs
@@ -303,7 +313,7 @@ export interface ResolvedOptions {
 	/** Raw reportingTimezone option; normalized into a resolver at init. */
 	reportingTimezone?: string | TimezoneResolver
 	platformAdapter?: string
-	access: { platformRead: PlatformReadAccess }
+	access: { platformRead: PlatformReadAccess; read: AnalyticsReadAccess }
 	capture: ResolvedCapture
 	/** Config goals, validated; the goals collection layers its own on top of these. */
 	goals: Goal[]
@@ -583,6 +593,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 		access: {
 			platformRead:
 				options.access?.platformRead ?? (scoped ? () => false : ({ req }) => Boolean(req.user)),
+			read: options.access?.read ?? (({ req }) => Boolean(req.user)),
 		},
 		capture: {
 			slots: {

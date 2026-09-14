@@ -10,6 +10,7 @@ import { configGoalsResolver, createGoalsResolver } from './goals/resolver'
 import { trackServerEvent } from './native/ingest/serverTrack'
 import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
 import { isModuleNotFoundError } from './plugin/peerImportError'
+import { makeQueryHandler, QUERY_PATH } from './plugin/queryEndpoint'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
@@ -184,6 +185,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			...(config.endpoints ?? []),
 			{ method: 'get', path: SOURCES_PATH, handler: makeSourcesHandler() },
 			{ method: 'get', path: GOALS_PATH, handler: makeGoalsHandler() },
+			{ method: 'get', path: QUERY_PATH, handler: makeQueryHandler() },
 		]
 		// A runtime provider's capture support is unknown at config time, so providers
 		// alone are enough to mount the proxy; every slot is still resolved per request.
@@ -290,6 +292,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				scoped: resolved.scoped,
 				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,
+				readAccess: resolved.access.read,
 				bindings: resolved.bindings,
 				engine,
 				ttl: resolved.cache.ttl,
@@ -315,6 +318,7 @@ export type {
 	AnalyticsGoalsOptions,
 	AnalyticsPluginOptions,
 	AnalyticsPluginOptions as PluginOptions,
+	AnalyticsReadAccess,
 	AutoCaptureOptions,
 	CaptureConsentOption,
 	ConsentMode,
@@ -355,6 +359,13 @@ export type {
 export { GOAL_ACTION_TYPE, trackGoalAction } from './goals/trackGoalAction'
 export type { Goal, GoalMatch, TrackerGoal } from './goals/types'
 export { trackServerEvent } from './native/ingest/serverTrack'
+export type { QueryError, QueryErrorCode } from './query/errors'
+export type {
+	QueryErrorResponse,
+	QueryResponse,
+	QuerySourceRef,
+	SerializedAnalyticsQuery,
+} from './query/response'
 export type { TimeframePreset } from './timeframe/presets'
 export type { CustomWidgetDef } from './widgets/customWidget'
 export { analyticsDefaultWidgets } from './widgets/defaults'

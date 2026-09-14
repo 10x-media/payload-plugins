@@ -28,4 +28,10 @@ export type { Goal, GoalMatch, TrackerGoal } from '../goals/types'
 export type { AnalyticsPluginOptions } from '../index'
 export type { QueryError, QueryErrorCode } from '../query/errors'
 export type { ParsedQuery, ParseResult } from '../query/parse'
+export type {
+	QueryErrorResponse,
+	QueryResponse,
+	QuerySourceRef,
+	SerializedAnalyticsQuery,
+} from '../query/response'
 export type { TimeframePreset } from '../timeframe/presets'
