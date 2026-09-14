@@ -72,9 +72,9 @@ const pointsOf = (
 	})
 
 /**
- * The charted metric over the window. The comparison period is drawn as its own chart
- * below rather than overlaid: `TrendChart` plots one series, and stacking two of them
- * keeps this PR out of the chart's internals.
+ * The charted metric over the window, with the comparison period overlaid on the same
+ * axes when the view asked for one. Both series are bucketed identically, so the overlay
+ * aligns to the primary axis by index.
  */
 export function Trend({
 	query,
@@ -109,18 +109,19 @@ export function Trend({
 				<SectionEmpty />
 			) : (
 				<>
-					<TrendChart ariaLabel={`${title} ${caption}`} buckets={points} minHeight={200} />
+					<TrendChart
+						ariaLabel={`${title} ${caption}`}
+						buckets={points}
+						{...(previous.length > 0
+							? {
+									comparison: previous,
+									comparisonLabel: t(keys.viewTrendPrevious),
+									label: title,
+								}
+							: {})}
+						minHeight={200}
+					/>
 					<span className="analytics-view__caption">{caption}</span>
-					{previous.length > 0 ? (
-						<>
-							<TrendChart
-								ariaLabel={`${title} ${t(keys.viewTrendPrevious)}`}
-								buckets={previous}
-								minHeight={120}
-							/>
-							<span className="analytics-view__caption">{t(keys.viewTrendPrevious)}</span>
-						</>
-					) : null}
 				</>
 			)}
 		</section>

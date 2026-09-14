@@ -39,6 +39,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.widgetFieldTitle]: '标题',
 	[keys.widgetFieldMetric]: '指标',
 	[keys.widgetFieldTimeframe]: '时间范围',
+	[keys.widgetFieldCompare]: '与上一周期比较',
 	[keys.widgetFieldDataSource]: '数据源',
 	[keys.widgetFieldTitlePlaceholder]: '例如：每日页面浏览量',
 	[keys.widgetTimeframeCustom]: '自定义范围',

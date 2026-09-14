@@ -33,6 +33,7 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 	const locale = props.req.i18n.language ?? 'en-US'
 	const title = data.title?.trim() || t(METRIC_KEYS[metric])
 
+	const compare = data.compare === true
 	const result = await readForWidgetSeries({
 		req: props.req,
 		metric,
@@ -40,6 +41,7 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 		adapterId: data.dataSource,
 		now: new Date(),
 		range: customRange,
+		compare,
 		...(timezone ? { timezone } : {}),
 	})
 
@@ -59,10 +61,17 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 	const buckets = customRange
 		? bucketByRange(result.points, customRange, result.timezone)
 		: bucketSeries(result.points, timeframe, result.timezone)
-	const trendPoints = buckets.map((b) => ({
-		...b,
-		display: formatMetricValue(metric, b.value, locale),
-	}))
+	const toPoints = (source: typeof buckets) =>
+		source.map((b) => ({ ...b, display: formatMetricValue(metric, b.value, locale) }))
+	const trendPoints = toPoints(buckets)
+	const comparisonPoints =
+		compare && result.comparisonPoints
+			? toPoints(
+					customRange
+						? bucketByRange(result.comparisonPoints, customRange, result.timezone)
+						: bucketSeries(result.comparisonPoints, timeframe, result.timezone)
+				)
+			: undefined
 	return (
 		<div className="analytics-trend-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>
@@ -76,7 +85,22 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 			>
 				{formatMetricValue(metric, result.total, locale)}
 			</span>
-			<TrendChart buckets={trendPoints} ariaLabel={`${title} ${caption}`} minHeight={180} />
+			<TrendChart
+				buckets={trendPoints}
+				{...(comparisonPoints && result.comparisonRange
+					? {
+							comparison: comparisonPoints,
+							comparisonLabel: `${t(keys.viewTrendPrevious)} · ${formatRangeCaption(
+								result.comparisonRange,
+								locale,
+								result.timezone
+							)}`,
+							label: title,
+						}
+					: {})}
+				ariaLabel={`${title} ${caption}`}
+				minHeight={180}
+			/>
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
 			{result.comparisonRange ? (
 				<ComparisonDelta

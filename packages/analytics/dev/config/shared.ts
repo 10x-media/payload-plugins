@@ -78,7 +78,7 @@ export const sharedDashboardLayout: DashboardLayout = [
 	{
 		widgetSlug: 'analytics-trend',
 		width: 'large',
-		data: { metric: 'pageviews', timeframe: 'last30days' },
+		data: { metric: 'pageviews', timeframe: 'last30days', compare: true },
 	},
 	{
 		widgetSlug: 'analytics-trend',

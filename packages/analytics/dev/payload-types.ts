@@ -984,6 +984,7 @@ export interface AnalyticsTrendWidget {
       from?: string | null;
       to?: string | null;
     };
+    compare?: boolean | null;
     dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium' | 'large' | 'x-large' | 'full';

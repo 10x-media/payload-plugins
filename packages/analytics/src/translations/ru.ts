@@ -39,6 +39,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.widgetFieldTitle]: 'Заголовок',
 	[keys.widgetFieldMetric]: 'Метрика',
 	[keys.widgetFieldTimeframe]: 'Период',
+	[keys.widgetFieldCompare]: 'Сравнить с предыдущим периодом',
 	[keys.widgetFieldDataSource]: 'Источник данных',
 	[keys.widgetFieldTitlePlaceholder]: 'напр. Просмотры страниц за день',
 	[keys.widgetTimeframeCustom]: 'Свой период',

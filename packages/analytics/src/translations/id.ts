@@ -39,6 +39,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.widgetFieldTitle]: 'Judul',
 	[keys.widgetFieldMetric]: 'Metrik',
 	[keys.widgetFieldTimeframe]: 'Rentang waktu',
+	[keys.widgetFieldCompare]: 'Bandingkan dengan periode sebelumnya',
 	[keys.widgetFieldDataSource]: 'Sumber data',
 	[keys.widgetFieldTitlePlaceholder]: 'mis. Tayangan halaman harian',
 	[keys.widgetTimeframeCustom]: 'Rentang khusus',

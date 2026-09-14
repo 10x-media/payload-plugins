@@ -62,6 +62,8 @@ Trend widgets render a real daily series for every provider that has one; where 
 
 The metric and trend widgets show a period-over-period comparison when the active adapter declares `capabilities.comparison`: the plugin reads the same count of whole reporting-timezone days immediately preceding the current window and renders a colored delta (an up/down arrow with the percentage change) and a "vs. previous period" caption. Metrics where lower is better (bounce rate) invert the coloring, and `allTime` never compares. The comparison is capability-gated, so adapters that cannot answer a second window simply omit it; set `widgets: { comparison: false }` to skip the previous-window read entirely. All comparison strings are typed translations, localizable through the [`translations` option](/analytics/i18n).
 
+The trend widget can also draw the previous period: tick **Compare to previous period** and the chart overlays it as a muted line on the same axes, with a legend naming both series and a tooltip row for each. The overlay costs no extra read (the delta already reads that window) and aligns to the primary axis day for day.
+
 Charts are dependency-free SVG and CSS, themed with Payload's design tokens. The series color reads `--analytics-chart-1`, overridable from your admin stylesheet.
 
 ## Options

@@ -147,6 +147,14 @@ const timeframeSelectField = (): Field => ({
 	],
 })
 
+/** Trend widget only: the chart overlays the previous period when this is on. */
+const compareField = (): Field => ({
+	name: 'compare',
+	type: 'checkbox',
+	defaultValue: false,
+	label: labelForKey(keys.widgetFieldCompare),
+})
+
 const dataSourceField = (args: RegisterWidgetsArgs): Field => ({
 	name: 'dataSource',
 	type: 'select',
@@ -184,11 +192,12 @@ const customRangeField = (): Field =>
 export const findMetricField = (fields: Field[]): Field | undefined =>
 	fields.find((field) => 'name' in field && field.name === 'metric')
 
-const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
+const metricWidgetFields = (args: RegisterWidgetsArgs, extra: Field[] = []): Field[] => [
 	titleField(args, en[keys.widgetFieldTitlePlaceholder]),
 	metricSelectField(WIDGET_METRICS, args),
 	timeframeSelectField(),
 	customRangeField(),
+	...extra,
 	...(args.multiProvider ? [dataSourceField(args)] : []),
 ]
 
@@ -250,7 +259,7 @@ const WIDGET_DEFS: WidgetDef[] = [
 		requires: { metrics: ['pageviews'] },
 		minWidth: 'small',
 		maxWidth: 'full',
-		fields: metricWidgetFields,
+		fields: (args) => metricWidgetFields(args, [compareField()]),
 	},
 	{
 		slug: 'analytics-realtime',

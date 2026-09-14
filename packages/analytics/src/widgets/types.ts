@@ -12,6 +12,8 @@ export interface MetricWidgetData {
 	timeframe?: TimeframePreset | 'custom'
 	range?: WidgetRange
 	dataSource?: string
+	/** Trend widget only: overlay the previous period on the chart. */
+	compare?: boolean
 }
 
 export const WIDGET_METRICS: MetricKey[] = [

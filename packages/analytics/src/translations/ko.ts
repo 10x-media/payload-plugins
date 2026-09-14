@@ -39,6 +39,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.widgetFieldTitle]: '제목',
 	[keys.widgetFieldMetric]: '지표',
 	[keys.widgetFieldTimeframe]: '기간',
+	[keys.widgetFieldCompare]: '이전 기간과 비교',
 	[keys.widgetFieldDataSource]: '데이터 소스',
 	[keys.widgetFieldTitlePlaceholder]: '예: 일별 페이지뷰',
 	[keys.widgetTimeframeCustom]: '사용자 지정 기간',

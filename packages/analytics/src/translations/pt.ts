@@ -39,6 +39,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.widgetFieldTitle]: 'Título',
 	[keys.widgetFieldMetric]: 'Métrica',
 	[keys.widgetFieldTimeframe]: 'Período',
+	[keys.widgetFieldCompare]: 'Comparar com o período anterior',
 	[keys.widgetFieldDataSource]: 'Fonte de dados',
 	[keys.widgetFieldTitlePlaceholder]: 'ex. Visualizações de página por dia',
 	[keys.widgetTimeframeCustom]: 'Período personalizado',

@@ -40,6 +40,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.widgetFieldTitle]: 'Titel',
 	[keys.widgetFieldMetric]: 'Kennzahl',
 	[keys.widgetFieldTimeframe]: 'Zeitraum',
+	[keys.widgetFieldCompare]: 'Mit vorherigem Zeitraum vergleichen',
 	[keys.widgetFieldDataSource]: 'Datenquelle',
 	[keys.widgetFieldTitlePlaceholder]: 'z. B. Tägliche Seitenaufrufe',
 	[keys.widgetTimeframeCustom]: 'Benutzerdefinierter Zeitraum',

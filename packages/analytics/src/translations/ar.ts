@@ -39,6 +39,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.widgetFieldTitle]: 'العنوان',
 	[keys.widgetFieldMetric]: 'المقياس',
 	[keys.widgetFieldTimeframe]: 'الفترة الزمنية',
+	[keys.widgetFieldCompare]: 'المقارنة بالفترة السابقة',
 	[keys.widgetFieldDataSource]: 'مصدر البيانات',
 	[keys.widgetFieldTitlePlaceholder]: 'مثال: مشاهدات الصفحة اليومية',
 	[keys.widgetTimeframeCustom]: 'نطاق مخصص',

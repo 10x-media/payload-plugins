@@ -39,6 +39,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.widgetFieldTitle]: 'Заголовок',
 	[keys.widgetFieldMetric]: 'Метрика',
 	[keys.widgetFieldTimeframe]: 'Період',
+	[keys.widgetFieldCompare]: 'Порівняти з попереднім періодом',
 	[keys.widgetFieldDataSource]: 'Джерело даних',
 	[keys.widgetFieldTitlePlaceholder]: 'напр. Перегляди сторінок за день',
 	[keys.widgetTimeframeCustom]: 'Власний період',

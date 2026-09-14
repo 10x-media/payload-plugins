@@ -42,6 +42,7 @@ export const keys = {
 	widgetFieldTitle: 'analytics:widgetFieldTitle',
 	widgetFieldMetric: 'analytics:widgetFieldMetric',
 	widgetFieldTimeframe: 'analytics:widgetFieldTimeframe',
+	widgetFieldCompare: 'analytics:widgetFieldCompare',
 	widgetFieldDataSource: 'analytics:widgetFieldDataSource',
 	widgetFieldTitlePlaceholder: 'analytics:widgetFieldTitlePlaceholder',
 	widgetTimeframeCustom: 'analytics:widgetTimeframeCustom',
