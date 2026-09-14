@@ -206,6 +206,22 @@ describeForDb('native insertIfNew dedup', {}, (db) => {
 			})
 		).toBe(false)
 	})
+
+	// A pageview and a goal event arriving together race on one ledger row. The loser can come
+	// back as a driver duplicate-key error rather than a quiet no-op, which used to escape the
+	// ingest handler as a 500; enough concurrent writers reaches that branch on either adapter.
+	it(`answers "already seen" to every writer that loses a crowded race on ${db}`, async () => {
+		const key = {
+			bucket: 'crowded',
+			kind: 'visitor',
+			value: 'v',
+			period: new Date('2026-01-10T00:00:00Z'),
+		}
+		const results = await Promise.all(
+			Array.from({ length: 24 }, () => insertIfNew(booted.payload, SEEN_SLUG, key))
+		)
+		expect(results.filter(Boolean)).toHaveLength(1)
+	})
 })
 
 describeForDb('native distinct counting', {}, (db) => {
