@@ -31,22 +31,24 @@ export default buildConfig({
 
 ## The built-in widgets
 
-| Slug | Shows |
-|---|---|
-| `analytics-metric` | One headline number. |
-| `analytics-trend` | A gradient area chart of one metric over time, with timeframe-aware axis labels and a hover tooltip. |
-| `analytics-goals` | Conversions, revenue and conversion rate per [goal](/analytics/goals). See [below](#the-goals-widget). |
-| `analytics-breakdown-pages` | Top pages as a filled bar list. |
-| `analytics-breakdown-sources` | Top traffic sources. |
-| `analytics-breakdown-devices` | Device classes. |
-| `analytics-breakdown-countries` | Countries. |
-| `analytics-breakdown-goals` | [Goal](/analytics/goals) completions per goal slug, defaulting its metric to `conversions`. |
-| `analytics-breakdown-referrers` | Referring URLs, as the source reports them. |
-| `analytics-breakdown-browsers` | Browsers. |
-| `analytics-breakdown-os` | Operating systems. |
-| `analytics-breakdown-campaigns` | UTM campaigns. |
-| `analytics-breakdown-events` | Named custom events, defaulting its metric to `events`. |
-| `analytics-realtime` | An "active now" count with a per-minute sparkline. |
+| Slug | Shows | Dimension | Default metric |
+|---|---|---|---|
+| `analytics-metric` | One headline number. | | `pageviews` |
+| `analytics-trend` | A gradient area chart of one metric over time, with timeframe-aware axis labels and a hover tooltip. | | `pageviews` |
+| `analytics-goals` | Conversions, revenue and conversion rate per [goal](/analytics/goals). See [below](#the-goals-widget). | `goal` | none, it has no metric field |
+| `analytics-breakdown-pages` | Top pages as a filled bar list. | `page` | `pageviews` |
+| `analytics-breakdown-sources` | Top traffic sources. | `source` | `pageviews` |
+| `analytics-breakdown-devices` | Device classes. | `device` | `pageviews` |
+| `analytics-breakdown-countries` | Countries. | `country` | `pageviews` |
+| `analytics-breakdown-goals` | [Goal](/analytics/goals) completions per goal slug. | `goal` | `conversions` |
+| `analytics-breakdown-referrers` | Referring URLs, as the source reports them. | `referrer` | `pageviews` |
+| `analytics-breakdown-browsers` | Browsers. | `browser` | `pageviews` |
+| `analytics-breakdown-os` | Operating systems. | `os` | `pageviews` |
+| `analytics-breakdown-campaigns` | UTM campaigns. | `utmCampaign` | `pageviews` |
+| `analytics-breakdown-events` | Named custom events. | `event` | `events` |
+| `analytics-realtime` | An "active now" count with a per-minute sparkline. | | `visitors` |
+
+A default metric the selected source cannot serve is not offered, and the select falls to the first one it can.
 
 Every breakdown widget is one component over one dimension, so the five added last (referrers, browsers, operating systems, campaigns, events) behave exactly like the four before them: same fields, same capability gate, same bar list. The gate is what decides whether you see them. The native engine buckets `page`, `source`, `device`, `country`, `event` and `goal` only, so on a native-only install the referrer, browser, operating-system and campaign widgets do not register at all; with [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) enabled they register open-world and degrade to "Not available for this data source" wherever the request's own source cannot answer them.
 
@@ -87,11 +89,11 @@ Charts are dependency-free SVG and CSS, themed with Payload's design tokens. The
 | Revenue | Summed completion values, as a bare number. Omitted as a column when the source serves no revenue; a row the source cannot fill shows a dash. |
 | Conversion rate | The goal's visitors over the window's site visitors. Omitted as a column when the source serves no visitors. |
 
-It registers only where a source can serve both the `conversions` metric and the `goal` dimension, so an install whose sources answer neither never sees it at all, and one with [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) enabled sees it degrade per request instead. Its fields are the title, the timeframe (presets plus a custom range), a row limit of 10, 25 or 50, the compare checkbox, and the data source in multi-adapter setups.
+It registers only where a source can serve both the `conversions` metric and the `goal` dimension, so an install whose sources cannot answer both never sees it at all, and one with [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) enabled sees it degrade per request instead. Its fields are the title, the timeframe (presets plus a custom range), a row limit of 10, 25 or 50, the compare checkbox, and the data source in multi-adapter setups.
 
-The table costs two engine reads, or three with comparison on: the ranked `goal` breakdown (carrying revenue and visitors per row where the source serves them), the window's site visitors for the rate denominator, and the previous window's breakdown for the deltas. The previous window is read four rows deep for every row shown, because both windows rank by their own conversions and a goal near the top today can sit well below the cut in the window before it.
+The table costs one engine read, the ranked `goal` breakdown carrying revenue and visitors per row where the source serves them. Add one for the window's site visitors wherever the source serves `visitors`, since that is the rate's denominator, and one more for the previous window's breakdown when comparison is on. That previous window is read four rows deep for every row shown, because both windows rank by their own conversions and a goal near the top today can sit well below the cut in the window before it.
 
-A goal the previous window's rows do not reach carries no delta at all, rather than a fabricated one; a goal that converted zero times then shows the localized direction word, since there is no baseline to take a percentage of.
+A goal the previous window's rows do not reach carries no delta at all, rather than a fabricated one; a goal that converted zero times in the previous window shows the localized direction word instead of a percentage, since there is no baseline to take one of.
 
 ## Open in Analytics
 
@@ -213,19 +215,56 @@ const totals = await readForWidget({
 })
 ```
 
-Both helpers, and `readForWidgetSeries`, also report `stale: true` when the engine answered from a stale cache entry after a failed provider read. The built-ins render a small note for it; yours can too.
+Both helpers also report `stale: true` when the engine answered from a stale cache entry after a failed provider read (`readForWidgetSeries` does not). Of the built-ins only the goals widget renders a note for it; the metric, trend and breakdown widgets drop it. Yours can render one.
 
 ### Drawing a comparison with `TrendChart`
 
-`TrendChart` takes the previous period as a second series on the same axes. Pass `comparison` as points aligned to `buckets` by index (`readForWidgetSeries({ compare: true })` returns exactly that as `comparisonPoints`, zero-filled to the same length), plus the labels the legend and tooltip name them by:
+`TrendChart` takes the previous period as a second series on the same axes:
 
 | Prop | Purpose |
 |---|---|
-| `comparison` | The previous-period points, index-aligned to `buckets`. Without it nothing below applies and no legend renders. |
+| `comparison` | The previous-period points as `TrendPoint[]`, index-aligned to `buckets`. Without it nothing below applies and no legend renders. |
 | `comparisonLabel` | Names the comparison series in the legend and in every tooltip. Keep it short. |
 | `comparisonRange` | The comparison window, in the legend only, so the tooltip stays narrow on a small card. |
 | `label` | Names the primary series in the legend. |
 
-The y-scale covers both series, so the overlay cannot rescale the primary line out of shape. Both series are drawn as given: if you bucket a long window into weeks or months yourself, re-date the previous series onto the primary axis before bucketing, or the two windows land on different boundaries and the overlay drifts.
+`readForWidgetSeries({ compare: true })` supplies the numbers, not the points: `comparisonPoints` is `SeriesPoint[]` (`{ date, value }`), zero-filled to the same length as `points` and aligned to it by index. `TrendChart` wants `TrendPoint[]` (`{ label, value, display }`), so the mapping is yours:
+
+```tsx title="components/TrendWidget.tsx"
+import { TrendChart } from '@10x-media/analytics/client'
+import { formatMetricValue, readForWidgetSeries, type SeriesPoint } from '@10x-media/analytics/rsc'
+import type { WidgetServerProps } from 'payload'
+
+export default async function TrendWidget(props: WidgetServerProps) {
+  const locale = props.req.i18n.language ?? 'en-US'
+  const result = await readForWidgetSeries({
+    req: props.req,
+    metric: 'pageviews',
+    timeframe: 'last30days',
+    compare: true,
+    now: new Date(),
+  })
+  if (result.status !== 'ok') return <span>No data</span>
+
+  const toPoints = (points: SeriesPoint[]) =>
+    points.map((point) => ({
+      label: point.date,
+      value: point.value,
+      display: formatMetricValue('pageviews', point.value, locale),
+    }))
+
+  return (
+    <TrendChart
+      ariaLabel="Pageviews, last 30 days"
+      buckets={toPoints(result.points)}
+      {...(result.comparisonPoints
+        ? { comparison: toPoints(result.comparisonPoints), comparisonLabel: 'Previous', label: 'Pageviews' }
+        : {})}
+    />
+  )
+}
+```
+
+The y-scale covers both series, so the overlay cannot rescale the primary line out of shape. Both series are drawn as given, index for index. If you coarsen the daily axis into weeks or months yourself, re-date `comparisonPoints` onto the primary points' dates by index **before** bucketing: bucketed on its own dates the previous window lands on different boundaries, and the overlay drifts by a bucket.
 
 A custom widget's own config fields can reuse the same live pickers: `MetricSelectField` and `SourceSelectField` from `@10x-media/analytics/client`, or the `useAnalyticsSources` hook directly for a bespoke picker. `MetricSelectField` narrows against a sibling source field named `dataSource` by default; pass `sourceFieldPath` when a custom field layout names it something else.
