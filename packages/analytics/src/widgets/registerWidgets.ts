@@ -203,10 +203,9 @@ const metricWidgetFields = (args: RegisterWidgetsArgs, extra: Field[] = []): Fie
 
 const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): Field[] => [
 	titleField(args, en[spec.label]),
-	// A goals breakdown is a conversion table: pageviews per goal is a stranger default.
 	metricSelectField(WIDGET_METRICS, args, {
 		extra: { dimensions: [spec.dimension] },
-		...(spec.dimension === 'goal' ? { preferredDefault: 'conversions' as MetricKey } : {}),
+		...(spec.preferredDefault ? { preferredDefault: spec.preferredDefault } : {}),
 	}),
 	timeframeSelectField(),
 	customRangeField(),

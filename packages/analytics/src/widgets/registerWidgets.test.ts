@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { AnalyticsAdapter, DimensionKey, MetricKey } from '../core/contract'
 import { native } from '../native/nativeAdapter'
 import { memoryAdapter } from '../testing/memoryAdapter'
+import { keys, type TranslationKey } from '../translations/keys'
 import { findMetricField, registerWidgets, widgetIsSupported } from './registerWidgets'
 import { WIDGET_METRICS } from './types'
 
@@ -388,6 +389,11 @@ describe('registerWidgets', () => {
 				'analytics-breakdown-devices',
 				'analytics-breakdown-countries',
 				'analytics-breakdown-goals',
+				'analytics-breakdown-referrers',
+				'analytics-breakdown-browsers',
+				'analytics-breakdown-os',
+				'analytics-breakdown-campaigns',
+				'analytics-breakdown-events',
 				'analytics-realtime',
 			],
 			register: [{ slug: 'myapp-only', component: 'x#y', label: 'Mine' }],
@@ -460,6 +466,60 @@ describe('registerWidgets', () => {
 				'analytics-breakdown-countries',
 			])
 		)
+	})
+
+	it('registers the five new breakdown widgets with their label and default metric', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: true,
+			disabled: [],
+			register: [],
+		})
+		const widgetsBySlug = new Map((config.admin?.dashboard?.widgets ?? []).map((w) => [w.slug, w]))
+		const expectations: [slug: string, label: TranslationKey, defaultMetric: string][] = [
+			['analytics-breakdown-referrers', keys.widgetBreakdownReferrers, 'pageviews'],
+			['analytics-breakdown-browsers', keys.widgetBreakdownBrowsers, 'pageviews'],
+			['analytics-breakdown-os', keys.widgetBreakdownOs, 'pageviews'],
+			['analytics-breakdown-campaigns', keys.widgetBreakdownCampaigns, 'pageviews'],
+			['analytics-breakdown-events', keys.widgetBreakdownEvents, 'events'],
+		]
+		for (const [slug, label, defaultMetric] of expectations) {
+			const widget = widgetsBySlug.get(slug)
+			expect(widget).toBeDefined()
+			expect(
+				widget?.label && (widget.label as (args: never) => string)({ t: (k: string) => k } as never)
+			).toBe(label)
+			const metricField = widget?.fields ? findMetricField(widget.fields) : undefined
+			expect(metricField && 'defaultValue' in metricField && metricField.defaultValue).toBe(
+				defaultMetric
+			)
+		}
+	})
+
+	it('skips the campaigns breakdown when no config adapter serves utmCampaign, but registers it when providersEnabled', () => {
+		const withoutProviders = bareConfig()
+		registerWidgets(withoutProviders, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+		})
+		const slugsWithout = withoutProviders.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
+		expect(slugsWithout).not.toContain('analytics-breakdown-campaigns')
+
+		const withProviders = bareConfig()
+		registerWidgets(withProviders, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: true,
+			disabled: [],
+			register: [],
+		})
+		const slugsWith = withProviders.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
+		expect(slugsWith).toContain('analytics-breakdown-campaigns')
 	})
 
 	it('with providersEnabled, the metric select lists every WIDGET_METRICS candidate (native lacks bounceRate)', () => {

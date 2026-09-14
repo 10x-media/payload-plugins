@@ -130,6 +130,16 @@ export const sharedDashboardLayout: DashboardLayout = [
 		width: 'medium',
 		data: { metric: 'conversions', timeframe: 'last30days', limit: 5 },
 	},
+	{
+		widgetSlug: 'analytics-breakdown-referrers',
+		width: 'medium',
+		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
+	},
+	{
+		widgetSlug: 'analytics-breakdown-events',
+		width: 'medium',
+		data: { metric: 'events', timeframe: 'last30days', limit: 5 },
+	},
 	{ widgetSlug: 'dev-custom-sources', width: 'medium', data: {} },
 ]
 
