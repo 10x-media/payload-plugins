@@ -35,7 +35,7 @@ Both layers are merged into one registry per scope: the config adapters in confi
 }
 ```
 
-It requires a signed-in user (`401` otherwise) and passes `access.read` (`403` otherwise); both answer a flat `{ "error": "unauthorized" }` string rather than the query endpoint's coded errors. It takes **no scope parameter**, deliberately, so a tenant can never enumerate another tenant's sources. A request whose scope cannot be resolved, or whose resolution throws, gets `{ "defaultId": null, "sources": [] }` rather than a fallback list.
+It requires a signed-in user (`401` otherwise) and passes `access.read` (`403` otherwise); both answer a flat `{ "error": "unauthorized" }` string rather than the query endpoint's coded errors. It takes **no scope parameter**, deliberately, so a tenant can never enumerate another tenant's sources. On a scoped install, a request whose scope cannot be resolved, or whose resolution throws, gets `{ "defaultId": null, "sources": [] }` rather than a fallback list: a failed resolution is indistinguishable from a forged one, so it fails closed. An unscoped install has no scope to get wrong and falls back to the config registry.
 
 ## Capability gating
 
@@ -125,7 +125,11 @@ Windows longer than 366 days answer `range_too_long`. Shorter ones can still be 
 
 `query` is the request after validation and defaulting, with the date range as ISO instants, so a client renders the window it actually got rather than the one it typed. `meta` is passed through from the engine untouched: `meta.stale` is `true` when a cache entry expired, the refresh failed, and the expired value was served instead (see [stale-while-error](/analytics/cache)), which is worth surfacing as a badge rather than an error.
 
-`comparison` is the equal-length window immediately preceding the range, aligned to whole reporting-timezone days, and is present only for `compare=previous`.
+`comparison` is the equal-length window immediately preceding the range, aligned to whole days in the effective timezone (the `timezone` parameter when given, otherwise the one the plugin's resolver returned), and is present only for `compare=previous`.
+
+<Callout type="info">
+**An unconfigured source answers `200`, not an error.** A source whose credentials are unset returns an empty `rows` array, no `totals`, and `meta.provider` set to its adapter id. The read is short-circuited before any network call, so nothing distinguishes it from a real window with no traffic. If that matters to your surface, check the source's configuration rather than inferring it from an empty result.
+</Callout>
 
 ### Errors
 
@@ -146,8 +150,7 @@ Every non-2xx answer is an `{ error }` object carrying a `code`, a `message`, an
 | `403` | `forbidden` | `source` | a listed shared source that cannot filter by scope, read under a scope, without `platformRead` |
 | `404` | `unknown_source` | | no source resolves for this request at all |
 | `404` | `unknown_source` | `source` | a `source` id outside this request's own registry |
-| `503` | `unavailable` | | the source is down and no cached entry survived; carries `Retry-After: 30` |
-| `503` | `unavailable` | | the plugin is not installed on this Payload instance (no `Retry-After`) |
+| `503` | `unavailable` | | the plugin runtime is not ready on this Payload instance, or the source failed with no cached entry to fall back on. Always carries `Retry-After: 30`, so a client backs off identically either way |
 | `500` | `internal` | | an unexpected failure; the detail is logged with the adapter id, never returned |
 
 <Callout type="warn">
@@ -264,6 +267,8 @@ Scope comes from the request, exactly as it does everywhere else: the plugin's `
 - On a scoped install, a request resolving no scope at all is ambiguous rather than install-wide (it usually means no tenant is selected), so it fails closed: `404 unknown_source`.
 - A `scopeResolver` that answers the platform wildcard (`*`) for a given request is itself a cross-scope resolution, so it too requires `access.platformRead`. Without it, that request resolves no sources at all, on this endpoint and on the sources endpoint.
 - A shared config adapter that cannot filter by scope is listed for a tenant but not readable by one: see the `403` note above.
+
+A platform reader meets the other half of that last rule. Passing `scope=<tenant>` for a config adapter without `scopedQueries` is **allowed**, because `access.platformRead` grants it, but the adapter still cannot narrow the query, so the answer is install-wide totals rather than that tenant's. The echoed `query` is how a client tells: it carries no `scope` key, because none was stamped on the read. Treat a missing `query.scope` on a scoped request as "these numbers are not scoped", and label the surface accordingly instead of captioning install-wide totals with a tenant's name.
 
 Granting `access.read` never widens which scope a user reads. The two gates are independent, and scope gating always applies.
 

@@ -193,6 +193,8 @@ analytics({
 
 The authenticated [query endpoint](/analytics/data-sources#query-endpoint) follows exactly these rules, and it is the one place they are visible as status codes. Scope comes from the request; an explicit `scope` parameter is honored only for platform readers (`400 untrusted_scope` for anyone else) and `scope=*` reads every scope behind the same `platformRead` gate; a scoped install whose request resolves no scope fails closed with `404 unknown_source`, as does a `scopeResolver` answering `*` for a caller `platformRead` denies; and a listed shared config adapter that cannot filter by scope answers `403` with `param: 'source'` rather than returning another tenant's totals.
 
+That last rule cuts both ways. A platform reader passing `scope=<tenant>` for a config adapter without `scopedQueries` is allowed through, since `platformRead` grants it, but the adapter still cannot narrow the query: the answer is install-wide totals, not that tenant's. The echoed `query` carries no `scope` key when that happens, which is how a client tells the two apart before captioning the numbers with a tenant's name.
+
 `access.read` is the gate in front of all of that. It covers every authenticated read endpoint (query, document panel, realtime, sources, goals) and defaults to allowing any signed-in user, so an install that does not set it behaves as before. Narrow it to a role check to keep analytics away from admins who should not see them. It is independent of scope: granting `read` never widens which scope a user reads.
 
 ## 5. Cron tiers
