@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bucketByRange, bucketSeries } from './bucket'
+import { bucketByRange, bucketSeries, onPrimaryAxis } from './bucket'
 
 const day = (iso: string, value: number) => ({ date: `${iso}T00:00:00.000Z`, value })
 
@@ -64,5 +64,31 @@ describe('bucketByRange', () => {
 			end: new Date('2026-06-01T00:00:00.000Z'),
 		})
 		expect(out.map((b) => b.label)).toEqual(['Jan', 'Feb'])
+	})
+})
+
+describe('onPrimaryAxis', () => {
+	const series = (start: string, days: number, value: number) =>
+		Array.from({ length: days }, (_, i) => ({
+			date: new Date(new Date(`${start}T00:00:00.000Z`).getTime() + i * 86_400_000).toISOString(),
+			value,
+		}))
+
+	it('buckets a 90-day comparison onto the primary week boundaries', () => {
+		// Jun 16 is a Tuesday, so the window's first week is partial: bucketed on its own
+		// Mar 18 start the previous window splits into a different number of weeks.
+		const primary = series('2026-06-16', 90, 2)
+		const comparison = series('2026-03-18', 90, 1)
+		const primaryBuckets = bucketSeries(primary, 'last90days')
+		const aligned = bucketSeries(onPrimaryAxis(comparison, primary), 'last90days')
+		expect(aligned).toHaveLength(primaryBuckets.length)
+		expect(aligned.map((b) => b.label)).toEqual(primaryBuckets.map((b) => b.label))
+		expect(aligned.reduce((a, b) => a + b.value, 0)).toBe(90)
+	})
+
+	it('keeps its own date where the axis is shorter', () => {
+		const out = onPrimaryAxis(series('2026-03-18', 2, 1), series('2026-06-16', 1, 2))
+		expect(out[0]?.date).toBe('2026-06-16T00:00:00.000Z')
+		expect(out[1]?.date).toBe('2026-03-19T00:00:00.000Z')
 	})
 })

@@ -16,6 +16,7 @@ export interface BreakdownSpec {
 	slug: string
 	dimension: DimensionKey
 	label: TranslationKey
+	preferredDefault?: MetricKey
 }
 
 export const BREAKDOWN_SPECS: BreakdownSpec[] = [
@@ -27,7 +28,35 @@ export const BREAKDOWN_SPECS: BreakdownSpec[] = [
 		dimension: 'country',
 		label: keys.widgetBreakdownCountries,
 	},
-	{ slug: 'analytics-breakdown-goals', dimension: 'goal', label: keys.widgetBreakdownGoals },
+	{
+		slug: 'analytics-breakdown-goals',
+		dimension: 'goal',
+		label: keys.widgetBreakdownGoals,
+		// A goals breakdown is a conversion table: pageviews per goal is a stranger default.
+		preferredDefault: 'conversions',
+	},
+	{
+		slug: 'analytics-breakdown-referrers',
+		dimension: 'referrer',
+		label: keys.widgetBreakdownReferrers,
+	},
+	{
+		slug: 'analytics-breakdown-browsers',
+		dimension: 'browser',
+		label: keys.widgetBreakdownBrowsers,
+	},
+	{ slug: 'analytics-breakdown-os', dimension: 'os', label: keys.widgetBreakdownOs },
+	{
+		slug: 'analytics-breakdown-campaigns',
+		dimension: 'utmCampaign',
+		label: keys.widgetBreakdownCampaigns,
+	},
+	{
+		slug: 'analytics-breakdown-events',
+		dimension: 'event',
+		label: keys.widgetBreakdownEvents,
+		preferredDefault: 'events',
+	},
 ]
 
 export const breakdownSpecBySlug = (slug: string): BreakdownSpec | undefined =>

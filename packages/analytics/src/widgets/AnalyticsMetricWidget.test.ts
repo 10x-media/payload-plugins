@@ -1,9 +1,11 @@
 import type { Payload, PayloadRequest, WidgetServerProps } from 'payload'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter } from '../core/contract'
 import { type AnalyticsRuntime, setRuntime } from '../plugin/runtime'
 import AnalyticsMetricWidget from './AnalyticsMetricWidget'
 import type { MetricWidgetData } from './types'
+import type { WidgetView } from './viewLink'
 
 const unconfigured = {
 	id: 'test',
@@ -15,7 +17,10 @@ const unconfigured = {
 const bootFakeRuntime = () => {
 	const resolveScope = vi.fn(() => Promise.resolve(null))
 	const resolveTimezone = vi.fn(() => Promise.resolve('Europe/Berlin'))
-	const payload = { logger: { warn: () => {} } } as unknown as Payload
+	const payload = {
+		logger: { warn: () => {} },
+		config: { routes: { admin: '/admin' } },
+	} as unknown as Payload
 	setRuntime(payload, {
 		registry: { default: () => unconfigured, get: () => unconfigured },
 		configAdapterIds: new Set<string>(),
@@ -32,8 +37,23 @@ const bootFakeRuntime = () => {
 	return { req, resolveScope, resolveTimezone }
 }
 
-const render = (req: PayloadRequest, widgetData: MetricWidgetData) =>
-	AnalyticsMetricWidget({ req, widgetData } as unknown as WidgetServerProps)
+const render = (req: PayloadRequest, widgetData: MetricWidgetData, view?: WidgetView) =>
+	AnalyticsMetricWidget({ req, widgetData, view } as unknown as WidgetServerProps)
+
+const renderHtml = async (
+	req: PayloadRequest,
+	widgetData: MetricWidgetData,
+	view?: WidgetView
+): Promise<string> => renderToStaticMarkup(await render(req, widgetData, view))
+
+const hrefIn = (html: string): string | undefined =>
+	html.match(/<a[^>]+href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&')
+
+const view = {
+	path: '/analytics',
+	defaultRange: 'last30days',
+	defaultMetric: 'pageviews',
+} as const
 
 describe('AnalyticsMetricWidget', () => {
 	it('resolves the reporting timezone once, inside the read, for a preset timeframe', async () => {
@@ -53,5 +73,54 @@ describe('AnalyticsMetricWidget', () => {
 		// Once for the range and caption, once for the read's own scope resolution.
 		expect(resolveScope).toHaveBeenCalledTimes(2)
 		expect(resolveTimezone).toHaveBeenCalledTimes(1)
+	})
+
+	it('links into the view on its own metric, window and the adapter that served it', async () => {
+		const { req } = bootFakeRuntime()
+		const html = await renderHtml(
+			req,
+			{ metric: 'visitors', timeframe: 'last7days', dataSource: 'plausible' },
+			view
+		)
+		expect(html).toContain('analytics:widgetOpenInView')
+		// `test` is the adapter the read resolved to, not the `plausible` the widget asked for.
+		expect(hrefIn(html)).toBe('/admin/analytics?range=last7days&source=test&metric=visitors')
+	})
+
+	it('spells a custom window as days in the reporting timezone', async () => {
+		const { req } = bootFakeRuntime()
+		const html = await renderHtml(
+			req,
+			{
+				metric: 'pageviews',
+				timeframe: 'custom',
+				range: { from: '2026-06-01', to: '2026-06-22' },
+			},
+			view
+		)
+		expect(hrefIn(html)).toBe(
+			'/admin/analytics?range=custom&from=2026-06-01&to=2026-06-22&source=test'
+		)
+	})
+
+	it('omits a range and metric the install already defaults to', async () => {
+		const { req } = bootFakeRuntime()
+		const html = await renderHtml(
+			req,
+			{ metric: 'visitors', timeframe: 'today' },
+			{
+				path: '/analytics',
+				defaultRange: 'today',
+				defaultMetric: 'visitors',
+			}
+		)
+		expect(hrefIn(html)).toBe('/admin/analytics?source=test')
+	})
+
+	it('renders no link when the app turned the view off', async () => {
+		const { req } = bootFakeRuntime()
+		const html = await renderHtml(req, { metric: 'pageviews' }, false)
+		expect(html).not.toContain('analytics-widget__link')
+		expect(html).not.toContain('analytics:widgetOpenInView')
 	})
 })

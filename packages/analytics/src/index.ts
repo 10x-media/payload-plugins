@@ -203,6 +203,15 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				register: resolved.widgets.register,
 				localizeText: resolved.widgets.localizeText,
 				defaultId: resolved.defaultAdapter,
+				comparison: resolved.widgets.comparison,
+				view:
+					resolved.view === false
+						? false
+						: {
+								path: resolved.view.path,
+								defaultRange: resolved.view.defaultRange,
+								defaultMetric: resolved.view.defaultMetric,
+							},
 			})
 		}
 		registerView(config, { view: resolved.view, pluginOptions: options })

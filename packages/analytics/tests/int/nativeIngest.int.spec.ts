@@ -183,6 +183,25 @@ describeForDb('native ingest through the router', { dbs: ['mongo'] }, (db) => {
 		expect(docs).toHaveLength(1)
 		expect((docs[0] as { durationMs?: number } | undefined)?.durationMs).toBe(300)
 	})
+
+	// A pageview and a goal from the same visitor share every rollup bucket, so they race on
+	// the same seen-ledger row. Whichever loses the unique index gets a duplicate-key error
+	// back from the driver, which used to escape flushBatch as a 500.
+	it('202s a pageview and a goal racing on the same seen-ledger row', async () => {
+		const body = (type: 'pageview' | 'goal') =>
+			JSON.stringify({
+				type,
+				path: '/race',
+				hostname: 'h',
+				...(type === 'goal' ? { name: 'race-goal' } : {}),
+			})
+		for (let round = 0; round < 20; round++) {
+			const statuses = (await Promise.all([post(body('pageview')), post(body('goal'))])).map(
+				(res) => res.status
+			)
+			expect(statuses, `round ${round}`).toEqual([202, 202])
+		}
+	})
 })
 
 describeForDb('native retention', { dbs: ['mongo'] }, (db) => {

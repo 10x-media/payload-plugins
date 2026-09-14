@@ -1,7 +1,7 @@
 'use client'
 
 export { BarList, type BarListProps } from '../charts/BarList'
-export { TrendChart, type TrendChartProps } from '../charts/TrendChart'
+export { TrendChart, type TrendChartProps, type TrendPoint } from '../charts/TrendChart'
 export type { WireSource } from '../fields/config/fetchSources'
 export { MetricSelectField, type MetricSelectFieldProps } from '../fields/config/MetricSelectField'
 export { SourceSelectField } from '../fields/config/SourceSelectField'

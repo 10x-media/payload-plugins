@@ -69,7 +69,6 @@ export interface Config {
   collections: {
     users: User;
     pages: Page;
-    tenants: Tenant;
     'analytics-providers': AnalyticsProvider;
     'analytics-goals': AnalyticsGoal;
     'analytics-events': AnalyticsEvent;
@@ -86,7 +85,6 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
-    tenants: TenantsSelect<false> | TenantsSelect<true>;
     'analytics-providers': AnalyticsProvidersSelect<false> | AnalyticsProvidersSelect<true>;
     'analytics-goals': AnalyticsGoalsSelect<false> | AnalyticsGoalsSelect<true>;
     'analytics-events': AnalyticsEventsSelect<false> | AnalyticsEventsSelect<true>;
@@ -114,11 +112,17 @@ export interface Config {
     'analytics-metric': AnalyticsMetricWidget;
     'analytics-trend': AnalyticsTrendWidget;
     'analytics-realtime': AnalyticsRealtimeWidget;
+    'analytics-goals': AnalyticsGoalsWidget;
     'analytics-breakdown-pages': AnalyticsBreakdownPagesWidget;
     'analytics-breakdown-sources': AnalyticsBreakdownSourcesWidget;
     'analytics-breakdown-devices': AnalyticsBreakdownDevicesWidget;
     'analytics-breakdown-countries': AnalyticsBreakdownCountriesWidget;
     'analytics-breakdown-goals': AnalyticsBreakdownGoalsWidget;
+    'analytics-breakdown-referrers': AnalyticsBreakdownReferrersWidget;
+    'analytics-breakdown-browsers': AnalyticsBreakdownBrowsersWidget;
+    'analytics-breakdown-os': AnalyticsBreakdownOsWidget;
+    'analytics-breakdown-campaigns': AnalyticsBreakdownCampaignsWidget;
+    'analytics-breakdown-events': AnalyticsBreakdownEventsWidget;
     'dev-custom-sources': DevCustomSourcesWidget;
     collections: CollectionsWidget;
   };
@@ -159,12 +163,6 @@ export interface UserAuthOperations {
  */
 export interface User {
   id: string;
-  tenants?:
-    | {
-        tenant: string | Tenant;
-        id?: string | null;
-      }[]
-    | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -183,17 +181,6 @@ export interface User {
     | null;
   password?: string | null;
   collection: 'users';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "tenants".
- */
-export interface Tenant {
-  id: string;
-  name: string;
-  slug: string;
-  updatedAt: string;
-  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -222,10 +209,10 @@ export interface Page {
  */
 export interface AnalyticsProvider {
   id: string;
-  tenant?: (string | null) | Tenant;
   name: string;
   provider: 'plausible' | 'umami' | 'ga4' | 'posthog';
   enabled?: boolean | null;
+  scope?: string | null;
   plausible?: {
     siteId?: string | null;
     apiKey?: string;
@@ -328,7 +315,6 @@ export interface AnalyticsEvent {
     | number
     | boolean
     | null;
-  scope?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -344,7 +330,6 @@ export interface AnalyticsRollup {
   dimension: string;
   dimvalue: string;
   hostname: string;
-  scope: string;
   pageviews: number;
   events: number;
   durationMs: number;
@@ -524,10 +509,6 @@ export interface PayloadLockedDocument {
         value: string | Page;
       } | null)
     | ({
-        relationTo: 'tenants';
-        value: string | Tenant;
-      } | null)
-    | ({
         relationTo: 'analytics-providers';
         value: string | AnalyticsProvider;
       } | null)
@@ -598,12 +579,6 @@ export interface PayloadMigration {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
-  tenants?:
-    | T
-    | {
-        tenant?: T;
-        id?: T;
-      };
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -646,23 +621,13 @@ export interface PagesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "tenants_select".
- */
-export interface TenantsSelect<T extends boolean = true> {
-  name?: T;
-  slug?: T;
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "analytics-providers_select".
  */
 export interface AnalyticsProvidersSelect<T extends boolean = true> {
-  tenant?: T;
   name?: T;
   provider?: T;
   enabled?: T;
+  scope?: T;
   plausible?:
     | T
     | {
@@ -759,7 +724,6 @@ export interface AnalyticsEventsSelect<T extends boolean = true> {
   currency?: T;
   scrollDepth?: T;
   goals?: T;
-  scope?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -774,7 +738,6 @@ export interface AnalyticsRollupsSelect<T extends boolean = true> {
   dimension?: T;
   dimvalue?: T;
   hostname?: T;
-  scope?: T;
   pageviews?: T;
   events?: T;
   durationMs?: T;
@@ -984,6 +947,7 @@ export interface AnalyticsTrendWidget {
       from?: string | null;
       to?: string | null;
     };
+    compare?: boolean | null;
     dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
@@ -1000,6 +964,33 @@ export interface AnalyticsRealtimeWidget {
     dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-goals_widget".
+ */
+export interface AnalyticsGoalsWidget {
+  data?: {
+    title?: string | null;
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: ('10' | '25' | '50') | null;
+    compare?: boolean | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1150,6 +1141,186 @@ export interface AnalyticsBreakdownCountriesWidget {
  * via the `definition` "analytics-breakdown-goals_widget".
  */
 export interface AnalyticsBreakdownGoalsWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-referrers_widget".
+ */
+export interface AnalyticsBreakdownReferrersWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-browsers_widget".
+ */
+export interface AnalyticsBreakdownBrowsersWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-os_widget".
+ */
+export interface AnalyticsBreakdownOsWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-campaigns_widget".
+ */
+export interface AnalyticsBreakdownCampaignsWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-events_widget".
+ */
+export interface AnalyticsBreakdownEventsWidget {
   data?: {
     title?: string | null;
     metric:

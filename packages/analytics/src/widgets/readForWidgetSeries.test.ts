@@ -126,6 +126,80 @@ describe('readForWidgetSeries', () => {
 		expect(result.previousTotal).toBe(12)
 	})
 
+	it('returns a comparison series aligned to the primary axis when compare is asked for', async () => {
+		const result = await readForWidgetSeries({
+			req: reqWith([seriesAdapter({ capabilities: { ...baseCaps(), comparison: true } })]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
+			compare: true,
+		})
+		expect(result.status).toBe('ok')
+		expect(result.comparisonPoints).toHaveLength(result.points.length)
+		expect(result.previousTotal).toBe(12)
+		// The adapter's rows fall outside the previous window, so every bucket zero-fills.
+		expect(result.comparisonPoints?.every((p) => p.value === 0)).toBe(true)
+	})
+
+	it('reads the previous window at day granularity only when compare is asked for', async () => {
+		const received: (Granularity | undefined)[] = []
+		const adapter = seriesAdapter({
+			capabilities: { ...baseCaps(), comparison: true },
+			async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+				received.push(q.granularity)
+				return {
+					rows: [],
+					totals: { pageviews: 3 },
+					meta: { provider: 'native', fetchedAt: NOW.toISOString() },
+				}
+			},
+		})
+		await readForWidgetSeries({
+			req: reqWith([adapter]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
+			compare: true,
+		})
+		expect(received).toEqual(['day', 'day'])
+	})
+
+	it('omits the comparison series when compare is not asked for', async () => {
+		const result = await readForWidgetSeries({
+			req: reqWith([seriesAdapter({ capabilities: { ...baseCaps(), comparison: true } })]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
+			compare: false,
+		})
+		expect(result.comparisonPoints).toBeUndefined()
+		expect(result.previousTotal).toBe(12)
+	})
+
+	it('omits the comparison series and reads once when the adapter cannot compare', async () => {
+		let reads = 0
+		const adapter = seriesAdapter({
+			async query(_q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+				reads += 1
+				return {
+					rows: [],
+					totals: { pageviews: 1 },
+					meta: { provider: 'native', fetchedAt: NOW.toISOString() },
+				}
+			},
+		})
+		const result = await readForWidgetSeries({
+			req: reqWith([adapter]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
+			compare: true,
+		})
+		expect(result.comparisonPoints).toBeUndefined()
+		expect(result.comparisonRange).toBeUndefined()
+		expect(reads).toBe(1)
+	})
+
 	it('omits comparison data when the adapter does not support it', async () => {
 		const result = await readForWidgetSeries({
 			req: reqWith([seriesAdapter()]),

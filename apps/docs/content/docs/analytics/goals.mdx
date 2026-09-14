@@ -283,7 +283,7 @@ The [native engine](/analytics/native) then serves three metrics and one dimensi
 | `scrollDepth` | Average deepest scroll, over the pageviews that actually reported one. |
 | `goal` (dimension) | Groups by goal slug. Groupable, not filterable. |
 
-All three metrics appear in the widget metric, trend, and breakdown pickers, and the built-in `analytics-breakdown-goals` widget lists completions per goal (defaulting its metric to `conversions`). See [Dashboard widgets](/analytics/widgets).
+All three metrics appear in the widget metric, trend, and breakdown pickers, and the built-in `analytics-breakdown-goals` widget lists completions per goal (defaulting its metric to `conversions`). For the fuller table, the [goals widget](/analytics/widgets#the-goals-widget) reports conversions, revenue and a conversion rate per goal, under each goal's own name rather than its slug. See [Dashboard widgets](/analytics/widgets).
 
 A `goal` event counts under the `events` metric, not `pageviews`, and is deliberately kept out of the `event` dimension breakdown: its name is a goal slug and belongs to the `goal` dimension instead.
 

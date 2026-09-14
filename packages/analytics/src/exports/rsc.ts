@@ -15,6 +15,7 @@ export { AnalyticsScripts, type AnalyticsScriptsProps } from '../rsc/AnalyticsSc
 export { AnalyticsView, type AnalyticsViewProps } from '../view/AnalyticsView'
 export type { AnalyticsViewClientProps, ViewGoal } from '../view/viewProps'
 export { default as AnalyticsBreakdownWidget } from '../widgets/AnalyticsBreakdownWidget'
+export { default as AnalyticsGoalsWidget } from '../widgets/AnalyticsGoalsWidget'
 export { default as AnalyticsMetricWidget } from '../widgets/AnalyticsMetricWidget'
 export { default as AnalyticsRealtimeWidget } from '../widgets/AnalyticsRealtimeWidget'
 export { default as AnalyticsTrendWidget } from '../widgets/AnalyticsTrendWidget'
@@ -31,6 +32,12 @@ export type {
 	WidgetBreakdownResult,
 } from '../widgets/readForWidgetBreakdown'
 export { readForWidgetBreakdown } from '../widgets/readForWidgetBreakdown'
+export type {
+	GoalRow,
+	ReadForWidgetGoalsArgs,
+	WidgetGoalsResult,
+} from '../widgets/readForWidgetGoals'
+export { readForWidgetGoals } from '../widgets/readForWidgetGoals'
 export type {
 	ReadForWidgetRealtimeArgs,
 	RealtimePoint,

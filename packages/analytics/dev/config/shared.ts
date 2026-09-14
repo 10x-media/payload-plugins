@@ -78,12 +78,17 @@ export const sharedDashboardLayout: DashboardLayout = [
 	{
 		widgetSlug: 'analytics-trend',
 		width: 'large',
-		data: { metric: 'pageviews', timeframe: 'last30days' },
+		data: { metric: 'pageviews', timeframe: 'last30days', compare: true },
 	},
 	{
 		widgetSlug: 'analytics-trend',
 		width: 'large',
 		data: { metric: 'visitors', timeframe: 'last30days' },
+	},
+	{
+		widgetSlug: 'analytics-goals',
+		width: 'large',
+		data: { timeframe: 'last30days', limit: '10', compare: true },
 	},
 	{
 		widgetSlug: 'analytics-metric',
@@ -129,6 +134,18 @@ export const sharedDashboardLayout: DashboardLayout = [
 		widgetSlug: 'analytics-breakdown-goals',
 		width: 'medium',
 		data: { metric: 'conversions', timeframe: 'last30days', limit: 5 },
+	},
+	{
+		widgetSlug: 'analytics-breakdown-referrers',
+		width: 'medium',
+		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
+	},
+	{
+		// The one widget on a window other than the view's own default, so its "Open in
+		// Analytics" link carries a range rather than serializing away to the default.
+		widgetSlug: 'analytics-breakdown-events',
+		width: 'medium',
+		data: { metric: 'events', timeframe: 'last7days', limit: 5 },
 	},
 	{ widgetSlug: 'dev-custom-sources', width: 'medium', data: {} },
 ]

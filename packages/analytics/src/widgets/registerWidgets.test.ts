@@ -3,10 +3,22 @@ import { describe, expect, it } from 'vitest'
 import type { AnalyticsAdapter, DimensionKey, MetricKey } from '../core/contract'
 import { native } from '../native/nativeAdapter'
 import { memoryAdapter } from '../testing/memoryAdapter'
-import { findMetricField, registerWidgets, widgetIsSupported } from './registerWidgets'
+import { keys, type TranslationKey } from '../translations/keys'
+import type { CustomWidgetDef } from './customWidget'
+import {
+	findMetricField,
+	type RegisterWidgetsArgs,
+	registerWidgets,
+	widgetIsSupported,
+} from './registerWidgets'
 import { WIDGET_METRICS } from './types'
 
 const bareConfig = (): Config => ({}) as Config
+
+const fieldNames = (config: Config, slug: string): string[] =>
+	(config.admin?.dashboard?.widgets?.find((w) => w.slug === slug)?.fields ?? []).flatMap((f) =>
+		'name' in f && typeof f.name === 'string' ? [f.name] : []
+	)
 
 const metricFieldOf = (config: Config, slug = 'analytics-metric') => {
 	const widget = config.admin?.dashboard?.widgets?.find((w) => w.slug === slug)
@@ -37,6 +49,32 @@ describe('registerWidgets', () => {
 		})
 		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
 		expect(slugs).toContain('analytics-metric')
+	})
+
+	it('puts the compare checkbox on the trend widget only', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+		})
+		expect(fieldNames(config, 'analytics-trend')).toContain('compare')
+		expect(fieldNames(config, 'analytics-metric')).not.toContain('compare')
+	})
+
+	it('drops the compare checkbox when the host turned comparison off', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+			comparison: false,
+		})
+		expect(fieldNames(config, 'analytics-trend')).not.toContain('compare')
 	})
 
 	it('omits widgets named in the disabled list', () => {
@@ -388,7 +426,13 @@ describe('registerWidgets', () => {
 				'analytics-breakdown-devices',
 				'analytics-breakdown-countries',
 				'analytics-breakdown-goals',
+				'analytics-breakdown-referrers',
+				'analytics-breakdown-browsers',
+				'analytics-breakdown-os',
+				'analytics-breakdown-campaigns',
+				'analytics-breakdown-events',
 				'analytics-realtime',
+				'analytics-goals',
 			],
 			register: [{ slug: 'myapp-only', component: 'x#y', label: 'Mine' }],
 		})
@@ -462,6 +506,60 @@ describe('registerWidgets', () => {
 		)
 	})
 
+	it('registers the five new breakdown widgets with their label and default metric', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: true,
+			disabled: [],
+			register: [],
+		})
+		const widgetsBySlug = new Map((config.admin?.dashboard?.widgets ?? []).map((w) => [w.slug, w]))
+		const expectations: [slug: string, label: TranslationKey, defaultMetric: string][] = [
+			['analytics-breakdown-referrers', keys.widgetBreakdownReferrers, 'pageviews'],
+			['analytics-breakdown-browsers', keys.widgetBreakdownBrowsers, 'pageviews'],
+			['analytics-breakdown-os', keys.widgetBreakdownOs, 'pageviews'],
+			['analytics-breakdown-campaigns', keys.widgetBreakdownCampaigns, 'pageviews'],
+			['analytics-breakdown-events', keys.widgetBreakdownEvents, 'events'],
+		]
+		for (const [slug, label, defaultMetric] of expectations) {
+			const widget = widgetsBySlug.get(slug)
+			expect(widget).toBeDefined()
+			expect(
+				widget?.label && (widget.label as (args: never) => string)({ t: (k: string) => k } as never)
+			).toBe(label)
+			const metricField = widget?.fields ? findMetricField(widget.fields) : undefined
+			expect(metricField && 'defaultValue' in metricField && metricField.defaultValue).toBe(
+				defaultMetric
+			)
+		}
+	})
+
+	it('skips the campaigns breakdown when no config adapter serves utmCampaign, but registers it when providersEnabled', () => {
+		const withoutProviders = bareConfig()
+		registerWidgets(withoutProviders, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+		})
+		const slugsWithout = withoutProviders.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
+		expect(slugsWithout).not.toContain('analytics-breakdown-campaigns')
+
+		const withProviders = bareConfig()
+		registerWidgets(withProviders, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: true,
+			disabled: [],
+			register: [],
+		})
+		const slugsWith = withProviders.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
+		expect(slugsWith).toContain('analytics-breakdown-campaigns')
+	})
+
 	it('with providersEnabled, the metric select lists every WIDGET_METRICS candidate (native lacks bounceRate)', () => {
 		const config = bareConfig()
 		registerWidgets(config, {
@@ -509,5 +607,132 @@ describe('registerWidgets', () => {
 				'analytics-breakdown-countries',
 			])
 		)
+	})
+})
+
+describe('registerWidgets: goals widget', () => {
+	const register = (args: Partial<Parameters<typeof registerWidgets>[1]> = {}): Config => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+			...args,
+		})
+		return config
+	}
+
+	const goalsWidget = (config: Config) =>
+		config.admin?.dashboard?.widgets?.find((w) => w.slug === 'analytics-goals')
+
+	it('registers the goals widget with its own RSC component and label', () => {
+		const widget = goalsWidget(register())
+		expect(widget?.Component).toMatchObject({
+			path: '@10x-media/analytics/rsc#AnalyticsGoalsWidget',
+		})
+		expect(
+			widget?.label && (widget.label as (args: never) => string)({ t: (k: string) => k } as never)
+		).toBe(keys.widgetGoals)
+	})
+
+	it('gives it a timeframe, custom range, limit and compare field', () => {
+		const names = fieldNames(register(), 'analytics-goals')
+		expect(names).toEqual(['title', 'timeframe', 'range', 'limit', 'compare'])
+	})
+
+	it('offers 10, 25 and 50 rows, defaulting to 10', () => {
+		const limit = goalsWidget(register())?.fields?.find((f) => 'name' in f && f.name === 'limit')
+		expect(limit?.type).toBe('select')
+		expect(limit && 'options' in limit ? limit.options : []).toEqual([
+			{ value: '10', label: '10' },
+			{ value: '25', label: '25' },
+			{ value: '50', label: '50' },
+		])
+		expect(limit && 'defaultValue' in limit ? limit.defaultValue : undefined).toBe('10')
+	})
+
+	it('drops the compare checkbox when the host turned comparison off', () => {
+		expect(fieldNames(register({ comparison: false }), 'analytics-goals')).not.toContain('compare')
+	})
+
+	it('adds the data-source field in a multi-provider install', () => {
+		const names = fieldNames(
+			register({ adapters: [native(), memoryAdapter()], multiProvider: true }),
+			'analytics-goals'
+		)
+		expect(names).toContain('dataSource')
+	})
+
+	it('skips the widget when no config adapter serves conversions by goal', () => {
+		const noGoals: AnalyticsAdapter = {
+			id: 'limited',
+			label: 'Limited',
+			capabilities: { ...native().capabilities, dimensions: new Set<DimensionKey>(['page']) },
+			isConfigured: () => true,
+			query: async () => ({ rows: [], meta: { provider: 'limited', fetchedAt: '' } }),
+		}
+		const slugs = register({ adapters: [noGoals] }).admin?.dashboard?.widgets?.map((w) => w.slug)
+		expect(slugs).not.toContain('analytics-goals')
+		const withProviders = register({ adapters: [noGoals], providersEnabled: true })
+		expect(withProviders.admin?.dashboard?.widgets?.map((w) => w.slug)).toContain('analytics-goals')
+	})
+
+	it('skips the widget when no config adapter serves conversions at all', () => {
+		const noConversions: AnalyticsAdapter = {
+			id: 'limited',
+			label: 'Limited',
+			capabilities: { ...native().capabilities, metrics: new Set<MetricKey>(['pageviews']) },
+			isConfigured: () => true,
+			query: async () => ({ rows: [], meta: { provider: 'limited', fetchedAt: '' } }),
+		}
+		const slugs = register({ adapters: [noConversions] }).admin?.dashboard?.widgets?.map(
+			(w) => w.slug
+		)
+		expect(slugs).not.toContain('analytics-goals')
+	})
+})
+
+describe('registerWidgets view link', () => {
+	const custom: CustomWidgetDef = { slug: 'custom', component: 'x#Custom', label: 'Custom' }
+	const view = { path: '/insights', defaultRange: 'today', defaultMetric: 'visitors' } as const
+
+	const built = (view?: RegisterWidgetsArgs['view']): Config => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [custom],
+			...(view === undefined ? {} : { view }),
+		})
+		return config
+	}
+
+	const serverPropsOf = (config: Config, slug: string): Record<string, unknown> | undefined => {
+		const component = config.admin?.dashboard?.widgets?.find((w) => w.slug === slug)?.Component
+		return typeof component === 'object' && component !== null && 'serverProps' in component
+			? (component.serverProps as Record<string, unknown>)
+			: undefined
+	}
+
+	it('hands every built-in widget the view path and the defaults it opens on', () => {
+		const config = built(view)
+		const builtIns = (config.admin?.dashboard?.widgets ?? []).filter((w) => w.slug !== custom.slug)
+		expect(builtIns.length).toBeGreaterThan(0)
+		for (const widget of builtIns) {
+			expect(serverPropsOf(config, widget.slug)?.view).toEqual(view)
+		}
+	})
+
+	it('hands them false when the app turned the view off', () => {
+		expect(serverPropsOf(built(false), 'analytics-metric')?.view).toBe(false)
+		expect(serverPropsOf(built(), 'analytics-metric')?.view).toBe(false)
+	})
+
+	it('leaves a host-registered widget alone', () => {
+		expect(serverPropsOf(built(view), custom.slug)).toBeUndefined()
 	})
 })

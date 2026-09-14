@@ -20,6 +20,8 @@ export interface WidgetReadResult {
 	dateRange: DateRange
 	metrics: Partial<Record<MetricKey, number>>
 	clamped?: boolean
+	/** True when the engine served a stale cache entry after a failed provider read. */
+	stale?: boolean
 	/** Previous-window totals, present only when the adapter supports comparison. */
 	previousMetrics?: Partial<Record<MetricKey, number>>
 	/** The previous comparable window, present only when comparison ran. */
@@ -41,6 +43,11 @@ export interface ReadForWidgetArgs {
 	 */
 	timezone?: string
 	filters?: AnalyticsFilter[]
+	/**
+	 * Read the previous window too, where the install and the source both allow it. Defaults
+	 * to on; a caller that never renders a delta passes false to save the second read.
+	 */
+	comparison?: boolean
 }
 
 export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetReadResult> => {
@@ -86,7 +93,7 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
 	const comparisonRange =
-		runtime.comparison && adapter.capabilities.comparison
+		args.comparison !== false && runtime.comparison && adapter.capabilities.comparison
 			? (previousWindow(dateRange, tz) ?? undefined)
 			: undefined
 	let result: AnalyticsResult
@@ -122,6 +129,7 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		dateRange,
 		metrics: result.totals ?? {},
 		clamped: result.meta.clamped ?? false,
+		stale: result.meta.stale ?? false,
 		previousMetrics,
 		comparisonRange,
 	}
