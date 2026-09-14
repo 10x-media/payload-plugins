@@ -66,6 +66,48 @@ describe('buildCacheKey', () => {
 		})
 		expect(a).not.toBe(b)
 	})
+	it('keys a closed window on its exact bounds', () => {
+		const key = buildCacheKey('native', {
+			metrics: ['pageviews'],
+			timezone: 'Europe/Berlin',
+			dateRange: {
+				start: new Date('2026-05-31T22:00:00.000Z'),
+				end: new Date('2026-06-23T21:59:59.999Z'),
+			},
+		})
+		expect(key).toContain('2026-05-31T22:00:00.000Z_2026-06-23T21:59:59.999Z')
+	})
+	it('separates a closed window from the narrower one that snapped to the same day', () => {
+		// The picker's raw local-midnight instants and the inclusive window they now resolve
+		// to both end on Jun 23 in Berlin; a day-snapped key served the narrow answer for both.
+		const stored = buildCacheKey('native', {
+			metrics: ['pageviews'],
+			timezone: 'Europe/Berlin',
+			dateRange: {
+				start: new Date('2026-05-31T22:00:00.000Z'),
+				end: new Date('2026-06-22T22:00:00.000Z'),
+			},
+		})
+		const inclusive = buildCacheKey('native', {
+			metrics: ['pageviews'],
+			timezone: 'Europe/Berlin',
+			dateRange: {
+				start: new Date('2026-05-31T22:00:00.000Z'),
+				end: new Date('2026-06-23T21:59:59.999Z'),
+			},
+		})
+		expect(inclusive).not.toBe(stored)
+	})
+	it('reads "closed" in the query timezone, not in UTC', () => {
+		const range = {
+			start: new Date('2026-05-31T22:00:00.000Z'),
+			end: new Date('2026-06-23T21:59:59.999Z'),
+		}
+		// The same instant ends a Berlin day but falls mid-day in UTC, which still snaps.
+		expect(buildCacheKey('native', { metrics: ['pageviews'], dateRange: range })).toContain(
+			'2026-06-24T00:00:00.000Z'
+		)
+	})
 	it('keeps the unscoped key format unchanged', () => {
 		expect(buildCacheKey('ga4', base)).toBe(
 			'analytics|ga4|_|/pricing|pageviews,visitors||2026-01-01T00:00:00.000Z_2026-02-01T00:00:00.000Z|_||_|_'

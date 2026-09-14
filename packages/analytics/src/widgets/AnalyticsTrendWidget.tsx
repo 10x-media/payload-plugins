@@ -24,8 +24,10 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 	const data = (props.widgetData ?? {}) as MetricWidgetData
 	const metric: MetricKey = data.metric ?? 'pageviews'
 	const rawTimeframe = data.timeframe ?? 'last30days'
-	const timezone = await requestTimezone(props.req)
-	const customRange = resolveCustomRange(rawTimeframe, data.range, timezone)
+	// Only a custom range needs the reporting timezone before the read; a preset window
+	// resolves inside the read path, which resolves the timezone there as it always has.
+	const timezone = rawTimeframe === 'custom' ? await requestTimezone(props.req) : undefined
+	const customRange = timezone ? resolveCustomRange(rawTimeframe, data.range, timezone) : undefined
 	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
 	const t = asTranslate(props.req.i18n.t)
 	const locale = props.req.i18n.language ?? 'en-US'
@@ -38,7 +40,7 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 		adapterId: data.dataSource,
 		now: new Date(),
 		range: customRange,
-		timezone,
+		...(timezone ? { timezone } : {}),
 	})
 
 	if (result.status !== 'ok') {
@@ -50,9 +52,10 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 		)
 	}
 
-	const caption = customRange
-		? formatRangeCaption(customRange, locale, timezone)
-		: t(TIMEFRAME_KEYS[timeframe])
+	const caption =
+		customRange && timezone
+			? formatRangeCaption(customRange, locale, timezone)
+			: t(TIMEFRAME_KEYS[timeframe])
 	const buckets = customRange
 		? bucketByRange(result.points, customRange, result.timezone)
 		: bucketSeries(result.points, timeframe, result.timezone)

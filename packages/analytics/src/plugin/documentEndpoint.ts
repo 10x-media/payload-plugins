@@ -28,8 +28,8 @@ const parseMetrics = (raw: string | null): MetricKey[] | null => {
  * A custom window from the query string, read exactly like the query endpoint's: a
  * `YYYY-MM-DD` day is the whole calendar day in the reporting timezone (`to` inclusive of
  * its final instant), a datetime must carry `Z` or a `±HH:MM` offset, and anything else,
- * including an offset-less datetime, is rejected. A single-day window is valid, since a
- * day string no longer collapses to an empty span.
+ * including an offset-less datetime, is rejected. `from` equal to `to` is one whole day for
+ * day strings and a zero-width window for two instants, so only the latter is rejected.
  */
 const parseRange = (from: string | null, to: string | null, timezone: string): DateRange | null => {
 	if (!from || !to) {
@@ -37,7 +37,7 @@ const parseRange = (from: string | null, to: string | null, timezone: string): D
 	}
 	const start = parseDayOrInstant(from, { timezone, edge: 'start' })
 	const end = parseDayOrInstant(to, { timezone, edge: 'end' })
-	if (!start || !end || end.getTime() < start.getTime()) {
+	if (!start || !end || end.getTime() <= start.getTime()) {
 		return null
 	}
 	return { start, end }

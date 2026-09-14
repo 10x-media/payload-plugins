@@ -1,11 +1,13 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { Endpoint, PayloadRequest, TypedUser } from 'payload'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import type { Endpoint, PayloadRequest, TypedUser, WidgetInstance } from 'payload'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { analytics } from '../../src/index'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { native } from '../../src/native/nativeAdapter'
 import { DOCUMENT_PATH } from '../../src/plugin/paths'
+import { getRuntime } from '../../src/plugin/runtime'
+import { warmTask } from '../../src/plugin/warmTask'
 import { resolveCustomRange } from '../../src/widgets/range'
 import { readForWidget } from '../../src/widgets/readForWidget'
 
@@ -129,6 +131,50 @@ describeForDb('custom ranges in the reporting timezone', { dbs: ['mongo'] }, (db
 			`collection=pages&id=${pageId}&metrics=pageviews&timeframe=custom&from=2026-06-23&to=2026-06-01`
 		)
 		expect(inverted.status).toBe(400)
+	})
+
+	it(`rejects two equal instants as a zero-width window on ${db}`, async () => {
+		const res = await call(
+			`collection=pages&id=${pageId}&metrics=pageviews&timeframe=custom&from=2026-06-23T10:00:00Z&to=2026-06-23T10:00:00Z`
+		)
+		expect(res.status).toBe(400)
+		expect(await res.json()).toEqual({ error: 'invalid range' })
+	})
+
+	it(`warms the very cache key a custom-range widget then asks for on ${db}`, async () => {
+		const layout: WidgetInstance[] = [
+			{
+				widgetSlug: 'analytics-metric',
+				width: 'small',
+				data: { metric: 'visitors', timeframe: 'custom', range: BERLIN_ADMIN_PICK },
+			},
+		]
+		const handler = warmTask('*/30 * * * *', layout).handler
+		if (typeof handler !== 'function') {
+			throw new Error('warm task handler must be a function')
+		}
+		const req = { payload: booted.payload } as unknown as PayloadRequest
+		const output = (await handler({ req } as unknown as Parameters<typeof handler>[0])) as {
+			output: { warmed: number; failed: number }
+		}
+		expect(output.output).toEqual({ warmed: 1, failed: 0 })
+
+		const adapter = getRuntime(booted.payload)?.registry.default()
+		if (!adapter) {
+			throw new Error('runtime adapter missing after boot')
+		}
+		const spy = vi.spyOn(adapter, 'query')
+		const live = await readForWidget({
+			req,
+			metrics: ['visitors'],
+			timeframe: 'last30days',
+			now: new Date(),
+			range: resolveCustomRange('custom', BERLIN_ADMIN_PICK, TZ),
+			timezone: TZ,
+		})
+		expect(live.status).toBe('ok')
+		expect(spy).not.toHaveBeenCalled()
+		spy.mockRestore()
 	})
 
 	it(`widget reads cover the whole final day the admin picked on ${db}`, async () => {
