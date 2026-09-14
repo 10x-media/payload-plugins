@@ -3,9 +3,9 @@ import type { ImportMap, PayloadComponent } from 'payload'
 import type React from 'react'
 
 import type { RenderedSlots, RenderedVariantSlots } from '../client/types'
-import type { ResolvedCollection, ResolvedVariant } from '../plugin/registry'
+import type { ResolvedCollection, ResolvedFieldItem, ResolvedVariant } from '../plugin/registry'
 import type { SlotComponents } from '../types'
-import { renderedKey } from './manifest'
+import { itemIndexPath, renderedKey } from './manifest'
 
 type RenderArgs = {
 	importMap: ImportMap
@@ -87,15 +87,19 @@ export const renderVariant = (
 		if (step.Component) {
 			rendered[renderedKey(variant.key, step.key)] = render(args, step.Component, stepProps)
 		}
-		step.items.forEach((item, index) => {
-			if (item.type === 'component') {
-				rendered[renderedKey(variant.key, step.key, index)] = render(
-					args,
-					item.Component,
-					stepProps
-				)
-			}
-		})
+		const renderItems = (items: ResolvedFieldItem[], prefix: string): void => {
+			items.forEach((item, index) => {
+				const at = itemIndexPath(prefix, index)
+				if (item.type === 'component') {
+					rendered[renderedKey(variant.key, step.key, at)] = render(args, item.Component, stepProps)
+					return
+				}
+				if ('items' in item) {
+					renderItems(item.items, at)
+				}
+			})
+		}
+		renderItems(step.items, '')
 		if (step.components) {
 			slots.steps[step.key] = renderSlots(args, step.components, stepProps)
 		}

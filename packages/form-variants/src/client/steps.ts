@@ -1,6 +1,6 @@
 import type { FormState } from 'payload'
 
-import type { ClientStep } from './types'
+import type { ClientFieldItem, ClientStep } from './types'
 
 /** Whether `path` is `itemPath` or nested below it. */
 export const isUnderPath = (path: string, itemPath: string): boolean =>
@@ -15,10 +15,11 @@ export const stepIsRenderable = (step: ClientStep, formStatePaths: Iterable<stri
 	if (step.kind === 'component') {
 		return true
 	}
+	if (hasComponentItem(step.items)) {
+		return true
+	}
 	const paths = Array.from(formStatePaths)
-	return step.items.some((item) =>
-		item.type === 'component' ? true : paths.some((path) => isUnderPath(path, item.path))
-	)
+	return itemPaths(step.items).some((itemPath) => paths.some((path) => isUnderPath(path, itemPath)))
 }
 
 /** The steps to show, in order: condition passed and something to render. */
@@ -36,11 +37,29 @@ export const resolveStepKey = (steps: ClientStep[], requested: null | string): n
 	return steps[0]?.key ?? null
 }
 
+/**
+ * The field paths a step lists, flattened: the containers a step draws around its fields are
+ * presentational and nest without touching a path.
+ */
+export const itemPaths = (items: ClientFieldItem[]): string[] =>
+	items.flatMap((item) => {
+		if (item.type === 'field') {
+			return [item.path]
+		}
+		return 'items' in item ? itemPaths(item.items) : []
+	})
+
+/** Whether anywhere in the tree a step draws a component of its own. */
+export const hasComponentItem = (items: ClientFieldItem[]): boolean =>
+	items.some((item) =>
+		item.type === 'component' ? true : 'items' in item && hasComponentItem(item.items)
+	)
+
 /** Form state paths of one step, prefix-matched so nested paths count. */
 export const stepPaths = (step: ClientStep, formState: FormState): string[] => {
-	const itemPaths = step.items.flatMap((item) => (item.type === 'field' ? [item.path] : []))
+	const paths = itemPaths(step.items)
 	return Object.keys(formState).filter((path) =>
-		itemPaths.some((itemPath) => isUnderPath(path, itemPath))
+		paths.some((itemPath) => isUnderPath(path, itemPath))
 	)
 }
 

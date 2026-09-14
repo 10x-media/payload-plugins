@@ -83,11 +83,23 @@ export type DataPaths<T, Depth extends number = 4> = Depth extends 0
 /** A field path typed against the collection's generated type. */
 export type FieldPath<TSlug extends CollectionSlug> = DataPaths<DataFromCollectionSlug<TSlug>>
 
+/** Presentational overrides a step puts on the field it lists. */
+export type FieldItemAdmin = {
+	/**
+	 * The field's width inside a `row`, as Payload's own `admin.width`: any CSS length, e.g.
+	 * `'50%'`. Outside a row it has no effect, as on the native form.
+	 */
+	width?: string
+}
+
 /** A field on a step with presentational overrides. */
 export type FieldItemWithOverrides<TSlug extends CollectionSlug> = {
+	admin?: FieldItemAdmin
 	description?: VariantLabel
 	label?: VariantLabel
 	path: FieldPath<TSlug>
+	/** Optional, since a plain path and a bare string mean the same thing. */
+	type?: 'field'
 }
 
 /** A non-field component placed between the fields of a step. */
@@ -96,11 +108,48 @@ export type ComponentItem = {
 	type: 'component'
 }
 
-/** One entry in a field step. */
+/**
+ * Fields laid side by side, as Payload's own `row` does. Width comes from each field's
+ * `admin.width`; fields without one share what is left.
+ */
+export type RowItem<TSlug extends CollectionSlug> = {
+	fields: FieldItem<TSlug>[]
+	type: 'row'
+}
+
+/** Fields behind a collapsible lid, as Payload's own `collapsible` does. */
+export type CollapsibleItem<TSlug extends CollectionSlug> = {
+	fields: FieldItem<TSlug>[]
+	initCollapsed?: boolean
+	label: VariantLabel
+	type: 'collapsible'
+}
+
+/** Fields under a heading and a rule, as Payload's own unnamed `group` does. */
+export type GroupItem<TSlug extends CollectionSlug> = {
+	description?: VariantLabel
+	fields: FieldItem<TSlug>[]
+	label?: VariantLabel
+	type: 'group'
+}
+
+/**
+ * One entry in a field step: a field of the collection, a component, or one of the containers
+ * a step may draw around them.
+ *
+ * The containers exist only on the step. They carry no name and touch no data path, exactly as
+ * Payload's own `row`, `collapsible` and unnamed `group` do, so the fields inside keep the
+ * paths, conditions, validation and custom components they have on the native form. A step can
+ * therefore lay out fields that sit far apart in the collection, or in none of its containers
+ * at all.
+ */
 export type FieldItem<TSlug extends CollectionSlug> =
+	| CollapsibleItem<TSlug>
 	| ComponentItem
 	| FieldItemWithOverrides<TSlug>
 	| FieldPath<TSlug>
+	| GroupItem<TSlug>
+	| RowItem<TSlug>
 
 /**
  * Chrome replacements. A slot is a Payload component rendered on the server with

@@ -11,6 +11,56 @@ On a forward move, only the current step's paths are validated (server-side, nes
 
 If the save itself returns an error for a field on no step, Payload shows it as a toast. The plugin does not check at config time that required fields are covered, because a component step may cover them.
 
+## Layout
+
+A step lists fields in one column by default. Three containers give it a shape: `row`, `collapsible` and `group`. They nest freely and may hold component items too.
+
+```ts
+fields: [
+  { type: 'row', fields: ['firstName', 'lastName'] },
+  {
+    type: 'row',
+    fields: [
+      { path: 'title', admin: { width: '70%' } },
+      { path: 'status', admin: { width: '30%' } },
+    ],
+  },
+  {
+    type: 'group',
+    label: 'Reaching them',
+    fields: [{ type: 'row', fields: ['email', 'phone'] }, 'address.city'],
+  },
+  {
+    type: 'collapsible',
+    label: 'Rarely needed',
+    initCollapsed: true,
+    fields: ['notes'],
+  },
+]
+```
+
+| Container | Properties |
+|---|---|
+| `row` | `fields` |
+| `collapsible` | `label` (required), `initCollapsed`, `fields` |
+| `group` | `label`, `description`, `fields` |
+
+These are the step's containers, not the collection's. They carry no name and contribute no path, exactly as Payload's own `row`, `collapsible` and unnamed `group` do, and the collection's own containers are unaffected: a field keeps the path, condition, validation and custom components it has on the native form wherever a step puts it. So a step can put fields that sit in different tabs of the collection side by side in one row, and a field from the sidebar next to one from the main column.
+
+Each field inside is still rendered on its own rather than handed to Payload's container fields, which would push a schema path segment of their own onto everything inside.
+
+Payload's own containers are not reproduced by the plugin. Listing `firstName` and `lastName` out of a collection row gives two stacked fields; put them in a step `row` to get the row back.
+
+### Width
+
+`admin.width` on a field item is Payload's own `admin.width`: any CSS length, and it sizes the field inside a `row`. Fields without one share what the sized ones leave. Widths in a row add up to the row, so `70%` and `30%` sit on one line; the gap between them is taken out of the widths rather than added to them, as on the native form. Below Payload's mid breakpoint a row stacks and widths are ignored.
+
+Outside a row `admin.width` does nothing, as on the native form.
+
+### Not containers
+
+`tabs` inside a step and `admin.position: 'sidebar'` are not supported. A step has one column, and a tab strip inside a step of a variant whose steps are already tabs is a question of design rather than of plumbing.
+
 ## Component steps
 
 A component step is a Payload component rendered on the server with `{ collection, variant, step }` as props. A server component is a static frame rendered once at page load; anything live inside it is a client child reading the hooks below. The same holds for slots.

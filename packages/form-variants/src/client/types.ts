@@ -5,8 +5,17 @@ import type { ResolvedUI } from '../plugin/registry'
 
 /** One entry of a field step, with labels resolved on the server. */
 export type ClientFieldItem =
-	| { description?: string; label?: string; path: string; type: 'field' }
+	| {
+			admin?: { width?: string }
+			description?: string
+			label?: string
+			path: string
+			type: 'field'
+	  }
+	| { description?: string; items: ClientFieldItem[]; label?: string; type: 'group' }
 	| { id: string; type: 'component' }
+	| { initCollapsed?: boolean; items: ClientFieldItem[]; label: string; type: 'collapsible' }
+	| { items: ClientFieldItem[]; type: 'row' }
 
 export type ClientStep = {
 	description?: string

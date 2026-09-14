@@ -1,6 +1,6 @@
 import type { CollectionConfig, CollectionSlug } from 'payload'
 
-import type { FormVariantsConfig, Step } from '../types'
+import type { FieldItem, FormVariantsConfig, Step } from '../types'
 import { NATIVE_KEY } from './constants'
 import { collectDataPaths } from './fieldPaths'
 
@@ -49,14 +49,29 @@ const checkStep = (args: {
 	if (!hasFields) {
 		return
 	}
-	for (const item of step.fields ?? []) {
-		if (typeof item === 'object' && 'type' in item) {
-			if (!item.Component) {
-				fail(`${where} has a component item with no Component.`)
+	const checkItems = (items: FieldItem<CollectionSlug>[]): void => {
+		for (const item of items) {
+			if (typeof item !== 'string' && item.type === 'component') {
+				if (!item.Component) {
+					fail(`${where} has a component item with no Component.`)
+				}
+				continue
 			}
-			continue
+			if (typeof item !== 'string' && 'fields' in item) {
+				if (!Array.isArray(item.fields) || item.fields.length === 0) {
+					fail(`${where} has a "${item.type}" container with no fields.`)
+				}
+				if (item.type === 'collapsible' && !item.label) {
+					fail(`${where} has a collapsible with no label. A lid with no name cannot be opened.`)
+				}
+				checkItems(item.fields)
+				continue
+			}
+			checkPath(typeof item === 'string' ? item : (item.path as string))
 		}
-		const path = typeof item === 'string' ? item : (item.path as string)
+	}
+
+	const checkPath = (path: string): void => {
 		if (!path) {
 			fail(`${where} lists a field item with no path.`)
 		}
@@ -78,6 +93,8 @@ const checkStep = (args: {
 			)
 		}
 	}
+
+	checkItems(step.fields ?? [])
 }
 
 /**

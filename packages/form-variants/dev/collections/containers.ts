@@ -111,6 +111,44 @@ export const containers: CollectionConfig = {
 						},
 					],
 				},
+				{
+					key: 'laid-out',
+					label: 'Laid out',
+					navigation: 'free',
+					save: 'always',
+					steps: [
+						{
+							key: 'who',
+							label: 'Who',
+							description: 'Containers the step draws itself, over fields that sit apart.',
+							fields: [
+								{ type: 'row', fields: ['firstName', 'lastName'] },
+								{
+									type: 'row',
+									fields: [
+										{ path: 'reference', admin: { width: '70%' } },
+										{ path: 'status', admin: { width: '30%' } },
+									],
+								},
+								{
+									type: 'group',
+									label: 'Reaching them',
+									description: 'A group of the step, over fields from the collection group.',
+									fields: [
+										{ type: 'row', fields: ['contact.email', 'contact.phone'] },
+										'contact.postal.city',
+									],
+								},
+								{
+									type: 'collapsible',
+									label: 'Rarely needed',
+									initCollapsed: true,
+									fields: ['nickname', { type: 'row', fields: ['height', 'weight'] }, 'note'],
+								},
+							],
+						},
+					],
+				},
 				{ key: 'native', label: 'Native' },
 			],
 		}),
@@ -120,8 +158,8 @@ export const containers: CollectionConfig = {
 		{
 			type: 'row',
 			fields: [
-				{ name: 'firstName', type: 'text' },
-				{ name: 'lastName', type: 'text' },
+				{ name: 'firstName', type: 'text', admin: { width: '70%' } },
+				{ name: 'lastName', type: 'text', admin: { width: '30%' } },
 			],
 		},
 		{

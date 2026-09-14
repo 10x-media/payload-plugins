@@ -29,14 +29,33 @@ const resolveItem = (item: FieldItem<CollectionSlug>): ResolvedFieldItem => {
 	if (typeof item === 'string') {
 		return { path: item, type: 'field' }
 	}
-	if ('type' in item) {
-		return { Component: item.Component, type: 'component' }
-	}
-	return {
-		description: item.description,
-		label: item.label,
-		path: item.path as string,
-		type: 'field',
+	switch (item.type) {
+		case 'collapsible':
+			return {
+				initCollapsed: item.initCollapsed,
+				items: item.fields.map(resolveItem),
+				label: item.label,
+				type: 'collapsible',
+			}
+		case 'component':
+			return { Component: item.Component, type: 'component' }
+		case 'group':
+			return {
+				description: item.description,
+				items: item.fields.map(resolveItem),
+				label: item.label,
+				type: 'group',
+			}
+		case 'row':
+			return { items: item.fields.map(resolveItem), type: 'row' }
+		default:
+			return {
+				admin: item.admin,
+				description: item.description,
+				label: item.label,
+				path: item.path as string,
+				type: 'field',
+			}
 	}
 }
 

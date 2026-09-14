@@ -242,7 +242,8 @@
 	gap: var(--form-variants-field-gap);
 }
 
-:where(.form-variants__fields > .render-fields:empty) {
+:where(.form-variants__fields > .render-fields:empty),
+:where(.form-variants__row-item > .render-fields:empty) {
 	display: none;
 }
 
@@ -254,6 +255,76 @@
 	> .rich-text
 ) {
 	margin-block: var(--form-variants-field-gap);
+}
+
+/*
+ * Containers a step draws around its own fields. They are the step's, not the collection's:
+ * no name, no path, no schema segment, so each field inside is still rendered on its own and
+ * keeps everything it has on the native form. Only the chrome is ours.
+ */
+
+/*
+ * Payload's own row does not space its fields with `gap`, and cannot: widths are written as
+ * percentages, so `50% + 50%` plus any gap overflows and wraps. It gives each field half the
+ * gap as a margin instead, subtracts the whole gap from the declared width, and pulls the row
+ * itself out by half a gap on each side. The widths then add up to exactly the row. Same here,
+ * with the subtraction done where the width is known, in `FieldStep`.
+ */
+:where(.form-variants__row) {
+	--form-variants-row-gap: calc(var(--base) * 0.5);
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	row-gap: var(--form-variants-field-gap);
+	margin-inline: calc(var(--form-variants-row-gap) / -2);
+}
+
+/*
+ * A field with no `admin.width` shares what the sized ones leave. Both halves arrive as custom
+ * properties rather than an inline `flex`, so the narrow-screen rule below can stack the row
+ * without having to outrank an inline style.
+ */
+:where(.form-variants__row-item) {
+	flex-grow: var(--form-variants-item-grow, 1);
+	flex-shrink: 1;
+	flex-basis: var(--form-variants-item-basis, auto);
+	min-width: 0;
+	margin-inline: calc(var(--form-variants-row-gap) / 2);
+}
+
+:where(.form-variants__group) {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) * 0.4);
+	padding-inline-start: var(--base);
+	border-inline-start: 1px solid var(--theme-elevation-100);
+}
+
+:where(.form-variants__group-title) {
+	margin: 0;
+	font-size: calc(var(--base) * 0.8);
+	font-weight: 500;
+	line-height: var(--base);
+	letter-spacing: -0.375px;
+}
+
+:where(.form-variants__group-description) {
+	margin: 0;
+	color: var(--form-variants-muted);
+}
+
+:where(.form-variants__collapsible .collapsible__content) {
+	padding-block-start: calc(var(--base) * 0.75);
+}
+
+@media (max-width: 768px) {
+	:where(.form-variants__row-item) {
+		flex-basis: 100%;
+	}
+
+	:where(.form-variants__row) {
+		row-gap: var(--form-variants-field-gap);
+	}
 }
 
 :where(.form-variants__fields > :first-child) {

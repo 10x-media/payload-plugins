@@ -3,6 +3,7 @@ import type { Config, PayloadComponent, SanitizedConfig } from 'payload'
 import type {
 	AfterSaveHook,
 	DefaultVariant,
+	FieldItemAdmin,
 	GateResult,
 	SlotComponents,
 	StepContext,
@@ -15,7 +16,16 @@ import { REGISTRY_KEY } from './constants'
 
 export type ResolvedFieldItem =
 	| { Component: PayloadComponent; type: 'component' }
+	| { description?: VariantLabel; items: ResolvedFieldItem[]; label?: VariantLabel; type: 'group' }
 	| {
+			initCollapsed?: boolean
+			items: ResolvedFieldItem[]
+			label: VariantLabel
+			type: 'collapsible'
+	  }
+	| { items: ResolvedFieldItem[]; type: 'row' }
+	| {
+			admin?: FieldItemAdmin
 			description?: VariantLabel
 			label?: VariantLabel
 			path: string

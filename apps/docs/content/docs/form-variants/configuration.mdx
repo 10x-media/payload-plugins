@@ -48,7 +48,18 @@ The plugin only sees collections present in `config.collections` when it runs, s
 | `gate` | `(ctx & { values, state }) => GateResult` | Server-side, runs when the user leaves the step forwards |
 | `components` | slot map | Per-step `Progress`, `StepHeader`, `Navigation`; `false` hides one on this step |
 
-A `FieldItem` is a field path, a path with presentational overrides (`{ path, label?, description? }`), or a non-field component (`{ type: 'component', Component }`) placed between the fields.
+A `FieldItem` is one of:
+
+| Item | Shape |
+|---|---|
+| A field path | `'firstName'` |
+| A path with presentational overrides | `{ path, label?, description?, admin?: { width } }` |
+| A component between the fields | `{ type: 'component', Component }` |
+| A row | `{ type: 'row', fields: FieldItem[] }` |
+| A collapsible | `{ type: 'collapsible', label, initCollapsed?, fields: FieldItem[] }` |
+| A group | `{ type: 'group', label?, description?, fields: FieldItem[] }` |
+
+The last three are the step's own containers and nest freely, see [Layout](./steps#layout).
 
 ## Field paths
 
