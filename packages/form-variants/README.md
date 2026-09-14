@@ -6,11 +6,14 @@ Alternative edit forms for a Payload collection. A variant is a sequence of step
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
+> [!WARNING]
+> **Beta.** This plugin replaces a collection's edit view, which is the largest surface Payload has: every field type, custom field components, drafts, localization, uploads, drawers, and every combination of those. It is covered by unit, integration and end-to-end tests on both Mongo and Postgres, but no suite reaches every combination. Expect gaps, and expect some of Payload's own edit-view features to be missing on a variant. [Open an issue](https://github.com/10x-media/payload-plugins/issues) for anything that renders wrong, saves wrong or is not supported.
+
 ## Features
 
 - **Steps over the real form**: a step lists paths of the collection's own fields, so custom components, conditions and validation apply. A simplified form and a guided wizard are the same mechanism.
 - **`native` is Payload's own view**, untouched, with a switcher. Restricting who sees it is one `access` function.
-- **One save guard**: header buttons, Ctrl+S and Enter all respect it. Saving happens on the last step unless a variant says `save: 'always'`.
+- **One save guard**: the save controls, Ctrl+S and Enter all respect it. Saving happens on the last step unless a variant says `save: 'always'`. On a drafts collection a Save Draft button stands beside the one that publishes.
 - **Server-side step logic**: `access`, `defaultVariant`, `condition`, `gate` and `afterSave` run with `req`, first at page render and then through the plugin's endpoint.
 - **Component steps** with the full wizard API (`useWizard`, `useWizardState`, `finish`), and slots for every piece of chrome down to a headless layout.
 - **Drawers too**: a document created from a relationship field's drawer gets the same variant.

@@ -5,15 +5,17 @@ description: The save guard, what happens after a save, autosave and drafts, and
 
 ## Where the variants render
 
-`native` is Payload's `DefaultEditView`, untouched, with the switcher in its controls bar.
+`native` is Payload's own edit view, untouched, with the switcher in its controls bar.
 
-Every other variant renders inside one `<Form>` the plugin owns, composed from the same pieces Payload's view is built from (`Form`, `DocumentControls`, the locking, stale-data and leave-without-saving modals, the upload area). Owning the form is what makes the guard, `afterSave` and value-preserving switching possible. Switching between two step variants keeps every value; switching to or from `native` crosses into another form, so with unsaved changes the switcher asks first. That crossing also refreshes the route first, since the form being mounted starts from the state the server rendered with the page, and anything saved since is not in it. A drawer has no route of its own and cannot, so there the switch crosses with the state the drawer opened on.
+Every other variant renders in a form of the plugin's own, with the same document locking, stale-data and leave-without-saving modals and the same upload area.
 
-Two things the plugin's form does not carry from `DefaultEditView`: the live preview window, and the auth fields (email, password) of an auth collection. Put those on `native`.
+Switching between two step variants keeps every value. Switching to or from `native` is a different form, so with unsaved changes the switcher asks first, and the document is reloaded so the form you land on shows what is saved. A drawer cannot reload itself, so a switch there shows the document as it was when the drawer opened.
+
+Two things a variant does not carry from the native form: the live preview window, and the auth fields (email, password) of an auth collection. Put those on `native`.
 
 ## The guard
 
-Every save path on a document page ends in the form's `submit`: the header buttons, Ctrl+S, and Enter in an input. The guard allows a save only when:
+Every save goes through one guard, whether it came from the save controls, Ctrl+S or Enter in an input. It allows a save only when:
 
 - `save` is `always`, or the user is on the last visible step, and
 - no step has called `blockSave()`, and
@@ -34,21 +36,21 @@ Switching to `native` and saving there is not a bypass: access to `native` is th
 | `{ outcome: { ... } }` | Show the variant's `Outcome` slot, which reads the data through `useOutcome()` |
 | `{ switchTo: string }` | Switch to another available variant. On a full-page create this redirects to `/:id?variant=<key>` |
 
-The plugin owns `onSave` for its variants, so on a full-page create the action is applied before Payload's redirect would run. Autosave never triggers `afterSave`.
+On a full-page create the action is applied instead of Payload's redirect, not after it.
 
 ## Drafts
 
-The save controls are Payload's own buttons, under Payload's own rules: `Save` on a collection without drafts, `Save Draft` beside `Publish changes` on one with them, the same component, labels and enabled state, with the guard on top. They render wherever the variant saves, which is the top bar under `save: 'always'` and the last step under `save: 'final-step'`.
+The save controls are Payload's own, with the same labels and the same enabled state: `Save` on a collection without drafts, `Save Draft` beside `Publish changes` on one with them. They render wherever the variant saves, which is the top bar under `save: 'always'` and the last step under `save: 'final-step'`.
 
-A draft save sends the same values to the document's `?draft=true` endpoint, which leaves the published version standing and skips validation, so a half-filled wizard can be put down and picked up later. `_status: 'draft'` without that parameter is what Payload's Unpublish sends, which is a different thing entirely. Publish stays enabled while there is something to publish, which an unpublished draft is, and a document that was never published always is. An account without publish permission gets the one button, and it saves a draft. Ctrl+S saves a draft rather than publishing, as it does on Payload's own form.
+A draft save leaves the published version standing and skips validation, so a half-filled wizard can be put down and picked up later. Publish stays enabled while there is anything to publish: an unpublished draft, or a document that was never published. An account without publish permission gets the one button, and it saves a draft. Ctrl+S saves a draft rather than publishing, as it does on the native form.
 
-Scheduled publishing and per-locale publishing hang off Payload's publish button; they are document controls and stay on `native`.
+Scheduled publishing and per-locale publishing stay on `native`.
 
 ## Autosave
 
-A variant form does not autosave. Payload's `Autosave` lives in the document controls bar, which a variant replaces with its own, so nothing is written until a save. Payload still creates the document the moment `/create` opens on an autosave collection, so the variant runs as an update from the first render, but that document stays empty until the user saves.
+A variant does not autosave, even on a collection that has autosave enabled. Payload still creates the document the moment `/create` opens there, so the variant runs as an update from the first render, but nothing is written to it until a save.
 
-This is the one place the save controls differ from `native`: Payload drops `Save Draft` when autosave is what writes the drafts, and a variant keeps it, since without it an autosave collection could only ever be published from a variant.
+That is also the one place the save controls differ from `native`: native drops `Save Draft` when autosave is writing the drafts, and a variant keeps it, so a draft can still be saved.
 
 `save: 'final-step'` therefore holds the values out of the database until the last step, on an autosave collection as on any other. When a component step calls `finish(outcome)` instead of saving, the document Payload created stays in the database; removing it is the consumer's call, made in the same code that calls `finish`, which has the document id through `useDocumentInfo()`.
 
@@ -56,7 +58,7 @@ This is the one place the save controls differ from `native`: Payload drops `Sav
 
 Drawers use the same view resolution as the page, so the `edit.default` override applies inside a relationship field's "create new" drawer, and the user who never sees the full form on the page does not see it there either.
 
-In a drawer, `?variant=` does not exist (the drawer has no URL). The current step lives in memory as it does on the page, `inDrawer` is resolved on the client, and the saved document goes back to the relationship field as it does now.
+In a drawer there is no `?variant=`, since a drawer has no URL. The current step is kept in memory as it is on the page, and the saved document goes back to the relationship field as it does now.
 
 ## Security
 
@@ -64,5 +66,4 @@ Variants change what a person is shown, not what the API accepts:
 
 - REST, GraphQL, the Local API and scripts ignore variants. Restricting which fields an account may write is field access on the collection.
 - Gates are UX. A check that must hold for the data, such as duplicate detection, lives in a collection hook.
-- On autosave collections, `save: 'final-step'` does not keep values out of the database.
 - `values` and `state` sent to the evaluate endpoint are client input. On every call the endpoint loads the document with access enforced, answers 403 when the account lacks update access to it (create access when there is no id yet, or for `afterSave` after a create), and re-checks the variant's `access`. `afterSave` sees the document as the server reads it, not the copy the browser holds.

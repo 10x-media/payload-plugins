@@ -46,13 +46,13 @@ The plugin only sees collections present in `config.collections` when it runs, s
 | `width` | `'full' \| 'half'` | `full` is the width Payload's own form takes. `half` is a reading-width column, which suits a short form and a wizard. Default `full` |
 | `align` | `'left' \| 'center' \| 'right'` | Where a `half` column sits. Ignored at `full` width. Default `left` |
 
-Either option also takes an object naming the surface it applies to, `page` or `drawer`, since a drawer has far less room than the page. A surface the object leaves out takes the default rather than the other surface's value.
+Either option also takes an object naming the surface it applies to, `page` or `drawer`. A surface the object leaves out takes the default, not the other surface's value.
 
 ```ts
 ui: { align: 'center', width: { page: 'half' } }
 ```
 
-That is a centred reading column on the page and Payload's full width inside a drawer, which is narrow to begin with.
+A centred reading column on the page, and full width inside a drawer.
 
 ## Step
 
@@ -91,7 +91,7 @@ Paths are typed against the collection's generated type and validated at config 
 
 Every server function receives `ctx = { req, user, doc, operation, hasPublishedDoc, inDrawer }`. `doc` is the document being edited, or the initial data on create. Step functions additionally receive `values` (the current form values, this locale only) and `state` (wizard state); both come from the browser and are untrusted.
 
-`inDrawer` has no server-side source, so the view evaluates `access` and `defaultVariant` for both values and the browser picks the answer for where it finds itself.
+`inDrawer` cannot be known on the server, so `access` and `defaultVariant` are called once for each value and the browser takes the answer for where it is. Both are called on every document render; keep them cheap and free of side effects.
 
 On a collection with autosave, Payload creates the document the moment `/create` opens and redirects to `/:id`, so `operation` is `update` from the first render. `hasPublishedDoc` is the flag for "a draft that was never published still counts as new".
 
@@ -102,6 +102,6 @@ Per request, on the server:
 1. Collect the variants whose `access` passes.
 2. Pick the first available of: the `?variant=` query parameter (full page only), the account's stored choice, `defaultVariant(ctx)`. A parameter or stored choice naming a variant the account cannot access is ignored, so `?variant=native` does not give an editor the full form. With none of the three usable, the first available variant in config order opens.
 3. Show the switcher when two or more variants are available.
-4. With no variant available (`native` restricted and every other `access` false), render an empty state. Falling back to `native` would override the trust decision its `access` expresses.
+4. With no variant available (`native` restricted and every other `access` false), an empty state is rendered. There is no fallback to `native`.
 
 The stored choice is a Payload preference under `form-variants-<slug>`. Only an explicit switch in the switcher writes it.

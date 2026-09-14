@@ -5,7 +5,7 @@ description: Slots for the chrome, the headless mode, and translations.
 
 ## Slots
 
-The chrome is slots. A slot is a Payload component rendered on the server with serializable props (`collection`, `variant`, and `step` for step-level slots); the live half (current step, guard state) reaches its client parts through the hooks in `@10x-media/form-variants/client`. That keeps a replacement from being a fork.
+The chrome is slots. A slot is a Payload component rendered on the server with serializable props (`collection`, `variant`, and `step` for step-level slots); the live half (current step, guard state) reaches its client parts through the hooks in `@10x-media/form-variants/client`.
 
 | Slot | Default |
 |---|---|
@@ -66,7 +66,7 @@ export const TwoColumnLayout = () => {
 }
 ```
 
-Payload's document controls bar (save buttons, actions) always renders above the layout; it is Payload's, not the plugin's chrome.
+The variant's top bar, with the document status and the save controls, always renders above the layout and is not a slot.
 
 ## Styling
 

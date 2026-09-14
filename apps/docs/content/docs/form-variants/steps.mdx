@@ -7,9 +7,9 @@ description: Field steps, component steps, conditions, gates, and the wizard API
 
 A field step renders the listed paths with Payload's own field rendering against the form state. A field that carries custom components gets them. Fields not listed on any step stay in form state with their values and are submitted with the document.
 
-On a forward move, only the current step's paths are validated (server-side, nested paths included). Invalid fields show their errors and the move is refused. Payload's `submitted` flag is form-wide and is not reset, so after the first refused move any invalid field shows its error as soon as it appears on screen.
+On a forward move, only the current step's paths are validated (server-side, nested paths included). Invalid fields show their errors and the move is refused. After the first refused move, an invalid field shows its error as soon as it appears on screen, on any step.
 
-If the save itself returns an error for a field on no step, Payload shows it as a toast. The plugin does not check at config time that required fields are covered, because a component step may cover them.
+If the save itself returns an error for a field on no step, Payload shows it as a toast. Whether a variant covers every required field is not checked at config time.
 
 ## Layout
 
@@ -45,11 +45,9 @@ fields: [
 | `collapsible` | `label` (required), `initCollapsed`, `fields` |
 | `group` | `label`, `description`, `fields` |
 
-These are the step's containers, not the collection's. They carry no name and contribute no path, exactly as Payload's own `row`, `collapsible` and unnamed `group` do, and the collection's own containers are unaffected: a field keeps the path, condition, validation and custom components it has on the native form wherever a step puts it. So a step can put fields that sit in different tabs of the collection side by side in one row, and a field from the sidebar next to one from the main column.
+These are the step's containers, not the collection's. They carry no name and contribute no path, and the collection's own containers are unaffected: a field keeps the path, condition, validation and custom components it has on the native form wherever a step puts it. So a step can put fields that sit in different tabs of the collection side by side in one row, and a field from the sidebar next to one from the main column.
 
-Each field inside is still rendered on its own rather than handed to Payload's container fields, which would push a schema path segment of their own onto everything inside.
-
-Payload's own containers are not reproduced by the plugin. Listing `firstName` and `lastName` out of a collection row gives two stacked fields; put them in a step `row` to get the row back.
+A step does not inherit the collection's containers either. Listing `firstName` and `lastName` out of a collection row gives two stacked fields; put them in a step `row` to get the row back.
 
 ### Width
 
@@ -59,7 +57,7 @@ Outside a row `admin.width` does nothing, as on the native form.
 
 ### Not containers
 
-`tabs` inside a step and `admin.position: 'sidebar'` are not supported. A step has one column, and a tab strip inside a step of a variant whose steps are already tabs is a question of design rather than of plumbing.
+`tabs` inside a step and `admin.position: 'sidebar'` are not supported. A step has one column.
 
 ## Component steps
 
@@ -85,7 +83,7 @@ A step's `condition` runs on the server with the current values and wizard state
 
 The step the user is on is the one exception: it stays on screen even when its condition turns false under them, so that typing cannot move them off the step they are filling in. It goes away on the next move.
 
-Re-evaluation rides on Payload's own `onChange`, which is debounced and fires only when form state really changed, so it is one request per settled edit. What that request costs depends on whether the document exists yet:
+Re-evaluation is debounced and only fires when form state really changed, so it costs one request per settled edit. What that request reads depends on whether the document exists yet:
 
 | | Reads per call |
 |---|---|
@@ -93,7 +91,7 @@ Re-evaluation rides on Payload's own `onChange`, which is debounced and fires on
 | Existing document | 2 |
 | Existing document, drafts enabled | 3 |
 
-On create, the permission check runs without fetching, there is no document to load and `hasPublishedDoc` answers `false` outright, so re-evaluation reads nothing at all. On a saved document it is the permission check's own fetch plus the document the endpoint loads with access enforced, and on a drafts collection one more for the published version. Guided variants are meant for creating a document, where this is free; a `save: 'always'` sections variant with conditions pays the reads above while it is edited.
+A guided variant creating a document reads nothing. A `save: 'always'` sections variant with conditions pays the reads above for as long as the document is being edited.
 
 ## Gates
 
@@ -119,7 +117,7 @@ From `@10x-media/form-variants/client`:
 
 | Hook | Gives |
 |---|---|
-| `useWizard()` | `step`, `steps`, `index`, `count`, `isFirst`, `isLast`, `next()`, `back()`, `goTo(key)`, `save()`, `finish(outcome)`, `blockSave(reason)` / `allowSave()`, `saveAllowed`, `saveBlockedReason`, `onBeforeNext(fn)`, `busy`, `error`, `readOnly` |
+| `useWizard()` | `step`, `steps`, `index`, `count`, `isFirst`, `isLast`, `next()`, `back()`, `goTo(key)`, `canGoTo(key)`, `save({ draft }?)`, `finish(outcome)`, `blockSave(reason)` / `allowSave()`, `saveAllowed`, `saveBlockedReason`, `onBeforeNext(fn)`, `busy`, `error`, `readOnly` |
 | `useWizardState<T>(key)` | `[value, setValue]` over one key of wizard state |
 | `useOutcome()` | The data `finish()` or an `outcome` after-save action left behind |
 | `useFormVariants()` | `active`, `available`, `switchTo(key)`, `inDrawer` |
