@@ -4,7 +4,13 @@ import type { AnalyticsAdapter, DimensionKey, MetricKey } from '../core/contract
 import { native } from '../native/nativeAdapter'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { keys, type TranslationKey } from '../translations/keys'
-import { findMetricField, registerWidgets, widgetIsSupported } from './registerWidgets'
+import type { CustomWidgetDef } from './customWidget'
+import {
+	findMetricField,
+	type RegisterWidgetsArgs,
+	registerWidgets,
+	widgetIsSupported,
+} from './registerWidgets'
 import { WIDGET_METRICS } from './types'
 
 const bareConfig = (): Config => ({}) as Config
@@ -623,7 +629,9 @@ describe('registerWidgets: goals widget', () => {
 
 	it('registers the goals widget with its own RSC component and label', () => {
 		const widget = goalsWidget(register())
-		expect(widget?.Component).toBe('@10x-media/analytics/rsc#AnalyticsGoalsWidget')
+		expect(widget?.Component).toMatchObject({
+			path: '@10x-media/analytics/rsc#AnalyticsGoalsWidget',
+		})
 		expect(
 			widget?.label && (widget.label as (args: never) => string)({ t: (k: string) => k } as never)
 		).toBe(keys.widgetGoals)
@@ -683,5 +691,47 @@ describe('registerWidgets: goals widget', () => {
 			(w) => w.slug
 		)
 		expect(slugs).not.toContain('analytics-goals')
+	})
+})
+
+describe('registerWidgets view link', () => {
+	const custom: CustomWidgetDef = { slug: 'custom', component: 'x#Custom', label: 'Custom' }
+
+	const built = (view?: RegisterWidgetsArgs['view']): Config => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [custom],
+			...(view === undefined ? {} : { view }),
+		})
+		return config
+	}
+
+	const serverPropsOf = (config: Config, slug: string): Record<string, unknown> | undefined => {
+		const component = config.admin?.dashboard?.widgets?.find((w) => w.slug === slug)?.Component
+		return typeof component === 'object' && component !== null && 'serverProps' in component
+			? (component.serverProps as Record<string, unknown>)
+			: undefined
+	}
+
+	it('hands every built-in widget the view path', () => {
+		const config = built({ path: '/insights' })
+		const builtIns = (config.admin?.dashboard?.widgets ?? []).filter((w) => w.slug !== custom.slug)
+		expect(builtIns.length).toBeGreaterThan(0)
+		for (const widget of builtIns) {
+			expect(serverPropsOf(config, widget.slug)?.view).toEqual({ path: '/insights' })
+		}
+	})
+
+	it('hands them false when the app turned the view off', () => {
+		expect(serverPropsOf(built(false), 'analytics-metric')?.view).toBe(false)
+		expect(serverPropsOf(built(), 'analytics-metric')?.view).toBe(false)
+	})
+
+	it('leaves a host-registered widget alone', () => {
+		expect(serverPropsOf(built({ path: '/insights' }), custom.slug)).toBeUndefined()
 	})
 })

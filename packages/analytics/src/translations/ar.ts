@@ -59,6 +59,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.widgetRealtimeLabel]: 'نشط الآن',
 	[keys.widgetRealtimeCaption]: 'نشط في هذه اللحظة',
 	[keys.widgetRealtimePaused]: 'تم إيقاف التحديثات المباشرة مؤقتًا',
+	[keys.widgetOpenInView]: 'فتح في Analytics',
 	[keys.comparisonVsPrevious]: 'مقارنة بالفترة السابقة',
 	[keys.comparisonIncrease]: 'ارتفاع',
 	[keys.comparisonDecrease]: 'انخفاض',

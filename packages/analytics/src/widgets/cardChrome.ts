@@ -34,3 +34,14 @@ export const cardStyle: CSSProperties = {
 }
 
 export const labelStyle: CSSProperties = { ...CARD_LABEL }
+
+/** The card's footer link. `marginTop: auto` floors it, so cards of a row line their links up. */
+export const linkStyle: CSSProperties = {
+	marginTop: 'auto',
+	alignSelf: 'flex-start',
+	fontSize: '0.75rem',
+	fontWeight: 500,
+	color: 'var(--theme-elevation-500)',
+	textDecoration: 'underline',
+	textUnderlineOffset: '2px',
+}

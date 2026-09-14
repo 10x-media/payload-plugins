@@ -15,6 +15,7 @@ import AnalyticsTrendWidget from './AnalyticsTrendWidget'
 import { previousWindow } from './comparison'
 import { formatRangeCaption } from './range'
 import type { MetricWidgetData } from './types'
+import type { WidgetView } from './viewLink'
 
 const NOW = new Date('2026-06-03T12:00:00.000Z')
 
@@ -48,7 +49,9 @@ const adapter: AnalyticsAdapter = {
 }
 
 const req = (): PayloadRequest => {
-	const payload = {} as PayloadRequest['payload']
+	const payload = {
+		config: { routes: { admin: '/admin' } },
+	} as unknown as PayloadRequest['payload']
 	setRuntime(payload, {
 		registry: createRegistry([adapter]),
 		configAdapterIds: new Set(['native']),
@@ -60,10 +63,13 @@ const req = (): PayloadRequest => {
 	return { payload, i18n: { t: (key: string) => key, language: 'en' } } as unknown as PayloadRequest
 }
 
-const renderWidget = async (widgetData: MetricWidgetData): Promise<string> =>
+const renderWidget = async (widgetData: MetricWidgetData, view?: WidgetView): Promise<string> =>
 	renderToStaticMarkup(
-		await AnalyticsTrendWidget({ req: req(), widgetData } as unknown as WidgetServerProps)
+		await AnalyticsTrendWidget({ req: req(), widgetData, view } as unknown as WidgetServerProps)
 	)
+
+const hrefIn = (html: string): string | undefined =>
+	html.match(/<a[^>]+href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&')
 
 describe('AnalyticsTrendWidget comparison', () => {
 	// The chart injects its stylesheet inline, so every class name appears in the markup
@@ -91,5 +97,21 @@ describe('AnalyticsTrendWidget comparison', () => {
 		expect(html).not.toContain('<div class="analytics-chart__legend">')
 		// The period-over-period delta is independent of the overlay.
 		expect(html).toContain('analytics:comparisonVsPrevious')
+	})
+})
+
+describe('AnalyticsTrendWidget view link', () => {
+	it('carries its window, metric and comparison into the view', async () => {
+		const html = await renderWidget(
+			{ metric: 'pageviews', timeframe: 'last7days', compare: true },
+			{ path: '/analytics' }
+		)
+		expect(html).toContain('analytics:widgetOpenInView')
+		expect(hrefIn(html)).toBe('/admin/analytics?range=last7days&compare=1')
+	})
+
+	it('renders no link when the app turned the view off', async () => {
+		const html = await renderWidget({ metric: 'pageviews', timeframe: 'last7days' }, false)
+		expect(html).not.toContain('analytics-widget__link')
 	})
 })

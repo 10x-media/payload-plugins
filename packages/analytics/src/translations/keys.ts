@@ -62,6 +62,7 @@ export const keys = {
 	widgetRealtimeLabel: 'analytics:widgetRealtimeLabel',
 	widgetRealtimeCaption: 'analytics:widgetRealtimeCaption',
 	widgetRealtimePaused: 'analytics:widgetRealtimePaused',
+	widgetOpenInView: 'analytics:widgetOpenInView',
 	comparisonVsPrevious: 'analytics:comparisonVsPrevious',
 	comparisonIncrease: 'analytics:comparisonIncrease',
 	comparisonDecrease: 'analytics:comparisonDecrease',

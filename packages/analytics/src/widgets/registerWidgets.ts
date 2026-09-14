@@ -19,6 +19,7 @@ import { labelForKey } from '../translations/server'
 import { BREAKDOWN_SPECS, type BreakdownSpec } from './breakdownTypes'
 import { buildCustomWidgets, type CustomWidgetDef } from './customWidget'
 import { GOAL_ROW_LIMITS, WIDGET_METRICS } from './types'
+import type { WidgetView } from './viewLink'
 
 /**
  * Select options must carry static labels: `filterOptions` results are serialized
@@ -48,6 +49,11 @@ export interface RegisterWidgetsArgs {
 	defaultId?: string
 	/** `widgets.comparison`; false hides every compare checkbox. Defaults to on. */
 	comparison?: boolean
+	/**
+	 * Where the analytics view mounts, so every built-in widget can link into it. False or
+	 * absent means no view to link to, and the widgets render without the footer link.
+	 */
+	view?: WidgetView
 }
 
 interface WidgetDef {
@@ -330,7 +336,7 @@ export const registerWidgets = (config: Config, args: RegisterWidgetsArgs): void
 		}
 		built.push({
 			slug: def.slug,
-			Component: def.component,
+			Component: { path: def.component, serverProps: { view: args.view ?? false } },
 			label: labelForKey(def.label),
 			fields,
 			minWidth: def.minWidth,

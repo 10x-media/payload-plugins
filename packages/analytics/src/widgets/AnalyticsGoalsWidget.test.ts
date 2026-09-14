@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import AnalyticsGoalsWidget from './AnalyticsGoalsWidget'
 import { readForWidgetGoals, type WidgetGoalsResult } from './readForWidgetGoals'
 import type { GoalsWidgetData } from './types'
+import type { WidgetView } from './viewLink'
 
 vi.mock('./readForWidgetGoals', () => ({ readForWidgetGoals: vi.fn() }))
 
@@ -24,14 +25,17 @@ const result = (over: Partial<WidgetGoalsResult> = {}): WidgetGoalsResult => ({
 
 const req = (): PayloadRequest =>
 	({
-		payload: {} as PayloadRequest['payload'],
+		payload: { config: { routes: { admin: '/admin' } } } as unknown as PayloadRequest['payload'],
 		i18n: { t: (key: string) => key, language: 'en' },
 	}) as unknown as PayloadRequest
 
-const render = async (widgetData: GoalsWidgetData = {}): Promise<string> =>
+const render = async (widgetData: GoalsWidgetData = {}, view?: WidgetView): Promise<string> =>
 	renderToStaticMarkup(
-		await AnalyticsGoalsWidget({ req: req(), widgetData } as unknown as WidgetServerProps)
+		await AnalyticsGoalsWidget({ req: req(), widgetData, view } as unknown as WidgetServerProps)
 	)
+
+const hrefIn = (html: string): string | undefined =>
+	html.match(/<a[^>]+href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&')
 
 describe('AnalyticsGoalsWidget', () => {
 	beforeEach(() => {
@@ -137,5 +141,17 @@ describe('AnalyticsGoalsWidget', () => {
 		expect(await render()).toContain('analytics:timeframeLast30Days')
 		expect(await render()).toContain('analytics:widgetGoals')
 		expect(await render({ title: 'Signups' })).toContain('Signups')
+	})
+
+	it('links into the view on its goals tab', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(result())
+		const html = await render({ timeframe: 'last7days', dataSource: 'plausible' }, { path: '/x' })
+		expect(html).toContain('analytics:widgetOpenInView')
+		expect(hrefIn(html)).toBe('/admin/x?range=last7days&source=plausible&tab=goals')
+	})
+
+	it('renders no link when the app turned the view off', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(result())
+		expect(await render({}, false)).not.toContain('analytics-widget__link')
 	})
 })

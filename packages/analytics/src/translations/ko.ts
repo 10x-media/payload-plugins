@@ -59,6 +59,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.widgetRealtimeLabel]: '현재 활성',
 	[keys.widgetRealtimeCaption]: '지금 활동 중',
 	[keys.widgetRealtimePaused]: '실시간 업데이트 일시 중지됨',
+	[keys.widgetOpenInView]: 'Analytics에서 열기',
 	[keys.comparisonVsPrevious]: '이전 기간 대비',
 	[keys.comparisonIncrease]: '증가',
 	[keys.comparisonDecrease]: '감소',

@@ -59,6 +59,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.widgetRealtimeLabel]: 'Aktif sekarang',
 	[keys.widgetRealtimeCaption]: 'aktif saat ini',
 	[keys.widgetRealtimePaused]: 'Pembaruan langsung dijeda',
+	[keys.widgetOpenInView]: 'Buka di Analytics',
 	[keys.comparisonVsPrevious]: 'vs. periode sebelumnya',
 	[keys.comparisonIncrease]: 'Naik',
 	[keys.comparisonDecrease]: 'Turun',

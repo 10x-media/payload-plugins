@@ -59,6 +59,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.widgetRealtimeLabel]: 'Ativos agora',
 	[keys.widgetRealtimeCaption]: 'ativos neste momento',
 	[keys.widgetRealtimePaused]: 'Atualizações ao vivo pausadas',
+	[keys.widgetOpenInView]: 'Abrir no Analytics',
 	[keys.comparisonVsPrevious]: 'vs. período anterior',
 	[keys.comparisonIncrease]: 'Aumentou',
 	[keys.comparisonDecrease]: 'Diminuiu',

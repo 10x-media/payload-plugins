@@ -59,6 +59,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.widgetRealtimeLabel]: '当前活跃',
 	[keys.widgetRealtimeCaption]: '当前在线',
 	[keys.widgetRealtimePaused]: '实时更新已暂停',
+	[keys.widgetOpenInView]: '在 Analytics 中打开',
 	[keys.comparisonVsPrevious]: '较上一周期',
 	[keys.comparisonIncrease]: '上升',
 	[keys.comparisonDecrease]: '下降',

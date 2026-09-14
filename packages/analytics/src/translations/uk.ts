@@ -59,6 +59,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.widgetRealtimeLabel]: 'Зараз активні',
 	[keys.widgetRealtimeCaption]: 'активні просто зараз',
 	[keys.widgetRealtimePaused]: 'Оновлення в реальному часі призупинено',
+	[keys.widgetOpenInView]: 'Відкрити в Analytics',
 	[keys.comparisonVsPrevious]: 'до попереднього періоду',
 	[keys.comparisonIncrease]: 'Зростання',
 	[keys.comparisonDecrease]: 'Спад',

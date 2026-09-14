@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react'
 import { formatMetricValue } from '../fields/format'
 import { requestTimezone } from '../plugin/runtime'
 import type { TimeframePreset } from '../timeframe/presets'
+import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { keys, type TranslationKey } from '../translations/keys'
 import { TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
@@ -12,6 +13,8 @@ import { formatRangeCaption, resolveCustomRange } from './range'
 import type { WidgetReadStatus } from './readForWidget'
 import { readForWidgetGoals } from './readForWidgetGoals'
 import { type GoalsWidgetData, resolveGoalRowLimit } from './types'
+import { type WidgetViewProps, widgetViewHref } from './viewLink'
+import { WidgetViewLink } from './WidgetViewLink'
 
 const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
 	'not-configured': keys.stateNotConfigured,
@@ -49,7 +52,7 @@ const noteStyle: CSSProperties = { fontSize: '0.6875rem', color: 'var(--theme-el
  * currency is its own, so one formatted column would state a currency the rows do not
  * share. Columns the source cannot fill are left out rather than rendered empty.
  */
-export default async function AnalyticsGoalsWidget(props: WidgetServerProps) {
+export default async function AnalyticsGoalsWidget(props: WidgetServerProps & WidgetViewProps) {
 	const t = asTranslate(props.req.i18n.t)
 	const data = (props.widgetData ?? {}) as GoalsWidgetData
 	const rawTimeframe = data.timeframe ?? 'last30days'
@@ -59,6 +62,13 @@ export default async function AnalyticsGoalsWidget(props: WidgetServerProps) {
 	const customRange = timezone ? resolveCustomRange(rawTimeframe, data.range, timezone) : undefined
 	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
 	const title = data.title?.trim() || t(keys.widgetGoals)
+	const href = widgetViewHref(props.view, props.req, {
+		timeframe: rawTimeframe,
+		timezone: timezone ?? DEFAULT_TIMEZONE,
+		...(customRange ? { range: customRange } : {}),
+		...(data.dataSource ? { source: data.dataSource } : {}),
+		tab: 'goals',
+	})
 
 	const result = await readForWidgetGoals({
 		req: props.req,
@@ -150,6 +160,7 @@ export default async function AnalyticsGoalsWidget(props: WidgetServerProps) {
 			<span style={captionStyle}>{caption}</span>
 			{result.stale ? <span style={noteStyle}>{t(keys.viewStale)}</span> : null}
 			{result.clamped ? <span style={noteStyle}>{t(keys.stateClamped)}</span> : null}
+			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
 		</div>
 	)
 }
