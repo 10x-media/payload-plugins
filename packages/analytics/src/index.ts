@@ -13,6 +13,7 @@ import { isModuleNotFoundError } from './plugin/peerImportError'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
+import { validateScopeField } from './plugin/scopeFieldBoot'
 import { makeSourcesHandler, SOURCES_PATH } from './plugin/sourcesEndpoint'
 import { warmTask } from './plugin/warmTask'
 import type { BuildSecretField } from './providers/collection'
@@ -238,6 +239,22 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		// The runtime is installed before the app's own onInit runs so consumer init code
 		// (seeding, cache warming, sync passes) can already read through the plugin.
 		config.onInit = async (payload) => {
+			// Host-owned scope fields only exist once every plugin has run, so the collections
+			// are checked against the assembled config rather than at config time.
+			if (resolved.scoped && resolved.goalsCollection.enabled) {
+				validateScopeField(payload, {
+					option: 'goals.collection.scopeField',
+					slug: resolved.goalsCollection.slug,
+					scopeField: resolved.goalsCollection.scopeField,
+				})
+			}
+			if (resolved.scoped && resolved.providers.collection.enabled) {
+				validateScopeField(payload, {
+					option: 'providers.collection.scopeField',
+					slug: resolved.providers.collection.slug,
+					scopeField: resolved.providers.collection.scopeField,
+				})
+			}
 			if (resolved.providers.collection.enabled) {
 				const { validateEncryptedBoot } = await import('@10x-media/fields/encrypted')
 				await validateEncryptedBoot(payload, resolved.providers.collection.encryption?.keys)

@@ -21,6 +21,8 @@ export interface GoalsResolver {
 /**
  * A scoped install stores install-wide goals with no scope at all, so a null scope has to
  * match both an absent field and an empty string (same shape the providers lookup uses).
+ * The empty string is not castable on a relationship-typed `scopeField`, so install-wide
+ * lookups on a host-owned relationship field fail the read and resolve config goals only.
  */
 export const goalScopeWhere = (scopeField: string, scope: string | null): Where =>
 	scope === null

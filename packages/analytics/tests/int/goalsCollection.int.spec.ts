@@ -1,6 +1,8 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionConfig, Endpoint, Payload, PayloadRequest } from 'payload'
+import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
+import type { TrackerConfig } from '../../src/capture/trackerConfig'
 import { GOALS_SLUG } from '../../src/goals/collection'
 import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
@@ -311,5 +313,126 @@ describeForDb('analytics goals collection: scoped', { dbs: ['mongo'] }, (db) => 
 				match: { kind: 'goal' },
 			})
 		).rejects.toMatchObject({ data: { errors: [{ path: 'slug' }] } })
+	})
+})
+
+describeForDb('analytics goals collection: tracker config', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	const trackerGoals = async (origin: string): Promise<TrackerConfig['goals']> => {
+		const res = await handleEndpoints({
+			config: booted.payload.config,
+			payloadInstanceCacheKey: booted.cacheKey,
+			request: new Request(`${origin}/api/analytics/tracker`),
+		})
+		expect(res.status).toBe(200)
+		return ((await res.json()) as TrackerConfig).goals
+	}
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			plugin: analytics({
+				adapters: [native()],
+				scopeResolver: ({ req }) => req.host?.split(':')[0] ?? null,
+				access: { platformRead: () => true },
+				goals: { defaults: configGoals, collection: true },
+			}),
+		})
+		await booted.payload.create({
+			collection: GOALS_SLUG as never,
+			data: {
+				name: 'Newsletter (tenant A)',
+				slug: 'newsletter',
+				match: { kind: 'event', name: 'subscribed' },
+				value: { fixed: 12 },
+				currency: 'EUR',
+				scope: 'tenant-a.test',
+			} as never,
+		})
+		await booted.payload.create({
+			collection: GOALS_SLUG as never,
+			data: {
+				name: 'B only',
+				slug: 'b-only',
+				match: { kind: 'goal' },
+				scope: 'tenant-b.test',
+			} as never,
+		})
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('serves an editor-created goal to the browser, with its value and without its name', async () => {
+		const goals = await trackerGoals('http://tenant-a.test')
+		expect(goals).toContainEqual({
+			slug: 'newsletter',
+			match: { kind: 'event', name: 'subscribed' },
+			value: { fixed: 12 },
+			currency: 'EUR',
+		})
+		const json = JSON.stringify(goals)
+		expect(json).not.toContain('Newsletter (tenant A)')
+		expect(json).not.toContain('scope')
+	})
+
+	it('keeps another scope’s goals out of the response', async () => {
+		expect((await trackerGoals('http://tenant-a.test')).map((g) => g.slug)).toEqual([
+			'purchase',
+			'newsletter',
+		])
+		expect((await trackerGoals('http://tenant-b.test')).map((g) => g.slug)).toEqual([
+			'purchase',
+			'b-only',
+		])
+	})
+})
+
+describeForDb('analytics goals collection: scope field boot check', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	/** Stands in for a tenant plugin, which registers its own field after this plugin runs. */
+	const hostScopeField = (collection: CollectionConfig): CollectionConfig => ({
+		...collection,
+		fields: [...collection.fields, { name: 'tenant', type: 'text' }],
+	})
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			plugin: analytics({
+				adapters: [native()],
+				scopeResolver: () => 'tenant-a',
+				goals: { collection: { scopeField: 'tenant', overrides: hostScopeField } },
+			}),
+		})
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('leaves the scope field to the host and boots on it', () => {
+		const collection = booted.payload.config.collections.find((c) => c.slug === GOALS_SLUG)
+		expect(collection?.fields.some((f) => 'name' in f && f.name === 'tenant')).toBe(true)
+		expect(collection?.fields.some((f) => 'name' in f && f.name === 'scope')).toBe(false)
+	})
+
+	it('fails the boot when nothing registered the named scope field', async () => {
+		await expect(
+			bootPayload({
+				db,
+				attachTo: booted,
+				plugin: analytics({
+					adapters: [native()],
+					scopeResolver: () => 'tenant-a',
+					goals: { collection: { scopeField: 'tenant' } },
+				}),
+			})
+		).rejects.toThrow(
+			'analytics: goals.collection.scopeField "tenant" does not exist on analytics-goals; register the collection with your tenant plugin or use the default scope field'
+		)
 	})
 })

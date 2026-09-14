@@ -122,6 +122,25 @@ const uniqueSlugIndex = (args: BuildGoalsCollectionArgs): CompoundIndex | undefi
 	return args.scopeField === 'scope' ? { fields: ['slug', 'scope'], unique: true } : undefined
 }
 
+/**
+ * The plugin's own scope field, and only when `scopeField` still names it: a host-owned
+ * field (a tenant plugin's relationship) is the host's to register, and shadowing it with a
+ * hidden text field of another name would store the scope twice.
+ */
+const scopeField = (args: BuildGoalsCollectionArgs): Field[] =>
+	args.scopeField === 'scope'
+		? [
+				{
+					// Written by scoped setups; hidden because single-site installs never touch it.
+					name: 'scope',
+					type: 'text',
+					index: true,
+					label: labelForKey(keys.providerFieldScope),
+					admin: { hidden: true },
+				},
+			]
+		: []
+
 const matchField = (): Field => ({
 	name: 'match',
 	type: 'group',
@@ -272,15 +291,7 @@ export const buildGoalsCollection = (args: BuildGoalsCollectionArgs): Collection
 				label: labelForKey(keys.goalFieldCurrency),
 				validate: validateCurrency,
 			},
-			{
-				// Written by scoped setups (or a tenant plugin's own field via `scopeField`);
-				// hidden because single-site installs never touch it.
-				name: 'scope',
-				type: 'text',
-				index: true,
-				label: labelForKey(keys.providerFieldScope),
-				admin: { hidden: true },
-			},
+			...scopeField(args),
 		],
 	}
 	return args.overrides ? args.overrides(collection) : collection

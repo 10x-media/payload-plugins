@@ -32,7 +32,7 @@ export interface AnalyticsRuntime {
 	consentFor?: ConsentPolicy
 	/** Browser auto-capture toggles handed to the tracker; absent runtimes default all on. */
 	autoCapture?: ResolvedAutoCapture
-	/** Config goals; the tracker receives their slug and match only. */
+	/** Config goals, and the fallback wherever the merged resolution is unavailable. */
 	goals?: Goal[]
 	/**
 	 * Config goals merged with the goals collection for a request's scope. Absent runtimes

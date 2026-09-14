@@ -124,6 +124,12 @@ describe('buildGoalsCollection', () => {
 		expect(scope?.admin?.hidden).toBe(true)
 	})
 
+	it('leaves the scope field to the host when scopeField names one of its own', () => {
+		const hostOwned = build({ scoped: true, scopeField: 'tenant' })
+		expect(named(hostOwned.fields, 'scope')).toBeUndefined()
+		expect(named(hostOwned.fields, 'tenant')).toBeUndefined()
+	})
+
 	it('invalidates the resolver cache on change and on delete', async () => {
 		const onChange = vi.fn()
 		const withHooks = build({ onChange })

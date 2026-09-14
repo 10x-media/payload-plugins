@@ -18,6 +18,7 @@ export type {
 	AnalyticsStatRowOptions,
 	AnalyticsTabOptions,
 } from '../fields/factories'
+export type { GoalFieldOptions } from '../goals/goalField'
 export type {
 	GoalActionDefinition,
 	GoalActionRunArgs,

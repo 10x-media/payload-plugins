@@ -40,10 +40,13 @@ describeForDb('analytics server track: unscoped', { dbs: ['mongo'] }, (db) => {
 		return result.totals ?? {}
 	}
 
-	/** Pageviews per value of one dimension, install-wide. */
-	const breakdown = async (dimension: DimensionKey): Promise<Record<string, number>> => {
+	/** Pageviews per value of one dimension, for one path: order-independent across tests. */
+	const breakdown = async (
+		path: string,
+		dimension: DimensionKey
+	): Promise<Record<string, number>> => {
 		const result = await adapter.query(
-			{ metrics: ['pageviews'], dimensions: [dimension], dateRange: range },
+			{ path, metrics: ['pageviews'], dimensions: [dimension], dateRange: range },
 			{}
 		)
 		return Object.fromEntries(
@@ -93,8 +96,13 @@ describeForDb('analytics server track: unscoped', { dbs: ['mongo'] }, (db) => {
 	})
 
 	it('attributes geo and device from the request it is given, and abstains without one', async () => {
-		// Every event so far came from a script with no request, so none of them is a device.
-		expect(await breakdown('device')).toEqual({})
+		await trackServerEvent(booted.payload, {
+			type: 'pageview',
+			path: '/no-request',
+			hostname: HOST,
+		})
+		// A script event carries no user agent, so it lands in no device bucket at all.
+		expect(await breakdown('/no-request', 'device')).toEqual({})
 		const req = {
 			payload: booted.payload,
 			headers: new Headers({ 'x-vercel-ip-country': 'US', 'user-agent': IPHONE_UA }),
@@ -104,8 +112,8 @@ describeForDb('analytics server track: unscoped', { dbs: ['mongo'] }, (db) => {
 			{ type: 'pageview', path: '/from-browser', hostname: HOST },
 			{ req }
 		)
-		expect(await breakdown('device')).toEqual({ mobile: 1 })
-		expect(await breakdown('country')).toEqual({ US: 1 })
+		expect(await breakdown('/from-browser', 'device')).toEqual({ mobile: 1 })
+		expect(await breakdown('/from-browser', 'country')).toEqual({ US: 1 })
 	})
 
 	it('refuses an invalid event instead of writing a broken one', async () => {
