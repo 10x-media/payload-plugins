@@ -1,15 +1,7 @@
 'use client'
 
-import {
-	ChevronIcon,
-	ConfirmationModal,
-	Popup,
-	PopupList,
-	useFormModified,
-	useModal,
-} from '@payloadcms/ui'
+import { ChevronIcon, Popup, PopupList } from '@payloadcms/ui'
 import type React from 'react'
-import { useCallback, useState } from 'react'
 
 import { BASE_CLASS } from '../../plugin/constants'
 import { keys } from '../../translations/keys'
@@ -19,33 +11,12 @@ import { useFormVariants } from '../context'
 /**
  * One button naming the current form, opening a list of the others. It is a choice of mode,
  * not an action, so it is a single control rather than a row of buttons next to Save.
- * Switching between two step variants keeps every value, since they share one form; switching
- * to or from `native` leaves the form, so with unsaved changes it asks first.
+ * Switching keeps every value: two step variants share one form, and crossing to or from
+ * `native` hands the form state over.
  */
 export const VariantSwitcher: React.FC = () => {
 	const { t } = useTranslation()
-	const { active, available, collectionSlug, switchTo } = useFormVariants()
-	const modified = useFormModified()
-	const { closeModal, openModal } = useModal()
-	const [pending, setPending] = useState<null | string>(null)
-	const modalSlug = `${BASE_CLASS}-switch-${collectionSlug}`
-
-	const request = useCallback(
-		(key: string) => {
-			if (!active || key === active.key) {
-				return
-			}
-			const target = available.find((variant) => variant.key === key)
-			const crossesForms = Boolean(target) && target?.native !== active.native
-			if (crossesForms && modified) {
-				setPending(key)
-				openModal(modalSlug)
-				return
-			}
-			switchTo(key)
-		},
-		[active, available, modalSlug, modified, openModal, switchTo]
-	)
+	const { active, available, switchTo } = useFormVariants()
 
 	if (available.length < 2 || !active) {
 		return null
@@ -72,7 +43,9 @@ export const VariantSwitcher: React.FC = () => {
 								key={variant.key}
 								onClick={() => {
 									close()
-									request(variant.key)
+									if (variant.key !== active.key) {
+										switchTo(variant.key)
+									}
 								}}
 							>
 								{variant.label}
@@ -82,20 +55,6 @@ export const VariantSwitcher: React.FC = () => {
 				)}
 				size="large"
 				verticalAlign="bottom"
-			/>
-			<ConfirmationModal
-				body={t(keys.unsavedSwitchBody)}
-				confirmLabel={t(keys.switchConfirm)}
-				heading={t(keys.unsavedSwitchHeading)}
-				modalSlug={modalSlug}
-				onCancel={() => setPending(null)}
-				onConfirm={() => {
-					if (pending) {
-						switchTo(pending)
-					}
-					setPending(null)
-					closeModal(modalSlug)
-				}}
 			/>
 		</div>
 	)

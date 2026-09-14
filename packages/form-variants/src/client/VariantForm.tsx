@@ -39,6 +39,7 @@ import { SaveControls } from './chrome/SaveControls'
 import { VariantSwitcher } from './chrome/VariantSwitcher'
 import { useFormVariants } from './context'
 import { evaluate } from './evaluate'
+import { FormStateBridge } from './handoff'
 import { DrawerHeader, StaleDataModal } from './internals'
 import { Runner } from './Runner'
 import { resolveSlot } from './slots'
@@ -629,6 +630,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 					}}
 					onSuccess={onSave}
 				>
+					<FormStateBridge />
 					{isInDrawer && (
 						<DrawerHeader
 							AfterHeader={documentSlots.Description}

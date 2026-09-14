@@ -15,8 +15,5 @@ export const en: Record<TranslationKey, string> = {
 	[keys.readOnly]: 'This document is read-only.',
 	[keys.stepCompleted]: 'completed',
 	[keys.stepInvalid]: 'Fix the highlighted fields to continue.',
-	[keys.switchConfirm]: 'Switch',
 	[keys.switcherLabel]: 'Form',
-	[keys.unsavedSwitchBody]: 'Unsaved changes will be lost when switching to another form.',
-	[keys.unsavedSwitchHeading]: 'Switch form?',
 }

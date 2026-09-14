@@ -9,7 +9,7 @@ description: The save guard, what happens after a save, autosave and drafts, and
 
 Every other variant renders in a form of the plugin's own, with the same document locking, stale-data and leave-without-saving modals and the same upload area.
 
-Switching between two step variants keeps every value. Switching to or from `native` is a different form, so with unsaved changes the switcher asks first, and the document is reloaded so the form you land on shows what is saved. A drawer cannot reload itself, so a switch there shows the document as it was when the drawer opened.
+Switching keeps every value, in either direction and on either surface. Two step variants share one form; crossing to or from `native` hands the state of the form being left to the one taking its place, fields only the other form shows included.
 
 Two things a variant does not carry from the native form: the live preview window, and the auth fields (email, password) of an auth collection. Put those on `native`.
 

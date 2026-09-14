@@ -7,9 +7,8 @@ import {
 	useEditDepth,
 	usePreferences,
 } from '@payloadcms/ui'
-import { useRouter } from 'next/navigation'
 import type React from 'react'
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { BASE_CLASS, preferenceKeyFor, VARIANT_PARAM } from '../plugin/constants'
 import { keys } from '../translations/keys'
@@ -17,6 +16,7 @@ import { useTranslation } from '../translations/useTranslation'
 import type { WizardState } from '../types'
 import { VariantSwitcher } from './chrome/VariantSwitcher'
 import { FormVariantsContext, type FormVariantsContextValue, type SwitchOptions } from './context'
+import { type FormHandoff, FormStateBridge, HandoffContext } from './handoff'
 import { resolveSlot } from './slots'
 import type { Outcome, VariantProviderProps } from './types'
 import { replaceParam } from './url'
@@ -40,14 +40,13 @@ const EmptyState: React.FC = () => {
  * `native` is Payload's `DefaultEditView` untouched, with the switcher in its
  * `BeforeDocumentControls` slot. Every other variant renders inside one `<Form>` the plugin
  * owns, so switching between two step variants keeps every value; switching to or from
- * `native` crosses into another form and asks first when there are unsaved changes.
+ * `native` crosses into another form and hands the state over, so that keeps them too.
  */
 export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
 	const { availability, collectionSlug, documentSlots, initial, slots, storedSteps, variants } =
 		props
 	const { drawerSlug } = useDocumentDrawerContext()
 	const depth = useEditDepth()
-	const router = useRouter()
 	const { setPreference } = usePreferences()
 
 	const inDrawer = Boolean(drawerSlug) || depth > 1
@@ -72,36 +71,33 @@ export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
 	const [state, setState] = useState<WizardState>({})
 	const [outcome, setOutcome] = useState<null | Outcome>(null)
 	const [stepKey, setStepKey] = useState<null | string>(() => rememberedStep(initial[surface]))
-	const [crossing, setCrossing] = useState<null | string>(null)
-	const [refreshing, startRefresh] = useTransition()
+	const [handoff, setHandoff] = useState<FormHandoff | null>(null)
+	const captureRef = useRef<(() => FormHandoff) | null>(null)
 
 	const active = useMemo(
 		() => variants.find((variant) => variant.key === activeKey) ?? null,
 		[activeKey, variants]
 	)
 
-	const apply = useCallback(
-		(key: string) => {
-			setActiveKey(key)
-			setOutcome(null)
-			setStepKey(rememberedStep(key))
-			if (!inDrawer) {
-				replaceParam(VARIANT_PARAM, key)
+	const register = useCallback((capture: () => FormHandoff) => {
+		captureRef.current = capture
+		return () => {
+			if (captureRef.current === capture) {
+				captureRef.current = null
 			}
-		},
-		[inDrawer, rememberedStep]
-	)
+		}
+	}, [])
+
+	const release = useCallback(() => setHandoff(null), [])
 
 	/**
 	 * Crossing between `native` and a variant leaves one form for another, and the form being
-	 * mounted starts from the state the server rendered with the page. That state is as old as
-	 * the page: anything saved since, by either form, is not in it, so the new form would open
-	 * on the values the document had when it was opened. The server render is what holds it, so
-	 * the route is refreshed first and the switch waits for the answer.
+	 * mounted would otherwise start from the state the server rendered with the page, which is
+	 * as old as the page. The state is taken off the form on screen while it is still mounted
+	 * and handed to the one that replaces it, so the switch keeps every value, saved or not,
+	 * including the values of fields only the other form shows.
 	 *
-	 * A drawer has no route of its own: its document is rendered once by `renderDocument` when
-	 * the drawer opens and only the drawer itself can ask for it again, so there the switch
-	 * crosses with the state the drawer opened on.
+	 * Two step variants share one form and need none of this.
 	 */
 	const switchTo = useCallback(
 		(key: string, options?: SwitchOptions) => {
@@ -112,22 +108,20 @@ export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
 			if (options?.persist !== false) {
 				void setPreference(preferenceKeyFor(collectionSlug), { variant: key })
 			}
-			if (!inDrawer && active && target.native !== active.native) {
-				setCrossing(key)
-				startRefresh(() => router.refresh())
-				return
+			if (active && target.native !== active.native) {
+				setHandoff(captureRef.current?.() ?? null)
 			}
-			apply(key)
+			setActiveKey(key)
+			setOutcome(null)
+			setStepKey(rememberedStep(key))
+			if (!inDrawer) {
+				replaceParam(VARIANT_PARAM, key)
+			}
 		},
-		[active, apply, available, collectionSlug, inDrawer, router, setPreference]
+		[active, available, collectionSlug, inDrawer, rememberedStep, setPreference]
 	)
 
-	useEffect(() => {
-		if (crossing && !refreshing) {
-			apply(crossing)
-			setCrossing(null)
-		}
-	}, [apply, crossing, refreshing])
+	const handoffValue = useMemo(() => ({ handoff, register, release }), [handoff, register, release])
 
 	const value = useMemo<FormVariantsContextValue>(
 		() => ({
@@ -161,6 +155,7 @@ export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
 					<>
 						{documentSlots.BeforeDocumentControls}
 						{switcher}
+						<FormStateBridge />
 					</>
 				}
 			/>
@@ -169,5 +164,9 @@ export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
 		content = <VariantForm {...props} variant={active} />
 	}
 
-	return <FormVariantsContext value={value}>{content}</FormVariantsContext>
+	return (
+		<FormVariantsContext value={value}>
+			<HandoffContext value={handoffValue}>{content}</HandoffContext>
+		</FormVariantsContext>
+	)
 }

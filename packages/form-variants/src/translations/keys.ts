@@ -13,10 +13,7 @@ export const keys = {
 	readOnly: 'formVariants:readOnly',
 	stepCompleted: 'formVariants:stepCompleted',
 	stepInvalid: 'formVariants:stepInvalid',
-	switchConfirm: 'formVariants:switchConfirm',
 	switcherLabel: 'formVariants:switcherLabel',
-	unsavedSwitchBody: 'formVariants:unsavedSwitchBody',
-	unsavedSwitchHeading: 'formVariants:unsavedSwitchHeading',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]
