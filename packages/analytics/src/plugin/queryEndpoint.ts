@@ -28,6 +28,7 @@ const errorResponse = (
 
 /** How long a client should wait out a provider outage before retrying the same read. */
 const RETRY_AFTER_SECONDS = '30'
+const RETRY_AFTER = { 'Retry-After': RETRY_AFTER_SECONDS }
 
 const serializeQuery = (query: AnalyticsQuery): SerializedAnalyticsQuery => ({
 	...query,
@@ -54,7 +55,9 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 	}
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
-		return errorResponse(503, queryError('unavailable', 'analytics: not available'))
+		// Both `unavailable` answers are retryable, so both carry the same delay: a client
+		// backs off identically whether the plugin is still booting or a provider is down.
+		return errorResponse(503, queryError('unavailable', 'analytics: not available'), RETRY_AFTER)
 	}
 	let adapterId = 'unresolved'
 	try {
@@ -145,7 +148,7 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			return errorResponse(
 				503,
 				queryError('unavailable', 'analytics: source is temporarily unavailable'),
-				{ 'Retry-After': RETRY_AFTER_SECONDS }
+				RETRY_AFTER
 			)
 		}
 		const body: QueryResponse = {

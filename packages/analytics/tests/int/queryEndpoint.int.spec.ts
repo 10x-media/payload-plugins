@@ -53,13 +53,14 @@ interface StubOptions {
 	capabilities?: Partial<AnalyticsCapabilities>
 	pageviews?: number
 	seen?: AnalyticsQuery[]
+	configured?: boolean
 }
 
 const stubAdapter = (opts: StubOptions): AnalyticsAdapter => ({
 	id: opts.id,
 	label: opts.label ?? opts.id,
 	capabilities: { ...baseCapabilities, ...opts.capabilities },
-	isConfigured: () => true,
+	isConfigured: () => opts.configured ?? true,
 	query: async (q) => {
 		opts.seen?.push(q)
 		return {
@@ -96,6 +97,7 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 						},
 						pageviews: 7,
 					}),
+					stubAdapter({ id: 'unconfigured', label: 'Unconfigured source', configured: false }),
 				],
 				defaultAdapter: 'memory',
 			}),
@@ -181,6 +183,14 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(body.source.id).toBe('narrow')
 		expect(body.result.totals?.pageviews).toBe(7)
 		expect(body.capabilities.comparison).toBe(false)
+	})
+
+	it(`answers 200 with an empty result for a source whose adapter is unconfigured on ${db}`, async () => {
+		const body = await okBody(`source=unconfigured&metrics=pageviews&${RANGE}`)
+		expect(body.result.rows).toEqual([])
+		expect(body.result.totals).toBeUndefined()
+		expect(body.result.meta.provider).toBe('unconfigured')
+		expect(body.source.id).toBe('unconfigured')
 	})
 
 	it(`404s an unknown source id on ${db}`, async () => {
