@@ -10,6 +10,7 @@ const CHART_CSS = `
 .analytics-chart__legend-item { display: inline-flex; align-items: center; gap: 0.35rem; }
 .analytics-chart__legend-swatch { width: 0.75rem; height: 0.125rem; border-radius: 999px; background: var(--analytics-chart-1); }
 .analytics-chart__legend-swatch--comparison { background: var(--theme-elevation-500); }
+.analytics-chart__legend-range { color: var(--theme-elevation-400); }
 .analytics-chart__svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .analytics-chart__grid { stroke: var(--theme-elevation-150); stroke-width: 1; vector-effect: non-scaling-stroke; }
 .analytics-chart__area { stroke: none; }

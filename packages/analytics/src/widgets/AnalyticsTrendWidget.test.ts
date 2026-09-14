@@ -81,7 +81,9 @@ describe('AnalyticsTrendWidget comparison', () => {
 		if (!range) {
 			return
 		}
-		expect(html).toContain(formatRangeCaption(range, 'en', 'UTC'))
+		expect(html).toContain(
+			`<span class="analytics-chart__legend-range">· ${formatRangeCaption(range, 'en', 'UTC')}</span>`
+		)
 	})
 
 	it('draws one series when compare is off', async () => {

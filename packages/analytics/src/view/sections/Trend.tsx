@@ -72,9 +72,10 @@ const pointsOf = (
 	})
 
 /**
- * The charted metric over the window, with the comparison period overlaid on the same
- * axes when the view asked for one. Both series are bucketed identically, so the overlay
- * aligns to the primary axis by index.
+ * The charted metric over the window, with the comparison period overlaid on the same axes
+ * when the view asked for one. The endpoint buckets both windows itself, so at week and month
+ * granularity the comparison can come back one row longer or shorter than the primary; the
+ * chart normalizes it onto the primary axis by index.
  */
 export function Trend({
 	query,

@@ -1,5 +1,5 @@
 import type { WidgetServerProps } from 'payload'
-import { bucketByRange, bucketSeries } from '../charts/bucket'
+import { bucketByRange, bucketSeries, onPrimaryAxis } from '../charts/bucket'
 import { TrendChart } from '../charts/TrendChart'
 import type { MetricKey } from '../core/contract'
 import { formatMetricValue } from '../fields/format'
@@ -64,14 +64,19 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 	const toPoints = (source: typeof buckets) =>
 		source.map((b) => ({ ...b, display: formatMetricValue(metric, b.value, locale) }))
 	const trendPoints = toPoints(buckets)
-	const comparisonPoints =
+	// The comparison is re-dated onto the primary axis before bucketing: at week and month
+	// units its own dates would fall on different boundaries.
+	const previousSeries =
 		compare && result.comparisonPoints
-			? toPoints(
-					customRange
-						? bucketByRange(result.comparisonPoints, customRange, result.timezone)
-						: bucketSeries(result.comparisonPoints, timeframe, result.timezone)
-				)
+			? onPrimaryAxis(result.comparisonPoints, result.points)
 			: undefined
+	const comparisonPoints = previousSeries
+		? toPoints(
+				customRange
+					? bucketByRange(previousSeries, customRange, result.timezone)
+					: bucketSeries(previousSeries, timeframe, result.timezone)
+			)
+		: undefined
 	return (
 		<div className="analytics-trend-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>
@@ -90,11 +95,8 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps) {
 				{...(comparisonPoints && result.comparisonRange
 					? {
 							comparison: comparisonPoints,
-							comparisonLabel: `${t(keys.viewTrendPrevious)} · ${formatRangeCaption(
-								result.comparisonRange,
-								locale,
-								result.timezone
-							)}`,
+							comparisonLabel: t(keys.viewTrendPrevious),
+							comparisonRange: formatRangeCaption(result.comparisonRange, locale, result.timezone),
 							label: title,
 						}
 					: {})}

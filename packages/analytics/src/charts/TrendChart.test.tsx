@@ -78,6 +78,30 @@ describe('TrendChart comparison overlay', () => {
 		expect(container.querySelectorAll('.analytics-chart__legend-swatch')).toHaveLength(2)
 	})
 
+	it('names the comparison range in the legend, never in the tooltip', () => {
+		const { container } = render(
+			<TrendChart
+				ariaLabel="Pageviews"
+				buckets={primary}
+				comparison={previous}
+				comparisonLabel="Previous period"
+				comparisonRange="Jul 17, 2026 - Aug 15, 2026"
+				label="Pageviews"
+			/>
+		)
+		expect(container.querySelector('.analytics-chart__legend-range')?.textContent).toContain(
+			'Jul 17, 2026 - Aug 15, 2026'
+		)
+		const plot = container.querySelector('.analytics-chart__plot')
+		if (!plot) {
+			throw new Error('no plot')
+		}
+		fireEvent(plot, new MouseEvent('pointermove', { bubbles: true, clientX: 600 }))
+		const tooltip = container.querySelector('.analytics-chart__tooltip')
+		expect(tooltip?.textContent).toContain('Previous period')
+		expect(tooltip?.textContent).not.toContain('Jul 17, 2026')
+	})
+
 	it('shows both values in the tooltip for the hovered bucket', () => {
 		const { container } = render(
 			<TrendChart

@@ -9,6 +9,11 @@ import { WIDGET_METRICS } from './types'
 
 const bareConfig = (): Config => ({}) as Config
 
+const fieldNames = (config: Config, slug: string): string[] =>
+	(config.admin?.dashboard?.widgets?.find((w) => w.slug === slug)?.fields ?? []).flatMap((f) =>
+		'name' in f && typeof f.name === 'string' ? [f.name] : []
+	)
+
 const metricFieldOf = (config: Config, slug = 'analytics-metric') => {
 	const widget = config.admin?.dashboard?.widgets?.find((w) => w.slug === slug)
 	return widget?.fields ? findMetricField(widget.fields) : undefined
@@ -38,6 +43,32 @@ describe('registerWidgets', () => {
 		})
 		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
 		expect(slugs).toContain('analytics-metric')
+	})
+
+	it('puts the compare checkbox on the trend widget only', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+		})
+		expect(fieldNames(config, 'analytics-trend')).toContain('compare')
+		expect(fieldNames(config, 'analytics-metric')).not.toContain('compare')
+	})
+
+	it('drops the compare checkbox when the host turned comparison off', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+			comparison: false,
+		})
+		expect(fieldNames(config, 'analytics-trend')).not.toContain('compare')
 	})
 
 	it('omits widgets named in the disabled list', () => {

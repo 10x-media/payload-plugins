@@ -46,6 +46,8 @@ export interface RegisterWidgetsArgs {
 	localizeText?: boolean
 	/** The plugin's configured defaultAdapter, when set; falls back to the first adapter. */
 	defaultId?: string
+	/** `widgets.comparison`; false hides the trend widget's compare checkbox. Defaults to on. */
+	comparison?: boolean
 }
 
 interface WidgetDef {
@@ -258,7 +260,7 @@ const WIDGET_DEFS: WidgetDef[] = [
 		requires: { metrics: ['pageviews'] },
 		minWidth: 'small',
 		maxWidth: 'full',
-		fields: (args) => metricWidgetFields(args, [compareField()]),
+		fields: (args) => metricWidgetFields(args, args.comparison === false ? [] : [compareField()]),
 	},
 	{
 		slug: 'analytics-realtime',

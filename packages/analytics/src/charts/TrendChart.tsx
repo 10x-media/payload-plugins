@@ -18,8 +18,10 @@ export interface TrendChartProps {
 	buckets: TrendPoint[]
 	/** Previous-period series drawn on the same axes, aligned to `buckets` by index. */
 	comparison?: TrendPoint[]
-	/** Names the comparison series in the legend and the tooltip. */
+	/** Names the comparison series in the legend and the tooltip; keep it short. */
 	comparisonLabel?: string
+	/** The comparison window, shown in the legend only, so the tooltip stays narrow. */
+	comparisonRange?: string
 	/** Names the primary series in the legend; the legend only renders with a comparison. */
 	label?: string
 	ariaLabel: string
@@ -59,6 +61,7 @@ export function TrendChart({
 	buckets,
 	comparison,
 	comparisonLabel,
+	comparisonRange,
 	label,
 	ariaLabel,
 	minHeight = 160,
@@ -131,6 +134,9 @@ export function TrendChart({
 					<span className="analytics-chart__legend-item">
 						<span className="analytics-chart__legend-swatch analytics-chart__legend-swatch--comparison" />
 						{comparisonLabel}
+						{comparisonRange ? (
+							<span className="analytics-chart__legend-range">{`· ${comparisonRange}`}</span>
+						) : null}
 					</span>
 				</div>
 			) : null}
