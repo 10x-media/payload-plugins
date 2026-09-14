@@ -104,12 +104,12 @@ Every built-in widget ends in an **Open in Analytics** link that opens the [anal
 | Metric | window, source, metric |
 | Trend | window, source, metric, and `compare=1` when the instance compares |
 | Breakdown | window, source, metric, and the tab that offers its dimension |
-| Goals | window, source, `tab=goals` |
+| Goals | window, source, `metric=conversions`, `tab=goals`, and `compare=1` when the instance compares |
 | Realtime | source only. Its rolling window is no range the view can hold, so it opens on the view's own range |
 
 The link is built after the read, from the adapter that actually answered, so on a scoped or runtime-provider install it names the tenant's own source rather than the id the widget asked for. The view coerces anything the source cannot serve when it opens, exactly as it does for a hand-written link.
 
-Ranges serialize as the view's own URL state, against the install's configured defaults: `view: { defaultRange, defaultMetric }`. A widget already on the default window or metric leaves that key out, so the link stays short. A custom range becomes `range=custom&from=&to=` as two calendar days in the [reporting timezone](/analytics/timezone) the widget resolved.
+Ranges serialize as the view's own URL state, against the install's configured defaults: `view: { defaultRange, defaultMetric }`. A widget already on the default window or metric leaves that key out, so the link stays short. A custom range becomes `range=custom&from=&to=` as two calendar days in the [reporting timezone](/analytics/timezone) the widget resolved. A window wider than the view's 366-day cap links to its last 366 days, since the view drops a wider one.
 
 <Callout>
 **Three presets carry no range.** `allTime`, `thisMonth` and `thisYear` are widget windows the view's own range picker does not offer, so their links leave the range out and the view opens on its configured default rather than writing a value the picker could not render. A custom range with only one day picked does the same.
