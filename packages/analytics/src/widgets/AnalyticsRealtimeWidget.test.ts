@@ -34,21 +34,32 @@ const render = async (
 const hrefIn = (html: string): string | undefined =>
 	html.match(/<a[^>]+href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&')
 
+const view = { path: '/analytics', defaultRange: 'last30days', defaultMetric: 'pageviews' } as const
+
 describe('AnalyticsRealtimeWidget view link', () => {
 	beforeEach(() => {
 		vi.mocked(readForWidgetRealtime).mockReset()
 		vi.mocked(readForWidgetRealtime).mockResolvedValue(result())
 	})
 
-	it('opens the view root, since a rolling window is no range the view holds', async () => {
-		const html = await render({ dataSource: 'plausible' }, { path: '/analytics' })
+	it('opens the view on its own default range, naming the adapter that served', async () => {
+		vi.mocked(readForWidgetRealtime).mockResolvedValue(result({ adapterId: 'tenant-7' }))
+		const html = await render({ dataSource: 'plausible' }, view)
 		expect(html).toContain('analytics:widgetOpenInView')
-		expect(hrefIn(html)).toBe('/admin/analytics?source=plausible')
+		expect(hrefIn(html)).toBe('/admin/analytics?source=tenant-7')
 	})
 
-	it('keeps the link on an unavailable source', async () => {
-		vi.mocked(readForWidgetRealtime).mockResolvedValue(result({ status: 'unavailable' }))
-		expect(hrefIn(await render({}, { path: '/analytics' }))).toBe('/admin/analytics')
+	it('opens a configured default range without spelling it out', async () => {
+		expect(hrefIn(await render({}, { ...view, defaultRange: 'today' }))).toBe(
+			'/admin/analytics?source=native'
+		)
+	})
+
+	it('keeps the link on an unavailable source that resolved no adapter', async () => {
+		vi.mocked(readForWidgetRealtime).mockResolvedValue(
+			result({ status: 'unavailable', adapterId: '' })
+		)
+		expect(hrefIn(await render({}, view))).toBe('/admin/analytics')
 	})
 
 	it('renders no link when the app turned the view off', async () => {

@@ -3,7 +3,13 @@ import { DIMENSION_KEYS } from '../core/contract'
 import { TAB_DIMENSIONS } from '../view/gating'
 import { viewHref, viewTabForDimension } from './viewLink'
 
-const base = { adminRoute: '/admin', viewPath: '/analytics', timezone: 'Europe/Berlin' } as const
+const base = {
+	adminRoute: '/admin',
+	viewPath: '/analytics',
+	timezone: 'Europe/Berlin',
+	defaultRange: 'last30days',
+	defaultMetric: 'pageviews',
+} as const
 
 const query = (href: string): URLSearchParams =>
 	new URLSearchParams(href.slice(href.indexOf('?') + 1))
@@ -27,6 +33,27 @@ describe('viewHref', () => {
 
 	it('omits the range when the widget is on the view default', () => {
 		expect(query(viewHref({ ...base, timeframe: 'last30days' })).has('range')).toBe(false)
+	})
+
+	it('omits exactly what the install configured as its default', () => {
+		const configured = { ...base, defaultRange: 'today', defaultMetric: 'visitors' } as const
+		expect(query(viewHref({ ...configured, timeframe: 'today' })).has('range')).toBe(false)
+		expect(query(viewHref({ ...configured, timeframe: 'last30days' })).get('range')).toBe(
+			'last30days'
+		)
+		expect(
+			query(viewHref({ ...configured, timeframe: 'today', metric: 'visitors' })).has('metric')
+		).toBe(false)
+		expect(
+			query(viewHref({ ...configured, timeframe: 'today', metric: 'pageviews' })).get('metric')
+		).toBe('pageviews')
+	})
+
+	it('opens a configured allTime default on the range the view falls back to', () => {
+		const configured = { ...base, defaultRange: 'allTime' } as const
+		expect(query(viewHref({ ...configured, timeframe: 'allTime' })).has('range')).toBe(false)
+		expect(query(viewHref({ ...configured, timeframe: 'last30days' })).has('range')).toBe(false)
+		expect(query(viewHref({ ...configured, timeframe: 'today' })).get('range')).toBe('today')
 	})
 
 	it('omits the range for a window the view has no preset for', () => {

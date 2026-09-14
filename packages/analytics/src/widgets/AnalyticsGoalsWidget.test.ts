@@ -37,6 +37,8 @@ const render = async (widgetData: GoalsWidgetData = {}, view?: WidgetView): Prom
 const hrefIn = (html: string): string | undefined =>
 	html.match(/<a[^>]+href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&')
 
+const view = { path: '/x', defaultRange: 'last30days', defaultMetric: 'pageviews' } as const
+
 /** The rendered column headers, in order. */
 const headers = (html: string): string[] =>
 	Array.from(html.matchAll(/<th[^>]*>([^<]*)<\/th>/g), (m) => m[1] ?? '')
@@ -175,11 +177,17 @@ describe('AnalyticsGoalsWidget', () => {
 		expect(await render({ title: 'Signups' })).toContain('Signups')
 	})
 
-	it('links into the view on its goals tab', async () => {
-		vi.mocked(readForWidgetGoals).mockResolvedValue(result())
-		const html = await render({ timeframe: 'last7days', dataSource: 'plausible' }, { path: '/x' })
+	it('links into the view on its goals tab, naming the adapter that served the rows', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(result({ adapterId: 'tenant-7' }))
+		const html = await render({ timeframe: 'last7days', dataSource: 'plausible' }, view)
 		expect(html).toContain('analytics:widgetOpenInView')
-		expect(hrefIn(html)).toBe('/admin/x?range=last7days&source=plausible&tab=goals')
+		expect(hrefIn(html)).toBe('/admin/x?range=last7days&source=tenant-7&tab=goals')
+	})
+
+	it('omits a range the install already defaults to', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(result())
+		const html = await render({ timeframe: 'last7days' }, { ...view, defaultRange: 'last7days' })
+		expect(hrefIn(html)).toBe('/admin/x?source=native&tab=goals')
 	})
 
 	it('renders no link when the app turned the view off', async () => {

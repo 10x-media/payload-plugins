@@ -696,6 +696,7 @@ describe('registerWidgets: goals widget', () => {
 
 describe('registerWidgets view link', () => {
 	const custom: CustomWidgetDef = { slug: 'custom', component: 'x#Custom', label: 'Custom' }
+	const view = { path: '/insights', defaultRange: 'today', defaultMetric: 'visitors' } as const
 
 	const built = (view?: RegisterWidgetsArgs['view']): Config => {
 		const config = bareConfig()
@@ -717,12 +718,12 @@ describe('registerWidgets view link', () => {
 			: undefined
 	}
 
-	it('hands every built-in widget the view path', () => {
-		const config = built({ path: '/insights' })
+	it('hands every built-in widget the view path and the defaults it opens on', () => {
+		const config = built(view)
 		const builtIns = (config.admin?.dashboard?.widgets ?? []).filter((w) => w.slug !== custom.slug)
 		expect(builtIns.length).toBeGreaterThan(0)
 		for (const widget of builtIns) {
-			expect(serverPropsOf(config, widget.slug)?.view).toEqual({ path: '/insights' })
+			expect(serverPropsOf(config, widget.slug)?.view).toEqual(view)
 		}
 	})
 
@@ -732,6 +733,6 @@ describe('registerWidgets view link', () => {
 	})
 
 	it('leaves a host-registered widget alone', () => {
-		expect(serverPropsOf(built({ path: '/insights' }), custom.slug)).toBeUndefined()
+		expect(serverPropsOf(built(view), custom.slug)).toBeUndefined()
 	})
 })

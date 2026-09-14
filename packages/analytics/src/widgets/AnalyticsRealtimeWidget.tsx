@@ -1,6 +1,5 @@
 import type { WidgetServerProps } from 'payload'
 import type { MetricKey } from '../core/contract'
-import { DEFAULT_VIEW } from '../core/options'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { keys, type TranslationKey } from '../translations/keys'
 import { METRIC_KEYS } from '../translations/metricKeys'
@@ -33,19 +32,18 @@ export default async function AnalyticsRealtimeWidget(props: WidgetServerProps &
 	const t = asTranslate(props.req.i18n.t)
 	const locale = props.req.i18n.language ?? 'en-US'
 	const title = data.title?.trim() || t(keys.widgetRealtimeLabel)
-	// A rolling few minutes is no window the view can hold, so the link opens it as configured.
-	const href = widgetViewHref(props.view, props.req, {
-		timeframe: DEFAULT_VIEW.defaultRange,
-		timezone: DEFAULT_TIMEZONE,
-		...(data.dataSource ? { source: data.dataSource } : {}),
-	})
-
 	const result = await readForWidgetRealtime({
 		req: props.req,
 		metric,
 		windowMinutes,
 		adapterId: data.dataSource,
 		now: new Date(),
+	})
+	// No timeframe: a rolling few minutes is no window the view can hold, so the link opens
+	// it on its configured range, naming the adapter that actually answered.
+	const href = widgetViewHref(props.view, props.req, {
+		timezone: DEFAULT_TIMEZONE,
+		...(result.adapterId ? { source: result.adapterId } : {}),
 	})
 
 	if (result.status !== 'ok') {

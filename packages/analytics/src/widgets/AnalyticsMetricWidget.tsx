@@ -36,14 +36,6 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps & W
 		customRange && timezone
 			? formatRangeCaption(customRange, locale, timezone)
 			: t(TIMEFRAME_KEYS[timeframe])
-	const href = widgetViewHref(props.view, props.req, {
-		timeframe: rawTimeframe,
-		timezone: timezone ?? DEFAULT_TIMEZONE,
-		...(customRange ? { range: customRange } : {}),
-		...(data.dataSource ? { source: data.dataSource } : {}),
-		metric,
-	})
-
 	const result = await readForWidget({
 		req: props.req,
 		metrics: [metric],
@@ -52,6 +44,15 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps & W
 		now: new Date(),
 		range: customRange,
 		...(timezone ? { timezone } : {}),
+	})
+	// The adapter that answered, which on a scoped or runtime-provider install is not the
+	// id the widget asked for.
+	const href = widgetViewHref(props.view, props.req, {
+		timeframe: rawTimeframe,
+		timezone: timezone ?? DEFAULT_TIMEZONE,
+		...(customRange ? { range: customRange } : {}),
+		...(result.adapterId ? { source: result.adapterId } : {}),
+		metric,
 	})
 
 	if (result.status !== 'ok') {

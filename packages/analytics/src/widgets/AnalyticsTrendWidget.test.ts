@@ -101,13 +101,30 @@ describe('AnalyticsTrendWidget comparison', () => {
 })
 
 describe('AnalyticsTrendWidget view link', () => {
-	it('carries its window, metric and comparison into the view', async () => {
+	const view = {
+		path: '/analytics',
+		defaultRange: 'last30days',
+		defaultMetric: 'pageviews',
+	} as const
+
+	it('carries its window, comparison and the adapter that served it into the view', async () => {
 		const html = await renderWidget(
 			{ metric: 'pageviews', timeframe: 'last7days', compare: true },
-			{ path: '/analytics' }
+			view
 		)
 		expect(html).toContain('analytics:widgetOpenInView')
-		expect(hrefIn(html)).toBe('/admin/analytics?range=last7days&compare=1')
+		expect(hrefIn(html)).toBe('/admin/analytics?range=last7days&compare=1&source=native')
+	})
+
+	it('omits a range the install already defaults to', async () => {
+		const html = await renderWidget(
+			{ metric: 'pageviews', timeframe: 'last7days' },
+			{
+				...view,
+				defaultRange: 'last7days',
+			}
+		)
+		expect(hrefIn(html)).toBe('/admin/analytics?source=native')
 	})
 
 	it('renders no link when the app turned the view off', async () => {

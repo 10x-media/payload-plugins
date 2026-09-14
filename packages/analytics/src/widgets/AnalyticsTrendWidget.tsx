@@ -37,14 +37,6 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps & Wi
 	const title = data.title?.trim() || t(METRIC_KEYS[metric])
 
 	const compare = data.compare === true
-	const href = widgetViewHref(props.view, props.req, {
-		timeframe: rawTimeframe,
-		timezone: timezone ?? DEFAULT_TIMEZONE,
-		...(customRange ? { range: customRange } : {}),
-		...(data.dataSource ? { source: data.dataSource } : {}),
-		metric,
-		compare,
-	})
 	const result = await readForWidgetSeries({
 		req: props.req,
 		metric,
@@ -54,6 +46,16 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps & Wi
 		range: customRange,
 		compare,
 		...(timezone ? { timezone } : {}),
+	})
+	// The adapter that answered, which on a scoped or runtime-provider install is not the
+	// id the widget asked for.
+	const href = widgetViewHref(props.view, props.req, {
+		timeframe: rawTimeframe,
+		timezone: timezone ?? DEFAULT_TIMEZONE,
+		...(customRange ? { range: customRange } : {}),
+		...(result.adapterId ? { source: result.adapterId } : {}),
+		metric,
+		compare,
 	})
 
 	if (result.status !== 'ok') {

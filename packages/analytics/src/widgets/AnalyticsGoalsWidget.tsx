@@ -65,14 +65,6 @@ export default async function AnalyticsGoalsWidget(props: WidgetServerProps & Wi
 	const customRange = timezone ? resolveCustomRange(rawTimeframe, data.range, timezone) : undefined
 	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
 	const title = data.title?.trim() || t(keys.widgetGoals)
-	const href = widgetViewHref(props.view, props.req, {
-		timeframe: rawTimeframe,
-		timezone: timezone ?? DEFAULT_TIMEZONE,
-		...(customRange ? { range: customRange } : {}),
-		...(data.dataSource ? { source: data.dataSource } : {}),
-		tab: 'goals',
-	})
-
 	const result = await readForWidgetGoals({
 		req: props.req,
 		timeframe,
@@ -82,6 +74,15 @@ export default async function AnalyticsGoalsWidget(props: WidgetServerProps & Wi
 		now: new Date(),
 		range: customRange,
 		...(timezone ? { timezone } : {}),
+	})
+	// The adapter that answered, which on a scoped or runtime-provider install is not the
+	// id the widget asked for.
+	const href = widgetViewHref(props.view, props.req, {
+		timeframe: rawTimeframe,
+		timezone: timezone ?? DEFAULT_TIMEZONE,
+		...(customRange ? { range: customRange } : {}),
+		...(result.adapterId ? { source: result.adapterId } : {}),
+		tab: 'goals',
 	})
 
 	const locale = props.req.i18n.language ?? 'en-US'

@@ -44,15 +44,6 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 	}
 
 	const tab = viewTabForDimension(spec.dimension)
-	const href = widgetViewHref(props.view, props.req, {
-		timeframe: rawTimeframe,
-		timezone: timezone ?? DEFAULT_TIMEZONE,
-		...(customRange ? { range: customRange } : {}),
-		...(data.dataSource ? { source: data.dataSource } : {}),
-		...(tab ? { tab } : {}),
-		metric,
-	})
-
 	const result = await readForWidgetBreakdown({
 		req: props.req,
 		metric,
@@ -63,6 +54,16 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 		now: new Date(),
 		range: customRange,
 		...(timezone ? { timezone } : {}),
+	})
+	// The adapter that answered, which on a scoped or runtime-provider install is not the
+	// id the widget asked for.
+	const href = widgetViewHref(props.view, props.req, {
+		timeframe: rawTimeframe,
+		timezone: timezone ?? DEFAULT_TIMEZONE,
+		...(customRange ? { range: customRange } : {}),
+		...(result.adapterId ? { source: result.adapterId } : {}),
+		...(tab ? { tab } : {}),
+		metric,
 	})
 
 	const locale = props.req.i18n.language ?? 'en-US'

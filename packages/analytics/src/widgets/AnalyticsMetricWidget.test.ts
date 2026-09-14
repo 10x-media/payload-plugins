@@ -49,6 +49,12 @@ const renderHtml = async (
 const hrefIn = (html: string): string | undefined =>
 	html.match(/<a[^>]+href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&')
 
+const view = {
+	path: '/analytics',
+	defaultRange: 'last30days',
+	defaultMetric: 'pageviews',
+} as const
+
 describe('AnalyticsMetricWidget', () => {
 	it('resolves the reporting timezone once, inside the read, for a preset timeframe', async () => {
 		const { req, resolveScope, resolveTimezone } = bootFakeRuntime()
@@ -69,15 +75,16 @@ describe('AnalyticsMetricWidget', () => {
 		expect(resolveTimezone).toHaveBeenCalledTimes(1)
 	})
 
-	it('links into the view on its own metric, window and source', async () => {
+	it('links into the view on its own metric, window and the adapter that served it', async () => {
 		const { req } = bootFakeRuntime()
 		const html = await renderHtml(
 			req,
 			{ metric: 'visitors', timeframe: 'last7days', dataSource: 'plausible' },
-			{ path: '/analytics' }
+			view
 		)
 		expect(html).toContain('analytics:widgetOpenInView')
-		expect(hrefIn(html)).toBe('/admin/analytics?range=last7days&source=plausible&metric=visitors')
+		// `test` is the adapter the read resolved to, not the `plausible` the widget asked for.
+		expect(hrefIn(html)).toBe('/admin/analytics?range=last7days&source=test&metric=visitors')
 	})
 
 	it('spells a custom window as days in the reporting timezone', async () => {
@@ -89,9 +96,25 @@ describe('AnalyticsMetricWidget', () => {
 				timeframe: 'custom',
 				range: { from: '2026-06-01', to: '2026-06-22' },
 			},
-			{ path: '/analytics' }
+			view
 		)
-		expect(hrefIn(html)).toBe('/admin/analytics?range=custom&from=2026-06-01&to=2026-06-22')
+		expect(hrefIn(html)).toBe(
+			'/admin/analytics?range=custom&from=2026-06-01&to=2026-06-22&source=test'
+		)
+	})
+
+	it('omits a range and metric the install already defaults to', async () => {
+		const { req } = bootFakeRuntime()
+		const html = await renderHtml(
+			req,
+			{ metric: 'visitors', timeframe: 'today' },
+			{
+				path: '/analytics',
+				defaultRange: 'today',
+				defaultMetric: 'visitors',
+			}
+		)
+		expect(hrefIn(html)).toBe('/admin/analytics?source=test')
 	})
 
 	it('renders no link when the app turned the view off', async () => {

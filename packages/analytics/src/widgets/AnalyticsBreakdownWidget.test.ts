@@ -10,12 +10,15 @@ vi.mock('./readForWidgetBreakdown', () => ({ readForWidgetBreakdown: vi.fn() }))
 
 const NOW = new Date('2026-06-03T12:00:00.000Z')
 
-const result = (): WidgetBreakdownResult => ({
+const result = (over: Partial<WidgetBreakdownResult> = {}): WidgetBreakdownResult => ({
 	status: 'ok',
 	adapterId: 'native',
 	dateRange: { start: new Date('2026-05-04T00:00:00.000Z'), end: NOW },
 	rows: [{ label: 'google.com', value: 12 }],
+	...over,
 })
+
+const view = { path: '/analytics', defaultRange: 'last30days', defaultMetric: 'pageviews' } as const
 
 const req = (): PayloadRequest =>
 	({
@@ -50,19 +53,30 @@ describe('AnalyticsBreakdownWidget view link', () => {
 		const html = await render(
 			'analytics-breakdown-referrers',
 			{ metric: 'visitors', timeframe: 'last7days' },
-			{ path: '/analytics' }
+			view
 		)
 		expect(html).toContain('analytics:widgetOpenInView')
-		expect(hrefIn(html)).toBe('/admin/analytics?range=last7days&metric=visitors&tab=sources')
+		expect(hrefIn(html)).toBe(
+			'/admin/analytics?range=last7days&source=native&metric=visitors&tab=sources'
+		)
+	})
+
+	it('names the adapter that served the rows, not the one the widget asked for', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(result({ adapterId: 'tenant-7' }))
+		const html = await render('analytics-breakdown-pages', { dataSource: 'plausible' }, view)
+		expect(hrefIn(html)).toBe('/admin/analytics?source=tenant-7')
 	})
 
 	it('maps each built-in breakdown to its own tab', async () => {
 		const tabs = await Promise.all(
 			['analytics-breakdown-browsers', 'analytics-breakdown-countries'].map(async (slug) =>
-				hrefIn(await render(slug, {}, { path: '/analytics' }))
+				hrefIn(await render(slug, {}, view))
 			)
 		)
-		expect(tabs).toEqual(['/admin/analytics?tab=technology', '/admin/analytics?tab=geography'])
+		expect(tabs).toEqual([
+			'/admin/analytics?source=native&tab=technology',
+			'/admin/analytics?source=native&tab=geography',
+		])
 	})
 
 	it('renders no link when the app turned the view off', async () => {
