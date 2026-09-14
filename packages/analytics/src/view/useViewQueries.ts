@@ -11,14 +11,16 @@ import type { AnalyticsViewClientProps } from './viewProps'
 /**
  * One section's read. `error` is a `QueryFetchError` whenever the endpoint answered.
  *
- * `data` survives into the next `loading`, so changing the range or the metric dims the
- * chart it already shows instead of blanking it; `isRefetching` is that state, and is the
- * flag to render a subtle busy affordance on. `status === 'loading'` with no `data` is the
- * only real empty load, and the only one that earns a skeleton.
+ * `data` survives into the next `loading` and into an `error`, so changing the range or
+ * hitting a transient failure dims or annotates the chart it already shows instead of
+ * blanking it; `isRefetching` is the loading half of that, and is the flag to render a
+ * subtle busy affordance on. `status === 'loading'` with no `data` is the only real empty
+ * load, and the only one that earns a skeleton. A section that stops being servable at all
+ * drops its data, since it belongs to a source or tab the view is no longer showing.
  */
 export interface QueryState<T> {
 	status: 'loading' | 'ok' | 'error'
-	/** May be the previous read's answer while `status` is `loading`. */
+	/** May be the previous read's answer while `status` is `loading` or `error`. */
 	data?: T
 	error?: Error
 	isRefetching: boolean
@@ -165,7 +167,15 @@ const useQuerySection = (
 					if (!controller.signal.aborted) setSection({ status: 'ok', data })
 				},
 				(err: unknown) => {
-					if (!controller.signal.aborted) setSection({ status: 'error', error: asError(err) })
+					// The failure is reported beside whatever is on screen: a transient 503 on a
+					// refetch shows a retry banner over the last good read instead of a blank panel.
+					if (!controller.signal.aborted) {
+						setSection((prev) => ({
+							status: 'error',
+							error: asError(err),
+							...(prev.data === undefined ? {} : { data: prev.data }),
+						}))
+					}
 				}
 			)
 		},

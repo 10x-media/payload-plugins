@@ -8,6 +8,7 @@ import {
 } from '../core/contract'
 import { GRANULARITY_ORDER } from '../core/granularity'
 import type { SourcesResponse, WireSource } from '../fields/config/fetchSources'
+import { dayRangeDays } from './dayRange'
 
 /** Every metric the view can show, in the order the overview cards read. */
 export const VIEW_METRIC_ORDER: MetricKey[] = [
@@ -118,25 +119,13 @@ export const gate = (caps: SerializedCapabilities): ViewGate => {
 	}
 }
 
-const DAY_MS = 86_400_000
-
-/** Calendar days a `YYYY-MM-DD` window covers, counting both ends; 1 for an unreadable one. */
-const inclusiveDays = (range: DayRange): number => {
-	const from = Date.parse(`${range.from}T00:00:00.000Z`)
-	const to = Date.parse(`${range.to}T00:00:00.000Z`)
-	if (Number.isNaN(from) || Number.isNaN(to) || to < from) {
-		return 1
-	}
-	return Math.round((to - from) / DAY_MS) + 1
-}
-
 /**
  * The bucket a range reads best at: hours for a window of a day or two, weeks past four
  * months, days between. Never finer than the source serves, so the endpoint's granularity
  * check cannot reject what the view picked for itself.
  */
 export const autoGranularity = (range: DayRange, caps: SerializedCapabilities): Granularity => {
-	const days = inclusiveDays(range)
+	const days = dayRangeDays(range)
 	const finest = GRANULARITY_ORDER.indexOf(caps.minGranularity)
 	const serves = (granularity: Granularity): boolean =>
 		GRANULARITY_ORDER.indexOf(granularity) >= finest

@@ -1,0 +1,221 @@
+'use client'
+
+import { SelectInput } from '@payloadcms/ui'
+import { type KeyboardEvent, useRef } from 'react'
+import { BarList } from '../../charts/BarList'
+import type { DimensionKey, MetricKey } from '../../core/contract'
+import { formatMetricValue } from '../../fields/format'
+import type { QueryResponse } from '../../query/response'
+import { keys } from '../../translations/keys'
+import { METRIC_KEYS } from '../../translations/metricKeys'
+import { useTranslation } from '../../translations/useTranslation'
+import type { BreakdownTab } from '../gating'
+import { DIMENSION_LABELS, TAB_LABELS } from '../labels'
+import { VIEW_LIMITS, type ViewLimit, type ViewState } from '../state'
+import type { QueryState } from '../useViewQueries'
+import { SectionError, Skeleton } from './EmptyStates'
+
+export interface BreakdownsProps {
+	tabs: BreakdownTab[]
+	tab: BreakdownTab
+	/** The dimension the active tab reads; null when the source serves none. */
+	dimension: DimensionKey | null
+	metric: MetricKey
+	query: QueryState<QueryResponse>
+	limit: ViewLimit
+	order?: ViewState['order']
+	/** The source can filter by this tab's dimension, so a row click is meaningful. */
+	canFilter: boolean
+	locale: string
+	onTabChange: (tab: BreakdownTab) => void
+	onLimitChange: (limit: ViewLimit) => void
+	onSortChange: (order: NonNullable<ViewState['order']>) => void
+	onRowSelect: (value: string) => void
+}
+
+const SECONDARY: MetricKey = 'visitors'
+
+const nextIndex = (key: string, at: number, length: number): number | null => {
+	if (key === 'ArrowRight') return (at + 1) % length
+	if (key === 'ArrowLeft') return (at - 1 + length) % length
+	if (key === 'Home') return 0
+	if (key === 'End') return length - 1
+	return null
+}
+
+/**
+ * The dimension tables, one tab per group the source serves. A row is a button only when
+ * the source can filter by the tab's dimension; otherwise the rows are inert and the
+ * caption says so, rather than offering a click the endpoint would reject.
+ */
+export function Breakdowns({
+	tabs,
+	tab,
+	dimension,
+	metric,
+	query,
+	limit,
+	order,
+	canFilter,
+	locale,
+	onTabChange,
+	onLimitChange,
+	onSortChange,
+	onRowSelect,
+}: BreakdownsProps) {
+	const { t } = useTranslation()
+	const strip = useRef<HTMLDivElement>(null)
+
+	const rows = query.data?.result.rows ?? []
+	const servesSecondary = rows.some((row) => row.metrics[SECONDARY] !== undefined)
+	const dimensionLabel = dimension === null ? t(TAB_LABELS[tab]) : t(DIMENSION_LABELS[dimension])
+
+	const onStripKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+		const at = tabs.indexOf(tab)
+		const to = nextIndex(event.key, at, tabs.length)
+		const next = to === null ? undefined : tabs[to]
+		if (next === undefined) {
+			return
+		}
+		event.preventDefault()
+		onTabChange(next)
+		strip.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[to ?? 0]?.focus()
+	}
+
+	const sortBy = (column: MetricKey): void => {
+		const active = order?.metric === column
+		onSortChange({
+			metric: column,
+			direction: active && order?.direction === 'desc' ? 'asc' : 'desc',
+		})
+	}
+
+	const sortLabel = (column: MetricKey): string => {
+		if (order?.metric !== column) {
+			return t(METRIC_KEYS[column])
+		}
+		const direction = order.direction === 'asc' ? keys.viewSortAscending : keys.viewSortDescending
+		return `${t(METRIC_KEYS[column])}, ${t(direction)}`
+	}
+
+	return (
+		<section
+			aria-busy={query.isRefetching}
+			className="analytics-view__panel analytics-view__section analytics-view__breakdown"
+		>
+			<div
+				aria-label={t(keys.viewBreakdowns)}
+				className="analytics-view__tabs"
+				onKeyDown={onStripKeyDown}
+				ref={strip}
+				role="tablist"
+			>
+				{tabs.map((candidate) => (
+					<button
+						aria-controls="analytics-view-breakdown-panel"
+						aria-selected={candidate === tab}
+						className="analytics-view__tab"
+						id={`analytics-view-tab-${candidate}`}
+						key={candidate}
+						onClick={() => onTabChange(candidate)}
+						role="tab"
+						tabIndex={candidate === tab ? 0 : -1}
+						type="button"
+					>
+						{t(TAB_LABELS[candidate])}
+					</button>
+				))}
+			</div>
+			<div
+				aria-labelledby={`analytics-view-tab-${tab}`}
+				id="analytics-view-breakdown-panel"
+				role="tabpanel"
+			>
+				{query.status === 'error' ? (
+					<SectionError error={query.error ?? new Error('')} onRetry={query.refetch} />
+				) : null}
+				{query.data === undefined ? (
+					query.status === 'error' ? null : (
+						<Skeleton rows={Math.min(limit, 5)} variant="row" />
+					)
+				) : (
+					<>
+						<div className="analytics-view__bars-head">
+							<span className="analytics-view__bars-head-dimension">{dimensionLabel}</span>
+							<button
+								aria-pressed={order?.metric === metric}
+								className="analytics-view__sort analytics-view__sort--metric"
+								onClick={() => sortBy(metric)}
+								type="button"
+							>
+								{sortLabel(metric)}
+							</button>
+							{servesSecondary && metric !== SECONDARY ? (
+								<button
+									aria-pressed={order?.metric === SECONDARY}
+									className="analytics-view__sort analytics-view__sort--secondary"
+									onClick={() => sortBy(SECONDARY)}
+									type="button"
+								>
+									{sortLabel(SECONDARY)}
+								</button>
+							) : null}
+						</div>
+						<BarList
+							data={rows.map((row) => {
+								const value = row.metrics[metric] ?? 0
+								const secondary =
+									servesSecondary && metric !== SECONDARY ? row.metrics[SECONDARY] : undefined
+								return {
+									label: (dimension === null ? undefined : row.dimensions?.[dimension]) ?? '',
+									value,
+									display: formatMetricValue(metric, value, locale),
+									...(secondary === undefined
+										? {}
+										: { secondary: formatMetricValue(SECONDARY, secondary, locale) }),
+								}
+							})}
+							emptyLabel={t(keys.stateNoBreakdown)}
+							{...(canFilter
+								? {
+										onSelect: (index: number) => {
+											const value =
+												dimension === null ? undefined : rows[index]?.dimensions?.[dimension]
+											if (value !== undefined) {
+												onRowSelect(value)
+											}
+										},
+									}
+								: {})}
+						/>
+					</>
+				)}
+			</div>
+			<div className="analytics-view__controls">
+				<div className="analytics-view__control">
+					<SelectInput
+						isClearable={false}
+						label={t(keys.widgetFieldLimit)}
+						name="analytics-limit"
+						onChange={(selected) => {
+							const option = Array.isArray(selected) ? selected[0] : selected
+							const value = Number((option as { value?: unknown } | null)?.value)
+							if (VIEW_LIMITS.includes(value as ViewLimit)) {
+								onLimitChange(value as ViewLimit)
+							}
+						}}
+						options={VIEW_LIMITS.map((option) => ({
+							value: String(option),
+							label: String(option),
+						}))}
+						path="analytics-limit"
+						value={String(limit)}
+					/>
+				</div>
+				{canFilter ? null : (
+					<span className="analytics-view__caption">{t(keys.viewFiltersUnsupported)}</span>
+				)}
+			</div>
+		</section>
+	)
+}

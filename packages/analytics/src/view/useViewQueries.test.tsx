@@ -273,6 +273,39 @@ describe('useViewQueries', () => {
 		expect(latest?.cards.isRefetching).toBe(false)
 	})
 
+	it('keeps the rendered data when a refetch fails', async () => {
+		const payload = response()
+		fetchQueryMock.mockImplementation(() => Promise.resolve(payload))
+		render(<Probe props={propsFor(nativeCaps)} state={baseState} />)
+		await act(async () => {})
+
+		fetchQueryMock.mockImplementation(() =>
+			Promise.reject(new QueryFetchError(503, { code: 'unavailable', message: 'busy' }, 30))
+		)
+		const refetch = latest?.cards.refetch
+		await act(async () => {
+			refetch?.()
+		})
+		expect(latest?.cards.status).toBe('error')
+		expect(latest?.cards.data).toBe(payload)
+		expect(latest?.cards.isRefetching).toBe(false)
+	})
+
+	it('drops the rendered data when the section stops being servable', async () => {
+		const payload = response()
+		fetchQueryMock.mockImplementation(() => Promise.resolve(payload))
+		const { rerender } = render(<Probe props={propsFor(nativeCaps)} state={baseState} />)
+		await act(async () => {})
+		expect(latest?.breakdown.data).toBe(payload)
+
+		const props = propsFor(nativeCaps)
+		rerender(
+			<Probe props={{ ...props, sources: { defaultId: null, sources: [] } }} state={baseState} />
+		)
+		expect(latest?.breakdown.status).toBe('error')
+		expect(latest?.breakdown.data).toBeUndefined()
+	})
+
 	it('reports no data and no refetch on a first read', () => {
 		render(<Probe props={propsFor(nativeCaps)} state={baseState} />)
 		expect(latest?.cards.status).toBe('loading')
