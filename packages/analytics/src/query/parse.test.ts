@@ -76,8 +76,6 @@ describe('parseQueryParams, valid requests', () => {
 		expect(parsed.query.limit).toBe(DEFAULT_QUERY_LIMIT)
 		expect(parsed.query.timezone).toBe('UTC')
 		expect(parsed.compare).toBeNull()
-		expect(parsed.sourceId).toBeNull()
-		expect(parsed.explicitScope).toBeNull()
 		expect(parsed.query.dimensions).toBeUndefined()
 		expect(parsed.query.granularity).toBeUndefined()
 		expect(parsed.query.order).toBeUndefined()
@@ -107,12 +105,10 @@ describe('parseQueryParams, valid requests', () => {
 		expect(parsed.query.dimensions).toEqual(['page'])
 	})
 
-	it('carries source, scope, path, hostname, granularity, order and compare through', () => {
+	it('carries path, hostname, granularity, order and compare through, ignoring source and scope', () => {
 		const parsed = ok(
 			`metrics=pageviews,visitors&from=2026-09-01&to=2026-09-07&source=native&scope=tenant-a&path=/pricing&hostname=example.com&granularity=day&order=visitors:desc&compare=previous&limit=100`
 		)
-		expect(parsed.sourceId).toBe('native')
-		expect(parsed.explicitScope).toBe('tenant-a')
 		expect(parsed.compare).toBe('previous')
 		expect(parsed.query.path).toBe('/pricing')
 		expect(parsed.query.hostname).toBe('example.com')
@@ -227,6 +223,14 @@ describe('parseQueryParams, date range', () => {
 		).query
 		expect(dateRange.start.toISOString()).toBe('2026-09-01T06:30:00.000Z')
 		expect(dateRange.end.toISOString()).toBe('2026-09-01T18:00:00.000Z')
+	})
+
+	it('accepts sub-millisecond fractional seconds, truncating to the millisecond', () => {
+		const { dateRange } = ok(
+			'metrics=pageviews&from=2026-09-01T06:30:00.123456Z&to=2026-09-01T18:00:00.123456789Z'
+		).query
+		expect(dateRange.start.toISOString()).toBe('2026-09-01T06:30:00.123Z')
+		expect(dateRange.end.toISOString()).toBe('2026-09-01T18:00:00.123Z')
 	})
 
 	it('honors an explicit UTC offset without shifting it again', () => {
@@ -659,8 +663,6 @@ describe('parseQueryParams, blank params', () => {
 		expect(parsed.query.limit).toBe(DEFAULT_QUERY_LIMIT)
 		expect(parsed.query.timezone).toBe('UTC')
 		expect(parsed.compare).toBeNull()
-		expect(parsed.sourceId).toBeNull()
-		expect(parsed.explicitScope).toBeNull()
 		expect(parsed.query.dimensions).toBeUndefined()
 	})
 })

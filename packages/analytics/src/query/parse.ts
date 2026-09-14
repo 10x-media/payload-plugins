@@ -25,12 +25,13 @@ export const MAX_QUERY_FILTER_VALUE_LENGTH = 256
 export const MAX_QUERY_PATH_LENGTH = 512
 export const MAX_QUERY_HOSTNAME_LENGTH = 253
 
-/** A validated read request: the normalized query plus the parameters the handler resolves. */
+/**
+ * A validated read request. `source` and `scope` are absent by design: the handler must
+ * resolve both before the parser can run, and reads them itself through {@link readParam}.
+ */
 export interface ParsedQuery {
 	query: AnalyticsQuery
 	compare: 'previous' | null
-	sourceId: string | null
-	explicitScope: string | null
 }
 
 export type ParseResult = { ok: true; value: ParsedQuery } | { ok: false; error: QueryError }
@@ -47,7 +48,8 @@ const KNOWN_OPERATORS = new Set<string>(FILTER_OPERATORS)
 const KNOWN_GRANULARITIES = new Set<string>(GRANULARITY_ORDER)
 const DAY_MS = 86_400_000
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/
-const DATE_TIME = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?([Zz]|[+-]\d{2}:\d{2})$/
+// Fractional seconds run to nanoseconds because Python emits microseconds; `Date` truncates.
+const DATE_TIME = /^(\d{4}-\d{2}-\d{2})T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?([Zz]|[+-]\d{2}:\d{2})$/
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
 const fail = (code: QueryError['code'], message: string, param: string): ParseResult => ({
@@ -353,11 +355,6 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 	}
 	return {
 		ok: true,
-		value: {
-			query,
-			compare: rawCompare === 'previous' ? 'previous' : null,
-			sourceId: readParam(params, 'source'),
-			explicitScope: readParam(params, 'scope'),
-		},
+		value: { query, compare: rawCompare === 'previous' ? 'previous' : null },
 	}
 }

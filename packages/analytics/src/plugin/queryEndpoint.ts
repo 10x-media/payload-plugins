@@ -41,10 +41,12 @@ const serializeQuery = (query: AnalyticsQuery): SerializedAnalyticsQuery => ({
  * Authenticated GET over the surfacing engine: the public read primitive the admin view
  * and consumers' own dashboards are built on. Gating runs in a fixed order so a caller
  * learns nothing from the answer it is not already entitled to: authentication, then
- * `access.read`, then scope and source resolution (shared with the sources endpoint, so
- * a tenant sees exactly the sources that endpoint lists), then capability validation of
- * every parameter against the selected source. Errors carry a code and the parameter at
- * fault; adapter configuration and upstream error text never reach the response.
+ * `access.read`, then scope and source resolution (shared with the sources endpoint, so a
+ * tenant can select no source that endpoint does not list), then capability validation of
+ * every parameter against the selected source. Being listed is not sufficient: a shared
+ * source that cannot narrow to the caller's scope answers 403 with `param: 'source'`.
+ * Errors carry a code and the parameter at fault; adapter configuration and upstream error
+ * text never reach the response.
  */
 export const makeQueryHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {

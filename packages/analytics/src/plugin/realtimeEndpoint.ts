@@ -21,6 +21,7 @@ export const makeRealtimeHandler = (): PayloadHandler => async (req) => {
 		return Response.json({ error: 'unauthorized' }, { status: 401 })
 	}
 	const runtime = getRuntime(req.payload)
+	// No runtime means no adapter to read, so the skipped gate protects no data.
 	if (runtime && !(await readAccessFor(runtime, req))) {
 		return Response.json({ error: 'forbidden' }, { status: 403 })
 	}

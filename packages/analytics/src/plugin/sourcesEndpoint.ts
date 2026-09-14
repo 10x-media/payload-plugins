@@ -19,6 +19,7 @@ export const makeSourcesHandler = (): PayloadHandler => async (req) => {
 		return Response.json({ error: 'unauthorized' }, { status: 401 })
 	}
 	const runtime = getRuntime(req.payload)
+	// No runtime means the plugin served nothing to gate: the listing below is empty anyway.
 	if (runtime && !(await readAccessFor(runtime, req))) {
 		return Response.json({ error: 'forbidden' }, { status: 403 })
 	}

@@ -65,6 +65,7 @@ describe('buildQueryUrl', () => {
 			order: { metric: 'pageviews', direction: 'desc' },
 			compare: 'previous',
 			source: 'native',
+			scope: 'tenant-a',
 			path: '/blog',
 			hostname: 'example.com',
 			timezone: 'UTC',
@@ -74,8 +75,24 @@ describe('buildQueryUrl', () => {
 			'/api/analytics/query?metrics=pageviews%2Cvisitors&dimensions=page&from=2026-09-01' +
 				'&to=2026-09-07&granularity=day&filters=%5B%7B%22dimension%22%3A%22page%22%2C%22operator' +
 				'%22%3A%22eq%22%2C%22value%22%3A%22%2F%22%7D%5D&limit=25&order=pageviews%3Adesc' +
-				'&compare=previous&source=native&path=%2Fblog&hostname=example.com&timezone=UTC'
+				'&compare=previous&source=native&scope=tenant-a&path=%2Fblog&hostname=example.com&timezone=UTC'
 		)
+	})
+
+	it('encodes scope when set and omits it otherwise', () => {
+		const withScope = new URL(
+			buildQueryUrl('/api', { ...baseRequest, scope: 'tenant-a' }),
+			'http://localhost'
+		).searchParams
+		expect(withScope.get('scope')).toBe('tenant-a')
+
+		const without = new URL(buildQueryUrl('/api', baseRequest), 'http://localhost').searchParams
+		expect(without.has('scope')).toBe(false)
+	})
+
+	it('joins an apiRoute with a trailing slash without doubling it', () => {
+		expect(buildQueryUrl('/api/', baseRequest)).toBe(buildQueryUrl('/api', baseRequest))
+		expect(buildQueryUrl('/api/', baseRequest)).toContain('/api/analytics/query?')
 	})
 
 	it('joins multi-value fields with commas', () => {
@@ -266,6 +283,31 @@ describe('fetchQuery', () => {
 		}
 	})
 
+	it("leaves error undefined for another endpoint's flat string error body", async () => {
+		vi.mocked(fetch).mockResolvedValue(errorResponse(403, { error: 'forbidden' }))
+
+		try {
+			await fetchQuery('/api', baseRequest)
+			throw new Error('expected fetchQuery to reject')
+		} catch (err) {
+			const queryErr = err as QueryFetchError
+			expect(queryErr.status).toBe(403)
+			expect(queryErr.error).toBeUndefined()
+			expect(queryErr.message).toContain('403')
+		}
+	})
+
+	it('leaves error undefined for an error object missing code or message', async () => {
+		vi.mocked(fetch).mockResolvedValue(errorResponse(400, { error: { code: 'invalid_param' } }))
+
+		try {
+			await fetchQuery('/api', baseRequest)
+			throw new Error('expected fetchQuery to reject')
+		} catch (err) {
+			expect((err as QueryFetchError).error).toBeUndefined()
+		}
+	})
+
 	it('reads Retry-After on a 503', async () => {
 		vi.mocked(fetch).mockResolvedValue(
 			errorResponse(
@@ -282,6 +324,40 @@ describe('fetchQuery', () => {
 			const queryErr = err as QueryFetchError
 			expect(queryErr.status).toBe(503)
 			expect(queryErr.retryAfter).toBe(30)
+		}
+	})
+
+	it('leaves retryAfter undefined for a Retry-After HTTP-date', async () => {
+		vi.mocked(fetch).mockResolvedValue(
+			errorResponse(
+				503,
+				{ error: { code: 'unavailable', message: 'down' } },
+				{ 'Retry-After': 'Wed, 21 Oct 2026 07:28:00 GMT' }
+			)
+		)
+
+		try {
+			await fetchQuery('/api', baseRequest)
+			throw new Error('expected fetchQuery to reject')
+		} catch (err) {
+			expect((err as QueryFetchError).retryAfter).toBeUndefined()
+		}
+	})
+
+	it('floors a fractional Retry-After to whole seconds', async () => {
+		vi.mocked(fetch).mockResolvedValue(
+			errorResponse(
+				503,
+				{ error: { code: 'unavailable', message: 'down' } },
+				{ 'Retry-After': '30.5' }
+			)
+		)
+
+		try {
+			await fetchQuery('/api', baseRequest)
+			throw new Error('expected fetchQuery to reject')
+		} catch (err) {
+			expect((err as QueryFetchError).retryAfter).toBe(30)
 		}
 	})
 

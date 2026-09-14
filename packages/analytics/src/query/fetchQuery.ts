@@ -15,6 +15,11 @@ export interface QueryRequest {
 	order?: { metric: MetricKey; direction: 'asc' | 'desc' }
 	compare?: 'previous'
 	source?: string
+	/**
+	 * Read another scope's data. Platform readers only: the endpoint answers
+	 * `400 untrusted_scope` for any caller that may not read across scopes.
+	 */
+	scope?: string
 	path?: string
 	hostname?: string
 	timezone?: string
@@ -51,6 +56,9 @@ export const buildQueryUrl = (apiRoute: string, request: QueryRequest): string =
 	if (request.source !== undefined) {
 		params.set('source', request.source)
 	}
+	if (request.scope !== undefined) {
+		params.set('scope', request.scope)
+	}
 	if (request.path !== undefined) {
 		params.set('path', request.path)
 	}
@@ -60,11 +68,23 @@ export const buildQueryUrl = (apiRoute: string, request: QueryRequest): string =
 	if (request.timezone !== undefined) {
 		params.set('timezone', request.timezone)
 	}
-	return `${apiRoute}${QUERY_PATH}?${params.toString()}`
+	const base = apiRoute.endsWith('/') ? apiRoute.slice(0, -1) : apiRoute
+	return `${base}${QUERY_PATH}?${params.toString()}`
 }
 
-const isQueryErrorResponse = (value: unknown): value is QueryErrorResponse =>
-	typeof value === 'object' && value !== null && 'error' in value
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === 'object' && value !== null
+
+/**
+ * Only the query endpoint's structured body counts. The plugin's other read endpoints
+ * answer a flat `{ "error": "forbidden" }`, which must not land in `QueryFetchError.error`
+ * as a string where a `QueryError` is declared.
+ */
+const isQueryErrorResponse = (value: unknown): value is QueryErrorResponse => {
+	if (!isRecord(value)) return false
+	const error = value.error
+	return isRecord(error) && typeof error.code === 'string' && typeof error.message === 'string'
+}
 
 /** Thrown by `fetchQuery` for any non-2xx response; `error` is set only when the body parsed as the endpoint's error shape. */
 export class QueryFetchError extends Error {
@@ -84,8 +104,10 @@ export class QueryFetchError extends Error {
 const readRetryAfter = (res: Response): number | undefined => {
 	const header = res.headers.get('Retry-After')
 	if (header === null) return undefined
+	// The HTTP-date form is not a number, so it yields no delay rather than a bogus one;
+	// a fractional delay floors, since callers schedule in whole seconds.
 	const seconds = Number(header)
-	return Number.isNaN(seconds) ? undefined : seconds
+	return Number.isFinite(seconds) ? Math.floor(seconds) : undefined
 }
 
 const runFetch = async (url: string): Promise<QueryResponse> => {
