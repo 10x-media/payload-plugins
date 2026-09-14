@@ -137,3 +137,17 @@ export const platformReadFor = async (
 	req: PayloadRequest
 ): Promise<boolean> =>
 	runtime.platformRead ? await runtime.platformRead({ req }) : Boolean(req.user)
+
+/** A `platformRead` decision evaluated at most once, however many gates consult it. */
+export type PlatformReadGate = () => Promise<boolean>
+
+export const platformReadGate = (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest
+): PlatformReadGate => {
+	let pending: Promise<boolean> | undefined
+	return () => {
+		pending ??= platformReadFor(runtime, req)
+		return pending
+	}
+}

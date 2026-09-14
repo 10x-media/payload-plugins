@@ -58,8 +58,12 @@ const fail = (code: QueryError['code'], message: string, param: string): ParseRe
 /** Echo a rejected value back in a message without letting a caller inflate the response. */
 const echo = (value: string): string => (value.length > 40 ? `${value.slice(0, 40)}...` : value)
 
-/** A trimmed non-empty parameter, or null when absent or blank. */
-const read = (params: URLSearchParams, name: string): string | null => {
+/**
+ * A trimmed non-empty parameter, or null when absent or blank. Exported so the handler
+ * reads `source` and `scope` (which it must resolve before the parser can run) exactly
+ * the way the parser reads everything else.
+ */
+export const readParam = (params: URLSearchParams, name: string): string | null => {
 	const raw = params.get(name)?.trim()
 	return raw ? raw : null
 }
@@ -187,13 +191,13 @@ const parseFilters = (
  * pass through unvalidated, since only the handler knows whether they are trusted.
  */
 export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs): ParseResult => {
-	const rawTimezone = read(params, 'timezone')
+	const rawTimezone = readParam(params, 'timezone')
 	if (rawTimezone !== null && !isValidTimeZone(rawTimezone)) {
 		return fail('invalid_param', `unknown timezone: ${echo(rawTimezone)}`, 'timezone')
 	}
 	const timezone = rawTimezone ?? args.timezone
 
-	const rawMetrics = read(params, 'metrics')
+	const rawMetrics = readParam(params, 'metrics')
 	const metricList = rawMetrics ? commaList(rawMetrics) : []
 	if (metricList.length === 0) {
 		return fail('invalid_param', 'metrics is required', 'metrics')
@@ -212,7 +216,7 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 		return fail('unsupported_metric', `source does not serve ${unsupportedMetric}`, 'metrics')
 	}
 
-	const rawDimensions = read(params, 'dimensions')
+	const rawDimensions = readParam(params, 'dimensions')
 	const dimensionList = rawDimensions ? commaList(rawDimensions) : []
 	const unknownDimension = dimensionList.find((d) => !KNOWN_DIMENSIONS.has(d))
 	if (unknownDimension !== undefined) {
@@ -236,8 +240,8 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 		)
 	}
 
-	const rawFrom = read(params, 'from')
-	const rawTo = read(params, 'to')
+	const rawFrom = readParam(params, 'from')
+	const rawTo = readParam(params, 'to')
 	if (!rawFrom) {
 		return fail('invalid_param', 'from is required', 'from')
 	}
@@ -259,7 +263,7 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 		return fail('range_too_long', `the range must not exceed ${MAX_QUERY_RANGE_DAYS} days`, 'to')
 	}
 
-	const rawGranularity = read(params, 'granularity')
+	const rawGranularity = readParam(params, 'granularity')
 	if (rawGranularity !== null && !KNOWN_GRANULARITIES.has(rawGranularity)) {
 		return fail('invalid_param', `unknown granularity: ${echo(rawGranularity)}`, 'granularity')
 	}
@@ -276,13 +280,13 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 		)
 	}
 
-	const rawFilters = read(params, 'filters')
+	const rawFilters = readParam(params, 'filters')
 	const filters = rawFilters === null ? [] : parseFilters(rawFilters, args.capabilities)
 	if (!Array.isArray(filters)) {
 		return filters
 	}
 
-	const rawLimit = read(params, 'limit')
+	const rawLimit = readParam(params, 'limit')
 	let limit = DEFAULT_QUERY_LIMIT
 	if (rawLimit !== null) {
 		if (!/^\d+$/.test(rawLimit)) {
@@ -298,7 +302,7 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 		}
 	}
 
-	const rawOrder = read(params, 'order')
+	const rawOrder = readParam(params, 'order')
 	let order: AnalyticsQuery['order']
 	if (rawOrder !== null) {
 		const parts = rawOrder.split(':')
@@ -314,7 +318,7 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 		order = { metric: ordered, direction }
 	}
 
-	const rawCompare = read(params, 'compare')
+	const rawCompare = readParam(params, 'compare')
 	if (rawCompare !== null && rawCompare !== 'previous') {
 		return fail('invalid_param', `compare must be "previous": ${echo(rawCompare)}`, 'compare')
 	}
@@ -322,11 +326,11 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 		return fail('invalid_param', 'source does not support comparison', 'compare')
 	}
 
-	const path = read(params, 'path')
+	const path = readParam(params, 'path')
 	if (path !== null && path.length > MAX_QUERY_PATH_LENGTH) {
 		return fail('invalid_param', `path must be at most ${MAX_QUERY_PATH_LENGTH} characters`, 'path')
 	}
-	const hostname = read(params, 'hostname')
+	const hostname = readParam(params, 'hostname')
 	if (hostname !== null && hostname.length > MAX_QUERY_HOSTNAME_LENGTH) {
 		return fail(
 			'invalid_param',
@@ -352,8 +356,8 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 		value: {
 			query,
 			compare: rawCompare === 'previous' ? 'previous' : null,
-			sourceId: read(params, 'source'),
-			explicitScope: read(params, 'scope'),
+			sourceId: readParam(params, 'source'),
+			explicitScope: readParam(params, 'scope'),
 		},
 	}
 }

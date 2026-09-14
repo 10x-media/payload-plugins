@@ -3,6 +3,7 @@ import { GOALS_PATH } from '../plugin/paths'
 import {
 	getRuntime,
 	platformReadFor,
+	readAccessFor,
 	resolveGoalsDetailedFor,
 	resolveScopeFor,
 } from '../plugin/runtime'
@@ -12,7 +13,8 @@ export type { GoalsResponse, WireGoal }
 export { GOALS_PATH }
 
 /**
- * Authenticated GET listing the goals visible to the requesting scope: the config goals
+ * Authenticated GET listing the goals visible to the requesting scope, gated by
+ * `access.read` like every other read endpoint: the config goals
  * merged with the goals collection, each tagged with where it came from. Scope gating
  * mirrors the sources endpoint exactly, because the reasoning is the same: there is no
  * scope parameter, so a tenant can never enumerate another tenant's goals; on a scoped
@@ -28,6 +30,9 @@ export const makeGoalsHandler = (): PayloadHandler => async (req) => {
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
 		return Response.json({ goals: [], collection: null } satisfies GoalsResponse)
+	}
+	if (!(await readAccessFor(runtime, req))) {
+		return Response.json({ error: 'forbidden' }, { status: 403 })
 	}
 	const collection = runtime.goalsCollectionSlug ? { slug: runtime.goalsCollectionSlug } : null
 	const configGoals = (): WireGoal[] =>

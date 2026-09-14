@@ -89,8 +89,8 @@ export type AnalyticsReadAccess = (args: { req: PayloadRequest }) => boolean | P
 
 export type AnalyticsAccessOptions = {
 	/**
-	 * Gates the query endpoint (`GET /analytics/query`). Defaults to any authenticated
-	 * user, the same bar the other read endpoints apply; narrow it to a role check to keep
+	 * Gates every authenticated read endpoint: query, document panel, realtime, sources
+	 * and goals. Defaults to any authenticated user; narrow it to a role check to keep
 	 * analytics away from admins who should not see them. Scope gating is separate and
 	 * always applies: granting `read` never widens which scope a user reads.
 	 */

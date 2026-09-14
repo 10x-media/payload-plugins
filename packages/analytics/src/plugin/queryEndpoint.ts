@@ -1,33 +1,33 @@
-import type { PayloadHandler, PayloadRequest } from 'payload'
+import type { PayloadHandler } from 'payload'
 import { serializeCapabilities } from '../core/capabilities'
-import { type AnalyticsAdapter, type AnalyticsQuery, PLATFORM_SCOPE } from '../core/contract'
+import {
+	type AnalyticsQuery,
+	type AnalyticsResult,
+	type DateRange,
+	PLATFORM_SCOPE,
+} from '../core/contract'
+import { resolveQueryScope } from '../core/scopedRead'
 import { type QueryError, queryError } from '../query/errors'
-import { parseQueryParams } from '../query/parse'
+import { parseQueryParams, readParam } from '../query/parse'
 import type { QueryResponse, SerializedAnalyticsQuery } from '../query/response'
 import { previousWindow } from '../widgets/comparison'
 import { QUERY_PATH } from './paths'
 import { resolveSourcesForRequest } from './readContextForRequest'
-import {
-	type AnalyticsRuntime,
-	getRuntime,
-	platformReadFor,
-	readAccessFor,
-	resolveTimezoneFor,
-} from './runtime'
+import { getRuntime, platformReadGate, readAccessFor, resolveTimezoneFor } from './runtime'
 
 export { QUERY_PATH }
 
 /** Scope depends on the caller's cookies, so no shared cache may ever hold an answer. */
 const NO_STORE = { 'Cache-Control': 'private, no-store' }
 
-const errorResponse = (status: number, error: QueryError): Response =>
-	Response.json({ error }, { status, headers: NO_STORE })
+const errorResponse = (
+	status: number,
+	error: QueryError,
+	headers: Record<string, string> = {}
+): Response => Response.json({ error }, { status, headers: { ...NO_STORE, ...headers } })
 
-/** A trimmed non-empty parameter, or null when absent or blank, as the parser reads them. */
-const read = (params: URLSearchParams, name: string): string | null => {
-	const raw = params.get(name)?.trim()
-	return raw ? raw : null
-}
+/** How long a client should wait out a provider outage before retrying the same read. */
+const RETRY_AFTER_SECONDS = '30'
 
 const serializeQuery = (query: AnalyticsQuery): SerializedAnalyticsQuery => ({
 	...query,
@@ -36,27 +36,6 @@ const serializeQuery = (query: AnalyticsQuery): SerializedAnalyticsQuery => ({
 		end: query.dateRange.end.toISOString(),
 	},
 })
-
-/**
- * The scope stamped on the adapter query, mirroring `resolveReadContext`: a scoped read
- * through a shared config adapter that cannot filter by scope would return every scope's
- * data, so it is a cross-scope read and fails closed behind `platformRead`.
- */
-const resolveQueryScope = async (args: {
-	runtime: AnalyticsRuntime
-	req: PayloadRequest
-	scope: string | null
-	adapter: AnalyticsAdapter
-}): Promise<{ ok: true; queryScope?: string } | { ok: false }> => {
-	const { runtime, req, scope, adapter } = args
-	if (scope === null || scope === PLATFORM_SCOPE) {
-		return { ok: true }
-	}
-	if (runtime.configAdapterIds.has(adapter.id) && !adapter.capabilities.scopedQueries) {
-		return (await platformReadFor(runtime, req)) ? { ok: true } : { ok: false }
-	}
-	return { ok: true, queryScope: scope }
-}
 
 /**
  * Authenticated GET over the surfacing engine: the public read primitive the admin view
@@ -81,30 +60,37 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			return errorResponse(403, queryError('forbidden', 'analytics: read access denied'))
 		}
 		const params = new URL(req.url ?? '', 'http://localhost').searchParams
-		const requestedScope = read(params, 'scope')
-		if (requestedScope !== null && !(await platformReadFor(runtime, req))) {
+		const platformRead = platformReadGate(runtime, req)
+		const requestedScope = readParam(params, 'scope')
+		if (requestedScope !== null && !(await platformRead())) {
 			return errorResponse(
 				400,
 				queryError('untrusted_scope', 'analytics: scope is not permitted for this request', 'scope')
 			)
 		}
-		const context = await resolveSourcesForRequest(
-			req,
-			requestedScope === null ? {} : { scope: requestedScope }
-		)
+		const context = await resolveSourcesForRequest(req, {
+			platformRead,
+			...(requestedScope === null ? {} : { scope: requestedScope }),
+		})
 		if (context.adapters.size === 0) {
 			return errorResponse(
 				404,
 				queryError('unknown_source', 'analytics: no source is available for this request')
 			)
 		}
-		const requestedSource = read(params, 'source')
+		const requestedSource = readParam(params, 'source')
 		const adapter = context.adapters.get(requestedSource ?? context.defaultId ?? '')
 		if (!adapter) {
 			return errorResponse(404, queryError('unknown_source', 'analytics: unknown source', 'source'))
 		}
 		adapterId = adapter.id
-		const queryScope = await resolveQueryScope({ runtime, req, scope: context.scope, adapter })
+		const queryScope = await resolveQueryScope({
+			runtime,
+			req,
+			scope: context.scope,
+			adapter,
+			platformRead,
+		})
 		if (!queryScope.ok) {
 			return errorResponse(
 				403,
@@ -125,14 +111,41 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			...parsed.value.query,
 			...(queryScope.queryScope === undefined ? {} : { scope: queryScope.queryScope }),
 		}
-		const comparisonRange =
-			parsed.value.compare === 'previous' ? previousWindow(query.dateRange, query.timezone) : null
-		const [result, comparison] = await Promise.all([
-			runtime.engine.read(adapter, query),
-			comparisonRange
-				? runtime.engine.read(adapter, { ...query, dateRange: comparisonRange })
-				: undefined,
-		])
+		let comparisonRange: DateRange | null = null
+		if (parsed.value.compare === 'previous') {
+			comparisonRange = previousWindow(query.dateRange, query.timezone)
+			if (!comparisonRange) {
+				return errorResponse(
+					400,
+					queryError(
+						'invalid_param',
+						'analytics: the range is too long to compare against a previous period',
+						'compare'
+					)
+				)
+			}
+		}
+		let result: AnalyticsResult
+		let comparison: AnalyticsResult | undefined
+		try {
+			;[result, comparison] = await Promise.all([
+				runtime.engine.read(adapter, query),
+				comparisonRange
+					? runtime.engine.read(adapter, { ...query, dateRange: comparisonRange })
+					: undefined,
+			])
+		} catch (err) {
+			// Neither a fresh nor a stale entry survived the read: the source is down, not the
+			// request wrong, so the client is told to retry rather than to change anything.
+			req.payload.logger?.warn(
+				`analytics: query read failed for adapter "${adapter.id}": ${String(err)}`
+			)
+			return errorResponse(
+				503,
+				queryError('unavailable', 'analytics: source is temporarily unavailable'),
+				{ 'Retry-After': RETRY_AFTER_SECONDS }
+			)
+		}
 		const body: QueryResponse = {
 			result,
 			...(comparison ? { comparison } : {}),
