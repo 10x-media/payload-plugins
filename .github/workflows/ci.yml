@@ -144,7 +144,7 @@ jobs:
           "import('mongodb-memory-server').then((m) => m.MongoMemoryServer.create()).then((s) => s.stop()).then(() => process.exit(0))"
       - run: pnpm exec turbo run test:matrix ${{ steps.scope.outputs.flag }}
 
-  # Heavier tiers run on demand (PR label or manual dispatch), not on every push,
+  # The heaviest tier runs on demand (PR label or manual dispatch), not on every push,
   # so main stays fast. test-matrix already covers Postgres-in-Docker on push.
   test-container:
     runs-on: ubuntu-latest
@@ -160,10 +160,46 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:container
 
+  # The plugins whose e2e this change can reach. A plugin is picked when it or its dev app
+  # is affected: the dev app is what e2e drives, and it can import other plugins
+  # (admin-wiki-dev imports fields). Runs on pull requests and manual dispatch, where the
+  # `no_e2e` label opts out; the scope fallback (CI changes, dispatch) picks every plugin.
+  e2e-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name != 'push' && !contains(github.event.pull_request.labels.*.name, 'no_e2e')
+    outputs:
+      plugins: ${{ steps.plugins.outputs.plugins }}
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - id: scope
+        name: Resolve affected scope
+        run: bash scripts/ci-affected.sh
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - id: plugins
+        name: Resolve plugins to e2e
+        run: |
+          e2e=$(jq -cn '[inputs | select(.scripts["test:e2e"]) | .name]' packages/*/package.json)
+          plugins=$(pnpm exec turbo ls ${{ steps.scope.outputs.flag }} --output=json |
+            jq -c --argjson e2e "$e2e" '[.packages.items[].name | rtrimstr("-dev") | select(IN($e2e[])) | ltrimstr("@10x-media/")] | unique')
+          echo "e2e: ${plugins}"
+          echo "plugins=${plugins}" >>"$GITHUB_OUTPUT"
+
   e2e:
+    needs: e2e-scope
+    if: needs.e2e-scope.outputs.plugins != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'e2e')
+    strategy:
+      fail-fast: false
+      matrix:
+        plugin: ${{ fromJSON(needs.e2e-scope.outputs.plugins) }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -172,8 +208,8 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm --filter @10x-media/jobs exec playwright install --with-deps chromium
-      - run: pnpm -r test:e2e
+      - run: pnpm --filter @10x-media/${{ matrix.plugin }} exec playwright install --with-deps chromium
+      - run: pnpm test:e2e ${{ matrix.plugin }}
 
   changeset-required:
     runs-on: ubuntu-latest

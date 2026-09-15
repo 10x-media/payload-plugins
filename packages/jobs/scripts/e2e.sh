@@ -24,8 +24,10 @@ docker compose -f docker-compose.test.yml up -d --wait
 echo "Running worker-drain process e2e..."
 node --import tsx dev/e2e/worker-drain.ts
 
-echo "Building plugin..."
-pnpm --filter @10x-media/jobs build
+# Everything the dev app imports from the workspace, not just this plugin: a fresh
+# checkout has no dist/ for any of it.
+echo "Building the dev app's workspace dependencies..."
+pnpm --filter '@10x-media/jobs-dev^...' build
 
 echo "Building dev app..."
 pnpm --filter @10x-media/jobs-dev build

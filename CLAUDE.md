@@ -121,6 +121,8 @@ The base comes from the workflow-level `AFFECTED_BASE_SHA`: a pull request's bas
 
 Scoping is by **package graph**, never by directory. A change to `jobs` also selects `automations`, because `automations` depends on it. `--filter` and `--affected` intersect rather than union, so `build` stays `--filter='./packages/*'` and simply narrows within it.
 
+`e2e` reuses the same scope step in its own `e2e-scope` job, which turns `turbo ls` into a matrix with one `pnpm test:e2e <plugin>` leg per plugin. A plugin is picked when it *or its dev app* is affected, because the dev app is what Playwright drives and it can import other plugins: a `fields` change selects `admin-wiki-dev` rather than `admin-wiki`, and still runs admin-wiki's e2e. It runs on pull requests and `workflow_dispatch`, not on pushes to `main`, and the `no_e2e` label opts a pull request out. Labels are read from the triggering event, so adding one takes effect on the next push, the same as `no-release`.
+
 **What forces the whole workspace**, and this is the part to keep intact when editing any of it:
 
 - A path in `globalDependencies` (`config/**`, `tsconfig.json`, `biome.json`, `.npmrc`, the root `package.json`, `pnpm-workspace.yaml`). Turbo fans those out to all 29 packages. The root manifest and the catalog are in that list *specifically* for this: without them a Payload bump in `pnpm-workspace.yaml`'s `catalog:` selects no packages at all and CI passes having tested nothing.

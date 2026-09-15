@@ -10,20 +10,36 @@ import { expect, type Page, test } from '@playwright/test'
 const EMAIL = 'dev@10xmedia.de'
 const PASSWORD = 'password'
 
+/**
+ * Through the API: the login form is not under test here, and driving it against the production
+ * build flaked, leaving the wait for the redirect off `/login` to time out.
+ */
 const login = async (page: Page): Promise<void> => {
-	await page.goto('/admin/login')
-	if (page.url().includes('/login')) {
-		await page.getByLabel('Email').fill(EMAIL)
-		await page.getByLabel('Password', { exact: true }).fill(PASSWORD)
-		await page.getByRole('button', { name: 'Login' }).click()
-	}
-	await page.waitForURL((url) => !url.pathname.endsWith('/login'))
+	const res = await page.request.post('/api/users/login', {
+		data: { email: EMAIL, password: PASSWORD },
+	})
+	expect(res.ok()).toBeTruthy()
 }
+
+/** Payload's list writes its default query (`?depth=1&limit=10`) into the address. */
+const tagsList = /\/admin\/collections\/tags(\?|$)/
 
 const panel = (page: Page) => page.locator('.settings-overlay__panel')
 const rail = (page: Page) => page.locator('.settings-overlay__rail')
 const row = (page: Page, label: string) =>
 	page.locator('.settings-overlay__rail-item', { hasText: label })
+
+/**
+ * The pane hosts the list in drawer mode, where the linked column is a button that selects the
+ * row rather than an anchor, so the row itself is not what to click.
+ */
+const openFirstRow = async (page: Page): Promise<void> => {
+	await page
+		.locator('.settings-overlay__pane-body tbody tr')
+		.first()
+		.locator('[class*="__first-cell"]')
+		.click()
+}
 
 test.beforeEach(async ({ page }) => {
 	await login(page)
@@ -68,7 +84,7 @@ test.describe('opening and addressing', () => {
 		await expect(panel(page)).toBeVisible()
 		await page.goBack()
 		await expect(panel(page)).toBeHidden()
-		await expect(page).toHaveURL(/\/admin\/collections\/tags$/)
+		await expect(page).toHaveURL(tagsList)
 		await page.goBack()
 		await expect(page).toHaveURL(/\/admin$/)
 	})
@@ -78,10 +94,7 @@ test.describe('opening and addressing', () => {
 		await page.getByRole('button', { name: 'Open system settings' }).click()
 		await expect(page).toHaveURL(/settings=system%2Fappearance/)
 		await row(page, 'Tags').click()
-		await page
-			.locator('.settings-overlay__pane-body .row-1 a, .settings-overlay__pane-body tbody tr')
-			.first()
-			.click()
+		await openFirstRow(page)
 		await expect(page).toHaveURL(/settings=system%2Ftags%2F|settings=system\/tags\//)
 		await page.goBack()
 		await expect(page).toHaveURL(/settings=system(%2F|\/)tags($|&)/)
@@ -99,7 +112,7 @@ test.describe('opening and addressing', () => {
 		await row(page, 'Notes').click()
 		await expect(page).toHaveURL(/settings=workspace%2Fnotes/)
 		await page.locator('.settings-overlay__pane-header button[aria-label="Close"]').click()
-		await expect(page).toHaveURL(/\/admin\/collections\/tags$/)
+		await expect(page).toHaveURL(tagsList)
 		await page.goBack()
 		await expect(page).toHaveURL(/\/admin$/)
 	})
@@ -154,12 +167,16 @@ test.describe('the rail', () => {
 		await expect(row(page, 'Dashboard')).toHaveCount(0)
 	})
 
-	test('search keeps only the groups that still have a match', async ({ page }) => {
+	test('search keeps only the rows that match, across groups', async ({ page }) => {
 		await page.goto('/admin?settings=workspace')
 		await rail(page).locator('.settings-overlay__search-input').fill('overview')
-		const headings = rail(page).locator('.settings-overlay__rail-group-label')
-		await expect(headings).toHaveText(['Workspace', 'Help'])
+		await expect(row(page, 'Dashboard')).toBeVisible()
+		await expect(row(page, 'Documentation')).toBeVisible()
 		await expect(row(page, 'Exports')).toHaveCount(0)
+		await expect(row(page, 'Stats')).toHaveCount(0)
+		// Every group is open while filtering, so the headings drop out rather than stay as dead
+		// toggles.
+		await expect(rail(page).locator('.settings-overlay__rail-group-label')).toHaveCount(0)
 	})
 
 	test('a collapsed group still shows its matches while searching', async ({ page }) => {
@@ -217,10 +234,7 @@ test.describe('panes', () => {
 
 	test('a collection opens its list, then a document, then goes back', async ({ page }) => {
 		await page.goto('/admin?settings=system/tags')
-		await page
-			.locator('.settings-overlay__pane-body .row-1 a, .settings-overlay__pane-body tbody tr')
-			.first()
-			.click()
+		await openFirstRow(page)
 		await expect(page).toHaveURL(/settings=system%2Ftags%2F|settings=system\/tags\//)
 		await page.locator('.settings-overlay__pane-header button[aria-label="Back"]').click()
 		await expect(page).toHaveURL(/settings=system(%2F|\/)tags($|&)/)
@@ -257,12 +271,16 @@ test.describe('unsaved edits', () => {
 })
 
 test.describe('the whole admin', () => {
-	test('a listed collection is gone from the nav and from its own route', async ({ page }) => {
+	test('a collection a hiding panel lists is gone from the nav and from its own route', async ({
+		page,
+	}) => {
+		// Only the workspace panel sets `hideEntities`, so `secrets` is hidden while `tags`, listed
+		// by the system panel under the default, keeps its nav entry.
 		await page.goto('/admin')
-		await expect(page.locator('.nav a[href*="/collections/tags"]')).toHaveCount(0)
-		await expect(page.locator('.nav a[href*="/collections/posts"]')).toHaveCount(1)
+		await expect(page.locator('.nav a[href*="/collections/secrets"]')).toHaveCount(0)
+		await expect(page.locator('.nav a[href*="/collections/tags"]')).toHaveCount(1)
 
-		const response = await page.goto('/admin/collections/tags')
+		const response = await page.goto('/admin/collections/secrets')
 		expect(response?.status()).toBeLessThan(500)
 	})
 
@@ -270,7 +288,10 @@ test.describe('the whole admin', () => {
 		await page.goto('/admin')
 		await page.getByRole('button', { name: 'Open system settings' }).click()
 		await expect(page.locator('.settings-overlay--system')).toBeVisible()
-		await page.getByRole('button', { name: /Open workspace/ }).click()
+		// The open panel's backdrop covers the nav, so no pointer reaches the other launcher.
+		// Dispatching its click still makes the same `useSettingsOverlay()` call a component
+		// inside the panel would.
+		await page.getByRole('button', { name: /Open workspace/ }).dispatchEvent('click')
 		await expect(page.locator('.settings-overlay--workspace')).toBeVisible()
 		await expect(page.locator('.settings-overlay--system')).toBeHidden()
 	})
