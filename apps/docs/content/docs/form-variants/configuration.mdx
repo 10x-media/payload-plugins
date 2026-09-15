@@ -1,0 +1,109 @@
+---
+title: Configuration
+description: Where variants are declared, what a variant and a step look like, and how the active variant is chosen.
+---
+
+## Where config lives
+
+A collection is configured in exactly one place.
+
+**On the collection**, under `custom.formVariants`. `custom` is server-only in Payload, so access functions and server logic are allowed there. `custom` carries no slug, so give it with `defineFormVariants('people', { ... })`; that is what types field paths against the generated document type. The slug is checked at config time against the collection the config sits on, so a config copied to another collection fails with both slugs named.
+
+**In the plugin options**, for collections you do not own:
+
+```ts
+formVariants({
+  collections: {
+    'some-plugin-collection': { variants: [/* same shape */] },
+  },
+})
+```
+
+The plugin only sees collections present in `config.collections` when it runs, so list `formVariants()` after any plugin that adds a collection you configure. A slug configured in both places, an unknown slug, and a collection whose `edit.default` or `edit.root` view is already overridden all fail at config time with the slug named.
+
+## Variant
+
+| Property | Type | Notes |
+|---|---|---|
+| `key` | `string` | `native` is reserved for Payload's own edit view |
+| `label` | `StaticLabel \| LabelFunction` | Payload's label types |
+| `access` | `(ctx) => boolean \| Promise<boolean>` | Which accounts may see this variant |
+| `steps` | `Step[]` | Absent on `native` |
+| `navigation` | `'linear' \| 'free'` | `free` lets any step be opened directly. Default `linear` |
+| `save` | `'final-step' \| 'always'` | When the save guard allows a save. Default `final-step` |
+| `components` | slot map | Per-variant slot replacements or `false` to hide a part, see [Customization](./customization) |
+| `afterSave` | `(ctx & { savedDoc }) => AfterSaveAction` | See [Saving](./saving) |
+| `ui` | `{ width, align }` | How wide the variant's column is and where it sits, see below |
+
+`native` accepts only `key`, `label` and `access`. It always exists: a collection that does not list it gets `native` available to everyone, and listing it is how its access is restricted.
+
+### Presentation
+
+`ui` is how the variant sits in the room it has.
+
+| Option | Type | Notes |
+|---|---|---|
+| `width` | `'full' \| 'half'` | `full` is the width Payload's own form takes. `half` is a reading-width column, which suits a short form and a wizard. Default `full` |
+| `align` | `'left' \| 'center' \| 'right'` | Where a `half` column sits. Ignored at `full` width. Default `left` |
+
+Either option also takes an object naming the surface it applies to, `page` or `drawer`. A surface the object leaves out takes the default, not the other surface's value.
+
+```ts
+ui: { align: 'center', width: { page: 'half' } }
+```
+
+A centred reading column on the page, and full width inside a drawer.
+
+## Step
+
+| Property | Type | Notes |
+|---|---|---|
+| `key` | `string` | Identifies the step to `goTo`, to per-step slots, and to the remembered open section |
+| `label`, `description` | Payload label types | |
+| `fields` | `FieldItem[]` | A field step. Exclusive with `Component` |
+| `Component` | `PayloadComponent` | A component step |
+| `condition` | `(ctx & { values, state }) => boolean` | Server-side. A failing step is skipped and left out of the count |
+| `gate` | `(ctx & { values, state }) => GateResult` | Server-side, runs when the user leaves the step forwards |
+| `components` | slot map | Per-step `Progress`, `StepHeader`, `Navigation`; `false` hides one on this step |
+
+A `FieldItem` is one of:
+
+| Item | Shape |
+|---|---|
+| A field path | `'firstName'` |
+| A path with presentational overrides | `{ path, label?, description?, admin?: { width } }` |
+| A component between the fields | `{ type: 'component', Component }` |
+| A row | `{ type: 'row', fields: FieldItem[] }` |
+| A collapsible | `{ type: 'collapsible', label, initCollapsed?, fields: FieldItem[] }` |
+| A group | `{ type: 'group', label?, description?, fields: FieldItem[] }` |
+
+The last three are the step's own containers and nest freely, see [Layout](./steps#layout).
+
+## Field paths
+
+Paths are typed against the collection's generated type and validated at config time. They follow the data shape: unnamed rows, collapsibles, tabs and groups contribute no segment, so `firstName` inside a row is `firstName`, and `city` inside a named group `address` is `address.city`.
+
+- A path stops at the first `array` or `blocks` field. Such a field goes on a step whole; `skills.0.name` is not addressable, because rows exist only at runtime.
+- An unnamed container cannot be addressed as a unit, only its fields one by one. A named group or tab can be addressed whole or field by field.
+- A listed field that is absent from form state for this account (`access.read` false, `admin.hidden`) is skipped silently. A field step left with nothing to render and no component items is skipped like a step whose condition failed.
+
+## Context
+
+Every server function receives `ctx = { req, user, doc, operation, hasPublishedDoc, inDrawer }`. `doc` is the document being edited, or the initial data on create. Step functions additionally receive `values` (the current form values, this locale only) and `state` (wizard state); both come from the browser and are untrusted.
+
+On a localized collection every call runs in the locale being edited, the page render and each later re-evaluation alike, so `doc` and any query the function makes answer in that locale.
+
+`inDrawer` cannot be known on the server, so `access` and `defaultVariant` are called once for each value and the browser takes the answer for where it is. Both are called on every document render; keep them cheap and free of side effects.
+
+On a collection with autosave, Payload creates the document the moment `/create` opens and redirects to `/:id`, so `operation` is `update` from the first render. `hasPublishedDoc` is the flag for "a draft that was never published still counts as new".
+
+## Selecting the active variant
+
+Per request, on the server:
+
+1. Collect the variants whose `access` passes.
+2. Pick the first available of: the `?variant=` query parameter (full page only), the account's stored choice, `defaultVariant(ctx)`. A parameter or stored choice naming a variant the account cannot access is ignored, so `?variant=native` does not give an editor the full form. With none of the three usable, the first available variant in config order opens.
+3. Show the switcher when two or more variants are available.
+4. With no variant available (`native` restricted and every other `access` false), an empty state is rendered. There is no fallback to `native`.
+
+The stored choice is a Payload preference under `form-variants-<slug>`. Only an explicit switch in the switcher writes it.

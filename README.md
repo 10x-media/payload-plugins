@@ -16,7 +16,9 @@ Open-source plugins for [Payload v3](https://payloadcms.com) maintained by [10x-
 | [@10x-media/audit-logs](./packages/audit-logs) | Audit fields plus a field-level diff per change, with a browsable view and scheduled archiving | [![npm](https://img.shields.io/npm/v/@10x-media/audit-logs)](https://www.npmjs.com/package/@10x-media/audit-logs) |
 | [@10x-media/automations](./packages/automations) | No-code automation engine (beta scaffold) | [![npm](https://img.shields.io/npm/v/@10x-media/automations)](https://www.npmjs.com/package/@10x-media/automations) |
 | [@10x-media/folder-picker](./packages/folder-picker) | Folder browsing inside the list drawer, so any field picks documents by folder | [![npm](https://img.shields.io/npm/v/@10x-media/folder-picker)](https://www.npmjs.com/package/@10x-media/folder-picker) |
-| [@10x-media/dual-session](./packages/dual-session) | Give each Payload auth collection its own session cookie, so an admin session and a frontend session can coexist. | [![npm](https://img.shields.io/npm/v/@10x-media/folder-picker)](https://www.npmjs.com/package/@10x-media/dual-session) |
+| [@10x-media/dual-session](./packages/dual-session) | Give each Payload auth collection its own session cookie, so an admin session and a frontend session can coexist. | [![npm](https://img.shields.io/npm/v/@10x-media/dual-session)](https://www.npmjs.com/package/@10x-media/dual-session) |
+| [@10x-media/form-variants](./packages/form-variants) | Alternative edit forms for a collection: simplified and step-by-step variants over the native form state | [![npm](https://img.shields.io/npm/v/@10x-media/form-variants)](https://www.npmjs.com/package/@10x-media/form-variants) |
+| [@10x-media/settings-overlay](./packages/settings-overlay) | Files any collection, global, admin view or component behind a deep-linkable floating panel | [![npm](https://img.shields.io/npm/v/@10x-media/settings-overlay)](https://www.npmjs.com/package/@10x-media/settings-overlay) |
 
 
 ## Status
