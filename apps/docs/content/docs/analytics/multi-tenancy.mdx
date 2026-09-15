@@ -13,6 +13,7 @@ description: Per-tenant analytics providers, a shared platform provider, and sco
 | `scopes` | Enumerates every tenant scope so the cache-warm and sync cron tiers fan out per tenant. See [Cron tiers](#5-cron-tiers). |
 | `providers.collection` | Opt-in admin collection where providers are configured at runtime (per scope). |
 | `platformAdapter` | Names one config adapter shared by every scope: the platform's own analytics. |
+| `access.read` | Gates every authenticated read endpoint (query, document panel, realtime, sources, goals). Defaults to any signed-in user, so it changes nothing until you set it. |
 | `access.platformRead` | Gates cross-scope reads. Defaults to deny once `scopeResolver` is set; defaults to any authenticated admin user without it. |
 | `posthog({ scopeProperty })` | Lets one PostHog project serve per-scope reads by filtering on an event property. |
 | `capture.slots` | Which adapter captures for the platform (`global`) and for the request's tenant (`tenant`). See [Capture slots per tenant](#capture-slots-per-tenant). |
@@ -188,6 +189,14 @@ analytics({
 - A scoped read through any shared config adapter that cannot filter by scope, not only the one designated `platformAdapter`, would expose cross-scope data, so it fails closed behind the same `platformRead` gate. A tenant's own runtime providers (from `providers.collection` or `providers.resolve`) are never gated, since their credentials are the tenant's own. Give the platform adapter a `scopeProperty` (or use native) to serve tenants without the gate.
 - A platform admin's own request resolves no scope at all when no tenant is selected (`scopeResolver` returns `null`, the same value an unscoped install always reads with). The native adapter applies no `scope` filter for a `null`/`undefined` scope, so that read is a genuine cross-tenant total, every tenant's data summed, not an isolated "unscoped-only" bucket that happens to exclude tenant data.
 
+### Query endpoint
+
+The authenticated [query endpoint](/analytics/data-sources#query-endpoint) follows exactly these rules, and it is the one place they are visible as status codes. Scope comes from the request; an explicit `scope` parameter is honored only for platform readers (`400 untrusted_scope` for anyone else) and `scope=*` reads every scope behind the same `platformRead` gate; a scoped install whose request resolves no scope fails closed with `404 unknown_source`, as does a `scopeResolver` answering `*` for a caller `platformRead` denies; and a listed shared config adapter that cannot filter by scope answers `403` with `param: 'source'` rather than returning another tenant's totals.
+
+That last rule cuts both ways. A platform reader passing `scope=<tenant>` for a config adapter without `scopedQueries` is allowed through, since `platformRead` grants it, but the adapter still cannot narrow the query: the answer is install-wide totals, not that tenant's. The echoed `query` carries no `scope` key when that happens, which is how a client tells the two apart before captioning the numbers with a tenant's name.
+
+`access.read` is the gate in front of all of that. It covers every authenticated read endpoint (query, document panel, realtime, sources, goals) and defaults to allowing any signed-in user, so an install that does not set it behaves as before. Narrow it to a role check to keep analytics away from admins who should not see them. It is independent of scope: granting `read` never widens which scope a user reads.
+
 ## 5. Cron tiers
 
 Reads happen per request, but the [cache-warm](/analytics/cache#scheduled-warming-opt-in) and [sync](/analytics/sync) tiers run on a cron with no request to resolve a scope from. `scopes` enumerates the tenant scopes those two tiers should fan out over, on top of the install-wide pass they already run:
@@ -206,6 +215,34 @@ A shared config adapter, one declared in `adapters` rather than resolved per ten
 
 A tenant-pass warm target that degrades for this reason, or for any other non-`ok` read status, is not counted as a failure. It is logged once per scope-and-adapter pair so a warm count that looks short of `scopes × targets` is traceable back to which tenant and adapter were gated; an install-wide pass degrading stays silent, matching the tier's pre-`scopes` behavior.
 
+## Goals per tenant
+
+The [goals collection](/analytics/goals#5-let-editors-manage-goals) scopes on the same rules the provider collection does, through the same `scopeResolver`. Enable it alongside the providers wiring from [step 2](#2-register-the-provider-collection-per-tenant):
+
+```ts
+analytics({
+  // Editors manage their own goals per tenant; the plugin owns the scope column.
+  goals: { defaults: sharedGoals, collection: true },
+  // Providers ride the tenant plugin's own field.
+  providers: { collection: { scopeField: 'tenant' } },
+  scopeResolver, // the two-branch resolver from above
+})
+```
+
+What that buys, per tenant:
+
+- **Row access.** A tenant reads, updates and deletes only goals in their own scope. `access.platformRead` lifts that for platform admins, and defaults to deny once `scopeResolver` is set, exactly as it does for providers.
+- **The scope stamp.** Every create is stamped with the request's resolved scope server-side, and a body declaring another scope is refused rather than silently rewritten. A seed or migration writing another tenant's goal therefore needs a `req` whose `platformRead` resolves `true`, the same requirement provider documents have.
+- **Uniqueness per scope.** A slug may exist once per scope, checked on every write inside the request's own transaction. A database index backs that check where it can: `slug` alone on an unscoped install, `(slug, scope)` once a `scopeResolver` is configured and the plugin still owns the scope field. Two cases stay hook-guarded only. Postgres treats a NULL scope as distinct from every other, so install-wide rows on a scoped Postgres install are not covered by the index; and a `scopeField` another plugin owns gets no index from this plugin at all, since that column is not the plugin's to index.
+- **Resolution.** The goals picker and its `GET /api/analytics/goals` endpoint list the config goals merged with the requesting scope's own collection goals, and so does the public tracker config a visitor's browser boots from. There is no scope parameter on either, so a tenant can never enumerate another tenant's goals. Native ingest, [`trackServerEvent`](/analytics/goals#4-track-from-server-code) and the [form action](/analytics/goals#3-track-a-form-submission) all resolve goals under the scope the event is stamped with, so one tenant's traffic can only ever complete that tenant's goals. One read serves at most 500 enabled goals per scope.
+- **The scope field itself.** With `scopeField` left at `'scope'` the plugin registers its own hidden text field. Name another and the plugin registers nothing, since that field belongs to the plugin that owns it, and a boot-time check fails the install with a named error when nothing registered it. A relationship-typed scope field carries one more caveat: an install-wide lookup matches an empty string, which a relationship column cannot be compared against, so install-wide goals resolve to the config goals only.
+
+<Callout type="warn">
+Registering the goals collection with `@payloadcms/plugin-multi-tenant` is **not supported yet**: pointing `goals.collection.scopeField` at the plugin's `tenant` relationship and adding `'analytics-goals'` to `multiTenantPlugin`'s `collections` map hangs a tenant user's admin panel in the plugin's own dev app. The cause is not diagnosed. Providers are unaffected and stay registered as `{ isGlobal: true }`.
+
+Goals still scope correctly without that registration, through the plugin's own `scope` field and your `scopeResolver`: access, the stamp, per-scope uniqueness, the picker, the endpoint, and matching at ingest all follow the resolved scope. What a multi-tenant install gives up today is the admin tenant selector filtering the goals list view, so a platform admin browsing that collection sees every tenant's goals in one list. A fix is planned.
+</Callout>
+
 ## Dev app: TENANCY=on
 
 The plugin's dev app (`packages/analytics/dev`) is the reference wiring for this whole page. `TENANCY=on pnpm dev analytics` boots it with a seeded `tenants` collection, `@payloadcms/plugin-multi-tenant`, and the tenancy config fragment in place of the default single-tenant one; `TENANCY` left unset boots the plain single-tenant playground, unchanged from before this mode existed.
@@ -221,6 +258,12 @@ The dev app's `platformAdapter` is the in-memory config adapter, which declares 
 The dev app's tenancy resolver is the two-branch shape above: an admin session resolves through the tenant selector, and anonymous frontend traffic resolves from the first hostname label, so `alpha.localhost:<port>` fills the tenant slot with alpha's native adapter. Plain `localhost` matches no tenant and captures nothing. The global slot is always empty: the dev `platformAdapter` is the in-memory demo source, which declares no capture support. The label parsing is a playground shortcut, not the pattern to copy; a real install matches the host against a stored domain, as [above](#capture-slots-per-tenant).
 
 Both tenant admins' "Analytics providers" nav link redirects straight to their own tenant's document rather than a list, and so does the platform admin's, to whichever tenant is currently selected: the `isGlobal: true` behavior from [step 2](#2-register-the-provider-collection-per-tenant) applies uniformly.
+
+Both modes enable the goals collection and seed a CTA page whose block points at a collection goal: `/newsletter` single-tenant, and one per tenant (`/alpha-offer`, `/beta-offer`) under `TENANCY=on`. That makes the [goal picker](/analytics/goals#2-pick-a-goal-in-a-block) and the per-scope isolation clickable: alpha's admin lists alpha's goal and never beta's, and a click on either page books a conversion for that tenant alone.
+
+Contributors regenerating the dev app's own output should run both commands as `TENANCY=on pnpm generate:types analytics` and `TENANCY=on pnpm generate:importmap analytics`. The tenancy config is the superset, and the committed `dev/payload-types.ts` and `dev/app/(payload)/admin/importMap.js` are generated from it: a default-env run silently drops the multi-tenant import map entries and the `Tenant` type along with every `tenant` and `scope` field, which breaks the tenancy admin. A local `pnpm dev analytics` with auto-generation on rewrites both files the same way.
+
+The dev app boots Payload from `dev/instrumentation.ts` rather than waiting for the first request. Next's dev app-page runtime installs a process-wide `async_hooks` hook that builds and stack-parses an `Error` per promise, and a seed running from `onInit` after that hook loads pays the tax on every write: tenancy mode, at roughly five times single-tenant's volume, spent minutes pinned at 100% CPU answering nothing. `register` runs first, so the same seed is cheap. This is dev-app wiring, not plugin behavior.
 
 Switching `TENANCY` on a **persistent** database (a `DATABASE_URI_MONGO`/`DATABASE_URI_POSTGRES` you point at yourself, or `DEV_DB=postgres`) after it already booted once in the other mode needs a reseed and the `scope` column migration from the [native engine's upgrade note](/analytics/native#upgrading-an-existing-install): the rows and schema from the first boot don't retroactively match the new mode's shape. The default in-memory database is immune, since every boot starts from an empty one.
 

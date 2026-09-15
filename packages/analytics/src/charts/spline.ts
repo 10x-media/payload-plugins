@@ -7,6 +7,8 @@ export interface SplineOptions {
 	width: number
 	height: number
 	padding?: number
+	/** Explicit value domain, so two series drawn on one chart share a y-scale. */
+	domain?: { min: number; max: number }
 }
 
 const round = (n: number): number => Math.round(n * 100) / 100
@@ -60,8 +62,8 @@ export const monotoneAreaPath = (values: number[], opts: SplineOptions): SplineG
 		return { line: '', area: '' }
 	}
 	const innerH = height - padding * 2
-	const max = Math.max(...values)
-	const min = Math.min(...values)
+	const max = opts.domain?.max ?? Math.max(...values)
+	const min = opts.domain?.min ?? Math.min(...values)
 	const span = max - min || 1
 	const x = (i: number): number => round(values.length > 1 ? (i / (values.length - 1)) * width : 0)
 	const y = (v: number): number =>

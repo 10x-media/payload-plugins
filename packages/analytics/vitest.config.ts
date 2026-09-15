@@ -8,7 +8,7 @@ import { defineConfig, mergeConfig } from 'vitest/config'
 const isMatrixRun = Boolean(process.env.DB_MATRIX)
 
 /** Browser-only modules; everything else runs in the node project. */
-const JSDOM_TESTS = ['src/tracker/**/*.test.ts', 'src/react/**/*.test.tsx']
+const JSDOM_TESTS = ['src/tracker/**/*.test.ts', 'src/**/*.test.tsx']
 
 // Test selection is controlled by package.json scripts that pass explicit
 // paths. Default `test` runs everything below; `test:unit`/`test:int`/
@@ -27,6 +27,10 @@ export default mergeConfig(
 						dangerouslyIgnoreUnhandledErrors: isMatrixRun,
 						include: ['tests/int/**/*.int.spec.ts', 'src/**/*.test.ts'],
 						exclude: ['node_modules', 'dist', '.next', 'tests/e2e/**', ...JSDOM_TESTS],
+						// The admin view's server shell pulls in Payload's own admin chrome, whose
+						// dist imports stylesheets. Externalized, Node's loader chokes on the first
+						// `.css`; inlined, vite transforms them away.
+						server: { deps: { inline: [/@payloadcms\/next/, /@payloadcms\/ui/] } },
 					},
 				},
 				{

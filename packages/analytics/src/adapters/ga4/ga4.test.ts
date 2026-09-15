@@ -284,4 +284,34 @@ describe('ga4 adapter', () => {
 		expect(result.totals).toEqual({ pageviews: 35 })
 		expect(runReport).toHaveBeenCalledTimes(1)
 	})
+
+	it('formats both range bounds as calendar days in the reporting timezone', async () => {
+		runReport.mockResolvedValue([{ dimensionHeaders: [], metricHeaders: [], rows: [] }])
+		await ga4(config).query(
+			q({
+				timezone: 'America/New_York',
+				dateRange: {
+					start: new Date('2026-09-01T04:00:00.000Z'),
+					end: new Date('2026-09-08T03:59:59.999Z'),
+				},
+			}),
+			{}
+		)
+		expect(sentRequest().dateRanges).toEqual([{ startDate: '2026-09-01', endDate: '2026-09-07' }])
+	})
+
+	it('does not roll the start bound back a day for zones east of UTC', async () => {
+		runReport.mockResolvedValue([{ dimensionHeaders: [], metricHeaders: [], rows: [] }])
+		await ga4(config).query(
+			q({
+				timezone: 'Europe/Berlin',
+				dateRange: {
+					start: new Date('2026-08-31T22:00:00.000Z'),
+					end: new Date('2026-09-07T21:59:59.999Z'),
+				},
+			}),
+			{}
+		)
+		expect(sentRequest().dateRanges).toEqual([{ startDate: '2026-09-01', endDate: '2026-09-07' }])
+	})
 })

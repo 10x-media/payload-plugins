@@ -3,7 +3,7 @@ title: Dashboard widgets
 description: Analytics widgets for Payload's Modular Dashboard, plus a public API for custom ones.
 ---
 
-The plugin registers widgets into Payload's Modular Dashboard (`admin.dashboard.widgets`); they are the site-wide view, with [display fields](/analytics/display-fields) as the per-document counterpart. Each widget is capability-gated: if no configured adapter can answer its metric or dimension, it is not registered at all, so dead tiles never appear and nobody can configure a widget no data source could answer.
+The plugin registers widgets into Payload's Modular Dashboard (`admin.dashboard.widgets`); they are the site-wide summary, with [display fields](/analytics/display-fields) as the per-document counterpart and the [analytics view](/analytics/analytics-view) as the full report behind both. Each widget is capability-gated: if no configured adapter can answer its metric or dimension, it is not registered at all, so dead tiles never appear and nobody can configure a widget no data source could answer.
 
 That gate is closed only for a config-time adapter union. An install with [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) enabled (`providers.collection` or `providers.resolve`) is open-world instead: every built-in widget registers, and each widget's metric select offers every candidate metric for that widget type (the realtime widget stays limited to visitors and pageviews), since a tenant's own runtime adapter can serve capabilities no config-time adapter declares. The per-request `GET /api/analytics/sources` endpoint and the client pickers described below still narrow to what each request's actual sources support; a widget or metric that no source in that request can serve simply degrades to an unavailable read, the same outcome a config-gated install shows by never registering the widget at all.
 
@@ -27,24 +27,44 @@ export default buildConfig({
 })
 ```
 
-`analyticsDefaultWidgets()` returns a large pageviews trend, two small metric widgets (pageviews and visitors), and the four breakdown widgets (top pages, sources, devices, countries), all over the last 30 days. Compose your own layout instead by listing `{ widgetSlug, width, data }` instances directly. If you set `widgets: false`, do not spread the helper; its instances would reference unregistered widgets.
+`analyticsDefaultWidgets()` returns a large pageviews trend, two small metric widgets (pageviews and visitors), and the four breakdown widgets (top pages, sources, devices, countries), all over the last 30 days. It is a starting layout rather than the whole catalogue: the goals widget and the newer breakdowns below are not in it, so list them yourself. Compose your own layout instead by listing `{ widgetSlug, width, data }` instances directly. If you set `widgets: false`, do not spread the helper; its instances would reference unregistered widgets.
 
 ## The built-in widgets
 
-| Slug | Shows |
-|---|---|
-| `analytics-metric` | One headline number. |
-| `analytics-trend` | A gradient area chart of one metric over time, with timeframe-aware axis labels and a hover tooltip. |
-| `analytics-breakdown-pages` | Top pages as a filled bar list. |
-| `analytics-breakdown-sources` | Top traffic sources. |
-| `analytics-breakdown-devices` | Device classes. |
-| `analytics-breakdown-countries` | Countries. |
-| `analytics-breakdown-goals` | [Goal](/analytics/goals) completions per goal slug, defaulting its metric to `conversions`. |
-| `analytics-realtime` | An "active now" count with a per-minute sparkline. |
+| Slug | Shows | Dimension | Default metric |
+|---|---|---|---|
+| `analytics-metric` | One headline number. | | `pageviews` |
+| `analytics-trend` | A gradient area chart of one metric over time, with timeframe-aware axis labels and a hover tooltip. | | `pageviews` |
+| `analytics-goals` | Conversions, revenue and conversion rate per [goal](/analytics/goals). See [below](#the-goals-widget). | `goal` | none, it has no metric field |
+| `analytics-breakdown-pages` | Top pages as a filled bar list. | `page` | `pageviews` |
+| `analytics-breakdown-sources` | Top traffic sources. | `source` | `pageviews` |
+| `analytics-breakdown-devices` | Device classes. | `device` | `pageviews` |
+| `analytics-breakdown-countries` | Countries. | `country` | `pageviews` |
+| `analytics-breakdown-goals` | [Goal](/analytics/goals) completions per goal slug. | `goal` | `conversions` |
+| `analytics-breakdown-referrers` | Referring URLs, as the source reports them. | `referrer` | `pageviews` |
+| `analytics-breakdown-browsers` | Browsers. | `browser` | `pageviews` |
+| `analytics-breakdown-os` | Operating systems. | `os` | `pageviews` |
+| `analytics-breakdown-campaigns` | UTM campaigns. | `utmCampaign` | `pageviews` |
+| `analytics-breakdown-events` | Named custom events. | `event` | `events` |
+| `analytics-realtime` | An "active now" count with a per-minute sparkline. | | `visitors` |
 
-The metric pickers offer `pageviews`, `visitors`, `sessions`, `avgDuration`, `bounceRate`, `events`, `conversions`, `revenue`, and `scrollDepth`, each narrowed to what the selected source can actually serve. A custom widget can group by the `goal` dimension the same way the built-in goals breakdown does (`requires: { dimensions: ['goal'] }`); it is groupable but not filterable, so it never appears in an `AnalyticsQuery.filters` entry.
+A default metric the selected source cannot serve is not offered, and the select falls to the first one it can.
 
-Each instance is configurable in the dashboard: an editable title, the metric, a timeframe (the presets plus **Custom range**, which reveals a date picker), and, in multi-adapter setups, a data source. The data source and metric selects render through client components that resolve the list of available adapters live from an authenticated `GET /api/analytics/sources` endpoint, cached per admin session. Runtime providers appear for their scope under the provider document's name (a generated label stands in when unset), and the metric list narrows to what the selected source can actually serve. Without JavaScript or when the endpoint is unreachable the pickers fall back to the config-time option lists, and stored values the endpoint no longer lists keep the previous behavior of degrading at read time. A custom range that exceeds a provider's lookback limit is narrowed to the provider maximum, with a visible note.
+Every breakdown widget is one component over one dimension, so the five added last (referrers, browsers, operating systems, campaigns, events) behave exactly like the four before them: same fields, same capability gate, same bar list. The gate is what decides whether you see them. The native engine buckets `page`, `source`, `device`, `country`, `event` and `goal` only, so on a native-only install the referrer, browser, operating-system and campaign widgets do not register at all; with [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) enabled they register open-world and degrade to "Not available for this data source" wherever the request's own source cannot answer them.
+
+The metric pickers offer `pageviews`, `visitors`, `sessions`, `avgDuration`, `bounceRate`, `events`, `conversions`, `revenue`, and `scrollDepth`, each narrowed to what the selected source can actually serve. `visits` is not among them, so no widget offers it. A custom widget can group by the `goal` dimension the same way the built-in goals breakdown does (`requires: { dimensions: ['goal'] }`); it is groupable but not filterable, so it never appears in an `AnalyticsQuery.filters` entry.
+
+Each instance is configurable in the dashboard: an editable title, the metric, a timeframe (the presets plus **Custom range**, which reveals a date picker; both picked days are read whole, in the [reporting timezone](/analytics/timezone), wherever the admin who picked them sat), and, in multi-adapter setups, a data source. The data source and metric selects render through client components that resolve the list of available adapters live from an authenticated `GET /api/analytics/sources` endpoint, cached per admin session. Runtime providers appear for their scope under the provider document's name (a generated label stands in when unset), and the metric list narrows to what the selected source can actually serve. Without JavaScript or when the endpoint is unreachable the pickers fall back to the config-time option lists, and stored values the endpoint no longer lists keep the previous behavior of degrading at read time. A custom range that exceeds a provider's lookback limit is narrowed to the provider maximum, with a visible note.
+
+<Callout type="warn">
+**Custom ranges follow the reporting timezone.** A custom range is the two days the admin picked, read whole in the [reporting timezone](/analytics/timezone), rather than the two instants the picker happened to store.
+
+A Berlin admin picking Jun 1 to Jun 23 stores `2026-05-31T22:00:00.000Z` and `2026-06-22T22:00:00.000Z`. With `reportingTimezone: 'Europe/Berlin'` the window is now `2026-05-31T22:00:00.000Z` to `2026-06-23T21:59:59.999Z`, and on a UTC install `2026-06-01T00:00:00.000Z` to `2026-06-23T23:59:59.999Z`: the whole of Jun 23 is read either way, and a New York admin picking the same two days gets the same window and the same caption.
+
+Numbers move on installs whose admin browsers sit in a different zone from the reporting timezone, and on instant-comparing reads (filtered or hour-granular native reads, and the vendor adapters' calendar-day formatting), which used to drop the final day. Day-rollup reads where the two zones coincide were already right. Captions name the picked days rather than the server zone's spelling of the stored instants.
+
+The picked day is recovered from the stored instant exactly for every browser offset in `(-12, +12]`. A browser at +12:45 or beyond (Chatham in daylight time, Kiritimati) recovers the previous day.
+</Callout>
 
 The realtime widget polls an authenticated `GET /api/analytics/realtime` endpoint every 15 seconds and registers when a realtime-capable adapter (the native engine today) is configured, or, per the open-world rule above, whenever runtime providers are enabled at all.
 
@@ -52,7 +72,50 @@ Trend widgets render a real daily series for every provider that has one; where 
 
 The metric and trend widgets show a period-over-period comparison when the active adapter declares `capabilities.comparison`: the plugin reads the same count of whole reporting-timezone days immediately preceding the current window and renders a colored delta (an up/down arrow with the percentage change) and a "vs. previous period" caption. Metrics where lower is better (bounce rate) invert the coloring, and `allTime` never compares. The comparison is capability-gated, so adapters that cannot answer a second window simply omit it; set `widgets: { comparison: false }` to skip the previous-window read entirely. All comparison strings are typed translations, localizable through the [`translations` option](/analytics/i18n).
 
+The trend widget can also draw the previous period. Tick **Compare to previous period** on the widget instance and the chart overlays that window as a muted line on the same axes, scaled so both series fit, with a legend naming each series (the previous one carrying its own date range) and a tooltip row per series. The overlay is the same previous-window read the delta already makes, asked for by day instead of as a total, so adapters that answer a series and a total in separate calls make one more call for it and it lands under its own cache key. Points align to the primary axis day for day, re-dated onto it first so a week- or month-bucketed chart cannot land the two windows on different boundaries. The checkbox is gated the same way the delta is: `widgets: { comparison: false }` removes the field from every widget's config rather than leaving a toggle that reads nothing.
+
+The analytics view's trend does the same, so a comparison is one chart on both surfaces rather than a second one stacked below.
+
 Charts are dependency-free SVG and CSS, themed with Payload's design tokens. The series color reads `--analytics-chart-1`, overridable from your admin stylesheet.
+
+## The goals widget
+
+`analytics-goals` is the dashboard counterpart to the [analytics view](/analytics/analytics-view)'s goals panel: one row per [goal](/analytics/goals) over the widget's window, under the goal's own name rather than its slug, ranked by conversions.
+
+| Column | Notes |
+|---|---|
+| Goal | The name from your config or the goals collection, resolved for the request's own scope. A slug no configured goal claims renders as the slug. |
+| Conversions | Completions in the window, with a period-over-period delta beside them when comparison is on. |
+| Revenue | Summed completion values, as a bare number. Omitted as a column when the source serves no revenue; a row the source cannot fill shows a dash. |
+| Conversion rate | The goal's visitors over the window's site visitors. Omitted as a column when the source serves no visitors. |
+
+It registers only where a source can serve both the `conversions` metric and the `goal` dimension, so an install whose sources cannot answer both never sees it at all, and one with [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) enabled sees it degrade per request instead. Its fields are the title, the timeframe (presets plus a custom range), a row limit of 10, 25 or 50, the compare checkbox, and the data source in multi-adapter setups.
+
+The table costs one engine read, the ranked `goal` breakdown carrying revenue and visitors per row where the source serves them. Add one for the window's site visitors wherever the source serves `visitors`, since that is the rate's denominator, and one more for the previous window's breakdown when comparison is on. That previous window is read four rows deep for every row shown, because both windows rank by their own conversions and a goal near the top today can sit well below the cut in the window before it.
+
+A goal the previous window's rows do not reach carries no delta at all, rather than a fabricated one; a goal that converted zero times in the previous window shows the localized direction word instead of a percentage, since there is no baseline to take one of.
+
+## Open in Analytics
+
+Every built-in widget ends in an **Open in Analytics** link that opens the [analytics view](/analytics/analytics-view) already showing what the card shows: the widget's window, its data source, and its metric or breakdown tab. A card is a summary, and this is the way from the summary to the report without re-picking any of it.
+
+| Widget | Carries |
+|---|---|
+| Metric | window, source, metric |
+| Trend | window, source, metric, and `compare=1` when the instance compares |
+| Breakdown | window, source, metric, and the tab that offers its dimension |
+| Goals | window, source, `metric=conversions`, `tab=goals`, and `compare=1` when the instance compares |
+| Realtime | source only. Its rolling window is no range the view can hold, so it opens on the view's own range |
+
+The link is built after the read, from the adapter that actually answered, so on a scoped or runtime-provider install it names the tenant's own source rather than the id the widget asked for. The view coerces anything the source cannot serve when it opens, exactly as it does for a hand-written link.
+
+Ranges serialize as the view's own URL state, against the install's configured defaults: `view: { defaultRange, defaultMetric }`. A widget already on the default window or metric leaves that key out, so the link stays short. A custom range becomes `range=custom&from=&to=` as two calendar days in the [reporting timezone](/analytics/timezone) the widget resolved. A window wider than the view's 366-day cap links to its last 366 days, since the view drops a wider one.
+
+<Callout>
+**Three presets carry no range.** `allTime`, `thisMonth` and `thisYear` are widget windows the view's own range picker does not offer, so their links leave the range out and the view opens on its configured default rather than writing a value the picker could not render. A custom range with only one day picked does the same.
+</Callout>
+
+Set `view: false` and the whole view goes away: the route, the nav link, and this link with them. Widgets you register yourself never get one; they are your components, and `viewHref` is not a public export.
 
 ## Options
 
@@ -122,5 +185,86 @@ export default async function TopSourcesWidget(props: WidgetServerProps) {
 ```
 
 Run `payload generate:importmap` after registering. The widget appears only when a configured adapter satisfies its `requires` gate, exactly like the built-ins.
+
+### Reading more than one metric at a time
+
+`readForWidgetBreakdown` ranks by one metric, and `extraMetrics` reads further ones alongside it. Each is narrowed to what the source serves first, so asking for one it cannot answer costs you that column rather than the whole read, and every row gains a `metrics` object with the ones that came back. Ranking, the row limit and the `status` still follow `metric` alone. This is how the goals widget reads revenue and per-goal visitors without a second pass:
+
+```ts
+const result = await readForWidgetBreakdown({
+  req: props.req,
+  metric: 'conversions',
+  dimension: 'goal',
+  extraMetrics: ['revenue', 'visitors'],
+  timeframe: 'last30days',
+  limit: 10,
+  now: new Date(),
+})
+// result.rows[0] -> { label: 'newsletter', value: 12, metrics: { revenue: 120, visitors: 9 } }
+```
+
+`readForWidget` reads the previous window by default, so its `previousMetrics` and `comparisonRange` are there for a delta. A read that only needs a denominator does not want that second window; pass `comparison: false` and it is skipped:
+
+```ts
+const totals = await readForWidget({
+  req: props.req,
+  metrics: ['visitors'],
+  timeframe: 'last30days',
+  comparison: false,
+  now: new Date(),
+})
+```
+
+Both helpers also report `stale: true` when the engine answered from a stale cache entry after a failed provider read (`readForWidgetSeries` does not). Of the built-ins only the goals widget renders a note for it; the metric, trend and breakdown widgets drop it. Yours can render one.
+
+### Drawing a comparison with `TrendChart`
+
+`TrendChart` takes the previous period as a second series on the same axes:
+
+| Prop | Purpose |
+|---|---|
+| `comparison` | The previous-period points as `TrendPoint[]`, index-aligned to `buckets`. Without it nothing below applies and no legend renders. |
+| `comparisonLabel` | Names the comparison series in the legend and in every tooltip. Keep it short. |
+| `comparisonRange` | The comparison window, in the legend only, so the tooltip stays narrow on a small card. |
+| `label` | Names the primary series in the legend. |
+
+`readForWidgetSeries({ compare: true })` supplies the numbers, not the points: `comparisonPoints` is `SeriesPoint[]` (`{ date, value }`), zero-filled to the same length as `points` and aligned to it by index. `TrendChart` wants `TrendPoint[]` (`{ label, value, display }`), so the mapping is yours:
+
+```tsx title="components/TrendWidget.tsx"
+import { TrendChart } from '@10x-media/analytics/client'
+import { formatMetricValue, readForWidgetSeries, type SeriesPoint } from '@10x-media/analytics/rsc'
+import type { WidgetServerProps } from 'payload'
+
+export default async function TrendWidget(props: WidgetServerProps) {
+  const locale = props.req.i18n.language ?? 'en-US'
+  const result = await readForWidgetSeries({
+    req: props.req,
+    metric: 'pageviews',
+    timeframe: 'last30days',
+    compare: true,
+    now: new Date(),
+  })
+  if (result.status !== 'ok') return <span>No data</span>
+
+  const toPoints = (points: SeriesPoint[]) =>
+    points.map((point) => ({
+      label: point.date,
+      value: point.value,
+      display: formatMetricValue('pageviews', point.value, locale),
+    }))
+
+  return (
+    <TrendChart
+      ariaLabel="Pageviews, last 30 days"
+      buckets={toPoints(result.points)}
+      {...(result.comparisonPoints
+        ? { comparison: toPoints(result.comparisonPoints), comparisonLabel: 'Previous', label: 'Pageviews' }
+        : {})}
+    />
+  )
+}
+```
+
+The y-scale covers both series, so the overlay cannot rescale the primary line out of shape. Both series are drawn as given, index for index. If you coarsen the daily axis into weeks or months yourself, re-date `comparisonPoints` onto the primary points' dates by index **before** bucketing: bucketed on its own dates the previous window lands on different boundaries, and the overlay drifts by a bucket.
 
 A custom widget's own config fields can reuse the same live pickers: `MetricSelectField` and `SourceSelectField` from `@10x-media/analytics/client`, or the `useAnalyticsSources` hook directly for a bespoke picker. `MetricSelectField` narrows against a sibling source field named `dataSource` by default; pass `sourceFieldPath` when a custom field layout names it something else.

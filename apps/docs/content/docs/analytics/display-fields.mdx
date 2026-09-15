@@ -84,7 +84,7 @@ Every factory accepts `timeframe` (`today`, `last7days`, `last30days` (default),
 
 `analyticsTab` (and `analyticsTabsField`) renders an interactive panel by default: metric cards with period-over-period deltas (when the adapter declares `capabilities.comparison`), a daily trend chart for the first metric, and a timeframe picker that refetches without leaving the document. Reads go through an authenticated `GET /api/analytics/document` endpoint that enforces read access on the document itself, so analytics never leak for content a user cannot see. Pass `interactive: false` to render the static stats row instead.
 
-The endpoint also serves your own UIs: `collection`, `id`, `timeframe` (or `timeframe=custom` with `from`/`to`), `metrics` (comma-separated), `dataSource`, and the `compare=1` / `series=1` flags mirror the panel's reads.
+The endpoint also serves your own UIs: `collection`, `id`, `timeframe` (or `timeframe=custom` with `from`/`to`), `metrics` (comma-separated), `dataSource`, and the `compare=1` / `series=1` flags mirror the panel's reads. `from` and `to` read exactly like the [query endpoint's](/analytics/data-sources): a `YYYY-MM-DD` day is that whole calendar day in the [reporting timezone](/analytics/timezone), `to` included, and a datetime must carry `Z` or an offset. An offset-less datetime, or a `to` before `from`, answers `400`.
 
 Composing the tab into an existing tabs field:
 

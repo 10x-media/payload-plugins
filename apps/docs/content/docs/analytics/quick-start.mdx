@@ -82,13 +82,16 @@ The native engine's beacon endpoint (`POST /api/analytics/ingest`) stays public,
 ## Verify
 
 1. Hit a few frontend pages.
-2. Open the admin dashboard: the trend, metric, and breakdown widgets show the traffic.
-3. Open a `pages` document whose slug matches a tracked path: the stat row shows that document's numbers.
+2. Open **Analytics** in the admin nav (`/admin/analytics`): the [analytics view](/analytics/analytics-view) shows the cards, the trend and a breakdown of everything captured so far. It is the first thing to open after installing, and the fastest way to tell whether events are landing.
+3. Open the admin dashboard: the trend, metric, and breakdown widgets show the same traffic.
+4. Open a `pages` document whose slug matches a tracked path: the stat row shows that document's numbers.
 
 ## Where to go next
 
+- Read the full report and share a filtered view as a link: [Analytics view](/analytics/analytics-view).
 - Point the plugin at an existing provider instead: [Adapters](/analytics/adapters), and serve its tracker from your own origin with the [first-party proxy](/analytics/proxy).
 - Mark conversions and read revenue: [Goals](/analytics/goals).
 - Bind more collections and tune the fields: [Display fields](/analytics/display-fields).
 - Configure the dashboard: [Widgets](/analytics/widgets).
+- Read the numbers from your own code: [Data sources](/analytics/data-sources) and the query endpoint.
 - Production concerns: [geo resolution](/analytics/geo), [caching and warming](/analytics/cache), [retention](/analytics/native#retention-pruning), and the Mongo `ensureIndexes` note in [Native engine](/analytics/native#production-note-mongo).

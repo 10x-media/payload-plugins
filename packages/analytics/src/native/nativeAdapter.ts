@@ -17,9 +17,10 @@ import { seenCollection } from './collections/seen'
 import { composeGeoResolvers } from './geo/composeGeoResolvers'
 import { type GeoResolver, platformHeaderResolver } from './geo/geoResolver'
 import { maxmindResolver } from './geo/maxmindResolver'
-import { makeIngestHandler } from './ingest/endpoint'
+import { type IngestResolvers, makeIngestHandler } from './ingest/endpoint'
 import { flushBatch } from './ingest/flushBatch'
 import type { StoredEvent } from './ingest/normalizeEvent'
+import { makeServerTrack } from './ingest/serverTrack'
 import { createWriteBuffer, type WriteBuffer } from './ingest/writeBuffer'
 import { aggregateEvents, type EventLike, filtersToWhere } from './query/eventAgg'
 import { buildRealtime, type RealtimeEvent } from './realtime/buildRealtime'
@@ -187,7 +188,19 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 		return docs as unknown as RollupDoc[]
 	}
 
-	const ingest = { path: options.ingestPath ?? INGEST_PATH }
+	// The plugin's resolvers arrive in register(); server tracking reads them late so it
+	// resolves the same scope, timezone and goals the endpoint does.
+	let resolvers: IngestResolvers = {}
+
+	const ingest = {
+		path: options.ingestPath ?? INGEST_PATH,
+		track: makeServerTrack({
+			getPayload: () => payloadRef,
+			geoResolver,
+			getBuffer: () => buffer,
+			getResolvers: () => resolvers,
+		}),
+	}
 
 	return {
 		id: 'native',
@@ -208,16 +221,17 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				rollupsCollection(scoped),
 				seenCollection(),
 			]
+			resolvers = {
+				scope: scoped ? context?.resolveScope : undefined,
+				timezone: context?.resolveTimezone,
+				goals: context?.resolveGoals,
+			}
 			config.endpoints = [
 				...(config.endpoints ?? []),
 				{
 					method: 'post',
 					path: ingest.path,
-					handler: makeIngestHandler(geoResolver, () => buffer, {
-						scope: scoped ? context?.resolveScope : undefined,
-						timezone: context?.resolveTimezone,
-						goals: context?.resolveGoals,
-					}),
+					handler: makeIngestHandler(geoResolver, () => buffer, resolvers),
 				},
 			]
 			if (options.retentionDays && options.retentionDays > 0) {

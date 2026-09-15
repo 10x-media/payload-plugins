@@ -43,7 +43,7 @@ await initTracker()
 
 The package ships ES modules, so bundle that entry into your site (or serve it from a CDN and import it in a `<script type="module">`). `initTracker` defaults to `GET /api/analytics/tracker`; pass `endpoint` when the app moved Payload's `routes.api`. A failed fetch or a non-ok response yields a tracker whose calls do nothing, so a missing analytics config never breaks the page that awaited it. The `/tracker` subpath has zero runtime dependencies: no React, no Payload, no Node built-ins.
 
-`GET /api/analytics/tracker` is public, answers `Cache-Control: private, max-age=60` with `Vary: Host`, sets no cookie, and carries only what an adapter declared as public (`capture.client` and `capture.snippet`), never a query credential and never a goal's admin-facing name.
+`GET /api/analytics/tracker` is public, answers `Cache-Control: private, max-age=60` with `Vary: Host, Cookie`, sets no cookie, and carries only what an adapter declared as public (`capture.client` and `capture.snippet`), never a query credential and never a goal's admin-facing name. Its payload is resolved per request, so a scoped install serves each scope its own slots and its own [goals](/analytics/goals#5-let-editors-manage-goals); both `Vary` keys are load-bearing for exactly that reason.
 
 ## Capture slots
 
@@ -152,6 +152,10 @@ trackGoal('book-demo', { value: 500, currency: 'EUR' })
 `props` are sanitized at native ingest: flat scalars only (string, finite number, boolean), at most 20 entries, keys up to 64 characters, string values truncated to 256. Anything else is dropped key by key and the event is still stored. Event names are capped at 128 characters, because the name is the `event` dimension's bucket key.
 
 Both calls fan out to every filled slot. Vendor sinks drop pageviews, because each vendor's own script tracks them.
+
+## Server-side tracking
+
+Not every event has a browser behind it. `trackServerEvent(payload, event, { req })` records a pageview, an event, or a goal completion from server code (a webhook, a job, a server action) through the native engine's own ingest pipeline, with no HTTP round trip and the same sanitizers this page describes. Pass the request it belongs to and the event inherits that request's attribution, scope, and reporting timezone. See [Track from server code](/analytics/goals#4-track-from-server-code) for the signature and what changes when there is no request.
 
 ## Content Security Policy
 

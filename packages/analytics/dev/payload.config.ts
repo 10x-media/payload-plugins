@@ -5,6 +5,7 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { analyticsTab } from '../src/index'
+import { ctaBlock } from './config/shared'
 import { singleFragment } from './config/single'
 import { tenancyFragment } from './config/tenancy'
 import { startMemoryMongo } from './helpers/memoryDb'
@@ -36,6 +37,7 @@ const pages: CollectionConfig = {
 					fields: [
 						{ name: 'title', type: 'text' },
 						{ name: 'slug', type: 'text', required: true },
+						{ name: 'layout', type: 'blocks', blocks: [ctaBlock] },
 					],
 				},
 				analyticsTab(),

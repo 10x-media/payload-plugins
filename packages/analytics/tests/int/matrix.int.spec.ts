@@ -2,6 +2,8 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import type { Config, Endpoint, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { readForField } from '../../src/fields/readForDocument'
+import { GOALS_SLUG } from '../../src/goals/collection'
+import { GOAL_ACTION_TYPE } from '../../src/goals/trackGoalAction'
 import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
@@ -20,7 +22,9 @@ import { insertIfNew } from '../../src/native/rollups/insertIfNew'
 import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
 import { type MemoryAnalyticsAdapter, memoryAdapter } from '../../src/testing/memoryAdapter'
 import { startOfDayInTz } from '../../src/timeframe/tz'
+import { resolveCustomRange } from '../../src/widgets/range'
 import { readForWidget } from '../../src/widgets/readForWidget'
+import { ACTION_HOST_SLUG, actionHost } from './actionHost'
 import { ingestRequest } from './ingestRequest'
 
 describeForDb('analytics cross-db', {}, (db) => {
@@ -39,6 +43,8 @@ describeForDb('analytics cross-db', {}, (db) => {
 		expect(booted.db).toBe(db)
 	})
 })
+
+const actionGoals: Goal[] = [{ slug: 'book-demo', name: 'Book a demo', match: { kind: 'goal' } }]
 
 const rollupInc = (over: Partial<RollupInc> = {}): RollupInc => ({
 	pageviews: 0,
@@ -200,6 +206,22 @@ describeForDb('native insertIfNew dedup', {}, (db) => {
 			})
 		).toBe(false)
 	})
+
+	// A pageview and a goal event arriving together race on one ledger row. The loser can come
+	// back as a driver duplicate-key error rather than a quiet no-op, which used to escape the
+	// ingest handler as a 500; enough concurrent writers reaches that branch on either adapter.
+	it(`answers "already seen" to every writer that loses a crowded race on ${db}`, async () => {
+		const key = {
+			bucket: 'crowded',
+			kind: 'visitor',
+			value: 'v',
+			period: new Date('2026-01-10T00:00:00Z'),
+		}
+		const results = await Promise.all(
+			Array.from({ length: 24 }, () => insertIfNew(booted.payload, SEEN_SLUG, key))
+		)
+		expect(results.filter(Boolean)).toHaveLength(1)
+	})
 })
 
 describeForDb('native distinct counting', {}, (db) => {
@@ -312,7 +334,10 @@ describeForDb('native goal rollups', {}, (db) => {
 	// Both assertions read the same two events, so they are ingested once here rather than
 	// by the first test, which would leave the second unable to run on its own.
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [adapter], goals }), db })
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [adapter], goals: { defaults: goals, collection: true } }),
+			db,
+		})
 		await ingest({ type: 'pageview', path: '/thank-you' })
 		await ingest({
 			type: 'goal',
@@ -372,6 +397,15 @@ describeForDb('native goal rollups', {}, (db) => {
 		})
 		expect(thanks?.conversions).toBe(1)
 		expect(thanks?.revenue).toBe(0)
+	})
+
+	it(`keeps one goal document per slug on ${db}`, async () => {
+		const demo = { name: 'Demo', slug: 'demo', match: { kind: 'goal' } }
+		await booted.payload.create({ collection: GOALS_SLUG, data: demo as never })
+		// The hook answers first; the collection's unique index is the storage-level backstop.
+		await expect(
+			booted.payload.create({ collection: GOALS_SLUG, data: { ...demo, name: 'Demo 2' } as never })
+		).rejects.toMatchObject({ data: { errors: [{ path: 'slug' }] } })
 	})
 
 	it(`returns one breakdown row per goal through the adapter on ${db}`, async () => {
@@ -611,6 +645,63 @@ describeForDb('native reporting timezone bucketing', {}, (db) => {
 		})
 		const period = new Date((rollups.docs[0] as unknown as { period: string }).period)
 		expect(period.toISOString()).toBe(startOfDayInTz(eventTs, TZ).toISOString())
+	})
+})
+
+describeForDb('custom range end bound', {}, (db) => {
+	const TZ = 'Europe/Berlin'
+	let booted: BootedPayload
+
+	// Jun 23 in Berlin ends at 2026-06-23T21:59:59.999Z, so 23:30 local is the last event
+	// inside the picked window and 00:30 the next morning is the first one outside it.
+	const pageview = (timestamp: string, visitor: string): StoredEvent => ({
+		timestamp: new Date(timestamp),
+		type: 'pageview',
+		path: '/cr',
+		hostname: 'h',
+		visitorHash: visitor,
+		sessionId: `${visitor}-s`,
+		timezone: TZ,
+	})
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native()], reportingTimezone: TZ }),
+			db,
+		})
+		await flushBatch(booted.payload, [
+			pageview('2026-06-23T21:30:00.000Z', 'in'),
+			pageview('2026-06-23T22:30:00.000Z', 'out'),
+		])
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it(`includes the final picked day up to its last instant on ${db}`, async () => {
+		const range = resolveCustomRange('custom', { from: '2026-06-01', to: '2026-06-23' }, TZ)
+		expect(range?.end.toISOString()).toBe('2026-06-23T21:59:59.999Z')
+		const req = { payload: booted.payload } as unknown as PayloadRequest
+		const args = {
+			req,
+			metrics: ['pageviews' as const],
+			timeframe: 'last30days' as const,
+			now: new Date(),
+			range,
+			timezone: TZ,
+		}
+		// Day rollups, whose period is bucketed on the reporting timezone's day.
+		const rollups = await readForWidget(args)
+		expect(rollups.status).toBe('ok')
+		expect(rollups.metrics.pageviews).toBe(1)
+		// And raw events, where the adapter compares the end instant itself.
+		const raw = await readForWidget({
+			...args,
+			filters: [{ dimension: 'page', operator: 'eq', value: '/cr' }],
+		})
+		expect(raw.status).toBe('ok')
+		expect(raw.metrics.pageviews).toBe(1)
 	})
 })
 
@@ -1161,5 +1252,40 @@ describeForDb('analytics sync tier: per-scope resolution isolation', {}, (db) =>
 			overrideAccess: true,
 		})
 		expect(docs.docs.length).toBeGreaterThanOrEqual(1)
+	})
+})
+
+describeForDb('form-builder action block composition', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native()], goals: { defaults: actionGoals } }),
+			collections: [actionHost()],
+			db,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it(`stores the action config under the action block slug on ${db}`, async () => {
+		const created = await booted.payload.create({
+			collection: ACTION_HOST_SLUG as never,
+			data: {
+				actions: [{ blockType: GOAL_ACTION_TYPE, goal: 'book-demo', value: 40, currency: 'EUR' }],
+			} as never,
+		})
+		const read = await booted.payload.findByID({
+			collection: ACTION_HOST_SLUG as never,
+			id: (created as { id: string | number }).id,
+		})
+		expect((read as { actions?: Array<Record<string, unknown>> }).actions?.[0]).toMatchObject({
+			blockType: GOAL_ACTION_TYPE,
+			goal: 'book-demo',
+			value: 40,
+			currency: 'EUR',
+		})
 	})
 })

@@ -2,7 +2,9 @@ import type { WidgetServerProps } from 'payload'
 import { BarList } from '../charts/BarList'
 import type { MetricKey } from '../core/contract'
 import { formatMetricValue } from '../fields/format'
+import { requestTimezone } from '../plugin/runtime'
 import type { TimeframePreset } from '../timeframe/presets'
+import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { keys, type TranslationKey } from '../translations/keys'
 import { TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
@@ -11,19 +13,24 @@ import { cardStyle, labelStyle } from './cardChrome'
 import { formatRangeCaption, resolveCustomRange } from './range'
 import type { WidgetReadStatus } from './readForWidget'
 import { readForWidgetBreakdown } from './readForWidgetBreakdown'
+import { viewTabForDimension, type WidgetViewProps, widgetViewHref } from './viewLink'
+import { WidgetViewLink } from './WidgetViewLink'
 
 const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
 	'not-configured': keys.stateNotConfigured,
 	unavailable: keys.stateUnavailable,
 }
 
-export default async function AnalyticsBreakdownWidget(props: WidgetServerProps) {
+export default async function AnalyticsBreakdownWidget(props: WidgetServerProps & WidgetViewProps) {
 	const spec = breakdownSpecBySlug(props.widgetSlug)
 	const t = asTranslate(props.req.i18n.t)
 	const data = (props.widgetData ?? {}) as BreakdownWidgetData
 	const metric: MetricKey = data.metric ?? 'pageviews'
 	const rawTimeframe = data.timeframe ?? 'last30days'
-	const customRange = resolveCustomRange(rawTimeframe, data.range)
+	// Only a custom range needs the reporting timezone before the read; a preset window
+	// resolves inside the read path, which resolves the timezone there as it always has.
+	const timezone = rawTimeframe === 'custom' ? await requestTimezone(props.req) : undefined
+	const customRange = timezone ? resolveCustomRange(rawTimeframe, data.range, timezone) : undefined
 	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
 	const limit = data.limit ?? 5
 	const title = data.title?.trim() || (spec ? t(spec.label) : '')
@@ -36,6 +43,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps)
 		)
 	}
 
+	const tab = viewTabForDimension(spec.dimension)
 	const result = await readForWidgetBreakdown({
 		req: props.req,
 		metric,
@@ -45,12 +53,24 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps)
 		adapterId: data.dataSource,
 		now: new Date(),
 		range: customRange,
+		...(timezone ? { timezone } : {}),
+	})
+	// The adapter that answered, which on a scoped or runtime-provider install is not the
+	// id the widget asked for.
+	const href = widgetViewHref(props.view, props.req, {
+		timeframe: rawTimeframe,
+		timezone: timezone ?? DEFAULT_TIMEZONE,
+		...(customRange ? { range: customRange } : {}),
+		...(result.adapterId ? { source: result.adapterId } : {}),
+		...(tab ? { tab } : {}),
+		metric,
 	})
 
 	const locale = props.req.i18n.language ?? 'en-US'
-	const caption = customRange
-		? formatRangeCaption(customRange, locale)
-		: t(TIMEFRAME_KEYS[timeframe])
+	const caption =
+		customRange && timezone
+			? formatRangeCaption(customRange, locale, timezone)
+			: t(TIMEFRAME_KEYS[timeframe])
 	return (
 		<div className="analytics-breakdown-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>
@@ -72,6 +92,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps)
 					{t(keys.stateClamped)}
 				</span>
 			) : null}
+			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
 		</div>
 	)
 }

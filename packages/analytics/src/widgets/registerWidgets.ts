@@ -18,7 +18,8 @@ import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { labelForKey } from '../translations/server'
 import { BREAKDOWN_SPECS, type BreakdownSpec } from './breakdownTypes'
 import { buildCustomWidgets, type CustomWidgetDef } from './customWidget'
-import { WIDGET_METRICS } from './types'
+import { GOAL_ROW_LIMITS, WIDGET_METRICS } from './types'
+import type { WidgetView } from './viewLink'
 
 /**
  * Select options must carry static labels: `filterOptions` results are serialized
@@ -46,6 +47,13 @@ export interface RegisterWidgetsArgs {
 	localizeText?: boolean
 	/** The plugin's configured defaultAdapter, when set; falls back to the first adapter. */
 	defaultId?: string
+	/** `widgets.comparison`; false hides every compare checkbox. Defaults to on. */
+	comparison?: boolean
+	/**
+	 * Where the analytics view mounts, so every built-in widget can link into it. False or
+	 * absent means no view to link to, and the widgets render without the footer link.
+	 */
+	view?: WidgetView
 }
 
 interface WidgetDef {
@@ -147,6 +155,14 @@ const timeframeSelectField = (): Field => ({
 	],
 })
 
+/** Reads the previous period too: the trend overlays it, the goals table deltas against it. */
+const compareField = (): Field => ({
+	name: 'compare',
+	type: 'checkbox',
+	defaultValue: false,
+	label: labelForKey(keys.widgetFieldCompare),
+})
+
 const dataSourceField = (args: RegisterWidgetsArgs): Field => ({
 	name: 'dataSource',
 	type: 'select',
@@ -184,20 +200,20 @@ const customRangeField = (): Field =>
 export const findMetricField = (fields: Field[]): Field | undefined =>
 	fields.find((field) => 'name' in field && field.name === 'metric')
 
-const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
+const metricWidgetFields = (args: RegisterWidgetsArgs, extra: Field[] = []): Field[] => [
 	titleField(args, en[keys.widgetFieldTitlePlaceholder]),
 	metricSelectField(WIDGET_METRICS, args),
 	timeframeSelectField(),
 	customRangeField(),
+	...extra,
 	...(args.multiProvider ? [dataSourceField(args)] : []),
 ]
 
 const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): Field[] => [
 	titleField(args, en[spec.label]),
-	// A goals breakdown is a conversion table: pageviews per goal is a stranger default.
 	metricSelectField(WIDGET_METRICS, args, {
 		extra: { dimensions: [spec.dimension] },
-		...(spec.dimension === 'goal' ? { preferredDefault: 'conversions' as MetricKey } : {}),
+		...(spec.preferredDefault ? { preferredDefault: spec.preferredDefault } : {}),
 	}),
 	timeframeSelectField(),
 	customRangeField(),
@@ -209,6 +225,25 @@ const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): 
 		max: 20,
 		label: labelForKey(keys.widgetFieldLimit),
 	},
+	...(args.multiProvider ? [dataSourceField(args)] : []),
+]
+
+/** A select, not the breakdown's free number: the goals table is a summary, not a report. */
+const goalLimitField = (): Field => ({
+	name: 'limit',
+	type: 'select',
+	defaultValue: String(GOAL_ROW_LIMITS[0]),
+	label: labelForKey(keys.widgetFieldLimit),
+	admin: { isClearable: false },
+	options: GOAL_ROW_LIMITS.map((limit) => ({ value: String(limit), label: String(limit) })),
+})
+
+const goalsWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
+	titleField(args, en[keys.widgetGoals]),
+	timeframeSelectField(),
+	customRangeField(),
+	goalLimitField(),
+	...(args.comparison === false ? [] : [compareField()]),
 	...(args.multiProvider ? [dataSourceField(args)] : []),
 ]
 
@@ -250,7 +285,7 @@ const WIDGET_DEFS: WidgetDef[] = [
 		requires: { metrics: ['pageviews'] },
 		minWidth: 'small',
 		maxWidth: 'full',
-		fields: metricWidgetFields,
+		fields: (args) => metricWidgetFields(args, args.comparison === false ? [] : [compareField()]),
 	},
 	{
 		slug: 'analytics-realtime',
@@ -260,6 +295,15 @@ const WIDGET_DEFS: WidgetDef[] = [
 		minWidth: 'small' as WidgetWidth,
 		maxWidth: 'medium' as WidgetWidth,
 		fields: realtimeWidgetFields,
+	},
+	{
+		slug: 'analytics-goals',
+		component: '@10x-media/analytics/rsc#AnalyticsGoalsWidget',
+		label: keys.widgetGoals,
+		requires: { metrics: ['conversions'], dimensions: ['goal'] },
+		minWidth: 'small' as WidgetWidth,
+		maxWidth: 'large' as WidgetWidth,
+		fields: goalsWidgetFields,
 	},
 	...BREAKDOWN_SPECS.map(
 		(spec): WidgetDef => ({
@@ -292,7 +336,7 @@ export const registerWidgets = (config: Config, args: RegisterWidgetsArgs): void
 		}
 		built.push({
 			slug: def.slug,
-			Component: def.component,
+			Component: { path: def.component, serverProps: { view: args.view ?? false } },
 			label: labelForKey(def.label),
 			fields,
 			minWidth: def.minWidth,

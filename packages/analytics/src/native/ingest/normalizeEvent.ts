@@ -164,6 +164,7 @@ export async function normalizeEvent({
 	const scrollDepth = depth(raw.scrollDepth)
 	const durationMs = duration(raw.durationMs)
 	const name = eventName(raw.name)
+	const device = classifyDevice(ua)
 	// Match on the sanitized fields so a rejected value never reaches a goal's revenue.
 	const completions = goals?.length
 		? matchGoals({ type: raw.type, name, path, props, value }, goals)
@@ -175,7 +176,7 @@ export async function normalizeEvent({
 		path,
 		hostname,
 		referrer: raw.referrer,
-		device: classifyDevice(ua),
+		...(device ? { device } : {}),
 		source: deriveSource(raw.referrer, hostname),
 		country: geo.country,
 		region: geo.region,

@@ -1,7 +1,8 @@
 import type { PayloadRequest } from 'payload'
 import {
 	type AnalyticsRuntime,
-	platformReadFor,
+	type PlatformReadGate,
+	platformReadGate,
 	resolveRegistryFor,
 	resolveScopeFor,
 } from '../plugin/runtime'
@@ -25,6 +26,41 @@ export interface ResolveReadContextArgs {
 	scope?: string | null
 }
 
+export interface QueryScopeArgs {
+	runtime: AnalyticsRuntime
+	req: PayloadRequest
+	/** The read's resolved scope; `'*'` is the explicit cross-scope marker. */
+	scope: string | null
+	adapter: AnalyticsAdapter
+	/** Shared `platformRead` decision; one is created per call when omitted. */
+	platformRead?: PlatformReadGate
+}
+
+/**
+ * The scope to stamp on one adapter query, or a refusal. Cross-scope reads fail closed
+ * behind `platformRead`: the `'*'` marker, and any scoped read through a shared config
+ * adapter that cannot narrow the query to one scope (whether or not it is the designated
+ * platform adapter), which would otherwise answer with every scope's data. A tenant's own
+ * runtime adapters are never gated. Every read path decides this here, so the widgets and
+ * the query endpoint cannot drift apart on what counts as cross-scope.
+ */
+export const resolveQueryScope = async (
+	args: QueryScopeArgs
+): Promise<{ ok: true; queryScope?: string } | { ok: false }> => {
+	const { runtime, req, scope, adapter } = args
+	const allowed = args.platformRead ?? platformReadGate(runtime, req)
+	if (scope === PLATFORM_SCOPE) {
+		return (await allowed()) ? { ok: true } : { ok: false }
+	}
+	if (scope === null) {
+		return { ok: true }
+	}
+	if (runtime.configAdapterIds.has(adapter.id) && !adapter.capabilities.scopedQueries) {
+		return (await allowed()) ? { ok: true } : { ok: false }
+	}
+	return { ok: true, queryScope: scope }
+}
+
 /**
  * Resolve one read's scope and adapter: explicit scope wins over the request's
  * resolved scope, the registry is resolved per scope, then the adapter is picked
@@ -44,14 +80,10 @@ export interface ResolveReadContextArgs {
  */
 export const resolveReadContext = async (args: ResolveReadContextArgs): Promise<ReadContext> => {
 	const { runtime, req, adapterId } = args
+	const allowed = platformReadGate(runtime, req)
 	try {
 		const scope = args.scope !== undefined ? args.scope : await resolveScopeFor(runtime, req)
-		if (
-			runtime.scoped &&
-			args.scope === undefined &&
-			scope === null &&
-			!(await platformReadFor(runtime, req))
-		) {
+		if (runtime.scoped && args.scope === undefined && scope === null && !(await allowed())) {
 			return { ok: false }
 		}
 		const registryScope = scope === PLATFORM_SCOPE ? null : scope
@@ -61,23 +93,17 @@ export const resolveReadContext = async (args: ResolveReadContextArgs): Promise<
 			scope: registryScope,
 		})
 		const adapter = adapterId ? registry.get(adapterId) : registry.default()
-		if (scope === PLATFORM_SCOPE) {
-			if (!(await platformReadFor(runtime, req))) {
-				return { ok: false }
-			}
-			return { ok: true, adapter, scope: null, queryScope: undefined }
+		const decision = await resolveQueryScope({
+			runtime,
+			req,
+			scope,
+			adapter,
+			platformRead: allowed,
+		})
+		if (!decision.ok) {
+			return { ok: false }
 		}
-		if (
-			scope !== null &&
-			runtime.configAdapterIds.has(adapter.id) &&
-			!adapter.capabilities.scopedQueries
-		) {
-			if (!(await platformReadFor(runtime, req))) {
-				return { ok: false }
-			}
-			return { ok: true, adapter, scope, queryScope: undefined }
-		}
-		return { ok: true, adapter, scope, queryScope: scope ?? undefined }
+		return { ok: true, adapter, scope: registryScope, queryScope: decision.queryScope }
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: read context resolution failed: ${String(err)}`)
 		return { ok: false }

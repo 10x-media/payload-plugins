@@ -2,6 +2,8 @@ import config from '@payload-config'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
+import { goalSlug } from '../../../../src/index'
+import type { Page } from '../../../payload-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,7 +15,7 @@ export default async function DevPage({ params }: { params: Promise<{ slug: stri
 		where: { slug: { equals: slug } },
 		limit: 1,
 	})
-	const page = result.docs[0] as { title?: string; slug: string } | undefined
+	const page = result.docs[0] as Page | undefined
 	if (!page) {
 		notFound()
 	}
@@ -30,6 +32,14 @@ export default async function DevPage({ params }: { params: Promise<{ slug: stri
 					Analytics tab in the admin panel.
 				</span>
 			</p>
+			{(page.layout ?? []).map((block, index) => (
+				<section key={block.id ?? index}>
+					{block.heading ? <h2>{block.heading}</h2> : null}
+					<button data-analytics-goal={goalSlug(block.goal) ?? undefined} type="button">
+						{block.label}
+					</button>
+				</section>
+			))}
 		</main>
 	)
 }
