@@ -16,8 +16,10 @@ trap cleanup EXIT
 echo "Starting e2e DBs (mongo:8 replSet + postgres:16)..."
 docker compose -f docker-compose.test.yml up -d --wait
 
-echo "Building plugin..."
-pnpm --filter @10x-media/webhooks build
+# Everything the dev app imports from the workspace, not just this plugin: a fresh
+# checkout has no dist/ for any of it.
+echo "Building the dev app's workspace dependencies..."
+pnpm --filter '@10x-media/webhooks-dev^...' build
 
 echo "Generating dev app import map..."
 bash "$REPO_ROOT/scripts/payload.sh" "$PKG_DIR/dev" generate:importmap
