@@ -18,7 +18,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Component steps** with the full wizard API (`useWizard`, `useWizardState`, `finish`), and slots for every piece of chrome down to a headless layout.
 - **Drawers too**: a document created from a relationship field's drawer gets the same variant.
 - **No storage**: the chosen variant and the open section of a sections variant are Payload preferences. A guided variant always starts at its first step, so its steps cannot be linked past.
-- **Typed translations** with per-key overrides via `@10x-media/form-variants/i18n`.
+- **Typed translations** in eleven locales, with per-key overrides via `@10x-media/form-variants/i18n`.
 
 ## Quick start
 

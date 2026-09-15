@@ -10,9 +10,9 @@ The chrome is slots. A slot is a Payload component rendered on the server with s
 | Slot | Default |
 |---|---|
 | `Layout` | Wraps everything a variant renders |
-| `Progress` | Step n of m, step labels |
-| `StepHeader` | Label and description of the current step |
-| `Navigation` | Back, Next, and Save on the final step |
+| `Progress` | A rail of the visible steps, with the passed ones marked and failing ones carrying an error pill. Renders nothing for a single step |
+| `StepHeader` | Description of the current step, and its label too when no progress rail is on screen to show it already |
+| `Navigation` | The footer: one status line, Back, and one primary button (Next, or the save controls on the final step) |
 | `VariantSwitcher` | Shown when two or more variants are available, including on `native` |
 | `Outcome` | Shown after `finish(outcome)` or an `outcome` after-save action |
 
@@ -81,7 +81,7 @@ Every class is stable and prefixed `form-variants__`. Defaults are declared with
 
 ## Translations
 
-The plugin ships English. Override or add a locale through the plugin option:
+The plugin ships `ar`, `de`, `en`, `es`, `fr`, `id`, `ko`, `pt`, `ru`, `uk` and `zh`. Override any of them, or add a locale it does not ship, through the plugin option:
 
 ```ts
 import { keys } from '@10x-media/form-variants/i18n'

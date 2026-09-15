@@ -26,6 +26,7 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 import { PersonOutcome as PersonOutcome_f37d6683b4bbe07709590322e22d27a9 } from '../../../components/PersonOutcome'
 import { DuplicateCheckStep as DuplicateCheckStep_b624fd749668535e2e5cce445115db6f } from '../../../components/DuplicateCheckStep'
 import { ProgramHint as ProgramHint_adcdd37f929b12849013aec1a6d69b4c } from '../../../components/ProgramHint'
+import { ContainerNote as ContainerNote_7bc51643bc6f275402cce3f0f32077a1 } from '../../../components/ContainerNote'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -56,5 +57,6 @@ export const importMap = {
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
   "./components/PersonOutcome#PersonOutcome": PersonOutcome_f37d6683b4bbe07709590322e22d27a9,
   "./components/DuplicateCheckStep#DuplicateCheckStep": DuplicateCheckStep_b624fd749668535e2e5cce445115db6f,
-  "./components/ProgramHint#ProgramHint": ProgramHint_adcdd37f929b12849013aec1a6d69b4c
+  "./components/ProgramHint#ProgramHint": ProgramHint_adcdd37f929b12849013aec1a6d69b4c,
+  "./components/ContainerNote#ContainerNote": ContainerNote_7bc51643bc6f275402cce3f0f32077a1
 }

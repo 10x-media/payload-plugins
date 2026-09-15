@@ -135,6 +135,7 @@ export const containers: CollectionConfig = {
 									label: 'Reaching them',
 									description: 'A group of the step, over fields from the collection group.',
 									fields: [
+										{ type: 'component', Component: './components/ContainerNote#ContainerNote' },
 										{ type: 'row', fields: ['contact.email', 'contact.phone'] },
 										'contact.postal.city',
 									],

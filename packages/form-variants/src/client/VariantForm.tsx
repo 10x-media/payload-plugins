@@ -52,13 +52,6 @@ const PENDING_SUCCESS_TOAST_KEY = 'payload-pending-success-toast'
 type Props = VariantProviderProps & { variant: ClientVariant }
 
 /**
- * Whether a save came from Payload's `Autosave`, which is the one caller that turns
- * `getDocPermissions` off in its submit context. Autosave never triggers `afterSave`.
- */
-const isAutosave = (context: Record<string, unknown> | undefined): boolean =>
-	context?.getDocPermissions === false
-
-/**
  * The plugin's own edit form: Payload's `Form` and document modals, the variant's top bar,
  * and the step runner. It is not a copy of `DefaultEditView`: there is no document controls
  * bar (status menu, duplicate, delete, preview, autosave), which stays on `native`.
@@ -317,7 +310,9 @@ export const VariantForm: React.FC<Props> = (props) => {
 			}
 
 			const isPageCreate = !isEditing && depth < 2 && redirectAfterCreate !== false
-			const action = isAutosave(context) ? null : await runAfterSave(document, saveOperation)
+			// Every save here is a deliberate one: the variant form renders no `Autosave`, so
+			// `afterSave` needs no exception for the writes autosave would otherwise make.
+			const action = await runAfterSave(document, saveOperation)
 
 			if (action && 'redirect' in action) {
 				startRouteTransition(() => router.push(action.redirect))

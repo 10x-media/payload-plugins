@@ -77,6 +77,29 @@ export const DuplicateCheckStep = () => {
 }
 ```
 
+### Driving the footer
+
+A component step that needs a button of its own does not have to draw one. `setPrimaryAction` replaces the footer's primary button while the step is open, and `setMessage` writes the line beside it, so the step keeps the one Back button, the one primary button and the one status line every other step has.
+
+```tsx
+const { setMessage, setPrimaryAction } = useWizard()
+
+useEffect(() => {
+  if (matches === null) {
+    setPrimaryAction({ disabled: true, label: 'Searching…', onClick: () => {} })
+    return
+  }
+  if (matches.length === 0) {
+    setPrimaryAction(null) // back to the wizard's own Next or Save
+    return
+  }
+  setMessage(`${matches.length} people already have that name.`)
+  setPrimaryAction({ label: 'Ask an admin to create it', onClick: requestCreation })
+}, [matches, requestCreation, setMessage, setPrimaryAction])
+```
+
+Both lapse on their own when the step changes, so there is nothing to clean up. `setPrimaryAction(null)` restores Next, or the save controls on the final step. Hiding the footer entirely with `components: { Navigation: false }` and drawing a second set of buttons is the other way, and it is the one that ends up with two of everything.
+
 ## Conditions
 
 A step's `condition` runs on the server with the current values and wizard state. It is evaluated at page render against the saved document, on every step change, and again after each edit the form settles on, so a step appears or disappears as soon as the field its condition reads changes rather than at the next move. On a new document the first render has empty values, so a condition that depends on them is false until the first edit.
@@ -117,10 +140,10 @@ From `@10x-media/form-variants/client`:
 
 | Hook | Gives |
 |---|---|
-| `useWizard()` | `step`, `steps`, `index`, `count`, `isFirst`, `isLast`, `next()`, `back()`, `goTo(key)`, `canGoTo(key)`, `save({ draft }?)`, `finish(outcome)`, `blockSave(reason)` / `allowSave()`, `saveAllowed`, `saveBlockedReason`, `onBeforeNext(fn)`, `busy`, `error`, `readOnly` |
+| `useWizard()` | `step`, `steps`, `index`, `count`, `isFirst`, `isLast`, `next()`, `back()`, `goTo(key)`, `canGoTo(key)`, `errorCount(key)`, `save({ draft }?)`, `finish(outcome)`, `blockSave(reason)` / `allowSave()`, `saveAllowed`, `saveBlockedReason`, `saveBlockedMessage`, `onBeforeNext(fn)`, `setPrimaryAction(action)` / `primaryAction`, `setMessage(text)` / `message`, `busy`, `error`, `readOnly`, `variant` |
 | `useWizardState<T>(key)` | `[value, setValue]` over one key of wizard state |
 | `useOutcome()` | The data `finish()` or an `outcome` after-save action left behind |
-| `useFormVariants()` | `active`, `available`, `switchTo(key)`, `inDrawer` |
+| `useFormVariants()` | `active`, `available`, `switchTo(key)`, `inDrawer`, `outcome`, `state` / `setState`, `collectionSlug` |
 | Payload's `useForm`, `useField`, `useFormFields`, `useDocumentInfo` | The form and the document, unchanged |
 
 `finish(outcome)` ends the wizard without a native save and shows the `Outcome` slot. `onBeforeNext` is the client-side counterpart of `gate`; returning `false` refuses the move.

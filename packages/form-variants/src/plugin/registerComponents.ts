@@ -2,7 +2,7 @@ import type { CollectionConfig, Config, EditConfig, PayloadComponent } from 'pay
 
 import type { SlotComponents } from '../types'
 import { DEPENDENCY_PREFIX, VIEW_PATH } from './constants'
-import type { ResolvedCollection } from './registry'
+import type { ResolvedCollection, ResolvedFieldItem } from './registry'
 
 type Dependencies = NonNullable<NonNullable<Config['admin']>['dependencies']>
 
@@ -49,6 +49,25 @@ export const collectDependencies = (
 		}
 	}
 
+	/**
+	 * Component items anywhere in a step, containers included. A step's `row`, `collapsible` and
+	 * `group` nest freely and may hold components, and the render walk descends into them, so this
+	 * one has to as well or a nested component is rendered from an import map that never heard of it.
+	 * The key follows the same dotted index path the renderer addresses the item by.
+	 */
+	const addItems = (stepKey: string, items: ResolvedFieldItem[], prefix: string): void => {
+		items.forEach((item, index) => {
+			const at = prefix === '' ? String(index) : `${prefix}.${index}`
+			if (item.type === 'component') {
+				add(`${stepKey}-item-${at}`, item.Component)
+				return
+			}
+			if ('items' in item) {
+				addItems(stepKey, item.items, at)
+			}
+		})
+	}
+
 	addSlots(`${DEPENDENCY_PREFIX}-slot`, pluginSlots)
 
 	for (const collection of Object.values(collections)) {
@@ -60,11 +79,7 @@ export const collectDependencies = (
 				const stepKey = `${variantKey}-${step.key}`
 				add(`${stepKey}-component`, step.Component)
 				addSlots(`${stepKey}-slot`, step.components)
-				step.items.forEach((item, index) => {
-					if (item.type === 'component') {
-						add(`${stepKey}-item-${index}`, item.Component)
-					}
-				})
+				addItems(stepKey, step.items, '')
 			}
 		}
 	}
