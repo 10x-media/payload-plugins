@@ -1,11 +1,12 @@
 import type { Payload, PayloadRequest } from 'payload'
+import { GOALS_SLUG } from '../../src/goals/collection'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { syncTask } from '../../src/sync/syncTask'
 import { startOfDayInTz } from '../../src/timeframe/tz'
-import { DEV_REPORTING_TIMEZONE } from '../config/shared'
-import { tenancyScopes } from '../config/tenancy'
+import { DEV_REPORTING_TIMEZONE, pagePath } from '../config/shared'
+import { GOAL_SCOPE_FIELD, tenancyScopes } from '../config/tenancy'
 import { devMemoryAdapter } from './adapters'
 
 const DEV_EMAIL = 'dev@10xmedia.de'
@@ -19,6 +20,15 @@ const SEED_DEVICES = ['desktop', 'mobile', 'tablet'] as const
 const SEED_SOURCES = ['google.com', 'Direct', 't.co', 'news.ycombinator.com']
 const SEED_VISITOR_COUNT = 6
 const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Named custom events, so the events breakdown widget has rows on a fresh boot. */
+const SEED_EVENT_NAMES = ['signup', 'download', 'video-play']
+
+/**
+ * One conversion every third dense day, so the goals widget shows a table on a fresh boot and
+ * every preset compares against a previous window that also converted.
+ */
+const CONVERSION_EVERY_DAYS = 3
 
 /**
  * Two years, so every preset compares against a populated previous window and the widgets
@@ -50,17 +60,26 @@ const pageviewsForDay = (day: number): number =>
 			: 0
 
 /**
- * Builds a deterministic span of pageview events. `scale` multiplies the daily volume
- * (alpha and beta get different scales in tenancy mode); `scope` stamps every event.
- * A scoped install has no scope-less bucket family (rollups make `scope` required,
- * '' = null scope), so omitting it is only correct for a genuinely unscoped install.
+ * Builds a deterministic span of pageview events, plus the named custom events and goal
+ * completions the events and goals surfaces read. `scale` multiplies the daily pageview
+ * volume (alpha and beta get different scales in tenancy mode); `scope` stamps every event;
+ * `goal` names the goal the seeded conversions complete (the install's own collection goal,
+ * per tenant in tenancy mode) and the path they happen on, which is that goal's own CTA page
+ * rather than the site root: `/` carries the conversions the e2e specs fire by hand, and one
+ * of them asserts the other tenant's root has none. A scoped install has no scope-less bucket
+ * family (rollups make `scope` required, '' = null scope), so omitting `scope` is only
+ * correct for a genuinely unscoped install.
+ *
+ * Seeded events bypass the ingest endpoint, so goal matching never runs on them: a
+ * conversion has to carry its completion explicitly, at the value the goal document states.
  */
 const buildSeedEvents = (
 	now: Date,
-	opts: { scale?: number; scope?: string } = {}
+	opts: { scale?: number; scope?: string; goal?: { slug: string; path: string } } = {}
 ): StoredEvent[] => {
 	const scale = opts.scale ?? 1
 	const events: StoredEvent[] = []
+	const scoped = opts.scope !== undefined ? { scope: opts.scope } : {}
 	for (let day = 0; day < SEED_DAYS; day++) {
 		const pageviewsToday = Math.max(0, Math.round(pageviewsForDay(day) * scale))
 		for (let i = 0; i < pageviewsToday; i++) {
@@ -79,7 +98,40 @@ const buildSeedEvents = (
 				device: SEED_DEVICES[(day + i) % SEED_DEVICES.length],
 				source: SEED_SOURCES[(day + i) % SEED_SOURCES.length],
 				timezone: DEV_REPORTING_TIMEZONE,
-				...(opts.scope !== undefined ? { scope: opts.scope } : {}),
+				...scoped,
+			})
+		}
+		if (day >= SEED_DENSE_DAYS) {
+			continue
+		}
+		const visitorHash = `seed-visitor-${day % SEED_VISITOR_COUNT}`
+		const attribution = {
+			hostname: 'localhost',
+			visitorHash,
+			sessionId: `${visitorHash}-d${day}`,
+			country: SEED_COUNTRIES[day % SEED_COUNTRIES.length],
+			device: SEED_DEVICES[day % SEED_DEVICES.length],
+			source: SEED_SOURCES[day % SEED_SOURCES.length],
+			timezone: DEV_REPORTING_TIMEZONE,
+			...scoped,
+		}
+		events.push({
+			timestamp: new Date(now.getTime() - day * DAY_MS + 60_000),
+			type: 'event',
+			name: SEED_EVENT_NAMES[day % SEED_EVENT_NAMES.length] ?? 'signup',
+			path: SEED_PATHS[day % SEED_PATHS.length] ?? '/',
+			...attribution,
+		})
+		if (opts.goal && day % CONVERSION_EVERY_DAYS === 0) {
+			events.push({
+				timestamp: new Date(now.getTime() - day * DAY_MS + 120_000),
+				type: 'goal',
+				name: opts.goal.slug,
+				path: opts.goal.path,
+				value: GOAL_VALUE,
+				currency: GOAL_CURRENCY,
+				goals: [{ slug: opts.goal.slug, value: GOAL_VALUE }],
+				...attribution,
 			})
 		}
 	}
@@ -124,9 +176,16 @@ const SEED_PAGES = [
 	{ title: 'Contact', slug: 'contact' },
 ]
 
-/** Mirror the native seed into the memory provider so multi-provider reads have data. */
+/**
+ * Mirror the native seed into the memory provider so multi-provider reads have data. The
+ * provider counts pageviews only, so the seeded custom events and conversions stay out of it
+ * rather than arriving there as extra pageviews.
+ */
 const seedMemoryAdapter = (events: StoredEvent[]): void => {
 	for (const event of events) {
+		if (event.type !== 'pageview') {
+			continue
+		}
 		devMemoryAdapter.record({
 			path: event.path,
 			timestamp: event.timestamp,
@@ -228,13 +287,127 @@ const seedTenantProviders = async (
 	payload.logger.info(`Seeded analytics-providers: ${SEED_PROVIDERS.map((p) => p.name).join(', ')}`)
 }
 
+/** Every seeded collection goal is worth the same fixed amount, so revenue is checkable. */
+const GOAL_VALUE = 10
+const GOAL_CURRENCY = 'EUR'
+
+interface SeedGoalPage {
+	goal: { slug: string; name: string }
+	page: { title: string; slug: string; heading: string; label: string }
+}
+
+/** The unscoped install's editor-managed goal and the page whose CTA block points at it. */
+const SEED_GOAL_PAGE: SeedGoalPage = {
+	goal: { slug: 'newsletter', name: 'Newsletter signup' },
+	page: {
+		title: 'Newsletter',
+		slug: 'newsletter',
+		heading: 'Stay in the loop',
+		label: 'Subscribe',
+	},
+}
+
+/**
+ * One goal per tenant, each on its own page, so a click on alpha's CTA is a conversion for
+ * alpha and nothing at all for beta: the same isolation the providers seed demonstrates, on
+ * the goals surface.
+ */
+const SEED_TENANT_GOAL_PAGES: Array<SeedGoalPage & { tenantKey: 'alpha' | 'beta' }> = [
+	{
+		tenantKey: 'alpha',
+		goal: { slug: 'alpha-newsletter', name: 'Alpha newsletter signup' },
+		page: {
+			title: 'Alpha offer',
+			slug: 'alpha-offer',
+			heading: 'Alpha: stay in the loop',
+			label: 'Subscribe',
+		},
+	},
+	{
+		tenantKey: 'beta',
+		goal: { slug: 'beta-quote', name: 'Beta quote request' },
+		page: {
+			title: 'Beta offer',
+			slug: 'beta-offer',
+			heading: 'Beta: tell us what you need',
+			label: 'Request a quote',
+		},
+	},
+]
+
+/**
+ * A goal document and its CTA page, both guarded by slug so a re-boot against a populated
+ * database adds neither twice. The scope is written under whatever field the install points
+ * `scopeField` at (`GOAL_SCOPE_FIELD` for the tenancy fragment), never a hard-coded key:
+ * writing `scope` to a collection scoped by a tenant plugin's own relationship field would
+ * land every seeded goal install-wide instead. Stamped as the platform admin for the same
+ * reason the provider seed is: the hook that stamps the scope only honours an explicit one
+ * from a request it recognizes as platform-wide, and the seed carries no tenant cookie.
+ */
+const seedGoalPage = async (
+	payload: Payload,
+	entry: SeedGoalPage,
+	opts: {
+		platformAdmin: { id: string | number }
+		scope?: { field: string; value: string | number }
+	}
+): Promise<void> => {
+	const { platformAdmin, scope } = opts
+	const existingGoal = await payload.count({
+		collection: GOALS_SLUG as never,
+		where: { slug: { equals: entry.goal.slug } },
+	})
+	if (existingGoal.totalDocs === 0) {
+		await payload.create({
+			collection: GOALS_SLUG as never,
+			data: {
+				name: entry.goal.name,
+				slug: entry.goal.slug,
+				enabled: true,
+				match: { kind: 'goal' },
+				value: { fixed: GOAL_VALUE },
+				currency: GOAL_CURRENCY,
+				...(scope ? { [scope.field]: scope.value } : {}),
+			} as never,
+			overrideAccess: true,
+			user: platformAdmin as never,
+		})
+		payload.logger.info(`Seeded collection goal: ${entry.goal.slug}`)
+	}
+
+	const existingPage = await payload.count({
+		collection: 'pages' as never,
+		where: { slug: { equals: entry.page.slug } },
+	})
+	if (existingPage.totalDocs === 0) {
+		await payload.create({
+			collection: 'pages' as never,
+			data: {
+				title: entry.page.title,
+				slug: entry.page.slug,
+				layout: [
+					{
+						blockType: 'cta',
+						heading: entry.page.heading,
+						label: entry.page.label,
+						goal: entry.goal.slug,
+					},
+				],
+			} as never,
+		})
+		payload.logger.info(`Seeded CTA page: /${entry.page.slug}`)
+	}
+}
+
 /**
  * Seed the dev Payload app: an admin user to log in with, page documents matching the
  * seeded traffic paths (so the per-document Analytics tab shows real numbers), a
  * two-year span of sample pageviews in both the native engine and the memory provider,
- * and one sync pass so the analytics-daily collection has rows to inspect. In tenancy
- * mode, additionally seeds the `tenants` collection, a tenant-scoped admin per tenant,
- * a scaled-volume traffic span per tenant, and one placeholder provider doc per tenant.
+ * one sync pass so the analytics-daily collection has rows to inspect, and one
+ * editor-managed goal with the CTA page that converts it. In tenancy mode, additionally
+ * seeds the `tenants` collection, a tenant-scoped admin per tenant, a scaled-volume
+ * traffic span per tenant, one placeholder provider doc per tenant, and one goal plus CTA
+ * page per tenant instead of the unscoped pair.
  * Idempotent (each block is skipped once its collection is populated).
  */
 export const seedDev = async (
@@ -269,26 +442,61 @@ export const seedDev = async (
 		await seedTenantUsers(payload, tenants)
 	}
 
+	// Each scope converts its own goal on that goal's own CTA page, so a tenant's goals
+	// widget lists that tenant's goal and never the other one.
+	const conversionsFor = (entry: SeedGoalPage): { slug: string; path: string } => {
+		const path = pagePath(entry.page)
+		if (!path) {
+			throw new Error(`analytics dev seed: goal page "${entry.goal.slug}" has no path`)
+		}
+		return { slug: entry.goal.slug, path }
+	}
+	const tenantGoal = (tenantKey: 'alpha' | 'beta'): SeedGoalPage => {
+		const entry = SEED_TENANT_GOAL_PAGES.find((e) => e.tenantKey === tenantKey)
+		if (!entry) {
+			throw new Error(`analytics dev seed: no goal page for tenant "${tenantKey}"`)
+		}
+		return entry
+	}
 	const events = [
 		// Tenancy mode is a scoped install, so even the install-wide pass needs the
 		// explicit null-scope stamp ('') rather than an absent scope key.
-		...buildSeedEvents(new Date(), tenants ? { scope: '' } : {}),
+		...buildSeedEvents(
+			new Date(),
+			tenants ? { scope: '' } : { goal: conversionsFor(SEED_GOAL_PAGE) }
+		),
 		...(tenants
-			? buildSeedEvents(new Date(), { scale: ALPHA_SCALE, scope: String(tenants.alpha.id) })
+			? buildSeedEvents(new Date(), {
+					scale: ALPHA_SCALE,
+					scope: String(tenants.alpha.id),
+					goal: conversionsFor(tenantGoal('alpha')),
+				})
 			: []),
 		...(tenants
-			? buildSeedEvents(new Date(), { scale: BETA_SCALE, scope: String(tenants.beta.id) })
+			? buildSeedEvents(new Date(), {
+					scale: BETA_SCALE,
+					scope: String(tenants.beta.id),
+					goal: conversionsFor(tenantGoal('beta')),
+				})
 			: []),
 	]
 	seedMemoryAdapter(events)
 	const eventCount = await payload.count({ collection: EVENTS_SLUG as never })
 	if (eventCount.totalDocs === 0) {
 		await flushSeedEvents(payload, events)
-		payload.logger.info(`Seeded ${events.length} analytics pageview events`)
+		payload.logger.info(`Seeded ${events.length} analytics events`)
 	}
 
 	if (tenants) {
 		await seedTenantProviders(payload, tenants, platformAdmin)
+		for (const entry of SEED_TENANT_GOAL_PAGES) {
+			await seedGoalPage(payload, entry, {
+				platformAdmin,
+				scope: { field: GOAL_SCOPE_FIELD, value: String(tenants[entry.tenantKey].id) },
+			})
+		}
+	} else {
+		await seedGoalPage(payload, SEED_GOAL_PAGE, { platformAdmin })
 	}
 
 	const dailyCount = await payload.count({ collection: 'analytics-daily' as never })

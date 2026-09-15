@@ -3,9 +3,9 @@ import type { CaptureClientKind, CaptureSnippet, CaptureSupport } from '../core/
 import { DEFAULT_AUTO_CAPTURE, defaultConsentFor, type ResolvedAutoCapture } from '../core/options'
 import type { Goal, TrackerGoal } from '../goals/types'
 import { INGEST_PATH, PROXY_PATH } from '../plugin/paths'
-import type { AnalyticsRuntime } from '../plugin/runtime'
+import { type AnalyticsRuntime, resolveGoalsFor, resolveScopeFor } from '../plugin/runtime'
 import { normalizeMountPath } from './mountPath'
-import { CAPTURE_SLOTS, type CaptureSlot, resolveSlotAdapter } from './slots'
+import { CAPTURE_SLOTS, type CaptureSlot, resolveSlotAdapterFor } from './slots'
 
 export interface TrackerSlotConfig {
 	slot: CaptureSlot
@@ -26,6 +26,7 @@ export interface TrackerSlotConfig {
 export interface TrackerConfig {
 	slots: TrackerSlotConfig[]
 	autoCapture: ResolvedAutoCapture
+	/** The request scope's goals, config merged with the goals collection. */
 	goals: TrackerGoal[]
 	/** Where the native sink posts events, derived from the app's own `routes.api`. */
 	ingestPath: string
@@ -40,6 +41,32 @@ const trackerGoals = (goals: Goal[] | undefined): TrackerGoal[] =>
 		...(value ? { value } : {}),
 		...(currency ? { currency } : {}),
 	}))
+
+/** The request's scope, or null when the host's resolver has none or throws. */
+const scopeFor = async (runtime: AnalyticsRuntime, req: PayloadRequest): Promise<string | null> => {
+	try {
+		return await resolveScopeFor(runtime, req)
+	} catch (err) {
+		req.payload?.logger?.warn(`analytics: tracker config scope resolution failed: ${String(err)}`)
+		return null
+	}
+}
+
+/** The scope's merged goals, falling back to the config goals when the merge fails. */
+const goalsFor = async (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest,
+	scope: string | null
+): Promise<Goal[]> => {
+	try {
+		return await resolveGoalsFor(runtime, req, scope)
+	} catch (err) {
+		req.payload?.logger?.warn(
+			`analytics: tracker config goals resolution failed, falling back to config goals: ${String(err)}`
+		)
+		return runtime.goals ?? []
+	}
+}
 
 /** The config for an install with no runtime yet: no slots, but still a usable ingest path. */
 export const emptyTrackerConfig = (req: PayloadRequest): TrackerConfig => ({
@@ -68,10 +95,13 @@ export const resolveTrackerConfig = async (args: {
 }): Promise<TrackerConfig> => {
 	const { runtime, req } = args
 	const base = apiRoute(req)
+	// One scope resolution for the whole config: the slots and the goals must agree on it,
+	// and the host's resolver can be as expensive as a database read.
+	const scope = await scopeFor(runtime, req)
 	const slots: TrackerSlotConfig[] = []
 	const filled = new Set<string>()
 	for (const slot of CAPTURE_SLOTS) {
-		const adapter = await resolveSlotAdapter(runtime, req, slot)
+		const adapter = await resolveSlotAdapterFor({ runtime, req, slot, scope })
 		const capture = adapter?.capture
 		if (!adapter || !capture || filled.has(adapter.id)) {
 			continue
@@ -100,7 +130,7 @@ export const resolveTrackerConfig = async (args: {
 	return {
 		slots,
 		autoCapture: runtime.autoCapture ?? DEFAULT_AUTO_CAPTURE,
-		goals: trackerGoals(runtime.goals),
+		goals: trackerGoals(await goalsFor(runtime, req, scope)),
 		ingestPath: `${base}${runtime.ingestPath ?? INGEST_PATH}`,
 	}
 }

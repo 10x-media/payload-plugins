@@ -34,6 +34,12 @@ export interface WidgetSeriesResult {
 	previousTotal?: number
 	/** The previous comparable window, present only when comparison ran. */
 	comparisonRange?: DateRange
+	/**
+	 * The previous window's daily series, present only when `compare` was asked for and the
+	 * adapter supports comparison. Zero-filled to the same length as `points`, so the
+	 * previous window's day i overlays `points[i]`.
+	 */
+	comparisonPoints?: SeriesPoint[]
 }
 
 export interface ReadForWidgetSeriesArgs {
@@ -45,7 +51,14 @@ export interface ReadForWidgetSeriesArgs {
 	range?: DateRange
 	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
 	scope?: string | null
+	/**
+	 * Reporting timezone the caller already resolved, reused rather than resolved again so
+	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+	 */
+	timezone?: string
 	filters?: AnalyticsFilter[]
+	/** Also return the previous window's series, for the chart's comparison overlay. */
+	compare?: boolean
 }
 
 const MAX_SERIES_DAYS = 366
@@ -87,6 +100,17 @@ export const fillDailySeries = (args: {
 }
 
 /**
+ * Project a comparison series onto the primary axis: day i of the previous window overlays
+ * day i of the current one. Both windows span the same day count by construction, so this
+ * only guards a DST-shifted or clamped edge, silently truncating or zero-filling; a filled
+ * bucket borrows the axis day so every point still carries a real date.
+ */
+const alignSeries = (points: SeriesPoint[], axis: SeriesPoint[]): SeriesPoint[] =>
+	points.length === axis.length
+		? points
+		: axis.map((day, i) => points[i] ?? { date: day.date, value: 0 })
+
+/**
  * Site-wide time-series read for a trend widget: resolve the timeframe, pick the
  * adapter, gate on the metric and day-granularity support, read through the engine,
  * then return a zero-filled daily series plus the headline total. Mirrors
@@ -95,12 +119,12 @@ export const fillDailySeries = (args: {
 export const readForWidgetSeries = async (
 	args: ReadForWidgetSeriesArgs
 ): Promise<WidgetSeriesResult> => {
-	const { req, metric, timeframe, adapterId, now, range, filters } = args
+	const { req, metric, timeframe, adapterId, now, range, filters, compare } = args
 	const fallback = (status: WidgetReadStatus, id: string): WidgetSeriesResult => ({
 		status,
 		adapterId: id,
-		dateRange: range ?? resolveTimeframe(timeframe, now),
-		timezone: DEFAULT_TIMEZONE,
+		dateRange: range ?? resolveTimeframe(timeframe, now, args.timezone),
+		timezone: args.timezone ?? DEFAULT_TIMEZONE,
 		points: [],
 		total: 0,
 	})
@@ -113,7 +137,7 @@ export const readForWidgetSeries = async (
 	if (!ctx.ok) {
 		return fallback('unavailable', adapterId ?? '')
 	}
-	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
+	const tz = args.timezone ?? (await resolveTimezoneFor(runtime, req, ctx.scope))
 	const dateRange = range ?? resolveTimeframe(timeframe, now, tz)
 	const base = { dateRange, timezone: tz, points: [] as SeriesPoint[], total: 0 }
 	const adapter: AnalyticsAdapter = ctx.adapter
@@ -154,6 +178,9 @@ export const readForWidgetSeries = async (
 				? runtime.engine.read(adapter, {
 						metrics: [metric],
 						dateRange: comparisonRange,
+						// The overlay needs the previous window bucketed like the primary; the delta
+						// alone only needs its total, so the read stays as it was without `compare`.
+						...(compare ? { granularity: 'day' as const } : {}),
 						filters,
 						timezone: tz,
 						scope: ctx.queryScope,
@@ -166,15 +193,24 @@ export const readForWidgetSeries = async (
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
 	const previousTotal = previous ? previous.totals?.[metric] : undefined
+	const points = fillDailySeries({ rows: result.rows, dateRange, metric, tz })
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
 		dateRange,
 		timezone: tz,
-		points: fillDailySeries({ rows: result.rows, dateRange, metric, tz }),
+		points,
 		total: result.totals?.[metric] ?? 0,
 		clamped: result.meta.clamped ?? false,
 		previousTotal,
 		comparisonRange,
+		...(compare && previous && comparisonRange
+			? {
+					comparisonPoints: alignSeries(
+						fillDailySeries({ rows: previous.rows, dateRange: comparisonRange, metric, tz }),
+						points
+					),
+				}
+			: {}),
 	}
 }

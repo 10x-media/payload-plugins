@@ -9,6 +9,7 @@ import type {
 	DimensionKey,
 	MetricKey,
 } from '../../core/contract'
+import { DEFAULT_TIMEZONE, zonedCalendarDay } from '../../timeframe/tz'
 import { dayIso } from '../series'
 
 export interface Ga4Config {
@@ -174,8 +175,8 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 				property: `properties/${config.propertyId}`,
 				dateRanges: [
 					{
-						startDate: q.dateRange.start.toISOString().slice(0, 10),
-						endDate: q.dateRange.end.toISOString().slice(0, 10),
+						startDate: zonedCalendarDay(q.dateRange.start, q.timezone ?? DEFAULT_TIMEZONE),
+						endDate: zonedCalendarDay(q.dateRange.end, q.timezone ?? DEFAULT_TIMEZONE),
 					},
 				],
 				metrics: providerMetrics.map((name) => ({ name })),

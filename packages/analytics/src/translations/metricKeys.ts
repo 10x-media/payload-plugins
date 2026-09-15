@@ -6,7 +6,7 @@ import { keys } from './keys'
 export const METRIC_KEYS: Record<MetricKey, TranslationKey> = {
 	pageviews: keys.metricPageviews,
 	visitors: keys.metricVisitors,
-	visits: keys.metricVisitors,
+	visits: keys.metricVisits,
 	sessions: keys.metricSessions,
 	events: keys.metricEvents,
 	avgDuration: keys.metricAvgDuration,

@@ -53,6 +53,25 @@ const captureField = (name: string, label: TranslationKey, width?: string): Fiel
 	},
 })
 
+/**
+ * The plugin's own scope field, and only when `scopeField` still names it: a host-owned
+ * field (a tenant plugin's relationship) is the host's to register, and shadowing it with a
+ * hidden text field of another name would store the scope twice.
+ */
+const scopeField = (args: BuildProvidersCollectionArgs): Field[] =>
+	args.scopeField === 'scope'
+		? [
+				{
+					// Written by scoped setups; hidden because single-site installs never touch it.
+					name: 'scope',
+					type: 'text',
+					index: true,
+					label: labelForKey(keys.providerFieldScope),
+					admin: { hidden: true },
+				},
+			]
+		: []
+
 const hostField = (): Field => ({
 	name: 'host',
 	type: 'text',
@@ -141,15 +160,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 					},
 				],
 			},
-			{
-				// Written by scoped setups (or a tenant plugin's own field via `scopeField`);
-				// hidden because single-site installs never touch it.
-				name: 'scope',
-				type: 'text',
-				index: true,
-				label: labelForKey(keys.providerFieldScope),
-				admin: { hidden: true },
-			},
+			...scopeField(args),
 			providerGroup('plausible', keys.providerNamePlausible, [
 				{
 					type: 'row',

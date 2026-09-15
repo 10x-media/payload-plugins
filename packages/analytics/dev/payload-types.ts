@@ -70,6 +70,7 @@ export interface Config {
     users: User;
     pages: Page;
     'analytics-providers': AnalyticsProvider;
+    'analytics-goals': AnalyticsGoal;
     'analytics-events': AnalyticsEvent;
     'analytics-rollups': AnalyticsRollup;
     'analytics-seen': AnalyticsSeen;
@@ -85,6 +86,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     pages: PagesSelect<false> | PagesSelect<true>;
     'analytics-providers': AnalyticsProvidersSelect<false> | AnalyticsProvidersSelect<true>;
+    'analytics-goals': AnalyticsGoalsSelect<false> | AnalyticsGoalsSelect<true>;
     'analytics-events': AnalyticsEventsSelect<false> | AnalyticsEventsSelect<true>;
     'analytics-rollups': AnalyticsRollupsSelect<false> | AnalyticsRollupsSelect<true>;
     'analytics-seen': AnalyticsSeenSelect<false> | AnalyticsSeenSelect<true>;
@@ -110,11 +112,17 @@ export interface Config {
     'analytics-metric': AnalyticsMetricWidget;
     'analytics-trend': AnalyticsTrendWidget;
     'analytics-realtime': AnalyticsRealtimeWidget;
+    'analytics-goals': AnalyticsGoalsWidget;
     'analytics-breakdown-pages': AnalyticsBreakdownPagesWidget;
     'analytics-breakdown-sources': AnalyticsBreakdownSourcesWidget;
     'analytics-breakdown-devices': AnalyticsBreakdownDevicesWidget;
     'analytics-breakdown-countries': AnalyticsBreakdownCountriesWidget;
     'analytics-breakdown-goals': AnalyticsBreakdownGoalsWidget;
+    'analytics-breakdown-referrers': AnalyticsBreakdownReferrersWidget;
+    'analytics-breakdown-browsers': AnalyticsBreakdownBrowsersWidget;
+    'analytics-breakdown-os': AnalyticsBreakdownOsWidget;
+    'analytics-breakdown-campaigns': AnalyticsBreakdownCampaignsWidget;
+    'analytics-breakdown-events': AnalyticsBreakdownEventsWidget;
     'dev-custom-sources': DevCustomSourcesWidget;
     collections: CollectionsWidget;
   };
@@ -182,6 +190,16 @@ export interface Page {
   id: string;
   title?: string | null;
   slug: string;
+  layout?:
+    | {
+        heading?: string | null;
+        label: string;
+        goal: string;
+        id?: string | null;
+        blockName?: string | null;
+        blockType: 'cta';
+      }[]
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -230,6 +248,29 @@ export interface AnalyticsProvider {
     region?: ('us' | 'eu') | null;
     host?: string | null;
   };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-goals".
+ */
+export interface AnalyticsGoal {
+  id: string;
+  name: string;
+  slug: string;
+  enabled?: boolean | null;
+  match: {
+    kind: 'goal' | 'event' | 'path';
+    name?: string | null;
+    pattern?: string | null;
+  };
+  value?: {
+    fixed?: number | null;
+    prop?: string | null;
+  };
+  currency?: string | null;
+  scope?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -472,6 +513,10 @@ export interface PayloadLockedDocument {
         value: string | AnalyticsProvider;
       } | null)
     | ({
+        relationTo: 'analytics-goals';
+        value: string | AnalyticsGoal;
+      } | null)
+    | ({
         relationTo: 'analytics-events';
         value: string | AnalyticsEvent;
       } | null)
@@ -558,6 +603,19 @@ export interface UsersSelect<T extends boolean = true> {
 export interface PagesSelect<T extends boolean = true> {
   title?: T;
   slug?: T;
+  layout?:
+    | T
+    | {
+        cta?:
+          | T
+          | {
+              heading?: T;
+              label?: T;
+              goal?: T;
+              id?: T;
+              blockName?: T;
+            };
+      };
   updatedAt?: T;
   createdAt?: T;
 }
@@ -613,6 +671,32 @@ export interface AnalyticsProvidersSelect<T extends boolean = true> {
         region?: T;
         host?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-goals_select".
+ */
+export interface AnalyticsGoalsSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  enabled?: T;
+  match?:
+    | T
+    | {
+        kind?: T;
+        name?: T;
+        pattern?: T;
+      };
+  value?:
+    | T
+    | {
+        fixed?: T;
+        prop?: T;
+      };
+  currency?: T;
+  scope?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -863,6 +947,7 @@ export interface AnalyticsTrendWidget {
       from?: string | null;
       to?: string | null;
     };
+    compare?: boolean | null;
     dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
@@ -879,6 +964,33 @@ export interface AnalyticsRealtimeWidget {
     dataSource?: ('native' | 'memory') | null;
   };
   width: 'small' | 'medium';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-goals_widget".
+ */
+export interface AnalyticsGoalsWidget {
+  data?: {
+    title?: string | null;
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: ('10' | '25' | '50') | null;
+    compare?: boolean | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1029,6 +1141,186 @@ export interface AnalyticsBreakdownCountriesWidget {
  * via the `definition` "analytics-breakdown-goals_widget".
  */
 export interface AnalyticsBreakdownGoalsWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-referrers_widget".
+ */
+export interface AnalyticsBreakdownReferrersWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-browsers_widget".
+ */
+export interface AnalyticsBreakdownBrowsersWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-os_widget".
+ */
+export interface AnalyticsBreakdownOsWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-campaigns_widget".
+ */
+export interface AnalyticsBreakdownCampaignsWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-events_widget".
+ */
+export interface AnalyticsBreakdownEventsWidget {
   data?: {
     title?: string | null;
     metric:

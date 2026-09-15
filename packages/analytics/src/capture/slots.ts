@@ -21,12 +21,18 @@ export const isCaptureSlot = (value: string): value is CaptureSlot =>
  *
  * A slot configured `false` is null before any of that runs: an explicit disable outranks
  * every default, and nothing happens on its behalf, not even a scope lookup.
+ *
+ * `scope` passes in an already-resolved scope so a caller filling both slots (and the
+ * request's goals) calls the host's resolver once; omit it and the tenant slot resolves
+ * its own.
  */
-export const resolveSlotAdapter = async (
-	runtime: AnalyticsRuntime,
-	req: PayloadRequest,
+export const resolveSlotAdapterFor = async (args: {
+	runtime: AnalyticsRuntime
+	req: PayloadRequest
 	slot: CaptureSlot
-): Promise<AnalyticsAdapter | null> => {
+	scope?: string | null
+}): Promise<AnalyticsAdapter | null> => {
+	const { runtime, req, slot, scope } = args
 	const configured = runtime.captureSlots?.[slot]
 	if (configured === false) {
 		return null
@@ -42,14 +48,25 @@ export const resolveSlotAdapter = async (
 			const all = runtime.registry.all()
 			return all.length === 1 ? (all[0] as AnalyticsAdapter) : null
 		}
-		const scope = await resolveScopeFor(runtime, req)
-		if (scope === null) {
+		const resolved = scope === undefined ? await resolveScopeFor(runtime, req) : scope
+		if (resolved === null) {
 			return null
 		}
-		const registry = await resolveRegistryFor(runtime, { payload: req.payload, req, scope })
+		const registry = await resolveRegistryFor(runtime, {
+			payload: req.payload,
+			req,
+			scope: resolved,
+		})
 		return configured ? registry.get(configured) : registry.default()
 	} catch (err) {
 		req.payload?.logger?.warn(`analytics: capture slot "${slot}" resolution failed: ${String(err)}`)
 		return null
 	}
 }
+
+/** {@link resolveSlotAdapterFor} for a caller holding one slot and no scope of its own. */
+export const resolveSlotAdapter = (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest,
+	slot: CaptureSlot
+): Promise<AnalyticsAdapter | null> => resolveSlotAdapterFor({ runtime, req, slot })

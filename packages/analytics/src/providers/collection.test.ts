@@ -74,6 +74,18 @@ describe('buildProvidersCollection', () => {
 		expect(scope?.admin?.hidden).toBe(true)
 	})
 
+	it('leaves the scope field to the host when scopeField names one of its own', () => {
+		const hostOwned = buildProvidersCollection({
+			slug: 'analytics-providers',
+			onChange: () => {},
+			...unscopedArgs,
+			scoped: true,
+			scopeField: 'tenant',
+		})
+		expect(named(hostOwned.fields, 'scope')).toBeUndefined()
+		expect(named(hostOwned.fields, 'tenant')).toBeUndefined()
+	})
+
 	it('delegates secret fields to buildSecret with the right source shape', () => {
 		const group = named(collection.fields, 'plausible')
 		const fields = group && 'fields' in group ? group.fields : []

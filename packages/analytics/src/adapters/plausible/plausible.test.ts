@@ -262,6 +262,48 @@ describe('plausible capture', () => {
 		expect(plausible({ siteId: 'example.com', apiKey: 'k' }).capture).toBeUndefined()
 	})
 
+	it('formats both range bounds as calendar days in the reporting timezone', async () => {
+		let captured: { date_range?: string[] } = {}
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				captured = (await request.json()) as typeof captured
+				return HttpResponse.json({ results: [], meta: {}, query: {} })
+			})
+		)
+		await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+			q({
+				timezone: 'America/New_York',
+				dateRange: {
+					start: new Date('2026-09-01T04:00:00.000Z'),
+					end: new Date('2026-09-08T03:59:59.999Z'),
+				},
+			}),
+			{}
+		)
+		expect(captured.date_range).toEqual(['2026-09-01', '2026-09-07'])
+	})
+
+	it('does not roll the start bound back a day for zones east of UTC', async () => {
+		let captured: { date_range?: string[] } = {}
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				captured = (await request.json()) as typeof captured
+				return HttpResponse.json({ results: [], meta: {}, query: {} })
+			})
+		)
+		await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+			q({
+				timezone: 'Europe/Berlin',
+				dateRange: {
+					start: new Date('2026-08-31T22:00:00.000Z'),
+					end: new Date('2026-09-07T21:59:59.999Z'),
+				},
+			}),
+			{}
+		)
+		expect(captured.date_range).toEqual(['2026-09-01', '2026-09-07'])
+	})
+
 	it('client carries only the kind, no site credentials', () => {
 		const capture = plausible({
 			siteId: 'example.com',

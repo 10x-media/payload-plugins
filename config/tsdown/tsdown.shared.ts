@@ -16,6 +16,11 @@ type PluginBuildOptions = {
  * CSS imported by client components stays external and is copied verbatim via
  * `copy` (the Payload copyfiles pattern): the consumer's Next bundler resolves
  * the import from dist, so no css processing happens at build time.
+ *
+ * `next/*` is external by pattern as well. Resolved rather than externalized, a
+ * subpath is rewritten to the file it landed on (`next/navigation.js`), which
+ * only works because Next ships no exports map; the bare specifier is what the
+ * consumer's bundler is meant to see.
  */
 export const definePluginBuild = (options: PluginBuildOptions) =>
 	defineConfig({
@@ -26,7 +31,7 @@ export const definePluginBuild = (options: PluginBuildOptions) =>
 		unbundle: true,
 		sourcemap: true,
 		fixedExtension: false,
-		external: [/\.css$/],
+		external: [/\.css$/, /^next(\/|$)/],
 		copy: options.copy,
 		// Rolldown's default sanitizer rewrites '+' to '_' in preserved-module
 		// names, so a checkout path containing '+' no longer matches

@@ -44,6 +44,11 @@ export interface ReadForFieldArgs {
 	now: Date
 	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
 	scope?: string | null
+	/**
+	 * Reporting timezone the caller already resolved, reused rather than resolved again so
+	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+	 */
+	timezone?: string
 	/** Also read the previous comparable window when the adapter supports comparison. */
 	compare?: boolean
 	/** Also read a daily series for the first supported metric when the adapter can. */
@@ -70,7 +75,7 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 			status: 'not-bound',
 			adapterId: adapterId ?? '',
 			dateRange,
-			timezone: DEFAULT_TIMEZONE,
+			timezone: args.timezone ?? DEFAULT_TIMEZONE,
 			...empty,
 		}
 	}
@@ -80,7 +85,7 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 			status: 'not-bound',
 			adapterId: adapterId ?? '',
 			dateRange,
-			timezone: DEFAULT_TIMEZONE,
+			timezone: args.timezone ?? DEFAULT_TIMEZONE,
 			...empty,
 		}
 	}
@@ -90,11 +95,11 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 			status: 'unavailable',
 			adapterId: adapterId ?? '',
 			dateRange,
-			timezone: DEFAULT_TIMEZONE,
+			timezone: args.timezone ?? DEFAULT_TIMEZONE,
 			...empty,
 		}
 	}
-	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
+	const tz = args.timezone ?? (await resolveTimezoneFor(runtime, req, ctx.scope))
 	dateRange = range ?? resolveTimeframe(timeframe, now, tz)
 	const adapter: AnalyticsAdapter = ctx.adapter
 	const bindingCtx = { req, locale: req.locale ?? undefined }

@@ -27,10 +27,12 @@ export type MetricSelectFieldProps = SelectFieldClientProps & {
  * narrowing filters out; the read path degrades that case on its own.
  */
 export const MetricSelectField = (props: MetricSelectFieldProps) => {
-	const { field, path, readOnly, requires, sourceFieldPath = 'dataSource' } = props
+	const { field, path: pathFromProps, readOnly, requires, sourceFieldPath = 'dataSource' } = props
 	const { i18n } = useTranslation()
 	const locale = i18n.language
-	const { setValue, showError, value } = useField<string>({ path })
+	const { path, setValue, showError, value } = useField<string>({
+		potentiallyStalePath: pathFromProps,
+	})
 	const { sources } = useAnalyticsSources()
 	const sourceId = useFormFields(
 		([fields]) => fields?.[sourceFieldPath]?.value as string | undefined

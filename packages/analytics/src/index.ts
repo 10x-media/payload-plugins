@@ -4,12 +4,17 @@ import { proxyEndpoints } from './capture/proxyEndpoint'
 import { trackerEndpoint } from './capture/trackerEndpoint'
 import { type AnalyticsPluginOptions, resolveOptions } from './core/options'
 import { createRegistry, staticRegistryResolver } from './core/registry'
-import type { Goal } from './goals/types'
+import { buildGoalsCollection } from './goals/collection'
+import { GOALS_PATH, makeGoalsHandler } from './goals/goalsEndpoint'
+import { configGoalsResolver, createGoalsResolver } from './goals/resolver'
+import { trackServerEvent } from './native/ingest/serverTrack'
 import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
 import { isModuleNotFoundError } from './plugin/peerImportError'
+import { makeQueryHandler, QUERY_PATH } from './plugin/queryEndpoint'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
+import { validateScopeField } from './plugin/scopeFieldBoot'
 import { makeSourcesHandler, SOURCES_PATH } from './plugin/sourcesEndpoint'
 import { warmTask } from './plugin/warmTask'
 import type { BuildSecretField } from './providers/collection'
@@ -24,6 +29,7 @@ import { createEngine } from './surfacing/engine'
 import { syncCollection } from './sync/collection'
 import { syncTask } from './sync/syncTask'
 import { DEFAULT_TIMEZONE, isValidTimeZone } from './timeframe/tz'
+import { registerView } from './view/registerView'
 import { registerWidgets } from './widgets/registerWidgets'
 
 declare module 'payload' {
@@ -110,6 +116,31 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				withEncryptedQueryRewrite(providersCollection),
 			]
 		}
+		// Config goals are install-wide; the collection resolves per scope and merges over
+		// them behind the same signature, so ingest and the tracker config read one source.
+		const goalsResolver = resolved.goalsCollection.enabled
+			? createGoalsResolver({
+					slug: resolved.goalsCollection.slug,
+					scopeField: resolved.goalsCollection.scopeField,
+					scoped: resolved.scoped,
+					config: resolved.goals,
+				})
+			: configGoalsResolver(resolved.goals)
+		if (resolved.goalsCollection.enabled) {
+			config.collections = [
+				...(config.collections ?? []),
+				buildGoalsCollection({
+					slug: resolved.goalsCollection.slug,
+					access: resolved.goalsCollection.access,
+					overrides: resolved.goalsCollection.overrides,
+					onChange: () => goalsResolver.invalidate(),
+					scoped: resolved.scoped,
+					scopeField: resolved.goalsCollection.scopeField,
+					resolveScope,
+					platformRead: resolved.access.platformRead,
+				}),
+			]
+		}
 		const resolveTimezone = async (req: PayloadRequest, scope?: string | null): Promise<string> => {
 			const opt = resolved.reportingTimezone
 			if (opt === undefined) {
@@ -128,16 +159,12 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				return DEFAULT_TIMEZONE
 			}
 		}
-		// Config goals are install-wide, so scope is accepted and ignored here; a collection
-		// source resolves per scope behind the same signature.
-		const resolveGoals = async (_req: PayloadRequest, _scope?: string | null): Promise<Goal[]> =>
-			resolved.goals
 		for (const adapter of resolved.adapters) {
 			adapter.register?.(config, {
 				scoped: resolved.scoped,
 				resolveScope,
 				resolveTimezone,
-				resolveGoals,
+				resolveGoals: goalsResolver.resolve,
 			})
 		}
 		if (
@@ -158,6 +185,8 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		config.endpoints = [
 			...(config.endpoints ?? []),
 			{ method: 'get', path: SOURCES_PATH, handler: makeSourcesHandler() },
+			{ method: 'get', path: GOALS_PATH, handler: makeGoalsHandler() },
+			{ method: 'get', path: QUERY_PATH, handler: makeQueryHandler() },
 		]
 		// A runtime provider's capture support is unknown at config time, so providers
 		// alone are enough to mount the proxy; every slot is still resolved per request.
@@ -174,8 +203,18 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				register: resolved.widgets.register,
 				localizeText: resolved.widgets.localizeText,
 				defaultId: resolved.defaultAdapter,
+				comparison: resolved.widgets.comparison,
+				view:
+					resolved.view === false
+						? false
+						: {
+								path: resolved.view.path,
+								defaultRange: resolved.view.defaultRange,
+								defaultMetric: resolved.view.defaultMetric,
+							},
 			})
 		}
+		registerView(config, { view: resolved.view, pluginOptions: options })
 		if (resolved.cache.warm.enabled) {
 			config.jobs = {
 				...config.jobs,
@@ -213,6 +252,22 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		// The runtime is installed before the app's own onInit runs so consumer init code
 		// (seeding, cache warming, sync passes) can already read through the plugin.
 		config.onInit = async (payload) => {
+			// Host-owned scope fields only exist once every plugin has run, so the collections
+			// are checked against the assembled config rather than at config time.
+			if (resolved.scoped && resolved.goalsCollection.enabled) {
+				validateScopeField(payload, {
+					option: 'goals.collection.scopeField',
+					slug: resolved.goalsCollection.slug,
+					scopeField: resolved.goalsCollection.scopeField,
+				})
+			}
+			if (resolved.scoped && resolved.providers.collection.enabled) {
+				validateScopeField(payload, {
+					option: 'providers.collection.scopeField',
+					slug: resolved.providers.collection.slug,
+					scopeField: resolved.providers.collection.scopeField,
+				})
+			}
 			if (resolved.providers.collection.enabled) {
 				const { validateEncryptedBoot } = await import('@10x-media/fields/encrypted')
 				await validateEncryptedBoot(payload, resolved.providers.collection.encryption?.keys)
@@ -238,10 +293,17 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				consentFor: resolved.capture.consent,
 				autoCapture: resolved.capture.autoCapture,
 				goals: resolved.goals,
+				resolveGoals: goalsResolver.resolve,
+				resolveGoalsDetailed: goalsResolver.resolveDetailed,
+				...(resolved.goalsCollection.enabled
+					? { goalsCollectionSlug: resolved.goalsCollection.slug }
+					: {}),
 				ingestPath: resolved.adapters.find((a) => a.ingest)?.ingest?.path,
+				track: (event, opts) => trackServerEvent(payload, event, opts),
 				scoped: resolved.scoped,
 				configAdapterIds: new Set(resolved.adapters.map((a) => a.id)),
 				platformRead: resolved.access.platformRead,
+				readAccess: resolved.access.read,
 				bindings: resolved.bindings,
 				engine,
 				ttl: resolved.cache.ttl,
@@ -263,9 +325,13 @@ export { PLATFORM_SCOPE } from './core/contract'
 export type {
 	AnalyticsAccessOptions,
 	AnalyticsCaptureOptions,
+	AnalyticsGoalsCollectionOptions,
 	AnalyticsGoalsOptions,
 	AnalyticsPluginOptions,
 	AnalyticsPluginOptions as PluginOptions,
+	AnalyticsReadAccess,
+	AnalyticsViewAccess,
+	AnalyticsViewOptions,
 	AutoCaptureOptions,
 	CaptureConsentOption,
 	ConsentMode,
@@ -278,6 +344,8 @@ export type {
 	ScopesResolver,
 	TimezoneResolver,
 } from './core/options'
+export type { ServerEventInput, ServerTrack, ServerTrackOptions } from './core/serverEvent'
+export { AnalyticsTrackError } from './core/serverEvent'
 export type {
 	AnalyticsFieldsOptions,
 	AnalyticsMetricLabel,
@@ -293,7 +361,24 @@ export {
 	analyticsTab,
 	analyticsTabsField,
 } from './fields/factories'
+export type { GoalFieldOptions } from './goals/goalField'
+export { goalField, goalSlug } from './goals/goalField'
+export type { GoalsResponse, WireGoal } from './goals/goalsEndpoint'
+export type {
+	GoalActionDefinition,
+	GoalActionRunArgs,
+	TrackGoalActionOptions,
+} from './goals/trackGoalAction'
+export { GOAL_ACTION_TYPE, trackGoalAction } from './goals/trackGoalAction'
 export type { Goal, GoalMatch, TrackerGoal } from './goals/types'
+export { trackServerEvent } from './native/ingest/serverTrack'
+export type { QueryError, QueryErrorCode } from './query/errors'
+export type {
+	QueryErrorResponse,
+	QueryResponse,
+	QuerySourceRef,
+	SerializedAnalyticsQuery,
+} from './query/response'
 export type { TimeframePreset } from './timeframe/presets'
 export type { CustomWidgetDef } from './widgets/customWidget'
 export { analyticsDefaultWidgets } from './widgets/defaults'

@@ -1,5 +1,5 @@
-import type { CollectionConfig, Config, Plugin } from 'payload'
-import type { AnalyticsPluginOptions, Goal } from '../../src/index'
+import type { Block, CollectionConfig, Config, Plugin } from 'payload'
+import { type AnalyticsPluginOptions, type Goal, goalField } from '../../src/index'
 
 /**
  * Shared with the plugin's `reportingTimezone` option in both dev config fragments and
@@ -50,6 +50,21 @@ export const sharedGoals: Goal[] = [
 	{ slug: 'thank-you', name: 'Thank-you page', match: { kind: 'path', pattern: '/thank-you' } },
 ]
 
+/**
+ * The dev site's one layout block. Its goal is picked with the plugin's own `goalField`, so
+ * the picker is exercised where a real install puts it: nested in a block row, next to
+ * ordinary text fields, rather than at the top level of a collection.
+ */
+export const ctaBlock: Block = {
+	slug: 'cta',
+	labels: { singular: 'CTA', plural: 'CTAs' },
+	fields: [
+		{ name: 'heading', type: 'text' },
+		{ name: 'label', type: 'text', required: true, defaultValue: 'Book a demo' },
+		goalField({ name: 'goal', required: true }),
+	],
+}
+
 type DashboardConfig = NonNullable<NonNullable<Config['admin']>['dashboard']>
 type DashboardLayout = Extract<DashboardConfig['defaultLayout'], unknown[]>
 
@@ -63,12 +78,17 @@ export const sharedDashboardLayout: DashboardLayout = [
 	{
 		widgetSlug: 'analytics-trend',
 		width: 'large',
-		data: { metric: 'pageviews', timeframe: 'last30days' },
+		data: { metric: 'pageviews', timeframe: 'last30days', compare: true },
 	},
 	{
 		widgetSlug: 'analytics-trend',
 		width: 'large',
 		data: { metric: 'visitors', timeframe: 'last30days' },
+	},
+	{
+		widgetSlug: 'analytics-goals',
+		width: 'large',
+		data: { timeframe: 'last30days', limit: '10', compare: true },
 	},
 	{
 		widgetSlug: 'analytics-metric',
@@ -114,6 +134,18 @@ export const sharedDashboardLayout: DashboardLayout = [
 		widgetSlug: 'analytics-breakdown-goals',
 		width: 'medium',
 		data: { metric: 'conversions', timeframe: 'last30days', limit: 5 },
+	},
+	{
+		widgetSlug: 'analytics-breakdown-referrers',
+		width: 'medium',
+		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
+	},
+	{
+		// The one widget on a window other than the view's own default, so its "Open in
+		// Analytics" link carries a range rather than serializing away to the default.
+		widgetSlug: 'analytics-breakdown-events',
+		width: 'medium',
+		data: { metric: 'events', timeframe: 'last7days', limit: 5 },
 	},
 	{ widgetSlug: 'dev-custom-sources', width: 'medium', data: {} },
 ]

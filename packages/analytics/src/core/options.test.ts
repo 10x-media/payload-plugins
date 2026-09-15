@@ -1,6 +1,8 @@
+import type { CollectionConfig } from 'payload'
 import { describe, expect, it } from 'vitest'
 import type { Goal } from '../goals/types'
 import { memoryAdapter } from '../testing/memoryAdapter'
+import type { AnalyticsPluginOptions } from './options'
 import { resolveOptions } from './options'
 
 describe('resolveOptions widgets.register', () => {
@@ -450,7 +452,7 @@ describe('resolveOptions goals', () => {
 			purchase,
 		])
 	})
-	it('accepts the object form, whose collection source arrives later', () => {
+	it('accepts the object form alongside the collection source', () => {
 		expect(resolveOptions({ adapters, goals: { defaults: [signup] } }).goals).toEqual([signup])
 	})
 	it('throws on a duplicate slug', () => {
@@ -476,5 +478,111 @@ describe('resolveOptions goals', () => {
 		expect(
 			resolveOptions({ adapters, goals: [{ ...signup, value: { fixed: 0 } }] }).goals[0]?.value
 		).toEqual({ fixed: 0 })
+	})
+})
+
+describe('resolveOptions goals collection', () => {
+	const adapters = [memoryAdapter()]
+	const collectionOf = (goals: AnalyticsPluginOptions['goals']) =>
+		resolveOptions({ adapters, goals }).goalsCollection
+
+	it('is off unless asked for, in every goals form', () => {
+		expect(collectionOf(undefined).enabled).toBe(false)
+		expect(collectionOf([]).enabled).toBe(false)
+		expect(collectionOf({ defaults: [] }).enabled).toBe(false)
+		expect(collectionOf({ collection: false }).enabled).toBe(false)
+		expect(collectionOf({ collection: { enabled: false, slug: 'custom' } })).toEqual({
+			enabled: false,
+			slug: 'analytics-goals',
+			scopeField: 'scope',
+		})
+	})
+
+	it('defaults the slug and the scope field when enabled', () => {
+		expect(collectionOf({ collection: true })).toEqual({
+			enabled: true,
+			slug: 'analytics-goals',
+			scopeField: 'scope',
+		})
+	})
+
+	it('carries the slug, scope field, access and overrides through', () => {
+		const overrides = (c: CollectionConfig) => c
+		const access = { read: () => true }
+		expect(
+			collectionOf({ collection: { slug: 'conversions', scopeField: 'tenant', access, overrides } })
+		).toEqual({ enabled: true, slug: 'conversions', scopeField: 'tenant', access, overrides })
+	})
+
+	it('stores the slug trimmed', () => {
+		expect(collectionOf({ collection: { slug: '  conversions  ' } }).slug).toBe('conversions')
+	})
+
+	it('throws on an empty slug or an unusable scope field', () => {
+		expect(() => collectionOf({ collection: { slug: '  ' } })).toThrow(/non-empty collection slug/i)
+		expect(() => collectionOf({ collection: { scopeField: '' } })).toThrow(/non-empty field name/i)
+		expect(() => collectionOf({ collection: { scopeField: 'tenant.id' } })).toThrow(/no dots/i)
+	})
+})
+
+describe('resolveOptions view', () => {
+	const adapters = [memoryAdapter()]
+
+	it('fills the defaults when the option is absent', () => {
+		expect(resolveOptions({ adapters }).view).toEqual({
+			path: '/analytics',
+			defaultRange: 'last30days',
+			defaultMetric: 'pageviews',
+		})
+	})
+
+	it('keeps false so nothing is registered', () => {
+		expect(resolveOptions({ adapters, view: false }).view).toBe(false)
+	})
+
+	it('carries path, range, metric and navLabel through', () => {
+		expect(
+			resolveOptions({
+				adapters,
+				view: {
+					path: '/insights',
+					defaultRange: 'last7days',
+					defaultMetric: 'visitors',
+					navLabel: 'Traffic',
+				},
+			}).view
+		).toEqual({
+			path: '/insights',
+			defaultRange: 'last7days',
+			defaultMetric: 'visitors',
+			navLabel: 'Traffic',
+		})
+	})
+
+	it('rejects a path that is not rooted', () => {
+		expect(() => resolveOptions({ adapters, view: { path: 'insights' as `/${string}` } })).toThrow(
+			/view\.path/i
+		)
+	})
+
+	it('rejects an unknown timeframe preset or metric', () => {
+		expect(() =>
+			resolveOptions({ adapters, view: { defaultRange: '30d' as 'last30days' } })
+		).toThrow(/view\.defaultRange/i)
+		expect(() =>
+			resolveOptions({ adapters, view: { defaultMetric: 'clicks' as 'pageviews' } })
+		).toThrow(/view\.defaultMetric/i)
+	})
+
+	it('defaults access.view to the resolved read gate', () => {
+		const resolved = resolveOptions({ adapters })
+		expect(resolved.access.view).toBe(resolved.access.read)
+	})
+
+	it('keeps an explicit access.view separate from access.read', () => {
+		const view = () => false
+		const resolved = resolveOptions({ adapters, access: { view } })
+		expect(resolved.access.view).toBe(view)
+		expect(resolved.access.read).not.toBe(view)
 	})
 })

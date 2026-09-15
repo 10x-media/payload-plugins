@@ -121,7 +121,7 @@ describe('deriveWarmTargets', () => {
 		expect(targets).toHaveLength(1)
 	})
 
-	it('keeps a custom-range widget when its range resolves', () => {
+	it('keeps a custom-range widget, carrying its stored days for the warm loop to resolve', () => {
 		const [target] = deriveWarmTargets(
 			layout([
 				{
@@ -134,7 +134,7 @@ describe('deriveWarmTargets', () => {
 				},
 			])
 		)
-		expect(target?.range).toEqual({ start: new Date('2026-01-01'), end: new Date('2026-01-31') })
+		expect(target?.range).toEqual({ from: '2026-01-01', to: '2026-01-31' })
 	})
 
 	it('skips a custom-timeframe widget whose range is incomplete', () => {

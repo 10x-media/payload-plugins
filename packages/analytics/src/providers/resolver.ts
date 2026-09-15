@@ -71,6 +71,8 @@ export const collectionProvidersSource = (slug: string, scopeField: string): Pro
 	return async ({ payload, req, scope }) => {
 		const { decryptFieldValue, withRawEncrypted } = await import('@10x-media/fields/encrypted')
 		const readReq = req ?? (await createLocalReq({}, payload))
+		// The empty string is not castable on a relationship-typed scopeField, so install-wide
+		// lookups on a host-owned relationship field resolve the config adapters only.
 		const scopeWhere: Where =
 			scope === null
 				? { or: [{ [scopeField]: { equals: null } }, { [scopeField]: { equals: '' } }] }

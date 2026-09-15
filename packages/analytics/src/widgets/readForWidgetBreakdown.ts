@@ -16,6 +16,8 @@ import type { WidgetReadStatus } from './readForWidget'
 export interface BreakdownRow {
 	label: string
 	value: number
+	/** Every metric the read asked for, present only when `extraMetrics` asked for more. */
+	metrics?: Partial<Record<MetricKey, number>>
 }
 
 export interface WidgetBreakdownResult {
@@ -24,6 +26,8 @@ export interface WidgetBreakdownResult {
 	dateRange: DateRange
 	rows: BreakdownRow[]
 	clamped?: boolean
+	/** True when the engine served a stale cache entry after a failed provider read. */
+	stale?: boolean
 }
 
 export interface ReadForWidgetBreakdownArgs {
@@ -37,7 +41,18 @@ export interface ReadForWidgetBreakdownArgs {
 	range?: DateRange
 	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
 	scope?: string | null
+	/**
+	 * Reporting timezone the caller already resolved, reused rather than resolved again so
+	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+	 */
+	timezone?: string
 	filters?: AnalyticsFilter[]
+	/**
+	 * Further metrics to read alongside the ranked one, narrowed to what the source serves
+	 * so an unsupported one never turns the whole read unavailable. They reach each row's
+	 * `metrics`; ranking and status still follow `metric` alone.
+	 */
+	extraMetrics?: MetricKey[]
 }
 
 /**
@@ -56,7 +71,7 @@ export const readForWidgetBreakdown = async (
 		return {
 			status: 'unavailable',
 			adapterId: adapterId ?? '',
-			dateRange: range ?? resolveTimeframe(timeframe, now),
+			dateRange: range ?? resolveTimeframe(timeframe, now, args.timezone),
 			rows: emptyRows,
 		}
 	}
@@ -65,11 +80,11 @@ export const readForWidgetBreakdown = async (
 		return {
 			status: 'unavailable',
 			adapterId: adapterId ?? '',
-			dateRange: range ?? resolveTimeframe(timeframe, now),
+			dateRange: range ?? resolveTimeframe(timeframe, now, args.timezone),
 			rows: emptyRows,
 		}
 	}
-	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
+	const tz = args.timezone ?? (await resolveTimezoneFor(runtime, req, ctx.scope))
 	const dateRange = range ?? resolveTimeframe(timeframe, now, tz)
 	const base = { dateRange, rows: emptyRows }
 	const adapter: AnalyticsAdapter = ctx.adapter
@@ -90,10 +105,14 @@ export const readForWidgetBreakdown = async (
 	) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
+	const metrics = [
+		metric,
+		...(args.extraMetrics ?? []).filter((m) => m !== metric && adapter.capabilities.metrics.has(m)),
+	]
 	let result: AnalyticsResult
 	try {
 		result = await runtime.engine.read(adapter, {
-			metrics: [metric],
+			metrics,
 			dimensions: [dimension],
 			dateRange,
 			limit,
@@ -110,6 +129,7 @@ export const readForWidgetBreakdown = async (
 	const rows = result.rows.map((row) => ({
 		label: row.dimensions?.[dimension] ?? '(none)',
 		value: row.metrics[metric] ?? 0,
+		...(metrics.length > 1 ? { metrics: row.metrics } : {}),
 	}))
 	return {
 		status: 'ok',
@@ -117,5 +137,6 @@ export const readForWidgetBreakdown = async (
 		dateRange,
 		rows,
 		clamped: result.meta.clamped ?? false,
+		stale: result.meta.stale ?? false,
 	}
 }
