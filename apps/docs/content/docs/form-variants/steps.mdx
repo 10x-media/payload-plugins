@@ -49,6 +49,10 @@ These are the step's containers, not the collection's. They carry no name and co
 
 A step does not inherit the collection's containers either. Listing `firstName` and `lastName` out of a collection row gives two stacked fields; put them in a step `row` to get the row back.
 
+![A step called Where: its description under the progress rail, a Workplace select, then a group headed Office holding City and Country side by side in a row and a full-width Office field below them, with Back and Next in the footer](/images/form-variants/publish_a_role_where.png)
+
+The group and the row in that screenshot are the step's own. In the collection, those three fields sit in a `group` called `location` with nothing around them.
+
 ### Width
 
 `admin.width` on a field item is Payload's own `admin.width`: any CSS length, and it sizes the field inside a `row`. Fields without one share what the sized ones leave. Widths in a row add up to the row, so `70%` and `30%` sit on one line; the gap between them is taken out of the widths rather than added to them, as on the native form. Below Payload's mid breakpoint a row stacks and widths are ignored.

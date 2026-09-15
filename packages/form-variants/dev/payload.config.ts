@@ -15,6 +15,7 @@ import {
 	companies,
 	containers,
 	events,
+	openings,
 	pages,
 	people,
 	secrets,
@@ -48,7 +49,7 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users, people, companies, events, articles, secrets, containers, pages],
+	collections: [users, people, companies, openings, events, articles, secrets, containers, pages],
 	editor: lexicalEditor(),
 	// `pages` is the localized collection; the rest ignore locales, so the switcher is only
 	// meaningful there.

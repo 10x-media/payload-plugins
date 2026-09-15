@@ -23,21 +23,32 @@ Setting `Progress`, `StepHeader`, `Navigation` or `VariantSwitcher` to `false` h
 ```ts
 formVariants({
   components: {
-    Progress: '/components/Dots#Dots',
+    Progress: '/components/StepCounter#StepCounter',
   },
 })
 ```
 
-```tsx title="components/Dots.tsx"
+```tsx title="components/StepCounter.tsx"
 'use client'
 
 import { useWizard } from '@10x-media/form-variants/client'
 
-export const Dots = () => {
-  const { index, steps } = useWizard()
-  return <ol>{steps.map((step, i) => <li key={step.key} aria-current={i === index}>{step.label}</li>)}</ol>
+export const StepCounter = () => {
+  const { count, index, step } = useWizard()
+  if (count < 2) return null
+  return (
+    <p>
+      Step {index + 1} of {count} — {step?.label}
+    </p>
+  )
 }
 ```
+
+`count` is the number of *visible* steps, so a step whose `condition` turned false is already out of the total and the counter moves with it. The same component works as a per-step `Progress`, inside a replaced `Navigation`, or anywhere in a custom `Layout`: it reads the wizard rather than its own position.
+
+![The last step of a three-step variant with the built-in rail replaced: a Step 3 of 3 heading beside the step's name, a segmented bar under it with all three segments filled, the step's fields, and Back, Save Draft and Publish changes in the footer](/images/form-variants/quick_draft_step-3.png)
+
+The save controls in that footer are Payload's own, on the last step because the variant saves there. Nothing about the replaced slot changed them.
 
 ## Headless
 

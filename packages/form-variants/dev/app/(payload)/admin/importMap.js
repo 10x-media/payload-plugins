@@ -25,6 +25,10 @@ import { VariantEditView as VariantEditView_654fa555539f4d3a2be3fc3df376f0d3 } f
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 import { PersonOutcome as PersonOutcome_f37d6683b4bbe07709590322e22d27a9 } from '../../../components/PersonOutcome'
 import { DuplicateCheckStep as DuplicateCheckStep_b624fd749668535e2e5cce445115db6f } from '../../../components/DuplicateCheckStep'
+import { OpeningOutcome as OpeningOutcome_eb51776147765f799ec697db59262598 } from '../../../components/OpeningOutcome'
+import { RoleHint as RoleHint_b7631701a3fe109d22003b0197ee47d3 } from '../../../components/RoleHint'
+import { OpeningReview as OpeningReview_ec71783256aa14d57bb6e7f71c914787 } from '../../../components/OpeningReview'
+import { StepCounter as StepCounter_ed8b7d8fd7d8139886c10808b07fe517 } from '../../../components/StepCounter'
 import { ProgramHint as ProgramHint_adcdd37f929b12849013aec1a6d69b4c } from '../../../components/ProgramHint'
 import { ContainerNote as ContainerNote_7bc51643bc6f275402cce3f0f32077a1 } from '../../../components/ContainerNote'
 
@@ -57,6 +61,10 @@ export const importMap = {
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
   "./components/PersonOutcome#PersonOutcome": PersonOutcome_f37d6683b4bbe07709590322e22d27a9,
   "./components/DuplicateCheckStep#DuplicateCheckStep": DuplicateCheckStep_b624fd749668535e2e5cce445115db6f,
+  "./components/OpeningOutcome#OpeningOutcome": OpeningOutcome_eb51776147765f799ec697db59262598,
+  "./components/RoleHint#RoleHint": RoleHint_b7631701a3fe109d22003b0197ee47d3,
+  "./components/OpeningReview#OpeningReview": OpeningReview_ec71783256aa14d57bb6e7f71c914787,
+  "./components/StepCounter#StepCounter": StepCounter_ed8b7d8fd7d8139886c10808b07fe517,
   "./components/ProgramHint#ProgramHint": ProgramHint_adcdd37f929b12849013aec1a6d69b4c,
   "./components/ContainerNote#ContainerNote": ContainerNote_7bc51643bc6f275402cce3f0f32077a1
 }

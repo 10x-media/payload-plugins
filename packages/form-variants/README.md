@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/form-variants
 
 Alternative edit forms for a Payload collection. A variant is a sequence of steps drawn over Payload's own form state, rendered with Payload's own fields, saved by Payload's own save. The native form is one of the variants, so accounts with access can switch back and forth.

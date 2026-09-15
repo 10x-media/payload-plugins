@@ -70,6 +70,7 @@ export interface Config {
     users: User;
     people: Person;
     companies: Company;
+    openings: Opening;
     events: Event;
     articles: Article;
     secrets: Secret;
@@ -85,6 +86,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     people: PeopleSelect<false> | PeopleSelect<true>;
     companies: CompaniesSelect<false> | CompaniesSelect<true>;
+    openings: OpeningsSelect<false> | OpeningsSelect<true>;
     events: EventsSelect<false> | EventsSelect<true>;
     articles: ArticlesSelect<false> | ArticlesSelect<true>;
     secrets: SecretsSelect<false> | SecretsSelect<true>;
@@ -223,6 +225,84 @@ export interface Company {
   notes?: string | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "openings".
+ */
+export interface Opening {
+  id: string;
+  title: string;
+  department: 'engineering' | 'design' | 'product' | 'marketing' | 'sales' | 'operations';
+  seniority?: ('junior' | 'mid' | 'senior' | 'staff' | 'principal') | null;
+  employmentType?: ('full-time' | 'part-time' | 'contract' | 'internship') | null;
+  headcount?: number | null;
+  workplace: 'onsite' | 'hybrid' | 'remote';
+  location?: {
+    city?: string | null;
+    country?: string | null;
+    /**
+     * The entity that employs them.
+     */
+    office?: string | null;
+  };
+  timezones?: string | null;
+  /**
+   * Days in the office per week.
+   */
+  officeDays?: number | null;
+  compensation?: {
+    currency?: ('EUR' | 'USD' | 'GBP') | null;
+    min?: number | null;
+    max?: number | null;
+    equity?: boolean | null;
+  };
+  summary?: string | null;
+  description?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  responsibilities?:
+    | {
+        item: string;
+        id?: string | null;
+      }[]
+    | null;
+  requirements?:
+    | {
+        item: string;
+        mustHave?: boolean | null;
+        id?: string | null;
+      }[]
+    | null;
+  benefits?: ('learning-budget' | 'sabbatical' | 'four-day-week' | 'relocation' | 'childcare')[] | null;
+  hiringManager?: (string | null) | Person;
+  company?: (string | null) | Company;
+  applyBy?: string | null;
+  interviewStages?:
+    | {
+        name: string;
+        minutes?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  internalNotes?: string | null;
+  referralBonus?: number | null;
+  status?: ('open' | 'paused' | 'filled' | 'cancelled') | null;
+  updatedAt: string;
+  createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -425,6 +505,10 @@ export interface PayloadLockedDocument {
         value: string | Company;
       } | null)
     | ({
+        relationTo: 'openings';
+        value: string | Opening;
+      } | null)
+    | ({
         relationTo: 'events';
         value: string | Event;
       } | null)
@@ -562,6 +646,67 @@ export interface CompaniesSelect<T extends boolean = true> {
   notes?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "openings_select".
+ */
+export interface OpeningsSelect<T extends boolean = true> {
+  title?: T;
+  department?: T;
+  seniority?: T;
+  employmentType?: T;
+  headcount?: T;
+  workplace?: T;
+  location?:
+    | T
+    | {
+        city?: T;
+        country?: T;
+        office?: T;
+      };
+  timezones?: T;
+  officeDays?: T;
+  compensation?:
+    | T
+    | {
+        currency?: T;
+        min?: T;
+        max?: T;
+        equity?: T;
+      };
+  summary?: T;
+  description?: T;
+  responsibilities?:
+    | T
+    | {
+        item?: T;
+        id?: T;
+      };
+  requirements?:
+    | T
+    | {
+        item?: T;
+        mustHave?: T;
+        id?: T;
+      };
+  benefits?: T;
+  hiringManager?: T;
+  company?: T;
+  applyBy?: T;
+  interviewStages?:
+    | T
+    | {
+        name?: T;
+        minutes?: T;
+        id?: T;
+      };
+  internalNotes?: T;
+  referralBonus?: T;
+  status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
