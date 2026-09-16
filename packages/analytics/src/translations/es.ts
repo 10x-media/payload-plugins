@@ -61,6 +61,7 @@ export const es: Record<TranslationKey, string> = {
 	[keys.widgetFilterValueRequired]: 'Introduce un valor o borra la dimensión.',
 	[keys.widgetFilterValueTooLong]: 'Máximo 256 caracteres.',
 	[keys.widgetFilterCaption]: 'donde {{dimension}} {{operator}} {{value}}',
+	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
 	[keys.filterOperatorEq]: 'es',
 	[keys.filterOperatorContains]: 'contiene',
 	[keys.filterOperatorMatches]: 'coincide con el patrón',

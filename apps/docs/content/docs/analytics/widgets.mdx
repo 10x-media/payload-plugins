@@ -113,7 +113,7 @@ Both selects are narrowed live by the same `GET /api/analytics/sources` endpoint
 
 A source that cannot apply the stored filter renders **"This source cannot apply this filter"** in place of the number, the chart or the rows. The check runs before the query, so the read never falls back to unfiltered numbers and the adapter is never called; the widget's title and its **Open in Analytics** link stay. This is the same shape as the "Not available for this data source" state a missing metric or dimension produces, and it happens for the same reasons: a dimension the source does not list as filterable, an operator it does not declare, or a scoped install whose tenant source differs from the one the widget was configured against.
 
-A filtered widget states its filter in the caption, after the window: **Last 30 days where Country is DE**. The dimension and the operator are translated, the value is yours verbatim, and the sentence itself is a translated template (`'where {{dimension}} {{operator}} {{value}}'`), so a locale can reorder its three parts through the [`translations` option](/analytics/i18n). The window and the sentence are joined with a plain space, which CJK locales would not write. The caption renders with the data it describes: a widget on any non-ok state shows its title, the message and the link, never a caption for numbers it does not have.
+A filtered widget states its filter in the caption, after the window: **Last 30 days where Country is DE**. The dimension and the operator are translated, the value is yours verbatim, and both the sentence (`'where {{dimension}} {{operator}} {{value}}'`) and the join that puts it after the window (`'{{window}} {{filter}}'`) are translated templates, so a locale can reorder the parts, and one that does not separate clauses with a space drops it. Both are overridable through the [`translations` option](/analytics/i18n). The caption renders with the data it describes: a widget on any non-ok state shows its title, the message and the link, never a caption for numbers it does not have.
 
 ## Open in Analytics
 
@@ -228,7 +228,16 @@ if (result.status === 'filter-unsupported') return <span>This source cannot appl
 if (result.status !== 'ok') return <span>No data</span>
 ```
 
-The built-in `filter` config group and the `widgetFilters` helper that turns it into an `AnalyticsFilter[]` are internal: a custom widget owns its own config fields and builds its own array. The two pickers are not, though. `FilterDimensionSelectField` and `FilterOperatorSelectField` from `@10x-media/analytics/client` are the same live, source-narrowed selects the built-ins use, and `useFilterCapabilities` is the hook behind them for a bespoke one. Like `MetricSelectField`, each narrows against a sibling source field named `dataSource`; pass `sourceFieldPath` when yours is named something else.
+A widget that stores its filter the way the built-ins do can reuse their whole stack. `widgetFilters(data)` from `@10x-media/analytics` turns a stored `WidgetFilter` group into the `AnalyticsFilter[]` the read wants, applying the same rules: the dimension is the gate, the operator defaults to `eq`, the value is trimmed and capped, and a half-filled group is no filter at all.
+
+```tsx
+import { widgetFilters, type WidgetFilter } from '@10x-media/analytics'
+
+const data = (props.widgetData ?? {}) as { filter?: WidgetFilter }
+const result = await readForWidgetBreakdown({ /* ... */ filters: widgetFilters(data) })
+```
+
+The two pickers are public as well: `FilterDimensionSelectField` and `FilterOperatorSelectField` from `@10x-media/analytics/client` are the same live, source-narrowed selects the built-ins use, and `useFilterCapabilities` is the hook behind them for a bespoke one. Like `MetricSelectField`, each narrows against a sibling source field named `dataSource`; pass `sourceFieldPath` when yours is named something else.
 
 ### Reading more than one metric at a time
 

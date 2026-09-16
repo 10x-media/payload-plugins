@@ -61,6 +61,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.widgetFilterValueRequired]: 'Введите значение или очистите измерение.',
 	[keys.widgetFilterValueTooLong]: 'Не более 256 символов.',
 	[keys.widgetFilterCaption]: 'где {{dimension}} {{operator}} {{value}}',
+	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
 	[keys.filterOperatorEq]: 'равно',
 	[keys.filterOperatorContains]: 'содержит',
 	[keys.filterOperatorMatches]: 'соответствует шаблону',

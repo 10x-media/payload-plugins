@@ -11,7 +11,7 @@ import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { ComparisonDelta } from './ComparisonDelta'
 import { cardStyle, labelStyle } from './cardChrome'
-import { filterCaption } from './filterCaption'
+import { captionWithFilter } from './filterCaption'
 import { widgetFilters } from './filterField'
 import { formatRangeCaption, resolveCustomRange } from './range'
 import type { WidgetReadStatus } from './readForWidget'
@@ -78,7 +78,7 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps & Wi
 		customRange && timezone
 			? formatRangeCaption(customRange, locale, timezone)
 			: t(TIMEFRAME_KEYS[timeframe])
-	const caption = filters[0] ? `${windowCaption} ${filterCaption(filters[0], t)}` : windowCaption
+	const caption = captionWithFilter(windowCaption, filters[0], t)
 	const buckets = customRange
 		? bucketByRange(result.points, customRange, result.timezone)
 		: bucketSeries(result.points, timeframe, result.timezone)

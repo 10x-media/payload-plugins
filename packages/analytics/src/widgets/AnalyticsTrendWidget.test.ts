@@ -136,18 +136,21 @@ describe('AnalyticsTrendWidget view link', () => {
 	})
 })
 
+/** The two caption templates, which carry the `{{vars}}` the assertions read. */
+const TEMPLATES: Record<string, string> = {
+	[keys.widgetFilterCaption]: en[keys.widgetFilterCaption],
+	[keys.widgetCaptionWithFilter]: en[keys.widgetCaptionWithFilter],
+}
+
 /**
- * Every key stands in for itself, except the caption sentence, which comes from the real
- * bundle so the assertion sees the same `{{vars}}` pass Payload's own `t` makes.
+ * Every key stands in for itself, except the caption templates, which come from the real
+ * bundle so the assertion sees the same one-pass `{{vars}}` fill Payload's own `t` makes.
  */
 const fakeT = (key: string, vars?: Record<string, string | number>): string =>
-	(key === keys.widgetFilterCaption ? en[keys.widgetFilterCaption] : key).replace(
-		/\{\{(.*?)\}\}/g,
-		(match, name: string) => {
-			const value = vars?.[name.trim()]
-			return value === undefined ? match : String(value)
-		}
-	)
+	(TEMPLATES[key] ?? key).replace(/\{\{(.*?)\}\}/g, (match, name: string) => {
+		const value = vars?.[name.trim()]
+		return value === undefined ? match : String(value)
+	})
 
 const filterableReq = (filters: DimensionKey[]): PayloadRequest => {
 	const filtering: AnalyticsAdapter = {

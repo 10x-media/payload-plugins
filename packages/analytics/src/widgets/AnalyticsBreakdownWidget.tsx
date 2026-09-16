@@ -10,7 +10,7 @@ import { TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { type BreakdownWidgetData, breakdownSpecBySlug } from './breakdownTypes'
 import { cardStyle, labelStyle } from './cardChrome'
-import { filterCaption } from './filterCaption'
+import { captionWithFilter } from './filterCaption'
 import { widgetFilters } from './filterField'
 import { formatRangeCaption, resolveCustomRange } from './range'
 import type { WidgetReadStatus } from './readForWidget'
@@ -88,7 +88,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 		customRange && timezone
 			? formatRangeCaption(customRange, locale, timezone)
 			: t(TIMEFRAME_KEYS[timeframe])
-	const caption = filters[0] ? `${windowCaption} ${filterCaption(filters[0], t)}` : windowCaption
+	const caption = captionWithFilter(windowCaption, filters[0], t)
 	return (
 		<div className="analytics-breakdown-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>

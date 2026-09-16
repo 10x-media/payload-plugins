@@ -61,6 +61,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.widgetFilterValueRequired]: 'Masukkan nilai, atau kosongkan dimensi.',
 	[keys.widgetFilterValueTooLong]: 'Maksimal 256 karakter.',
 	[keys.widgetFilterCaption]: 'di mana {{dimension}} {{operator}} {{value}}',
+	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
 	[keys.filterOperatorEq]: 'adalah',
 	[keys.filterOperatorContains]: 'mengandung',
 	[keys.filterOperatorMatches]: 'cocok dengan pola',

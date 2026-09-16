@@ -22,23 +22,26 @@ const result = (over: Partial<WidgetBreakdownResult> = {}): WidgetBreakdownResul
 
 const view = { path: '/analytics', defaultRange: 'last30days', defaultMetric: 'pageviews' } as const
 
+/** The two caption templates, which carry the `{{vars}}` the assertions read. */
+const TEMPLATES: Record<string, string> = {
+	[keys.widgetFilterCaption]: en[keys.widgetFilterCaption],
+	[keys.widgetCaptionWithFilter]: en[keys.widgetCaptionWithFilter],
+}
+
 /**
- * Every key stands in for itself, except the caption sentence, which comes from the real
- * bundle so the assertion sees the same `{{vars}}` pass Payload's own `t` makes.
+ * Every key stands in for itself, except the caption templates, which come from the real
+ * bundle so the assertion sees the same one-pass `{{vars}}` fill Payload's own `t` makes.
  */
 const fakeT = (key: string, vars?: Record<string, string | number>): string =>
-	(key === keys.widgetFilterCaption ? en[keys.widgetFilterCaption] : key).replace(
-		/\{\{(.*?)\}\}/g,
-		(match, name: string) => {
-			const value = vars?.[name.trim()]
-			return value === undefined ? match : String(value)
-		}
-	)
+	(TEMPLATES[key] ?? key).replace(/\{\{(.*?)\}\}/g, (match, name: string) => {
+		const value = vars?.[name.trim()]
+		return value === undefined ? match : String(value)
+	})
 
-const req = (): PayloadRequest =>
+const req = (t: typeof fakeT = fakeT): PayloadRequest =>
 	({
 		payload: { config: { routes: { admin: '/admin' } } } as unknown as PayloadRequest['payload'],
-		i18n: { t: fakeT, language: 'en' },
+		i18n: { t, language: 'en' },
 	}) as unknown as PayloadRequest
 
 const render = async (
@@ -127,6 +130,26 @@ describe('AnalyticsBreakdownWidget filter', () => {
 		})
 		expect(html).toContain(
 			'analytics:timeframeLast7Days where analytics:viewDimensionCountry analytics:filterOperatorEq DE'
+		)
+	})
+
+	it('joins the window and the sentence through the locale, not a hard-coded space', async () => {
+		const tight = (key: string, vars?: Record<string, string | number>): string =>
+			key === keys.widgetCaptionWithFilter
+				? `${String(vars?.window)}${String(vars?.filter)}`
+				: fakeT(key, vars)
+		const html = renderToStaticMarkup(
+			await AnalyticsBreakdownWidget({
+				req: req(tight),
+				widgetSlug: 'analytics-breakdown-pages',
+				widgetData: {
+					timeframe: 'last7days',
+					filter: { dimension: 'country', operator: 'eq', value: 'DE' },
+				},
+			} as unknown as WidgetServerProps)
+		)
+		expect(html).toContain(
+			'analytics:timeframeLast7Dayswhere analytics:viewDimensionCountry analytics:filterOperatorEq DE'
 		)
 	})
 

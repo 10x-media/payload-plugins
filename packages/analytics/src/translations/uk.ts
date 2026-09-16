@@ -61,6 +61,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.widgetFilterValueRequired]: 'Введіть значення або очистіть вимір.',
 	[keys.widgetFilterValueTooLong]: 'Не більше 256 символів.',
 	[keys.widgetFilterCaption]: 'де {{dimension}} {{operator}} {{value}}',
+	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
 	[keys.filterOperatorEq]: 'дорівнює',
 	[keys.filterOperatorContains]: 'містить',
 	[keys.filterOperatorMatches]: 'відповідає шаблону',

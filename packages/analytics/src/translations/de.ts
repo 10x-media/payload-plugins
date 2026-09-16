@@ -62,6 +62,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.widgetFilterValueRequired]: 'Wert eingeben oder Dimension leeren.',
 	[keys.widgetFilterValueTooLong]: 'Höchstens 256 Zeichen.',
 	[keys.widgetFilterCaption]: 'wobei {{dimension}} {{operator}} {{value}}',
+	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
 	[keys.filterOperatorEq]: 'ist',
 	[keys.filterOperatorContains]: 'enthält',
 	[keys.filterOperatorMatches]: 'entspricht Muster',

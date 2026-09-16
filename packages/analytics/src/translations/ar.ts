@@ -61,6 +61,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.widgetFilterValueRequired]: 'أدخل قيمة أو امسح البُعد.',
 	[keys.widgetFilterValueTooLong]: '256 حرفًا كحد أقصى.',
 	[keys.widgetFilterCaption]: 'حيث {{dimension}} {{operator}} {{value}}',
+	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
 	[keys.filterOperatorEq]: 'يساوي',
 	[keys.filterOperatorContains]: 'يحتوي على',
 	[keys.filterOperatorMatches]: 'يطابق النمط',

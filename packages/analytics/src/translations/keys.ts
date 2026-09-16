@@ -63,6 +63,7 @@ export const keys = {
 	widgetFilterValueRequired: 'analytics:widgetFilterValueRequired',
 	widgetFilterValueTooLong: 'analytics:widgetFilterValueTooLong',
 	widgetFilterCaption: 'analytics:widgetFilterCaption',
+	widgetCaptionWithFilter: 'analytics:widgetCaptionWithFilter',
 	filterOperatorEq: 'analytics:filterOperatorEq',
 	filterOperatorContains: 'analytics:filterOperatorContains',
 	filterOperatorMatches: 'analytics:filterOperatorMatches',

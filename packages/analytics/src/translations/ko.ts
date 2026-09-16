@@ -61,6 +61,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.widgetFilterValueRequired]: '값을 입력하거나 차원을 비우세요.',
 	[keys.widgetFilterValueTooLong]: '최대 256자입니다.',
 	[keys.widgetFilterCaption]: '조건: {{dimension}} {{operator}} {{value}}',
+	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
 	[keys.filterOperatorEq]: '같음',
 	[keys.filterOperatorContains]: '포함',
 	[keys.filterOperatorMatches]: '패턴 일치',

@@ -61,6 +61,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.widgetFilterValueRequired]: 'Introduza um valor ou limpe a dimensão.',
 	[keys.widgetFilterValueTooLong]: 'No máximo 256 caracteres.',
 	[keys.widgetFilterCaption]: 'onde {{dimension}} {{operator}} {{value}}',
+	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
 	[keys.filterOperatorEq]: 'é',
 	[keys.filterOperatorContains]: 'contém',
 	[keys.filterOperatorMatches]: 'corresponde ao padrão',
