@@ -107,7 +107,7 @@ describe('buildProvidersCollection', () => {
 
 	// Public capture config, not credentials: they reach the browser in the snippet, so they
 	// must stay plain text (a sealed field would be unreadable to the tracker config).
-	it('carries the public capture fields as plain text on posthog and plausible', () => {
+	it('carries the public capture fields as plain text on posthog, plausible and ga4', () => {
 		const inGroup = (provider: string, name: string): Field | undefined => {
 			const group = named(collection.fields, provider)
 			const fields = group && 'fields' in group ? group.fields : []
@@ -140,6 +140,25 @@ describe('buildProvidersCollection', () => {
 			expect(field?.type).toBe('text')
 			expect((field as TaggedField | undefined)?.custom?.fake).toBeUndefined()
 		}
+
+		const measurementId = inGroup('ga4', 'measurementId')
+		expect(measurementId?.type).toBe('text')
+		expect((measurementId as TaggedField | undefined)?.custom?.fake).toBeUndefined()
+	})
+
+	it('validates the plausible revenue currency as an ISO 4217 code', () => {
+		const group = named(collection.fields, 'plausible')
+		const fields = group && 'fields' in group ? group.fields : []
+		const currency = named(fields, 'revenueCurrency') as TextField | undefined
+		expect(currency?.type).toBe('text')
+		const validate = currency?.validate as
+			| ((value: unknown, options: unknown) => true | string)
+			| undefined
+		const req = { req: { t: (key: string) => key } } as never
+		expect(validate?.('EUR', req)).toBe(true)
+		expect(validate?.('', req)).toBe(true)
+		expect(validate?.('eur', req)).toBe('analytics:goalErrorCurrency')
+		expect(validate?.('EURO', req)).toBe('analytics:goalErrorCurrency')
 	})
 
 	it('keeps SECRET_PATHS in parity with the collection secret fields', () => {

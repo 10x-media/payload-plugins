@@ -157,8 +157,13 @@ const sqlString = (value: string): string =>
 // then % and _, before the whole thing is wrapped in % ... % and quoted.
 const escapeLikeValue = (value: string): string => value.replace(/[\\%_]/g, (c) => `\\${c}`)
 
-const sqlDateTimeLiteral = (d: Date): string =>
-	sqlString(d.toISOString().slice(0, 19).replace('T', ' '))
+/**
+ * A bare HogQL date literal parses in the project's timezone, so the UTC wall time
+ * `toISOString` produces would drift by that offset; the zone is passed explicitly to keep
+ * the bound an absolute instant (https://posthog.com/docs/hogql/expressions).
+ */
+const utcDateTime = (d: Date): string =>
+	`toDateTime(${sqlString(d.toISOString().slice(0, 19).replace('T', ' '))}, 'UTC')`
 
 interface PosthogQueryResponse {
 	columns: string[]
@@ -230,8 +235,8 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			}
 
 			const where = [
-				`timestamp >= toDateTime(${sqlDateTimeLiteral(q.dateRange.start)})`,
-				`timestamp <= toDateTime(${sqlDateTimeLiteral(q.dateRange.end)})`,
+				`timestamp >= ${utcDateTime(q.dateRange.start)}`,
+				`timestamp <= ${utcDateTime(q.dateRange.end)}`,
 			]
 			if (!scanAllEvents) {
 				where.unshift("event = '$pageview'")

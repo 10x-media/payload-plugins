@@ -497,3 +497,31 @@ describe('ga4 adapter', () => {
 		})
 	})
 })
+
+describe('ga4 capture', () => {
+	it('declares no capture without a measurementId', () => {
+		expect(ga4(config).capture).toBeUndefined()
+	})
+
+	it('loads the gtag tag and boots it with the measurement id', () => {
+		const capture = ga4({ ...config, measurementId: 'G-AB12CD34' }).capture
+		expect(capture?.proxy.routes).toEqual([])
+		expect(capture?.client).toEqual({ kind: 'ga4', measurementId: 'G-AB12CD34' })
+		const scripts = capture?.snippet({ path: '/api/analytics/p/global' }).scripts ?? []
+		expect(scripts[0]).toEqual({
+			src: 'https://www.googletagmanager.com/gtag/js?id=G-AB12CD34',
+			async: true,
+		})
+		expect(scripts[1]?.inline).toBe(
+			'window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","G-AB12CD34")'
+		)
+	})
+
+	// The id reaches an inline script and a URL, so anything that is not a bare token is
+	// refused outright rather than escaped into either.
+	it('declares no capture for an id carrying anything but letters, digits and dashes', () => {
+		for (const measurementId of ['G-AB"12', 'G AB12', 'G-AB12</script>', 'G-AB12&x=1']) {
+			expect(ga4({ ...config, measurementId }).capture).toBeUndefined()
+		}
+	})
+})

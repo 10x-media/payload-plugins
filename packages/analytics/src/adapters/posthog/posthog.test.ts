@@ -49,8 +49,8 @@ describe('posthog adapter', () => {
 		expect(body.query?.kind).toBe('HogQLQuery')
 		const sql = body.query?.query ?? ''
 		expect(sql).toContain("event = '$pageview'")
-		expect(sql).toContain("timestamp >= toDateTime('2026-01-01 00:00:00')")
-		expect(sql).toContain("timestamp <= toDateTime('2026-01-31 00:00:00')")
+		expect(sql).toContain("timestamp >= toDateTime('2026-01-01 00:00:00', 'UTC')")
+		expect(sql).toContain("timestamp <= toDateTime('2026-01-31 00:00:00', 'UTC')")
 		expect(sql).toContain("properties.$pathname = '/pricing'")
 		expect(sql).toContain('count(DISTINCT person_id)')
 		expect(result.totals).toEqual({ pageviews: 42891, visitors: 3102, sessions: 8774 })

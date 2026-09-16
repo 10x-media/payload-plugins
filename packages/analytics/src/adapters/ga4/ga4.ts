@@ -1,4 +1,5 @@
 import type { BetaAnalyticsDataClient, protos } from '@google-analytics/data'
+import type { CaptureSupport } from '../../core/capture'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -32,6 +33,40 @@ export interface Ga4Config {
 	projectId?: string
 	/** Maximum days of historical data. Defaults to 425 (GA4's rolling-window limit). Pass null to disable clamping. */
 	maxLookbackDays?: number | null
+	/**
+	 * Public measurement id (`G-XXXXXXX`). Setting it turns on capture: the tag is loaded
+	 * from googletagmanager.com and booted with gtag.
+	 */
+	measurementId?: string
+}
+
+/** What Google's own ids look like, and all the inline snippet and the tag URL may carry. */
+const MEASUREMENT_ID_PATTERN = /^[A-Za-z0-9-]+$/
+
+/**
+ * Google's documented install snippet (https://developers.google.com/tag-platform/gtagjs/install):
+ * the tag loads from googletagmanager.com and the inline publishes `dataLayer` and `gtag`
+ * before configuring the measurement id. The tag is served from Google's own CDN with the id
+ * in the query string, so there is nothing to proxy and `routes` stays empty; the snippet is
+ * rendered from an absolute `src` and the slot's proxy mount answers 404.
+ */
+function buildCapture(measurementId: string): CaptureSupport {
+	const id = JSON.stringify(measurementId)
+	return {
+		proxy: { routes: [] },
+		snippet: () => ({
+			scripts: [
+				{
+					src: `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`,
+					async: true,
+				},
+				{
+					inline: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config",${id})`,
+				},
+			],
+		}),
+		client: { kind: 'ga4', measurementId },
+	}
 }
 
 const METRIC_MAP: Partial<Record<MetricKey, string>> = {
@@ -165,10 +200,16 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 		return clientPromise
 	}
 
+	const measurementId = config.measurementId
 	return {
 		id: 'ga4',
 		label: 'Google Analytics 4',
 		capabilities,
+		// An id that is not a bare token is dropped rather than escaped: it lands in an inline
+		// script and in the tag URL, and no legitimate measurement id needs anything else.
+		...(measurementId && MEASUREMENT_ID_PATTERN.test(measurementId)
+			? { capture: buildCapture(measurementId) }
+			: {}),
 		isConfigured: () =>
 			Boolean(
 				config.propertyId && config.credentials?.client_email && config.credentials?.private_key

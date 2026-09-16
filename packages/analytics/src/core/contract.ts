@@ -199,7 +199,7 @@ export interface AnalyticsAdapter {
 	readonly id: string
 	readonly label: string
 	readonly capabilities: AnalyticsCapabilities
-	/** Browser-tracker proxying/boot descriptor. Absent when the adapter has no client-side script (GA4). */
+	/** Browser-tracker proxying/boot descriptor. Absent when no public capture field is set. */
 	readonly capture?: CaptureSupport
 	/**
 	 * Where this adapter's own ingest endpoint listens, relative to `routes.api`, for the

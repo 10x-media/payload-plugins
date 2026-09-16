@@ -96,6 +96,8 @@ export const es: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: 'Región',
 	[keys.providerFieldDomain]: 'Dominio del sitio',
 	[keys.providerFieldScriptId]: 'ID del script',
+	[keys.providerFieldRevenueCurrency]: 'Moneda de ingresos',
+	[keys.providerFieldMeasurementId]: 'ID de medición',
 	[keys.providerFieldCaptureHelp]:
 		'Configuración pública del navegador. La captura solo se ejecuta si está definida.',
 	[keys.providerNamePlausible]: 'Plausible',

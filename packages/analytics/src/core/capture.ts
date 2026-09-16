@@ -31,7 +31,7 @@ export interface CaptureSnippet {
 	scripts: SnippetScript[]
 }
 
-export type CaptureClientKind = 'native' | 'posthog' | 'plausible' | 'umami'
+export type CaptureClientKind = 'native' | 'posthog' | 'plausible' | 'umami' | 'ga4'
 
 /**
  * Pure descriptor of how a vendor's browser tracker is proxied and booted, consumed by

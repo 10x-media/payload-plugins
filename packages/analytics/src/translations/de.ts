@@ -97,6 +97,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: 'Region',
 	[keys.providerFieldDomain]: 'Website-Domain',
 	[keys.providerFieldScriptId]: 'Skript-ID',
+	[keys.providerFieldRevenueCurrency]: 'Umsatzwährung',
+	[keys.providerFieldMeasurementId]: 'Mess-ID',
 	[keys.providerFieldCaptureHelp]:
 		'Öffentliche Browser-Konfiguration. Erfassung läuft nur, wenn sie gesetzt ist.',
 	[keys.providerNamePlausible]: 'Plausible',

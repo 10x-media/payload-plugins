@@ -96,6 +96,8 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: 'المنطقة',
 	[keys.providerFieldDomain]: 'نطاق الموقع',
 	[keys.providerFieldScriptId]: 'معرّف السكربت',
+	[keys.providerFieldRevenueCurrency]: 'عملة الإيرادات',
+	[keys.providerFieldMeasurementId]: 'معرّف القياس',
 	[keys.providerFieldCaptureHelp]: 'إعدادات عامة للمتصفح. لا يعمل التتبع إلا عند ضبطها.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',

@@ -96,6 +96,8 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: '지역',
 	[keys.providerFieldDomain]: '사이트 도메인',
 	[keys.providerFieldScriptId]: '스크립트 ID',
+	[keys.providerFieldRevenueCurrency]: '수익 통화',
+	[keys.providerFieldMeasurementId]: '측정 ID',
 	[keys.providerFieldCaptureHelp]: '공개 브라우저 설정입니다. 값이 있을 때만 수집이 실행됩니다.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',

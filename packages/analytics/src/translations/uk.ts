@@ -96,6 +96,8 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: 'Регіон',
 	[keys.providerFieldDomain]: 'Домен сайту',
 	[keys.providerFieldScriptId]: 'ID скрипта',
+	[keys.providerFieldRevenueCurrency]: 'Валюта доходу',
+	[keys.providerFieldMeasurementId]: 'ID вимірювання',
 	[keys.providerFieldCaptureHelp]:
 		'Публічна конфігурація для браузера. Збір працює, лише якщо її задано.',
 	[keys.providerNamePlausible]: 'Plausible',

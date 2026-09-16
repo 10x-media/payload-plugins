@@ -46,8 +46,9 @@ const assertNoCollisions = (paths: string[]): void => {
  * the runtime proxy, which can be told to keep one via `trailingSlashes`); harmless for
  * every vendor this helper supports today.
  *
- * An adapter without `capture` (GA4) or with no proxy routes (the native adapter)
- * contributes nothing rather than throwing, so one broken slot never blanks the rest.
+ * An adapter without `capture`, or with no proxy routes (the native adapter, and GA4 whose
+ * tag is served from Google's own CDN), contributes nothing rather than throwing, so one
+ * broken slot never blanks the rest.
  * Output preserves mount order, then each mount's declared route order.
  *
  * Throws for a mount path that normalizes to the site root (an unprefixed catch-all

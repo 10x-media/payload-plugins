@@ -96,6 +96,8 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: 'Регион',
 	[keys.providerFieldDomain]: 'Домен сайта',
 	[keys.providerFieldScriptId]: 'ID скрипта',
+	[keys.providerFieldRevenueCurrency]: 'Валюта дохода',
+	[keys.providerFieldMeasurementId]: 'ID измерения',
 	[keys.providerFieldCaptureHelp]:
 		'Публичная конфигурация для браузера. Сбор работает, только если она задана.',
 	[keys.providerNamePlausible]: 'Plausible',

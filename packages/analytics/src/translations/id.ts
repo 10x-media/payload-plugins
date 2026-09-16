@@ -96,6 +96,8 @@ export const id: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: 'Wilayah',
 	[keys.providerFieldDomain]: 'Domain situs',
 	[keys.providerFieldScriptId]: 'ID skrip',
+	[keys.providerFieldRevenueCurrency]: 'Mata uang pendapatan',
+	[keys.providerFieldMeasurementId]: 'ID pengukuran',
 	[keys.providerFieldCaptureHelp]:
 		'Konfigurasi publik browser. Perekaman hanya berjalan bila diisi.',
 	[keys.providerNamePlausible]: 'Plausible',

@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SnippetScript } from '../../core/capture'
 import type { TrackerEvent, TrackerWindow } from '../types'
+import { createGa4Sink } from './ga4'
 import { createPlausibleSink } from './plausible'
 import { createPosthogSink } from './posthog'
 import { createUmamiSink } from './umami'
@@ -26,6 +27,7 @@ interface VendorGlobals {
 	posthog?: { capture: ReturnType<typeof vi.fn> }
 	plausible?: ReturnType<typeof vi.fn>
 	umami?: { track: ReturnType<typeof vi.fn> }
+	gtag?: ReturnType<typeof vi.fn>
 }
 
 /** A window whose vendor globals appear only when the test says they do. */
@@ -33,6 +35,7 @@ const vendorWindow = () => {
 	const capture = vi.fn()
 	const plausible = vi.fn()
 	const track = vi.fn()
+	const gtag = vi.fn()
 	const globals: VendorGlobals = {}
 	const win = {
 		...globals,
@@ -43,8 +46,9 @@ const vendorWindow = () => {
 		win.posthog = { capture }
 		win.plausible = plausible
 		win.umami = { track }
+		win.gtag = gtag
 	}
-	return { win, capture, plausible, track, install }
+	return { win, capture, plausible, track, gtag, install }
 }
 
 afterEach(() => {
@@ -133,11 +137,16 @@ describe('vendor sink loading', () => {
 	})
 
 	it('never forwards a pageview: the vendor script tracks its own', async () => {
-		const { win, capture, plausible, track, install } = vendorWindow()
+		const { win, capture, plausible, track, gtag, install } = vendorWindow()
 		install()
 		const loadScript = vi.fn((_script: SnippetScript) => Promise.resolve())
 		const args = { slot: 'tenant', win, scripts: SCRIPTS, loadScript } as const
-		const sinks = [createPosthogSink(args), createPlausibleSink(args), createUmamiSink(args)]
+		const sinks = [
+			createPosthogSink(args),
+			createPlausibleSink(args),
+			createUmamiSink(args),
+			createGa4Sink(args),
+		]
 		await Promise.all(sinks.map((sink) => sink.ready()))
 		for (const sink of sinks) {
 			sink.send(pageview)
@@ -146,6 +155,7 @@ describe('vendor sink loading', () => {
 		expect(capture).not.toHaveBeenCalled()
 		expect(plausible).not.toHaveBeenCalled()
 		expect(track).not.toHaveBeenCalled()
+		expect(gtag).not.toHaveBeenCalled()
 	})
 })
 
@@ -195,5 +205,20 @@ describe('vendor call shapes', () => {
 		sink.send(purchase)
 
 		expect(track).toHaveBeenCalledWith('checkout', { plan: 'pro', value: 49, currency: 'EUR' })
+	})
+
+	it('ga4: gtag("event", name, { ...props, value, currency })', async () => {
+		const { win, gtag, install } = vendorWindow()
+		install()
+		const sink = await ready(createGa4Sink, win)
+		sink.send(purchase)
+		sink.send({ type: 'event', name: 'signup', path: '/', hostname: 'shop.test' })
+
+		expect(gtag).toHaveBeenNthCalledWith(1, 'event', 'checkout', {
+			plan: 'pro',
+			value: 49,
+			currency: 'EUR',
+		})
+		expect(gtag).toHaveBeenNthCalledWith(2, 'event', 'signup', {})
 	})
 })

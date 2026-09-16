@@ -98,6 +98,8 @@ export const keys = {
 	providerFieldRegion: 'analytics:providerFieldRegion',
 	providerFieldDomain: 'analytics:providerFieldDomain',
 	providerFieldScriptId: 'analytics:providerFieldScriptId',
+	providerFieldRevenueCurrency: 'analytics:providerFieldRevenueCurrency',
+	providerFieldMeasurementId: 'analytics:providerFieldMeasurementId',
 	providerFieldCaptureHelp: 'analytics:providerFieldCaptureHelp',
 	providerNamePlausible: 'analytics:providerNamePlausible',
 	providerNameUmami: 'analytics:providerNameUmami',

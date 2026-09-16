@@ -101,6 +101,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: 'Region',
 	[keys.providerFieldDomain]: 'Site domain',
 	[keys.providerFieldScriptId]: 'Script ID',
+	[keys.providerFieldRevenueCurrency]: 'Revenue currency',
+	[keys.providerFieldMeasurementId]: 'Measurement ID',
 	[keys.providerFieldCaptureHelp]: 'Public browser config. Capture only runs when it is set.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',

@@ -33,6 +33,7 @@ export type ProviderDoc = {
 		clientEmail?: string | null
 		privateKey?: string | null
 		projectId?: string | null
+		measurementId?: string | null
 	} | null
 	posthog?: {
 		projectId?: string | null
@@ -100,6 +101,7 @@ const buildBaseAdapter = (doc: ProviderDoc): AnalyticsAdapter | null => {
 					private_key: normalizePrivateKey(cfg.privateKey ?? ''),
 				},
 				projectId: orUndefined(cfg.projectId),
+				measurementId: orUndefined(cfg.measurementId),
 			})
 		}
 		case 'posthog': {

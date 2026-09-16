@@ -1,4 +1,5 @@
 import type { CollectionConfig, Field, TextareaField, TextField } from 'payload'
+import { validateCurrency } from '../goals/currency'
 import { keys, type TranslationKey } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ProviderAccessArgs } from './access'
@@ -176,6 +177,12 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 						captureField('scriptId', keys.providerFieldScriptId, '50%'),
 					],
 				},
+				{
+					name: 'revenueCurrency',
+					type: 'text',
+					label: labelForKey(keys.providerFieldRevenueCurrency),
+					validate: validateCurrency,
+				},
 				hostField(),
 			]),
 			providerGroup('umami', keys.providerNameUmami, [
@@ -198,6 +205,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 					],
 				},
 				textField('clientEmail', keys.providerFieldClientEmail),
+				captureField('measurementId', keys.providerFieldMeasurementId),
 				...args.buildSecret({
 					name: 'privateKey',
 					type: 'textarea',
