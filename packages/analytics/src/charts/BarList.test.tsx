@@ -29,4 +29,17 @@ describe('BarList fill', () => {
 		expect(secondary).toHaveLength(1)
 		expect(secondary[0]?.textContent).toBe('1')
 	})
+
+	it('replaces rows that share a label instead of stranding them', () => {
+		const shared = [
+			{ label: '', value: 53, display: '53' },
+			{ label: '', value: 51, display: '51' },
+		]
+		const { container, rerender } = render(<BarList data={shared} emptyLabel="empty" />)
+		expect(container.querySelectorAll('.analytics-bars__row')).toHaveLength(2)
+		rerender(<BarList data={data} emptyLabel="empty" />)
+		expect(
+			[...container.querySelectorAll('.analytics-bars__label')].map((row) => row.textContent)
+		).toEqual(['/pricing', 'book-demo'])
+	})
 })

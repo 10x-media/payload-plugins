@@ -7,6 +7,7 @@ const ALL_ON: ResolvedAutoCapture = {
 	outboundLinks: true,
 	fileDownloads: true,
 	goalAttribute: true,
+	query: true,
 }
 
 let handlers: AutoCaptureHandlers & {

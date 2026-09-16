@@ -159,6 +159,7 @@ export const keys = {
 	viewTrendPrevious: 'analytics:viewTrendPrevious',
 	viewBreakdowns: 'analytics:viewBreakdowns',
 	viewFiltersUnsupported: 'analytics:viewFiltersUnsupported',
+	viewGroupBy: 'analytics:viewGroupBy',
 	viewSortAscending: 'analytics:viewSortAscending',
 	viewSortDescending: 'analytics:viewSortDescending',
 	viewConversionRate: 'analytics:viewConversionRate',

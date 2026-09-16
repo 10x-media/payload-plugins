@@ -82,6 +82,43 @@ describeForDb('native ingest endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(row?.sessions).toBe(1)
 	})
 
+	it('persists browser, os, language and the utm keys, and never the raw query', async () => {
+		const res = await makeIngestHandler(platformHeaderResolver)(
+			ingestRequest(
+				booted.payload,
+				{
+					type: 'pageview',
+					path: '/dimensions',
+					hostname: 'h',
+					query:
+						'utm_source=newsletter&utm_medium=email&utm_campaign=spring&utm_content=hero&utm_term=shoes&token=secret',
+				},
+				{
+					'user-agent':
+						'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+					'accept-language': 'de-DE,de;q=0.9',
+				}
+			)
+		)
+		expect(res.status).toBe(202)
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/dimensions' } },
+			pagination: false,
+		})
+		expect(docs[0]).toMatchObject({
+			browser: 'chrome',
+			os: 'macos',
+			language: 'de-de',
+			utmSource: 'newsletter',
+			utmMedium: 'email',
+			utmCampaign: 'spring',
+			utmContent: 'hero',
+			utmTerm: 'shoes',
+		})
+		expect(JSON.stringify(docs[0])).not.toContain('secret')
+	})
+
 	it('ingests with a missing MaxMind db, falling back to the platform-header country', async () => {
 		const composed = composeGeoResolvers(
 			platformHeaderResolver,

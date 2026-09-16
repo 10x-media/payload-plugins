@@ -155,6 +155,11 @@ export type AutoCaptureOptions = {
 	outboundLinks?: boolean
 	fileDownloads?: boolean
 	goalAttribute?: boolean
+	/**
+	 * Send each pageview's query string so ingest can extract its utm keys. The raw query is
+	 * never stored, only the five campaign values; set false to stop sending it at all.
+	 */
+	query?: boolean
 }
 
 export type ResolvedAutoCapture = Required<AutoCaptureOptions>
@@ -409,6 +414,7 @@ export const DEFAULT_AUTO_CAPTURE: ResolvedAutoCapture = {
 	outboundLinks: true,
 	fileDownloads: true,
 	goalAttribute: true,
+	query: true,
 }
 
 const resolveAutoCapture = (option: AutoCaptureOptions | undefined): ResolvedAutoCapture => ({
@@ -416,6 +422,7 @@ const resolveAutoCapture = (option: AutoCaptureOptions | undefined): ResolvedAut
 	outboundLinks: option?.outboundLinks ?? DEFAULT_AUTO_CAPTURE.outboundLinks,
 	fileDownloads: option?.fileDownloads ?? DEFAULT_AUTO_CAPTURE.fileDownloads,
 	goalAttribute: option?.goalAttribute ?? DEFAULT_AUTO_CAPTURE.goalAttribute,
+	query: option?.query ?? DEFAULT_AUTO_CAPTURE.query,
 })
 
 /** Cookieless native capture needs no consent gate; a vendor's tracker does. */

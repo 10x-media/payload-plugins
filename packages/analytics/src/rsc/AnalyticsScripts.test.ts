@@ -36,6 +36,7 @@ const config = (requiresConsent = false): TrackerConfig => ({
 		outboundLinks: true,
 		fileDownloads: true,
 		goalAttribute: true,
+		query: true,
 	},
 	goals: [],
 	ingestPath: '/api/analytics/ingest',

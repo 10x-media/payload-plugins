@@ -38,13 +38,20 @@ export const BREAKDOWN_TABS: BreakdownTab[] = [
 /**
  * The dimensions each breakdown tab offers, most useful first. Every contract dimension
  * belongs to exactly one tab, so a source that serves a new dimension gains a column
- * rather than an unreachable capability.
+ * rather than an unreachable capability. The first one a source serves is the tab's default,
+ * which the reader changes through the breakdown's group-by picker, so the order decides what
+ * a link carrying no `dim` opens on and is not free to change.
+ *
+ * `sources` leads with `source` rather than `referrer`: for a provider serving both (Plausible,
+ * GA4) that moves the tab's default off the referring host it used to open on, which is the one
+ * default this ordering does move. It is the right one: `source` is what every source serves,
+ * and `referrer` is one pick away.
  */
 export const TAB_DIMENSIONS: Record<BreakdownTab, DimensionKey[]> = {
 	pages: ['page'],
 	sources: [
-		'referrer',
 		'source',
+		'referrer',
 		'medium',
 		'campaign',
 		'utmSource',
@@ -73,6 +80,7 @@ export interface DayRange {
 export interface ViewGate {
 	metrics: MetricKey[]
 	tabs: BreakdownTab[]
+	/** What the tab can group by, in declared order. The first is the tab's default. */
 	dimensionsFor: (tab: BreakdownTab) => DimensionKey[]
 	canFilter: (dimension: DimensionKey) => boolean
 	operators: FilterOperator[]

@@ -160,6 +160,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.viewTrendPrevious]: 'Periode sebelumnya',
 	[keys.viewBreakdowns]: 'Rincian',
 	[keys.viewFiltersUnsupported]: 'Sumber data ini tidak mendukung filter pada dimensi ini.',
+	[keys.viewGroupBy]: 'Kelompokkan menurut',
 	[keys.viewSortAscending]: 'urut naik',
 	[keys.viewSortDescending]: 'urut turun',
 	[keys.viewConversionRate]: 'Tingkat konversi',

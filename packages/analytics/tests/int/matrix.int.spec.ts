@@ -1,6 +1,7 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { Config, Endpoint, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
+import type { DimensionKey } from '../../src/core/contract'
 import { readForField } from '../../src/fields/readForDocument'
 import { GOALS_SLUG } from '../../src/goals/collection'
 import { GOAL_ACTION_TYPE } from '../../src/goals/trackGoalAction'
@@ -14,11 +15,14 @@ import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { native } from '../../src/native/nativeAdapter'
-import { applyDistinctDeltas } from '../../src/native/rollups/applyDistinctDeltas'
 import { applyRollupDeltas } from '../../src/native/rollups/applyRollupDeltas'
+import { bucketKey } from '../../src/native/rollups/bucketKey'
 import { bumpRollup } from '../../src/native/rollups/bumpRollup'
+import { bumpRollups } from '../../src/native/rollups/bumpRollups'
 import { computeRollupDeltas, type RollupInc } from '../../src/native/rollups/deltas'
 import { insertIfNew } from '../../src/native/rollups/insertIfNew'
+import { insertManyIfNew } from '../../src/native/rollups/insertManyIfNew'
+import { MAX_GEO_LENGTH } from '../../src/query/limits'
 import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
 import { type MemoryAnalyticsAdapter, memoryAdapter } from '../../src/testing/memoryAdapter'
 import { startOfDayInTz } from '../../src/timeframe/tz'
@@ -224,6 +228,81 @@ describeForDb('native insertIfNew dedup', {}, (db) => {
 	})
 })
 
+describeForDb('native batched ledger primitives', {}, (db) => {
+	let booted: BootedPayload
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+	})
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const period = new Date('2026-08-01T00:00:00Z')
+	const seenRow = (value: string, bucket = 'batch') => ({ bucket, kind: 'visitor', value, period })
+
+	it(`answers new or seen per row, in order, on ${db}`, async () => {
+		expect(await insertManyIfNew(booted.payload, SEEN_SLUG, [seenRow('a'), seenRow('b')])).toEqual([
+			true,
+			true,
+		])
+		expect(
+			await insertManyIfNew(booted.payload, SEEN_SLUG, [seenRow('b'), seenRow('c'), seenRow('a')])
+		).toEqual([false, true, false])
+	})
+
+	it(`counts a row repeated inside one call once on ${db}`, async () => {
+		expect(
+			await insertManyIfNew(booted.payload, SEEN_SLUG, [seenRow('d'), seenRow('d'), seenRow('e')])
+		).toEqual([true, false, true])
+		const { totalDocs } = await booted.payload.count({
+			collection: SEEN_SLUG,
+			where: { value: { equals: 'd' } },
+		})
+		expect(totalDocs).toBe(1)
+	})
+
+	it(`takes an empty batch as a no-op on ${db}`, async () => {
+		expect(await insertManyIfNew(booted.payload, SEEN_SLUG, [])).toEqual([])
+		await expect(bumpRollups(booted.payload, [])).resolves.toBeUndefined()
+	})
+
+	const bucket = (dimvalue: string) => ({
+		granularity: 'day' as const,
+		period,
+		path: '',
+		dimension: 'country',
+		dimvalue,
+		hostname: '',
+	})
+
+	it(`upserts several buckets in one call, then increments them again on ${db}`, async () => {
+		await bumpRollups(booted.payload, [
+			{ key: bucket('US'), inc: { pageviews: 2, samples: 2 } },
+			{ key: bucket('DE'), inc: { pageviews: 1, samples: 1 } },
+		])
+		await bumpRollups(booted.payload, [
+			{ key: bucket('US'), inc: { pageviews: 1, visitors: 1 } },
+			// Two entries for one bucket in a single call must sum rather than collide: on
+			// Postgres a repeated conflict target in one statement is an error, not an upsert.
+			{ key: bucket('DE'), inc: { visitors: 1 } },
+			{ key: bucket('DE'), inc: { sessions: 1 } },
+		])
+		const { docs } = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { dimension: { equals: 'country' }, period: { equals: period.toISOString() } },
+			pagination: false,
+		})
+		const byValue = new Map(
+			(docs as unknown as Array<{ dimvalue: string; [metric: string]: unknown }>).map((d) => [
+				d.dimvalue,
+				d,
+			])
+		)
+		expect(byValue.get('US')).toMatchObject({ pageviews: 3, samples: 2, visitors: 1, sessions: 0 })
+		expect(byValue.get('DE')).toMatchObject({ pageviews: 1, samples: 1, visitors: 1, sessions: 1 })
+	})
+})
+
 describeForDb('native distinct counting', {}, (db) => {
 	let booted: BootedPayload
 	beforeAll(async () => {
@@ -233,21 +312,20 @@ describeForDb('native distinct counting', {}, (db) => {
 		await booted.stop()
 	})
 
-	const hit = async (visitorHash: string, country?: string): Promise<void> => {
-		const event: StoredEvent = {
-			timestamp: new Date('2026-02-01T10:00:00Z'),
-			type: 'pageview',
-			path: '/d',
-			hostname: 'h',
-			visitorHash,
-			sessionId: `sess-${visitorHash}`,
-			country,
-			durationMs: 100,
-		}
-		const deltas = computeRollupDeltas(event)
-		await applyRollupDeltas(booted.payload, deltas)
-		await applyDistinctDeltas(booted.payload, event, deltas)
-	}
+	// Through flushBatch, which is the write path every ingest actually takes.
+	const hit = (visitorHash: string, country?: string): Promise<void> =>
+		flushBatch(booted.payload, [
+			{
+				timestamp: new Date('2026-02-01T10:00:00Z'),
+				type: 'pageview',
+				path: '/d',
+				hostname: 'h',
+				visitorHash,
+				sessionId: `sess-${visitorHash}`,
+				country,
+				durationMs: 100,
+			},
+		])
 
 	it(`counts a repeat visitor once but pageviews twice on ${db}`, async () => {
 		await hit('vv1')
@@ -274,6 +352,180 @@ describeForDb('native distinct counting', {}, (db) => {
 		const row = docs[0] as { visitors: number } | undefined
 		// vv1 (prior test) + vv2 + vv3 all share the '/d' path bucket: 3 distinct visitors.
 		expect(row?.visitors).toBe(3)
+	})
+})
+
+describeForDb('native flushBatch parity with the serial write path', {}, (db) => {
+	let booted: BootedPayload
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+	})
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	/**
+	 * The write path as it was before the batched primitives: one upsert per bucket, one
+	 * insert-if-new per visitor and session per bucket, one more upsert per new one. Kept here
+	 * as the reference the batched path has to match row for row.
+	 */
+	const serialWrite = async (events: StoredEvent[]): Promise<void> => {
+		for (const event of events) {
+			const deltas = computeRollupDeltas(event)
+			await applyRollupDeltas(booted.payload, deltas)
+			for (const delta of deltas) {
+				const bucket = bucketKey(delta.key)
+				const period = delta.key.period
+				for (const [kind, value, metric] of [
+					['visitor', event.visitorHash, 'visitors'],
+					['session', event.sessionId, 'sessions'],
+				] as const) {
+					if (await insertIfNew(booted.payload, SEEN_SLUG, { bucket, kind, value, period })) {
+						await bumpRollup(booted.payload, delta.key, { [metric]: 1 })
+					}
+				}
+			}
+		}
+	}
+
+	// A batch with everything that makes counting interesting: two visitors sharing a session
+	// hash of their own, a repeat hit, two paths, two hostnames, a custom event, a goal with
+	// revenue, a scroll depth, and every classified dimension.
+	const fixture = (day: string): StoredEvent[] => [
+		{
+			timestamp: new Date(`${day}T10:00:00Z`),
+			type: 'pageview',
+			path: '/a',
+			hostname: 'one.example',
+			visitorHash: 'p-v1',
+			sessionId: 'p-s1',
+			durationMs: 1000,
+			scrollDepth: 60,
+			country: 'US',
+			region: 'CA',
+			city: 'San Francisco',
+			device: 'desktop',
+			browser: 'chrome',
+			os: 'macos',
+			language: 'en-us',
+			source: 'example.org',
+			referrerHost: 'example.org',
+			utmSource: 'newsletter',
+			utmCampaign: 'spring',
+		},
+		{
+			timestamp: new Date(`${day}T10:05:00Z`),
+			type: 'pageview',
+			path: '/a',
+			hostname: 'one.example',
+			visitorHash: 'p-v1',
+			sessionId: 'p-s1',
+			durationMs: 500,
+			country: 'US',
+			device: 'desktop',
+			browser: 'chrome',
+			os: 'macos',
+		},
+		{
+			timestamp: new Date(`${day}T11:00:00Z`),
+			type: 'pageview',
+			path: '/b',
+			hostname: 'two.example',
+			visitorHash: 'p-v2',
+			sessionId: 'p-s2',
+			durationMs: 250,
+			country: 'DE',
+			device: 'mobile',
+			browser: 'firefox',
+			os: 'android',
+			language: 'de-de',
+		},
+		{
+			timestamp: new Date(`${day}T11:10:00Z`),
+			type: 'event',
+			name: 'signup',
+			path: '/b',
+			hostname: 'two.example',
+			visitorHash: 'p-v2',
+			sessionId: 'p-s2',
+		},
+		{
+			timestamp: new Date(`${day}T11:20:00Z`),
+			type: 'goal',
+			name: 'purchase',
+			path: '/checkout',
+			hostname: 'two.example',
+			visitorHash: 'p-v3',
+			sessionId: 'p-s3',
+			goals: [{ slug: 'purchase', value: 25.5 }],
+		},
+	]
+
+	/** Every rollup row for one day, comparable across days: id and period dropped. */
+	const rowsFor = async (period: Date) => {
+		const { docs } = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { period: { equals: period.toISOString() } },
+			pagination: false,
+			limit: 1000,
+			overrideAccess: true,
+		})
+		return (docs as unknown as Array<Record<string, number | string>>)
+			.map((d) => ({
+				path: d.path,
+				dimension: d.dimension,
+				dimvalue: d.dimvalue,
+				hostname: d.hostname,
+				pageviews: d.pageviews,
+				events: d.events,
+				durationMs: d.durationMs,
+				samples: d.samples,
+				visitors: d.visitors,
+				sessions: d.sessions,
+				conversions: d.conversions,
+				revenue: d.revenue,
+				scrollDepthSum: d.scrollDepthSum,
+				scrollSamples: d.scrollSamples,
+			}))
+			.sort((a, b) =>
+				`${a.hostname}|${a.path}|${a.dimension}|${a.dimvalue}`.localeCompare(
+					`${b.hostname}|${b.path}|${b.dimension}|${b.dimvalue}`
+				)
+			)
+	}
+
+	it(`writes exactly what the serial path wrote, bucket for bucket, on ${db}`, async () => {
+		// Two days apart so both paths write their own buckets and ledger rows in one database.
+		await flushBatch(booted.payload, fixture('2026-07-01'))
+		await serialWrite(fixture('2026-07-02'))
+
+		const batched = await rowsFor(new Date('2026-07-01T00:00:00Z'))
+		const serial = await rowsFor(new Date('2026-07-02T00:00:00Z'))
+		expect(batched).toEqual(serial)
+		expect(batched.length).toBeGreaterThan(20)
+
+		// And the numbers are the right ones, not merely the same wrong ones on both paths.
+		const site = batched.find((r) => r.path === '' && r.dimension === '' && r.hostname === '')
+		expect(site).toMatchObject({
+			pageviews: 3,
+			events: 2,
+			samples: 5,
+			visitors: 3,
+			sessions: 3,
+			durationMs: 1750,
+			conversions: 1,
+			revenue: 25.5,
+			scrollDepthSum: 60,
+			scrollSamples: 1,
+		})
+		const pageA = batched.find((r) => r.path === '/a' && r.hostname === '')
+		expect(pageA).toMatchObject({ pageviews: 2, visitors: 1, sessions: 1 })
+		const chrome = batched.find((r) => r.dimension === 'browser' && r.hostname === '')
+		expect(chrome).toMatchObject({ dimvalue: 'chrome', pageviews: 2, visitors: 1 })
+		const scopedHost = batched.find(
+			(r) => r.hostname === 'two.example' && r.path === '' && r.dimension === ''
+		)
+		expect(scopedHost).toMatchObject({ pageviews: 1, events: 2, visitors: 2, sessions: 2 })
 	})
 })
 
@@ -422,6 +674,181 @@ describeForDb('native goal rollups', {}, (db) => {
 		expect(byGoal.purchase).toEqual({ conversions: 1, revenue: 25.5 })
 		expect(byGoal.thanks).toEqual({ conversions: 1, revenue: 0 })
 		expect(result.totals).toEqual({ conversions: 2, revenue: 25.5 })
+	})
+})
+
+describeForDb('native dimension columns and breakdowns', {}, (db) => {
+	const adapter = native()
+	let booted: BootedPayload
+
+	// One ingest carrying every attribute the new dimensions are derived from, so each
+	// breakdown has exactly one row to find on either database.
+	const attributed = {
+		'user-agent':
+			'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+		'accept-language': 'de-DE,de;q=0.9',
+		'x-vercel-ip-country': 'US',
+		'x-vercel-ip-country-region': 'CA',
+		'x-vercel-ip-city': 'San Francisco',
+	}
+
+	const expected: ReadonlyArray<readonly [DimensionKey, string]> = [
+		['referrer', 'example.org'],
+		['region', 'CA'],
+		['city', 'San Francisco'],
+		['browser', 'chrome'],
+		['os', 'macos'],
+		['language', 'de-de'],
+		['utmSource', 'newsletter'],
+		['utmMedium', 'email'],
+		['utmCampaign', 'spring'],
+		['utmContent', 'hero'],
+		['utmTerm', 'shoes'],
+	]
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
+		const endpoint = (booted.payload.config.endpoints ?? []).find(
+			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		)
+		if (!endpoint || typeof endpoint.handler !== 'function') {
+			throw new Error('ingest endpoint not registered')
+		}
+		const res = await endpoint.handler(
+			ingestRequest(
+				booted.payload,
+				{
+					type: 'pageview',
+					path: '/dims',
+					hostname: 'site.com',
+					referrer: 'https://www.example.org/path?x=1',
+					query:
+						'utm_source=newsletter&utm_medium=email&utm_campaign=spring&utm_content=hero&utm_term=shoes',
+					durationMs: 100,
+				},
+				attributed
+			)
+		)
+		expect(res.status).toBe(202)
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it(`stores every derived dimension column on ${db}`, async () => {
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/dims' } } as never,
+			pagination: false,
+			overrideAccess: true,
+		})
+		expect(docs[0]).toMatchObject({
+			referrerHost: 'example.org',
+			region: 'CA',
+			city: 'San Francisco',
+			browser: 'chrome',
+			os: 'macos',
+			language: 'de-de',
+			utmSource: 'newsletter',
+			utmMedium: 'email',
+			utmCampaign: 'spring',
+			utmContent: 'hero',
+			utmTerm: 'shoes',
+		})
+	})
+
+	it(`serves a rollup and a raw-event breakdown per new dimension on ${db}`, async () => {
+		const range = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
+		for (const [dimension, value] of expected) {
+			const rollups = await adapter.query(
+				{ metrics: ['pageviews'], dimensions: [dimension], dateRange: range },
+				{}
+			)
+			expect(rollups.rows).toEqual([
+				{ dimensions: { [dimension]: value }, metrics: { pageviews: 1 } },
+			])
+			// A filter forces the raw-event path, which must agree with the rollups.
+			const events = await adapter.query(
+				{
+					metrics: ['pageviews'],
+					dimensions: [dimension],
+					dateRange: range,
+					filters: [{ dimension, operator: 'eq', value }],
+				},
+				{}
+			)
+			expect(events.rows).toEqual(rollups.rows)
+		}
+	})
+})
+
+/** Deterministic printable ASCII with no repeating run for PGLZ to squeeze out. */
+const noise = (length: number): string => {
+	let seed = 12345
+	let out = ''
+	for (let i = 0; i < length; i++) {
+		seed = (seed * 1103515245 + 12345) % 2147483648
+		out += String.fromCharCode(33 + (seed % 94))
+	}
+	return out
+}
+
+describeForDb('native geo caps', {}, (db) => {
+	const adapter = native()
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	// A geo header is client-settable, and its value becomes a rollup dimvalue and part of a
+	// seen-ledger key. Uncapped, an oversized one blows past Postgres's 2704-byte btree key
+	// limit and fails the write while Mongo accepts it, so the databases would disagree about
+	// whether the hit counted at all. The fixture has to be incompressible: Postgres compresses
+	// index values, so 3 KB of one repeated character would fit the key and prove nothing.
+	it(`truncates an oversized geo header instead of failing the write on ${db}`, async () => {
+		const endpoint = (booted.payload.config.endpoints ?? []).find(
+			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		)
+		if (!endpoint || typeof endpoint.handler !== 'function') {
+			throw new Error('ingest endpoint not registered')
+		}
+		const res = await endpoint.handler(
+			ingestRequest(
+				booted.payload,
+				{ type: 'pageview', path: '/geo', hostname: 'site.com', durationMs: 100 },
+				{ 'user-agent': 'UA', 'x-vercel-ip-city': noise(3000) }
+			)
+		)
+		expect(res.status).toBe(202)
+
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/geo' } } as never,
+			pagination: false,
+			overrideAccess: true,
+		})
+		expect((docs[0] as unknown as { city: string }).city).toHaveLength(MAX_GEO_LENGTH)
+
+		const rows = await adapter.query(
+			{
+				metrics: ['pageviews', 'visitors'],
+				dimensions: ['city'],
+				dateRange: { start: new Date('2020-01-01'), end: new Date('2030-01-01') },
+			},
+			{}
+		)
+		expect(rows.rows).toEqual([
+			{
+				dimensions: { city: noise(3000).slice(0, MAX_GEO_LENGTH) },
+				metrics: { pageviews: 1, visitors: 1 },
+			},
+		])
 	})
 })
 

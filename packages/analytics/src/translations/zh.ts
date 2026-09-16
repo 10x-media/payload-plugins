@@ -157,6 +157,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.viewTrendPrevious]: '上一周期',
 	[keys.viewBreakdowns]: '细分',
 	[keys.viewFiltersUnsupported]: '该数据源不支持按此维度筛选。',
+	[keys.viewGroupBy]: '分组依据',
 	[keys.viewSortAscending]: '升序排列',
 	[keys.viewSortDescending]: '降序排列',
 	[keys.viewConversionRate]: '转化率',

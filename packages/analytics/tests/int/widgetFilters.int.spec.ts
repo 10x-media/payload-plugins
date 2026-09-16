@@ -164,8 +164,15 @@ describeForDb('widget filters against the native adapter', { dbs: ['mongo'] }, (
 	})
 
 	it('answers filter-unsupported for a dimension the native adapter cannot filter on', async () => {
-		const result = await metric([{ dimension: 'browser', operator: 'eq', value: 'Chrome' }])
+		// native groups by `goal` but cannot filter by it: completions live in a json column.
+		const result = await metric([{ dimension: 'goal', operator: 'eq', value: 'thanks' }])
 		expect(result.status).toBe('filter-unsupported')
+	})
+
+	it('narrows the metric widget total with an eq filter on a classified dimension', async () => {
+		const chrome = await metric([{ dimension: 'browser', operator: 'eq', value: 'chrome' }])
+		expect(chrome.status).toBe('ok')
+		expect(chrome.metrics.pageviews).toBe(5)
 	})
 })
 

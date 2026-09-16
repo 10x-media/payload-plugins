@@ -1,8 +1,13 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { GOALS_SLUG } from '../../src/goals/collection'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
+import { classifyBrowser, classifyOs } from '../../src/native/ingest/browser'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
+import { primaryLanguage } from '../../src/native/ingest/language'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
+import { referrerHost, storedReferrer } from '../../src/native/ingest/referrer'
+import { deriveSource } from '../../src/native/ingest/source'
+import { extractUtm } from '../../src/native/ingest/utm'
 import { syncTask } from '../../src/sync/syncTask'
 import { startOfDayInTz } from '../../src/timeframe/tz'
 import { DEV_REPORTING_TIMEZONE, pagePath } from '../config/shared'
@@ -15,11 +20,123 @@ const ALPHA_EMAIL = 'alpha@10xmedia.de'
 const BETA_EMAIL = 'beta@10xmedia.de'
 
 const SEED_PATHS = ['/', '/about', '/pricing', '/blog', '/contact']
-const SEED_COUNTRIES = ['US', 'DE', 'GB', 'FR']
 const SEED_DEVICES = ['desktop', 'mobile', 'tablet'] as const
-const SEED_SOURCES = ['google.com', 'Direct', 't.co', 'news.ycombinator.com']
 const SEED_VISITOR_COUNT = 6
+const SEED_HOSTNAME = 'localhost'
 const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Country, region and city together, so all three geography levels rank real rows. */
+const SEED_GEO = [
+	{ country: 'US', region: 'California', city: 'San Francisco' },
+	{ country: 'DE', region: 'Berlin', city: 'Berlin' },
+	{ country: 'GB', region: 'England', city: 'London' },
+	{ country: 'FR', region: 'Ile-de-France', city: 'Paris' },
+]
+
+/**
+ * One visitor per browser and OS family, each carrying the `accept-language` of the country
+ * it is paired with below, so the browsers, operating systems and languages breakdowns all
+ * rank several rows and a row reads as a plausible visitor rather than a random pairing.
+ */
+const SEED_AGENTS = [
+	{
+		ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+		acceptLanguage: 'en-US,en;q=0.9',
+	},
+	{
+		ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+		acceptLanguage: 'de-DE,de;q=0.9,en;q=0.8',
+	},
+	{
+		ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0',
+		acceptLanguage: 'en-GB,en;q=0.9',
+	},
+	{
+		ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0',
+		acceptLanguage: 'fr-FR,fr;q=0.9',
+	},
+]
+
+/**
+ * Raw referrers as a browser sends them: external hosts with their own query strings (which
+ * storage strips), one empty value for direct traffic, and one same-site referrer, which
+ * contributes no `referrer` row and reads as `Direct`. The `source` channel is derived from
+ * the same value rather than stated, so the two dimensions cannot drift apart in the seed.
+ */
+const SEED_REFERRERS = [
+	'https://www.google.com/search?q=payload+analytics',
+	'',
+	'https://t.co/9xQz1',
+	'https://news.ycombinator.com/item?id=41000000',
+	'https://www.bing.com/search?q=payload+cms',
+	`http://${SEED_HOSTNAME}/pricing?ref=nav`,
+]
+
+/**
+ * Campaign landings, as the query string the tracker sends on a pageview. Every seventh one
+ * carries a campaign, so the campaigns widget ranks two of them against an unattributed
+ * majority; 7 shares no factor with the other fixture lists, so a campaign is not pinned to
+ * one browser, device or path.
+ */
+const SEED_CAMPAIGN_QUERIES = [
+	'utm_source=newsletter&utm_medium=email&utm_campaign=spring',
+	'utm_source=twitter&utm_medium=social&utm_campaign=launch',
+]
+const CAMPAIGN_EVERY = 7
+
+/** Only the optional dimension fields, so spreading one can never blank a required one. */
+type SeedAttribution = Pick<
+	StoredEvent,
+	| 'country'
+	| 'region'
+	| 'city'
+	| 'device'
+	| 'source'
+	| 'browser'
+	| 'os'
+	| 'language'
+	| 'referrer'
+	| 'referrerHost'
+	| 'utmSource'
+	| 'utmMedium'
+	| 'utmCampaign'
+	| 'utmContent'
+	| 'utmTerm'
+>
+
+/**
+ * Everything ingest would classify from a real request, derived here with the ingest
+ * helpers themselves: seeded events bypass the endpoint, so a hand-written literal would be
+ * the one place the seed and a live hit could disagree on what a bucket is called. `index`
+ * walks the fixture lists so the combinations vary across the span deterministically.
+ */
+const attributionFor = (index: number): SeedAttribution => {
+	const agent = SEED_AGENTS[index % SEED_AGENTS.length]
+	const geo = SEED_GEO[index % SEED_GEO.length]
+	const referrer = SEED_REFERRERS[index % SEED_REFERRERS.length] ?? ''
+	const query =
+		index % CAMPAIGN_EVERY === 0
+			? SEED_CAMPAIGN_QUERIES[index % SEED_CAMPAIGN_QUERIES.length]
+			: undefined
+	const browser = agent ? classifyBrowser(agent.ua) : undefined
+	const os = agent ? classifyOs(agent.ua) : undefined
+	const language = agent ? primaryLanguage(agent.acceptLanguage) : undefined
+	const referrerValue = storedReferrer(referrer)
+	const host = referrerHost(referrer, SEED_HOSTNAME)
+	return {
+		country: geo?.country,
+		region: geo?.region,
+		city: geo?.city,
+		device: SEED_DEVICES[index % SEED_DEVICES.length],
+		source: deriveSource(referrer, SEED_HOSTNAME),
+		...(browser ? { browser } : {}),
+		...(os ? { os } : {}),
+		...(language ? { language } : {}),
+		...(referrerValue ? { referrer: referrerValue } : {}),
+		...(host ? { referrerHost: host } : {}),
+		...extractUtm(query),
+	}
+}
 
 /** Named custom events, so the events breakdown widget has rows on a fresh boot. */
 const SEED_EVENT_NAMES = ['signup', 'download', 'video-play']
@@ -90,13 +207,11 @@ const buildSeedEvents = (
 				timestamp: new Date(now.getTime() - day * DAY_MS + i * 90_000),
 				type: 'pageview',
 				path: SEED_PATHS[(day + i) % SEED_PATHS.length] ?? '/',
-				hostname: 'localhost',
+				hostname: SEED_HOSTNAME,
 				visitorHash,
 				sessionId: `${visitorHash}-d${day}`,
 				durationMs: 30_000 + ((day + i) % 5) * 30_000,
-				country: SEED_COUNTRIES[(day + i) % SEED_COUNTRIES.length],
-				device: SEED_DEVICES[(day + i) % SEED_DEVICES.length],
-				source: SEED_SOURCES[(day + i) % SEED_SOURCES.length],
+				...attributionFor(day + i),
 				timezone: DEV_REPORTING_TIMEZONE,
 				...scoped,
 			})
@@ -106,12 +221,10 @@ const buildSeedEvents = (
 		}
 		const visitorHash = `seed-visitor-${day % SEED_VISITOR_COUNT}`
 		const attribution = {
-			hostname: 'localhost',
+			hostname: SEED_HOSTNAME,
 			visitorHash,
 			sessionId: `${visitorHash}-d${day}`,
-			country: SEED_COUNTRIES[day % SEED_COUNTRIES.length],
-			device: SEED_DEVICES[day % SEED_DEVICES.length],
-			source: SEED_SOURCES[day % SEED_SOURCES.length],
+			...attributionFor(day),
 			timezone: DEV_REPORTING_TIMEZONE,
 			...scoped,
 		}

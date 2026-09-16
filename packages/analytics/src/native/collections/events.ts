@@ -24,11 +24,23 @@ export const eventsCollection = (scoped = false): CollectionConfig => ({
 		{ name: 'path', type: 'text', required: true, index: true },
 		{ name: 'hostname', type: 'text', required: true },
 		{ name: 'referrer', type: 'text' },
+		// Derived from the referrer at ingest: the `referrer` dimension groups and filters on the
+		// bare host, which a read-time `where` could not compute.
+		{ name: 'referrerHost', type: 'text' },
 		{ name: 'device', type: 'text' },
+		{ name: 'browser', type: 'text' },
+		{ name: 'os', type: 'text' },
 		{ name: 'source', type: 'text' },
+		// Extracted from the pageview's query string at ingest; the raw query is never stored.
+		{ name: 'utmSource', type: 'text' },
+		{ name: 'utmMedium', type: 'text' },
+		{ name: 'utmCampaign', type: 'text' },
+		{ name: 'utmContent', type: 'text' },
+		{ name: 'utmTerm', type: 'text' },
 		{ name: 'country', type: 'text' },
 		{ name: 'region', type: 'text' },
 		{ name: 'city', type: 'text' },
+		{ name: 'language', type: 'text' },
 		{ name: 'visitorHash', type: 'text', required: true, index: true },
 		{ name: 'sessionId', type: 'text', required: true, index: true },
 		{ name: 'durationMs', type: 'number' },

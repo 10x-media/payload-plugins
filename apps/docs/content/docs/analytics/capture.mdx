@@ -105,10 +105,19 @@ An adapter entry wins over a slot entry, and both win over the per-family defaul
 | `outboundLinks` | on | `outbound_link` with `props.url` for a click on a link to another origin. |
 | `fileDownloads` | on | `file_download` with `props.url` for a link whose extension is a known file type. |
 | `scrollDepth` | **off** | `scroll_depth` with `props.depth` at 25/50/75/100, and the page's deepest position on the pageview. |
+| `query` | on | The page's query string on each pageview, which is where campaign attribution comes from. |
 
 ```ts
 capture: { autoCapture: { scrollDepth: true, fileDownloads: false } }
 ```
+
+`query` carries `location.search` without its leading `?`, capped at 512 characters, on pageviews only: an event fired later in the page's life would attribute the same visit twice. The [native ingest](/analytics/native#dimensions) reads the five `utm_*` keys out of it and discards the rest, so the raw query is never stored. Set it false when your URLs carry identifiers you would rather not put on the wire at all:
+
+```ts
+capture: { autoCapture: { query: false } }
+```
+
+That costs the install its `utmSource`, `utmMedium`, `utmCampaign`, `utmContent` and `utmTerm` breakdowns, since nothing else carries them. The tracker treats an absent key as on, so a config snapshot rendered before this option existed keeps the documented default.
 
 Listeners are delegated: one `click` and one `submit` handler on `document`, both in the capture phase, so a handler that stops propagation (or a link that navigates away) cannot swallow them first, and the listener set never grows with the DOM. A link that is both outbound and a download reports both.
 
@@ -178,6 +187,7 @@ One JSON object per event, `content-type: application/json`, `POST`ed to the con
   "path": "/pricing",      // required
   "hostname": "shop.test", // required
   "referrer": "https://google.com/",  // absent when empty
+  "query": "utm_source=newsletter",   // pageviews only, no leading '?', capped at 512
   "props": { "plan": "pro" },
   "value": 49,             // goals only today
   "currency": "EUR",       // goals only today

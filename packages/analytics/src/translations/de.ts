@@ -161,6 +161,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.viewTrendPrevious]: 'Vorheriger Zeitraum',
 	[keys.viewBreakdowns]: 'Aufschlüsselungen',
 	[keys.viewFiltersUnsupported]: 'Diese Datenquelle unterstützt keine Filter für diese Dimension.',
+	[keys.viewGroupBy]: 'Gruppieren nach',
 	[keys.viewSortAscending]: 'aufsteigend sortiert',
 	[keys.viewSortDescending]: 'absteigend sortiert',
 	[keys.viewConversionRate]: 'Conversion-Rate',

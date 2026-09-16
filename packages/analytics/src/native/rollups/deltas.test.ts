@@ -130,6 +130,88 @@ describe('computeRollupDeltas', () => {
 		)
 	})
 
+	it('emits a bucket for every stored dimension the event carries', () => {
+		const deltas = computeRollupDeltas(
+			ev({
+				referrerHost: 'example.org',
+				region: 'CA',
+				city: 'San Francisco',
+				browser: 'chrome',
+				os: 'macos',
+				language: 'de-de',
+				utmSource: 'newsletter',
+				utmMedium: 'email',
+				utmCampaign: 'spring',
+				utmContent: 'hero',
+				utmTerm: 'shoes',
+			})
+		)
+		const dims = deltas.map((d) => `${d.key.dimension}:${d.key.dimvalue}`)
+		expect(dims).toEqual(
+			expect.arrayContaining([
+				'referrer:example.org',
+				'region:CA',
+				'city:San Francisco',
+				'browser:chrome',
+				'os:macos',
+				'language:de-de',
+				'utmSource:newsletter',
+				'utmMedium:email',
+				'utmCampaign:spring',
+				'utmContent:hero',
+				'utmTerm:shoes',
+			])
+		)
+		// The two base buckets (page, site) plus one per dimension carried.
+		expect(deltas).toHaveLength(13)
+		for (const delta of deltas) {
+			expect(delta.inc).toMatchObject({ pageviews: 1, samples: 1 })
+		}
+	})
+
+	it('emits no bucket for a dimension the event does not carry', () => {
+		const deltas = computeRollupDeltas(ev({ browser: 'chrome' }))
+		const dimensions = deltas.map((d) => d.key.dimension)
+		expect(dimensions).toContain('browser')
+		for (const dimension of [
+			'referrer',
+			'region',
+			'city',
+			'os',
+			'language',
+			'utmSource',
+			'utmMedium',
+			'utmCampaign',
+			'utmContent',
+			'utmTerm',
+		]) {
+			expect(dimensions).not.toContain(dimension)
+		}
+	})
+
+	it('emits no referrer bucket for internal navigation, which carries no referrer host', () => {
+		// normalizeEvent leaves referrerHost unset for a self-referral, so the referrers
+		// breakdown never reports a site's own domain as its top referrer.
+		const deltas = computeRollupDeltas(
+			ev({ hostname: 'site.example', referrer: 'https://site.example/pricing' })
+		)
+		expect(deltas.some((d) => d.key.dimension === 'referrer')).toBe(false)
+	})
+
+	it('dual-emits the new dimension buckets into the hostname family and carries the scope', () => {
+		const deltas = computeRollupDeltas(
+			ev({ hostname: 'a.example', scope: 't1', browser: 'firefox', utmCampaign: 'spring' })
+		)
+		// page, site, browser, utmCampaign in each of the two families.
+		expect(deltas).toHaveLength(8)
+		const browsers = deltas.filter((d) => d.key.dimension === 'browser')
+		expect(browsers.map((d) => d.key.hostname).sort()).toEqual(['', 'a.example'])
+		expect(browsers.every((d) => d.key.scope === 't1')).toBe(true)
+		const campaigns = deltas.filter((d) => d.key.dimension === 'utmCampaign')
+		expect(campaigns.map((d) => d.key.hostname).sort()).toEqual(['', 'a.example'])
+		expect(campaigns.every((d) => d.key.dimvalue === 'spring')).toBe(true)
+	})
+
 	it('emits an event-name bucket for a custom event with name', () => {
 		const deltas = computeRollupDeltas(ev({ type: 'event', name: 'signup' }))
 		expect(deltas).toHaveLength(3)

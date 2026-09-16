@@ -57,6 +57,8 @@ export interface ViewState {
 	/** Absent means automatic; {@link autoGranularity} picks one from the range. */
 	granularity?: Granularity
 	tab: BreakdownTab
+	/** The dimension the tab groups by. Absent means its default, the first one served. */
+	dim?: DimensionKey
 	filters: AnalyticsFilter[]
 	limit: ViewLimit
 	order?: { metric: MetricKey; direction: 'asc' | 'desc' }
@@ -209,6 +211,7 @@ export const parseViewState = (search: URLSearchParams, defaults: ViewDefaults):
 	const metric = read(search, 'metric')
 	const granularity = read(search, 'granularity')
 	const tab = read(search, 'tab')
+	const dim = read(search, 'dim')
 	const source = read(search, 'source')
 	const limit = Number(read(search, 'limit'))
 	const compare = read(search, 'compare')
@@ -225,6 +228,7 @@ export const parseViewState = (search: URLSearchParams, defaults: ViewDefaults):
 			tab !== null && BREAKDOWN_TABS.includes(tab as BreakdownTab)
 				? (tab as BreakdownTab)
 				: DEFAULT_VIEW_TAB,
+		...(dim !== null && KNOWN_DIMENSIONS.has(dim) ? { dim: dim as DimensionKey } : {}),
 		filters: parseFilters(search),
 		limit: VIEW_LIMITS.includes(limit as ViewLimit) ? (limit as ViewLimit) : DEFAULT_VIEW_LIMIT,
 		...(order === undefined ? {} : { order }),
@@ -259,6 +263,9 @@ export const serializeViewState = (state: ViewState, defaults: ViewDefaults): UR
 	if (state.tab !== DEFAULT_VIEW_TAB) {
 		params.set('tab', state.tab)
 	}
+	if (state.dim !== undefined) {
+		params.set('dim', state.dim)
+	}
 	if (state.filters.length > 0) {
 		params.set('filters', JSON.stringify(state.filters))
 	}
@@ -273,7 +280,7 @@ export const serializeViewState = (state: ViewState, defaults: ViewDefaults): UR
 
 /**
  * The nearest state the selected source can actually serve. The URL outlives a source
- * switch, so a metric, tab, filter, comparison, bucket or sort the new source lacks is
+ * switch, so a metric, tab, grouping, filter, comparison, bucket or sort the new source lacks is
  * replaced or dropped here rather than sent to the endpoint to be rejected. Returns the
  * same object when the gate forbids nothing, so a render can compare by identity.
  */
@@ -282,6 +289,8 @@ export const coerceState = (state: ViewState, gate: ViewGate): ViewState => {
 		? state.metric
 		: (gate.metrics[0] ?? state.metric)
 	const tab = gate.tabs.includes(state.tab) ? state.tab : (gate.tabs[0] ?? state.tab)
+	const dim =
+		state.dim !== undefined && gate.dimensionsFor(tab).includes(state.dim) ? state.dim : undefined
 	const compare = state.compare && gate.canCompare
 	const filters = state.filters.filter(
 		(filter) => gate.canFilter(filter.dimension) && gate.operators.includes(filter.operator)
@@ -295,6 +304,7 @@ export const coerceState = (state: ViewState, gate: ViewGate): ViewState => {
 	const unchanged =
 		metric === state.metric &&
 		tab === state.tab &&
+		dim === state.dim &&
 		compare === state.compare &&
 		filters.length === state.filters.length &&
 		granularity === state.granularity &&
@@ -311,6 +321,7 @@ export const coerceState = (state: ViewState, gate: ViewGate): ViewState => {
 		metric,
 		...(granularity === undefined ? {} : { granularity }),
 		tab,
+		...(dim === undefined ? {} : { dim }),
 		filters,
 		limit: state.limit,
 		...(order === undefined ? {} : { order }),

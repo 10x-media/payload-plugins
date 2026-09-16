@@ -67,7 +67,7 @@ describe('AnalyticsBreakdownWidget view link', () => {
 		vi.mocked(readForWidgetBreakdown).mockResolvedValue(result())
 	})
 
-	it('opens the view on the tab that offers its dimension', async () => {
+	it('opens the view on the tab that offers its dimension, grouped by that dimension', async () => {
 		const html = await render(
 			'analytics-breakdown-referrers',
 			{ metric: 'visitors', timeframe: 'last7days' },
@@ -75,7 +75,7 @@ describe('AnalyticsBreakdownWidget view link', () => {
 		)
 		expect(html).toContain('analytics:widgetOpenInView')
 		expect(hrefIn(html)).toBe(
-			'/admin/analytics?range=last7days&source=native&metric=visitors&tab=sources'
+			'/admin/analytics?range=last7days&source=native&metric=visitors&tab=sources&dim=referrer'
 		)
 	})
 
@@ -85,14 +85,18 @@ describe('AnalyticsBreakdownWidget view link', () => {
 		expect(hrefIn(html)).toBe('/admin/analytics?source=tenant-7')
 	})
 
-	it('maps each built-in breakdown to its own tab', async () => {
+	it('maps each built-in breakdown to its own tab, naming the grouping only when it is not the default', async () => {
 		const tabs = await Promise.all(
-			['analytics-breakdown-browsers', 'analytics-breakdown-countries'].map(async (slug) =>
-				hrefIn(await render(slug, {}, view))
-			)
+			[
+				'analytics-breakdown-browsers',
+				'analytics-breakdown-os',
+				'analytics-breakdown-countries',
+			].map(async (slug) => hrefIn(await render(slug, {}, view)))
 		)
 		expect(tabs).toEqual([
-			'/admin/analytics?source=native&tab=technology',
+			'/admin/analytics?source=native&tab=technology&dim=browser',
+			'/admin/analytics?source=native&tab=technology&dim=os',
+			// `country` leads the geography tab, so the link is the one it always was.
 			'/admin/analytics?source=native&tab=geography',
 		])
 	})

@@ -22,6 +22,7 @@ const config: TrackerConfig = {
 		outboundLinks: false,
 		fileDownloads: false,
 		goalAttribute: false,
+		query: false,
 	},
 	goals: [],
 	ingestPath: '/api/analytics/ingest',

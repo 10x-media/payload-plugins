@@ -166,6 +166,28 @@ describe('useViewQueries', () => {
 		expect(breakdown?.order).toEqual({ metric: 'pageviews', direction: 'desc' })
 	})
 
+	it('groups the breakdown by the picked dimension, and by the tab default without one', () => {
+		render(<Probe props={propsFor(nativeCaps)} state={{ ...baseState, tab: 'technology' }} />)
+		expect(requests()[2]?.dimensions).toEqual(['device'])
+		cleanup()
+
+		fetchQueryMock.mockClear()
+		render(
+			<Probe
+				props={propsFor(nativeCaps)}
+				state={{ ...baseState, tab: 'technology', dim: 'browser' }}
+			/>
+		)
+		expect(requests()[2]?.dimensions).toEqual(['browser'])
+	})
+
+	it('ignores a picked dimension the source or the tab does not serve', () => {
+		render(
+			<Probe props={propsFor(narrowCaps)} state={{ ...baseState, tab: 'pages', dim: 'browser' }} />
+		)
+		expect(requests()[2]?.dimensions).toEqual(['page'])
+	})
+
 	it('carries the resolved source and the active filters into every request', () => {
 		render(
 			<Probe

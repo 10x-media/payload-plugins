@@ -157,6 +157,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.viewTrendPrevious]: 'الفترة السابقة',
 	[keys.viewBreakdowns]: 'التفصيلات',
 	[keys.viewFiltersUnsupported]: 'مصدر البيانات هذا لا يدعم التصفية حسب هذا البُعد.',
+	[keys.viewGroupBy]: 'التجميع حسب',
 	[keys.viewSortAscending]: 'مرتّب تصاعديًا',
 	[keys.viewSortDescending]: 'مرتّب تنازليًا',
 	[keys.viewConversionRate]: 'معدّل التحويل',

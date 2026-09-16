@@ -2,12 +2,12 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SerializedCapabilities } from '../../core/capabilities'
-import type { AnalyticsRow } from '../../core/contract'
+import type { AnalyticsRow, DimensionKey } from '../../core/contract'
 import type { QueryResponse } from '../../query/response'
 import { keys } from '../../translations/keys'
 import { METRIC_KEYS } from '../../translations/metricKeys'
 import type { BreakdownTab } from '../gating'
-import { TAB_LABELS } from '../labels'
+import { DIMENSION_LABELS, TAB_LABELS } from '../labels'
 import type { QueryState } from '../useViewQueries'
 import { Breakdowns } from './Breakdowns'
 
@@ -84,10 +84,13 @@ const renderBreakdowns = (
 	over: {
 		tabs?: BreakdownTab[]
 		tab?: BreakdownTab
+		dimension?: DimensionKey
+		dimensions?: DimensionKey[]
 		canFilter?: boolean
 		query?: QueryState<QueryResponse>
 		order?: { metric: 'pageviews' | 'visitors'; direction: 'asc' | 'desc' }
 		onTabChange?: (tab: BreakdownTab) => void
+		onDimensionChange?: (dimension: DimensionKey) => void
 		onLimitChange?: (limit: number) => void
 		onSortChange?: (order: { metric: string; direction: 'asc' | 'desc' }) => void
 		onRowSelect?: (value: string) => void
@@ -96,10 +99,12 @@ const renderBreakdowns = (
 	render(
 		<Breakdowns
 			canFilter={over.canFilter ?? true}
-			dimension="page"
+			dimension={over.dimension ?? 'page'}
+			dimensions={over.dimensions ?? ['page']}
 			limit={10}
 			locale="en"
 			metric="pageviews"
+			onDimensionChange={over.onDimensionChange ?? (() => {})}
 			onLimitChange={over.onLimitChange ?? (() => {})}
 			onRowSelect={over.onRowSelect ?? (() => {})}
 			onSortChange={over.onSortChange ?? (() => {})}
@@ -143,9 +148,11 @@ describe('Breakdowns tabs', () => {
 			<Breakdowns
 				canFilter={true}
 				dimension="page"
+				dimensions={['page']}
 				limit={10}
 				locale="en"
 				metric="pageviews"
+				onDimensionChange={() => {}}
 				onLimitChange={() => {}}
 				onRowSelect={() => {}}
 				onSortChange={() => {}}
@@ -164,6 +171,72 @@ describe('Breakdowns tabs', () => {
 		renderBreakdowns({ onTabChange, tabs: ['pages', 'sources'] })
 		fireEvent.keyDown(tabButtons()[0] as HTMLElement, { key: 'ArrowLeft' })
 		expect(onTabChange).toHaveBeenCalledWith('sources')
+	})
+})
+
+describe('Breakdowns group-by picker', () => {
+	const TECHNOLOGY: DimensionKey[] = ['device', 'browser', 'os']
+
+	it('stays away on a tab that groups by one dimension', () => {
+		renderBreakdowns()
+		expect(screen.queryByLabelText(keys.viewGroupBy)).toBeNull()
+	})
+
+	it('lists every dimension the tab groups by and reports the pick', () => {
+		const onDimensionChange = vi.fn()
+		renderBreakdowns({
+			dimension: 'device',
+			dimensions: TECHNOLOGY,
+			onDimensionChange,
+			tab: 'technology',
+		})
+		const picker = screen.getByLabelText(keys.viewGroupBy)
+		expect([...picker.querySelectorAll('option')].map((option) => option.textContent)).toEqual(
+			TECHNOLOGY.map((dimension) => DIMENSION_LABELS[dimension])
+		)
+		fireEvent.change(picker, { target: { value: 'browser' } })
+		expect(onDimensionChange).toHaveBeenCalledWith('browser')
+	})
+
+	it('names and filters on the dimension picked, not on the tab default', () => {
+		const onRowSelect = vi.fn()
+		const browsers: AnalyticsRow[] = [
+			{ dimensions: { browser: 'chrome' }, metrics: { pageviews: 9 } },
+		]
+		renderBreakdowns({
+			dimension: 'browser',
+			dimensions: TECHNOLOGY,
+			onRowSelect,
+			query: state({
+				data: {
+					...answer(),
+					result: {
+						rows: browsers,
+						meta: { provider: 'native', fetchedAt: '2026-09-14T00:00:00.000Z' },
+					},
+				},
+			}),
+			tab: 'technology',
+		})
+		expect(document.querySelector('.analytics-view__bars-head-dimension')?.textContent).toBe(
+			DIMENSION_LABELS.browser
+		)
+		fireEvent.click(screen.getByRole('button', { name: /chrome/ }))
+		expect(onRowSelect).toHaveBeenCalledWith('chrome')
+	})
+
+	it('waits rather than ranking the previous grouping under the new label', () => {
+		// The `page` rows are still on screen from the read before the pick, which is what the
+		// refetch deliberately keeps. They carry no browser, so they are not rows of this list.
+		renderBreakdowns({
+			dimension: 'browser',
+			dimensions: TECHNOLOGY,
+			query: state({ isRefetching: true }),
+			tab: 'technology',
+		})
+		expect(screen.queryByText('/pricing')).toBeNull()
+		expect(screen.queryByText(keys.stateNoBreakdown)).toBeNull()
+		expect(document.querySelectorAll('.analytics-bars__row')).toHaveLength(0)
 	})
 })
 
@@ -197,9 +270,11 @@ describe('Breakdowns rows', () => {
 			<Breakdowns
 				canFilter={true}
 				dimension="page"
+				dimensions={['page']}
 				limit={10}
 				locale="en"
 				metric="pageviews"
+				onDimensionChange={() => {}}
 				onLimitChange={() => {}}
 				onRowSelect={() => {}}
 				onSortChange={onSortChange}

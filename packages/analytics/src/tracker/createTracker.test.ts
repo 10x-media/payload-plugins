@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
+import { MAX_QUERY_LENGTH } from '../query/limits'
 import { CONSENT_QUEUE_LIMIT, CONSENT_STORAGE_KEY } from './consent'
 import { createTracker } from './createTracker'
 import type { LoadScript, Tracker, TrackerEvent } from './types'
@@ -42,6 +43,7 @@ const configWith = (
 		outboundLinks: false,
 		fileDownloads: false,
 		goalAttribute: false,
+		query: true,
 	},
 	goals: [],
 	ingestPath: '/api/analytics/ingest',
@@ -119,6 +121,56 @@ describe('page tracking', () => {
 
 		expect(posted()[0]?.referrer).toBe('https://google.com/')
 		Object.defineProperty(document, 'referrer', { value: '', configurable: true })
+	})
+})
+
+describe('query string capture', () => {
+	it('carries the query, without its leading question mark, on a pageview', () => {
+		window.history.replaceState(null, '', '/pricing?utm_source=newsletter&page=2')
+		boot(configWith([nativeSlot])).flush()
+
+		expect(posted()[0]?.query).toBe('utm_source=newsletter&page=2')
+		expect(posted()[0]?.path).toBe('/pricing')
+	})
+
+	it('omits the query on a page with none', () => {
+		boot(configWith([nativeSlot])).flush()
+
+		expect(posted()[0]).not.toHaveProperty('query')
+	})
+
+	it('never carries the query on an event or a goal', () => {
+		window.history.replaceState(null, '', '/pricing?utm_source=newsletter')
+		const tracker = boot(configWith([nativeSlot]))
+		tracker.track('signup')
+		tracker.trackGoal('checkout')
+
+		expect(posted()[0]).not.toHaveProperty('query')
+		expect(posted()[1]).not.toHaveProperty('query')
+	})
+
+	it('sends nothing when autoCapture.query is off', () => {
+		window.history.replaceState(null, '', '/pricing?utm_source=newsletter')
+		boot(
+			configWith([nativeSlot], {
+				autoCapture: {
+					scrollDepth: false,
+					outboundLinks: false,
+					fileDownloads: false,
+					goalAttribute: false,
+					query: false,
+				},
+			})
+		).flush()
+
+		expect(posted()[0]).not.toHaveProperty('query')
+	})
+
+	it('caps the query it sends', () => {
+		window.history.replaceState(null, '', `/pricing?pad=${'x'.repeat(MAX_QUERY_LENGTH)}`)
+		boot(configWith([nativeSlot])).flush()
+
+		expect(posted()[0]?.query).toHaveLength(MAX_QUERY_LENGTH)
 	})
 })
 
@@ -308,6 +360,7 @@ describe('one failing slot never takes the others down', () => {
 					outboundLinks: false,
 					fileDownloads: false,
 					goalAttribute: false,
+					query: true,
 				},
 			})
 		)

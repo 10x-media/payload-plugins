@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import type { Goal } from '../../goals/types'
 import { noopResolver, platformHeaderResolver } from '../geo/geoResolver'
 import { SERVER_USER_AGENT } from './device'
-import { normalizeEvent } from './normalizeEvent'
+import {
+	MAX_GEO_LENGTH,
+	MAX_QUERY_LENGTH,
+	MAX_REFERRER_LENGTH,
+	normalizeEvent,
+} from './normalizeEvent'
 
 const headers = (h: Record<string, string>) => new Headers(h)
 
@@ -230,5 +235,200 @@ describe('normalizeEvent contract growth', () => {
 			{ slug: 'thanks', name: 'Thanks', match: { kind: 'path', pattern: '/thank-you' } },
 		])
 		expect(ev.goals).toBeUndefined()
+	})
+})
+
+describe('normalizeEvent native dimensions', () => {
+	const CHROME_UA =
+		'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+
+	const build = async (raw: Record<string, unknown>, h: Record<string, string>) =>
+		normalizeEvent({
+			raw: raw as never,
+			headers: headers(h),
+			geoResolver: noopResolver,
+			salt: 's',
+			now: new Date('2026-06-01T00:00:00Z'),
+		})
+
+	it('stores browser, os, language and the utm keys', async () => {
+		const ev = await build(
+			{
+				type: 'pageview',
+				path: '/pricing',
+				hostname: 'site.com',
+				query:
+					'utm_source=newsletter&utm_medium=email&utm_campaign=spring&utm_content=hero&utm_term=shoes&page=2',
+			},
+			{ 'user-agent': CHROME_UA, 'accept-language': 'de-DE,de;q=0.9' }
+		)
+		expect(ev).toMatchObject({
+			browser: 'chrome',
+			os: 'macos',
+			language: 'de-de',
+			utmSource: 'newsletter',
+			utmMedium: 'email',
+			utmCampaign: 'spring',
+			utmContent: 'hero',
+			utmTerm: 'shoes',
+		})
+	})
+
+	it('never stores the raw query itself', async () => {
+		const ev = await build(
+			{ type: 'pageview', path: '/p', hostname: 'site.com', query: 'token=secret&utm_source=g' },
+			{ 'user-agent': CHROME_UA }
+		)
+		expect('query' in ev).toBe(false)
+		expect(JSON.stringify(ev)).not.toContain('secret')
+		expect(ev.utmSource).toBe('g')
+	})
+
+	it('reads only the first MAX_QUERY_LENGTH characters of the query', async () => {
+		const padding = `pad=${'x'.repeat(MAX_QUERY_LENGTH)}`
+		const ev = await build(
+			{ type: 'pageview', path: '/p', hostname: 'site.com', query: `${padding}&utm_source=late` },
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.utmSource).toBeUndefined()
+	})
+
+	it('drops a query that is not a string', async () => {
+		const ev = await build(
+			{ type: 'event', name: 'signup', path: '/p', hostname: 'site.com', query: { a: 1 } },
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.utmSource).toBeUndefined()
+		expect(ev.browser).toBe('chrome')
+	})
+
+	it('classifies events and goals too, not just pageviews', async () => {
+		const ev = await build(
+			{
+				type: 'goal',
+				name: 'purchase',
+				path: '/thanks',
+				hostname: 'site.com',
+				query: 'utm_source=google',
+			},
+			{ 'user-agent': CHROME_UA, 'accept-language': 'en-US,en;q=0.9' }
+		)
+		expect(ev).toMatchObject({
+			browser: 'chrome',
+			os: 'macos',
+			language: 'en-us',
+			utmSource: 'google',
+		})
+	})
+
+	it('omits browser and os for the synthetic server agent, keeping the fields absent', async () => {
+		const ev = await build(
+			{ type: 'event', name: 'invoice_paid', path: '/hook', hostname: 'site.com' },
+			{ 'user-agent': SERVER_USER_AGENT }
+		)
+		expect('browser' in ev).toBe(false)
+		expect('os' in ev).toBe(false)
+		expect('language' in ev).toBe(false)
+		expect('utmSource' in ev).toBe(false)
+	})
+
+	it('stores the referrer host beside the referrer, and neither when there is none', async () => {
+		const ev = await build(
+			{
+				type: 'pageview',
+				path: '/p',
+				hostname: 'site.com',
+				referrer: 'https://www.example.org/path?x=1',
+			},
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.referrer).toBe('https://www.example.org/path')
+		expect(ev.referrerHost).toBe('example.org')
+
+		const direct = await build(
+			{ type: 'pageview', path: '/p', hostname: 'site.com' },
+			{ 'user-agent': CHROME_UA }
+		)
+		expect('referrerHost' in direct).toBe(false)
+	})
+
+	it('never stores a referrer query string, a same-origin one least of all', async () => {
+		const ev = await build(
+			{
+				type: 'pageview',
+				path: '/p',
+				hostname: 'site.com',
+				referrer: 'https://site.com/reset?token=abc#top',
+			},
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.referrer).toBe('https://site.com/reset')
+		expect(JSON.stringify(ev)).not.toContain('abc')
+		expect(ev.source).toBe('Direct')
+	})
+
+	it('truncates an over-long referrer without disturbing its host or source', async () => {
+		const ev = await build(
+			{
+				type: 'pageview',
+				path: '/p',
+				hostname: 'site.com',
+				referrer: `https://news.example.org/${'a'.repeat(MAX_REFERRER_LENGTH)}`,
+			},
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.referrer).toHaveLength(MAX_REFERRER_LENGTH)
+		expect(ev.referrerHost).toBe('news.example.org')
+		expect(ev.source).toBe('news.example.org')
+	})
+
+	it('reports no referrer host for internal navigation, as source reports Direct', async () => {
+		for (const referrer of ['https://site.com/other', 'https://www.site.com/other']) {
+			const ev = await build(
+				{ type: 'pageview', path: '/p', hostname: 'site.com', referrer },
+				{ 'user-agent': CHROME_UA }
+			)
+			expect('referrerHost' in ev).toBe(false)
+			expect(ev.source).toBe('Direct')
+		}
+	})
+
+	it('drops a referrer that is not a string instead of throwing', async () => {
+		for (const referrer of [{}, 42, ['https://example.org/'], true]) {
+			const ev = await build(
+				{ type: 'pageview', path: '/p', hostname: 'site.com', referrer },
+				{ 'user-agent': CHROME_UA }
+			)
+			expect(ev.referrer).toBeUndefined()
+			expect('referrerHost' in ev).toBe(false)
+			expect(ev.source).toBe('Direct')
+		}
+	})
+
+	it('caps the geo values, which become rollup dimvalues and seen-ledger keys', async () => {
+		const ev = await normalizeEvent({
+			raw: { type: 'pageview', path: '/p', hostname: 'site.com' },
+			headers: headers({ 'user-agent': CHROME_UA }),
+			geoResolver: () => ({
+				country: 'U'.repeat(MAX_GEO_LENGTH + 50),
+				region: 'R'.repeat(MAX_GEO_LENGTH + 50),
+				city: 'C'.repeat(MAX_GEO_LENGTH + 50),
+			}),
+			salt: 's',
+			now: new Date('2026-06-01T00:00:00Z'),
+		})
+		expect(ev.country).toHaveLength(MAX_GEO_LENGTH)
+		expect(ev.region).toHaveLength(MAX_GEO_LENGTH)
+		expect(ev.city).toHaveLength(MAX_GEO_LENGTH)
+	})
+
+	it('leaves an absent geo value absent rather than empty', async () => {
+		const ev = await build(
+			{ type: 'pageview', path: '/p', hostname: 'site.com' },
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.country).toBeUndefined()
+		expect(ev.region).toBeUndefined()
+		expect(ev.city).toBeUndefined()
 	})
 })

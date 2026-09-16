@@ -1,10 +1,18 @@
 import { type GoalCompletion, matchGoals } from '../../goals/match'
 import type { Goal } from '../../goals/types'
+import { MAX_GEO_LENGTH, MAX_QUERY_LENGTH, MAX_REFERRER_LENGTH } from '../../query/limits'
 import type { GeoResolver } from '../geo/geoResolver'
+import { type BrowserName, classifyBrowser, classifyOs, type OsName } from './browser'
 import { clientIpFromHeaders } from './clientIp'
 import { classifyDevice, type DeviceType } from './device'
+import { primaryLanguage } from './language'
+import { referrerHost, storedReferrer } from './referrer'
 import { deriveSource } from './source'
+import { extractUtm } from './utm'
 import { dailyVisitorHash, deriveSessionId } from './visitorHash'
+
+/** The wire caps, re-exported beside the sanitizers that apply them. */
+export { MAX_GEO_LENGTH, MAX_QUERY_LENGTH, MAX_REFERRER_LENGTH }
 
 export type EventType = 'pageview' | 'event' | 'goal'
 
@@ -15,6 +23,12 @@ export interface RawEventInput {
 	path: string
 	hostname: string
 	referrer?: string
+	/**
+	 * The page's query string, without its leading `?`. Read for its utm keys and then
+	 * discarded: it is never stored, so a session token or an email address that happens to
+	 * be in the URL never lands in the events collection.
+	 */
+	query?: string
 	durationMs?: number
 	props?: Record<string, unknown>
 	/** Revenue for a goal completion, in `currency`. */
@@ -30,12 +44,28 @@ export interface StoredEvent {
 	name?: string
 	path: string
 	hostname: string
+	/** Origin and path only: the query string and fragment are stripped before storage. */
 	referrer?: string
+	/**
+	 * The referrer's bare host, derived at ingest because a `where` cannot derive it at read
+	 * time: it is what the `referrer` dimension buckets and filters on.
+	 */
+	referrerHost?: string
 	device?: DeviceType
+	browser?: BrowserName
+	os?: OsName
 	source?: string
+	/** The five campaign keys extracted from the wire `query`; absent when it carried none. */
+	utmSource?: string
+	utmMedium?: string
+	utmCampaign?: string
+	utmContent?: string
+	utmTerm?: string
 	country?: string
 	region?: string
 	city?: string
+	/** Primary `Accept-Language` tag, lowercased (`de-de`). */
+	language?: string
 	visitorHash: string
 	sessionId: string
 	durationMs?: number
@@ -109,6 +139,18 @@ const duration = (value: unknown): number | undefined => {
 const eventName = (value: unknown): string | undefined =>
 	typeof value === 'string' ? value.slice(0, MAX_NAME_LENGTH) : undefined
 
+/**
+ * A geo value as stored. The resolver reads request headers a client can set, and each value
+ * becomes a rollup dimvalue and part of a seen-ledger key, so it is capped here rather than
+ * trusted. An empty value stays absent: '' would be a bucket of its own.
+ */
+const geoValue = (value: string | undefined): string | undefined =>
+	value ? value.slice(0, MAX_GEO_LENGTH) : undefined
+
+/** Capped before it is parsed, so a hostile query cannot make ingest do unbounded work. */
+const queryString = (value: unknown): string | undefined =>
+	typeof value === 'string' ? value.slice(0, MAX_QUERY_LENGTH) : undefined
+
 const depth = (value: unknown): number | undefined => {
 	const n = nonNegative(value)
 	return n === undefined ? undefined : Math.round(Math.min(n, 100))
@@ -153,8 +195,11 @@ export async function normalizeEvent({
 	const geo = await geoResolver(headers)
 	const ip = clientIpFromHeaders(headers) ?? ''
 	const ua = headers.get('user-agent') ?? ''
-	// Both are unique-index bucket keys on the rollup and seen rows, so they are capped
-	// before anything derives from them: an uncapped path exceeds Mongo's index key limit.
+	// Everything that becomes a rollup dimvalue or a seen-ledger key is capped before anything
+	// derives from it: an uncapped value exceeds Mongo's index key limit, and on Postgres a
+	// btree key over 2704 bytes fails the write outright. That covers path and hostname here,
+	// the geo values below (a client can set the headers a resolver reads), and the event name,
+	// query and referrer in their own sanitizers.
 	const path = raw.path.slice(0, MAX_PATH_LENGTH)
 	const hostname = raw.hostname.slice(0, MAX_HOSTNAME_LENGTH)
 	const visitorHash = dailyVisitorHash({ ip, ua, site: hostname, salt })
@@ -165,6 +210,11 @@ export async function normalizeEvent({
 	const durationMs = duration(raw.durationMs)
 	const name = eventName(raw.name)
 	const device = classifyDevice(ua)
+	const browser = classifyBrowser(ua)
+	const os = classifyOs(ua)
+	const language = primaryLanguage(headers.get('accept-language'))
+	const refHost = referrerHost(raw.referrer, hostname)
+	const utm = extractUtm(queryString(raw.query))
 	// Match on the sanitized fields so a rejected value never reaches a goal's revenue.
 	const completions = goals?.length
 		? matchGoals({ type: raw.type, name, path, props, value }, goals)
@@ -175,12 +225,17 @@ export async function normalizeEvent({
 		name,
 		path,
 		hostname,
-		referrer: raw.referrer,
+		referrer: storedReferrer(raw.referrer),
+		...(refHost ? { referrerHost: refHost } : {}),
 		...(device ? { device } : {}),
+		...(browser ? { browser } : {}),
+		...(os ? { os } : {}),
 		source: deriveSource(raw.referrer, hostname),
-		country: geo.country,
-		region: geo.region,
-		city: geo.city,
+		...utm,
+		country: geoValue(geo.country),
+		region: geoValue(geo.region),
+		city: geoValue(geo.city),
+		...(language ? { language } : {}),
 		visitorHash,
 		sessionId: deriveSessionId(visitorHash, hourBucket),
 		props,

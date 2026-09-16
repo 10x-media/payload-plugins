@@ -82,6 +82,14 @@ describe('createNativeSink', () => {
 		])
 	})
 
+	it('carries the pageview query through the buffer window', () => {
+		const native = sink()
+		native.send({ ...pageview, query: 'utm_source=newsletter' })
+		native.flush?.()
+
+		expect(sent()[0]).toMatchObject({ type: 'pageview', query: 'utm_source=newsletter' })
+	})
+
 	it('omits scrollDepth when the scroll listener is off', () => {
 		const native = sink(() => undefined)
 		native.send(pageview)

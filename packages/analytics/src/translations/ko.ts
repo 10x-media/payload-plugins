@@ -157,6 +157,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.viewTrendPrevious]: '이전 기간',
 	[keys.viewBreakdowns]: '분류',
 	[keys.viewFiltersUnsupported]: '이 데이터 소스는 이 항목의 필터를 지원하지 않습니다.',
+	[keys.viewGroupBy]: '그룹 기준',
 	[keys.viewSortAscending]: '오름차순 정렬',
 	[keys.viewSortDescending]: '내림차순 정렬',
 	[keys.viewConversionRate]: '전환율',

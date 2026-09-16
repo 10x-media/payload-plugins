@@ -1,4 +1,5 @@
 import type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
+import { MAX_QUERY_LENGTH } from '../query/limits'
 import { type AutoCapture, createAutoCapture } from './autoCapture'
 import { createConsentQueue, readConsent, writeConsent } from './consent'
 import { createScriptLoader } from './loadScript'
@@ -115,8 +116,22 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 		...(win.document.referrer ? { referrer: win.document.referrer } : {}),
 	})
 
+	/**
+	 * Pageviews only: it exists so ingest can extract the campaign keys, and an event fired
+	 * later in the page's life would attribute the same visit twice.
+	 */
+	const query = (): Pick<TrackerEvent, 'query'> => {
+		// Absent means on: a tracker config snapshot rendered before the toggle existed must
+		// keep the documented default rather than silently losing campaign attribution.
+		if (config.autoCapture.query === false) {
+			return {}
+		}
+		const search = win.location.search.replace(/^\?/, '').slice(0, MAX_QUERY_LENGTH)
+		return search ? { query: search } : {}
+	}
+
 	const page = () => {
-		dispatch({ type: 'pageview', ...context() })
+		dispatch({ type: 'pageview', ...context(), ...query() })
 		auto?.resetPage()
 	}
 

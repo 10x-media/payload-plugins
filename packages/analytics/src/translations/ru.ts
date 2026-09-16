@@ -161,6 +161,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.viewTrendPrevious]: 'Предыдущий период',
 	[keys.viewBreakdowns]: 'Разрезы',
 	[keys.viewFiltersUnsupported]: 'Этот источник данных не поддерживает фильтры по этому измерению.',
+	[keys.viewGroupBy]: 'Группировать по',
 	[keys.viewSortAscending]: 'по возрастанию',
 	[keys.viewSortDescending]: 'по убыванию',
 	[keys.viewConversionRate]: 'Коэффициент конверсии',

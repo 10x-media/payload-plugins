@@ -164,6 +164,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.viewBreakdowns]: 'Répartitions',
 	[keys.viewFiltersUnsupported]:
 		'Cette source de données ne prend pas en charge les filtres sur cette dimension.',
+	[keys.viewGroupBy]: 'Regrouper par',
 	[keys.viewSortAscending]: 'tri croissant',
 	[keys.viewSortDescending]: 'tri décroissant',
 	[keys.viewConversionRate]: 'Taux de conversion',

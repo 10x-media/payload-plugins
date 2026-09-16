@@ -161,6 +161,7 @@ export const es: Record<TranslationKey, string> = {
 	[keys.viewTrendPrevious]: 'Periodo anterior',
 	[keys.viewBreakdowns]: 'Desgloses',
 	[keys.viewFiltersUnsupported]: 'Esta fuente de datos no admite filtros para esta dimensión.',
+	[keys.viewGroupBy]: 'Agrupar por',
 	[keys.viewSortAscending]: 'orden ascendente',
 	[keys.viewSortDescending]: 'orden descendente',
 	[keys.viewConversionRate]: 'Tasa de conversión',

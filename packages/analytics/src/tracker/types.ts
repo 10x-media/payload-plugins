@@ -19,6 +19,11 @@ export interface TrackerEvent {
 	path: string
 	hostname: string
 	referrer?: string
+	/**
+	 * The page's query string without its leading `?`, on pageviews only. Ingest reads the
+	 * utm keys out of it and drops the rest; the raw string is never stored.
+	 */
+	query?: string
 	props?: Record<string, unknown>
 	value?: number
 	currency?: string

@@ -27,6 +27,13 @@ interface Hover {
 	y: number
 }
 
+/**
+ * Ranked rows are identified by rank, since two can share a label: a provider that answers an
+ * unattributed bucket as an empty string, or one that repeats a value. Keying on the label
+ * alone made those collide, and React strands the duplicates in the DOM across a rerender.
+ */
+const rowKey = (row: BarRow, i: number): string => `${i}:${row.label}`
+
 const RowContent = ({ row }: { row: BarRow }): ReactNode => (
 	<>
 		<span className="analytics-bars__track">
@@ -63,7 +70,7 @@ export function BarList({ data, emptyLabel, onSelect, fill = 'solid' }: BarListP
 					onSelect ? (
 						<button
 							className="analytics-bars__row analytics-bars__row--action"
-							key={row.label}
+							key={rowKey(row, i)}
 							onClick={() => onSelect(i)}
 							onPointerEnter={track(i)}
 							onPointerLeave={() => setHover(null)}
@@ -75,7 +82,7 @@ export function BarList({ data, emptyLabel, onSelect, fill = 'solid' }: BarListP
 					) : (
 						<div
 							className="analytics-bars__row"
-							key={row.label}
+							key={rowKey(row, i)}
 							onPointerEnter={track(i)}
 							onPointerLeave={() => setHover(null)}
 							onPointerMove={track(i)}

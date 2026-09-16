@@ -54,7 +54,7 @@ The exact routes and snippets each one declares are on the [proxy page](/analyti
 
 | Adapter | Filterable dimensions | Operators |
 |---|---|---|
-| native | `page`, `country`, `region`, `city`, `device`, `source`, `event` | `eq`, `contains` |
+| native | every dimension it serves except `goal`: `page`, `referrer`, `source`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` | `eq`, `contains` |
 | PostHog | `page`, `event` | `eq`, `contains`, `matches` |
 | Plausible | `page`, `source`, `referrer`, `device`, `browser`, `os`, `country`, `region`, `city`, `utmSource`, `utmMedium`, `utmCampaign` | `eq` |
 | GA4 | `page`, `referrer`, `source`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` | `eq` |

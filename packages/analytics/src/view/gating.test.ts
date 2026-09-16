@@ -72,6 +72,19 @@ describe('gate', () => {
 		expect([...filed].sort()).toEqual([...DIMENSION_KEYS].sort())
 	})
 
+	it('leads each tab with the dimension that tab read before the group-by picker', () => {
+		// The first served dimension is a tab's default, so this order is what an existing link
+		// without a `dim` opens on. Reordering it would silently move everyone's saved views.
+		expect(BREAKDOWN_TABS.map((tab) => TAB_DIMENSIONS[tab][0])).toEqual([
+			'page',
+			'source',
+			'device',
+			'country',
+			'event',
+			'goal',
+		])
+	})
+
 	it('serves every control for the native engine', () => {
 		const g = gate(nativeCaps)
 		expect(g.metrics).toEqual(VIEW_METRIC_ORDER)

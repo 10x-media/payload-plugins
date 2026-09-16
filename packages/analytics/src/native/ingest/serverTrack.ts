@@ -109,6 +109,7 @@ export const makeServerTrack =
 				path: event.path,
 				hostname: event.hostname,
 				referrer: event.referrer,
+				query: event.query,
 				props: event.props,
 				value: event.value,
 				currency: event.currency,

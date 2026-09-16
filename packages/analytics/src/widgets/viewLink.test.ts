@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { type AnalyticsFilter, DIMENSION_KEYS } from '../core/contract'
+import { type AnalyticsFilter, DIMENSION_KEYS, type DimensionKey } from '../core/contract'
 import { MAX_QUERY_RANGE_DAYS } from '../query/limits'
-import { TAB_DIMENSIONS } from '../view/gating'
+import { type BreakdownTab, TAB_DIMENSIONS } from '../view/gating'
 import { parseViewState, type ViewDefaults } from '../view/state'
 import { viewHref, viewTabForDimension } from './viewLink'
 
@@ -178,6 +178,21 @@ describe('viewHref', () => {
 		const filters: AnalyticsFilter[] = [{ dimension: 'page', operator: 'contains', value: '/blog' }]
 		const href = viewHref({ ...base, timeframe: 'last30days', filters, tab: 'pages' })
 		expect(parseViewState(query(href), defaults).filters).toEqual(filters)
+	})
+
+	it('opens the tab on the widget grouping, and omits a dim the tab leads with', () => {
+		const dim = (tab: BreakdownTab, dimension: DimensionKey): string | null =>
+			query(viewHref({ ...base, timeframe: 'last30days', tab, dim: dimension })).get('dim')
+		expect(dim('technology', 'browser')).toBe('browser')
+		expect(dim('geography', 'city')).toBe('city')
+		expect(dim('sources', 'referrer')).toBe('referrer')
+		expect(dim('technology', 'device')).toBeNull()
+		expect(dim('goals', 'goal')).toBeNull()
+	})
+
+	it('reads back as the grouping the widget ranked', () => {
+		const href = viewHref({ ...base, timeframe: 'last30days', tab: 'technology', dim: 'os' })
+		expect(parseViewState(query(href), defaults)).toMatchObject({ tab: 'technology', dim: 'os' })
 	})
 
 	it('writes no filters param at all when the widget carries none', () => {

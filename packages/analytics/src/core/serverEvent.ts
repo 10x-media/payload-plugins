@@ -8,12 +8,14 @@ import type { RawEventInput } from '../native/ingest/normalizeEvent'
  */
 export type ServerEventInput = Pick<
 	RawEventInput,
-	'type' | 'name' | 'path' | 'hostname' | 'referrer' | 'props' | 'value' | 'currency'
+	'type' | 'name' | 'path' | 'hostname' | 'referrer' | 'query' | 'props' | 'value' | 'currency'
 > & {
 	/**
 	 * Attribution inputs, overlaid on `opts.req`'s own headers when there is a request.
 	 * With neither, the event is attributed to the day's synthetic server visitor and
-	 * reports no device. No IP is ever fabricated.
+	 * reports no device, browser, OS or language: those are read off the request's headers,
+	 * and inventing them would put a fabricated visitor in every breakdown. No IP is ever
+	 * fabricated either.
 	 */
 	ip?: string
 	userAgent?: string

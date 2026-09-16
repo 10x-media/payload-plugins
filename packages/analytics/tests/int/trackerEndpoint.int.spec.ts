@@ -89,6 +89,7 @@ describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
 			outboundLinks: true,
 			fileDownloads: true,
 			goalAttribute: true,
+			query: true,
 		})
 	})
 
@@ -156,5 +157,39 @@ describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(scoped.slots.map((s) => s.slot)).toEqual(['global', 'tenant'])
 		const unscoped = await getTrackerConfig(booted.payload)
 		expect(unscoped.slots.map((s) => s.slot)).toEqual(['global'])
+	})
+})
+
+describeForDb('analytics tracker endpoint with query capture off', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			plugin: analytics({
+				adapters: [native()],
+				capture: { autoCapture: { query: false } },
+			}),
+		})
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	// The tracker reads this one key to decide whether a pageview carries its query string at
+	// all, so an install that opts out of campaign capture has to see `false` arrive over the
+	// wire: the guard is `=== false`, and an option that never reached the config would read as
+	// the default and keep sending it.
+	it('carries the disabled toggle into the public tracker config', async () => {
+		const res = await handleEndpoints({
+			config: booted.payload.config,
+			payloadInstanceCacheKey: booted.cacheKey,
+			request: new Request('http://localhost:3000/api/analytics/tracker'),
+		})
+		expect(res.status).toBe(200)
+		const config = (await res.json()) as TrackerConfig
+		expect(config.autoCapture.query).toBe(false)
+		expect(config.autoCapture.outboundLinks).toBe(true)
 	})
 })

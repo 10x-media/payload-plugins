@@ -121,7 +121,8 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 		queries.breakdown,
 		...(queries.goals ? [queries.goals] : []),
 	]
-	const dimension = served.dimensionsFor(state.tab)[0] ?? null
+	const dimensions = served.dimensionsFor(state.tab)
+	const dimension = state.dim ?? dimensions[0] ?? null
 	const canFilter = dimension !== null && served.canFilter(dimension)
 
 	const addFilter = (value: string): void => {
@@ -180,13 +181,19 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 			<Breakdowns
 				canFilter={canFilter}
 				dimension={dimension}
+				dimensions={dimensions}
 				limit={state.limit}
 				locale={props.locale}
 				metric={state.metric}
+				// The tab's default is its absence, so picking it back writes a link without `dim`.
+				onDimensionChange={(dim) =>
+					write({ ...state, dim: dim === dimensions[0] ? undefined : dim })
+				}
 				onLimitChange={(limit) => write({ ...state, limit })}
 				onRowSelect={addFilter}
 				onSortChange={(order) => write({ ...state, order })}
-				onTabChange={(tab) => write({ ...state, tab })}
+				// A grouping belongs to the tab that offered it, so a new tab starts on its own default.
+				onTabChange={(tab) => write({ ...state, tab, dim: undefined })}
 				{...(state.order === undefined ? {} : { order: state.order })}
 				query={queries.breakdown}
 				tab={state.tab}
