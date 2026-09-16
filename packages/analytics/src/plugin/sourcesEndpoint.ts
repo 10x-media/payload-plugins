@@ -1,6 +1,7 @@
 import type { PayloadHandler } from 'payload'
 import { SOURCES_PATH } from './paths'
 import { resolveSourcesForRequest } from './readContextForRequest'
+import { NO_STORE } from './responses'
 import { getRuntime, readAccessFor } from './runtime'
 
 export { SOURCES_PATH }
@@ -16,13 +17,13 @@ export { SOURCES_PATH }
  */
 export const makeSourcesHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
-		return Response.json({ error: 'unauthorized' }, { status: 401 })
+		return Response.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE })
 	}
 	const runtime = getRuntime(req.payload)
 	// No runtime means the plugin served nothing to gate: the listing below is empty anyway.
 	if (runtime && !(await readAccessFor(runtime, req))) {
-		return Response.json({ error: 'forbidden' }, { status: 403 })
+		return Response.json({ error: 'forbidden' }, { status: 403, headers: NO_STORE })
 	}
 	const { sources, defaultId } = await resolveSourcesForRequest(req)
-	return Response.json({ defaultId, sources })
+	return Response.json({ defaultId, sources }, { headers: NO_STORE })
 }

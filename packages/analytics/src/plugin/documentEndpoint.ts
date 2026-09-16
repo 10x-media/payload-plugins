@@ -6,6 +6,7 @@ import { parseDayOrInstant } from '../query/dates'
 import { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 import { METRIC_KEYS } from '../translations/metricKeys'
 import { DOCUMENT_PATH } from './paths'
+import { NO_STORE } from './responses'
 import { getRuntime, readAccessFor, requestTimezone } from './runtime'
 
 export { DOCUMENT_PATH }
@@ -54,20 +55,20 @@ const parseRange = (from: string | null, to: string | null, timezone: string): D
  */
 export const makeDocumentHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
-		return Response.json({ error: 'unauthorized' }, { status: 401 })
+		return Response.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE })
 	}
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
-		return Response.json({ error: 'unavailable' }, { status: 503 })
+		return Response.json({ error: 'unavailable' }, { status: 503, headers: NO_STORE })
 	}
 	if (!(await readAccessFor(runtime, req))) {
-		return Response.json({ error: 'forbidden' }, { status: 403 })
+		return Response.json({ error: 'forbidden' }, { status: 403, headers: NO_STORE })
 	}
 	const params = new URL(req.url ?? '', 'http://localhost').searchParams
 	const collection = params.get('collection') ?? ''
 	const id = params.get('id') ?? ''
 	if (!runtime.bindings[collection] || !id) {
-		return Response.json({ error: 'not found' }, { status: 404 })
+		return Response.json({ error: 'not found' }, { status: 404, headers: NO_STORE })
 	}
 	const rawTimeframe = params.get('timeframe') ?? 'last30days'
 	// Custom bounds name calendar days, so the reporting timezone has to be resolved before
@@ -79,7 +80,7 @@ export const makeDocumentHandler = (): PayloadHandler => async (req) => {
 		? (rawTimeframe as TimeframePreset)
 		: 'last30days'
 	if (rawTimeframe === 'custom' && !range) {
-		return Response.json({ error: 'invalid range' }, { status: 400 })
+		return Response.json({ error: 'invalid range' }, { status: 400, headers: NO_STORE })
 	}
 	const metrics = parseMetrics(params.get('metrics')) ?? [
 		'pageviews',
@@ -98,7 +99,7 @@ export const makeDocumentHandler = (): PayloadHandler => async (req) => {
 			req,
 		})) as BindingDoc
 	} catch {
-		return Response.json({ error: 'not found' }, { status: 404 })
+		return Response.json({ error: 'not found' }, { status: 404, headers: NO_STORE })
 	}
 	const result = await readForField({
 		req,
@@ -113,5 +114,5 @@ export const makeDocumentHandler = (): PayloadHandler => async (req) => {
 		compare: params.get('compare') === '1',
 		series: params.get('series') === '1',
 	})
-	return Response.json(result)
+	return Response.json(result, { headers: NO_STORE })
 }

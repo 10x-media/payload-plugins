@@ -7,29 +7,17 @@ import {
 	PLATFORM_SCOPE,
 } from '../core/contract'
 import { resolveQueryScope } from '../core/scopedRead'
-import { type QueryError, queryError } from '../query/errors'
+import { queryError } from '../query/errors'
 import { parseQueryParams, readParam } from '../query/parse'
 import type { QueryResponse, SerializedAnalyticsQuery } from '../query/response'
 import { previousWindow, withinLookback } from '../widgets/comparison'
 import { goalSlugsFor } from './goalHint'
 import { QUERY_PATH } from './paths'
 import { resolveSourcesForRequest } from './readContextForRequest'
+import { errorResponse, NO_STORE, RETRY_AFTER } from './responses'
 import { getRuntime, platformReadGate, readAccessFor, resolveTimezoneFor } from './runtime'
 
 export { QUERY_PATH }
-
-/** Scope depends on the caller's cookies, so no shared cache may ever hold an answer. */
-const NO_STORE = { 'Cache-Control': 'private, no-store' }
-
-const errorResponse = (
-	status: number,
-	error: QueryError,
-	headers: Record<string, string> = {}
-): Response => Response.json({ error }, { status, headers: { ...NO_STORE, ...headers } })
-
-/** How long a client should wait out a provider outage before retrying the same read. */
-const RETRY_AFTER_SECONDS = '30'
-const RETRY_AFTER = { 'Retry-After': RETRY_AFTER_SECONDS }
 
 const serializeQuery = (query: AnalyticsQuery): SerializedAnalyticsQuery => ({
 	...query,

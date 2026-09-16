@@ -77,6 +77,12 @@ describeForDb('analytics sources endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(res.status).toBe(401)
 	})
 
+	// The listing is the caller's own scope's, so no shared cache may hold it.
+	it('never lets a shared cache hold the listing', async () => {
+		const res = await handler(reqFor(userC))
+		expect(res.headers.get('cache-control')).toBe('private, no-store')
+	})
+
 	it('lists config adapters with serialized capabilities and reports the registry default', async () => {
 		const res = await handler(reqFor(userC))
 		expect(res.status).toBe(200)
