@@ -11,7 +11,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Features
 
 - **One adapter contract** with a capabilities model; adapters ship as code-split subpaths (`@10x-media/analytics/adapters/*`) plus a `memoryAdapter` for tests.
-- **Native engine**: self-hosted, cookieless analytics in your own database, with atomic rollups, exact daily uniques, geo resolution (platform headers or MaxMind), retention pruning, and opt-in write batching.
+- **Native engine**: self-hosted, cookieless analytics in your own database, with atomic rollups, exact daily uniques, geo resolution (platform headers or MaxMind), retention pruning, and opt-in write batching. It classifies referrer host, browser, OS, language and the five UTM keys at ingest, so it serves and filters every breakdown the widgets and the view offer except the goal dimension.
 - **Capture**: a dependency-free browser tracker (`@10x-media/analytics/tracker`) with SPA pageviews, consent gating, auto-capture, and goals, booted from React (`@10x-media/analytics/react`) or a server component; capture-capable adapters are served through a first-party proxy so a vendor's SDK loads from your own origin.
 - **Goals**: conversions and revenue, completed from a `data-analytics-goal` attribute, a `goalField()` picker in your own blocks, a `@10x-media/form-builder` action, or `trackServerEvent` from server code (webhooks, jobs), and declared in config or in an opt-in collection editors manage per scope.
 - **Analytics view** at `/admin/analytics`: overview cards, a trend, capability-gated breakdown tabs with click-to-filter, goals and realtime, with range, source, metric, tab and filters in the URL so a report is a shareable link.

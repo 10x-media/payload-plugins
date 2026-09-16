@@ -17,7 +17,7 @@ It is on by default. Set `view: false` to remove the route and the nav link.
 
 **Trend.** The selected metric over the window, bucketed by hour, day, week or month. The bucket is picked from the window length (hours up to two days, weeks past four months, days in between) and never finer than the source serves. With comparison on, the previous period is overlaid on the same axes as a muted line, named "Previous period" in the legend and in every tooltip.
 
-**Breakdowns.** A tab per dimension group the source serves: pages, sources, technology, geography, events and goals. Each tab is a ranked bar list with the selected metric, a visitors column where the source serves one, sortable columns and a row limit of 10, 25, 50 or 100. Clicking a row adds an `eq` filter for that value and every section re-reads through it; the chip above removes it again.
+**Breakdowns.** A tab per dimension group the source serves: pages, sources, technology, geography, events and goals. Each tab ranks the first dimension of its group that the source can answer, so the sources tab lists referring hosts where a source serves `referrer` and the derived `source` channel where it does not. Each tab is a ranked bar list with the selected metric, a visitors column where the source serves one, sortable columns and a row limit of 10, 25, 50 or 100. Clicking a row adds an `eq` filter for that value and every section re-reads through it; the chip above removes it again.
 
 **Goals.** Conversions per [goal](/analytics/goals) over the window, with revenue and a conversion rate against the range's visitors. Goal names come from your config and from the goals collection; revenue is a bare number, because currency is per goal rather than per read.
 

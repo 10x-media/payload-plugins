@@ -12,7 +12,7 @@ import { native } from '@10x-media/analytics/adapters/native'
 analytics({ adapters: [native()] })
 ```
 
-Registering it adds three hidden collections (`analytics-events`, `analytics-rollups`, `analytics-seen`) and a public beacon endpoint. Metrics served: `pageviews`, `visitors`, `sessions`, `events`, `avgDuration`, `conversions`, `revenue`, `scrollDepth`. Dimensions: `page`, `country`, `source`, `device`, `event`, `goal`. Realtime is supported.
+Registering it adds three hidden collections (`analytics-events`, `analytics-rollups`, `analytics-seen`) and a public beacon endpoint. Metrics served: `pageviews`, `visitors`, `sessions`, `events`, `avgDuration`, `conversions`, `revenue`, `scrollDepth`. Dimensions: `page`, `referrer`, `source`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event`, `goal`, each of them detailed under [dimensions](#dimensions). Realtime is supported.
 
 ## The ingest endpoint
 
@@ -25,6 +25,7 @@ interface RawEventInput {
   hostname: string      // required
   name?: string         // event name, or the goal slug; required unless type is 'pageview'
   referrer?: string
+  query?: string        // the page's query string, no leading '?'; pageviews only
   durationMs?: number
   props?: Record<string, unknown>
   value?: number        // revenue for a goal completion, in `currency`
@@ -35,11 +36,43 @@ interface RawEventInput {
 
 An event is rejected only on its required fields: a known `type`, a non-empty string `path` and `hostname`, and a non-empty string `name` on everything but a pageview. Optional fields are sanitized rather than rejected, so one malformed attribute costs an attribute instead of the whole event: `value` must be a finite number `>= 0`, `currency` must match `/^[A-Z]{3}$/`, `scrollDepth` is clamped to 100 and rounded, `durationMs` must be a finite number between 0 and 86,400,000 (a day) or it is dropped, `name` is truncated to 128 characters (it is the `event` dimension's bucket key), `path` to 512 and `hostname` to 253 (both are rollup bucket keys), and `props` keeps at most 20 flat scalar entries with keys up to 64 characters and string values truncated to 256. The request body is capped at 64 KiB (`413` above it) and unparseable JSON answers `400`.
 
-The server derives the rest at ingest time: device class from the user agent, traffic source from the referrer, geo from [resolvers](/analytics/geo), a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days), and the [goals](/analytics/goals) the event completed, stamped onto the stored event. The endpoint responds `202` on success and `400` on an invalid body.
+The server derives the rest at ingest time: the [dimensions](#dimensions) below, a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days), and the [goals](/analytics/goals) the event completed, stamped onto the stored event. The endpoint responds `202` on success and `400` on an invalid body.
+
+`query` never reaches storage. It is capped at 512 characters, parsed for its five `utm_*` keys, and thrown away, so a session token or an email address that happens to be in the URL is not written to the events collection. Sending it at all is optional: [`capture.autoCapture.query: false`](/analytics/capture#auto-capture) stops the tracker putting it on the wire.
 
 A `goal` event counts under `events`, never under `pageviews`, and is kept out of the `event` dimension breakdown: its name is a goal slug, and it appears under the `goal` dimension instead. `revenue` is summed as a plain number in the event's own currency, with no conversion; see the currency note on [Goals](/analytics/goals#how-native-reports-them). `scrollDepth` averages over the pageviews that actually reported one, tracked by its own sample counter so a pageview whose tracker never sent a depth does not drag the average down.
 
 Events are written atomically, via `$inc` on Mongo and `ON CONFLICT DO UPDATE` on Postgres, so concurrent ingestion is safe.
+
+## Dimensions
+
+Everything the engine can know about a hit is classified once, at ingest, and stored on the event row. A breakdown then reads the stored value rather than re-deriving it, so the day-bucketed rollups and the raw-event path can never disagree about what a bucket is called.
+
+| Dimension | Derived from | Stored as |
+|---|---|---|
+| `page` | the event's `path` | verbatim, capped at 512 |
+| `referrer` | the referring URL's host | lowercased, `www.` stripped, capped at 253; nothing for a same-site referral |
+| `source` | the same host | that host, or `Direct` when there is none, it is unparseable, or it is the site itself |
+| `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` | the `query` field's `utm_*` keys | decoded, trimmed, case as sent, capped at 128 |
+| `device` | `user-agent` | `desktop`, `mobile`, `tablet` |
+| `browser` | `user-agent` | `chrome`, `safari`, `firefox`, `edge`, `opera`, `samsung`, `other` |
+| `os` | `user-agent` | `ios`, `android`, `windows`, `macos`, `linux`, `chromeos`, `other` |
+| `country`, `region`, `city` | the [geo resolvers](/analytics/geo) | as the resolver reports them, each capped at 128 |
+| `language` | the first `accept-language` tag | lowercased without its `q` factor (`de-de`), capped at 16 |
+| `event` | a custom event's `name` | verbatim, capped at 128 |
+| `goal` | the [goals](/analytics/goals) the event completed | a json column: groupable, but the one dimension a filter cannot name |
+
+A dimension the event does not carry emits no bucket at all, so an unattributed hit never lands in an "unknown" row. Keys are capped because each value becomes a rollup bucket key: an uncapped one exceeds Mongo's index key limit, and on Postgres a btree key over 2704 bytes fails the write outright.
+
+Every cap is applied server-side, on a public endpoint, so a hand-rolled body cannot get past it. `browser`, `os` and `language` come off the request headers, so a [server-side event](/analytics/goals#4-track-from-server-code) without a request reports none of them rather than inventing a visitor.
+
+### Referrers
+
+Three things happen to a referrer, and they answer different questions:
+
+- **`referrer` on the event row** keeps the origin and the path, with everything from the first `#` or `?` onwards removed, capped at 512. A same-origin navigation puts the previous page's whole URL in `document.referrer`, so the query string routinely carries a reset token or an email address; stripping it is what keeps that out of the events collection.
+- **The `referrer` dimension** groups by the bare host: lowercased, no scheme, port, path or `www.`. A **same-site referral reports no host at all**, so a site's own domain can never top its referrers breakdown.
+- **The `source` channel** is the same host, or `Direct` when there is no usable one, which includes that same-site case.
 
 ## Write batching (opt-in)
 
@@ -51,6 +84,8 @@ native({ buffer: { maxSize: 100, maxAgeMs: 1000 } })
 ```
 
 Batching coalesces per-bucket upserts and cuts database round trips. The trade is durability: the endpoint responds before the batch is persisted, so a hard crash can lose up to `maxAgeMs` of events (the same best-effort model Plausible and Umami use). Call `native().flush()` on graceful shutdown to drain the buffer; keep a reference to the adapter instance if you need to.
+
+Whether or not you opt in, **every flush writes its rollup buckets and its seen-ledger rows in a handful of statements**, not one per bucket. The rollup upserts go out as two multi-row statements, the counters and then the visitor and session increments the ledger gate just granted (a Mongo `bulkWrite`, a Postgres `ON CONFLICT DO UPDATE` that reads each row's own increments), and the ledger's insert-if-new gate as a single `insertMany` / `ON CONFLICT DO NOTHING ... RETURNING`. A fully attributed pageview therefore costs 4 round trips rather than the 161 the bucket-at-a-time path needed, and a buffered batch pays those three writes once for the whole batch, though each event row is still its own insert. Counting is unchanged: bumps landing on the same bucket are summed before the statement goes out, which Postgres requires anyway, since it rejects a statement whose `DO UPDATE` would touch one row twice.
 
 ## Uniques and sessions
 
@@ -70,7 +105,7 @@ On Postgres the unique index comes from migrations; nothing extra is needed once
 
 ## Filters and hour granularity
 
-`AnalyticsQuery.filters` narrows a read to matching raw events, honored on `page`, `country`, `region`, `city`, `device`, `source`, and `event` with the `eq` and `contains` operators (`contains` is case-insensitive on both Mongo and Postgres; on Postgres `%` and `_` in the value act as wildcards, while Mongo escapes them; a `matches` filter is dropped, since native has no regex engine over stored events). `granularity: 'hour'` buckets a series into UTC hours instead of days.
+`AnalyticsQuery.filters` narrows a read to matching raw events, honored on **every dimension above except `goal`** with the `eq` and `contains` operators (`contains` is case-insensitive on both Mongo and Postgres; on Postgres `%` and `_` in the value act as wildcards, while Mongo escapes them; a `matches` filter is dropped, since native has no regex engine over stored events). `granularity: 'hour'` buckets a series into UTC hours instead of days.
 
 Both a filtered read and an hour-granularity read bypass the day-bucketed rollups and aggregate raw events directly, so they are bounded by [retention](#retention-pruning): a range reaching further back than `retentionDays` is clamped, and the read is capped at the same 50,000-event window as realtime, past which `meta.sampled` reports `true`. An unfiltered, day-granularity read still comes from the exact rollup buckets and has no such cap. Hour buckets floor to the UTC hour regardless of `reportingTimezone`; day buckets stay timezone-aligned. `binding.hostname` (see [display fields](/analytics/display-fields)) filters both paths.
 
@@ -91,6 +126,10 @@ native({ retentionDays: 90 })
 ```
 
 This registers a Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) that deletes raw `analytics-events` and `analytics-seen` rows older than the window. Rollups are untouched, so long-range aggregates survive pruning. Like all scheduled work here, the task fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler).
+
+<Callout type="info">
+`retentionDays` covers the events and the seen ledger, and nothing else. **Rollups are never pruned**, by design, and they now grow per day with the cardinality of the new dimensions: one row per distinct referrer host, city, campaign, `utmContent` and `utmTerm` you receive, doubled for each distinct hostname you ingest from. A site with a long tail of campaign URLs should plan storage for that tail rather than assume a retention window bounds it.
+</Callout>
 
 ## Upgrading an existing install
 
@@ -184,6 +223,43 @@ Mongo needs only the rollup backfill: an absent event field is simply absent the
 Two Postgres details worth keeping if you hand-write your own version. The statements go through `payload.db.drizzle`, the pool handle, rather than the transaction-bound `db` argument, so each one autocommits; that is what keeps `ALTER TYPE ... ADD VALUE` out of an open transaction and lets the new enum member be usable straight away. And the migration is deliberately irreversible: Postgres cannot drop an enum member once it exists, so `down` does nothing.
 
 Rows written before the migration read back as zero rather than `NaN`, so an install that has not run it yet reports 0 conversions instead of breaking, but it cannot ingest a `goal` event on Postgres until the enum member exists.
+
+## Upgrading for the dimension columns
+
+Serving the dimensions above adds nine optional text fields to `analytics-events`: `browser`, `os`, `language`, the five `utm*` keys, and `referrerHost` (the bare host the `referrer` dimension reads, derived at ingest because a `where` cannot reduce a URL to its host at read time). The rollups collection is unchanged, since its rows are keyed by `(dimension, dimvalue)` text columns.
+
+Mongo needs nothing: the fields are optional, and an event written before this release simply carries none of them, which is already what "no bucket for that dimension" means. Push-mode dev installs pick the columns up on the next boot. A migrate-mode Postgres install needs this, which is the plugin's own migration statement for statement:
+
+```ts
+import type { MigrateDownArgs, MigrateUpArgs } from '@payloadcms/db-mongodb'
+
+export async function up({ payload }: MigrateUpArgs): Promise<void> {
+  if (payload.db.name === 'mongoose') {
+    return
+  }
+  const db = payload.db as unknown as { drizzle: { execute: (query: string) => Promise<unknown> } }
+  for (const column of [
+    'browser',
+    'os',
+    'language',
+    'utm_source',
+    'utm_medium',
+    'utm_campaign',
+    'utm_content',
+    'utm_term',
+    'referrer_host',
+  ]) {
+    await db.drizzle.execute(
+      `ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS ${column} varchar`
+    )
+  }
+}
+
+/** Deliberately irreversible: dropping the columns would discard already-attributed events. */
+export async function down(_args: MigrateDownArgs): Promise<void> {}
+```
+
+Every statement is `ADD COLUMN IF NOT EXISTS`, so the migration is re-runnable and leaves a push-mode schema alone. Events ingested before it runs keep their old attribution: nothing backfills a browser onto a row whose user agent was never stored, so the new breakdowns start at the migration rather than at the beginning of your data.
 
 ## Options
 
