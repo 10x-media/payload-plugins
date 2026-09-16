@@ -11,22 +11,7 @@ export const POLL_CONTEXT_KEY = 'formBuilderPollConfig'
 /** The poll state `validateSubmission` stashes under {@link POLL_CONTEXT_KEY}. */
 export type PollContextState = { pollEnabled: boolean; allowChange: boolean }
 
-/**
- * `req.context` key the vote-submit endpoint sets to the id of the submission a cookie-identified
- * re-vote is updating. Its presence is what opts the update operation into the create-grade
- * pipeline: the spam guard, full validation in `validateSubmission`, the dedup rule's
- * self-exclusion, and the voted-cookie refresh all key off it, so an unflagged update (host
- * server code, admin tooling) keeps today's behavior exactly.
- */
-export const VOTE_CHANGE_CONTEXT_KEY = 'formBuilderVoteChange'
-
-/** The change-target submission id a flagged request carries, or undefined. */
-export const voteChangeTargetOf = (req: {
-	context?: Record<string, unknown>
-}): number | string | undefined => {
-	const target = req.context?.[VOTE_CHANGE_CONTEXT_KEY]
-	return typeof target === 'string' || typeof target === 'number' ? target : undefined
-}
+export { VOTE_CHANGE_CONTEXT_KEY, voteChangeTargetOf } from './voteChange'
 
 /** Redeclared to avoid a cycle: `collections/formSubmissions` imports from this module. */
 const FORM_SUBMISSIONS_SLUG = 'form-submissions'
