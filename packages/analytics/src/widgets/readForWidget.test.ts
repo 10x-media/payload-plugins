@@ -179,6 +179,51 @@ describe('readForWidget', () => {
 		expect(result.previousMetrics).toBeUndefined()
 	})
 
+	it('omits comparison when the previous window falls outside the source lookback', async () => {
+		const base = memoryAdapter()
+		const adapter: AnalyticsAdapter = {
+			id: 'short-lookback',
+			label: 'Short lookback',
+			capabilities: { ...base.capabilities, maxLookbackDays: 7 },
+			isConfigured: () => true,
+			async query(_q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+				return {
+					rows: [],
+					totals: { pageviews: 3 },
+					meta: { provider: 'short-lookback', fetchedAt: NOW.toISOString() },
+				}
+			},
+		}
+		const result = await readForWidget({
+			req: reqWith([adapter]),
+			metrics: ['pageviews'],
+			timeframe: 'last7days',
+			now: NOW,
+		})
+		expect(result.status).toBe('ok')
+		expect(result.comparisonRange).toBeUndefined()
+		expect(result.previousMetrics).toBeUndefined()
+	})
+
+	it('keeps comparison when the previous window still fits the source lookback', async () => {
+		const adapter = memoryAdapter()
+		adapter.record({ path: '/c', timestamp: new Date('2026-05-30T12:00:00Z') })
+		adapter.record({ path: '/c', timestamp: new Date('2026-05-24T12:00:00Z') })
+		const scoped: AnalyticsAdapter = {
+			...adapter,
+			capabilities: { ...adapter.capabilities, maxLookbackDays: 30 },
+		}
+		const result = await readForWidget({
+			req: reqWith([scoped]),
+			metrics: ['pageviews'],
+			timeframe: 'last7days',
+			now: NOW,
+		})
+		expect(result.status).toBe('ok')
+		expect(result.comparisonRange).toBeDefined()
+		expect(result.previousMetrics?.pageviews).toBe(1)
+	})
+
 	it('returns unavailable for an unknown adapterId', async () => {
 		const result = await readForWidget({
 			req: reqWith([memoryAdapter()]),

@@ -1,5 +1,5 @@
 import type { PayloadRequest } from 'payload'
-import { satisfiesCapabilities } from '../core/capabilities'
+import { comparisonOf, satisfiesCapabilities } from '../core/capabilities'
 import type {
 	AnalyticsAdapter,
 	AnalyticsFilter,
@@ -10,10 +10,11 @@ import type {
 } from '../core/contract'
 import { supportsGranularity } from '../core/granularity'
 import { resolveReadContext } from '../core/scopedRead'
+import { goalSlugsFor } from '../plugin/goalHint'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { addDaysInTz, DEFAULT_TIMEZONE, startOfDayInTz, zonedDayIso } from '../timeframe/tz'
-import { previousWindow } from './comparison'
+import { previousWindow, withinLookback } from './comparison'
 import { supportsFilters, type WidgetReadStatus } from './readForWidget'
 
 export interface SeriesPoint {
@@ -30,6 +31,8 @@ export interface WidgetSeriesResult {
 	points: SeriesPoint[]
 	total: number
 	clamped?: boolean
+	/** True when the source answered without one of the filters the read carried. */
+	filtersUnapplied?: boolean
 	/** Previous-window headline total, present only when the adapter supports comparison. */
 	previousTotal?: number
 	/** The previous comparable window, present only when comparison ran. */
@@ -153,32 +156,33 @@ export const readForWidgetSeries = async (
 	if (!supportsFilters(adapter.capabilities, filters)) {
 		return { status: 'filter-unsupported', adapterId: adapter.id, ...base }
 	}
+	const previousRange =
+		runtime.comparison && comparisonOf(adapter.capabilities) ? previousWindow(dateRange, tz) : null
 	const comparisonRange =
-		runtime.comparison && adapter.capabilities.comparison
-			? (previousWindow(dateRange, tz) ?? undefined)
+		previousRange &&
+		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
+			? previousRange
 			: undefined
+	const goalSlugs = await goalSlugsFor({ runtime, req, scope: ctx.scope, metrics: [metric] })
+	const readBase = {
+		metrics: [metric],
+		filters,
+		timezone: tz,
+		scope: ctx.queryScope,
+		...(goalSlugs === undefined ? {} : { goalSlugs }),
+	}
 	let result: AnalyticsResult
 	let previous: AnalyticsResult | undefined
 	try {
 		;[result, previous] = await Promise.all([
-			runtime.engine.read(adapter, {
-				metrics: [metric],
-				dateRange,
-				granularity: 'day',
-				filters,
-				timezone: tz,
-				scope: ctx.queryScope,
-			}),
+			runtime.engine.read(adapter, { ...readBase, dateRange, granularity: 'day' }),
 			comparisonRange
 				? runtime.engine.read(adapter, {
-						metrics: [metric],
+						...readBase,
 						dateRange: comparisonRange,
 						// The overlay needs the previous window bucketed like the primary; the delta
 						// alone only needs its total, so the read stays as it was without `compare`.
 						...(compare ? { granularity: 'day' as const } : {}),
-						filters,
-						timezone: tz,
-						scope: ctx.queryScope,
 					})
 				: undefined,
 		])
@@ -197,6 +201,7 @@ export const readForWidgetSeries = async (
 		points,
 		total: result.totals?.[metric] ?? 0,
 		clamped: result.meta.clamped ?? false,
+		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
 		previousTotal,
 		comparisonRange,
 		...(compare && previous && comparisonRange

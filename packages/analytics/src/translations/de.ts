@@ -43,6 +43,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Zeilen',
 	[keys.stateNoBreakdown]: 'Noch keine Daten',
 	[keys.stateClamped]: 'Zeigt den maximalen Zeitraum des Anbieters',
+	[keys.stateFiltersUnapplied]: 'Einige Filter wurden von dieser Datenquelle nicht angewendet',
+	[keys.stateGoalsUnresolved]: 'Ziele konnten aus dieser Datenquelle nicht gelesen werden',
 	[keys.widgetFieldTitle]: 'Titel',
 	[keys.widgetFieldMetric]: 'Kennzahl',
 	[keys.widgetFieldTimeframe]: 'Zeitraum',
@@ -97,8 +99,12 @@ export const de: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: 'Region',
 	[keys.providerFieldDomain]: 'Website-Domain',
 	[keys.providerFieldScriptId]: 'Skript-ID',
+	[keys.providerFieldRevenueCurrency]: 'Umsatzwährung',
+	[keys.providerFieldMeasurementId]: 'Mess-ID',
 	[keys.providerFieldCaptureHelp]:
 		'Öffentliche Browser-Konfiguration. Erfassung läuft nur, wenn sie gesetzt ist.',
+	[keys.providerErrorMeasurementId]:
+		'Nur Buchstaben, Ziffern und Bindestriche, zum Beispiel G-AB12CD34.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',
@@ -194,4 +200,10 @@ export const de: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: 'Sprache',
 	[keys.viewDimensionEvent]: 'Ereignis',
 	[keys.viewDimensionGoal]: 'Ziel',
+	[keys.channelDirect]: 'Direkt',
+	[keys.channelSearch]: 'Suche',
+	[keys.channelSocial]: 'Social Media',
+	[keys.channelEmail]: 'E-Mail',
+	[keys.channelPaid]: 'Bezahlt',
+	[keys.channelReferral]: 'Verweis',
 }

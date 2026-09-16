@@ -70,7 +70,7 @@ The trade-offs:
 Providers that accept a timezone are told the resolved zone:
 
 - **Umami** sends it as the `timezone` query parameter on the daily series.
-- **PostHog** buckets the daily series with `toStartOfDay(timestamp, '<zone>')` in HogQL.
+- **PostHog** buckets the daily series with `toStartOfDay(timestamp, '<zone>')` in HogQL. Its range bounds are sent as `toDateTime('...', 'UTC')`, absolute instants: a bare HogQL date literal parses in the **project's** timezone, so a project set to anything but UTC used to read a window shifted by its own offset. Buckets are unchanged; only the window moved.
 
 **GA4** and **Plausible** bucket in their own property / site timezone; the plugin cannot override that per read, so align the provider's own configured timezone with `reportingTimezone` for consistent daily boundaries.
 

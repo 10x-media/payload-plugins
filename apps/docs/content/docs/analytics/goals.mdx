@@ -302,5 +302,31 @@ A goal travels to a vendor as an ordinary event named by its slug, so it shows u
 | PostHog | `posthog.capture(slug, { ...props, value, currency })` | As the `value` and `currency` properties, which PostHog's revenue analytics reads. |
 | Plausible | `plausible(slug, { props, revenue: { amount, currency } })` | Plausible's documented ecommerce shape. |
 | Umami | `umami.track(slug, { ...props, value, currency })` | Umami has no revenue field; both ride along as event data. |
+| GA4 | `gtag('event', name, { ...props, value, currency })` | As the `value` and `currency` params, which GA4's ecommerce reports read. |
 
-Reading `conversions` and `revenue` back still depends on the adapter's own capabilities: native and GA4 serve both, Plausible serves `revenue`, PostHog and Umami serve neither. That is what the [capability gate](/analytics/adapters#the-capabilities-model) enforces, so a widget whose active source cannot answer degrades rather than reporting a wrong number.
+The name GA4 receives is the slug normalized to an event name GA4 accepts, since it takes no hyphens: see [reading them back](#reading-them-back-on-a-provider).
+
+### Reading them back on a provider
+
+Every provider serves `conversions` and the `goal` dimension. GA4 serves `revenue` too, and Plausible does where `revenueCurrency` names the currency of a revenue goal:
+
+| Adapter | Goal rows from | Conversions | Revenue |
+|---|---|---|---|
+| Plausible | `event:goal` | the `events` metric on goal rows (the dashboard's Total Conversions) | `total_revenue`, only with `revenueCurrency` set |
+| GA4 | `eventName` | `keyEvents` | `totalRevenue` |
+| PostHog | `event` | `count()` over the goal events | none |
+| Umami | `/metrics?type=event` | event occurrences | none |
+
+A provider does not know which of its events are this install's goals, so a read that asks about goals carries the scope's goal slugs with it, set by the query endpoint, the widgets and the display fields, and partitioning the cache. **The slug has to be the provider's own name for the goal**: the goal's display name in Plausible's own goal list, the captured event's name on PostHog and Umami, and on GA4 the slug normalized to a valid GA4 event name (hyphens become underscores, anything outside letters, digits and underscores is dropped, a name not starting with a letter gains an `e_` prefix, 40 characters at most), which is exactly what the GA4 sink sends.
+
+<Callout type="info">
+**`conversions` on a provider means this install's goals.** It counts completions of the goals declared here, as it does on native, rather than whatever the vendor counts install-wide. An install with no goals configured therefore reads no conversions from a provider at all, and the result says so with `meta.goalsUnresolved`. GA4's `keyEvents` narrows twice: it counts only the goals here **and** only the events the property itself marks as key events.
+</Callout>
+
+Three more things worth knowing before you build on it:
+
+- **A rejected goal request costs the goals, not the read.** When a provider refuses the goal half, the site numbers are served without conversions (and without Plausible's revenue) and the answer carries `meta.goalsUnresolved`. Emptying a pageviews card because goals could not resolve would be worse than the missing column.
+- **Conversions can cost a second request.** A read that asks for site metrics and conversions together cannot goal-filter the whole request without zeroing the site numbers, so Plausible and GA4 issue a second, goal-filtered request and merge it row by row. It runs after the first, inside the same rate-limit permit.
+- **Umami serves conversions as goal rows and a range total only.** There is no per-day source for them, so a conversions trend on Umami charts nothing rather than a flat zero line.
+
+`revenue` is still native, GA4 and Plausible only. That is what the [capability gate](/analytics/adapters#the-capabilities-model) enforces, so a widget whose active source cannot answer degrades rather than reporting a wrong number.

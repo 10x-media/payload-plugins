@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MetricKey } from '../core/contract'
 import { fetchQuery, type QueryRequest } from '../query/fetchQuery'
 import type { QueryResponse } from '../query/response'
-import { autoGranularity, gate, resolveSource } from './gating'
+import { autoGranularity, canCompareRange, gate, resolveSource } from './gating'
 import { coerceState, rangeFor, type ViewState } from './state'
 import type { AnalyticsViewClientProps } from './viewProps'
 
@@ -82,7 +82,10 @@ export const buildViewRequests = (
 		source: source.id,
 		timezone: props.timezone,
 	}
-	const compare = view.compare ? ({ compare: 'previous' } as const) : {}
+	const compare =
+		view.compare && canCompareRange(served, range, { timezone: props.timezone, now })
+			? ({ compare: 'previous' } as const)
+			: {}
 	const breakdownMetrics: MetricKey[] = [
 		view.metric,
 		...(served.metrics.includes('visitors') && view.metric !== 'visitors'

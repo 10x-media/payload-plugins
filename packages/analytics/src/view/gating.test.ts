@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { SerializedCapabilities } from '../core/capabilities'
-import { DIMENSION_KEYS, FILTER_OPERATORS } from '../core/contract'
+import { ga4 } from '../adapters/ga4/ga4'
+import { plausible } from '../adapters/plausible/plausible'
+import { posthog } from '../adapters/posthog/posthog'
+import { umami } from '../adapters/umami/umami'
+import { type SerializedCapabilities, serializeCapabilities } from '../core/capabilities'
+import { type AnalyticsCapabilities, DIMENSION_KEYS, FILTER_OPERATORS } from '../core/contract'
 import { METRIC_KEYS } from '../translations/metricKeys'
 import {
 	autoGranularity,
@@ -98,6 +102,23 @@ describe('gate', () => {
 		expect(g.goals).toBe(true)
 	})
 
+	it('offers comparison to a source whose adapter never declared the capability', () => {
+		const provider: AnalyticsCapabilities = {
+			perPageQuery: false,
+			realtime: false,
+			minGranularity: 'day',
+			maxLookbackDays: 90,
+			metrics: new Set(['pageviews']),
+			dimensions: new Set(['page']),
+			filters: new Set(),
+			filterOperators: new Set(),
+			batchPageReport: false,
+			rateLimit: null,
+			recommendedTtl: { realtime: 300, aggregate: 3600 },
+		}
+		expect(gate(serializeCapabilities(provider)).canCompare).toBe(true)
+	})
+
 	it('orders metrics canonically regardless of the capability order', () => {
 		expect(gate(posthogCaps).metrics).toEqual([
 			'pageviews',
@@ -155,6 +176,20 @@ describe('gate', () => {
 	it('needs both conversions and the goal dimension for the goals panel', () => {
 		expect(gate({ ...nativeCaps, metrics: ['pageviews'] }).goals).toBe(false)
 		expect(gate({ ...nativeCaps, dimensions: ['page'] }).goals).toBe(false)
+	})
+
+	// The capability objects the shipped adapters actually declare, not a stand-in: the goals
+	// tab appears for every source that can answer it.
+	it.each([
+		['plausible', plausible({ siteId: 's', apiKey: 'k' })],
+		['ga4', ga4({ propertyId: '1', credentials: { client_email: 'a', private_key: 'b' } })],
+		['posthog', posthog({ projectId: '1', apiKey: 'phx_k' })],
+		['umami', umami({ websiteId: 'w', apiKey: 'k' })],
+	])('opens the goals tab for %s', (_id, adapter) => {
+		const g = gate(serializeCapabilities(adapter.capabilities))
+		expect(g.goals).toBe(true)
+		expect(g.tabs).toContain('goals')
+		expect(g.metrics).toContain('conversions')
 	})
 })
 

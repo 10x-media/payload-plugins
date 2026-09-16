@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SerializedCapabilities } from '../core/capabilities'
-import { DIMENSION_KEYS, FILTER_OPERATORS } from '../core/contract'
+import { type AnalyticsResult, DIMENSION_KEYS, FILTER_OPERATORS } from '../core/contract'
 import type { QueryRequest } from '../query/fetchQuery'
 import type { QueryResponse } from '../query/response'
 import { keys } from '../translations/keys'
@@ -99,7 +99,10 @@ const props = (overrides: Partial<AnalyticsViewClientProps> = {}): AnalyticsView
 	...overrides,
 })
 
-const answer = (request: QueryRequest, stale = false): QueryResponse => ({
+const answer = (
+	request: QueryRequest,
+	meta: Partial<AnalyticsResult['meta']> = {}
+): QueryResponse => ({
 	result: {
 		rows:
 			request.dimensions === undefined
@@ -112,7 +115,7 @@ const answer = (request: QueryRequest, stale = false): QueryResponse => ({
 		meta: {
 			provider: 'native',
 			fetchedAt: '2026-09-14T00:00:00.000Z',
-			...(stale ? { stale } : {}),
+			...meta,
 		},
 	},
 	source: { id: 'native', label: 'Native', kind: 'config' },
@@ -122,6 +125,16 @@ const answer = (request: QueryRequest, stale = false): QueryResponse => ({
 		dateRange: { start: '2026-08-16T00:00:00.000Z', end: '2026-09-14T00:00:00.000Z' },
 	},
 })
+
+/** What a source that could not read its goals answers a goal breakdown with. */
+const goalsUnresolvedResult: AnalyticsResult = {
+	rows: [],
+	meta: {
+		provider: 'native',
+		fetchedAt: '2026-09-14T00:00:00.000Z',
+		goalsUnresolved: true,
+	},
+}
 
 class ResizeObserverStub {
 	observe(): void {}
@@ -250,7 +263,7 @@ describe('AnalyticsViewClient', () => {
 
 	it('badges a read served from an expired cache', async () => {
 		mocks.fetchQueryMock.mockImplementation((_route, request) =>
-			Promise.resolve(answer(request, true))
+			Promise.resolve(answer(request, { stale: true }))
 		)
 		await renderView()
 		expect(screen.getByText(keys.viewStale)).toBeDefined()
@@ -259,6 +272,45 @@ describe('AnalyticsViewClient', () => {
 	it('leaves the badge off a fresh read', async () => {
 		await renderView()
 		expect(screen.queryByText(keys.viewStale)).toBeNull()
+		expect(screen.queryByText(keys.stateFiltersUnapplied)).toBeNull()
+	})
+
+	it('notes a read the source answered without one of the filters it carried', async () => {
+		mocks.fetchQueryMock.mockImplementation((_route, request) =>
+			Promise.resolve(
+				answer(request, {
+					unappliedFilters: [{ dimension: 'page', operator: 'eq', value: '/pricing' }],
+				})
+			)
+		)
+		await renderView()
+		expect(screen.getByText(keys.stateFiltersUnapplied)).toBeDefined()
+	})
+
+	it('says the goals could not be read rather than showing them as unconverted', async () => {
+		mocks.fetchQueryMock.mockImplementation((_route, request) =>
+			Promise.resolve(
+				request.dimensions?.[0] === 'goal'
+					? { ...answer(request, { goalsUnresolved: true }), result: goalsUnresolvedResult }
+					: answer(request)
+			)
+		)
+		await renderView()
+		expect(screen.getByText(keys.stateGoalsUnresolved)).toBeDefined()
+		expect(screen.queryByText(keys.stateNoBreakdown)).toBeNull()
+	})
+
+	it('repeats the unresolved-goals state on the goals tab, where the breakdown is empty too', async () => {
+		mocks.search = 'tab=goals'
+		mocks.fetchQueryMock.mockImplementation((_route, request) =>
+			Promise.resolve(
+				request.dimensions?.[0] === 'goal'
+					? { ...answer(request, { goalsUnresolved: true }), result: goalsUnresolvedResult }
+					: answer(request)
+			)
+		)
+		await renderView()
+		expect(screen.getAllByText(keys.stateGoalsUnresolved)).toHaveLength(2)
 	})
 
 	it('surfaces a failed section with a retry that reissues the read', async () => {

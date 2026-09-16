@@ -32,10 +32,10 @@ const login = async (payload: Payload, email: string) => {
 
 type ErrorBody = { error: { code: string; message: string; param?: string } }
 
+// No `comparison` key: a provider-shaped source that never declares it still compares.
 const baseCapabilities: AnalyticsCapabilities = {
 	perPageQuery: true,
 	realtime: false,
-	comparison: true,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews', 'visitors']),
@@ -73,10 +73,38 @@ const stubAdapter = (opts: StubOptions): AnalyticsAdapter => ({
 
 const RANGE = 'from=2026-01-10&to=2026-01-16'
 
+/**
+ * A source shaped like the provider adapters: goal rows exist only for the slugs the read
+ * hints at, and a goal read without them says so instead of counting every event.
+ */
+const goalsAdapter = (seen: AnalyticsQuery[]): AnalyticsAdapter => ({
+	id: 'goals',
+	label: 'Goal source',
+	capabilities: {
+		...baseCapabilities,
+		metrics: new Set(['pageviews', 'conversions']),
+		dimensions: new Set(['page', 'goal']),
+	},
+	isConfigured: () => true,
+	query: async (q) => {
+		seen.push(q)
+		const fetchedAt = q.dateRange.end.toISOString()
+		const slugs = q.goalSlugs ?? []
+		if (slugs.length === 0) {
+			return { rows: [], meta: { provider: 'goals', fetchedAt, goalsUnresolved: true } }
+		}
+		return {
+			rows: slugs.map((slug) => ({ dimensions: { goal: slug }, metrics: { conversions: 1 } })),
+			meta: { provider: 'goals', fetchedAt },
+		}
+	},
+})
+
 describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
 	let token: string
 	const mem = memoryAdapter()
+	const goalQueries: AnalyticsQuery[] = []
 
 	beforeAll(async () => {
 		booted = await bootPayload({
@@ -97,7 +125,20 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 						},
 						pageviews: 7,
 					}),
+					stubAdapter({
+						id: 'wide',
+						label: 'Wide lookback source',
+						capabilities: { maxLookbackDays: 36_500 },
+						pageviews: 5,
+					}),
+					stubAdapter({
+						id: 'lookback',
+						label: 'Short lookback source',
+						capabilities: { maxLookbackDays: 1 },
+						pageviews: 3,
+					}),
 					stubAdapter({ id: 'unconfigured', label: 'Unconfigured source', configured: false }),
+					goalsAdapter(goalQueries),
 				],
 				defaultAdapter: 'memory',
 			}),
@@ -151,6 +192,22 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 			(e): e is Endpoint => typeof e === 'object' && e.path === QUERY_PATH
 		)
 		expect(endpoint?.method).toBe('get')
+	})
+
+	// This install configures no goals, so there is nothing to hint with: the source answers
+	// no goal rows rather than every event it has, and says why.
+	it(`surfaces goalsUnresolved when the scope has no goals on ${db}`, async () => {
+		goalQueries.length = 0
+		const body = await okBody(`source=goals&metrics=conversions&dimensions=goal&${RANGE}`)
+		expect(goalQueries[0]?.goalSlugs).toEqual([])
+		expect(body.result.rows).toEqual([])
+		expect(body.result.meta.goalsUnresolved).toBe(true)
+	})
+
+	it(`leaves a read that is about no goal unhinted on ${db}`, async () => {
+		goalQueries.length = 0
+		await okBody(`source=goals&metrics=pageviews&${RANGE}`)
+		expect(goalQueries[0]?.goalSlugs).toBeUndefined()
 	})
 
 	it(`401s an anonymous request on ${db}`, async () => {
@@ -246,6 +303,20 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(body.query.dateRange.start).toBe('2026-01-10T00:00:00.000Z')
 		expect(body.comparison).toBeDefined()
 		expect(body.comparison?.meta.fetchedAt).toBe('2026-01-09T23:59:59.999Z')
+	})
+
+	it(`adds the comparison for a provider-shaped source that never declared it on ${db}`, async () => {
+		const body = await okBody(`source=wide&metrics=pageviews&compare=previous&${RANGE}`)
+		expect(body.capabilities.comparison).toBe(true)
+		expect(body.comparison).toBeDefined()
+		expect(body.comparison?.totals?.pageviews).toBe(5)
+		expect(body.comparison?.meta.fetchedAt).toBe('2026-01-09T23:59:59.999Z')
+	})
+
+	it(`omits the comparison when the previous window predates the source lookback on ${db}`, async () => {
+		const body = await okBody(`source=lookback&metrics=pageviews&compare=previous&${RANGE}`)
+		expect(body.comparison).toBeUndefined()
+		expect(body.result.totals?.pageviews).toBe(3)
 	})
 
 	it(`accepts a limit at the 500 cap and rejects one above it on ${db}`, async () => {

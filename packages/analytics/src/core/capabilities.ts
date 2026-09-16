@@ -28,6 +28,12 @@ export function satisfiesCapabilities(
 	return true
 }
 
+/**
+ * Whether a source compares against its previous period. The engine does that read
+ * generically, so it is on unless an adapter opted out.
+ */
+export const comparisonOf = (caps: AnalyticsCapabilities): boolean => caps.comparison ?? true
+
 /** Wire form of AnalyticsCapabilities for client pickers: a deliberate allowlist, so adapter internals (rate limits, TTLs) never become client contract by accident. */
 export type SerializedCapabilities = {
 	metrics: MetricKey[]
@@ -52,7 +58,7 @@ export const serializeCapabilities = (caps: AnalyticsCapabilities): SerializedCa
 		? { realtimeWindowMinutes: caps.realtimeWindowMinutes }
 		: {}),
 	perPageQuery: caps.perPageQuery,
-	comparison: caps.comparison,
+	comparison: comparisonOf(caps),
 	minGranularity: caps.minGranularity,
 	maxLookbackDays: caps.maxLookbackDays,
 })

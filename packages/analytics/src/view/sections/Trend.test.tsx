@@ -70,6 +70,26 @@ describe('Trend section', () => {
 		expect(legend?.textContent).toContain('analytics:viewTrendPrevious')
 	})
 
+	// A source can serve the metric as a range total and nothing per bucket (Umami answers
+	// conversions only as goal rows and a range total); a zeroed line would read as a real zero.
+	it('shows the empty state when no bucket carries the selected metric', () => {
+		const { container } = render(
+			<Trend
+				compare={false}
+				granularity="day"
+				locale="en"
+				metric="conversions"
+				query={query(false)}
+				rangeCaption="Jun 1 - Jun 3"
+				timezone="UTC"
+			/>
+		)
+		expect(container.querySelectorAll('.analytics-chart')).toHaveLength(0)
+		expect(container.querySelector('.analytics-view__empty')?.textContent).toBe(
+			'analytics:stateNoData'
+		)
+	})
+
 	it('draws no legend without a comparison', () => {
 		const { container } = renderTrend(false)
 		expect(container.querySelectorAll('.analytics-chart')).toHaveLength(1)

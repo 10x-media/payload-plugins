@@ -10,7 +10,7 @@ import { keys } from '../../translations/keys'
 import { METRIC_KEYS } from '../../translations/metricKeys'
 import { useTranslation } from '../../translations/useTranslation'
 import type { BreakdownTab } from '../gating'
-import { DIMENSION_LABELS, TAB_LABELS } from '../labels'
+import { DIMENSION_LABELS, TAB_LABELS, valueLabel } from '../labels'
 import { VIEW_LIMITS, type ViewLimit, type ViewState } from '../state'
 import type { QueryState } from '../useViewQueries'
 import { SectionError, Skeleton } from './EmptyStates'
@@ -73,6 +73,15 @@ export function Breakdowns({
 	const strip = useRef<HTMLDivElement>(null)
 
 	const served = query.data?.result.rows ?? []
+	// Only the native source buckets `source` into channels; a provider serves a raw utm_source
+	// under the same name, so the label formatter needs to know which answered.
+	const provider = query.data?.result.meta.provider ?? ''
+	// A goal breakdown the source could not resolve has no rows, which the plain empty state
+	// would read as "nobody converted".
+	const emptyLabel =
+		dimension === 'goal' && query.data?.result.meta.goalsUnresolved === true
+			? keys.stateGoalsUnresolved
+			: keys.stateNoBreakdown
 	// The read kept on screen through a refetch answers the grouping that was asked for when
 	// it was issued, so switching tab or dimension leaves rows that carry no value for the one
 	// now selected. They are not this breakdown's rows: showing them would be a run of
@@ -80,7 +89,15 @@ export function Breakdowns({
 	const rows =
 		dimension === null ? [] : served.filter((row) => row.dimensions?.[dimension] !== undefined)
 	const answered = dimension === null || served.length === 0 || rows.length > 0
-	const servesSecondary = rows.some((row) => row.metrics[SECONDARY] !== undefined)
+	const carried = (candidate: MetricKey): boolean =>
+		rows.some((row) => row.metrics[candidate] !== undefined)
+	// A source can group by a dimension without serving the selected metric per row (Umami's
+	// /metrics reports visitors and nothing else), so the list charts the first metric of the
+	// read that some row carries rather than a run of zeros under the wrong name.
+	const charted = carried(metric)
+		? metric
+		: ((query.data?.query.metrics ?? []).find(carried) ?? metric)
+	const servesSecondary = carried(SECONDARY)
 	const dimensionLabel = dimension === null ? t(TAB_LABELS[tab]) : t(DIMENSION_LABELS[dimension])
 
 	const onStripKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -156,14 +173,14 @@ export function Breakdowns({
 						<div className="analytics-view__bars-head">
 							<span className="analytics-view__bars-head-dimension">{dimensionLabel}</span>
 							<button
-								aria-pressed={order?.metric === metric}
+								aria-pressed={order?.metric === charted}
 								className="analytics-view__sort analytics-view__sort--metric"
-								onClick={() => sortBy(metric)}
+								onClick={() => sortBy(charted)}
 								type="button"
 							>
-								{sortLabel(metric)}
+								{sortLabel(charted)}
 							</button>
-							{servesSecondary && metric !== SECONDARY ? (
+							{servesSecondary && charted !== SECONDARY ? (
 								<button
 									aria-pressed={order?.metric === SECONDARY}
 									className="analytics-view__sort analytics-view__sort--secondary"
@@ -176,19 +193,23 @@ export function Breakdowns({
 						</div>
 						<BarList
 							data={rows.map((row) => {
-								const value = row.metrics[metric] ?? 0
+								const value = row.metrics[charted] ?? 0
 								const secondary =
-									servesSecondary && metric !== SECONDARY ? row.metrics[SECONDARY] : undefined
+									servesSecondary && charted !== SECONDARY ? row.metrics[SECONDARY] : undefined
+								const stored = (dimension === null ? undefined : row.dimensions?.[dimension]) ?? ''
 								return {
-									label: (dimension === null ? undefined : row.dimensions?.[dimension]) ?? '',
+									label:
+										dimension === null
+											? stored
+											: valueLabel({ dimension, value: stored, provider, t }),
 									value,
-									display: formatMetricValue(metric, value, locale),
+									display: formatMetricValue(charted, value, locale),
 									...(secondary === undefined
 										? {}
 										: { secondary: formatMetricValue(SECONDARY, secondary, locale) }),
 								}
 							})}
-							emptyLabel={t(keys.stateNoBreakdown)}
+							emptyLabel={t(emptyLabel)}
 							fill="soft"
 							{...(canFilter
 								? {

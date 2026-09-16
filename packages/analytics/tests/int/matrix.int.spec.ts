@@ -14,6 +14,7 @@ import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
+import type { TrafficChannel } from '../../src/native/ingest/source'
 import { native } from '../../src/native/nativeAdapter'
 import { applyRollupDeltas } from '../../src/native/rollups/applyRollupDeltas'
 import { bucketKey } from '../../src/native/rollups/bucketKey'
@@ -779,6 +780,85 @@ describeForDb('native dimension columns and breakdowns', {}, (db) => {
 				{}
 			)
 			expect(events.rows).toEqual(rollups.rows)
+		}
+	})
+})
+
+describeForDb('native source channels', {}, (db) => {
+	const adapter = native()
+	let booted: BootedPayload
+
+	// One hit per channel, each reaching the classifier through the real ingest endpoint, so
+	// every bucket the `source` dimension can hold is written and read back on either database.
+	const hits: ReadonlyArray<
+		readonly [TrafficChannel, { path: string; referrer?: string; query?: string }]
+	> = [
+		['direct', { path: '/direct' }],
+		['search', { path: '/search', referrer: 'https://www.google.com/search?q=x' }],
+		['social', { path: '/social', referrer: 'https://t.co/abc' }],
+		['email', { path: '/email', query: 'utm_source=newsletter&utm_medium=email' }],
+		['paid', { path: '/paid', referrer: 'https://www.bing.com/', query: 'msclkid=abc' }],
+		['referral', { path: '/referral', referrer: 'https://news.ycombinator.com/item?id=1' }],
+	]
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
+		const endpoint = (booted.payload.config.endpoints ?? []).find(
+			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		)
+		if (!endpoint || typeof endpoint.handler !== 'function') {
+			throw new Error('ingest endpoint not registered')
+		}
+		for (const [, hit] of hits) {
+			const res = await endpoint.handler(
+				ingestRequest(
+					booted.payload,
+					{ type: 'pageview', hostname: 'site.com', durationMs: 100, ...hit },
+					{ 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0' }
+				)
+			)
+			expect(res.status).toBe(202)
+		}
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it(`stores the channel, not the referrer host, on ${db}`, async () => {
+		for (const [channel, hit] of hits) {
+			const { docs } = await booted.payload.find({
+				collection: EVENTS_SLUG as never,
+				where: { path: { equals: hit.path } } as never,
+				pagination: false,
+				overrideAccess: true,
+			})
+			expect(docs).toHaveLength(1)
+			expect(docs[0]).toMatchObject({ source: channel })
+		}
+	})
+
+	it(`serves a rollup and a raw-event breakdown per channel on ${db}`, async () => {
+		const range = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
+		const rollups = await adapter.query(
+			{ metrics: ['pageviews'], dimensions: ['source'], dateRange: range },
+			{}
+		)
+		expect(
+			Object.fromEntries(rollups.rows.map((row) => [row.dimensions?.source, row.metrics.pageviews]))
+		).toEqual(Object.fromEntries(hits.map(([channel]) => [channel, 1])))
+		for (const [channel] of hits) {
+			// A filter forces the raw-event path, which must agree with the rollups.
+			const events = await adapter.query(
+				{
+					metrics: ['pageviews'],
+					dimensions: ['source'],
+					dateRange: range,
+					filters: [{ dimension: 'source', operator: 'eq', value: channel }],
+				},
+				{}
+			)
+			expect(events.rows).toEqual([{ dimensions: { source: channel }, metrics: { pageviews: 1 } }])
 		}
 	})
 })

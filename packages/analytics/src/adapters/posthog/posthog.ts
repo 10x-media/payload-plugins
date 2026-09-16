@@ -9,6 +9,7 @@ import type {
 	DimensionKey,
 	MetricKey,
 } from '../../core/contract'
+import { goalHint, goalsUnresolvedResult } from '../goalRead'
 import { fetchJson } from '../http/fetchJson'
 import { dayIso, hourIso } from '../series'
 
@@ -103,8 +104,9 @@ const METRIC_SQL_PAGEVIEW: Partial<Record<MetricKey, string>> = {
 }
 
 // All-event expressions, used when `events` (total captured events, matching PostHog's own
-// Events definition) or an `event`-name breakdown is requested. The WHERE is not filtered to
-// `$pageview`, so the pageview-family metrics scope themselves with conditional aggregates.
+// Events definition), `conversions`, or an `event`/`goal` breakdown is requested. The WHERE
+// is not filtered to `$pageview`, so the pageview-family metrics scope themselves with
+// conditional aggregates.
 const METRIC_SQL_ALL: Partial<Record<MetricKey, string>> = {
 	pageviews: "countIf(event = '$pageview')",
 	visitors: "count(DISTINCT if(event = '$pageview', person_id, NULL))",
@@ -113,14 +115,36 @@ const METRIC_SQL_ALL: Partial<Record<MetricKey, string>> = {
 	events: 'count()',
 }
 
+// A goal breakdown restricts the scan to the goal events themselves, so every metric counts
+// the rows it already has. The conditional aggregates above would answer 0 for each one, and
+// a conversion rate against a zeroed visitors count is 0% for every goal.
+const METRIC_SQL_GOAL: Partial<Record<MetricKey, string>> = {
+	pageviews: 'count()',
+	visitors: 'count(DISTINCT person_id)',
+	visits: 'count(DISTINCT properties.$session_id)',
+	sessions: 'count(DISTINCT properties.$session_id)',
+	events: 'count()',
+}
+
+/** A goal is an event name here, so a plugin goal's slug must equal the captured event's name. */
 const DIMENSION_SQL: Partial<Record<DimensionKey, string>> = {
 	page: 'properties.$pathname',
 	event: 'event',
+	goal: 'event',
 }
 
-const posthogMetrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_SQL_ALL) as MetricKey[])
+// conversions has no fixed expression: it counts the read's own goal slugs, so the adapter
+// builds its conditional aggregate per query.
+const posthogMetrics: ReadonlySet<MetricKey> = new Set([
+	...(Object.keys(METRIC_SQL_ALL) as MetricKey[]),
+	'conversions',
+])
 const posthogDimensions: ReadonlySet<DimensionKey> = new Set(
 	Object.keys(DIMENSION_SQL) as DimensionKey[]
+)
+// `goal` is a breakdown, not a filter: the read's own goal slugs own the event clause.
+const posthogFilters: ReadonlySet<DimensionKey> = new Set(
+	[...posthogDimensions].filter((dimension) => dimension !== 'goal')
 )
 
 // The Query API has no parameter binding, so values are inlined as quoted literals.
@@ -133,8 +157,13 @@ const sqlString = (value: string): string =>
 // then % and _, before the whole thing is wrapped in % ... % and quoted.
 const escapeLikeValue = (value: string): string => value.replace(/[\\%_]/g, (c) => `\\${c}`)
 
-const sqlDateTimeLiteral = (d: Date): string =>
-	sqlString(d.toISOString().slice(0, 19).replace('T', ' '))
+/**
+ * A bare HogQL date literal parses in the project's timezone, so the UTC wall time
+ * `toISOString` produces would drift by that offset; the zone is passed explicitly to keep
+ * the bound an absolute instant (https://posthog.com/docs/hogql/expressions).
+ */
+const utcDateTime = (d: Date): string =>
+	`toDateTime(${sqlString(d.toISOString().slice(0, 19).replace('T', ' '))}, 'UTC')`
 
 interface PosthogQueryResponse {
 	columns: string[]
@@ -149,12 +178,11 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 	const capabilities: AnalyticsCapabilities = {
 		perPageQuery: true,
 		realtime: false,
-		comparison: false,
 		minGranularity: 'hour',
 		maxLookbackDays,
 		metrics: posthogMetrics,
 		dimensions: posthogDimensions,
-		filters: posthogDimensions,
+		filters: posthogFilters,
 		filterOperators: new Set(['eq', 'contains', 'matches']),
 		batchPageReport: true,
 		rateLimit: { requestsPerMinute: 240, requestsPerHour: 2400 },
@@ -171,24 +199,52 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()
 			const breakdownDim = (q.dimensions ?? []).find((d) => DIMENSION_SQL[d])
-			// A total-events metric, an event-name breakdown, or a filter on the event
-			// dimension must scan every event, not just pageviews (a `$pageview` WHERE
-			// clause combined with an `event = 'x'` filter would be self-contradictory and
-			// zero every metric); those reads switch to conditional aggregation.
+			const hint = goalHint(q)
+			if (breakdownDim === 'goal' && !hint) {
+				return goalsUnresolvedResult('posthog', q)
+			}
+			// A total-events metric, a goal or event-name breakdown, a conversions count, or a
+			// filter on the event dimension must scan every event, not just pageviews (a
+			// `$pageview` WHERE clause combined with an `event = 'x'` filter would be
+			// self-contradictory and zero every metric); those reads switch to conditional
+			// aggregation.
 			const scanAllEvents =
 				q.metrics.includes('events') ||
+				q.metrics.includes('conversions') ||
 				breakdownDim === 'event' ||
+				breakdownDim === 'goal' ||
 				(q.filters ?? []).some((f) => f.dimension === 'event' && DIMENSION_SQL[f.dimension])
-			const metricSql = scanAllEvents ? METRIC_SQL_ALL : METRIC_SQL_PAGEVIEW
+			const eventInHint = hint ? `event IN (${hint.map(sqlString).join(', ')})` : undefined
+			// Counting the goals conditionally, rather than restricting the WHERE, keeps the
+			// site metrics of a read that asks for both site-wide.
+			const metricSql: Partial<Record<MetricKey, string>> = {
+				...(breakdownDim === 'goal'
+					? METRIC_SQL_GOAL
+					: scanAllEvents
+						? METRIC_SQL_ALL
+						: METRIC_SQL_PAGEVIEW),
+				...(eventInHint ? { conversions: `countIf(${eventInHint})` } : {}),
+			}
+			const unresolved = q.metrics.includes('conversions') && !hint
 			const wanted = q.metrics.filter((m) => metricSql[m])
 			const exprs = [...new Set(wanted.map((m) => metricSql[m] as string))]
+			const meta: AnalyticsResult['meta'] = {
+				provider: 'posthog',
+				fetchedAt,
+				...(unresolved ? { goalsUnresolved: true as const } : {}),
+			}
 
 			const where = [
-				`timestamp >= toDateTime(${sqlDateTimeLiteral(q.dateRange.start)})`,
-				`timestamp <= toDateTime(${sqlDateTimeLiteral(q.dateRange.end)})`,
+				`timestamp >= ${utcDateTime(q.dateRange.start)}`,
+				`timestamp <= ${utcDateTime(q.dateRange.end)}`,
 			]
 			if (!scanAllEvents) {
 				where.unshift("event = '$pageview'")
+			}
+			// Only the goal breakdown narrows the scan itself: its rows are the goals and
+			// nothing else.
+			if (breakdownDim === 'goal' && eventInHint) {
+				where.push(eventInHint)
 			}
 			if (q.path) {
 				where.push(`properties.$pathname = ${sqlString(q.path)}`)
@@ -204,7 +260,9 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			// Capability gating (filters/filterOperators) is the real contract upstream; an
 			// unsupported dimension is dropped here as the safety net so it never throws.
 			for (const filter of q.filters ?? []) {
-				const expr = DIMENSION_SQL[filter.dimension]
+				const expr = posthogFilters.has(filter.dimension)
+					? DIMENSION_SQL[filter.dimension]
+					: undefined
 				if (!expr) {
 					continue
 				}
@@ -260,7 +318,7 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 						rows.push({ timestamp: ts, metrics: readRow(row, 1) })
 					}
 				}
-				return { rows, totals, meta: { provider: 'posthog', fetchedAt } }
+				return { rows, totals, meta }
 			}
 
 			if (q.granularity === 'hour' && !breakdownDim) {
@@ -275,7 +333,7 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 						rows.push({ timestamp: ts, metrics: readRow(row, 1) })
 					}
 				}
-				return { rows, totals, meta: { provider: 'posthog', fetchedAt } }
+				return { rows, totals, meta }
 			}
 
 			if (breakdownDim) {
@@ -286,11 +344,11 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 					dimensions: { [breakdownDim]: String(row[0] ?? '') },
 					metrics: readRow(row, 1),
 				}))
-				return { rows, totals: undefined, meta: { provider: 'posthog', fetchedAt } }
+				return { rows, totals: undefined, meta }
 			}
 
 			const totals = await fetchTotals()
-			return { rows: [{ metrics: totals }], totals, meta: { provider: 'posthog', fetchedAt } }
+			return { rows: [{ metrics: totals }], totals, meta }
 		},
 	}
 }

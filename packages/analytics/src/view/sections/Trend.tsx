@@ -57,6 +57,14 @@ const labelFor = (
 	return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone }).format(at)
 }
 
+/**
+ * Whether the series can be charted at all. A source may serve the metric as a range total
+ * and nothing per bucket (Umami answers conversions only as goal rows and a range total), and
+ * those buckets would otherwise draw a flat line of zeros that reads as "nobody converted".
+ */
+const carriesMetric = (result: AnalyticsResult | undefined, metric: MetricKey): boolean =>
+	(result?.rows ?? []).some((row) => row.metrics[metric] !== undefined)
+
 const pointsOf = (
 	result: AnalyticsResult | undefined,
 	metric: MetricKey,
@@ -122,7 +130,8 @@ export function Trend({
 	const title = t(METRIC_KEYS[metric])
 	const caption = `${rangeCaption} · ${t(GRANULARITY_LABELS[granularity])}`
 	const bucket = { granularity, locale, timezone }
-	const points = pointsOf(query.data?.result, metric, bucket)
+	const charted = carriesMetric(query.data?.result, metric)
+	const points = charted ? pointsOf(query.data?.result, metric, bucket) : []
 	const previous = compare
 		? comparisonPointsOf({
 				comparison: query.data?.comparison,

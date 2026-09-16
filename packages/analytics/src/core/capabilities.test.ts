@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { satisfiesCapabilities, serializeCapabilities } from './capabilities'
+import { comparisonOf, satisfiesCapabilities, serializeCapabilities } from './capabilities'
 import type { AnalyticsCapabilities } from './contract'
 
 const caps: AnalyticsCapabilities = {
@@ -46,7 +46,40 @@ describe('satisfiesCapabilities', () => {
 	})
 })
 
+/** A provider adapter that never mentions comparison: the engine reads the previous window for it. */
+const undeclaredComparison: AnalyticsCapabilities = {
+	perPageQuery: false,
+	realtime: false,
+	minGranularity: 'day',
+	maxLookbackDays: 90,
+	metrics: new Set(['pageviews']),
+	dimensions: new Set(['page']),
+	filters: new Set(),
+	filterOperators: new Set(),
+	batchPageReport: false,
+	rateLimit: null,
+	recommendedTtl: { realtime: 300, aggregate: 3600 },
+}
+
+describe('comparisonOf', () => {
+	it('defaults to true when the adapter never declared the capability', () => {
+		expect(comparisonOf(undeclaredComparison)).toBe(true)
+	})
+
+	it('keeps an explicit true', () => {
+		expect(comparisonOf(caps)).toBe(true)
+	})
+
+	it('honors an explicit opt-out', () => {
+		expect(comparisonOf({ ...caps, comparison: false })).toBe(false)
+	})
+})
+
 describe('serializeCapabilities', () => {
+	it('sends the default to the wire when the adapter omits the key', () => {
+		expect(serializeCapabilities(undeclaredComparison).comparison).toBe(true)
+	})
+
 	it('turns the metric and dimension sets into arrays and keeps the wire fields', () => {
 		const caps: AnalyticsCapabilities = {
 			perPageQuery: true,

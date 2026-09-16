@@ -122,6 +122,45 @@ test('the sources tab ranks referrer hosts and never the site itself', async ({ 
 	await expect(breakdown).not.toContainText('localhost')
 })
 
+/**
+ * Every channel the seed produces, named as `en` names them: the run is on the default
+ * English locale, so a row reads as the `channel*` translation of the token it stores.
+ */
+const SEED_CHANNELS = ['Direct', 'Search', 'Social', 'Email', 'Paid', 'Referral']
+
+test('the sources tab buckets traffic into named channels and filters on the raw token', async ({
+	page,
+}) => {
+	await login(page, PLATFORM)
+	await page.goto('/admin/analytics?tab=sources')
+
+	const breakdown = page.locator('.analytics-view__breakdown')
+	// `has` matches inside the row it filters, so its locator is rooted at the page rather
+	// than chained off the breakdown, which would resolve outside the row and match nothing.
+	const label = (name: string) =>
+		page.locator('.analytics-bars__label', { hasText: new RegExp(`^${name}$`) })
+	for (const channel of SEED_CHANNELS) {
+		await expect(
+			breakdown.locator('.analytics-bars__label', { hasText: new RegExp(`^${channel}$`) })
+		).toBeVisible()
+	}
+	// The channel replaces the host the dimension used to store, so no row is a hostname.
+	await expect(breakdown).not.toContainText('google.com')
+
+	await breakdown
+		.locator('.analytics-bars__row--action')
+		.filter({ has: label('Search') })
+		.click()
+
+	// The filter and the URL carry the stored token; only the row and the chip are named.
+	const filters = async (): Promise<unknown> => {
+		const raw = new URLSearchParams(await search(page)).get('filters')
+		return raw === null ? null : JSON.parse(raw)
+	}
+	await expect.poll(filters).toEqual([{ dimension: 'source', operator: 'eq', value: 'search' }])
+	await expect(page.getByRole('button', { name: 'Remove filter: Source = Search' })).toBeVisible()
+})
+
 test('the group-by picker regroups a tab and writes the pick to the URL', async ({ page }) => {
 	await login(page, PLATFORM)
 	await page.goto('/admin/analytics?tab=technology')

@@ -9,6 +9,7 @@ import type {
 	MetricKey,
 } from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
+import { goalSlugsFor } from '../plugin/goalHint'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { supportsFilters, type WidgetReadStatus } from './readForWidget'
@@ -25,9 +26,15 @@ export interface WidgetBreakdownResult {
 	adapterId: string
 	dateRange: DateRange
 	rows: BreakdownRow[]
+	/** The source that answered, absent on a read that never reached one. */
+	provider?: string
 	clamped?: boolean
 	/** True when the engine served a stale cache entry after a failed provider read. */
 	stale?: boolean
+	/** True when the source answered without one of the filters the read carried. */
+	filtersUnapplied?: boolean
+	/** True when the source could not read the scope's goals; the rows say nothing about them. */
+	goalsUnresolved?: boolean
 }
 
 export interface ReadForWidgetBreakdownArgs {
@@ -53,6 +60,11 @@ export interface ReadForWidgetBreakdownArgs {
 	 * `metrics`; ranking and status still follow `metric` alone.
 	 */
 	extraMetrics?: MetricKey[]
+	/**
+	 * The scope's goal slugs, for a `goal` or `conversions` read. Resolved here when omitted,
+	 * so a caller that already resolved them (the goals table) does not resolve them twice.
+	 */
+	goalSlugs?: string[]
 }
 
 /**
@@ -106,6 +118,9 @@ export const readForWidgetBreakdown = async (
 		metric,
 		...(args.extraMetrics ?? []).filter((m) => m !== metric && adapter.capabilities.metrics.has(m)),
 	]
+	const goalSlugs =
+		args.goalSlugs ??
+		(await goalSlugsFor({ runtime, req, scope: ctx.scope, metrics, dimensions: [dimension] }))
 	let result: AnalyticsResult
 	try {
 		result = await runtime.engine.read(adapter, {
@@ -117,6 +132,7 @@ export const readForWidgetBreakdown = async (
 			filters,
 			timezone: tz,
 			scope: ctx.queryScope,
+			...(goalSlugs === undefined ? {} : { goalSlugs }),
 		})
 	} catch {
 		// No cache entry (fresh or stale) survived the failed read; degrade like an
@@ -133,7 +149,10 @@ export const readForWidgetBreakdown = async (
 		adapterId: adapter.id,
 		dateRange,
 		rows,
+		provider: result.meta.provider,
 		clamped: result.meta.clamped ?? false,
 		stale: result.meta.stale ?? false,
+		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
+		goalsUnresolved: result.meta.goalsUnresolved === true,
 	}
 }

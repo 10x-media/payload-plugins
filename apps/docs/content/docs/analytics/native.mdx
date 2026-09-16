@@ -52,7 +52,7 @@ Everything the engine can know about a hit is classified once, at ingest, and st
 |---|---|---|
 | `page` | the event's `path` | verbatim, capped at 512 |
 | `referrer` | the referring URL's host | lowercased, `www.` stripped, capped at 253; nothing for a same-site referral |
-| `source` | the same host | that host, or `Direct` when there is none, it is unparseable, or it is the site itself |
+| `source` | `utm_medium`, the ad click ids, and the referrer host | the traffic channel: `direct`, `search`, `social`, `email`, `paid` or `referral`, lowercase |
 | `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` | the `query` field's `utm_*` keys | decoded, trimmed, case as sent, capped at 128 |
 | `device` | `user-agent` | `desktop`, `mobile`, `tablet` |
 | `browser` | `user-agent` | `chrome`, `safari`, `firefox`, `edge`, `opera`, `samsung`, `other` |
@@ -72,7 +72,26 @@ Three things happen to a referrer:
 
 - **`referrer` on the event row** keeps the origin and the path, with everything from the first `#` or `?` onwards removed, capped at 512. A same-origin navigation puts the previous page's whole URL in `document.referrer`, so the query string routinely carries a reset token or an email address; stripping it is what keeps that out of the events collection.
 - **The `referrer` dimension** groups by the bare host: lowercased, no scheme, port, path or `www.`. A **same-site referral reports no host at all**, so a site's own domain can never top its referrers breakdown.
-- **The `source` dimension** is that same host, or `Direct` when there is no usable one, which includes the same-site case. On native it is not a traffic channel: it is the referrer host with a name for "no referrer", so a referred hit reads the same under `source` as under `referrer`.
+- **The `source` dimension** is the traffic channel the hit arrived through, which is what a report is usually asked for ("how much of last month was paid?"), while the host it came from stays the `referrer` dimension's job.
+
+### Traffic channels
+
+`source` holds one of six lowercase tokens: `direct`, `search`, `social`, `email`, `paid`, `referral`. They are classified once, at ingest, in this order:
+
+1. **`utm_medium`**, trimmed and lowercased. Anything starting with `paid` is `paid`; then `cpc`, `ppc`, `display` and `retargeting` are `paid`, `email` and `newsletter` are `email`, `social`, `social-media` and `sm` are `social`, `organic` and `search` are `search`. A campaign states its own channel, and the referrer host is then only its last hop. Any other medium falls through, so `utm_medium=referral` with no referrer is `direct` rather than `referral`.
+2. **An ad click id** in the page's query string with a non-empty value: `gclid`, `fbclid`, `msclkid` or `ttclid`, matched case-insensitively. An ad click carries one whatever host it bounced through. A valueless `?gclid=` is not a click.
+3. **The referrer host**, against a built-in list. Search: `bing.com`, `duckduckgo.com`, `baidu.com`, `ecosia.org`, `search.brave.com`, `qwant.com`, `startpage.com`, `naver.com`, `seznam.cz`, `sogou.com`, plus the `google`, `yahoo` and `yandex` brands. Social: `facebook.com`, `fb.com`, `instagram.com`, `twitter.com`, `x.com`, `t.co`, `linkedin.com`, `lnkd.in`, `reddit.com`, `tiktok.com`, `youtube.com`, `youtu.be`, `threads.net`, `mastodon.social`, `bsky.app`, `web.telegram.org`, `t.me`, `wa.me`, `whatsapp.com`, plus the `pinterest` brand. Subdomains of a listed host count.
+4. **`direct`** when there is no usable host (none sent, unparseable, or the site itself), **`referral`** for every other host.
+
+The three brands that run one site per country are matched on the label rather than a fixed suffix: `google.de`, `google.co.uk` and `news.google.com` are search, while `google.evil.com` is not, because the label must be followed by exactly one more label, or by two when the first is a registrar second level (`co`, `com`, `net`, `org`, `ac`, `gov`, `edu`).
+
+Webmail hosts (`mail.google.com`, `mail.yahoo.com`, `outlook.live.com`, `outlook.office.com`, `mail.proton.me`) are `referral`, not `email`. A referrer proves a link was opened in a mail client, never that the mail was the newsletter an `email` bucket would take credit for.
+
+<Callout type="warn">
+**Rows written before this shipped keep the host `source` used to store**, and nothing is backfilled. A Sources tab spanning the upgrade mixes channels and hostnames until the older days age out of the window. A stored value that is not one of the six tokens is shown verbatim.
+</Callout>
+
+The six tokens are what is stored, filtered and put in a URL; the admin renders them through [typed translations](/analytics/i18n), so a Sources tab reads **Search** or **Direct** in the reader's language.
 
 ## Write batching (opt-in)
 

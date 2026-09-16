@@ -87,6 +87,13 @@ export interface AnalyticsQuery {
 	 * others report in their own account timezone. Part of the cache key when set.
 	 */
 	timezone?: string
+	/**
+	 * The scope's goal slugs, set by callers that ask for the `goal` dimension or the
+	 * `conversions` metric. Provider adapters restrict goal rows to it, since nothing in a
+	 * provider marks which of its events are this install's goals; the native engine ignores
+	 * it and matches completions itself. Part of the surfacing cache key when set.
+	 */
+	goalSlugs?: string[]
 }
 
 export interface AnalyticsRow {
@@ -105,9 +112,24 @@ export interface AnalyticsResult {
 		fetchedAt: string
 		/** Served from an expired cache entry because the live refresh failed. */
 		stale?: boolean
+		/**
+		 * Filters the source could not carry, so the rows are wider than the query asked for.
+		 * A provider whose API takes one value per dimension reports the ones it dropped here.
+		 */
+		unappliedFilters?: AnalyticsFilter[]
+		/**
+		 * The read's goal numbers are absent: either it ran without `AnalyticsQuery.goalSlugs`,
+		 * so the source returned no goal rows rather than every event it has, or the provider
+		 * rejected the goal request and the rest of the read was served without it.
+		 */
+		goalsUnresolved?: true
 	}
 }
 
+/**
+ * A read carrying conversions costs a provider up to twice the requests: the goal numbers
+ * come from a second, goal-filtered request the adapter issues after the plain one.
+ */
 export interface RateLimitDescriptor {
 	requestsPerMinute?: number
 	requestsPerHour?: number
@@ -125,7 +147,11 @@ export interface AnalyticsCapabilities {
 	perPageQuery: boolean
 	realtime: boolean
 	realtimeWindowMinutes?: number
-	comparison: boolean
+	/**
+	 * Period-over-period comparison, which the engine serves for every source by reading the
+	 * previous window itself. Adapters omit this; set it false only to opt a source out.
+	 */
+	comparison?: boolean
 	minGranularity: Granularity
 	maxLookbackDays: number | null
 	metrics: ReadonlySet<MetricKey>
@@ -173,7 +199,7 @@ export interface AnalyticsAdapter {
 	readonly id: string
 	readonly label: string
 	readonly capabilities: AnalyticsCapabilities
-	/** Browser-tracker proxying/boot descriptor. Absent when the adapter has no client-side script (GA4). */
+	/** Browser-tracker proxying/boot descriptor. Absent when no public capture field is set. */
 	readonly capture?: CaptureSupport
 	/**
 	 * Where this adapter's own ingest endpoint listens, relative to `routes.api`, for the

@@ -4,6 +4,7 @@ import { type AutoCapture, createAutoCapture } from './autoCapture'
 import { createConsentQueue, readConsent, writeConsent } from './consent'
 import { createScriptLoader } from './loadScript'
 import { createPageTracking } from './pageTracking'
+import { createGa4Sink } from './sinks/ga4'
 import { createNativeSink } from './sinks/native'
 import { createPlausibleSink } from './sinks/plausible'
 import { createPosthogSink } from './sinks/posthog'
@@ -46,6 +47,8 @@ const buildSink = (args: {
 			return createPlausibleSink(vendor)
 		case 'umami':
 			return createUmamiSink(vendor)
+		case 'ga4':
+			return createGa4Sink(vendor)
 	}
 }
 

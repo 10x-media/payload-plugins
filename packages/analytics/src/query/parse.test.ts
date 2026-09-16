@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { SerializedCapabilities } from '../core/capabilities'
-import type { MetricKey } from '../core/contract'
+import { type SerializedCapabilities, serializeCapabilities } from '../core/capabilities'
+import type { AnalyticsCapabilities, MetricKey } from '../core/contract'
 import { addDaysInTz, startOfDayInTz } from '../timeframe/tz'
 import type { QueryErrorCode } from './errors'
 import {
@@ -634,6 +634,26 @@ describe('parseQueryParams, evaluation order', () => {
 
 	it('reports limit before order', () => {
 		expect(err(`${BASE}&limit=0&order=bogus`)).toMatchObject({ param: 'limit' })
+	})
+
+	it('accepts compare=previous for a source whose adapter never declared the capability', () => {
+		const provider: AnalyticsCapabilities = {
+			perPageQuery: false,
+			realtime: false,
+			minGranularity: 'day',
+			maxLookbackDays: 90,
+			metrics: new Set(['pageviews']),
+			dimensions: new Set(['page']),
+			filters: new Set(),
+			filterOperators: new Set(),
+			batchPageReport: false,
+			rateLimit: null,
+			recommendedTtl: { realtime: 300, aggregate: 3600 },
+		}
+		const parsed = ok(`${BASE}&compare=previous`, {
+			capabilities: serializeCapabilities(provider),
+		})
+		expect(parsed.compare).toBe('previous')
 	})
 
 	it('reports order before compare', () => {

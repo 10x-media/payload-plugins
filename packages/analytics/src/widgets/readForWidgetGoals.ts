@@ -1,4 +1,5 @@
 import type { PayloadRequest } from 'payload'
+import { comparisonOf } from '../core/capabilities'
 import type { DateRange } from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
 import {
@@ -11,7 +12,7 @@ import { MAX_QUERY_LIMIT } from '../query/limits'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { conversionRate } from '../view/conversionRate'
-import { previousWindow } from './comparison'
+import { previousWindow, withinLookback } from './comparison'
 import { readForWidget, type WidgetReadStatus } from './readForWidget'
 import { readForWidgetBreakdown } from './readForWidgetBreakdown'
 
@@ -36,6 +37,8 @@ export interface WidgetGoalsResult {
 	siteVisitors?: number
 	clamped?: boolean
 	stale?: boolean
+	/** True when the source could not read the scope's goals, so the empty table means nothing. */
+	goalsUnresolved?: boolean
 }
 
 export interface ReadForWidgetGoalsArgs {
@@ -120,12 +123,21 @@ export const readForWidgetGoals = async (
 	// The sub-reads resolve their own context; pinning the adapter, scope, timezone and
 	// window keeps all three answering about exactly the same read.
 	const shared = { req, timeframe, adapterId: adapter.id, scope: ctx.scope, timezone: tz, now }
+	const previousRange =
+		compare && runtime.comparison && comparisonOf(adapter.capabilities)
+			? previousWindow(dateRange, tz)
+			: null
 	const comparisonRange =
-		compare && runtime.comparison && adapter.capabilities.comparison
-			? (previousWindow(dateRange, tz) ?? undefined)
+		previousRange &&
+		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
+			? previousRange
 			: undefined
 
-	const [breakdown, totals, previous, names] = await Promise.all([
+	// The names are resolved first: their slugs are the hint a provider source restricts its
+	// goal rows to, so both reads below need them before they run.
+	const names = await goalNames(runtime, req, ctx.scope)
+	const goalSlugs = [...names.keys()]
+	const [breakdown, totals, previous] = await Promise.all([
 		readForWidgetBreakdown({
 			...shared,
 			range: dateRange,
@@ -133,6 +145,7 @@ export const readForWidgetGoals = async (
 			dimension: 'goal',
 			limit,
 			extraMetrics: ['revenue', 'visitors'],
+			goalSlugs,
 		}),
 		adapter.capabilities.metrics.has('visitors')
 			? // The site total is a denominator, never a delta: its own previous window would
@@ -146,9 +159,9 @@ export const readForWidgetGoals = async (
 					metric: 'conversions',
 					dimension: 'goal',
 					limit: previousLimit(limit),
+					goalSlugs,
 				})
 			: undefined,
-		goalNames(runtime, req, ctx.scope),
 	])
 	if (breakdown.status !== 'ok') {
 		return { ...fallback(breakdown.status, breakdown.adapterId), dateRange, timezone: tz }
@@ -185,5 +198,6 @@ export const readForWidgetGoals = async (
 		...(siteVisitors !== undefined ? { siteVisitors } : {}),
 		clamped: Boolean(breakdown.clamped || totals?.clamped || previous?.clamped),
 		stale: Boolean(breakdown.stale || totals?.stale || previous?.stale),
+		goalsUnresolved: breakdown.goalsUnresolved === true,
 	}
 }

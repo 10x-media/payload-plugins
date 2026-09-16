@@ -58,10 +58,11 @@ const SEED_AGENTS = [
 ]
 
 /**
- * Raw referrers as a browser sends them: external hosts with their own query strings (which
- * storage strips), one empty value for direct traffic, and one same-site referrer, which
- * contributes no `referrer` row and reads as `Direct`. The `source` channel is derived from
- * the same value rather than stated, so the two dimensions cannot drift apart in the seed.
+ * Raw referrers as a browser sends them: two search engines, a social shortener, an unlisted
+ * host for the referral channel, one empty value for direct traffic, and one same-site
+ * referrer, which contributes no `referrer` row and reads as `direct`. The `source` channel is
+ * classified from the same value rather than stated, so the two dimensions cannot drift apart
+ * in the seed.
  */
 const SEED_REFERRERS = [
 	'https://www.google.com/search?q=payload+analytics',
@@ -74,13 +75,15 @@ const SEED_REFERRERS = [
 
 /**
  * Campaign landings, as the query string the tracker sends on a pageview. Every seventh one
- * carries a campaign, so the campaigns widget ranks two of them against an unattributed
- * majority; 7 shares no factor with the other fixture lists, so a campaign is not pinned to
- * one browser, device or path.
+ * carries a campaign, so the campaigns widget ranks them against an unattributed majority; 7
+ * shares no factor with the other fixture lists, so a campaign is not pinned to one browser,
+ * device or path. The third carries an ad click id instead of a medium, which is what puts a
+ * `paid` row in the sources breakdown.
  */
 const SEED_CAMPAIGN_QUERIES = [
 	'utm_source=newsletter&utm_medium=email&utm_campaign=spring',
 	'utm_source=twitter&utm_medium=social&utm_campaign=launch',
+	'utm_source=google&utm_campaign=brand&gclid=abc',
 ]
 const CAMPAIGN_EVERY = 7
 
@@ -123,18 +126,19 @@ const attributionFor = (index: number): SeedAttribution => {
 	const language = agent ? primaryLanguage(agent.acceptLanguage) : undefined
 	const referrerValue = storedReferrer(referrer)
 	const host = referrerHost(referrer, SEED_HOSTNAME)
+	const utm = extractUtm(query)
 	return {
 		country: geo?.country,
 		region: geo?.region,
 		city: geo?.city,
 		device: SEED_DEVICES[index % SEED_DEVICES.length],
-		source: deriveSource(referrer, SEED_HOSTNAME),
+		source: deriveSource({ referrerHost: host, utmMedium: utm.utmMedium, query }),
 		...(browser ? { browser } : {}),
 		...(os ? { os } : {}),
 		...(language ? { language } : {}),
 		...(referrerValue ? { referrer: referrerValue } : {}),
 		...(host ? { referrerHost: host } : {}),
-		...extractUtm(query),
+		...utm,
 	}
 }
 

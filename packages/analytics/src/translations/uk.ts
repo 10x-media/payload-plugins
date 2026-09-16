@@ -42,6 +42,8 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Рядків',
 	[keys.stateNoBreakdown]: 'Даних поки немає',
 	[keys.stateClamped]: 'Показано максимальний період, який підтримує провайдер',
+	[keys.stateFiltersUnapplied]: 'Деякі фільтри не були застосовані цим джерелом даних',
+	[keys.stateGoalsUnresolved]: 'Не вдалося прочитати цілі з цього джерела даних',
 	[keys.widgetFieldTitle]: 'Заголовок',
 	[keys.widgetFieldMetric]: 'Метрика',
 	[keys.widgetFieldTimeframe]: 'Період',
@@ -96,8 +98,12 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: 'Регіон',
 	[keys.providerFieldDomain]: 'Домен сайту',
 	[keys.providerFieldScriptId]: 'ID скрипта',
+	[keys.providerFieldRevenueCurrency]: 'Валюта доходу',
+	[keys.providerFieldMeasurementId]: 'ID вимірювання',
 	[keys.providerFieldCaptureHelp]:
 		'Публічна конфігурація для браузера. Збір працює, лише якщо її задано.',
+	[keys.providerErrorMeasurementId]:
+		'Використовуйте лише літери, цифри та дефіси, наприклад G-AB12CD34.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',
@@ -193,4 +199,10 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: 'Мова',
 	[keys.viewDimensionEvent]: 'Подія',
 	[keys.viewDimensionGoal]: 'Ціль',
+	[keys.channelDirect]: 'Прямі',
+	[keys.channelSearch]: 'Пошук',
+	[keys.channelSocial]: 'Соцмережі',
+	[keys.channelEmail]: 'Ел. пошта',
+	[keys.channelPaid]: 'Платні',
+	[keys.channelReferral]: 'Переходи',
 }
