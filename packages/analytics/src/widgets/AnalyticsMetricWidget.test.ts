@@ -221,6 +221,65 @@ describe('AnalyticsMetricWidget', () => {
 		expect(html).not.toContain('analytics:viewDimensionCountry')
 	})
 
+	it('says the number is approximate when the read hit the source event scan cap', async () => {
+		const sampling = {
+			...filterableAdapter(['country']),
+			query: () =>
+				Promise.resolve({
+					rows: [],
+					totals: { pageviews: 7 },
+					meta: { provider: 'test', fetchedAt: '2026-06-01T00:00:00.000Z', sampled: true },
+				}),
+		} as unknown as AnalyticsAdapter
+		const { req } = bootFakeRuntime(sampling)
+		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
+		expect(html).toContain('analytics:stateSampled')
+	})
+
+	it('says a conversions total stands on goals the source could not read', async () => {
+		const unresolvedGoals = {
+			...filterableAdapter(['country']),
+			query: () =>
+				Promise.resolve({
+					rows: [],
+					totals: { pageviews: 0 },
+					meta: {
+						provider: 'test',
+						fetchedAt: '2026-06-01T00:00:00.000Z',
+						goalsUnresolved: true,
+					},
+				}),
+		} as unknown as AnalyticsAdapter
+		const { req } = bootFakeRuntime(unresolvedGoals)
+		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
+		expect(html).toContain('analytics:stateGoalsUnresolved')
+	})
+
+	it('says no goals are configured when a conversions total has none behind it', async () => {
+		const base = filterableAdapter(['country'])
+		const goalless = {
+			...base,
+			capabilities: { ...base.capabilities, metrics: new Set(['pageviews', 'conversions']) },
+			query: () =>
+				Promise.resolve({
+					rows: [],
+					totals: { conversions: 0 },
+					meta: { provider: 'test', fetchedAt: '2026-06-01T00:00:00.000Z' },
+				}),
+		} as unknown as AnalyticsAdapter
+		const { req } = bootFakeRuntime(goalless)
+		const html = await renderHtml(req, { metric: 'conversions', timeframe: 'last7days' }, view)
+		expect(html).toContain('analytics:stateNoGoals')
+		expect(html).not.toContain('analytics:stateGoalsUnresolved')
+	})
+
+	it('leaves both notes off a read the source answered in full', async () => {
+		const { req } = bootFakeRuntime(filterableAdapter(['country']))
+		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
+		expect(html).not.toContain('analytics:stateSampled')
+		expect(html).not.toContain('analytics:stateGoalsUnresolved')
+	})
+
 	it('carries the filter into the view link', async () => {
 		const { req } = bootFakeRuntime(filterableAdapter(['country']))
 		const html = await renderHtml(

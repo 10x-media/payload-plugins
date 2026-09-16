@@ -111,7 +111,11 @@ export default async function AnalyticsGoalsWidget(props: WidgetServerProps & Wi
 				// read as "nobody converted".
 				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(keys.stateGoalsUnresolved)}</span>
 			) : result.rows.length === 0 ? (
-				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(keys.stateNoBreakdown)}</span>
+				// A scope that configures no goals has nothing to convert on, which is a setup
+				// step rather than a window in which nobody converted.
+				<span style={{ color: 'var(--theme-elevation-400)' }}>
+					{t(result.noGoals ? keys.stateNoGoals : keys.stateNoBreakdown)}
+				</span>
 			) : (
 				<table style={tableStyle}>
 					<thead>
@@ -177,6 +181,7 @@ export default async function AnalyticsGoalsWidget(props: WidgetServerProps & Wi
 			<span style={captionStyle}>{caption}</span>
 			{result.stale ? <span style={noteStyle}>{t(keys.viewStale)}</span> : null}
 			{result.clamped ? <span style={noteStyle}>{t(keys.stateClamped)}</span> : null}
+			{result.sampled ? <span style={noteStyle}>{t(keys.stateSampled)}</span> : null}
 			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
 		</div>
 	)

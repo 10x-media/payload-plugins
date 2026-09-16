@@ -249,6 +249,34 @@ describe('readForWidgetGoals', () => {
 		expect(result.rows.map((r) => r.name)).toEqual(['newsletter', 'purchase', 'thanks'])
 	})
 
+	// Both goal reads are restricted by the same hint, so a failure that reached only one of
+	// them would leave the previous window sharing a healthy cache key.
+	it('hints both goal reads with the sentinel when the names resolution throws', async () => {
+		const queries: AnalyticsQuery[] = []
+		const req = reqWith(goalsAdapter({ queries }), {
+			resolveGoalsDetailed: async () => {
+				throw new Error('lookup failed')
+			},
+		})
+		const result = await read(req, { compare: true })
+		expect(result.status).toBe('ok')
+		const goalReads = queries.filter((q) => q.dimensions?.includes('goal'))
+		expect(goalReads).toHaveLength(2)
+		expect(goalReads.every((q) => q.goalSlugs === 'unresolved')).toBe(true)
+		expect(result.noGoals).toBe(false)
+	})
+
+	// An install that configured nothing is an empty table with a setup notice, which the
+	// widget cannot tell from "nobody converted" without the flag.
+	it('reports a scope that configures no goals', async () => {
+		const queries: AnalyticsQuery[] = []
+		const result = await read(reqWith(goalsAdapter({ queries }), { goals: [] }))
+		expect(result.status).toBe('ok')
+		expect(result.noGoals).toBe(true)
+		expect(result.goalsUnresolved).toBe(false)
+		expect(queries.find((q) => q.dimensions?.includes('goal'))?.goalSlugs).toEqual([])
+	})
+
 	it('reports unavailable when the source lacks the goal dimension', async () => {
 		const capabilities = caps({ dimensions: new Set() })
 		const result = await read(reqWith(goalsAdapter({ capabilities })))

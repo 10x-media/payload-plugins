@@ -1,21 +1,17 @@
 import type { PayloadRequest } from 'payload'
-import { comparisonOf, satisfiesCapabilities } from '../core/capabilities'
+import { comparisonOf } from '../core/capabilities'
 import type {
-	AnalyticsAdapter,
 	AnalyticsFilter,
 	AnalyticsResult,
 	AnalyticsRow,
 	DateRange,
 	MetricKey,
 } from '../core/contract'
-import { supportsGranularity } from '../core/granularity'
-import { resolveReadContext } from '../core/scopedRead'
-import { goalSlugsFor } from '../plugin/goalHint'
-import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
-import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
+import type { TimeframePreset } from '../timeframe/presets'
 import { addDaysInTz, DEFAULT_TIMEZONE, startOfDayInTz, zonedDayIso } from '../timeframe/tz'
 import { previousWindow, withinLookback } from './comparison'
-import { supportsFilters, type WidgetReadStatus } from './readForWidget'
+import { prepareWidgetRead, type WidgetReadStatus } from './prepareWidgetRead'
+import { readMeta } from './readMeta'
 
 export interface SeriesPoint {
 	date: string
@@ -30,9 +26,17 @@ export interface WidgetSeriesResult {
 	timezone: string
 	points: SeriesPoint[]
 	total: number
+	/** The source that answered, absent on a read that never reached one. */
+	provider?: string
 	clamped?: boolean
+	/** True when the engine served a stale cache entry after a failed provider read. */
+	stale?: boolean
 	/** True when the source answered without one of the filters the read carried. */
 	filtersUnapplied?: boolean
+	/** True when the read hit the source's event scan cap, so the numbers are a floor. */
+	sampled?: boolean
+	/** True when the source could not read the scope's goals, so a conversions series means nothing. */
+	goalsUnresolved?: boolean
 	/** Previous-window headline total, present only when the adapter supports comparison. */
 	previousTotal?: number
 	/** The previous comparable window, present only when comparison ran. */
@@ -123,39 +127,32 @@ export const readForWidgetSeries = async (
 	args: ReadForWidgetSeriesArgs
 ): Promise<WidgetSeriesResult> => {
 	const { req, metric, timeframe, adapterId, now, range, filters, compare } = args
-	const fallback = (status: WidgetReadStatus, id: string): WidgetSeriesResult => ({
-		status,
-		adapterId: id,
-		dateRange: range ?? resolveTimeframe(timeframe, now, args.timezone),
-		timezone: args.timezone ?? DEFAULT_TIMEZONE,
-		points: [],
-		total: 0,
-	})
 
-	const runtime = getRuntime(req.payload)
-	if (!runtime) {
-		return fallback('unavailable', adapterId ?? '')
+	const prepared = await prepareWidgetRead({
+		req,
+		now,
+		timeframe,
+		adapterId,
+		scope: args.scope,
+		timezone: args.timezone,
+		range,
+		filters,
+		requires: { metrics: [metric] },
+		granularity: 'day',
+		goalRead: () => ({ metrics: [metric] }),
+	})
+	if (!prepared.ok) {
+		return {
+			status: prepared.status,
+			adapterId: prepared.adapterId,
+			dateRange: prepared.dateRange,
+			timezone: prepared.tz,
+			points: [],
+			total: 0,
+		}
 	}
-	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
-	if (!ctx.ok) {
-		return fallback('unavailable', adapterId ?? '')
-	}
-	const tz = args.timezone ?? (await resolveTimezoneFor(runtime, req, ctx.scope))
-	const dateRange = range ?? resolveTimeframe(timeframe, now, tz)
+	const { runtime, adapter, tz, dateRange, goalSlugs } = prepared
 	const base = { dateRange, timezone: tz, points: [] as SeriesPoint[], total: 0 }
-	const adapter: AnalyticsAdapter = ctx.adapter
-	if (!adapter.isConfigured()) {
-		return { status: 'not-configured', adapterId: adapter.id, ...base }
-	}
-	if (
-		!satisfiesCapabilities(adapter.capabilities, { metrics: [metric] }) ||
-		!supportsGranularity(adapter.capabilities, 'day')
-	) {
-		return { status: 'unavailable', adapterId: adapter.id, ...base }
-	}
-	if (!supportsFilters(adapter.capabilities, filters)) {
-		return { status: 'filter-unsupported', adapterId: adapter.id, ...base }
-	}
 	const previousRange =
 		runtime.comparison && comparisonOf(adapter.capabilities) ? previousWindow(dateRange, tz) : null
 	const comparisonRange =
@@ -163,12 +160,11 @@ export const readForWidgetSeries = async (
 		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
 			? previousRange
 			: undefined
-	const goalSlugs = await goalSlugsFor({ runtime, req, scope: ctx.scope, metrics: [metric] })
 	const readBase = {
 		metrics: [metric],
 		filters,
 		timezone: tz,
-		scope: ctx.queryScope,
+		scope: prepared.queryScope,
 		...(goalSlugs === undefined ? {} : { goalSlugs }),
 	}
 	let result: AnalyticsResult
@@ -200,8 +196,7 @@ export const readForWidgetSeries = async (
 		timezone: tz,
 		points,
 		total: result.totals?.[metric] ?? 0,
-		clamped: result.meta.clamped ?? false,
-		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
+		...readMeta(result),
 		previousTotal,
 		comparisonRange,
 		...(compare && previous && comparisonRange

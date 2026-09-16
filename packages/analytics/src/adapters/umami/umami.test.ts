@@ -175,6 +175,25 @@ describe('umami adapter', () => {
 			expect(result.meta.goalsUnresolved).toBe(true)
 		})
 
+		it('says so when the goal resolver failed', async () => {
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: 'unresolved' }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		// A website with no goals configured has an empty goal table, not a broken one.
+		it('serves an empty goal breakdown unflagged when the scope configures no goals', async () => {
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: [] }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBeUndefined()
+		})
+
 		// Umami splits an eq. value on commas with no escape, so a slug containing one cannot
 		// be asked for: it is left out of the request and reported rather than widening it.
 		it('drops a slug containing a comma and reports it as unapplied', async () => {
@@ -274,6 +293,18 @@ describe('umami adapter', () => {
 			)
 			expect(result.totals).toEqual({ pageviews: 1000 })
 			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		it('drops conversions unflagged when the scope configures no goals', async () => {
+			server.use(
+				http.get('https://api.umami.is/v1/websites/w/stats', () => HttpResponse.json(STATS))
+			)
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({ metrics: ['pageviews', 'conversions'], goalSlugs: [] }),
+				{}
+			)
+			expect(result.totals).toEqual({ pageviews: 1000 })
+			expect(result.meta.goalsUnresolved).toBeUndefined()
 		})
 
 		// Umami has no per-day event series, so a trend on conversions keeps its headline and

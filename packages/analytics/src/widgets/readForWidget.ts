@@ -1,47 +1,31 @@
 import type { PayloadRequest } from 'payload'
-import { comparisonOf, satisfiesCapabilities } from '../core/capabilities'
-import type {
-	AnalyticsAdapter,
-	AnalyticsCapabilities,
-	AnalyticsFilter,
-	AnalyticsResult,
-	DateRange,
-	MetricKey,
-} from '../core/contract'
-import { resolveReadContext } from '../core/scopedRead'
-import { goalSlugsFor } from '../plugin/goalHint'
-import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
-import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
+import { comparisonOf } from '../core/capabilities'
+import type { AnalyticsFilter, AnalyticsResult, DateRange, MetricKey } from '../core/contract'
+import type { TimeframePreset } from '../timeframe/presets'
 import { previousWindow, withinLookback } from './comparison'
+import { prepareWidgetRead, type WidgetReadStatus } from './prepareWidgetRead'
+import { readMeta } from './readMeta'
 
-export type WidgetReadStatus = 'ok' | 'not-configured' | 'unavailable' | 'filter-unsupported'
-
-/**
- * Whether the serving source can apply every filter the read carries. Answered before the
- * query so a source that cannot filter says so rather than returning site-wide numbers a
- * reader would take for filtered ones.
- */
-export const supportsFilters = (
-	caps: AnalyticsCapabilities,
-	filters?: AnalyticsFilter[]
-): boolean =>
-	!filters ||
-	filters.length === 0 ||
-	satisfiesCapabilities(caps, {
-		filters: filters.map((f) => f.dimension),
-		filterOperators: filters.map((f) => f.operator),
-	})
+export type { WidgetReadStatus } from './prepareWidgetRead'
 
 export interface WidgetReadResult {
 	status: WidgetReadStatus
 	adapterId: string
 	dateRange: DateRange
 	metrics: Partial<Record<MetricKey, number>>
+	/** The source that answered, absent on a read that never reached one. */
+	provider?: string
 	clamped?: boolean
 	/** True when the engine served a stale cache entry after a failed provider read. */
 	stale?: boolean
 	/** True when the source answered without one of the filters the read carried. */
 	filtersUnapplied?: boolean
+	/** True when the read hit the source's event scan cap, so the numbers are a floor. */
+	sampled?: boolean
+	/** True when the source could not read the scope's goals, so a conversions total means nothing. */
+	goalsUnresolved?: boolean
+	/** The read asked about goals and the scope has none configured. */
+	noGoals?: boolean
 	/** Previous-window totals, present only when the adapter supports comparison. */
 	previousMetrics?: Partial<Record<MetricKey, number>>
 	/** The previous comparable window, present only when comparison ran. */
@@ -74,37 +58,29 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 	const { req, metrics, timeframe, adapterId, now, range, filters } = args
 	const emptyMetrics = {} as Partial<Record<MetricKey, number>>
 
-	const runtime = getRuntime(req.payload)
-	if (!runtime) {
+	const prepared = await prepareWidgetRead({
+		req,
+		now,
+		timeframe,
+		adapterId,
+		scope: args.scope,
+		timezone: args.timezone,
+		range,
+		filters,
+		requires: { metrics },
+		goalRead: () => ({ metrics }),
+	})
+	if (!prepared.ok) {
 		return {
-			status: 'unavailable',
-			adapterId: adapterId ?? '',
-			dateRange: range ?? resolveTimeframe(timeframe, now, args.timezone),
+			status: prepared.status,
+			adapterId: prepared.adapterId,
+			dateRange: prepared.dateRange,
 			metrics: emptyMetrics,
 		}
 	}
-	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
-	if (!ctx.ok) {
-		return {
-			status: 'unavailable',
-			adapterId: adapterId ?? '',
-			dateRange: range ?? resolveTimeframe(timeframe, now, args.timezone),
-			metrics: emptyMetrics,
-		}
-	}
-	const tz = args.timezone ?? (await resolveTimezoneFor(runtime, req, ctx.scope))
-	const dateRange = range ?? resolveTimeframe(timeframe, now, tz)
+	const { runtime, adapter, tz, dateRange } = prepared
 	const base = { dateRange, metrics: emptyMetrics }
-	const adapter: AnalyticsAdapter = ctx.adapter
-	if (!adapter.isConfigured()) {
-		return { status: 'not-configured', adapterId: adapter.id, ...base }
-	}
-	if (!satisfiesCapabilities(adapter.capabilities, { metrics })) {
-		return { status: 'unavailable', adapterId: adapter.id, ...base }
-	}
-	if (!supportsFilters(adapter.capabilities, filters)) {
-		return { status: 'filter-unsupported', adapterId: adapter.id, ...base }
-	}
+
 	const previousRange =
 		args.comparison !== false && runtime.comparison && comparisonOf(adapter.capabilities)
 			? previousWindow(dateRange, tz)
@@ -114,13 +90,12 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
 			? previousRange
 			: undefined
-	const goalSlugs = await goalSlugsFor({ runtime, req, scope: ctx.scope, metrics })
 	const readBase = {
 		metrics,
 		filters,
 		timezone: tz,
-		scope: ctx.queryScope,
-		...(goalSlugs === undefined ? {} : { goalSlugs }),
+		scope: prepared.queryScope,
+		...(prepared.goalSlugs === undefined ? {} : { goalSlugs: prepared.goalSlugs }),
 	}
 	let result: AnalyticsResult
 	let previous: AnalyticsResult | undefined
@@ -142,9 +117,8 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		adapterId: adapter.id,
 		dateRange,
 		metrics: result.totals ?? {},
-		clamped: result.meta.clamped ?? false,
-		stale: result.meta.stale ?? false,
-		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
+		...readMeta(result),
+		noGoals: Array.isArray(prepared.goalSlugs) && prepared.goalSlugs.length === 0,
 		previousMetrics,
 		comparisonRange,
 	}

@@ -12,9 +12,10 @@ import type {
 } from '../../core/contract'
 import { DEFAULT_TIMEZONE, zonedCalendarDay } from '../../timeframe/tz'
 import {
+	emptyGoalBreakdown,
 	type GoalKeyedRow,
 	goalHint,
-	goalsUnresolvedResult,
+	hintSlugs,
 	mergeGoalRows,
 	providerMetricKeys,
 	readGoalPair,
@@ -212,8 +213,10 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 			const dims = (q.dimensions ?? []).filter((d) => DIMENSION_MAP[d])
 			const goalBreakdown = dims.includes('goal')
 			const hint = goalHint(q)
-			if (goalBreakdown && !hint) {
-				return goalsUnresolvedResult('plausible', q)
+			const slugs = hintSlugs(hint)
+			const empty = goalBreakdown ? emptyGoalBreakdown({ provider: 'plausible', q, hint }) : null
+			if (empty) {
+				return empty
 			}
 			const wanted = q.metrics.filter((m) => METRIC_MAP[m] && (revenueGoals || m !== 'revenue'))
 			const { siteMetrics, goalMetrics, unresolved } = splitGoalMetrics({
@@ -243,8 +246,8 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 				}
 				filters.push([OPERATOR_MAP[filter.operator], mapped, [filter.value]])
 			}
-			const goalFilters: Array<[string, string, string[]]> = hint
-				? [...filters, ['is', 'event:goal', hint]]
+			const goalFilters: Array<[string, string, string[]]> = slugs
+				? [...filters, ['is', 'event:goal', slugs]]
 				: filters
 			const siteFilters = goalBreakdown ? goalFilters : filters
 			// Set when the provider rejects a goal request the site request survived, so the

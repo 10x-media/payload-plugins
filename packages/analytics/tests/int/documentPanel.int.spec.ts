@@ -82,6 +82,16 @@ describeForDb('document analytics endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(res.status).toBe(401)
 	})
 
+	// The numbers are the caller's own document's, so no shared cache may hold them.
+	it(`never lets a shared cache hold a reading on ${db}`, async () => {
+		const res = await call(
+			`collection=pages&id=${pageId}&timeframe=last7days&metrics=pageviews`,
+			fakeUser
+		)
+		expect(res.status).toBe(200)
+		expect(res.headers.get('cache-control')).toBe('private, no-store')
+	})
+
 	it(`returns 404 for an unbound collection on ${db}`, async () => {
 		const res = await call(`collection=users&id=${pageId}`, fakeUser)
 		expect(res.status).toBe(404)

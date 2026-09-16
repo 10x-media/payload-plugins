@@ -2,7 +2,8 @@ import type { PayloadRequest } from 'payload'
 import type { DimensionKey, MetricKey } from '../core/contract'
 import { type AnalyticsRuntime, resolveGoalsFor } from './runtime'
 
-interface GoalRead {
+/** What a read asks for, which is all the hint needs to know whether goals are involved. */
+export interface GoalRead {
 	metrics: MetricKey[]
 	dimensions?: DimensionKey[]
 }
@@ -20,10 +21,14 @@ export const needsGoalHint = (read: GoalRead): boolean =>
 
 /**
  * The scope's goal slugs for a read that asks about goals, and undefined for every other
- * read, which no adapter restricts. A resolver that throws costs the read its goal rows
- * (the provider answers `goalsUnresolved`), never the read itself.
+ * read, which no adapter restricts. An empty list is an install with no goals, which reads
+ * as an empty result; a resolver that throws hints `'unresolved'` instead, so the read
+ * costs only its goal rows (the provider answers `goalsUnresolved`) and is neither cached
+ * as a healthy answer nor mistaken for an install that configured nothing.
  */
-export const goalSlugsFor = async (args: GoalSlugsArgs): Promise<string[] | undefined> => {
+export const goalSlugsFor = async (
+	args: GoalSlugsArgs
+): Promise<string[] | 'unresolved' | undefined> => {
 	if (!needsGoalHint(args)) {
 		return undefined
 	}
@@ -32,6 +37,6 @@ export const goalSlugsFor = async (args: GoalSlugsArgs): Promise<string[] | unde
 		return goals.map((goal) => goal.slug)
 	} catch (err) {
 		args.req.payload.logger?.warn(`analytics: goal slugs failed to resolve: ${String(err)}`)
-		return []
+		return 'unresolved'
 	}
 }
