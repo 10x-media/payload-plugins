@@ -112,6 +112,17 @@ test('the analytics view reads seeded traffic, filters from the URL and keeps hi
 	await expect(tab(page, 'Pages')).toHaveAttribute('aria-selected', 'true')
 })
 
+test('the sources tab ranks referrer hosts and never the site itself', async ({ page }) => {
+	await login(page, PLATFORM)
+	await page.goto('/admin/analytics?tab=sources')
+
+	// Native serves `referrer`, which the sources tab reads ahead of the `source` channel.
+	// The seed's same-site referrer is deliberately absent: a site is not its own referrer.
+	const breakdown = page.locator('.analytics-view__breakdown')
+	await expect(breakdown.getByText('google.com', { exact: true })).toBeVisible()
+	await expect(breakdown).not.toContainText('localhost')
+})
+
 test('@tenancy the view reports the selected tenant and never another one', async ({
 	browser,
 	baseURL,

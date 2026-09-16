@@ -53,7 +53,7 @@ const conversionsIn = async (row: Locator): Promise<number> => {
 	return Number.parseInt(leading.replace(/[^0-9]/g, ''), 10)
 }
 
-test('the dashboard renders the goals, events and referrers widgets', async ({ page }) => {
+test('the dashboard renders the goals, events and native dimension widgets', async ({ page }) => {
 	await login(page, PLATFORM)
 	await page.goto('/admin')
 
@@ -69,12 +69,22 @@ test('the dashboard renders the goals, events and referrers widgets', async ({ p
 	await expect(events).toBeVisible()
 	await expect(events.locator('.analytics-bars__row').first()).toBeVisible()
 
-	// The native engine serves no `referrer` dimension, so the widget registers (runtime
-	// providers keep the install open-world) and degrades rather than rendering rows.
+	// Native classifies the referrer host, the browser and the campaign at ingest, so all
+	// three widgets rank real rows on a native-only install rather than degrading.
 	const referrers = breakdownWidget(page, 'Top referrers')
 	await expect(referrers).toBeVisible()
-	await expect(referrers).toContainText('Not available for this data source')
 	await expect(referrers.locator('a.analytics-widget__link')).toBeVisible()
+	const referrerRows = await barRows(referrers)
+	expect(referrerRows.size).toBeGreaterThan(0)
+	expect(referrerRows.has('localhost'), 'a same-site referrer is never a referrer row').toBe(false)
+
+	const browsers = breakdownWidget(page, 'Browsers')
+	await expect(browsers).toBeVisible()
+	expect([...(await barRows(browsers)).keys()]).toContain('chrome')
+
+	const campaigns = breakdownWidget(page, 'Campaigns')
+	await expect(campaigns).toBeVisible()
+	expect([...(await barRows(campaigns)).keys()]).toContain('spring')
 
 	// The seed layout ticks Compare on one trend widget, which is what draws the legend.
 	const legend = page.locator('.analytics-chart__legend').first()
@@ -120,6 +130,26 @@ test('a filtered widget ranks only matching rows and says so', async ({ page }) 
 		expect(total, `"${label}" is one of the pages the unfiltered widget ranks`).toBeDefined()
 		// One country's share of a path, so strictly fewer than every country's.
 		expect(value).toBeLessThan(total ?? 0)
+	}
+})
+
+test('a browser filter narrows a widget on the native engine', async ({ page }) => {
+	await login(page, PLATFORM)
+	await page.goto('/admin')
+
+	// `browser` is classified at ingest and filtered through the raw-event path, so this is
+	// the filter surface on a derived dimension rather than on a geo one.
+	const all = breakdownTitled(page, 'Top pages')
+	const filtered = breakdownTitled(page, 'Top pages in Chrome')
+	await expect(filtered).toBeVisible()
+	await expect(filtered).toContainText('Last 30 days where Browser is chrome')
+
+	const unfiltered = await barRows(all)
+	const matching = await barRows(filtered)
+	expect(matching.size).toBeGreaterThan(0)
+	for (const [label, value] of matching) {
+		expect(unfiltered.get(label), `"${label}" is a page the unfiltered widget ranks`).toBeDefined()
+		expect(value).toBeLessThan(unfiltered.get(label) ?? 0)
 	}
 })
 
@@ -177,5 +207,58 @@ test('@tenancy the goals widget and its deep link stay on the selected tenant', 
 	const breakdown = page.locator('.analytics-view__breakdown')
 	await expect(breakdown.getByText('alpha-newsletter', { exact: true })).toBeVisible()
 	await expect(breakdown).not.toContainText('beta-quote')
+	await context.close()
+})
+
+test('@tenancy the native dimension widgets rank rows for the selected tenant', async ({
+	browser,
+	baseURL,
+}) => {
+	const port = new URL(baseURL ?? 'http://localhost:3100').port
+	const origin = `http://alpha.localhost:${port}`
+
+	const context = await browser.newContext()
+	const page = await context.newPage()
+	await login(page, PLATFORM, origin)
+
+	const tenantsRes = await page.request.get(`${origin}/api/tenants?depth=0&limit=10`)
+	expect(tenantsRes.ok()).toBeTruthy()
+	const { docs: tenants } = (await tenantsRes.json()) as {
+		docs: Array<{ id: string | number; slug: string }>
+	}
+	const alphaId = tenants.find((t) => t.slug === 'alpha')?.id
+	expect(alphaId, 'tenant "alpha" seeded').toBeDefined()
+	await context.addCookies([{ name: 'payload-tenant', value: String(alphaId), url: origin }])
+	await page.goto(`${origin}/admin`)
+
+	const referrers = breakdownWidget(page, 'Top referrers')
+	await expect(referrers).toBeVisible()
+	const referrerRows = await barRows(referrers)
+	expect(referrerRows.size).toBeGreaterThan(0)
+	expect(referrerRows.has('localhost'), 'a same-site referrer is never a referrer row').toBe(false)
+
+	const browsers = breakdownWidget(page, 'Browsers')
+	await expect(browsers).toBeVisible()
+	expect([...(await barRows(browsers)).keys()]).toContain('chrome')
+
+	const campaigns = breakdownWidget(page, 'Campaigns')
+	await expect(campaigns).toBeVisible()
+	expect([...(await barRows(campaigns)).keys()]).toContain('spring')
+
+	const filtered = breakdownTitled(page, 'Top pages in Chrome')
+	await expect(filtered).toContainText('Last 30 days where Browser is chrome')
+	const scopedRows = await barRows(filtered)
+	expect(scopedRows.size).toBeGreaterThan(0)
+	const unfiltered = await barRows(breakdownTitled(page, 'Top pages'))
+	for (const [label, value] of scopedRows) {
+		expect(value).toBeLessThan(unfiltered.get(label) ?? 0)
+	}
+
+	// The view reads the same dimension the referrers widget does, on this tenant's scope.
+	await page.goto(`${origin}/admin/analytics?tab=sources`)
+	const breakdown = page.locator('.analytics-view__breakdown')
+	await expect(breakdown).toBeVisible()
+	await expect(breakdown.getByText('google.com', { exact: true })).toBeVisible()
+	await expect(breakdown).not.toContainText('localhost')
 	await context.close()
 })
