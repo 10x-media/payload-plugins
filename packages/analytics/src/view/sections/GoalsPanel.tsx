@@ -1,7 +1,7 @@
 'use client'
 
 import { formatMetricValue } from '../../fields/format'
-import type { QueryResponse } from '../../query/response'
+import { askedAboutNoGoals, type QueryResponse } from '../../query/response'
 import { keys } from '../../translations/keys'
 import { METRIC_KEYS } from '../../translations/metricKeys'
 import { useTranslation } from '../../translations/useTranslation'
@@ -52,7 +52,11 @@ export function GoalsPanel({ query, goals, siteVisitors, locale }: GoalsPanelPro
 				// read as "nobody converted".
 				<SectionEmpty label={keys.stateGoalsUnresolved} />
 			) : rows.length === 0 ? (
-				<SectionEmpty label={keys.stateNoBreakdown} />
+				// A scope that configures no goals has nothing to convert on, which is a setup
+				// step rather than a window in which nobody converted.
+				<SectionEmpty
+					label={askedAboutNoGoals(query.data.query) ? keys.stateNoGoals : keys.stateNoBreakdown}
+				/>
 			) : (
 				<div className="analytics-view__scroll">
 					<table className="analytics-view__table">

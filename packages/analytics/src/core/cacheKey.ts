@@ -20,11 +20,12 @@ const rangeKey = (range: AnalyticsQuery['dateRange'], tz: string): string => {
 
 /**
  * The goal segment, absent for a read with no hint and for an install with no goals, which
- * both ask the provider for the same rows.
+ * both ask the provider for the same rows. The failed-resolver segment carries a `!`, which
+ * `GOAL_SLUG_PATTERN` forbids, so no list of slugs can be written to look like it.
  */
 const goalKey = (goalSlugs: AnalyticsQuery['goalSlugs']): string[] => {
 	if (goalSlugs === 'unresolved') {
-		return ['goals:unresolved']
+		return ['goals:!unresolved']
 	}
 	return goalSlugs?.length ? [`goals:${stable(goalSlugs)}`] : []
 }

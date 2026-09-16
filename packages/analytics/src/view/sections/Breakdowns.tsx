@@ -5,8 +5,8 @@ import { type KeyboardEvent, useRef } from 'react'
 import { BarList } from '../../charts/BarList'
 import type { DimensionKey, MetricKey } from '../../core/contract'
 import { formatMetricValue } from '../../fields/format'
-import type { QueryResponse } from '../../query/response'
-import { keys } from '../../translations/keys'
+import { askedAboutNoGoals, type QueryResponse } from '../../query/response'
+import { keys, type TranslationKey } from '../../translations/keys'
 import { METRIC_KEYS } from '../../translations/metricKeys'
 import { useTranslation } from '../../translations/useTranslation'
 import type { BreakdownTab } from '../gating'
@@ -76,12 +76,15 @@ export function Breakdowns({
 	// Only the native source buckets `source` into channels; a provider serves a raw utm_source
 	// under the same name, so the label formatter needs to know which answered.
 	const provider = query.data?.result.meta.provider ?? ''
-	// A goal breakdown the source could not resolve has no rows, which the plain empty state
-	// would read as "nobody converted".
-	const emptyLabel =
-		dimension === 'goal' && query.data?.result.meta.goalsUnresolved === true
-			? keys.stateGoalsUnresolved
-			: keys.stateNoBreakdown
+	// A goal breakdown has two empty states of its own the plain one would read as "nobody
+	// converted": the source could not answer about the goals, and the scope configures none.
+	const goalEmptyLabel = (): TranslationKey => {
+		if (query.data?.result.meta.goalsUnresolved === true) {
+			return keys.stateGoalsUnresolved
+		}
+		return askedAboutNoGoals(query.data?.query) ? keys.stateNoGoals : keys.stateNoBreakdown
+	}
+	const emptyLabel = dimension === 'goal' ? goalEmptyLabel() : keys.stateNoBreakdown
 	// The read kept on screen through a refetch answers the grouping that was asked for when
 	// it was issued, so switching tab or dimension leaves rows that carry no value for the one
 	// now selected. They are not this breakdown's rows: showing them would be a run of

@@ -45,6 +45,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.stateClamped]: 'Zeigt den maximalen Zeitraum des Anbieters',
 	[keys.stateFiltersUnapplied]: 'Einige Filter wurden von dieser Datenquelle nicht angewendet',
 	[keys.stateGoalsUnresolved]: 'Ziele konnten aus dieser Datenquelle nicht gelesen werden',
+	[keys.stateNoGoals]: 'Für diesen Bereich sind keine Ziele konfiguriert',
 	[keys.stateSampled]: 'Zahlen sind ungefähr: Die Abfrage hat das Ereignislimit erreicht',
 	[keys.widgetFieldTitle]: 'Titel',
 	[keys.widgetFieldMetric]: 'Kennzahl',

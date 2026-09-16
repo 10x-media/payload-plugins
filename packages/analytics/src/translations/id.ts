@@ -44,6 +44,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.stateClamped]: 'Menampilkan rentang maksimum yang didukung penyedia',
 	[keys.stateFiltersUnapplied]: 'Beberapa filter tidak diterapkan oleh sumber data ini',
 	[keys.stateGoalsUnresolved]: 'Sasaran tidak dapat dibaca dari sumber data ini',
+	[keys.stateNoGoals]: 'Tidak ada sasaran yang dikonfigurasi untuk cakupan ini',
 	[keys.stateSampled]: 'Angka bersifat perkiraan: pembacaan mencapai batas peristiwa',
 	[keys.widgetFieldTitle]: 'Judul',
 	[keys.widgetFieldMetric]: 'Metrik',

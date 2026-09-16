@@ -45,6 +45,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.stateFiltersUnapplied]:
 		'Certains filtres n’ont pas été appliqués par cette source de données',
 	[keys.stateGoalsUnresolved]: 'Impossible de lire les objectifs depuis cette source de données',
+	[keys.stateNoGoals]: 'Aucun objectif n’est configuré pour cette portée',
 	[keys.stateSampled]:
 		'Les chiffres sont approximatifs : la lecture a atteint la limite d’événements',
 	[keys.widgetFieldTitle]: 'Titre',

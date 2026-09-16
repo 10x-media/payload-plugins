@@ -223,5 +223,13 @@ describe('AnalyticsGoalsWidget', () => {
 		const html = await render()
 		expect(html).toContain('analytics:stateNoBreakdown')
 		expect(html).not.toContain('analytics:stateGoalsUnresolved')
+		expect(html).not.toContain('analytics:stateNoGoals')
+	})
+
+	it('says the scope configures no goals rather than that nobody converted', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(result({ rows: [], noGoals: true }))
+		const html = await render()
+		expect(html).toContain('analytics:stateNoGoals')
+		expect(html).not.toContain('analytics:stateNoBreakdown')
 	})
 })
