@@ -111,7 +111,7 @@ A dimension or operator the contract does not define (a hand-edited layout, a wi
 **`contains` differs by database on the native engine.** It is case-insensitive on both, but on Postgres the value is a raw `ILIKE` pattern, so `%` and `_` in it act as wildcards; on Mongo the value is regex-escaped first and matches literally. Keep filter values free of `%` and `_` if the same widget has to read the same way on either database.
 </Callout>
 
-Both selects are narrowed live by the same `GET /api/analytics/sources` endpoint the data source and metric pickers use: they offer only the dimensions the widget's chosen source declares as filterable and only the operators it declares, in the plugin's own contract order rather than the source's. A stored value the current source no longer offers stays visible and clearable rather than vanishing. While the endpoint is in flight neither select shows a notice, so a slow request never reads as "this source cannot filter"; a source that settles with nothing filterable says so next to the field's description, and a failed request says that instead.
+Both selects are narrowed live by the same `GET /api/analytics/sources` endpoint the data source and metric pickers use: they offer only the dimensions the widget's chosen source declares as filterable and only the operators it declares, in the plugin's own contract order rather than the source's. A stored value the current source no longer offers stays visible rather than vanishing; the dimension can then be cleared, while the operator, which always has a value, cannot. While the endpoint is in flight neither select shows a notice, so a slow request never reads as "this source cannot filter"; a source that settles with nothing filterable says so below the select, and a failed request says that instead.
 
 <Callout type="warn">
 **With no data source chosen, the pickers offer the union of the request's sources.** On a single-provider install, or on any widget left on the default source, there is no one source to narrow against, so the lists are the union across every source that request can reach. A dimension only one source can filter is then offered next to an operator only another declares, and the pair they make is one no single source can serve. That is caught at read time, as the unsupported state below, rather than by hiding options the widget's eventual source may well support.
@@ -216,10 +216,10 @@ Run `payload generate:importmap` after registering. The widget appears only when
 
 ### Filtering a custom widget
 
-Every read helper takes `filters?: AnalyticsFilter[]`, and answers `status: 'filter-unsupported'` when the source that would serve the read cannot apply one of them. The check runs before the query, so an unsupported filter costs no provider call, and it is distinct from `'unavailable'`: the metric or dimension is fine, the filter is not. Handle it, or your widget claims a slice it did not read.
+`readForWidget`, `readForWidgetBreakdown` and `readForWidgetSeries` take `filters?: AnalyticsFilter[]`, and answer `status: 'filter-unsupported'` when the source that would serve the read cannot apply one of them. The check runs before the query, so an unsupported filter costs no provider call, and it is distinct from `'unavailable'`: the metric or dimension is fine, the filter is not. Handle it, or your widget claims a slice it did not read. `readForWidgetGoals` and `readForWidgetRealtime` take no filters and never answer it.
 
 ```tsx title="components/GermanPagesWidget.tsx"
-import type { AnalyticsFilter } from '@10x-media/analytics/rsc'
+import { type AnalyticsFilter, readForWidgetBreakdown } from '@10x-media/analytics/rsc'
 
 const filters: AnalyticsFilter[] = [{ dimension: 'country', operator: 'eq', value: 'DE' }]
 
@@ -245,7 +245,7 @@ const data = (props.widgetData ?? {}) as { filter?: WidgetFilter }
 const result = await readForWidgetBreakdown({ /* ... */ filters: widgetFilters(data) })
 ```
 
-The two pickers are public as well: `FilterDimensionSelectField` and `FilterOperatorSelectField` from `@10x-media/analytics/client` are the same live, source-narrowed selects the built-ins use, and `useFilterCapabilities` is the hook behind them for a bespoke one. Like `MetricSelectField`, each narrows against a sibling source field named `dataSource`; pass `sourceFieldPath` when yours is named something else.
+The two pickers are public as well: `FilterDimensionSelectField` and `FilterOperatorSelectField` from `@10x-media/analytics/client` are the same live, source-narrowed selects the built-ins use, and `useFilterCapabilities` is the hook behind them for a bespoke one. Like `MetricSelectField`, each narrows against the widget's top-level `dataSource` form path; pass `sourceFieldPath`, which is a full form path rather than a relative sibling name, when your source field sits elsewhere.
 
 ### Reading more than one metric at a time
 
