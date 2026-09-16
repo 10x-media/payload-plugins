@@ -1,5 +1,5 @@
 import type { PayloadRequest } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -137,11 +137,48 @@ describe('readForWidgetBreakdown', () => {
 		expect(received?.filters).toEqual([{ dimension: 'country', operator: 'eq', value: 'US' }])
 	})
 
-	it('returns unavailable when the adapter lacks the filter dimension', async () => {
+	it('answers filter-unsupported, without querying, when the adapter lacks the dimension', async () => {
+		const adapter = breakdownAdapter()
+		const spy = vi.spyOn(adapter, 'query')
 		const result = await readForWidgetBreakdown({
-			req: reqWith([breakdownAdapter()]),
+			req: reqWith([adapter]),
 			metric: 'pageviews',
 			dimension: 'source',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+			filters: [{ dimension: 'country', operator: 'eq', value: 'US' }],
+		})
+		expect(result.status).toBe('filter-unsupported')
+		expect(spy).not.toHaveBeenCalled()
+	})
+
+	it('answers filter-unsupported when the operator is the part the adapter lacks', async () => {
+		const adapter = breakdownAdapter({
+			capabilities: { ...caps(), filters: new Set(['country']) },
+		})
+		const spy = vi.spyOn(adapter, 'query')
+		const result = await readForWidgetBreakdown({
+			req: reqWith([adapter]),
+			metric: 'pageviews',
+			dimension: 'source',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+			// caps() declares 'eq' alone.
+			filters: [{ dimension: 'country', operator: 'contains', value: 'US' }],
+		})
+		expect(result.status).toBe('filter-unsupported')
+		expect(spy).not.toHaveBeenCalled()
+	})
+
+	it('still answers unavailable when the breakdown dimension itself is unsupported', async () => {
+		const result = await readForWidgetBreakdown({
+			req: reqWith([
+				breakdownAdapter({ capabilities: { ...caps(), filters: new Set(['country']) } }),
+			]),
+			metric: 'pageviews',
+			dimension: 'browser',
 			timeframe: 'last30days',
 			limit: 5,
 			now: NOW,

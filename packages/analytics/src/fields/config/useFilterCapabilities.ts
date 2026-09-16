@@ -20,6 +20,11 @@ export interface FilterCapabilities {
 	loading: boolean
 	/** The source list could not be fetched, so an empty offer is not a verdict. */
 	error: boolean
+	/**
+	 * A source list actually answered. False covers both the pending fetch and the window
+	 * before there is a user to fetch for, where nothing offered is not yet a verdict.
+	 */
+	resolved: boolean
 }
 
 const EMPTY: Pick<FilterCapabilities, 'dimensions' | 'operators'> = {
@@ -63,5 +68,5 @@ export const useFilterCapabilities = (dataSourcePath = 'dataSource'): FilterCapa
 		() => deriveFilterCapabilities({ sourceId, sources }),
 		[sourceId, sources]
 	)
-	return { dimensions, error, loading, operators }
+	return { dimensions, error, loading, operators, resolved: sources !== null }
 }

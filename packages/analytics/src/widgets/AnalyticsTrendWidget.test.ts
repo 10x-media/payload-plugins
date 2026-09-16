@@ -7,10 +7,13 @@ import type {
 	AnalyticsCapabilities,
 	AnalyticsQuery,
 	AnalyticsResult,
+	DimensionKey,
 } from '../core/contract'
 import { createRegistry } from '../core/registry'
 import { setRuntime } from '../plugin/runtime'
 import { resolveTimeframe } from '../timeframe/presets'
+import { en } from '../translations/en'
+import { keys } from '../translations/keys'
 import AnalyticsTrendWidget from './AnalyticsTrendWidget'
 import { previousWindow } from './comparison'
 import { formatRangeCaption } from './range'
@@ -130,5 +133,101 @@ describe('AnalyticsTrendWidget view link', () => {
 	it('renders no link when the app turned the view off', async () => {
 		const html = await renderWidget({ metric: 'pageviews', timeframe: 'last7days' }, false)
 		expect(html).not.toContain('analytics-widget__link')
+	})
+})
+
+/**
+ * Every key stands in for itself, except the caption sentence, which comes from the real
+ * bundle so the assertion sees the same `{{vars}}` pass Payload's own `t` makes.
+ */
+const fakeT = (key: string, vars?: Record<string, string | number>): string =>
+	(key === keys.widgetFilterCaption ? en[keys.widgetFilterCaption] : key).replace(
+		/\{\{(.*?)\}\}/g,
+		(match, name: string) => {
+			const value = vars?.[name.trim()]
+			return value === undefined ? match : String(value)
+		}
+	)
+
+const filterableReq = (filters: DimensionKey[]): PayloadRequest => {
+	const filtering: AnalyticsAdapter = {
+		...adapter,
+		capabilities: { ...capabilities, filters: new Set(filters) },
+	}
+	const payload = {
+		config: { routes: { admin: '/admin' } },
+	} as unknown as PayloadRequest['payload']
+	setRuntime(payload, {
+		registry: createRegistry([filtering]),
+		configAdapterIds: new Set(['native']),
+		bindings: {},
+		engine: { read: async (a, query) => a.query(query, {}) },
+		ttl: { aggregate: 3600, realtime: 300 },
+		comparison: false,
+	})
+	return { payload, i18n: { t: fakeT, language: 'en' } } as unknown as PayloadRequest
+}
+
+const renderFiltered = async (
+	filters: DimensionKey[],
+	widgetData: MetricWidgetData,
+	view?: WidgetView
+): Promise<string> =>
+	renderToStaticMarkup(
+		await AnalyticsTrendWidget({
+			req: filterableReq(filters),
+			widgetData,
+			view,
+		} as unknown as WidgetServerProps)
+	)
+
+describe('AnalyticsTrendWidget filter', () => {
+	const view = {
+		path: '/analytics',
+		defaultRange: 'last30days',
+		defaultMetric: 'pageviews',
+	} as const
+
+	it('appends the filter sentence to the caption', async () => {
+		const html = await renderFiltered(['page'], {
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			filter: { dimension: 'page', operator: 'eq', value: '/blog' },
+		})
+		expect(html).toContain(
+			'analytics:timeframeLast7Days where analytics:viewDimensionPage analytics:filterOperatorEq /blog'
+		)
+	})
+
+	it('says the source cannot apply the filter instead of charting an unfiltered series', async () => {
+		const html = await renderFiltered(
+			[],
+			{
+				metric: 'pageviews',
+				timeframe: 'last7days',
+				filter: { dimension: 'page', operator: 'eq', value: '/blog' },
+			},
+			view
+		)
+		expect(html).toContain('analytics:stateFilterUnsupported')
+		expect(html).not.toContain('analytics-chart')
+	})
+
+	it('carries the filter into the view link, even where the source cannot apply it', async () => {
+		for (const filters of [['page'] as DimensionKey[], [] as DimensionKey[]]) {
+			const html = await renderFiltered(
+				filters,
+				{
+					metric: 'pageviews',
+					timeframe: 'last7days',
+					filter: { dimension: 'page', operator: 'eq', value: '/blog' },
+				},
+				view
+			)
+			const carried = new URLSearchParams(hrefIn(html)?.split('?')[1] ?? '').get('filters')
+			expect(carried && JSON.parse(carried)).toEqual([
+				{ dimension: 'page', operator: 'eq', value: '/blog' },
+			])
+		}
 	})
 })

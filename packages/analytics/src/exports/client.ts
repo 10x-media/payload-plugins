@@ -13,7 +13,10 @@ export {
 export type { WireSource } from '../fields/config/fetchSources'
 export { MetricSelectField, type MetricSelectFieldProps } from '../fields/config/MetricSelectField'
 export { SourceSelectField } from '../fields/config/SourceSelectField'
-export { useAnalyticsSources } from '../fields/config/useAnalyticsSources'
+export {
+	type AnalyticsSources,
+	useAnalyticsSources,
+} from '../fields/config/useAnalyticsSources'
 export {
 	type FilterCapabilities,
 	useFilterCapabilities,

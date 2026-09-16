@@ -38,7 +38,7 @@ const asDimension = (value: string): DimensionKey | undefined =>
 const FilterDimensionSelectFieldComponent = (props: FilterDimensionSelectFieldProps) => {
 	const { field, path: pathFromProps, readOnly, sourceFieldPath } = props
 	const { t } = useTranslation()
-	const { dimensions, error, loading } = useFilterCapabilities(sourceFieldPath)
+	const { dimensions, error, resolved } = useFilterCapabilities(sourceFieldPath)
 	const {
 		customComponents: { AfterInput, BeforeInput, Description, Error: ErrorComponent, Label } = {},
 		disabled,
@@ -58,7 +58,7 @@ const FilterDimensionSelectFieldComponent = (props: FilterDimensionSelectFieldPr
 
 	const notice = error
 		? t(keys.fieldFilterError)
-		: !loading && dimensions.length === 0
+		: resolved && dimensions.length === 0
 			? t(keys.fieldFilterEmpty)
 			: null
 

@@ -268,6 +268,16 @@ describe('FilterDimensionSelectField', () => {
 		expect(screen.queryByText(keys.fieldFilterEmpty)).toBeNull()
 	})
 
+	it('stays quiet while there is no user to fetch the sources for', () => {
+		answer(twoSources)
+		mocks.userId = ''
+
+		render(<FilterDimensionSelectField {...props()} />)
+
+		expect(screen.queryByText(keys.fieldFilterEmpty)).toBeNull()
+		expect(screen.queryByText(keys.fieldFilterError)).toBeNull()
+	})
+
 	it('renders a notice alongside the configured description rather than in place of it', async () => {
 		answer({ defaultId: 'flat', sources: [source('flat', { filters: [] })] })
 		mocks.sourceId = 'flat'

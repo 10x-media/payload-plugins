@@ -36,7 +36,7 @@ const asOperator = (value: string): FilterOperator | undefined =>
 const FilterOperatorSelectFieldComponent = (props: FilterOperatorSelectFieldProps) => {
 	const { field, path: pathFromProps, readOnly, sourceFieldPath } = props
 	const { t } = useTranslation()
-	const { error, loading, operators } = useFilterCapabilities(sourceFieldPath)
+	const { error, operators, resolved } = useFilterCapabilities(sourceFieldPath)
 	const {
 		customComponents: { AfterInput, BeforeInput, Description, Error: ErrorComponent, Label } = {},
 		disabled,
@@ -56,7 +56,7 @@ const FilterOperatorSelectFieldComponent = (props: FilterOperatorSelectFieldProp
 
 	const notice = error
 		? t(keys.fieldFilterError)
-		: !loading && operators.length === 0
+		: resolved && operators.length === 0
 			? t(keys.fieldFilterEmpty)
 			: null
 

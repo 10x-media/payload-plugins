@@ -16,9 +16,12 @@ import { type GoalsWidgetData, resolveGoalRowLimit } from './types'
 import { type WidgetViewProps, widgetViewHref } from './viewLink'
 import { WidgetViewLink } from './WidgetViewLink'
 
+// The goals widget carries no filter, so `filter-unsupported` is unreachable here; the map
+// stays total so the status union cannot grow without every widget answering for it.
 const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
 	'not-configured': keys.stateNotConfigured,
 	unavailable: keys.stateUnavailable,
+	'filter-unsupported': keys.stateFilterUnsupported,
 }
 
 const tableStyle: CSSProperties = {

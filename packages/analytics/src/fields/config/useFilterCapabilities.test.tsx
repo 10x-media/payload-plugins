@@ -138,6 +138,39 @@ describe('useFilterCapabilities', () => {
 		expect(result.current.dimensions).toEqual(['page', 'referrer', 'country'])
 	})
 
+	it('is unresolved until the source list answers, so an empty offer is no verdict', async () => {
+		answer(twoSources)
+
+		const { result } = renderHook(() => useFilterCapabilities())
+
+		expect(result.current.resolved).toBe(false)
+		await waitFor(() => expect(result.current.resolved).toBe(true))
+	})
+
+	it('stays unresolved with no user to fetch for, which is not a settled empty list', () => {
+		answer(twoSources)
+		mocks.userId = ''
+
+		const { result } = renderHook(() => useFilterCapabilities())
+
+		expect(result.current.resolved).toBe(false)
+		expect(result.current.loading).toBe(false)
+		expect(result.current.error).toBe(false)
+	})
+
+	it('is resolved for a source that answered with nothing to filter by', async () => {
+		answer({
+			defaultId: 'flat',
+			sources: [source('flat', { filters: [], filterOperators: [] })],
+		})
+		mocks.sourceId = 'flat'
+
+		const { result } = renderHook(() => useFilterCapabilities())
+
+		await waitFor(() => expect(result.current.resolved).toBe(true))
+		expect(result.current.dimensions).toEqual([])
+	})
+
 	it('reports the failed fetch rather than an empty source', async () => {
 		fetchMock.mockRejectedValue(new Error('offline'))
 

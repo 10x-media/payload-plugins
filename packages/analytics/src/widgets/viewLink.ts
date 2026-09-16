@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import { formatAdminURL } from 'payload/shared'
-import type { DateRange, DimensionKey, MetricKey } from '../core/contract'
+import type { AnalyticsFilter, DateRange, DimensionKey, MetricKey } from '../core/contract'
 import { MAX_QUERY_RANGE_DAYS } from '../query/limits'
 import type { TimeframePreset } from '../timeframe/presets'
 import { zonedCalendarDay } from '../timeframe/tz'
@@ -43,6 +43,8 @@ export interface ViewHrefArgs {
 	compare?: boolean
 	metric?: MetricKey
 	tab?: BreakdownTab
+	/** The widget's own filter, carried as the view's filter state. */
+	filters?: AnalyticsFilter[]
 }
 
 /** `allTime` is no range the view can hold, so an install defaulting to it opens here. */
@@ -106,7 +108,7 @@ export const viewHref = (args: ViewHrefArgs): string => {
 		...(args.source === undefined ? {} : { source: args.source }),
 		metric: args.metric ?? defaults.metric,
 		tab: args.tab ?? DEFAULT_VIEW_TAB,
-		filters: [],
+		filters: args.filters ?? [],
 		limit: DEFAULT_VIEW_LIMIT,
 	}
 	// `resolveView` refuses a path without a leading slash, so the option cannot be wider.

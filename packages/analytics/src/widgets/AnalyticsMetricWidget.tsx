@@ -9,6 +9,8 @@ import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { ComparisonDelta } from './ComparisonDelta'
 import { cardStyle, labelStyle } from './cardChrome'
+import { filterCaption } from './filterCaption'
+import { widgetFilters } from './filterField'
 import { formatRangeCaption, resolveCustomRange } from './range'
 import { readForWidget, type WidgetReadStatus } from './readForWidget'
 import type { MetricWidgetData } from './types'
@@ -18,6 +20,7 @@ import { WidgetViewLink } from './WidgetViewLink'
 const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
 	'not-configured': keys.stateNotConfigured,
 	unavailable: keys.stateUnavailable,
+	'filter-unsupported': keys.stateFilterUnsupported,
 }
 
 export default async function AnalyticsMetricWidget(props: WidgetServerProps & WidgetViewProps) {
@@ -32,10 +35,12 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps & W
 	const t = asTranslate(props.req.i18n.t)
 	const locale = props.req.i18n.language ?? 'en-US'
 	const title = data.title?.trim() || t(METRIC_KEYS[metric])
-	const caption =
+	const filters = widgetFilters(data)
+	const windowCaption =
 		customRange && timezone
 			? formatRangeCaption(customRange, locale, timezone)
 			: t(TIMEFRAME_KEYS[timeframe])
+	const caption = filters[0] ? `${windowCaption} ${filterCaption(filters[0], t)}` : windowCaption
 	const result = await readForWidget({
 		req: props.req,
 		metrics: [metric],
@@ -43,6 +48,7 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps & W
 		adapterId: data.dataSource,
 		now: new Date(),
 		range: customRange,
+		filters,
 		...(timezone ? { timezone } : {}),
 	})
 	// The adapter that answered, which on a scoped or runtime-provider install is not the
@@ -53,6 +59,7 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps & W
 		...(customRange ? { range: customRange } : {}),
 		...(result.adapterId ? { source: result.adapterId } : {}),
 		metric,
+		filters,
 	})
 
 	if (result.status !== 'ok') {

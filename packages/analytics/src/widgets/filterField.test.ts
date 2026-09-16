@@ -8,7 +8,12 @@ import type {
 import { describe, expect, it } from 'vitest'
 import { MAX_QUERY_FILTER_VALUE_LENGTH } from '../query/limits'
 import { keys } from '../translations/keys'
-import { FILTER_DIMENSION_COMPONENT, FILTER_OPERATOR_COMPONENT, filterField } from './filterField'
+import {
+	FILTER_DIMENSION_COMPONENT,
+	FILTER_OPERATOR_COMPONENT,
+	filterField,
+	widgetFilters,
+} from './filterField'
 
 const subField = (group: NamedGroupField, name: string): TextField => {
 	const found = group.fields.find((f: Field) => 'name' in f && f.name === name)
@@ -111,5 +116,49 @@ describe('filterField', () => {
 
 		expect(validateValue(long, { dimension: 'page' })).toBe(keys.widgetFilterValueTooLong)
 		expect(validateValue(atCap, { dimension: 'page' })).toBe(true)
+	})
+})
+
+describe('widgetFilters', () => {
+	it('returns nothing for a widget carrying no filter group at all', () => {
+		expect(widgetFilters({})).toEqual([])
+	})
+
+	it('returns nothing while the dimension is still unchosen', () => {
+		expect(widgetFilters({ filter: { operator: 'eq', value: 'DE' } })).toEqual([])
+	})
+
+	it('returns nothing for a dimension with no value, blank or whitespace-only', () => {
+		expect(widgetFilters({ filter: { dimension: 'country' } })).toEqual([])
+		expect(widgetFilters({ filter: { dimension: 'country', value: '' } })).toEqual([])
+		expect(widgetFilters({ filter: { dimension: 'country', value: '   ' } })).toEqual([])
+	})
+
+	it('defaults a missing operator to eq, so a half-stored group still reads', () => {
+		expect(widgetFilters({ filter: { dimension: 'country', value: 'DE' } })).toEqual([
+			{ dimension: 'country', operator: 'eq', value: 'DE' },
+		])
+	})
+
+	it('keeps the stored operator', () => {
+		expect(
+			widgetFilters({ filter: { dimension: 'page', operator: 'contains', value: '/blog' } })
+		).toEqual([{ dimension: 'page', operator: 'contains', value: '/blog' }])
+	})
+
+	it('trims the value, which is stored as typed', () => {
+		expect(widgetFilters({ filter: { dimension: 'country', value: '  DE  ' } })).toEqual([
+			{ dimension: 'country', operator: 'eq', value: 'DE' },
+		])
+	})
+
+	it('caps the value at the query limit after trimming', () => {
+		const value = `  ${'x'.repeat(MAX_QUERY_FILTER_VALUE_LENGTH + 20)}  `
+		const [filter] = widgetFilters({ filter: { dimension: 'page', value } })
+		expect(filter?.value).toHaveLength(MAX_QUERY_FILTER_VALUE_LENGTH)
+	})
+
+	it('never returns more than the one filter a widget can hold', () => {
+		expect(widgetFilters({ filter: { dimension: 'page', value: '/a' } })).toHaveLength(1)
 	})
 })

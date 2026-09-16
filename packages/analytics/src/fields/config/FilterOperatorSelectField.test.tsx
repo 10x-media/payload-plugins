@@ -246,6 +246,16 @@ describe('FilterOperatorSelectField', () => {
 		expect(screen.queryByText(keys.fieldFilterEmpty)).toBeNull()
 	})
 
+	it('stays quiet while there is no user to fetch the sources for', () => {
+		answer(twoSources)
+		mocks.userId = ''
+
+		render(<FilterOperatorSelectField {...props()} />)
+
+		expect(screen.queryByText(keys.fieldFilterEmpty)).toBeNull()
+		expect(screen.queryByText(keys.fieldFilterError)).toBeNull()
+	})
+
 	it('follows the form state path rather than the possibly stale prop', async () => {
 		answer(twoSources)
 		mocks.path = 'blocks.0.filter.operator'

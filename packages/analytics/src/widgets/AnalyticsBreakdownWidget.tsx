@@ -10,6 +10,8 @@ import { TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { type BreakdownWidgetData, breakdownSpecBySlug } from './breakdownTypes'
 import { cardStyle, labelStyle } from './cardChrome'
+import { filterCaption } from './filterCaption'
+import { widgetFilters } from './filterField'
 import { formatRangeCaption, resolveCustomRange } from './range'
 import type { WidgetReadStatus } from './readForWidget'
 import { readForWidgetBreakdown } from './readForWidgetBreakdown'
@@ -19,6 +21,7 @@ import { WidgetViewLink } from './WidgetViewLink'
 const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
 	'not-configured': keys.stateNotConfigured,
 	unavailable: keys.stateUnavailable,
+	'filter-unsupported': keys.stateFilterUnsupported,
 }
 
 export default async function AnalyticsBreakdownWidget(props: WidgetServerProps & WidgetViewProps) {
@@ -44,6 +47,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 	}
 
 	const tab = viewTabForDimension(spec.dimension)
+	const filters = widgetFilters(data)
 	const result = await readForWidgetBreakdown({
 		req: props.req,
 		metric,
@@ -53,6 +57,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 		adapterId: data.dataSource,
 		now: new Date(),
 		range: customRange,
+		filters,
 		...(timezone ? { timezone } : {}),
 	})
 	// The adapter that answered, which on a scoped or runtime-provider install is not the
@@ -64,13 +69,15 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 		...(result.adapterId ? { source: result.adapterId } : {}),
 		...(tab ? { tab } : {}),
 		metric,
+		filters,
 	})
 
 	const locale = props.req.i18n.language ?? 'en-US'
-	const caption =
+	const windowCaption =
 		customRange && timezone
 			? formatRangeCaption(customRange, locale, timezone)
 			: t(TIMEFRAME_KEYS[timeframe])
+	const caption = filters[0] ? `${windowCaption} ${filterCaption(filters[0], t)}` : windowCaption
 	return (
 		<div className="analytics-breakdown-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>

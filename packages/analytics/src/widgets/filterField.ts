@@ -1,7 +1,9 @@
 import type { NamedGroupField, TextFieldSingleValidation } from 'payload'
+import type { AnalyticsFilter } from '../core/contract'
 import { MAX_QUERY_FILTER_VALUE_LENGTH } from '../query/limits'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
+import type { WidgetFilter } from './types'
 
 /** importMap paths of the scoped pickers; the factory never imports the components. */
 export const FILTER_DIMENSION_COMPONENT = '@10x-media/analytics/client#FilterDimensionSelectField'
@@ -19,6 +21,26 @@ const validateValue: TextFieldSingleValidation = (value, { req, siblingData }) =
 	return trimmed.length <= MAX_QUERY_FILTER_VALUE_LENGTH
 		? true
 		: asTranslate(req.t)(keys.widgetFilterValueTooLong)
+}
+
+/**
+ * The stored group as query filters: one entry, or none at all. A group without both a
+ * dimension and a value is still being configured, and the value is stored exactly as it
+ * was typed, so the query's own trimming and cap are applied here rather than assumed.
+ */
+export const widgetFilters = (data: { filter?: WidgetFilter }): AnalyticsFilter[] => {
+	const { dimension, operator, value } = data.filter ?? {}
+	const trimmed = typeof value === 'string' ? value.trim() : ''
+	if (!dimension || trimmed === '') {
+		return []
+	}
+	return [
+		{
+			dimension,
+			operator: operator ?? 'eq',
+			value: trimmed.slice(0, MAX_QUERY_FILTER_VALUE_LENGTH),
+		},
+	]
 }
 
 /**
