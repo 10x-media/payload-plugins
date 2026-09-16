@@ -106,6 +106,10 @@ export default async function AnalyticsGoalsWidget(props: WidgetServerProps & Wi
 			<span style={labelStyle}>{title}</span>
 			{result.status !== 'ok' ? (
 				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
+			) : result.goalsUnresolved ? (
+				// The source never answered about the goals, which the plain empty state would
+				// read as "nobody converted".
+				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(keys.stateGoalsUnresolved)}</span>
 			) : result.rows.length === 0 ? (
 				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(keys.stateNoBreakdown)}</span>
 			) : (

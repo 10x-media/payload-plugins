@@ -42,6 +42,9 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Lignes',
 	[keys.stateNoBreakdown]: 'Pas encore de données',
 	[keys.stateClamped]: 'Affichage de la période maximale prise en charge par le fournisseur',
+	[keys.stateFiltersUnapplied]:
+		'Certains filtres n’ont pas été appliqués par cette source de données',
+	[keys.stateGoalsUnresolved]: 'Impossible de lire les objectifs depuis cette source de données',
 	[keys.widgetFieldTitle]: 'Titre',
 	[keys.widgetFieldMetric]: 'Métrique',
 	[keys.widgetFieldTimeframe]: 'Période',

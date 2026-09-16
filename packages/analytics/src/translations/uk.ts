@@ -42,6 +42,8 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Рядків',
 	[keys.stateNoBreakdown]: 'Даних поки немає',
 	[keys.stateClamped]: 'Показано максимальний період, який підтримує провайдер',
+	[keys.stateFiltersUnapplied]: 'Деякі фільтри не були застосовані цим джерелом даних',
+	[keys.stateGoalsUnresolved]: 'Не вдалося прочитати цілі з цього джерела даних',
 	[keys.widgetFieldTitle]: 'Заголовок',
 	[keys.widgetFieldMetric]: 'Метрика',
 	[keys.widgetFieldTimeframe]: 'Період',

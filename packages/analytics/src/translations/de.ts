@@ -43,6 +43,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Zeilen',
 	[keys.stateNoBreakdown]: 'Noch keine Daten',
 	[keys.stateClamped]: 'Zeigt den maximalen Zeitraum des Anbieters',
+	[keys.stateFiltersUnapplied]: 'Einige Filter wurden von dieser Datenquelle nicht angewendet',
+	[keys.stateGoalsUnresolved]: 'Ziele konnten aus dieser Datenquelle nicht gelesen werden',
 	[keys.widgetFieldTitle]: 'Titel',
 	[keys.widgetFieldMetric]: 'Kennzahl',
 	[keys.widgetFieldTimeframe]: 'Zeitraum',

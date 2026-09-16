@@ -47,6 +47,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Rows',
 	[keys.stateNoBreakdown]: 'No data yet',
 	[keys.stateClamped]: 'Showing the maximum range the provider supports',
+	[keys.stateFiltersUnapplied]: 'Some filters were not applied by this source',
+	[keys.stateGoalsUnresolved]: 'Goals could not be read from this source',
 	[keys.widgetFieldTitle]: 'Title',
 	[keys.widgetFieldMetric]: 'Metric',
 	[keys.widgetFieldTimeframe]: 'Timeframe',

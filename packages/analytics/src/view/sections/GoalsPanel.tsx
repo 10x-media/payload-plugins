@@ -47,6 +47,10 @@ export function GoalsPanel({ query, goals, siteVisitors, locale }: GoalsPanelPro
 				query.status === 'error' ? null : (
 					<Skeleton rows={3} variant="row" />
 				)
+			) : query.data.result.meta.goalsUnresolved === true ? (
+				// The source never answered about the goals, which the plain empty state would
+				// read as "nobody converted".
+				<SectionEmpty label={keys.stateGoalsUnresolved} />
 			) : rows.length === 0 ? (
 				<SectionEmpty label={keys.stateNoBreakdown} />
 			) : (

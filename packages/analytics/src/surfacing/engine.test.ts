@@ -2,7 +2,7 @@ import { inMemoryKVAdapter } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter, AnalyticsQuery, AnalyticsResult } from '../core/contract'
 import { memoryAdapter } from '../testing/memoryAdapter'
-import { kvCacheStore } from './cacheStore'
+import { type CacheStore, kvCacheStore } from './cacheStore'
 import { createEngine } from './engine'
 import { PROVIDER_READ_TIMEOUT_MESSAGE } from './retryPolicy'
 
@@ -443,5 +443,64 @@ describe('createEngine', () => {
 		} finally {
 			vi.useRealTimers()
 		}
+	})
+})
+
+describe('createEngine goal caching', () => {
+	const recordingStore = (): { store: CacheStore; writes: number[] } => {
+		const writes: number[] = []
+		return {
+			writes,
+			store: {
+				now: () => 0,
+				get: async () => null,
+				getStale: async () => null,
+				set: async (_key, _value, ttlSeconds) => {
+					writes.push(ttlSeconds)
+				},
+			},
+		}
+	}
+
+	const goalAdapter = (meta: AnalyticsResult['meta']): AnalyticsAdapter => ({
+		id: 'degraded',
+		label: 'Degraded',
+		capabilities: memoryAdapter().capabilities,
+		isConfigured: () => true,
+		query: async () => ({ rows: [], totals: {}, meta }),
+	})
+
+	const goalQuery: AnalyticsQuery = {
+		metrics: ['conversions'],
+		dimensions: ['goal'],
+		dateRange: q.dateRange,
+		goalSlugs: ['signup'],
+	}
+
+	const engineOn = (store: CacheStore) =>
+		createEngine({ store, queue: { concurrency: 4 }, ttl: {}, timeoutMs: 15_000 })
+
+	it('caches a failed goal read for the realtime ttl, not the aggregate one', async () => {
+		const { store, writes } = recordingStore()
+		await engineOn(store).read(
+			goalAdapter({ provider: 'degraded', fetchedAt: '', goalsUnresolved: true }),
+			goalQuery
+		)
+		expect(writes).toEqual([300])
+	})
+
+	it('keeps the aggregate ttl when the read carried no goal slugs', async () => {
+		const { store, writes } = recordingStore()
+		await engineOn(store).read(
+			goalAdapter({ provider: 'degraded', fetchedAt: '', goalsUnresolved: true }),
+			{ ...goalQuery, goalSlugs: [] }
+		)
+		expect(writes).toEqual([3600])
+	})
+
+	it('keeps the aggregate ttl for a goal read the provider answered', async () => {
+		const { store, writes } = recordingStore()
+		await engineOn(store).read(goalAdapter({ provider: 'degraded', fetchedAt: '' }), goalQuery)
+		expect(writes).toEqual([3600])
 	})
 })

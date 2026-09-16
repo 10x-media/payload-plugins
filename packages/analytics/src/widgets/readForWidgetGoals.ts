@@ -37,6 +37,8 @@ export interface WidgetGoalsResult {
 	siteVisitors?: number
 	clamped?: boolean
 	stale?: boolean
+	/** True when the source could not read the scope's goals, so the empty table means nothing. */
+	goalsUnresolved?: boolean
 }
 
 export interface ReadForWidgetGoalsArgs {
@@ -196,5 +198,6 @@ export const readForWidgetGoals = async (
 		...(siteVisitors !== undefined ? { siteVisitors } : {}),
 		clamped: Boolean(breakdown.clamped || totals?.clamped || previous?.clamped),
 		stale: Boolean(breakdown.stale || totals?.stale || previous?.stale),
+		goalsUnresolved: breakdown.goalsUnresolved === true,
 	}
 }

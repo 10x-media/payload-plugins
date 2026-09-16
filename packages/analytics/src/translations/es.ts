@@ -42,6 +42,8 @@ export const es: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Filas',
 	[keys.stateNoBreakdown]: 'Aún no hay datos',
 	[keys.stateClamped]: 'Se muestra el rango máximo que admite el proveedor',
+	[keys.stateFiltersUnapplied]: 'Esta fuente de datos no aplicó algunos filtros',
+	[keys.stateGoalsUnresolved]: 'No se pudieron leer los objetivos de esta fuente de datos',
 	[keys.widgetFieldTitle]: 'Título',
 	[keys.widgetFieldMetric]: 'Métrica',
 	[keys.widgetFieldTimeframe]: 'Periodo',

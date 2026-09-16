@@ -6,29 +6,39 @@ import { CHANNEL_LABELS, valueLabel } from './labels'
 
 const t: Translate = (key) => `t(${key})`
 
+const native = (dimension: Parameters<typeof valueLabel>[0]['dimension'], value: string): string =>
+	valueLabel({ dimension, value, provider: 'native', t })
+
 describe('valueLabel', () => {
-	it('names every traffic channel the source dimension can hold', () => {
+	it('names every traffic channel the native source dimension can hold', () => {
 		for (const channel of TRAFFIC_CHANNELS) {
-			expect(valueLabel('source', channel, t)).toBe(`t(${CHANNEL_LABELS[channel]})`)
+			expect(native('source', channel)).toBe(`t(${CHANNEL_LABELS[channel]})`)
 		}
 	})
 
 	it('translates a channel through its own key', () => {
-		expect(valueLabel('source', 'search', t)).toBe(`t(${keys.channelSearch})`)
+		expect(native('source', 'search')).toBe(`t(${keys.channelSearch})`)
 	})
 
 	it('reads a legacy host row under source as it was stored', () => {
-		expect(valueLabel('source', 'google.com', t)).toBe('google.com')
+		expect(native('source', 'google.com')).toBe('google.com')
 	})
 
 	it('answers a prototype member name as itself', () => {
-		expect(valueLabel('source', 'constructor', t)).toBe('constructor')
-		expect(valueLabel('source', '__proto__', t)).toBe('__proto__')
+		expect(native('source', 'constructor')).toBe('constructor')
+		expect(native('source', '__proto__')).toBe('__proto__')
+	})
+
+	it('leaves a provider source row raw, since it is a utm_source and not a channel', () => {
+		expect(valueLabel({ dimension: 'source', value: 'email', provider: 'plausible', t })).toBe(
+			'email'
+		)
+		expect(valueLabel({ dimension: 'source', value: 'search', provider: 'ga4', t })).toBe('search')
 	})
 
 	it('leaves every other dimension raw', () => {
-		expect(valueLabel('referrer', 'search', t)).toBe('search')
-		expect(valueLabel('page', '/pricing', t)).toBe('/pricing')
-		expect(valueLabel('utmMedium', 'email', t)).toBe('email')
+		expect(native('referrer', 'search')).toBe('search')
+		expect(native('page', '/pricing')).toBe('/pricing')
+		expect(native('utmMedium', 'email')).toBe('email')
 	})
 })

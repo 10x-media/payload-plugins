@@ -180,7 +180,9 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 	 * all be sent. Two `eq` values on one param are an AND that matches nothing, which the
 	 * read answers as empty without calling the API; anything else keeps the first filter,
 	 * except that `q.path` always wins the `path` param so a per-page read stays scoped to
-	 * its page. Whatever was dropped travels back in `meta.unappliedFilters`.
+	 * its page. An `eq` value carrying a comma is dropped too: Umami reads such a value as a
+	 * list and offers no escape, so sending it would answer a wider question than the one
+	 * asked. Whatever was dropped travels back in `meta.unappliedFilters`.
 	 */
 	const params = (q: AnalyticsQuery): UmamiParams => {
 		const p = new URLSearchParams({
@@ -204,6 +206,10 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		for (const filter of q.filters ?? []) {
 			const mapped = DIMENSION_MAP[filter.dimension]
 			if (!mapped) {
+				continue
+			}
+			if (filter.operator === 'eq' && filter.value.includes(',')) {
+				unapplied.push(filter)
 				continue
 			}
 			const value = `${OPERATOR_PREFIX[filter.operator]}${filter.value}`

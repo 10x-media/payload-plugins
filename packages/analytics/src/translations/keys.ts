@@ -45,6 +45,8 @@ export const keys = {
 	widgetFieldLimit: 'analytics:widgetFieldLimit',
 	stateNoBreakdown: 'analytics:stateNoBreakdown',
 	stateClamped: 'analytics:stateClamped',
+	stateFiltersUnapplied: 'analytics:stateFiltersUnapplied',
+	stateGoalsUnresolved: 'analytics:stateGoalsUnresolved',
 	widgetFieldTitle: 'analytics:widgetFieldTitle',
 	widgetFieldMetric: 'analytics:widgetFieldMetric',
 	widgetFieldTimeframe: 'analytics:widgetFieldTimeframe',

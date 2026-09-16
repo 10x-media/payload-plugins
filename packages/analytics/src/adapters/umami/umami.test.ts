@@ -434,6 +434,55 @@ describe('umami adapter', () => {
 		expect(result.meta.unappliedFilters).toEqual([displaced])
 	})
 
+	it('drops an eq value carrying a comma, which Umami would read as a value list', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/stats', ({ request }) => {
+				const search = new URL(request.url).searchParams
+				expect(search.has('path')).toBe(false)
+				expect(search.get('country')).toBe('eq.DE')
+				return HttpResponse.json({
+					pageviews: 1,
+					visitors: 1,
+					visits: 1,
+					bounces: 0,
+					totaltime: 0,
+				})
+			})
+		)
+		const listed = { dimension: 'page', operator: 'eq', value: '/a,/b' } as const
+		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [listed, { dimension: 'country', operator: 'eq', value: 'DE' }],
+			}),
+			{}
+		)
+		expect(result.meta.unappliedFilters).toEqual([listed])
+	})
+
+	it('still sends a contains value carrying a comma, which Umami matches literally', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/stats', ({ request }) => {
+				expect(new URL(request.url).searchParams.get('path')).toBe('c./a,/b')
+				return HttpResponse.json({
+					pageviews: 1,
+					visitors: 1,
+					visits: 1,
+					bounces: 0,
+					totaltime: 0,
+				})
+			})
+		)
+		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'page', operator: 'contains', value: '/a,/b' }],
+			}),
+			{}
+		)
+		expect(result.meta.unappliedFilters).toBeUndefined()
+	})
+
 	it('leaves meta.unappliedFilters off a read that carried every filter', async () => {
 		server.use(
 			http.get('https://api.umami.is/v1/websites/w/stats', () =>

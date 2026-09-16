@@ -42,6 +42,8 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Linhas',
 	[keys.stateNoBreakdown]: 'Ainda sem dados',
 	[keys.stateClamped]: 'Exibindo o intervalo máximo compatível com o fornecedor',
+	[keys.stateFiltersUnapplied]: 'Esta fonte de dados não aplicou alguns filtros',
+	[keys.stateGoalsUnresolved]: 'Não foi possível ler os objetivos desta fonte de dados',
 	[keys.widgetFieldTitle]: 'Título',
 	[keys.widgetFieldMetric]: 'Métrica',
 	[keys.widgetFieldTimeframe]: 'Período',

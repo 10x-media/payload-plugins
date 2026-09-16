@@ -57,11 +57,24 @@ export const CHANNEL_LABELS: Record<TrafficChannel, TranslationKey> = {
 const isTrafficChannel = (value: string): value is TrafficChannel =>
 	(TRAFFIC_CHANNELS as readonly string[]).includes(value)
 
+export interface ValueLabelArgs {
+	dimension: DimensionKey
+	value: string
+	/** The source that answered the read the value came from. */
+	provider: string
+	t: Translate
+}
+
 /**
- * A dimension value as it is shown. Only `source` holds a fixed set of buckets worth naming in
- * the reader's language; every other dimension, and any host a rollup written before `source`
- * became a channel still carries, reads as the value that was stored. The stored value is what
- * a filter and the URL keep, so only the display changes.
+ * A dimension value as it is shown. Only the native source's `source` holds a fixed set of
+ * buckets worth naming in the reader's language: a provider serves that dimension as a raw
+ * `utm_source` (Plausible's `visit:source`, GA4's `sessionSource`), where a row reading
+ * `email` is the campaign parameter and not the Email channel. Every other dimension, and
+ * any host a rollup written before `source` became a channel still carries, reads as the
+ * value that was stored. The stored value is what a filter and the URL keep, so only the
+ * display changes.
  */
-export const valueLabel = (dimension: DimensionKey, value: string, t: Translate): string =>
-	dimension === 'source' && isTrafficChannel(value) ? t(CHANNEL_LABELS[value]) : value
+export const valueLabel = ({ dimension, value, provider, t }: ValueLabelArgs): string =>
+	provider === 'native' && dimension === 'source' && isTrafficChannel(value)
+		? t(CHANNEL_LABELS[value])
+		: value

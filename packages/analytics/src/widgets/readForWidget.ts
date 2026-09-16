@@ -40,6 +40,8 @@ export interface WidgetReadResult {
 	clamped?: boolean
 	/** True when the engine served a stale cache entry after a failed provider read. */
 	stale?: boolean
+	/** True when the source answered without one of the filters the read carried. */
+	filtersUnapplied?: boolean
 	/** Previous-window totals, present only when the adapter supports comparison. */
 	previousMetrics?: Partial<Record<MetricKey, number>>
 	/** The previous comparable window, present only when comparison ran. */
@@ -142,6 +144,7 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		metrics: result.totals ?? {},
 		clamped: result.meta.clamped ?? false,
 		stale: result.meta.stale ?? false,
+		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
 		previousMetrics,
 		comparisonRange,
 	}

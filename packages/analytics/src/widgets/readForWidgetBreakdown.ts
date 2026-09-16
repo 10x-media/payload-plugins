@@ -26,9 +26,15 @@ export interface WidgetBreakdownResult {
 	adapterId: string
 	dateRange: DateRange
 	rows: BreakdownRow[]
+	/** The source that answered, absent on a read that never reached one. */
+	provider?: string
 	clamped?: boolean
 	/** True when the engine served a stale cache entry after a failed provider read. */
 	stale?: boolean
+	/** True when the source answered without one of the filters the read carried. */
+	filtersUnapplied?: boolean
+	/** True when the source could not read the scope's goals; the rows say nothing about them. */
+	goalsUnresolved?: boolean
 }
 
 export interface ReadForWidgetBreakdownArgs {
@@ -143,7 +149,10 @@ export const readForWidgetBreakdown = async (
 		adapterId: adapter.id,
 		dateRange,
 		rows,
+		provider: result.meta.provider,
 		clamped: result.meta.clamped ?? false,
 		stale: result.meta.stale ?? false,
+		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
+		goalsUnresolved: result.meta.goalsUnresolved === true,
 	}
 }

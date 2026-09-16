@@ -210,4 +210,18 @@ describe('AnalyticsGoalsWidget', () => {
 		vi.mocked(readForWidgetGoals).mockResolvedValue(result())
 		expect(await render({}, false)).not.toContain('analytics-widget__link')
 	})
+
+	it('says the goals could not be read rather than showing them as unconverted', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(result({ rows: [], goalsUnresolved: true }))
+		const html = await render()
+		expect(html).toContain('analytics:stateGoalsUnresolved')
+		expect(html).not.toContain('analytics:stateNoBreakdown')
+	})
+
+	it('keeps the plain empty state when the source answered and nobody converted', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(result({ rows: [] }))
+		const html = await render()
+		expect(html).toContain('analytics:stateNoBreakdown')
+		expect(html).not.toContain('analytics:stateGoalsUnresolved')
+	})
 })
