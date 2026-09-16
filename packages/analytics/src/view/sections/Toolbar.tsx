@@ -8,7 +8,7 @@ import { keys } from '../../translations/keys'
 import { TIMEFRAME_KEYS } from '../../translations/metricKeys'
 import { useTranslation } from '../../translations/useTranslation'
 import { clampDayRange, dayRangeCaption, dayRangeDays } from '../dayRange'
-import type { DayRange, ViewGate } from '../gating'
+import { canCompareRange, type DayRange, type ViewGate } from '../gating'
 import { rangeFor, VIEW_RANGE_PRESETS, type ViewState } from '../state'
 import { FilterChips } from './FilterChips'
 
@@ -25,6 +25,10 @@ export interface ToolbarProps {
 	stale: boolean
 	/** Any section read a shorter window than the one that was asked for. */
 	clamped: boolean
+	/** Any section was answered without one of the filters it carried. */
+	filtersUnapplied: boolean
+	/** The source that answered, which decides whether a `source` chip names a channel. */
+	provider: string
 	now: Date
 	/**
 	 * The committed state as one string. Any change to it, not just to the days, drops a
@@ -61,6 +65,8 @@ export function Toolbar({
 	locale,
 	stale,
 	clamped,
+	filtersUnapplied,
+	provider,
 	now,
 	stateKey,
 	onChange,
@@ -180,7 +186,7 @@ export function Toolbar({
 						</div>
 					</>
 				) : null}
-				{gate.canCompare ? (
+				{canCompareRange(gate, range, { timezone, now }) ? (
 					<Button
 						buttonStyle={state.compare ? 'primary' : 'secondary'}
 						className="analytics-view__toggle"
@@ -200,10 +206,12 @@ export function Toolbar({
 						</Pill>
 					) : null}
 					{clamped ? <span>{t(keys.stateClamped)}</span> : null}
+					{filtersUnapplied ? <span>{t(keys.stateFiltersUnapplied)}</span> : null}
 				</div>
 			</div>
 			<FilterChips
 				filters={state.filters}
+				provider={provider}
 				onRemove={(index) =>
 					onChange({ ...state, filters: state.filters.filter((_, at) => at !== index) })
 				}

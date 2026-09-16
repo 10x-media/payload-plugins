@@ -45,6 +45,8 @@ export const keys = {
 	widgetFieldLimit: 'analytics:widgetFieldLimit',
 	stateNoBreakdown: 'analytics:stateNoBreakdown',
 	stateClamped: 'analytics:stateClamped',
+	stateFiltersUnapplied: 'analytics:stateFiltersUnapplied',
+	stateGoalsUnresolved: 'analytics:stateGoalsUnresolved',
 	widgetFieldTitle: 'analytics:widgetFieldTitle',
 	widgetFieldMetric: 'analytics:widgetFieldMetric',
 	widgetFieldTimeframe: 'analytics:widgetFieldTimeframe',
@@ -98,7 +100,10 @@ export const keys = {
 	providerFieldRegion: 'analytics:providerFieldRegion',
 	providerFieldDomain: 'analytics:providerFieldDomain',
 	providerFieldScriptId: 'analytics:providerFieldScriptId',
+	providerFieldRevenueCurrency: 'analytics:providerFieldRevenueCurrency',
+	providerFieldMeasurementId: 'analytics:providerFieldMeasurementId',
 	providerFieldCaptureHelp: 'analytics:providerFieldCaptureHelp',
+	providerErrorMeasurementId: 'analytics:providerErrorMeasurementId',
 	providerNamePlausible: 'analytics:providerNamePlausible',
 	providerNameUmami: 'analytics:providerNameUmami',
 	providerNameGa4: 'analytics:providerNameGa4',
@@ -192,6 +197,12 @@ export const keys = {
 	viewDimensionLanguage: 'analytics:viewDimensionLanguage',
 	viewDimensionEvent: 'analytics:viewDimensionEvent',
 	viewDimensionGoal: 'analytics:viewDimensionGoal',
+	channelDirect: 'analytics:channelDirect',
+	channelSearch: 'analytics:channelSearch',
+	channelSocial: 'analytics:channelSocial',
+	channelEmail: 'analytics:channelEmail',
+	channelPaid: 'analytics:channelPaid',
+	channelReferral: 'analytics:channelReferral',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

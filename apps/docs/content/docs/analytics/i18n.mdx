@@ -24,6 +24,8 @@ analytics({
 
 `@10x-media/analytics/i18n` exports `keys` (constants covering metrics, widget labels, breakdowns, timeframes, and field states), the built-in `translations`, and the `TranslationKey` / `TranslationsOption` types. A typo'd key fails to compile.
 
+A handful of keys name data rather than chrome: `channelDirect`, `channelSearch`, `channelSocial`, `channelEmail`, `channelPaid` and `channelReferral` are how the native engine's [traffic channels](/analytics/native#traffic-channels) are shown. Override them to rename a channel in the admin; the stored value, the filters and the URL keep their lowercase tokens either way.
+
 Because [display-field labels](/analytics/display-fields#labels) default to these translations, overriding a metric's key here renames it everywhere at once; per-field `label`/`labels` options are the targeted alternative. Widget titles are editor-entered content, not translations; localize those with the [`widgets.localizeText` option](/analytics/widgets#options).
 
 How overrides merge, and how to add a locale the plugin does not ship, is covered once for all plugins in [Translations](/concepts/translations).

@@ -10,6 +10,7 @@ interface IngestOpts {
 	path?: string
 	ua: string
 	referrer?: string
+	query?: string
 	type?: 'pageview' | 'event'
 	name?: string
 }
@@ -23,6 +24,7 @@ const ingest = (booted: BootedPayload, opts: IngestOpts) =>
 				...(opts.type === 'event' ? { path: '/' } : { path: opts.path ?? '/' }),
 				hostname: 'example.com',
 				referrer: opts.referrer,
+				...(opts.query ? { query: opts.query } : {}),
 				...(opts.name ? { name: opts.name } : {}),
 			},
 			{ 'user-agent': opts.ua }
@@ -51,7 +53,7 @@ describeForDb('native dimension breakdowns', { dbs: ['mongo'] }, (db) => {
 		await booted.stop()
 	})
 
-	it('breaks pageviews down by source', async () => {
+	it('breaks pageviews down by source channel, not by referrer host', async () => {
 		const result = await adapter.query(
 			{ metrics: ['pageviews'], dimensions: ['source'], dateRange: RANGE },
 			{}
@@ -59,8 +61,9 @@ describeForDb('native dimension breakdowns', { dbs: ['mongo'] }, (db) => {
 		const bySource = Object.fromEntries(
 			result.rows.map((r) => [r.dimensions?.source, r.metrics.pageviews])
 		)
-		expect(bySource['google.com']).toBe(2)
-		expect(bySource['t.co']).toBe(1)
+		expect(bySource).toMatchObject({ search: 2, social: 1 })
+		expect(bySource['google.com']).toBeUndefined()
+		expect(bySource['t.co']).toBeUndefined()
 	})
 
 	it('breaks pageviews down by device', async () => {

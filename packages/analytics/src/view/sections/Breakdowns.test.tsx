@@ -261,6 +261,32 @@ describe('Breakdowns rows', () => {
 		expect(screen.getByText('90')).toBeDefined()
 	})
 
+	it('names a traffic channel in the reader language and still filters on the stored value', () => {
+		const onRowSelect = vi.fn()
+		const channels: AnalyticsRow[] = [
+			{ dimensions: { source: 'search' }, metrics: { pageviews: 9 } },
+		]
+		renderBreakdowns({
+			dimension: 'source',
+			dimensions: ['source', 'referrer'],
+			onRowSelect,
+			query: state({
+				data: {
+					...answer(),
+					result: {
+						rows: channels,
+						meta: { provider: 'native', fetchedAt: '2026-09-14T00:00:00.000Z' },
+					},
+				},
+			}),
+			tab: 'sources',
+		})
+		expect(screen.getByText(keys.channelSearch)).toBeDefined()
+		expect(screen.queryByText('search')).toBeNull()
+		fireEvent.click(screen.getByRole('button', { name: new RegExp(keys.channelSearch) }))
+		expect(onRowSelect).toHaveBeenCalledWith('search')
+	})
+
 	it('sorts on a column header, and flips the direction on a second click', () => {
 		const onSortChange = vi.fn()
 		const { rerender } = renderBreakdowns({ onSortChange })
@@ -294,6 +320,32 @@ describe('Breakdowns rows', () => {
 		renderBreakdowns({ onLimitChange })
 		fireEvent.change(screen.getByLabelText(keys.widgetFieldLimit), { target: { value: '50' } })
 		expect(onLimitChange).toHaveBeenCalledWith(50)
+	})
+
+	it('charts a metric the rows carry when the selected one is not among them', () => {
+		// A Umami-shaped answer: /metrics reports visitors per row and nothing else, so the
+		// pageviews column the view asked for has no number on any row.
+		const umamiRows: AnalyticsRow[] = [
+			{ dimensions: { page: '/pricing' }, metrics: { visitors: 90 } },
+			{ dimensions: { page: '/about' }, metrics: { visitors: 40 } },
+		]
+		renderBreakdowns({
+			query: state({
+				data: {
+					...answer(),
+					result: {
+						rows: umamiRows,
+						meta: { provider: 'umami', fetchedAt: '2026-09-14T00:00:00.000Z' },
+					},
+				},
+			}),
+		})
+		expect(document.querySelector('.analytics-view__sort--metric')?.textContent).toBe(
+			METRIC_KEYS.visitors
+		)
+		expect(document.querySelector('.analytics-view__sort--secondary')).toBeNull()
+		expect(screen.getByText('90')).toBeDefined()
+		expect(screen.queryByText('0')).toBeNull()
 	})
 
 	it('shows the empty copy when the read came back with no rows', () => {

@@ -214,4 +214,39 @@ describe('AnalyticsBreakdownWidget filter', () => {
 			{ dimension: 'country', operator: 'eq', value: 'DE' },
 		])
 	})
+
+	it('notes a read the source answered without one of its filters', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(result({ filtersUnapplied: true }))
+		const html = await render('analytics-breakdown-pages')
+		expect(html).toContain('analytics:stateFiltersUnapplied')
+	})
+
+	it('leaves the note off a read the source answered in full', async () => {
+		const html = await render('analytics-breakdown-pages')
+		expect(html).not.toContain('analytics:stateFiltersUnapplied')
+	})
+
+	it('names a native source row as a channel', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({ provider: 'native', rows: [{ label: 'email', value: 9 }] })
+		)
+		const html = await render('analytics-breakdown-sources')
+		expect(html).toContain('analytics:channelEmail')
+	})
+
+	it('leaves a provider source row as the raw utm_source it is', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({ provider: 'plausible', rows: [{ label: 'email', value: 9 }] })
+		)
+		const html = await render('analytics-breakdown-sources')
+		expect(html).not.toContain('analytics:channelEmail')
+		expect(html).toContain('email')
+	})
+
+	it('says the goals could not be read instead of showing an empty goal table', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(result({ rows: [], goalsUnresolved: true }))
+		const html = await render('analytics-breakdown-goals')
+		expect(html).toContain('analytics:stateGoalsUnresolved')
+		expect(html).not.toContain('analytics:stateNoBreakdown')
+	})
 })

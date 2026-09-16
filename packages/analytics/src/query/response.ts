@@ -18,7 +18,10 @@ export type SerializedAnalyticsQuery = Omit<AnalyticsQuery, 'dateRange'> & {
 /** Successful answer of `GET /analytics/query`. */
 export interface QueryResponse {
 	result: AnalyticsResult
-	/** The equal-length window before `query.dateRange`, present only for `compare=previous`. */
+	/**
+	 * The equal-length window before `query.dateRange`, asked for with `compare=previous`.
+	 * Omitted when the source does not compare or that window is beyond its lookback.
+	 */
 	comparison?: AnalyticsResult
 	source: QuerySourceRef
 	capabilities: SerializedCapabilities

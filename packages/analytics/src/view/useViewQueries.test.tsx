@@ -137,6 +137,18 @@ describe('useViewQueries', () => {
 		expect(requests().every((request) => request.compare === undefined)).toBe(true)
 	})
 
+	it('drops the comparison when the previous window predates the source lookback', () => {
+		const shortLookback: SerializedCapabilities = { ...nativeCaps, maxLookbackDays: 45 }
+		render(<Probe props={propsFor(shortLookback)} state={{ ...baseState, compare: true }} />)
+		expect(requests().every((request) => request.compare === undefined)).toBe(true)
+		cleanup()
+
+		fetchQueryMock.mockClear()
+		const longLookback: SerializedCapabilities = { ...nativeCaps, maxLookbackDays: 90 }
+		render(<Probe props={propsFor(longLookback)} state={{ ...baseState, compare: true }} />)
+		expect(requests()[0]?.compare).toBe('previous')
+	})
+
 	it('omits the goals request when the source serves no goal breakdown', () => {
 		render(<Probe props={propsFor(narrowCaps)} state={baseState} />)
 		expect(fetchQueryMock).toHaveBeenCalledTimes(3)

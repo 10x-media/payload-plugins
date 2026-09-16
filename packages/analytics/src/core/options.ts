@@ -313,8 +313,9 @@ export type AnalyticsPluginOptions = {
 				localizeText?: boolean
 				/**
 				 * Period-over-period comparison on the metric and trend widgets. On by
-				 * default for adapters that declare `capabilities.comparison`; set false
-				 * to skip the second (previous-window) read entirely.
+				 * default for every source except one whose adapter sets
+				 * `capabilities.comparison` false; set false to skip the second
+				 * (previous-window) read entirely.
 				 */
 				comparison?: boolean
 		  }

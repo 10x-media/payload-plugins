@@ -137,6 +137,21 @@ describe('buildCacheKey', () => {
 		const key = buildCacheKey('ga4', { ...base, timezone: 'Europe/Berlin', scope: 'tenant-a' })
 		expect(key.endsWith('|Europe/Berlin|tenant-a')).toBe(true)
 	})
+	it('partitions the key by the goal hint, which decides what rows a provider returns', () => {
+		const none = buildCacheKey('plausible', base)
+		const one = buildCacheKey('plausible', { ...base, goalSlugs: ['signup'] })
+		const two = buildCacheKey('plausible', { ...base, goalSlugs: ['signup', 'purchase'] })
+		expect(one).not.toBe(none)
+		expect(one).not.toBe(two)
+		expect(two).toBe(buildCacheKey('plausible', { ...base, goalSlugs: ['purchase', 'signup'] }))
+	})
+
+	it('keeps the key unchanged when no goal hint is set', () => {
+		expect(buildCacheKey('plausible', { ...base, goalSlugs: [] })).toBe(
+			buildCacheKey('plausible', base)
+		)
+	})
+
 	it('two instance ids of one provider type produce distinct keys', () => {
 		const q = base
 		expect(buildCacheKey('posthog:a', q)).not.toBe(buildCacheKey('posthog:b', q))

@@ -5,7 +5,6 @@ import { supportsGranularity } from './granularity'
 const caps = (minGranularity: Granularity): AnalyticsCapabilities => ({
 	perPageQuery: true,
 	realtime: false,
-	comparison: false,
 	minGranularity,
 	maxLookbackDays: null,
 	metrics: new Set(),

@@ -64,7 +64,7 @@ The same resolver also runs on the three public endpoints a visitor's browser ca
 
 ## 2. Register the provider collection per tenant
 
-`providers.collection` scaffolds an `analytics-providers` collection where providers (Plausible, Umami, GA4, PostHog) are configured from the admin UI. Register it with `plugin-multi-tenant` as a per-tenant global:
+`providers.collection` scaffolds an `analytics-providers` collection where providers (Plausible, Umami, GA4, PostHog) are configured from the admin UI. Beside the credentials and the public capture fields, two fields shape what a provider serves: Plausible's `revenueCurrency` (the ISO code of the site's revenue goals, which is what turns its `revenue` metric on) and GA4's `measurementId` (which turns capture on). Both are validated on the document, so a lowercase currency or a malformed measurement id is rejected at save rather than at read. Register the collection with `plugin-multi-tenant` as a per-tenant global:
 
 ```ts
 multiTenantPlugin({
@@ -137,7 +137,7 @@ The `scopeProperty: 'tenant'` on the platform adapter (step 1) closes the loop: 
 
 A scoped install fills two [capture slots](/analytics/capture#capture-slots) per request: `global` from the config registry (the `platformAdapter`, or `capture.slots.global`), and `tenant` from the request's own resolved scope's registry, which includes that scope's runtime providers. So one page can send to the platform's PostHog and to the tenant's own Plausible at once. When both slots resolve to the same adapter, only the global entry survives, so a scoped native install never posts every event twice.
 
-The `tenant` slot is empty whenever no scope resolves, and nothing is captured for it. A provider document fills it only once its **public** capture fields are set, since an adapter declares capture support from those alone: `projectToken` (plus the optional `region`) for PostHog, `domain` or `scriptId` for Plausible, `websiteId` for Umami. They sit beside the sealed credentials in the provider document, unencrypted because the tracker serves them to the browser; a document holding only query credentials reads dashboards and captures nothing.
+The `tenant` slot is empty whenever no scope resolves, and nothing is captured for it. A provider document fills it only once its **public** capture fields are set, since an adapter declares capture support from those alone: `projectToken` (plus the optional `region`) for PostHog, `domain` or `scriptId` for Plausible, `websiteId` for Umami, and `measurementId` for GA4, which is validated on save and fills no slot when it is anything but `^[A-Za-z0-9-]+$`. They sit beside the sealed credentials in the provider document, unencrypted because the tracker serves them to the browser; a document holding only query credentials reads dashboards and captures nothing.
 
 <Callout type="warn">
 The tracker endpoint and the capture proxy are **public and unauthenticated**: a visitor's browser calls them with no admin session. Your `scopeResolver` runs on those requests too.

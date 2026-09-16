@@ -8,6 +8,8 @@ import {
 } from '../core/contract'
 import { GRANULARITY_ORDER } from '../core/granularity'
 import type { SourcesResponse, WireSource } from '../fields/config/fetchSources'
+import { parseDayOrInstant } from '../query/dates'
+import { previousWindow, withinLookback } from '../widgets/comparison'
 import { dayRangeDays } from './dayRange'
 
 /** Every metric the view can show, in the order the overview cards read. */
@@ -88,8 +90,9 @@ export interface ViewGate {
 	granularities: Granularity[]
 	/**
 	 * Days the source can look back, or null for no limit. The engine clamps a longer read
-	 * and marks it `meta.clamped`, so this only lets the toolbar hide a range that would
-	 * silently answer for a shorter window than its label promises.
+	 * and marks it `meta.clamped`, so this lets the toolbar hide a range that would silently
+	 * answer for a shorter window than its label promises, and {@link canCompareRange} drop
+	 * a previous period that reaches past it.
 	 */
 	maxRangeDays: number | null
 	canCompare: boolean
@@ -125,6 +128,31 @@ export const gate = (caps: SerializedCapabilities): ViewGate => {
 		realtime: caps.realtime,
 		goals: metricSet.has('conversions') && dimensionSet.has('goal'),
 	}
+}
+
+/**
+ * Whether the view may compare this window. `ViewGate.canCompare` answers for the source
+ * alone; the previous period must also still be inside the source's lookback, or the
+ * endpoint drops the comparison from its answer. The gate sees only capabilities, so every
+ * surface that knows the selected window (the toolbar's toggle, the request builder) asks
+ * here instead.
+ */
+export const canCompareRange = (
+	served: ViewGate,
+	range: DayRange,
+	args: { timezone: string; now: Date }
+): boolean => {
+	if (!served.canCompare) {
+		return false
+	}
+	const { timezone, now } = args
+	const start = parseDayOrInstant(range.from, { timezone, edge: 'start' })
+	const end = parseDayOrInstant(range.to, { timezone, edge: 'end' })
+	if (!start || !end) {
+		return false
+	}
+	const previous = previousWindow({ start, end }, timezone)
+	return previous !== null && withinLookback(previous, served.maxRangeDays, { tz: timezone, now })
 }
 
 /**

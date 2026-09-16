@@ -56,10 +56,9 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 	'scrollDepth',
 ])
 /**
- * Everything the tracker can know about a hit. `source` is today the referring host or
- * `Direct`, which is what `referrer` answers too for a referred hit; classifying it into a
- * traffic channel (search, social, paid) is a follow-up, and the two keys stay separate so
- * that change lands without moving anyone's saved links.
+ * Everything the tracker can know about a hit. `source` is the traffic channel (`direct`,
+ * `search`, `social`, `email`, `paid`, `referral`) and `referrer` the host it came from, so a
+ * report can ask how much of the month was paid without reading a list of hostnames.
  */
 const dimensions: ReadonlySet<DimensionKey> = new Set([
 	'page',
@@ -87,7 +86,6 @@ const baseCapabilities: AnalyticsCapabilities = {
 	perPageQuery: true,
 	realtime: true,
 	realtimeWindowMinutes: 60,
-	comparison: true,
 	minGranularity: 'hour',
 	maxLookbackDays: null,
 	metrics,
@@ -95,6 +93,8 @@ const baseCapabilities: AnalyticsCapabilities = {
 	// Every dimension except `goal`, whose completions live in a json column rather than a
 	// field a `where` can compare.
 	filters: new Set([...dimensions].filter((dimension) => dimension !== 'goal')),
+	// No `matches`: every regex flavor the providers offer differs, and the two database
+	// adapters have no portable one to match them with.
 	filterOperators: new Set(['eq', 'contains']),
 	batchPageReport: true,
 	rateLimit: null,

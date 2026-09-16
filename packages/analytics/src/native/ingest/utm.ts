@@ -9,13 +9,18 @@ export interface UtmParams {
 /** Each extracted value is a rollup bucket key, so it is capped like every other one. */
 export const MAX_UTM_LENGTH = 128
 
-const UTM_KEYS: Readonly<Record<string, keyof UtmParams>> = {
-	utm_source: 'utmSource',
-	utm_medium: 'utmMedium',
-	utm_campaign: 'utmCampaign',
-	utm_content: 'utmContent',
-	utm_term: 'utmTerm',
-}
+/**
+ * A `Map` rather than an object literal: the lookup is keyed by a query key an attacker
+ * writes, and an object literal answers its inherited members, so `?constructor=x` would
+ * otherwise reach storage under a key `UtmParams` does not declare.
+ */
+const UTM_KEYS: ReadonlyMap<string, keyof UtmParams> = new Map<string, keyof UtmParams>([
+	['utm_source', 'utmSource'],
+	['utm_medium', 'utmMedium'],
+	['utm_campaign', 'utmCampaign'],
+	['utm_content', 'utmContent'],
+	['utm_term', 'utmTerm'],
+])
 
 /**
  * The five utm keys carried by a page's query string, decoded and capped. Keys are matched
@@ -29,7 +34,7 @@ export const extractUtm = (query: string | undefined): UtmParams => {
 	}
 	const out: UtmParams = {}
 	for (const [rawKey, rawValue] of new URLSearchParams(query)) {
-		const key = UTM_KEYS[rawKey.toLowerCase()]
+		const key = UTM_KEYS.get(rawKey.toLowerCase())
 		if (!key || out[key] !== undefined) {
 			continue
 		}

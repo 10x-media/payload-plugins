@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeDelta, previousWindow } from './comparison'
+import { computeDelta, previousWindow, withinLookback } from './comparison'
 
 describe('previousWindow', () => {
 	it('returns the same count of whole days immediately preceding the range', () => {
@@ -65,5 +65,42 @@ describe('computeDelta', () => {
 	it('returns null when either value is missing', () => {
 		expect(computeDelta(undefined, 100)).toBeNull()
 		expect(computeDelta(100, undefined)).toBeNull()
+	})
+})
+
+describe('withinLookback', () => {
+	const NOW = new Date('2026-06-15T09:00:00.000Z')
+	const window = {
+		start: new Date('2026-05-18T00:00:00.000Z'),
+		end: new Date('2026-05-24T23:59:59.999Z'),
+	}
+
+	it('passes any window when the source declares no lookback limit', () => {
+		expect(withinLookback({ start: new Date(0), end: NOW }, null, { tz: 'UTC', now: NOW })).toBe(
+			true
+		)
+	})
+
+	it('passes a window starting after the lookback floor', () => {
+		expect(withinLookback(window, 90, { tz: 'UTC', now: NOW })).toBe(true)
+	})
+
+	it('fails a window starting before the lookback floor', () => {
+		expect(withinLookback(window, 14, { tz: 'UTC', now: NOW })).toBe(false)
+	})
+
+	it('passes a window starting exactly on the lookback floor', () => {
+		// The floor is the start of the day 28 days before NOW, which is the window's own start.
+		expect(withinLookback(window, 28, { tz: 'UTC', now: NOW })).toBe(true)
+	})
+
+	it('measures the floor from the start of the day in the reporting timezone', () => {
+		// Berlin's day start is 22:00Z the day before, so the floor sits 2h earlier than UTC's.
+		const berlin = {
+			start: new Date('2026-05-17T22:00:00.000Z'),
+			end: new Date('2026-05-24T21:59:59.999Z'),
+		}
+		expect(withinLookback(berlin, 28, { tz: 'Europe/Berlin', now: NOW })).toBe(true)
+		expect(withinLookback(berlin, 28, { tz: 'UTC', now: NOW })).toBe(false)
 	})
 })

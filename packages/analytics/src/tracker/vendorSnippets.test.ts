@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest'
+import { ga4 } from '../adapters/ga4/ga4'
 import { plausible } from '../adapters/plausible/plausible'
 import { posthog } from '../adapters/posthog/posthog'
 import type { CaptureSnippet } from '../core/capture'
 import { createScriptLoader } from './loadScript'
+import { createGa4Sink } from './sinks/ga4'
 import { createPlausibleSink } from './sinks/plausible'
 import { createPosthogSink } from './sinks/posthog'
 import type { TrackerWindow } from './types'
@@ -15,6 +17,8 @@ import type { TrackerWindow } from './types'
  */
 
 interface VendorRealm {
+	dataLayer?: unknown[]
+	gtag?: (...args: unknown[]) => void
 	posthog?: unknown[] & { capture?: (name: string, props?: unknown) => void; _i?: unknown[] }
 	plausible?: ((name: string, options?: unknown) => void) & {
 		q?: unknown[]
@@ -72,6 +76,8 @@ beforeEach(() => {
 	realm = bridgeRealm()
 	realm.posthog = undefined
 	realm.plausible = undefined
+	realm.dataLayer = undefined
+	realm.gtag = undefined
 })
 
 describe('posthog snippet', () => {
@@ -177,5 +183,41 @@ describe('plausible per-site snippet', () => {
 		// real tracker or the real init: the endpoint would be lost with it.
 		expect(realm.plausible).toBe(real)
 		expect(realm.plausible?.init).toBe(realInit)
+	})
+})
+
+describe('ga4 snippet', () => {
+	const snippet = () =>
+		ga4({
+			propertyId: '1',
+			credentials: { client_email: 'sa@x.iam', private_key: 'pk' },
+			measurementId: 'G-AB12CD34',
+		}).capture?.snippet({ path: '/api/analytics/p/tenant' }) ?? { scripts: [] }
+
+	it('loads the tag from googletagmanager and publishes a callable gtag', async () => {
+		await runSnippet(snippet())
+
+		expect(scriptSources()).toContain('https://www.googletagmanager.com/gtag/js?id=G-AB12CD34')
+		expect(typeof realm.gtag).toBe('function')
+		// gtag pushes `arguments`, so the queue holds array-likes rather than arrays.
+		const queued = [...(realm.dataLayer ?? [])].map((args) => [...(args as unknown[])])
+		expect(queued[0]?.[0]).toBe('js')
+		expect(queued[1]).toEqual(['config', 'G-AB12CD34'])
+	})
+
+	it('queues a sink dispatch made before the tag lands', async () => {
+		await runSnippet(snippet())
+
+		createGa4Sink(sinkArgs(realm)).send({
+			type: 'goal',
+			name: 'checkout',
+			path: '/',
+			hostname: 'shop.test',
+			value: 49,
+			currency: 'EUR',
+		})
+
+		const queued = [...(realm.dataLayer ?? [])].map((args) => [...(args as unknown[])])
+		expect(queued.at(-1)).toEqual(['event', 'checkout', { value: 49, currency: 'EUR' }])
 	})
 })

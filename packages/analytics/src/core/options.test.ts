@@ -339,6 +339,8 @@ describe('resolveOptions capture.consent', () => {
 		expect(consent('global', 'native', 'native')).toBe('none')
 		expect(consent('tenant', 'ph', 'posthog')).toBe('required')
 		expect(consent('tenant', 'pl', 'plausible')).toBe('required')
+		expect(consent('tenant', 'um', 'umami')).toBe('required')
+		expect(consent('tenant', 'ga', 'ga4')).toBe('required')
 	})
 	it('lets a bare mode force every slot, native included', () => {
 		const consent = resolveOptions({ adapters, capture: { consent: 'required' } }).capture.consent

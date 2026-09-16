@@ -22,6 +22,8 @@ Adapters ship as code-split subpaths, so a site bundles only what it imports. Ea
 
 Each adapter declares an `AnalyticsCapabilities` object: which `metrics` and `dimensions` it supports, which of those `dimensions` also accept an `AnalyticsQuery.filters` entry (`filters`) and with which operators (`filterOperators`, from `eq` / `contains` / `matches`), whether it can query per page (`perPageQuery`) or in `realtime`, its `maxLookbackDays`, rate-limit hints, and recommended cache TTLs.
 
+`comparison` is optional and defaults to `true`. The previous-window read is the engine's own, and it works against any source, so an adapter of your own compares without declaring anything; set `comparison: false` to opt a source out. The serialized form the pickers read still carries a plain boolean.
+
 Every surface is gated by it:
 
 - A [dashboard widget](/analytics/widgets) whose metric or dimension no configured adapter supports is not registered at all.
@@ -34,7 +36,7 @@ An unconfigured adapter (missing credentials) degrades to an empty state and mak
 
 ## Capture support
 
-Reading and capturing are separate concerns. An adapter that declares `capture` can also fill a [capture slot](/analytics/capture#capture-slots): the browser tracker boots its snippet, and its tracker traffic is served through the [first-party proxy](/analytics/proxy) rather than the vendor domain. Read credentials are never part of it; only what the browser is allowed to see.
+Reading and capturing are separate concerns. An adapter that declares `capture` can also fill a [capture slot](/analytics/capture#capture-slots): the browser tracker boots its snippet, and its tracker traffic is served through the [first-party proxy](/analytics/proxy) rather than the vendor domain, wherever the adapter declares proxy routes. Read credentials are never part of it; only what the browser is allowed to see.
 
 | Adapter | Capture | Extra config it needs |
 |---|---|---|
@@ -42,9 +44,9 @@ Reading and capturing are separate concerns. An adapter that declares `capture` 
 | PostHog | Yes | `projectToken` (the public `phc_...` browser key, distinct from the read `apiKey`) and `region` (`us` / `eu`, derived from `host` when omitted). |
 | Plausible | Yes | `domain` for the legacy `data-domain` tag, or `scriptId` for the per-site `pa-<id>.js` model. `domain` wins when both are set; with neither, no snippet is emitted. |
 | Umami | Yes | None beyond `websiteId`. `host` doubles as the app origin for capture: a trailing `/api` is stripped, so one value serves the Stats API and the tracker. |
-| GA4 | No | Google's collection domains and consent mode make a clean first-party proxy impractical. Reads are unaffected. |
+| GA4 | Yes | `measurementId` (the public `G-XXXXXXX`). The tag loads from googletagmanager.com rather than a first-party proxy, so this is the one capture slot that is not proxied. |
 
-Capture support is declared only when the public capture config it needs is actually present, so a PostHog adapter configured for reads alone (no `projectToken`) or a Plausible one with neither `domain` nor `scriptId` declares no `capture` at all: no proxy route, no snippet, and it fills no slot. Reads are unaffected either way.
+Capture support is declared only when the public capture config it needs is actually present, so a PostHog adapter configured for reads alone (no `projectToken`), a Plausible one with neither `domain` nor `scriptId`, or a GA4 one without a `measurementId` declares no `capture` at all: no proxy route, no snippet, and it fills no slot. Reads are unaffected either way.
 
 The exact routes and snippets each one declares are on the [proxy page](/analytics/proxy#per-vendor-routes).
 
@@ -56,12 +58,18 @@ The exact routes and snippets each one declares are on the [proxy page](/analyti
 |---|---|---|
 | native | every dimension it serves except `goal`: `page`, `referrer`, `source`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` | `eq`, `contains` |
 | PostHog | `page`, `event` | `eq`, `contains`, `matches` |
-| Plausible | `page`, `source`, `referrer`, `device`, `browser`, `os`, `country`, `region`, `city`, `utmSource`, `utmMedium`, `utmCampaign` | `eq` |
-| GA4 | `page`, `referrer`, `source`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` | `eq` |
-| Umami | none | none |
+| Plausible | `page`, `source`, `referrer`, `device`, `browser`, `os`, `country`, `region`, `city`, `utmSource`, `utmMedium`, `utmCampaign` | `eq`, `contains`, `matches` |
+| GA4 | `page`, `referrer`, `source`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` | `eq`, `contains`, `matches` |
+| Umami | `page`, `referrer`, `browser`, `os`, `device`, `country`, `region`, `city`, `language`, `event`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` | `eq`, `contains`, `matches` |
 | `memoryAdapter` (testing) | `page` | `eq` |
 
-`contains` is case-insensitive everywhere it's supported. On native it goes through Payload's own `contains` operator: case-insensitive on both Mongo and Postgres, but the two DBs differ on what a raw `%` or `_` in the filter value does. Mongo regex-escapes the value first, so it always matches as a literal substring; Postgres wraps it in an ILIKE pattern without escaping it, so `%`/`_` act as SQL wildcards there. PostHog's `contains` escapes wildcard characters in the value itself before building its `ILIKE` pattern, so a `%` or `_` matches literally regardless of DB.
+`goal` is nowhere in this table. It is a breakdown on every source that serves it, narrowed by the read's own goal slugs rather than by a filter a caller writes; see [goals on a provider](/analytics/goals#how-providers-report-them).
+
+`matches` is provider-only, and each provider's regex is its own dialect: Plausible's `matches` is an re2 **full** match, GA4's `FULL_REGEXP` likewise (so a pattern must cover the whole value, `/docs/.*` rather than `^/docs`), Umami's `re.` is a case-insensitive **partial** match, and PostHog's is re2 through `match()`. Native declares no `matches` at all, because the two database adapters have no portable flavor to match any of them with.
+
+`contains` is case-insensitive on native, Umami (`ilike`) and GA4 (`CONTAINS` with `caseSensitive: false`); Plausible's is case-sensitive, since the adapter does not send its case-insensitive modifier. GA4's `eq` and `matches` compare literally. On native, `contains` goes through Payload's own `contains` operator: case-insensitive on both Mongo and Postgres, but the two DBs differ on what a raw `%` or `_` in the filter value does. Mongo regex-escapes the value first, so it always matches as a literal substring; Postgres wraps it in an ILIKE pattern without escaping it, so `%`/`_` act as SQL wildcards there. PostHog's `contains` escapes wildcard characters in the value itself before building its `ILIKE` pattern, so a `%` or `_` matches literally regardless of DB.
+
+Umami takes **one value per query parameter**, so a read can carry filters it cannot send. Two `eq` filters on one dimension with different values are an AND that matches nothing, which the adapter answers as an empty result without calling the API; any other collision keeps the first filter, except that a per-page read's own path always wins the `path` parameter. Whatever was dropped comes back in `meta.unappliedFilters`, so a surface can say the rows are wider than it asked for.
 
 ## Plausible
 
@@ -71,7 +79,9 @@ import { plausible } from '@10x-media/analytics/adapters/plausible'
 plausible({ siteId: 'example.com', apiKey: process.env.PLAUSIBLE_API_KEY! })
 ```
 
-Uses the Stats API v2 (`POST /api/v2/query`). Pass `host` for a self-hosted Community Edition instance, and `domain` or `scriptId` to capture through it. Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, scrollDepth, revenue. Durations are normalized to milliseconds. Default `maxLookbackDays: 730` (set `null` to disable clamping).
+Uses the Stats API v2 (`POST /api/v2/query`). Pass `host` for a self-hosted Community Edition instance, and `domain` or `scriptId` to capture through it. Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, scrollDepth, conversions, and revenue where `revenueCurrency` is set. Dimensions include `goal`, which maps to `event:goal`. Durations are normalized to milliseconds. Default `maxLookbackDays: 730` (set `null` to disable clamping).
+
+`revenueCurrency` is the ISO code of the site's revenue goals, and it is what turns the `revenue` metric on: Plausible serves `total_revenue` only inside a goal-filtered request on a site that has a revenue goal, and errors the request on a site that has none. Unset, the adapter neither declares `revenue` nor asks for it.
 
 ## Umami
 
@@ -85,7 +95,11 @@ umami({ websiteId: 'xxxx', apiKey: process.env.UMAMI_API_KEY! })
 umami({ websiteId: 'xxxx', token: process.env.UMAMI_TOKEN!, host: 'https://analytics.example.com/api' })
 ```
 
-Metrics: pageviews, visitors, visits, sessions, plus bounceRate and avgDuration derived from visit totals. The `page` dimension maps to Umami's `/metrics?type=url`. Umami has no per-day source for visitors, bounce rate, or duration, so trend series on those metrics are empty while headlines stay correct.
+Targets Umami 3.x, cloud and self-hosted. Metrics: pageviews, visitors, visits, sessions, plus bounceRate and avgDuration derived from visit totals, and conversions. The `page` dimension maps to `/metrics?type=path` (`type=url` was the 2.x name and 3.x rejects it). Umami has no per-day source for visitors, bounce rate, or duration, so trend series on those metrics are empty while headlines stay correct.
+
+`/metrics` reports one number per row, and on every dimension but `goal` that number is the count of distinct sessions, so **a breakdown row carries `visitors`** whatever metric the read asked for; a breakdown that asks for something else charts the first metric its rows do carry rather than a column of zeros under the wrong name. `event` is filterable but not groupable, since the install-wide `events` metric has no source in `/stats`; `goal` is the reverse, a breakdown the read's own goal slugs narrow, whose rows count event occurrences as `conversions`.
+
+Filter values carry an operator prefix (`eq.`, `c.`, `re.`), and Umami reads any of its operator names followed by a dot as an operator, so the adapter always writes `eq.` explicitly and a value like `s.example.com` stays literal. Umami splits an `eq.` value on commas into a value list with no escape, so a goal slug containing a comma cannot be asked for and is reported in `meta.unappliedFilters`.
 
 ## GA4
 
@@ -107,7 +121,9 @@ Uses the GA4 Data API (`runReport`) through the official SDK, declared as an opt
 pnpm add @google-analytics/data
 ```
 
-Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, conversions, revenue. Durations normalize to milliseconds, bounce rate to a percentage. GA4 bills a token quota, so the adapter recommends a long aggregate TTL (6 hours); [cache warming](/analytics/cache) pairs well with it. Default `maxLookbackDays: 425` (GA4's rolling window).
+Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, conversions, revenue. Dimensions include `goal`, which maps to `eventName` restricted to the read's own goals. Durations normalize to milliseconds, bounce rate to a percentage. GA4 bills a token quota, so the adapter recommends a long aggregate TTL (6 hours); [cache warming](/analytics/cache) pairs well with it. Default `maxLookbackDays: 425` (GA4's rolling window).
+
+`conversions` reads GA4's `keyEvents`, which counts only events the property itself marks as key events: an event that is a goal here but is not marked there reports 0. Set `measurementId` to capture through the same property; see [Capture](/analytics/capture#ga4).
 
 ## PostHog
 
@@ -117,7 +133,9 @@ import { posthog } from '@10x-media/analytics/adapters/posthog'
 posthog({ projectId: '123', apiKey: process.env.POSTHOG_API_KEY! })
 ```
 
-Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope and never reaches the browser; capture takes the public `projectToken` (`phc_...`) instead. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted; US Cloud is the default, and `region` pins the proxied capture hosts independently. Metrics: pageviews, visitors, visits, sessions, events. `events` counts every captured event (matching PostHog's own Events definition); requesting it (or the `event` dimension) switches the read off the `$pageview`-only filter, and the pageview-family metrics stay pageview-scoped through conditional aggregation. Dimensions: `page` (top-pages breakdown) and `event` (per-event-name breakdown). A binding `hostname` filters on `properties.$host`.
+Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope and never reaches the browser; capture takes the public `projectToken` (`phc_...`) instead. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted; US Cloud is the default, and `region` pins the proxied capture hosts independently. Metrics: pageviews, visitors, visits, sessions, events. `events` counts every captured event (matching PostHog's own Events definition); requesting it (or the `event` dimension) switches the read off the `$pageview`-only filter, and the pageview-family metrics stay pageview-scoped through conditional aggregation. Dimensions: `page` (top-pages breakdown), `event` (per-event-name breakdown) and `goal`, which is the event name restricted to the read's own goals. `conversions` counts those goal events; PostHog serves no revenue. A binding `hostname` filters on `properties.$host`.
+
+Time bounds are sent as `toDateTime('...', 'UTC')`. A bare HogQL date literal parses in the project's timezone, so a project set to anything but UTC used to read a window shifted by its offset; buckets are still cut in the reporting timezone.
 
 ## Testing: memoryAdapter
 
@@ -133,4 +151,4 @@ A deterministic in-memory adapter for tests and local development, with wide dec
 
 ## Writing your own adapter
 
-Implement `AnalyticsAdapter` from `@10x-media/analytics/types`: an `id`, a `label`, honest `capabilities`, `isConfigured()`, and `query(query, ctx)` returning rows and totals. Optional extras: `realtime(query, ctx)` for the realtime widget, and `register(config)` to add collections or endpoints (the native engine uses this hook). `capabilities.filters` and `capabilities.filterOperators` are required fields, even if empty (`new Set()`) for an adapter that honors no `AnalyticsQuery.filters` entry at all. Declare only capabilities you actually serve; the plugin trusts them.
+Implement `AnalyticsAdapter` from `@10x-media/analytics/types`: an `id`, a `label`, honest `capabilities`, `isConfigured()`, and `query(query, ctx)` returning rows and totals. A read that asks for `conversions` or the `goal` dimension also carries `query.goalSlugs`, the scope's goal slugs; a provider adapter restricts its goal rows to them and sets `meta.goalsUnresolved` when it has none. Optional extras: `realtime(query, ctx)` for the realtime widget, and `register(config)` to add collections or endpoints (the native engine uses this hook). `capabilities.filters` and `capabilities.filterOperators` are required fields, even if empty (`new Set()`) for an adapter that honors no `AnalyticsQuery.filters` entry at all. Declare only capabilities you actually serve; the plugin trusts them.

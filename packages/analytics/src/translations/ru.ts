@@ -42,6 +42,8 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Строк',
 	[keys.stateNoBreakdown]: 'Данных пока нет',
 	[keys.stateClamped]: 'Показан максимальный период, который поддерживает провайдер',
+	[keys.stateFiltersUnapplied]: 'Некоторые фильтры не были применены этим источником данных',
+	[keys.stateGoalsUnresolved]: 'Не удалось прочитать цели из этого источника данных',
 	[keys.widgetFieldTitle]: 'Заголовок',
 	[keys.widgetFieldMetric]: 'Метрика',
 	[keys.widgetFieldTimeframe]: 'Период',
@@ -96,8 +98,12 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: 'Регион',
 	[keys.providerFieldDomain]: 'Домен сайта',
 	[keys.providerFieldScriptId]: 'ID скрипта',
+	[keys.providerFieldRevenueCurrency]: 'Валюта дохода',
+	[keys.providerFieldMeasurementId]: 'ID измерения',
 	[keys.providerFieldCaptureHelp]:
 		'Публичная конфигурация для браузера. Сбор работает, только если она задана.',
+	[keys.providerErrorMeasurementId]:
+		'Используйте только буквы, цифры и дефисы, например G-AB12CD34.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',
@@ -194,4 +200,10 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: 'Язык',
 	[keys.viewDimensionEvent]: 'Событие',
 	[keys.viewDimensionGoal]: 'Цель',
+	[keys.channelDirect]: 'Прямые',
+	[keys.channelSearch]: 'Поиск',
+	[keys.channelSocial]: 'Соцсети',
+	[keys.channelEmail]: 'Эл. почта',
+	[keys.channelPaid]: 'Платные',
+	[keys.channelReferral]: 'Переходы',
 }

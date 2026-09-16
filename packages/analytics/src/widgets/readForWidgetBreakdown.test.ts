@@ -8,6 +8,7 @@ import type {
 	AnalyticsResult,
 } from '../core/contract'
 import { createRegistry } from '../core/registry'
+import type { Goal } from '../goals/types'
 import { setRuntime } from '../plugin/runtime'
 import { readForWidgetBreakdown } from './readForWidgetBreakdown'
 
@@ -36,8 +37,8 @@ const breakdownAdapter = (over: Partial<AnalyticsAdapter> = {}): AnalyticsAdapte
 	async query(_q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
 		return {
 			rows: [
-				{ dimensions: { source: 'google.com' }, metrics: { pageviews: 9 } },
-				{ dimensions: { source: 'Direct' }, metrics: { pageviews: 4 } },
+				{ dimensions: { source: 'search' }, metrics: { pageviews: 9 } },
+				{ dimensions: { source: 'direct' }, metrics: { pageviews: 4 } },
 			],
 			meta: { provider: 'native', fetchedAt: NOW.toISOString() },
 		}
@@ -45,7 +46,7 @@ const breakdownAdapter = (over: Partial<AnalyticsAdapter> = {}): AnalyticsAdapte
 	...over,
 })
 
-const reqWith = (adapters: AnalyticsAdapter[]): PayloadRequest => {
+const reqWith = (adapters: AnalyticsAdapter[], goals: Goal[] = []): PayloadRequest => {
 	const payload = {} as PayloadRequest['payload']
 	setRuntime(payload, {
 		registry: createRegistry(adapters),
@@ -54,9 +55,34 @@ const reqWith = (adapters: AnalyticsAdapter[]): PayloadRequest => {
 		engine: { read: async (adapter, query) => adapter.query(query, {}) },
 		ttl: { aggregate: 3600, realtime: 300 },
 		comparison: true,
+		goals,
 	})
 	return { payload } as PayloadRequest
 }
+
+const goalCaps = (): AnalyticsCapabilities => ({
+	...caps(),
+	metrics: new Set(['pageviews', 'conversions']),
+	dimensions: new Set(['source', 'goal']),
+})
+
+/** Records the query it was read with and answers one goal row. */
+const recordingAdapter = (
+	seen: AnalyticsQuery[],
+	capabilities: AnalyticsCapabilities
+): AnalyticsAdapter =>
+	breakdownAdapter({
+		capabilities,
+		async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+			seen.push(q)
+			return {
+				rows: [{ dimensions: { goal: 'signup' }, metrics: { conversions: 3 } }],
+				meta: { provider: 'native', fetchedAt: NOW.toISOString() },
+			}
+		},
+	})
+
+const goal = (slug: string): Goal => ({ slug, name: slug, match: { kind: 'goal' } })
 
 describe('readForWidgetBreakdown', () => {
 	it('returns ok with label/value rows from the adapter dimension', async () => {
@@ -70,8 +96,8 @@ describe('readForWidgetBreakdown', () => {
 		})
 		expect(result.status).toBe('ok')
 		expect(result.rows).toEqual([
-			{ label: 'google.com', value: 9 },
-			{ label: 'Direct', value: 4 },
+			{ label: 'search', value: 9 },
+			{ label: 'direct', value: 4 },
 		])
 	})
 
@@ -185,5 +211,72 @@ describe('readForWidgetBreakdown', () => {
 			filters: [{ dimension: 'country', operator: 'eq', value: 'US' }],
 		})
 		expect(result.status).toBe('unavailable')
+	})
+
+	it('hints the scope goal slugs on a goal read, so a provider knows what to count', async () => {
+		const seen: AnalyticsQuery[] = []
+		const result = await readForWidgetBreakdown({
+			req: reqWith([recordingAdapter(seen, goalCaps())], [goal('signup'), goal('purchase')]),
+			metric: 'conversions',
+			dimension: 'goal',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+		})
+		expect(seen[0]?.goalSlugs).toEqual(['signup', 'purchase'])
+		expect(result.rows).toEqual([{ label: 'signup', value: 3 }])
+	})
+
+	it('prefers the slugs the caller already resolved over resolving them again', async () => {
+		const seen: AnalyticsQuery[] = []
+		await readForWidgetBreakdown({
+			req: reqWith([recordingAdapter(seen, goalCaps())], [goal('signup')]),
+			metric: 'conversions',
+			dimension: 'goal',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+			goalSlugs: ['from-caller'],
+		})
+		expect(seen[0]?.goalSlugs).toEqual(['from-caller'])
+	})
+
+	// A goal read a resolver could not answer is a read without rows, never a read that
+	// silently counts every event the source has.
+	it('hints nothing but still reads when the goals resolver throws', async () => {
+		const seen: AnalyticsQuery[] = []
+		const payload = {} as PayloadRequest['payload']
+		setRuntime(payload, {
+			registry: createRegistry([recordingAdapter(seen, goalCaps())]),
+			configAdapterIds: new Set(['native']),
+			bindings: {},
+			engine: { read: async (adapter, query) => adapter.query(query, {}) },
+			ttl: { aggregate: 3600, realtime: 300 },
+			comparison: true,
+			resolveGoals: () => Promise.reject(new Error('boom')),
+		})
+		const result = await readForWidgetBreakdown({
+			req: { payload } as PayloadRequest,
+			metric: 'conversions',
+			dimension: 'goal',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+		})
+		expect(seen[0]?.goalSlugs).toEqual([])
+		expect(result.status).toBe('ok')
+	})
+
+	it('leaves a read that is about no goal unhinted', async () => {
+		const seen: AnalyticsQuery[] = []
+		await readForWidgetBreakdown({
+			req: reqWith([recordingAdapter(seen, goalCaps())], [goal('signup')]),
+			metric: 'pageviews',
+			dimension: 'source',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+		})
+		expect(seen[0]?.goalSlugs).toBeUndefined()
 	})
 })

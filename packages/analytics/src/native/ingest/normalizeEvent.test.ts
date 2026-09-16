@@ -44,7 +44,7 @@ describe('normalizeEvent', () => {
 		expect(ev.country).toBeUndefined()
 	})
 
-	it('derives device from the user-agent header and source from the referrer', async () => {
+	it('derives device from the user-agent header and the source channel from the referrer', async () => {
 		const event = await normalizeEvent({
 			raw: {
 				type: 'pageview',
@@ -60,7 +60,7 @@ describe('normalizeEvent', () => {
 			now: new Date('2026-06-01T00:00:00.000Z'),
 		})
 		expect(event.device).toBe('mobile')
-		expect(event.source).toBe('google.com')
+		expect(event.source).toBe('search')
 	})
 
 	it('omits device entirely for a user agent that is not a device', async () => {
@@ -364,10 +364,10 @@ describe('normalizeEvent native dimensions', () => {
 		)
 		expect(ev.referrer).toBe('https://site.com/reset')
 		expect(JSON.stringify(ev)).not.toContain('abc')
-		expect(ev.source).toBe('Direct')
+		expect(ev.source).toBe('direct')
 	})
 
-	it('truncates an over-long referrer without disturbing its host or source', async () => {
+	it('truncates an over-long referrer without disturbing its host or channel', async () => {
 		const ev = await build(
 			{
 				type: 'pageview',
@@ -379,17 +379,17 @@ describe('normalizeEvent native dimensions', () => {
 		)
 		expect(ev.referrer).toHaveLength(MAX_REFERRER_LENGTH)
 		expect(ev.referrerHost).toBe('news.example.org')
-		expect(ev.source).toBe('news.example.org')
+		expect(ev.source).toBe('referral')
 	})
 
-	it('reports no referrer host for internal navigation, as source reports Direct', async () => {
+	it('reports no referrer host for internal navigation, as source reports direct', async () => {
 		for (const referrer of ['https://site.com/other', 'https://www.site.com/other']) {
 			const ev = await build(
 				{ type: 'pageview', path: '/p', hostname: 'site.com', referrer },
 				{ 'user-agent': CHROME_UA }
 			)
 			expect('referrerHost' in ev).toBe(false)
-			expect(ev.source).toBe('Direct')
+			expect(ev.source).toBe('direct')
 		}
 	})
 
@@ -401,7 +401,7 @@ describe('normalizeEvent native dimensions', () => {
 			)
 			expect(ev.referrer).toBeUndefined()
 			expect('referrerHost' in ev).toBe(false)
-			expect(ev.source).toBe('Direct')
+			expect(ev.source).toBe('direct')
 		}
 	})
 

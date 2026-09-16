@@ -42,6 +42,8 @@ export const id: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Baris',
 	[keys.stateNoBreakdown]: 'Belum ada data',
 	[keys.stateClamped]: 'Menampilkan rentang maksimum yang didukung penyedia',
+	[keys.stateFiltersUnapplied]: 'Beberapa filter tidak diterapkan oleh sumber data ini',
+	[keys.stateGoalsUnresolved]: 'Sasaran tidak dapat dibaca dari sumber data ini',
 	[keys.widgetFieldTitle]: 'Judul',
 	[keys.widgetFieldMetric]: 'Metrik',
 	[keys.widgetFieldTimeframe]: 'Rentang waktu',
@@ -96,8 +98,12 @@ export const id: Record<TranslationKey, string> = {
 	[keys.providerFieldRegion]: 'Wilayah',
 	[keys.providerFieldDomain]: 'Domain situs',
 	[keys.providerFieldScriptId]: 'ID skrip',
+	[keys.providerFieldRevenueCurrency]: 'Mata uang pendapatan',
+	[keys.providerFieldMeasurementId]: 'ID pengukuran',
 	[keys.providerFieldCaptureHelp]:
 		'Konfigurasi publik browser. Perekaman hanya berjalan bila diisi.',
+	[keys.providerErrorMeasurementId]:
+		'Gunakan hanya huruf, angka, dan tanda hubung, misalnya G-AB12CD34.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',
@@ -193,4 +199,10 @@ export const id: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: 'Bahasa',
 	[keys.viewDimensionEvent]: 'Peristiwa',
 	[keys.viewDimensionGoal]: 'Sasaran',
+	[keys.channelDirect]: 'Langsung',
+	[keys.channelSearch]: 'Pencarian',
+	[keys.channelSocial]: 'Media sosial',
+	[keys.channelEmail]: 'Email',
+	[keys.channelPaid]: 'Berbayar',
+	[keys.channelReferral]: 'Rujukan',
 }

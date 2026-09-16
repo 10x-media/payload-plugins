@@ -4,10 +4,12 @@ import { Pill, XIcon } from '@payloadcms/ui'
 import type { AnalyticsFilter } from '../../core/contract'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
-import { DIMENSION_LABELS } from '../labels'
+import { DIMENSION_LABELS, valueLabel } from '../labels'
 
 export interface FilterChipsProps {
 	filters: AnalyticsFilter[]
+	/** The source that answered, which decides whether a `source` value names a channel. */
+	provider: string
 	onRemove: (index: number) => void
 }
 
@@ -19,7 +21,7 @@ const OPERATOR_SIGN: Record<AnalyticsFilter['operator'], string> = {
 }
 
 /** The filters a view is reading through, each removable on its own. */
-export function FilterChips({ filters, onRemove }: FilterChipsProps) {
+export function FilterChips({ filters, provider, onRemove }: FilterChipsProps) {
 	const { t } = useTranslation()
 	if (filters.length === 0) {
 		return null
@@ -28,7 +30,7 @@ export function FilterChips({ filters, onRemove }: FilterChipsProps) {
 		<div className="analytics-view__chips">
 			<span className="analytics-view__label">{t(keys.viewFilters)}</span>
 			{filters.map((filter, index) => {
-				const text = `${t(DIMENSION_LABELS[filter.dimension])} ${OPERATOR_SIGN[filter.operator]} ${filter.value}`
+				const text = `${t(DIMENSION_LABELS[filter.dimension])} ${OPERATOR_SIGN[filter.operator]} ${valueLabel({ dimension: filter.dimension, value: filter.value, provider, t })}`
 				return (
 					<Pill key={`${filter.dimension}:${filter.operator}:${filter.value}`} size="small">
 						{text}

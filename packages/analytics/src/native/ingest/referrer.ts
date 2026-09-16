@@ -32,8 +32,8 @@ export const storedReferrer = (raw: unknown): string | undefined => {
  * A self-referral reports nothing either: internal navigation is the bulk of any site's
  * traffic, and counting it would put the site's own domain at the top of its referrers
  * breakdown forever. `selfHostname` is the event's own hostname, compared on the same terms
- * (case-insensitively, `www.` stripped). The `source` dimension calls the same visit `Direct`
- * through its own rule.
+ * (case-insensitively, `www.` stripped). The `source` dimension reads the same absence as its
+ * `direct` channel.
  */
 export const referrerHost = (raw: unknown, selfHostname: string): string | undefined => {
 	if (typeof raw !== 'string' || !raw) {

@@ -53,8 +53,13 @@ describe('captureRewrites', () => {
 		])
 	})
 
-	it('contributes nothing for an adapter without capture (GA4)', () => {
-		const adapter = ga4({ propertyId: '', credentials: { client_email: '', private_key: '' } })
+	it('contributes nothing for an adapter whose capture declares no routes (GA4)', () => {
+		const adapter = ga4({
+			propertyId: '',
+			credentials: { client_email: '', private_key: '' },
+			measurementId: 'G-ABC123',
+		})
+		expect(adapter.capture?.proxy.routes).toEqual([])
 		expect(captureRewrites([{ path: '/ga', adapter }])).toEqual([])
 	})
 

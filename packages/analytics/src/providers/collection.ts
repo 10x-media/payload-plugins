@@ -1,4 +1,12 @@
-import type { CollectionConfig, Field, TextareaField, TextField } from 'payload'
+import type {
+	CollectionConfig,
+	Field,
+	TextareaField,
+	TextField,
+	TextFieldSingleValidation,
+} from 'payload'
+import { validateMeasurementId } from '../adapters/ga4/measurementId'
+import { validateCurrency } from '../goals/currency'
 import { keys, type TranslationKey } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ProviderAccessArgs } from './access'
@@ -43,13 +51,18 @@ const secretField = (
  * serves it to the browser. An adapter declares `capture` only when its public field is
  * filled, so these are what let a provider document fill a capture slot.
  */
-const captureField = (name: string, label: TranslationKey, width?: string): Field => ({
+const captureField = (
+	name: string,
+	label: TranslationKey,
+	opts: { width?: string; validate?: TextFieldSingleValidation } = {}
+): Field => ({
 	name,
 	type: 'text',
 	label: labelForKey(label),
+	...(opts.validate ? { validate: opts.validate } : {}),
 	admin: {
 		description: labelForKey(keys.providerFieldCaptureHelp),
-		...(width ? { width } : {}),
+		...(opts.width ? { width: opts.width } : {}),
 	},
 })
 
@@ -172,9 +185,15 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 				{
 					type: 'row',
 					fields: [
-						captureField('domain', keys.providerFieldDomain, '50%'),
-						captureField('scriptId', keys.providerFieldScriptId, '50%'),
+						captureField('domain', keys.providerFieldDomain, { width: '50%' }),
+						captureField('scriptId', keys.providerFieldScriptId, { width: '50%' }),
 					],
+				},
+				{
+					name: 'revenueCurrency',
+					type: 'text',
+					label: labelForKey(keys.providerFieldRevenueCurrency),
+					validate: validateCurrency,
 				},
 				hostField(),
 			]),
@@ -198,6 +217,9 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 					],
 				},
 				textField('clientEmail', keys.providerFieldClientEmail),
+				captureField('measurementId', keys.providerFieldMeasurementId, {
+					validate: validateMeasurementId,
+				}),
 				...args.buildSecret({
 					name: 'privateKey',
 					type: 'textarea',
@@ -215,7 +237,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 				{
 					type: 'row',
 					fields: [
-						captureField('projectToken', keys.providerFieldProjectToken, '50%'),
+						captureField('projectToken', keys.providerFieldProjectToken, { width: '50%' }),
 						{
 							name: 'region',
 							type: 'select',

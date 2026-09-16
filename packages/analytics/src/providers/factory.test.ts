@@ -93,6 +93,30 @@ describe('adapterFromProviderDoc', () => {
 		expect(adapter?.capture).toBeUndefined()
 	})
 
+	it('passes the ga4 measurementId through to the adapter', () => {
+		const adapter = adapterFromProviderDoc({
+			provider: 'ga4',
+			ga4: {
+				propertyId: '1',
+				clientEmail: 'svc@x.iam',
+				privateKey: 'pk',
+				measurementId: 'G-XYZ789',
+			},
+		})
+		expect(adapter?.capture?.client).toEqual({ kind: 'ga4', measurementId: 'G-XYZ789' })
+		expect(adapter?.capture?.snippet({ path: '/ga' }).scripts[1]?.src).toBe(
+			'https://www.googletagmanager.com/gtag/js?id=G-XYZ789'
+		)
+	})
+
+	it('declares no ga4 capture without a measurementId', () => {
+		const adapter = adapterFromProviderDoc({
+			provider: 'ga4',
+			ga4: { propertyId: '1', clientEmail: 'svc@x.iam', privateKey: 'pk' },
+		})
+		expect(adapter?.capture).toBeUndefined()
+	})
+
 	it('treats empty-string capture fields as unset', () => {
 		const adapter = adapterFromProviderDoc({
 			provider: 'posthog',

@@ -110,7 +110,13 @@ export function createEngine(opts: EngineOptions): Engine {
 				const result: AnalyticsResult = clamped
 					? { ...fresh, meta: { ...fresh.meta, clamped: true } }
 					: fresh
-				const ttl = opts.ttl.aggregate ?? adapter.capabilities.recommendedTtl.aggregate
+				// `goalsUnresolved` on a read that carried goal slugs means the provider's goal
+				// request failed; at the aggregate TTL one transient error would pin "no
+				// conversions" for an hour. Without slugs the flag is stable config, not a failure.
+				const degraded = result.meta.goalsUnresolved === true && (q.goalSlugs?.length ?? 0) > 0
+				const ttl = degraded
+					? (opts.ttl.realtime ?? adapter.capabilities.recommendedTtl.realtime)
+					: (opts.ttl.aggregate ?? adapter.capabilities.recommendedTtl.aggregate)
 				await opts.store.set(key, result, ttl)
 				return result
 			})

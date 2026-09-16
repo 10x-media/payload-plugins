@@ -28,6 +28,7 @@ export { DEFAULT_TRACKER_ENDPOINT, type InitTrackerArgs, initTracker } from '../
 export { createScriptLoader } from '../tracker/loadScript'
 export { createPageTracking, type PageTracking } from '../tracker/pageTracking'
 export { acquireTracker, type TrackerLease } from '../tracker/registry'
+export { createGa4Sink } from '../tracker/sinks/ga4'
 export { createNativeSink, PAGEVIEW_BUFFER_MS } from '../tracker/sinks/native'
 export { createPlausibleSink } from '../tracker/sinks/plausible'
 export { createPosthogSink } from '../tracker/sinks/posthog'

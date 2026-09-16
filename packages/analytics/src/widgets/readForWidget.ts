@@ -1,5 +1,5 @@
 import type { PayloadRequest } from 'payload'
-import { satisfiesCapabilities } from '../core/capabilities'
+import { comparisonOf, satisfiesCapabilities } from '../core/capabilities'
 import type {
 	AnalyticsAdapter,
 	AnalyticsCapabilities,
@@ -9,9 +9,10 @@ import type {
 	MetricKey,
 } from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
+import { goalSlugsFor } from '../plugin/goalHint'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
-import { previousWindow } from './comparison'
+import { previousWindow, withinLookback } from './comparison'
 
 export type WidgetReadStatus = 'ok' | 'not-configured' | 'unavailable' | 'filter-unsupported'
 
@@ -39,6 +40,8 @@ export interface WidgetReadResult {
 	clamped?: boolean
 	/** True when the engine served a stale cache entry after a failed provider read. */
 	stale?: boolean
+	/** True when the source answered without one of the filters the read carried. */
+	filtersUnapplied?: boolean
 	/** Previous-window totals, present only when the adapter supports comparison. */
 	previousMetrics?: Partial<Record<MetricKey, number>>
 	/** The previous comparable window, present only when comparison ran. */
@@ -102,29 +105,30 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 	if (!supportsFilters(adapter.capabilities, filters)) {
 		return { status: 'filter-unsupported', adapterId: adapter.id, ...base }
 	}
+	const previousRange =
+		args.comparison !== false && runtime.comparison && comparisonOf(adapter.capabilities)
+			? previousWindow(dateRange, tz)
+			: null
 	const comparisonRange =
-		args.comparison !== false && runtime.comparison && adapter.capabilities.comparison
-			? (previousWindow(dateRange, tz) ?? undefined)
+		previousRange &&
+		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
+			? previousRange
 			: undefined
+	const goalSlugs = await goalSlugsFor({ runtime, req, scope: ctx.scope, metrics })
+	const readBase = {
+		metrics,
+		filters,
+		timezone: tz,
+		scope: ctx.queryScope,
+		...(goalSlugs === undefined ? {} : { goalSlugs }),
+	}
 	let result: AnalyticsResult
 	let previous: AnalyticsResult | undefined
 	try {
 		;[result, previous] = await Promise.all([
-			runtime.engine.read(adapter, {
-				metrics,
-				dateRange,
-				filters,
-				timezone: tz,
-				scope: ctx.queryScope,
-			}),
+			runtime.engine.read(adapter, { ...readBase, dateRange }),
 			comparisonRange
-				? runtime.engine.read(adapter, {
-						metrics,
-						dateRange: comparisonRange,
-						filters,
-						timezone: tz,
-						scope: ctx.queryScope,
-					})
+				? runtime.engine.read(adapter, { ...readBase, dateRange: comparisonRange })
 				: undefined,
 		])
 	} catch {
@@ -140,6 +144,7 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		metrics: result.totals ?? {},
 		clamped: result.meta.clamped ?? false,
 		stale: result.meta.stale ?? false,
+		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
 		previousMetrics,
 		comparisonRange,
 	}

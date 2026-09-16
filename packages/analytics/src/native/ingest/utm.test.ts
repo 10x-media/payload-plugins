@@ -51,6 +51,12 @@ describe('extractUtm', () => {
 		})
 	})
 
+	it('ignores a query key naming a prototype member', () => {
+		expect(
+			extractUtm('constructor=x&__proto__=y&toString=z&hasOwnProperty=w&utm_source=google')
+		).toEqual({ utmSource: 'google' })
+	})
+
 	it('keeps the first value when a key repeats', () => {
 		expect(extractUtm('utm_source=first&utm_source=second')).toEqual({ utmSource: 'first' })
 	})

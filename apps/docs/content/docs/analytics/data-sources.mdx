@@ -49,7 +49,7 @@ Each row carries the adapter's `SerializedCapabilities`, a deliberate allowlist 
 | `filterOperators` | `eq` / `contains` / `matches` | the `operator` of each `filters` entry |
 | `realtime`, `realtimeWindowMinutes` | boolean, plus the window it reports over | whether a realtime surface renders at all |
 | `perPageQuery` | boolean | whether per-document [display fields](/analytics/display-fields) can read it |
-| `comparison` | boolean | the `compare` parameter |
+| `comparison` | boolean, `true` unless the adapter opted out | the `compare` parameter |
 | `minGranularity` | the finest bucket it can return | the `granularity` parameter |
 | `maxLookbackDays` | days, or `null` for unbounded | how far back a read is narrowed, visibly |
 
@@ -79,7 +79,7 @@ It requires a signed-in user and `access.read`. Every answer, success or failure
 | `filters` | JSON array of `{ dimension, operator, value }` | none | at most 10; each dimension in `capabilities.filters`, each operator in `capabilities.filterOperators`, each value 1 to 256 characters |
 | `limit` | integer | `50` | 1 to 500 |
 | `order` | `<metric>:asc` or `<metric>:desc` | the adapter's own order | the metric must be one of `metrics` |
-| `compare` | `previous` | none | only when `capabilities.comparison`, and only for a range with a comparable previous window |
+| `compare` | `previous` | none | only when `capabilities.comparison`, and only for a range with a comparable previous window. A previous window beyond the source's lookback is dropped rather than rejected |
 | `source` | a source id from the sources endpoint | the request's default source | must be a source this request resolves |
 | `path` | string | none | at most 512 characters |
 | `hostname` | string | none | at most 253 characters |
@@ -111,15 +111,18 @@ Windows longer than 366 days answer `range_too_long`. Shorter ones can still be 
       // "clamped": true  the range was narrowed to the source's maxLookbackDays
       // "sampled": true  the adapter hit its own row cap
       // "stale": true    an expired cache entry was served because the refresh failed
+      // "unappliedFilters": [...]  filters the source could not carry, so the rows are wider
+      // "goalsUnresolved": true    the goal numbers are absent from this read
     }
   },
-  "comparison": { "...": "..." },  // an AnalyticsResult over the previous window, only with compare=previous
+  "comparison": { "...": "..." },  // an AnalyticsResult over the previous window, asked for with compare=previous
   "source": { "id": "native", "label": "Native", "kind": "config" },
   "capabilities": { "metrics": ["pageviews"], "...": "..." },
   "query": {
     "metrics": ["pageviews"],
     "dateRange": { "start": "2026-09-01T00:00:00.000Z", "end": "2026-09-07T23:59:59.999Z" },
     "limit": 50,
+    "goalSlugs": ["signup"],  // present when the read asks about goals
     "timezone": "UTC"
   }
 }
@@ -127,7 +130,13 @@ Windows longer than 366 days answer `range_too_long`. Shorter ones can still be 
 
 `query` is the request after validation and defaulting, with the date range as ISO instants, so a client renders the window it actually got rather than the one it typed. `meta` is passed through from the engine untouched: `meta.stale` is `true` when a cache entry expired, the refresh failed, and the expired value was served instead (see [stale-while-error](/analytics/cache)), which is worth surfacing as a badge rather than an error.
 
-`comparison` is the equal-length window immediately preceding the range, aligned to whole days in the effective timezone (the `timezone` parameter when given, otherwise the one the plugin's resolver returned), and is present only for `compare=previous`.
+`comparison` is the equal-length window immediately preceding the range, aligned to whole days in the effective timezone (the `timezone` parameter when given, otherwise the one the plugin's resolver returned). It is asked for with `compare=previous` and omitted when that window starts before the source's `maxLookbackDays`, measured from today: the read is served without it rather than failed, so a client renders the numbers and drops the delta.
+
+`meta.unappliedFilters` lists the narrowing a source could not carry, which means the rows answer a wider question than the request asked: `filters` entries it had to drop (an `eq` value with a comma on Umami among them), and on Umami a goal slug whose comma its value list cannot escape. `meta.goalsUnresolved` says the read's goal numbers are absent: either it asked about goals with none configured for the scope, or the provider rejected the goal request and the rest of the read was served without it. Neither is an error, and both are worth captioning rather than hiding. The view and the widgets do exactly that: an unapplied filter raises a notice beside the range caption, and an unresolved goal read renders its own empty state rather than the plain no-data one, so it never reads as nobody having converted.
+
+<Callout type="warn">
+**A far-past absolute range is served unclamped, but loses its comparison.** The engine's clamp floors a read at that read's **own end** minus the source's lookback, so a window that is itself shorter than the lookback is never narrowed however far back it sits. The comparison guard measures from **today** instead, because that is where a provider measures its own lookback from, so such a range answers in full and its previous window is dropped.
+</Callout>
 
 <Callout type="info">
 **An unconfigured source answers `200`, not an error.** A source whose credentials are unset returns an empty `rows` array, no `totals`, and `meta.provider` set to its adapter id. The read is short-circuited before any network call, so nothing distinguishes it from a real window with no traffic. If that matters to your surface, check the source's configuration rather than inferring it from an empty result.
@@ -139,7 +148,7 @@ Every non-2xx answer is an `{ error }` object carrying a `code`, a `message`, an
 
 | Status | `error.code` | `param` | When |
 |---|---|---|---|
-| `400` | `invalid_param` | the parameter at fault | any malformed parameter, including `compare=previous` on a source without `capabilities.comparison` or on a range with no comparable previous window |
+| `400` | `invalid_param` | the parameter at fault | any malformed parameter, including `compare=previous` on a source whose adapter set `comparison: false` or on a range too long to have a previous window. A previous window beyond the source's lookback is not an error: it is omitted from the answer |
 | `400` | `unsupported_metric` | `metrics` | a known metric this source does not serve |
 | `400` | `unsupported_dimension` | `dimensions` | a known dimension this source cannot break down by |
 | `400` | `unsupported_filter` | `filters` | a dimension outside `capabilities.filters` |
