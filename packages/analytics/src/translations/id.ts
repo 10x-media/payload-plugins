@@ -100,6 +100,8 @@ export const id: Record<TranslationKey, string> = {
 	[keys.providerFieldMeasurementId]: 'ID pengukuran',
 	[keys.providerFieldCaptureHelp]:
 		'Konfigurasi publik browser. Perekaman hanya berjalan bila diisi.',
+	[keys.providerErrorMeasurementId]:
+		'Gunakan hanya huruf, angka, dan tanda hubung, misalnya G-AB12CD34.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

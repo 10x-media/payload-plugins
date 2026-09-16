@@ -100,6 +100,8 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.providerFieldMeasurementId]: 'ID вимірювання',
 	[keys.providerFieldCaptureHelp]:
 		'Публічна конфігурація для браузера. Збір працює, лише якщо її задано.',
+	[keys.providerErrorMeasurementId]:
+		'Використовуйте лише літери, цифри та дефіси, наприклад G-AB12CD34.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

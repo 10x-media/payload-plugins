@@ -161,6 +161,20 @@ describe('buildProvidersCollection', () => {
 		expect(validate?.('EURO', req)).toBe('analytics:goalErrorCurrency')
 	})
 
+	it('validates the ga4 measurement id as a bare token', () => {
+		const group = named(collection.fields, 'ga4')
+		const fields = group && 'fields' in group ? group.fields : []
+		const measurementId = named(fields, 'measurementId') as TextField | undefined
+		const validate = measurementId?.validate as
+			| ((value: unknown, options: unknown) => true | string)
+			| undefined
+		const req = { req: { t: (key: string) => key } } as never
+		expect(validate?.('G-AB12CD34', req)).toBe(true)
+		expect(validate?.('', req)).toBe(true)
+		expect(validate?.('G-AB12</script>', req)).toBe('analytics:providerErrorMeasurementId')
+		expect(validate?.('G AB12', req)).toBe('analytics:providerErrorMeasurementId')
+	})
+
 	it('keeps SECRET_PATHS in parity with the collection secret fields', () => {
 		const taggedPaths = collectTaggedPaths(collection.fields)
 		expect(new Set(taggedPaths)).toEqual(new Set(SECRET_PATHS.map((s) => s.path)))

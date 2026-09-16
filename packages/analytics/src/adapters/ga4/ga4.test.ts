@@ -487,6 +487,63 @@ describe('ga4 adapter', () => {
 			])
 		})
 
+		it('asks for the GA4 event names its slugs normalize to, and maps the rows back', async () => {
+			respond(() => [
+				{ dimensionValues: [{ value: 'checkout_complete' }], metricValues: [{ value: '7' }] },
+			])
+			const result = await ga4(config).query(
+				q({
+					metrics: ['conversions'],
+					dimensions: ['goal'],
+					goalSlugs: ['checkout-complete'],
+				}),
+				{}
+			)
+			expect(requests()[0]?.dimensionFilter).toEqual({
+				filter: {
+					fieldName: 'eventName',
+					inListFilter: { values: ['checkout_complete'], caseSensitive: true },
+				},
+			})
+			expect(result.rows).toEqual([
+				{ dimensions: { goal: 'checkout-complete' }, metrics: { conversions: 7 } },
+			])
+		})
+
+		it('gives rows of a shared GA4 event name to the first slug that claims it', async () => {
+			respond(() => [{ dimensionValues: [{ value: 'book_demo' }], metricValues: [{ value: '3' }] }])
+			const result = await ga4(config).query(
+				q({
+					metrics: ['conversions'],
+					dimensions: ['goal'],
+					goalSlugs: ['book-demo', 'book_demo'],
+				}),
+				{}
+			)
+			expect(requests()[0]?.dimensionFilter).toEqual({
+				filter: {
+					fieldName: 'eventName',
+					inListFilter: { values: ['book_demo'], caseSensitive: true },
+				},
+			})
+			expect(result.rows).toEqual([
+				{ dimensions: { goal: 'book-demo' }, metrics: { conversions: 3 } },
+			])
+		})
+
+		it('leaves an event breakdown reporting GA4 event names as they are', async () => {
+			respond(() => [
+				{ dimensionValues: [{ value: 'checkout_complete' }], metricValues: [{ value: '5' }] },
+			])
+			const result = await ga4(config).query(
+				q({ metrics: ['events'], dimensions: ['event'], goalSlugs: ['checkout-complete'] }),
+				{}
+			)
+			expect(result.rows).toEqual([
+				{ dimensions: { event: 'checkout_complete' }, metrics: { events: 5 } },
+			])
+		})
+
 		it('keeps the site metrics and drops conversions when the read carries no hint', async () => {
 			respond(() => [{ dimensionValues: [], metricValues: [{ value: '500' }] }])
 			const result = await ga4(config).query(q({ metrics: ['pageviews', 'conversions'] }), {})
@@ -508,13 +565,15 @@ describe('ga4 capture', () => {
 		expect(capture?.proxy.routes).toEqual([])
 		expect(capture?.client).toEqual({ kind: 'ga4', measurementId: 'G-AB12CD34' })
 		const scripts = capture?.snippet({ path: '/api/analytics/p/global' }).scripts ?? []
-		expect(scripts[0]).toEqual({
+		// Inline first: `gtag` and its queue exist before the tag lands, and survive a tag that
+		// never lands at all.
+		expect(scripts[0]?.inline).toBe(
+			'window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","G-AB12CD34")'
+		)
+		expect(scripts[1]).toEqual({
 			src: 'https://www.googletagmanager.com/gtag/js?id=G-AB12CD34',
 			async: true,
 		})
-		expect(scripts[1]?.inline).toBe(
-			'window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","G-AB12CD34")'
-		)
 	})
 
 	// The id reaches an inline script and a URL, so anything that is not a bare token is

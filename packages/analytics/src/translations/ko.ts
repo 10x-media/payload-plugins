@@ -99,6 +99,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.providerFieldRevenueCurrency]: '수익 통화',
 	[keys.providerFieldMeasurementId]: '측정 ID',
 	[keys.providerFieldCaptureHelp]: '공개 브라우저 설정입니다. 값이 있을 때만 수집이 실행됩니다.',
+	[keys.providerErrorMeasurementId]: '영문자, 숫자, 하이픈만 사용하세요. 예: G-AB12CD34',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

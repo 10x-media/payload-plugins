@@ -101,6 +101,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.providerFieldMeasurementId]: 'Mess-ID',
 	[keys.providerFieldCaptureHelp]:
 		'Öffentliche Browser-Konfiguration. Erfassung läuft nur, wenn sie gesetzt ist.',
+	[keys.providerErrorMeasurementId]:
+		'Nur Buchstaben, Ziffern und Bindestriche, zum Beispiel G-AB12CD34.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

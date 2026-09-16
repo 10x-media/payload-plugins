@@ -104,7 +104,7 @@ describe('adapterFromProviderDoc', () => {
 			},
 		})
 		expect(adapter?.capture?.client).toEqual({ kind: 'ga4', measurementId: 'G-XYZ789' })
-		expect(adapter?.capture?.snippet({ path: '/ga' }).scripts[0]?.src).toBe(
+		expect(adapter?.capture?.snippet({ path: '/ga' }).scripts[1]?.src).toBe(
 			'https://www.googletagmanager.com/gtag/js?id=G-XYZ789'
 		)
 	})

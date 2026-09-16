@@ -104,6 +104,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.providerFieldRevenueCurrency]: 'Revenue currency',
 	[keys.providerFieldMeasurementId]: 'Measurement ID',
 	[keys.providerFieldCaptureHelp]: 'Public browser config. Capture only runs when it is set.',
+	[keys.providerErrorMeasurementId]:
+		'Use letters, digits and hyphens only, for example G-AB12CD34.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

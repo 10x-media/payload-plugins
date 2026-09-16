@@ -23,6 +23,8 @@ import {
 	splitGoalMetrics,
 } from '../goalRead'
 import { dayIso } from '../series'
+import { ga4EventName } from './eventName'
+import { MEASUREMENT_ID_PATTERN } from './measurementId'
 
 export interface Ga4Config {
 	/** GA4 property id (numeric), e.g. '123456789'. */
@@ -40,15 +42,14 @@ export interface Ga4Config {
 	measurementId?: string
 }
 
-/** What Google's own ids look like, and all the inline snippet and the tag URL may carry. */
-const MEASUREMENT_ID_PATTERN = /^[A-Za-z0-9-]+$/
-
 /**
  * Google's documented install snippet (https://developers.google.com/tag-platform/gtagjs/install):
- * the tag loads from googletagmanager.com and the inline publishes `dataLayer` and `gtag`
- * before configuring the measurement id. The tag is served from Google's own CDN with the id
- * in the query string, so there is nothing to proxy and `routes` stays empty; the snippet is
- * rendered from an absolute `src` and the slot's proxy mount answers 404.
+ * the inline publishes `dataLayer` and `gtag` and configures the measurement id, then the tag
+ * loads from googletagmanager.com. Inline first is Google's own ordering for consent mode, and
+ * it leaves the queue defined even when the tag itself is blocked. The tag is served from
+ * Google's CDN with the id in the query string, so there is nothing to proxy and `routes`
+ * stays empty; the snippet is rendered from an absolute `src` and the slot's proxy mount
+ * answers 404.
  */
 function buildCapture(measurementId: string): CaptureSupport {
 	const id = JSON.stringify(measurementId)
@@ -57,11 +58,11 @@ function buildCapture(measurementId: string): CaptureSupport {
 		snippet: () => ({
 			scripts: [
 				{
-					src: `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`,
-					async: true,
+					inline: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config",${id})`,
 				},
 				{
-					inline: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config",${id})`,
+					src: `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`,
+					async: true,
 				},
 			],
 		}),
@@ -102,11 +103,28 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 }
 
 /**
- * Metrics GA4 answers only for a goal-restricted read. `keyEvents` counts events the
- * property itself marks as key events, so an event that is a goal here but not marked
- * there reports 0.
+ * Metrics GA4 answers only for a goal-restricted read. A goal matches the GA4 event named by
+ * its normalized slug, since GA4 refuses the kebab-case slug itself. `keyEvents` counts
+ * events the property itself marks as key events, so an event that is a goal here but not
+ * marked there reports 0.
  */
 const GOAL_METRICS: ReadonlySet<MetricKey> = new Set(['conversions'])
+
+/**
+ * The hint's slugs keyed by the GA4 event name each one normalizes to, which is both the
+ * `eventName` list the goal request sends and the way its rows map back. Two slugs can
+ * normalize to one GA4 event, which GA4 counts once: the first hint slug owns those rows.
+ */
+const goalSlugsByEventName = (slugs: string[]): Map<string, string> => {
+	const byName = new Map<string, string>()
+	for (const slug of slugs) {
+		const name = ga4EventName(slug)
+		if (!byName.has(name)) {
+			byName.set(name, slug)
+		}
+	}
+	return byName
+}
 
 type StringMatchType = 'EXACT' | 'CONTAINS' | 'FULL_REGEXP'
 
@@ -274,13 +292,14 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 				}
 				filterExprs.push(stringFilter(fieldName, MATCH_TYPE_MAP[filter.operator], filter.value))
 			}
-			const goalExprs = hint
+			const goalSlugs = hint ? goalSlugsByEventName(hint) : null
+			const goalExprs = goalSlugs
 				? [
 						...filterExprs,
 						{
 							filter: {
 								fieldName: 'eventName',
-								inListFilter: { values: hint, caseSensitive: true },
+								inListFilter: { values: [...goalSlugs.keys()], caseSensitive: true },
 							},
 						},
 					]
@@ -408,7 +427,10 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 				const dimValues: Partial<Record<DimensionKey, string>> = {}
 				for (const d of dims) {
 					const idx = providerDims.indexOf(DIMENSION_MAP[d] as string)
-					dimValues[d] = row.keys[idx] ?? ''
+					const value = row.keys[idx] ?? ''
+					// A `goal` row reports the slug it was asked for; an `event` row reports GA4's own
+					// event name, even though both read the same dimension.
+					dimValues[d] = d === 'goal' ? (goalSlugs?.get(value) ?? value) : value
 				}
 				return { dimensions: dimValues, metrics: row.metrics }
 			})

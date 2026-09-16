@@ -101,6 +101,7 @@ export const keys = {
 	providerFieldRevenueCurrency: 'analytics:providerFieldRevenueCurrency',
 	providerFieldMeasurementId: 'analytics:providerFieldMeasurementId',
 	providerFieldCaptureHelp: 'analytics:providerFieldCaptureHelp',
+	providerErrorMeasurementId: 'analytics:providerErrorMeasurementId',
 	providerNamePlausible: 'analytics:providerNamePlausible',
 	providerNameUmami: 'analytics:providerNameUmami',
 	providerNameGa4: 'analytics:providerNameGa4',

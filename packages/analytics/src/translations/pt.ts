@@ -100,6 +100,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.providerFieldMeasurementId]: 'ID de medição',
 	[keys.providerFieldCaptureHelp]:
 		'Configuração pública do navegador. A captura só é executada quando estiver definida.',
+	[keys.providerErrorMeasurementId]: 'Use apenas letras, dígitos e hifens, por exemplo G-AB12CD34.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

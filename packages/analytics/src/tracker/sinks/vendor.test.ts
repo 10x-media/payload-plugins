@@ -221,4 +221,23 @@ describe('vendor call shapes', () => {
 		})
 		expect(gtag).toHaveBeenNthCalledWith(2, 'event', 'signup', {})
 	})
+
+	// GA4 refuses a hyphen in an event name, so a kebab-case goal slug has to be normalized;
+	// the other vendors take the slug as authored.
+	it('ga4: sends a hyphenated goal slug under its GA4 event name', async () => {
+		const { win, gtag, plausible, install } = vendorWindow()
+		install()
+		const goal: TrackerEvent = { ...purchase, name: 'checkout-complete' }
+		const sink = await ready(createGa4Sink, win)
+		sink.send(goal)
+		const plausibleSink = await ready(createPlausibleSink, win)
+		plausibleSink.send(goal)
+
+		expect(gtag).toHaveBeenCalledWith('event', 'checkout_complete', {
+			plan: 'pro',
+			value: 49,
+			currency: 'EUR',
+		})
+		expect(plausible).toHaveBeenCalledWith('checkout-complete', expect.anything())
+	})
 })

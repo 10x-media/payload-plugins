@@ -100,6 +100,8 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.providerFieldMeasurementId]: 'ID измерения',
 	[keys.providerFieldCaptureHelp]:
 		'Публичная конфигурация для браузера. Сбор работает, только если она задана.',
+	[keys.providerErrorMeasurementId]:
+		'Используйте только буквы, цифры и дефисы, например G-AB12CD34.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

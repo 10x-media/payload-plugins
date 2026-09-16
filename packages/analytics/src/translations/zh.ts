@@ -99,6 +99,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.providerFieldRevenueCurrency]: '收入货币',
 	[keys.providerFieldMeasurementId]: '衡量 ID',
 	[keys.providerFieldCaptureHelp]: '面向浏览器的公开配置。仅在填写后才会进行采集。',
+	[keys.providerErrorMeasurementId]: '只能使用字母、数字和连字符，例如 G-AB12CD34。',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',

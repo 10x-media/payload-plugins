@@ -168,10 +168,10 @@ describeForDb('analytics ga4 capture from a provider document', { dbs: ['mongo']
 		expect(slot.requiresConsent).toBe(true)
 		expect(slot.client).toEqual({ kind: 'ga4', measurementId: MEASUREMENT_ID })
 		expect(slot.snippet.scripts).toEqual([
-			{ src: `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`, async: true },
 			{
 				inline: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","${MEASUREMENT_ID}")`,
 			},
+			{ src: `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`, async: true },
 		])
 	})
 

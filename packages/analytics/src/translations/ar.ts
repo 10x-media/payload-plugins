@@ -99,6 +99,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.providerFieldRevenueCurrency]: 'عملة الإيرادات',
 	[keys.providerFieldMeasurementId]: 'معرّف القياس',
 	[keys.providerFieldCaptureHelp]: 'إعدادات عامة للمتصفح. لا يعمل التتبع إلا عند ضبطها.',
+	[keys.providerErrorMeasurementId]: 'استخدم الأحرف والأرقام والشرطات فقط، مثل G-AB12CD34.',
 	[keys.providerNamePlausible]: 'Plausible',
 	[keys.providerNameUmami]: 'Umami',
 	[keys.providerNameGa4]: 'Google Analytics 4',
