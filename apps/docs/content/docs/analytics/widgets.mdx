@@ -37,7 +37,7 @@ export default buildConfig({
 | `analytics-trend` | A gradient area chart of one metric over time, with timeframe-aware axis labels and a hover tooltip. | | `pageviews` |
 | `analytics-goals` | Conversions, revenue and conversion rate per [goal](/analytics/goals). See [below](#the-goals-widget). | `goal` | none, it has no metric field |
 | `analytics-breakdown-pages` | Top pages as a filled bar list. | `page` | `pageviews` |
-| `analytics-breakdown-sources` | Top traffic sources. | `source` | `pageviews` |
+| `analytics-breakdown-sources` | Top traffic sources. On the [native engine](/analytics/native#dimensions) these are traffic channels, rendered under their translated names while the stored value stays a lowercase token. | `source` | `pageviews` |
 | `analytics-breakdown-devices` | Device classes. | `device` | `pageviews` |
 | `analytics-breakdown-countries` | Countries. | `country` | `pageviews` |
 | `analytics-breakdown-goals` | [Goal](/analytics/goals) completions per goal slug. | `goal` | `conversions` |
@@ -70,9 +70,9 @@ The realtime widget polls an authenticated `GET /api/analytics/realtime` endpoin
 
 Trend widgets render a real daily series for every provider that has one; where a provider has no per-day source for a metric (Umami's visitors, for example), the headline stays correct and the series is empty. Headline totals are range-correct: distinct metrics like visitors are never summed across days.
 
-The metric and trend widgets show a period-over-period comparison when the active adapter declares `capabilities.comparison`: the plugin reads the same count of whole reporting-timezone days immediately preceding the current window and renders a colored delta (an up/down arrow with the percentage change) and a "vs. previous period" caption. Metrics where lower is better (bounce rate) invert the coloring, and `allTime` never compares. The comparison is capability-gated, so adapters that cannot answer a second window simply omit it; set `widgets: { comparison: false }` to skip the previous-window read entirely. All comparison strings are typed translations, localizable through the [`translations` option](/analytics/i18n).
+The metric and trend widgets show a period-over-period comparison on every source: the plugin reads the same count of whole reporting-timezone days immediately preceding the current window and renders a colored delta (an up/down arrow with the percentage change) and a "vs. previous period" caption. The previous-window read is the engine's own, so it works against a provider exactly as it does against native; an adapter opts out with `comparison: false`. Metrics where lower is better (bounce rate) invert the coloring, and `allTime` never compares. A previous window starting before the source's `maxLookbackDays` is omitted silently, so the number stands without a delta rather than the widget failing; set `widgets: { comparison: false }` to skip the previous-window read entirely. All comparison strings are typed translations, localizable through the [`translations` option](/analytics/i18n).
 
-The trend widget can also draw the previous period. Tick **Compare to previous period** on the widget instance and the chart overlays that window as a muted line on the same axes, scaled so both series fit, with a legend naming each series (the previous one carrying its own date range) and a tooltip row per series. The overlay is the same previous-window read the delta already makes, asked for by day instead of as a total, so adapters that answer a series and a total in separate calls make one more call for it and it lands under its own cache key. Points align to the primary axis day for day, re-dated onto it first so a week- or month-bucketed chart cannot land the two windows on different boundaries. The checkbox is gated the same way the delta is: `widgets: { comparison: false }` removes the field from every widget's config rather than leaving a toggle that reads nothing.
+The trend widget can also draw the previous period. Tick **Compare to previous period** on the widget instance, which every source offers unless its adapter opted out, and the chart overlays that window as a muted line on the same axes, scaled so both series fit, with a legend naming each series (the previous one carrying its own date range) and a tooltip row per series. The overlay is the same previous-window read the delta already makes, asked for by day instead of as a total, so adapters that answer a series and a total in separate calls make one more call for it and it lands under its own cache key. Points align to the primary axis day for day, re-dated onto it first so a week- or month-bucketed chart cannot land the two windows on different boundaries. The checkbox is gated the same way the delta is: `widgets: { comparison: false }` removes the field from every widget's config rather than leaving a toggle that reads nothing.
 
 The analytics view's trend does the same, so a comparison is one chart on both surfaces rather than a second one stacked below.
 
@@ -89,7 +89,7 @@ Charts are dependency-free SVG and CSS, themed with Payload's design tokens. The
 | Revenue | Summed completion values, as a bare number. Omitted as a column when the source serves no revenue; a row the source cannot fill shows a dash. |
 | Conversion rate | The goal's visitors over the window's site visitors. Omitted as a column when the source serves no visitors. |
 
-It registers only where a source can serve both the `conversions` metric and the `goal` dimension, so an install whose sources cannot answer both never sees it at all, and one with [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) enabled sees it degrade per request instead. Its fields are the title, the timeframe (presets plus a custom range), a row limit of 10, 25 or 50, the compare checkbox, and the data source in multi-adapter setups.
+It registers only where a source can serve both the `conversions` metric and the `goal` dimension, which every built-in provider now does, so an install whose sources cannot answer both never sees it at all, and one with [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) enabled sees it degrade per request instead. Its fields are the title, the timeframe (presets plus a custom range), a row limit of 10, 25 or 50, the compare checkbox, and the data source in multi-adapter setups.
 
 The table costs one engine read, the ranked `goal` breakdown carrying revenue and visitors per row where the source serves them. Add one for the window's site visitors wherever the source serves `visitors`, since that is the rate's denominator, and one more for the previous window's breakdown when comparison is on. That previous window is read four rows deep for every row shown, because both windows rank by their own conversions and a goal near the top today can sit well below the cut in the window before it.
 
@@ -102,7 +102,7 @@ Metric, trend and breakdown widgets carry one optional **Filter**: a dimension, 
 | Field | Notes |
 |---|---|
 | Dimension | The gate. Cleared, there is no filter and the other two are ignored. |
-| Operator | `is`, `contains` or `matches pattern`, whichever the source declares. Defaults to `is` and is never empty. |
+| Operator | `is`, `contains` or `matches pattern`, whichever the source declares. `matches pattern` is provider-only: the native engine declares no regex operator, and each provider's flavor is its own (see [Filters](/analytics/adapters#filters)). Defaults to `is` and is never empty. |
 | Value | Your own text, trimmed, capped at 256 characters. Required once a dimension is set, and never translated. |
 
 A dimension or operator the contract does not define (a hand-edited layout, a widget saved against an older version) is not applied: the dimension drops the filter entirely and an unknown operator falls back to `is`.
@@ -121,7 +121,7 @@ A source that cannot apply the stored filter renders **"This source cannot apply
 
 A filtered widget states its filter in the caption, after the window: **Last 30 days where Country is DE**. The dimension and the operator are translated, the value is yours verbatim, and both the sentence (`'where {{dimension}} {{operator}} {{value}}'`) and the join that puts it after the window (`'{{window}} {{filter}}'`) are translated templates, so a locale can reorder the parts, and one that does not separate clauses with a space drops it. Both are overridable through the [`translations` option](/analytics/i18n). The caption renders with the data it describes: a widget on any non-ok state shows its title, the message and the link, never a caption for numbers it does not have.
 
-The caption and the view's filter chip word the same filter differently: the card reads **where Country is DE**, a sentence under a number, and the chip the link lands on reads **Country = DE**, a control you can remove. Same filter, two registers.
+The caption and the view's filter chip word the same filter differently: the card reads **where Country is DE**, a sentence under a number, and the chip the link lands on reads **Country = DE**, a control you can remove. Same filter, two registers. The chip names a `source` value by its channel name (**Source = Search**); the caption quotes the value the editor typed, so a filter on `source` reads **where Source is search** there.
 
 ## Open in Analytics
 

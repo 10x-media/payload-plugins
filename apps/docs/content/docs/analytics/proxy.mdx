@@ -77,7 +77,7 @@ analytics({ capture: { paths: { global: '/ph' } } })
 Notes:
 
 - `skipTrailingSlashRedirect: true` is required whenever a mounted adapter sets `capture.proxy.trailingSlashes`, which today means PostHog.
-- An adapter with no capture support (GA4) or no proxy routes (native) contributes nothing rather than throwing, so one unfilled mount never blanks the others.
+- An adapter with no capture support, or with capture but no proxy routes (native, GA4), contributes nothing rather than throwing, so one unfilled mount never blanks the others.
 - A mount path that normalizes to the site root throws: an unprefixed catch-all route would swallow the whole app. So do two mounts whose paths are equal or nested (`/ph` and `/ph/x`), because Next matches rewrites first-match-wins and the earlier catch-all would silently shadow the later mount. Mere string-prefix siblings (`/ph` and `/phx`) are fine.
 - Next always strips a trailing slash from the matched path before substituting it into `destination`, unlike the runtime endpoint, which can be told to keep one. Harmless for every vendor supported today.
 - `posthogProxyRewrites({ path, region })` still works and is now a thin wrapper over `captureRewrites`. It is **deprecated**: prefer `captureRewrites` with a `posthog()` instance, which also covers the other vendors and multiple mounts. Its emitted rewrites are unchanged apart from the capture-group name (`:path*` became `:p*`, which Next resolves identically).
@@ -123,7 +123,7 @@ Umami Cloud serves the script and collects events on two different hosts, which 
 
 ### GA4
 
-No capture support. Google's collection domains and consent mode make a clean first-party proxy impractical; use Google's own server-side tagging if you need first-party GA. The GA4 adapter still serves reads.
+No routes. GA4 [captures](/analytics/capture#ga4) once `measurementId` is set, but the tag is served from `googletagmanager.com` with the id in the query string, so there is nothing first-party to proxy: the descriptor declares an empty route list, the slot's runtime mount answers 404, and `captureRewrites` emits nothing for it. Use Google's own server-side tagging if you need first-party collection for GA.
 
 ### Native
 
