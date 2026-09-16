@@ -308,7 +308,7 @@ The name GA4 receives is the slug normalized to an event name GA4 accepts, since
 
 ### Reading them back on a provider
 
-Every provider serves `conversions` and the `goal` dimension, and Plausible adds `revenue` where a revenue goal exists:
+Every provider serves `conversions` and the `goal` dimension. GA4 serves `revenue` too, and Plausible does where `revenueCurrency` names the currency of a revenue goal:
 
 | Adapter | Goal rows from | Conversions | Revenue |
 |---|---|---|---|
