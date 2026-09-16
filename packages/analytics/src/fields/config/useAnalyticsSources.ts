@@ -3,11 +3,20 @@
 import { useAuth, useConfig } from '@payloadcms/ui'
 import { useEffect, useState } from 'react'
 import { fetchSources, type WireSource } from './fetchSources'
-import { EMPTY_SOURCES, type KeyedSources, resolveSourcesState } from './sourcesState'
+import {
+	EMPTY_SOURCES,
+	FAILED_SOURCES,
+	type KeyedSources,
+	resolveSourcesState,
+} from './sourcesState'
 
 export interface AnalyticsSources {
 	sources: WireSource[] | null
 	defaultId: string | null
+	/** The fetch has yet to answer: not the same thing as a scope with no sources. */
+	loading: boolean
+	/** The fetch settled in failure, so a picker can say so instead of claiming none exist. */
+	error: boolean
 }
 
 /**
@@ -15,8 +24,9 @@ export interface AnalyticsSources {
  * per-user cache `fetchSources` already keeps. `sources` and `defaultId` stay
  * null until the fetch resolves, on a failed fetch, or when there is no
  * authenticated user yet; consumers fall back to their static option list in
- * that window. Sources fetched for a previous user are never returned while
- * a new user's fetch is pending.
+ * that window, and `loading`/`error` tell those two windows apart. Sources
+ * fetched for a previous user are never returned while a new user's fetch is
+ * pending.
  */
 export const useAnalyticsSources = (): AnalyticsSources => {
 	const { user } = useAuth()
@@ -37,10 +47,12 @@ export const useAnalyticsSources = (): AnalyticsSources => {
 		let cancelled = false
 		fetchSources(serverURL ?? '', api, userKey)
 			.then(({ defaultId, sources }) => {
-				if (!cancelled) setState({ key: userKey, data: { sources, defaultId } })
+				if (!cancelled) {
+					setState({ key: userKey, data: { defaultId, error: false, loading: false, sources } })
+				}
 			})
 			.catch(() => {
-				if (!cancelled) setState({ key: userKey, data: EMPTY_SOURCES })
+				if (!cancelled) setState({ key: userKey, data: FAILED_SOURCES })
 			})
 		return () => {
 			cancelled = true

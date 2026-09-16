@@ -95,15 +95,43 @@ The table costs one engine read, the ranked `goal` breakdown carrying revenue an
 
 A goal the previous window's rows do not reach carries no delta at all, rather than a fabricated one; a goal that converted zero times in the previous window shows the localized direction word instead of a percentage, since there is no baseline to take one of.
 
+## Filters
+
+Metric, trend and breakdown widgets carry one optional **Filter**: a dimension, an operator and a value. Set it and the card answers for that slice only, so "Pageviews" and "Pageviews from Germany" are two instances of the same widget rather than two widgets. The goals and realtime widgets have no filter field.
+
+| Field | Notes |
+|---|---|
+| Dimension | The gate. Cleared, there is no filter and the other two are ignored. |
+| Operator | `is`, `contains` or `matches pattern`, whichever the source declares. Defaults to `is` and is never empty. |
+| Value | Your own text, trimmed, capped at 256 characters. Required once a dimension is set, and never translated. |
+
+A dimension or operator the contract does not define (a hand-edited layout, a widget saved against an older version) is not applied: the dimension drops the filter entirely and an unknown operator falls back to `is`.
+
+<Callout type="warn">
+**`contains` differs by database on the native engine.** It is case-insensitive on both, but on Postgres the value is a raw `ILIKE` pattern, so `%` and `_` in it act as wildcards; on Mongo the value is regex-escaped first and matches literally. Keep filter values free of `%` and `_` if the same widget has to read the same way on either database.
+</Callout>
+
+Both selects are narrowed live by the same `GET /api/analytics/sources` endpoint the data source and metric pickers use: they offer only the dimensions the widget's chosen source declares as filterable and only the operators it declares, in the plugin's own contract order rather than the source's. A stored value the current source no longer offers stays visible rather than vanishing; the dimension can then be cleared, while the operator, which always has a value, cannot. While the endpoint is in flight neither select shows a notice, so a slow request never reads as "this source cannot filter"; a source that settles with nothing filterable says so below the select, and a failed request says that instead.
+
+<Callout type="warn">
+**With no data source chosen, the pickers offer the union of the request's sources.** On a single-provider install, or on any widget left on the default source, there is no one source to narrow against, so the lists are the union across every source that request can reach. A dimension only one source can filter is then offered next to an operator only another declares, and the pair they make is one no single source can serve. That is caught at read time, as the unsupported state below, rather than by hiding options the widget's eventual source may well support.
+</Callout>
+
+A source that cannot apply the stored filter renders **"This source cannot apply this filter"** in place of the number, the chart or the rows. The check runs before the query, so the read never falls back to unfiltered numbers and the adapter is never called; the widget's title and its **Open in Analytics** link stay. This is the same shape as the "Not available for this data source" state a missing metric or dimension produces, and it happens for the same reasons: a dimension the source does not list as filterable, an operator it does not declare, or a scoped install whose tenant source differs from the one the widget was configured against.
+
+A filtered widget states its filter in the caption, after the window: **Last 30 days where Country is DE**. The dimension and the operator are translated, the value is yours verbatim, and both the sentence (`'where {{dimension}} {{operator}} {{value}}'`) and the join that puts it after the window (`'{{window}} {{filter}}'`) are translated templates, so a locale can reorder the parts, and one that does not separate clauses with a space drops it. Both are overridable through the [`translations` option](/analytics/i18n). The caption renders with the data it describes: a widget on any non-ok state shows its title, the message and the link, never a caption for numbers it does not have.
+
+The caption and the view's filter chip word the same filter differently: the card reads **where Country is DE**, a sentence under a number, and the chip the link lands on reads **Country = DE**, a control you can remove. Same filter, two registers.
+
 ## Open in Analytics
 
-Every built-in widget ends in an **Open in Analytics** link that opens the [analytics view](/analytics/analytics-view) already showing what the card shows: the widget's window, its data source, and its metric or breakdown tab. A card is a summary, and this is the way from the summary to the report without re-picking any of it.
+Every built-in widget ends in an **Open in Analytics** link that opens the [analytics view](/analytics/analytics-view) already showing what the card shows: the widget's window, its data source, its metric or breakdown tab, and its filter. A card is a summary, and this is the way from the summary to the report without re-picking any of it.
 
 | Widget | Carries |
 |---|---|
-| Metric | window, source, metric |
-| Trend | window, source, metric, and `compare=1` when the instance compares |
-| Breakdown | window, source, metric, and the tab that offers its dimension |
+| Metric | window, source, metric, and its filter |
+| Trend | window, source, metric, its filter, and `compare=1` when the instance compares |
+| Breakdown | window, source, metric, its filter, and the tab that offers its dimension |
 | Goals | window, source, `metric=conversions`, `tab=goals`, and `compare=1` when the instance compares |
 | Realtime | source only. Its rolling window is no range the view can hold, so it opens on the view's own range |
 
@@ -185,6 +213,39 @@ export default async function TopSourcesWidget(props: WidgetServerProps) {
 ```
 
 Run `payload generate:importmap` after registering. The widget appears only when a configured adapter satisfies its `requires` gate, exactly like the built-ins.
+
+### Filtering a custom widget
+
+`readForWidget`, `readForWidgetBreakdown` and `readForWidgetSeries` take `filters?: AnalyticsFilter[]`, and answer `status: 'filter-unsupported'` when the source that would serve the read cannot apply one of them. The check runs before the query, so an unsupported filter costs no provider call, and it is distinct from `'unavailable'`: the metric or dimension is fine, the filter is not. Handle it, or your widget claims a slice it did not read. `readForWidgetGoals` and `readForWidgetRealtime` take no filters and never answer it.
+
+```tsx title="components/GermanPagesWidget.tsx"
+import { type AnalyticsFilter, readForWidgetBreakdown } from '@10x-media/analytics/rsc'
+
+const filters: AnalyticsFilter[] = [{ dimension: 'country', operator: 'eq', value: 'DE' }]
+
+const result = await readForWidgetBreakdown({
+  req: props.req,
+  metric: 'pageviews',
+  dimension: 'page',
+  timeframe: 'last30days',
+  limit: 5,
+  filters,
+  now: new Date(),
+})
+if (result.status === 'filter-unsupported') return <span>This source cannot apply this filter</span>
+if (result.status !== 'ok') return <span>No data</span>
+```
+
+A widget that stores its filter the way the built-ins do can reuse their whole stack. `widgetFilters(data)` from `@10x-media/analytics` turns a stored `WidgetFilter` group into the `AnalyticsFilter[]` the read wants, applying the same rules: the dimension is the gate, the operator defaults to `eq`, the value is trimmed and capped, and a half-filled group is no filter at all.
+
+```tsx
+import { widgetFilters, type WidgetFilter } from '@10x-media/analytics'
+
+const data = (props.widgetData ?? {}) as { filter?: WidgetFilter }
+const result = await readForWidgetBreakdown({ /* ... */ filters: widgetFilters(data) })
+```
+
+The two pickers are public as well: `FilterDimensionSelectField` and `FilterOperatorSelectField` from `@10x-media/analytics/client` are the same live, source-narrowed selects the built-ins use, and `useFilterCapabilities` is the hook behind them for a bespoke one. Like `MetricSelectField`, each narrows against the widget's top-level `dataSource` form path; pass `sourceFieldPath`, which is a full form path rather than a relative sibling name, when your source field sits elsewhere.
 
 ### Reading more than one metric at a time
 

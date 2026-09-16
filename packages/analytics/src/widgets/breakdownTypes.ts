@@ -1,7 +1,7 @@
 import type { DimensionKey, MetricKey } from '../core/contract'
 import type { TimeframePreset } from '../timeframe/presets'
 import { keys, type TranslationKey } from '../translations/keys'
-import type { WidgetRange } from './types'
+import type { WidgetFilter, WidgetRange } from './types'
 
 export interface BreakdownWidgetData {
 	title?: string
@@ -10,6 +10,7 @@ export interface BreakdownWidgetData {
 	range?: WidgetRange
 	limit?: number
 	dataSource?: string
+	filter?: WidgetFilter
 }
 
 export interface BreakdownSpec {

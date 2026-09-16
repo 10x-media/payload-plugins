@@ -1,10 +1,11 @@
-import type { Config } from 'payload'
+import type { Config, GroupField } from 'payload'
 import { describe, expect, it } from 'vitest'
 import type { AnalyticsAdapter, DimensionKey, MetricKey } from '../core/contract'
 import { native } from '../native/nativeAdapter'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { keys, type TranslationKey } from '../translations/keys'
 import type { CustomWidgetDef } from './customWidget'
+import { FILTER_DIMENSION_COMPONENT } from './filterField'
 import {
 	findMetricField,
 	type RegisterWidgetsArgs,
@@ -734,5 +735,67 @@ describe('registerWidgets view link', () => {
 
 	it('leaves a host-registered widget alone', () => {
 		expect(serverPropsOf(built(view), custom.slug)).toBeUndefined()
+	})
+})
+
+describe('registerWidgets: filter group', () => {
+	const register = (args: Partial<Parameters<typeof registerWidgets>[1]> = {}): Config => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+			...args,
+		})
+		return config
+	}
+
+	const filterGroup = (config: Config, slug: string): GroupField | undefined => {
+		const field = config.admin?.dashboard?.widgets
+			?.find((w) => w.slug === slug)
+			?.fields?.find((f) => 'name' in f && f.name === 'filter')
+		return field && field.type === 'group' ? field : undefined
+	}
+
+	const filtered = ['analytics-metric', 'analytics-trend', 'analytics-breakdown-pages']
+
+	it('puts the filter group on the metric, trend and breakdown widgets', () => {
+		const config = register()
+		for (const slug of filtered) {
+			expect(fieldNames(config, slug)).toContain('filter')
+		}
+	})
+
+	it('leaves the goals and realtime widgets unfiltered', () => {
+		const config = register()
+		expect(fieldNames(config, 'analytics-goals')).not.toContain('filter')
+		expect(fieldNames(config, 'analytics-realtime')).not.toContain('filter')
+	})
+
+	it('places the group after the data source field in a multi-provider install', () => {
+		const config = register({ adapters: [native(), memoryAdapter()], multiProvider: true })
+		for (const slug of filtered) {
+			const names = fieldNames(config, slug)
+			expect(names.indexOf('filter')).toBeGreaterThan(names.indexOf('dataSource'))
+			expect(names.at(-1)).toBe('filter')
+		}
+	})
+
+	it('places the group last in a single-provider install too', () => {
+		const config = register()
+		for (const slug of filtered) {
+			expect(fieldNames(config, slug).at(-1)).toBe('filter')
+		}
+	})
+
+	it('carries the scoped pickers into every widget it registers', () => {
+		const group = filterGroup(register(), 'analytics-breakdown-pages')
+		const dimension = group?.fields.find((f) => 'name' in f && f.name === 'dimension')
+		const component = dimension?.admin?.components?.Field
+		expect(component && typeof component === 'object' ? component.path : '').toBe(
+			FILTER_DIMENSION_COMPONENT
+		)
 	})
 })

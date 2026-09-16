@@ -382,3 +382,5 @@ export type {
 export type { TimeframePreset } from './timeframe/presets'
 export type { CustomWidgetDef } from './widgets/customWidget'
 export { analyticsDefaultWidgets } from './widgets/defaults'
+export { widgetFilters } from './widgets/filterField'
+export type { WidgetFilter } from './widgets/types'

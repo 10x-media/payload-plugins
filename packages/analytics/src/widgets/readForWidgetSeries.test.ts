@@ -1,5 +1,5 @@
 import type { PayloadRequest } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -265,13 +265,48 @@ describe('readForWidgetSeries', () => {
 		expect(received?.filters).toEqual([{ dimension: 'page', operator: 'eq', value: '/a' }])
 	})
 
-	it('returns unavailable when the adapter lacks the filter dimension', async () => {
+	it('answers filter-unsupported, without querying, when the adapter lacks the dimension', async () => {
+		const adapter = seriesAdapter({ capabilities: baseCaps() })
+		const spy = vi.spyOn(adapter, 'query')
 		const result = await readForWidgetSeries({
-			req: reqWith([seriesAdapter({ capabilities: baseCaps() })]),
+			req: reqWith([adapter]),
 			metric: 'pageviews',
 			timeframe: 'last7days',
 			now: NOW,
 			// baseCaps declares no filters at all.
+			filters: [{ dimension: 'page', operator: 'eq', value: '/a' }],
+		})
+		expect(result.status).toBe('filter-unsupported')
+		expect(spy).not.toHaveBeenCalled()
+	})
+
+	it('answers filter-unsupported when the operator is the part the adapter lacks', async () => {
+		const adapter = seriesAdapter({
+			capabilities: { ...baseCaps(), filters: new Set(['page']) },
+		})
+		const spy = vi.spyOn(adapter, 'query')
+		const result = await readForWidgetSeries({
+			req: reqWith([adapter]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
+			// baseCaps declares 'eq' alone.
+			filters: [{ dimension: 'page', operator: 'matches', value: '^/a' }],
+		})
+		expect(result.status).toBe('filter-unsupported')
+		expect(spy).not.toHaveBeenCalled()
+	})
+
+	it('still answers unavailable when day granularity is what the adapter lacks', async () => {
+		const result = await readForWidgetSeries({
+			req: reqWith([
+				seriesAdapter({
+					capabilities: { ...baseCaps(), filters: new Set(['page']), minGranularity: 'month' },
+				}),
+			]),
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			now: NOW,
 			filters: [{ dimension: 'page', operator: 'eq', value: '/a' }],
 		})
 		expect(result.status).toBe('unavailable')

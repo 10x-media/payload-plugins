@@ -913,6 +913,11 @@ export interface AnalyticsMetricWidget {
       to?: string | null;
     };
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'x-small' | 'small' | 'medium';
 }
@@ -949,6 +954,11 @@ export interface AnalyticsTrendWidget {
     };
     compare?: boolean | null;
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
 }
@@ -1025,6 +1035,11 @@ export interface AnalyticsBreakdownPagesWidget {
     };
     limit?: number | null;
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -1061,6 +1076,11 @@ export interface AnalyticsBreakdownSourcesWidget {
     };
     limit?: number | null;
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -1097,6 +1117,11 @@ export interface AnalyticsBreakdownDevicesWidget {
     };
     limit?: number | null;
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -1133,6 +1158,11 @@ export interface AnalyticsBreakdownCountriesWidget {
     };
     limit?: number | null;
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -1169,6 +1199,11 @@ export interface AnalyticsBreakdownGoalsWidget {
     };
     limit?: number | null;
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -1205,6 +1240,11 @@ export interface AnalyticsBreakdownReferrersWidget {
     };
     limit?: number | null;
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -1241,6 +1281,11 @@ export interface AnalyticsBreakdownBrowsersWidget {
     };
     limit?: number | null;
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -1277,6 +1322,11 @@ export interface AnalyticsBreakdownOsWidget {
     };
     limit?: number | null;
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -1313,6 +1363,11 @@ export interface AnalyticsBreakdownCampaignsWidget {
     };
     limit?: number | null;
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'small' | 'medium' | 'large';
 }
@@ -1349,6 +1404,11 @@ export interface AnalyticsBreakdownEventsWidget {
     };
     limit?: number | null;
     dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
   };
   width: 'small' | 'medium' | 'large';
 }

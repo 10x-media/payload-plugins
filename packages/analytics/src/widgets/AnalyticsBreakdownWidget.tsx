@@ -10,6 +10,8 @@ import { TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { type BreakdownWidgetData, breakdownSpecBySlug } from './breakdownTypes'
 import { cardStyle, labelStyle } from './cardChrome'
+import { captionWithFilter } from './filterCaption'
+import { widgetFilters } from './filterField'
 import { formatRangeCaption, resolveCustomRange } from './range'
 import type { WidgetReadStatus } from './readForWidget'
 import { readForWidgetBreakdown } from './readForWidgetBreakdown'
@@ -19,6 +21,7 @@ import { WidgetViewLink } from './WidgetViewLink'
 const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
 	'not-configured': keys.stateNotConfigured,
 	unavailable: keys.stateUnavailable,
+	'filter-unsupported': keys.stateFilterUnsupported,
 }
 
 export default async function AnalyticsBreakdownWidget(props: WidgetServerProps & WidgetViewProps) {
@@ -44,6 +47,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 	}
 
 	const tab = viewTabForDimension(spec.dimension)
+	const filters = widgetFilters(data)
 	const result = await readForWidgetBreakdown({
 		req: props.req,
 		metric,
@@ -53,6 +57,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 		adapterId: data.dataSource,
 		now: new Date(),
 		range: customRange,
+		filters,
 		...(timezone ? { timezone } : {}),
 	})
 	// The adapter that answered, which on a scoped or runtime-provider install is not the
@@ -64,30 +69,39 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 		...(result.adapterId ? { source: result.adapterId } : {}),
 		...(tab ? { tab } : {}),
 		metric,
+		filters,
 	})
 
 	const locale = props.req.i18n.language ?? 'en-US'
-	const caption =
+
+	if (result.status !== 'ok') {
+		return (
+			<div className="analytics-breakdown-widget" style={cardStyle}>
+				<span style={labelStyle}>{title}</span>
+				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
+				<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
+			</div>
+		)
+	}
+
+	const windowCaption =
 		customRange && timezone
 			? formatRangeCaption(customRange, locale, timezone)
 			: t(TIMEFRAME_KEYS[timeframe])
+	const caption = captionWithFilter(windowCaption, filters[0], t)
 	return (
 		<div className="analytics-breakdown-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>
-			{result.status !== 'ok' ? (
-				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
-			) : (
-				<BarList
-					data={result.rows.map((row) => ({
-						label: row.label,
-						value: row.value,
-						display: formatMetricValue(metric, row.value, locale),
-					}))}
-					emptyLabel={t(keys.stateNoBreakdown)}
-				/>
-			)}
+			<BarList
+				data={result.rows.map((row) => ({
+					label: row.label,
+					value: row.value,
+					display: formatMetricValue(metric, row.value, locale),
+				}))}
+				emptyLabel={t(keys.stateNoBreakdown)}
+			/>
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
-			{result.status === 'ok' && result.clamped ? (
+			{result.clamped ? (
 				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
 					{t(keys.stateClamped)}
 				</span>

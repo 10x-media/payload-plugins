@@ -144,13 +144,20 @@ test('@tenancy the view reports the selected tenant and never another one', asyn
 
 	const selector = platformPage.locator('.tenant-selector')
 	await expect(selector).toBeVisible()
+	/**
+	 * Selecting a tenant writes the cookie and fires a `router.refresh()`. The two are not
+	 * ordered: a refresh that reaches the server before the cookie commits re-renders on the
+	 * old scope, the client's scope key is unchanged, and nothing remounts, so a poll on the
+	 * numbers alone can only time out. Wait for the selector to show the new tenant, which is
+	 * the cookie having landed, then navigate, so the scope is resolved by a fresh request.
+	 */
 	const selectTenant = async (name: string): Promise<void> => {
 		await selector.locator('.rs__control').click()
 		await platformPage.locator('.rs__option', { hasText: name }).first().click()
+		await expect(selector).toContainText(name)
+		await platformPage.goto(`${origin}/admin/analytics`)
 	}
 
-	// A tenant switch is a `router.refresh()`, not a reload, so the numbers have to follow
-	// on their own: that is what keying the client on the resolved scope buys.
 	await selectTenant('Alpha')
 	await expect
 		.poll(() => cardValue(platformPage, 'Pageviews'), { timeout: 20_000 })

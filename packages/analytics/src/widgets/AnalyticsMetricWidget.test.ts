@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter } from '../core/contract'
 import { type AnalyticsRuntime, setRuntime } from '../plugin/runtime'
+import { en } from '../translations/en'
+import { keys } from '../translations/keys'
 import AnalyticsMetricWidget from './AnalyticsMetricWidget'
 import type { MetricWidgetData } from './types'
 import type { WidgetView } from './viewLink'
@@ -14,7 +16,23 @@ const unconfigured = {
 	isConfigured: () => false,
 } as unknown as AnalyticsAdapter
 
-const bootFakeRuntime = () => {
+/** The two caption templates, which carry the `{{vars}}` the assertions read. */
+const TEMPLATES: Record<string, string> = {
+	[keys.widgetFilterCaption]: en[keys.widgetFilterCaption],
+	[keys.widgetCaptionWithFilter]: en[keys.widgetCaptionWithFilter],
+}
+
+/**
+ * Every key stands in for itself, except the caption templates, which come from the real
+ * bundle so the assertion sees the same one-pass `{{vars}}` fill Payload's own `t` makes.
+ */
+const fakeT = (key: string, vars?: Record<string, string | number>): string =>
+	(TEMPLATES[key] ?? key).replace(/\{\{(.*?)\}\}/g, (match, name: string) => {
+		const value = vars?.[name.trim()]
+		return value === undefined ? match : String(value)
+	})
+
+const bootFakeRuntime = (adapter: AnalyticsAdapter = unconfigured) => {
 	const resolveScope = vi.fn(() => Promise.resolve(null))
 	const resolveTimezone = vi.fn(() => Promise.resolve('Europe/Berlin'))
 	const payload = {
@@ -22,9 +40,10 @@ const bootFakeRuntime = () => {
 		config: { routes: { admin: '/admin' } },
 	} as unknown as Payload
 	setRuntime(payload, {
-		registry: { default: () => unconfigured, get: () => unconfigured },
+		registry: { default: () => adapter, get: () => adapter },
 		configAdapterIds: new Set<string>(),
 		bindings: {},
+		engine: { read: (a: AnalyticsAdapter, query: unknown) => a.query(query as never, {}) },
 		ttl: {},
 		comparison: false,
 		resolveScope,
@@ -32,10 +51,33 @@ const bootFakeRuntime = () => {
 	} as unknown as AnalyticsRuntime)
 	const req = {
 		payload,
-		i18n: { t: (key: string) => key, language: 'en' },
+		i18n: { t: fakeT, language: 'en' },
 	} as unknown as PayloadRequest
 	return { req, resolveScope, resolveTimezone }
 }
+
+/** A source that serves pageviews and can filter exactly what `filters` names. */
+const filterableAdapter = (filters: string[], operators: string[] = ['eq']): AnalyticsAdapter =>
+	({
+		id: 'test',
+		label: 'Test',
+		capabilities: {
+			metrics: new Set(['pageviews', 'visitors']),
+			dimensions: new Set(['country', 'page']),
+			filters: new Set(filters),
+			filterOperators: new Set(operators),
+			comparison: false,
+			minGranularity: 'day',
+			maxLookbackDays: null,
+		},
+		isConfigured: () => true,
+		query: () =>
+			Promise.resolve({
+				rows: [],
+				totals: { pageviews: 7, visitors: 7 },
+				meta: { provider: 'test', fetchedAt: '2026-06-01T00:00:00.000Z' },
+			}),
+	}) as unknown as AnalyticsAdapter
 
 const render = (req: PayloadRequest, widgetData: MetricWidgetData, view?: WidgetView) =>
 	AnalyticsMetricWidget({ req, widgetData, view } as unknown as WidgetServerProps)
@@ -122,5 +164,77 @@ describe('AnalyticsMetricWidget', () => {
 		const html = await renderHtml(req, { metric: 'pageviews' }, false)
 		expect(html).not.toContain('analytics-widget__link')
 		expect(html).not.toContain('analytics:widgetOpenInView')
+	})
+
+	it('appends the filter sentence to the caption', async () => {
+		const { req } = bootFakeRuntime(filterableAdapter(['country']))
+		const html = await renderHtml(
+			req,
+			{
+				metric: 'pageviews',
+				timeframe: 'last7days',
+				filter: { dimension: 'country', operator: 'eq', value: 'DE' },
+			},
+			view
+		)
+		expect(html).toContain(
+			'analytics:timeframeLast7Days where analytics:viewDimensionCountry analytics:filterOperatorEq DE'
+		)
+	})
+
+	it('leaves the caption alone when the widget carries no filter', async () => {
+		const { req } = bootFakeRuntime(filterableAdapter(['country']))
+		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
+		expect(html).toContain('analytics:timeframeLast7Days')
+		expect(html).not.toContain('analytics:widgetFilterCaption')
+		expect(html).not.toContain('analytics:filterOperatorEq')
+	})
+
+	it('says the source cannot apply the filter instead of showing an unfiltered number', async () => {
+		const { req } = bootFakeRuntime(filterableAdapter(['page']))
+		const html = await renderHtml(
+			req,
+			{
+				metric: 'pageviews',
+				timeframe: 'last7days',
+				filter: { dimension: 'country', operator: 'eq', value: 'DE' },
+			},
+			view
+		)
+		expect(html).toContain('analytics:stateFilterUnsupported')
+		expect(html).not.toContain('analytics:stateUnavailable')
+		expect(html).not.toContain('>7<')
+	})
+
+	it('holds the caption back when there is no number to caption', async () => {
+		const { req } = bootFakeRuntime(filterableAdapter(['page']))
+		const html = await renderHtml(
+			req,
+			{
+				metric: 'pageviews',
+				timeframe: 'last7days',
+				filter: { dimension: 'country', operator: 'eq', value: 'DE' },
+			},
+			view
+		)
+		expect(html).not.toContain('analytics:timeframeLast7Days')
+		expect(html).not.toContain('analytics:viewDimensionCountry')
+	})
+
+	it('carries the filter into the view link', async () => {
+		const { req } = bootFakeRuntime(filterableAdapter(['country']))
+		const html = await renderHtml(
+			req,
+			{
+				metric: 'pageviews',
+				timeframe: 'last7days',
+				filter: { dimension: 'country', operator: 'eq', value: '  DE  ' },
+			},
+			view
+		)
+		const filters = new URLSearchParams(hrefIn(html)?.split('?')[1] ?? '').get('filters')
+		expect(filters && JSON.parse(filters)).toEqual([
+			{ dimension: 'country', operator: 'eq', value: 'DE' },
+		])
 	})
 })

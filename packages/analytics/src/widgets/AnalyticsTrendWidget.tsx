@@ -11,6 +11,8 @@ import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { ComparisonDelta } from './ComparisonDelta'
 import { cardStyle, labelStyle } from './cardChrome'
+import { captionWithFilter } from './filterCaption'
+import { widgetFilters } from './filterField'
 import { formatRangeCaption, resolveCustomRange } from './range'
 import type { WidgetReadStatus } from './readForWidget'
 import { readForWidgetSeries } from './readForWidgetSeries'
@@ -21,6 +23,7 @@ import { WidgetViewLink } from './WidgetViewLink'
 const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
 	'not-configured': keys.stateNotConfigured,
 	unavailable: keys.stateUnavailable,
+	'filter-unsupported': keys.stateFilterUnsupported,
 }
 
 export default async function AnalyticsTrendWidget(props: WidgetServerProps & WidgetViewProps) {
@@ -37,6 +40,7 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps & Wi
 	const title = data.title?.trim() || t(METRIC_KEYS[metric])
 
 	const compare = data.compare === true
+	const filters = widgetFilters(data)
 	const result = await readForWidgetSeries({
 		req: props.req,
 		metric,
@@ -45,6 +49,7 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps & Wi
 		now: new Date(),
 		range: customRange,
 		compare,
+		filters,
 		...(timezone ? { timezone } : {}),
 	})
 	// The adapter that answered, which on a scoped or runtime-provider install is not the
@@ -56,6 +61,7 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps & Wi
 		...(result.adapterId ? { source: result.adapterId } : {}),
 		metric,
 		compare,
+		filters,
 	})
 
 	if (result.status !== 'ok') {
@@ -68,10 +74,11 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps & Wi
 		)
 	}
 
-	const caption =
+	const windowCaption =
 		customRange && timezone
 			? formatRangeCaption(customRange, locale, timezone)
 			: t(TIMEFRAME_KEYS[timeframe])
+	const caption = captionWithFilter(windowCaption, filters[0], t)
 	const buckets = customRange
 		? bucketByRange(result.points, customRange, result.timezone)
 		: bucketSeries(result.points, timeframe, result.timezone)

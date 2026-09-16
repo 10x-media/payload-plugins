@@ -2,6 +2,7 @@ import type { PayloadRequest } from 'payload'
 import { satisfiesCapabilities } from '../core/capabilities'
 import type {
 	AnalyticsAdapter,
+	AnalyticsCapabilities,
 	AnalyticsFilter,
 	AnalyticsResult,
 	DateRange,
@@ -12,7 +13,23 @@ import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { previousWindow } from './comparison'
 
-export type WidgetReadStatus = 'ok' | 'not-configured' | 'unavailable'
+export type WidgetReadStatus = 'ok' | 'not-configured' | 'unavailable' | 'filter-unsupported'
+
+/**
+ * Whether the serving source can apply every filter the read carries. Answered before the
+ * query so a source that cannot filter says so rather than returning site-wide numbers a
+ * reader would take for filtered ones.
+ */
+export const supportsFilters = (
+	caps: AnalyticsCapabilities,
+	filters?: AnalyticsFilter[]
+): boolean =>
+	!filters ||
+	filters.length === 0 ||
+	satisfiesCapabilities(caps, {
+		filters: filters.map((f) => f.dimension),
+		filterOperators: filters.map((f) => f.operator),
+	})
 
 export interface WidgetReadResult {
 	status: WidgetReadStatus
@@ -79,18 +96,11 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 	if (!adapter.isConfigured()) {
 		return { status: 'not-configured', adapterId: adapter.id, ...base }
 	}
-	if (
-		!satisfiesCapabilities(adapter.capabilities, {
-			metrics,
-			...(filters && filters.length > 0
-				? {
-						filters: filters.map((f) => f.dimension),
-						filterOperators: filters.map((f) => f.operator),
-					}
-				: {}),
-		})
-	) {
+	if (!satisfiesCapabilities(adapter.capabilities, { metrics })) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
+	}
+	if (!supportsFilters(adapter.capabilities, filters)) {
+		return { status: 'filter-unsupported', adapterId: adapter.id, ...base }
 	}
 	const comparisonRange =
 		args.comparison !== false && runtime.comparison && adapter.capabilities.comparison

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { DIMENSION_KEYS } from '../core/contract'
+import { type AnalyticsFilter, DIMENSION_KEYS } from '../core/contract'
 import { MAX_QUERY_RANGE_DAYS } from '../query/limits'
 import { TAB_DIMENSIONS } from '../view/gating'
+import { parseViewState, type ViewDefaults } from '../view/state'
 import { viewHref, viewTabForDimension } from './viewLink'
 
 const base = {
@@ -11,6 +12,8 @@ const base = {
 	defaultRange: 'last30days',
 	defaultMetric: 'pageviews',
 } as const
+
+const defaults: ViewDefaults = { range: base.defaultRange, metric: base.defaultMetric }
 
 const query = (href: string): URLSearchParams =>
 	new URLSearchParams(href.slice(href.indexOf('?') + 1))
@@ -162,6 +165,25 @@ describe('viewHref', () => {
 			})
 		).toBe(
 			'/admin/analytics?range=last7days&compare=1&source=plausible&metric=visitors&tab=sources'
+		)
+	})
+
+	it('carries the widget filter into the view state, verbatim', () => {
+		const filters: AnalyticsFilter[] = [{ dimension: 'country', operator: 'eq', value: 'DE' }]
+		const href = viewHref({ ...base, timeframe: 'last7days', filters })
+		expect(parseViewState(query(href), defaults).filters).toEqual(filters)
+	})
+
+	it('carries a contains filter the same way', () => {
+		const filters: AnalyticsFilter[] = [{ dimension: 'page', operator: 'contains', value: '/blog' }]
+		const href = viewHref({ ...base, timeframe: 'last30days', filters, tab: 'pages' })
+		expect(parseViewState(query(href), defaults).filters).toEqual(filters)
+	})
+
+	it('writes no filters param at all when the widget carries none', () => {
+		expect(query(viewHref({ ...base, timeframe: 'last7days' })).has('filters')).toBe(false)
+		expect(query(viewHref({ ...base, timeframe: 'last7days', filters: [] })).has('filters')).toBe(
+			false
 		)
 	})
 })

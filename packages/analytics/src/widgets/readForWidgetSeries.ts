@@ -14,7 +14,7 @@ import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { addDaysInTz, DEFAULT_TIMEZONE, startOfDayInTz, zonedDayIso } from '../timeframe/tz'
 import { previousWindow } from './comparison'
-import type { WidgetReadStatus } from './readForWidget'
+import { supportsFilters, type WidgetReadStatus } from './readForWidget'
 
 export interface SeriesPoint {
 	date: string
@@ -145,18 +145,13 @@ export const readForWidgetSeries = async (
 		return { status: 'not-configured', adapterId: adapter.id, ...base }
 	}
 	if (
-		!satisfiesCapabilities(adapter.capabilities, {
-			metrics: [metric],
-			...(filters && filters.length > 0
-				? {
-						filters: filters.map((f) => f.dimension),
-						filterOperators: filters.map((f) => f.operator),
-					}
-				: {}),
-		}) ||
+		!satisfiesCapabilities(adapter.capabilities, { metrics: [metric] }) ||
 		!supportsGranularity(adapter.capabilities, 'day')
 	) {
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
+	}
+	if (!supportsFilters(adapter.capabilities, filters)) {
+		return { status: 'filter-unsupported', adapterId: adapter.id, ...base }
 	}
 	const comparisonRange =
 		runtime.comparison && adapter.capabilities.comparison

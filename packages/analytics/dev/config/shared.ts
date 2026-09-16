@@ -116,6 +116,20 @@ export const sharedDashboardLayout: DashboardLayout = [
 		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
 	},
 	{
+		// The one filtered widget: the same breakdown as above, narrowed to one country the
+		// seed produces, so its rows are always a subset of the unfiltered pages widget's and
+		// its caption carries the filter sentence.
+		widgetSlug: 'analytics-breakdown-pages',
+		width: 'medium',
+		data: {
+			title: 'Top pages in Germany',
+			metric: 'pageviews',
+			timeframe: 'last30days',
+			limit: 5,
+			filter: { dimension: 'country', operator: 'eq', value: 'DE' },
+		},
+	},
+	{
 		widgetSlug: 'analytics-breakdown-sources',
 		width: 'medium',
 		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },

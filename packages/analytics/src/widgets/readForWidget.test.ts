@@ -6,6 +6,7 @@ import type {
 	AnalyticsAdapter,
 	AnalyticsQuery,
 	AnalyticsResult,
+	MetricKey,
 } from '../core/contract'
 import { createRegistry } from '../core/registry'
 import { setRuntime } from '../plugin/runtime'
@@ -70,7 +71,7 @@ describe('readForWidget', () => {
 			label: 'Limited',
 			capabilities: {
 				...baseCapabilities,
-				metrics: new Set<import('../core/contract').MetricKey>(['pageviews']),
+				metrics: new Set<MetricKey>(['pageviews']),
 			},
 			isConfigured: () => true,
 			async query(_q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
@@ -205,9 +206,10 @@ describe('readForWidget', () => {
 		expect(result.metrics.pageviews).toBe(1)
 	})
 
-	it('returns unavailable when the adapter lacks the filter dimension', async () => {
+	it('answers filter-unsupported, without querying, when the adapter lacks the dimension', async () => {
 		const adapter = memoryAdapter()
 		adapter.record({ path: '/a', timestamp: new Date('2026-05-15T12:00:00Z') })
+		const spy = vi.spyOn(adapter, 'query')
 		const result = await readForWidget({
 			req: reqWith([adapter]),
 			metrics: ['pageviews'],
@@ -215,12 +217,14 @@ describe('readForWidget', () => {
 			now: NOW,
 			filters: [{ dimension: 'country', operator: 'eq', value: 'US' }],
 		})
-		expect(result.status).toBe('unavailable')
+		expect(result.status).toBe('filter-unsupported')
+		expect(spy).not.toHaveBeenCalled()
 	})
 
-	it('returns unavailable when the dimension is supported but the operator is not', async () => {
+	it('answers filter-unsupported when the dimension is supported but the operator is not', async () => {
 		const adapter = memoryAdapter()
 		adapter.record({ path: '/a', timestamp: new Date('2026-05-15T12:00:00Z') })
+		const spy = vi.spyOn(adapter, 'query')
 		const result = await readForWidget({
 			req: reqWith([adapter]),
 			metrics: ['pageviews'],
@@ -228,6 +232,31 @@ describe('readForWidget', () => {
 			now: NOW,
 			// memoryAdapter's capabilities.filterOperators only declares 'eq'.
 			filters: [{ dimension: 'page', operator: 'matches', value: '^/a$' }],
+		})
+		expect(result.status).toBe('filter-unsupported')
+		expect(spy).not.toHaveBeenCalled()
+	})
+
+	it('still answers unavailable when the metric itself is missing, filter or no filter', async () => {
+		const base = memoryAdapter()
+		const adapter: AnalyticsAdapter = {
+			id: 'limited',
+			label: 'Limited',
+			capabilities: {
+				...base.capabilities,
+				metrics: new Set<MetricKey>(['pageviews']),
+			},
+			isConfigured: () => true,
+			async query(_q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+				return { rows: [], meta: { provider: 'limited', fetchedAt: NOW.toISOString() } }
+			},
+		}
+		const result = await readForWidget({
+			req: reqWith([adapter]),
+			metrics: ['scrollDepth'],
+			timeframe: 'last30days',
+			now: NOW,
+			filters: [{ dimension: 'country', operator: 'eq', value: 'US' }],
 		})
 		expect(result.status).toBe('unavailable')
 	})

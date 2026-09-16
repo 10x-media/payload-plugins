@@ -2,10 +2,25 @@
 
 export { BarList, type BarListProps } from '../charts/BarList'
 export { TrendChart, type TrendChartProps, type TrendPoint } from '../charts/TrendChart'
+export {
+	FilterDimensionSelectField,
+	type FilterDimensionSelectFieldProps,
+} from '../fields/config/FilterDimensionSelectField'
+export {
+	FilterOperatorSelectField,
+	type FilterOperatorSelectFieldProps,
+} from '../fields/config/FilterOperatorSelectField'
 export type { WireSource } from '../fields/config/fetchSources'
 export { MetricSelectField, type MetricSelectFieldProps } from '../fields/config/MetricSelectField'
 export { SourceSelectField } from '../fields/config/SourceSelectField'
-export { useAnalyticsSources } from '../fields/config/useAnalyticsSources'
+export {
+	type AnalyticsSources,
+	useAnalyticsSources,
+} from '../fields/config/useAnalyticsSources'
+export {
+	type FilterCapabilities,
+	useFilterCapabilities,
+} from '../fields/config/useFilterCapabilities'
 export { DateRangeField } from '../fields/dateRange/ui'
 export type { GoalsResponse, WireGoal } from '../goals/fetchGoals'
 export { GoalSelectField } from '../goals/GoalSelectField'

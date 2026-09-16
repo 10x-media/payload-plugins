@@ -1,6 +1,8 @@
 import type { PayloadRequest, WidgetServerProps } from 'payload'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { en } from '../translations/en'
+import { keys } from '../translations/keys'
 import AnalyticsBreakdownWidget from './AnalyticsBreakdownWidget'
 import type { BreakdownWidgetData } from './breakdownTypes'
 import { readForWidgetBreakdown, type WidgetBreakdownResult } from './readForWidgetBreakdown'
@@ -20,10 +22,26 @@ const result = (over: Partial<WidgetBreakdownResult> = {}): WidgetBreakdownResul
 
 const view = { path: '/analytics', defaultRange: 'last30days', defaultMetric: 'pageviews' } as const
 
-const req = (): PayloadRequest =>
+/** The two caption templates, which carry the `{{vars}}` the assertions read. */
+const TEMPLATES: Record<string, string> = {
+	[keys.widgetFilterCaption]: en[keys.widgetFilterCaption],
+	[keys.widgetCaptionWithFilter]: en[keys.widgetCaptionWithFilter],
+}
+
+/**
+ * Every key stands in for itself, except the caption templates, which come from the real
+ * bundle so the assertion sees the same one-pass `{{vars}}` fill Payload's own `t` makes.
+ */
+const fakeT = (key: string, vars?: Record<string, string | number>): string =>
+	(TEMPLATES[key] ?? key).replace(/\{\{(.*?)\}\}/g, (match, name: string) => {
+		const value = vars?.[name.trim()]
+		return value === undefined ? match : String(value)
+	})
+
+const req = (t: typeof fakeT = fakeT): PayloadRequest =>
 	({
 		payload: { config: { routes: { admin: '/admin' } } } as unknown as PayloadRequest['payload'],
-		i18n: { t: (key: string) => key, language: 'en' },
+		i18n: { t, language: 'en' },
 	}) as unknown as PayloadRequest
 
 const render = async (
@@ -82,5 +100,114 @@ describe('AnalyticsBreakdownWidget view link', () => {
 	it('renders no link when the app turned the view off', async () => {
 		const html = await render('analytics-breakdown-pages', {}, false)
 		expect(html).not.toContain('analytics-widget__link')
+	})
+})
+
+describe('AnalyticsBreakdownWidget filter', () => {
+	beforeEach(() => {
+		vi.mocked(readForWidgetBreakdown).mockReset()
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(result())
+	})
+
+	it('passes the stored filter into the read, trimmed', async () => {
+		await render('analytics-breakdown-pages', {
+			filter: { dimension: 'country', operator: 'eq', value: '  DE  ' },
+		})
+		expect(vi.mocked(readForWidgetBreakdown).mock.calls[0]?.[0].filters).toEqual([
+			{ dimension: 'country', operator: 'eq', value: 'DE' },
+		])
+	})
+
+	it('passes no filters at all for a half-filled group', async () => {
+		await render('analytics-breakdown-pages', { filter: { operator: 'eq', value: 'DE' } })
+		expect(vi.mocked(readForWidgetBreakdown).mock.calls[0]?.[0].filters).toEqual([])
+	})
+
+	it('renders the unfiltered widget for a dimension the contract does not define', async () => {
+		const html = await render('analytics-breakdown-pages', {
+			timeframe: 'last7days',
+			filter: { dimension: 'countrey', value: 'DE' },
+		} as unknown as BreakdownWidgetData)
+		expect(vi.mocked(readForWidgetBreakdown).mock.calls[0]?.[0].filters).toEqual([])
+		expect(html).toContain('analytics:timeframeLast7Days')
+		expect(html).not.toContain('countrey')
+	})
+
+	it('reads an operator the contract does not define as eq', async () => {
+		const html = await render('analytics-breakdown-pages', {
+			timeframe: 'last7days',
+			filter: { dimension: 'country', operator: '', value: 'DE' },
+		} as unknown as BreakdownWidgetData)
+		expect(vi.mocked(readForWidgetBreakdown).mock.calls[0]?.[0].filters).toEqual([
+			{ dimension: 'country', operator: 'eq', value: 'DE' },
+		])
+		expect(html).toContain(
+			'analytics:timeframeLast7Days where analytics:viewDimensionCountry analytics:filterOperatorEq DE'
+		)
+	})
+
+	it('appends the filter sentence to the caption', async () => {
+		const html = await render('analytics-breakdown-pages', {
+			timeframe: 'last7days',
+			filter: { dimension: 'country', operator: 'eq', value: 'DE' },
+		})
+		expect(html).toContain(
+			'analytics:timeframeLast7Days where analytics:viewDimensionCountry analytics:filterOperatorEq DE'
+		)
+	})
+
+	it('joins the window and the sentence through the locale, not a hard-coded space', async () => {
+		const tight = (key: string, vars?: Record<string, string | number>): string =>
+			key === keys.widgetCaptionWithFilter
+				? `${String(vars?.window)}${String(vars?.filter)}`
+				: fakeT(key, vars)
+		const html = renderToStaticMarkup(
+			await AnalyticsBreakdownWidget({
+				req: req(tight),
+				widgetSlug: 'analytics-breakdown-pages',
+				widgetData: {
+					timeframe: 'last7days',
+					filter: { dimension: 'country', operator: 'eq', value: 'DE' },
+				},
+			} as unknown as WidgetServerProps)
+		)
+		expect(html).toContain(
+			'analytics:timeframeLast7Dayswhere analytics:viewDimensionCountry analytics:filterOperatorEq DE'
+		)
+	})
+
+	it('says the source cannot apply the filter instead of ranking unfiltered rows', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({ status: 'filter-unsupported', rows: [] })
+		)
+		const html = await render('analytics-breakdown-pages', {
+			filter: { dimension: 'country', operator: 'eq', value: 'DE' },
+		})
+		expect(html).toContain('analytics:stateFilterUnsupported')
+		expect(html).not.toContain('analytics:stateUnavailable')
+	})
+
+	it('holds the caption back when there are no rows to caption', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({ status: 'filter-unsupported', rows: [] })
+		)
+		const html = await render('analytics-breakdown-pages', {
+			timeframe: 'last7days',
+			filter: { dimension: 'country', operator: 'eq', value: 'DE' },
+		})
+		expect(html).not.toContain('analytics:timeframeLast7Days')
+		expect(html).not.toContain('analytics:viewDimensionCountry')
+	})
+
+	it('carries the filter into the view link', async () => {
+		const html = await render(
+			'analytics-breakdown-pages',
+			{ filter: { dimension: 'country', operator: 'eq', value: 'DE' } },
+			view
+		)
+		const carried = new URLSearchParams(hrefIn(html)?.split('?')[1] ?? '').get('filters')
+		expect(carried && JSON.parse(carried)).toEqual([
+			{ dimension: 'country', operator: 'eq', value: 'DE' },
+		])
 	})
 })
