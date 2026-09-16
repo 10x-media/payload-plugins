@@ -13,9 +13,10 @@ import type {
 } from '../../core/contract'
 import { DEFAULT_TIMEZONE, zonedCalendarDay } from '../../timeframe/tz'
 import {
+	emptyGoalBreakdown,
 	type GoalKeyedRow,
 	goalHint,
-	goalsUnresolvedResult,
+	hintSlugs,
 	mergeGoalRows,
 	mergeGoalTotals,
 	providerMetricKeys,
@@ -239,8 +240,10 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 			const dims = (q.dimensions ?? []).filter((d) => DIMENSION_MAP[d])
 			const goalBreakdown = dims.includes('goal')
 			const hint = goalHint(q)
-			if (goalBreakdown && !hint) {
-				return goalsUnresolvedResult('ga4', q)
+			const slugs = hintSlugs(hint)
+			const empty = goalBreakdown ? emptyGoalBreakdown({ provider: 'ga4', q, hint }) : null
+			if (empty) {
+				return empty
 			}
 			const wanted = q.metrics.filter((m) => METRIC_MAP[m])
 			const { siteMetrics, goalMetrics, unresolved } = splitGoalMetrics({
@@ -292,7 +295,7 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 				}
 				filterExprs.push(stringFilter(fieldName, MATCH_TYPE_MAP[filter.operator], filter.value))
 			}
-			const goalSlugs = hint ? goalSlugsByEventName(hint) : null
+			const goalSlugs = slugs ? goalSlugsByEventName(slugs) : null
 			const goalExprs = goalSlugs
 				? [
 						...filterExprs,

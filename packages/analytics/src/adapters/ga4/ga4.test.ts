@@ -390,6 +390,27 @@ describe('ga4 adapter', () => {
 			expect(runReport).not.toHaveBeenCalled()
 		})
 
+		it('says so when the goal resolver failed', async () => {
+			const result = await ga4(config).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: 'unresolved' }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBe(true)
+			expect(runReport).not.toHaveBeenCalled()
+		})
+
+		// A property with no goals configured has an empty goal table, not a broken one.
+		it('serves an empty goal breakdown unflagged when the scope configures no goals', async () => {
+			const result = await ga4(config).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: [] }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBeUndefined()
+			expect(runReport).not.toHaveBeenCalled()
+		})
+
 		it('reads conversions beside site metrics from a second, in-list filtered report', async () => {
 			respond((metrics) =>
 				metrics.includes('keyEvents')

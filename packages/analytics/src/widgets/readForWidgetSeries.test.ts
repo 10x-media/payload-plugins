@@ -297,6 +297,37 @@ describe('readForWidgetSeries', () => {
 		expect(spy).not.toHaveBeenCalled()
 	})
 
+	// The sentinel is what keeps a failed resolver off the healthy cache key, so every
+	// helper has to hand it to the adapter rather than flattening it to an empty hint.
+	it('passes the failed-resolver sentinel through to the adapter', async () => {
+		const seen: AnalyticsQuery[] = []
+		const adapter = seriesAdapter({
+			capabilities: { ...baseCaps(), metrics: new Set(['conversions']) },
+			async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+				seen.push(q)
+				return { rows: [], meta: { provider: 'native', fetchedAt: NOW.toISOString() } }
+			},
+		})
+		const payload = { logger: { warn: () => {} } } as unknown as PayloadRequest['payload']
+		setRuntime(payload, {
+			registry: createRegistry([adapter]),
+			configAdapterIds: new Set([adapter.id]),
+			bindings: {},
+			engine: { read: async (a, query) => a.query(query, {}) },
+			ttl: { aggregate: 3600, realtime: 300 },
+			comparison: false,
+			resolveGoals: () => Promise.reject(new Error('boom')),
+		})
+		const result = await readForWidgetSeries({
+			req: { payload } as PayloadRequest,
+			metric: 'conversions',
+			timeframe: 'last7days',
+			now: NOW,
+		})
+		expect(seen[0]?.goalSlugs).toBe('unresolved')
+		expect(result.status).toBe('ok')
+	})
+
 	it('still answers unavailable when day granularity is what the adapter lacks', async () => {
 		const result = await readForWidgetSeries({
 			req: reqWith([

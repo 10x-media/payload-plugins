@@ -1,14 +1,33 @@
 import type { AnalyticsQuery, AnalyticsResult, MetricKey } from '../core/contract'
 
 /**
- * The goal slugs a provider read may restrict its rows to, or null when the caller set no
- * hint. Nothing in a provider marks which of its events are this install's goals, so a
- * provider adapter counts conversions for these names and for no others.
+ * What a read tells a provider about this install's goals: the slugs its goal rows are
+ * restricted to (possibly none, for an install that configured none), `'unresolved'` when
+ * the resolver failed, or null when the caller set no hint at all. Nothing in a provider
+ * marks which of its events are this install's goals, so a provider adapter counts
+ * conversions for the hinted names and for no others.
  */
-export const goalHint = (q: AnalyticsQuery): string[] | null => {
-	const slugs = [...new Set((q.goalSlugs ?? []).filter((slug) => slug.length > 0))]
-	return slugs.length > 0 ? slugs : null
+export type GoalHint = { slugs: string[] } | 'unresolved' | null
+
+export const goalHint = (q: AnalyticsQuery): GoalHint => {
+	if (q.goalSlugs === undefined) {
+		return null
+	}
+	if (q.goalSlugs === 'unresolved') {
+		return 'unresolved'
+	}
+	return { slugs: [...new Set(q.goalSlugs.filter((slug) => slug.length > 0))] }
 }
+
+/** The slugs a provider request filters by, or null when the hint names none to filter by. */
+export const hintSlugs = (hint: GoalHint): string[] | null =>
+	hint === null || hint === 'unresolved' || hint.slugs.length === 0 ? null : hint.slugs
+
+/**
+ * Whether goal numbers are missing because the hint failed or was never set, rather than
+ * because the install configured no goals, which is an empty result and not a failure.
+ */
+export const hintFailed = (hint: GoalHint): boolean => hint === null || hint === 'unresolved'
 
 /** Meta a goal read still has to report beside its empty rows (unapplied filters, sampling). */
 type GoalsUnresolvedMeta = Omit<
@@ -31,10 +50,34 @@ export const goalsUnresolvedResult = (
 	},
 })
 
+/**
+ * The answer a `goal` breakdown owes before it reads, or null when its hint names rows to
+ * read. A failed or absent hint is reported with `goalsUnresolved`; an install that
+ * configured no goals gets the same empty rows without the flag.
+ */
+export const emptyGoalBreakdown = ({
+	provider,
+	q,
+	hint,
+	meta,
+}: {
+	provider: string
+	q: AnalyticsQuery
+	hint: GoalHint
+	meta?: GoalsUnresolvedMeta
+}): AnalyticsResult | null => {
+	if (hintSlugs(hint) !== null) {
+		return null
+	}
+	return hintFailed(hint)
+		? goalsUnresolvedResult(provider, q, meta)
+		: { rows: [], meta: { provider, fetchedAt: q.dateRange.end.toISOString(), ...meta } }
+}
+
 export interface GoalMetricSplit {
 	/** Metrics the plain request asks for. */
 	siteMetrics: MetricKey[]
-	/** Metrics only the goal-filtered request can answer; empty when the read has no hint. */
+	/** Metrics only the goal-filtered request can answer; empty when the hint names no goal. */
 	goalMetrics: MetricKey[]
 	/** The read wanted goal numbers it had no hint to ask for. */
 	unresolved: boolean
@@ -55,17 +98,16 @@ export const splitGoalMetrics = ({
 	wanted: MetricKey[]
 	goalOnly: ReadonlySet<MetricKey>
 	goalBreakdown: boolean
-	hint: string[] | null
+	hint: GoalHint
 }): GoalMetricSplit => {
 	if (goalBreakdown) {
 		return { siteMetrics: wanted, goalMetrics: [], unresolved: false }
 	}
 	const goalMetrics = wanted.filter((m) => goalOnly.has(m))
-	const unresolved = goalMetrics.length > 0 && hint === null
 	return {
 		siteMetrics: wanted.filter((m) => !goalOnly.has(m)),
-		goalMetrics: unresolved ? [] : goalMetrics,
-		unresolved,
+		goalMetrics: hintSlugs(hint) === null ? [] : goalMetrics,
+		unresolved: goalMetrics.length > 0 && hintFailed(hint),
 	}
 }
 

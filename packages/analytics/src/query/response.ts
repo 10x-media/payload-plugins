@@ -29,6 +29,14 @@ export interface QueryResponse {
 	query: SerializedAnalyticsQuery
 }
 
+/**
+ * Whether the echoed query asked about goals and the scope configured none. The hint is
+ * set only for a goal read, so an empty list is a scope with nothing to convert on: an
+ * empty table rather than a source that could not answer, which is `meta.goalsUnresolved`.
+ */
+export const askedAboutNoGoals = (query?: SerializedAnalyticsQuery): boolean =>
+	Array.isArray(query?.goalSlugs) && query.goalSlugs.length === 0
+
 /** Every non-2xx answer of `GET /analytics/query`. */
 export interface QueryErrorResponse {
 	error: QueryError

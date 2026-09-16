@@ -161,6 +161,7 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 				onChangeDeferred={writeLater}
 				provider={provider}
 				range={range}
+				sampled={sections.some((section) => section.data?.result.meta.sampled === true)}
 				sourceId={source.id}
 				sources={props.sources.sources}
 				stale={sections.some((section) => section.data?.result.meta.stale === true)}

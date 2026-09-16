@@ -1,9 +1,9 @@
 import type { PayloadRequest } from 'payload'
-import { satisfiesCapabilities } from '../core/capabilities'
-import type { AnalyticsAdapter, MetricKey } from '../core/contract'
-import { resolveReadContext } from '../core/scopedRead'
-import { getRuntime } from '../plugin/runtime'
+import type { MetricKey } from '../core/contract'
 import { kvCacheStore } from '../surfacing/cacheStore'
+import { DEFAULT_TIMEZONE } from '../timeframe/tz'
+import { prepareWidgetRead } from './prepareWidgetRead'
+import { readMeta } from './readMeta'
 
 export type WidgetRealtimeStatus = 'ok' | 'not-configured' | 'unavailable'
 
@@ -17,6 +17,14 @@ export interface WidgetRealtimeResult {
 	adapterId: string
 	activeNow: number
 	series: RealtimePoint[]
+	/** The source that answered, absent on a read that never reached one. */
+	provider?: string
+	clamped?: boolean
+	stale?: boolean
+	filtersUnapplied?: boolean
+	goalsUnresolved?: boolean
+	/** True when the read hit the source's event scan cap, so the counts are a floor. */
+	sampled?: boolean
 }
 
 export interface ReadForWidgetRealtimeArgs {
@@ -46,25 +54,33 @@ export const readForWidgetRealtime = async (
 	args: ReadForWidgetRealtimeArgs
 ): Promise<WidgetRealtimeResult> => {
 	const { req, metric, windowMinutes, adapterId, now } = args
-	const runtime = getRuntime(req.payload)
-	if (!runtime) {
-		return empty('unavailable', adapterId ?? '')
+	const dateRange = { start: new Date(now.getTime() - windowMinutes * 60_000), end: now }
+	// The window is anchored on `now` and never rendered in a zone, so the poll skips the
+	// install's timezone resolver rather than paying for it ahead of the cache check.
+	const prepared = await prepareWidgetRead({
+		req,
+		now,
+		range: dateRange,
+		timezone: DEFAULT_TIMEZONE,
+		adapterId,
+		scope: args.scope,
+		requires: { realtime: true },
+	})
+	if (!prepared.ok) {
+		// The window carries no filters, so `filter-unsupported` cannot arise here.
+		const status = prepared.status === 'not-configured' ? 'not-configured' : 'unavailable'
+		return empty(status, prepared.adapterId)
 	}
-	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
-	if (!ctx.ok) {
-		return empty('unavailable', adapterId ?? '')
-	}
-	const adapter: AnalyticsAdapter = ctx.adapter
-	if (!adapter.isConfigured()) {
-		return empty('not-configured', adapter.id)
-	}
-	if (!adapter.realtime || !satisfiesCapabilities(adapter.capabilities, { realtime: true })) {
+	const { runtime, adapter, queryScope } = prepared
+	// The capability says the source counts live visitors; the hook is what reads them.
+	const realtime = adapter.realtime
+	if (!realtime) {
 		return empty('unavailable', adapter.id)
 	}
 
 	const ttlSeconds = runtime.ttl.realtime ?? adapter.capabilities.recommendedTtl.realtime
 	const bucket = Math.floor(now.getTime() / 1000 / Math.max(1, ttlSeconds))
-	const scopeKey = ctx.queryScope === undefined ? '' : `:${encodeURIComponent(ctx.queryScope)}`
+	const scopeKey = queryScope === undefined ? '' : `:${encodeURIComponent(queryScope)}`
 	const key = `rt:${adapter.id}:${metric}:${windowMinutes}:${bucket}${scopeKey}`
 	const store = kvCacheStore(req.payload.kv)
 	const cached = await store.get<WidgetRealtimeResult>(key)
@@ -72,13 +88,13 @@ export const readForWidgetRealtime = async (
 		return cached
 	}
 
-	const dateRange = { start: new Date(now.getTime() - windowMinutes * 60_000), end: now }
-	const result = await adapter.realtime({ metrics: [metric], dateRange, scope: ctx.queryScope }, {})
+	const result = await realtime({ metrics: [metric], dateRange, scope: queryScope }, {})
 	const out: WidgetRealtimeResult = {
 		status: 'ok',
 		adapterId: adapter.id,
 		activeNow: result.totals?.[metric] ?? 0,
 		series: result.rows.map((r) => ({ date: r.timestamp ?? '', value: r.metrics[metric] ?? 0 })),
+		...readMeta(result),
 	}
 	await store.set(key, out, ttlSeconds)
 	return out

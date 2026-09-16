@@ -316,6 +316,27 @@ describe('plausible adapter', () => {
 			expect(result.meta.goalsUnresolved).toBe(true)
 		})
 
+		it('says so when the goal resolver failed', async () => {
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: 'unresolved' }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		// A site with no goals configured has an empty goal table, not a broken one.
+		it('serves an empty goal breakdown unflagged when the scope configures no goals', async () => {
+			const bodies = capture(() => ({ results: [], meta: {}, query: {} }))
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: [] }),
+				{}
+			)
+			expect(bodies).toEqual([])
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBeUndefined()
+		})
+
 		it('reads conversions beside site metrics from a second, goal-filtered request', async () => {
 			const bodies = capture((body) =>
 				body.metrics.includes('events')

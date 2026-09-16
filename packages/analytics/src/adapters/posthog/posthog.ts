@@ -9,7 +9,7 @@ import type {
 	DimensionKey,
 	MetricKey,
 } from '../../core/contract'
-import { goalHint, goalsUnresolvedResult } from '../goalRead'
+import { emptyGoalBreakdown, goalHint, hintFailed, hintSlugs } from '../goalRead'
 import { fetchJson } from '../http/fetchJson'
 import { dayIso, hourIso } from '../series'
 
@@ -200,8 +200,11 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			const fetchedAt = q.dateRange.end.toISOString()
 			const breakdownDim = (q.dimensions ?? []).find((d) => DIMENSION_SQL[d])
 			const hint = goalHint(q)
-			if (breakdownDim === 'goal' && !hint) {
-				return goalsUnresolvedResult('posthog', q)
+			const slugs = hintSlugs(hint)
+			const empty =
+				breakdownDim === 'goal' ? emptyGoalBreakdown({ provider: 'posthog', q, hint }) : null
+			if (empty) {
+				return empty
 			}
 			// A total-events metric, a goal or event-name breakdown, a conversions count, or a
 			// filter on the event dimension must scan every event, not just pageviews (a
@@ -214,7 +217,7 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 				breakdownDim === 'event' ||
 				breakdownDim === 'goal' ||
 				(q.filters ?? []).some((f) => f.dimension === 'event' && DIMENSION_SQL[f.dimension])
-			const eventInHint = hint ? `event IN (${hint.map(sqlString).join(', ')})` : undefined
+			const eventInHint = slugs ? `event IN (${slugs.map(sqlString).join(', ')})` : undefined
 			// Counting the goals conditionally, rather than restricting the WHERE, keeps the
 			// site metrics of a read that asks for both site-wide.
 			const metricSql: Partial<Record<MetricKey, string>> = {
@@ -225,7 +228,7 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 						: METRIC_SQL_PAGEVIEW),
 				...(eventInHint ? { conversions: `countIf(${eventInHint})` } : {}),
 			}
-			const unresolved = q.metrics.includes('conversions') && !hint
+			const unresolved = q.metrics.includes('conversions') && hintFailed(hint)
 			const wanted = q.metrics.filter((m) => metricSql[m])
 			const exprs = [...new Set(wanted.map((m) => metricSql[m] as string))]
 			const meta: AnalyticsResult['meta'] = {

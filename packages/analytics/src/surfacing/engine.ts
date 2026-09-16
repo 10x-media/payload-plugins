@@ -110,10 +110,11 @@ export function createEngine(opts: EngineOptions): Engine {
 				const result: AnalyticsResult = clamped
 					? { ...fresh, meta: { ...fresh.meta, clamped: true } }
 					: fresh
-				// `goalsUnresolved` on a read that carried goal slugs means the provider's goal
-				// request failed; at the aggregate TTL one transient error would pin "no
-				// conversions" for an hour. Without slugs the flag is stable config, not a failure.
-				const degraded = result.meta.goalsUnresolved === true && (q.goalSlugs?.length ?? 0) > 0
+				// `goalsUnresolved` is always a failure to resolve, whatever hint the read carried:
+				// a scope with no goals answers empty rows unflagged. At the aggregate TTL one
+				// transient error would pin "no conversions" for an hour. A direct engine caller
+				// that never hints is flagged on every read and so stays at the short TTL.
+				const degraded = result.meta.goalsUnresolved === true
 				const ttl = degraded
 					? (opts.ttl.realtime ?? adapter.capabilities.recommendedTtl.realtime)
 					: (opts.ttl.aggregate ?? adapter.capabilities.recommendedTtl.aggregate)

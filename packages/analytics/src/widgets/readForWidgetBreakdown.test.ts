@@ -242,8 +242,9 @@ describe('readForWidgetBreakdown', () => {
 	})
 
 	// A goal read a resolver could not answer is a read without rows, never a read that
-	// silently counts every event the source has.
-	it('hints nothing but still reads when the goals resolver throws', async () => {
+	// silently counts every event the source has, and never one that shares the cache key of
+	// a scope whose goals resolved.
+	it('hints the failure but still reads when the goals resolver throws', async () => {
 		const seen: AnalyticsQuery[] = []
 		const payload = {} as PayloadRequest['payload']
 		setRuntime(payload, {
@@ -263,8 +264,36 @@ describe('readForWidgetBreakdown', () => {
 			limit: 5,
 			now: NOW,
 		})
-		expect(seen[0]?.goalSlugs).toEqual([])
+		expect(seen[0]?.goalSlugs).toBe('unresolved')
 		expect(result.status).toBe('ok')
+	})
+
+	// The widget shows a setup notice for this, which it cannot tell from a window in which
+	// nobody converted unless the read says which of the two it answered.
+	it('reports a goal read of a scope that configures no goals', async () => {
+		const seen: AnalyticsQuery[] = []
+		const result = await readForWidgetBreakdown({
+			req: reqWith([recordingAdapter(seen, goalCaps())]),
+			metric: 'conversions',
+			dimension: 'goal',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+		})
+		expect(seen[0]?.goalSlugs).toEqual([])
+		expect(result.noGoals).toBe(true)
+	})
+
+	it('leaves a non-goal read of a scope with no goals unflagged', async () => {
+		const result = await readForWidgetBreakdown({
+			req: reqWith([breakdownAdapter()]),
+			metric: 'pageviews',
+			dimension: 'source',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+		})
+		expect(result.noGoals).toBe(false)
 	})
 
 	it('leaves a read that is about no goal unhinted', async () => {

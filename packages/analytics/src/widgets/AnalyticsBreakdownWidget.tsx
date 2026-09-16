@@ -90,6 +90,17 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 			? formatRangeCaption(customRange, locale, timezone)
 			: t(TIMEFRAME_KEYS[timeframe])
 	const caption = captionWithFilter(windowCaption, filters[0], t)
+	// A goal read has three empty states: the source could not answer about the goals, the
+	// scope configures none, or nobody converted. The plain one reads as the last of them.
+	const emptyKey = (): TranslationKey => {
+		if (spec.dimension !== 'goal') {
+			return keys.stateNoBreakdown
+		}
+		if (result.goalsUnresolved) {
+			return keys.stateGoalsUnresolved
+		}
+		return result.noGoals ? keys.stateNoGoals : keys.stateNoBreakdown
+	}
 	return (
 		<div className="analytics-breakdown-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>
@@ -104,13 +115,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 					value: row.value,
 					display: formatMetricValue(metric, row.value, locale),
 				}))}
-				emptyLabel={t(
-					// A goal read the source could not resolve has no rows, which the plain empty
-					// state would read as "nobody converted".
-					spec.dimension === 'goal' && result.goalsUnresolved
-						? keys.stateGoalsUnresolved
-						: keys.stateNoBreakdown
-				)}
+				emptyLabel={t(emptyKey())}
 			/>
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
 			{result.clamped ? (
@@ -121,6 +126,11 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 			{result.filtersUnapplied ? (
 				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
 					{t(keys.stateFiltersUnapplied)}
+				</span>
+			) : null}
+			{result.sampled ? (
+				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
+					{t(keys.stateSampled)}
 				</span>
 			) : null}
 			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />

@@ -44,6 +44,8 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.stateClamped]: '제공자가 지원하는 최대 기간을 표시합니다',
 	[keys.stateFiltersUnapplied]: '이 데이터 소스가 일부 필터를 적용하지 못했습니다',
 	[keys.stateGoalsUnresolved]: '이 데이터 소스에서 목표를 읽지 못했습니다',
+	[keys.stateNoGoals]: '이 범위에 구성된 목표가 없습니다',
+	[keys.stateSampled]: '수치는 근사값입니다: 읽기가 이벤트 한도에 도달했습니다',
 	[keys.widgetFieldTitle]: '제목',
 	[keys.widgetFieldMetric]: '지표',
 	[keys.widgetFieldTimeframe]: '기간',

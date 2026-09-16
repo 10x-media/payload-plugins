@@ -273,6 +273,15 @@ describe('AnalyticsViewClient', () => {
 		await renderView()
 		expect(screen.queryByText(keys.viewStale)).toBeNull()
 		expect(screen.queryByText(keys.stateFiltersUnapplied)).toBeNull()
+		expect(screen.queryByText(keys.stateSampled)).toBeNull()
+	})
+
+	it('notes a read that hit the source event scan cap', async () => {
+		mocks.fetchQueryMock.mockImplementation((_route, request) =>
+			Promise.resolve(answer(request, { sampled: true }))
+		)
+		await renderView()
+		expect(screen.getByText(keys.stateSampled)).toBeDefined()
 	})
 
 	it('notes a read the source answered without one of the filters it carried', async () => {

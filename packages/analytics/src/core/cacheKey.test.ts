@@ -146,9 +146,27 @@ describe('buildCacheKey', () => {
 		expect(two).toBe(buildCacheKey('plausible', { ...base, goalSlugs: ['purchase', 'signup'] }))
 	})
 
-	it('keeps the key unchanged when no goal hint is set', () => {
+	it('keeps the key unchanged for a scope with no goals, which asks for the same rows', () => {
 		expect(buildCacheKey('plausible', { ...base, goalSlugs: [] })).toBe(
 			buildCacheKey('plausible', base)
+		)
+	})
+
+	// A failed resolver answers no goal rows; sharing the healthy key would serve that
+	// degraded answer to every later read until it expired.
+	it('keys a failed goal resolver apart from every healthy hint', () => {
+		const unresolved = buildCacheKey('plausible', { ...base, goalSlugs: 'unresolved' })
+		expect(unresolved).not.toBe(buildCacheKey('plausible', { ...base, goalSlugs: [] }))
+		expect(unresolved).not.toBe(buildCacheKey('plausible', base))
+		expect(unresolved).not.toBe(buildCacheKey('plausible', { ...base, goalSlugs: ['signup'] }))
+		expect(unresolved.endsWith('|goals:!unresolved')).toBe(true)
+	})
+
+	// `unresolved` is a legal goal slug, so a sentinel spelled like one would hand a scope
+	// that configured that goal the degraded answer of a scope whose resolver failed.
+	it('keys a goal named "unresolved" apart from the failed-resolver sentinel', () => {
+		expect(buildCacheKey('plausible', { ...base, goalSlugs: ['unresolved'] })).not.toBe(
+			buildCacheKey('plausible', { ...base, goalSlugs: 'unresolved' })
 		)
 	})
 
