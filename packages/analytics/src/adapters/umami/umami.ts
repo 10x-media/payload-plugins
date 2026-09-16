@@ -237,19 +237,27 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			const headers = authHeaders()
 			const goalBreakdown = (q.dimensions ?? []).includes('goal')
 			const hint = goalHint(q)
-			if (goalBreakdown && !hint) {
-				return goalsUnresolvedResult('umami', q)
-			}
 			const plan = params(q)
+			let breakdown: ({ dimension: DimensionKey } & UmamiDimension) | undefined
+			for (const dimension of q.dimensions ?? []) {
+				const mapped = DIMENSION_MAP[dimension]
+				if (mapped) {
+					breakdown = { dimension, ...mapped }
+					break
+				}
+			}
 			// Umami splits an `eq.` value list on commas and offers no escape, so a slug carrying
 			// one cannot be asked for: it is left out of the request and reported, rather than
 			// widening the read to every event.
 			const askable = (hint ?? []).filter((slug) => !slug.includes(','))
 			const eventValue = `eq.${askable.join(',')}`
 			// The goal rows come from the `event` param, so a caller's own filter on it would
-			// contradict the hint. The hint wins and that filter is reported unapplied.
+			// contradict the hint. The hint wins and that filter is reported unapplied, but only
+			// on a read that fetches goal rows at all: a breakdown by another dimension never
+			// does, so its event filter travels with the request as written.
 			const eventFilter = (q.filters ?? []).find((f) => f.dimension === 'event')
-			const readsGoals = goalBreakdown || (q.metrics.includes('conversions') && hint !== null)
+			const readsGoals =
+				goalBreakdown || (!breakdown && q.metrics.includes('conversions') && hint !== null)
 			const unapplied: AnalyticsFilter[] = [
 				...plan.unapplied,
 				...(hint ?? [])
@@ -266,10 +274,14 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 					: []),
 			]
 			const unresolved = q.metrics.includes('conversions') && !hint
+			const unappliedMeta = unapplied.length > 0 ? { unappliedFilters: unapplied } : {}
+			if (goalBreakdown && !hint) {
+				return goalsUnresolvedResult('umami', q, unappliedMeta)
+			}
 			const meta: AnalyticsResult['meta'] = {
 				provider: 'umami',
 				fetchedAt,
-				...(unapplied.length > 0 ? { unappliedFilters: unapplied } : {}),
+				...unappliedMeta,
 				...(unresolved ? { goalsUnresolved: true as const } : {}),
 			}
 			// Totals are left undefined rather than zeroed, the same as every other number this
@@ -305,15 +317,6 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 					metrics: { [GOAL_DIMENSION.metric]: row.y },
 				}))
 				return { rows, totals: undefined, meta }
-			}
-
-			let breakdown: ({ dimension: DimensionKey } & UmamiDimension) | undefined
-			for (const dimension of q.dimensions ?? []) {
-				const mapped = DIMENSION_MAP[dimension]
-				if (mapped) {
-					breakdown = { dimension, ...mapped }
-					break
-				}
 			}
 
 			if (breakdown) {

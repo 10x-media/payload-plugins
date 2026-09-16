@@ -11,7 +11,15 @@ import type {
 	MetricKey,
 } from '../../core/contract'
 import { DEFAULT_TIMEZONE, zonedCalendarDay } from '../../timeframe/tz'
-import { goalHint, goalsUnresolvedResult } from '../goalRead'
+import {
+	type GoalKeyedRow,
+	goalHint,
+	goalsUnresolvedResult,
+	mergeGoalRows,
+	providerMetricKeys,
+	readGoalPair,
+	splitGoalMetrics,
+} from '../goalRead'
 import { fetchJson } from '../http/fetchJson'
 import { dayIso } from '../series'
 
@@ -32,6 +40,12 @@ export interface PlausibleConfig {
 	 * declares `capture` only when one of it and `domain` is set.
 	 */
 	scriptId?: string
+	/**
+	 * The ISO currency of the site's revenue goals. Declaring it turns on the `revenue`
+	 * metric: Plausible serves `total_revenue` only where a revenue goal exists, and errors
+	 * the whole request on a site that has none.
+	 */
+	revenueCurrency?: string
 }
 
 /**
@@ -127,6 +141,10 @@ const OPERATOR_MAP: Record<FilterOperator, string> = {
 }
 
 const plausibleMetrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_MAP) as MetricKey[])
+// A site without revenue goals has no total_revenue at all, so the metric is opt-in.
+const plausibleMetricsNoRevenue: ReadonlySet<MetricKey> = new Set(
+	[...plausibleMetrics].filter((m) => m !== 'revenue')
+)
 const plausibleDimensions: ReadonlySet<DimensionKey> = new Set(
 	Object.keys(DIMENSION_MAP) as DimensionKey[]
 )
@@ -160,18 +178,21 @@ const toContractValue = (metric: MetricKey, raw: number): number =>
  * "Visit /thank-you"), so a plugin goal's slug must equal that name for its conversions to
  * read. Conversions are the `events` metric on goal rows, which is the dashboard's Total
  * Conversions; revenue is `total_revenue`, which Plausible serves only for a revenue goal
- * and reports as an object whose `value` is null when the rows mix currencies.
+ * and reports as an object whose `value` is null when the rows mix currencies. Revenue is
+ * offered only when `revenueCurrency` says the site has such a goal: asking for it on a site
+ * without one errors the request.
  */
 export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 	const host = config.host ?? 'https://plausible.io'
 	const maxLookbackDays = config.maxLookbackDays !== undefined ? config.maxLookbackDays : 730
+	const revenueGoals = Boolean(config.revenueCurrency)
 
 	const capabilities: AnalyticsCapabilities = {
 		perPageQuery: true,
 		realtime: false,
 		minGranularity: 'day',
 		maxLookbackDays,
-		metrics: plausibleMetrics,
+		metrics: revenueGoals ? plausibleMetrics : plausibleMetricsNoRevenue,
 		dimensions: plausibleDimensions,
 		filters: plausibleFilters,
 		filterOperators: new Set(['eq', 'contains', 'matches']),
@@ -194,22 +215,15 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 			if (goalBreakdown && !hint) {
 				return goalsUnresolvedResult('plausible', q)
 			}
-			const wanted = q.metrics.filter((m) => METRIC_MAP[m])
-			// A goal breakdown restricts every row it returns, so its goal metrics come from that
-			// one request. Anywhere else they need a request of their own: an event:goal filter
-			// over the whole read would scope the site metrics to goal hits as well.
-			const siteMetrics = goalBreakdown ? wanted : wanted.filter((m) => !GOAL_METRICS.has(m))
-			const goalMetrics = goalBreakdown ? [] : wanted.filter((m) => GOAL_METRICS.has(m))
-			const unresolved = goalMetrics.length > 0 && !hint
-			const readGoals = unresolved ? [] : goalMetrics
-			// Several contract metrics alias one Plausible metric (sessions and visits both
-			// map to "visits"), so dedupe before sending and read each contract metric back
-			// from its provider key's position rather than the request index.
-			const providerKeys = (ms: MetricKey[]): string[] => [
-				...new Set(ms.map((m) => METRIC_MAP[m] as string)),
-			]
-			const siteKeys = providerKeys(siteMetrics)
-			const goalKeys = providerKeys(readGoals)
+			const wanted = q.metrics.filter((m) => METRIC_MAP[m] && (revenueGoals || m !== 'revenue'))
+			const { siteMetrics, goalMetrics, unresolved } = splitGoalMetrics({
+				wanted,
+				goalOnly: GOAL_METRICS,
+				goalBreakdown,
+				hint,
+			})
+			const siteKeys = providerMetricKeys(siteMetrics, METRIC_MAP)
+			const goalKeys = providerMetricKeys(goalMetrics, METRIC_MAP)
 
 			const filters: Array<[string, string, string[]]> = []
 			if (q.path) {
@@ -233,11 +247,14 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 				? [...filters, ['is', 'event:goal', hint]]
 				: filters
 			const siteFilters = goalBreakdown ? goalFilters : filters
-			const meta: AnalyticsResult['meta'] = {
+			// Set when the provider rejects a goal request the site request survived, so the
+			// rows keep their site metrics and lose only their goal numbers.
+			let goalsFailed = false
+			const meta = (): AnalyticsResult['meta'] => ({
 				provider: 'plausible',
 				fetchedAt,
-				...(unresolved ? { goalsUnresolved: true as const } : {}),
-			}
+				...(unresolved || goalsFailed ? { goalsUnresolved: true as const } : {}),
+			})
 
 			const readMetrics = (
 				ms: MetricKey[],
@@ -281,32 +298,32 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 					provider: 'plausible',
 				})
 
-			interface MergedRow {
-				dimensions: string[]
-				metrics: Partial<Record<MetricKey, number>>
-			}
+			const keyedRows = (
+				response: PlausibleResponse | undefined,
+				ms: MetricKey[],
+				keys: string[]
+			): GoalKeyedRow[] | undefined =>
+				response?.results.map((row) => ({
+					keys: row.dimensions,
+					metrics: readMetrics(ms, keys, row),
+				}))
 
 			/**
-			 * One request shape read twice, plainly and goal-filtered, merged per row. A row the
+			 * One request shape read twice, plainly and goal-filtered, unioned per row. A row the
 			 * goal read has no counterpart for carries no conversions: no goal was completed there.
 			 */
-			const readPair = async (extra: Record<string, unknown>): Promise<MergedRow[]> => {
-				const [site, goals] = await Promise.all([
-					siteKeys.length ? postQuery(siteKeys, siteFilters, extra) : undefined,
-					goalKeys.length ? postQuery(goalKeys, goalFilters, extra) : undefined,
-				])
-				const key = (row: PlausibleResult): string => JSON.stringify(row.dimensions)
-				const byKey = new Map((goals?.results ?? []).map((row) => [key(row), row]))
-				return (site?.results ?? goals?.results ?? []).map((row) => {
-					const goalRow = site ? byKey.get(key(row)) : row
-					return {
-						dimensions: row.dimensions,
-						metrics: {
-							...(site ? readMetrics(siteMetrics, siteKeys, row) : {}),
-							...(goalRow ? readMetrics(readGoals, goalKeys, goalRow) : {}),
-						},
-					}
+			const readPair = async (extra: Record<string, unknown>): Promise<GoalKeyedRow[]> => {
+				const pair = await readGoalPair({
+					site: siteKeys.length ? () => postQuery(siteKeys, siteFilters, extra) : undefined,
+					goals: goalKeys.length ? () => postQuery(goalKeys, goalFilters, extra) : undefined,
 				})
+				if (pair.failed) {
+					goalsFailed = true
+				}
+				return mergeGoalRows(
+					keyedRows(pair.site, siteMetrics, siteKeys),
+					keyedRows(pair.goals, goalMetrics, goalKeys)
+				)
 			}
 
 			if (q.granularity === 'day' && !dims.length) {
@@ -316,17 +333,17 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 				])
 				const rows: AnalyticsRow[] = []
 				for (const row of series) {
-					const ts = dayIso(row.dimensions[0] ?? '')
+					const ts = dayIso(row.keys[0] ?? '')
 					if (ts) {
 						rows.push({ timestamp: ts, metrics: row.metrics })
 					}
 				}
-				return { rows, totals: totalRows[0]?.metrics ?? {}, meta }
+				return { rows, totals: totalRows[0]?.metrics ?? {}, meta: meta() }
 			}
 
 			if (!dims.length) {
 				const totals = (await readPair({}))[0]?.metrics ?? {}
-				return { rows: [{ metrics: totals }], totals, meta }
+				return { rows: [{ metrics: totals }], totals, meta: meta() }
 			}
 
 			const merged = await readPair({ dimensions: dims.map((d) => DIMENSION_MAP[d] as string) })
@@ -335,12 +352,12 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 				for (let i = 0; i < dims.length; i++) {
 					const d = dims[i]
 					if (d !== undefined) {
-						dimValues[d] = row.dimensions[i] ?? ''
+						dimValues[d] = row.keys[i] ?? ''
 					}
 				}
 				return { dimensions: dimValues, metrics: row.metrics }
 			})
-			return { rows, totals: undefined, meta }
+			return { rows, totals: undefined, meta: meta() }
 		},
 	}
 }

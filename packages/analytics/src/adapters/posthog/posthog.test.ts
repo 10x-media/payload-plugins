@@ -252,6 +252,35 @@ describe('posthog adapter', () => {
 			expect(result.meta.goalsUnresolved).toBe(true)
 		})
 
+		it('counts a goal breakdown with plain aggregates, not the pageview-conditional ones', async () => {
+			const sent = capture(() => [['signup', 42, 30]])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({
+					metrics: ['conversions', 'visitors'],
+					dimensions: ['goal'],
+					goalSlugs: ['signup'],
+				}),
+				{}
+			)
+			const sql = sent[0] ?? ''
+			// The scan is already restricted to the goal events, so a $pageview-conditional
+			// visitors count would be 0 on every row and every conversion rate 0%.
+			expect(sql).toContain('count(DISTINCT person_id)')
+			expect(sql).not.toContain("count(DISTINCT if(event = '$pageview', person_id, NULL))")
+			expect(result.rows).toEqual([
+				{ dimensions: { goal: 'signup' }, metrics: { conversions: 42, visitors: 30 } },
+			])
+		})
+
+		it('keeps the conditional aggregates on an event breakdown, which scans every event', async () => {
+			const sent = capture(() => [['signup', 1]])
+			await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['visitors'], dimensions: ['event'] }),
+				{}
+			)
+			expect(sent[0]).toContain("count(DISTINCT if(event = '$pageview', person_id, NULL))")
+		})
+
 		it('escapes a quote in a goal slug (no HogQL injection)', async () => {
 			const sent = capture(() => [['x', 1]])
 			await posthog({ projectId: '123', apiKey: 'phx_k' }).query(

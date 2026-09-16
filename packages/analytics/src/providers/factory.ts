@@ -20,6 +20,7 @@ export type ProviderDoc = {
 		host?: string | null
 		domain?: string | null
 		scriptId?: string | null
+		revenueCurrency?: string | null
 	} | null
 	umami?: {
 		websiteId?: string | null
@@ -78,6 +79,7 @@ const buildBaseAdapter = (doc: ProviderDoc): AnalyticsAdapter | null => {
 				host: orUndefined(cfg.host),
 				domain: orUndefined(cfg.domain),
 				scriptId: orUndefined(cfg.scriptId),
+				revenueCurrency: orUndefined(cfg.revenueCurrency),
 			})
 		}
 		case 'umami': {

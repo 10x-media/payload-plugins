@@ -215,6 +215,42 @@ describe('umami adapter', () => {
 			])
 		})
 
+		// A breakdown by another dimension never fetches goal rows, so nothing takes the
+		// `event` param from the caller and there is nothing to report unapplied.
+		it('applies a caller event filter on a breakdown read, which asks for no goal rows', async () => {
+			const seen = eventMetrics([{ x: '/a', y: 3 }])
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({
+					metrics: ['visitors', 'conversions'],
+					dimensions: ['page'],
+					goalSlugs: ['signup'],
+					filters: [{ dimension: 'event', operator: 'eq', value: 'other' }],
+				}),
+				{}
+			)
+			expect(seen[0]?.get('event')).toBe('eq.other')
+			expect(result.meta.unappliedFilters).toBeUndefined()
+		})
+
+		it('still reports the filters it could not carry when the goals stay unresolved', async () => {
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({
+					metrics: ['conversions'],
+					dimensions: ['goal'],
+					filters: [
+						{ dimension: 'country', operator: 'eq', value: 'DE' },
+						{ dimension: 'country', operator: 'contains', value: 'AT' },
+					],
+				}),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBe(true)
+			expect(result.meta.unappliedFilters).toEqual([
+				{ dimension: 'country', operator: 'contains', value: 'AT' },
+			])
+		})
+
 		it('sums the goal rows into conversions on a totals read', async () => {
 			const seen = eventMetrics([
 				{ x: 'signup', y: 30 },

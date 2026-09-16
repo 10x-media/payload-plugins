@@ -118,13 +118,18 @@ export interface AnalyticsResult {
 		 */
 		unappliedFilters?: AnalyticsFilter[]
 		/**
-		 * A provider goal read ran without `AnalyticsQuery.goalSlugs`, so it returned no goal
-		 * rows rather than every event the source has.
+		 * The read's goal numbers are absent: either it ran without `AnalyticsQuery.goalSlugs`,
+		 * so the source returned no goal rows rather than every event it has, or the provider
+		 * rejected the goal request and the rest of the read was served without it.
 		 */
 		goalsUnresolved?: true
 	}
 }
 
+/**
+ * A read carrying conversions costs a provider up to twice the requests: the goal numbers
+ * come from a second, goal-filtered request the adapter issues after the plain one.
+ */
 export interface RateLimitDescriptor {
 	requestsPerMinute?: number
 	requestsPerHour?: number

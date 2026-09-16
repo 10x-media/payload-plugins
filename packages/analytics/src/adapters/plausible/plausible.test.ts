@@ -246,8 +246,34 @@ describe('plausible adapter', () => {
 			const caps = plausible({ siteId: 's', apiKey: 'k' }).capabilities
 			expect(caps.dimensions.has('goal')).toBe(true)
 			expect(caps.metrics.has('conversions')).toBe(true)
-			expect(caps.metrics.has('revenue')).toBe(true)
 			expect(caps.filters.has('goal')).toBe(false)
+		})
+
+		it('offers revenue only once a revenue currency says the site has a revenue goal', () => {
+			expect(plausible({ siteId: 's', apiKey: 'k' }).capabilities.metrics.has('revenue')).toBe(
+				false
+			)
+			expect(
+				plausible({ siteId: 's', apiKey: 'k', revenueCurrency: 'EUR' }).capabilities.metrics.has(
+					'revenue'
+				)
+			).toBe(true)
+		})
+
+		// total_revenue needs a revenue goal: a site without one errors the whole request, so a
+		// read asking for revenue against such a site must not send the metric at all.
+		it('never sends total_revenue without a revenue currency', async () => {
+			const bodies = capture(() => [{ metrics: [9], dimensions: ['Signup'] }])
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({
+					metrics: ['conversions', 'revenue'],
+					dimensions: ['goal'],
+					goalSlugs: ['Signup'],
+				}),
+				{}
+			)
+			expect(bodies[0]?.metrics).toEqual(['events'])
+			expect(result.rows).toEqual([{ dimensions: { goal: 'Signup' }, metrics: { conversions: 9 } }])
 		})
 
 		it('breaks down by event:goal, restricted to the hint, reading events as conversions', async () => {
@@ -255,7 +281,11 @@ describe('plausible adapter', () => {
 				{ metrics: [9, { value: 120.5, currency: 'EUR' }, 7], dimensions: ['Signup'] },
 				{ metrics: [2, null, 2], dimensions: ['Purchase'] },
 			])
-			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+			const result = await plausible({
+				siteId: 'example.com',
+				apiKey: 'k',
+				revenueCurrency: 'EUR',
+			}).query(
 				q({
 					metrics: ['conversions', 'revenue', 'visitors'],
 					dimensions: ['goal'],
@@ -328,10 +358,11 @@ describe('plausible adapter', () => {
 					? [{ metrics: [{ value: 42, currency: 'EUR' }], dimensions: [] }]
 					: [{ metrics: [500], dimensions: [] }]
 			)
-			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
-				q({ metrics: ['pageviews', 'revenue'], goalSlugs: ['purchase'] }),
-				{}
-			)
+			const result = await plausible({
+				siteId: 'example.com',
+				apiKey: 'k',
+				revenueCurrency: 'EUR',
+			}).query(q({ metrics: ['pageviews', 'revenue'], goalSlugs: ['purchase'] }), {})
 			expect(bodies[0]?.metrics).toEqual(['pageviews'])
 			expect(bodies[1]?.metrics).toEqual(['total_revenue'])
 			expect(bodies[1]?.filters).toEqual([['is', 'event:goal', ['purchase']]])
@@ -351,6 +382,72 @@ describe('plausible adapter', () => {
 			expect(bodies[1]?.filters).toEqual([
 				['is', 'event:page', ['/pricing']],
 				['is', 'event:goal', ['signup']],
+			])
+		})
+
+		it('keeps the site rows and flags the goals when the goal request fails', async () => {
+			const bodies: Body[] = []
+			server.use(
+				http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+					const body = (await request.json()) as Body
+					bodies.push(body)
+					if (body.metrics.includes('events')) {
+						return new HttpResponse('no such goal', { status: 400 })
+					}
+					return HttpResponse.json({
+						results: [{ metrics: [500, 300], dimensions: [] }],
+						meta: {},
+						query: {},
+					})
+				})
+			)
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({ metrics: ['pageviews', 'visitors', 'conversions'], goalSlugs: ['signup'] }),
+				{}
+			)
+			expect(bodies).toHaveLength(2)
+			expect(result.totals).toEqual({ pageviews: 500, visitors: 300 })
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		it('fails the read when the goal request is the only request it makes', async () => {
+			server.use(
+				http.post('https://plausible.io/api/v2/query', () =>
+					HttpResponse.json({ error: 'nope' }, { status: 400 })
+				)
+			)
+			await expect(
+				plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+					q({ metrics: ['conversions'], goalSlugs: ['signup'] }),
+					{}
+				)
+			).rejects.toThrow('HTTP 400')
+		})
+
+		it('unions a breakdown: a goal-only row is appended, a site-only row keeps no conversions', async () => {
+			capture((body) =>
+				body.metrics.includes('events')
+					? [
+							{ metrics: [4], dimensions: ['/pricing'] },
+							{ metrics: [1], dimensions: ['/thanks'] },
+						]
+					: [
+							{ metrics: [90], dimensions: ['/pricing'] },
+							{ metrics: [30], dimensions: ['/blog'] },
+						]
+			)
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({
+					metrics: ['pageviews', 'conversions'],
+					dimensions: ['page'],
+					goalSlugs: ['signup'],
+				}),
+				{}
+			)
+			expect(result.rows).toEqual([
+				{ dimensions: { page: '/pricing' }, metrics: { pageviews: 90, conversions: 4 } },
+				{ dimensions: { page: '/blog' }, metrics: { pageviews: 30 } },
+				{ dimensions: { page: '/thanks' }, metrics: { conversions: 1 } },
 			])
 		})
 

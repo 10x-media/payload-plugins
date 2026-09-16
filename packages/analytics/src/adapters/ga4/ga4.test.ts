@@ -429,6 +429,64 @@ describe('ga4 adapter', () => {
 			})
 		})
 
+		it('keeps the site rows and flags the goals when the goal report fails', async () => {
+			runReport.mockImplementation((request: RunReportRequest) => {
+				if ((request.metrics ?? []).some((m) => m.name === 'keyEvents')) {
+					throw new Error('property has no key events')
+				}
+				return [{ rows: [{ dimensionValues: [], metricValues: [{ value: '500' }] }] }]
+			})
+			const result = await ga4(config).query(
+				q({ metrics: ['pageviews', 'conversions'], goalSlugs: ['signup', 'purchase'] }),
+				{}
+			)
+			expect(requests()).toHaveLength(2)
+			expect(result.totals).toEqual({ pageviews: 500 })
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		it('fails the read when the goal report is the only report it runs', async () => {
+			runReport.mockImplementation(() => {
+				throw new Error('property has no key events')
+			})
+			await expect(
+				ga4(config).query(q({ metrics: ['conversions'], goalSlugs: ['signup'] }), {})
+			).rejects.toThrow('property has no key events')
+		})
+
+		it('unions a breakdown: a goal-only row is appended, a site-only row keeps no conversions', async () => {
+			respond((metrics) =>
+				metrics.includes('keyEvents')
+					? [
+							{ dimensionValues: [{ value: '/pricing' }], metricValues: [{ value: '4' }] },
+							{ dimensionValues: [{ value: '/thanks' }], metricValues: [{ value: '1' }] },
+						]
+					: [
+							{ dimensionValues: [{ value: '/pricing' }], metricValues: [{ value: '90' }] },
+							{ dimensionValues: [{ value: '/blog' }], metricValues: [{ value: '30' }] },
+						]
+			)
+			const result = await ga4(config).query(
+				q({
+					metrics: ['pageviews', 'conversions'],
+					dimensions: ['page'],
+					limit: 2,
+					goalSlugs: ['signup', 'purchase'],
+				}),
+				{}
+			)
+			const [site, goals] = requests()
+			expect(site?.limit).toBe(2)
+			// The goal report answers a different ranking, so the read's own limit would cut
+			// goals the union still needs.
+			expect(goals?.limit).toBeUndefined()
+			expect(result.rows).toEqual([
+				{ dimensions: { page: '/pricing' }, metrics: { pageviews: 90, conversions: 4 } },
+				{ dimensions: { page: '/blog' }, metrics: { pageviews: 30 } },
+				{ dimensions: { page: '/thanks' }, metrics: { conversions: 1 } },
+			])
+		})
+
 		it('keeps the site metrics and drops conversions when the read carries no hint', async () => {
 			respond(() => [{ dimensionValues: [], metricValues: [{ value: '500' }] }])
 			const result = await ga4(config).query(q({ metrics: ['pageviews', 'conversions'] }), {})

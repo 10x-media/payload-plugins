@@ -115,6 +115,17 @@ const METRIC_SQL_ALL: Partial<Record<MetricKey, string>> = {
 	events: 'count()',
 }
 
+// A goal breakdown restricts the scan to the goal events themselves, so every metric counts
+// the rows it already has. The conditional aggregates above would answer 0 for each one, and
+// a conversion rate against a zeroed visitors count is 0% for every goal.
+const METRIC_SQL_GOAL: Partial<Record<MetricKey, string>> = {
+	pageviews: 'count()',
+	visitors: 'count(DISTINCT person_id)',
+	visits: 'count(DISTINCT properties.$session_id)',
+	sessions: 'count(DISTINCT properties.$session_id)',
+	events: 'count()',
+}
+
 /** A goal is an event name here, so a plugin goal's slug must equal the captured event's name. */
 const DIMENSION_SQL: Partial<Record<DimensionKey, string>> = {
 	page: 'properties.$pathname',
@@ -202,7 +213,11 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			// Counting the goals conditionally, rather than restricting the WHERE, keeps the
 			// site metrics of a read that asks for both site-wide.
 			const metricSql: Partial<Record<MetricKey, string>> = {
-				...(scanAllEvents ? METRIC_SQL_ALL : METRIC_SQL_PAGEVIEW),
+				...(breakdownDim === 'goal'
+					? METRIC_SQL_GOAL
+					: scanAllEvents
+						? METRIC_SQL_ALL
+						: METRIC_SQL_PAGEVIEW),
 				...(eventInHint ? { conversions: `countIf(${eventInHint})` } : {}),
 			}
 			const unresolved = q.metrics.includes('conversions') && !hint

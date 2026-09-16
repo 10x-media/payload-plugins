@@ -11,7 +11,16 @@ import type {
 	MetricKey,
 } from '../../core/contract'
 import { DEFAULT_TIMEZONE, zonedCalendarDay } from '../../timeframe/tz'
-import { goalHint, goalsUnresolvedResult } from '../goalRead'
+import {
+	type GoalKeyedRow,
+	goalHint,
+	goalsUnresolvedResult,
+	mergeGoalRows,
+	mergeGoalTotals,
+	providerMetricKeys,
+	readGoalPair,
+	splitGoalMetrics,
+} from '../goalRead'
 import { dayIso } from '../series'
 
 export interface Ga4Config {
@@ -175,24 +184,23 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 				return goalsUnresolvedResult('ga4', q)
 			}
 			const wanted = q.metrics.filter((m) => METRIC_MAP[m])
-			// A goal breakdown restricts every row it returns, so its goal metrics come from that
-			// one report. Anywhere else they need a report of their own: an eventName filter over
-			// the whole read would scope the site metrics to goal hits as well.
-			const siteMetrics = goalBreakdown ? wanted : wanted.filter((m) => !GOAL_METRICS.has(m))
-			const goalMetrics = goalBreakdown ? [] : wanted.filter((m) => GOAL_METRICS.has(m))
-			const unresolved = goalMetrics.length > 0 && !hint
-			const readGoals = unresolved ? [] : goalMetrics
-			const providerKeys = (ms: MetricKey[]): string[] => [
-				...new Set(ms.map((m) => METRIC_MAP[m] as string)),
-			]
-			const siteKeys = providerKeys(siteMetrics)
-			const goalKeys = providerKeys(readGoals)
+			const { siteMetrics, goalMetrics, unresolved } = splitGoalMetrics({
+				wanted,
+				goalOnly: GOAL_METRICS,
+				goalBreakdown,
+				hint,
+			})
+			const siteKeys = providerMetricKeys(siteMetrics, METRIC_MAP)
+			const goalKeys = providerMetricKeys(goalMetrics, METRIC_MAP)
 			const providerDims = [...new Set(dims.map((d) => DIMENSION_MAP[d] as string))]
-			const meta: AnalyticsResult['meta'] = {
+			// Set when GA4 rejects a goal report the site report survived, so the rows keep their
+			// site metrics and lose only their conversions.
+			let goalsFailed = false
+			const meta = (): AnalyticsResult['meta'] => ({
 				provider: 'ga4',
 				fetchedAt,
-				...(unresolved ? { goalsUnresolved: true as const } : {}),
-			}
+				...(unresolved || goalsFailed ? { goalsUnresolved: true as const } : {}),
+			})
 
 			const readMetrics = (
 				ms: MetricKey[],
@@ -267,59 +275,63 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 
 			const client = await getClient()
 
-			interface MergedRow {
-				keys: string[]
-				metrics: Partial<Record<MetricKey, number>>
-			}
-
 			interface PairedReport {
-				rows: MergedRow[]
+				rows: GoalKeyedRow[]
 				totals: Partial<Record<MetricKey, number>> | undefined
 			}
 
+			const rowKeys = (row: protos.google.analytics.data.v1beta.IRow): string[] =>
+				(row.dimensionValues ?? []).map((value) => value.value ?? '')
+
 			/**
-			 * One report shape run twice, plainly and goal-filtered, merged per row. A row the
+			 * One report shape run twice, plainly and goal-filtered, unioned per row. A row the
 			 * goal report has no counterpart for carries no conversions: no key event fired there.
+			 * `limit` is the site report's alone, since a goal ranked outside its top N would
+			 * otherwise be lost from the union.
 			 */
 			const runPair = async (
-				extra: protos.google.analytics.data.v1beta.IRunReportRequest
+				extra: protos.google.analytics.data.v1beta.IRunReportRequest,
+				limit?: number
 			): Promise<PairedReport> => {
 				const runReport = async (
 					metrics: string[],
-					exprs: protos.google.analytics.data.v1beta.IFilterExpression[]
+					exprs: protos.google.analytics.data.v1beta.IFilterExpression[],
+					reportExtra: protos.google.analytics.data.v1beta.IRunReportRequest
 				) => {
-					const [response] = await client.runReport(request(metrics, exprs, extra))
+					const [response] = await client.runReport(request(metrics, exprs, reportExtra))
 					return response
 				}
 				// A goal breakdown restricts its own rows, so its one report carries the hint too.
 				const siteExprs = goalBreakdown ? goalExprs : filterExprs
-				const [site, goals] = await Promise.all([
-					siteKeys.length ? runReport(siteKeys, siteExprs) : undefined,
-					goalKeys.length ? runReport(goalKeys, goalExprs) : undefined,
-				])
-				const rowKeys = (row: protos.google.analytics.data.v1beta.IRow): string[] =>
-					(row.dimensionValues ?? []).map((value) => value.value ?? '')
-				const byKey = new Map((goals?.rows ?? []).map((row) => [JSON.stringify(rowKeys(row)), row]))
-				const rows = (site?.rows ?? goals?.rows ?? []).map((row) => {
-					const goalRow = site ? byKey.get(JSON.stringify(rowKeys(row))) : row
-					return {
-						keys: rowKeys(row),
-						metrics: {
-							...(site ? readMetrics(siteMetrics, siteKeys, row) : {}),
-							...(goalRow ? readMetrics(readGoals, goalKeys, goalRow) : {}),
-						},
-					}
+				const siteExtra = limit ? { ...extra, limit } : extra
+				const pair = await readGoalPair({
+					site: siteKeys.length ? () => runReport(siteKeys, siteExprs, siteExtra) : undefined,
+					goals: goalKeys.length ? () => runReport(goalKeys, goalExprs, extra) : undefined,
 				})
-				const siteTotals = site?.totals?.[0]
-				const goalTotals = goals?.totals?.[0]
-				const totals =
-					siteTotals || goalTotals
-						? {
-								...(siteTotals ? readMetrics(siteMetrics, siteKeys, siteTotals) : {}),
-								...(goalTotals ? readMetrics(readGoals, goalKeys, goalTotals) : {}),
-							}
-						: undefined
-				return { rows, totals }
+				if (pair.failed) {
+					goalsFailed = true
+				}
+				const keyed = (
+					response: protos.google.analytics.data.v1beta.IRunReportResponse | undefined,
+					ms: MetricKey[],
+					keys: string[]
+				): GoalKeyedRow[] | undefined =>
+					response?.rows?.map((row) => ({
+						keys: rowKeys(row),
+						metrics: readMetrics(ms, keys, row),
+					})) ?? (response ? [] : undefined)
+				const siteTotals = pair.site?.totals?.[0]
+				const goalTotals = pair.goals?.totals?.[0]
+				return {
+					rows: mergeGoalRows(
+						keyed(pair.site, siteMetrics, siteKeys),
+						keyed(pair.goals, goalMetrics, goalKeys)
+					),
+					totals: mergeGoalTotals(
+						siteTotals ? readMetrics(siteMetrics, siteKeys, siteTotals) : undefined,
+						goalTotals ? readMetrics(goalMetrics, goalKeys, goalTotals) : undefined
+					),
+				}
 			}
 
 			if (q.granularity === 'day' && !dims.length) {
@@ -338,17 +350,17 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 						rows.push({ timestamp: ts, metrics: row.metrics })
 					}
 				}
-				return { rows, totals: report.totals ?? {}, meta }
+				return { rows, totals: report.totals ?? {}, meta: meta() }
 			}
 
-			const report = await runPair({
-				...(providerDims.length ? { dimensions: providerDims.map((name) => ({ name })) } : {}),
-				...(q.limit ? { limit: q.limit } : {}),
-			})
+			const report = await runPair(
+				providerDims.length ? { dimensions: providerDims.map((name) => ({ name })) } : {},
+				q.limit
+			)
 
 			if (!dims.length) {
 				const totals = report.rows[0]?.metrics ?? {}
-				return { rows: [{ metrics: totals }], totals, meta }
+				return { rows: [{ metrics: totals }], totals, meta: meta() }
 			}
 
 			const rows: AnalyticsRow[] = report.rows.map((row) => {
@@ -359,7 +371,7 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 				}
 				return { dimensions: dimValues, metrics: row.metrics }
 			})
-			return { rows, totals: undefined, meta }
+			return { rows, totals: undefined, meta: meta() }
 		},
 	}
 }
