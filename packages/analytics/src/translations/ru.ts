@@ -42,6 +42,8 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Строк',
 	[keys.stateNoBreakdown]: 'Данных пока нет',
 	[keys.stateClamped]: 'Показан максимальный период, который поддерживает провайдер',
+	[keys.stateFiltersUnapplied]: 'Некоторые фильтры не были применены этим источником данных',
+	[keys.stateGoalsUnresolved]: 'Не удалось прочитать цели из этого источника данных',
 	[keys.widgetFieldTitle]: 'Заголовок',
 	[keys.widgetFieldMetric]: 'Метрика',
 	[keys.widgetFieldTimeframe]: 'Период',

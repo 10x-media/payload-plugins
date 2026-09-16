@@ -95,16 +95,32 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 			<span style={labelStyle}>{title}</span>
 			<BarList
 				data={result.rows.map((row) => ({
-					label: valueLabel(spec.dimension, row.label, t),
+					label: valueLabel({
+						dimension: spec.dimension,
+						value: row.label,
+						provider: result.provider ?? '',
+						t,
+					}),
 					value: row.value,
 					display: formatMetricValue(metric, row.value, locale),
 				}))}
-				emptyLabel={t(keys.stateNoBreakdown)}
+				emptyLabel={t(
+					// A goal read the source could not resolve has no rows, which the plain empty
+					// state would read as "nobody converted".
+					spec.dimension === 'goal' && result.goalsUnresolved
+						? keys.stateGoalsUnresolved
+						: keys.stateNoBreakdown
+				)}
 			/>
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
 			{result.clamped ? (
 				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
 					{t(keys.stateClamped)}
+				</span>
+			) : null}
+			{result.filtersUnapplied ? (
+				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
+					{t(keys.stateFiltersUnapplied)}
 				</span>
 			) : null}
 			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />

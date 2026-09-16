@@ -31,6 +31,8 @@ export interface WidgetSeriesResult {
 	points: SeriesPoint[]
 	total: number
 	clamped?: boolean
+	/** True when the source answered without one of the filters the read carried. */
+	filtersUnapplied?: boolean
 	/** Previous-window headline total, present only when the adapter supports comparison. */
 	previousTotal?: number
 	/** The previous comparable window, present only when comparison ran. */
@@ -199,6 +201,7 @@ export const readForWidgetSeries = async (
 		points,
 		total: result.totals?.[metric] ?? 0,
 		clamped: result.meta.clamped ?? false,
+		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
 		previousTotal,
 		comparisonRange,
 		...(compare && previous && comparisonRange

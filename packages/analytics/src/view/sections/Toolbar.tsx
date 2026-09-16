@@ -25,6 +25,10 @@ export interface ToolbarProps {
 	stale: boolean
 	/** Any section read a shorter window than the one that was asked for. */
 	clamped: boolean
+	/** Any section was answered without one of the filters it carried. */
+	filtersUnapplied: boolean
+	/** The source that answered, which decides whether a `source` chip names a channel. */
+	provider: string
 	now: Date
 	/**
 	 * The committed state as one string. Any change to it, not just to the days, drops a
@@ -61,6 +65,8 @@ export function Toolbar({
 	locale,
 	stale,
 	clamped,
+	filtersUnapplied,
+	provider,
 	now,
 	stateKey,
 	onChange,
@@ -200,10 +206,12 @@ export function Toolbar({
 						</Pill>
 					) : null}
 					{clamped ? <span>{t(keys.stateClamped)}</span> : null}
+					{filtersUnapplied ? <span>{t(keys.stateFiltersUnapplied)}</span> : null}
 				</div>
 			</div>
 			<FilterChips
 				filters={state.filters}
+				provider={provider}
 				onRemove={(index) =>
 					onChange({ ...state, filters: state.filters.filter((_, at) => at !== index) })
 				}

@@ -132,8 +132,8 @@ export const gate = (caps: SerializedCapabilities): ViewGate => {
 
 /**
  * Whether the view may compare this window. `ViewGate.canCompare` answers for the source
- * alone; the previous period must also still be inside the source's lookback, which the
- * endpoint rejects outright rather than clamping. The gate sees only capabilities, so every
+ * alone; the previous period must also still be inside the source's lookback, or the
+ * endpoint drops the comparison from its answer. The gate sees only capabilities, so every
  * surface that knows the selected window (the toolbar's toggle, the request builder) asks
  * here instead.
  */

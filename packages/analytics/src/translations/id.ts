@@ -42,6 +42,8 @@ export const id: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: 'Baris',
 	[keys.stateNoBreakdown]: 'Belum ada data',
 	[keys.stateClamped]: 'Menampilkan rentang maksimum yang didukung penyedia',
+	[keys.stateFiltersUnapplied]: 'Beberapa filter tidak diterapkan oleh sumber data ini',
+	[keys.stateGoalsUnresolved]: 'Sasaran tidak dapat dibaca dari sumber data ini',
 	[keys.widgetFieldTitle]: 'Judul',
 	[keys.widgetFieldMetric]: 'Metrik',
 	[keys.widgetFieldTimeframe]: 'Rentang waktu',

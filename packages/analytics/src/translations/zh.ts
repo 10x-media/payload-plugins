@@ -42,6 +42,8 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.widgetFieldLimit]: '行数',
 	[keys.stateNoBreakdown]: '暂无数据',
 	[keys.stateClamped]: '已显示该提供商支持的最大时间范围',
+	[keys.stateFiltersUnapplied]: '此数据源未应用部分筛选条件',
+	[keys.stateGoalsUnresolved]: '无法从此数据源读取目标',
 	[keys.widgetFieldTitle]: '标题',
 	[keys.widgetFieldMetric]: '指标',
 	[keys.widgetFieldTimeframe]: '时间范围',

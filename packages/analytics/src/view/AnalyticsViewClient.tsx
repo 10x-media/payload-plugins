@@ -121,6 +121,9 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 		queries.breakdown,
 		...(queries.goals ? [queries.goals] : []),
 	]
+	// Whichever section has answered names the source that answered it; every section reads
+	// through the same one.
+	const provider = sections.find((section) => section.data)?.data?.result.meta.provider ?? ''
 	const dimensions = served.dimensionsFor(state.tab)
 	const dimension = state.dim ?? dimensions[0] ?? null
 	const canFilter = dimension !== null && served.canFilter(dimension)
@@ -148,11 +151,15 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 			<h1 className="analytics-view__title">{t(keys.viewTitle)}</h1>
 			<Toolbar
 				clamped={sections.some((section) => section.data?.result.meta.clamped === true)}
+				filtersUnapplied={sections.some(
+					(section) => (section.data?.result.meta.unappliedFilters?.length ?? 0) > 0
+				)}
 				gate={served}
 				locale={props.locale}
 				now={now}
 				onChange={write}
 				onChangeDeferred={writeLater}
+				provider={provider}
 				range={range}
 				sourceId={source.id}
 				sources={props.sources.sources}

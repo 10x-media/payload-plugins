@@ -73,6 +73,15 @@ export function Breakdowns({
 	const strip = useRef<HTMLDivElement>(null)
 
 	const served = query.data?.result.rows ?? []
+	// Only the native source buckets `source` into channels; a provider serves a raw utm_source
+	// under the same name, so the label formatter needs to know which answered.
+	const provider = query.data?.result.meta.provider ?? ''
+	// A goal breakdown the source could not resolve has no rows, which the plain empty state
+	// would read as "nobody converted".
+	const emptyLabel =
+		dimension === 'goal' && query.data?.result.meta.goalsUnresolved === true
+			? keys.stateGoalsUnresolved
+			: keys.stateNoBreakdown
 	// The read kept on screen through a refetch answers the grouping that was asked for when
 	// it was issued, so switching tab or dimension leaves rows that carry no value for the one
 	// now selected. They are not this breakdown's rows: showing them would be a run of
@@ -189,7 +198,10 @@ export function Breakdowns({
 									servesSecondary && charted !== SECONDARY ? row.metrics[SECONDARY] : undefined
 								const stored = (dimension === null ? undefined : row.dimensions?.[dimension]) ?? ''
 								return {
-									label: dimension === null ? stored : valueLabel(dimension, stored, t),
+									label:
+										dimension === null
+											? stored
+											: valueLabel({ dimension, value: stored, provider, t }),
 									value,
 									display: formatMetricValue(charted, value, locale),
 									...(secondary === undefined
@@ -197,7 +209,7 @@ export function Breakdowns({
 										: { secondary: formatMetricValue(SECONDARY, secondary, locale) }),
 								}
 							})}
-							emptyLabel={t(keys.stateNoBreakdown)}
+							emptyLabel={t(emptyLabel)}
 							fill="soft"
 							{...(canFilter
 								? {

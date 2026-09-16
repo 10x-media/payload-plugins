@@ -103,6 +103,8 @@ const renderToolbar = (
 		state?: ViewState
 		stale?: boolean
 		clamped?: boolean
+		filtersUnapplied?: boolean
+		provider?: string
 		onChange?: (next: ViewState) => void
 		onChangeDeferred?: (next: ViewState) => void
 	} = {}
@@ -112,11 +114,13 @@ const renderToolbar = (
 	return render(
 		<Toolbar
 			clamped={overrides.clamped ?? false}
+			filtersUnapplied={overrides.filtersUnapplied ?? false}
 			gate={gate(caps)}
 			locale="en"
 			now={NOW}
 			onChange={overrides.onChange ?? (() => {})}
 			onChangeDeferred={overrides.onChangeDeferred ?? (() => {})}
+			provider={overrides.provider ?? 'native'}
 			range={{ from: '2026-08-16', to: '2026-09-14' }}
 			sourceId="native"
 			sources={overrides.sources ?? [source('native', caps)]}
@@ -243,6 +247,12 @@ describe('Toolbar controls', () => {
 		renderToolbar()
 		expect(screen.queryByText(keys.viewStale)).toBeNull()
 		expect(screen.queryByText(keys.stateClamped)).toBeNull()
+		expect(screen.queryByText(keys.stateFiltersUnapplied)).toBeNull()
+	})
+
+	it('notes a read the source answered without one of its filters', () => {
+		renderToolbar({ filtersUnapplied: true })
+		expect(screen.getByText(keys.stateFiltersUnapplied)).toBeDefined()
 	})
 
 	it('removes a filter chip through its own button', () => {
@@ -257,5 +267,18 @@ describe('Toolbar controls', () => {
 		expect(screen.getByText(/\/pricing/)).toBeDefined()
 		fireEvent.click(screen.getByRole('button', { name: new RegExp(keys.viewFilterRemove) }))
 		expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ filters: [] }))
+	})
+
+	it('names a native source chip as a channel and leaves a provider one as its raw token', () => {
+		const state: ViewState = {
+			...baseState,
+			filters: [{ dimension: 'source', operator: 'eq', value: 'search' }],
+		}
+		renderToolbar({ state })
+		expect(screen.getByText(new RegExp(keys.channelSearch))).toBeDefined()
+		cleanup()
+		renderToolbar({ state, provider: 'plausible' })
+		expect(screen.queryByText(new RegExp(keys.channelSearch))).toBeNull()
+		expect(screen.getByText(/search/)).toBeDefined()
 	})
 })
