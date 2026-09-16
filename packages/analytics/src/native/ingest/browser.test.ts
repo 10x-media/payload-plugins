@@ -83,6 +83,18 @@ const AGENTS: Agent[] = [
 		os: 'ios',
 	},
 	{
+		label: 'legacy Edge on Windows (Edge/)',
+		ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.140 Safari/537.36 Edge/18.17763',
+		browser: 'edge',
+		os: 'windows',
+	},
+	{
+		label: 'Opera Touch on Android (OPT)',
+		ua: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36 OPT/4.2.2',
+		browser: 'opera',
+		os: 'android',
+	},
+	{
 		label: 'Opera on Windows (OPR)',
 		ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 OPR/111.0.0.0',
 		browser: 'opera',

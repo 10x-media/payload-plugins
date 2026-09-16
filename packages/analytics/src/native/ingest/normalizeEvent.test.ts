@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Goal } from '../../goals/types'
 import { noopResolver, platformHeaderResolver } from '../geo/geoResolver'
 import { SERVER_USER_AGENT } from './device'
-import { MAX_QUERY_LENGTH, normalizeEvent } from './normalizeEvent'
+import { MAX_QUERY_LENGTH, MAX_REFERRER_LENGTH, normalizeEvent } from './normalizeEvent'
 
 const headers = (h: Record<string, string>) => new Headers(h)
 
@@ -327,7 +327,7 @@ describe('normalizeEvent native dimensions', () => {
 		expect('utmSource' in ev).toBe(false)
 	})
 
-	it('stores the referrer host beside the raw referrer, and neither when there is none', async () => {
+	it('stores the referrer host beside the referrer, and neither when there is none', async () => {
 		const ev = await build(
 			{
 				type: 'pageview',
@@ -337,7 +337,7 @@ describe('normalizeEvent native dimensions', () => {
 			},
 			{ 'user-agent': CHROME_UA }
 		)
-		expect(ev.referrer).toBe('https://www.example.org/path?x=1')
+		expect(ev.referrer).toBe('https://www.example.org/path')
 		expect(ev.referrerHost).toBe('example.org')
 
 		const direct = await build(
@@ -345,6 +345,37 @@ describe('normalizeEvent native dimensions', () => {
 			{ 'user-agent': CHROME_UA }
 		)
 		expect('referrerHost' in direct).toBe(false)
+	})
+
+	it('never stores a referrer query string, a same-origin one least of all', async () => {
+		const ev = await build(
+			{
+				type: 'pageview',
+				path: '/p',
+				hostname: 'site.com',
+				referrer: 'https://site.com/reset?token=abc#top',
+			},
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.referrer).toBe('https://site.com/reset')
+		expect(JSON.stringify(ev)).not.toContain('abc')
+		expect(ev.referrerHost).toBe('site.com')
+		expect(ev.source).toBe('Direct')
+	})
+
+	it('truncates an over-long referrer without disturbing its host or source', async () => {
+		const ev = await build(
+			{
+				type: 'pageview',
+				path: '/p',
+				hostname: 'site.com',
+				referrer: `https://news.example.org/${'a'.repeat(MAX_REFERRER_LENGTH)}`,
+			},
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.referrer).toHaveLength(MAX_REFERRER_LENGTH)
+		expect(ev.referrerHost).toBe('news.example.org')
+		expect(ev.source).toBe('news.example.org')
 	})
 
 	it('keeps a self-referrer host, which the source channel reports as Direct', async () => {

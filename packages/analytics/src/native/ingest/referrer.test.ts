@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { referrerHost } from './referrer'
+import { MAX_REFERRER_LENGTH } from '../../query/limits'
+import { referrerHost, storedReferrer } from './referrer'
 
 describe('referrerHost', () => {
 	it('keeps the bare host, dropping scheme, port, path, query and fragment', () => {
@@ -34,5 +35,38 @@ describe('referrerHost', () => {
 	it('caps an absurd host at the longest legal DNS name', () => {
 		const host = `${'a'.repeat(300)}.example`
 		expect(referrerHost(`https://${host}/`)).toHaveLength(253)
+	})
+})
+
+describe('storedReferrer', () => {
+	it('drops the query string and the fragment, keeping origin and path', () => {
+		expect(storedReferrer('https://example.org/path?token=abc#x')).toBe('https://example.org/path')
+	})
+
+	it('drops a query that hides inside the fragment', () => {
+		expect(storedReferrer('https://example.org/path#/spa?token=abc')).toBe(
+			'https://example.org/path'
+		)
+	})
+
+	it('keeps a plain referrer verbatim, case, port and trailing slash included', () => {
+		expect(storedReferrer('https://www.Example.org:8080/a/b/')).toBe(
+			'https://www.Example.org:8080/a/b/'
+		)
+	})
+
+	it('strips an unparseable referrer too, rather than trusting it', () => {
+		expect(storedReferrer('not a url?token=abc')).toBe('not a url')
+	})
+
+	it('caps a long referrer', () => {
+		const long = `https://example.org/${'a'.repeat(MAX_REFERRER_LENGTH)}`
+		expect(storedReferrer(long)).toHaveLength(MAX_REFERRER_LENGTH)
+	})
+
+	it('reports nothing for an absent, empty or query-only referrer', () => {
+		expect(storedReferrer(undefined)).toBeUndefined()
+		expect(storedReferrer('')).toBeUndefined()
+		expect(storedReferrer('?token=abc')).toBeUndefined()
 	})
 })

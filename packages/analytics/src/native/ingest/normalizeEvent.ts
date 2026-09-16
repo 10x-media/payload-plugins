@@ -1,18 +1,18 @@
 import { type GoalCompletion, matchGoals } from '../../goals/match'
 import type { Goal } from '../../goals/types'
-import { MAX_QUERY_LENGTH } from '../../tracker/types'
+import { MAX_QUERY_LENGTH, MAX_REFERRER_LENGTH } from '../../query/limits'
 import type { GeoResolver } from '../geo/geoResolver'
 import { type BrowserName, classifyBrowser, classifyOs, type OsName } from './browser'
 import { clientIpFromHeaders } from './clientIp'
 import { classifyDevice, type DeviceType } from './device'
 import { primaryLanguage } from './language'
-import { referrerHost } from './referrer'
+import { referrerHost, storedReferrer } from './referrer'
 import { deriveSource } from './source'
 import { extractUtm } from './utm'
 import { dailyVisitorHash, deriveSessionId } from './visitorHash'
 
-/** The cap the tracker already applied; ingest re-applies it, since the endpoint is public. */
-export { MAX_QUERY_LENGTH }
+/** The wire caps, re-exported beside the sanitizers that apply them. */
+export { MAX_QUERY_LENGTH, MAX_REFERRER_LENGTH }
 
 export type EventType = 'pageview' | 'event' | 'goal'
 
@@ -44,6 +44,7 @@ export interface StoredEvent {
 	name?: string
 	path: string
 	hostname: string
+	/** Origin and path only: the query string and fragment are stripped before storage. */
 	referrer?: string
 	/**
 	 * The referrer's bare host, derived at ingest because a `where` cannot derive it at read
@@ -213,7 +214,7 @@ export async function normalizeEvent({
 		name,
 		path,
 		hostname,
-		referrer: raw.referrer,
+		referrer: storedReferrer(raw.referrer),
 		...(refHost ? { referrerHost: refHost } : {}),
 		...(device ? { device } : {}),
 		...(browser ? { browser } : {}),

@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
+import { MAX_QUERY_LENGTH } from '../query/limits'
 import { CONSENT_QUEUE_LIMIT, CONSENT_STORAGE_KEY } from './consent'
 import { createTracker } from './createTracker'
-import { type LoadScript, MAX_QUERY_LENGTH, type Tracker, type TrackerEvent } from './types'
+import type { LoadScript, Tracker, TrackerEvent } from './types'
 
 const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 202 })))
 

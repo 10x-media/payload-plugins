@@ -8,13 +8,6 @@ import type { SnippetScript } from '../core/capture'
 export type TrackerWindow = Window & typeof globalThis
 
 /**
- * Cap on the wire `query`, applied by the tracker before it sends and again at ingest. It
- * lives here rather than beside the ingest sanitizers because both sides bundle separately
- * and must agree on one number.
- */
-export const MAX_QUERY_LENGTH = 512
-
-/**
  * One event on the wire. The native sink posts this shape verbatim to `ingestPath`;
  * vendor sinks map it onto their own SDK call and ignore `type: 'pageview'` because the
  * vendor script tracks pageviews itself.

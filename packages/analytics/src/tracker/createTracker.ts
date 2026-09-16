@@ -1,4 +1,5 @@
 import type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
+import { MAX_QUERY_LENGTH } from '../query/limits'
 import { type AutoCapture, createAutoCapture } from './autoCapture'
 import { createConsentQueue, readConsent, writeConsent } from './consent'
 import { createScriptLoader } from './loadScript'
@@ -7,15 +8,14 @@ import { createNativeSink } from './sinks/native'
 import { createPlausibleSink } from './sinks/plausible'
 import { createPosthogSink } from './sinks/posthog'
 import { createUmamiSink } from './sinks/umami'
-import {
-	type ConsentState,
-	type LoadScript,
-	MAX_QUERY_LENGTH,
-	type Sink,
-	type Tracker,
-	type TrackerEvent,
-	type TrackerOptions,
-	type TrackerWindow,
+import type {
+	ConsentState,
+	LoadScript,
+	Sink,
+	Tracker,
+	TrackerEvent,
+	TrackerOptions,
+	TrackerWindow,
 } from './types'
 
 /** Stand-in for a host with no DOM (server rendering, a worker). Every call is a no-op. */
