@@ -15,9 +15,13 @@ It is on by default. Set `view: false` to remove the route and the nav link.
 
 **Overview cards.** One card per metric the source serves, with a period-over-period delta when comparison is on. Clicking a card charts that metric in the trend and sorts the breakdown by it. A source serving both `visitors` and `visits` (Plausible does) gets a card each, labelled **Visitors** and **Visits**; `visits` used to carry the visitors label, wherever a metric label is rendered.
 
-**Trend.** The selected metric over the window, bucketed by hour, day, week or month. The bucket is picked from the window length (hours up to two days, weeks past four months, days in between) and never finer than the source serves. With comparison on, the previous period is overlaid on the same axes as a muted line, named "Previous period" in the legend and in every tooltip.
+**Trend.** The selected metric over the window, bucketed by hour, day, week or month. The bucket is picked from the window length (hours up to two days, weeks past four months, days in between) and never finer than the source serves. With comparison on, the previous period is overlaid on the same axes as a muted line, named "Previous period" in the legend and in every tooltip. A metric the source serves as a range total and not per bucket (Umami's conversions) charts nothing at all rather than a flat line of zeros, which would read as "nobody converted".
 
 **Breakdowns.** A tab per dimension group the source serves: pages, sources, technology, geography, events and goals. Each tab is a ranked bar list with the selected metric, a visitors column where the source serves one, sortable columns and a row limit of 10, 25, 50 or 100. Clicking a row adds an `eq` filter for that value and every section re-reads through it; the chip above removes it again.
+
+The Sources tab's own `source` rows are [traffic channels](/analytics/native#traffic-channels) on the native engine, and they read as translated names (**Search**, **Direct**) while the stored value, the filter and the URL keep the lowercase token. A row a source cannot name, including a host a rollup written before channels still holds, reads verbatim.
+
+A source can group by a dimension without serving the selected metric per row (Umami's `/metrics` reports distinct sessions and nothing else). The list then charts the first metric of the read that its rows do carry, under that metric's own name, rather than a column of zeros under the name you picked.
 
 A tab opens on the first dimension of its group the source can answer, and a **Group by** select beside the row limit switches between the rest whenever the source serves more than one:
 
@@ -58,7 +62,7 @@ One exception to Back: the two day pickers replace the current history entry rat
 
 Anything equal to the install's default is left out, so an untouched view has a clean URL. The parser is total: a value that names no metric, tab, dimension, operator or calendar day falls back to the default instead of failing, so a truncated or hand-edited link still opens a working view.
 
-A link built for one source keeps working when it is opened against another. Values the selected source cannot serve (a metric it lacks, a filter it cannot apply, a comparison it cannot answer) are coerced for the reads but left in the address bar, so the link itself is not rewritten by being opened. That only lasts until the next control writes: the URL it writes carries the coerced values, and the originals are gone from the address bar. Back, or opening the link again, brings them back.
+A link built for one source keeps working when it is opened against another. Values the selected source cannot serve (a metric it lacks, a filter it cannot apply, a comparison whose previous window it cannot reach) are coerced for the reads but left in the address bar, so the link itself is not rewritten by being opened. That only lasts until the next control writes: the URL it writes carries the coerced values, and the originals are gone from the address bar. Back, or opening the link again, brings them back.
 
 ## Capability gating
 
@@ -68,7 +72,7 @@ Every control reads the selected source's [capabilities](/analytics/adapters#the
 |---|---|
 | Data source select | the request resolves more than one readable source |
 | A metric card | the metric is in `capabilities.metrics` |
-| Compare | `capabilities.comparison` |
+| Compare | every source, unless its adapter set `comparison: false`. Hidden for a window whose previous period starts before the source's `maxLookbackDays` |
 | A range preset | its window fits `capabilities.maxLookbackDays` |
 | A breakdown tab | the source serves at least one dimension in that tab's group |
 | Group by select | the source serves more than one dimension in the active tab's group |

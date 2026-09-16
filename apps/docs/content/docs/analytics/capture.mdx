@@ -54,7 +54,7 @@ An install fills at most two slots, in this order:
 | `global` | `capture.slots.global`, else the designated `platformAdapter`, else the single config adapter when only one is configured. |
 | `tenant` | `capture.slots.tenant`, else the resolved scope's default adapter. Empty whenever no scope resolves. |
 
-One slot, one adapter, and one adapter fills at most one slot: when both slots resolve to the same adapter the global entry keeps it, so a scoped native install never posts every event twice. An adapter that declares no `capture` (GA4) fills nothing.
+One slot, one adapter, and one adapter fills at most one slot: when both slots resolve to the same adapter the global entry keeps it, so a scoped native install never posts every event twice. An adapter that declares no `capture`, because the public config it needs is unset, fills nothing.
 
 A native-only install renders no snippet at all: the tracker itself is the client, posting to the ingest endpoint.
 
@@ -70,6 +70,20 @@ analytics({
 `false` disables a slot outright: nothing fills it, its proxy mount 404s, and the tracker config omits it. An unknown `global` id throws at config time; a `tenant` id may also name a runtime provider instance, so it is resolved per request instead.
 
 `capture.paths` moves a slot's mount off the runtime proxy, for installs serving it through Next rewrites instead. Pass the same path [`captureRewrites`](/analytics/proxy#next-rewrites) was mounted at.
+
+### GA4
+
+GA4 fills a slot as soon as `measurementId` (the public `G-XXXXXXX`) is set, on the adapter or on the [provider document](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant). It is the one vendor that is not proxied: the tag is served from `googletagmanager.com` with the id in the query string, so the adapter declares no proxy routes and the slot's proxy mount answers 404.
+
+The snippet is Google's own, inline first: `window.dataLayer`, the `gtag` function, `gtag('js', ...)` and `gtag('config', '<measurementId>')`, then the async tag. Inline first is Google's ordering for consent mode, and it leaves the queue defined even when the tag itself is blocked, so nothing sent before the tag lands is lost. Consent is `required` by default like every other vendor, so neither script is in the server-rendered HTML until consent is granted.
+
+The sink forwards events and goals as `gtag('event', name, params)` and **no pageviews at all**: `gtag('config')` sends the first page view itself, and page views on history changes come from the web data stream's [enhanced measurement](https://support.google.com/analytics/answer/9216061), which is on by default. An install that turned that stream option off should turn it back on, since the sink will not make up the difference.
+
+The id must match `^[A-Za-z0-9-]+$`, because it lands in both the inline script and the tag URL. The provider document validates it on save, and an adapter configured with anything else fills no slot rather than escaping it.
+
+<Callout type="warn">
+**`file_download` double counts on a GA4 slot.** Enhanced measurement collects file downloads too, so the tracker's own `fileDownloads` auto-capture and GA4's own each report the same click. Turn one of the two off: `capture: { autoCapture: { fileDownloads: false } }` here, or the file-downloads option on the data stream there.
+</Callout>
 
 ## Consent
 
