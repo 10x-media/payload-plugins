@@ -10,6 +10,7 @@ import type {
 } from '../core/contract'
 import { supportsGranularity } from '../core/granularity'
 import { resolveReadContext } from '../core/scopedRead'
+import { goalSlugsFor } from '../plugin/goalHint'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { addDaysInTz, DEFAULT_TIMEZONE, startOfDayInTz, zonedDayIso } from '../timeframe/tz'
@@ -160,28 +161,26 @@ export const readForWidgetSeries = async (
 		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
 			? previousRange
 			: undefined
+	const goalSlugs = await goalSlugsFor({ runtime, req, scope: ctx.scope, metrics: [metric] })
+	const readBase = {
+		metrics: [metric],
+		filters,
+		timezone: tz,
+		scope: ctx.queryScope,
+		...(goalSlugs === undefined ? {} : { goalSlugs }),
+	}
 	let result: AnalyticsResult
 	let previous: AnalyticsResult | undefined
 	try {
 		;[result, previous] = await Promise.all([
-			runtime.engine.read(adapter, {
-				metrics: [metric],
-				dateRange,
-				granularity: 'day',
-				filters,
-				timezone: tz,
-				scope: ctx.queryScope,
-			}),
+			runtime.engine.read(adapter, { ...readBase, dateRange, granularity: 'day' }),
 			comparisonRange
 				? runtime.engine.read(adapter, {
-						metrics: [metric],
+						...readBase,
 						dateRange: comparisonRange,
 						// The overlay needs the previous window bucketed like the primary; the delta
 						// alone only needs its total, so the read stays as it was without `compare`.
 						...(compare ? { granularity: 'day' as const } : {}),
-						filters,
-						timezone: tz,
-						scope: ctx.queryScope,
 					})
 				: undefined,
 		])

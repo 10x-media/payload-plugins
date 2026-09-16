@@ -11,6 +11,7 @@ import { type QueryError, queryError } from '../query/errors'
 import { parseQueryParams, readParam } from '../query/parse'
 import type { QueryResponse, SerializedAnalyticsQuery } from '../query/response'
 import { previousWindow, withinLookback } from '../widgets/comparison'
+import { goalSlugsFor } from './goalHint'
 import { QUERY_PATH } from './paths'
 import { resolveSourcesForRequest } from './readContextForRequest'
 import { getRuntime, platformReadGate, readAccessFor, resolveTimezoneFor } from './runtime'
@@ -112,9 +113,17 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 		if (!parsed.ok) {
 			return errorResponse(400, parsed.error)
 		}
+		const goalSlugs = await goalSlugsFor({
+			runtime,
+			req,
+			scope: context.scope === PLATFORM_SCOPE ? null : context.scope,
+			metrics: parsed.value.query.metrics,
+			dimensions: parsed.value.query.dimensions,
+		})
 		const query: AnalyticsQuery = {
 			...parsed.value.query,
 			...(queryScope.queryScope === undefined ? {} : { scope: queryScope.queryScope }),
+			...(goalSlugs === undefined ? {} : { goalSlugs }),
 		}
 		let comparisonRange: DateRange | null = null
 		if (parsed.value.compare === 'previous') {

@@ -76,9 +76,11 @@ describe('plausible adapter', () => {
 		])
 	})
 
-	it('declares filters as the mapped-dimension key set with every contract operator', () => {
+	it('declares filters as the mapped dimensions except goal, with every contract operator', () => {
 		const caps = plausible({ siteId: 's', apiKey: 'k' }).capabilities
-		expect(caps.filters).toEqual(caps.dimensions)
+		expect(caps.filters).toEqual(
+			new Set([...caps.dimensions].filter((dimension) => dimension !== 'goal'))
+		)
 		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
 	})
 
@@ -219,6 +221,167 @@ describe('plausible adapter', () => {
 			},
 		])
 		expect(result.totals).toEqual({ pageviews: 35, visitors: 20, avgDuration: 35000 })
+	})
+	describe('goals and conversions', () => {
+		interface Body {
+			metrics: string[]
+			dimensions?: string[]
+			filters?: unknown[]
+		}
+
+		/** Every request body the adapter sent, in call order. */
+		const capture = (respond: (body: Body) => unknown): Body[] => {
+			const bodies: Body[] = []
+			server.use(
+				http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+					const body = (await request.json()) as Body
+					bodies.push(body)
+					return HttpResponse.json({ results: respond(body), meta: {}, query: {} })
+				})
+			)
+			return bodies
+		}
+
+		it('declares the goal dimension and conversions, and does not offer goal as a filter', () => {
+			const caps = plausible({ siteId: 's', apiKey: 'k' }).capabilities
+			expect(caps.dimensions.has('goal')).toBe(true)
+			expect(caps.metrics.has('conversions')).toBe(true)
+			expect(caps.metrics.has('revenue')).toBe(true)
+			expect(caps.filters.has('goal')).toBe(false)
+		})
+
+		it('breaks down by event:goal, restricted to the hint, reading events as conversions', async () => {
+			const bodies = capture(() => [
+				{ metrics: [9, { value: 120.5, currency: 'EUR' }, 7], dimensions: ['Signup'] },
+				{ metrics: [2, null, 2], dimensions: ['Purchase'] },
+			])
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({
+					metrics: ['conversions', 'revenue', 'visitors'],
+					dimensions: ['goal'],
+					goalSlugs: ['Signup', 'Purchase'],
+				}),
+				{}
+			)
+			expect(bodies).toHaveLength(1)
+			expect(bodies[0]?.metrics).toEqual(['events', 'total_revenue', 'visitors'])
+			expect(bodies[0]?.dimensions).toEqual(['event:goal'])
+			expect(bodies[0]?.filters).toEqual([['is', 'event:goal', ['Signup', 'Purchase']]])
+			expect(result.rows).toEqual([
+				{
+					dimensions: { goal: 'Signup' },
+					metrics: { conversions: 9, revenue: 120.5, visitors: 7 },
+				},
+				{ dimensions: { goal: 'Purchase' }, metrics: { conversions: 2, visitors: 2 } },
+			])
+			expect(result.meta.goalsUnresolved).toBeUndefined()
+		})
+
+		it('serves no goal rows and says so when the read carries no hint', async () => {
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'] }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		it('reads conversions beside site metrics from a second, goal-filtered request', async () => {
+			const bodies = capture((body) =>
+				body.metrics.includes('events')
+					? [{ metrics: [11], dimensions: [] }]
+					: [{ metrics: [500, 300], dimensions: [] }]
+			)
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({
+					metrics: ['pageviews', 'visitors', 'conversions'],
+					goalSlugs: ['signup'],
+				}),
+				{}
+			)
+			expect(bodies).toHaveLength(2)
+			expect(bodies[0]?.metrics).toEqual(['pageviews', 'visitors'])
+			expect(bodies[0]?.filters).toBeUndefined()
+			expect(bodies[1]?.metrics).toEqual(['events'])
+			expect(bodies[1]?.filters).toEqual([['is', 'event:goal', ['signup']]])
+			expect(result.totals).toEqual({ pageviews: 500, visitors: 300, conversions: 11 })
+			expect(result.rows).toEqual([{ metrics: { pageviews: 500, visitors: 300, conversions: 11 } }])
+		})
+
+		it('keeps the site metrics and drops conversions when the read carries no hint', async () => {
+			const bodies = capture(() => [{ metrics: [500], dimensions: [] }])
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({ metrics: ['pageviews', 'conversions'] }),
+				{}
+			)
+			expect(bodies).toHaveLength(1)
+			expect(bodies[0]?.metrics).toEqual(['pageviews'])
+			expect(result.totals).toEqual({ pageviews: 500 })
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		// total_revenue needs a revenue goal in scope: requested on a site-wide read, the API
+		// rejects the whole query.
+		it('never asks for total_revenue outside a goal-filtered request', async () => {
+			const bodies = capture((body) =>
+				body.metrics.includes('total_revenue')
+					? [{ metrics: [{ value: 42, currency: 'EUR' }], dimensions: [] }]
+					: [{ metrics: [500], dimensions: [] }]
+			)
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({ metrics: ['pageviews', 'revenue'], goalSlugs: ['purchase'] }),
+				{}
+			)
+			expect(bodies[0]?.metrics).toEqual(['pageviews'])
+			expect(bodies[1]?.metrics).toEqual(['total_revenue'])
+			expect(bodies[1]?.filters).toEqual([['is', 'event:goal', ['purchase']]])
+			expect(result.totals).toEqual({ pageviews: 500, revenue: 42 })
+		})
+
+		it('carries the page filter into the goal request too', async () => {
+			const bodies = capture((body) =>
+				body.metrics.includes('events')
+					? [{ metrics: [3], dimensions: [] }]
+					: [{ metrics: [9], dimensions: [] }]
+			)
+			await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({ metrics: ['pageviews', 'conversions'], path: '/pricing', goalSlugs: ['signup'] }),
+				{}
+			)
+			expect(bodies[1]?.filters).toEqual([
+				['is', 'event:page', ['/pricing']],
+				['is', 'event:goal', ['signup']],
+			])
+		})
+
+		it('merges goal-filtered conversions into a daily series by day', async () => {
+			const bodies = capture((body) => {
+				const goal = body.metrics.includes('events')
+				if (!body.dimensions) {
+					return [{ metrics: goal ? [4] : [90], dimensions: [] }]
+				}
+				return goal
+					? [{ metrics: [3], dimensions: ['2026-01-02'] }]
+					: [
+							{ metrics: [50], dimensions: ['2026-01-01'] },
+							{ metrics: [40], dimensions: ['2026-01-02'] },
+						]
+			})
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({
+					metrics: ['pageviews', 'conversions'],
+					granularity: 'day',
+					goalSlugs: ['signup'],
+				}),
+				{}
+			)
+			expect(bodies).toHaveLength(4)
+			expect(result.rows).toEqual([
+				{ timestamp: '2026-01-01T00:00:00.000Z', metrics: { pageviews: 50 } },
+				{ timestamp: '2026-01-02T00:00:00.000Z', metrics: { pageviews: 40, conversions: 3 } },
+			])
+			expect(result.totals).toEqual({ pageviews: 90, conversions: 4 })
+		})
 	})
 })
 

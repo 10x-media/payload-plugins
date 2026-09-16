@@ -11,6 +11,7 @@ import type {
 	MetricKey,
 } from '../../core/contract'
 import { DEFAULT_TIMEZONE, zonedCalendarDay } from '../../timeframe/tz'
+import { goalHint, goalsUnresolvedResult } from '../goalRead'
 import { dayIso } from '../series'
 
 export interface Ga4Config {
@@ -53,7 +54,15 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 	city: 'city',
 	language: 'language',
 	event: 'eventName',
+	goal: 'eventName',
 }
+
+/**
+ * Metrics GA4 answers only for a goal-restricted read. `keyEvents` counts events the
+ * property itself marks as key events, so an event that is a goal here but not marked
+ * there reports 0.
+ */
+const GOAL_METRICS: ReadonlySet<MetricKey> = new Set(['conversions'])
 
 type StringMatchType = 'EXACT' | 'CONTAINS' | 'FULL_REGEXP'
 
@@ -91,6 +100,10 @@ const ga4Metrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_MAP) as Me
 const ga4Dimensions: ReadonlySet<DimensionKey> = new Set(
 	Object.keys(DIMENSION_MAP) as DimensionKey[]
 )
+// `goal` is a breakdown, not a filter: the read's own goal slugs own the eventName clause.
+const ga4Filters: ReadonlySet<DimensionKey> = new Set(
+	[...ga4Dimensions].filter((dimension) => dimension !== 'goal')
+)
 
 // GA4 returns bounceRate as a 0..1 ratio and averageSessionDuration in seconds; the
 // contract uses a 0..100 percentage and milliseconds.
@@ -114,7 +127,7 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 		maxLookbackDays,
 		metrics: ga4Metrics,
 		dimensions: ga4Dimensions,
-		filters: ga4Dimensions,
+		filters: ga4Filters,
 		filterOperators: new Set(['eq', 'contains', 'matches']),
 		batchPageReport: true,
 		rateLimit: { maxConcurrent: 10, quotaModel: 'tokens', readsCountAsUsage: true },
@@ -155,17 +168,40 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 		// forwarded; gax cancellation uses the call's own handle, not our signal.
 		async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()
-			const wanted = q.metrics.filter((m) => METRIC_MAP[m])
-			const providerMetrics = [...new Set(wanted.map((m) => METRIC_MAP[m] as string))]
 			const dims = (q.dimensions ?? []).filter((d) => DIMENSION_MAP[d])
+			const goalBreakdown = dims.includes('goal')
+			const hint = goalHint(q)
+			if (goalBreakdown && !hint) {
+				return goalsUnresolvedResult('ga4', q)
+			}
+			const wanted = q.metrics.filter((m) => METRIC_MAP[m])
+			// A goal breakdown restricts every row it returns, so its goal metrics come from that
+			// one report. Anywhere else they need a report of their own: an eventName filter over
+			// the whole read would scope the site metrics to goal hits as well.
+			const siteMetrics = goalBreakdown ? wanted : wanted.filter((m) => !GOAL_METRICS.has(m))
+			const goalMetrics = goalBreakdown ? [] : wanted.filter((m) => GOAL_METRICS.has(m))
+			const unresolved = goalMetrics.length > 0 && !hint
+			const readGoals = unresolved ? [] : goalMetrics
+			const providerKeys = (ms: MetricKey[]): string[] => [
+				...new Set(ms.map((m) => METRIC_MAP[m] as string)),
+			]
+			const siteKeys = providerKeys(siteMetrics)
+			const goalKeys = providerKeys(readGoals)
 			const providerDims = [...new Set(dims.map((d) => DIMENSION_MAP[d] as string))]
+			const meta: AnalyticsResult['meta'] = {
+				provider: 'ga4',
+				fetchedAt,
+				...(unresolved ? { goalsUnresolved: true as const } : {}),
+			}
 
-			const readRow = (
+			const readMetrics = (
+				ms: MetricKey[],
+				keys: string[],
 				row: protos.google.analytics.data.v1beta.IRow
 			): Partial<Record<MetricKey, number>> => {
 				const out: Partial<Record<MetricKey, number>> = {}
-				for (const m of wanted) {
-					const idx = providerMetrics.indexOf(METRIC_MAP[m] as string)
+				for (const m of ms) {
+					const idx = keys.indexOf(METRIC_MAP[m] as string)
 					out[m] = toContractValue(m, Number(row.metricValues?.[idx]?.value ?? 0))
 				}
 				return out
@@ -181,36 +217,113 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 			// Capability gating (filters/filterOperators) is the real contract upstream; an
 			// unsupported dimension is dropped here as the safety net.
 			for (const filter of q.filters ?? []) {
-				const fieldName = DIMENSION_MAP[filter.dimension]
+				const fieldName = ga4Filters.has(filter.dimension)
+					? DIMENSION_MAP[filter.dimension]
+					: undefined
 				if (!fieldName) {
 					continue
 				}
 				filterExprs.push(stringFilter(fieldName, MATCH_TYPE_MAP[filter.operator], filter.value))
 			}
-			const dimensionFilter =
-				filterExprs.length === 0
+			const goalExprs = hint
+				? [
+						...filterExprs,
+						{
+							filter: {
+								fieldName: 'eventName',
+								inListFilter: { values: hint, caseSensitive: true },
+							},
+						},
+					]
+				: filterExprs
+			const asFilter = (
+				exprs: protos.google.analytics.data.v1beta.IFilterExpression[]
+			): protos.google.analytics.data.v1beta.IFilterExpression | undefined =>
+				exprs.length === 0
 					? undefined
-					: filterExprs.length === 1
-						? filterExprs[0]
-						: { andGroup: { expressions: filterExprs } }
+					: exprs.length === 1
+						? exprs[0]
+						: { andGroup: { expressions: exprs } }
 
-			const baseRequest: protos.google.analytics.data.v1beta.IRunReportRequest = {
-				property: `properties/${config.propertyId}`,
-				dateRanges: [
-					{
-						startDate: zonedCalendarDay(q.dateRange.start, q.timezone ?? DEFAULT_TIMEZONE),
-						endDate: zonedCalendarDay(q.dateRange.end, q.timezone ?? DEFAULT_TIMEZONE),
-					},
-				],
-				metrics: providerMetrics.map((name) => ({ name })),
-				...(dimensionFilter ? { dimensionFilter } : {}),
+			const request = (
+				metrics: string[],
+				exprs: protos.google.analytics.data.v1beta.IFilterExpression[],
+				extra: protos.google.analytics.data.v1beta.IRunReportRequest
+			): protos.google.analytics.data.v1beta.IRunReportRequest => {
+				const dimensionFilter = asFilter(exprs)
+				return {
+					property: `properties/${config.propertyId}`,
+					dateRanges: [
+						{
+							startDate: zonedCalendarDay(q.dateRange.start, q.timezone ?? DEFAULT_TIMEZONE),
+							endDate: zonedCalendarDay(q.dateRange.end, q.timezone ?? DEFAULT_TIMEZONE),
+						},
+					],
+					metrics: metrics.map((name) => ({ name })),
+					...(dimensionFilter ? { dimensionFilter } : {}),
+					...extra,
+				}
 			}
 
 			const client = await getClient()
 
+			interface MergedRow {
+				keys: string[]
+				metrics: Partial<Record<MetricKey, number>>
+			}
+
+			interface PairedReport {
+				rows: MergedRow[]
+				totals: Partial<Record<MetricKey, number>> | undefined
+			}
+
+			/**
+			 * One report shape run twice, plainly and goal-filtered, merged per row. A row the
+			 * goal report has no counterpart for carries no conversions: no key event fired there.
+			 */
+			const runPair = async (
+				extra: protos.google.analytics.data.v1beta.IRunReportRequest
+			): Promise<PairedReport> => {
+				const runReport = async (
+					metrics: string[],
+					exprs: protos.google.analytics.data.v1beta.IFilterExpression[]
+				) => {
+					const [response] = await client.runReport(request(metrics, exprs, extra))
+					return response
+				}
+				// A goal breakdown restricts its own rows, so its one report carries the hint too.
+				const siteExprs = goalBreakdown ? goalExprs : filterExprs
+				const [site, goals] = await Promise.all([
+					siteKeys.length ? runReport(siteKeys, siteExprs) : undefined,
+					goalKeys.length ? runReport(goalKeys, goalExprs) : undefined,
+				])
+				const rowKeys = (row: protos.google.analytics.data.v1beta.IRow): string[] =>
+					(row.dimensionValues ?? []).map((value) => value.value ?? '')
+				const byKey = new Map((goals?.rows ?? []).map((row) => [JSON.stringify(rowKeys(row)), row]))
+				const rows = (site?.rows ?? goals?.rows ?? []).map((row) => {
+					const goalRow = site ? byKey.get(JSON.stringify(rowKeys(row))) : row
+					return {
+						keys: rowKeys(row),
+						metrics: {
+							...(site ? readMetrics(siteMetrics, siteKeys, row) : {}),
+							...(goalRow ? readMetrics(readGoals, goalKeys, goalRow) : {}),
+						},
+					}
+				})
+				const siteTotals = site?.totals?.[0]
+				const goalTotals = goals?.totals?.[0]
+				const totals =
+					siteTotals || goalTotals
+						? {
+								...(siteTotals ? readMetrics(siteMetrics, siteKeys, siteTotals) : {}),
+								...(goalTotals ? readMetrics(readGoals, goalKeys, goalTotals) : {}),
+							}
+						: undefined
+				return { rows, totals }
+			}
+
 			if (q.granularity === 'day' && !dims.length) {
-				const [response] = await client.runReport({
-					...baseRequest,
+				const report = await runPair({
 					dimensions: [{ name: 'date' }],
 					metricAggregations: [
 						'TOTAL',
@@ -218,39 +331,35 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 					orderBys: [{ dimension: { dimensionName: 'date' } }],
 				})
 				const rows: AnalyticsRow[] = []
-				for (const row of response.rows ?? []) {
-					const ymd = row.dimensionValues?.[0]?.value ?? ''
+				for (const row of report.rows) {
+					const ymd = row.keys[0] ?? ''
 					const ts = dayIso(`${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`)
 					if (ts) {
-						rows.push({ timestamp: ts, metrics: readRow(row) })
+						rows.push({ timestamp: ts, metrics: row.metrics })
 					}
 				}
-				const totalsRow = response.totals?.[0]
-				const totals = totalsRow ? readRow(totalsRow) : {}
-				return { rows, totals, meta: { provider: 'ga4', fetchedAt } }
+				return { rows, totals: report.totals ?? {}, meta }
 			}
 
-			const [response] = await client.runReport({
-				...baseRequest,
+			const report = await runPair({
 				...(providerDims.length ? { dimensions: providerDims.map((name) => ({ name })) } : {}),
 				...(q.limit ? { limit: q.limit } : {}),
 			})
 
 			if (!dims.length) {
-				const row = response.rows?.[0]
-				const totals = row ? readRow(row) : {}
-				return { rows: [{ metrics: totals }], totals, meta: { provider: 'ga4', fetchedAt } }
+				const totals = report.rows[0]?.metrics ?? {}
+				return { rows: [{ metrics: totals }], totals, meta }
 			}
 
-			const rows: AnalyticsRow[] = (response.rows ?? []).map((row) => {
+			const rows: AnalyticsRow[] = report.rows.map((row) => {
 				const dimValues: Partial<Record<DimensionKey, string>> = {}
 				for (const d of dims) {
 					const idx = providerDims.indexOf(DIMENSION_MAP[d] as string)
-					dimValues[d] = row.dimensionValues?.[idx]?.value ?? ''
+					dimValues[d] = row.keys[idx] ?? ''
 				}
-				return { dimensions: dimValues, metrics: readRow(row) }
+				return { dimensions: dimValues, metrics: row.metrics }
 			})
-			return { rows, totals: undefined, meta: { provider: 'ga4', fetchedAt } }
+			return { rows, totals: undefined, meta }
 		},
 	}
 }

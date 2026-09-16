@@ -11,6 +11,7 @@ import type {
 	FilterOperator,
 	MetricKey,
 } from '../../core/contract'
+import { goalHint, goalsUnresolvedResult } from '../goalRead'
 import { fetchJson } from '../http/fetchJson'
 import { dayIso } from '../series'
 
@@ -65,6 +66,7 @@ const umamiMetrics: ReadonlySet<MetricKey> = new Set<MetricKey>([
 	'sessions',
 	'bounceRate',
 	'avgDuration',
+	'conversions',
 ])
 
 interface UmamiDimension {
@@ -95,6 +97,14 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, UmamiDimension>> = {
 }
 
 /**
+ * Goals are custom events here, counted by `/metrics?type=event`, whose y is the number of
+ * occurrences: a plugin goal's slug must equal the captured event's name. It is the one
+ * shape that answers `conversions`, so a breakdown by any other dimension and the daily
+ * series report none.
+ */
+const GOAL_DIMENSION: UmamiDimension = { param: 'event', metric: 'conversions' }
+
+/**
  * Umami's `re.` is `~*`: a case-insensitive partial match, so an unanchored pattern hits
  * anywhere in the value. `c.` is `ilike`, also case-insensitive.
  */
@@ -109,10 +119,12 @@ const umamiFilters: ReadonlySet<DimensionKey> = new Set(
 )
 
 // `event` is filterable but not a group: /metrics counts event occurrences for it, and the
-// adapter cannot declare `events` as a metric because /stats reports no such number.
-const umamiDimensions: ReadonlySet<DimensionKey> = new Set(
-	[...umamiFilters].filter((dimension) => dimension !== 'event')
-)
+// adapter cannot declare `events` as a metric because /stats reports no such number. `goal`
+// is the reverse, a group the read's own slugs narrow rather than a filter a caller writes.
+const umamiDimensions: ReadonlySet<DimensionKey> = new Set([
+	...[...umamiFilters].filter((dimension) => dimension !== 'event'),
+	'goal' as DimensionKey,
+])
 
 interface UmamiParams {
 	search: URLSearchParams
@@ -223,11 +235,42 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()
 			const headers = authHeaders()
+			const goalBreakdown = (q.dimensions ?? []).includes('goal')
+			const hint = goalHint(q)
+			if (goalBreakdown && !hint) {
+				return goalsUnresolvedResult('umami', q)
+			}
 			const plan = params(q)
+			// Umami splits an `eq.` value list on commas and offers no escape, so a slug carrying
+			// one cannot be asked for: it is left out of the request and reported, rather than
+			// widening the read to every event.
+			const askable = (hint ?? []).filter((slug) => !slug.includes(','))
+			const eventValue = `eq.${askable.join(',')}`
+			// The goal rows come from the `event` param, so a caller's own filter on it would
+			// contradict the hint. The hint wins and that filter is reported unapplied.
+			const eventFilter = (q.filters ?? []).find((f) => f.dimension === 'event')
+			const readsGoals = goalBreakdown || (q.metrics.includes('conversions') && hint !== null)
+			const unapplied: AnalyticsFilter[] = [
+				...plan.unapplied,
+				...(hint ?? [])
+					.filter((slug) => slug.includes(','))
+					.map((slug) => ({
+						dimension: 'goal' as const,
+						operator: 'eq' as const,
+						value: slug,
+					})),
+				...(readsGoals &&
+				eventFilter &&
+				`${OPERATOR_PREFIX[eventFilter.operator]}${eventFilter.value}` !== eventValue
+					? [eventFilter]
+					: []),
+			]
+			const unresolved = q.metrics.includes('conversions') && !hint
 			const meta: AnalyticsResult['meta'] = {
 				provider: 'umami',
 				fetchedAt,
-				...(plan.unapplied.length > 0 ? { unappliedFilters: plan.unapplied } : {}),
+				...(unapplied.length > 0 ? { unappliedFilters: unapplied } : {}),
+				...(unresolved ? { goalsUnresolved: true as const } : {}),
 			}
 			// Totals are left undefined rather than zeroed, the same as every other number this
 			// adapter cannot report, so the display layer shows "no data" instead of a real 0.
@@ -235,6 +278,34 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 				return { rows: [], totals: undefined, meta }
 			}
 			const search = (): URLSearchParams => new URLSearchParams(plan.search)
+
+			/**
+			 * The goal rows for the hint, narrowed to it again on the way back so nothing the API
+			 * did not restrict can arrive as a goal.
+			 */
+			const fetchGoalRows = async (): Promise<Array<{ x: string; y: number }>> => {
+				if (askable.length === 0) {
+					return []
+				}
+				const p = search()
+				p.set('type', GOAL_DIMENSION.param)
+				p.set(GOAL_DIMENSION.param, eventValue)
+				const data = await fetchJson<Array<{ x: string; y: number }>>(
+					`${base}/websites/${config.websiteId}/metrics?${p.toString()}`,
+					{ headers, signal: ctx.signal, provider: 'umami' }
+				)
+				const wanted = new Set(askable)
+				return data.filter((row) => wanted.has(row.x))
+			}
+
+			if (goalBreakdown) {
+				const data = await fetchGoalRows()
+				const rows: AnalyticsRow[] = data.map((row) => ({
+					dimensions: { goal: row.x },
+					metrics: { [GOAL_DIMENSION.metric]: row.y },
+				}))
+				return { rows, totals: undefined, meta }
+			}
 
 			let breakdown: ({ dimension: DimensionKey } & UmamiDimension) | undefined
 			for (const dimension of q.dimensions ?? []) {
@@ -264,11 +335,16 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			}
 
 			const fetchTotals = async (): Promise<Partial<Record<MetricKey, number>>> => {
-				const stats = await fetchJson<UmamiStats>(
-					`${base}/websites/${config.websiteId}/stats?${search().toString()}`,
-					{ headers, signal: ctx.signal, provider: 'umami' }
-				)
+				// Conversions have no place in /stats: their total is the goal rows summed.
+				const [stats, goalRows] = await Promise.all([
+					fetchJson<UmamiStats>(
+						`${base}/websites/${config.websiteId}/stats?${search().toString()}`,
+						{ headers, signal: ctx.signal, provider: 'umami' }
+					),
+					q.metrics.includes('conversions') && hint ? fetchGoalRows() : undefined,
+				])
 				const all: Partial<Record<MetricKey, number>> = {
+					...(goalRows ? { conversions: goalRows.reduce((sum, row) => sum + row.y, 0) } : {}),
 					pageviews: stats.pageviews,
 					visitors: stats.visitors,
 					visits: stats.visits,

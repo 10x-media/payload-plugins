@@ -73,10 +73,38 @@ const stubAdapter = (opts: StubOptions): AnalyticsAdapter => ({
 
 const RANGE = 'from=2026-01-10&to=2026-01-16'
 
+/**
+ * A source shaped like the provider adapters: goal rows exist only for the slugs the read
+ * hints at, and a goal read without them says so instead of counting every event.
+ */
+const goalsAdapter = (seen: AnalyticsQuery[]): AnalyticsAdapter => ({
+	id: 'goals',
+	label: 'Goal source',
+	capabilities: {
+		...baseCapabilities,
+		metrics: new Set(['pageviews', 'conversions']),
+		dimensions: new Set(['page', 'goal']),
+	},
+	isConfigured: () => true,
+	query: async (q) => {
+		seen.push(q)
+		const fetchedAt = q.dateRange.end.toISOString()
+		const slugs = q.goalSlugs ?? []
+		if (slugs.length === 0) {
+			return { rows: [], meta: { provider: 'goals', fetchedAt, goalsUnresolved: true } }
+		}
+		return {
+			rows: slugs.map((slug) => ({ dimensions: { goal: slug }, metrics: { conversions: 1 } })),
+			meta: { provider: 'goals', fetchedAt },
+		}
+	},
+})
+
 describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
 	let token: string
 	const mem = memoryAdapter()
+	const goalQueries: AnalyticsQuery[] = []
 
 	beforeAll(async () => {
 		booted = await bootPayload({
@@ -110,6 +138,7 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 						pageviews: 3,
 					}),
 					stubAdapter({ id: 'unconfigured', label: 'Unconfigured source', configured: false }),
+					goalsAdapter(goalQueries),
 				],
 				defaultAdapter: 'memory',
 			}),
@@ -163,6 +192,22 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 			(e): e is Endpoint => typeof e === 'object' && e.path === QUERY_PATH
 		)
 		expect(endpoint?.method).toBe('get')
+	})
+
+	// This install configures no goals, so there is nothing to hint with: the source answers
+	// no goal rows rather than every event it has, and says why.
+	it(`surfaces goalsUnresolved when the scope has no goals on ${db}`, async () => {
+		goalQueries.length = 0
+		const body = await okBody(`source=goals&metrics=conversions&dimensions=goal&${RANGE}`)
+		expect(goalQueries[0]?.goalSlugs).toEqual([])
+		expect(body.result.rows).toEqual([])
+		expect(body.result.meta.goalsUnresolved).toBe(true)
+	})
+
+	it(`leaves a read that is about no goal unhinted on ${db}`, async () => {
+		goalQueries.length = 0
+		await okBody(`source=goals&metrics=pageviews&${RANGE}`)
+		expect(goalQueries[0]?.goalSlugs).toBeUndefined()
 	})
 
 	it(`401s an anonymous request on ${db}`, async () => {

@@ -131,7 +131,11 @@ export const readForWidgetGoals = async (
 			? previousRange
 			: undefined
 
-	const [breakdown, totals, previous, names] = await Promise.all([
+	// The names are resolved first: their slugs are the hint a provider source restricts its
+	// goal rows to, so both reads below need them before they run.
+	const names = await goalNames(runtime, req, ctx.scope)
+	const goalSlugs = [...names.keys()]
+	const [breakdown, totals, previous] = await Promise.all([
 		readForWidgetBreakdown({
 			...shared,
 			range: dateRange,
@@ -139,6 +143,7 @@ export const readForWidgetGoals = async (
 			dimension: 'goal',
 			limit,
 			extraMetrics: ['revenue', 'visitors'],
+			goalSlugs,
 		}),
 		adapter.capabilities.metrics.has('visitors')
 			? // The site total is a denominator, never a delta: its own previous window would
@@ -152,9 +157,9 @@ export const readForWidgetGoals = async (
 					metric: 'conversions',
 					dimension: 'goal',
 					limit: previousLimit(limit),
+					goalSlugs,
 				})
 			: undefined,
-		goalNames(runtime, req, ctx.scope),
 	])
 	if (breakdown.status !== 'ok') {
 		return { ...fallback(breakdown.status, breakdown.adapterId), dateRange, timezone: tz }

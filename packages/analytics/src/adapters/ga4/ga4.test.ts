@@ -128,9 +128,11 @@ describe('ga4 adapter', () => {
 		})
 	})
 
-	it('declares filters as the mapped-dimension key set with every contract operator', () => {
+	it('declares filters as the mapped dimensions except goal, with every contract operator', () => {
 		const caps = ga4(config).capabilities
-		expect(caps.filters).toEqual(caps.dimensions)
+		expect(caps.filters).toEqual(
+			new Set([...caps.dimensions].filter((dimension) => dimension !== 'goal'))
+		)
 		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
 	})
 
@@ -328,5 +330,112 @@ describe('ga4 adapter', () => {
 			{}
 		)
 		expect(sentRequest().dateRanges).toEqual([{ startDate: '2026-09-01', endDate: '2026-09-07' }])
+	})
+
+	describe('goals and conversions', () => {
+		const GOAL_FILTER = {
+			filter: {
+				fieldName: 'eventName',
+				inListFilter: { values: ['signup', 'purchase'], caseSensitive: true },
+			},
+		}
+
+		/** Answers a request with the rows its metric list asks for; key events come goal-filtered. */
+		const respond = (rowsFor: (metrics: string[]) => unknown[]): void => {
+			runReport.mockImplementation((request: RunReportRequest) => [
+				{ rows: rowsFor((request.metrics ?? []).map((m) => m.name ?? '')) },
+			])
+		}
+
+		const requests = (): RunReportRequest[] =>
+			runReport.mock.calls.map((call) => call[0] as RunReportRequest)
+
+		it('declares the goal dimension and conversions, and does not offer goal as a filter', () => {
+			const caps = ga4(config).capabilities
+			expect(caps.dimensions.has('goal')).toBe(true)
+			expect(caps.metrics.has('conversions')).toBe(true)
+			expect(caps.filters.has('goal')).toBe(false)
+		})
+
+		it('breaks eventName down, in-list filtered to the hint, reading keyEvents as conversions', async () => {
+			respond(() => [
+				{ dimensionValues: [{ value: 'signup' }], metricValues: [{ value: '9' }] },
+				{ dimensionValues: [{ value: 'purchase' }], metricValues: [{ value: '2' }] },
+			])
+			const result = await ga4(config).query(
+				q({
+					metrics: ['conversions'],
+					dimensions: ['goal'],
+					goalSlugs: ['signup', 'purchase'],
+				}),
+				{}
+			)
+			const sent = requests()[0]
+			expect(sent?.dimensions).toEqual([{ name: 'eventName' }])
+			expect(sent?.metrics).toEqual([{ name: 'keyEvents' }])
+			expect(sent?.dimensionFilter).toEqual(GOAL_FILTER)
+			expect(result.rows).toEqual([
+				{ dimensions: { goal: 'signup' }, metrics: { conversions: 9 } },
+				{ dimensions: { goal: 'purchase' }, metrics: { conversions: 2 } },
+			])
+		})
+
+		it('serves no goal rows and says so when the read carries no hint', async () => {
+			const result = await ga4(config).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'] }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBe(true)
+			expect(runReport).not.toHaveBeenCalled()
+		})
+
+		it('reads conversions beside site metrics from a second, in-list filtered report', async () => {
+			respond((metrics) =>
+				metrics.includes('keyEvents')
+					? [{ dimensionValues: [], metricValues: [{ value: '11' }] }]
+					: [{ dimensionValues: [], metricValues: [{ value: '500' }] }]
+			)
+			const result = await ga4(config).query(
+				q({ metrics: ['pageviews', 'conversions'], goalSlugs: ['signup', 'purchase'] }),
+				{}
+			)
+			const [site, goals] = requests()
+			expect(site?.metrics).toEqual([{ name: 'screenPageViews' }])
+			expect(site?.dimensionFilter).toBeUndefined()
+			expect(goals?.metrics).toEqual([{ name: 'keyEvents' }])
+			expect(goals?.dimensionFilter).toEqual(GOAL_FILTER)
+			expect(result.totals).toEqual({ pageviews: 500, conversions: 11 })
+		})
+
+		it('ands the goal hint onto the page filter', async () => {
+			respond(() => [{ dimensionValues: [], metricValues: [{ value: '1' }] }])
+			await ga4(config).query(
+				q({ metrics: ['conversions'], path: '/pricing', goalSlugs: ['signup', 'purchase'] }),
+				{}
+			)
+			expect(requests()[0]?.dimensionFilter).toEqual({
+				andGroup: {
+					expressions: [
+						{
+							filter: {
+								fieldName: 'pagePath',
+								stringFilter: { matchType: 'EXACT', value: '/pricing', caseSensitive: true },
+							},
+						},
+						GOAL_FILTER,
+					],
+				},
+			})
+		})
+
+		it('keeps the site metrics and drops conversions when the read carries no hint', async () => {
+			respond(() => [{ dimensionValues: [], metricValues: [{ value: '500' }] }])
+			const result = await ga4(config).query(q({ metrics: ['pageviews', 'conversions'] }), {})
+			expect(requests()).toHaveLength(1)
+			expect(requests()[0]?.metrics).toEqual([{ name: 'screenPageViews' }])
+			expect(result.totals).toEqual({ pageviews: 500 })
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
 	})
 })

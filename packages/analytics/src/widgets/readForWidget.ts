@@ -9,6 +9,7 @@ import type {
 	MetricKey,
 } from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
+import { goalSlugsFor } from '../plugin/goalHint'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { previousWindow, withinLookback } from './comparison'
@@ -111,25 +112,21 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
 			? previousRange
 			: undefined
+	const goalSlugs = await goalSlugsFor({ runtime, req, scope: ctx.scope, metrics })
+	const readBase = {
+		metrics,
+		filters,
+		timezone: tz,
+		scope: ctx.queryScope,
+		...(goalSlugs === undefined ? {} : { goalSlugs }),
+	}
 	let result: AnalyticsResult
 	let previous: AnalyticsResult | undefined
 	try {
 		;[result, previous] = await Promise.all([
-			runtime.engine.read(adapter, {
-				metrics,
-				dateRange,
-				filters,
-				timezone: tz,
-				scope: ctx.queryScope,
-			}),
+			runtime.engine.read(adapter, { ...readBase, dateRange }),
 			comparisonRange
-				? runtime.engine.read(adapter, {
-						metrics,
-						dateRange: comparisonRange,
-						filters,
-						timezone: tz,
-						scope: ctx.queryScope,
-					})
+				? runtime.engine.read(adapter, { ...readBase, dateRange: comparisonRange })
 				: undefined,
 		])
 	} catch {

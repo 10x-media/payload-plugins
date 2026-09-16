@@ -5,6 +5,7 @@ import { comparisonOf, satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, DateRange, MetricKey } from '../core/contract'
 import { supportsGranularity } from '../core/granularity'
 import { resolveReadContext } from '../core/scopedRead'
+import { goalSlugsFor } from '../plugin/goalHint'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
@@ -137,7 +138,19 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 		}
 	}
 	const hostname = await resolveHostname(binding, data, bindingCtx)
-	const base = { path, hostname, timezone: tz, scope: ctx.queryScope }
+	const goalSlugs = await goalSlugsFor({
+		runtime,
+		req,
+		scope: ctx.scope,
+		metrics: supportedMetrics,
+	})
+	const base = {
+		path,
+		hostname,
+		timezone: tz,
+		scope: ctx.queryScope,
+		...(goalSlugs === undefined ? {} : { goalSlugs }),
+	}
 	const previousRange =
 		args.compare && runtime.comparison && comparisonOf(adapter.capabilities)
 			? previousWindow(dateRange, tz)

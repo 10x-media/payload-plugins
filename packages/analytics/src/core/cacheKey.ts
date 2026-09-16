@@ -41,5 +41,8 @@ export function buildCacheKey(provider: string, q: AnalyticsQuery): string {
 		// Appended only for a non-UTC timezone so default (UTC) keys keep their format.
 		...(q.timezone !== undefined && q.timezone !== DEFAULT_TIMEZONE ? [q.timezone] : []),
 		...(q.scope !== undefined ? [encodeURIComponent(q.scope)] : []),
+		// A provider read restricts its goal rows to the hint, so two hints answer differently
+		// and must never share an entry. Prefixed, so the segment cannot read as a scope.
+		...(q.goalSlugs?.length ? [`goals:${stable(q.goalSlugs)}`] : []),
 	].join('|')
 }

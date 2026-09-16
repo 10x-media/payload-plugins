@@ -85,7 +85,7 @@ describe('umami adapter', () => {
 			})
 		)
 		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
-			q({ metrics: ['visitors'], dimensions: ['goal', 'browser'] }),
+			q({ metrics: ['visitors'], dimensions: ['source', 'browser'] }),
 			{}
 		)
 		expect(result.rows).toEqual([{ dimensions: { browser: 'chrome' }, metrics: { visitors: 7 } }])
@@ -120,14 +120,152 @@ describe('umami adapter', () => {
 		expect(result.rows).toEqual([{ dimensions: { event: 'signup' }, metrics: { events: 30 } }])
 	})
 
+	describe('goals and conversions', () => {
+		const STATS = { pageviews: 1000, visitors: 400, visits: 500, bounces: 250, totaltime: 5000 }
+
+		/** Captures the /metrics query string and answers with the given event rows. */
+		const eventMetrics = (rows: Array<{ x: string; y: number }>): URLSearchParams[] => {
+			const seen: URLSearchParams[] = []
+			server.use(
+				http.get('https://api.umami.is/v1/websites/w/metrics', ({ request }) => {
+					seen.push(new URL(request.url).searchParams)
+					return HttpResponse.json(rows)
+				}),
+				http.get('https://api.umami.is/v1/websites/w/stats', () => HttpResponse.json(STATS))
+			)
+			return seen
+		}
+
+		it('declares the goal dimension and conversions, and does not offer goal as a filter', () => {
+			const caps = umami({ websiteId: 'w', apiKey: 'k' }).capabilities
+			expect(caps.dimensions.has('goal')).toBe(true)
+			expect(caps.metrics.has('conversions')).toBe(true)
+			expect(caps.filters.has('goal')).toBe(false)
+		})
+
+		it('reads goal rows from type=event, restricted to the hint by one eq. value list', async () => {
+			const seen = eventMetrics([
+				{ x: 'signup', y: 30 },
+				{ x: 'purchase', y: 4 },
+				{ x: 'unrelated', y: 99 },
+			])
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({
+					metrics: ['conversions'],
+					dimensions: ['goal'],
+					goalSlugs: ['signup', 'purchase'],
+				}),
+				{}
+			)
+			expect(seen[0]?.get('type')).toBe('event')
+			expect(seen[0]?.get('event')).toBe('eq.signup,purchase')
+			// A row outside the hint never becomes a goal, whatever the API returned.
+			expect(result.rows).toEqual([
+				{ dimensions: { goal: 'signup' }, metrics: { conversions: 30 } },
+				{ dimensions: { goal: 'purchase' }, metrics: { conversions: 4 } },
+			])
+		})
+
+		it('serves no goal rows and says so when the read carries no hint', async () => {
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'] }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		// Umami splits an eq. value on commas with no escape, so a slug containing one cannot
+		// be asked for: it is left out of the request and reported rather than widening it.
+		it('drops a slug containing a comma and reports it as unapplied', async () => {
+			const seen = eventMetrics([{ x: 'signup', y: 30 }])
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({
+					metrics: ['conversions'],
+					dimensions: ['goal'],
+					goalSlugs: ['signup', 'a,b'],
+				}),
+				{}
+			)
+			expect(seen[0]?.get('event')).toBe('eq.signup')
+			expect(result.meta.unappliedFilters).toEqual([
+				{ dimension: 'goal', operator: 'eq', value: 'a,b' },
+			])
+			expect(result.rows).toEqual([
+				{ dimensions: { goal: 'signup' }, metrics: { conversions: 30 } },
+			])
+		})
+
+		// The goal rows come from the `event` param: a caller's own filter on it would contradict
+		// the hint, so the hint wins and that filter comes back reported.
+		it('lets the hint win the event param over a caller filter, and reports the filter', async () => {
+			const seen = eventMetrics([{ x: 'signup', y: 30 }])
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({
+					metrics: ['conversions'],
+					dimensions: ['goal'],
+					goalSlugs: ['signup'],
+					filters: [{ dimension: 'event', operator: 'eq', value: 'other' }],
+				}),
+				{}
+			)
+			expect(seen[0]?.get('event')).toBe('eq.signup')
+			expect(result.meta.unappliedFilters).toEqual([
+				{ dimension: 'event', operator: 'eq', value: 'other' },
+			])
+		})
+
+		it('sums the goal rows into conversions on a totals read', async () => {
+			const seen = eventMetrics([
+				{ x: 'signup', y: 30 },
+				{ x: 'purchase', y: 4 },
+			])
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({ metrics: ['pageviews', 'conversions'], goalSlugs: ['signup', 'purchase'] }),
+				{}
+			)
+			expect(seen[0]?.get('type')).toBe('event')
+			expect(result.totals).toEqual({ pageviews: 1000, conversions: 34 })
+		})
+
+		it('keeps the site metrics and drops conversions when the read carries no hint', async () => {
+			server.use(
+				http.get('https://api.umami.is/v1/websites/w/stats', () => HttpResponse.json(STATS))
+			)
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({ metrics: ['pageviews', 'conversions'] }),
+				{}
+			)
+			expect(result.totals).toEqual({ pageviews: 1000 })
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		// Umami has no per-day event series, so a trend on conversions keeps its headline and
+		// reports no per-day number rather than one it did not measure.
+		it('keeps conversions in the totals of a daily series but out of its rows', async () => {
+			eventMetrics([{ x: 'signup', y: 30 }])
+			server.use(
+				http.get('https://api.umami.is/v1/websites/w/pageviews', () =>
+					HttpResponse.json({ pageviews: [{ x: '2026-01-01', y: 5 }], sessions: [] })
+				)
+			)
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({ metrics: ['conversions'], granularity: 'day', goalSlugs: ['signup'] }),
+				{}
+			)
+			expect(result.rows).toEqual([{ timestamp: '2026-01-01T00:00:00.000Z', metrics: {} }])
+			expect(result.totals).toEqual({ conversions: 30 })
+		})
+	})
+
 	it('declares every contract operator, and filters by an event it cannot group by', () => {
 		const caps = umami({ websiteId: 'w', apiKey: 'k' }).capabilities
 		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
 		expect(caps.filters.has('event')).toBe(true)
 		expect(caps.dimensions.has('event')).toBe(false)
-		expect([...caps.filters].filter((dimension) => dimension !== 'event')).toEqual([
-			...caps.dimensions,
-		])
+		expect([...caps.filters].filter((dimension) => dimension !== 'event')).toEqual(
+			[...caps.dimensions].filter((dimension) => dimension !== 'goal')
+		)
 	})
 
 	it.each([

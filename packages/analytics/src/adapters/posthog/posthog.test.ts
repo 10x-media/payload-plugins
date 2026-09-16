@@ -172,6 +172,96 @@ describe('posthog adapter', () => {
 		])
 	})
 
+	describe('goals and conversions', () => {
+		/** Every SQL statement the adapter sent, in call order. */
+		const capture = (respond: (sql: string) => unknown[][]): string[] => {
+			const sent: string[] = []
+			server.use(
+				http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+					const body = (await request.json()) as { query?: { query?: string } }
+					const sql = body.query?.query ?? ''
+					sent.push(sql)
+					return HttpResponse.json({ columns: [], types: [], results: respond(sql) })
+				})
+			)
+			return sent
+		}
+
+		it('declares the goal dimension and conversions, and does not offer goal as a filter', () => {
+			const caps = posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities
+			expect(caps.dimensions.has('goal')).toBe(true)
+			expect(caps.metrics.has('conversions')).toBe(true)
+			expect(caps.filters.has('goal')).toBe(false)
+		})
+
+		it('groups by event, restricted to the hint, counting occurrences as conversions', async () => {
+			const sent = capture(() => [
+				['signup', 42],
+				['purchase', 11],
+			])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({
+					metrics: ['conversions'],
+					dimensions: ['goal'],
+					goalSlugs: ['signup', 'purchase'],
+				}),
+				{}
+			)
+			const sql = sent[0] ?? ''
+			expect(sql).toContain('event AS dim')
+			expect(sql).toContain("event IN ('signup', 'purchase')")
+			// A goal read scans every event: a $pageview clause would zero every count.
+			expect(sql).not.toContain("event = '$pageview'")
+			expect(result.rows).toEqual([
+				{ dimensions: { goal: 'signup' }, metrics: { conversions: 42 } },
+				{ dimensions: { goal: 'purchase' }, metrics: { conversions: 11 } },
+			])
+		})
+
+		it('serves no goal rows and says so when the read carries no hint', async () => {
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'] }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		it('counts conversions with a conditional aggregate, leaving the site metrics site-wide', async () => {
+			const sent = capture(() => [[500, 11]])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['pageviews', 'conversions'], goalSlugs: ['signup'] }),
+				{}
+			)
+			expect(sent).toHaveLength(1)
+			const sql = sent[0] ?? ''
+			expect(sql).toContain("countIf(event = '$pageview')")
+			expect(sql).toContain("countIf(event IN ('signup'))")
+			expect(sql).not.toContain('WHERE event IN')
+			expect(result.totals).toEqual({ pageviews: 500, conversions: 11 })
+		})
+
+		it('keeps the site metrics and drops conversions when the read carries no hint', async () => {
+			const sent = capture(() => [[500]])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['pageviews', 'conversions'] }),
+				{}
+			)
+			expect(sent[0]).not.toContain('countIf(event IN')
+			expect(result.totals).toEqual({ pageviews: 500 })
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		it('escapes a quote in a goal slug (no HogQL injection)', async () => {
+			const sent = capture(() => [['x', 1]])
+			await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: ["it's"] }),
+				{}
+			)
+			expect(sent[0]).toContain("event IN ('it\\'s')")
+		})
+	})
+
 	it('filters by hostname via properties.$host', async () => {
 		let body: { query?: { query?: string } } = {}
 		server.use(

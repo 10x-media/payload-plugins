@@ -87,6 +87,13 @@ export interface AnalyticsQuery {
 	 * others report in their own account timezone. Part of the cache key when set.
 	 */
 	timezone?: string
+	/**
+	 * The scope's goal slugs, set by callers that ask for the `goal` dimension or the
+	 * `conversions` metric. Provider adapters restrict goal rows to it, since nothing in a
+	 * provider marks which of its events are this install's goals; the native engine ignores
+	 * it and matches completions itself. Part of the surfacing cache key when set.
+	 */
+	goalSlugs?: string[]
 }
 
 export interface AnalyticsRow {
@@ -110,6 +117,11 @@ export interface AnalyticsResult {
 		 * A provider whose API takes one value per dimension reports the ones it dropped here.
 		 */
 		unappliedFilters?: AnalyticsFilter[]
+		/**
+		 * A provider goal read ran without `AnalyticsQuery.goalSlugs`, so it returned no goal
+		 * rows rather than every event the source has.
+		 */
+		goalsUnresolved?: true
 	}
 }
 

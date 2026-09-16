@@ -9,6 +9,7 @@ import type {
 	MetricKey,
 } from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
+import { goalSlugsFor } from '../plugin/goalHint'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { supportsFilters, type WidgetReadStatus } from './readForWidget'
@@ -53,6 +54,11 @@ export interface ReadForWidgetBreakdownArgs {
 	 * `metrics`; ranking and status still follow `metric` alone.
 	 */
 	extraMetrics?: MetricKey[]
+	/**
+	 * The scope's goal slugs, for a `goal` or `conversions` read. Resolved here when omitted,
+	 * so a caller that already resolved them (the goals table) does not resolve them twice.
+	 */
+	goalSlugs?: string[]
 }
 
 /**
@@ -106,6 +112,9 @@ export const readForWidgetBreakdown = async (
 		metric,
 		...(args.extraMetrics ?? []).filter((m) => m !== metric && adapter.capabilities.metrics.has(m)),
 	]
+	const goalSlugs =
+		args.goalSlugs ??
+		(await goalSlugsFor({ runtime, req, scope: ctx.scope, metrics, dimensions: [dimension] }))
 	let result: AnalyticsResult
 	try {
 		result = await runtime.engine.read(adapter, {
@@ -117,6 +126,7 @@ export const readForWidgetBreakdown = async (
 			filters,
 			timezone: tz,
 			scope: ctx.queryScope,
+			...(goalSlugs === undefined ? {} : { goalSlugs }),
 		})
 	} catch {
 		// No cache entry (fresh or stale) survived the failed read; degrade like an
