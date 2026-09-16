@@ -249,4 +249,25 @@ describe('AnalyticsBreakdownWidget filter', () => {
 		expect(html).toContain('analytics:stateGoalsUnresolved')
 		expect(html).not.toContain('analytics:stateNoBreakdown')
 	})
+
+	it('says the scope configures no goals rather than that nobody converted', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(result({ rows: [], noGoals: true }))
+		const html = await render('analytics-breakdown-goals')
+		expect(html).toContain('analytics:stateNoGoals')
+		expect(html).not.toContain('analytics:stateNoBreakdown')
+	})
+
+	it('keeps the plain empty state on a goal read of a scope that has goals', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(result({ rows: [] }))
+		const html = await render('analytics-breakdown-goals')
+		expect(html).toContain('analytics:stateNoBreakdown')
+		expect(html).not.toContain('analytics:stateNoGoals')
+	})
+
+	it('never reads a non-goal breakdown of an install with no goals as a setup step', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(result({ rows: [], noGoals: true }))
+		const html = await render('analytics-breakdown-pages')
+		expect(html).toContain('analytics:stateNoBreakdown')
+		expect(html).not.toContain('analytics:stateNoGoals')
+	})
 })

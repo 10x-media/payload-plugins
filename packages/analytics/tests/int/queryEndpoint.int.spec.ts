@@ -203,6 +203,9 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(goalQueries[0]?.goalSlugs).toEqual([])
 		expect(body.result.rows).toEqual([])
 		expect(body.result.meta.goalsUnresolved).toBeUndefined()
+		// The echo is how a client tells this apart from a resolver that failed, which
+		// echoes the string `unresolved` instead.
+		expect(body.query.goalSlugs).toEqual([])
 	})
 
 	it(`leaves a read that is about no goal unhinted on ${db}`, async () => {

@@ -268,6 +268,34 @@ describe('readForWidgetBreakdown', () => {
 		expect(result.status).toBe('ok')
 	})
 
+	// The widget shows a setup notice for this, which it cannot tell from a window in which
+	// nobody converted unless the read says which of the two it answered.
+	it('reports a goal read of a scope that configures no goals', async () => {
+		const seen: AnalyticsQuery[] = []
+		const result = await readForWidgetBreakdown({
+			req: reqWith([recordingAdapter(seen, goalCaps())]),
+			metric: 'conversions',
+			dimension: 'goal',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+		})
+		expect(seen[0]?.goalSlugs).toEqual([])
+		expect(result.noGoals).toBe(true)
+	})
+
+	it('leaves a non-goal read of a scope with no goals unflagged', async () => {
+		const result = await readForWidgetBreakdown({
+			req: reqWith([breakdownAdapter()]),
+			metric: 'pageviews',
+			dimension: 'source',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+		})
+		expect(result.noGoals).toBe(false)
+	})
+
 	it('leaves a read that is about no goal unhinted', async () => {
 		const seen: AnalyticsQuery[] = []
 		await readForWidgetBreakdown({

@@ -18,7 +18,9 @@ const DEFAULT_WINDOW = 30
  * and 403 when `access.read` denies, which defaults to any authenticated user (not
  * admin-panel access specifically); the response is integer counts only. A source that
  * throws answers a retryable 503 rather than an unhandled 500: the widget polls this every
- * few seconds, and a provider outage is not a reason to burn a stack trace per poll. Every
+ * few seconds, and a provider outage is not a reason to burn a stack trace per poll. Only
+ * the read is retryable, though, so an `access.read` resolver that throws answers 500: that
+ * is a configuration bug, and telling the poller to come back would only repeat it. Every
  * answer is `no-store`, since what it counts depends on the caller's own scope.
  */
 export const makeRealtimeHandler = (): PayloadHandler => async (req) => {
@@ -39,20 +41,25 @@ export const makeRealtimeHandler = (): PayloadHandler => async (req) => {
 		const rawWindow = Number(params.get('windowMinutes'))
 		const windowMinutes = ALLOWED_WINDOWS.includes(rawWindow) ? rawWindow : DEFAULT_WINDOW
 		const dataSource = params.get('dataSource') ?? undefined
-		const result = await readForWidgetRealtime({
-			req,
-			metric,
-			windowMinutes,
-			adapterId: dataSource,
-			now: new Date(),
-		})
-		return Response.json(result, { headers: NO_STORE })
+		try {
+			const result = await readForWidgetRealtime({
+				req,
+				metric,
+				windowMinutes,
+				adapterId: dataSource,
+				now: new Date(),
+			})
+			return Response.json(result, { headers: NO_STORE })
+		} catch (err) {
+			req.payload.logger?.warn(`analytics: realtime read failed: ${String(err)}`)
+			return errorResponse(
+				503,
+				queryError('unavailable', 'analytics: source is temporarily unavailable'),
+				RETRY_AFTER
+			)
+		}
 	} catch (err) {
-		req.payload.logger?.warn(`analytics: realtime read failed: ${String(err)}`)
-		return errorResponse(
-			503,
-			queryError('unavailable', 'analytics: source is temporarily unavailable'),
-			RETRY_AFTER
-		)
+		req.payload.logger?.warn(`analytics: realtime request failed: ${String(err)}`)
+		return errorResponse(500, queryError('internal', 'analytics: realtime read failed'))
 	}
 }

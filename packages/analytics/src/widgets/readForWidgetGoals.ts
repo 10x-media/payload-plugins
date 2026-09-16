@@ -39,6 +39,8 @@ export interface WidgetGoalsResult {
 	sampled?: boolean
 	/** True when the source could not read the scope's goals, so the empty table means nothing. */
 	goalsUnresolved?: boolean
+	/** True when the scope configures no goals at all, which is an empty table, not a failure. */
+	noGoals?: boolean
 }
 
 export interface ReadForWidgetGoalsArgs {
@@ -209,5 +211,6 @@ export const readForWidgetGoals = async (
 		),
 		sampled: Boolean(breakdown.sampled || totals?.sampled || previous?.sampled),
 		goalsUnresolved: breakdown.goalsUnresolved === true,
+		noGoals: breakdown.noGoals === true,
 	}
 }

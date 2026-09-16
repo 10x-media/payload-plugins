@@ -19,7 +19,13 @@ import { getRuntime, platformReadGate, readAccessFor, resolveTimezoneFor } from 
 
 export { QUERY_PATH }
 
-const serializeQuery = (query: AnalyticsQuery): SerializedAnalyticsQuery => ({
+/**
+ * The query as the response echoes it: the date range's instants as ISO strings, every
+ * other field as the read carried it. `goalSlugs` rides along unchanged, so a client sees
+ * the scope's slugs, an empty list for a scope with no goals, or the string `'unresolved'`
+ * when the resolver failed.
+ */
+export const serializeQuery = (query: AnalyticsQuery): SerializedAnalyticsQuery => ({
 	...query,
 	dateRange: {
 		start: query.dateRange.start.toISOString(),

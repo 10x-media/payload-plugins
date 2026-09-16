@@ -49,6 +49,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.stateClamped]: 'Showing the maximum range the provider supports',
 	[keys.stateFiltersUnapplied]: 'Some filters were not applied by this source',
 	[keys.stateGoalsUnresolved]: 'Goals could not be read from this source',
+	[keys.stateNoGoals]: 'No goals are configured for this scope',
 	[keys.stateSampled]: 'Numbers are approximate: the read hit the event limit',
 	[keys.widgetFieldTitle]: 'Title',
 	[keys.widgetFieldMetric]: 'Metric',

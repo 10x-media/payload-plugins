@@ -359,3 +359,44 @@ describe('Breakdowns rows', () => {
 		expect(screen.getByText(keys.stateNoBreakdown)).toBeDefined()
 	})
 })
+
+describe('Breakdowns goal empty states', () => {
+	const emptyGoalRead = (goalSlugs?: string[] | 'unresolved', goalsUnresolved?: true) =>
+		state({
+			data: {
+				...answer(),
+				result: {
+					rows: [],
+					meta: {
+						provider: 'native',
+						fetchedAt: '2026-09-14T00:00:00.000Z',
+						...(goalsUnresolved ? { goalsUnresolved } : {}),
+					},
+				},
+				query: { ...answer().query, ...(goalSlugs === undefined ? {} : { goalSlugs }) },
+			},
+		})
+
+	const renderGoalTab = (query: QueryState<QueryResponse>) =>
+		renderBreakdowns({ dimension: 'goal', dimensions: ['goal'], query, tab: 'goals' })
+
+	it('says the scope configures no goals when the read was hinted an empty list', () => {
+		renderGoalTab(emptyGoalRead([]))
+		expect(screen.getByText(keys.stateNoGoals)).toBeDefined()
+	})
+
+	it('keeps the plain empty state when the scope has goals and none converted', () => {
+		renderGoalTab(emptyGoalRead(['signup']))
+		expect(screen.getByText(keys.stateNoBreakdown)).toBeDefined()
+	})
+
+	it('keeps saying the source could not answer when the resolver failed', () => {
+		renderGoalTab(emptyGoalRead('unresolved', true))
+		expect(screen.getByText(keys.stateGoalsUnresolved)).toBeDefined()
+	})
+
+	it('never reads a non-goal breakdown as a scope with no goals', () => {
+		renderBreakdowns({ query: emptyGoalRead([]) })
+		expect(screen.getByText(keys.stateNoBreakdown)).toBeDefined()
+	})
+})

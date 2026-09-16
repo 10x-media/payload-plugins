@@ -159,7 +159,15 @@ describe('buildCacheKey', () => {
 		expect(unresolved).not.toBe(buildCacheKey('plausible', { ...base, goalSlugs: [] }))
 		expect(unresolved).not.toBe(buildCacheKey('plausible', base))
 		expect(unresolved).not.toBe(buildCacheKey('plausible', { ...base, goalSlugs: ['signup'] }))
-		expect(unresolved.endsWith('|goals:unresolved')).toBe(true)
+		expect(unresolved.endsWith('|goals:!unresolved')).toBe(true)
+	})
+
+	// `unresolved` is a legal goal slug, so a sentinel spelled like one would hand a scope
+	// that configured that goal the degraded answer of a scope whose resolver failed.
+	it('keys a goal named "unresolved" apart from the failed-resolver sentinel', () => {
+		expect(buildCacheKey('plausible', { ...base, goalSlugs: ['unresolved'] })).not.toBe(
+			buildCacheKey('plausible', { ...base, goalSlugs: 'unresolved' })
+		)
 	})
 
 	it('two instance ids of one provider type produce distinct keys', () => {

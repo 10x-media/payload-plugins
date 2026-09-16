@@ -18,11 +18,12 @@ describeForDb('realtime endpoint', { dbs: ['mongo'] }, (db) => {
 	const reqFor = (url: string, user: unknown) =>
 		({ url, user, payload: booted.payload }) as unknown as PayloadRequest
 
-	it('401s without an authenticated user', async () => {
+	it('401s without an authenticated user, and no cache may hold that answer either', async () => {
 		const res = await handler(
 			reqFor('http://x/api/analytics/realtime?metric=visitors&windowMinutes=30', null)
 		)
 		expect(res.status).toBe(401)
+		expect(res.headers.get('cache-control')).toBe('private, no-store')
 	})
 
 	it('returns the realtime payload for an authenticated user', async () => {
@@ -48,6 +49,53 @@ describeForDb('realtime endpoint', { dbs: ['mongo'] }, (db) => {
 			reqFor('http://x/api/analytics/realtime?metric=visitors&windowMinutes=30', { id: '1' })
 		)
 		expect(res.headers.get('cache-control')).toBe('private, no-store')
+	})
+})
+
+describeForDb('realtime endpoint access control', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({
+				adapters: [native()],
+				access: {
+					read: ({ req }) => {
+						const email = (req.user as { email?: string } | null)?.email
+						if (email === 'broken@t.dev') {
+							throw new Error('access resolver is misconfigured')
+						}
+						return email === 'allowed@t.dev'
+					},
+				},
+			}),
+			db,
+		})
+	})
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const call = (email: string) =>
+		makeRealtimeHandler()({
+			url: 'http://x/api/analytics/realtime?metric=visitors&windowMinutes=30',
+			user: { id: '1', email },
+			payload: booted.payload,
+		} as unknown as PayloadRequest)
+
+	it('403s a reader access.read denies, and keeps that answer out of every cache', async () => {
+		const res = await call('denied@t.dev')
+		expect(res.status).toBe(403)
+		expect(res.headers.get('cache-control')).toBe('private, no-store')
+	})
+
+	// A gate that throws is a configuration bug: polling again cannot resolve it, so it is
+	// not the retryable 503 a provider outage gets.
+	it('500s when the access resolver throws rather than telling the poller to retry', async () => {
+		const res = await call('broken@t.dev')
+		expect(res.status).toBe(500)
+		expect(res.headers.get('retry-after')).toBeNull()
+		const body = (await res.json()) as { error: { code: string } }
+		expect(body.error.code).toBe('internal')
 	})
 })
 

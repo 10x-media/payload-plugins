@@ -34,6 +34,8 @@ export interface WidgetBreakdownResult {
 	sampled?: boolean
 	/** True when the source could not read the scope's goals; the rows say nothing about them. */
 	goalsUnresolved?: boolean
+	/** True when the read asked about goals and the scope configures none: an empty table. */
+	noGoals?: boolean
 }
 
 export interface ReadForWidgetBreakdownArgs {
@@ -135,5 +137,8 @@ export const readForWidgetBreakdown = async (
 		dateRange,
 		rows,
 		...readMeta(result),
+		// The hint is set only for a read about goals, so an empty one is a scope that
+		// configured none rather than a read that never asked.
+		noGoals: Array.isArray(goalSlugs) && goalSlugs.length === 0,
 	}
 }
