@@ -8,7 +8,7 @@ import type { ResolvedReliabilityOptions } from './options'
 
 /** The slice of a handler's args the heartbeat needs. Real handlers pass a superset. */
 export type HeartbeatHandlerArgs = {
-	job: { id: JobId }
+	job: { id: JobId; workflowSlug?: string | null }
 	req: { payload: Payload }
 }
 
@@ -24,6 +24,12 @@ export type WithHeartbeatArgs = {
 	counter?: InFlightCounter
 	/** Test/diagnostic seam: invoked once if a fenced renew finds the claim was lost. */
 	onLeaseLost?: (jobId: JobId) => void
+	/**
+	 * True when an enclosing workflow's own heartbeat already holds this job's lease. A task
+	 * run by a workflow shares the workflow's job row, so stamping it again would move the
+	 * fence token out from under the workflow and turn its next renew into a false lost lease.
+	 */
+	leaseHeldByWorkflow?: (job: HeartbeatHandlerArgs['job']) => boolean
 }
 
 /**
@@ -38,12 +44,15 @@ export type WithHeartbeatArgs = {
  * reclaimed) the handler still runs, just without a heartbeat.
  */
 export const withHeartbeat = (args: WithHeartbeatArgs): JobHandler => {
-	const { counter, getStore, handler, onLeaseLost, options, ownerId } = args
+	const { counter, getStore, handler, leaseHeldByWorkflow, onLeaseLost, options, ownerId } = args
 	const ttlMs = initialLeaseTtlMs(options)
 	const beats = isHeartbeatMode(options)
 	const intervalMs = options.heartbeatIntervalMs
 
 	return async (handlerArgs: HeartbeatHandlerArgs): Promise<unknown> => {
+		if (leaseHeldByWorkflow?.(handlerArgs.job)) {
+			return handler(handlerArgs)
+		}
 		const payload = handlerArgs.req.payload
 		const jobId = handlerArgs.job.id
 		const store = getStore(payload)
@@ -112,7 +121,9 @@ type WrappableEntry = { handler?: unknown }
  * Wrap every task and workflow handler on the config with the heartbeat. Only
  * function handlers are wrapped (Payload also allows a string path for controlled
  * handlers, which we leave alone). One job-lease store is reused per Payload instance
- * via a WeakMap. All other task and workflow properties are preserved.
+ * via a WeakMap. All other task and workflow properties are preserved. A task that runs
+ * inside a wrapped workflow leaves the lease to the workflow; a single-task job, which
+ * Payload runs through an internal workflow this never wraps, still heartbeats itself.
  */
 export const registerHeartbeat = (
 	config: Config,
@@ -139,7 +150,18 @@ export const registerHeartbeat = (
 	// (worker reads via getOrCreateCounter(ownerId) as well).
 	const counter = getOrCreateCounter(ownerId)
 
-	const wrapEntry = <T extends WrappableEntry>(entry: T): T => {
+	const heartbeatWorkflows = new Set(
+		(Array.isArray(jobs.workflows) ? jobs.workflows : [])
+			.filter((workflow) => typeof workflow.handler === 'function')
+			.map((workflow) => workflow.slug)
+	)
+	const leaseHeldByWorkflow = (job: HeartbeatHandlerArgs['job']): boolean =>
+		typeof job.workflowSlug === 'string' && heartbeatWorkflows.has(job.workflowSlug)
+
+	const wrapEntry = <T extends WrappableEntry>(
+		entry: T,
+		heldByWorkflow?: WithHeartbeatArgs['leaseHeldByWorkflow']
+	): T => {
 		if (typeof entry.handler !== 'function') {
 			return entry
 		}
@@ -147,6 +169,7 @@ export const registerHeartbeat = (
 			counter,
 			getStore,
 			handler: entry.handler as unknown as JobHandler,
+			leaseHeldByWorkflow: heldByWorkflow,
 			options,
 			ownerId,
 		})
@@ -154,9 +177,9 @@ export const registerHeartbeat = (
 	}
 
 	if (Array.isArray(jobs.tasks)) {
-		jobs.tasks = jobs.tasks.map(wrapEntry) as typeof jobs.tasks
+		jobs.tasks = jobs.tasks.map((task) => wrapEntry(task, leaseHeldByWorkflow)) as typeof jobs.tasks
 	}
 	if (Array.isArray(jobs.workflows)) {
-		jobs.workflows = jobs.workflows.map(wrapEntry) as typeof jobs.workflows
+		jobs.workflows = jobs.workflows.map((workflow) => wrapEntry(workflow)) as typeof jobs.workflows
 	}
 }

@@ -5,8 +5,8 @@ import {
 	installTestClock,
 	type TestClock,
 } from '@10x-media/payload-test-harness'
-import type { TaskConfig } from 'payload'
-import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
+import type { TaskConfig, WorkflowConfig } from 'payload'
+import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 
 import { jobs } from '../../src/index'
 import { withHeartbeat } from '../../src/reliability/heartbeat'
@@ -286,6 +286,50 @@ describeForDb('heartbeat registration seam', {}, (db) => {
 		// Normalize formatting across adapters (string vs Date serialization).
 		expect(seenLease).toBeTruthy()
 		expect(new Date(seenLease as string).toISOString()).toBe('2026-06-01T02:00:01.000Z')
+	})
+})
+
+describeForDb('heartbeat inside a workflow', {}, (db) => {
+	let booted: BootedPayload
+
+	const slowTask: TaskConfig<'slow'> = {
+		slug: 'slow',
+		handler: async () => {
+			await new Promise((r) => setTimeout(r, 450))
+			return { output: {} }
+		},
+	}
+
+	const pipeline: WorkflowConfig<'pipeline'> = {
+		slug: 'pipeline',
+		handler: async ({ tasks }) => {
+			const runSlow = tasks.slow
+			if (!runSlow) {
+				throw new Error('slow task is not registered')
+			}
+			await runSlow('1', { input: {} })
+		},
+	}
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: jobs({ reliability: { heartbeatIntervalMs: 100, jobLeaseTtlMs: 1000 } }),
+			db,
+			configOverrides: { jobs: { tasks: [slowTask], workflows: [pipeline] } },
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('keeps the workflow lease while its tasks run', async () => {
+		const warn = vi.spyOn(booted.payload.logger, 'warn')
+		await booted.payload.jobs.queue({ input: {}, workflow: 'pipeline' })
+		await booted.payload.jobs.run({ allQueues: true })
+		const lost = warn.mock.calls.filter(([message]) => String(message).includes('lost lease'))
+		warn.mockRestore()
+		expect(lost).toEqual([])
 	})
 })
 
