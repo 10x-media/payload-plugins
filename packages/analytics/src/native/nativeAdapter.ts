@@ -14,6 +14,7 @@ import { INGEST_PATH } from '../plugin/paths'
 import { EVENTS_SLUG, eventsCollection } from './collections/events'
 import { ROLLUPS_SLUG, rollupsCollection } from './collections/rollups'
 import { seenCollection } from './collections/seen'
+import { EVENT_SCAN_LIMIT, eventScanMeta } from './eventScan'
 import { composeGeoResolvers } from './geo/composeGeoResolvers'
 import { type GeoResolver, platformHeaderResolver } from './geo/geoResolver'
 import { maxmindResolver } from './geo/maxmindResolver'
@@ -79,8 +80,6 @@ const dimensions: ReadonlySet<DimensionKey> = new Set([
 	'event',
 	'goal',
 ])
-
-const REALTIME_EVENT_LIMIT = 50_000
 
 const baseCapabilities: AnalyticsCapabilities = {
 	perPageQuery: true,
@@ -156,7 +155,7 @@ async function queryEvents(
 		where: where as never,
 		// Newest-first under a hard cap, same tradeoff as realtime(): a very busy site
 		// with more events than the cap in range keeps its most recent activity.
-		limit: REALTIME_EVENT_LIMIT,
+		limit: EVENT_SCAN_LIMIT,
 		pagination: false,
 		depth: 0,
 		sort: '-timestamp',
@@ -173,10 +172,7 @@ async function queryEvents(
 		order: q.order,
 		limit: q.limit,
 	})
-	const meta: AnalyticsResult['meta'] = { provider: 'native', fetchedAt }
-	if (clamped) meta.clamped = true
-	if (events.length >= REALTIME_EVENT_LIMIT) meta.sampled = true
-	return { rows, totals, meta }
+	return { rows, totals, meta: eventScanMeta({ fetchedAt, eventCount: events.length, clamped }) }
 }
 
 export function native(options: NativeOptions = {}): NativeAdapter {
@@ -380,14 +376,14 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				// Newest-first under a hard cap: if a very busy site has more events than the
 				// cap in the window, keep the most recent activity rather than the oldest.
 				// Unbounded accuracy via DB-side aggregation is deferred to the hardening spec.
-				limit: REALTIME_EVENT_LIMIT,
+				limit: EVENT_SCAN_LIMIT,
 				pagination: false,
 				depth: 0,
 				sort: '-timestamp',
 			})
 			const events = docs as unknown as RealtimeEvent[]
 			const { rows, totals } = buildRealtime(events, q.dateRange, q.metrics)
-			return { rows, totals, meta: { provider: 'native', fetchedAt } }
+			return { rows, totals, meta: eventScanMeta({ fetchedAt, eventCount: events.length }) }
 		},
 	}
 }

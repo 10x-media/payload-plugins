@@ -104,6 +104,7 @@ const renderToolbar = (
 		stale?: boolean
 		clamped?: boolean
 		filtersUnapplied?: boolean
+		sampled?: boolean
 		provider?: string
 		onChange?: (next: ViewState) => void
 		onChangeDeferred?: (next: ViewState) => void
@@ -122,6 +123,7 @@ const renderToolbar = (
 			onChangeDeferred={overrides.onChangeDeferred ?? (() => {})}
 			provider={overrides.provider ?? 'native'}
 			range={{ from: '2026-08-16', to: '2026-09-14' }}
+			sampled={overrides.sampled ?? false}
 			sourceId="native"
 			sources={overrides.sources ?? [source('native', caps)]}
 			stale={overrides.stale ?? false}
@@ -248,11 +250,17 @@ describe('Toolbar controls', () => {
 		expect(screen.queryByText(keys.viewStale)).toBeNull()
 		expect(screen.queryByText(keys.stateClamped)).toBeNull()
 		expect(screen.queryByText(keys.stateFiltersUnapplied)).toBeNull()
+		expect(screen.queryByText(keys.stateSampled)).toBeNull()
 	})
 
 	it('notes a read the source answered without one of its filters', () => {
 		renderToolbar({ filtersUnapplied: true })
 		expect(screen.getByText(keys.stateFiltersUnapplied)).toBeDefined()
+	})
+
+	it('notes a read that hit its source event scan cap', () => {
+		renderToolbar({ sampled: true })
+		expect(screen.getByText(keys.stateSampled)).toBeDefined()
 	})
 
 	it('removes a filter chip through its own button', () => {

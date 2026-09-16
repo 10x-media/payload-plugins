@@ -33,6 +33,8 @@ export interface WidgetSeriesResult {
 	clamped?: boolean
 	/** True when the source answered without one of the filters the read carried. */
 	filtersUnapplied?: boolean
+	/** True when the read hit the source's event scan cap, so the numbers are a floor. */
+	sampled?: boolean
 	/** Previous-window headline total, present only when the adapter supports comparison. */
 	previousTotal?: number
 	/** The previous comparable window, present only when comparison ran. */
@@ -202,6 +204,7 @@ export const readForWidgetSeries = async (
 		total: result.totals?.[metric] ?? 0,
 		clamped: result.meta.clamped ?? false,
 		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
+		sampled: result.meta.sampled ?? false,
 		previousTotal,
 		comparisonRange,
 		...(compare && previous && comparisonRange

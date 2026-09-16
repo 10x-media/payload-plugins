@@ -17,6 +17,8 @@ export interface WidgetRealtimeResult {
 	adapterId: string
 	activeNow: number
 	series: RealtimePoint[]
+	/** True when the read hit the source's event scan cap, so the counts are a floor. */
+	sampled?: boolean
 }
 
 export interface ReadForWidgetRealtimeArgs {
@@ -79,6 +81,7 @@ export const readForWidgetRealtime = async (
 		adapterId: adapter.id,
 		activeNow: result.totals?.[metric] ?? 0,
 		series: result.rows.map((r) => ({ date: r.timestamp ?? '', value: r.metrics[metric] ?? 0 })),
+		sampled: result.meta.sampled ?? false,
 	}
 	await store.set(key, out, ttlSeconds)
 	return out

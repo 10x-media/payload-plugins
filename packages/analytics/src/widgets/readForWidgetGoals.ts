@@ -37,6 +37,8 @@ export interface WidgetGoalsResult {
 	siteVisitors?: number
 	clamped?: boolean
 	stale?: boolean
+	/** True when a read hit the source's event scan cap, so the numbers are a floor. */
+	sampled?: boolean
 	/** True when the source could not read the scope's goals, so the empty table means nothing. */
 	goalsUnresolved?: boolean
 }
@@ -200,6 +202,7 @@ export const readForWidgetGoals = async (
 		...(siteVisitors !== undefined ? { siteVisitors } : {}),
 		clamped: Boolean(breakdown.clamped || totals?.clamped || previous?.clamped),
 		stale: Boolean(breakdown.stale || totals?.stale || previous?.stale),
+		sampled: Boolean(breakdown.sampled || totals?.sampled || previous?.sampled),
 		goalsUnresolved: breakdown.goalsUnresolved === true,
 	}
 }

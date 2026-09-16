@@ -33,6 +33,8 @@ export interface WidgetBreakdownResult {
 	stale?: boolean
 	/** True when the source answered without one of the filters the read carried. */
 	filtersUnapplied?: boolean
+	/** True when the read hit the source's event scan cap, so the numbers are a floor. */
+	sampled?: boolean
 	/** True when the source could not read the scope's goals; the rows say nothing about them. */
 	goalsUnresolved?: boolean
 }
@@ -154,6 +156,7 @@ export const readForWidgetBreakdown = async (
 		clamped: result.meta.clamped ?? false,
 		stale: result.meta.stale ?? false,
 		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
+		sampled: result.meta.sampled ?? false,
 		goalsUnresolved: result.meta.goalsUnresolved === true,
 	}
 }

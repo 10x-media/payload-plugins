@@ -71,9 +71,11 @@ export default async function AnalyticsRealtimeWidget(props: WidgetServerProps &
 				dataSource={data.dataSource}
 				initialActiveNow={result.activeNow}
 				initialSeries={result.series}
+				initialSampled={result.sampled === true}
 				locale={locale}
 				caption={caption}
 				pausedLabel={t(keys.widgetRealtimePaused)}
+				sampledLabel={t(keys.stateSampled)}
 			/>
 			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
 		</div>
