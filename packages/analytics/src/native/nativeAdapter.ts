@@ -56,9 +56,10 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 	'scrollDepth',
 ])
 /**
- * Everything the tracker can know about a hit. `source` is the derived traffic channel,
- * `referrer` the referring host itself, so the two answer different questions about the
- * same visit.
+ * Everything the tracker can know about a hit. `source` is today the referring host or
+ * `Direct`, which is what `referrer` answers too for a referred hit; classifying it into a
+ * traffic channel (search, social, paid) is a follow-up, and the two keys stay separate so
+ * that change lands without moving anyone's saved links.
  */
 const dimensions: ReadonlySet<DimensionKey> = new Set([
 	'page',

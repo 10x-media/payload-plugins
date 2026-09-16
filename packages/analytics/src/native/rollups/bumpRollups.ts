@@ -108,6 +108,14 @@ export async function bumpRollups(payload: Payload, bumps: RollupBump[]): Promis
 		await model.collection.bulkWrite(ops, { ordered: false })
 		return
 	}
+	// The conflict target must match the unique index exactly, which includes the scope column
+	// only in scoped installs. One target covers the whole statement, so a batch that mixes
+	// scoped and unscoped buckets has no single right answer and is a caller bug, not a row to
+	// silently file under the first bucket's shape.
+	const scoped = merged[0]?.key.scope !== undefined
+	if (merged.some(({ key }) => (key.scope !== undefined) !== scoped)) {
+		throw new Error('analytics: rollup bumps mix scoped and unscoped buckets in one batch')
+	}
 	const { sql } = await importPostgresSql()
 	const db = payload.db as unknown as PgDb
 	const tableName = db.tableNameMap.get(PG_TABLE_KEY)
@@ -123,8 +131,6 @@ export async function bumpRollups(payload: Payload, bumps: RollupBump[]): Promis
 		if (!column?.name) throw new Error(`analytics: rollup column "${metric}" not found`)
 		set[metric] = sql`${table[metric]} + excluded.${sql.identifier(column.name)}`
 	}
-	// The conflict target must match the unique index exactly, which includes the scope
-	// column only in scoped installs (mirrored by a scope key on RollupKey).
 	const target = [
 		table.granularity,
 		table.period,
@@ -133,7 +139,7 @@ export async function bumpRollups(payload: Payload, bumps: RollupBump[]): Promis
 		table.dimvalue,
 		table.hostname,
 	]
-	if (merged[0]?.key.scope !== undefined) {
+	if (scoped) {
 		target.push(table.scope)
 	}
 	await db.drizzle

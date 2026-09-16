@@ -53,6 +53,9 @@ const isDuplicateKeyError = (err: unknown, code: number | string): boolean => {
  * racing the same key means one of them loses, either quietly (no upsert, no insert) or with a
  * duplicate-key error the driver raises after the index rejects its write. Both outcomes mean
  * "already seen", so the error is caught here rather than escaping into the ingest response.
+ *
+ * Superseded on the write path by the batched `insertManyIfNew`, and kept as the serial
+ * reference the matrix parity test replays a whole flush through.
  */
 export async function insertIfNew(
 	payload: Payload,
