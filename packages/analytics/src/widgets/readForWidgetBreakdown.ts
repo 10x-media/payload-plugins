@@ -61,10 +61,11 @@ export interface ReadForWidgetBreakdownArgs {
 	 */
 	extraMetrics?: MetricKey[]
 	/**
-	 * The scope's goal slugs, for a `goal` or `conversions` read. Resolved here when omitted,
-	 * so a caller that already resolved them (the goals table) does not resolve them twice.
+	 * The scope's goal slugs, for a `goal` or `conversions` read, or `'unresolved'` when the
+	 * caller's own resolver failed. Resolved here when omitted, so a caller that already
+	 * resolved them (the goals table) does not resolve them twice.
 	 */
-	goalSlugs?: string[]
+	goalSlugs?: string[] | 'unresolved'
 }
 
 /**

@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import type { AnalyticsQuery, MetricKey } from '../core/contract'
+import type { AnalyticsQuery, AnalyticsResult, MetricKey } from '../core/contract'
 import {
+	emptyGoalBreakdown,
+	type GoalHint,
 	type GoalKeyedRow,
 	goalHint,
 	goalsUnresolvedResult,
+	hintFailed,
+	hintSlugs,
 	mergeGoalRows,
 	mergeGoalTotals,
 	providerMetricKeys,
@@ -24,12 +28,55 @@ const row = (keys: string[], metrics: Partial<Record<MetricKey, number>>): GoalK
 
 describe('goalHint', () => {
 	it('dedupes the slugs and drops the empty ones', () => {
-		expect(goalHint(q({ goalSlugs: ['a', 'a', '', 'b'] }))).toEqual(['a', 'b'])
+		expect(goalHint(q({ goalSlugs: ['a', 'a', '', 'b'] }))).toEqual({ slugs: ['a', 'b'] })
 	})
 
-	it('is null when the read carries no usable slug', () => {
+	it('tells a scope with no goals apart from a resolver that failed', () => {
+		expect(goalHint(q({ goalSlugs: [] }))).toEqual({ slugs: [] })
+		expect(goalHint(q({ goalSlugs: [''] }))).toEqual({ slugs: [] })
+		expect(goalHint(q({ goalSlugs: 'unresolved' }))).toBe('unresolved')
+	})
+
+	it('is null when the read carries no hint at all', () => {
 		expect(goalHint(q())).toBeNull()
-		expect(goalHint(q({ goalSlugs: [''] }))).toBeNull()
+	})
+})
+
+describe('hintSlugs', () => {
+	it('is the list only when there is one to filter by', () => {
+		expect(hintSlugs({ slugs: ['signup'] })).toEqual(['signup'])
+		expect(hintSlugs({ slugs: [] })).toBeNull()
+		expect(hintSlugs('unresolved')).toBeNull()
+		expect(hintSlugs(null)).toBeNull()
+	})
+})
+
+describe('hintFailed', () => {
+	it('is a failed or absent hint, never an install with no goals', () => {
+		expect(hintFailed('unresolved')).toBe(true)
+		expect(hintFailed(null)).toBe(true)
+		expect(hintFailed({ slugs: [] })).toBe(false)
+		expect(hintFailed({ slugs: ['signup'] })).toBe(false)
+	})
+})
+
+describe('emptyGoalBreakdown', () => {
+	const breakdown = (hint: GoalHint): AnalyticsResult | null =>
+		emptyGoalBreakdown({ provider: 'umami', q: q(), hint })
+
+	it('flags the rows it cannot define when the hint failed or was never set', () => {
+		expect(breakdown('unresolved')?.meta.goalsUnresolved).toBe(true)
+		expect(breakdown(null)?.meta.goalsUnresolved).toBe(true)
+	})
+
+	it('answers empty rows without the flag for a scope that configured no goals', () => {
+		const result = breakdown({ slugs: [] })
+		expect(result?.rows).toEqual([])
+		expect(result?.meta).toEqual({ provider: 'umami', fetchedAt: '2026-01-31T00:00:00.000Z' })
+	})
+
+	it('lets the adapter read when the hint names rows', () => {
+		expect(breakdown({ slugs: ['signup'] })).toBeNull()
 	})
 })
 
@@ -58,7 +105,7 @@ describe('splitGoalMetrics', () => {
 				wanted: ['conversions', 'visitors'],
 				goalOnly,
 				goalBreakdown: true,
-				hint: ['signup'],
+				hint: { slugs: ['signup'] },
 			})
 		).toEqual({ siteMetrics: ['conversions', 'visitors'], goalMetrics: [], unresolved: false })
 	})
@@ -69,7 +116,7 @@ describe('splitGoalMetrics', () => {
 				wanted: ['pageviews', 'conversions', 'revenue'],
 				goalOnly,
 				goalBreakdown: false,
-				hint: ['signup'],
+				hint: { slugs: ['signup'] },
 			})
 		).toEqual({
 			siteMetrics: ['pageviews'],
@@ -78,15 +125,28 @@ describe('splitGoalMetrics', () => {
 		})
 	})
 
-	it('keeps the site half and reports unresolved when there is no hint', () => {
+	it('keeps the site half and reports unresolved when the hint failed or is absent', () => {
+		for (const hint of [null, 'unresolved'] as const) {
+			expect(
+				splitGoalMetrics({
+					wanted: ['pageviews', 'conversions'],
+					goalOnly,
+					goalBreakdown: false,
+					hint,
+				})
+			).toEqual({ siteMetrics: ['pageviews'], goalMetrics: [], unresolved: true })
+		}
+	})
+
+	it('drops the goal half without reporting unresolved when the scope has no goals', () => {
 		expect(
 			splitGoalMetrics({
 				wanted: ['pageviews', 'conversions'],
 				goalOnly,
 				goalBreakdown: false,
-				hint: null,
+				hint: { slugs: [] },
 			})
-		).toEqual({ siteMetrics: ['pageviews'], goalMetrics: [], unresolved: true })
+		).toEqual({ siteMetrics: ['pageviews'], goalMetrics: [], unresolved: false })
 	})
 
 	it('is resolved when the read wanted no goal metric at all', () => {

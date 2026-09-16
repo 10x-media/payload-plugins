@@ -72,19 +72,20 @@ const previousLimit = (limit: number): number =>
 
 /**
  * Goal names for the read's own scope. A resolver that throws must not cost the widget its
- * table, so the rows fall back to their slugs.
+ * table, so the rows fall back to their slugs; the failure travels on as the hint, which is
+ * what tells the read apart from a scope that configured no goals at all.
  */
 const goalNames = async (
 	runtime: AnalyticsRuntime,
 	req: PayloadRequest,
 	scope: string | null
-): Promise<Map<string, string>> => {
+): Promise<Map<string, string> | 'unresolved'> => {
 	try {
 		const resolved = await resolveGoalsDetailedFor(runtime, req, scope)
 		return new Map(resolved.map(({ goal }) => [goal.slug, goal.name]))
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: widget goal names failed to resolve: ${String(err)}`)
-		return new Map()
+		return 'unresolved'
 	}
 }
 
@@ -135,8 +136,9 @@ export const readForWidgetGoals = async (
 
 	// The names are resolved first: their slugs are the hint a provider source restricts its
 	// goal rows to, so both reads below need them before they run.
-	const names = await goalNames(runtime, req, ctx.scope)
-	const goalSlugs = [...names.keys()]
+	const resolved = await goalNames(runtime, req, ctx.scope)
+	const names = resolved === 'unresolved' ? new Map<string, string>() : resolved
+	const goalSlugs = resolved === 'unresolved' ? 'unresolved' : [...names.keys()]
 	const [breakdown, totals, previous] = await Promise.all([
 		readForWidgetBreakdown({
 			...shared,

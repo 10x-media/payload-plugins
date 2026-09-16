@@ -227,6 +227,27 @@ describe('posthog adapter', () => {
 			expect(result.meta.goalsUnresolved).toBe(true)
 		})
 
+		it('says so when the goal resolver failed', async () => {
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: 'unresolved' }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		// A project with no goals configured has an empty goal table, not a broken one.
+		it('serves an empty goal breakdown unflagged when the scope configures no goals', async () => {
+			const sent = capture(() => [])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: [] }),
+				{}
+			)
+			expect(sent).toEqual([])
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBeUndefined()
+		})
+
 		it('counts conversions with a conditional aggregate, leaving the site metrics site-wide', async () => {
 			const sent = capture(() => [[500, 11]])
 			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
@@ -250,6 +271,17 @@ describe('posthog adapter', () => {
 			expect(sent[0]).not.toContain('countIf(event IN')
 			expect(result.totals).toEqual({ pageviews: 500 })
 			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		it('drops conversions unflagged when the scope configures no goals', async () => {
+			const sent = capture(() => [[500]])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['pageviews', 'conversions'], goalSlugs: [] }),
+				{}
+			)
+			expect(sent[0]).not.toContain('countIf(event IN')
+			expect(result.totals).toEqual({ pageviews: 500 })
+			expect(result.meta.goalsUnresolved).toBeUndefined()
 		})
 
 		it('counts a goal breakdown with plain aggregates, not the pageview-conditional ones', async () => {

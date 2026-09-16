@@ -146,10 +146,20 @@ describe('buildCacheKey', () => {
 		expect(two).toBe(buildCacheKey('plausible', { ...base, goalSlugs: ['purchase', 'signup'] }))
 	})
 
-	it('keeps the key unchanged when no goal hint is set', () => {
+	it('keeps the key unchanged for a scope with no goals, which asks for the same rows', () => {
 		expect(buildCacheKey('plausible', { ...base, goalSlugs: [] })).toBe(
 			buildCacheKey('plausible', base)
 		)
+	})
+
+	// A failed resolver answers no goal rows; sharing the healthy key would serve that
+	// degraded answer to every later read until it expired.
+	it('keys a failed goal resolver apart from every healthy hint', () => {
+		const unresolved = buildCacheKey('plausible', { ...base, goalSlugs: 'unresolved' })
+		expect(unresolved).not.toBe(buildCacheKey('plausible', { ...base, goalSlugs: [] }))
+		expect(unresolved).not.toBe(buildCacheKey('plausible', base))
+		expect(unresolved).not.toBe(buildCacheKey('plausible', { ...base, goalSlugs: ['signup'] }))
+		expect(unresolved.endsWith('|goals:unresolved')).toBe(true)
 	})
 
 	it('two instance ids of one provider type produce distinct keys', () => {
