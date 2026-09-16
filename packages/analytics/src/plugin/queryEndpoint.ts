@@ -129,19 +129,14 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 					)
 				)
 			}
+			// The view decides this same predicate on the browser clock, so a client near the
+			// floor or with a skewed clock must lose only its delta, never the whole read.
 			if (
 				!withinLookback(comparisonRange, adapter.capabilities.maxLookbackDays, {
 					tz: query.timezone,
 				})
 			) {
-				return errorResponse(
-					400,
-					queryError(
-						'invalid_param',
-						"analytics: the previous period is beyond the source's lookback",
-						'compare'
-					)
-				)
+				comparisonRange = null
 			}
 		}
 		let result: AnalyticsResult

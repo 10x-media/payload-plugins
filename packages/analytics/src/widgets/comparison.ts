@@ -46,8 +46,10 @@ export const previousWindow = (
  * Whether a source can still answer for `window`. The engine's clamp floors a read at that
  * read's own end minus the lookback, so a previous window is clamped only when it is itself
  * longer than the lookback: a 60-day range on a 90-day source reads 120 days back unmarked.
- * Callers check this first and omit the comparison instead. The floor is computed from `now`
- * the way the clamp computes its own: the start of the day in `tz`, `maxLookbackDays` back.
+ * Callers check this first and omit the comparison instead. The floor uses the clamp's formula
+ * but anchors on `now` rather than the read's end, because a provider measures its lookback from
+ * today. Fixed-day arithmetic can put it an hour off across a DST change, which is harmless while
+ * every caller goes through this one helper.
  */
 export const withinLookback = (
 	window: DateRange,

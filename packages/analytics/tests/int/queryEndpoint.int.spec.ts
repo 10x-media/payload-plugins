@@ -98,9 +98,15 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 						pageviews: 7,
 					}),
 					stubAdapter({
+						id: 'wide',
+						label: 'Wide lookback source',
+						capabilities: { maxLookbackDays: 36_500 },
+						pageviews: 5,
+					}),
+					stubAdapter({
 						id: 'lookback',
 						label: 'Short lookback source',
-						capabilities: { maxLookbackDays: 90 },
+						capabilities: { maxLookbackDays: 1 },
 						pageviews: 3,
 					}),
 					stubAdapter({ id: 'unconfigured', label: 'Unconfigured source', configured: false }),
@@ -255,17 +261,17 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 	})
 
 	it(`adds the comparison for a provider-shaped source that never declared it on ${db}`, async () => {
-		const body = await okBody(`source=lookback&metrics=pageviews&${RANGE}`)
+		const body = await okBody(`source=wide&metrics=pageviews&compare=previous&${RANGE}`)
 		expect(body.capabilities.comparison).toBe(true)
+		expect(body.comparison).toBeDefined()
+		expect(body.comparison?.totals?.pageviews).toBe(5)
+		expect(body.comparison?.meta.fetchedAt).toBe('2026-01-09T23:59:59.999Z')
 	})
 
-	it(`400s compare when the previous window predates the source lookback on ${db}`, async () => {
-		const error = await errorBody(
-			`source=lookback&metrics=pageviews&compare=previous&${RANGE}`,
-			400
-		)
-		expect(error).toMatchObject({ code: 'invalid_param', param: 'compare' })
-		expect(error.message).toContain("beyond the source's lookback")
+	it(`omits the comparison when the previous window predates the source lookback on ${db}`, async () => {
+		const body = await okBody(`source=lookback&metrics=pageviews&compare=previous&${RANGE}`)
+		expect(body.comparison).toBeUndefined()
+		expect(body.result.totals?.pageviews).toBe(3)
 	})
 
 	it(`accepts a limit at the 500 cap and rejects one above it on ${db}`, async () => {
