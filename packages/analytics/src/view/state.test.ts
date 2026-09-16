@@ -40,7 +40,7 @@ describe('parseViewState', () => {
 
 	it('reads every parameter', () => {
 		const state = parse(
-			'range=last7days&compare=1&source=native&metric=visitors&granularity=hour&tab=geography&limit=25&order=visitors:asc&filters=' +
+			'range=last7days&compare=1&source=native&metric=visitors&granularity=hour&tab=geography&dim=city&limit=25&order=visitors:asc&filters=' +
 				encodeURIComponent('[{"dimension":"country","operator":"eq","value":"DE"}]')
 		)
 		expect(state).toEqual({
@@ -50,6 +50,7 @@ describe('parseViewState', () => {
 			metric: 'visitors',
 			granularity: 'hour',
 			tab: 'geography',
+			dim: 'city',
 			limit: 25,
 			order: { metric: 'visitors', direction: 'asc' },
 			filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }],
@@ -58,7 +59,9 @@ describe('parseViewState', () => {
 
 	it('falls back to the defaults for invalid values', () => {
 		expect(
-			parse('range=fortnight&metric=clicks&tab=funnels&limit=7&granularity=decade&order=nope')
+			parse(
+				'range=fortnight&metric=clicks&tab=funnels&dim=tenant&limit=7&granularity=decade&order=nope'
+			)
 		).toEqual(baseState)
 	})
 
@@ -143,6 +146,7 @@ describe('serializeViewState', () => {
 				metric: 'visitors',
 				granularity: 'day',
 				tab: 'sources',
+				dim: 'referrer',
 				filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }],
 				limit: 50,
 				order: { metric: 'visitors', direction: 'asc' },
@@ -158,6 +162,7 @@ describe('serializeViewState', () => {
 			'metric',
 			'granularity',
 			'tab',
+			'dim',
 			'filters',
 			'limit',
 			'order',
@@ -169,6 +174,7 @@ describe('serializeViewState', () => {
 			baseState,
 			{ ...baseState, range: 'custom', from: '2026-01-01', to: '2026-01-31' },
 			{ ...baseState, compare: true, source: 'posthog', granularity: 'hour' },
+			{ ...baseState, tab: 'technology', dim: 'browser' },
 			{
 				...baseState,
 				metric: 'conversions',
@@ -243,6 +249,20 @@ describe('coerceState', () => {
 		expect(coerced.compare).toBe(false)
 		expect(coerced.granularity).toBeUndefined()
 		expect(coerced.order).toBeUndefined()
+	})
+
+	it('drops a grouping the resolved tab does not offer', () => {
+		expect(coerceState({ ...baseState, dim: 'country' }, gate(caps())).dim).toBeUndefined()
+		// The tab itself is coerced away first, so the grouping is judged against where it lands.
+		expect(
+			coerceState({ ...baseState, tab: 'technology', dim: 'browser' }, gate(caps())).dim
+		).toBeUndefined()
+	})
+
+	it('keeps a grouping the tab offers, without rebuilding the state', () => {
+		const state: ViewState = { ...baseState, tab: 'geography', dim: 'region' }
+		const served = gate(caps({ dimensions: ['page', 'country', 'region'] }))
+		expect(coerceState(state, served)).toBe(state)
 	})
 
 	it('keeps a granularity the source serves', () => {

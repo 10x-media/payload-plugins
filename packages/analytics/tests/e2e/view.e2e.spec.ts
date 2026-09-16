@@ -114,13 +114,29 @@ test('the analytics view reads seeded traffic, filters from the URL and keeps hi
 
 test('the sources tab ranks referrer hosts and never the site itself', async ({ page }) => {
 	await login(page, PLATFORM)
-	await page.goto('/admin/analytics?tab=sources')
+	await page.goto('/admin/analytics?tab=sources&dim=referrer')
 
-	// Native serves `referrer`, which the sources tab reads ahead of the `source` channel.
 	// The seed's same-site referrer is deliberately absent: a site is not its own referrer.
 	const breakdown = page.locator('.analytics-view__breakdown')
 	await expect(breakdown.getByText('google.com', { exact: true })).toBeVisible()
 	await expect(breakdown).not.toContainText('localhost')
+})
+
+test('the group-by picker regroups a tab and writes the pick to the URL', async ({ page }) => {
+	await login(page, PLATFORM)
+	await page.goto('/admin/analytics?tab=technology')
+
+	// Native serves three technology dimensions, so the tab opens on its default and offers
+	// the other two. Devices first; browsers are one pick away.
+	const breakdown = page.locator('.analytics-view__breakdown')
+	await expect(breakdown.getByText('desktop', { exact: true })).toBeVisible()
+
+	const picker = breakdown.locator('.analytics-view__control').first()
+	await picker.locator('.rs__control').click()
+	await page.locator('.rs__option', { hasText: 'Browser' }).first().click()
+
+	await expect.poll(() => search(page)).toContain('dim=browser')
+	await expect(breakdown.getByText('chrome', { exact: true })).toBeVisible()
 })
 
 test('@tenancy the view reports the selected tenant and never another one', async ({

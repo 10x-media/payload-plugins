@@ -17,7 +17,20 @@ It is on by default. Set `view: false` to remove the route and the nav link.
 
 **Trend.** The selected metric over the window, bucketed by hour, day, week or month. The bucket is picked from the window length (hours up to two days, weeks past four months, days in between) and never finer than the source serves. With comparison on, the previous period is overlaid on the same axes as a muted line, named "Previous period" in the legend and in every tooltip.
 
-**Breakdowns.** A tab per dimension group the source serves: pages, sources, technology, geography, events and goals. Each tab ranks the first dimension of its group that the source can answer, so the sources tab lists referring hosts where a source serves `referrer` and the derived `source` channel where it does not. Each tab is a ranked bar list with the selected metric, a visitors column where the source serves one, sortable columns and a row limit of 10, 25, 50 or 100. Clicking a row adds an `eq` filter for that value and every section re-reads through it; the chip above removes it again.
+**Breakdowns.** A tab per dimension group the source serves: pages, sources, technology, geography, events and goals. Each tab is a ranked bar list with the selected metric, a visitors column where the source serves one, sortable columns and a row limit of 10, 25, 50 or 100. Clicking a row adds an `eq` filter for that value and every section re-reads through it; the chip above removes it again.
+
+A tab opens on the first dimension of its group the source can answer, and a **Group by** select beside the row limit switches between the rest whenever the source serves more than one:
+
+| Tab | Groups by |
+|---|---|
+| Pages | `page` |
+| Sources | `source`, `referrer`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` |
+| Technology | `device`, `browser`, `os` |
+| Geography | `country`, `region`, `city`, `language` |
+| Events | `event` |
+| Goals | `goal` |
+
+The pick lands in the URL as `dim` and is dropped again when it is the tab's default, so the link a reader shares opens on what they were looking at. Switching tabs starts the new one on its own default. Where a source serves only one dimension in a group the select is not rendered at all.
 
 **Goals.** Conversions per [goal](/analytics/goals) over the window, with revenue and a conversion rate against the range's visitors. Goal names come from your config and from the goals collection; revenue is a bare number, because currency is per goal rather than per read.
 
@@ -38,11 +51,12 @@ One exception to Back: the two day pickers replace the current history entry rat
 | `metric` | the charted metric, and the breakdown's first column |
 | `granularity` | `hour`, `day`, `week`, `month`. Unset, the window picks one |
 | `tab` | `pages`, `sources`, `technology`, `geography`, `events`, `goals` |
+| `dim` | the dimension the tab groups by. Unset, the tab uses its default |
 | `filters` | JSON array of `{ dimension, operator, value }`, up to 10 |
 | `limit` | `10`, `25`, `50`, `100` |
 | `order` | `<metric>:asc` or `<metric>:desc` |
 
-Anything equal to the install's default is left out, so an untouched view has a clean URL. The parser is total: a value that names no metric, tab, operator or calendar day falls back to the default instead of failing, so a truncated or hand-edited link still opens a working view.
+Anything equal to the install's default is left out, so an untouched view has a clean URL. The parser is total: a value that names no metric, tab, dimension, operator or calendar day falls back to the default instead of failing, so a truncated or hand-edited link still opens a working view.
 
 A link built for one source keeps working when it is opened against another. Values the selected source cannot serve (a metric it lacks, a filter it cannot apply, a comparison it cannot answer) are coerced for the reads but left in the address bar, so the link itself is not rewritten by being opened. That only lasts until the next control writes: the URL it writes carries the coerced values, and the originals are gone from the address bar. Back, or opening the link again, brings them back.
 
@@ -57,7 +71,8 @@ Every control reads the selected source's [capabilities](/analytics/adapters#the
 | Compare | `capabilities.comparison` |
 | A range preset | its window fits `capabilities.maxLookbackDays` |
 | A breakdown tab | the source serves at least one dimension in that tab's group |
-| Row click, filter chips | the tab's dimension is in `capabilities.filters`. Otherwise rows are inert and a caption says so |
+| Group by select | the source serves more than one dimension in the active tab's group |
+| Row click, filter chips | the dimension on screen is in `capabilities.filters`. Otherwise rows are inert and a caption says so |
 | Trend granularity | never finer than `capabilities.minGranularity`, and never finer than an hour |
 | Goals breakdown tab | `goal` is in `capabilities.dimensions`, like any other tab |
 | Goals panel | `goal` in the dimensions and `conversions` in the metrics |
@@ -101,7 +116,7 @@ The source select lists that request's sources, so a tenant's own [runtime provi
 
 ## Keyboard
 
-The breakdown tabs are a proper tab strip: one tab stop, then <kbd>Left</kbd> and <kbd>Right</kbd> to move between tabs (wrapping at both ends), <kbd>Home</kbd> and <kbd>End</kbd> for the first and last. The source, range and row-count selects are Payload's own select inputs, which are react-select comboboxes rather than native `<select>` elements; the two day pickers are native date inputs, and everything else is a button.
+The breakdown tabs are a proper tab strip: one tab stop, then <kbd>Left</kbd> and <kbd>Right</kbd> to move between tabs (wrapping at both ends), <kbd>Home</kbd> and <kbd>End</kbd> for the first and last. The source, range, group-by and row-count selects are Payload's own select inputs, which are react-select comboboxes rather than native `<select>` elements; the two day pickers are native date inputs, and everything else is a button.
 
 ## Cached and clamped reads
 

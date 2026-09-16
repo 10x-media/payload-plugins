@@ -160,6 +160,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.viewTrendPrevious]: 'Попередній період',
 	[keys.viewBreakdowns]: 'Розрізи',
 	[keys.viewFiltersUnsupported]: 'Це джерело даних не підтримує фільтри за цим виміром.',
+	[keys.viewGroupBy]: 'Групувати за',
 	[keys.viewSortAscending]: 'за зростанням',
 	[keys.viewSortDescending]: 'за спаданням',
 	[keys.viewConversionRate]: 'Коефіцієнт конверсії',

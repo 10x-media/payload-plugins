@@ -89,7 +89,9 @@ export const buildViewRequests = (
 			? (['visitors'] as const)
 			: []),
 	]
-	const dimension = served.dimensionsFor(view.tab)[0]
+	// The coerced state only carries a `dim` the tab actually offers, so the picked one can
+	// be taken as-is and the tab's default is the fallback.
+	const dimension = view.dim ?? served.dimensionsFor(view.tab)[0]
 	const order: QueryRequest['order'] =
 		view.order !== undefined && breakdownMetrics.includes(view.order.metric)
 			? view.order
