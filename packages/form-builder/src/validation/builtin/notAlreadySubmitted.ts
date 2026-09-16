@@ -1,4 +1,4 @@
-import { voteChangeTargetOf } from '../../submissions/votedCookie'
+import { voteChangeTargetOf } from '../../submissions/voteChange'
 import { keys } from '../../translations/keys'
 import { defineValidationRule } from '../defineValidationRule'
 
