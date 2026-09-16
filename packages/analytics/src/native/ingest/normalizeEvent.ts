@@ -1,10 +1,17 @@
 import { type GoalCompletion, matchGoals } from '../../goals/match'
 import type { Goal } from '../../goals/types'
+import { MAX_QUERY_LENGTH } from '../../tracker/types'
 import type { GeoResolver } from '../geo/geoResolver'
+import { type BrowserName, classifyBrowser, classifyOs, type OsName } from './browser'
 import { clientIpFromHeaders } from './clientIp'
 import { classifyDevice, type DeviceType } from './device'
+import { primaryLanguage } from './language'
 import { deriveSource } from './source'
+import { extractUtm } from './utm'
 import { dailyVisitorHash, deriveSessionId } from './visitorHash'
+
+/** The cap the tracker already applied; ingest re-applies it, since the endpoint is public. */
+export { MAX_QUERY_LENGTH }
 
 export type EventType = 'pageview' | 'event' | 'goal'
 
@@ -15,6 +22,12 @@ export interface RawEventInput {
 	path: string
 	hostname: string
 	referrer?: string
+	/**
+	 * The page's query string, without its leading `?`. Read for its utm keys and then
+	 * discarded: it is never stored, so a session token or an email address that happens to
+	 * be in the URL never lands in the events collection.
+	 */
+	query?: string
 	durationMs?: number
 	props?: Record<string, unknown>
 	/** Revenue for a goal completion, in `currency`. */
@@ -32,10 +45,20 @@ export interface StoredEvent {
 	hostname: string
 	referrer?: string
 	device?: DeviceType
+	browser?: BrowserName
+	os?: OsName
 	source?: string
+	/** The five campaign keys extracted from the wire `query`; absent when it carried none. */
+	utmSource?: string
+	utmMedium?: string
+	utmCampaign?: string
+	utmContent?: string
+	utmTerm?: string
 	country?: string
 	region?: string
 	city?: string
+	/** Primary `Accept-Language` tag, lowercased (`de-de`). */
+	language?: string
 	visitorHash: string
 	sessionId: string
 	durationMs?: number
@@ -109,6 +132,10 @@ const duration = (value: unknown): number | undefined => {
 const eventName = (value: unknown): string | undefined =>
 	typeof value === 'string' ? value.slice(0, MAX_NAME_LENGTH) : undefined
 
+/** Capped before it is parsed, so a hostile query cannot make ingest do unbounded work. */
+const queryString = (value: unknown): string | undefined =>
+	typeof value === 'string' ? value.slice(0, MAX_QUERY_LENGTH) : undefined
+
 const depth = (value: unknown): number | undefined => {
 	const n = nonNegative(value)
 	return n === undefined ? undefined : Math.round(Math.min(n, 100))
@@ -165,6 +192,10 @@ export async function normalizeEvent({
 	const durationMs = duration(raw.durationMs)
 	const name = eventName(raw.name)
 	const device = classifyDevice(ua)
+	const browser = classifyBrowser(ua)
+	const os = classifyOs(ua)
+	const language = primaryLanguage(headers.get('accept-language'))
+	const utm = extractUtm(queryString(raw.query))
 	// Match on the sanitized fields so a rejected value never reaches a goal's revenue.
 	const completions = goals?.length
 		? matchGoals({ type: raw.type, name, path, props, value }, goals)
@@ -177,10 +208,14 @@ export async function normalizeEvent({
 		hostname,
 		referrer: raw.referrer,
 		...(device ? { device } : {}),
+		...(browser ? { browser } : {}),
+		...(os ? { os } : {}),
 		source: deriveSource(raw.referrer, hostname),
+		...utm,
 		country: geo.country,
 		region: geo.region,
 		city: geo.city,
+		...(language ? { language } : {}),
 		visitorHash,
 		sessionId: deriveSessionId(visitorHash, hourBucket),
 		props,

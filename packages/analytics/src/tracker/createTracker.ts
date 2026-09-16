@@ -7,14 +7,15 @@ import { createNativeSink } from './sinks/native'
 import { createPlausibleSink } from './sinks/plausible'
 import { createPosthogSink } from './sinks/posthog'
 import { createUmamiSink } from './sinks/umami'
-import type {
-	ConsentState,
-	LoadScript,
-	Sink,
-	Tracker,
-	TrackerEvent,
-	TrackerOptions,
-	TrackerWindow,
+import {
+	type ConsentState,
+	type LoadScript,
+	MAX_QUERY_LENGTH,
+	type Sink,
+	type Tracker,
+	type TrackerEvent,
+	type TrackerOptions,
+	type TrackerWindow,
 } from './types'
 
 /** Stand-in for a host with no DOM (server rendering, a worker). Every call is a no-op. */
@@ -115,8 +116,22 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 		...(win.document.referrer ? { referrer: win.document.referrer } : {}),
 	})
 
+	/**
+	 * Pageviews only: it exists so ingest can extract the campaign keys, and an event fired
+	 * later in the page's life would attribute the same visit twice.
+	 */
+	const query = (): Pick<TrackerEvent, 'query'> => {
+		// Absent means on: a tracker config snapshot rendered before the toggle existed must
+		// keep the documented default rather than silently losing campaign attribution.
+		if (config.autoCapture.query === false) {
+			return {}
+		}
+		const search = win.location.search.replace(/^\?/, '').slice(0, MAX_QUERY_LENGTH)
+		return search ? { query: search } : {}
+	}
+
 	const page = () => {
-		dispatch({ type: 'pageview', ...context() })
+		dispatch({ type: 'pageview', ...context(), ...query() })
 		auto?.resetPage()
 	}
 

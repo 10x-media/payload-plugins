@@ -8,7 +8,7 @@ import type { RawEventInput } from '../native/ingest/normalizeEvent'
  */
 export type ServerEventInput = Pick<
 	RawEventInput,
-	'type' | 'name' | 'path' | 'hostname' | 'referrer' | 'props' | 'value' | 'currency'
+	'type' | 'name' | 'path' | 'hostname' | 'referrer' | 'query' | 'props' | 'value' | 'currency'
 > & {
 	/**
 	 * Attribution inputs, overlaid on `opts.req`'s own headers when there is a request.

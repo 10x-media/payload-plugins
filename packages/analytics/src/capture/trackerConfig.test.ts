@@ -223,6 +223,7 @@ describe('resolveTrackerConfig autoCapture and goals', () => {
 			outboundLinks: true,
 			fileDownloads: true,
 			goalAttribute: true,
+			query: true,
 		})
 	})
 
@@ -232,6 +233,7 @@ describe('resolveTrackerConfig autoCapture and goals', () => {
 			outboundLinks: true,
 			fileDownloads: false,
 			goalAttribute: true,
+			query: false,
 		}
 		const config = await resolveTrackerConfig({
 			runtime: runtimeWith([native()], { autoCapture }),

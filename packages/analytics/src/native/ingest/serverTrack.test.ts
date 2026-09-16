@@ -107,6 +107,29 @@ describe('makeServerTrack attribution', () => {
 		const { track, events } = setup()
 		await track(pageview)
 		expect(events[0]?.device).toBeUndefined()
+		expect(events[0]?.browser).toBeUndefined()
+		expect(events[0]?.os).toBeUndefined()
+	})
+
+	it('extracts the utm keys from a query the caller passes, storing no query', async () => {
+		const { track, events } = setup()
+		await track({ ...pageview, query: 'utm_source=newsletter&utm_medium=email&token=secret' })
+		expect(events[0]?.utmSource).toBe('newsletter')
+		expect(events[0]?.utmMedium).toBe('email')
+		expect(JSON.stringify(events[0])).not.toContain('secret')
+	})
+
+	it('classifies browser, os and language from the request it is given', async () => {
+		const { track, events } = setup()
+		const req = fakeReq({
+			'user-agent':
+				'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+			'accept-language': 'de-DE,de;q=0.9',
+		})
+		await track(pageview, { req })
+		expect(events[0]?.browser).toBe('safari')
+		expect(events[0]?.os).toBe('ios')
+		expect(events[0]?.language).toBe('de-de')
 	})
 
 	it('inherits the whole header set of the request it is given', async () => {

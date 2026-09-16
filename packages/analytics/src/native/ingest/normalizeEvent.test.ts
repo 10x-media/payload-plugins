@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Goal } from '../../goals/types'
 import { noopResolver, platformHeaderResolver } from '../geo/geoResolver'
 import { SERVER_USER_AGENT } from './device'
-import { normalizeEvent } from './normalizeEvent'
+import { MAX_QUERY_LENGTH, normalizeEvent } from './normalizeEvent'
 
 const headers = (h: Record<string, string>) => new Headers(h)
 
@@ -230,5 +230,100 @@ describe('normalizeEvent contract growth', () => {
 			{ slug: 'thanks', name: 'Thanks', match: { kind: 'path', pattern: '/thank-you' } },
 		])
 		expect(ev.goals).toBeUndefined()
+	})
+})
+
+describe('normalizeEvent native dimensions', () => {
+	const CHROME_UA =
+		'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
+
+	const build = async (raw: Record<string, unknown>, h: Record<string, string>) =>
+		normalizeEvent({
+			raw: raw as never,
+			headers: headers(h),
+			geoResolver: noopResolver,
+			salt: 's',
+			now: new Date('2026-06-01T00:00:00Z'),
+		})
+
+	it('stores browser, os, language and the utm keys', async () => {
+		const ev = await build(
+			{
+				type: 'pageview',
+				path: '/pricing',
+				hostname: 'site.com',
+				query:
+					'utm_source=newsletter&utm_medium=email&utm_campaign=spring&utm_content=hero&utm_term=shoes&page=2',
+			},
+			{ 'user-agent': CHROME_UA, 'accept-language': 'de-DE,de;q=0.9' }
+		)
+		expect(ev).toMatchObject({
+			browser: 'chrome',
+			os: 'macos',
+			language: 'de-de',
+			utmSource: 'newsletter',
+			utmMedium: 'email',
+			utmCampaign: 'spring',
+			utmContent: 'hero',
+			utmTerm: 'shoes',
+		})
+	})
+
+	it('never stores the raw query itself', async () => {
+		const ev = await build(
+			{ type: 'pageview', path: '/p', hostname: 'site.com', query: 'token=secret&utm_source=g' },
+			{ 'user-agent': CHROME_UA }
+		)
+		expect('query' in ev).toBe(false)
+		expect(JSON.stringify(ev)).not.toContain('secret')
+		expect(ev.utmSource).toBe('g')
+	})
+
+	it('reads only the first MAX_QUERY_LENGTH characters of the query', async () => {
+		const padding = `pad=${'x'.repeat(MAX_QUERY_LENGTH)}`
+		const ev = await build(
+			{ type: 'pageview', path: '/p', hostname: 'site.com', query: `${padding}&utm_source=late` },
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.utmSource).toBeUndefined()
+	})
+
+	it('drops a query that is not a string', async () => {
+		const ev = await build(
+			{ type: 'event', name: 'signup', path: '/p', hostname: 'site.com', query: { a: 1 } },
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.utmSource).toBeUndefined()
+		expect(ev.browser).toBe('chrome')
+	})
+
+	it('classifies events and goals too, not just pageviews', async () => {
+		const ev = await build(
+			{
+				type: 'goal',
+				name: 'purchase',
+				path: '/thanks',
+				hostname: 'site.com',
+				query: 'utm_source=google',
+			},
+			{ 'user-agent': CHROME_UA, 'accept-language': 'en-US,en;q=0.9' }
+		)
+		expect(ev).toMatchObject({
+			browser: 'chrome',
+			os: 'macos',
+			language: 'en-us',
+			utmSource: 'google',
+		})
+	})
+
+	it('omits browser and os for the synthetic server agent, keeping the fields absent', async () => {
+		const ev = await build(
+			{ type: 'event', name: 'invoice_paid', path: '/hook', hostname: 'site.com' },
+			{ 'user-agent': SERVER_USER_AGENT }
+		)
+		expect('browser' in ev).toBe(false)
+		expect('os' in ev).toBe(false)
+		expect('language' in ev).toBe(false)
+		expect('utmSource' in ev).toBe(false)
 	})
 })

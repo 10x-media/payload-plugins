@@ -417,6 +417,7 @@ describe('resolveOptions capture.autoCapture', () => {
 			outboundLinks: true,
 			fileDownloads: true,
 			goalAttribute: true,
+			query: true,
 		})
 	})
 	it('overrides one toggle without disturbing the rest', () => {
@@ -429,6 +430,20 @@ describe('resolveOptions capture.autoCapture', () => {
 			outboundLinks: true,
 			fileDownloads: false,
 			goalAttribute: true,
+			query: true,
+		})
+	})
+	it('turns the query string off without disturbing the rest', () => {
+		const auto = resolveOptions({
+			adapters,
+			capture: { autoCapture: { query: false } },
+		}).capture.autoCapture
+		expect(auto).toEqual({
+			scrollDepth: false,
+			outboundLinks: true,
+			fileDownloads: true,
+			goalAttribute: true,
+			query: false,
 		})
 	})
 })

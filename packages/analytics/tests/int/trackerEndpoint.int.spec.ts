@@ -89,6 +89,7 @@ describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
 			outboundLinks: true,
 			fileDownloads: true,
 			goalAttribute: true,
+			query: true,
 		})
 	})
 
