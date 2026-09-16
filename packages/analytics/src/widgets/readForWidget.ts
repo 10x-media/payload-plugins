@@ -24,6 +24,8 @@ export interface WidgetReadResult {
 	sampled?: boolean
 	/** True when the source could not read the scope's goals, so a conversions total means nothing. */
 	goalsUnresolved?: boolean
+	/** The read asked about goals and the scope has none configured. */
+	noGoals?: boolean
 	/** Previous-window totals, present only when the adapter supports comparison. */
 	previousMetrics?: Partial<Record<MetricKey, number>>
 	/** The previous comparable window, present only when comparison ran. */
@@ -116,6 +118,7 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		dateRange,
 		metrics: result.totals ?? {},
 		...readMeta(result),
+		noGoals: Array.isArray(prepared.goalSlugs) && prepared.goalSlugs.length === 0,
 		previousMetrics,
 		comparisonRange,
 	}

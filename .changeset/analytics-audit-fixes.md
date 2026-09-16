@@ -1,5 +1,5 @@
 ---
-"@10x-media/analytics": patch
+"@10x-media/analytics": minor
 ---
 
 **Fixed: a failed goal resolver no longer poisons the healthy cache entry.** When the goals resolver threw, the read carried an empty goal hint, the provider answered `meta.goalsUnresolved`, and the engine cached that answer at the aggregate TTL under the same key a healthy read with no goals uses. The hint is now three-way: the scope's slugs (an empty list when no goals are configured, which is an empty result rather than a failure), `'unresolved'` when the resolver failed (its own `goals:!unresolved` cache segment, which no list of slugs can produce, and the short realtime TTL), or absent when the read does not ask about goals.

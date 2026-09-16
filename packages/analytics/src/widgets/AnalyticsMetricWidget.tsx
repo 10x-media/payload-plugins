@@ -111,11 +111,11 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps & W
 					{t(keys.stateSampled)}
 				</span>
 			) : null}
-			{result.goalsUnresolved ? (
-				// A conversions total the source could not resolve goals for is a number about
-				// nothing, which the plain caption would read as "nobody converted".
+			{result.goalsUnresolved || result.noGoals ? (
+				// A conversions total with no goals behind it is a number about nothing, which
+				// the plain caption would read as "nobody converted".
 				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
-					{t(keys.stateGoalsUnresolved)}
+					{t(result.goalsUnresolved ? keys.stateGoalsUnresolved : keys.stateNoGoals)}
 				</span>
 			) : null}
 			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />

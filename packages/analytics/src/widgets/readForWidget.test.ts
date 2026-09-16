@@ -374,4 +374,48 @@ describe('readForWidget', () => {
 		expect(seen[0]?.goalSlugs).toBe('unresolved')
 		expect(result.status).toBe('ok')
 	})
+
+	it('flags a goal read on a scope with no goals as noGoals, never as unresolved', async () => {
+		const seen: AnalyticsQuery[] = []
+		const adapter: AnalyticsAdapter = {
+			id: 'goals',
+			label: 'Goals',
+			capabilities: {
+				...memoryAdapter().capabilities,
+				metrics: new Set<MetricKey>(['pageviews', 'conversions']),
+			},
+			isConfigured: () => true,
+			async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
+				seen.push(q)
+				return { rows: [], meta: { provider: 'goals', fetchedAt: NOW.toISOString() } }
+			},
+		}
+		const payload = { logger: { warn: () => {} } } as unknown as PayloadRequest['payload']
+		setRuntime(payload, {
+			registry: createRegistry([adapter]),
+			configAdapterIds: new Set([adapter.id]),
+			bindings: {},
+			engine: { read: async (a, query) => a.query(query, {}) },
+			ttl: { aggregate: 3600, realtime: 300 },
+			comparison: false,
+			resolveGoals: () => Promise.resolve([]),
+		})
+		const req = { payload } as PayloadRequest
+		const goals = await readForWidget({
+			req,
+			metrics: ['conversions'],
+			timeframe: 'last30days',
+			now: NOW,
+		})
+		expect(seen[0]?.goalSlugs).toEqual([])
+		expect(goals).toMatchObject({ status: 'ok', noGoals: true, goalsUnresolved: false })
+		const plain = await readForWidget({
+			req,
+			metrics: ['pageviews'],
+			timeframe: 'last30days',
+			now: NOW,
+		})
+		expect(seen[1]?.goalSlugs).toBeUndefined()
+		expect(plain).toMatchObject({ status: 'ok', noGoals: false })
+	})
 })

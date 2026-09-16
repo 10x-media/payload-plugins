@@ -1,6 +1,7 @@
 import type { PayloadRequest } from 'payload'
 import type { MetricKey } from '../core/contract'
 import { kvCacheStore } from '../surfacing/cacheStore'
+import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { prepareWidgetRead } from './prepareWidgetRead'
 import { readMeta } from './readMeta'
 
@@ -54,10 +55,13 @@ export const readForWidgetRealtime = async (
 ): Promise<WidgetRealtimeResult> => {
 	const { req, metric, windowMinutes, adapterId, now } = args
 	const dateRange = { start: new Date(now.getTime() - windowMinutes * 60_000), end: now }
+	// The window is anchored on `now` and never rendered in a zone, so the poll skips the
+	// install's timezone resolver rather than paying for it ahead of the cache check.
 	const prepared = await prepareWidgetRead({
 		req,
 		now,
 		range: dateRange,
+		timezone: DEFAULT_TIMEZONE,
 		adapterId,
 		scope: args.scope,
 		requires: { realtime: true },
