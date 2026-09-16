@@ -195,6 +195,12 @@ export const keys = {
 	viewDimensionLanguage: 'analytics:viewDimensionLanguage',
 	viewDimensionEvent: 'analytics:viewDimensionEvent',
 	viewDimensionGoal: 'analytics:viewDimensionGoal',
+	channelDirect: 'analytics:channelDirect',
+	channelSearch: 'analytics:channelSearch',
+	channelSocial: 'analytics:channelSocial',
+	channelEmail: 'analytics:channelEmail',
+	channelPaid: 'analytics:channelPaid',
+	channelReferral: 'analytics:channelReferral',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

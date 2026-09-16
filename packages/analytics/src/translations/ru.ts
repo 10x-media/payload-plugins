@@ -198,4 +198,10 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: 'Язык',
 	[keys.viewDimensionEvent]: 'Событие',
 	[keys.viewDimensionGoal]: 'Цель',
+	[keys.channelDirect]: 'Прямые',
+	[keys.channelSearch]: 'Поиск',
+	[keys.channelSocial]: 'Соцсети',
+	[keys.channelEmail]: 'Эл. почта',
+	[keys.channelPaid]: 'Платные',
+	[keys.channelReferral]: 'Переходы',
 }

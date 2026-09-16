@@ -201,4 +201,10 @@ export const en: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: 'Language',
 	[keys.viewDimensionEvent]: 'Event',
 	[keys.viewDimensionGoal]: 'Goal',
+	[keys.channelDirect]: 'Direct',
+	[keys.channelSearch]: 'Search',
+	[keys.channelSocial]: 'Social',
+	[keys.channelEmail]: 'Email',
+	[keys.channelPaid]: 'Paid',
+	[keys.channelReferral]: 'Referral',
 }

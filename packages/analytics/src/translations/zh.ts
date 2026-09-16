@@ -193,4 +193,10 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: '语言',
 	[keys.viewDimensionEvent]: '事件',
 	[keys.viewDimensionGoal]: '目标',
+	[keys.channelDirect]: '直接访问',
+	[keys.channelSearch]: '搜索',
+	[keys.channelSocial]: '社交',
+	[keys.channelEmail]: '邮件',
+	[keys.channelPaid]: '付费',
+	[keys.channelReferral]: '引荐',
 }

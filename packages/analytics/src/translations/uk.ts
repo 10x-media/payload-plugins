@@ -197,4 +197,10 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: 'Мова',
 	[keys.viewDimensionEvent]: 'Подія',
 	[keys.viewDimensionGoal]: 'Ціль',
+	[keys.channelDirect]: 'Прямі',
+	[keys.channelSearch]: 'Пошук',
+	[keys.channelSocial]: 'Соцмережі',
+	[keys.channelEmail]: 'Ел. пошта',
+	[keys.channelPaid]: 'Платні',
+	[keys.channelReferral]: 'Переходи',
 }

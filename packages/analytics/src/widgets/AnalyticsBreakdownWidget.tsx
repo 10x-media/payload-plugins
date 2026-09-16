@@ -8,6 +8,7 @@ import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { keys, type TranslationKey } from '../translations/keys'
 import { TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
+import { valueLabel } from '../view/labels'
 import { type BreakdownWidgetData, breakdownSpecBySlug } from './breakdownTypes'
 import { cardStyle, labelStyle } from './cardChrome'
 import { captionWithFilter } from './filterCaption'
@@ -94,7 +95,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 			<span style={labelStyle}>{title}</span>
 			<BarList
 				data={result.rows.map((row) => ({
-					label: row.label,
+					label: valueLabel(spec.dimension, row.label, t),
 					value: row.value,
 					display: formatMetricValue(metric, row.value, locale),
 				}))}

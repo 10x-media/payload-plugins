@@ -256,10 +256,13 @@ test('@tenancy the native dimension widgets rank rows for the selected tenant', 
 
 	// The sources tab defaults to `source`, which buckets the traffic channel; the host the
 	// referrers widget ranks is the `referrer` dimension beside it, on this tenant's scope.
+	// The channel is named, not shown raw, and this run is on the default English locale,
+	// so the row reads as `en`'s `channelSearch`.
 	await page.goto(`${origin}/admin/analytics?tab=sources`)
 	const breakdown = page.locator('.analytics-view__breakdown')
 	await expect(breakdown).toBeVisible()
-	await expect(breakdown.getByText('search', { exact: true })).toBeVisible()
+	const rowLabels = breakdown.locator('.analytics-bars__row .analytics-bars__label')
+	await expect(rowLabels.filter({ hasText: /^Search$/ })).toBeVisible()
 	await expect(breakdown).not.toContainText('localhost')
 
 	await page.goto(`${origin}/admin/analytics?tab=sources&dim=referrer`)

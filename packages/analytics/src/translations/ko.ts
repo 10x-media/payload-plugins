@@ -193,4 +193,10 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: '언어',
 	[keys.viewDimensionEvent]: '이벤트',
 	[keys.viewDimensionGoal]: '목표',
+	[keys.channelDirect]: '직접 유입',
+	[keys.channelSearch]: '검색',
+	[keys.channelSocial]: '소셜',
+	[keys.channelEmail]: '이메일',
+	[keys.channelPaid]: '유료',
+	[keys.channelReferral]: '참조',
 }

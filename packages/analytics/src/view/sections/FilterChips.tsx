@@ -4,7 +4,7 @@ import { Pill, XIcon } from '@payloadcms/ui'
 import type { AnalyticsFilter } from '../../core/contract'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
-import { DIMENSION_LABELS } from '../labels'
+import { DIMENSION_LABELS, valueLabel } from '../labels'
 
 export interface FilterChipsProps {
 	filters: AnalyticsFilter[]
@@ -28,7 +28,7 @@ export function FilterChips({ filters, onRemove }: FilterChipsProps) {
 		<div className="analytics-view__chips">
 			<span className="analytics-view__label">{t(keys.viewFilters)}</span>
 			{filters.map((filter, index) => {
-				const text = `${t(DIMENSION_LABELS[filter.dimension])} ${OPERATOR_SIGN[filter.operator]} ${filter.value}`
+				const text = `${t(DIMENSION_LABELS[filter.dimension])} ${OPERATOR_SIGN[filter.operator]} ${valueLabel(filter.dimension, filter.value, t)}`
 				return (
 					<Pill key={`${filter.dimension}:${filter.operator}:${filter.value}`} size="small">
 						{text}

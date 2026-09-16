@@ -10,7 +10,7 @@ import { keys } from '../../translations/keys'
 import { METRIC_KEYS } from '../../translations/metricKeys'
 import { useTranslation } from '../../translations/useTranslation'
 import type { BreakdownTab } from '../gating'
-import { DIMENSION_LABELS, TAB_LABELS } from '../labels'
+import { DIMENSION_LABELS, TAB_LABELS, valueLabel } from '../labels'
 import { VIEW_LIMITS, type ViewLimit, type ViewState } from '../state'
 import type { QueryState } from '../useViewQueries'
 import { SectionError, Skeleton } from './EmptyStates'
@@ -187,8 +187,9 @@ export function Breakdowns({
 								const value = row.metrics[charted] ?? 0
 								const secondary =
 									servesSecondary && charted !== SECONDARY ? row.metrics[SECONDARY] : undefined
+								const stored = (dimension === null ? undefined : row.dimensions?.[dimension]) ?? ''
 								return {
-									label: (dimension === null ? undefined : row.dimensions?.[dimension]) ?? '',
+									label: dimension === null ? stored : valueLabel(dimension, stored, t),
 									value,
 									display: formatMetricValue(charted, value, locale),
 									...(secondary === undefined

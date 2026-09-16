@@ -198,4 +198,10 @@ export const de: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: 'Sprache',
 	[keys.viewDimensionEvent]: 'Ereignis',
 	[keys.viewDimensionGoal]: 'Ziel',
+	[keys.channelDirect]: 'Direkt',
+	[keys.channelSearch]: 'Suche',
+	[keys.channelSocial]: 'Social Media',
+	[keys.channelEmail]: 'E-Mail',
+	[keys.channelPaid]: 'Bezahlt',
+	[keys.channelReferral]: 'Verweis',
 }

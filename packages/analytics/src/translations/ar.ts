@@ -193,4 +193,10 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: 'اللغة',
 	[keys.viewDimensionEvent]: 'الحدث',
 	[keys.viewDimensionGoal]: 'الهدف',
+	[keys.channelDirect]: 'مباشر',
+	[keys.channelSearch]: 'بحث',
+	[keys.channelSocial]: 'شبكات اجتماعية',
+	[keys.channelEmail]: 'بريد إلكتروني',
+	[keys.channelPaid]: 'مدفوع',
+	[keys.channelReferral]: 'إحالة',
 }

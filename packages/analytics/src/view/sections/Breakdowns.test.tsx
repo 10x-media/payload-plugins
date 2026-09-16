@@ -261,6 +261,32 @@ describe('Breakdowns rows', () => {
 		expect(screen.getByText('90')).toBeDefined()
 	})
 
+	it('names a traffic channel in the reader language and still filters on the stored value', () => {
+		const onRowSelect = vi.fn()
+		const channels: AnalyticsRow[] = [
+			{ dimensions: { source: 'search' }, metrics: { pageviews: 9 } },
+		]
+		renderBreakdowns({
+			dimension: 'source',
+			dimensions: ['source', 'referrer'],
+			onRowSelect,
+			query: state({
+				data: {
+					...answer(),
+					result: {
+						rows: channels,
+						meta: { provider: 'native', fetchedAt: '2026-09-14T00:00:00.000Z' },
+					},
+				},
+			}),
+			tab: 'sources',
+		})
+		expect(screen.getByText(keys.channelSearch)).toBeDefined()
+		expect(screen.queryByText('search')).toBeNull()
+		fireEvent.click(screen.getByRole('button', { name: new RegExp(keys.channelSearch) }))
+		expect(onRowSelect).toHaveBeenCalledWith('search')
+	})
+
 	it('sorts on a column header, and flips the direction on a second click', () => {
 		const onSortChange = vi.fn()
 		const { rerender } = renderBreakdowns({ onSortChange })

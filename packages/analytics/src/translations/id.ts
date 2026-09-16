@@ -197,4 +197,10 @@ export const id: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: 'Bahasa',
 	[keys.viewDimensionEvent]: 'Peristiwa',
 	[keys.viewDimensionGoal]: 'Sasaran',
+	[keys.channelDirect]: 'Langsung',
+	[keys.channelSearch]: 'Pencarian',
+	[keys.channelSocial]: 'Media sosial',
+	[keys.channelEmail]: 'Email',
+	[keys.channelPaid]: 'Berbayar',
+	[keys.channelReferral]: 'Rujukan',
 }

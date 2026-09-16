@@ -197,4 +197,10 @@ export const es: Record<TranslationKey, string> = {
 	[keys.viewDimensionLanguage]: 'Idioma',
 	[keys.viewDimensionEvent]: 'Evento',
 	[keys.viewDimensionGoal]: 'Objetivo',
+	[keys.channelDirect]: 'Directo',
+	[keys.channelSearch]: 'Búsqueda',
+	[keys.channelSocial]: 'Redes sociales',
+	[keys.channelEmail]: 'Correo',
+	[keys.channelPaid]: 'Pago',
+	[keys.channelReferral]: 'Referencia',
 }

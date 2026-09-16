@@ -11,23 +11,43 @@ export interface SourceInput {
 	query?: string
 }
 
-const MEDIUM_CHANNELS: Readonly<Record<string, TrafficChannel>> = {
-	cpc: 'paid',
-	ppc: 'paid',
-	display: 'paid',
-	retargeting: 'paid',
-	email: 'email',
-	newsletter: 'email',
-	social: 'social',
-	'social-media': 'social',
-	sm: 'social',
-	organic: 'search',
-	search: 'search',
-	referral: 'referral',
-}
+/**
+ * A `Map` rather than an object literal: a lookup keyed by whatever `utm_medium` carries must
+ * answer nothing for `constructor` or `__proto__`, where an object literal answers an
+ * inherited member and puts a function in the `source` column.
+ *
+ * `referral` is deliberately absent. It names the channel the host branch already decides, and
+ * pinning it here would turn a hit with no referrer at all into `referral` rather than `direct`.
+ */
+const MEDIUM_CHANNELS: ReadonlyMap<string, TrafficChannel> = new Map<string, TrafficChannel>([
+	['cpc', 'paid'],
+	['ppc', 'paid'],
+	['display', 'paid'],
+	['retargeting', 'paid'],
+	['email', 'email'],
+	['newsletter', 'email'],
+	['social', 'social'],
+	['social-media', 'social'],
+	['sm', 'social'],
+	['organic', 'search'],
+	['search', 'search'],
+])
 
 /** A click id only an ad click carries, whatever the referrer says. */
 const CLICK_IDS: ReadonlySet<string> = new Set(['gclid', 'fbclid', 'msclkid', 'ttclid'])
+
+/**
+ * Hosts whose channel the lists below would get wrong, checked first. Webmail is `referral`
+ * rather than `email`: a referrer only proves a link was opened in a mail client, never that
+ * the mail was the newsletter an `email` bucket claims credit for.
+ */
+const HOST_OVERRIDES: ReadonlyMap<string, TrafficChannel> = new Map<string, TrafficChannel>([
+	['mail.google.com', 'referral'],
+	['mail.yahoo.com', 'referral'],
+	['outlook.live.com', 'referral'],
+	['outlook.office.com', 'referral'],
+	['mail.proton.me', 'referral'],
+])
 
 const SEARCH_HOSTS = [
 	'bing.com',
@@ -37,6 +57,9 @@ const SEARCH_HOSTS = [
 	'search.brave.com',
 	'qwant.com',
 	'startpage.com',
+	'naver.com',
+	'seznam.cz',
+	'sogou.com',
 ]
 const SOCIAL_HOSTS = [
 	'facebook.com',
@@ -54,6 +77,10 @@ const SOCIAL_HOSTS = [
 	'threads.net',
 	'mastodon.social',
 	'bsky.app',
+	'web.telegram.org',
+	't.me',
+	'wa.me',
+	'whatsapp.com',
 ]
 
 /** Brands running one site per country, matched on the label rather than a fixed tld. */
@@ -85,6 +112,11 @@ const matchesBrand = (host: string, brand: string): boolean => {
 }
 
 const hostChannel = (host: string): TrafficChannel => {
+	for (const [domain, channel] of HOST_OVERRIDES) {
+		if (matchesHost(host, domain)) {
+			return channel
+		}
+	}
 	if (
 		SEARCH_HOSTS.some((domain) => matchesHost(host, domain)) ||
 		SEARCH_BRANDS.some((brand) => matchesBrand(host, brand))
@@ -122,7 +154,7 @@ const hasClickId = (query: string): boolean => {
 export const deriveSource = ({ referrerHost, utmMedium, query }: SourceInput): TrafficChannel => {
 	const medium = utmMedium?.trim().toLowerCase()
 	if (medium) {
-		const channel = medium.startsWith('paid') ? 'paid' : MEDIUM_CHANNELS[medium]
+		const channel = medium.startsWith('paid') ? 'paid' : MEDIUM_CHANNELS.get(medium)
 		if (channel) {
 			return channel
 		}
