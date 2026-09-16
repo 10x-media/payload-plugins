@@ -8,7 +8,7 @@
 
 **Fixed: a scope with no goals says so instead of reading as nobody converting.** The goals panel, the goals widget and both goal breakdowns fell through to the plain "No data yet" whenever the scope configured no goals. They now render `stateNoGoals` ("No goals are configured for this scope", in all 11 locales) for that case, keeping the unresolved-goals state for a source that could not answer at all.
 
-**Fixed: a sampled native read says so everywhere.** A filtered or hourly native read that hits the event scan limit sets `meta.sampled`; `realtime()` now sets it too (both paths build their meta through one `eventScanMeta`), and the view and the widgets show a notice for it beside the clamped and stale ones instead of presenting truncated numbers as exact.
+**Fixed: a sampled native read says so everywhere.** A filtered or hourly native read that hits the event scan limit sets `meta.sampled`; `realtime()` now sets it too (both paths build their meta through one `eventScanMeta`), and the view and the widgets show a notice for it beside the clamped and stale ones instead of presenting truncated numbers as exact. **Additive:** the realtime strip and the realtime widget carry the notice through their polls, and `RealtimeCounter` gained two optional props for it, `initialSampled` and `sampledLabel`, with no notice rendered when the label is left off.
 
 **Behavioral: every widget carries the same read flags.** The five widget read helpers share one prologue and one meta mapping, so the metric widget now shows the unresolved-goals notice for `conversions` and the trend widget shows the stale notice, both of which they used to omit while their siblings showed them.
 

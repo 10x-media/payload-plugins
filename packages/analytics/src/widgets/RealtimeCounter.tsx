@@ -14,11 +14,12 @@ export interface RealtimeCounterProps {
 	initialActiveNow: number
 	initialSeries: RealtimePoint[]
 	/** Whether the reading it mounts with hit the source's event scan cap. */
-	initialSampled: boolean
+	initialSampled?: boolean
 	locale: string
 	caption: string
 	pausedLabel: string
-	sampledLabel: string
+	/** Notice for a sampled reading; without it the counter renders none. */
+	sampledLabel?: string
 }
 
 export function RealtimeCounter(props: RealtimeCounterProps) {
@@ -35,7 +36,7 @@ export function RealtimeCounter(props: RealtimeCounterProps) {
 	} = props
 	const [activeNow, setActiveNow] = useState(props.initialActiveNow)
 	const [series, setSeries] = useState(props.initialSeries)
-	const [sampled, setSampled] = useState(props.initialSampled)
+	const [sampled, setSampled] = useState(props.initialSampled === true)
 	const [paused, setPaused] = useState(false)
 
 	useEffect(() => {
@@ -87,7 +88,7 @@ export function RealtimeCounter(props: RealtimeCounterProps) {
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>
 				{paused ? pausedLabel : caption}
 			</span>
-			{sampled ? (
+			{sampled && sampledLabel ? (
 				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
 					{sampledLabel}
 				</span>

@@ -1,11 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import type {
-	AnalyticsAdapter,
-	AnalyticsCapabilities,
-	Granularity,
-	MetricKey,
-} from '../core/contract'
+import type { AnalyticsAdapter, AnalyticsCapabilities, MetricKey } from '../core/contract'
 import { createRegistry } from '../core/registry'
 import { type AnalyticsRuntime, setRuntime } from '../plugin/runtime'
 import { memoryAdapter } from '../testing/memoryAdapter'
@@ -66,6 +61,19 @@ describe('prepareWidgetRead', () => {
 		expect(prepared).toMatchObject({ ok: false, status: 'not-configured', adapterId: 'test' })
 	})
 
+	it('refuses an unconfigured source in the resolved timezone, not the caller default', async () => {
+		const prepared = await prepareWidgetRead({
+			req: reqWith([withCapabilities({}, false)], {
+				resolveTimezone: () => Promise.resolve('Europe/Berlin'),
+			}),
+			now: NOW,
+			timeframe: 'today',
+		})
+		expect(prepared).toMatchObject({ ok: false, status: 'not-configured', tz: 'Europe/Berlin' })
+		if (prepared.ok) return
+		expect(prepared.dateRange.start.toISOString()).toBe('2026-05-31T22:00:00.000Z')
+	})
+
 	it('refuses a source that does not serve what the read needs', async () => {
 		const prepared = await prepareWidgetRead({
 			req: reqWith([withCapabilities({ metrics: new Set(['pageviews']) })]),
@@ -78,7 +86,7 @@ describe('prepareWidgetRead', () => {
 
 	it('refuses a bucket finer than the source can serve', async () => {
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({ minGranularity: 'month' as Granularity })]),
+			req: reqWith([withCapabilities({ minGranularity: 'month' })]),
 			now: NOW,
 			timeframe: 'last30days',
 			granularity: 'day',
