@@ -67,7 +67,7 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 		timezone: timezone ?? DEFAULT_TIMEZONE,
 		...(customRange ? { range: customRange } : {}),
 		...(result.adapterId ? { source: result.adapterId } : {}),
-		...(tab ? { tab } : {}),
+		...(tab ? { tab, dim: spec.dimension } : {}),
 		metric,
 		filters,
 	})

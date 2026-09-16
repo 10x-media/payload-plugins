@@ -43,6 +43,12 @@ export interface ViewHrefArgs {
 	compare?: boolean
 	metric?: MetricKey
 	tab?: BreakdownTab
+	/**
+	 * The dimension the widget ranks, so the view opens on the same grouping rather than on
+	 * whatever its tab defaults to. Dropped when it is that default, which keeps the link short
+	 * and unchanged for every widget whose dimension already leads its tab.
+	 */
+	dim?: DimensionKey
 	/** The widget's own filter, carried as the view's filter state. */
 	filters?: AnalyticsFilter[]
 }
@@ -102,12 +108,17 @@ const rangeOf = (
  */
 export const viewHref = (args: ViewHrefArgs): string => {
 	const defaults: ViewDefaults = { range: args.defaultRange, metric: args.defaultMetric }
+	const tab = args.tab ?? DEFAULT_VIEW_TAB
+	// Against the declared order, not the source's: a link is built without capabilities, and a
+	// `dim` naming what the selected source leads its tab with is dropped by the view anyway.
+	const dim = args.dim === TAB_DIMENSIONS[tab][0] ? undefined : args.dim
 	const state: ViewState = {
 		...rangeOf(args, defaults),
 		compare: args.compare === true,
 		...(args.source === undefined ? {} : { source: args.source }),
 		metric: args.metric ?? defaults.metric,
-		tab: args.tab ?? DEFAULT_VIEW_TAB,
+		tab,
+		...(dim === undefined ? {} : { dim }),
 		filters: args.filters ?? [],
 		limit: DEFAULT_VIEW_LIMIT,
 	}

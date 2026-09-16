@@ -89,6 +89,14 @@ export async function bumpRollups(payload: Payload, bumps: RollupBump[]): Promis
 	if (merged.length === 0) {
 		return
 	}
+	// A batch belongs to one install shape: scope is part of the unique bucket where it is
+	// present, and Postgres needs one conflict target for the whole statement. A mixed batch has
+	// no single right answer, so it is a caller bug on both adapters rather than rows quietly
+	// filed under the first bucket's shape.
+	const scoped = merged[0]?.key.scope !== undefined
+	if (merged.some(({ key }) => (key.scope !== undefined) !== scoped)) {
+		throw new Error('analytics: rollup bumps mix scoped and unscoped buckets in one batch')
+	}
 	if (payload.db.name === 'mongoose') {
 		const db = payload.db as unknown as MongoDb
 		const model = db.collections[ROLLUPS_SLUG]
@@ -108,14 +116,6 @@ export async function bumpRollups(payload: Payload, bumps: RollupBump[]): Promis
 		await model.collection.bulkWrite(ops, { ordered: false })
 		return
 	}
-	// The conflict target must match the unique index exactly, which includes the scope column
-	// only in scoped installs. One target covers the whole statement, so a batch that mixes
-	// scoped and unscoped buckets has no single right answer and is a caller bug, not a row to
-	// silently file under the first bucket's shape.
-	const scoped = merged[0]?.key.scope !== undefined
-	if (merged.some(({ key }) => (key.scope !== undefined) !== scoped)) {
-		throw new Error('analytics: rollup bumps mix scoped and unscoped buckets in one batch')
-	}
 	const { sql } = await importPostgresSql()
 	const db = payload.db as unknown as PgDb
 	const tableName = db.tableNameMap.get(PG_TABLE_KEY)
@@ -131,6 +131,8 @@ export async function bumpRollups(payload: Payload, bumps: RollupBump[]): Promis
 		if (!column?.name) throw new Error(`analytics: rollup column "${metric}" not found`)
 		set[metric] = sql`${table[metric]} + excluded.${sql.identifier(column.name)}`
 	}
+	// The conflict target must match the unique index exactly, which carries the scope column
+	// only in scoped installs.
 	const target = [
 		table.granularity,
 		table.period,

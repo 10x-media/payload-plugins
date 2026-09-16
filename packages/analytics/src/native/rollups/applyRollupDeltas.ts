@@ -3,9 +3,11 @@ import { bumpRollup } from './bumpRollup'
 import type { RollupDelta } from './deltas'
 
 /**
- * One upsert per bucket. Superseded on the write path by the batched `bumpRollups`, and kept
- * as the serial reference the matrix parity test replays a whole flush through before
- * comparing the two row for row.
+ * One round trip per bucket, through `bumpRollup`, which is a one-bump call to the same
+ * batched `bumpRollups` statement. So the parity test the matrix suite replays a flush through
+ * is not checking two upsert implementations against each other: it checks what `flushBatch`
+ * puts around this one, its coalescing of a whole batch into one statement, against the
+ * bucket-at-a-time loop kept here.
  */
 export async function applyRollupDeltas(payload: Payload, deltas: RollupDelta[]): Promise<void> {
 	for (const d of deltas) {

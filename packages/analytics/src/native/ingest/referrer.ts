@@ -1,7 +1,4 @@
-import { MAX_REFERRER_LENGTH } from '../../query/limits'
-
-/** Longest legal DNS name, and the same cap the event's own hostname carries. */
-export const MAX_REFERRER_HOST_LENGTH = 253
+import { MAX_QUERY_HOSTNAME_LENGTH, MAX_REFERRER_LENGTH } from '../../query/limits'
 
 /** A hostname as it is compared: lowercased, without a leading `www.`. */
 const bareHost = (host: string): string => host.toLowerCase().replace(/^www\./, '')
@@ -35,7 +32,7 @@ export const storedReferrer = (raw: unknown): string | undefined => {
  * A self-referral reports nothing either: internal navigation is the bulk of any site's
  * traffic, and counting it would put the site's own domain at the top of its referrers
  * breakdown forever. `selfHostname` is the event's own hostname, compared on the same terms
- * (case-insensitively, `www.` stripped). The `source` channel calls the same visit `Direct`
+ * (case-insensitively, `www.` stripped). The `source` dimension calls the same visit `Direct`
  * through its own rule.
  */
 export const referrerHost = (raw: unknown, selfHostname: string): string | undefined => {
@@ -52,5 +49,5 @@ export const referrerHost = (raw: unknown, selfHostname: string): string | undef
 	if (!bare || bare === bareHost(selfHostname)) {
 		return undefined
 	}
-	return bare.slice(0, MAX_REFERRER_HOST_LENGTH)
+	return bare.slice(0, MAX_QUERY_HOSTNAME_LENGTH)
 }

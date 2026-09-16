@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
+import { ROLLUPS_SLUG } from '../collections/rollups'
 import { bumpRollups, type RollupBump } from './bumpRollups'
 import type { RollupKey } from './deltas'
 
@@ -57,9 +58,40 @@ const pgPayload = (
 	}
 }
 
+const mongoPayload = (bulkWrite: (ops: object[]) => unknown): Payload =>
+	({
+		db: { name: 'mongoose', collections: { [ROLLUPS_SLUG]: { collection: { bulkWrite } } } },
+	}) as unknown as Payload
+
 const bump = (over: Partial<RollupKey> = {}): RollupBump => ({
 	key: key(over),
 	inc: { pageviews: 1 },
+})
+
+describe('bumpRollups', () => {
+	it('refuses a batch that mixes scoped and unscoped buckets on either adapter', async () => {
+		const mixed = [bump({ scope: 't1' }), bump({ path: '/b' })]
+		const bulkWrite = vi.fn()
+		await expect(bumpRollups(mongoPayload(bulkWrite), mixed)).rejects.toThrow(
+			/mix scoped and unscoped/
+		)
+		expect(bulkWrite).not.toHaveBeenCalled()
+
+		const conflict = conflictSpy()
+		await expect(bumpRollups(pgPayload(conflict).payload, mixed)).rejects.toThrow(
+			/mix scoped and unscoped/
+		)
+		expect(conflict).not.toHaveBeenCalled()
+	})
+
+	it('writes a batch whose buckets share one scope shape', async () => {
+		const bulkWrite = vi.fn()
+		await bumpRollups(mongoPayload(bulkWrite), [
+			bump({ scope: 't1' }),
+			bump({ path: '/b', scope: 't2' }),
+		])
+		expect(bulkWrite).toHaveBeenCalledOnce()
+	})
 })
 
 describe('bumpRollups on postgres', () => {
@@ -75,12 +107,9 @@ describe('bumpRollups on postgres', () => {
 		expect(targetOf(bareConflict)).not.toContain(bare.columns.scope)
 	})
 
-	it('refuses a batch that mixes scoped and unscoped buckets', async () => {
+	it('reads the scope shape from the whole batch, not from its first bucket', async () => {
 		const conflict = conflictSpy()
 		const { payload } = pgPayload(conflict)
-		await expect(
-			bumpRollups(payload, [bump({ scope: 't1' }), bump({ path: '/b' })])
-		).rejects.toThrow(/mix scoped and unscoped/)
 		await expect(
 			bumpRollups(payload, [bump({ path: '/b' }), bump({ scope: 't1' })])
 		).rejects.toThrow(/mix scoped and unscoped/)
