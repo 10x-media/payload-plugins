@@ -10,6 +10,27 @@ describe('native adapter', () => {
 		expect(caps.dimensions.has('country')).toBe(true)
 	})
 
+	it('serves and filters every dimension the tracker can know', () => {
+		const caps = native().capabilities
+		for (const dimension of [
+			'referrer',
+			'region',
+			'city',
+			'browser',
+			'os',
+			'language',
+			'utmSource',
+			'utmMedium',
+			'utmCampaign',
+			'utmContent',
+			'utmTerm',
+		] as const) {
+			expect(caps.dimensions.has(dimension)).toBe(true)
+			expect(caps.filters.has(dimension)).toBe(true)
+		}
+		expect([...caps.filterOperators].sort()).toEqual(['contains', 'eq'])
+	})
+
 	it('is configured', () => {
 		expect(native().isConfigured()).toBe(true)
 	})

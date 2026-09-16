@@ -1,4 +1,6 @@
-const stripWww = (host: string): string => host.replace(/^www\./, '')
+import { referrerHost } from './referrer'
+
+const stripWww = (host: string): string => host.toLowerCase().replace(/^www\./, '')
 
 /**
  * Reduce a raw referrer URL to a coarse traffic source: the bare referrer host
@@ -6,17 +8,9 @@ const stripWww = (host: string): string => host.replace(/^www\./, '')
  * points back at the site itself (internal navigation is not a traffic source).
  */
 export const deriveSource = (referrer: string | undefined, selfHostname: string): string => {
-	if (!referrer) {
+	const host = referrerHost(referrer)
+	if (!host || host === stripWww(selfHostname)) {
 		return 'Direct'
 	}
-	let host: string
-	try {
-		host = new URL(referrer).hostname
-	} catch {
-		return 'Direct'
-	}
-	if (!host || stripWww(host) === stripWww(selfHostname)) {
-		return 'Direct'
-	}
-	return stripWww(host)
+	return host
 }

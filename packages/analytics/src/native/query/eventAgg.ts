@@ -8,10 +8,20 @@ export interface EventLike {
 	name?: string
 	path: string
 	device?: string
+	browser?: string
+	os?: string
 	source?: string
+	/** The referrer host derived at ingest; the raw referrer is never grouped or filtered on. */
+	referrerHost?: string
 	country?: string
 	region?: string
 	city?: string
+	language?: string
+	utmSource?: string
+	utmMedium?: string
+	utmCampaign?: string
+	utmContent?: string
+	utmTerm?: string
 	visitorHash: string
 	sessionId: string
 	durationMs?: number
@@ -22,16 +32,45 @@ export interface EventLike {
 
 const HOUR_MS = 3_600_000
 
-type EventStringField = 'path' | 'country' | 'region' | 'city' | 'device' | 'source' | 'name'
+type EventStringField =
+	| 'path'
+	| 'country'
+	| 'region'
+	| 'city'
+	| 'device'
+	| 'browser'
+	| 'os'
+	| 'language'
+	| 'source'
+	| 'referrerHost'
+	| 'utmSource'
+	| 'utmMedium'
+	| 'utmCampaign'
+	| 'utmContent'
+	| 'utmTerm'
+	| 'name'
 
-/** Dimensions native can filter/group on directly against the events collection. */
+/**
+ * Dimensions native can filter/group on directly against the events collection. `referrer`
+ * reads the host derived at ingest rather than the raw referrer, since a `where` cannot
+ * reduce a URL to its host; it is the same field the rollup bucket is keyed by.
+ */
 const EVENT_FIELD: Partial<Record<DimensionKey, EventStringField>> = {
 	page: 'path',
 	country: 'country',
 	region: 'region',
 	city: 'city',
 	device: 'device',
+	browser: 'browser',
+	os: 'os',
+	language: 'language',
 	source: 'source',
+	referrer: 'referrerHost',
+	utmSource: 'utmSource',
+	utmMedium: 'utmMedium',
+	utmCampaign: 'utmCampaign',
+	utmContent: 'utmContent',
+	utmTerm: 'utmTerm',
 	event: 'name',
 }
 

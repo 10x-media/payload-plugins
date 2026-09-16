@@ -1,6 +1,7 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { Config, Endpoint, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
+import type { DimensionKey } from '../../src/core/contract'
 import { readForField } from '../../src/fields/readForDocument'
 import { GOALS_SLUG } from '../../src/goals/collection'
 import { GOAL_ACTION_TYPE } from '../../src/goals/trackGoalAction'
@@ -422,6 +423,112 @@ describeForDb('native goal rollups', {}, (db) => {
 		expect(byGoal.purchase).toEqual({ conversions: 1, revenue: 25.5 })
 		expect(byGoal.thanks).toEqual({ conversions: 1, revenue: 0 })
 		expect(result.totals).toEqual({ conversions: 2, revenue: 25.5 })
+	})
+})
+
+describeForDb('native dimension columns and breakdowns', {}, (db) => {
+	const adapter = native()
+	let booted: BootedPayload
+
+	// One ingest carrying every attribute the new dimensions are derived from, so each
+	// breakdown has exactly one row to find on either database.
+	const attributed = {
+		'user-agent':
+			'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+		'accept-language': 'de-DE,de;q=0.9',
+		'x-vercel-ip-country': 'US',
+		'x-vercel-ip-country-region': 'CA',
+		'x-vercel-ip-city': 'San Francisco',
+	}
+
+	const expected: ReadonlyArray<readonly [DimensionKey, string]> = [
+		['referrer', 'example.org'],
+		['region', 'CA'],
+		['city', 'San Francisco'],
+		['browser', 'chrome'],
+		['os', 'macos'],
+		['language', 'de-de'],
+		['utmSource', 'newsletter'],
+		['utmMedium', 'email'],
+		['utmCampaign', 'spring'],
+		['utmContent', 'hero'],
+		['utmTerm', 'shoes'],
+	]
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
+		const endpoint = (booted.payload.config.endpoints ?? []).find(
+			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		)
+		if (!endpoint || typeof endpoint.handler !== 'function') {
+			throw new Error('ingest endpoint not registered')
+		}
+		const res = await endpoint.handler(
+			ingestRequest(
+				booted.payload,
+				{
+					type: 'pageview',
+					path: '/dims',
+					hostname: 'site.com',
+					referrer: 'https://www.example.org/path?x=1',
+					query:
+						'utm_source=newsletter&utm_medium=email&utm_campaign=spring&utm_content=hero&utm_term=shoes',
+					durationMs: 100,
+				},
+				attributed
+			)
+		)
+		expect(res.status).toBe(202)
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it(`stores every derived dimension column on ${db}`, async () => {
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/dims' } } as never,
+			pagination: false,
+			overrideAccess: true,
+		})
+		expect(docs[0]).toMatchObject({
+			referrerHost: 'example.org',
+			region: 'CA',
+			city: 'San Francisco',
+			browser: 'chrome',
+			os: 'macos',
+			language: 'de-de',
+			utmSource: 'newsletter',
+			utmMedium: 'email',
+			utmCampaign: 'spring',
+			utmContent: 'hero',
+			utmTerm: 'shoes',
+		})
+	})
+
+	it(`serves a rollup and a raw-event breakdown per new dimension on ${db}`, async () => {
+		const range = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
+		for (const [dimension, value] of expected) {
+			const rollups = await adapter.query(
+				{ metrics: ['pageviews'], dimensions: [dimension], dateRange: range },
+				{}
+			)
+			expect(rollups.rows).toEqual([
+				{ dimensions: { [dimension]: value }, metrics: { pageviews: 1 } },
+			])
+			// A filter forces the raw-event path, which must agree with the rollups.
+			const events = await adapter.query(
+				{
+					metrics: ['pageviews'],
+					dimensions: [dimension],
+					dateRange: range,
+					filters: [{ dimension, operator: 'eq', value }],
+				},
+				{}
+			)
+			expect(events.rows).toEqual(rollups.rows)
+		}
 	})
 })
 

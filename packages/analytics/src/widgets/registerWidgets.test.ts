@@ -538,9 +538,11 @@ describe('registerWidgets', () => {
 	})
 
 	it('skips the campaigns breakdown when no config adapter serves utmCampaign, but registers it when providersEnabled', () => {
+		// memoryAdapter serves page/referrer/country/device only, so nothing in the install
+		// answers a campaign breakdown until a runtime provider might.
 		const withoutProviders = bareConfig()
 		registerWidgets(withoutProviders, {
-			adapters: [native()],
+			adapters: [memoryAdapter()],
 			multiProvider: false,
 			providersEnabled: false,
 			disabled: [],
@@ -551,7 +553,7 @@ describe('registerWidgets', () => {
 
 		const withProviders = bareConfig()
 		registerWidgets(withProviders, {
-			adapters: [native()],
+			adapters: [memoryAdapter()],
 			multiProvider: false,
 			providersEnabled: true,
 			disabled: [],
@@ -559,6 +561,26 @@ describe('registerWidgets', () => {
 		})
 		const slugsWith = withProviders.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
 		expect(slugsWith).toContain('analytics-breakdown-campaigns')
+	})
+
+	it('registers the campaigns breakdown for a native-only install, which serves utmCampaign itself', () => {
+		const config = bareConfig()
+		registerWidgets(config, {
+			adapters: [native()],
+			multiProvider: false,
+			providersEnabled: false,
+			disabled: [],
+			register: [],
+		})
+		const slugs = config.admin?.dashboard?.widgets?.map((w) => w.slug) ?? []
+		expect(slugs).toEqual(
+			expect.arrayContaining([
+				'analytics-breakdown-referrers',
+				'analytics-breakdown-browsers',
+				'analytics-breakdown-os',
+				'analytics-breakdown-campaigns',
+			])
+		)
 	})
 
 	it('with providersEnabled, the metric select lists every WIDGET_METRICS candidate (native lacks bounceRate)', () => {

@@ -326,4 +326,33 @@ describe('normalizeEvent native dimensions', () => {
 		expect('language' in ev).toBe(false)
 		expect('utmSource' in ev).toBe(false)
 	})
+
+	it('stores the referrer host beside the raw referrer, and neither when there is none', async () => {
+		const ev = await build(
+			{
+				type: 'pageview',
+				path: '/p',
+				hostname: 'site.com',
+				referrer: 'https://www.example.org/path?x=1',
+			},
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.referrer).toBe('https://www.example.org/path?x=1')
+		expect(ev.referrerHost).toBe('example.org')
+
+		const direct = await build(
+			{ type: 'pageview', path: '/p', hostname: 'site.com' },
+			{ 'user-agent': CHROME_UA }
+		)
+		expect('referrerHost' in direct).toBe(false)
+	})
+
+	it('keeps a self-referrer host, which the source channel reports as Direct', async () => {
+		const ev = await build(
+			{ type: 'pageview', path: '/p', hostname: 'site.com', referrer: 'https://site.com/other' },
+			{ 'user-agent': CHROME_UA }
+		)
+		expect(ev.referrerHost).toBe('site.com')
+		expect(ev.source).toBe('Direct')
+	})
 })

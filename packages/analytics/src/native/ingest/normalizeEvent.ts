@@ -6,6 +6,7 @@ import { type BrowserName, classifyBrowser, classifyOs, type OsName } from './br
 import { clientIpFromHeaders } from './clientIp'
 import { classifyDevice, type DeviceType } from './device'
 import { primaryLanguage } from './language'
+import { referrerHost } from './referrer'
 import { deriveSource } from './source'
 import { extractUtm } from './utm'
 import { dailyVisitorHash, deriveSessionId } from './visitorHash'
@@ -44,6 +45,11 @@ export interface StoredEvent {
 	path: string
 	hostname: string
 	referrer?: string
+	/**
+	 * The referrer's bare host, derived at ingest because a `where` cannot derive it at read
+	 * time: it is what the `referrer` dimension buckets and filters on.
+	 */
+	referrerHost?: string
 	device?: DeviceType
 	browser?: BrowserName
 	os?: OsName
@@ -195,6 +201,7 @@ export async function normalizeEvent({
 	const browser = classifyBrowser(ua)
 	const os = classifyOs(ua)
 	const language = primaryLanguage(headers.get('accept-language'))
+	const refHost = referrerHost(raw.referrer)
 	const utm = extractUtm(queryString(raw.query))
 	// Match on the sanitized fields so a rejected value never reaches a goal's revenue.
 	const completions = goals?.length
@@ -207,6 +214,7 @@ export async function normalizeEvent({
 		path,
 		hostname,
 		referrer: raw.referrer,
+		...(refHost ? { referrerHost: refHost } : {}),
 		...(device ? { device } : {}),
 		...(browser ? { browser } : {}),
 		...(os ? { os } : {}),

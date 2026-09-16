@@ -33,8 +33,38 @@ describe('filtersToWhere', () => {
 	})
 
 	it('drops unsupported dimensions as the safety net', () => {
-		const filters: AnalyticsFilter[] = [{ dimension: 'browser', operator: 'eq', value: 'chrome' }]
+		const filters: AnalyticsFilter[] = [{ dimension: 'medium', operator: 'eq', value: 'email' }]
 		expect(filtersToWhere(filters)).toEqual({})
+	})
+
+	it('maps the referrer dimension to the derived host field, not the raw referrer', () => {
+		const filters: AnalyticsFilter[] = [
+			{ dimension: 'referrer', operator: 'eq', value: 'example.org' },
+		]
+		expect(filtersToWhere(filters)).toEqual({ and: [{ referrerHost: { equals: 'example.org' } }] })
+	})
+
+	it('maps eq and contains onto every native dimension field', () => {
+		const cases: Array<[AnalyticsFilter['dimension'], string]> = [
+			['region', 'region'],
+			['city', 'city'],
+			['browser', 'browser'],
+			['os', 'os'],
+			['language', 'language'],
+			['utmSource', 'utmSource'],
+			['utmMedium', 'utmMedium'],
+			['utmCampaign', 'utmCampaign'],
+			['utmContent', 'utmContent'],
+			['utmTerm', 'utmTerm'],
+		]
+		for (const [dimension, field] of cases) {
+			expect(filtersToWhere([{ dimension, operator: 'eq', value: 'v' }])).toEqual({
+				and: [{ [field]: { equals: 'v' } }],
+			})
+			expect(filtersToWhere([{ dimension, operator: 'contains', value: 'v' }])).toEqual({
+				and: [{ [field]: { contains: 'v' } }],
+			})
+		}
 	})
 
 	it('AND-composes multiple filters as separate fragments instead of merging by key', () => {
@@ -127,6 +157,53 @@ describe('aggregateEvents dimension breakdown', () => {
 		)
 		expect(byName).toEqual({ signup: 2, login: 1 })
 		expect(result.rows).toHaveLength(2)
+	})
+
+	it('groups by the referrer host and skips events with no referrer', () => {
+		const events: EventLike[] = [
+			pageview({ referrerHost: 'example.org' }),
+			pageview({ referrerHost: 'example.org' }),
+			pageview({ referrerHost: 't.co' }),
+			pageview(),
+		]
+		const result = aggregateEvents(events, { metrics: ['pageviews'], dimension: 'referrer' })
+		expect(
+			Object.fromEntries(result.rows.map((r) => [r.dimensions?.referrer, r.metrics.pageviews]))
+		).toEqual({ 'example.org': 2, 't.co': 1 })
+	})
+
+	it('groups by each classified and campaign dimension', () => {
+		const events: EventLike[] = [
+			pageview({
+				browser: 'chrome',
+				os: 'macos',
+				language: 'de-de',
+				region: 'CA',
+				city: 'San Francisco',
+				utmSource: 'newsletter',
+				utmMedium: 'email',
+				utmCampaign: 'spring',
+				utmContent: 'hero',
+				utmTerm: 'shoes',
+			}),
+			pageview(),
+		]
+		for (const dimension of [
+			'browser',
+			'os',
+			'language',
+			'region',
+			'city',
+			'utmSource',
+			'utmMedium',
+			'utmCampaign',
+			'utmContent',
+			'utmTerm',
+		] as const) {
+			const result = aggregateEvents(events, { metrics: ['pageviews'], dimension })
+			expect(result.rows).toHaveLength(1)
+			expect(result.rows[0]?.metrics.pageviews).toBe(1)
+		}
 	})
 
 	it('sorts breakdown rows by pageviews desc by default', () => {

@@ -55,11 +55,27 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 	'revenue',
 	'scrollDepth',
 ])
+/**
+ * Everything the tracker can know about a hit. `source` is the derived traffic channel,
+ * `referrer` the referring host itself, so the two answer different questions about the
+ * same visit.
+ */
 const dimensions: ReadonlySet<DimensionKey> = new Set([
 	'page',
-	'country',
+	'referrer',
 	'source',
+	'utmSource',
+	'utmMedium',
+	'utmCampaign',
+	'utmContent',
+	'utmTerm',
 	'device',
+	'browser',
+	'os',
+	'country',
+	'region',
+	'city',
+	'language',
 	'event',
 	'goal',
 ])
@@ -75,7 +91,9 @@ const baseCapabilities: AnalyticsCapabilities = {
 	maxLookbackDays: null,
 	metrics,
 	dimensions,
-	filters: new Set(['page', 'country', 'region', 'city', 'device', 'source', 'event']),
+	// Every dimension except `goal`, whose completions live in a json column rather than a
+	// field a `where` can compare.
+	filters: new Set([...dimensions].filter((dimension) => dimension !== 'goal')),
 	filterOperators: new Set(['eq', 'contains']),
 	batchPageReport: true,
 	rateLimit: null,

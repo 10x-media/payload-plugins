@@ -1,3 +1,4 @@
+import type { DimensionKey } from '../../core/contract'
 import { startOfDayInTz } from '../../timeframe/tz'
 import type { StoredEvent } from '../ingest/normalizeEvent'
 
@@ -45,6 +46,31 @@ export interface RollupDelta {
 	key: RollupKey
 	inc: RollupInc
 }
+
+/**
+ * Every dimension whose bucket value is a stored string field, and the field it reads. A
+ * dimension the event carries no value for emits no bucket at all, so an unattributed hit
+ * never lands in an "unknown" row. `referrer` reads the host derived at ingest, the same
+ * field the raw-event read path groups and filters on.
+ */
+const DIMENSION_FIELDS: ReadonlyArray<
+	readonly [dimension: DimensionKey, field: keyof StoredEvent]
+> = [
+	['country', 'country'],
+	['region', 'region'],
+	['city', 'city'],
+	['device', 'device'],
+	['browser', 'browser'],
+	['os', 'os'],
+	['language', 'language'],
+	['source', 'source'],
+	['referrer', 'referrerHost'],
+	['utmSource', 'utmSource'],
+	['utmMedium', 'utmMedium'],
+	['utmCampaign', 'utmCampaign'],
+	['utmContent', 'utmContent'],
+	['utmTerm', 'utmTerm'],
+]
 
 /**
  * Distinct metrics (visitors, sessions) are exact per bucket and must never be summed
@@ -100,14 +126,11 @@ export function computeRollupDeltas(event: StoredEvent): RollupDelta[] {
 	if (event.type === 'event' && event.name) {
 		buckets.push(['', 'event', event.name])
 	}
-	if (event.country) {
-		buckets.push(['', 'country', event.country])
-	}
-	if (event.device) {
-		buckets.push(['', 'device', event.device])
-	}
-	if (event.source) {
-		buckets.push(['', 'source', event.source])
+	for (const [dimension, field] of DIMENSION_FIELDS) {
+		const value = event[field]
+		if (typeof value === 'string' && value) {
+			buckets.push(['', dimension, value])
+		}
 	}
 	const families = event.hostname ? ['', event.hostname] : ['']
 	const deltas: RollupDelta[] = []
