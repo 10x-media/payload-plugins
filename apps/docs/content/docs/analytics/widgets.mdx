@@ -105,6 +105,12 @@ Metric, trend and breakdown widgets carry one optional **Filter**: a dimension, 
 | Operator | `is`, `contains` or `matches pattern`, whichever the source declares. Defaults to `is` and is never empty. |
 | Value | Your own text, trimmed, capped at 256 characters. Required once a dimension is set, and never translated. |
 
+A dimension or operator the contract does not define (a hand-edited layout, a widget saved against an older version) is not applied: the dimension drops the filter entirely and an unknown operator falls back to `is`.
+
+<Callout type="warn">
+**`contains` differs by database on the native engine.** It is case-insensitive on both, but on Postgres the value is a raw `ILIKE` pattern, so `%` and `_` in it act as wildcards; on Mongo the value is regex-escaped first and matches literally. Keep filter values free of `%` and `_` if the same widget has to read the same way on either database.
+</Callout>
+
 Both selects are narrowed live by the same `GET /api/analytics/sources` endpoint the data source and metric pickers use: they offer only the dimensions the widget's chosen source declares as filterable and only the operators it declares, in the plugin's own contract order rather than the source's. A stored value the current source no longer offers stays visible and clearable rather than vanishing. While the endpoint is in flight neither select shows a notice, so a slow request never reads as "this source cannot filter"; a source that settles with nothing filterable says so next to the field's description, and a failed request says that instead.
 
 <Callout type="warn">
@@ -114,6 +120,8 @@ Both selects are narrowed live by the same `GET /api/analytics/sources` endpoint
 A source that cannot apply the stored filter renders **"This source cannot apply this filter"** in place of the number, the chart or the rows. The check runs before the query, so the read never falls back to unfiltered numbers and the adapter is never called; the widget's title and its **Open in Analytics** link stay. This is the same shape as the "Not available for this data source" state a missing metric or dimension produces, and it happens for the same reasons: a dimension the source does not list as filterable, an operator it does not declare, or a scoped install whose tenant source differs from the one the widget was configured against.
 
 A filtered widget states its filter in the caption, after the window: **Last 30 days where Country is DE**. The dimension and the operator are translated, the value is yours verbatim, and both the sentence (`'where {{dimension}} {{operator}} {{value}}'`) and the join that puts it after the window (`'{{window}} {{filter}}'`) are translated templates, so a locale can reorder the parts, and one that does not separate clauses with a space drops it. Both are overridable through the [`translations` option](/analytics/i18n). The caption renders with the data it describes: a widget on any non-ok state shows its title, the message and the link, never a caption for numbers it does not have.
+
+The caption and the view's filter chip word the same filter differently: the card reads **where Country is DE**, a sentence under a number, and the chip the link lands on reads **Country = DE**, a control you can remove. Same filter, two registers.
 
 ## Open in Analytics
 
