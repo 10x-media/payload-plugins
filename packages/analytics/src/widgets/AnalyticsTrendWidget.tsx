@@ -134,6 +134,11 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps & Wi
 					t={t}
 				/>
 			) : null}
+			{result.stale ? (
+				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
+					{t(keys.viewStale)}
+				</span>
+			) : null}
 			{result.clamped ? (
 				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
 					{t(keys.stateClamped)}

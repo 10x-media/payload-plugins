@@ -1,5 +1,4 @@
 import type { PayloadRequest } from 'payload'
-import { satisfiesCapabilities } from '../core/capabilities'
 import type {
 	AnalyticsAdapter,
 	AnalyticsFilter,
@@ -8,11 +7,9 @@ import type {
 	DimensionKey,
 	MetricKey,
 } from '../core/contract'
-import { resolveReadContext } from '../core/scopedRead'
-import { goalSlugsFor } from '../plugin/goalHint'
-import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
-import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
-import { supportsFilters, type WidgetReadStatus } from './readForWidget'
+import type { TimeframePreset } from '../timeframe/presets'
+import { prepareWidgetRead, type WidgetReadStatus } from './prepareWidgetRead'
+import { readMeta } from './readMeta'
 
 export interface BreakdownRow {
 	label: string
@@ -81,49 +78,34 @@ export const readForWidgetBreakdown = async (
 	const { req, metric, dimension, timeframe, limit, adapterId, now, range, filters } = args
 	const emptyRows = [] as BreakdownRow[]
 
-	const runtime = getRuntime(req.payload)
-	if (!runtime) {
-		return {
-			status: 'unavailable',
-			adapterId: adapterId ?? '',
-			dateRange: range ?? resolveTimeframe(timeframe, now, args.timezone),
-			rows: emptyRows,
-		}
-	}
-	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
-	if (!ctx.ok) {
-		return {
-			status: 'unavailable',
-			adapterId: adapterId ?? '',
-			dateRange: range ?? resolveTimeframe(timeframe, now, args.timezone),
-			rows: emptyRows,
-		}
-	}
-	const tz = args.timezone ?? (await resolveTimezoneFor(runtime, req, ctx.scope))
-	const dateRange = range ?? resolveTimeframe(timeframe, now, tz)
-	const base = { dateRange, rows: emptyRows }
-	const adapter: AnalyticsAdapter = ctx.adapter
-	if (!adapter.isConfigured()) {
-		return { status: 'not-configured', adapterId: adapter.id, ...base }
-	}
-	if (
-		!satisfiesCapabilities(adapter.capabilities, {
-			metrics: [metric],
-			dimensions: [dimension],
-		})
-	) {
-		return { status: 'unavailable', adapterId: adapter.id, ...base }
-	}
-	if (!supportsFilters(adapter.capabilities, filters)) {
-		return { status: 'filter-unsupported', adapterId: adapter.id, ...base }
-	}
-	const metrics = [
+	const metricsFor = (adapter: AnalyticsAdapter): MetricKey[] => [
 		metric,
 		...(args.extraMetrics ?? []).filter((m) => m !== metric && adapter.capabilities.metrics.has(m)),
 	]
-	const goalSlugs =
-		args.goalSlugs ??
-		(await goalSlugsFor({ runtime, req, scope: ctx.scope, metrics, dimensions: [dimension] }))
+	const prepared = await prepareWidgetRead({
+		req,
+		now,
+		timeframe,
+		adapterId,
+		scope: args.scope,
+		timezone: args.timezone,
+		range,
+		filters,
+		requires: { metrics: [metric], dimensions: [dimension] },
+		goalRead: (adapter) => ({ metrics: metricsFor(adapter), dimensions: [dimension] }),
+		goalSlugs: args.goalSlugs,
+	})
+	if (!prepared.ok) {
+		return {
+			status: prepared.status,
+			adapterId: prepared.adapterId,
+			dateRange: prepared.dateRange,
+			rows: emptyRows,
+		}
+	}
+	const { runtime, adapter, tz, dateRange, goalSlugs } = prepared
+	const base = { dateRange, rows: emptyRows }
+	const metrics = metricsFor(adapter)
 	let result: AnalyticsResult
 	try {
 		result = await runtime.engine.read(adapter, {
@@ -134,7 +116,7 @@ export const readForWidgetBreakdown = async (
 			order: { metric, direction: 'desc' },
 			filters,
 			timezone: tz,
-			scope: ctx.queryScope,
+			scope: prepared.queryScope,
 			...(goalSlugs === undefined ? {} : { goalSlugs }),
 		})
 	} catch {
@@ -152,11 +134,6 @@ export const readForWidgetBreakdown = async (
 		adapterId: adapter.id,
 		dateRange,
 		rows,
-		provider: result.meta.provider,
-		clamped: result.meta.clamped ?? false,
-		stale: result.meta.stale ?? false,
-		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
-		sampled: result.meta.sampled ?? false,
-		goalsUnresolved: result.meta.goalsUnresolved === true,
+		...readMeta(result),
 	}
 }

@@ -2,7 +2,8 @@ import type { PayloadRequest } from 'payload'
 import type { DimensionKey, MetricKey } from '../core/contract'
 import { type AnalyticsRuntime, resolveGoalsFor } from './runtime'
 
-interface GoalRead {
+/** What a read asks for, which is all the hint needs to know whether goals are involved. */
+export interface GoalRead {
 	metrics: MetricKey[]
 	dimensions?: DimensionKey[]
 }
