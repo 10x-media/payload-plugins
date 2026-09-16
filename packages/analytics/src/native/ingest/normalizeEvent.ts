@@ -54,6 +54,11 @@ export interface StoredEvent {
 	device?: DeviceType
 	browser?: BrowserName
 	os?: OsName
+	/**
+	 * The hit's traffic channel (`TrafficChannel`). Typed as a string because rows written
+	 * before the channel classifier hold a referrer host here instead, and they are never
+	 * rewritten.
+	 */
 	source?: string
 	/** The five campaign keys extracted from the wire `query`; absent when it carried none. */
 	utmSource?: string
@@ -214,7 +219,8 @@ export async function normalizeEvent({
 	const os = classifyOs(ua)
 	const language = primaryLanguage(headers.get('accept-language'))
 	const refHost = referrerHost(raw.referrer, hostname)
-	const utm = extractUtm(queryString(raw.query))
+	const query = queryString(raw.query)
+	const utm = extractUtm(query)
 	// Match on the sanitized fields so a rejected value never reaches a goal's revenue.
 	const completions = goals?.length
 		? matchGoals({ type: raw.type, name, path, props, value }, goals)
@@ -230,7 +236,7 @@ export async function normalizeEvent({
 		...(device ? { device } : {}),
 		...(browser ? { browser } : {}),
 		...(os ? { os } : {}),
-		source: deriveSource(raw.referrer, hostname),
+		source: deriveSource({ referrerHost: refHost, utmMedium: utm.utmMedium, query }),
 		...utm,
 		country: geoValue(geo.country),
 		region: geoValue(geo.region),

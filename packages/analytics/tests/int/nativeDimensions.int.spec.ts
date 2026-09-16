@@ -168,7 +168,9 @@ describeForDb('native dimensions: ingest to breakdowns', { dbs: ['mongo'] }, (db
 			{ 'user-agent': `${CHROME_MAC} internal` }
 		)
 		expect(Object.keys(await breakdown('referrer'))).toEqual(['example.org'])
-		expect(await breakdown('source')).toMatchObject({ Direct: 2 })
+		// The campaign visitors' referrer is external but their `utm_medium` is email, which
+		// outranks it; the plain visitor and this internal hop are the only direct ones.
+		expect(await breakdown('source')).toMatchObject({ direct: 2, email: 2 })
 	})
 
 	it('answers 202 and stores no referrer for a body whose referrer is not a string', async () => {

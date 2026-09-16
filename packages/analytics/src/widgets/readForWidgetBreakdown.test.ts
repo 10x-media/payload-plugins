@@ -37,8 +37,8 @@ const breakdownAdapter = (over: Partial<AnalyticsAdapter> = {}): AnalyticsAdapte
 	async query(_q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
 		return {
 			rows: [
-				{ dimensions: { source: 'google.com' }, metrics: { pageviews: 9 } },
-				{ dimensions: { source: 'Direct' }, metrics: { pageviews: 4 } },
+				{ dimensions: { source: 'search' }, metrics: { pageviews: 9 } },
+				{ dimensions: { source: 'direct' }, metrics: { pageviews: 4 } },
 			],
 			meta: { provider: 'native', fetchedAt: NOW.toISOString() },
 		}
@@ -96,8 +96,8 @@ describe('readForWidgetBreakdown', () => {
 		})
 		expect(result.status).toBe('ok')
 		expect(result.rows).toEqual([
-			{ label: 'google.com', value: 9 },
-			{ label: 'Direct', value: 4 },
+			{ label: 'search', value: 9 },
+			{ label: 'direct', value: 4 },
 		])
 	})
 

@@ -254,9 +254,15 @@ test('@tenancy the native dimension widgets rank rows for the selected tenant', 
 		expect(value).toBeLessThan(unfiltered.get(label) ?? 0)
 	}
 
-	// The view reads the same dimension the referrers widget does, on this tenant's scope.
+	// The sources tab defaults to `source`, which buckets the traffic channel; the host the
+	// referrers widget ranks is the `referrer` dimension beside it, on this tenant's scope.
 	await page.goto(`${origin}/admin/analytics?tab=sources`)
 	const breakdown = page.locator('.analytics-view__breakdown')
+	await expect(breakdown).toBeVisible()
+	await expect(breakdown.getByText('search', { exact: true })).toBeVisible()
+	await expect(breakdown).not.toContainText('localhost')
+
+	await page.goto(`${origin}/admin/analytics?tab=sources&dim=referrer`)
 	await expect(breakdown).toBeVisible()
 	await expect(breakdown.getByText('google.com', { exact: true })).toBeVisible()
 	await expect(breakdown).not.toContainText('localhost')
