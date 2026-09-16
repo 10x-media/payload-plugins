@@ -1,14 +1,9 @@
 import type { Payload } from 'payload'
 import { SEEN_SLUG } from '../collections/seen'
 import { bucketKey } from '../rollups/bucketKey'
-import { bumpRollup } from '../rollups/bumpRollup'
-import {
-	computeRollupDeltas,
-	type RollupInc,
-	type RollupKey,
-	type RollupMetric,
-} from '../rollups/deltas'
-import { insertIfNew } from '../rollups/insertIfNew'
+import { bumpRollups, type RollupBump } from '../rollups/bumpRollups'
+import { computeRollupDeltas, type RollupInc, type RollupKey } from '../rollups/deltas'
+import { insertManyIfNew } from '../rollups/insertManyIfNew'
 import type { StoredEvent } from './normalizeEvent'
 import { writeEvent } from './writeEvent'
 
@@ -23,10 +18,14 @@ interface DistinctCandidate {
 	value: string
 }
 
-// Coalesces a batch of events into the fewest writes: events insert concurrently, base
-// rollup increments are summed per bucket into one upsert each, and distinct visitor /
-// session candidates are de-duplicated within the batch before insert-if-new. Correctness
-// matches the per-event path because the seen ledger still de-dupes across batches.
+/**
+ * Coalesces a batch of events into the fewest writes: events insert concurrently, base rollup
+ * increments are summed per bucket, and distinct visitor / session candidates are de-duplicated
+ * within the batch before one insert-if-new decides which of them the ledger had not seen.
+ * Whatever the batch size, that is three round trips for the rollups and the ledger rather
+ * than one per bucket. Correctness matches the per-event path because the seen ledger still
+ * de-dupes across batches, and its unique index still arbitrates between concurrent writers.
+ */
 export async function flushBatch(payload: Payload, events: StoredEvent[]): Promise<void> {
 	if (events.length === 0) {
 		return
@@ -59,34 +58,29 @@ export async function flushBatch(payload: Payload, events: StoredEvent[]): Promi
 		}
 	}
 
-	for (const agg of base.values()) {
-		await bumpRollup(payload, agg.key, agg.inc)
-	}
+	await bumpRollups(payload, [...base.values()])
 
-	const distinct = new Map<string, { key: RollupKey; metric: RollupMetric; count: number }>()
-	for (const candidate of candidates.values()) {
-		const isNew = await insertIfNew(payload, SEEN_SLUG, {
+	const pending = [...candidates.values()]
+	const isNew = await insertManyIfNew(
+		payload,
+		SEEN_SLUG,
+		pending.map((candidate) => ({
 			bucket: bucketKey(candidate.key),
 			kind: candidate.kind,
 			value: candidate.value,
 			period: candidate.key.period,
-		})
-		if (!isNew) {
-			continue
+		}))
+	)
+	// One increment per ledger row this flush actually created; bumpRollups sums the ones that
+	// land on the same bucket.
+	const distinct: RollupBump[] = []
+	pending.forEach((candidate, index) => {
+		if (isNew[index]) {
+			distinct.push({
+				key: candidate.key,
+				inc: candidate.kind === 'visitor' ? { visitors: 1 } : { sessions: 1 },
+			})
 		}
-		const metric: RollupMetric = candidate.kind === 'visitor' ? 'visitors' : 'sessions'
-		const dk = `${bucketKey(candidate.key)}|${metric}`
-		const entry = distinct.get(dk)
-		if (entry) {
-			entry.count += 1
-		} else {
-			distinct.set(dk, { key: candidate.key, metric, count: 1 })
-		}
-	}
-
-	for (const entry of distinct.values()) {
-		const inc: Partial<Record<RollupMetric, number>> = {}
-		inc[entry.metric] = entry.count
-		await bumpRollup(payload, entry.key, inc)
-	}
+	})
+	await bumpRollups(payload, distinct)
 }
