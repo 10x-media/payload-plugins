@@ -213,6 +213,20 @@ describe('AnalyticsTrendWidget filter', () => {
 		expect(html).not.toContain('analytics-chart')
 	})
 
+	it('holds the caption back when there is no series to caption', async () => {
+		const html = await renderFiltered(
+			[],
+			{
+				metric: 'pageviews',
+				timeframe: 'last7days',
+				filter: { dimension: 'page', operator: 'eq', value: '/blog' },
+			},
+			view
+		)
+		expect(html).not.toContain('analytics:timeframeLast7Days')
+		expect(html).not.toContain('analytics:viewDimensionPage')
+	})
+
 	it('carries the filter into the view link, even where the source cannot apply it', async () => {
 		for (const filters of [['page'] as DimensionKey[], [] as DimensionKey[]]) {
 			const html = await renderFiltered(

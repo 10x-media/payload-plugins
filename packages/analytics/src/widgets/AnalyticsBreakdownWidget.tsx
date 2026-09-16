@@ -73,6 +73,17 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 	})
 
 	const locale = props.req.i18n.language ?? 'en-US'
+
+	if (result.status !== 'ok') {
+		return (
+			<div className="analytics-breakdown-widget" style={cardStyle}>
+				<span style={labelStyle}>{title}</span>
+				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
+				<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
+			</div>
+		)
+	}
+
 	const windowCaption =
 		customRange && timezone
 			? formatRangeCaption(customRange, locale, timezone)
@@ -81,20 +92,16 @@ export default async function AnalyticsBreakdownWidget(props: WidgetServerProps 
 	return (
 		<div className="analytics-breakdown-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>
-			{result.status !== 'ok' ? (
-				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
-			) : (
-				<BarList
-					data={result.rows.map((row) => ({
-						label: row.label,
-						value: row.value,
-						display: formatMetricValue(metric, row.value, locale),
-					}))}
-					emptyLabel={t(keys.stateNoBreakdown)}
-				/>
-			)}
+			<BarList
+				data={result.rows.map((row) => ({
+					label: row.label,
+					value: row.value,
+					display: formatMetricValue(metric, row.value, locale),
+				}))}
+				emptyLabel={t(keys.stateNoBreakdown)}
+			/>
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
-			{result.status === 'ok' && result.clamped ? (
+			{result.clamped ? (
 				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
 					{t(keys.stateClamped)}
 				</span>

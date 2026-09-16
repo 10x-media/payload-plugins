@@ -141,6 +141,18 @@ describe('AnalyticsBreakdownWidget filter', () => {
 		expect(html).not.toContain('analytics:stateUnavailable')
 	})
 
+	it('holds the caption back when there are no rows to caption', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({ status: 'filter-unsupported', rows: [] })
+		)
+		const html = await render('analytics-breakdown-pages', {
+			timeframe: 'last7days',
+			filter: { dimension: 'country', operator: 'eq', value: 'DE' },
+		})
+		expect(html).not.toContain('analytics:timeframeLast7Days')
+		expect(html).not.toContain('analytics:viewDimensionCountry')
+	})
+
 	it('carries the filter into the view link', async () => {
 		const html = await render(
 			'analytics-breakdown-pages',

@@ -203,6 +203,21 @@ describe('AnalyticsMetricWidget', () => {
 		expect(html).not.toContain('>7<')
 	})
 
+	it('holds the caption back when there is no number to caption', async () => {
+		const { req } = bootFakeRuntime(filterableAdapter(['page']))
+		const html = await renderHtml(
+			req,
+			{
+				metric: 'pageviews',
+				timeframe: 'last7days',
+				filter: { dimension: 'country', operator: 'eq', value: 'DE' },
+			},
+			view
+		)
+		expect(html).not.toContain('analytics:timeframeLast7Days')
+		expect(html).not.toContain('analytics:viewDimensionCountry')
+	})
+
 	it('carries the filter into the view link', async () => {
 		const { req } = bootFakeRuntime(filterableAdapter(['country']))
 		const html = await renderHtml(
