@@ -489,13 +489,17 @@ describe('createEngine goal caching', () => {
 		expect(writes).toEqual([300])
 	})
 
-	it('keeps the aggregate ttl when the read carried no goal slugs', async () => {
-		const { store, writes } = recordingStore()
-		await engineOn(store).read(
-			goalAdapter({ provider: 'degraded', fetchedAt: '', goalsUnresolved: true }),
-			{ ...goalQuery, goalSlugs: [] }
-		)
-		expect(writes).toEqual([3600])
+	// Every `goalsUnresolved` answer is a failure: a scope with no goals answers empty rows
+	// instead, so the flag never stands for stable configuration.
+	it('caches a failed goal read for the realtime ttl whatever hint it carried', async () => {
+		for (const goalSlugs of [[], 'unresolved' as const, undefined]) {
+			const { store, writes } = recordingStore()
+			await engineOn(store).read(
+				goalAdapter({ provider: 'degraded', fetchedAt: '', goalsUnresolved: true }),
+				{ ...goalQuery, goalSlugs }
+			)
+			expect(writes).toEqual([300])
+		}
 	})
 
 	it('keeps the aggregate ttl for a goal read the provider answered', async () => {

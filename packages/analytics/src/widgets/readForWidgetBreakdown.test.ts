@@ -242,8 +242,9 @@ describe('readForWidgetBreakdown', () => {
 	})
 
 	// A goal read a resolver could not answer is a read without rows, never a read that
-	// silently counts every event the source has.
-	it('hints nothing but still reads when the goals resolver throws', async () => {
+	// silently counts every event the source has, and never one that shares the cache key of
+	// a scope whose goals resolved.
+	it('hints the failure but still reads when the goals resolver throws', async () => {
 		const seen: AnalyticsQuery[] = []
 		const payload = {} as PayloadRequest['payload']
 		setRuntime(payload, {
@@ -263,7 +264,7 @@ describe('readForWidgetBreakdown', () => {
 			limit: 5,
 			now: NOW,
 		})
-		expect(seen[0]?.goalSlugs).toEqual([])
+		expect(seen[0]?.goalSlugs).toBe('unresolved')
 		expect(result.status).toBe('ok')
 	})
 

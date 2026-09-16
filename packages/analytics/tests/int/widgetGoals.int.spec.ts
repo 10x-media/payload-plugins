@@ -58,7 +58,7 @@ const providerStub = (seen: AnalyticsQuery[]): AnalyticsAdapter => ({
 	query: async (q) => {
 		seen.push(q)
 		const fetchedAt = q.dateRange.end.toISOString()
-		const slugs = q.goalSlugs ?? []
+		const slugs = q.goalSlugs === undefined || q.goalSlugs === 'unresolved' ? [] : q.goalSlugs
 		if ((q.dimensions ?? []).includes('goal')) {
 			if (slugs.length === 0) {
 				return { rows: [], meta: { provider: 'provider-stub', fetchedAt, goalsUnresolved: true } }

@@ -11,7 +11,7 @@ import type {
 	FilterOperator,
 	MetricKey,
 } from '../../core/contract'
-import { goalHint, goalsUnresolvedResult } from '../goalRead'
+import { emptyGoalBreakdown, goalHint, hintFailed, hintSlugs } from '../goalRead'
 import { fetchJson } from '../http/fetchJson'
 import { dayIso } from '../series'
 
@@ -243,6 +243,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			const headers = authHeaders()
 			const goalBreakdown = (q.dimensions ?? []).includes('goal')
 			const hint = goalHint(q)
+			const slugs = hintSlugs(hint)
 			const plan = params(q)
 			let breakdown: ({ dimension: DimensionKey } & UmamiDimension) | undefined
 			for (const dimension of q.dimensions ?? []) {
@@ -255,7 +256,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			// Umami splits an `eq.` value list on commas and offers no escape, so a slug carrying
 			// one cannot be asked for: it is left out of the request and reported, rather than
 			// widening the read to every event.
-			const askable = (hint ?? []).filter((slug) => !slug.includes(','))
+			const askable = (slugs ?? []).filter((slug) => !slug.includes(','))
 			const eventValue = `eq.${askable.join(',')}`
 			// The goal rows come from the `event` param, so a caller's own filter on it would
 			// contradict the hint. The hint wins and that filter is reported unapplied, but only
@@ -263,10 +264,10 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			// does, so its event filter travels with the request as written.
 			const eventFilter = (q.filters ?? []).find((f) => f.dimension === 'event')
 			const readsGoals =
-				goalBreakdown || (!breakdown && q.metrics.includes('conversions') && hint !== null)
+				goalBreakdown || (!breakdown && q.metrics.includes('conversions') && slugs !== null)
 			const unapplied: AnalyticsFilter[] = [
 				...plan.unapplied,
-				...(hint ?? [])
+				...(slugs ?? [])
 					.filter((slug) => slug.includes(','))
 					.map((slug) => ({
 						dimension: 'goal' as const,
@@ -279,10 +280,13 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 					? [eventFilter]
 					: []),
 			]
-			const unresolved = q.metrics.includes('conversions') && !hint
+			const unresolved = q.metrics.includes('conversions') && hintFailed(hint)
 			const unappliedMeta = unapplied.length > 0 ? { unappliedFilters: unapplied } : {}
-			if (goalBreakdown && !hint) {
-				return goalsUnresolvedResult('umami', q, unappliedMeta)
+			const empty = goalBreakdown
+				? emptyGoalBreakdown({ provider: 'umami', q, hint, meta: unappliedMeta })
+				: null
+			if (empty) {
+				return empty
 			}
 			const meta: AnalyticsResult['meta'] = {
 				provider: 'umami',
@@ -350,7 +354,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 						`${base}/websites/${config.websiteId}/stats?${search().toString()}`,
 						{ headers, signal: ctx.signal, provider: 'umami' }
 					),
-					q.metrics.includes('conversions') && hint ? fetchGoalRows() : undefined,
+					q.metrics.includes('conversions') && slugs ? fetchGoalRows() : undefined,
 				])
 				const all: Partial<Record<MetricKey, number>> = {
 					...(goalRows ? { conversions: goalRows.reduce((sum, row) => sum + row.y, 0) } : {}),

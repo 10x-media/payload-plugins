@@ -89,11 +89,14 @@ export interface AnalyticsQuery {
 	timezone?: string
 	/**
 	 * The scope's goal slugs, set by callers that ask for the `goal` dimension or the
-	 * `conversions` metric. Provider adapters restrict goal rows to it, since nothing in a
-	 * provider marks which of its events are this install's goals; the native engine ignores
-	 * it and matches completions itself. Part of the surfacing cache key when set.
+	 * `conversions` metric, and possibly empty when the scope configures no goals. Provider
+	 * adapters restrict goal rows to it, since nothing in a provider marks which of its
+	 * events are this install's goals; the native engine ignores it and matches completions
+	 * itself. `'unresolved'` is the sentinel for a goal resolver that failed: the read keeps
+	 * its site numbers, reports `goalsUnresolved`, and never shares a healthy cache key.
+	 * Part of the surfacing cache key when set.
 	 */
-	goalSlugs?: string[]
+	goalSlugs?: string[] | 'unresolved'
 }
 
 export interface AnalyticsRow {
@@ -118,9 +121,10 @@ export interface AnalyticsResult {
 		 */
 		unappliedFilters?: AnalyticsFilter[]
 		/**
-		 * The read's goal numbers are absent: either it ran without `AnalyticsQuery.goalSlugs`,
-		 * so the source returned no goal rows rather than every event it has, or the provider
-		 * rejected the goal request and the rest of the read was served without it.
+		 * The read's goal numbers are absent because resolving them failed: it ran without
+		 * `AnalyticsQuery.goalSlugs`, or with `'unresolved'`, or the provider rejected the goal
+		 * request and the rest of the read was served without it. A scope that configured no
+		 * goals is an empty result instead, not this flag.
 		 */
 		goalsUnresolved?: true
 	}
