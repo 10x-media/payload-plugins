@@ -1,19 +1,13 @@
 import type { PayloadRequest } from 'payload'
 import { comparisonOf } from '../core/capabilities'
 import type { DateRange } from '../core/contract'
-import { resolveReadContext } from '../core/scopedRead'
-import {
-	type AnalyticsRuntime,
-	getRuntime,
-	resolveGoalsDetailedFor,
-	resolveTimezoneFor,
-} from '../plugin/runtime'
+import { type AnalyticsRuntime, resolveGoalsDetailedFor } from '../plugin/runtime'
 import { MAX_QUERY_LIMIT } from '../query/limits'
-import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
-import { DEFAULT_TIMEZONE } from '../timeframe/tz'
+import type { TimeframePreset } from '../timeframe/presets'
 import { conversionRate } from '../view/conversionRate'
 import { previousWindow, withinLookback } from './comparison'
-import { readForWidget, type WidgetReadStatus } from './readForWidget'
+import { prepareWidgetRead, type WidgetReadStatus } from './prepareWidgetRead'
+import { readForWidget } from './readForWidget'
 import { readForWidgetBreakdown } from './readForWidgetBreakdown'
 
 export interface GoalRow {
@@ -35,8 +29,12 @@ export interface WidgetGoalsResult {
 	rows: GoalRow[]
 	/** Range total the rate divides by; absent when the source does not serve visitors. */
 	siteVisitors?: number
+	/** The source that answered, absent on a read that never reached one. */
+	provider?: string
 	clamped?: boolean
 	stale?: boolean
+	/** True when the source answered without one of the filters a read carried. */
+	filtersUnapplied?: boolean
 	/** True when a read hit the source's event scan cap, so the numbers are a floor. */
 	sampled?: boolean
 	/** True when the source could not read the scope's goals, so the empty table means nothing. */
@@ -104,28 +102,31 @@ export const readForWidgetGoals = async (
 	args: ReadForWidgetGoalsArgs
 ): Promise<WidgetGoalsResult> => {
 	const { req, timeframe, limit, compare, adapterId, now } = args
-	const fallback = (status: WidgetReadStatus, id: string): WidgetGoalsResult => ({
-		status,
-		adapterId: id,
-		dateRange: args.range ?? resolveTimeframe(timeframe, now, args.timezone),
-		timezone: args.timezone ?? DEFAULT_TIMEZONE,
-		rows: [],
-	})
+	const fallback = (
+		status: WidgetReadStatus,
+		id: string,
+		window: { dateRange: DateRange; timezone: string }
+	): WidgetGoalsResult => ({ status, adapterId: id, rows: [], ...window })
 
-	const runtime = getRuntime(req.payload)
-	if (!runtime) {
-		return fallback('unavailable', adapterId ?? '')
+	const prepared = await prepareWidgetRead({
+		req,
+		now,
+		timeframe,
+		adapterId,
+		scope: args.scope,
+		timezone: args.timezone,
+		range: args.range,
+	})
+	if (!prepared.ok) {
+		return fallback(prepared.status, prepared.adapterId, {
+			dateRange: prepared.dateRange,
+			timezone: prepared.tz,
+		})
 	}
-	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
-	if (!ctx.ok) {
-		return fallback('unavailable', adapterId ?? '')
-	}
-	const adapter = ctx.adapter
-	const tz = args.timezone ?? (await resolveTimezoneFor(runtime, req, ctx.scope))
-	const dateRange = args.range ?? resolveTimeframe(timeframe, now, tz)
+	const { runtime, adapter, tz, dateRange } = prepared
 	// The sub-reads resolve their own context; pinning the adapter, scope, timezone and
 	// window keeps all three answering about exactly the same read.
-	const shared = { req, timeframe, adapterId: adapter.id, scope: ctx.scope, timezone: tz, now }
+	const shared = { req, timeframe, adapterId: adapter.id, scope: prepared.scope, timezone: tz, now }
 	const previousRange =
 		compare && runtime.comparison && comparisonOf(adapter.capabilities)
 			? previousWindow(dateRange, tz)
@@ -138,7 +139,7 @@ export const readForWidgetGoals = async (
 
 	// The names are resolved first: their slugs are the hint a provider source restricts its
 	// goal rows to, so both reads below need them before they run.
-	const resolved = await goalNames(runtime, req, ctx.scope)
+	const resolved = await goalNames(runtime, req, prepared.scope)
 	const names = resolved === 'unresolved' ? new Map<string, string>() : resolved
 	const goalSlugs = resolved === 'unresolved' ? 'unresolved' : [...names.keys()]
 	const [breakdown, totals, previous] = await Promise.all([
@@ -168,7 +169,7 @@ export const readForWidgetGoals = async (
 			: undefined,
 	])
 	if (breakdown.status !== 'ok') {
-		return { ...fallback(breakdown.status, breakdown.adapterId), dateRange, timezone: tz }
+		return fallback(breakdown.status, breakdown.adapterId, { dateRange, timezone: tz })
 	}
 
 	const previousBySlug = new Map(
@@ -200,8 +201,12 @@ export const readForWidgetGoals = async (
 		timezone: tz,
 		rows,
 		...(siteVisitors !== undefined ? { siteVisitors } : {}),
+		...(breakdown.provider === undefined ? {} : { provider: breakdown.provider }),
 		clamped: Boolean(breakdown.clamped || totals?.clamped || previous?.clamped),
 		stale: Boolean(breakdown.stale || totals?.stale || previous?.stale),
+		filtersUnapplied: Boolean(
+			breakdown.filtersUnapplied || totals?.filtersUnapplied || previous?.filtersUnapplied
+		),
 		sampled: Boolean(breakdown.sampled || totals?.sampled || previous?.sampled),
 		goalsUnresolved: breakdown.goalsUnresolved === true,
 	}

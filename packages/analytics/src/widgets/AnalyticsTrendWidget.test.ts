@@ -248,3 +248,43 @@ describe('AnalyticsTrendWidget filter', () => {
 		}
 	})
 })
+
+describe('AnalyticsTrendWidget state notices', () => {
+	const renderWith = async (meta: Partial<AnalyticsResult['meta']>): Promise<string> => {
+		const degraded: AnalyticsAdapter = {
+			...adapter,
+			async query(q: AnalyticsQuery): Promise<AnalyticsResult> {
+				return {
+					rows: [{ timestamp: q.dateRange.start.toISOString(), metrics: { pageviews: 4 } }],
+					totals: { pageviews: 4 },
+					meta: { provider: 'native', fetchedAt: NOW.toISOString(), ...meta },
+				}
+			},
+		}
+		const payload = {
+			config: { routes: { admin: '/admin' } },
+		} as unknown as PayloadRequest['payload']
+		setRuntime(payload, {
+			registry: createRegistry([degraded]),
+			configAdapterIds: new Set(['native']),
+			bindings: {},
+			engine: { read: async (a, query) => a.query(query, {}) },
+			ttl: { aggregate: 3600, realtime: 300 },
+			comparison: false,
+		})
+		return renderToStaticMarkup(
+			await AnalyticsTrendWidget({
+				req: { payload, i18n: { t: (key: string) => key, language: 'en' } },
+				widgetData: { metric: 'pageviews', timeframe: 'last7days' },
+			} as unknown as WidgetServerProps)
+		)
+	}
+
+	it('says a series came from an expired cache rather than drawing it silently', async () => {
+		expect(await renderWith({ stale: true })).toContain(keys.viewStale)
+	})
+
+	it('says nothing about caching on a fresh series', async () => {
+		expect(await renderWith({})).not.toContain(keys.viewStale)
+	})
+})

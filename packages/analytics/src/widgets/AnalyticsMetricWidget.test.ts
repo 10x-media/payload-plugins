@@ -236,10 +236,30 @@ describe('AnalyticsMetricWidget', () => {
 		expect(html).toContain('analytics:stateSampled')
 	})
 
-	it('leaves that note off a read the source answered in full', async () => {
+	it('says a conversions total stands on goals the source could not read', async () => {
+		const unresolvedGoals = {
+			...filterableAdapter(['country']),
+			query: () =>
+				Promise.resolve({
+					rows: [],
+					totals: { pageviews: 0 },
+					meta: {
+						provider: 'test',
+						fetchedAt: '2026-06-01T00:00:00.000Z',
+						goalsUnresolved: true,
+					},
+				}),
+		} as unknown as AnalyticsAdapter
+		const { req } = bootFakeRuntime(unresolvedGoals)
+		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
+		expect(html).toContain('analytics:stateGoalsUnresolved')
+	})
+
+	it('leaves both notes off a read the source answered in full', async () => {
 		const { req } = bootFakeRuntime(filterableAdapter(['country']))
 		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
 		expect(html).not.toContain('analytics:stateSampled')
+		expect(html).not.toContain('analytics:stateGoalsUnresolved')
 	})
 
 	it('carries the filter into the view link', async () => {

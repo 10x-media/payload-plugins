@@ -276,7 +276,7 @@ const totals = await readForWidget({
 })
 ```
 
-Both helpers also report `stale: true` when the engine answered from a stale cache entry after a failed provider read (`readForWidgetSeries` does not). Of the built-ins only the goals widget renders a note for it; the metric, trend and breakdown widgets drop it. Yours can render one.
+Every read helper reports the same state flags beside its numbers: `clamped`, `stale` (the engine answered from an expired cache entry after a failed provider read), `filtersUnapplied`, `sampled` (the read hit the source's event scan cap, so the numbers are a floor), `goalsUnresolved`, and the `provider` that answered. Of the built-ins, the trend and goals widgets render a note for `stale` and the metric and breakdown widgets drop it. Yours can render any of them.
 
 ### Drawing a comparison with `TrendChart`
 
