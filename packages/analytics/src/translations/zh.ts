@@ -44,6 +44,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.stateClamped]: '已显示该提供商支持的最大时间范围',
 	[keys.stateFiltersUnapplied]: '此数据源未应用部分筛选条件',
 	[keys.stateGoalsUnresolved]: '无法从此数据源读取目标',
+	[keys.stateSampled]: '数字为近似值：本次读取已达到事件上限',
 	[keys.widgetFieldTitle]: '标题',
 	[keys.widgetFieldMetric]: '指标',
 	[keys.widgetFieldTimeframe]: '时间范围',

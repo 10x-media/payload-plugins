@@ -144,6 +144,11 @@ export default async function AnalyticsTrendWidget(props: WidgetServerProps & Wi
 					{t(keys.stateFiltersUnapplied)}
 				</span>
 			) : null}
+			{result.sampled ? (
+				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
+					{t(keys.stateSampled)}
+				</span>
+			) : null}
 			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
 		</div>
 	)

@@ -21,6 +21,7 @@ const POLL_MS = 15_000
 interface Reading {
 	activeNow: number
 	series: RealtimePoint[]
+	sampled: boolean
 }
 
 type FirstRead = { status: 'loading' } | { status: 'ok'; reading: Reading } | { status: 'error' }
@@ -46,19 +47,32 @@ export function RealtimeStrip({ apiRoute, sourceId, locale }: RealtimeStripProps
 		setFirst({ status: 'loading' })
 		fetch(path, { credentials: 'same-origin', signal: controller.signal })
 			.then((res) => (res.ok ? res.json() : null))
-			.then((data: { status?: string; activeNow?: number; series?: RealtimePoint[] } | null) => {
-				if (controller.signal.aborted) {
-					return
+			.then(
+				(
+					data: {
+						status?: string
+						activeNow?: number
+						series?: RealtimePoint[]
+						sampled?: boolean
+					} | null
+				) => {
+					if (controller.signal.aborted) {
+						return
+					}
+					setFirst(
+						data?.status === 'ok'
+							? {
+									status: 'ok',
+									reading: {
+										activeNow: data.activeNow ?? 0,
+										series: data.series ?? [],
+										sampled: data.sampled === true,
+									},
+								}
+							: { status: 'error' }
+					)
 				}
-				setFirst(
-					data?.status === 'ok'
-						? {
-								status: 'ok',
-								reading: { activeNow: data.activeNow ?? 0, series: data.series ?? [] },
-							}
-						: { status: 'error' }
-				)
-			})
+			)
 			.catch(() => {
 				// A refused or unreachable first read says so, rather than pulsing forever:
 				// without a reading the counter has nothing to mount with and never polls.
@@ -84,12 +98,14 @@ export function RealtimeStrip({ apiRoute, sourceId, locale }: RealtimeStripProps
 					dataSource={sourceId}
 					endpoint={endpoint}
 					initialActiveNow={first.reading.activeNow}
+					initialSampled={first.reading.sampled}
 					initialSeries={first.reading.series}
 					intervalMs={POLL_MS}
 					key={sourceId}
 					locale={locale}
 					metric="visitors"
 					pausedLabel={t(keys.widgetRealtimePaused)}
+					sampledLabel={t(keys.stateSampled)}
 					windowMinutes={WINDOW_MINUTES}
 				/>
 			)}

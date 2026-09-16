@@ -221,6 +221,27 @@ describe('AnalyticsMetricWidget', () => {
 		expect(html).not.toContain('analytics:viewDimensionCountry')
 	})
 
+	it('says the number is approximate when the read hit the source event scan cap', async () => {
+		const sampling = {
+			...filterableAdapter(['country']),
+			query: () =>
+				Promise.resolve({
+					rows: [],
+					totals: { pageviews: 7 },
+					meta: { provider: 'test', fetchedAt: '2026-06-01T00:00:00.000Z', sampled: true },
+				}),
+		} as unknown as AnalyticsAdapter
+		const { req } = bootFakeRuntime(sampling)
+		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
+		expect(html).toContain('analytics:stateSampled')
+	})
+
+	it('leaves that note off a read the source answered in full', async () => {
+		const { req } = bootFakeRuntime(filterableAdapter(['country']))
+		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
+		expect(html).not.toContain('analytics:stateSampled')
+	})
+
 	it('carries the filter into the view link', async () => {
 		const { req } = bootFakeRuntime(filterableAdapter(['country']))
 		const html = await renderHtml(

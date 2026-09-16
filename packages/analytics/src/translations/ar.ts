@@ -44,6 +44,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.stateClamped]: 'يتم عرض أقصى نطاق يدعمه المزود',
 	[keys.stateFiltersUnapplied]: 'لم يطبّق مصدر البيانات هذا بعض عوامل التصفية',
 	[keys.stateGoalsUnresolved]: 'تعذّرت قراءة الأهداف من مصدر البيانات هذا',
+	[keys.stateSampled]: 'الأرقام تقريبية: بلغت القراءة حدّ عدد الأحداث',
 	[keys.widgetFieldTitle]: 'العنوان',
 	[keys.widgetFieldMetric]: 'المقياس',
 	[keys.widgetFieldTimeframe]: 'الفترة الزمنية',

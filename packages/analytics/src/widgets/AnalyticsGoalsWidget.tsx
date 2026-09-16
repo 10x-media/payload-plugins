@@ -177,6 +177,7 @@ export default async function AnalyticsGoalsWidget(props: WidgetServerProps & Wi
 			<span style={captionStyle}>{caption}</span>
 			{result.stale ? <span style={noteStyle}>{t(keys.viewStale)}</span> : null}
 			{result.clamped ? <span style={noteStyle}>{t(keys.stateClamped)}</span> : null}
+			{result.sampled ? <span style={noteStyle}>{t(keys.stateSampled)}</span> : null}
 			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
 		</div>
 	)

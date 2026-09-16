@@ -13,16 +13,29 @@ export interface RealtimeCounterProps {
 	dataSource?: string
 	initialActiveNow: number
 	initialSeries: RealtimePoint[]
+	/** Whether the reading it mounts with hit the source's event scan cap. */
+	initialSampled: boolean
 	locale: string
 	caption: string
 	pausedLabel: string
+	sampledLabel: string
 }
 
 export function RealtimeCounter(props: RealtimeCounterProps) {
-	const { endpoint, intervalMs, metric, windowMinutes, dataSource, locale, caption, pausedLabel } =
-		props
+	const {
+		endpoint,
+		intervalMs,
+		metric,
+		windowMinutes,
+		dataSource,
+		locale,
+		caption,
+		pausedLabel,
+		sampledLabel,
+	} = props
 	const [activeNow, setActiveNow] = useState(props.initialActiveNow)
 	const [series, setSeries] = useState(props.initialSeries)
+	const [sampled, setSampled] = useState(props.initialSampled)
 	const [paused, setPaused] = useState(false)
 
 	useEffect(() => {
@@ -39,10 +52,12 @@ export function RealtimeCounter(props: RealtimeCounterProps) {
 					status: string
 					activeNow: number
 					series: RealtimePoint[]
+					sampled?: boolean
 				}
 				if (cancelled || data.status !== 'ok') return
 				setActiveNow(data.activeNow)
 				setSeries(data.series)
+				setSampled(data.sampled === true)
 				setPaused(false)
 			} catch {
 				if (!cancelled) setPaused(true)
@@ -72,6 +87,11 @@ export function RealtimeCounter(props: RealtimeCounterProps) {
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>
 				{paused ? pausedLabel : caption}
 			</span>
+			{sampled ? (
+				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
+					{sampledLabel}
+				</span>
+			) : null}
 			<TrendChart buckets={points} ariaLabel={caption} minHeight={120} />
 		</>
 	)

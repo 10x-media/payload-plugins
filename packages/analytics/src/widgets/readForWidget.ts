@@ -42,6 +42,8 @@ export interface WidgetReadResult {
 	stale?: boolean
 	/** True when the source answered without one of the filters the read carried. */
 	filtersUnapplied?: boolean
+	/** True when the read hit the source's event scan cap, so the numbers are a floor. */
+	sampled?: boolean
 	/** Previous-window totals, present only when the adapter supports comparison. */
 	previousMetrics?: Partial<Record<MetricKey, number>>
 	/** The previous comparable window, present only when comparison ran. */
@@ -145,6 +147,7 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		clamped: result.meta.clamped ?? false,
 		stale: result.meta.stale ?? false,
 		filtersUnapplied: (result.meta.unappliedFilters?.length ?? 0) > 0,
+		sampled: result.meta.sampled ?? false,
 		previousMetrics,
 		comparisonRange,
 	}
