@@ -155,6 +155,29 @@ export const sharedDashboardLayout: DashboardLayout = [
 		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
 	},
 	{
+		widgetSlug: 'analytics-breakdown-browsers',
+		width: 'medium',
+		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
+	},
+	{
+		// A filter on one of the dimensions the native engine classifies at ingest, so the
+		// filter surface is exercised on a derived value rather than only on a geo one.
+		widgetSlug: 'analytics-breakdown-pages',
+		width: 'medium',
+		data: {
+			title: 'Top pages in Chrome',
+			metric: 'pageviews',
+			timeframe: 'last30days',
+			limit: 5,
+			filter: { dimension: 'browser', operator: 'eq', value: 'chrome' },
+		},
+	},
+	{
+		widgetSlug: 'analytics-breakdown-campaigns',
+		width: 'medium',
+		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
+	},
+	{
 		// The one widget on a window other than the view's own default, so its "Open in
 		// Analytics" link carries a range rather than serializing away to the default.
 		widgetSlug: 'analytics-breakdown-events',
