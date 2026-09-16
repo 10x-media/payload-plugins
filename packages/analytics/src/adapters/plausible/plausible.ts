@@ -125,7 +125,6 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 	const capabilities: AnalyticsCapabilities = {
 		perPageQuery: true,
 		realtime: false,
-		comparison: false,
 		minGranularity: 'day',
 		maxLookbackDays,
 		metrics: plausibleMetrics,

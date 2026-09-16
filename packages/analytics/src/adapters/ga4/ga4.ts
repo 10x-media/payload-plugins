@@ -77,7 +77,6 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 	const capabilities: AnalyticsCapabilities = {
 		perPageQuery: true,
 		realtime: false,
-		comparison: false,
 		minGranularity: 'day',
 		maxLookbackDays,
 		metrics: ga4Metrics,

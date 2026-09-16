@@ -87,7 +87,6 @@ const baseCapabilities: AnalyticsCapabilities = {
 	perPageQuery: true,
 	realtime: true,
 	realtimeWindowMinutes: 60,
-	comparison: true,
 	minGranularity: 'hour',
 	maxLookbackDays: null,
 	metrics,

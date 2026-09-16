@@ -149,7 +149,6 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 	const capabilities: AnalyticsCapabilities = {
 		perPageQuery: true,
 		realtime: false,
-		comparison: false,
 		minGranularity: 'hour',
 		maxLookbackDays,
 		metrics: posthogMetrics,

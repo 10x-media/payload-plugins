@@ -32,10 +32,10 @@ const login = async (payload: Payload, email: string) => {
 
 type ErrorBody = { error: { code: string; message: string; param?: string } }
 
+// No `comparison` key: a provider-shaped source that never declares it still compares.
 const baseCapabilities: AnalyticsCapabilities = {
 	perPageQuery: true,
 	realtime: false,
-	comparison: true,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews', 'visitors']),
@@ -96,6 +96,12 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 							dimensions: new Set(['page']),
 						},
 						pageviews: 7,
+					}),
+					stubAdapter({
+						id: 'lookback',
+						label: 'Short lookback source',
+						capabilities: { maxLookbackDays: 90 },
+						pageviews: 3,
 					}),
 					stubAdapter({ id: 'unconfigured', label: 'Unconfigured source', configured: false }),
 				],
@@ -246,6 +252,20 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 		expect(body.query.dateRange.start).toBe('2026-01-10T00:00:00.000Z')
 		expect(body.comparison).toBeDefined()
 		expect(body.comparison?.meta.fetchedAt).toBe('2026-01-09T23:59:59.999Z')
+	})
+
+	it(`adds the comparison for a provider-shaped source that never declared it on ${db}`, async () => {
+		const body = await okBody(`source=lookback&metrics=pageviews&${RANGE}`)
+		expect(body.capabilities.comparison).toBe(true)
+	})
+
+	it(`400s compare when the previous window predates the source lookback on ${db}`, async () => {
+		const error = await errorBody(
+			`source=lookback&metrics=pageviews&compare=previous&${RANGE}`,
+			400
+		)
+		expect(error).toMatchObject({ code: 'invalid_param', param: 'compare' })
+		expect(error.message).toContain("beyond the source's lookback")
 	})
 
 	it(`accepts a limit at the 500 cap and rejects one above it on ${db}`, async () => {

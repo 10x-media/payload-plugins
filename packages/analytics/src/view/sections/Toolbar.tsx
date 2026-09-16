@@ -8,7 +8,7 @@ import { keys } from '../../translations/keys'
 import { TIMEFRAME_KEYS } from '../../translations/metricKeys'
 import { useTranslation } from '../../translations/useTranslation'
 import { clampDayRange, dayRangeCaption, dayRangeDays } from '../dayRange'
-import type { DayRange, ViewGate } from '../gating'
+import { canCompareRange, type DayRange, type ViewGate } from '../gating'
 import { rangeFor, VIEW_RANGE_PRESETS, type ViewState } from '../state'
 import { FilterChips } from './FilterChips'
 
@@ -180,7 +180,7 @@ export function Toolbar({
 						</div>
 					</>
 				) : null}
-				{gate.canCompare ? (
+				{canCompareRange(gate, range, { timezone, now }) ? (
 					<Button
 						buttonStyle={state.compare ? 'primary' : 'secondary'}
 						className="analytics-view__toggle"

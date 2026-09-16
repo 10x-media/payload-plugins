@@ -125,7 +125,11 @@ export interface AnalyticsCapabilities {
 	perPageQuery: boolean
 	realtime: boolean
 	realtimeWindowMinutes?: number
-	comparison: boolean
+	/**
+	 * Period-over-period comparison, which the engine serves for every source by reading the
+	 * previous window itself. Adapters omit this; set it false only to opt a source out.
+	 */
+	comparison?: boolean
 	minGranularity: Granularity
 	maxLookbackDays: number | null
 	metrics: ReadonlySet<MetricKey>

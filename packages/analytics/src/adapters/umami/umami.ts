@@ -81,7 +81,6 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 	const capabilities: AnalyticsCapabilities = {
 		perPageQuery: true,
 		realtime: false,
-		comparison: false,
 		minGranularity: 'day',
 		maxLookbackDays,
 		metrics: umamiMetrics,

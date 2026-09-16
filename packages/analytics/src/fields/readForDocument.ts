@@ -1,14 +1,14 @@
 import type { PayloadRequest } from 'payload'
 import { resolveHostname, resolvePathCached } from '../binding/resolvePath'
 import type { BindingDoc } from '../binding/types'
-import { satisfiesCapabilities } from '../core/capabilities'
+import { comparisonOf, satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, DateRange, MetricKey } from '../core/contract'
 import { supportsGranularity } from '../core/granularity'
 import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
-import { previousWindow } from '../widgets/comparison'
+import { previousWindow, withinLookback } from '../widgets/comparison'
 import { fillDailySeries, type SeriesPoint } from '../widgets/readForWidgetSeries'
 
 export type FieldReadStatus = 'ok' | 'no-path' | 'not-bound' | 'not-configured' | 'unavailable'
@@ -138,9 +138,14 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 	}
 	const hostname = await resolveHostname(binding, data, bindingCtx)
 	const base = { path, hostname, timezone: tz, scope: ctx.queryScope }
+	const previousRange =
+		args.compare && runtime.comparison && comparisonOf(adapter.capabilities)
+			? previousWindow(dateRange, tz)
+			: null
 	const comparisonRange =
-		args.compare && runtime.comparison && adapter.capabilities.comparison
-			? (previousWindow(dateRange, tz) ?? undefined)
+		previousRange &&
+		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
+			? previousRange
 			: undefined
 	const wantsSeries = args.series && supportsGranularity(adapter.capabilities, 'day')
 	const [result, previous, seriesResult] = await Promise.all([

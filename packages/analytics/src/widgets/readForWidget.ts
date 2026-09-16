@@ -1,5 +1,5 @@
 import type { PayloadRequest } from 'payload'
-import { satisfiesCapabilities } from '../core/capabilities'
+import { comparisonOf, satisfiesCapabilities } from '../core/capabilities'
 import type {
 	AnalyticsAdapter,
 	AnalyticsCapabilities,
@@ -11,7 +11,7 @@ import type {
 import { resolveReadContext } from '../core/scopedRead'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
-import { previousWindow } from './comparison'
+import { previousWindow, withinLookback } from './comparison'
 
 export type WidgetReadStatus = 'ok' | 'not-configured' | 'unavailable' | 'filter-unsupported'
 
@@ -102,9 +102,14 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 	if (!supportsFilters(adapter.capabilities, filters)) {
 		return { status: 'filter-unsupported', adapterId: adapter.id, ...base }
 	}
+	const previousRange =
+		args.comparison !== false && runtime.comparison && comparisonOf(adapter.capabilities)
+			? previousWindow(dateRange, tz)
+			: null
 	const comparisonRange =
-		args.comparison !== false && runtime.comparison && adapter.capabilities.comparison
-			? (previousWindow(dateRange, tz) ?? undefined)
+		previousRange &&
+		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
+			? previousRange
 			: undefined
 	let result: AnalyticsResult
 	let previous: AnalyticsResult | undefined

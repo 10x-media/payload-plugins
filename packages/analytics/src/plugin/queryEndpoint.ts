@@ -10,7 +10,7 @@ import { resolveQueryScope } from '../core/scopedRead'
 import { type QueryError, queryError } from '../query/errors'
 import { parseQueryParams, readParam } from '../query/parse'
 import type { QueryResponse, SerializedAnalyticsQuery } from '../query/response'
-import { previousWindow } from '../widgets/comparison'
+import { previousWindow, withinLookback } from '../widgets/comparison'
 import { QUERY_PATH } from './paths'
 import { resolveSourcesForRequest } from './readContextForRequest'
 import { getRuntime, platformReadGate, readAccessFor, resolveTimezoneFor } from './runtime'
@@ -125,6 +125,20 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 					queryError(
 						'invalid_param',
 						'analytics: the range is too long to compare against a previous period',
+						'compare'
+					)
+				)
+			}
+			if (
+				!withinLookback(comparisonRange, adapter.capabilities.maxLookbackDays, {
+					tz: query.timezone,
+				})
+			) {
+				return errorResponse(
+					400,
+					queryError(
+						'invalid_param',
+						"analytics: the previous period is beyond the source's lookback",
 						'compare'
 					)
 				)

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { SerializedCapabilities } from '../core/capabilities'
-import { DIMENSION_KEYS, FILTER_OPERATORS } from '../core/contract'
+import { type SerializedCapabilities, serializeCapabilities } from '../core/capabilities'
+import { type AnalyticsCapabilities, DIMENSION_KEYS, FILTER_OPERATORS } from '../core/contract'
 import { METRIC_KEYS } from '../translations/metricKeys'
 import {
 	autoGranularity,
@@ -96,6 +96,23 @@ describe('gate', () => {
 		expect(g.canHour).toBe(true)
 		expect(g.realtime).toBe(true)
 		expect(g.goals).toBe(true)
+	})
+
+	it('offers comparison to a source whose adapter never declared the capability', () => {
+		const provider: AnalyticsCapabilities = {
+			perPageQuery: false,
+			realtime: false,
+			minGranularity: 'day',
+			maxLookbackDays: 90,
+			metrics: new Set(['pageviews']),
+			dimensions: new Set(['page']),
+			filters: new Set(),
+			filterOperators: new Set(),
+			batchPageReport: false,
+			rateLimit: null,
+			recommendedTtl: { realtime: 300, aggregate: 3600 },
+		}
+		expect(gate(serializeCapabilities(provider)).canCompare).toBe(true)
 	})
 
 	it('orders metrics canonically regardless of the capability order', () => {

@@ -179,7 +179,6 @@ describeForDb('widget filters against the native adapter', { dbs: ['mongo'] }, (
 const caps = (over: Partial<AnalyticsCapabilities> = {}): AnalyticsCapabilities => ({
 	perPageQuery: false,
 	realtime: false,
-	comparison: false,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews']),

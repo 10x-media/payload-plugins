@@ -1,4 +1,5 @@
 import type { PayloadRequest } from 'payload'
+import { comparisonOf } from '../core/capabilities'
 import type { DateRange } from '../core/contract'
 import { resolveReadContext } from '../core/scopedRead'
 import {
@@ -11,7 +12,7 @@ import { MAX_QUERY_LIMIT } from '../query/limits'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { conversionRate } from '../view/conversionRate'
-import { previousWindow } from './comparison'
+import { previousWindow, withinLookback } from './comparison'
 import { readForWidget, type WidgetReadStatus } from './readForWidget'
 import { readForWidgetBreakdown } from './readForWidgetBreakdown'
 
@@ -120,9 +121,14 @@ export const readForWidgetGoals = async (
 	// The sub-reads resolve their own context; pinning the adapter, scope, timezone and
 	// window keeps all three answering about exactly the same read.
 	const shared = { req, timeframe, adapterId: adapter.id, scope: ctx.scope, timezone: tz, now }
+	const previousRange =
+		compare && runtime.comparison && comparisonOf(adapter.capabilities)
+			? previousWindow(dateRange, tz)
+			: null
 	const comparisonRange =
-		compare && runtime.comparison && adapter.capabilities.comparison
-			? (previousWindow(dateRange, tz) ?? undefined)
+		previousRange &&
+		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
+			? previousRange
 			: undefined
 
 	const [breakdown, totals, previous, names] = await Promise.all([
