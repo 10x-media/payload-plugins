@@ -76,13 +76,17 @@ describe('plausible adapter', () => {
 		])
 	})
 
-	it('declares filters as the mapped-dimension key set, eq-only', () => {
+	it('declares filters as the mapped-dimension key set with every contract operator', () => {
 		const caps = plausible({ siteId: 's', apiKey: 'k' }).capabilities
 		expect(caps.filters).toEqual(caps.dimensions)
-		expect(caps.filterOperators).toEqual(new Set(['eq']))
+		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
 	})
 
-	it('appends an eq filter to the filters array', async () => {
+	it.each([
+		['eq' as const, 'is'],
+		['contains' as const, 'contains'],
+		['matches' as const, 'matches'],
+	])('sends a %s filter as the v2 "%s" clause', async (operator, clause) => {
 		let captured: { filters?: unknown } = {}
 		server.use(
 			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
@@ -95,11 +99,11 @@ describe('plausible adapter', () => {
 			})
 		)
 		const adapter = plausible({ siteId: 'example.com', apiKey: 'k' })
-		await adapter.query(q({ filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }] }), {})
-		expect(captured.filters).toEqual([['is', 'visit:country', ['DE']]])
+		await adapter.query(q({ filters: [{ dimension: 'country', operator, value: 'DE' }] }), {})
+		expect(captured.filters).toEqual([[clause, 'visit:country', ['DE']]])
 	})
 
-	it('drops a filter for an unmapped dimension or unsupported operator', async () => {
+	it('keeps the per-page and hostname clauses on "is" while a filter uses its own operator', async () => {
 		let captured: { filters?: unknown } = {}
 		server.use(
 			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
@@ -114,11 +118,34 @@ describe('plausible adapter', () => {
 		const adapter = plausible({ siteId: 'example.com', apiKey: 'k' })
 		await adapter.query(
 			q({
-				filters: [
-					{ dimension: 'event', operator: 'eq', value: 'signup' },
-					{ dimension: 'country', operator: 'contains', value: 'DE' },
-				],
+				path: '/pricing',
+				hostname: 'a.example.com',
+				filters: [{ dimension: 'page', operator: 'matches', value: '^/docs' }],
 			}),
+			{}
+		)
+		expect(captured.filters).toEqual([
+			['is', 'event:page', ['/pricing']],
+			['is', 'event:hostname', ['a.example.com']],
+			['matches', 'event:page', ['^/docs']],
+		])
+	})
+
+	it('drops a filter for an unmapped dimension', async () => {
+		let captured: { filters?: unknown } = {}
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				captured = (await request.json()) as typeof captured
+				return HttpResponse.json({
+					results: [{ metrics: [1, 1, 1], dimensions: [] }],
+					meta: {},
+					query: {},
+				})
+			})
+		)
+		const adapter = plausible({ siteId: 'example.com', apiKey: 'k' })
+		await adapter.query(
+			q({ filters: [{ dimension: 'event', operator: 'eq', value: 'signup' }] }),
 			{}
 		)
 		expect(captured.filters).toBeUndefined()

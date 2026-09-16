@@ -7,6 +7,7 @@ import type {
 	AnalyticsResult,
 	AnalyticsRow,
 	DimensionKey,
+	FilterOperator,
 	MetricKey,
 } from '../../core/contract'
 import { DEFAULT_TIMEZONE, zonedCalendarDay } from '../../timeframe/tz'
@@ -105,6 +106,14 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 	utmCampaign: 'visit:utm_campaign',
 }
 
+// Stats API v2 filter operators, available on every dimension this adapter maps
+// (event:goal is the one exception in the grammar and is not mapped here).
+const OPERATOR_MAP: Record<FilterOperator, string> = {
+	eq: 'is',
+	contains: 'contains',
+	matches: 'matches',
+}
+
 const plausibleMetrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_MAP) as MetricKey[])
 const plausibleDimensions: ReadonlySet<DimensionKey> = new Set(
 	Object.keys(DIMENSION_MAP) as DimensionKey[]
@@ -130,7 +139,7 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 		metrics: plausibleMetrics,
 		dimensions: plausibleDimensions,
 		filters: plausibleDimensions,
-		filterOperators: new Set(['eq']),
+		filterOperators: new Set(['eq', 'contains', 'matches']),
 		batchPageReport: true,
 		rateLimit: { requestsPerHour: 600 },
 		recommendedTtl: { realtime: 300, aggregate: 3600 },
@@ -158,13 +167,13 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 				filters.push(['is', 'event:hostname', [q.hostname]])
 			}
 			// Capability gating (filters/filterOperators) is the real contract upstream; an
-			// unsupported dimension or operator is dropped here as the safety net.
+			// unsupported dimension is dropped here as the safety net.
 			for (const filter of q.filters ?? []) {
 				const mapped = DIMENSION_MAP[filter.dimension]
-				if (!mapped || filter.operator !== 'eq') {
+				if (!mapped) {
 					continue
 				}
-				filters.push(['is', mapped, [filter.value]])
+				filters.push([OPERATOR_MAP[filter.operator], mapped, [filter.value]])
 			}
 
 			const readRow = (row: { metrics: number[] }): Partial<Record<MetricKey, number>> => {

@@ -72,7 +72,10 @@ describe('ga4 adapter', () => {
 		])
 		expect(req.dateRanges).toEqual([{ startDate: '2026-01-01', endDate: '2026-01-31' }])
 		expect(req.dimensionFilter).toEqual({
-			filter: { fieldName: 'pagePath', stringFilter: { matchType: 'EXACT', value: '/pricing' } },
+			filter: {
+				fieldName: 'pagePath',
+				stringFilter: { matchType: 'EXACT', value: '/pricing', caseSensitive: true },
+			},
 		})
 		expect(result.totals).toEqual({ pageviews: 48312, visitors: 19847, avgDuration: 143821 })
 		expect(result.meta.provider).toBe('ga4')
@@ -95,13 +98,13 @@ describe('ga4 adapter', () => {
 					{
 						filter: {
 							fieldName: 'pagePath',
-							stringFilter: { matchType: 'EXACT', value: '/pricing' },
+							stringFilter: { matchType: 'EXACT', value: '/pricing', caseSensitive: true },
 						},
 					},
 					{
 						filter: {
 							fieldName: 'hostName',
-							stringFilter: { matchType: 'EXACT', value: 'a.example.com' },
+							stringFilter: { matchType: 'EXACT', value: 'a.example.com', caseSensitive: true },
 						},
 					},
 				],
@@ -120,18 +123,22 @@ describe('ga4 adapter', () => {
 		expect(sentRequest().dimensionFilter).toEqual({
 			filter: {
 				fieldName: 'hostName',
-				stringFilter: { matchType: 'EXACT', value: 'a.example.com' },
+				stringFilter: { matchType: 'EXACT', value: 'a.example.com', caseSensitive: true },
 			},
 		})
 	})
 
-	it('declares filters as the mapped-dimension key set, eq-only', () => {
+	it('declares filters as the mapped-dimension key set with every contract operator', () => {
 		const caps = ga4(config).capabilities
 		expect(caps.filters).toEqual(caps.dimensions)
-		expect(caps.filterOperators).toEqual(new Set(['eq']))
+		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
 	})
 
-	it('adds an eq filter as an additional dimensionFilter expression', async () => {
+	it.each([
+		['eq' as const, 'EXACT'],
+		['contains' as const, 'CONTAINS'],
+		['matches' as const, 'FULL_REGEXP'],
+	])('sends a %s filter as a case-sensitive %s stringFilter', async (operator, matchType) => {
 		runReport.mockResolvedValue([
 			{
 				metricHeaders: [{ name: 'screenPageViews', type: 'TYPE_INTEGER' }],
@@ -141,12 +148,15 @@ describe('ga4 adapter', () => {
 		await ga4(config).query(
 			q({
 				metrics: ['pageviews'],
-				filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }],
+				filters: [{ dimension: 'country', operator, value: 'DE' }],
 			}),
 			{}
 		)
 		expect(sentRequest().dimensionFilter).toEqual({
-			filter: { fieldName: 'countryId', stringFilter: { matchType: 'EXACT', value: 'DE' } },
+			filter: {
+				fieldName: 'countryId',
+				stringFilter: { matchType, value: 'DE', caseSensitive: true },
+			},
 		})
 	})
 
@@ -171,16 +181,21 @@ describe('ga4 adapter', () => {
 					{
 						filter: {
 							fieldName: 'pagePath',
-							stringFilter: { matchType: 'EXACT', value: '/pricing' },
+							stringFilter: { matchType: 'EXACT', value: '/pricing', caseSensitive: true },
 						},
 					},
-					{ filter: { fieldName: 'countryId', stringFilter: { matchType: 'EXACT', value: 'DE' } } },
+					{
+						filter: {
+							fieldName: 'countryId',
+							stringFilter: { matchType: 'EXACT', value: 'DE', caseSensitive: true },
+						},
+					},
 				],
 			},
 		})
 	})
 
-	it('drops a filter for an unmapped dimension or unsupported operator', async () => {
+	it('drops a filter for an unmapped dimension', async () => {
 		runReport.mockResolvedValue([
 			{
 				metricHeaders: [{ name: 'screenPageViews', type: 'TYPE_INTEGER' }],
@@ -190,7 +205,7 @@ describe('ga4 adapter', () => {
 		await ga4(config).query(
 			q({
 				metrics: ['pageviews'],
-				filters: [{ dimension: 'country', operator: 'contains', value: 'DE' }],
+				filters: [{ dimension: 'goal', operator: 'eq', value: 'signup' }],
 			}),
 			{}
 		)

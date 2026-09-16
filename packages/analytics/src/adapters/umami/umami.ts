@@ -7,6 +7,7 @@ import type {
 	AnalyticsResult,
 	AnalyticsRow,
 	DimensionKey,
+	FilterOperator,
 	MetricKey,
 } from '../../core/contract'
 import { fetchJson } from '../http/fetchJson'
@@ -64,7 +65,35 @@ const umamiMetrics: ReadonlySet<MetricKey> = new Set<MetricKey>([
 	'bounceRate',
 	'avgDuration',
 ])
-const umamiDimensions: ReadonlySet<DimensionKey> = new Set<DimensionKey>(['page'])
+
+// Contract dimension -> Umami filter param, which doubles as the /metrics `type` value.
+const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
+	page: 'path',
+	referrer: 'referrer',
+	browser: 'browser',
+	os: 'os',
+	device: 'device',
+	country: 'country',
+	region: 'region',
+	city: 'city',
+	language: 'language',
+	event: 'event',
+	utmSource: 'utmSource',
+	utmMedium: 'utmMedium',
+	utmCampaign: 'utmCampaign',
+	utmContent: 'utmContent',
+	utmTerm: 'utmTerm',
+}
+
+const OPERATOR_PREFIX: Record<FilterOperator, string> = {
+	eq: 'eq.',
+	contains: 'c.',
+	matches: 're.',
+}
+
+const umamiDimensions: ReadonlySet<DimensionKey> = new Set(
+	Object.keys(DIMENSION_MAP) as DimensionKey[]
+)
 
 interface UmamiStats {
 	pageviews: number
@@ -74,6 +103,11 @@ interface UmamiStats {
 	totaltime: number
 }
 
+/**
+ * Targets Umami 3.x (cloud and self-hosted): filter values carry an operator prefix, and
+ * `eq.` is always written explicitly so a value starting with `c.` or `re.` is not read as
+ * an operator. Umami splits an `eq.` value on commas into a value list, with no escape.
+ */
 export function umami(config: UmamiConfig): AnalyticsAdapter {
 	const base = config.host ?? CLOUD_BASE
 	const maxLookbackDays = config.maxLookbackDays !== undefined ? config.maxLookbackDays : 730
@@ -85,16 +119,13 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		maxLookbackDays,
 		metrics: umamiMetrics,
 		dimensions: umamiDimensions,
-		filters: new Set(),
-		filterOperators: new Set(['eq']),
+		filters: umamiDimensions,
+		filterOperators: new Set(['eq', 'contains', 'matches']),
 		batchPageReport: true,
 		rateLimit: null,
 		recommendedTtl: { realtime: 300, aggregate: 3600 },
 	}
 	// Cloud authenticates with x-umami-api-key; self-hosted with a bearer token.
-	// NOTE: the cloud header name and the per-URL `path` filter (set in params(), also
-	// sent to /metrics) match the documented v2 shape but are unvalidated against a live
-	// instance; confirm both before relying on per-URL provider data in production.
 	const authHeaders = (): Record<string, string> =>
 		config.apiKey
 			? { 'x-umami-api-key': config.apiKey }
@@ -107,8 +138,16 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			startAt: String(q.dateRange.start.getTime()),
 			endAt: String(q.dateRange.end.getTime()),
 		})
+		for (const filter of q.filters ?? []) {
+			const param = DIMENSION_MAP[filter.dimension]
+			if (param) {
+				p.set(param, `${OPERATOR_PREFIX[filter.operator]}${filter.value}`)
+			}
+		}
+		// Written last: Umami takes one value per param, so a per-page read stays scoped to
+		// its page even when the caller also filters on `page`.
 		if (q.path) {
-			p.set('path', q.path)
+			p.set('path', `eq.${q.path}`)
 		}
 		return p
 	}
@@ -122,20 +161,26 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()
 			const headers = authHeaders()
-			const wantsPageBreakdown = (q.dimensions ?? []).includes('page')
+			const breakdownDim = (q.dimensions ?? []).find((d) => DIMENSION_MAP[d])
 
-			if (wantsPageBreakdown) {
+			if (breakdownDim) {
 				const p = params(q)
-				p.set('type', 'url')
+				p.set('type', DIMENSION_MAP[breakdownDim] as string)
 				const data = await fetchJson<Array<{ x: string; y: number }>>(
 					`${base}/websites/${config.websiteId}/metrics?${p.toString()}`,
 					{ headers, signal: ctx.signal, provider: 'umami' }
 				)
-				const metric: MetricKey = q.metrics.includes('pageviews') ? 'pageviews' : 'visitors'
-				const rows: AnalyticsRow[] = data.map((row) => ({
-					dimensions: { page: row.x },
-					metrics: { [metric]: row.y } as Partial<Record<MetricKey, number>>,
-				}))
+				// /metrics reports exactly one number per row: distinct sessions (visitors) on
+				// pageview-type rows, and event occurrences on `type=event` rows. Any other
+				// requested metric is omitted rather than labelled with a number it is not.
+				const available: MetricKey = breakdownDim === 'event' ? 'events' : 'visitors'
+				const rows: AnalyticsRow[] = data.map((row) => {
+					const dimensions: Partial<Record<DimensionKey, string>> = { [breakdownDim]: row.x }
+					const metrics: Partial<Record<MetricKey, number>> = q.metrics.includes(available)
+						? { [available]: row.y }
+						: {}
+					return { dimensions, metrics }
+				})
 				return { rows, totals: undefined, meta: { provider: 'umami', fetchedAt } }
 			}
 

@@ -7,6 +7,7 @@ import type {
 	AnalyticsResult,
 	AnalyticsRow,
 	DimensionKey,
+	FilterOperator,
 	MetricKey,
 } from '../../core/contract'
 import { DEFAULT_TIMEZONE, zonedCalendarDay } from '../../timeframe/tz'
@@ -54,6 +55,24 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 	event: 'eventName',
 }
 
+type StringMatchType = 'EXACT' | 'CONTAINS' | 'FULL_REGEXP'
+
+const MATCH_TYPE_MAP: Record<FilterOperator, StringMatchType> = {
+	eq: 'EXACT',
+	contains: 'CONTAINS',
+	matches: 'FULL_REGEXP',
+}
+
+// caseSensitive is explicit on every string filter: the Data API defaults it to false, and
+// the contract's operators are case-sensitive on the other providers.
+const stringFilter = (
+	fieldName: string,
+	matchType: StringMatchType,
+	value: string
+): protos.google.analytics.data.v1beta.IFilterExpression => ({
+	filter: { fieldName, stringFilter: { matchType, value, caseSensitive: true } },
+})
+
 const ga4Metrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_MAP) as MetricKey[])
 const ga4Dimensions: ReadonlySet<DimensionKey> = new Set(
 	Object.keys(DIMENSION_MAP) as DimensionKey[]
@@ -82,7 +101,7 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 		metrics: ga4Metrics,
 		dimensions: ga4Dimensions,
 		filters: ga4Dimensions,
-		filterOperators: new Set(['eq']),
+		filterOperators: new Set(['eq', 'contains', 'matches']),
 		batchPageReport: true,
 		rateLimit: { maxConcurrent: 10, quotaModel: 'tokens', readsCountAsUsage: true },
 		recommendedTtl: { realtime: 300, aggregate: 21600 },
@@ -140,28 +159,19 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 
 			const filterExprs: protos.google.analytics.data.v1beta.IFilterExpression[] = []
 			if (q.path) {
-				filterExprs.push({
-					filter: { fieldName: 'pagePath', stringFilter: { matchType: 'EXACT', value: q.path } },
-				})
+				filterExprs.push(stringFilter('pagePath', 'EXACT', q.path))
 			}
 			if (q.hostname) {
-				filterExprs.push({
-					filter: {
-						fieldName: 'hostName',
-						stringFilter: { matchType: 'EXACT', value: q.hostname },
-					},
-				})
+				filterExprs.push(stringFilter('hostName', 'EXACT', q.hostname))
 			}
 			// Capability gating (filters/filterOperators) is the real contract upstream; an
-			// unsupported dimension or operator is dropped here as the safety net.
+			// unsupported dimension is dropped here as the safety net.
 			for (const filter of q.filters ?? []) {
 				const fieldName = DIMENSION_MAP[filter.dimension]
-				if (!fieldName || filter.operator !== 'eq') {
+				if (!fieldName) {
 					continue
 				}
-				filterExprs.push({
-					filter: { fieldName, stringFilter: { matchType: 'EXACT', value: filter.value } },
-				})
+				filterExprs.push(stringFilter(fieldName, MATCH_TYPE_MAP[filter.operator], filter.value))
 			}
 			const dimensionFilter =
 				filterExprs.length === 0

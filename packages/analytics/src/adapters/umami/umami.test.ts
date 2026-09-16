@@ -37,7 +37,7 @@ describe('umami adapter', () => {
 				expect(request.headers.get('x-umami-api-key')).toBe('k')
 				const url = new URL(request.url)
 				expect(url.searchParams.get('startAt')).toBe(String(Date.UTC(2026, 0, 1)))
-				expect(url.searchParams.get('path')).toBe('/pricing')
+				expect(url.searchParams.get('path')).toBe('eq./pricing')
 				return HttpResponse.json({
 					pageviews: 1000,
 					visitors: 400,
@@ -58,11 +58,11 @@ describe('umami adapter', () => {
 		expect(result.meta.provider).toBe('umami')
 	})
 
-	it('reads a self-hosted host with a bearer token and maps a page breakdown', async () => {
+	it('reads a self-hosted host with a bearer token and maps a page breakdown on type=path', async () => {
 		server.use(
 			http.get('https://a.io/api/websites/w/metrics', ({ request }) => {
 				expect(request.headers.get('authorization')).toBe('Bearer t')
-				expect(new URL(request.url).searchParams.get('type')).toBe('url')
+				expect(new URL(request.url).searchParams.get('type')).toBe('path')
 				return HttpResponse.json([
 					{ x: '/a', y: 12 },
 					{ x: '/b', y: 8 },
@@ -75,6 +75,99 @@ describe('umami adapter', () => {
 			{ dimensions: { page: '/a' }, metrics: { visitors: 12 } },
 			{ dimensions: { page: '/b' }, metrics: { visitors: 8 } },
 		])
+	})
+
+	it('breaks down on the first mapped dimension, using its own umami type', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/metrics', ({ request }) => {
+				expect(new URL(request.url).searchParams.get('type')).toBe('browser')
+				return HttpResponse.json([{ x: 'chrome', y: 7 }])
+			})
+		)
+		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({ metrics: ['visitors'], dimensions: ['goal', 'browser'] }),
+			{}
+		)
+		expect(result.rows).toEqual([{ dimensions: { browser: 'chrome' }, metrics: { visitors: 7 } }])
+	})
+
+	it('omits a breakdown metric /metrics cannot report rather than mislabelling y', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/metrics', () =>
+				HttpResponse.json([{ x: '/a', y: 12 }])
+			)
+		)
+		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({ metrics: ['pageviews'], dimensions: ['page'] }),
+			{}
+		)
+		expect(result.rows).toEqual([{ dimensions: { page: '/a' }, metrics: {} }])
+	})
+
+	it('reports event-breakdown rows as events, since y counts occurrences', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/metrics', ({ request }) => {
+				expect(new URL(request.url).searchParams.get('type')).toBe('event')
+				return HttpResponse.json([{ x: 'signup', y: 30 }])
+			})
+		)
+		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({ metrics: ['events'], dimensions: ['event'] }),
+			{}
+		)
+		expect(result.rows).toEqual([{ dimensions: { event: 'signup' }, metrics: { events: 30 } }])
+	})
+
+	it('declares filters as the mapped-dimension key set with every contract operator', () => {
+		const caps = umami({ websiteId: 'w', apiKey: 'k' }).capabilities
+		expect(caps.filters).toEqual(caps.dimensions)
+		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
+	})
+
+	it.each([
+		['eq' as const, 'eq.DE'],
+		['contains' as const, 'c.DE'],
+		['matches' as const, 're.DE'],
+	])('sends a %s filter as the "%s" query value', async (operator, expected) => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/stats', ({ request }) => {
+				expect(new URL(request.url).searchParams.get('country')).toBe(expected)
+				return HttpResponse.json({
+					pageviews: 1,
+					visitors: 1,
+					visits: 1,
+					bounces: 0,
+					totaltime: 0,
+				})
+			})
+		)
+		await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({ metrics: ['pageviews'], filters: [{ dimension: 'country', operator, value: 'DE' }] }),
+			{}
+		)
+	})
+
+	it('carries filters onto the breakdown request and drops an unmapped dimension', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/metrics', ({ request }) => {
+				const url = new URL(request.url)
+				expect(url.searchParams.get('type')).toBe('path')
+				expect(url.searchParams.get('utmSource')).toBe('c.news')
+				expect(url.searchParams.get('goal')).toBeNull()
+				return HttpResponse.json([{ x: '/a', y: 3 }])
+			})
+		)
+		await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({
+				metrics: ['visitors'],
+				dimensions: ['page'],
+				filters: [
+					{ dimension: 'utmSource', operator: 'contains', value: 'news' },
+					{ dimension: 'goal', operator: 'eq', value: 'signup' },
+				],
+			}),
+			{}
+		)
 	})
 
 	it('omits derived bounceRate and avgDuration when there are no visits', async () => {
