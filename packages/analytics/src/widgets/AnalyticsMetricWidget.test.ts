@@ -255,6 +255,24 @@ describe('AnalyticsMetricWidget', () => {
 		expect(html).toContain('analytics:stateGoalsUnresolved')
 	})
 
+	it('says no goals are configured when a conversions total has none behind it', async () => {
+		const base = filterableAdapter(['country'])
+		const goalless = {
+			...base,
+			capabilities: { ...base.capabilities, metrics: new Set(['pageviews', 'conversions']) },
+			query: () =>
+				Promise.resolve({
+					rows: [],
+					totals: { conversions: 0 },
+					meta: { provider: 'test', fetchedAt: '2026-06-01T00:00:00.000Z' },
+				}),
+		} as unknown as AnalyticsAdapter
+		const { req } = bootFakeRuntime(goalless)
+		const html = await renderHtml(req, { metric: 'conversions', timeframe: 'last7days' }, view)
+		expect(html).toContain('analytics:stateNoGoals')
+		expect(html).not.toContain('analytics:stateGoalsUnresolved')
+	})
+
 	it('leaves both notes off a read the source answered in full', async () => {
 		const { req } = bootFakeRuntime(filterableAdapter(['country']))
 		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)

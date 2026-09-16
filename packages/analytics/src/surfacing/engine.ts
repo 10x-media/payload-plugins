@@ -112,7 +112,8 @@ export function createEngine(opts: EngineOptions): Engine {
 					: fresh
 				// `goalsUnresolved` is always a failure to resolve, whatever hint the read carried:
 				// a scope with no goals answers empty rows unflagged. At the aggregate TTL one
-				// transient error would pin "no conversions" for an hour.
+				// transient error would pin "no conversions" for an hour. A direct engine caller
+				// that never hints is flagged on every read and so stays at the short TTL.
 				const degraded = result.meta.goalsUnresolved === true
 				const ttl = degraded
 					? (opts.ttl.realtime ?? adapter.capabilities.recommendedTtl.realtime)
