@@ -14,6 +14,7 @@ import {
 	filterField,
 	widgetFilters,
 } from './filterField'
+import type { WidgetFilter } from './types'
 
 const subField = (group: NamedGroupField, name: string): TextField => {
 	const found = group.fields.find((f: Field) => 'name' in f && f.name === name)
@@ -160,5 +161,25 @@ describe('widgetFilters', () => {
 
 	it('never returns more than the one filter a widget can hold', () => {
 		expect(widgetFilters({ filter: { dimension: 'page', value: '/a' } })).toHaveLength(1)
+	})
+
+	it('returns nothing for a dimension the contract does not define', () => {
+		const stored = { filter: { dimension: 'countrey', value: 'DE' } } as unknown as {
+			filter: WidgetFilter
+		}
+		expect(widgetFilters(stored)).toEqual([])
+	})
+
+	it('falls back to eq for an operator the contract does not define', () => {
+		const stored = (operator: string) =>
+			({ filter: { dimension: 'country', operator, value: 'DE' } }) as unknown as {
+				filter: WidgetFilter
+			}
+		expect(widgetFilters(stored(''))).toEqual([
+			{ dimension: 'country', operator: 'eq', value: 'DE' },
+		])
+		expect(widgetFilters(stored('startsWith'))).toEqual([
+			{ dimension: 'country', operator: 'eq', value: 'DE' },
+		])
 	})
 })

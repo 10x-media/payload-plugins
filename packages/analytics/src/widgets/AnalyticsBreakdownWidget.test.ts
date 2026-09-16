@@ -123,6 +123,29 @@ describe('AnalyticsBreakdownWidget filter', () => {
 		expect(vi.mocked(readForWidgetBreakdown).mock.calls[0]?.[0].filters).toEqual([])
 	})
 
+	it('renders the unfiltered widget for a dimension the contract does not define', async () => {
+		const html = await render('analytics-breakdown-pages', {
+			timeframe: 'last7days',
+			filter: { dimension: 'countrey', value: 'DE' },
+		} as unknown as BreakdownWidgetData)
+		expect(vi.mocked(readForWidgetBreakdown).mock.calls[0]?.[0].filters).toEqual([])
+		expect(html).toContain('analytics:timeframeLast7Days')
+		expect(html).not.toContain('countrey')
+	})
+
+	it('reads an operator the contract does not define as eq', async () => {
+		const html = await render('analytics-breakdown-pages', {
+			timeframe: 'last7days',
+			filter: { dimension: 'country', operator: '', value: 'DE' },
+		} as unknown as BreakdownWidgetData)
+		expect(vi.mocked(readForWidgetBreakdown).mock.calls[0]?.[0].filters).toEqual([
+			{ dimension: 'country', operator: 'eq', value: 'DE' },
+		])
+		expect(html).toContain(
+			'analytics:timeframeLast7Days where analytics:viewDimensionCountry analytics:filterOperatorEq DE'
+		)
+	})
+
 	it('appends the filter sentence to the caption', async () => {
 		const html = await render('analytics-breakdown-pages', {
 			timeframe: 'last7days',

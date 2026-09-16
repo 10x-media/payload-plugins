@@ -36,11 +36,6 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps & W
 	const locale = props.req.i18n.language ?? 'en-US'
 	const title = data.title?.trim() || t(METRIC_KEYS[metric])
 	const filters = widgetFilters(data)
-	const windowCaption =
-		customRange && timezone
-			? formatRangeCaption(customRange, locale, timezone)
-			: t(TIMEFRAME_KEYS[timeframe])
-	const caption = captionWithFilter(windowCaption, filters[0], t)
 	const result = await readForWidget({
 		req: props.req,
 		metrics: [metric],
@@ -72,6 +67,11 @@ export default async function AnalyticsMetricWidget(props: WidgetServerProps & W
 		)
 	}
 
+	const windowCaption =
+		customRange && timezone
+			? formatRangeCaption(customRange, locale, timezone)
+			: t(TIMEFRAME_KEYS[timeframe])
+	const caption = captionWithFilter(windowCaption, filters[0], t)
 	const value = result.metrics[metric]
 	return (
 		<div className="analytics-metric-widget" style={cardStyle}>

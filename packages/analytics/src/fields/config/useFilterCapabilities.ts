@@ -56,8 +56,10 @@ export const deriveFilterCapabilities = (args: {
 
 /**
  * Filter capabilities for the source a widget's config form currently points at, read
- * from the sibling source field through form state so it stays correct inside blocks and
- * arrays. `dataSourcePath` names that sibling for custom widgets that spell it differently.
+ * from that field's value in form state. `dataSourcePath` is a form path, not a relative
+ * sibling lookup: it defaults to the top-level `dataSource` the widget config forms use,
+ * and a custom widget whose source field sits elsewhere passes its own path, exactly as
+ * `MetricSelectField` does.
  */
 export const useFilterCapabilities = (dataSourcePath = 'dataSource'): FilterCapabilities => {
 	const { error, loading, sources } = useAnalyticsSources()

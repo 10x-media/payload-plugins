@@ -1,5 +1,5 @@
 import type { NamedGroupField, TextFieldSingleValidation } from 'payload'
-import type { AnalyticsFilter } from '../core/contract'
+import { type AnalyticsFilter, DIMENSION_KEYS, FILTER_OPERATORS } from '../core/contract'
 import { MAX_QUERY_FILTER_VALUE_LENGTH } from '../query/limits'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
@@ -27,17 +27,22 @@ const validateValue: TextFieldSingleValidation = (value, { req, siblingData }) =
  * The stored group as query filters: one entry, or none at all. A group without both a
  * dimension and a value is still being configured, and the value is stored exactly as it
  * was typed, so the query's own trimming and cap are applied here rather than assumed.
+ *
+ * Both keys are text fields the pickers fill, so a hand-edited layout or a widget saved
+ * against an older contract can hold anything. A dimension the contract does not define
+ * has no label to caption it with, so it is no filter at all; an undefined operator falls
+ * back to `eq`, the field's own default.
  */
 export const widgetFilters = (data: { filter?: WidgetFilter }): AnalyticsFilter[] => {
 	const { dimension, operator, value } = data.filter ?? {}
 	const trimmed = typeof value === 'string' ? value.trim() : ''
-	if (!dimension || trimmed === '') {
+	if (!dimension || !DIMENSION_KEYS.includes(dimension) || trimmed === '') {
 		return []
 	}
 	return [
 		{
 			dimension,
-			operator: operator ?? 'eq',
+			operator: operator && FILTER_OPERATORS.includes(operator) ? operator : 'eq',
 			value: trimmed.slice(0, MAX_QUERY_FILTER_VALUE_LENGTH),
 		},
 	]
