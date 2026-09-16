@@ -296,6 +296,32 @@ describe('Breakdowns rows', () => {
 		expect(onLimitChange).toHaveBeenCalledWith(50)
 	})
 
+	it('charts a metric the rows carry when the selected one is not among them', () => {
+		// A Umami-shaped answer: /metrics reports visitors per row and nothing else, so the
+		// pageviews column the view asked for has no number on any row.
+		const umamiRows: AnalyticsRow[] = [
+			{ dimensions: { page: '/pricing' }, metrics: { visitors: 90 } },
+			{ dimensions: { page: '/about' }, metrics: { visitors: 40 } },
+		]
+		renderBreakdowns({
+			query: state({
+				data: {
+					...answer(),
+					result: {
+						rows: umamiRows,
+						meta: { provider: 'umami', fetchedAt: '2026-09-14T00:00:00.000Z' },
+					},
+				},
+			}),
+		})
+		expect(document.querySelector('.analytics-view__sort--metric')?.textContent).toBe(
+			METRIC_KEYS.visitors
+		)
+		expect(document.querySelector('.analytics-view__sort--secondary')).toBeNull()
+		expect(screen.getByText('90')).toBeDefined()
+		expect(screen.queryByText('0')).toBeNull()
+	})
+
 	it('shows the empty copy when the read came back with no rows', () => {
 		const empty = state({
 			data: {

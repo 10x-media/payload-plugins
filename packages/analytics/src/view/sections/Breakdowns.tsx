@@ -80,7 +80,15 @@ export function Breakdowns({
 	const rows =
 		dimension === null ? [] : served.filter((row) => row.dimensions?.[dimension] !== undefined)
 	const answered = dimension === null || served.length === 0 || rows.length > 0
-	const servesSecondary = rows.some((row) => row.metrics[SECONDARY] !== undefined)
+	const carried = (candidate: MetricKey): boolean =>
+		rows.some((row) => row.metrics[candidate] !== undefined)
+	// A source can group by a dimension without serving the selected metric per row (Umami's
+	// /metrics reports visitors and nothing else), so the list charts the first metric of the
+	// read that some row carries rather than a run of zeros under the wrong name.
+	const charted = carried(metric)
+		? metric
+		: ((query.data?.query.metrics ?? []).find(carried) ?? metric)
+	const servesSecondary = carried(SECONDARY)
 	const dimensionLabel = dimension === null ? t(TAB_LABELS[tab]) : t(DIMENSION_LABELS[dimension])
 
 	const onStripKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
@@ -156,14 +164,14 @@ export function Breakdowns({
 						<div className="analytics-view__bars-head">
 							<span className="analytics-view__bars-head-dimension">{dimensionLabel}</span>
 							<button
-								aria-pressed={order?.metric === metric}
+								aria-pressed={order?.metric === charted}
 								className="analytics-view__sort analytics-view__sort--metric"
-								onClick={() => sortBy(metric)}
+								onClick={() => sortBy(charted)}
 								type="button"
 							>
-								{sortLabel(metric)}
+								{sortLabel(charted)}
 							</button>
-							{servesSecondary && metric !== SECONDARY ? (
+							{servesSecondary && charted !== SECONDARY ? (
 								<button
 									aria-pressed={order?.metric === SECONDARY}
 									className="analytics-view__sort analytics-view__sort--secondary"
@@ -176,13 +184,13 @@ export function Breakdowns({
 						</div>
 						<BarList
 							data={rows.map((row) => {
-								const value = row.metrics[metric] ?? 0
+								const value = row.metrics[charted] ?? 0
 								const secondary =
-									servesSecondary && metric !== SECONDARY ? row.metrics[SECONDARY] : undefined
+									servesSecondary && charted !== SECONDARY ? row.metrics[SECONDARY] : undefined
 								return {
 									label: (dimension === null ? undefined : row.dimensions?.[dimension]) ?? '',
 									value,
-									display: formatMetricValue(metric, value, locale),
+									display: formatMetricValue(charted, value, locale),
 									...(secondary === undefined
 										? {}
 										: { secondary: formatMetricValue(SECONDARY, secondary, locale) }),

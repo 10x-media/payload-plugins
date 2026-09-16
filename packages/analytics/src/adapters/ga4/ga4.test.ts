@@ -135,10 +135,10 @@ describe('ga4 adapter', () => {
 	})
 
 	it.each([
-		['eq' as const, 'EXACT'],
-		['contains' as const, 'CONTAINS'],
-		['matches' as const, 'FULL_REGEXP'],
-	])('sends a %s filter as a case-sensitive %s stringFilter', async (operator, matchType) => {
+		['eq' as const, 'EXACT', true],
+		['contains' as const, 'CONTAINS', false],
+		['matches' as const, 'FULL_REGEXP', true],
+	])('sends a %s filter as a %s stringFilter with caseSensitive %s', async (operator, matchType, caseSensitive) => {
 		runReport.mockResolvedValue([
 			{
 				metricHeaders: [{ name: 'screenPageViews', type: 'TYPE_INTEGER' }],
@@ -155,7 +155,7 @@ describe('ga4 adapter', () => {
 		expect(sentRequest().dimensionFilter).toEqual({
 			filter: {
 				fieldName: 'countryId',
-				stringFilter: { matchType, value: 'DE', caseSensitive: true },
+				stringFilter: { matchType, value: 'DE', caseSensitive },
 			},
 		})
 	})

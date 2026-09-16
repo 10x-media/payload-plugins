@@ -91,7 +91,7 @@ describe('umami adapter', () => {
 		expect(result.rows).toEqual([{ dimensions: { browser: 'chrome' }, metrics: { visitors: 7 } }])
 	})
 
-	it('omits a breakdown metric /metrics cannot report rather than mislabelling y', async () => {
+	it('labels a breakdown row with the metric /metrics returns, whatever was asked for', async () => {
 		server.use(
 			http.get('https://api.umami.is/v1/websites/w/metrics', () =>
 				HttpResponse.json([{ x: '/a', y: 12 }])
@@ -101,9 +101,11 @@ describe('umami adapter', () => {
 			q({ metrics: ['pageviews'], dimensions: ['page'] }),
 			{}
 		)
-		expect(result.rows).toEqual([{ dimensions: { page: '/a' }, metrics: {} }])
+		expect(result.rows).toEqual([{ dimensions: { page: '/a' }, metrics: { visitors: 12 } }])
 	})
 
+	// `event` is not a declared breakdown dimension, so only a direct adapter call reaches this
+	// branch; the goals read will.
 	it('reports event-breakdown rows as events, since y counts occurrences', async () => {
 		server.use(
 			http.get('https://api.umami.is/v1/websites/w/metrics', ({ request }) => {
@@ -118,10 +120,14 @@ describe('umami adapter', () => {
 		expect(result.rows).toEqual([{ dimensions: { event: 'signup' }, metrics: { events: 30 } }])
 	})
 
-	it('declares filters as the mapped-dimension key set with every contract operator', () => {
+	it('declares every contract operator, and filters by an event it cannot group by', () => {
 		const caps = umami({ websiteId: 'w', apiKey: 'k' }).capabilities
-		expect(caps.filters).toEqual(caps.dimensions)
 		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
+		expect(caps.filters.has('event')).toBe(true)
+		expect(caps.dimensions.has('event')).toBe(false)
+		expect([...caps.filters].filter((dimension) => dimension !== 'event')).toEqual([
+			...caps.dimensions,
+		])
 	})
 
 	it.each([
@@ -168,6 +174,106 @@ describe('umami adapter', () => {
 			}),
 			{}
 		)
+	})
+
+	it('writes an explicit eq. prefix so a value starting with an operator stays literal', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/stats', ({ request }) => {
+				expect(new URL(request.url).searchParams.get('referrer')).toBe('eq.s.example.com')
+				return HttpResponse.json({
+					pageviews: 1,
+					visitors: 1,
+					visits: 1,
+					bounces: 0,
+					totaltime: 0,
+				})
+			})
+		)
+		await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'referrer', operator: 'eq', value: 's.example.com' }],
+			}),
+			{}
+		)
+	})
+
+	it('answers two conflicting eq filters on one param as empty, without calling the API', async () => {
+		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [
+					{ dimension: 'country', operator: 'eq', value: 'DE' },
+					{ dimension: 'country', operator: 'eq', value: 'FR' },
+				],
+			}),
+			{}
+		)
+		// msw is set to error on an unhandled request, so reaching the API would fail the test.
+		expect(result.rows).toEqual([])
+		expect(result.totals).toBeUndefined()
+		expect(result.meta.provider).toBe('umami')
+	})
+
+	it('keeps the first filter on a param a second one cannot share, and reports the drop', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/stats', ({ request }) => {
+				expect(new URL(request.url).searchParams.get('country')).toBe('c.DE')
+				return HttpResponse.json({
+					pageviews: 1,
+					visitors: 1,
+					visits: 1,
+					bounces: 0,
+					totaltime: 0,
+				})
+			})
+		)
+		const dropped = { dimension: 'country', operator: 'matches', value: 'D.' } as const
+		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'country', operator: 'contains', value: 'DE' }, dropped],
+			}),
+			{}
+		)
+		expect(result.meta.unappliedFilters).toEqual([dropped])
+	})
+
+	it('scopes the path param to q.path over a page filter, and reports the one it displaced', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/stats', ({ request }) => {
+				expect(new URL(request.url).searchParams.get('path')).toBe('eq./pricing')
+				return HttpResponse.json({
+					pageviews: 1,
+					visitors: 1,
+					visits: 1,
+					bounces: 0,
+					totaltime: 0,
+				})
+			})
+		)
+		const displaced = { dimension: 'page', operator: 'contains', value: '/docs' } as const
+		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({ metrics: ['pageviews'], path: '/pricing', filters: [displaced] }),
+			{}
+		)
+		expect(result.meta.unappliedFilters).toEqual([displaced])
+	})
+
+	it('leaves meta.unappliedFilters off a read that carried every filter', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w/stats', () =>
+				HttpResponse.json({ pageviews: 1, visitors: 1, visits: 1, bounces: 0, totaltime: 0 })
+			)
+		)
+		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }],
+			}),
+			{}
+		)
+		expect(result.meta.unappliedFilters).toBeUndefined()
 	})
 
 	it('omits derived bounceRate and avgDuration when there are no visits', async () => {

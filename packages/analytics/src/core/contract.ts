@@ -105,6 +105,11 @@ export interface AnalyticsResult {
 		fetchedAt: string
 		/** Served from an expired cache entry because the live refresh failed. */
 		stale?: boolean
+		/**
+		 * Filters the source could not carry, so the rows are wider than the query asked for.
+		 * A provider whose API takes one value per dimension reports the ones it dropped here.
+		 */
+		unappliedFilters?: AnalyticsFilter[]
 	}
 }
 

@@ -94,6 +94,8 @@ const baseCapabilities: AnalyticsCapabilities = {
 	// Every dimension except `goal`, whose completions live in a json column rather than a
 	// field a `where` can compare.
 	filters: new Set([...dimensions].filter((dimension) => dimension !== 'goal')),
+	// No `matches`: every regex flavor the providers offer differs, and the two database
+	// adapters have no portable one to match them with.
 	filterOperators: new Set(['eq', 'contains']),
 	batchPageReport: true,
 	rateLimit: null,

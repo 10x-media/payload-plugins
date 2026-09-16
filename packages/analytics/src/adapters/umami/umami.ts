@@ -3,6 +3,7 @@ import type {
 	AdapterContext,
 	AnalyticsAdapter,
 	AnalyticsCapabilities,
+	AnalyticsFilter,
 	AnalyticsQuery,
 	AnalyticsResult,
 	AnalyticsRow,
@@ -66,34 +67,60 @@ const umamiMetrics: ReadonlySet<MetricKey> = new Set<MetricKey>([
 	'avgDuration',
 ])
 
-// Contract dimension -> Umami filter param, which doubles as the /metrics `type` value.
-const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
-	page: 'path',
-	referrer: 'referrer',
-	browser: 'browser',
-	os: 'os',
-	device: 'device',
-	country: 'country',
-	region: 'region',
-	city: 'city',
-	language: 'language',
-	event: 'event',
-	utmSource: 'utmSource',
-	utmMedium: 'utmMedium',
-	utmCampaign: 'utmCampaign',
-	utmContent: 'utmContent',
-	utmTerm: 'utmTerm',
+interface UmamiDimension {
+	/** Umami filter param, which doubles as the /metrics `type` value. */
+	param: string
+	/** The one metric /metrics reports for this type: y is nothing else. */
+	metric: MetricKey
 }
 
+// y is count(distinct session_id) on every pageview and session type, and event
+// occurrences on `type=event`.
+const DIMENSION_MAP: Partial<Record<DimensionKey, UmamiDimension>> = {
+	page: { param: 'path', metric: 'visitors' },
+	referrer: { param: 'referrer', metric: 'visitors' },
+	browser: { param: 'browser', metric: 'visitors' },
+	os: { param: 'os', metric: 'visitors' },
+	device: { param: 'device', metric: 'visitors' },
+	country: { param: 'country', metric: 'visitors' },
+	region: { param: 'region', metric: 'visitors' },
+	city: { param: 'city', metric: 'visitors' },
+	language: { param: 'language', metric: 'visitors' },
+	event: { param: 'event', metric: 'events' },
+	utmSource: { param: 'utmSource', metric: 'visitors' },
+	utmMedium: { param: 'utmMedium', metric: 'visitors' },
+	utmCampaign: { param: 'utmCampaign', metric: 'visitors' },
+	utmContent: { param: 'utmContent', metric: 'visitors' },
+	utmTerm: { param: 'utmTerm', metric: 'visitors' },
+}
+
+/**
+ * Umami's `re.` is `~*`: a case-insensitive partial match, so an unanchored pattern hits
+ * anywhere in the value. `c.` is `ilike`, also case-insensitive.
+ */
 const OPERATOR_PREFIX: Record<FilterOperator, string> = {
 	eq: 'eq.',
 	contains: 'c.',
 	matches: 're.',
 }
 
-const umamiDimensions: ReadonlySet<DimensionKey> = new Set(
+const umamiFilters: ReadonlySet<DimensionKey> = new Set(
 	Object.keys(DIMENSION_MAP) as DimensionKey[]
 )
+
+// `event` is filterable but not a group: /metrics counts event occurrences for it, and the
+// adapter cannot declare `events` as a metric because /stats reports no such number.
+const umamiDimensions: ReadonlySet<DimensionKey> = new Set(
+	[...umamiFilters].filter((dimension) => dimension !== 'event')
+)
+
+interface UmamiParams {
+	search: URLSearchParams
+	/** Filters a one-value-per-param request could not carry. */
+	unapplied: AnalyticsFilter[]
+	/** Two `eq` values on one param: the AND matches nothing, so the read serves no rows. */
+	empty: boolean
+}
 
 interface UmamiStats {
 	pageviews: number
@@ -105,8 +132,11 @@ interface UmamiStats {
 
 /**
  * Targets Umami 3.x (cloud and self-hosted): filter values carry an operator prefix, and
- * `eq.` is always written explicitly so a value starting with `c.` or `re.` is not read as
- * an operator. Umami splits an `eq.` value on commas into a value list, with no escape.
+ * `eq.` is always written explicitly. Umami parses any of `eq`, `neq`, `c`, `dnc`, `re`,
+ * `nre`, `s`, `ns`, `t`, `f`, `gt`, `lt`, `gte`, `lte`, `bf` and `af` followed by a dot as
+ * the operator, so a bare value beginning with one (`s.example.com`) would change meaning;
+ * written as `eq.s.example.com` it stays a literal. Umami splits an `eq.` value on commas
+ * into a value list, with no escape.
  */
 export function umami(config: UmamiConfig): AnalyticsAdapter {
 	const base = config.host ?? CLOUD_BASE
@@ -119,7 +149,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		maxLookbackDays,
 		metrics: umamiMetrics,
 		dimensions: umamiDimensions,
-		filters: umamiDimensions,
+		filters: umamiFilters,
 		filterOperators: new Set(['eq', 'contains', 'matches']),
 		batchPageReport: true,
 		rateLimit: null,
@@ -133,23 +163,55 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 				? { authorization: `Bearer ${config.token}` }
 				: {}
 
-	const params = (q: AnalyticsQuery): URLSearchParams => {
+	/**
+	 * Umami takes one value per query param, so filters that land on the same param cannot
+	 * all be sent. Two `eq` values on one param are an AND that matches nothing, which the
+	 * read answers as empty without calling the API; anything else keeps the first filter,
+	 * except that `q.path` always wins the `path` param so a per-page read stays scoped to
+	 * its page. Whatever was dropped travels back in `meta.unappliedFilters`.
+	 */
+	const params = (q: AnalyticsQuery): UmamiParams => {
 		const p = new URLSearchParams({
 			startAt: String(q.dateRange.start.getTime()),
 			endAt: String(q.dateRange.end.getTime()),
 		})
+		const unapplied: AnalyticsFilter[] = []
+		const eqValues = new Map<string, string>()
 		for (const filter of q.filters ?? []) {
-			const param = DIMENSION_MAP[filter.dimension]
-			if (param) {
-				p.set(param, `${OPERATOR_PREFIX[filter.operator]}${filter.value}`)
+			const mapped = DIMENSION_MAP[filter.dimension]
+			if (!mapped || filter.operator !== 'eq') {
+				continue
+			}
+			const held = eqValues.get(mapped.param)
+			if (held !== undefined && held !== filter.value) {
+				return { search: p, unapplied, empty: true }
+			}
+			eqValues.set(mapped.param, filter.value)
+		}
+		const held = new Map<string, { value: string; filter: AnalyticsFilter }>()
+		for (const filter of q.filters ?? []) {
+			const mapped = DIMENSION_MAP[filter.dimension]
+			if (!mapped) {
+				continue
+			}
+			const value = `${OPERATOR_PREFIX[filter.operator]}${filter.value}`
+			const first = held.get(mapped.param)
+			if (first === undefined) {
+				held.set(mapped.param, { value, filter })
+				p.set(mapped.param, value)
+			} else if (first.value !== value) {
+				unapplied.push(filter)
 			}
 		}
-		// Written last: Umami takes one value per param, so a per-page read stays scoped to
-		// its page even when the caller also filters on `page`.
 		if (q.path) {
-			p.set('path', `eq.${q.path}`)
+			const value = `eq.${q.path}`
+			const first = held.get('path')
+			if (first !== undefined && first.value !== value) {
+				unapplied.push(first.filter)
+			}
+			p.set('path', value)
 		}
-		return p
+		return { search: p, unapplied, empty: false }
 	}
 
 	return {
@@ -161,32 +223,49 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = q.dateRange.end.toISOString()
 			const headers = authHeaders()
-			const breakdownDim = (q.dimensions ?? []).find((d) => DIMENSION_MAP[d])
+			const plan = params(q)
+			const meta: AnalyticsResult['meta'] = {
+				provider: 'umami',
+				fetchedAt,
+				...(plan.unapplied.length > 0 ? { unappliedFilters: plan.unapplied } : {}),
+			}
+			// Totals are left undefined rather than zeroed, the same as every other number this
+			// adapter cannot report, so the display layer shows "no data" instead of a real 0.
+			if (plan.empty) {
+				return { rows: [], totals: undefined, meta }
+			}
+			const search = (): URLSearchParams => new URLSearchParams(plan.search)
 
-			if (breakdownDim) {
-				const p = params(q)
-				p.set('type', DIMENSION_MAP[breakdownDim] as string)
+			let breakdown: ({ dimension: DimensionKey } & UmamiDimension) | undefined
+			for (const dimension of q.dimensions ?? []) {
+				const mapped = DIMENSION_MAP[dimension]
+				if (mapped) {
+					breakdown = { dimension, ...mapped }
+					break
+				}
+			}
+
+			if (breakdown) {
+				const { dimension, param, metric } = breakdown
+				const p = search()
+				p.set('type', param)
 				const data = await fetchJson<Array<{ x: string; y: number }>>(
 					`${base}/websites/${config.websiteId}/metrics?${p.toString()}`,
 					{ headers, signal: ctx.signal, provider: 'umami' }
 				)
-				// /metrics reports exactly one number per row: distinct sessions (visitors) on
-				// pageview-type rows, and event occurrences on `type=event` rows. Any other
-				// requested metric is omitted rather than labelled with a number it is not.
-				const available: MetricKey = breakdownDim === 'event' ? 'events' : 'visitors'
-				const rows: AnalyticsRow[] = data.map((row) => {
-					const dimensions: Partial<Record<DimensionKey, string>> = { [breakdownDim]: row.x }
-					const metrics: Partial<Record<MetricKey, number>> = q.metrics.includes(available)
-						? { [available]: row.y }
-						: {}
-					return { dimensions, metrics }
-				})
-				return { rows, totals: undefined, meta: { provider: 'umami', fetchedAt } }
+				// /metrics reports exactly one number per row, and rows always carry it under the
+				// name it actually holds. A requested metric Umami has no per-row source for is
+				// absent rather than labelled with a number it is not.
+				const rows: AnalyticsRow[] = data.map((row) => ({
+					dimensions: { [dimension]: row.x },
+					metrics: { [metric]: row.y },
+				}))
+				return { rows, totals: undefined, meta }
 			}
 
 			const fetchTotals = async (): Promise<Partial<Record<MetricKey, number>>> => {
 				const stats = await fetchJson<UmamiStats>(
-					`${base}/websites/${config.websiteId}/stats?${params(q).toString()}`,
+					`${base}/websites/${config.websiteId}/stats?${search().toString()}`,
 					{ headers, signal: ctx.signal, provider: 'umami' }
 				)
 				const all: Partial<Record<MetricKey, number>> = {
@@ -214,7 +293,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			// visitors/bounceRate/avgDuration have no per-day source, so a trend on those
 			// metrics keeps a correct headline (from /stats) but an empty series.
 			if (q.granularity === 'day') {
-				const p = params(q)
+				const p = search()
 				p.set('unit', 'day')
 				p.set('timezone', q.timezone ?? 'UTC')
 				const fetchSeries = () =>
@@ -248,11 +327,11 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 					}
 					rows.push({ timestamp: ts, metrics })
 				}
-				return { rows, totals, meta: { provider: 'umami', fetchedAt } }
+				return { rows, totals, meta }
 			}
 
 			const totals = await fetchTotals()
-			return { rows: [{ metrics: totals }], totals, meta: { provider: 'umami', fetchedAt } }
+			return { rows: [{ metrics: totals }], totals, meta }
 		},
 	}
 }

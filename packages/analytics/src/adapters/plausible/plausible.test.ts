@@ -120,14 +120,14 @@ describe('plausible adapter', () => {
 			q({
 				path: '/pricing',
 				hostname: 'a.example.com',
-				filters: [{ dimension: 'page', operator: 'matches', value: '^/docs' }],
+				filters: [{ dimension: 'page', operator: 'matches', value: '/docs/.*' }],
 			}),
 			{}
 		)
 		expect(captured.filters).toEqual([
 			['is', 'event:page', ['/pricing']],
 			['is', 'event:hostname', ['a.example.com']],
-			['matches', 'event:page', ['^/docs']],
+			['matches', 'event:page', ['/docs/.*']],
 		])
 	})
 

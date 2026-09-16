@@ -106,8 +106,11 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 	utmCampaign: 'visit:utm_campaign',
 }
 
-// Stats API v2 filter operators, available on every dimension this adapter maps
-// (event:goal is the one exception in the grammar and is not mapped here).
+/**
+ * Stats API v2 filter operators, available on every dimension this adapter maps (event:goal
+ * is the one exception in the grammar and is not mapped here). `matches` is an re2 full
+ * match, so a pattern has to cover the whole value (`/docs/.*`, not `^/docs`).
+ */
 const OPERATOR_MAP: Record<FilterOperator, string> = {
 	eq: 'is',
 	contains: 'contains',

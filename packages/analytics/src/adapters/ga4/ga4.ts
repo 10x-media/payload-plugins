@@ -57,20 +57,34 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 
 type StringMatchType = 'EXACT' | 'CONTAINS' | 'FULL_REGEXP'
 
+/**
+ * FULL_REGEXP is a full match, so a pattern has to cover the whole value (`/docs/.*`, not
+ * `^/docs`). PARTIAL_REGEXP exists but is not the contract's `matches`.
+ */
 const MATCH_TYPE_MAP: Record<FilterOperator, StringMatchType> = {
 	eq: 'EXACT',
 	contains: 'CONTAINS',
 	matches: 'FULL_REGEXP',
 }
 
-// caseSensitive is explicit on every string filter: the Data API defaults it to false, and
-// the contract's operators are case-sensitive on the other providers.
+// caseSensitive is explicit on every string filter because the Data API defaults it to
+// false: `contains` stays insensitive, matching the native source and Umami's ilike, while
+// `eq` and `matches` compare literally.
+const CASE_SENSITIVE: Record<StringMatchType, boolean> = {
+	EXACT: true,
+	CONTAINS: false,
+	FULL_REGEXP: true,
+}
+
 const stringFilter = (
 	fieldName: string,
 	matchType: StringMatchType,
 	value: string
 ): protos.google.analytics.data.v1beta.IFilterExpression => ({
-	filter: { fieldName, stringFilter: { matchType, value, caseSensitive: true } },
+	filter: {
+		fieldName,
+		stringFilter: { matchType, value, caseSensitive: CASE_SENSITIVE[matchType] },
+	},
 })
 
 const ga4Metrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_MAP) as MetricKey[])
