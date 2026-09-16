@@ -15,11 +15,11 @@ import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { native } from '../../src/native/nativeAdapter'
-import { applyDistinctDeltas } from '../../src/native/rollups/applyDistinctDeltas'
 import { applyRollupDeltas } from '../../src/native/rollups/applyRollupDeltas'
 import { bumpRollup } from '../../src/native/rollups/bumpRollup'
-import { computeRollupDeltas, type RollupInc } from '../../src/native/rollups/deltas'
+import type { RollupInc } from '../../src/native/rollups/deltas'
 import { insertIfNew } from '../../src/native/rollups/insertIfNew'
+import { MAX_GEO_LENGTH } from '../../src/query/limits'
 import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
 import { type MemoryAnalyticsAdapter, memoryAdapter } from '../../src/testing/memoryAdapter'
 import { startOfDayInTz } from '../../src/timeframe/tz'
@@ -234,21 +234,20 @@ describeForDb('native distinct counting', {}, (db) => {
 		await booted.stop()
 	})
 
-	const hit = async (visitorHash: string, country?: string): Promise<void> => {
-		const event: StoredEvent = {
-			timestamp: new Date('2026-02-01T10:00:00Z'),
-			type: 'pageview',
-			path: '/d',
-			hostname: 'h',
-			visitorHash,
-			sessionId: `sess-${visitorHash}`,
-			country,
-			durationMs: 100,
-		}
-		const deltas = computeRollupDeltas(event)
-		await applyRollupDeltas(booted.payload, deltas)
-		await applyDistinctDeltas(booted.payload, event, deltas)
-	}
+	// Through flushBatch, which is the write path every ingest actually takes.
+	const hit = (visitorHash: string, country?: string): Promise<void> =>
+		flushBatch(booted.payload, [
+			{
+				timestamp: new Date('2026-02-01T10:00:00Z'),
+				type: 'pageview',
+				path: '/d',
+				hostname: 'h',
+				visitorHash,
+				sessionId: `sess-${visitorHash}`,
+				country,
+				durationMs: 100,
+			},
+		])
 
 	it(`counts a repeat visitor once but pageviews twice on ${db}`, async () => {
 		await hit('vv1')
@@ -529,6 +528,75 @@ describeForDb('native dimension columns and breakdowns', {}, (db) => {
 			)
 			expect(events.rows).toEqual(rollups.rows)
 		}
+	})
+})
+
+/** Deterministic printable ASCII with no repeating run for PGLZ to squeeze out. */
+const noise = (length: number): string => {
+	let seed = 12345
+	let out = ''
+	for (let i = 0; i < length; i++) {
+		seed = (seed * 1103515245 + 12345) % 2147483648
+		out += String.fromCharCode(33 + (seed % 94))
+	}
+	return out
+}
+
+describeForDb('native geo caps', {}, (db) => {
+	const adapter = native()
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	// A geo header is client-settable, and its value becomes a rollup dimvalue and part of a
+	// seen-ledger key. Uncapped, an oversized one blows past Postgres's 2704-byte btree key
+	// limit and fails the write while Mongo accepts it, so the databases would disagree about
+	// whether the hit counted at all. The fixture has to be incompressible: Postgres compresses
+	// index values, so 3 KB of one repeated character would fit the key and prove nothing.
+	it(`truncates an oversized geo header instead of failing the write on ${db}`, async () => {
+		const endpoint = (booted.payload.config.endpoints ?? []).find(
+			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		)
+		if (!endpoint || typeof endpoint.handler !== 'function') {
+			throw new Error('ingest endpoint not registered')
+		}
+		const res = await endpoint.handler(
+			ingestRequest(
+				booted.payload,
+				{ type: 'pageview', path: '/geo', hostname: 'site.com', durationMs: 100 },
+				{ 'user-agent': 'UA', 'x-vercel-ip-city': noise(3000) }
+			)
+		)
+		expect(res.status).toBe(202)
+
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/geo' } } as never,
+			pagination: false,
+			overrideAccess: true,
+		})
+		expect((docs[0] as unknown as { city: string }).city).toHaveLength(MAX_GEO_LENGTH)
+
+		const rows = await adapter.query(
+			{
+				metrics: ['pageviews', 'visitors'],
+				dimensions: ['city'],
+				dateRange: { start: new Date('2020-01-01'), end: new Date('2030-01-01') },
+			},
+			{}
+		)
+		expect(rows.rows).toEqual([
+			{
+				dimensions: { city: noise(3000).slice(0, MAX_GEO_LENGTH) },
+				metrics: { pageviews: 1, visitors: 1 },
+			},
+		])
 	})
 })
 

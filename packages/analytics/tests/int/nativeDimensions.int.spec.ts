@@ -3,6 +3,7 @@ import type { Endpoint, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { DimensionKey } from '../../src/core/contract'
 import { analytics } from '../../src/index'
+import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { native } from '../../src/native/nativeAdapter'
 import { ingestRequest } from './ingestRequest'
 
@@ -159,6 +160,32 @@ describeForDb('native dimensions: ingest to breakdowns', { dbs: ['mongo'] }, (db
 			)
 			expect(result.totals).toEqual({ pageviews: 2 })
 		}
+	})
+
+	it('emits no referrer bucket for internal navigation', async () => {
+		await ingest(
+			{ type: 'pageview', path: '/internal', referrer: 'https://www.site.com/pricing' },
+			{ 'user-agent': `${CHROME_MAC} internal` }
+		)
+		expect(Object.keys(await breakdown('referrer'))).toEqual(['example.org'])
+		expect(await breakdown('source')).toMatchObject({ Direct: 2 })
+	})
+
+	it('answers 202 and stores no referrer for a body whose referrer is not a string', async () => {
+		await ingest(
+			{ type: 'pageview', path: '/hostile', referrer: {} },
+			{ 'user-agent': `${CHROME_MAC} hostile` }
+		)
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/hostile' } } as never,
+			pagination: false,
+			overrideAccess: true,
+		})
+		expect(docs).toHaveLength(1)
+		const event = docs[0] as unknown as { referrer?: string; referrerHost?: string }
+		expect(event.referrer ?? null).toBeNull()
+		expect(event.referrerHost ?? null).toBeNull()
 	})
 
 	it('narrows a breakdown by a filter on another new dimension', async () => {

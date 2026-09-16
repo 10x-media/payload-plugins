@@ -6,12 +6,12 @@ import type { MigrateDownArgs, MigrateUpArgs } from '@payloadcms/db-mongodb'
  * dimension groups and filters on. Rollup rows are keyed by dimension name, so the rollups
  * collection is unchanged, and Mongo needs nothing at all: the fields are optional, and an
  * event written before this release simply carries none of them, which is exactly what "no
- * bucket for that dimension" already means. Every statement is idempotent, so a push-mode
- * dev schema that already picked the columns up is unaffected.
+ * bucket for that dimension" already means.
  *
- * The Postgres statements deliberately go through `payload.db.drizzle` (the pool handle)
- * rather than the transaction-bound argument, matching the goal-counters migration: each
- * autocommits instead of being pinned inside an open transaction.
+ * Every statement is `ADD COLUMN IF NOT EXISTS`, so the whole migration is re-runnable and a
+ * push-mode dev schema that already picked the columns up is left alone. It goes through
+ * `payload.db.drizzle` for consistency with the migrations beside it; plain `ADD COLUMN`
+ * needs nothing of the pool handle that `ALTER TYPE ... ADD VALUE` did.
  */
 export async function up({ payload }: MigrateUpArgs): Promise<void> {
 	if (payload.db.name === 'mongoose') {

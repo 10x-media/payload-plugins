@@ -23,3 +23,12 @@ export const MAX_QUERY_HOSTNAME_LENGTH = 253
  */
 export const MAX_QUERY_LENGTH = 512
 export const MAX_REFERRER_LENGTH = 512
+
+/**
+ * Caps each geo value (country, region, city). They arrive from a resolver reading
+ * request headers, which a client can set, and they end up as rollup dimvalues and
+ * seen-ledger keys: uncapped, one oversized header pushes a Postgres btree key past its
+ * 2704-byte limit and fails the write, while Mongo accepts it, so the two databases would
+ * disagree about whether the hit counted.
+ */
+export const MAX_GEO_LENGTH = 128

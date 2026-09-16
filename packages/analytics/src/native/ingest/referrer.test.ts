@@ -2,39 +2,58 @@ import { describe, expect, it } from 'vitest'
 import { MAX_REFERRER_LENGTH } from '../../query/limits'
 import { referrerHost, storedReferrer } from './referrer'
 
+/** The event's own hostname in every case that is not about self-referrals. */
+const SELF = 'site.example'
+
 describe('referrerHost', () => {
 	it('keeps the bare host, dropping scheme, port, path, query and fragment', () => {
-		expect(referrerHost('https://example.org/path?x=1#top')).toBe('example.org')
-		expect(referrerHost('http://example.org:8080/path')).toBe('example.org')
+		expect(referrerHost('https://example.org/path?x=1#top', SELF)).toBe('example.org')
+		expect(referrerHost('http://example.org:8080/path', SELF)).toBe('example.org')
 	})
 
 	it('lowercases the host', () => {
-		expect(referrerHost('https://EXAMPLE.ORG/Path')).toBe('example.org')
+		expect(referrerHost('https://EXAMPLE.ORG/Path', SELF)).toBe('example.org')
 	})
 
 	it('strips a leading www. and nothing that merely starts with www', () => {
-		expect(referrerHost('https://www.example.org/path')).toBe('example.org')
-		expect(referrerHost('https://wwwexample.org/')).toBe('wwwexample.org')
-		expect(referrerHost('https://www.www.example.org/')).toBe('www.example.org')
+		expect(referrerHost('https://www.example.org/path', SELF)).toBe('example.org')
+		expect(referrerHost('https://wwwexample.org/', SELF)).toBe('wwwexample.org')
+		expect(referrerHost('https://www.www.example.org/', SELF)).toBe('www.example.org')
 	})
 
 	it('keeps an IPv6 host in its bracketed form', () => {
-		expect(referrerHost('http://[2001:db8::1]:8080/x')).toBe('[2001:db8::1]')
+		expect(referrerHost('http://[2001:db8::1]:8080/x', SELF)).toBe('[2001:db8::1]')
 	})
 
 	it('reports nothing for an absent, empty or unparseable referrer', () => {
-		expect(referrerHost(undefined)).toBeUndefined()
-		expect(referrerHost('')).toBeUndefined()
-		expect(referrerHost('not a url')).toBeUndefined()
+		expect(referrerHost(undefined, SELF)).toBeUndefined()
+		expect(referrerHost('', SELF)).toBeUndefined()
+		expect(referrerHost('not a url', SELF)).toBeUndefined()
 	})
 
 	it('reports nothing for a URL that carries no host', () => {
-		expect(referrerHost('about:blank')).toBeUndefined()
+		expect(referrerHost('about:blank', SELF)).toBeUndefined()
+	})
+
+	it('reports nothing for a value that is not a string', () => {
+		expect(referrerHost({} as unknown as string, SELF)).toBeUndefined()
+		expect(referrerHost(42 as unknown as string, SELF)).toBeUndefined()
+		expect(referrerHost([] as unknown as string, SELF)).toBeUndefined()
+	})
+
+	it('excludes a self-referral, whatever its case or www prefix', () => {
+		expect(referrerHost('https://site.example/pricing', 'site.example')).toBeUndefined()
+		expect(referrerHost('https://www.site.example/pricing', 'site.example')).toBeUndefined()
+		expect(referrerHost('https://Site.Example/pricing', 'WWW.site.example')).toBeUndefined()
+	})
+
+	it('keeps a different host on the same registrable domain', () => {
+		expect(referrerHost('https://blog.site.example/x', 'site.example')).toBe('blog.site.example')
 	})
 
 	it('caps an absurd host at the longest legal DNS name', () => {
 		const host = `${'a'.repeat(300)}.example`
-		expect(referrerHost(`https://${host}/`)).toHaveLength(253)
+		expect(referrerHost(`https://${host}/`, SELF)).toHaveLength(253)
 	})
 })
 
@@ -68,5 +87,12 @@ describe('storedReferrer', () => {
 		expect(storedReferrer(undefined)).toBeUndefined()
 		expect(storedReferrer('')).toBeUndefined()
 		expect(storedReferrer('?token=abc')).toBeUndefined()
+	})
+
+	it('reports nothing for a value that is not a string, since the wire field is public', () => {
+		expect(storedReferrer({} as unknown as string)).toBeUndefined()
+		expect(storedReferrer(42 as unknown as string)).toBeUndefined()
+		expect(storedReferrer(['https://example.org/'] as unknown as string)).toBeUndefined()
+		expect(storedReferrer(true as unknown as string)).toBeUndefined()
 	})
 })

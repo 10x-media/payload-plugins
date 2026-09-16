@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bucketKey } from './applyDistinctDeltas'
+import { bucketKey } from './bucketKey'
 
 describe('bucketKey', () => {
 	it('serializes a rollup key deterministically', () => {

@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest'
 import type { Goal } from '../../goals/types'
 import { noopResolver, platformHeaderResolver } from '../geo/geoResolver'
 import { SERVER_USER_AGENT } from './device'
-import { MAX_QUERY_LENGTH, MAX_REFERRER_LENGTH, normalizeEvent } from './normalizeEvent'
+import {
+	MAX_GEO_LENGTH,
+	MAX_QUERY_LENGTH,
+	MAX_REFERRER_LENGTH,
+	normalizeEvent,
+} from './normalizeEvent'
 
 const headers = (h: Record<string, string>) => new Headers(h)
 
@@ -359,7 +364,6 @@ describe('normalizeEvent native dimensions', () => {
 		)
 		expect(ev.referrer).toBe('https://site.com/reset')
 		expect(JSON.stringify(ev)).not.toContain('abc')
-		expect(ev.referrerHost).toBe('site.com')
 		expect(ev.source).toBe('Direct')
 	})
 
@@ -378,12 +382,53 @@ describe('normalizeEvent native dimensions', () => {
 		expect(ev.source).toBe('news.example.org')
 	})
 
-	it('keeps a self-referrer host, which the source channel reports as Direct', async () => {
+	it('reports no referrer host for internal navigation, as source reports Direct', async () => {
+		for (const referrer of ['https://site.com/other', 'https://www.site.com/other']) {
+			const ev = await build(
+				{ type: 'pageview', path: '/p', hostname: 'site.com', referrer },
+				{ 'user-agent': CHROME_UA }
+			)
+			expect('referrerHost' in ev).toBe(false)
+			expect(ev.source).toBe('Direct')
+		}
+	})
+
+	it('drops a referrer that is not a string instead of throwing', async () => {
+		for (const referrer of [{}, 42, ['https://example.org/'], true]) {
+			const ev = await build(
+				{ type: 'pageview', path: '/p', hostname: 'site.com', referrer },
+				{ 'user-agent': CHROME_UA }
+			)
+			expect(ev.referrer).toBeUndefined()
+			expect('referrerHost' in ev).toBe(false)
+			expect(ev.source).toBe('Direct')
+		}
+	})
+
+	it('caps the geo values, which become rollup dimvalues and seen-ledger keys', async () => {
+		const ev = await normalizeEvent({
+			raw: { type: 'pageview', path: '/p', hostname: 'site.com' },
+			headers: headers({ 'user-agent': CHROME_UA }),
+			geoResolver: () => ({
+				country: 'U'.repeat(MAX_GEO_LENGTH + 50),
+				region: 'R'.repeat(MAX_GEO_LENGTH + 50),
+				city: 'C'.repeat(MAX_GEO_LENGTH + 50),
+			}),
+			salt: 's',
+			now: new Date('2026-06-01T00:00:00Z'),
+		})
+		expect(ev.country).toHaveLength(MAX_GEO_LENGTH)
+		expect(ev.region).toHaveLength(MAX_GEO_LENGTH)
+		expect(ev.city).toHaveLength(MAX_GEO_LENGTH)
+	})
+
+	it('leaves an absent geo value absent rather than empty', async () => {
 		const ev = await build(
-			{ type: 'pageview', path: '/p', hostname: 'site.com', referrer: 'https://site.com/other' },
+			{ type: 'pageview', path: '/p', hostname: 'site.com' },
 			{ 'user-agent': CHROME_UA }
 		)
-		expect(ev.referrerHost).toBe('site.com')
-		expect(ev.source).toBe('Direct')
+		expect(ev.country).toBeUndefined()
+		expect(ev.region).toBeUndefined()
+		expect(ev.city).toBeUndefined()
 	})
 })

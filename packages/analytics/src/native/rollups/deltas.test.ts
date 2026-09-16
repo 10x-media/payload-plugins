@@ -189,6 +189,15 @@ describe('computeRollupDeltas', () => {
 		}
 	})
 
+	it('emits no referrer bucket for internal navigation, which carries no referrer host', () => {
+		// normalizeEvent leaves referrerHost unset for a self-referral, so the referrers
+		// breakdown never reports a site's own domain as its top referrer.
+		const deltas = computeRollupDeltas(
+			ev({ hostname: 'site.example', referrer: 'https://site.example/pricing' })
+		)
+		expect(deltas.some((d) => d.key.dimension === 'referrer')).toBe(false)
+	})
+
 	it('dual-emits the new dimension buckets into the hostname family and carries the scope', () => {
 		const deltas = computeRollupDeltas(
 			ev({ hostname: 'a.example', scope: 't1', browser: 'firefox', utmCampaign: 'spring' })

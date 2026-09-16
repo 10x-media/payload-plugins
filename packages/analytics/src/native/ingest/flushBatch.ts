@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 import { SEEN_SLUG } from '../collections/seen'
-import { bucketKey } from '../rollups/applyDistinctDeltas'
+import { bucketKey } from '../rollups/bucketKey'
 import { bumpRollup } from '../rollups/bumpRollup'
 import {
 	computeRollupDeltas,
