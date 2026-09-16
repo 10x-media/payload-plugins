@@ -25,7 +25,7 @@ interface RawEventInput {
   hostname: string      // required
   name?: string         // event name, or the goal slug; required unless type is 'pageview'
   referrer?: string
-  query?: string        // the page's query string, no leading '?'; pageviews only
+  query?: string        // the page's query string, no leading '?'; read on any type
   durationMs?: number
   props?: Record<string, unknown>
   value?: number        // revenue for a goal completion, in `currency`
@@ -38,7 +38,7 @@ An event is rejected only on its required fields: a known `type`, a non-empty st
 
 The server derives the rest at ingest time: the [dimensions](#dimensions) below, a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days), and the [goals](/analytics/goals) the event completed, stamped onto the stored event. The endpoint responds `202` on success and `400` on an invalid body.
 
-`query` never reaches storage. It is capped at 512 characters, parsed for its five `utm_*` keys, and thrown away, so a session token or an email address that happens to be in the URL is not written to the events collection. Sending it at all is optional: [`capture.autoCapture.query: false`](/analytics/capture#auto-capture) stops the tracker putting it on the wire.
+`query` never reaches storage. It is capped at 512 characters, parsed for its five `utm_*` keys, and thrown away, so a session token or an email address that happens to be in the URL is not written to the events collection. The endpoint reads it on any event type; the tracker only sends it with pageviews, and sending it at all is optional: [`capture.autoCapture.query: false`](/analytics/capture#auto-capture) stops the tracker putting it on the wire.
 
 A `goal` event counts under `events`, never under `pageviews`, and is kept out of the `event` dimension breakdown: its name is a goal slug, and it appears under the `goal` dimension instead. `revenue` is summed as a plain number in the event's own currency, with no conversion; see the currency note on [Goals](/analytics/goals#how-native-reports-them). `scrollDepth` averages over the pageviews that actually reported one, tracked by its own sample counter so a pageview whose tracker never sent a depth does not drag the average down.
 
@@ -68,11 +68,11 @@ Every cap is applied server-side, on a public endpoint, so a hand-rolled body ca
 
 ### Referrers
 
-Three things happen to a referrer, and they answer different questions:
+Three things happen to a referrer:
 
 - **`referrer` on the event row** keeps the origin and the path, with everything from the first `#` or `?` onwards removed, capped at 512. A same-origin navigation puts the previous page's whole URL in `document.referrer`, so the query string routinely carries a reset token or an email address; stripping it is what keeps that out of the events collection.
 - **The `referrer` dimension** groups by the bare host: lowercased, no scheme, port, path or `www.`. A **same-site referral reports no host at all**, so a site's own domain can never top its referrers breakdown.
-- **The `source` channel** is the same host, or `Direct` when there is no usable one, which includes that same-site case.
+- **The `source` dimension** is that same host, or `Direct` when there is no usable one, which includes the same-site case. On native it is not a traffic channel: it is the referrer host with a name for "no referrer", so a referred hit reads the same under `source` as under `referrer`.
 
 ## Write batching (opt-in)
 
@@ -128,7 +128,7 @@ native({ retentionDays: 90 })
 This registers a Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) that deletes raw `analytics-events` and `analytics-seen` rows older than the window. Rollups are untouched, so long-range aggregates survive pruning. Like all scheduled work here, the task fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler).
 
 <Callout type="info">
-`retentionDays` covers the events and the seen ledger, and nothing else. **Rollups are never pruned**, by design, and they now grow per day with the cardinality of the new dimensions: one row per distinct referrer host, city, campaign, `utmContent` and `utmTerm` you receive, doubled for each distinct hostname you ingest from. A site with a long tail of campaign URLs should plan storage for that tail rather than assume a retention window bounds it.
+`retentionDays` covers the events and the seen ledger, and nothing else. **Rollups are never pruned**, by design, and they now grow per day with the cardinality of the new dimensions: one row per distinct referrer host, city, campaign, `utmContent` and `utmTerm` you receive, plus one extra bucket set per distinct hostname you ingest from. A site with a long tail of campaign URLs should plan storage for that tail rather than assume a retention window bounds it.
 </Callout>
 
 ## Upgrading an existing install
@@ -224,7 +224,7 @@ Two Postgres details worth keeping if you hand-write your own version. The state
 
 Rows written before the migration read back as zero rather than `NaN`, so an install that has not run it yet reports 0 conversions instead of breaking, but it cannot ingest a `goal` event on Postgres until the enum member exists.
 
-## Upgrading for the dimension columns
+## Upgrading for dimension columns
 
 Serving the dimensions above adds nine optional text fields to `analytics-events`: `browser`, `os`, `language`, the five `utm*` keys, and `referrerHost` (the bare host the `referrer` dimension reads, derived at ingest because a `where` cannot reduce a URL to its host at read time). The rollups collection is unchanged, since its rows are keyed by `(dimension, dimvalue)` text columns.
 
