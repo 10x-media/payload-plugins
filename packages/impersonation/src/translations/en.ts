@@ -8,6 +8,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.confirm]: 'Switch',
 	[keys.confirmTitle]: 'Switch to this user?',
 	[keys.endSession]: 'End session',
+	[keys.endSessionBody]: 'This ends the impersonation. The target signs back in as themselves.',
 	[keys.errorAlreadyImpersonating]: 'Already impersonating',
 	[keys.errorFailed]: 'Impersonation failed',
 	[keys.errorForbidden]: 'Not allowed',

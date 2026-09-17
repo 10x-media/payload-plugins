@@ -8,6 +8,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.confirm]: 'Basculer',
 	[keys.confirmTitle]: 'Basculer vers cet utilisateur ?',
 	[keys.endSession]: 'Terminer la session',
+	[keys.endSessionBody]: "Cela met fin à l'impersonation. La cible redevient elle-même.",
 	[keys.errorAlreadyImpersonating]: 'Usurpation déjà en cours',
 	[keys.errorFailed]: "L'usurpation a échoué",
 	[keys.errorForbidden]: 'Non autorisé',

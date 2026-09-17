@@ -8,6 +8,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.confirm]: 'Переключить',
 	[keys.confirmTitle]: 'Переключиться на этого пользователя?',
 	[keys.endSession]: 'Завершить сеанс',
+	[keys.endSessionBody]: 'Имперсонация будет завершена. Цель снова войдёт как она сама.',
 	[keys.errorAlreadyImpersonating]: 'Имперсонация уже идёт',
 	[keys.errorFailed]: 'Имперсонация не удалась',
 	[keys.errorForbidden]: 'Не разрешено',

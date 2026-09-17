@@ -8,6 +8,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.confirm]: 'تبديل',
 	[keys.confirmTitle]: 'التبديل إلى هذا المستخدم؟',
 	[keys.endSession]: 'إنهاء الجلسة',
+	[keys.endSessionBody]: 'سينتهي انتحال الهوية. يعود الهدف إلى حسابه.',
 	[keys.errorAlreadyImpersonating]: 'هناك انتحال هوية جارٍ',
 	[keys.errorFailed]: 'فشل انتحال الهوية',
 	[keys.errorForbidden]: 'غير مسموح',

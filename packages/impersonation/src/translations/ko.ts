@@ -8,6 +8,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.confirm]: '전환',
 	[keys.confirmTitle]: '이 사용자로 전환할까요?',
 	[keys.endSession]: '세션 종료',
+	[keys.endSessionBody]: '가장을 종료합니다. 대상은 다시 본인으로 로그인됩니다.',
 	[keys.errorAlreadyImpersonating]: '이미 가장 중입니다',
 	[keys.errorFailed]: '가장에 실패했습니다',
 	[keys.errorForbidden]: '허용되지 않습니다',
