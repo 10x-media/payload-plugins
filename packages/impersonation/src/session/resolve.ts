@@ -11,6 +11,41 @@ export const openByImpersonatorSid = (sid: string): Where => ({
 	and: [{ endedAt: { exists: false } }, { impersonatorSid: { equals: sid } }],
 })
 
+const findOpenWhere = async ({
+	options,
+	payload,
+	req,
+	where,
+}: {
+	options: ResolvedOptions
+	payload: Payload
+	req?: PayloadRequest
+	where: Where
+}): Promise<ImpersonationRecord | null> => {
+	try {
+		const found = await payload.find({
+			collection: options.collectionSlug,
+			depth: 0,
+			limit: 1,
+			overrideAccess: true,
+			pagination: false,
+			req,
+			where,
+		})
+		return (found.docs[0] as unknown as ImpersonationRecord | undefined) ?? null
+	} catch {
+		// Postgres CASCADE on impersonation_sessions_rels can make payload.find
+		// reject a row whose required impersonator or target relationship is gone.
+		const found = await payload.db.find({
+			collection: options.collectionSlug,
+			limit: 1,
+			req,
+			where,
+		})
+		return (found.docs[0] as unknown as ImpersonationRecord | undefined) ?? null
+	}
+}
+
 export const findOpenByTargetSid = async ({
 	options,
 	payload,
@@ -21,18 +56,8 @@ export const findOpenByTargetSid = async ({
 	payload: Payload
 	req?: PayloadRequest
 	sid: string
-}): Promise<ImpersonationRecord | null> => {
-	const found = await payload.find({
-		collection: options.collectionSlug,
-		depth: 0,
-		limit: 1,
-		overrideAccess: true,
-		pagination: false,
-		req,
-		where: openByTargetSid(sid),
-	})
-	return (found.docs[0] as unknown as ImpersonationRecord | undefined) ?? null
-}
+}): Promise<ImpersonationRecord | null> =>
+	findOpenWhere({ options, payload, req, where: openByTargetSid(sid) })
 
 export const findOpenByImpersonatorSid = async ({
 	options,
@@ -44,18 +69,8 @@ export const findOpenByImpersonatorSid = async ({
 	payload: Payload
 	req?: PayloadRequest
 	sid: string
-}): Promise<ImpersonationRecord | null> => {
-	const found = await payload.find({
-		collection: options.collectionSlug,
-		depth: 0,
-		limit: 1,
-		overrideAccess: true,
-		pagination: false,
-		req,
-		where: openByImpersonatorSid(sid),
-	})
-	return (found.docs[0] as unknown as ImpersonationRecord | undefined) ?? null
-}
+}): Promise<ImpersonationRecord | null> =>
+	findOpenWhere({ options, payload, req, where: openByImpersonatorSid(sid) })
 
 export const findOpenBySid = async (args: {
 	options: ResolvedOptions

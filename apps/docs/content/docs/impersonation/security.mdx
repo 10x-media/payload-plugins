@@ -32,7 +32,7 @@ Cookie POSTs to start, exit, and end must be same-origin. The plugin does **not*
 
 ## Parallel mode
 
-When `@10x-media/dual-session` isolated the target, start writes that cookie and leaves `${cookiePrefix}-token` alone. Admin requests still authenticate as the impersonator (`adminSessionPriority`). Frontend requests authenticate as the target. Current/bar/`_impersonation` resolve from either `targetSid` or `impersonatorSid`. A past `maxDuration` expires the isolated cookie and the hint; the impersonator's cookie stays.
+When `@10x-media/dual-session` isolated the target, start writes that cookie and leaves `` `${cookiePrefix}-token` `` alone. Admin requests still authenticate as the impersonator (`adminSessionPriority`). Frontend requests authenticate as the target. Current/bar/`_impersonation` resolve from either `targetSid` or `impersonatorSid`. A past `maxDuration` expires the isolated cookie and the hint; the impersonator's cookie stays.
 
 ## Writes
 

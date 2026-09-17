@@ -21,14 +21,30 @@ export const closeRecord = async ({
 		return record
 	}
 
-	const updated = (await payload.update({
-		id: record.id,
-		collection: options.collectionSlug,
-		data: { endedAt: new Date().toISOString(), endedBy } as never,
-		depth: 0,
-		overrideAccess: true,
-		req,
-	})) as unknown as ImpersonationRecord
+	const endedAt = new Date().toISOString()
+	let updated: ImpersonationRecord
+	try {
+		updated = (await payload.update({
+			id: record.id,
+			collection: options.collectionSlug,
+			data: { endedAt, endedBy } as never,
+			depth: 0,
+			overrideAccess: true,
+			req,
+		})) as unknown as ImpersonationRecord
+	} catch {
+		// Postgres CASCADE-deletes impersonation_sessions_rels when the
+		// impersonator or target user is deleted. payload.update then fails
+		// required-relationship validation. Close through the adapter instead.
+		await payload.db.updateOne({
+			id: record.id,
+			collection: options.collectionSlug,
+			data: { endedAt, endedBy },
+			req,
+			returning: false,
+		})
+		updated = { ...record, endedAt, endedBy }
+	}
 
 	await options.onEnd?.({ endedBy, payload, record: updated, req })
 	return updated
