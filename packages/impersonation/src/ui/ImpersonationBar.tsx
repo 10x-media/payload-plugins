@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, toast } from '@payloadcms/ui'
+import { Button, Pill, toast } from '@payloadcms/ui'
 import { useEffect, useState } from 'react'
 
 import { messageFor } from '../translations/lookup'
@@ -61,8 +61,11 @@ export const ImpersonationBar = ({
 			role="status"
 		>
 			<div className="impersonation-bar__meta">
-				<div>
-					<span className="impersonation-bar__badge">{pluginName}</span> {actingAs}
+				<div className="impersonation-bar__copy">
+					<Pill pillStyle="warning" size="small">
+						{pluginName}
+					</Pill>
+					<span>{actingAs}</span>
 				</div>
 				{sessionEndsAt ? (
 					<div className="impersonation-bar__time">

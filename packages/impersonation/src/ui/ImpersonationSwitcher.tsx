@@ -1,12 +1,26 @@
 'use client'
 
-import { Button, toast, useConfig } from '@payloadcms/ui'
-import { useCallback, useState } from 'react'
+import {
+	Button,
+	Drawer,
+	type ReactSelectOption,
+	SelectInput,
+	ShimmerEffect,
+	TextInput,
+	toast,
+	useConfig,
+	useDrawerSlug,
+	useModal,
+	useTranslation as usePayloadTranslation,
+} from '@payloadcms/ui'
+import { type ChangeEvent, useCallback, useEffect, useState } from 'react'
 
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
-import { errorKey, goAfterSwitch, postImpersonation } from './api'
+import { StartConfirmModal, type StartTarget } from './StartConfirmModal'
 import './impersonation.css'
+
+const CONFIRM_SLUG = 'impersonation-confirm-switcher'
 
 type UserHit = { email?: string; id: number | string; name?: string }
 
@@ -17,6 +31,14 @@ export type ImpersonationSwitcherProps = {
 	viewerId: number | string
 }
 
+const labelOf = (doc: UserHit) => String(doc.name ?? doc.email ?? doc.id ?? '')
+
+const optionValue = (selected: ReactSelectOption | ReactSelectOption[] | null) => {
+	const option = Array.isArray(selected) ? selected[0] : selected
+	const value = option?.value
+	return typeof value === 'string' || typeof value === 'number' ? String(value) : null
+}
+
 export const ImpersonationSwitcher = ({
 	apiPath,
 	collections,
@@ -24,152 +46,147 @@ export const ImpersonationSwitcher = ({
 	viewerId,
 }: ImpersonationSwitcherProps) => {
 	const { t } = useTranslation()
+	const { t: tAdmin } = usePayloadTranslation()
 	const { config } = useConfig()
-	const [open, setOpen] = useState(false)
-	const [busy, setBusy] = useState(false)
+	const { closeModal, isModalOpen, openModal } = useModal()
+	const drawerSlug = useDrawerSlug('impersonation-switcher')
+	const drawerOpen = isModalOpen(drawerSlug)
+
 	const [collection, setCollection] = useState(collections[0]?.slug ?? '')
 	const [query, setQuery] = useState('')
 	const [hits, setHits] = useState<UserHit[]>([])
-	const [pending, setPending] = useState<UserHit | null>(null)
-	const [reason, setReason] = useState('')
+	const [busy, setBusy] = useState(false)
+	const [target, setTarget] = useState<null | StartTarget>(null)
 
-	const search = useCallback(async () => {
-		if (!collection) {
-			return
-		}
-		const params = new URLSearchParams({
-			depth: '0',
-			limit: '20',
-			...(query ? { where: JSON.stringify({ email: { like: query } }) } : {}),
-		})
-		const response = await fetch(`${config.routes.api}/${collection}?${params}`, {
-			credentials: 'include',
-		})
-		if (!response.ok) {
-			toast.error(t(keys.errorFailed))
-			setHits([])
-			return
-		}
-		const body = (await response.json()) as { docs?: UserHit[] }
-		setHits((body.docs ?? []).filter((doc) => String(doc.id) !== String(viewerId)))
-	}, [collection, config.routes.api, query, t, viewerId])
+	const collectionOptions = collections.map((entry) => ({
+		label: entry.label,
+		value: entry.slug,
+	}))
 
-	const start = async () => {
-		if (!pending || busy) {
-			return
-		}
-		if (reasonMode === 'required' && !reason.trim()) {
-			toast.error(t(keys.errorReasonRequired))
-			return
-		}
-		setBusy(true)
-		try {
-			const result = await postImpersonation(`${apiPath}/start`, {
-				collection,
-				id: pending.id,
-				reason: reasonMode === 'off' ? undefined : reason,
-			})
-			if (!result.ok) {
-				toast.error(result.error ? t(errorKey(result.error)) : t(keys.errorFailed))
+	const search = useCallback(
+		async (term: string) => {
+			if (!collection) {
 				return
 			}
-			goAfterSwitch(result.redirect)
-		} finally {
-			setBusy(false)
+			setBusy(true)
+			try {
+				const params = new URLSearchParams({ depth: '0', limit: '20' })
+				const trimmed = term.trim()
+				if (trimmed) {
+					const titleField = config.collections.find((entry) => entry.slug === collection)?.admin
+						?.useAsTitle
+					const clauses: Record<string, unknown>[] = [{ email: { like: trimmed } }]
+					if (titleField && titleField !== 'email' && titleField !== 'id') {
+						clauses.push({ [titleField]: { like: trimmed } })
+					}
+					params.set('where', JSON.stringify({ or: clauses }))
+				}
+				const response = await fetch(`${config.routes.api}/${collection}?${params}`, {
+					credentials: 'include',
+				})
+				if (!response.ok) {
+					toast.error(t(keys.errorFailed))
+					setHits([])
+					return
+				}
+				const body = (await response.json()) as { docs?: UserHit[] }
+				setHits((body.docs ?? []).filter((doc) => String(doc.id) !== String(viewerId)))
+			} finally {
+				setBusy(false)
+			}
+		},
+		[collection, config.collections, config.routes.api, t, viewerId]
+	)
+
+	useEffect(() => {
+		if (!drawerOpen) {
+			return
 		}
+		const handle = window.setTimeout(() => {
+			void search(query)
+		}, 250)
+		return () => window.clearTimeout(handle)
+	}, [drawerOpen, query, search])
+
+	const pick = (hit: UserHit) => {
+		setTarget({ collection, id: hit.id, label: labelOf(hit) })
+		closeModal(drawerSlug)
+		openModal(CONFIRM_SLUG)
 	}
 
 	return (
 		<>
-			<Button
-				buttonStyle="pill"
-				onClick={() => {
-					setOpen(true)
-					void search()
-				}}
-				size="small"
-			>
+			<Button buttonStyle="pill" onClick={() => openModal(drawerSlug)} size="small">
 				<span data-testid="impersonation-switcher">{t(keys.switchToUser)}</span>
 			</Button>
-			{open ? (
-				<div className="impersonation-overlay">
-					<div className="impersonation-dialog" role="dialog">
-						<h2>{pending ? t(keys.confirmTitle) : t(keys.switchToUser)}</h2>
-						{collections.length > 1 && !pending ? (
-							<select onChange={(event) => setCollection(event.target.value)} value={collection}>
-								{collections.map((entry) => (
-									<option key={entry.slug} value={entry.slug}>
-										{entry.label}
-									</option>
-								))}
-							</select>
+			<Drawer slug={drawerSlug} title={t(keys.switchToUser)}>
+				<div className="impersonation-switcher">
+					{collections.length > 1 ? (
+						<SelectInput
+							isClearable={false}
+							label={tAdmin('general:collections')}
+							name="impersonation-collection"
+							onChange={(selected) => {
+								const value = optionValue(selected)
+								if (value) {
+									setCollection(value)
+								}
+							}}
+							options={collectionOptions}
+							path="impersonation-collection"
+							value={collection}
+						/>
+					) : null}
+					<TextInput
+						label={t(keys.searchUsers)}
+						onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
+						onKeyDown={(event) => {
+							if (event.key === 'Enter') {
+								event.preventDefault()
+								void search(query)
+							}
+						}}
+						path="impersonation-search"
+						placeholder={t(keys.searchUsers)}
+						value={query}
+					/>
+					<div className="impersonation-switcher__results">
+						{busy && hits.length === 0 ? <ShimmerEffect height="2rem" /> : null}
+						{!busy && hits.length === 0 ? (
+							<p className="impersonation-switcher__empty">{t(keys.noResults)}</p>
 						) : null}
-						{pending ? (
-							<>
-								<p>
-									{pending.name ?? pending.email} ({collection})
-								</p>
-								{reasonMode !== 'off' ? (
-									<label>
-										{t(keys.reasonLabel)}
-										<input
-											onChange={(event) => setReason(event.target.value)}
-											placeholder={t(keys.reasonPlaceholder)}
-											value={reason}
-										/>
-									</label>
-								) : null}
-								<div className="impersonation-dialog__actions">
-									<Button buttonStyle="secondary" disabled={busy} onClick={() => setPending(null)}>
-										{t(keys.cancel)}
-									</Button>
-									<Button
-										disabled={busy || (reasonMode === 'required' && !reason.trim())}
-										onClick={() => void start()}
-									>
-										<span data-testid="impersonation-confirm">{t(keys.confirm)}</span>
-									</Button>
-								</div>
-							</>
-						) : (
-							<>
-								<input
-									onChange={(event) => setQuery(event.target.value)}
-									onKeyDown={(event) => {
-										if (event.key === 'Enter') {
-											void search()
-										}
-									}}
-									placeholder={t(keys.searchUsers)}
-									value={query}
-								/>
-								<ul className="impersonation-dialog__list">
-									{hits.length === 0 ? <li>{t(keys.noResults)}</li> : null}
-									{hits.map((hit) => (
-										<li key={String(hit.id)}>
-											<button
-												className="impersonation-dialog__item"
-												onClick={() => setPending(hit)}
-												type="button"
-											>
-												{hit.name ?? hit.email ?? hit.id}
-											</button>
-										</li>
-									))}
-								</ul>
-								<div className="impersonation-dialog__actions">
-									<Button buttonStyle="secondary" onClick={() => setOpen(false)}>
-										{t(keys.cancel)}
-									</Button>
-									<Button buttonStyle="secondary" onClick={() => void search()}>
-										{t(keys.searchUsers)}
-									</Button>
-								</div>
-							</>
-						)}
+						{hits.map((hit) => (
+							<Button
+								buttonStyle="secondary"
+								disabled={busy}
+								key={String(hit.id)}
+								margin={false}
+								onClick={() => pick(hit)}
+								size="small"
+							>
+								{labelOf(hit)}
+							</Button>
+						))}
+					</div>
+					<div className="impersonation-switcher__controls">
+						<Button
+							buttonStyle="secondary"
+							margin={false}
+							onClick={() => closeModal(drawerSlug)}
+							size="large"
+						>
+							{t(keys.cancel)}
+						</Button>
 					</div>
 				</div>
-			) : null}
+			</Drawer>
+			<StartConfirmModal
+				apiPath={apiPath}
+				key={target ? `${target.collection}:${target.id}` : 'idle'}
+				modalSlug={CONFIRM_SLUG}
+				reasonMode={reasonMode}
+				target={target}
+			/>
 		</>
 	)
 }

@@ -8,6 +8,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.confirm]: 'Beralih',
 	[keys.confirmTitle]: 'Beralih ke pengguna ini?',
 	[keys.endSession]: 'Akhiri sesi',
+	[keys.endSessionBody]: 'Ini mengakhiri impersonasi. Target kembali sebagai dirinya sendiri.',
 	[keys.errorAlreadyImpersonating]: 'Sudah dalam impersonasi',
 	[keys.errorFailed]: 'Impersonasi gagal',
 	[keys.errorForbidden]: 'Tidak diizinkan',

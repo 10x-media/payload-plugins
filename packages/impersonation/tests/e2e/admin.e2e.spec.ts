@@ -11,18 +11,21 @@ const loginAdmin = async (page: Page) => {
 	await expect(page).not.toHaveURL(/\/admin\/login/)
 }
 
+const collectionLabel = (slug: string) =>
+	({ customers: 'Customers', partners: 'Partners', users: 'Users' })[slug] ?? slug
+
 const startAs = async (page: Page, name: string, collection?: string) => {
 	await page.getByTestId('impersonation-switcher').click()
-	await expect(page.getByRole('dialog')).toBeVisible()
+	const drawer = page.locator('.drawer--is-open, .drawer')
+	await expect(drawer).toBeVisible()
 	if (collection) {
-		await page.locator('.impersonation-dialog select').selectOption(collection)
-		await page.getByRole('button', { name: 'Search users' }).click()
+		await drawer.locator('.react-select').first().click()
+		await page.getByText(collectionLabel(collection), { exact: true }).click()
 	}
-	await page
-		.getByRole('button', { name: new RegExp(name) })
-		.first()
-		.click()
-	await page.getByTestId('impersonation-confirm').click()
+	await drawer.getByRole('button', { name, exact: true }).click()
+	const confirm = page.locator('.confirmation-modal')
+	await expect(confirm).toBeVisible()
+	await confirm.getByRole('button', { name: 'Switch', exact: true }).click()
 }
 
 const revealMenuItem = async (page: Page, testId: string) => {
@@ -72,6 +75,9 @@ test('document action starts impersonation', async ({ page }) => {
 	const id = (await listed.json()).docs[0].id
 	await page.goto(`/admin/collections/users/${id}`)
 	await (await revealMenuItem(page, 'impersonation-document-action')).click()
+	const confirm = page.locator('.confirmation-modal')
+	await expect(confirm).toBeVisible()
+	await confirm.getByRole('button', { name: 'Switch', exact: true }).click()
 	await expect(page.getByTestId('impersonation-bar')).toContainText('Acting as')
 })
 

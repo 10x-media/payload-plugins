@@ -1,84 +1,60 @@
 'use client'
 
-import { Button, toast, useConfig, useDocumentInfo } from '@payloadcms/ui'
-import { useState } from 'react'
+import { PopupList, useConfig, useDocumentInfo, useDocumentTitle, useModal } from '@payloadcms/ui'
+import { useMemo } from 'react'
 
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
-import { errorKey, goAfterSwitch, postImpersonation } from './api'
 import { useImpersonationClient } from './ImpersonationConfig'
-import './impersonation.css'
+import { StartConfirmModal, type StartTarget } from './StartConfirmModal'
+
+const CONFIRM_SLUG = 'impersonation-confirm-document'
 
 export const SwitchToUserMenuItem = () => {
-	const { collectionSlug, id } = useDocumentInfo()
+	const { collectionSlug, data, id } = useDocumentInfo()
+	const { title } = useDocumentTitle()
 	const { config } = useConfig()
 	const { t } = useTranslation()
+	const { openModal } = useModal()
 	const plugin = useImpersonationClient()
-	const [busy, setBusy] = useState(false)
-	const [reasonOpen, setReasonOpen] = useState(false)
-	const [reason, setReason] = useState('')
-
-	if (!collectionSlug || !id) {
-		return null
-	}
-
 	const apiPath = plugin?.apiPath ?? `${config.routes.api}/impersonation`
 	const reasonMode = plugin?.reasonMode ?? 'off'
 
-	const start = async (nextReason?: string) => {
-		setBusy(true)
-		try {
-			const result = await postImpersonation(`${apiPath}/start`, {
-				collection: collectionSlug,
-				id,
-				reason: reasonMode === 'off' ? undefined : nextReason,
-			})
-			if (!result.ok) {
-				toast.error(t(errorKey(result.error ?? 'failed')))
-				return
-			}
-			goAfterSwitch(result.redirect)
-		} finally {
-			setBusy(false)
+	const target = useMemo<null | StartTarget>(() => {
+		if (!collectionSlug || id === undefined) {
+			return null
 		}
-	}
+		const fromData =
+			data && typeof data === 'object'
+				? String(
+						(data as { email?: string; name?: string }).name ??
+							(data as { email?: string }).email ??
+							''
+					)
+				: ''
+		return {
+			collection: collectionSlug,
+			id,
+			label: fromData || title || String(id),
+		}
+	}, [collectionSlug, data, id, title])
 
-	const onClick = () => {
-		if (reasonMode === 'required') {
-			setReasonOpen(true)
-			return
-		}
-		void start(reasonMode === 'optional' ? reason : undefined)
+	if (!target) {
+		return null
 	}
 
 	return (
 		<>
-			<Button buttonStyle="pill" disabled={busy} onClick={onClick} size="small">
+			<PopupList.Button onClick={() => openModal(CONFIRM_SLUG)}>
 				<span data-testid="impersonation-document-action">{t(keys.switchToUser)}</span>
-			</Button>
-			{reasonOpen ? (
-				<div className="impersonation-overlay">
-					<div className="impersonation-dialog" role="dialog">
-						<h2>{t(keys.confirmTitle)}</h2>
-						<label>
-							{t(keys.reasonLabel)}
-							<input
-								onChange={(event) => setReason(event.target.value)}
-								placeholder={t(keys.reasonPlaceholder)}
-								value={reason}
-							/>
-						</label>
-						<div className="impersonation-dialog__actions">
-							<Button buttonStyle="secondary" disabled={busy} onClick={() => setReasonOpen(false)}>
-								{t(keys.cancel)}
-							</Button>
-							<Button disabled={busy || !reason.trim()} onClick={() => void start(reason)}>
-								<span data-testid="impersonation-confirm">{t(keys.confirm)}</span>
-							</Button>
-						</div>
-					</div>
-				</div>
-			) : null}
+			</PopupList.Button>
+			<StartConfirmModal
+				apiPath={apiPath}
+				key={target ? `${target.collection}:${target.id}` : 'idle'}
+				modalSlug={CONFIRM_SLUG}
+				reasonMode={reasonMode}
+				target={target}
+			/>
 		</>
 	)
 }

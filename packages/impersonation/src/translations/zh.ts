@@ -8,6 +8,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.confirm]: '切换',
 	[keys.confirmTitle]: '切换到此用户？',
 	[keys.endSession]: '结束会话',
+	[keys.endSessionBody]: '这将结束模拟登录。目标将重新以自己的身份登录。',
 	[keys.errorAlreadyImpersonating]: '已在模拟登录中',
 	[keys.errorFailed]: '模拟登录失败',
 	[keys.errorForbidden]: '不允许',

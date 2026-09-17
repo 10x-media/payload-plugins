@@ -11,6 +11,7 @@ export const keys = {
 	confirm: 'impersonation:confirm',
 	confirmTitle: 'impersonation:confirmTitle',
 	endSession: 'impersonation:endSession',
+	endSessionBody: 'impersonation:endSessionBody',
 	errorAlreadyImpersonating: 'impersonation:errorAlreadyImpersonating',
 	errorFailed: 'impersonation:errorFailed',
 	errorForbidden: 'impersonation:errorForbidden',
