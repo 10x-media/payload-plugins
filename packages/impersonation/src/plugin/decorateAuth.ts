@@ -1,10 +1,16 @@
-import type { AuthStrategy, Payload } from 'payload'
+import type { AuthStrategy, CollectionSlug, Payload, TypedUser } from 'payload'
 
 import { expireCookie, expirePayloadCookie } from '../auth/cookies'
+import { isolatedCookieNameFor } from '../auth/mode'
 import { collectionBySlug } from '../ids'
 import { closeAndRevoke } from '../session/close'
 import { findOpenBySid, isPastAbsoluteExpiry, relationOf } from '../session/resolve'
-import type { ImpersonatedUser, ImpersonationActor, ResolvedOptions } from '../types'
+import type {
+	ImpersonatedUser,
+	ImpersonationActor,
+	ImpersonationRecord,
+	ResolvedOptions,
+} from '../types'
 import { boundSid } from '../types'
 
 /**
@@ -47,24 +53,15 @@ const wrapStrategy = ({
 		}
 
 		if (isPastAbsoluteExpiry(row)) {
-			await closeAndRevoke({ endedBy: 'expired', options, payload, record: row })
-			const impersonator = relationOf(row.impersonator)
-			const authConfig =
-				(impersonator && collectionBySlug(payload, impersonator.collection)?.config.auth) ||
-				collectionBySlug(payload, payload.config.admin.user)?.config.auth
-			if (args.canSetHeaders && authConfig) {
-				const headers = result.responseHeaders ?? new Headers()
-				headers.append(
-					'Set-Cookie',
-					expirePayloadCookie({
-						authConfig,
-						cookiePrefix: payload.config.cookiePrefix,
-					})
-				)
-				headers.append('Set-Cookie', expireCookie({ authConfig, name: options.hintCookieName }))
-				return { responseHeaders: headers, user: null }
-			}
-			return { user: null }
+			return expireAbsoluteCap({
+				canSetHeaders: args.canSetHeaders,
+				options,
+				payload,
+				result,
+				row,
+				sid,
+				user,
+			})
 		}
 
 		const impersonator = relationOf(row.impersonator)
@@ -82,3 +79,101 @@ const wrapStrategy = ({
 		return result
 	},
 })
+
+/**
+ * Parallel expiry must not clear `${cookiePrefix}-token`. That cookie is still
+ * the impersonator. Swap expiry clears it because it was overwritten on start.
+ */
+const expireAbsoluteCap = async ({
+	canSetHeaders,
+	options,
+	payload,
+	result,
+	row,
+	sid,
+	user,
+}: {
+	canSetHeaders: boolean | undefined
+	options: ResolvedOptions
+	payload: Payload
+	result: Awaited<ReturnType<AuthStrategy['authenticate']>>
+	row: ImpersonationRecord
+	sid: string
+	user: ImpersonatedUser
+}): Promise<Awaited<ReturnType<AuthStrategy['authenticate']>>> => {
+	await closeAndRevoke({ endedBy: 'expired', options, payload, record: row })
+
+	const impersonator = relationOf(row.impersonator)
+	const target = relationOf(row.target)
+	const isImpersonatorRequest = sid === row.impersonatorSid && sid !== row.targetSid
+	const targetAuth = target ? collectionBySlug(payload, target.collection)?.config.auth : undefined
+	const impersonatorAuth =
+		(impersonator && collectionBySlug(payload, impersonator.collection)?.config.auth) ||
+		collectionBySlug(payload, payload.config.admin.user)?.config.auth
+	const cookieAuth = targetAuth ?? impersonatorAuth
+
+	if (!canSetHeaders || !cookieAuth) {
+		return isImpersonatorRequest ? result : { user: null }
+	}
+
+	const headers = result.responseHeaders ?? new Headers()
+	headers.append(
+		'Set-Cookie',
+		expireCookie({ authConfig: cookieAuth, name: options.hintCookieName })
+	)
+
+	if (row.mode === 'parallel' && target && targetAuth) {
+		const slotUser = await slotUserForTarget({ isImpersonatorRequest, payload, target, user })
+		const isolatedName = slotUser
+			? await isolatedCookieNameFor({
+					collection: target.collection as CollectionSlug,
+					payload,
+					user: slotUser,
+				})
+			: undefined
+		if (isolatedName) {
+			headers.append('Set-Cookie', expireCookie({ authConfig: targetAuth, name: isolatedName }))
+		}
+		if (isImpersonatorRequest) {
+			return { ...result, responseHeaders: headers }
+		}
+		return { responseHeaders: headers, user: null }
+	}
+
+	if (impersonatorAuth) {
+		headers.append(
+			'Set-Cookie',
+			expirePayloadCookie({
+				authConfig: impersonatorAuth,
+				cookiePrefix: payload.config.cookiePrefix,
+			})
+		)
+	}
+	return { responseHeaders: headers, user: null }
+}
+
+const slotUserForTarget = async ({
+	isImpersonatorRequest,
+	payload,
+	target,
+	user,
+}: {
+	isImpersonatorRequest: boolean
+	payload: Payload
+	target: { collection: string; id: number | string }
+	user: ImpersonatedUser
+}): Promise<null | TypedUser> => {
+	if (!isImpersonatorRequest) {
+		return user
+	}
+	try {
+		return (await payload.findByID({
+			id: target.id,
+			collection: target.collection as CollectionSlug,
+			depth: 0,
+			overrideAccess: true,
+		})) as TypedUser
+	} catch {
+		return { collection: target.collection, id: target.id } as TypedUser
+	}
+}

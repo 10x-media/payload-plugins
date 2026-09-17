@@ -2,7 +2,7 @@ import type { ServerProps } from 'payload'
 import type { ReactNode } from 'react'
 
 import { getRegistry } from '../plugin/registry'
-import { isPastAbsoluteExpiry, relationOf, resolveCurrent } from '../session/resolve'
+import { findOpenBySid, isPastAbsoluteExpiry, relationOf } from '../session/resolve'
 import { keys } from '../translations/keys'
 import { messageFor } from '../translations/lookup'
 import { boundSid } from '../types'
@@ -41,12 +41,7 @@ export const ImpersonationProvider = async ({
 		return wrapped
 	}
 
-	const row = await resolveCurrent({
-		headers: new Headers(),
-		options,
-		payload,
-		sid,
-	})
+	const row = await findOpenBySid({ options, payload, sid })
 
 	if (!row || isPastAbsoluteExpiry(row)) {
 		return wrapped
@@ -62,6 +57,7 @@ export const ImpersonationProvider = async ({
 			{wrapped}
 			<ImpersonationBar
 				actingAs={messageFor(locale, keys.actingAs).replace('{{name}}', String(targetName))}
+				adminRoute={payload.config.routes.admin}
 				apiPath={`${payload.config.routes.api}${options.apiPath}`}
 				impersonatorLocale={locale}
 				pluginName={messageFor(locale, keys.pluginName)}

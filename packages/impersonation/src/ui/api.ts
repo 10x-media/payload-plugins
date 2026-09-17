@@ -1,6 +1,7 @@
 'use client'
 
 import type { FailureCode } from '../endpoints/codes'
+import { CLIENT_FETCH_TIMEOUT_MS } from '../plugin/constants'
 import { keys } from '../translations/keys'
 
 export type { FailureCode }
@@ -11,23 +12,28 @@ export const postImpersonation = async (
 	path: string,
 	body: unknown
 ): Promise<{ error?: FailureCode; ok: boolean; redirect?: string; status: number }> => {
-	const response = await fetch(path, {
-		body: JSON.stringify(body ?? {}),
-		credentials: 'include',
-		headers: jsonHeaders,
-		method: 'POST',
-	})
-	let parsed: { error?: FailureCode; redirect?: string } = {}
 	try {
-		parsed = (await response.json()) as { error?: FailureCode; redirect?: string }
+		const response = await fetch(path, {
+			body: JSON.stringify(body ?? {}),
+			credentials: 'include',
+			headers: jsonHeaders,
+			method: 'POST',
+			signal: AbortSignal.timeout(CLIENT_FETCH_TIMEOUT_MS),
+		})
+		let parsed: { error?: FailureCode; redirect?: string } = {}
+		try {
+			parsed = (await response.json()) as { error?: FailureCode; redirect?: string }
+		} catch {
+			parsed = {}
+		}
+		return {
+			error: parsed.error,
+			ok: response.ok,
+			redirect: parsed.redirect,
+			status: response.status,
+		}
 	} catch {
-		parsed = {}
-	}
-	return {
-		error: parsed.error,
-		ok: response.ok,
-		redirect: parsed.redirect,
-		status: response.status,
+		return { error: 'failed', ok: false, status: 0 }
 	}
 }
 

@@ -208,3 +208,64 @@ describeForDb('impersonation parallel custom cookie', {}, (db) => {
 		}
 	})
 })
+
+describeForDb('impersonation parallel maxDuration', {}, (db) => {
+	it('expires the isolated cookie and keeps the impersonator', async () => {
+		const booted = await bootPayload({
+			collections: isolatedCollections,
+			configOverrides: {
+				admin: { user: 'users' },
+				plugins: [impersonation({ access: { impersonate: () => true }, maxDuration: 3600 })],
+			},
+			db,
+			plugin: dualSession({ collections: ['partners'] }),
+			seed: seedIsolated,
+		})
+		try {
+			const partner = await booted.payload.find({
+				collection: 'partners',
+				limit: 1,
+				where: { email: { equals: PARTNER.email } },
+			})
+			const client = createRestClient(booted)
+			await client.post('/api/users/login', { body: ADMIN })
+			const start = await client.post('/api/impersonation/start', {
+				body: { collection: 'partners', id: partner.docs[0]?.id },
+			})
+			expect(start.status).toBe(200)
+			expect(client.cookieNames()).toContain('payload-token')
+			expect(client.cookieNames()).toContain('payload-partners-token')
+
+			const rows = await booted.payload.find({
+				collection: 'impersonation-sessions',
+				limit: 1,
+				overrideAccess: true,
+				sort: '-startedAt',
+			})
+			await booted.payload.update({
+				id: rows.docs[0]?.id as number | string,
+				collection: 'impersonation-sessions',
+				data: { absoluteExpiresAt: new Date(0).toISOString() } as never,
+				overrideAccess: true,
+			})
+
+			const me = await client.get('/api/users/me')
+			expect((me.body as { user?: { email?: string } }).user?.email).toBe(ADMIN.email)
+			expect(client.cookieNames()).toContain('payload-token')
+			expect(client.cookieNames()).not.toContain('payload-partners-token')
+			expect(client.cookieNames()).not.toContain('impersonation-hint')
+
+			const current = await client.get('/api/impersonation')
+			expect(current.body).toMatchObject({ active: false })
+			const after = await booted.payload.find({
+				collection: 'impersonation-sessions',
+				limit: 1,
+				overrideAccess: true,
+				sort: '-startedAt',
+			})
+			expect(after.docs[0]).toMatchObject({ endedBy: 'expired' })
+		} finally {
+			await booted.stop()
+		}
+	})
+})

@@ -13,8 +13,9 @@ import {
 	useModal,
 	useTranslation as usePayloadTranslation,
 } from '@payloadcms/ui'
-import { type ChangeEvent, useCallback, useEffect, useState } from 'react'
+import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react'
 
+import { CLIENT_FETCH_TIMEOUT_MS } from '../plugin/constants'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { StartConfirmModal, type StartTarget } from './StartConfirmModal'
@@ -57,6 +58,7 @@ export const ImpersonationSwitcher = ({
 	const [hits, setHits] = useState<UserHit[]>([])
 	const [busy, setBusy] = useState(false)
 	const [target, setTarget] = useState<null | StartTarget>(null)
+	const abortRef = useRef<AbortController | null>(null)
 
 	const collectionOptions = collections.map((entry) => ({
 		label: entry.label,
@@ -68,6 +70,10 @@ export const ImpersonationSwitcher = ({
 			if (!collection) {
 				return
 			}
+			abortRef.current?.abort()
+			const controller = new AbortController()
+			abortRef.current = controller
+			const timeout = window.setTimeout(() => controller.abort(), CLIENT_FETCH_TIMEOUT_MS)
 			setBusy(true)
 			try {
 				const params = new URLSearchParams({ depth: '0', limit: '20' })
@@ -83,7 +89,11 @@ export const ImpersonationSwitcher = ({
 				}
 				const response = await fetch(`${config.routes.api}/${collection}?${params}`, {
 					credentials: 'include',
+					signal: controller.signal,
 				})
+				if (controller.signal.aborted) {
+					return
+				}
 				if (!response.ok) {
 					toast.error(t(keys.errorFailed))
 					setHits([])
@@ -91,8 +101,17 @@ export const ImpersonationSwitcher = ({
 				}
 				const body = (await response.json()) as { docs?: UserHit[] }
 				setHits((body.docs ?? []).filter((doc) => String(doc.id) !== String(viewerId)))
+			} catch {
+				if (controller.signal.aborted) {
+					return
+				}
+				toast.error(t(keys.errorFailed))
+				setHits([])
 			} finally {
-				setBusy(false)
+				window.clearTimeout(timeout)
+				if (abortRef.current === controller) {
+					setBusy(false)
+				}
 			}
 		},
 		[collection, config.collections, config.routes.api, t, viewerId]
@@ -100,6 +119,7 @@ export const ImpersonationSwitcher = ({
 
 	useEffect(() => {
 		if (!drawerOpen) {
+			abortRef.current?.abort()
 			return
 		}
 		const handle = window.setTimeout(() => {

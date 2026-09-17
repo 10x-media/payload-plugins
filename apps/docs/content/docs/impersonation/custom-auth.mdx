@@ -5,7 +5,7 @@ description: Session seams for collections that do not use Payload local login.
 
 Default minting is `db.findOne` (not `findByID`, which strips `sessions`) then `addSessionToUser`, `getFieldsToSign`, `jwtSign`, `generatePayloadCookie`.
 
-Collections with `useSessions: false` or `disableLocalStrategy` are excluded from default targets unless you pass all three seams:
+Collections with `useSessions: false` or `disableLocalStrategy` are excluded from default targets, the header picker, and the document action unless you pass all three seams:
 
 ```ts
 impersonation({

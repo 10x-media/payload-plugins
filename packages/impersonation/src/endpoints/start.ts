@@ -5,6 +5,7 @@ import { issueSession } from '../auth/issue'
 import { revokeSession } from '../auth/revoke'
 import { asId, collectionBySlug, idsEqual } from '../ids'
 import { REASON_MAX_LENGTH } from '../plugin/constants'
+import { isStartableAuthCollection } from '../plugin/startable'
 import { closeRecord } from '../session/close'
 import {
 	findOpenByImpersonatorSid,
@@ -28,33 +29,12 @@ import {
 	trimReason,
 } from './shared'
 
-const allowedTargets = (req: PayloadRequest, options: ResolvedOptions): Set<string> => {
-	if (options.targets) {
-		return new Set(options.targets)
-	}
-	const hasSeams = Boolean(
-		options.session.issue && options.session.revoke && options.session.binding
-	)
-	return new Set(
+const allowedTargets = (req: PayloadRequest, options: ResolvedOptions): Set<string> =>
+	new Set(
 		Object.values(req.payload.collections)
-			.filter((collection) => {
-				if (!collection.config.auth) {
-					return false
-				}
-				if (hasSeams) {
-					return true
-				}
-				if (collection.config.auth.disableLocalStrategy) {
-					return false
-				}
-				if (collection.config.auth.useSessions === false) {
-					return false
-				}
-				return true
-			})
+			.filter((collection) => isStartableAuthCollection(collection.config, options))
 			.map((collection) => collection.config.slug)
 	)
-}
 
 export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 	const gate = await prepareMutation(req)
@@ -118,13 +98,10 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 		existing = null
 	}
 	if (!existing) {
-		return fail({ error: 'targetNotFound', req, status: 404 })
-	}
-	if (existing.deletedAt) {
-		return fail({ error: 'targetTrashed', req, status: 403 })
+		return fail({ error: 'forbidden', req, status: 403 })
 	}
 
-	let readable: Record<string, unknown>
+	let readable: Record<string, unknown> | null = null
 	try {
 		readable = (await req.payload.findByID({
 			id: targetId,
@@ -134,22 +111,14 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 			req,
 		})) as unknown as Record<string, unknown>
 	} catch {
-		return fail({ error: 'forbidden', req, status: 403 })
-	}
-
-	if (!readable) {
-		return fail({ error: 'targetNotFound', req, status: 404 })
-	}
-
-	if (registered.config.auth.verify && readable._verified !== true) {
-		return fail({ error: 'targetUnverified', req, status: 403 })
+		readable = null
 	}
 
 	let allowed: unknown
 	try {
 		allowed = await options.access.impersonate({
 			req,
-			target: readable,
+			target: readable ?? existing,
 			targetCollection: collection as CollectionSlug,
 		})
 	} catch {
@@ -157,6 +126,17 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 	}
 	if (!isLiteralTrue(allowed)) {
 		return fail({ error: 'forbidden', req, status: 403 })
+	}
+
+	if (existing.deletedAt) {
+		return fail({ error: 'targetTrashed', req, status: 403 })
+	}
+	if (!readable) {
+		return fail({ error: 'forbidden', req, status: 403 })
+	}
+
+	if (registered.config.auth.verify && readable._verified !== true) {
+		return fail({ error: 'targetUnverified', req, status: 403 })
 	}
 
 	const reason = trimReason(body.reason, REASON_MAX_LENGTH)
@@ -174,7 +154,11 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 			req,
 			userId: targetId,
 		})
-	} catch {
+	} catch (error) {
+		req.payload.logger.error({
+			err: error,
+			msg: '@10x-media/impersonation: start failed to mint',
+		})
 		return fail({ error: 'failed', req, status: 500 })
 	}
 
@@ -265,7 +249,7 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 		const bodyOut: Record<string, unknown> = {
 			exp: minted.exp,
 			redirect,
-			user: minted.user,
+			user: readable,
 		}
 		if (!authConfig.removeTokenFromResponses) {
 			bodyOut.token = minted.token

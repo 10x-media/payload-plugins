@@ -1,6 +1,7 @@
 import type { CollectionConfig, Config } from 'payload'
 
 import type { ResolvedOptions } from '../types'
+import { isStartableAuthCollection } from './startable'
 
 const ACTION = '@10x-media/impersonation/rsc#ImpersonationAction'
 const PROVIDER = '@10x-media/impersonation/rsc#ImpersonationProvider'
@@ -26,15 +27,8 @@ export const registerAdmin = (config: Config, options: ResolvedOptions): void =>
 		return
 	}
 
-	const targets = new Set(
-		options.targets ??
-			(config.collections ?? [])
-				.filter((collection) => Boolean(collection.auth))
-				.map(({ slug }) => slug)
-	)
-
 	config.collections = (config.collections ?? []).map((collection) => {
-		if (!targets.has(collection.slug) || collection.slug === options.collectionSlug) {
+		if (!isStartableAuthCollection(collection, options)) {
 			return collection
 		}
 		return withDocumentAction(collection)

@@ -7,7 +7,7 @@ description: Origin gate, access.impersonate, session binding, and what is not a
 
 `access.impersonate` is required. Config throws if it is not a function. `disabled: true` skips the check.
 
-Only the literal `true` allows. A Payload `Where` object is deny, never allow-all. `() => {}` is deny. Start also `findByID`s the target with `overrideAccess: false`; cannot read means 403.
+Only the literal `true` allows. A Payload `Where` object is deny, never allow-all. `() => {}` is deny. Start loads the target with `overrideAccess: true` (and `trash: true` when the collection supports it). Missing is `forbidden`, not `targetNotFound`. `access.impersonate` then runs. Trash, unverified, and unreadable still 403 after an allow. The start JSON `user` is that readable document, not the minted `db.findOne` row (no hash, salt, reset tokens, or sessions).
 
 `access.terminate` and `access.readRecords` default deny. Exit is binding, not a role.
 
@@ -15,7 +15,7 @@ Only the literal `true` allows. A Payload `Where` object is deny, never allow-al
 
 Cookie POSTs to start, exit, and end must be same-origin. The plugin does **not** use host `config.csrf` as its only gate.
 
-- `Authorization: JWT` or `Bearer` skips the gate only when `auth.jwtOrder` ranks that scheme before `cookie`.
+- `Authorization: JWT` or `Bearer` skips the gate only when `auth.jwtOrder` ranks that scheme before `cookie` **and** the header carries a non-empty token. An empty `JWT ` / `Bearer ` prefix does not skip: Payload then authenticates the cookie.
 - `Sec-Fetch-Site: cross-site` and `same-site` are denied. Stricter than Payload's cookie CSRF and than dual-session, so a subdomain XSS cannot start an impersonation.
 - Allowlist is `serverURL` + `config.csrf` + `security.trustedOrigins`. Empty allowlist falls back to Origin host equals `Host`.
 - JSON `Content-Type` is required (forces a CORS preflight on cross-origin form posts).
@@ -32,7 +32,7 @@ Cookie POSTs to start, exit, and end must be same-origin. The plugin does **not*
 
 ## Parallel mode
 
-When `@10x-media/dual-session` isolated the target, start writes that cookie and leaves `${cookiePrefix}-token` alone. Admin requests still authenticate as the impersonator (`adminSessionPriority`). Frontend requests authenticate as the target. Current/bar/`_impersonation` resolve from either `targetSid` or `impersonatorSid`.
+When `@10x-media/dual-session` isolated the target, start writes that cookie and leaves `${cookiePrefix}-token` alone. Admin requests still authenticate as the impersonator (`adminSessionPriority`). Frontend requests authenticate as the target. Current/bar/`_impersonation` resolve from either `targetSid` or `impersonatorSid`. A past `maxDuration` expires the isolated cookie and the hint; the impersonator's cookie stays.
 
 ## Writes
 
