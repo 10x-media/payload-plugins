@@ -12,6 +12,29 @@ const resolveSameSite = (sameSite: AuthConfig['cookies']['sameSite']) => {
 
 export const sharedCookieName = (cookiePrefix: string) => `${cookiePrefix}-token`
 
+export const writeCookie = ({
+	authConfig,
+	httpOnly = true,
+	name,
+	value,
+}: {
+	authConfig: AuthConfig
+	httpOnly?: boolean
+	name: string
+	value: string
+}) =>
+	generateCookie<false>({
+		name,
+		domain: authConfig.cookies.domain ?? undefined,
+		expires: getCookieExpiration({ seconds: authConfig.tokenExpiration }),
+		httpOnly,
+		path: '/',
+		returnCookieAsObject: false,
+		sameSite: resolveSameSite(authConfig.cookies.sameSite),
+		secure: authConfig.cookies.secure,
+		value,
+	})
+
 export const generateHintCookie = ({
 	authConfig,
 	name,
@@ -20,25 +43,22 @@ export const generateHintCookie = ({
 	authConfig: AuthConfig
 	name: string
 	value: string
+}) => writeCookie({ authConfig, name, value })
+
+export const expireCookie = ({
+	authConfig,
+	httpOnly = true,
+	name,
+}: {
+	authConfig: AuthConfig
+	httpOnly?: boolean
+	name: string
 }) =>
 	generateCookie<false>({
 		name,
 		domain: authConfig.cookies.domain ?? undefined,
-		expires: getCookieExpiration({ seconds: authConfig.tokenExpiration }),
-		httpOnly: true,
-		path: '/',
-		returnCookieAsObject: false,
-		sameSite: resolveSameSite(authConfig.cookies.sameSite),
-		secure: authConfig.cookies.secure,
-		value,
-	})
-
-export const expireCookie = ({ authConfig, name }: { authConfig: AuthConfig; name: string }) =>
-	generateCookie<false>({
-		name,
-		domain: authConfig.cookies.domain ?? undefined,
 		expires: new Date(Date.now() - 1000),
-		httpOnly: true,
+		httpOnly,
 		path: '/',
 		returnCookieAsObject: false,
 		sameSite: resolveSameSite(authConfig.cookies.sameSite),

@@ -3,6 +3,11 @@ import type { CollectionSlug, Endpoint, PayloadRequest } from 'payload'
 import { expireCookies, generateHintCookie } from '../auth/cookies'
 import { issueSession } from '../auth/issue'
 import { revokeSession } from '../auth/revoke'
+import {
+	clearOnSwitchWithoutTenant,
+	readTenantCookie,
+	startTenantCookies,
+} from '../auth/tenantCookie'
 import { asId, collectionBySlug, idsEqual } from '../ids'
 import { REASON_MAX_LENGTH } from '../plugin/constants'
 import { isStartableAuthCollection } from '../plugin/startable'
@@ -182,6 +187,7 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 				impersonatorEmail: typeof user.email === 'string' ? user.email : undefined,
 				impersonatorLocale: locale,
 				impersonatorSid: sid,
+				impersonatorTenantCookie: readTenantCookie(req.headers, req.payload.config.cookiePrefix),
 				ip: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? undefined,
 				mode: minted.mode,
 				reason: options.reason === 'off' ? undefined : reason,
@@ -231,6 +237,7 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 		await options.onStart?.({ payload: req.payload, record: row, req })
 
 		const authConfig = registered.config.auth
+		const cookiePrefix = req.payload.config.cookiePrefix
 		const cookies = [
 			minted.cookie,
 			generateHintCookie({
@@ -238,10 +245,19 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 				name: options.hintCookieName,
 				value: String(row.id),
 			}),
+			...startTenantCookies({
+				authConfig,
+				cookiePrefix,
+				mode: minted.mode,
+				options,
+				target: readable,
+			}),
 			...expireCookies({
 				authConfig,
-				cookiePrefix: req.payload.config.cookiePrefix,
-				names: options.cookies.clearOnSwitch.filter((name) => name !== minted.cookieName),
+				cookiePrefix,
+				names: clearOnSwitchWithoutTenant(options.cookies.clearOnSwitch, cookiePrefix).filter(
+					(name) => name !== minted.cookieName
+				),
 			}),
 		]
 

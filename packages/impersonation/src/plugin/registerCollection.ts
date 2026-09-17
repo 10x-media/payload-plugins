@@ -68,6 +68,7 @@ export const buildRecordsCollection = ({
 			},
 			{ name: 'targetSid', type: 'text', index: true, required: true },
 			{ name: 'impersonatorSid', type: 'text', index: true, required: true },
+			{ name: 'impersonatorTenantCookie', type: 'text' },
 			{
 				name: 'startedAt',
 				type: 'date',

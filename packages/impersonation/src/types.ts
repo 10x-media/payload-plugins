@@ -171,6 +171,7 @@ export type ImpersonationRecord = {
 	impersonatorEmail?: null | string
 	impersonatorLocale?: null | string
 	impersonatorSid: string
+	impersonatorTenantCookie?: null | string
 	ip?: null | string
 	mode: ImpersonationMode
 	reason?: null | string
