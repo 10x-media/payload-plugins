@@ -1,0 +1,42 @@
+---
+title: Impersonation
+description: Let an authorised account sign in as another user, then return. Beta scaffold.
+---
+
+`@10x-media/impersonation` will let an authorised account sign in as another user without that user's password, browse the admin panel and the frontend as that user, then return. Every session is recorded. After start, `req.user` is the target. This is not a view-as overlay.
+
+<Callout type="warn">
+**Experimental, not built yet.** Installing the plugin today registers translations and the plugin slug. It adds no collections, no endpoints, and no UI. Do not use it in production.
+</Callout>
+
+## What exists today
+
+- The `impersonation(options)` factory with `disabled` and `translations`.
+- The standard subpath exports: `./types`, `./client`, `./i18n`. Translations follow the [shared pattern](/concepts/translations) (namespace `impersonation:`).
+- A host app that already seeds the collections the feature will exercise: staff users, a second local-auth collection, a dual-session isolated collection, and a `disableLocalStrategy` collection with a custom strategy.
+
+## Install
+
+```bash
+pnpm add @10x-media/impersonation
+```
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { impersonation } from '@10x-media/impersonation'
+
+export default buildConfig({
+  plugins: [impersonation({})],
+})
+```
+
+## Options
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `disabled` | `boolean` | `false` | Return the incoming config unchanged. |
+| `translations` | `TranslationsOption` | none | Per-locale string overrides. See [Translations](/concepts/translations). |
+
+## Where it is headed
+
+An authorised caller starts a recorded session, the browser authenticates as the target, and Exit restores the impersonator. Dual-session hosts get a parallel mode so both cookies can coexist. Custom auth is reached through host-supplied session seams. None of that ships in this scaffold.
