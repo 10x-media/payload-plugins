@@ -20,7 +20,7 @@ const startAs = async (page: Page, name: string, collection?: string) => {
 	await expect(drawer).toBeVisible()
 	if (collection) {
 		await drawer.locator('.react-select').first().click()
-		await page.getByText(collectionLabel(collection), { exact: true }).click()
+		await page.getByRole('option', { name: collectionLabel(collection), exact: true }).click()
 	}
 	await drawer.getByRole('button', { name, exact: true }).click()
 	const confirm = page.locator('.confirmation-modal')
