@@ -1,4 +1,12 @@
 {
 	"title": "Impersonation",
-	"pages": ["index", "quick-start", "configuration", "custom-auth", "security", "limits"]
+	"pages": [
+		"index",
+		"quick-start",
+		"configuration",
+		"custom-auth",
+		"security",
+		"multi-tenancy",
+		"limits"
+	]
 }

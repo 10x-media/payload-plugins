@@ -3,6 +3,7 @@ import type { CollectionSlug, Endpoint, PayloadRequest } from 'payload'
 import { expireCookie, expireCookies, expirePayloadCookie } from '../auth/cookies'
 import { resignSession } from '../auth/issue'
 import { isolatedCookieNameFor } from '../auth/mode'
+import { clearOnSwitchWithoutTenant, exitTenantCookies } from '../auth/tenantCookie'
 import { collectionBySlug } from '../ids'
 import { closeAndRevoke } from '../session/close'
 import { releaseLocks } from '../session/locks'
@@ -53,10 +54,12 @@ export const exitHandler = async (req: PayloadRequest): Promise<Response> => {
 		return fail({ error: 'failed', req, status: 500 })
 	}
 
+	const cookiePrefix = req.payload.config.cookiePrefix
+	const extraClearOnSwitch = clearOnSwitchWithoutTenant(options.cookies.clearOnSwitch, cookiePrefix)
 	const expireHintAndClear = expireCookies({
 		authConfig,
-		cookiePrefix: req.payload.config.cookiePrefix,
-		names: [...options.cookies.clearOnSwitch, options.hintCookieName],
+		cookiePrefix,
+		names: [...extraClearOnSwitch, options.hintCookieName],
 	})
 
 	if (!impersonator || !collectionBySlug(req.payload, impersonator.collection)) {
@@ -72,7 +75,7 @@ export const exitHandler = async (req: PayloadRequest): Promise<Response> => {
 			cookies: [
 				expirePayloadCookie({
 					authConfig,
-					cookiePrefix: req.payload.config.cookiePrefix,
+					cookiePrefix,
 				}),
 				...expireHintAndClear,
 			],
@@ -108,7 +111,7 @@ export const exitHandler = async (req: PayloadRequest): Promise<Response> => {
 			cookies: [
 				expirePayloadCookie({
 					authConfig,
-					cookiePrefix: req.payload.config.cookiePrefix,
+					cookiePrefix,
 				}),
 				...expireHintAndClear,
 			],
@@ -150,8 +153,8 @@ export const exitHandler = async (req: PayloadRequest): Promise<Response> => {
 				expireCookie({ authConfig, name: options.hintCookieName }),
 				...expireCookies({
 					authConfig,
-					cookiePrefix: req.payload.config.cookiePrefix,
-					names: options.cookies.clearOnSwitch,
+					cookiePrefix,
+					names: extraClearOnSwitch,
 				}),
 			],
 			req,
@@ -180,7 +183,7 @@ export const exitHandler = async (req: PayloadRequest): Promise<Response> => {
 			cookies: [
 				expirePayloadCookie({
 					authConfig,
-					cookiePrefix: req.payload.config.cookiePrefix,
+					cookiePrefix,
 				}),
 				...expireHintAndClear,
 			],
@@ -204,10 +207,17 @@ export const exitHandler = async (req: PayloadRequest): Promise<Response> => {
 		cookies: [
 			restored.cookie,
 			expireCookie({ authConfig, name: options.hintCookieName }),
+			...exitTenantCookies({
+				authConfig,
+				cookiePrefix,
+				mode: closed.mode,
+				options,
+				snapshot: row.impersonatorTenantCookie,
+			}),
 			...expireCookies({
 				authConfig,
-				cookiePrefix: req.payload.config.cookiePrefix,
-				names: options.cookies.clearOnSwitch,
+				cookiePrefix,
+				names: extraClearOnSwitch,
 			}),
 		],
 		req,

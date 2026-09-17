@@ -113,6 +113,20 @@ describeForDb('impersonation parallel', {}, (db) => {
 		)
 		await client.post('/api/impersonation/exit', { body: {} })
 	})
+
+	it('keeps the tenant cookie in parallel', async () => {
+		const client = createRestClient(booted)
+		await client.post('/api/users/login', { body: ADMIN })
+		client.setCookie('payload-tenant', 'tenant-a')
+		const start = await client.post('/api/impersonation/start', {
+			body: { collection: 'partners', id: partnerId },
+		})
+		expect(start.status).toBe(200)
+		expect(client.jar.get('payload-tenant')).toBe('tenant-a')
+		const exit = await client.post('/api/impersonation/exit', { body: {} })
+		expect(exit.status).toBe(200)
+		expect(client.jar.get('payload-tenant')).toBe('tenant-a')
+	})
 })
 
 describeForDb('impersonation role-split fallback', {}, (db) => {

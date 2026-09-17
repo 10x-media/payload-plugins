@@ -531,7 +531,9 @@ describeForDb('impersonation refusals', {}, (db) => {
 			})
 			expect(start.status).toBe(200)
 			expect(client.cookieNames()).not.toContain('acme-tenant')
-			await client.post('/api/impersonation/exit', { body: {} })
+			const exit = await client.post('/api/impersonation/exit', { body: {} })
+			expect(exit.status).toBe(200)
+			expect(client.jar.get('acme-tenant')).toBe('tenant-a')
 		} finally {
 			await booted.stop()
 		}
@@ -884,6 +886,59 @@ describeForDb('impersonation refusals', {}, (db) => {
 			const exit = await client.post('/api/impersonation/exit', { body: {} })
 			expect(exit.status).toBe(409)
 			expect(exit.body).toMatchObject({ error: 'impersonatorGone' })
+		} finally {
+			await booted.stop()
+		}
+	})
+
+	it('sets the unique assigned tenant on swap start', async () => {
+		const booted = await bootPayload({
+			collections: [
+				{
+					slug: 'users',
+					auth: true,
+					fields: [
+						{ name: 'name', type: 'text' },
+						{ hasMany: true, name: 'tenants', relationTo: 'users', type: 'relationship' },
+					],
+				},
+			],
+			configOverrides: { admin: { user: 'users' } },
+			db,
+			plugin: impersonation({ access: { impersonate: () => true } }),
+			seed: async (payload) => {
+				const admin = await payload.create({
+					collection: 'users',
+					data: { ...ADMIN, name: 'Admin' },
+				})
+				await payload.create({
+					collection: 'users',
+					data: { ...TARGET, name: 'Target', tenants: [admin.id] },
+				})
+			},
+		})
+		try {
+			const client = createRestClient(booted)
+			const target = await booted.payload.find({
+				collection: 'users',
+				limit: 1,
+				where: { email: { equals: TARGET.email } },
+			})
+			await client.post('/api/users/login', { body: ADMIN })
+			client.setCookie('payload-tenant', 'other-tenant')
+			const start = await client.post('/api/impersonation/start', {
+				body: { collection: 'users', id: target.docs[0]?.id },
+			})
+			expect(start.status).toBe(200)
+			const admin = await booted.payload.find({
+				collection: 'users',
+				limit: 1,
+				where: { email: { equals: ADMIN.email } },
+			})
+			expect(client.jar.get('payload-tenant')).toBe(String(admin.docs[0]?.id))
+			const exit = await client.post('/api/impersonation/exit', { body: {} })
+			expect(exit.status).toBe(200)
+			expect(client.jar.get('payload-tenant')).toBe('other-tenant')
 		} finally {
 			await booted.stop()
 		}
