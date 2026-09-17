@@ -1370,6 +1370,9 @@ importers:
 
   packages/impersonation:
     devDependencies:
+      '@10x-media/dual-session':
+        specifier: workspace:*
+        version: link:../dual-session
       '@10x-media/payload-test-harness':
         specifier: workspace:*
         version: link:../../tooling/test-harness

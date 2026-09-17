@@ -1,0 +1,17 @@
+export const FAILURE_CODES = [
+	'alreadyImpersonating',
+	'failed',
+	'forbidden',
+	'impersonatorGone',
+	'impersonatorSessionExpired',
+	'invalidBody',
+	'notImpersonating',
+	'origin',
+	'reasonRequired',
+	'selfTarget',
+	'targetNotFound',
+	'targetTrashed',
+	'targetUnverified',
+	'unsupportedAuth',
+	'unsupportedCollection',
+] as const

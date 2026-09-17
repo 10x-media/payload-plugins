@@ -12,8 +12,8 @@ const hasStaffRole = (user: null | TypedUser | undefined) =>
 	STAFF_ROLES.some((role) => rolesOf(user).includes(role))
 
 /**
- * Host predicate for `access.impersonate` once the plugin grows one.
- * Only `admin` may start a session; editors are valid targets.
+ * Host predicate for `access.impersonate`. Only `admin` may start a session;
+ * editors are valid targets.
  */
 export const canImpersonate = (user: null | TypedUser | undefined) =>
 	rolesOf(user).includes('admin')
@@ -30,7 +30,7 @@ export const users: CollectionConfig = {
 	auth: true,
 	admin: { useAsTitle: 'name', defaultColumns: ['name', 'email', 'roles'] },
 	fields: [
-		{ name: 'name', type: 'text', required: true },
+		{ name: 'name', type: 'text' },
 		{
 			name: 'roles',
 			type: 'select',
@@ -49,7 +49,7 @@ export const customers: CollectionConfig = {
 	slug: 'customers',
 	auth: true,
 	admin: { useAsTitle: 'name' },
-	fields: [{ name: 'name', type: 'text', required: true }],
+	fields: [{ name: 'name', type: 'text' }],
 }
 
 /**
@@ -60,7 +60,7 @@ export const partners: CollectionConfig = {
 	slug: 'partners',
 	auth: true,
 	admin: { useAsTitle: 'name' },
-	fields: [{ name: 'name', type: 'text', required: true }],
+	fields: [{ name: 'name', type: 'text' }],
 }
 
 /**
@@ -76,6 +76,6 @@ export const ssoUsers: CollectionConfig = {
 		strategies: [devSsoStrategy],
 	},
 	admin: { useAsTitle: 'email' },
-	fields: [{ name: 'name', type: 'text', required: true }],
+	fields: [{ name: 'name', type: 'text' }],
 	endpoints: [devSsoCallback],
 }

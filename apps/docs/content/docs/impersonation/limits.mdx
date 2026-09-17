@@ -1,0 +1,20 @@
+---
+title: Limits
+description: What v1 does not cover.
+---
+
+Out of scope for v1:
+
+- Read-only impersonation
+- GraphQL mutations
+- A shipped frontend React banner (`getImpersonation` is the helper)
+- Preference isolation hooks
+- Email kill-switch
+- Step-up password
+- Notify-the-target emails
+- BroadcastChannel multi-tab
+- Automatic audit-log attribution (`@10x-media/audit-logs` can read `_impersonation`)
+
+The admin collection cannot use `useSessions: false` or `disableLocalStrategy`. Numeric ids (Postgres) are accepted on start and terminate.
+
+Locked (`lockUntil`) targets are allowed and stamped. Trash, unverified-if-verify, self, nesting, and API-key callers are refused.

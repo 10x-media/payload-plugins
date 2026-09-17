@@ -1,4 +1,4 @@
 {
-	"title": "Impersonation",
-	"pages": ["index"]
+  "title": "Impersonation",
+  "pages": ["index", "quick-start", "configuration", "custom-auth", "security", "limits"]
 }
