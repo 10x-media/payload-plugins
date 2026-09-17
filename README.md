@@ -19,7 +19,7 @@ Open-source plugins for [Payload v3](https://payloadcms.com) maintained by [10x-
 | [@10x-media/dual-session](./packages/dual-session) | Give each Payload auth collection its own session cookie, so an admin session and a frontend session can coexist. | [![npm](https://img.shields.io/npm/v/@10x-media/dual-session)](https://www.npmjs.com/package/@10x-media/dual-session) |
 | [@10x-media/form-variants](./packages/form-variants) | Alternative edit forms for a collection: simplified and step-by-step variants over the native form state | [![npm](https://img.shields.io/npm/v/@10x-media/form-variants)](https://www.npmjs.com/package/@10x-media/form-variants) |
 | [@10x-media/settings-overlay](./packages/settings-overlay) | Files any collection, global, admin view or component behind a deep-linkable floating panel | [![npm](https://img.shields.io/npm/v/@10x-media/settings-overlay)](https://www.npmjs.com/package/@10x-media/settings-overlay) |
-| [@10x-media/impersonation](./packages/impersonation) | Let an authorised account sign in as another user, then return (beta scaffold) | [![npm](https://img.shields.io/npm/v/@10x-media/impersonation)](https://www.npmjs.com/package/@10x-media/impersonation) |
+| [@10x-media/impersonation](./packages/impersonation) | Let an authorised account sign in as another user without their password. After start, `req.user` is the target. | [![npm](https://img.shields.io/npm/v/@10x-media/impersonation)](https://www.npmjs.com/package/@10x-media/impersonation) |
 
 
 ## Status

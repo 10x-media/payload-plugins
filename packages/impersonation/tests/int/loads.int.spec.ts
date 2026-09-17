@@ -1,5 +1,6 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { afterAll, beforeAll, expect, it } from 'vitest'
+
 import { impersonation } from '../../src/index'
 
 describeForDb('impersonation loads', { dbs: ['mongo'] }, (db) => {
@@ -7,8 +8,8 @@ describeForDb('impersonation loads', { dbs: ['mongo'] }, (db) => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: impersonation({}),
 			db,
+			plugin: impersonation({ access: { impersonate: () => true } }),
 		})
 	})
 
@@ -21,7 +22,7 @@ describeForDb('impersonation loads', { dbs: ['mongo'] }, (db) => {
 		expect(booted.db).toBe(db)
 	})
 
-	it('plugin does not mutate config in passthrough mode', () => {
-		expect(booted.payload.collections).toBeDefined()
+	it('registers the impersonation-sessions collection', () => {
+		expect(booted.payload.collections['impersonation-sessions']).toBeDefined()
 	})
 })

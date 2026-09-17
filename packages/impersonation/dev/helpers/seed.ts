@@ -4,21 +4,21 @@ export const DEV_ADMIN = {
 	email: 'dev@10xmedia.de',
 	name: 'Dev Admin',
 	password: 'password',
-	roles: ['admin'],
+	roles: ['admin'] as ('admin' | 'editor' | 'user')[],
 }
 
 export const DEV_EDITOR = {
 	email: 'editor@10xmedia.de',
 	name: 'Dev Editor',
 	password: 'password',
-	roles: ['editor'],
+	roles: ['editor'] as ('admin' | 'editor' | 'user')[],
 }
 
 export const DEV_USER = {
 	email: 'user@10xmedia.de',
 	name: 'Dev User',
 	password: 'password',
-	roles: ['user'],
+	roles: ['user'] as ('admin' | 'editor' | 'user')[],
 }
 
 export const DEV_CUSTOMER = {

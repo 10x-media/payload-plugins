@@ -6,7 +6,7 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig } from 'payload'
 import { impersonation } from '../src/index'
-import { customers, partners, ssoUsers, users } from './collections'
+import { canImpersonate, customers, partners, ssoUsers, users } from './collections'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -35,7 +35,17 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	collections: [users, customers, partners, ssoUsers],
-	plugins: [dualSession({ collections: ['partners'] }), impersonation({})],
+	plugins: [
+		dualSession({ collections: ['partners'] }),
+		impersonation({
+			access: {
+				impersonate: ({ req }) => canImpersonate(req.user),
+				readRecords: ({ req }) => canImpersonate(req.user),
+				terminate: ({ req }) => canImpersonate(req.user),
+			},
+			cookies: { clearOnSwitch: ['payload-tenant'] },
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

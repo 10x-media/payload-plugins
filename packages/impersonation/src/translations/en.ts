@@ -1,10 +1,41 @@
 import { keys, type TranslationKey } from './keys'
 
-/**
- * English values, keyed by the typed constants in `keys.ts` so the two stay in
- * lockstep. The `Record<TranslationKey, string>` annotation makes a missing or
- * unknown key a type error. `translations/index.ts` nests these for Payload.
- */
 export const en: Record<TranslationKey, string> = {
+	[keys.actingAs]: 'Acting as {{name}}',
+	[keys.cancel]: 'Cancel',
+	[keys.collectionPlural]: 'Impersonation sessions',
+	[keys.collectionSingular]: 'Impersonation session',
+	[keys.confirm]: 'Switch',
+	[keys.confirmTitle]: 'Switch to this user?',
+	[keys.endSession]: 'End session',
+	[keys.errorAlreadyImpersonating]: 'Already impersonating',
+	[keys.errorFailed]: 'Impersonation failed',
+	[keys.errorForbidden]: 'Not allowed',
+	[keys.errorImpersonatorGone]: 'Your account is no longer available',
+	[keys.errorImpersonatorSessionExpired]: 'Your original session expired. Sign in again.',
+	[keys.errorInvalidBody]: 'Invalid request',
+	[keys.errorNotImpersonating]: 'Not impersonating',
+	[keys.errorOrigin]: 'Rejected by origin check',
+	[keys.errorReasonRequired]: 'A reason is required',
+	[keys.errorSelfTarget]: 'Cannot impersonate yourself',
+	[keys.errorTargetNotFound]: 'User not found',
+	[keys.errorTargetTrashed]: 'User is in the trash',
+	[keys.errorTargetUnverified]: 'User is not verified',
+	[keys.errorUnsupportedAuth]: 'This authentication method cannot impersonate',
+	[keys.errorUnsupportedCollection]: 'This collection cannot be impersonated',
+	[keys.fieldEndedAt]: 'Ended',
+	[keys.fieldEndedBy]: 'Ended by',
+	[keys.fieldImpersonator]: 'Impersonator',
+	[keys.fieldMode]: 'Mode',
+	[keys.fieldReason]: 'Reason',
+	[keys.fieldStartedAt]: 'Started',
+	[keys.fieldTarget]: 'Target',
+	[keys.noResults]: 'No users match',
 	[keys.pluginName]: 'Impersonation',
+	[keys.reasonLabel]: 'Reason',
+	[keys.reasonPlaceholder]: 'Optional reason',
+	[keys.returnTo]: 'Return to {{name}}',
+	[keys.searchUsers]: 'Search users',
+	[keys.sessionEndsAt]: 'Session ends at {{time}}',
+	[keys.switchToUser]: 'Switch to user',
 }

@@ -1,42 +1,26 @@
 ---
 title: Impersonation
-description: Let an authorised account sign in as another user, then return. Beta scaffold.
+description: Let an authorised account sign in as another user, then return. Every session is recorded.
 ---
 
-`@10x-media/impersonation` will let an authorised account sign in as another user without that user's password, browse the admin panel and the frontend as that user, then return. Every session is recorded. After start, `req.user` is the target. This is not a view-as overlay.
+`@10x-media/impersonation` lets an authorised account sign in as another user without that user's password. After start, `req.user` is the target. This is not a view-as overlay. Exit, logout, or remote terminate ends it. Every start is a closed-never-deleted row.
 
 <Callout type="warn">
-**Experimental, not built yet.** Installing the plugin today registers translations and the plugin slug. It adds no collections, no endpoints, and no UI. Do not use it in production.
+**Experimental.** This plugin mints and revokes sessions. It is covered by unit, integration and end-to-end tests against Payload's real routing on Mongo and Postgres, but auth surfaces differ a lot between projects. Try it in staging first.
 </Callout>
 
-## What exists today
+## What it does
 
-- The `impersonation(options)` factory with `disabled` and `translations`.
-- The standard subpath exports: `./types`, `./client`, `./i18n`. Translations follow the [shared pattern](/concepts/translations) (namespace `impersonation:`).
-- A host app that already seeds the collections the feature will exercise: staff users, a second local-auth collection, a dual-session isolated collection, and a `disableLocalStrategy` collection with a custom strategy.
+- A host `access.impersonate` function is mandatory. The plugin never compares roles.
+- Start mints a real target session (`addSessionToUser` + JWT + cookie). Payload then authenticates the target on every request.
+- `req.user._impersonation` is painted on afterwards by wrapping `payload.authStrategies` in `onInit`.
+- Active means an open row (`endedAt` null) whose `targetSid` matches `req.user._sid`. Refresh extending the minted session cannot hide the bar.
+- Swap replaces the shared auth cookie. Parallel writes an isolated cookie only when `@10x-media/dual-session` isolated the target.
 
-## Install
+## Next
 
-```bash
-pnpm add @10x-media/impersonation
-```
-
-```ts title="payload.config.ts"
-import { buildConfig } from 'payload'
-import { impersonation } from '@10x-media/impersonation'
-
-export default buildConfig({
-  plugins: [impersonation({})],
-})
-```
-
-## Options
-
-| Option | Type | Default | Description |
-|---|---|---|---|
-| `disabled` | `boolean` | `false` | Return the incoming config unchanged. |
-| `translations` | `TranslationsOption` | none | Per-locale string overrides. See [Translations](/concepts/translations). |
-
-## Where it is headed
-
-An authorised caller starts a recorded session, the browser authenticates as the target, and Exit restores the impersonator. Dual-session hosts get a parallel mode so both cookies can coexist. Custom auth is reached through host-supplied session seams. None of that ships in this scaffold.
+- [Quick start](/impersonation/quick-start)
+- [Configuration](/impersonation/configuration)
+- [Custom auth](/impersonation/custom-auth)
+- [Security](/impersonation/security)
+- [Limits](/impersonation/limits)
