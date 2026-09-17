@@ -1,6 +1,7 @@
 import { type Config, definePlugin } from 'payload'
 
 import { getImpersonation } from './getImpersonation'
+import { assertHookedAuthCollections } from './plugin/assertTargets'
 import { PLUGIN_SLUG } from './plugin/constants'
 import { decorateAuthStrategies } from './plugin/decorateAuth'
 import { normalizeOptions } from './plugin/normalizeOptions'
@@ -40,6 +41,9 @@ export const impersonation = definePlugin<ImpersonationPluginOptions>({
 		}
 
 		const resolved = normalizeOptions(options, config)
+		const hookedAuthSlugs = (config.collections ?? [])
+			.filter((collection) => Boolean(collection.auth))
+			.map(({ slug }) => slug)
 		registerTranslations(config, options.translations)
 		setRegistry(config, resolved)
 		registerCollection(config, resolved)
@@ -49,6 +53,8 @@ export const impersonation = definePlugin<ImpersonationPluginOptions>({
 
 		const priorOnInit = config.onInit
 		config.onInit = async (payload) => {
+			assertHookedAuthCollections(payload, resolved, hookedAuthSlugs)
+
 			if (resolved.maxDuration === undefined) {
 				payload.logger.warn(
 					'@10x-media/impersonation: maxDuration is unset. An impersonation never expires on its own because refresh keeps extending the minted session.'
@@ -59,14 +65,13 @@ export const impersonation = definePlugin<ImpersonationPluginOptions>({
 				decorateAuthStrategies(payload, resolved)
 			}
 
-			if (resolved.targets) {
-				for (const slug of resolved.targets) {
-					if (!payload.collections[slug]) {
-						throw new Error(
-							`@10x-media/impersonation: target collection "${slug}" is not in the config. Register impersonation after plugins that add auth collections.`
-						)
-					}
-				}
+			try {
+				await closeStaleImpersonations(payload)
+			} catch (error) {
+				payload.logger.error({
+					err: error,
+					msg: '@10x-media/impersonation: closeStaleImpersonations failed during onInit',
+				})
 			}
 
 			await priorOnInit?.(payload)

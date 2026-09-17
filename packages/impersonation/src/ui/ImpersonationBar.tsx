@@ -1,28 +1,32 @@
 'use client'
 
-import { Button } from '@payloadcms/ui'
-import { useEffect } from 'react'
+import { Button, toast } from '@payloadcms/ui'
+import { useEffect, useState } from 'react'
 
-import { keys } from '../translations/keys'
-import { useTranslation } from '../translations/useTranslation'
-import { goAfterSwitch, postImpersonation } from './api'
+import { messageFor } from '../translations/lookup'
+import { errorKey, goAfterSwitch, postImpersonation } from './api'
 import './impersonation.css'
 
 export type ImpersonationBarProps = {
+	actingAs: string
 	apiPath: string
-	impersonatorLabel: string
 	impersonatorLocale?: null | string
-	name: string
+	pluginName: string
+	returnTo: string
 	sessionEndsAt?: null | string
+	sessionEndsAtTemplate: string
 }
 
 export const ImpersonationBar = ({
+	actingAs,
 	apiPath,
-	impersonatorLabel,
-	name,
+	impersonatorLocale,
+	pluginName,
+	returnTo,
 	sessionEndsAt,
+	sessionEndsAtTemplate,
 }: ImpersonationBarProps) => {
-	const { t } = useTranslation()
+	const [busy, setBusy] = useState(false)
 
 	useEffect(() => {
 		document.body.classList.add('impersonation--active')
@@ -30,8 +34,23 @@ export const ImpersonationBar = ({
 	}, [])
 
 	const onExit = async () => {
-		const result = await postImpersonation(`${apiPath}/exit`, {})
-		goAfterSwitch(result.ok ? '/admin' : window.location.pathname)
+		if (busy) {
+			return
+		}
+		setBusy(true)
+		try {
+			const result = await postImpersonation(`${apiPath}/exit`, {})
+			if (!result.ok) {
+				toast.error(messageFor(impersonatorLocale, errorKey(result.error ?? 'failed')))
+				if (result.error === 'impersonatorSessionExpired' || result.error === 'impersonatorGone') {
+					goAfterSwitch('/admin')
+				}
+				return
+			}
+			goAfterSwitch('/admin')
+		} finally {
+			setBusy(false)
+		}
 	}
 
 	return (
@@ -43,20 +62,19 @@ export const ImpersonationBar = ({
 		>
 			<div className="impersonation-bar__meta">
 				<div>
-					<span className="impersonation-bar__badge">{t(keys.pluginName)}</span>{' '}
-					{t(keys.actingAs).replace('{{name}}', name)}
+					<span className="impersonation-bar__badge">{pluginName}</span> {actingAs}
 				</div>
 				{sessionEndsAt ? (
 					<div className="impersonation-bar__time">
-						{t(keys.sessionEndsAt).replace(
+						{sessionEndsAtTemplate.replace(
 							'{{time}}',
-							new Date(sessionEndsAt).toLocaleTimeString()
+							new Date(sessionEndsAt).toLocaleTimeString(impersonatorLocale ?? undefined)
 						)}
 					</div>
 				) : null}
 			</div>
-			<Button buttonStyle="pill" onClick={onExit} size="small">
-				{t(keys.returnTo).replace('{{name}}', impersonatorLabel)}
+			<Button buttonStyle="pill" disabled={busy} onClick={() => void onExit()} size="small">
+				{returnTo}
 			</Button>
 		</div>
 	)

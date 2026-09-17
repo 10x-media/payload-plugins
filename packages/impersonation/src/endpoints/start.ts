@@ -103,6 +103,27 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 		return fail({ error: 'selfTarget', req, status: 400 })
 	}
 
+	const supportsTrash = Boolean((registered.config as { trash?: boolean }).trash)
+	let existing: Record<string, unknown> | null = null
+	try {
+		existing = (await req.payload.findByID({
+			id: targetId,
+			collection: collection as CollectionSlug,
+			depth: 0,
+			overrideAccess: true,
+			req,
+			...(supportsTrash ? { trash: true } : {}),
+		})) as unknown as Record<string, unknown>
+	} catch {
+		existing = null
+	}
+	if (!existing) {
+		return fail({ error: 'targetNotFound', req, status: 404 })
+	}
+	if (existing.deletedAt) {
+		return fail({ error: 'targetTrashed', req, status: 403 })
+	}
+
 	let readable: Record<string, unknown>
 	try {
 		readable = (await req.payload.findByID({
@@ -120,11 +141,7 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 		return fail({ error: 'targetNotFound', req, status: 404 })
 	}
 
-	if (readable.deletedAt) {
-		return fail({ error: 'targetTrashed', req, status: 403 })
-	}
-
-	if (registered.config.auth.verify && readable._verified === false) {
+	if (registered.config.auth.verify && readable._verified !== true) {
 		return fail({ error: 'targetUnverified', req, status: 403 })
 	}
 
@@ -256,17 +273,24 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 
 		return json({ body: bodyOut, cookies, req, status: 200 })
 	} catch (error) {
-		await revoke({
-			collection: collection as CollectionSlug,
-			payload: req.payload,
-			req,
-			sid: minted.sid,
-			userId: targetId,
-		})
 		req.payload.logger.error({
 			err: error,
 			msg: '@10x-media/impersonation: start failed after mint',
 		})
+		try {
+			await revoke({
+				collection: collection as CollectionSlug,
+				payload: req.payload,
+				req,
+				sid: minted.sid,
+				userId: targetId,
+			})
+		} catch (revokeError) {
+			req.payload.logger.error({
+				err: revokeError,
+				msg: '@10x-media/impersonation: compensating revoke failed',
+			})
+		}
 		return fail({ error: 'failed', req, status: 500 })
 	}
 }

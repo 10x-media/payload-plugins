@@ -68,9 +68,3 @@ export const expireCookies = ({
 			? expirePayloadCookie({ authConfig, cookiePrefix })
 			: expireCookie({ authConfig, name })
 	)
-
-export const appendCookies = (headers: Headers, cookies: string[]): void => {
-	for (const cookie of cookies) {
-		headers.append('Set-Cookie', cookie)
-	}
-}

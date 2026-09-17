@@ -2,6 +2,7 @@ import type { CollectionSlug, Endpoint, PayloadRequest } from 'payload'
 
 import { expireCookie, expireCookies, expirePayloadCookie } from '../auth/cookies'
 import { resignSession } from '../auth/issue'
+import { isolatedCookieNameFor } from '../auth/mode'
 import { collectionBySlug } from '../ids'
 import { closeAndRevoke } from '../session/close'
 import { releaseLocks } from '../session/locks'
@@ -126,9 +127,22 @@ export const exitHandler = async (req: PayloadRequest): Promise<Response> => {
 			req,
 		})
 		await releaseLocks({ payload: req.payload, record: closed, req })
-		const isolatedName = targetCollection
-			? `${req.payload.config.cookiePrefix}-${target?.collection}-token`
-			: undefined
+		let isolatedName: string | undefined
+		if (target) {
+			const targetUser = (await req.payload.db.findOne({
+				collection: target.collection as CollectionSlug,
+				req,
+				where: { id: { equals: target.id } },
+			})) as { collection?: string } | null
+			if (targetUser) {
+				targetUser.collection = target.collection
+				isolatedName = await isolatedCookieNameFor({
+					collection: target.collection as CollectionSlug,
+					payload: req.payload,
+					user: targetUser as never,
+				})
+			}
+		}
 		return json({
 			body: { ok: true },
 			cookies: [

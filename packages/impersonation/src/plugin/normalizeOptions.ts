@@ -3,10 +3,10 @@ import type { CollectionConfig, CollectionSlug, Config } from 'payload'
 import type { EnabledOptions, ResolvedOptions, ResolvedUi } from '../types'
 import {
 	DEFAULT_API_PATH,
-	DEFAULT_CLEAR_ON_SWITCH,
 	DEFAULT_COLLECTION_SLUG,
 	DEFAULT_COOKIE_PREFIX,
 	DEFAULT_HINT_COOKIE,
+	defaultClearOnSwitch,
 	RESERVED_API_SEGMENTS,
 } from './constants'
 
@@ -95,7 +95,7 @@ export const normalizeOptions = (options: EnabledOptions, config: Config): Resol
 		apiPath,
 		collectionSlug,
 		cookies: {
-			clearOnSwitch: options.cookies?.clearOnSwitch ?? [...DEFAULT_CLEAR_ON_SWITCH],
+			clearOnSwitch: options.cookies?.clearOnSwitch ?? defaultClearOnSwitch(cookiePrefix),
 		},
 		decorateRequests: options.decorateRequests !== false,
 		hintCookieName,
@@ -108,18 +108,4 @@ export const normalizeOptions = (options: EnabledOptions, config: Config): Resol
 		targets: options.targets,
 		ui: resolveUi(options.ui),
 	}
-}
-
-export const isLocalStrategyAuth = (collection: CollectionConfig): boolean => {
-	if (!collection.auth) {
-		return false
-	}
-	const auth = typeof collection.auth === 'object' ? collection.auth : {}
-	if (auth.disableLocalStrategy) {
-		return false
-	}
-	if (auth.useSessions === false) {
-		return false
-	}
-	return true
 }

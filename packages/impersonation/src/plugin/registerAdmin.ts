@@ -7,14 +7,18 @@ const PROVIDER = '@10x-media/impersonation/rsc#ImpersonationProvider'
 const DOCUMENT_ACTION = '@10x-media/impersonation/client#SwitchToUserMenuItem'
 
 export const registerAdmin = (config: Config, options: ResolvedOptions): void => {
-	if (options.ui.headerAction || options.ui.bar) {
+	const anyUi =
+		options.ui.headerAction ||
+		options.ui.bar ||
+		options.ui.documentAction ||
+		options.ui.recordAction
+
+	if (anyUi) {
 		config.admin ??= {}
 		config.admin.components ??= {}
+		config.admin.components.providers = [...(config.admin.components.providers ?? []), PROVIDER]
 		if (options.ui.headerAction) {
 			config.admin.components.actions = [...(config.admin.components.actions ?? []), ACTION]
-		}
-		if (options.ui.bar) {
-			config.admin.components.providers = [...(config.admin.components.providers ?? []), PROVIDER]
 		}
 	}
 

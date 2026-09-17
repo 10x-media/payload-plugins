@@ -1,35 +1,9 @@
 'use client'
 
+import type { FailureCode } from '../endpoints/codes'
 import { keys } from '../translations/keys'
 
-export type FailureCode =
-	| 'alreadyImpersonating'
-	| 'failed'
-	| 'forbidden'
-	| 'impersonatorGone'
-	| 'impersonatorSessionExpired'
-	| 'invalidBody'
-	| 'notImpersonating'
-	| 'origin'
-	| 'reasonRequired'
-	| 'selfTarget'
-	| 'targetNotFound'
-	| 'targetTrashed'
-	| 'targetUnverified'
-	| 'unsupportedAuth'
-	| 'unsupportedCollection'
-
-export type CurrentResponse =
-	| {
-			absoluteExpiresAt: null | string
-			active: true
-			impersonator: { collection: string; id: number | string } | null
-			impersonatorLocale: null | string
-			mode: 'parallel' | 'swap'
-			startedAt: string
-			target: { collection: string; id: number | string } | null
-	  }
-	| { active: false }
+export type { FailureCode }
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
@@ -55,14 +29,6 @@ export const postImpersonation = async (
 		redirect: parsed.redirect,
 		status: response.status,
 	}
-}
-
-export const getCurrent = async (path: string): Promise<CurrentResponse> => {
-	const response = await fetch(path, { credentials: 'include' })
-	if (!response.ok) {
-		return { active: false }
-	}
-	return (await response.json()) as CurrentResponse
 }
 
 /** Reload when the redirect is the current path; `assign` would be a no-op. */

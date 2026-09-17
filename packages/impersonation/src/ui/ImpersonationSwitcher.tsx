@@ -26,6 +26,7 @@ export const ImpersonationSwitcher = ({
 	const { t } = useTranslation()
 	const { config } = useConfig()
 	const [open, setOpen] = useState(false)
+	const [busy, setBusy] = useState(false)
 	const [collection, setCollection] = useState(collections[0]?.slug ?? '')
 	const [query, setQuery] = useState('')
 	const [hits, setHits] = useState<UserHit[]>([])
@@ -39,35 +40,43 @@ export const ImpersonationSwitcher = ({
 		const params = new URLSearchParams({
 			depth: '0',
 			limit: '20',
-			...(query
-				? { where: JSON.stringify({ or: [{ email: { like: query } }, { name: { like: query } }] }) }
-				: {}),
+			...(query ? { where: JSON.stringify({ email: { like: query } }) } : {}),
 		})
 		const response = await fetch(`${config.routes.api}/${collection}?${params}`, {
 			credentials: 'include',
 		})
 		if (!response.ok) {
+			toast.error(t(keys.errorFailed))
 			setHits([])
 			return
 		}
 		const body = (await response.json()) as { docs?: UserHit[] }
 		setHits((body.docs ?? []).filter((doc) => String(doc.id) !== String(viewerId)))
-	}, [collection, config.routes.api, query, viewerId])
+	}, [collection, config.routes.api, query, t, viewerId])
 
 	const start = async () => {
-		if (!pending) {
+		if (!pending || busy) {
 			return
 		}
-		const result = await postImpersonation(`${apiPath}/start`, {
-			collection,
-			id: pending.id,
-			reason: reasonMode === 'off' ? undefined : reason,
-		})
-		if (!result.ok) {
-			toast.error(result.error ? t(errorKey(result.error)) : t(keys.errorFailed))
+		if (reasonMode === 'required' && !reason.trim()) {
+			toast.error(t(keys.errorReasonRequired))
 			return
 		}
-		goAfterSwitch(result.redirect)
+		setBusy(true)
+		try {
+			const result = await postImpersonation(`${apiPath}/start`, {
+				collection,
+				id: pending.id,
+				reason: reasonMode === 'off' ? undefined : reason,
+			})
+			if (!result.ok) {
+				toast.error(result.error ? t(errorKey(result.error)) : t(keys.errorFailed))
+				return
+			}
+			goAfterSwitch(result.redirect)
+		} finally {
+			setBusy(false)
+		}
 	}
 
 	return (
@@ -111,10 +120,13 @@ export const ImpersonationSwitcher = ({
 									</label>
 								) : null}
 								<div className="impersonation-dialog__actions">
-									<Button buttonStyle="secondary" onClick={() => setPending(null)}>
+									<Button buttonStyle="secondary" disabled={busy} onClick={() => setPending(null)}>
 										{t(keys.cancel)}
 									</Button>
-									<Button onClick={() => void start()}>
+									<Button
+										disabled={busy || (reasonMode === 'required' && !reason.trim())}
+										onClick={() => void start()}
+									>
 										<span data-testid="impersonation-confirm">{t(keys.confirm)}</span>
 									</Button>
 								</div>

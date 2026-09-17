@@ -94,6 +94,25 @@ describeForDb('impersonation parallel', {}, (db) => {
 		const me = await client.get('/api/users/me')
 		expect((me.body as { user?: { email?: string } }).user?.email).toBe(ADMIN.email)
 	})
+
+	it('sets _impersonation on the impersonator after a parallel start', async () => {
+		const client = createRestClient(booted)
+		await client.post('/api/users/login', { body: ADMIN })
+		await client.get('/api/users/me')
+		const start = await client.post('/api/impersonation/start', {
+			body: { collection: 'partners', id: partnerId },
+		})
+		expect(start.status).toBe(200)
+		const headers = new Headers({
+			cookie: [...client.jar].map(([name, value]) => `${name}=${value}`).join('; '),
+		})
+		const { user } = await booted.payload.auth({ headers })
+		expect((user as { email?: string } | null)?.email).toBe(ADMIN.email)
+		expect((user as { _impersonation?: { mode?: string } } | null)?._impersonation?.mode).toBe(
+			'parallel'
+		)
+		await client.post('/api/impersonation/exit', { body: {} })
+	})
 })
 
 describeForDb('impersonation role-split fallback', {}, (db) => {
@@ -148,6 +167,42 @@ describeForDb('impersonation role-split fallback', {}, (db) => {
 			expect(client.cookieNames()).toContain('payload-token')
 			expect(client.cookieNames()).not.toContain('payload-users-token')
 			await client.post('/api/impersonation/exit', { body: {} })
+		} finally {
+			await booted.stop()
+		}
+	})
+})
+
+describeForDb('impersonation parallel custom cookie', {}, (db) => {
+	it('expires the dual-session cookieName on exit, not a guessed name', async () => {
+		const booted = await bootPayload({
+			collections: isolatedCollections,
+			configOverrides: {
+				admin: { user: 'users' },
+				plugins: [impersonation({ access: { impersonate: () => true } })],
+			},
+			db,
+			plugin: dualSession({
+				collections: [{ cookieName: 'partner-session', slug: 'partners' }],
+			}),
+			seed: seedIsolated,
+		})
+		try {
+			const partner = await booted.payload.find({
+				collection: 'partners',
+				limit: 1,
+				where: { email: { equals: PARTNER.email } },
+			})
+			const client = createRestClient(booted)
+			await client.post('/api/users/login', { body: ADMIN })
+			const start = await client.post('/api/impersonation/start', {
+				body: { collection: 'partners', id: partner.docs[0]?.id },
+			})
+			expect(start.status).toBe(200)
+			expect(client.cookieNames()).toContain('partner-session')
+			const exit = await client.post('/api/impersonation/exit', { body: {} })
+			expect(exit.status).toBe(200)
+			expect(client.cookieNames()).not.toContain('partner-session')
 		} finally {
 			await booted.stop()
 		}
