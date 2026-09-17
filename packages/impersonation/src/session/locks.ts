@@ -40,7 +40,10 @@ export const releaseLocks = async ({
 				],
 			},
 		})
-	} catch {
-		// Adapter query shape for the polymorphic user field differs; a miss is not fatal.
+	} catch (error) {
+		payload.logger.error({
+			err: error,
+			msg: '@10x-media/impersonation: releaseLocks failed',
+		})
 	}
 }

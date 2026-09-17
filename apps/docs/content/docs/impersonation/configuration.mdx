@@ -15,7 +15,7 @@ description: Options for access, cookies, duration, UI, and session seams.
 | `decorateRequests` | `boolean` | `true` | Wrap `payload.authStrategies` to set `req.user._impersonation`. Nesting checks still hit the database when this is `false`. |
 | `reason` | `'off' \| 'optional' \| 'required'` | `'off'` | Ticket / SOC2 note stored on the row. |
 | `maxDuration` | `number` (seconds) | unset | Absolute cap from `startedAt`. Unset means refresh can keep the impersonation alive forever. |
-| `cookies.clearOnSwitch` | `string[]` | `['payload-tenant']` | Extra cookies expired on start and exit. |
+| `cookies.clearOnSwitch` | `string[]` | `` [`${cookiePrefix}-tenant`] `` | Extra cookies expired on start and exit. |
 | `security.trustedOrigins` | `string[]` | `[]` | Extra Origins allowed for cookie POSTs, on top of `serverURL` and `config.csrf`. |
 | `targets` | `string[]` | every local-strategy auth collection | Collections that can be impersonated. |
 | `session.issue` / `revoke` / `binding` | functions | Payload local-auth | Custom auth seams. |

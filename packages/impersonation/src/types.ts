@@ -13,22 +13,7 @@ export type EndedBy =
 	| 'targetGone'
 	| 'terminated'
 
-export type FailureCode =
-	| 'alreadyImpersonating'
-	| 'failed'
-	| 'forbidden'
-	| 'impersonatorGone'
-	| 'impersonatorSessionExpired'
-	| 'invalidBody'
-	| 'notImpersonating'
-	| 'origin'
-	| 'reasonRequired'
-	| 'selfTarget'
-	| 'targetNotFound'
-	| 'targetTrashed'
-	| 'targetUnverified'
-	| 'unsupportedAuth'
-	| 'unsupportedCollection'
+export type { FailureCode } from './endpoints/codes'
 
 export type ImpersonationActor = {
 	id: number | string

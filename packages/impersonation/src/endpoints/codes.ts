@@ -15,3 +15,5 @@ export const FAILURE_CODES = [
 	'unsupportedAuth',
 	'unsupportedCollection',
 ] as const
+
+export type FailureCode = (typeof FAILURE_CODES)[number]

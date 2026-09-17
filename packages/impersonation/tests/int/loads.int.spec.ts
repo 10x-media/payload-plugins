@@ -8,6 +8,7 @@ describeForDb('impersonation loads', { dbs: ['mongo'] }, (db) => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
+			collections: [{ slug: 'users', auth: true, fields: [] }],
 			db,
 			plugin: impersonation({ access: { impersonate: () => true } }),
 		})

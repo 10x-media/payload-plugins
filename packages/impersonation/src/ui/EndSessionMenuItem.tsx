@@ -6,24 +6,25 @@ import { useState } from 'react'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { postImpersonation } from './api'
+import { useImpersonationClient } from './ImpersonationConfig'
 
 export const EndSessionMenuItem = () => {
 	const { id } = useDocumentInfo()
 	const { config } = useConfig()
 	const { t } = useTranslation()
+	const plugin = useImpersonationClient()
 	const [busy, setBusy] = useState(false)
 
 	if (!id) {
 		return null
 	}
 
+	const apiPath = plugin?.apiPath ?? `${config.routes.api}/impersonation`
+
 	const onClick = async () => {
 		setBusy(true)
 		try {
-			const result = await postImpersonation(
-				`${config.routes.api}/impersonation/${encodeURIComponent(String(id))}/end`,
-				{}
-			)
+			const result = await postImpersonation(`${apiPath}/${encodeURIComponent(String(id))}/end`, {})
 			if (!result.ok) {
 				toast.error(t(keys.errorForbidden))
 				return

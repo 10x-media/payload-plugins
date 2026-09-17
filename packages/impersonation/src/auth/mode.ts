@@ -60,6 +60,16 @@ export const resolveMode = async ({
 	return { cookieName: shared, isolated: false }
 }
 
+/** Isolated cookie name for this user, or undefined when mode is swap. */
+export const isolatedCookieNameFor = async (args: {
+	collection: CollectionSlug
+	payload: Payload
+	user: TypedUser
+}): Promise<string | undefined> => {
+	const { cookieName, isolated } = await resolveMode(args)
+	return isolated ? cookieName : undefined
+}
+
 export const isolatedAuthCookie = async ({
 	collection,
 	payload,

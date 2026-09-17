@@ -16,6 +16,7 @@ description: Let an authorised account sign in as another user, then return. Eve
 - `req.user._impersonation` is painted on afterwards by wrapping `payload.authStrategies` in `onInit`.
 - Active means an open row (`endedAt` null) whose `targetSid` matches `req.user._sid`. Refresh extending the minted session cannot hide the bar.
 - Swap replaces the shared auth cookie. Parallel writes an isolated cookie only when `@10x-media/dual-session` isolated the target.
+- List this plugin **after** any plugin that adds auth collections. `onInit` throws if a live auth collection was missing at plugin-build time.
 
 ## Next
 

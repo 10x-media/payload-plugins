@@ -13,25 +13,21 @@ import { boundSid } from '../types'
  * user, so decorating only a collection strategy would miss every local-jwt
  * login.
  *
- * Negative-only cache: a minted sid does not exist before its row, so "no open
- * row for this sid" cannot go stale. Positive hits are never cached so terminate
- * is visible on the next request.
+ * No sid cache. A negative hit on the impersonator's sid would go stale the
+ * moment they start (findOpenBySid also matches impersonatorSid). Terminate
+ * must be visible on the next request, so positives stay uncached too.
  */
 export const decorateAuthStrategies = (payload: Payload, options: ResolvedOptions): void => {
-	const negative = new Set<string>()
-
 	payload.authStrategies = payload.authStrategies.map((strategy) =>
-		wrapStrategy({ negative, options, payload, strategy })
+		wrapStrategy({ options, payload, strategy })
 	)
 }
 
 const wrapStrategy = ({
-	negative,
 	options,
 	payload,
 	strategy,
 }: {
-	negative: Set<string>
 	options: ResolvedOptions
 	payload: Payload
 	strategy: AuthStrategy
@@ -45,13 +41,8 @@ const wrapStrategy = ({
 			return result
 		}
 
-		if (negative.has(sid)) {
-			return result
-		}
-
 		const row = await findOpenBySid({ options, payload, sid })
 		if (!row) {
-			negative.add(sid)
 			return result
 		}
 

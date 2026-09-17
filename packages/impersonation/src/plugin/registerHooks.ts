@@ -43,8 +43,11 @@ export const registerHooks = (config: Config, options: ResolvedOptions): void =>
 					expireCookie({ authConfig, name: options.hintCookieName })
 				)
 			}
-		} catch {
-			// afterLogout must not fail the logout.
+		} catch (error) {
+			req.payload.logger.error({
+				err: error,
+				msg: '@10x-media/impersonation: afterLogout failed to close the session',
+			})
 		}
 	}
 

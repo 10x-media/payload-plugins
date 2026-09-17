@@ -25,7 +25,7 @@ export const revokeSession = async ({
 	await payload.db.updateOne({
 		id: raw.id,
 		collection: collection as CollectionSlug,
-		data: { ...raw, sessions, updatedAt: null },
+		data: { sessions, updatedAt: null },
 		req: req as PayloadRequest,
 		returning: false,
 	})

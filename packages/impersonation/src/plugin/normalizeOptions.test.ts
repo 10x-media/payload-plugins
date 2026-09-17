@@ -79,4 +79,10 @@ describe('normalizeOptions', () => {
 	it('disables every UI surface when ui is false', () => {
 		expect(normalizeOptions(enabled({ ui: false }), config()).ui.bar).toBe(false)
 	})
+
+	it('derives the tenant cookie from cookiePrefix', () => {
+		expect(
+			normalizeOptions(enabled(), config({ cookiePrefix: 'acme' })).cookies.clearOnSwitch
+		).toEqual(['acme-tenant'])
+	})
 })
