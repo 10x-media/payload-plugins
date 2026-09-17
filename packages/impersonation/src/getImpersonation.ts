@@ -1,6 +1,7 @@
 import type { Payload, PayloadRequest, TypedUser } from 'payload'
 
 import { getRegistry } from './plugin/registry'
+import { closeAndRevoke } from './session/close'
 import { isPastAbsoluteExpiry, relationOf, resolveCurrent } from './session/resolve'
 import { boundSid } from './types'
 
@@ -21,6 +22,8 @@ const inactive = (): ImpersonationStatus => ({ active: false })
 /**
  * Read the active impersonation for a request. Resolves from the database by
  * sid (and an optional hint cookie), never from `user._impersonation` alone.
+ * A past `maxDuration` cap is closed here so local callers do not leave the
+ * row open when no decorated auth request runs.
  */
 export async function getImpersonation(
 	args: PayloadRequest | { headers: Headers; payload: Payload; user?: null | TypedUser }
@@ -43,7 +46,11 @@ export async function getImpersonation(
 	}
 
 	const row = await resolveCurrent({ headers, options, payload, sid })
-	if (!row || isPastAbsoluteExpiry(row)) {
+	if (!row) {
+		return inactive()
+	}
+	if (isPastAbsoluteExpiry(row)) {
+		await closeAndRevoke({ endedBy: 'expired', options, payload, record: row })
 		return inactive()
 	}
 

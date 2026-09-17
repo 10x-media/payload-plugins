@@ -10,6 +10,8 @@ export const DEFAULT_HINT_COOKIE = 'impersonation-hint'
 export const DEFAULT_COOKIE_PREFIX = 'payload'
 export const defaultClearOnSwitch = (cookiePrefix: string) => [`${cookiePrefix}-tenant`]
 export const REASON_MAX_LENGTH = 500
+/** Client POSTs that busy-gate a control abort after this. */
+export const CLIENT_FETCH_TIMEOUT_MS = 15_000
 export const ADMIN_GROUP = 'System'
 
 export const RESERVED_API_SEGMENTS = ['graphql', 'graphql-playground'] as const

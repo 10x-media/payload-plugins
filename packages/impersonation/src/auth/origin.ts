@@ -6,8 +6,10 @@ import type { ResolvedOptions } from '../types'
  * Cookie POSTs that start, exit, or end a session must be same-origin. This is
  * deliberately stricter than Payload's `extractJWT` cookie CSRF gate and than
  * dual-session's `isCookieAuthAllowed`: `same-site` is denied so a subdomain XSS
- * cannot start an impersonation. Authorization JWT/Bearer skip this gate only
- * when `auth.jwtOrder` ranks that scheme before `cookie`.
+ * cannot start an impersonation. JWT/Bearer skip this gate only when that
+ * scheme ranks before `cookie` and the header carries a non-empty token. An
+ * empty `JWT ` / `Bearer ` prefix must not skip: Payload then authenticates
+ * the cookie.
  *
  * Never reads `X-Forwarded-Host` or `X-Forwarded-Proto`.
  */
@@ -27,11 +29,18 @@ export const verifyMutationOrigin = ({
 		const rank = jwtOrder.indexOf(scheme)
 		return rank !== -1 && (cookieRank === -1 || rank < cookieRank)
 	}
+	const headerToken = (scheme: 'Bearer' | 'JWT') => {
+		const prefix = `${scheme} `
+		if (!authorization.startsWith(prefix)) {
+			return ''
+		}
+		return authorization.slice(prefix.length).trim()
+	}
 
-	if (authorization.startsWith('JWT ') && ranksBeforeCookie('JWT')) {
+	if (headerToken('JWT') && ranksBeforeCookie('JWT')) {
 		return true
 	}
-	if (authorization.startsWith('Bearer ') && ranksBeforeCookie('Bearer')) {
+	if (headerToken('Bearer') && ranksBeforeCookie('Bearer')) {
 		return true
 	}
 

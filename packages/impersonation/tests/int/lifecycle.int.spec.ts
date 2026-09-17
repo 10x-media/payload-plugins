@@ -2,7 +2,7 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import type { CollectionConfig, Payload } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
-import { impersonation } from '../../src/index'
+import { getImpersonation, impersonation } from '../../src/index'
 import { closeStaleImpersonations } from '../../src/session/closeStale'
 import { createRestClient } from './helpers/rest'
 
@@ -77,6 +77,11 @@ describeForDb('impersonation lifecycle', {}, (db) => {
 		})
 		expect(start.status).toBe(200)
 		expect((start.body as { user?: { email?: string } }).user?.email).toBe(TARGET.email)
+		const startedUser = (start.body as { user?: Record<string, unknown> }).user
+		expect(startedUser).not.toHaveProperty('hash')
+		expect(startedUser).not.toHaveProperty('salt')
+		expect(startedUser).not.toHaveProperty('resetPasswordToken')
+		expect((startedUser?.sessions as unknown[]) ?? []).toEqual([])
 		expect(client.cookieNames()).toContain('payload-token')
 		expect(client.cookieNames()).toContain('impersonation-hint')
 
@@ -98,6 +103,17 @@ describeForDb('impersonation lifecycle', {}, (db) => {
 		const meAgain = await client.get('/api/users/me')
 		expect((meAgain.body as { user?: { email?: string } }).user?.email).toBe(ADMIN.email)
 		void adminId
+	})
+
+	it('returns forbidden for a missing target instead of leaking existence', async () => {
+		const login = await client.post('/api/users/login', { body: ADMIN })
+		expect(login.status).toBe(200)
+
+		const start = await client.post('/api/impersonation/start', {
+			body: { collection: 'users', id: 'missing-user' },
+		})
+		expect(start.status).toBe(403)
+		expect(start.body).toMatchObject({ error: 'forbidden' })
 	})
 
 	it('refuses anonymous, self, and cross-origin cookie POSTs', async () => {
@@ -122,6 +138,17 @@ describeForDb('impersonation lifecycle', {}, (db) => {
 		})
 		expect(cross.status).toBe(403)
 		expect(cross.body).toMatchObject({ error: 'origin' })
+
+		const emptyJwt = await client.post('/api/impersonation/start', {
+			body: { collection: 'users', id: targetId },
+			headers: {
+				Authorization: 'JWT ',
+				Origin: 'https://evil.example',
+				'Sec-Fetch-Site': 'same-site',
+			},
+		})
+		expect(emptyJwt.status).toBe(403)
+		expect(emptyJwt.body).toMatchObject({ error: 'origin' })
 	})
 
 	it('does not drop the row after a real refresh extends the minted session', async () => {
@@ -696,6 +723,89 @@ describeForDb('impersonation refusals', {}, (db) => {
 				sort: '-startedAt',
 			})
 			expect(after.docs[0]).toMatchObject({ endedBy: 'expired' })
+		} finally {
+			await booted.stop()
+		}
+	})
+
+	it('getImpersonation closes a past maxDuration row', async () => {
+		const booted = await bootPayload({
+			collections,
+			configOverrides: { admin: { user: 'users' } },
+			db,
+			plugin: impersonation({ access: { impersonate: () => true }, maxDuration: 3600 }),
+			seed,
+		})
+		try {
+			const client = createRestClient(booted)
+			const target = await booted.payload.find({
+				collection: 'users',
+				limit: 1,
+				where: { email: { equals: TARGET.email } },
+			})
+			await client.post('/api/users/login', { body: ADMIN })
+			const start = await client.post('/api/impersonation/start', {
+				body: { collection: 'users', id: target.docs[0]?.id },
+			})
+			expect(start.status).toBe(200)
+			const rows = await booted.payload.find({
+				collection: 'impersonation-sessions',
+				limit: 1,
+				overrideAccess: true,
+				sort: '-startedAt',
+			})
+			await booted.payload.update({
+				id: rows.docs[0]?.id as number | string,
+				collection: 'impersonation-sessions',
+				data: { absoluteExpiresAt: new Date(0).toISOString() } as never,
+				overrideAccess: true,
+			})
+			const minted = await sessionsOf(booted.payload, TARGET.email)
+			const status = await getImpersonation({
+				headers: new Headers(),
+				payload: booted.payload,
+				user: {
+					_sid: minted?.sessions?.at(-1)?.id,
+					collection: 'users',
+					id: minted?.id,
+				} as never,
+			})
+			expect(status).toEqual({ active: false })
+			const after = await booted.payload.find({
+				collection: 'impersonation-sessions',
+				limit: 1,
+				overrideAccess: true,
+				sort: '-startedAt',
+			})
+			expect(after.docs[0]).toMatchObject({ endedBy: 'expired' })
+		} finally {
+			await booted.stop()
+		}
+	})
+
+	it('refuses disableLocalStrategy collections when no session seams are set', async () => {
+		const booted = await bootPayload({
+			collections: [
+				...collections,
+				{
+					slug: 'sso-users',
+					auth: { disableLocalStrategy: true },
+					fields: [{ name: 'name', type: 'text' }],
+				},
+			],
+			configOverrides: { admin: { user: 'users' } },
+			db,
+			plugin: impersonation({ access: { impersonate: () => true } }),
+			seed,
+		})
+		try {
+			const client = createRestClient(booted)
+			await client.post('/api/users/login', { body: ADMIN })
+			const start = await client.post('/api/impersonation/start', {
+				body: { collection: 'sso-users', id: 'missing' },
+			})
+			expect(start.status).toBe(400)
+			expect(start.body).toMatchObject({ error: 'unsupportedCollection' })
 		} finally {
 			await booted.stop()
 		}

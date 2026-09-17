@@ -38,6 +38,22 @@ describe('verifyMutationOrigin', () => {
 		).toBe(true)
 	})
 
+	it('does not skip the gate for an empty JWT or Bearer prefix (default jwtOrder)', () => {
+		for (const authorization of ['JWT ', 'JWT   ', 'Bearer ', 'Bearer   ']) {
+			expect(
+				verifyMutationOrigin({
+					headers: headersOf({
+						Authorization: authorization,
+						Origin: 'https://evil.example',
+						'Sec-Fetch-Site': 'same-site',
+					}),
+					options,
+					payload: payloadOf(),
+				})
+			).toBe(false)
+		}
+	})
+
 	it('does not skip the gate for a junk Authorization when cookie ranks first', () => {
 		expect(
 			verifyMutationOrigin({

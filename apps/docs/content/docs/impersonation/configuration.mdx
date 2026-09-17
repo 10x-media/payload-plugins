@@ -5,7 +5,7 @@ description: Options for access, cookies, duration, UI, and session seams.
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `access.impersonate` | `({ req, target, targetCollection }) => true \| false` | required | Only literal `true` allows. Receives the target document already read with `overrideAccess: false`. |
+| `access.impersonate` | `({ req, target, targetCollection }) => true \| false` | required | Only literal `true` allows. Missing, unreadable, and access-deny all return `forbidden`. |
 | `access.terminate` | `({ req }) => true \| false` | deny | Remote end of an open row. |
 | `access.readRecords` | Payload `Access` | deny | Read the `impersonation-sessions` collection. |
 | `disabled` | `boolean` | `false` | Return the incoming config unchanged. Skips the impersonate check. |

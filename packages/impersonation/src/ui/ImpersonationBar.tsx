@@ -9,6 +9,7 @@ import './impersonation.css'
 
 export type ImpersonationBarProps = {
 	actingAs: string
+	adminRoute: string
 	apiPath: string
 	impersonatorLocale?: null | string
 	pluginName: string
@@ -19,6 +20,7 @@ export type ImpersonationBarProps = {
 
 export const ImpersonationBar = ({
 	actingAs,
+	adminRoute,
 	apiPath,
 	impersonatorLocale,
 	pluginName,
@@ -43,11 +45,11 @@ export const ImpersonationBar = ({
 			if (!result.ok) {
 				toast.error(messageFor(impersonatorLocale, errorKey(result.error ?? 'failed')))
 				if (result.error === 'impersonatorSessionExpired' || result.error === 'impersonatorGone') {
-					goAfterSwitch('/admin')
+					goAfterSwitch(adminRoute)
 				}
 				return
 			}
-			goAfterSwitch('/admin')
+			goAfterSwitch(adminRoute)
 		} finally {
 			setBusy(false)
 		}

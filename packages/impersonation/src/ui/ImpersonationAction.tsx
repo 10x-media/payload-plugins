@@ -2,6 +2,7 @@ import type { ServerProps } from 'payload'
 
 import { collectionBySlug } from '../ids'
 import { getRegistry } from '../plugin/registry'
+import { isStartableAuthCollection } from '../plugin/startable'
 import { findOpenBySid } from '../session/resolve'
 import { boundSid } from '../types'
 import { ImpersonationSwitcher } from './ImpersonationSwitcher'
@@ -26,18 +27,13 @@ export const ImpersonationAction = async ({ payload, user }: ServerProps) => {
 		return null
 	}
 
-	const collections = (
-		options.targets ?? payload.config.collections.map(({ slug }) => slug)
-	).flatMap((slug) => {
-		if (slug === options.collectionSlug) {
+	const collections = payload.config.collections.flatMap((collection) => {
+		if (!isStartableAuthCollection(collection, options)) {
 			return []
 		}
-		const registered = collectionBySlug(payload, slug)
-		if (!registered?.config.auth) {
-			return []
-		}
-		const plural = registered.config.labels?.plural
-		return [{ label: plural ? String(plural) : slug, slug }]
+		const registered = collectionBySlug(payload, collection.slug)
+		const plural = registered?.config.labels?.plural
+		return [{ label: plural ? String(plural) : collection.slug, slug: collection.slug }]
 	})
 
 	if (collections.length === 0) {
