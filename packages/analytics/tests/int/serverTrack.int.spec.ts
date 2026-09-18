@@ -30,7 +30,7 @@ const NOTHING: Partial<Record<MetricKey, number>> = {
 	revenue: 0,
 }
 
-describeForDb('analytics server track: unscoped', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics server track: unscoped', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 	let range: { start: Date; end: Date }
@@ -128,7 +128,7 @@ describeForDb('analytics server track: unscoped', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb('analytics server track: scoped', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics server track: scoped', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 	let range: { start: Date; end: Date }

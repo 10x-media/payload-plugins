@@ -24,6 +24,10 @@ export default mergeConfig(
 					test: {
 						name: 'node',
 						environment: 'node',
+						// One Postgres server for the whole run instead of one per Payload boot;
+						// a no-op unless DB_MATRIX asks for Postgres. Scoped to this project
+						// because a root globalSetup is loaded and run once per project.
+						globalSetup: ['./tests/setup/sharedPostgres.ts'],
 						dangerouslyIgnoreUnhandledErrors: isMatrixRun,
 						include: ['tests/int/**/*.int.spec.ts', 'src/**/*.test.ts'],
 						exclude: ['node_modules', 'dist', '.next', 'tests/e2e/**', ...JSDOM_TESTS],

@@ -38,7 +38,7 @@ const trackerConfig = async (booted: BootedPayload): Promise<TrackerConfig> => {
 	return (await res.json()) as TrackerConfig
 }
 
-describeForDb('analytics capture slots - one adapter, one slot', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics capture slots - one adapter, one slot', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -66,7 +66,7 @@ describeForDb('analytics capture slots - one adapter, one slot', { dbs: ['mongo'
 	})
 })
 
-describeForDb('analytics capture slots - disabled with false', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics capture slots - disabled with false', {}, (db) => {
 	const server = setupServer(http.all(`${INGEST}/*`, () => new HttpResponse('ok', { status: 200 })))
 	let booted: BootedPayload
 

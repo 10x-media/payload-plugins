@@ -30,7 +30,7 @@ const flatten = (node: ReactNode): string => {
 
 const i18nStub = { t: (key: string) => key, language: 'en' }
 
-describeForDb('analytics stat field render', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics stat field render', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {

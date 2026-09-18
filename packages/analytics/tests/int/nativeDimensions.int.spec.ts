@@ -43,7 +43,7 @@ const ingestHandler = (booted: BootedPayload): IngestHandler => {
 	return endpoint.handler as IngestHandler
 }
 
-describeForDb('native dimensions: ingest to breakdowns', { dbs: ['mongo'] }, (db) => {
+describeForDb('native dimensions: ingest to breakdowns', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 
@@ -204,7 +204,7 @@ describeForDb('native dimensions: ingest to breakdowns', { dbs: ['mongo'] }, (db
 	})
 })
 
-describeForDb('native dimensions: scope isolation', { dbs: ['mongo'] }, (db) => {
+describeForDb('native dimensions: scope isolation', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 

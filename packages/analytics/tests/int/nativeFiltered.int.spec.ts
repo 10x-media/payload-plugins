@@ -99,7 +99,7 @@ const events: StoredEvent[] = [
 	},
 ]
 
-describeForDb('native filtered reads and hour granularity', { dbs: ['mongo'] }, (db) => {
+describeForDb('native filtered reads and hour granularity', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 

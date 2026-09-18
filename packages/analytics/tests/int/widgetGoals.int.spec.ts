@@ -100,7 +100,7 @@ const ingestAs = async (payload: Payload, args: IngestArgs): Promise<void> => {
 	expect(res.status).toBe(202)
 }
 
-describeForDb('goals widget read: unscoped native install', { dbs: ['mongo'] }, (db) => {
+describeForDb('goals widget read: unscoped native install', {}, (db) => {
 	let booted: BootedPayload
 	const providerQueries: AnalyticsQuery[] = []
 
@@ -278,7 +278,7 @@ describeForDb('goals widget read: unscoped native install', { dbs: ['mongo'] }, 
 	})
 })
 
-describeForDb('goals widget read: scoped native install', { dbs: ['mongo'] }, (db) => {
+describeForDb('goals widget read: scoped native install', {}, (db) => {
 	let booted: BootedPayload
 
 	const readAs = (tenant: string) =>
