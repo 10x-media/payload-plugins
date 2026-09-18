@@ -134,7 +134,7 @@ tracker.excluded        // true
 const { excluded, setExcluded } = useAnalytics()
 ```
 
-`EXCLUSION_STORAGE_KEY`, `DEFAULT_EXCLUSION_PARAM`, `readExclusion`, `writeExclusion`, `readExclusionParam` and `subscribeExclusion` are exported from `@10x-media/analytics/tracker` for a host that wants to render its own switch. Rename the parameter or turn it off with `exclusionParam`, which sits beside `persistConsent`:
+`EXCLUSION_STORAGE_KEY`, `DEFAULT_EXCLUSION_PARAM`, `readExclusion`, `writeExclusion`, `readExclusionParam` and `subscribeExclusion` are exported from `@10x-media/analytics/tracker` for a host that wants to render its own switch. Flip the flag through `tracker.exclude()` or `setExcluded` whenever a tracker is live: that is what stops the current page and sets the vendor switches. `writeExclusion` only persists the flag, which takes effect on the next boot. Rename the parameter or turn it off with `exclusionParam`, which sits beside `persistConsent`:
 
 ```ts
 createTracker(config, { exclusionParam: 'no_stats' })

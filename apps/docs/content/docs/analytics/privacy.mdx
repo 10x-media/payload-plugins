@@ -28,7 +28,7 @@ One row in `analytics-events`, column by column, and where its value came from:
 | `visitorHash`, `sessionId` | derived | the [daily hash](#the-visitor-hash) and the session derived from it |
 | `durationMs`, `scrollDepth` | the page | how long the pageview was open, and its deepest scroll when scroll capture is on |
 | `props` | the page | flat scalars the site sent: at most 20 entries, keys up to 64, string values up to 256 |
-| `value`, `currency` | the page | revenue on a goal completion |
+| `value`, `currency` | the page | revenue, normally on a goal completion |
 | `goals` | derived | the goals this event completed, matched at ingest |
 | `scope` | the request | the tenant the install's `scopeResolver` answered, on a scoped install only |
 
@@ -43,8 +43,9 @@ The tracker's only browser storage is `localStorage`, and it holds at most these
 | Key | Written when | Holds |
 |---|---|---|
 | `analytics:consent` | a consent decision is made | `granted` or `denied` |
-| `analytics:exclude` | a visit carries the [exclusion link](/analytics/capture#excluding-your-own-visits) | `1` or `0` |
+| `analytics:exclude` | a visit carries the [exclusion link](/analytics/capture#excluding-your-own-visits), or `exclude()` is called | `1` or `0` |
 | `plausible_ignore`, `umami.disabled` | exclusion is set, on an install with that vendor's slot | the vendor's own opt-out value |
+| PostHog's own opt-out key | exclusion is set, on an install with a PostHog slot | written by PostHog's SDK, not by the tracker |
 
 A browser with storage blocked reads as "no decision" and is never asked to store anything twice; nothing throws. `analytics:exclude` is also read by a server-rendered GA4 snippet, which is how an excluded browser turns that tag off before it reports anything.
 
@@ -59,11 +60,11 @@ visitorHash = HMAC-SHA256(key: the day's salt, message: "<client address>|<user 
 sessionId   = HMAC-SHA256(key: visitorHash, message: "<UTC hour>"), first 32 hex characters
 ```
 
-The salt is 16 random bytes, one per UTC day, held in `payload.kv`. A day's hashes are therefore unrelated to the same visitor's hashes on the day before and the day after: the same browser on two days is two hashes with nothing linking them.
+The salt is 16 random bytes, one per UTC day, held in `payload.kv`. The same browser on two days therefore gets two different hashes, and the stored values alone do not connect them. Only someone holding both days' salts and the visit's exact address, user agent and hostname could.
 
-Old salts are deleted, so the link cannot be rebuilt later either. Ingest deletes the days 2 to 8 back whenever a new day's salt is created, and the [nightly prune task](/analytics/native#the-daily-salts), when an install registers one, deletes the days 2 to 62 back. Once a day's salt is gone, nobody, the operator included, can recompute that day's hashes from an address and an agent, or join them to another day's.
+Old salts are deleted, so that link cannot be rebuilt later. Ingest deletes the days 2 to 8 back each time it creates a new day's salt, which happens when that day's first event arrives, and the [nightly prune task](/analytics/native#the-daily-salts), when an install registers one, deletes the days 2 to 62 back. Once a day's salt is gone, nobody, the operator included, can recompute that day's hashes from an address and an agent, or join them to another day's.
 
-While a day's salt exists, that day's hashes can be recomputed by someone who holds the salt and guesses the exact address, user agent and hostname a visit had. That is what makes a same-day distinct count exact, and it lasts a day.
+While a day's salt exists, that day's hashes can be recomputed by someone who holds the salt and guesses the exact address, user agent and hostname a visit had. That is what makes a same-day distinct count exact, and it lasts until the salt is swept: two days later on an install that receives events every day.
 
 ## The client address
 
@@ -111,12 +112,12 @@ Crawlers, link-preview fetchers, monitors and headless clients are dropped at in
 
 Two other collections hold what the raw events add up to:
 
-- `analytics-rollups` holds counts per bucket (pageviews, events, visitors, sessions, conversions, revenue, duration and scroll sums), keyed by granularity, period, path, dimension, dimension value and hostname. There is no visitor identifier in a rollup row.
+- `analytics-rollups` holds counts per bucket (pageviews, events, visitors, sessions, conversions, revenue, duration and scroll sums), keyed by granularity, period, path, dimension, dimension value and hostname, plus the scope on a scoped install. There is no visitor identifier in a rollup row.
 - `analytics-seen` is the ledger that makes daily distinct counts exact. Each row is a bucket key, a kind (`visitor` or `session`), the hash itself, and the period. It holds the same day-scoped hashes the events do and expires with them.
 
 ## An access or erasure request
 
-Nothing the plugin stores identifies a person. The one visitor-shaped value is a hash whose key is deleted after two days, and it is not reversible while the key exists either, so there is no identifier to look a person up by and no way to answer "show me this visitor's history" from the events alone.
+The plugin writes no identifier of its own. The one visitor-shaped value is a hash whose key is deleted within days and which cannot be inverted while the key exists, so the events alone offer no handle to look a person up by and no way to answer "show me this visitor's history" from the events alone.
 
 What remains is what the site itself sent. If your pages carry an identifier in a path, or your `track` calls put one in `props`, those rows are findable by exactly that value, and `payload.delete` on `analytics-events` removes them. If they do not, there is nothing to find, and an erasure that matters is already handled by [retention](#retention).
 
@@ -126,7 +127,7 @@ What remains is what the site itself sent. If your pages carry an identifier in 
 |---|---|---|
 | `analytics-events`, `analytics-seen` | rows older than the window | `retentionDays`, unset keeps them |
 | `analytics-rollups` | rows whose period is older than the window | `rollupRetentionDays`, requires `retentionDays` |
-| the daily salts | days 2 to 8 back at ingest, days 2 to 62 back in the task | none, always swept |
+| the daily salts | days 2 to 8 back when a day's first event arrives, days 2 to 62 back in the task | none |
 
 ```ts
 native({ retentionDays: 90, rollupRetentionDays: 730 })
