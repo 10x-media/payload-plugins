@@ -3,6 +3,7 @@ import { readCappedBody } from '../../capture/requestBody'
 import type { Goal } from '../../goals/types'
 import { analyticsError, errorResponse } from '../../plugin/errors'
 import type { GeoResolver } from '../geo/geoResolver'
+import { type BotFilter, isBot } from './bots'
 import { flushBatch } from './flushBatch'
 import { normalizeEvent, type RawEventInput, type StoredEvent } from './normalizeEvent'
 import { type ResolvedHostnameOption, resolveEventHostname } from './resolveHostname'
@@ -80,6 +81,8 @@ export interface IngestHandlerOptions {
 	getBuffer?: () => WriteBuffer<StoredEvent> | null
 	resolvers?: IngestResolvers
 	attribution?: IngestAttribution
+	/** Which agents never reach the pipeline. Defaults to the built-in `isBot`. */
+	filterBots?: BotFilter
 }
 
 export const makeIngestHandler = ({
@@ -87,6 +90,7 @@ export const makeIngestHandler = ({
 	getBuffer = () => null,
 	resolvers = {},
 	attribution = {},
+	filterBots = isBot,
 }: IngestHandlerOptions): PayloadHandler => {
 	// One line per reason for the life of the handler, which is the life of the process: a
 	// public endpoint must not be a log amplifier, and an attacker chooses how often it drops.
@@ -100,6 +104,12 @@ export const makeIngestHandler = ({
 	}
 
 	return async (req) => {
+		// First, before the body is even read, so a crawler costs one header lookup. Its beacon
+		// is answered exactly like a kept one and nothing is logged: bots are expected traffic
+		// rather than a misconfiguration an operator has to hear about once per process.
+		if (filterBots(req.headers.get('user-agent') ?? '')) {
+			return accepted()
+		}
 		const { scope: resolveScope, timezone: resolveTimezone, goals: resolveGoals } = resolvers
 		// Read like the capture proxy does, and for the same reasons: this is a public,
 		// unauthenticated path, so the body is capped before it is buffered and a body that

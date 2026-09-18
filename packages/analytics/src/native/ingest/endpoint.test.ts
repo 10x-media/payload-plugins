@@ -6,13 +6,21 @@ import { makeIngestHandler } from './endpoint'
 import type { StoredEvent } from './normalizeEvent'
 import type { WriteBuffer } from './writeBuffer'
 
+/** A visitor's agent: the handler drops anything the bot filter recognizes before reading a body. */
+const VISITOR_UA =
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+
 /** A real Request, because the handler reads the body stream rather than `req.json()`. */
 const rawReq = (body: BodyInit, contentType = 'application/json'): PayloadRequest =>
 	Object.assign(
 		new Request('http://localhost/api/analytics/ingest', {
 			method: 'POST',
 			body,
-			headers: { 'content-type': contentType, host: 'site.example' },
+			headers: {
+				'content-type': contentType,
+				host: 'site.example',
+				'user-agent': VISITOR_UA,
+			},
 		}),
 		{ payload: { kv: { get: async () => ({ salt: 'salt' }), set: async () => undefined } } }
 	) as unknown as PayloadRequest
@@ -208,7 +216,7 @@ describe('makeIngestHandler attribution', () => {
 			new Request('http://localhost/api/analytics/ingest', {
 				method: 'POST',
 				body: JSON.stringify(body),
-				headers: { 'content-type': 'application/json', ...headers },
+				headers: { 'content-type': 'application/json', 'user-agent': VISITOR_UA, ...headers },
 			}),
 			{ payload: { kv: { get: async () => ({ salt: 'salt' }), set: async () => undefined } } }
 		) as unknown as PayloadRequest
@@ -307,7 +315,7 @@ describe('makeIngestHandler drop warnings', () => {
 			new Request('http://localhost/api/analytics/ingest', {
 				method: 'POST',
 				body: JSON.stringify({ type: 'pageview', path: '/p' }),
-				headers: { 'content-type': 'application/json', ...headers },
+				headers: { 'content-type': 'application/json', 'user-agent': VISITOR_UA, ...headers },
 			}),
 			{
 				payload: {
@@ -354,5 +362,19 @@ describe('makeIngestHandler drop warnings', () => {
 		await handler(withLogger({}, warn))
 		await handler(withLogger({ host: 'a.example' }, warn))
 		expect(warn).toHaveBeenCalledTimes(2)
+	})
+
+	// A crawler is expected traffic, not a misconfiguration: it earns no line at all.
+	it('says nothing at all about a bot', async () => {
+		const warn = vi.fn()
+		const { buffer, events } = capture()
+		const handler = makeIngestHandler({ geoResolver: noopResolver, getBuffer: () => buffer })
+		const res = await handler(
+			withLogger({ host: 'a.example', 'user-agent': 'Googlebot/2.1' }, warn)
+		)
+		expect(res.status).toBe(202)
+		expect(await res.json()).toEqual({ ok: true })
+		expect(events).toEqual([])
+		expect(warn).not.toHaveBeenCalled()
 	})
 })

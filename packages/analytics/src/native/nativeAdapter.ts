@@ -19,6 +19,7 @@ import { EVENT_SCAN_LIMIT, eventScanMeta } from './eventScan'
 import { composeGeoResolvers } from './geo/composeGeoResolvers'
 import { type GeoResolver, platformHeaderResolver } from './geo/geoResolver'
 import { maxmindResolver } from './geo/maxmindResolver'
+import { type BotFilter, resolveBotFilter } from './ingest/bots'
 import { type IngestAttribution, type IngestResolvers, makeIngestHandler } from './ingest/endpoint'
 import { flushBatch } from './ingest/flushBatch'
 import type { StoredEvent } from './ingest/normalizeEvent'
@@ -73,6 +74,13 @@ export interface NativeOptions {
 	 * install's own `scopeResolver` already answers for them.
 	 */
 	platformHostnames?: string[]
+	/**
+	 * Whether crawlers, monitors and headless clients are dropped at ingest, by their user
+	 * agent. On by default. A function decides for itself and receives the raw agent; `false`
+	 * counts every beacon. A dropped bot is answered exactly like an accepted event, and
+	 * `trackServerEvent` is trusted host code that is never filtered.
+	 */
+	filterBots?: boolean | BotFilter
 }
 
 export type NativeAdapter = AnalyticsAdapter & { flush: () => Promise<void> }
@@ -228,6 +236,7 @@ const retentionWindow = (value: number | undefined, option: string): number | un
 export function native(options: NativeOptions = {}): NativeAdapter {
 	// Validated here so a bad list fails the boot rather than dropping every event at runtime.
 	const hostname = resolveHostnameOption(options.hostname)
+	const filterBots = resolveBotFilter(options.filterBots)
 	const rollupRetentionDays = retentionWindow(options.rollupRetentionDays, 'rollupRetentionDays')
 	// Zero and below have always meant "keep everything", so they stay a no-op rather than a throw.
 	const retentionDays =
@@ -336,6 +345,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 						getBuffer: () => buffer,
 						resolvers,
 						attribution,
+						filterBots,
 					}),
 				},
 			]
