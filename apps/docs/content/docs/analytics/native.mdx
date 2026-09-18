@@ -22,7 +22,7 @@ Registering it adds three hidden collections (`analytics-events`, `analytics-rol
 interface RawEventInput {
   type: 'pageview' | 'event' | 'goal'
   path: string          // required
-  hostname: string      // required
+  hostname?: string     // optional; the stored hostname comes from the request, see below
   name?: string         // event name, or the goal slug; required unless type is 'pageview'
   referrer?: string
   query?: string        // the page's query string, no leading '?'; read on any type
@@ -34,17 +34,89 @@ interface RawEventInput {
 }
 ```
 
-An event is rejected only on its required fields: a known `type`, a non-empty string `path` and `hostname`, and a non-empty string `name` on everything but a pageview. Optional fields are sanitized rather than rejected, so one malformed attribute costs an attribute instead of the whole event: `value` must be a finite number `>= 0`, `currency` must match `/^[A-Z]{3}$/`, `scrollDepth` is clamped to 100 and rounded, `durationMs` must be a finite number between 0 and 86,400,000 (a day) or it is dropped, `name` is truncated to 128 characters (it is the `event` dimension's bucket key), `path` to 512 and `hostname` to 253 (both are rollup bucket keys), and `props` keeps at most 20 flat scalar entries with keys up to 64 characters and string values truncated to 256. The request body is capped at 64 KiB (`413 payload_too_large` above it) and unparseable JSON answers `400 invalid_param`.
+An event is rejected only on its required fields: a known `type`, a non-empty string `path`, and a non-empty string `name` on everything but a pageview. `hostname` is not one of them: it is optional on the wire, and a body that carries one is only type-checked, since the stored value comes from the request rather than from the body (see [Where the hostname comes from](#where-the-hostname-comes-from)). Optional fields are sanitized rather than rejected, so one malformed attribute costs an attribute instead of the whole event: `value` must be a finite number `>= 0`, `currency` must match `/^[A-Z]{3}$/`, `scrollDepth` is clamped to 100 and rounded, `durationMs` must be a finite number between 0 and 86,400,000 (a day) or it is dropped, `name` is truncated to 128 characters (it is the `event` dimension's bucket key), `path` to 512 and the resolved hostname to 253 (both are rollup bucket keys), and `props` keeps at most 20 flat scalar entries with keys up to 64 characters and string values truncated to 256. The request body is capped at 64 KiB (`413 payload_too_large` above it) and unparseable JSON answers `400 invalid_param`.
 
-The server derives the rest at ingest time: the [dimensions](#dimensions) below, a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days), and the [goals](/analytics/goals) the event completed, stamped onto the stored event. The endpoint responds `202` on success and `400` on an invalid body.
+The server derives the rest at ingest time: the hostname the event is stored under, the [dimensions](#dimensions) below, a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days), and the [goals](/analytics/goals) the event completed, stamped onto the stored event. The endpoint responds `202` on success and `400` on an invalid body.
 
-A refusal is the same [error envelope](/analytics/data-sources#errors) the authenticated endpoints answer: `{ "error": { "code", "message", "param"? } }`. The `400` names the first field the event failed on in `param`, checked as `type`, `path`, `hostname`, `name`, so a tracker author is not left guessing which of four was refused; unparseable JSON names `type`, and a body that died in transit (a beacon from an unloading tab) names nothing. The `413` is `payload_too_large` and names nothing either.
+A refusal is the same [error envelope](/analytics/data-sources#errors) the authenticated endpoints answer: `{ "error": { "code", "message", "param"? } }`. The `400` names the first field the event failed on in `param`, checked as `type`, `path`, `hostname`, `name`, so a tracker author is not left guessing which one was refused; a missing `hostname` never lands there, only a non-string one does. Unparseable JSON names `type`, and a body that died in transit (a beacon from an unloading tab) names nothing. The `413` is `payload_too_large` and names nothing either.
 
 `query` never reaches storage. It is capped at 512 characters, parsed for its five `utm_*` keys and for the [ad click ids](#traffic-channels) the channel classifier reads, and thrown away, so a session token or an email address that happens to be in the URL is not written to the events collection. The endpoint reads it on any event type; the tracker only sends it with pageviews, and sending it at all is optional: [`capture.autoCapture.query: false`](/analytics/capture#auto-capture) stops the tracker putting it on the wire.
 
 A `goal` event counts under `events`, never under `pageviews`, and is kept out of the `event` dimension breakdown: its name is a goal slug, and it appears under the `goal` dimension instead. `revenue` is summed as a plain number in the event's own currency, with no conversion; see the currency note on [Goals](/analytics/goals#how-native-reports-them). `scrollDepth` averages over the pageviews that actually reported one, tracked by its own sample counter so a pageview whose tracker never sent a depth does not drag the average down.
 
 Events are written atomically, via `$inc` on Mongo and `ON CONFLICT DO UPDATE` on Postgres, so concurrent ingestion is safe.
+
+### Where the hostname comes from
+
+The stored hostname is the host the request itself carried, not the one its body claims. That is `x-forwarded-host`'s first value when the plugin's [`trustedProxyHops`](#trusted-proxies) is 1 or more, and the `Host` header otherwise, lowercased, with the port and a trailing root dot stripped and the result capped at 253 characters. A request that yields no usable host at all is dropped.
+
+The `Origin` header is deliberately never read. A scripted client can pair a valid `Host` with any `Origin` it likes, so reading it would leave the hole this closes: one client minting unlimited hostname bucket families inside a scope it is legitimately allowed to send to. The request host is what the edge routes on, so it can only ever be a host that reaches the install.
+
+The body's `hostname` is therefore optional, and the tracker keeps sending it: a [resolver](#a-resolver) receives it as `claimed`. [`trackServerEvent`](/analytics/goals#4-track-from-server-code) is trusted server code with no request to attribute to, so it keeps supplying its own hostname and still requires one.
+
+The `hostname` option on `native()` takes three forms.
+
+#### `'request'`
+
+The default, and the whole rule above:
+
+```ts
+native({ hostname: 'request' })
+```
+
+#### A list
+
+The request host is stored only when the list holds it, and the event is dropped otherwise:
+
+```ts
+native({ hostname: ['example.com', 'www.example.com'] })
+```
+
+Entries are bare hostnames, lowercased at boot: a scheme or a port in an entry fails the boot rather than silently matching nothing, and an empty list is refused for the same reason. **This is the form to use on a single-site install with no `scopeResolver` and no edge that validates `Host`.** There, `Host` is exactly as forgeable as the body was, and the list is the only thing that bounds which hostnames can be written.
+
+#### A resolver
+
+```ts
+native({
+  hostname: async ({ req, scope }) => {
+    // A split deployment: the page is on the tenant's domain, the API is not, so the
+    // page's own origin is validated against what the scope already resolved. `claimed`,
+    // the body's own hostname, is available here too and is the one value never trusted.
+    const origin = req.headers.get('origin')
+    return origin && (await tenantOwnsOrigin(req, scope, origin)) ? new URL(origin).hostname : null
+  },
+})
+```
+
+It receives the body's claim, the request, and the scope the request already resolved to, and returns the hostname to store or `null` to drop the event. The answer is normalized and capped like any other, and a resolver that throws drops the event too: ingest is a public path, so a broken lookup loses one event rather than the response.
+
+#### Scoped installs and `platformHostnames`
+
+On an install with a `scopeResolver`, an event whose request resolves no scope is dropped. Nothing is listed for that: a tenant who adds a custom domain is counted the moment the tenant document is saved, because the rule is "the request resolved to a tenant" and that lookup is the install's own. See [Multi-tenancy](/analytics/multi-tenancy#capture-slots-per-tenant) for the resolver to write.
+
+`platformHostnames` is the exception, and it is a static list on purpose:
+
+```ts
+native({ platformHostnames: ['app.example.com', 'www.example.com'] })
+```
+
+Those are the platform's own domains, which are infrastructure rather than tenants: they change with a deploy, not with a signup, so listing them costs nothing. A request from one of them ingests under the null scope even though it resolves no tenant. Tenant domains never belong here.
+
+<Callout type="info">
+**A dropped event answers exactly what an accepted one answers**: `202` with `{ "ok": true }`, the same headers, and nothing logged. A prober therefore learns nothing about which hosts or tenants exist, and a public endpoint is not a log amplifier. The cost is that a misconfigured `hostname` list or resolver is silent: if events stop arriving, check the option before the tracker.
+</Callout>
+
+### Trusted proxies
+
+`trustedProxyHops` is a plugin option rather than a native one, because the same client address is read by the native visitor hash, by the [geo resolvers](/analytics/geo), and by the [capture proxy](/analytics/proxy#runtime-endpoint):
+
+```ts
+analytics({ adapters: [native()], trustedProxyHops: 1 })
+```
+
+Unset, the leftmost `x-forwarded-for` entry is used, which is correct for honest traffic and is whatever the client wrote for the rest. Set to `n`, the entry `n` from the right is used, which is the address the outermost trusted proxy saw, and a chain shorter than `n` yields no address rather than falling back to the client-writable `x-real-ip`. It also lets the native ingest read `x-forwarded-host` for the event's hostname. It must be a non-negative integer or the boot fails.
+
+There is no default of 1. An install behind a CDN plus a proxy would then read the CDN's address for every visitor, collapsing geo and the visitor hash onto one value, which is worse than a spoofable one. Count the hops your own deployment actually has.
 
 ## Dimensions
 
@@ -306,5 +378,9 @@ Every statement is `ADD COLUMN IF NOT EXISTS`, so the migration is re-runnable a
 | `buffer` | `boolean \| { maxSize?, maxAgeMs? }` | off | In-memory write batching (50 events / 2000 ms). |
 | `geoDbPath` | `string` | none | Path to a MaxMind `.mmdb`; enables IP-level geo lookup. |
 | `geoResolver` | `GeoResolver` | platform headers (+ MaxMind when `geoDbPath` set) | Custom geo pipeline. |
+| `hostname` | `'request' \| string[] \| HostnameResolver` | `'request'` | Where a stored event's [hostname comes from](#where-the-hostname-comes-from). A list keeps only the hostnames it names; a resolver decides per event and `null` drops it. |
 | `ingestPath` | `string` | `/analytics/ingest` | Beacon endpoint path (served under `/api`). The tracker config follows it, so the browser posts to the moved mount. |
+| `platformHostnames` | `string[]` | `[]` | On a [scoped install](#scoped-installs-and-platformhostnames), the platform's own domains, which ingest under the null scope instead of being dropped. |
 | `retentionDays` | `number` | keep forever | Nightly pruning window for raw events. |
+
+`trustedProxyHops` sits on `analytics()` rather than here; see [Trusted proxies](#trusted-proxies).

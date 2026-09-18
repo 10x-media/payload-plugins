@@ -218,7 +218,7 @@ export const POST = async (request: Request) => {
 }
 ```
 
-`type`, `path` and `hostname` are required, and so is `name` on everything but a pageview. An event that fails one of them rejects with an `AnalyticsTrackError` naming the field, and nothing is written; the same input over the [ingest endpoint](/analytics/native#the-ingest-endpoint) answers `400`. Every optional field is sanitized exactly as it is on the wire.
+`type`, `path` and `hostname` are required, and so is `name` on everything but a pageview. An event that fails one of them rejects with an `AnalyticsTrackError` naming the field, and nothing is written. `hostname` is required **here** and optional over the [ingest endpoint](/analytics/native#the-ingest-endpoint), which stores the host the request carried instead: this is trusted server code, and there is no request to attribute a server event to, so the caller owns the value and it is stored as given. A missing `type`, `path` or `name` answers `400` over that endpoint the same way it throws here. Every optional field is sanitized exactly as it is on the wire.
 
 | Option | What it does |
 |---|---|
