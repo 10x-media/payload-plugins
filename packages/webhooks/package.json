@@ -75,12 +75,20 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
+		"@10x-media/fields": "^0.1.0-beta.5",
 		"@payloadcms/ui": "^3.83.0",
+		"next": "^15.0.0 || ^16.0.0",
 		"payload": "^3.83.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},
+	"peerDependenciesMeta": {
+		"next": {
+			"optional": true
+		}
+	},
 	"devDependencies": {
+		"@10x-media/fields": "workspace:*",
 		"@10x-media/payload-test-harness": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
 		"@10x-media/tsdown-config": "workspace:*",
@@ -89,6 +97,7 @@
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
+		"next": "catalog:",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
@@ -96,6 +105,7 @@
 		"playwright": "catalog:",
 		"react": "catalog:",
 		"react-dom": "catalog:",
+		"standardwebhooks": "catalog:",
 		"tsdown": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
