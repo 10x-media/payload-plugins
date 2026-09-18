@@ -74,6 +74,8 @@ const MEDIUM_CHANNELS: ReadonlyMap<string, TrafficChannel> = new Map<string, Tra
 	['display', 'display'],
 	['banner', 'display'],
 	['cpm', 'display'],
+	['retargeting', 'display'],
+	['remarketing', 'display'],
 	['social', 'organic-social'],
 	['social-media', 'organic-social'],
 	['sm', 'organic-social'],
@@ -290,8 +292,10 @@ const paidChannel = (platform: Platform | null | undefined): TrafficChannel =>
  * `utm_medium` wins outright, because a campaign states its own channel and the referrer host
  * is then only the last hop. A paid click id is next, since an ad click carries one whatever
  * host it bounced through, and it names its own network's platform. The platform itself comes
- * from the referrer host, else from `utm_source` matched by name. Anything left with a host is
- * `referral`, and a hit with no usable host at all is `direct`.
+ * from the referrer host, else from `utm_source` matched by name; on the paid path `utm_source`
+ * answers too when the host names no platform, because an ad click routinely arrives through the
+ * network's own redirect host. Anything left with a host is `referral`, and a hit with no usable
+ * host at all is `direct`.
  */
 export const classifyChannel = ({
 	referrerHost,
@@ -307,7 +311,12 @@ export const classifyChannel = ({
 	const platform = named ?? (!host && clicks.facebook ? 'social' : undefined)
 	if (medium) {
 		if (PAID_MEDIUMS.has(medium) || medium.startsWith('paid')) {
-			return paidChannel(PAID_MEDIUMS.get(medium) ?? clicks.paid ?? platform)
+			return paidChannel(
+				PAID_MEDIUMS.get(medium) ??
+					clicks.paid ??
+					platform ??
+					(name ? namePlatform(name) : undefined)
+			)
 		}
 		const channel = MEDIUM_CHANNELS.get(medium)
 		if (channel) {
@@ -327,7 +336,8 @@ export const classifyChannel = ({
  * The visit's named origin: the `utm_source` it was tagged with, else the host it came from,
  * else `direct`. That is what `source` means on Plausible (`visit:source`) and GA4
  * (`sessionSource`), so a report reads the same column whichever source answered it. The tag
- * keeps its case and is capped like every other campaign key; the host arrives lowercased.
+ * keeps its case and is capped like every other campaign key; the host arrives lowercased. A
+ * campaign tagged `utm_source=direct` therefore shares the `direct` bucket with untagged traffic.
  */
 export const deriveSource = ({ referrerHost, utmSource }: SourceInput): string => {
 	const tagged = utmSource?.trim().slice(0, MAX_UTM_LENGTH)
