@@ -1311,122 +1311,118 @@ describeForDb('reportingTimezone resolver (per-tenant)', {}, (db) => {
 	})
 })
 
-describeForDb(
-	'reportingTimezone invalid/null/throwing → UTC fallback',
-	{ dbs: ['mongo'] },
-	(db) => {
-		let booted: BootedPayload
+describeForDb('reportingTimezone invalid/null/throwing → UTC fallback', {}, (db) => {
+	let booted: BootedPayload
 
-		beforeAll(async () => {
-			booted = await bootPayload({
-				plugin: analytics({
-					adapters: [native()],
-					// Resolver returns null for unknown scopes and throws for 'bad-scope'.
-					reportingTimezone: ({ scope }) => {
-						if (scope === 'bad-scope') throw new Error('simulated resolver failure')
-						return null
-					},
-				}),
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({
+				adapters: [native()],
+				// Resolver returns null for unknown scopes and throws for 'bad-scope'.
+				reportingTimezone: ({ scope }) => {
+					if (scope === 'bad-scope') throw new Error('simulated resolver failure')
+					return null
+				},
+			}),
+			db,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const ingestViaEndpoint = async (tenantId: string | null, path: string): Promise<void> => {
+		const endpoint = (booted.payload.config.endpoints ?? []).find(
+			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		)
+		if (!endpoint || typeof endpoint.handler !== 'function') {
+			throw new Error('ingest endpoint not registered')
+		}
+		const res = await endpoint.handler(
+			ingestRequest(
+				booted.payload,
+				{ type: 'pageview', path, hostname: 'h', durationMs: 100 },
+				tenantId !== null ? { 'x-tenant-id': tenantId } : {}
+			)
+		)
+		expect(res.status).toBe(202)
+	}
+
+	const rollupPeriodFor = async (path: string): Promise<Date> => {
+		const rollups = await booted.payload.find({
+			collection: ROLLUPS_SLUG,
+			where: { path: { equals: path }, dimension: { equals: '' } },
+			pagination: false,
+			overrideAccess: true,
+		})
+		return new Date((rollups.docs[0] as unknown as { period: string }).period)
+	}
+
+	const eventTimestampFor = async (path: string): Promise<Date> => {
+		const events = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: path } },
+			pagination: false,
+			overrideAccess: true,
+		})
+		return new Date((events.docs[0] as unknown as { timestamp: string }).timestamp)
+	}
+
+	it(`buckets in UTC when resolver returns null on ${db}`, async () => {
+		await ingestViaEndpoint(null, '/tz-null')
+		const ts = await eventTimestampFor('/tz-null')
+		const period = await rollupPeriodFor('/tz-null')
+		expect(period.toISOString()).toBe(startOfDayInTz(ts, 'UTC').toISOString())
+	})
+
+	it(`buckets in UTC and does not throw when resolver throws on ${db}`, async () => {
+		await ingestViaEndpoint('bad-scope', '/tz-throw')
+		const ts = await eventTimestampFor('/tz-throw')
+		const period = await rollupPeriodFor('/tz-throw')
+		expect(period.toISOString()).toBe(startOfDayInTz(ts, 'UTC').toISOString())
+	})
+
+	it(`buckets in UTC for an invalid IANA string on ${db}`, async () => {
+		let booted2: BootedPayload | undefined
+		try {
+			booted2 = await bootPayload({
+				plugin: analytics({ adapters: [native()], reportingTimezone: 'Not/ATimezone' }),
 				db,
 			})
-		})
-
-		afterAll(async () => {
-			await booted.stop()
-		})
-
-		const ingestViaEndpoint = async (tenantId: string | null, path: string): Promise<void> => {
-			const endpoint = (booted.payload.config.endpoints ?? []).find(
+			const endpoint = (booted2.payload.config.endpoints ?? []).find(
 				(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
 			)
-			if (!endpoint || typeof endpoint.handler !== 'function') {
-				throw new Error('ingest endpoint not registered')
-			}
+			if (!endpoint || typeof endpoint.handler !== 'function') throw new Error('no endpoint')
 			const res = await endpoint.handler(
-				ingestRequest(
-					booted.payload,
-					{ type: 'pageview', path, hostname: 'h', durationMs: 100 },
-					tenantId !== null ? { 'x-tenant-id': tenantId } : {}
-				)
+				ingestRequest(booted2.payload, {
+					type: 'pageview',
+					path: '/tz-invalid',
+					hostname: 'h',
+					durationMs: 100,
+				})
 			)
 			expect(res.status).toBe(202)
-		}
-
-		const rollupPeriodFor = async (path: string): Promise<Date> => {
-			const rollups = await booted.payload.find({
+			const rollups = await booted2.payload.find({
 				collection: ROLLUPS_SLUG,
-				where: { path: { equals: path }, dimension: { equals: '' } },
+				where: { path: { equals: '/tz-invalid' }, dimension: { equals: '' } },
 				pagination: false,
 				overrideAccess: true,
 			})
-			return new Date((rollups.docs[0] as unknown as { period: string }).period)
-		}
-
-		const eventTimestampFor = async (path: string): Promise<Date> => {
-			const events = await booted.payload.find({
+			const events = await booted2.payload.find({
 				collection: EVENTS_SLUG as never,
-				where: { path: { equals: path } },
+				where: { path: { equals: '/tz-invalid' } },
 				pagination: false,
 				overrideAccess: true,
 			})
-			return new Date((events.docs[0] as unknown as { timestamp: string }).timestamp)
+			const ts = new Date((events.docs[0] as unknown as { timestamp: string }).timestamp)
+			const period = new Date((rollups.docs[0] as unknown as { period: string }).period)
+			expect(period.toISOString()).toBe(startOfDayInTz(ts, 'UTC').toISOString())
+		} finally {
+			await booted2?.stop()
 		}
-
-		it(`buckets in UTC when resolver returns null on ${db}`, async () => {
-			await ingestViaEndpoint(null, '/tz-null')
-			const ts = await eventTimestampFor('/tz-null')
-			const period = await rollupPeriodFor('/tz-null')
-			expect(period.toISOString()).toBe(startOfDayInTz(ts, 'UTC').toISOString())
-		})
-
-		it(`buckets in UTC and does not throw when resolver throws on ${db}`, async () => {
-			await ingestViaEndpoint('bad-scope', '/tz-throw')
-			const ts = await eventTimestampFor('/tz-throw')
-			const period = await rollupPeriodFor('/tz-throw')
-			expect(period.toISOString()).toBe(startOfDayInTz(ts, 'UTC').toISOString())
-		})
-
-		it(`buckets in UTC for an invalid IANA string on ${db}`, async () => {
-			let booted2: BootedPayload | undefined
-			try {
-				booted2 = await bootPayload({
-					plugin: analytics({ adapters: [native()], reportingTimezone: 'Not/ATimezone' }),
-					db,
-				})
-				const endpoint = (booted2.payload.config.endpoints ?? []).find(
-					(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
-				)
-				if (!endpoint || typeof endpoint.handler !== 'function') throw new Error('no endpoint')
-				const res = await endpoint.handler(
-					ingestRequest(booted2.payload, {
-						type: 'pageview',
-						path: '/tz-invalid',
-						hostname: 'h',
-						durationMs: 100,
-					})
-				)
-				expect(res.status).toBe(202)
-				const rollups = await booted2.payload.find({
-					collection: ROLLUPS_SLUG,
-					where: { path: { equals: '/tz-invalid' }, dimension: { equals: '' } },
-					pagination: false,
-					overrideAccess: true,
-				})
-				const events = await booted2.payload.find({
-					collection: EVENTS_SLUG as never,
-					where: { path: { equals: '/tz-invalid' } },
-					pagination: false,
-					overrideAccess: true,
-				})
-				const ts = new Date((events.docs[0] as unknown as { timestamp: string }).timestamp)
-				const period = new Date((rollups.docs[0] as unknown as { period: string }).period)
-				expect(period.toISOString()).toBe(startOfDayInTz(ts, 'UTC').toISOString())
-			} finally {
-				await booted2?.stop()
-			}
-		})
-	}
-)
+	})
+})
 
 describeForDb('analytics sync tier', {}, (db) => {
 	const DAY = 86_400_000

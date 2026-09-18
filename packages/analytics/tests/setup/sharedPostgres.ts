@@ -18,8 +18,29 @@ const wantsPostgres = (): boolean =>
 		.map((db) => db.trim())
 		.includes('postgres')
 
+/** Credentials out, host and database in: enough to recognize a server, safe to print. */
+const maskCredentials = (url: string): string => {
+	try {
+		const parsed = new URL(url)
+		if (parsed.username) parsed.username = '***'
+		if (parsed.password) parsed.password = '***'
+		return parsed.toString()
+	} catch {
+		return '<unparsable url>'
+	}
+}
+
 export const setup = async (): Promise<void> => {
-	if (!wantsPostgres() || process.env[SHARED_POSTGRES_SERVER_ENV]) {
+	if (!wantsPostgres()) {
+		return
+	}
+	const inherited = process.env[SHARED_POSTGRES_SERVER_ENV]
+	if (inherited) {
+		// A value left behind by a killed run points at a container that no longer exists, and
+		// the resulting connection errors are unreadable without knowing what was adopted.
+		console.info(
+			`[analytics] using inherited ${SHARED_POSTGRES_SERVER_ENV}: ${maskCredentials(inherited)}`
+		)
 		return
 	}
 	server = await startSharedPostgresServer()
