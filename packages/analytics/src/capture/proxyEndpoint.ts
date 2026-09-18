@@ -34,6 +34,10 @@ export const PROXY_METHODS: ReadonlyArray<Endpoint['method']> = [
 const ALLOWED_METHODS = 'GET, POST, OPTIONS'
 const SERVED_METHODS = new Set(['GET', 'POST', 'OPTIONS'])
 
+/**
+ * The proxy's only error answer, and the one endpoint here that sends no error envelope:
+ * it relays a vendor SDK's own traffic, and that SDK, not admin code, reads the answer.
+ */
 const empty = (status: number, headers?: HeadersInit) => new Response(null, { status, headers })
 
 /**

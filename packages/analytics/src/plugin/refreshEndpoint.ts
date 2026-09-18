@@ -2,11 +2,10 @@ import type { PayloadHandler, PayloadRequest } from 'payload'
 import { readCappedBody } from '../capture/requestBody'
 import { PLATFORM_SCOPE } from '../core/contract'
 import { resolveRequestedScope } from '../core/scopedRead'
-import { queryError } from '../query/errors'
 import type { RefreshResponse } from '../query/fetchQuery'
 import { epochKeyFor, INITIAL_EPOCH } from '../surfacing/epoch'
+import { analyticsError, errorResponse, NO_STORE, RETRY_AFTER } from './errors'
 import { REFRESH_PATH } from './paths'
-import { errorResponse, NO_STORE, RETRY_AFTER } from './responses'
 import { cacheEpochFor, getRuntime, platformReadGate, readAccessFor } from './runtime'
 
 export { REFRESH_PATH }
@@ -115,33 +114,44 @@ export const makeRefreshHandler = (opts: RefreshHandlerOptions = {}): PayloadHan
 
 	return async (req: PayloadRequest) => {
 		if (!req.user) {
-			return errorResponse(401, queryError('unauthorized', 'analytics: authentication required'))
+			return errorResponse(
+				401,
+				analyticsError('unauthorized', 'analytics: authentication required')
+			)
 		}
 		const runtime = getRuntime(req.payload)
 		if (!runtime) {
-			return errorResponse(503, queryError('unavailable', 'analytics: not available'), RETRY_AFTER)
+			return errorResponse(
+				503,
+				analyticsError('unavailable', 'analytics: not available'),
+				RETRY_AFTER
+			)
 		}
 		try {
 			if (!(await readAccessFor(runtime, req))) {
-				return errorResponse(403, queryError('forbidden', 'analytics: read access denied'))
+				return errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
 			}
 			const read = await readCappedBody(req, MAX_REFRESH_BODY_BYTES)
 			if (!read.ok) {
 				return read.reason === 'too-large'
 					? errorResponse(
 							413,
-							queryError('payload_too_large', 'analytics: the refresh body is too large')
+							analyticsError('payload_too_large', 'analytics: the refresh body is too large')
 						)
 					: errorResponse(
 							400,
-							queryError('invalid_param', 'analytics: the refresh body could not be read', 'scope')
+							analyticsError(
+								'invalid_param',
+								'analytics: the refresh body could not be read',
+								'scope'
+							)
 						)
 			}
 			const body = parseBody(read.body)
 			if (!body.ok) {
 				return errorResponse(
 					400,
-					queryError('invalid_param', 'analytics: scope must be a string', 'scope')
+					analyticsError('invalid_param', 'analytics: scope must be a string', 'scope')
 				)
 			}
 			const requested = await resolveRequestedScope({
@@ -153,7 +163,7 @@ export const makeRefreshHandler = (opts: RefreshHandlerOptions = {}): PayloadHan
 			if (!requested.ok) {
 				return errorResponse(
 					400,
-					queryError(
+					analyticsError(
 						'untrusted_scope',
 						'analytics: scope is not permitted for this request',
 						'scope'
@@ -176,7 +186,7 @@ export const makeRefreshHandler = (opts: RefreshHandlerOptions = {}): PayloadHan
 			req.payload.logger?.warn(`analytics: cache refresh failed: ${String(err)}`)
 			return errorResponse(
 				503,
-				queryError('unavailable', 'analytics: the cache could not be refreshed'),
+				analyticsError('unavailable', 'analytics: the cache could not be refreshed'),
 				RETRY_AFTER
 			)
 		}

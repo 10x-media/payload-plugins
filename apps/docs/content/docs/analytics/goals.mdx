@@ -150,7 +150,11 @@ Options come from `GET /api/analytics/goals`, an authenticated endpoint listing 
 }
 ```
 
-The endpoint is registered whether or not the collection is enabled, so the picker works on a config-only install. It takes no scope parameter, so a tenant can only ever enumerate their own goals. A scope with no goals at all still renders the select, with a notice under the input (and a link to the collection when the install has one). A slug stored before the goals changed renders as its own option and stays editable, clearable on an optional field; a `required: true` field keeps the stored value until a goal exists, because the picker itself makes a required goal field non-clearable (Payload's native select stays clearable regardless of `required`, and `admin.isClearable` is not read here).
+The endpoint is registered whether or not the collection is enabled, so the picker works on a config-only install. It takes no scope parameter, so a tenant can only ever enumerate their own goals.
+
+A scope with no goals at all still renders the select, with a notice under the input (and a link to the collection when the install has one). A slug stored before the goals changed renders as its own option and stays editable, clearable on an optional field; a `required: true` field keeps the stored value until a goal exists, because the picker itself makes a required goal field non-clearable (Payload's native select stays clearable regardless of `required`, and `admin.isClearable` is not read here).
+
+The endpoint refuses an anonymous request with `401 unauthorized` and a denied one with `403 forbidden`, both in the plugin-wide [error envelope](/analytics/data-sources#errors), and it has no other refusal: a resolution that throws answers `200` with the config goals on an unscoped install and an empty list on a scoped one, rather than a 5xx the picker would have to render. Every answer carries `Cache-Control: private, no-store`, successful listings included, because which goals a caller sees depends on that caller's own scope.
 
 Anything outside the admin reads the field by hand. The value is a plain slug string, and `goalSlug()` is the only normalization it needs.
 

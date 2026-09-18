@@ -26,6 +26,12 @@ export type { GoalsResponse, WireGoal } from '../goals/fetchGoals'
 export { GoalSelectField } from '../goals/GoalSelectField'
 export { useAnalyticsGoals } from '../goals/useAnalyticsGoals'
 export {
+	type AnalyticsError,
+	type AnalyticsErrorCode,
+	readErrorCode,
+	readResponseError,
+} from '../plugin/errors'
+export {
 	buildQueryUrl,
 	fetchQuery,
 	QueryFetchError,

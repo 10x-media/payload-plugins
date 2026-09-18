@@ -14,6 +14,8 @@ import { readForWidget } from '../../src/widgets/readForWidget'
 
 const TZ = 'Europe/Berlin'
 
+type ErrorBody = { error: { code: string; message: string; param?: string } }
+
 // Jun 23 in Berlin runs 2026-06-22T22:00Z .. 2026-06-23T21:59:59.999Z, so the two evening
 // events straddle the final day the picker shows as included.
 const LAST_DAY_EVENING = '2026-06-23T21:30:00.000Z'
@@ -120,7 +122,10 @@ describeForDb('custom ranges in the reporting timezone', {}, (db) => {
 			`collection=pages&id=${pageId}&metrics=pageviews&timeframe=custom&from=2026-06-01T00:00:00&to=2026-06-23T23:59:59`
 		)
 		expect(naive.status).toBe(400)
-		expect(await naive.json()).toEqual({ error: 'invalid range' })
+		expect(((await naive.json()) as ErrorBody).error).toMatchObject({
+			code: 'invalid_param',
+			param: 'from',
+		})
 	})
 
 	it(`accepts a single-day window and rejects an inverted one on ${db}`, async () => {
@@ -141,7 +146,10 @@ describeForDb('custom ranges in the reporting timezone', {}, (db) => {
 			`collection=pages&id=${pageId}&metrics=pageviews&timeframe=custom&from=2026-06-23T10:00:00Z&to=2026-06-23T10:00:00Z`
 		)
 		expect(res.status).toBe(400)
-		expect(await res.json()).toEqual({ error: 'invalid range' })
+		expect(((await res.json()) as ErrorBody).error).toMatchObject({
+			code: 'invalid_param',
+			param: 'to',
+		})
 	})
 
 	it(`warms the very cache key a custom-range widget then asks for on ${db}`, async () => {

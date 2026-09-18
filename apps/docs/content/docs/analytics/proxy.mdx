@@ -29,6 +29,7 @@ What it does with a request:
 - **Response.** Status and body stream back. Headers are allowlisted to `content-type`, `cache-control`, `etag`, `last-modified`, `vary`. `set-cookie` never comes back. `content-encoding` and `content-length` are deliberately dropped, because `fetch` decodes the body but leaves both describing the compressed bytes. `location` is not forwarded either, so an upstream 3xx arrives without it rather than redirecting off your origin.
 - **Body cap.** A `POST` over `capture.proxy.maxBodyBytes` (default 1 MiB, which clears a PostHog batch carrying session-replay data) is refused with `413` before anything is forwarded, and a body that dies in transit answers `400`. Bodies are buffered, not streamed, since the cap has to be enforced before forwarding anyway.
 - **Timeout.** `capture.proxy.timeoutMs` (default 10000) is a deadline for the upstream response *headers* only, so a large tracker bundle still streams to completion. A timeout or a network failure answers `502` with no body and no echo of the upstream URL.
+- **No error body.** Every status above is sent bodyless, and this is the one endpoint the plugin registers that answers no [error envelope](/analytics/data-sources#errors). It relays a vendor SDK's own traffic, and that SDK, not admin code, reads the answer. Read the status alone; there is no `code` to branch on and nothing to parse.
 
 ```ts
 analytics({

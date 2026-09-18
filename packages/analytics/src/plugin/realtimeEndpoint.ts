@@ -1,9 +1,8 @@
 import type { PayloadHandler } from 'payload'
 import type { MetricKey } from '../core/contract'
-import { queryError } from '../query/errors'
 import { readForWidgetRealtime } from '../widgets/readForWidgetRealtime'
+import { analyticsError, errorResponse, NO_STORE, RETRY_AFTER } from './errors'
 import { REALTIME_PATH } from './paths'
-import { errorResponse, NO_STORE, RETRY_AFTER } from './responses'
 import { getRuntime, readAccessFor } from './runtime'
 
 export { REALTIME_PATH }
@@ -25,13 +24,13 @@ const DEFAULT_WINDOW = 30
  */
 export const makeRealtimeHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
-		return Response.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE })
+		return errorResponse(401, analyticsError('unauthorized', 'analytics: authentication required'))
 	}
 	try {
 		const runtime = getRuntime(req.payload)
 		// No runtime means no adapter to read, so the skipped gate protects no data.
 		if (runtime && !(await readAccessFor(runtime, req))) {
-			return Response.json({ error: 'forbidden' }, { status: 403, headers: NO_STORE })
+			return errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
 		}
 		const params = new URL(req.url ?? '', 'http://localhost').searchParams
 		const rawMetric = params.get('metric')
@@ -54,12 +53,12 @@ export const makeRealtimeHandler = (): PayloadHandler => async (req) => {
 			req.payload.logger?.warn(`analytics: realtime read failed: ${String(err)}`)
 			return errorResponse(
 				503,
-				queryError('unavailable', 'analytics: source is temporarily unavailable'),
+				analyticsError('unavailable', 'analytics: source is temporarily unavailable'),
 				RETRY_AFTER
 			)
 		}
 	} catch (err) {
-		req.payload.logger?.warn(`analytics: realtime request failed: ${String(err)}`)
-		return errorResponse(500, queryError('internal', 'analytics: realtime read failed'))
+		req.payload.logger?.error(`analytics: realtime request failed: ${String(err)}`)
+		return errorResponse(500, analyticsError('internal', 'analytics: realtime read failed'))
 	}
 }
