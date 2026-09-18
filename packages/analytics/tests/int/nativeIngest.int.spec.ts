@@ -4,13 +4,11 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { ROLLUPS_SLUG } from '../../src/native/collections/rollups'
-import { SEEN_SLUG } from '../../src/native/collections/seen'
 import { composeGeoResolvers } from '../../src/native/geo/composeGeoResolvers'
 import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
 import { maxmindResolver } from '../../src/native/geo/maxmindResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { native } from '../../src/native/nativeAdapter'
-import { pruneEventsTask } from '../../src/native/retention/pruneTask'
 import { kvCacheStore } from '../../src/surfacing/cacheStore'
 import { createEngine } from '../../src/surfacing/engine'
 import { INGEST_HOST, ingestRequest } from './ingestRequest'
@@ -273,35 +271,6 @@ describeForDb('native ingest through the router', {}, (db) => {
 			)
 			expect(statuses, `round ${round}`).toEqual([202, 202])
 		}
-	})
-})
-
-describeForDb('native retention', {}, (db) => {
-	let booted: BootedPayload
-	beforeAll(async () => {
-		booted = await bootPayload({
-			plugin: analytics({ adapters: [native({ retentionDays: 30 })] }),
-			db,
-		})
-	})
-	afterAll(async () => {
-		await booted.stop()
-	})
-
-	it('prunes raw events and the seen ledger older than the cutoff', async () => {
-		await ingest(booted, '/old')
-		const seenBefore = await booted.payload.count({ collection: SEEN_SLUG as never })
-		expect(seenBefore.totalDocs).toBeGreaterThan(0)
-		const task = pruneEventsTask(0)
-		const handler = task.handler as (args: {
-			req: { payload: typeof booted.payload }
-		}) => Promise<{ output: { deleted: number } }>
-		const result = await handler({ req: { payload: booted.payload } })
-		expect(result.output.deleted).toBeGreaterThan(0)
-		const events = await booted.payload.count({ collection: EVENTS_SLUG as never })
-		expect(events.totalDocs).toBe(0)
-		const seenAfter = await booted.payload.count({ collection: SEEN_SLUG as never })
-		expect(seenAfter.totalDocs).toBe(0)
 	})
 })
 

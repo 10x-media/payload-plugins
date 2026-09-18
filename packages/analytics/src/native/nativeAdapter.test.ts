@@ -1,5 +1,13 @@
+import type { Config } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { native } from './nativeAdapter'
+import { type NativeOptions, native } from './nativeAdapter'
+import { PRUNE_TASK_SLUG } from './retention/pruneTask'
+
+const registeredTasks = (options: NativeOptions = {}): string[] => {
+	const config = {} as Config
+	native(options).register?.(config)
+	return (config.jobs?.tasks ?? []).map((task) => task.slug)
+}
 
 describe('native adapter', () => {
 	it('advertises visitors, sessions, and the country dimension', () => {
@@ -46,6 +54,28 @@ describe('native adapter', () => {
 
 	it('still constructs with a (possibly missing) geo database path', () => {
 		expect(typeof native({ geoDbPath: '/nonexistent/GeoLite2-City.mmdb' }).query).toBe('function')
+	})
+})
+
+describe('native retention options', () => {
+	it('registers the prune task on an install with no retention options at all', () => {
+		expect(registeredTasks()).toContain(PRUNE_TASK_SLUG)
+		expect(registeredTasks({ retentionDays: 30, rollupRetentionDays: 365 })).toContain(
+			PRUNE_TASK_SLUG
+		)
+	})
+
+	it('rejects a rollup window that is not a whole number of days above zero', () => {
+		for (const rollupRetentionDays of [0, -1, 1.5, Number.NaN]) {
+			expect(() => native({ rollupRetentionDays })).toThrow(/rollupRetentionDays/)
+		}
+	})
+
+	it('rejects a rollup window shorter than the raw-event window', () => {
+		expect(() => native({ retentionDays: 90, rollupRetentionDays: 30 })).toThrow(
+			/rollupRetentionDays/
+		)
+		expect(() => native({ retentionDays: 90, rollupRetentionDays: 90 })).not.toThrow()
 	})
 })
 

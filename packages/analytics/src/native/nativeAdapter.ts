@@ -49,6 +49,13 @@ export interface NativeOptions {
 	geoDbPath?: string
 	ingestPath?: string
 	retentionDays?: number
+	/**
+	 * Rollup rows older than this many days are deleted by the nightly task. Off by default,
+	 * since rollups are the long-term store. It cannot be shorter than `retentionDays`: a window
+	 * reaching past raw-event retention is answered from rollups, so a shorter rollup window
+	 * would make a long window report less than a short one.
+	 */
+	rollupRetentionDays?: number
 	/** Opt-in in-process write batching. `true` uses defaults (maxSize 50, maxAgeMs 2000). */
 	buffer?: boolean | { maxSize?: number; maxAgeMs?: number }
 	/**
@@ -205,9 +212,37 @@ async function queryEvents(
 	return { rows, totals, meta: eventScanMeta({ fetchedAt, eventCount: events.length, clamped }) }
 }
 
+/** Config-time window validation, so a nonsense window fails the boot rather than the sweep. */
+const retentionWindow = (value: number | undefined, option: string): number | undefined => {
+	if (value === undefined) {
+		return undefined
+	}
+	if (!Number.isInteger(value) || value <= 0) {
+		throw new Error(
+			`analytics: ${option} must be a whole number of days above zero, got ${String(value)}`
+		)
+	}
+	return value
+}
+
 export function native(options: NativeOptions = {}): NativeAdapter {
 	// Validated here so a bad list fails the boot rather than dropping every event at runtime.
 	const hostname = resolveHostnameOption(options.hostname)
+	const rollupRetentionDays = retentionWindow(options.rollupRetentionDays, 'rollupRetentionDays')
+	// Zero and below have always meant "keep everything", so they stay a no-op rather than a throw.
+	const retentionDays =
+		options.retentionDays !== undefined && options.retentionDays > 0
+			? options.retentionDays
+			: undefined
+	if (
+		rollupRetentionDays !== undefined &&
+		retentionDays !== undefined &&
+		rollupRetentionDays < retentionDays
+	) {
+		throw new Error(
+			`analytics: rollupRetentionDays (${rollupRetentionDays}) must not be shorter than retentionDays (${retentionDays}), since windows beyond retentionDays are answered from rollups`
+		)
+	}
 	const platformHostnames = hostnameSet(options.platformHostnames, 'platformHostnames')
 	const geoResolver =
 		options.geoResolver ??
@@ -304,11 +339,13 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 					}),
 				},
 			]
-			if (options.retentionDays && options.retentionDays > 0) {
-				config.jobs = {
-					...config.jobs,
-					tasks: [...(config.jobs?.tasks ?? []), pruneEventsTask(options.retentionDays)],
-				}
+			// Always registered: the salt sweep applies to every install, retention or not.
+			config.jobs = {
+				...config.jobs,
+				tasks: [
+					...(config.jobs?.tasks ?? []),
+					pruneEventsTask({ retentionDays, rollupRetentionDays }),
+				],
 			}
 			const prevOnInit = config.onInit
 			// payloadRef is set before the app's own onInit so consumer init code can
@@ -334,7 +371,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				throw new Error('analytics: native adapter queried before init')
 			}
 			if ((q.filters && q.filters.length > 0) || q.granularity === 'hour') {
-				return queryEvents(payloadRef, q, { retentionDays: options.retentionDays, scopeWhere })
+				return queryEvents(payloadRef, q, { retentionDays, scopeWhere })
 			}
 			const fetchedAt = q.dateRange.end.toISOString()
 			const periodWhere = {
