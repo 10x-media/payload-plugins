@@ -463,7 +463,7 @@ Every statement is `ADD COLUMN IF NOT EXISTS`, so the migration is re-runnable a
 | `hostname` | `'request' \| string[] \| EventHostnameResolver` | `'request'` | Where a stored event's [hostname comes from](#where-the-hostname-comes-from). A list keeps only the hostnames it names; a resolver decides per event and `null` drops it. |
 | `ingestPath` | `string` | `/analytics/ingest` | Beacon endpoint path (served under `/api`). The tracker config follows it, so the browser posts to the moved mount. |
 | `platformHostnames` | `string[]` | `[]` | On a [scoped install](#scoped-installs-and-platformhostnames), the platform's own domains, which ingest under the null scope instead of being dropped. |
-| `retentionDays` | `number` | keep forever | Nightly [pruning window](#retention-pruning) for raw events and the seen ledger. Zero or less keeps them forever. Setting it registers the prune task. |
+| `retentionDays` | `number` | keep forever | Nightly [pruning window](#retention-pruning) for raw events and the seen ledger. Zero or less keeps them forever, anything else is a whole number of days. Setting it registers the prune task. |
 | `rollupRetentionDays` | `number` | keep forever | Nightly [pruning window](#retention-pruning) for rollup rows. A whole number of days above zero, requires `retentionDays` and never shorter than it. |
 
 `trustedProxyHops` sits on `analytics()` rather than here; see [Trusted proxies](#trusted-proxies).

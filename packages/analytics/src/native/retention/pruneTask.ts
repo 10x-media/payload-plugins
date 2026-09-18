@@ -21,12 +21,25 @@ export interface PruneOptions {
 	retentionDays?: number
 	/** Rollup rows whose period is older than this many days go. Unset keeps them. */
 	rollupRetentionDays?: number
+	/** The clock the run reads. Defaults to `Date.now`, and exists so a test can pin an instant. */
+	now?: () => number
 }
+
+/**
+ * A window prunes only when it is a finite number of days above zero. Zero means "keep
+ * everything" wherever these windows are configured, so a window that does not say how far
+ * back to go must never be read here as a cutoff of now, which would delete the whole store.
+ */
+const pruneWindow = (days: number | undefined): number | undefined =>
+	days !== undefined && Number.isFinite(days) && days > 0 ? days : undefined
 
 /**
  * The nightly sweep of everything the native engine stores. It registers only on an install
  * that configured a retention window, and sweeps the daily salts whenever it runs; an install
  * without one sweeps its salts at ingest instead, so no install needs a jobs runner for that.
+ *
+ * A window that is not a finite number of days above zero leaves its store untouched, for both
+ * `retentionDays` and `rollupRetentionDays`.
  *
  * Deletes go through the database adapter's bulk delete, so no document is loaded to be
  * deleted and nothing is reported that would cost a read to count. That bypasses collection
@@ -37,10 +50,12 @@ export const pruneEventsTask = (
 ): TaskConfig<{ input: Record<string, never>; output: Record<string, never> }> => ({
 	slug: PRUNE_TASK_SLUG,
 	handler: async ({ req }) => {
-		const now = Date.now()
+		const now = (options.now ?? Date.now)()
 		const cutoff = (days: number): string => new Date(now - days * DAY_MS).toISOString()
-		if (options.retentionDays !== undefined) {
-			const before = cutoff(options.retentionDays)
+		const retentionDays = pruneWindow(options.retentionDays)
+		const rollupRetentionDays = pruneWindow(options.rollupRetentionDays)
+		if (retentionDays !== undefined) {
+			const before = cutoff(retentionDays)
 			await req.payload.db.deleteMany({
 				collection: EVENTS_SLUG,
 				where: { timestamp: { less_than: before } },
@@ -52,10 +67,10 @@ export const pruneEventsTask = (
 				req,
 			})
 		}
-		if (options.rollupRetentionDays !== undefined) {
+		if (rollupRetentionDays !== undefined) {
 			await req.payload.db.deleteMany({
 				collection: ROLLUPS_SLUG,
-				where: { period: { less_than: cutoff(options.rollupRetentionDays) } },
+				where: { period: { less_than: cutoff(rollupRetentionDays) } },
 				req,
 			})
 		}

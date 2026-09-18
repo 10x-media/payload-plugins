@@ -25,7 +25,11 @@ const SWEEP_LAST_DAY = 8
 const sweepOldSalts = (payload: Payload, now: Date): void => {
 	for (let day = SWEEP_FIRST_DAY; day <= SWEEP_LAST_DAY; day++) {
 		const stale = saltKey(new Date(now.getTime() - day * DAY_MS))
-		void Promise.resolve(payload.kv.delete(stale)).catch(() => undefined)
+		// The call itself is inside the thenable, so a kv adapter that throws synchronously
+		// fails the sweep rather than the ingest that triggered it.
+		void Promise.resolve()
+			.then(() => payload.kv.delete(stale))
+			.catch(() => undefined)
 	}
 }
 

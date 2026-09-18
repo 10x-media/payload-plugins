@@ -55,4 +55,16 @@ describe('dailySalt', () => {
 		const { payload } = fakeKv(() => Promise.reject(new Error('kv down')))
 		await expect(dailySalt(payload, NOW)).resolves.toMatch(/^[0-9a-f]{32}$/)
 	})
+
+	it('answers with the salt even when the kv adapter throws synchronously', async () => {
+		const kv = {
+			get: () => Promise.resolve(undefined),
+			set: () => Promise.resolve(),
+			delete: (): Promise<void> => {
+				throw new Error('kv down')
+			},
+		}
+		const payload = { kv } as unknown as Payload
+		await expect(dailySalt(payload, NOW)).resolves.toMatch(/^[0-9a-f]{32}$/)
+	})
 })

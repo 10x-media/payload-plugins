@@ -12,6 +12,11 @@ interface DeleteCall {
 
 type Handler = (args: { req: unknown }) => Promise<{ output: Record<string, never> }>
 
+const DAY_MS = 86_400_000
+// Pinned, so the day keys the assertions compute cannot land on the far side of a UTC midnight
+// from the ones the run computed.
+const NOW = new Date('2031-05-10T11:00:00.000Z').getTime()
+
 const run = async (
 	options: PruneOptions
 ): Promise<{ deletes: DeleteCall[]; deletedKeys: string[] }> => {
@@ -33,11 +38,11 @@ const run = async (
 			},
 		},
 	}
-	await (pruneEventsTask(options).handler as unknown as Handler)({ req })
+	await (pruneEventsTask({ ...options, now: () => NOW }).handler as unknown as Handler)({ req })
 	return { deletes, deletedKeys }
 }
 
-const dayKey = (daysAgo: number): string => saltKey(new Date(Date.now() - daysAgo * 86_400_000))
+const dayKey = (daysAgo: number): string => saltKey(new Date(NOW - daysAgo * DAY_MS))
 
 describe('prune task', () => {
 	it('sweeps the salts and deletes nothing when no retention is configured', async () => {
@@ -59,11 +64,21 @@ describe('prune task', () => {
 	it('deletes events and the seen ledger older than retentionDays', async () => {
 		const { deletes } = await run({ retentionDays: 30 })
 		expect(deletes.map((call) => call.collection)).toEqual([EVENTS_SLUG, SEEN_SLUG])
-		const cutoff = new Date(Date.now() - 30 * 86_400_000)
+		const cutoff = new Date(NOW - 30 * DAY_MS).toISOString()
 		for (const call of deletes) {
 			const field = call.collection === EVENTS_SLUG ? 'timestamp' : 'period'
-			const bound = (call.where[field] as { less_than: string }).less_than
-			expect(Math.abs(new Date(bound).getTime() - cutoff.getTime())).toBeLessThan(10_000)
+			expect((call.where[field] as { less_than: string }).less_than).toBe(cutoff)
+		}
+	})
+
+	it('deletes nothing for a window that is not a finite number of days above zero', async () => {
+		for (const window of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+			const { deletes, deletedKeys } = await run({
+				retentionDays: window,
+				rollupRetentionDays: window,
+			})
+			expect(deletes).toEqual([])
+			expect(deletedKeys).toHaveLength(61)
 		}
 	})
 

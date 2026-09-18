@@ -49,6 +49,11 @@ export interface NativeOptions {
 	geoResolver?: GeoResolver
 	geoDbPath?: string
 	ingestPath?: string
+	/**
+	 * Events and seen-ledger rows older than this many days are deleted by the nightly task.
+	 * Zero or less means keep everything; anything else must be a whole number of days, so a
+	 * window the sweep could not turn into a cutoff fails the boot.
+	 */
 	retentionDays?: number
 	/**
 	 * Rollup rows older than this many days are deleted by the nightly task. Off by default,
@@ -239,10 +244,14 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 	const filterBots = resolveBotFilter(options.filterBots)
 	const rollupRetentionDays = retentionWindow(options.rollupRetentionDays, 'rollupRetentionDays')
 	// Zero and below have always meant "keep everything", so they stay a no-op rather than a throw.
-	const retentionDays =
-		options.retentionDays !== undefined && options.retentionDays > 0
-			? options.retentionDays
-			: undefined
+	// Anything above zero goes through the same check as the rollup window, so a window the sweep
+	// could not build a cutoff from fails the boot instead of the first nightly run.
+	const retentionDays = retentionWindow(
+		options.retentionDays !== undefined && options.retentionDays <= 0
+			? undefined
+			: options.retentionDays,
+		'retentionDays'
+	)
 	if (rollupRetentionDays !== undefined && retentionDays === undefined) {
 		throw new Error(
 			'analytics: rollupRetentionDays requires retentionDays, since pruning rollups while keeping raw events forever would make an unfiltered long window answer less than the same window filtered'

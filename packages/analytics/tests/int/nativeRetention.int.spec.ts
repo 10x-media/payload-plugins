@@ -16,6 +16,10 @@ import {
 import { ingestRequest } from './ingestRequest'
 
 const DAY_MS = 86_400_000
+// Pinned, so a run and the assertions after it cannot straddle a UTC midnight. Offsetting the
+// task's clock forward is what makes a fixture written now older than a real positive window.
+const NOW = Date.now()
+const at = (offsetDays: number) => (): number => NOW + offsetDays * DAY_MS
 
 const ingest = (booted: BootedPayload, path: string) =>
 	makeIngestHandler({ geoResolver: platformHeaderResolver })(
@@ -60,18 +64,26 @@ describeForDb('native retention', {}, (db) => {
 
 	it('keeps everything still inside its window', async () => {
 		await ingest(booted, '/fresh')
-		await prune(booted, { retentionDays: 30, rollupRetentionDays: 365 })
+		await prune(booted, { retentionDays: 30, rollupRetentionDays: 365, now: at(0) })
 		const after = await counts(booted)
 		expect(after[EVENTS_SLUG]).toBeGreaterThan(0)
 		expect(after[SEEN_SLUG]).toBeGreaterThan(0)
 		expect(after[ROLLUPS_SLUG]).toBeGreaterThan(0)
 	})
 
+	// A window of zero means "keep everything" wherever it is configured, so the task must never
+	// read it as a cutoff of now and wipe the store.
+	it('deletes nothing for a window of zero, however far the clock has moved', async () => {
+		const before = await counts(booted)
+		await prune(booted, { retentionDays: 0, rollupRetentionDays: -1, now: at(400) })
+		expect(await counts(booted)).toEqual(before)
+	})
+
 	it('prunes events and the seen ledger while rollups keep their own window', async () => {
 		await ingest(booted, '/old')
 		const before = await counts(booted)
 		expect(before[EVENTS_SLUG]).toBeGreaterThan(0)
-		await prune(booted, { retentionDays: 0 })
+		await prune(booted, { retentionDays: 30, now: at(40) })
 		const after = await counts(booted)
 		expect(after[EVENTS_SLUG]).toBe(0)
 		expect(after[SEEN_SLUG]).toBe(0)
@@ -81,15 +93,15 @@ describeForDb('native retention', {}, (db) => {
 	it('prunes rollups once a rollup window is set', async () => {
 		await ingest(booted, '/rolled')
 		expect((await counts(booted))[ROLLUPS_SLUG]).toBeGreaterThan(0)
-		await prune(booted, { retentionDays: 0, rollupRetentionDays: 0 })
+		await prune(booted, { retentionDays: 30, rollupRetentionDays: 90, now: at(400) })
 		expect((await counts(booted))[ROLLUPS_SLUG]).toBe(0)
 	})
 
 	it('sweeps the daily salts from two days back, keeping today and yesterday', async () => {
 		const days = [0, 1, 2, 3, 70]
-		const keys = days.map((day) => saltKey(new Date(Date.now() - day * DAY_MS)))
+		const keys = days.map((day) => saltKey(new Date(NOW - day * DAY_MS)))
 		await Promise.all(keys.map((key) => booted.payload.kv.set(key, { salt: 'test' })))
-		await prune(booted, {})
+		await prune(booted, { now: at(0) })
 		const present = await Promise.all(keys.map((key) => booted.payload.kv.has(key)))
 		expect(present).toEqual([true, true, false, false, true])
 	})

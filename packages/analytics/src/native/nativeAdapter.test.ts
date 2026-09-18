@@ -81,6 +81,17 @@ describe('native retention options', () => {
 		}
 	})
 
+	it('rejects a raw-event window it could never build a cutoff from', () => {
+		for (const retentionDays of [Number.NaN, Number.POSITIVE_INFINITY, 1.5]) {
+			expect(() => native({ retentionDays })).toThrow(/retentionDays/)
+		}
+		// Zero and below still mean "keep everything" rather than a bad window.
+		for (const retentionDays of [0, -1, Number.NEGATIVE_INFINITY]) {
+			expect(() => native({ retentionDays })).not.toThrow()
+			expect(registeredTasks({ retentionDays })).not.toContain(PRUNE_TASK_SLUG)
+		}
+	})
+
 	it('rejects a rollup window without a raw-event window', () => {
 		expect(() => native({ rollupRetentionDays: 365 })).toThrow(
 			/rollupRetentionDays requires retentionDays/
