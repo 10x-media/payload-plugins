@@ -30,7 +30,16 @@ const goalKey = (goalSlugs: AnalyticsQuery['goalSlugs']): string[] => {
 	return goalSlugs?.length ? [`goals:${stable(goalSlugs)}`] : []
 }
 
-export function buildCacheKey(provider: string, q: AnalyticsQuery): string {
+export interface CacheKeyOptions {
+	/** The scope's cache epoch token; bumping it retires every entry keyed on the old one. */
+	epoch?: string
+}
+
+export function buildCacheKey(
+	provider: string,
+	q: AnalyticsQuery,
+	opts: CacheKeyOptions = {}
+): string {
 	const pathKey = q.path ?? 'site'
 	const tz = q.timezone ?? DEFAULT_TIMEZONE
 	const range = rangeKey(q.dateRange, tz)
@@ -40,6 +49,9 @@ export function buildCacheKey(provider: string, q: AnalyticsQuery): string {
 		.join(';')
 	return [
 		'analytics',
+		// Fixed second segment, always written, so there is one key format rather than two;
+		// its position keeps an adapter id spelled like an epoch from ever colliding with one.
+		`e${opts.epoch ?? '0'}`,
 		provider,
 		q.hostname ?? '_',
 		pathKey,

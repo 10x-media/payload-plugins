@@ -1,9 +1,10 @@
-import { inMemoryKVAdapter } from 'payload'
+import { inMemoryKVAdapter, type Payload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter, AnalyticsQuery, AnalyticsResult } from '../core/contract'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { type CacheStore, kvCacheStore } from './cacheStore'
 import { createEngine } from './engine'
+import { createEpochStore } from './epoch'
 import { PROVIDER_READ_TIMEOUT_MESSAGE } from './retryPolicy'
 
 const q: AnalyticsQuery = {
@@ -506,5 +507,60 @@ describe('createEngine goal caching', () => {
 		const { store, writes } = recordingStore()
 		await engineOn(store).read(goalAdapter({ provider: 'degraded', fetchedAt: '' }), goalQuery)
 		expect(writes).toEqual([3600])
+	})
+})
+
+describe('createEngine cache epoch', () => {
+	const scoped = (scope: string): AnalyticsQuery => ({ ...q, scope })
+
+	const setupWithEpoch = () => {
+		const kv = inMemoryKVAdapter().init({} as never)
+		const payload = { kv, logger: { warn: () => {} } } as unknown as Payload
+		const epoch = createEpochStore(payload)
+		const adapter = memoryAdapter()
+		adapter.record({ path: '/pricing', timestamp: new Date('2026-01-10') })
+		const engine = createEngine({
+			store: kvCacheStore(kv),
+			queue: { concurrency: 4 },
+			ttl: { aggregate: 60, realtime: 5 },
+			timeoutMs: 15_000,
+			epoch,
+		})
+		return { adapter, engine, epoch }
+	}
+
+	it('makes a read after a bump miss the cache and query the adapter again', async () => {
+		const { adapter, engine, epoch } = setupWithEpoch()
+		const spy = vi.spyOn(adapter, 'query')
+		await engine.read(adapter, scoped('tenant-a'))
+		await engine.read(adapter, scoped('tenant-a'))
+		expect(spy).toHaveBeenCalledTimes(1)
+
+		await epoch.bump('tenant-a')
+		await engine.read(adapter, scoped('tenant-a'))
+		expect(spy).toHaveBeenCalledTimes(2)
+	})
+
+	it('leaves the cached entry of another scope alone', async () => {
+		const { adapter, engine, epoch } = setupWithEpoch()
+		const spy = vi.spyOn(adapter, 'query')
+		await engine.read(adapter, scoped('tenant-a'))
+		await engine.read(adapter, scoped('tenant-b'))
+		expect(spy).toHaveBeenCalledTimes(2)
+
+		await epoch.bump('tenant-b')
+		await engine.read(adapter, scoped('tenant-a'))
+		expect(spy).toHaveBeenCalledTimes(2)
+	})
+
+	it('still coalesces two concurrent reads inside one epoch into one adapter call', async () => {
+		const { adapter, engine } = setupWithEpoch()
+		const spy = vi.spyOn(adapter, 'query')
+		const [a, b] = await Promise.all([
+			engine.read(adapter, scoped('tenant-a')),
+			engine.read(adapter, scoped('tenant-a')),
+		])
+		expect(spy).toHaveBeenCalledTimes(1)
+		expect(a.totals?.pageviews).toBe(b.totals?.pageviews)
 	})
 })

@@ -108,9 +108,36 @@ describe('buildCacheKey', () => {
 			'2026-06-24T00:00:00.000Z'
 		)
 	})
-	it('keeps the unscoped key format unchanged', () => {
+	it('writes the unscoped key in its documented segment order', () => {
 		expect(buildCacheKey('ga4', base)).toBe(
-			'analytics|ga4|_|/pricing|pageviews,visitors||2026-01-01T00:00:00.000Z_2026-02-01T00:00:00.000Z|_||_|_'
+			'analytics|e0|ga4|_|/pricing|pageviews,visitors||2026-01-01T00:00:00.000Z_2026-02-01T00:00:00.000Z|_||_|_'
+		)
+	})
+
+	it('writes the epoch segment right after the namespace', () => {
+		expect(
+			buildCacheKey('ga4', base, { epoch: 'mfa1-9c2b' }).startsWith('analytics|emfa1-9c2b|ga4|')
+		).toBe(true)
+	})
+
+	it("reads an absent epoch as '0', so one key format covers every caller", () => {
+		expect(buildCacheKey('ga4', base)).toBe(buildCacheKey('ga4', base, { epoch: '0' }))
+	})
+
+	it('never lets two epochs share an entry', () => {
+		const keys = new Set(
+			['0', 'mfa1-aaaa', 'mfa1-bbbb', 'mfa2-aaaa'].map((e) =>
+				buildCacheKey('ga4', base, { epoch: e })
+			)
+		)
+		expect(keys.size).toBe(4)
+	})
+
+	// The segment sits at a fixed position, so an adapter whose id reads like an epoch
+	// still keys apart from the epoch of that token.
+	it('cannot confuse an epoch with a provider id', () => {
+		expect(buildCacheKey('e5', base, { epoch: '0' })).not.toBe(
+			buildCacheKey('e0', base, { epoch: '5' })
 		)
 	})
 	it('partitions the key by scope', () => {

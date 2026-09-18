@@ -2,6 +2,7 @@ import type { PayloadRequest } from 'payload'
 import { type SerializedCapabilities, serializeCapabilities } from '../core/capabilities'
 import { type AnalyticsAdapter, PLATFORM_SCOPE } from '../core/contract'
 import type { AdapterRegistry } from '../core/registry'
+import { resolveRequestedScope } from '../core/scopedRead'
 import type { QuerySourceRef } from '../query/response'
 import {
 	type AnalyticsRuntime,
@@ -9,7 +10,6 @@ import {
 	type PlatformReadGate,
 	platformReadGate,
 	resolveRegistryFor,
-	resolveScopeFor,
 } from './runtime'
 
 /** One readable source on the wire: its identity plus the capabilities a client gates on. */
@@ -29,8 +29,8 @@ export interface RequestSources {
 
 export interface ResolveSourcesArgs {
 	/**
-	 * Read another scope's sources instead of the request's own. Evaluated behind
-	 * `access.platformRead`; a denied override resolves nothing at all.
+	 * A scope {@link resolveRequestedScope} already decided and gated for this request. It
+	 * replaces this call's own resolution, so pass only what that helper returned.
 	 */
 	scope?: string | null
 	/** Shared `platformRead` decision; one is created per call when omitted. */
@@ -66,13 +66,11 @@ const fromRegistry = (args: {
 
 /**
  * The sources a request may read, resolved once for both read endpoints: the request's
- * own scope (or a trusted explicit one), the per-scope registry, and each adapter's
- * serialized capabilities. Two resolutions are cross-scope and fail closed behind
- * `platformRead`: a scopeResolver answering the `'*'` marker, and, on a scoped install, one
- * answering no scope at all, which is ambiguous rather than install-wide (returning null
- * usually means "no tenant selected"). A failed resolution resolves nothing too, since it is
- * indistinguishable from a forged one. An unscoped install falls back to the static config
- * registry on failure.
+ * own scope (or one a caller already had gated), the per-scope registry, and each adapter's
+ * serialized capabilities. {@link resolveRequestedScope} owns the scope decision, so a
+ * cross-scope resolution resolves no sources at all rather than another tenant's. A
+ * resolution that fails outright degrades instead: nothing on a scoped install, where it is
+ * indistinguishable from a forged request, and the static config registry otherwise.
  */
 export const resolveSourcesForRequest = async (
 	req: PayloadRequest,
@@ -83,19 +81,18 @@ export const resolveSourcesForRequest = async (
 		return empty()
 	}
 	const allowed = args.platformRead ?? platformReadGate(runtime, req)
+	const degrade = (): RequestSources =>
+		runtime.scoped ? empty() : fromRegistry({ runtime, registry: runtime.registry, scope: null })
 	try {
 		let scope: string | null
 		if (args.scope !== undefined) {
-			if (!(await allowed())) {
-				return empty()
-			}
 			scope = args.scope
 		} else {
-			scope = await resolveScopeFor(runtime, req)
-			const crossScope = scope === PLATFORM_SCOPE || (runtime.scoped && scope === null)
-			if (crossScope && !(await allowed())) {
-				return empty()
+			const requested = await resolveRequestedScope({ runtime, req, platformRead: allowed })
+			if (!requested.ok) {
+				return requested.reason === 'failed' ? degrade() : empty()
 			}
+			scope = requested.scope
 		}
 		const registry = await resolveRegistryFor(runtime, {
 			payload: req.payload,
@@ -105,9 +102,6 @@ export const resolveSourcesForRequest = async (
 		return fromRegistry({ runtime, registry, scope })
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: source resolution failed: ${String(err)}`)
-		if (runtime.scoped) {
-			return empty()
-		}
-		return fromRegistry({ runtime, registry: runtime.registry, scope: null })
+		return degrade()
 	}
 }

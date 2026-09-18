@@ -112,6 +112,79 @@ test('the analytics view reads seeded traffic, filters from the URL and keeps hi
 	await expect(tab(page, 'Pages')).toHaveAttribute('aria-selected', 'true')
 })
 
+interface AnalyticsCall {
+	method: string
+	path: string
+	status: number
+}
+
+/**
+ * Records every answered analytics endpoint call in order, so a refresh can be asserted as
+ * the POST it issues and the reads that follow it rather than on the rendered numbers,
+ * which a cached read would leave unchanged.
+ */
+const recordAnalyticsCalls = (page: Page): AnalyticsCall[] => {
+	const calls: AnalyticsCall[] = []
+	page.on('response', (res) => {
+		const path = new URL(res.url()).pathname
+		if (path.startsWith('/api/analytics/')) {
+			calls.push({ method: res.request().method(), path, status: res.status() })
+		}
+	})
+	return calls
+}
+
+const queriesAfterRefresh = (calls: AnalyticsCall[]): number => {
+	const refreshed = calls.findIndex(
+		(call) => call.method === 'POST' && call.path === '/api/analytics/refresh'
+	)
+	if (refreshed === -1) {
+		return 0
+	}
+	return calls
+		.slice(refreshed + 1)
+		.filter((call) => call.method === 'GET' && call.path === '/api/analytics/query').length
+}
+
+/** Clicks Refresh and waits for the endpoint's own 200, so the assertions race nothing. */
+const clickRefresh = async (page: Page): Promise<void> => {
+	const refreshed = page.waitForResponse(
+		(res) =>
+			res.url().includes('/api/analytics/refresh') &&
+			res.request().method() === 'POST' &&
+			res.status() === 200
+	)
+	await page.getByRole('button', { name: 'Refresh' }).click()
+	await refreshed
+}
+
+test('the Refresh button invalidates the cached reads and reissues every section', async ({
+	page,
+}) => {
+	await login(page, PLATFORM)
+	await page.goto('/admin/analytics')
+	await settledPageviews(page)
+
+	const calls = recordAnalyticsCalls(page)
+	await clickRefresh(page)
+
+	// Four sections read through the query endpoint: cards, trend, breakdown and goals.
+	await expect.poll(() => queriesAfterRefresh(calls), { timeout: 20_000 }).toBeGreaterThanOrEqual(4)
+	expect(calls.filter((call) => call.path === '/api/analytics/refresh')).toHaveLength(1)
+	await expect(page.getByRole('button', { name: 'Refresh' })).toBeEnabled()
+})
+
+test("@tenancy the Refresh button refreshes a tenant reader's own scope", async ({ page }) => {
+	await loginAsTenant(page, ALPHA)
+	await page.goto('/admin/analytics')
+	await settledPageviews(page)
+
+	const calls = recordAnalyticsCalls(page)
+	await clickRefresh(page)
+
+	await expect.poll(() => queriesAfterRefresh(calls), { timeout: 20_000 }).toBeGreaterThanOrEqual(4)
+})
+
 test('the sources tab ranks referrer hosts and never the site itself', async ({ page }) => {
 	await login(page, PLATFORM)
 	await page.goto('/admin/analytics?tab=sources&dim=referrer')

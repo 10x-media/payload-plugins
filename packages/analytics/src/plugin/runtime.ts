@@ -7,6 +7,7 @@ import type { ServerTrack } from '../core/serverEvent'
 import type { GoalsResolver, ResolvedGoal } from '../goals/resolver'
 import type { Goal } from '../goals/types'
 import type { Engine } from '../surfacing/engine'
+import { type EpochStore, INITIAL_EPOCH } from '../surfacing/epoch'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 
 export interface AnalyticsRuntime {
@@ -74,6 +75,11 @@ export interface AnalyticsRuntime {
 	readAccess?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 	bindings: Record<string, ResolvedBinding>
 	engine: Engine
+	/**
+	 * The per-scope cache epoch the engine keys on, shared with the reads that build their
+	 * own keys. Absent runtimes key on the initial token throughout.
+	 */
+	epoch?: EpochStore
 	/** Explicit TTL overrides; when a value is unset the adapter's recommendedTtl applies. */
 	ttl: { aggregate?: number; realtime?: number }
 	/** Widget period-over-period comparison; false skips the previous-window read. */
@@ -129,6 +135,10 @@ export const requestTimezone = async (req: PayloadRequest): Promise<string> => {
 		return DEFAULT_TIMEZONE
 	}
 }
+
+/** The scope's cache epoch token, the initial one wherever the runtime carries no store. */
+export const cacheEpochFor = (runtime: AnalyticsRuntime, scope?: string | null): Promise<string> =>
+	runtime.epoch?.get(scope) ?? Promise.resolve(INITIAL_EPOCH)
 
 export const resolveRegistryFor = (
 	runtime: AnalyticsRuntime,

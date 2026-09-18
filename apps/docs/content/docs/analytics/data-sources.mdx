@@ -1,9 +1,9 @@
 ---
 title: Data sources
-description: What a source is, the sources endpoint, and the authenticated query endpoint every read surface is built on.
+description: What a source is, the sources endpoint, the authenticated query endpoint every read surface is built on, and the refresh endpoint that retires what it cached.
 ---
 
-A **source** is one readable analytics backend for one request: a config adapter, or a provider a tenant configured at runtime. Every widget, display field and dashboard reads through one, and two authenticated endpoints expose the same resolution to your own code: `GET /api/analytics/sources` lists what the request may read, and `GET /api/analytics/query` reads it.
+A **source** is one readable analytics backend for one request: a config adapter, or a provider a tenant configured at runtime. Every widget, display field and dashboard reads through one, and three authenticated endpoints expose the same resolution to your own code: `GET /api/analytics/sources` lists what the request may read, `GET /api/analytics/query` reads it, and `POST /api/analytics/refresh` retires what that reading cached.
 
 ## What a source is
 
@@ -270,6 +270,53 @@ export const TopPages = () => {
 `QueryRequest` takes an optional `scope`. Omit it and the helper reads the caller's own scope, which is what an admin surface wants. Set it and the endpoint honors it only for platform readers; everyone else gets `400 untrusted_scope`.
 
 `QueryRequest` and the response types are exported from `@10x-media/analytics/types`, along with `DIMENSION_KEYS` and `FILTER_OPERATORS` for building pickers of your own.
+
+## Refresh endpoint
+
+```http
+POST /api/analytics/refresh
+Content-Type: application/json
+
+{ "scope": "acme" }
+```
+
+It bumps one scope's [cache epoch](/analytics/cache#invalidation), which retires every cached read keyed on the old one across every instance, and answers the new token:
+
+```json
+{ "epoch": "mu70fj8y-bbbad86a" }
+```
+
+The token is opaque. It is a value to compare for change, never one to parse, order or count with. The answer carries `Cache-Control: private, no-store`.
+
+The body is optional and carries one optional `scope`. An empty body, a body that is not a JSON object, a body with no `scope`, and a `scope` that is blank once trimmed all mean the caller's own resolved scope, so a bare `POST` with nothing at all is the ordinary call. A body larger than 4 KiB answers `413 payload_too_large`; one that could not be read answers `400 invalid_param` with `param: 'scope'`.
+
+Authentication and `access.read` gate it exactly as they gate the read endpoints. Scope is then decided by the same code the query endpoint reads with, so this endpoint refuses every request that endpoint refuses. Naming any scope is a cross-scope decision and requires `access.platformRead`, so a tenant naming another tenant's scope gets `400 untrusted_scope` rather than a silent no-op. A request that resolves no scope at all on a scoped install is `untrusted_scope` too, unless the caller has `access.platformRead`: null usually means no tenant is selected rather than "everything", and the install-wide token it would otherwise bump is the one every cross-scope read keys on.
+
+| Status | `error.code` | `param` | When |
+|---|---|---|---|
+| `400` | `invalid_param` | `scope` | `scope` is present but not a string, or the body could not be read |
+| `400` | `untrusted_scope` | `scope` | a `scope` in the body from a caller `access.platformRead` denies, the platform wildcard included, or a request resolving no scope on a scoped install from a caller it denies |
+| `401` | `unauthorized` | | no signed-in user |
+| `403` | `forbidden` | | `access.read` denied the request |
+| `413` | `payload_too_large` | | the body is over 4 KiB |
+| `503` | `unavailable` | | the plugin runtime is not ready on this Payload instance, or the token could not be written. Carries `Retry-After: 30` |
+
+`scope: "*"` bumps the install-wide token rather than every scope's, because a cross-scope read stamps no scope on its query and its entries key on exactly that token. See [Cross-scope entries](/analytics/cache#cross-scope-entries-key-on-the-install-wide-token).
+
+An instance bumps a given scope at most once every five seconds for this endpoint. Inside that window the call answers `200` with the token already in force, without retiring anything again, so a looped `POST` cannot turn one scope's cached reads into provider calls over and over. The collection hooks are not debounced: a saved provider or goal document is always visible on the next read. This is a debounce of invalidation, not request rate limiting, which belongs in front of Payload.
+
+`refreshCache` wraps it for client components, beside `fetchQuery`:
+
+```ts
+import { refreshCache } from '@10x-media/analytics/client'
+
+const { epoch } = await refreshCache(api)                       // the caller's own scope
+await refreshCache(api, { scope: 'acme', signal })              // platform readers only
+```
+
+Unlike `fetchQuery` it is not deduped: a reader pressing Refresh twice means it twice, and the `AbortSignal` goes straight to the fetch because no other caller shares it. Any non-2xx throws `QueryFetchError`, with the same `status`, `error` and `retryAfter` a failed read carries. An answer whose `epoch` this client cannot read is reported as `'0'` rather than typed into a lie, since callers act on the refresh having happened rather than on the token.
+
+A refresh invalidates; it does not re-read. Nothing is fetched from the source until a surface asks, so the next read of that scope pays the cold round trip.
 
 ## Multi-tenancy
 

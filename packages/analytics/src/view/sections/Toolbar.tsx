@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, Pill, SelectInput } from '@payloadcms/ui'
+import { Banner, Button, Pill, SelectInput } from '@payloadcms/ui'
 import { useEffect, useRef } from 'react'
 import type { WireSource } from '../../fields/config/fetchSources'
 import type { TimeframePreset } from '../../timeframe/presets'
@@ -41,6 +41,10 @@ export interface ToolbarProps {
 	onChange: (next: ViewState) => void
 	/** Committed after a pause: the day inputs fire on every keystroke. */
 	onChangeDeferred: (next: ViewState) => void
+	/** Retires the scope's cached reads; the view owns the call and the refetch. */
+	onRefresh: () => void
+	refreshing: boolean
+	refreshFailed: boolean
 }
 
 const CUSTOM = 'custom'
@@ -74,6 +78,9 @@ export function Toolbar({
 	stateKey,
 	onChange,
 	onChangeDeferred,
+	onRefresh,
+	refreshing,
+	refreshFailed,
 }: ToolbarProps) {
 	const { t } = useTranslation()
 	const uncommitted = useRef<ViewState | null>(null)
@@ -200,6 +207,22 @@ export function Toolbar({
 						{t(keys.viewCompare)}
 					</Button>
 				) : null}
+				{/* aria-disabled rather than disabled: a keyboard user keeps focus on the button
+				    they pressed instead of losing it to the body while the refresh runs. */}
+				<Button
+					buttonStyle="secondary"
+					className="analytics-view__refresh"
+					extraButtonProps={{ 'aria-disabled': refreshing }}
+					onClick={() => {
+						if (refreshing) {
+							return
+						}
+						onRefresh()
+					}}
+					size="medium"
+				>
+					{t(refreshing ? keys.viewRefreshing : keys.viewRefresh)}
+				</Button>
 				<div className="analytics-view__captions">
 					<span>{dayRangeCaption(range, locale, timezone)}</span>
 					<span title={t(keys.viewTimezone)}>{timezone}</span>
@@ -212,6 +235,11 @@ export function Toolbar({
 					{filtersUnapplied ? <span>{t(keys.stateFiltersUnapplied)}</span> : null}
 					{sampled ? <span>{t(keys.stateSampled)}</span> : null}
 				</div>
+			</div>
+			{/* Mounted whether or not it has anything to say: a live region added at the same
+			    moment as its text is not announced. */}
+			<div role="status">
+				{refreshFailed ? <Banner type="error">{t(keys.viewRefreshFailed)}</Banner> : null}
 			</div>
 			<FilterChips
 				filters={state.filters}
