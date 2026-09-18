@@ -6,7 +6,7 @@ import type { GeoResolver } from '../geo/geoResolver'
 import { flushBatch } from './flushBatch'
 import { normalizeEvent, type RawEventInput, type StoredEvent } from './normalizeEvent'
 import { dailySalt } from './salt'
-import { rawEventError, validateRawEvent } from './validate'
+import { type RawEventField, rawEventError } from './validate'
 import type { WriteBuffer } from './writeBuffer'
 
 export interface IngestResolvers {
@@ -32,6 +32,17 @@ const parseBody = (bytes: ArrayBuffer): RawEventInput | undefined => {
 	}
 }
 
+/**
+ * The refusal for the first field an event failed on: naming it costs nothing and saves a
+ * tracker author guessing which one of four the endpoint refused. A body that is not an
+ * object at all fails the very check a typeless event does, so it names `type`.
+ */
+const invalidField = (param: RawEventField): Response =>
+	errorResponse(
+		400,
+		analyticsError('invalid_param', `analytics: ${param} is missing or invalid`, param)
+	)
+
 export const makeIngestHandler =
 	(
 		geoResolver: GeoResolver,
@@ -56,14 +67,12 @@ export const makeIngestHandler =
 					)
 		}
 		const raw = parseBody(read.body)
-		if (!validateRawEvent(raw)) {
-			// The validator decided on a field, so naming it costs nothing and saves a tracker
-			// author guessing which one of four the endpoint refused.
-			const param = rawEventError(raw) ?? 'type'
-			return errorResponse(
-				400,
-				analyticsError('invalid_param', `analytics: ${param} is missing or invalid`, param)
-			)
+		if (raw === undefined) {
+			return invalidField('type')
+		}
+		const param = rawEventError(raw)
+		if (param !== undefined) {
+			return invalidField(param)
 		}
 		const now = new Date()
 		const salt = await dailySalt(req.payload, now)

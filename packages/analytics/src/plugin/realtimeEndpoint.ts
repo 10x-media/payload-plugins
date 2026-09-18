@@ -58,7 +58,7 @@ export const makeRealtimeHandler = (): PayloadHandler => async (req) => {
 			)
 		}
 	} catch (err) {
-		req.payload.logger?.warn(`analytics: realtime request failed: ${String(err)}`)
+		req.payload.logger?.error(`analytics: realtime request failed: ${String(err)}`)
 		return errorResponse(500, analyticsError('internal', 'analytics: realtime read failed'))
 	}
 }

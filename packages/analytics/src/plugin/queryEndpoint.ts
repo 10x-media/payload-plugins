@@ -199,7 +199,7 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 		}
 		return Response.json(body, { headers: NO_STORE })
 	} catch (err) {
-		req.payload.logger?.warn(`analytics: query failed for adapter "${adapterId}": ${String(err)}`)
+		req.payload.logger?.error(`analytics: query failed for adapter "${adapterId}": ${String(err)}`)
 		return errorResponse(500, analyticsError('internal', 'analytics: query failed'))
 	}
 }

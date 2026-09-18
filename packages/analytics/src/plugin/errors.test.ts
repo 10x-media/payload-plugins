@@ -10,6 +10,7 @@ import {
 	RETRY_AFTER,
 	readError,
 	readErrorCode,
+	readResponseError,
 } from './errors'
 
 describe('analyticsError', () => {
@@ -101,6 +102,29 @@ describe('readError', () => {
 			message: 'no',
 			param: 'scope',
 		})
+	})
+})
+
+describe('readResponseError', () => {
+	it('reads the envelope out of a response the endpoints answered with', async () => {
+		const error = await readResponseError(errorResponse(404, analyticsError('not_found', 'gone')))
+		expect(error).toEqual({ code: 'not_found', message: 'gone' })
+	})
+
+	it('reads nothing from a body that is not JSON at all', async () => {
+		expect(
+			await readResponseError(new Response('<html>502</html>', { status: 502 }))
+		).toBeUndefined()
+	})
+
+	it('reads nothing from an empty body', async () => {
+		expect(await readResponseError(new Response(null, { status: 404 }))).toBeUndefined()
+	})
+
+	it('reads nothing from a body something else already consumed', async () => {
+		const res = errorResponse(403, analyticsError('forbidden', 'nope'))
+		await res.json()
+		expect(await readResponseError(res)).toBeUndefined()
 	})
 })
 

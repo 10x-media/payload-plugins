@@ -86,25 +86,28 @@ export const makeDocumentHandler = (): PayloadHandler => async (req) => {
 		return errorResponse(404, analyticsError('not_found', 'analytics: no such document'))
 	}
 	const rawTimeframe = params.get('timeframe') ?? 'last30days'
-	// Custom bounds name calendar days, so the reporting timezone has to be resolved before
-	// they can be read; a preset resolves its window inside `readForField` as before.
-	const timezone = rawTimeframe === 'custom' ? await requestTimezone(req) : undefined
-	const parsedRange =
-		timezone !== undefined ? parseRange(params.get('from'), params.get('to'), timezone) : undefined
+	let timezone: string | undefined
+	let range: DateRange | undefined
+	if (rawTimeframe === 'custom') {
+		// Custom bounds name calendar days, so the reporting timezone has to be resolved before
+		// they can be read; a preset resolves its window inside `readForField` as before.
+		timezone = await requestTimezone(req)
+		const parsed = parseRange(params.get('from'), params.get('to'), timezone)
+		if (!parsed.ok) {
+			return errorResponse(
+				400,
+				analyticsError(
+					'invalid_param',
+					'analytics: the custom range could not be read',
+					parsed.param
+				)
+			)
+		}
+		range = parsed.range
+	}
 	const timeframe: TimeframePreset = TIMEFRAME_PRESETS.includes(rawTimeframe as TimeframePreset)
 		? (rawTimeframe as TimeframePreset)
 		: 'last30days'
-	if (rawTimeframe === 'custom' && parsedRange?.ok !== true) {
-		return errorResponse(
-			400,
-			analyticsError(
-				'invalid_param',
-				'analytics: the custom range could not be read',
-				parsedRange?.ok === false ? parsedRange.param : 'from'
-			)
-		)
-	}
-	const range = parsedRange?.ok === true ? parsedRange.range : undefined
 	const metrics = parseMetrics(params.get('metrics')) ?? [
 		'pageviews',
 		'visitors',
@@ -128,7 +131,7 @@ export const makeDocumentHandler = (): PayloadHandler => async (req) => {
 		if (err instanceof APIError && (err.status === 404 || err.status === 403)) {
 			return errorResponse(404, analyticsError('not_found', 'analytics: no such document'))
 		}
-		req.payload.logger?.warn(`analytics: document read failed for "${collection}": ${String(err)}`)
+		req.payload.logger?.error(`analytics: document read failed for "${collection}": ${String(err)}`)
 		return errorResponse(500, analyticsError('internal', 'analytics: document read failed'))
 	}
 	const result = await readForField({
@@ -137,7 +140,7 @@ export const makeDocumentHandler = (): PayloadHandler => async (req) => {
 		data,
 		metrics,
 		timeframe,
-		range: range ?? undefined,
+		range,
 		...(timezone !== undefined ? { timezone } : {}),
 		adapterId: params.get('dataSource') ?? undefined,
 		now: new Date(),
