@@ -315,7 +315,7 @@ export const classifyChannel = ({
 				PAID_MEDIUMS.get(medium) ??
 					clicks.paid ??
 					platform ??
-					(name ? namePlatform(name) : undefined)
+					(host && name ? namePlatform(name) : undefined)
 			)
 		}
 		const channel = MEDIUM_CHANNELS.get(medium)
@@ -335,11 +335,12 @@ export const classifyChannel = ({
 /**
  * The visit's named origin: the `utm_source` it was tagged with, else the host it came from,
  * else `direct`. That is what `source` means on Plausible (`visit:source`) and GA4
- * (`sessionSource`), so a report reads the same column whichever source answered it. The tag
- * keeps its case and is capped like every other campaign key; the host arrives lowercased. A
+ * (`sessionSource`), so a report reads the same column whichever source answered it. The tag is
+ * lowercased and capped like every other campaign key, so one tag spelled two ways is one row; the
+ * host already arrives lowercased, and the `utmSource` dimension keeps the tag as it was written. A
  * campaign tagged `utm_source=direct` therefore shares the `direct` bucket with untagged traffic.
  */
 export const deriveSource = ({ referrerHost, utmSource }: SourceInput): string => {
-	const tagged = utmSource?.trim().slice(0, MAX_UTM_LENGTH)
+	const tagged = utmSource?.trim().toLowerCase().slice(0, MAX_UTM_LENGTH)
 	return tagged || referrerHost || 'direct'
 }
