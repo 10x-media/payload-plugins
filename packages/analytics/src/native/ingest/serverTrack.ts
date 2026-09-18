@@ -1,4 +1,5 @@
 import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
+import type { AnalyticsAdapter } from '../../core/contract'
 import {
 	AnalyticsTrackError,
 	type ServerEventInput,
@@ -139,6 +140,18 @@ export const makeServerTrack =
 	}
 
 /**
+ * The adapter {@link trackServerEvent} writes through: the first registered one with a server
+ * ingestion seam. Every caller that needs a second seam beside `track` (the hostname policy a
+ * goal action applies) reads it off this same adapter, so an event cannot be judged by one
+ * adapter and written by another. The registry here is the static config one, so a per-tenant
+ * runtime provider never supplies either seam.
+ */
+export const ingestAdapter = (payload: Payload): AnalyticsAdapter | undefined =>
+	getRuntime(payload)
+		?.registry.all()
+		.find((adapter) => adapter.ingest?.track)
+
+/**
  * Records an analytics event from server code: a webhook, a job, a server action. The event
  * goes through the same normalization, sanitization and goal matching a browser event does.
  * Pass `opts.req` whenever there is a request behind the event, so it inherits that request's
@@ -155,9 +168,7 @@ export const trackServerEvent = async (
 	event: ServerEventInput,
 	opts?: ServerTrackOptions
 ): Promise<void> => {
-	const track = getRuntime(payload)
-		?.registry.all()
-		.find((adapter) => adapter.ingest?.track)?.ingest?.track
+	const track = ingestAdapter(payload)?.ingest?.track
 	if (!track) {
 		throw new AnalyticsTrackError(
 			'analytics: trackServerEvent needs the native adapter; provider-slot server tracking is not supported yet'

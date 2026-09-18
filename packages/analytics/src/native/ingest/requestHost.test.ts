@@ -25,18 +25,52 @@ describe('requestHostname', () => {
 		expect(requestHostname(h, { trustedProxyHops: 1 })).toBe('b.example')
 	})
 
-	it('takes the first value of a comma-listed x-forwarded-host', () => {
+	it('counts a comma-listed x-forwarded-host from the trusted end', () => {
 		expect(
 			requestHostname(headers({ 'x-forwarded-host': 'b.example, c.example' }), {
 				trustedProxyHops: 1,
 			})
-		).toBe('b.example')
+		).toBe('c.example')
+	})
+
+	it('stores the proxy value rather than the client one it was appended to', () => {
+		expect(
+			requestHostname(
+				headers({ host: 'proxy.internal', 'x-forwarded-host': 'evil.example, real.example' }),
+				{ trustedProxyHops: 1 }
+			)
+		).toBe('real.example')
+	})
+
+	it('counts back two entries at two trusted hops', () => {
+		expect(
+			requestHostname(
+				headers({ 'x-forwarded-host': 'evil.example, outer.example, inner.example' }),
+				{ trustedProxyHops: 2 }
+			)
+		).toBe('outer.example')
 	})
 
 	it('falls back to Host when a trusted proxy sent no forwarded host', () => {
 		expect(requestHostname(headers({ host: 'a.example' }), { trustedProxyHops: 2 })).toBe(
 			'a.example'
 		)
+	})
+
+	it('falls back to Host when the forwarded chain is shorter than the trusted count', () => {
+		expect(
+			requestHostname(headers({ host: 'a.example', 'x-forwarded-host': 'b.example' }), {
+				trustedProxyHops: 2,
+			})
+		).toBe('a.example')
+	})
+
+	it('falls back to Host when the entry at the trusted hop is not a hostname', () => {
+		expect(
+			requestHostname(headers({ host: 'a.example', 'x-forwarded-host': 'b.example, not a host' }), {
+				trustedProxyHops: 1,
+			})
+		).toBe('a.example')
 	})
 
 	it('lowercases and strips the port', () => {

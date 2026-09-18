@@ -311,6 +311,16 @@ describeForDb('analytics scope seam: forwarded host at a trusted hop', {}, (db) 
 		await ingestWith(booted, '/direct', { host: 't2.example' })
 		expect(await attributionRows(booted, '/direct')).toEqual([['t2.example', 't2']])
 	})
+
+	// A proxy that appends rather than replaces leaves the client's own value at the head of the
+	// chain, so the tenant has to come from the trusted end or a visitor picks it.
+	it('keeps the proxy tenant when the client prepended another one', async () => {
+		await ingestWith(booted, '/prepended', {
+			host: 'proxy.internal',
+			'x-forwarded-host': 't2.example, t1.example',
+		})
+		expect(await attributionRows(booted, '/prepended')).toEqual([['t1.example', 't1']])
+	})
 })
 
 describeForDb('analytics scope seam: forwarded host with no trusted hop', {}, (db) => {

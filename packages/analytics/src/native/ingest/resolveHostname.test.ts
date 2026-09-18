@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import type { HostnameResolver } from './resolveHostname'
+import type { EventHostnameResolver } from './resolveHostname'
 import {
 	hostnameSet,
 	type ResolvedHostnameOption,
@@ -107,7 +107,7 @@ describe('resolveEventHostname', () => {
 	})
 
 	it('hands a resolver the claim, the request and the scope', async () => {
-		const fn = vi.fn<HostnameResolver>(async () => 'Chosen.Example')
+		const fn = vi.fn<EventHostnameResolver>(async () => 'Chosen.Example')
 		const option = resolveHostnameOption(fn)
 		expect(
 			await resolve(option, { host: 'a.example' }, { claimed: 'claimed.example', scope: 't1' })

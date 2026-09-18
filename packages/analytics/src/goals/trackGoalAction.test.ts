@@ -263,16 +263,24 @@ describe('trackGoalAction: hostname', () => {
 		expect(tracked[0]?.event.hostname).toBe('cms.example')
 	})
 
-	// Last resort, and deliberately not a throw: a conversion is a real event, and losing it
-	// over the name of the site it happened on would be the worse trade.
-	it('falls back to an empty hostname with no option, no request host and no serverURL', async () => {
-		await trackGoalAction().run(runArgs())
-		expect(tracked[0]?.event.hostname).toBe('')
+	// Deliberately neither a throw nor an empty hostname: with no option, no request host and
+	// no serverURL there is no site to attribute the completion to, and an empty one is a
+	// hostname `trackServerEvent` refuses anyway. The submission is what matters.
+	it('records nothing and warns once when no hostname resolves at all', async () => {
+		const warn = vi.fn()
+		const logged = { config: {}, logger: { warn } } as unknown as Payload
+
+		await trackGoalAction().run(runArgs({ payload: logged }))
+		await trackGoalAction().run(runArgs({ payload: logged }))
+
+		expect(tracked).toHaveLength(0)
+		expect(warn).toHaveBeenCalledTimes(1)
+		expect(String(warn.mock.calls[0]?.[0])).toContain('no hostname resolved')
 	})
 
-	it('falls back the same way when the serverURL is not a parsable URL', async () => {
+	it('records nothing the same way when the serverURL is not a parsable URL', async () => {
 		await trackGoalAction().run(runArgs({ payload: payloadWith('not a url') }))
-		expect(tracked[0]?.event.hostname).toBe('')
+		expect(tracked).toHaveLength(0)
 	})
 })
 

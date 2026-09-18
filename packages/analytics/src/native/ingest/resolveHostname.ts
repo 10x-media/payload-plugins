@@ -9,8 +9,11 @@ import { isHostname, normalizeHostname, requestHostname } from './requestHost'
  * The answer must be a hostname: it is normalized and then held to the same shape a request
  * host is, and anything else (a slug, a tenant id, free text) drops the event rather than
  * storing per-event text no rollup family can ever be pruned from.
+ *
+ * Distinct from the binding `HostnameResolver`, which names the hostname a document is read
+ * under rather than the one an event is written under.
  */
-export type HostnameResolver = (args: {
+export type EventHostnameResolver = (args: {
 	claimed: string | undefined
 	req: PayloadRequest
 	scope: string | null
@@ -21,12 +24,12 @@ export type HostnameResolver = (args: {
  * is one of those, for a single-site install behind no host validation. A function decides for
  * itself.
  */
-export type HostnameOption = 'request' | string[] | HostnameResolver
+export type HostnameOption = 'request' | string[] | EventHostnameResolver
 
 export type ResolvedHostnameOption =
 	| { kind: 'request' }
 	| { kind: 'list'; hosts: ReadonlySet<string> }
-	| { kind: 'resolver'; resolve: HostnameResolver }
+	| { kind: 'resolver'; resolve: EventHostnameResolver }
 
 /**
  * Config-time list validation: entries are lowercased here, so the ingest compare is exact.

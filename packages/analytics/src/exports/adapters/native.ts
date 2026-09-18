@@ -1,6 +1,6 @@
 export {
+	type EventHostnameResolver,
 	type HostnameOption,
-	type HostnameResolver,
 	type NativeOptions,
 	native,
 } from '../../native/nativeAdapter'

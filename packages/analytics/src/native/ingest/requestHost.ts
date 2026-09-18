@@ -51,8 +51,14 @@ export interface RequestHostnameOptions {
 }
 
 /**
- * The host the request itself carries: `x-forwarded-host`'s first value where a proxy hop is
- * trusted, else `Host`. Null when neither yields a usable hostname.
+ * The host the request itself carries: the `x-forwarded-host` entry `n` from the right where
+ * `n` proxy hops are trusted, which is the value the outermost trusted proxy wrote, else the
+ * `Host` header. Counting from the left would read the attacker-controlled end, since a proxy
+ * that appends rather than replaces keeps whatever the client sent ahead of its own value.
+ *
+ * `Host` is the fallback whenever the forwarded chain yields nothing usable, whether it is
+ * shorter than the trusted count or carries junk: the peer is still the trusted proxy, so
+ * `Host` is what that proxy sent.
  *
  * The `Origin` header is deliberately never read: a scripted client can pair a valid `Host`
  * with any `Origin` it likes and mint unlimited hostnames inside one scope, which is the hole
@@ -60,7 +66,16 @@ export interface RequestHostnameOptions {
  * host validates `Origin` itself, through the `hostname` resolver form.
  */
 export const requestHostname = (headers: Headers, opts: RequestHostnameOptions): string | null => {
-	const forwarded =
-		(opts.trustedProxyHops ?? 0) >= 1 ? headers.get('x-forwarded-host')?.split(',')[0] : undefined
-	return normalizeHostname(forwarded?.trim() || headers.get('host'))
+	const hops = opts.trustedProxyHops ?? 0
+	if (hops >= 1) {
+		const chain = (headers.get('x-forwarded-host') ?? '')
+			.split(',')
+			.map((entry) => entry.trim())
+			.filter(Boolean)
+		const forwarded = normalizeHostname(chain[chain.length - hops])
+		if (forwarded) {
+			return forwarded
+		}
+	}
+	return normalizeHostname(headers.get('host'))
 }

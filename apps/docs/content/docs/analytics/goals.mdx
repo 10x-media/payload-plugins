@@ -190,7 +190,7 @@ A form submission is a public request whose `Host` the visitor chose, so the act
 2. The submitting request's host, judged by the native adapter's own [`hostname` policy](/analytics/native#where-the-hostname-comes-from): `'request'` stores it, a list stores it only when the list holds it, and a resolver decides. A forged host that the endpoint would have refused is refused here too, so a conversion cannot mint a hostname a beacon could not.
 3. The host of the install's `serverURL`.
 
-The scoped-install drop rule does not apply: a submission's scope comes from the form document, not from its host. And a refused host costs the conversion its hostname, never the conversion: the last rung is an empty hostname, because losing a real conversion over the name of the site it happened on would be the worse trade.
+The scoped-install drop rule does not apply: a submission's scope comes from the form document, not from its host. There is no fourth rung: an install with no `serverURL` whose submitting request carries no usable host has nothing to attribute the completion to, so the action records nothing, writes one `warn` line for the life of the process, and returns. The submission itself is unaffected either way, since the action is not essential.
 
 <Callout type="warn">
 Set `hostname` on any install with a jobs runner. Form-builder queues every non-essential action, and a queued run carries the runner's request rather than the submitter's, so the fall-through lands on `serverURL` and every site's conversions pile up under the CMS host.

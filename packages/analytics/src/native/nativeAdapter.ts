@@ -42,7 +42,7 @@ import {
 	seriesFromRollups,
 } from './rollupAcc'
 
-export type { HostnameOption, HostnameResolver } from './ingest/resolveHostname'
+export type { EventHostnameResolver, HostnameOption } from './ingest/resolveHostname'
 
 export interface NativeOptions {
 	geoResolver?: GeoResolver
