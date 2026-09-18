@@ -17,6 +17,25 @@ const login = async (
 
 const search = (page: Page): Promise<string> => page.evaluate(() => window.location.search)
 
+/**
+ * Native's twelve channel tokens as `en` names them: the run is on the default English
+ * locale, so a channel row never reads as the token it stores.
+ */
+const CHANNEL_LABELS = [
+	'Direct',
+	'Organic search',
+	'Paid search',
+	'Organic social',
+	'Paid social',
+	'Organic video',
+	'Paid video',
+	'Email',
+	'Affiliate',
+	'Display',
+	'Referral',
+	'Other paid',
+]
+
 const goalsWidget = (page: Page): Locator => page.locator('.analytics-goals-widget').first()
 
 const breakdownWidget = (page: Page, title: string): Locator =>
@@ -85,6 +104,14 @@ test('the dashboard renders the goals, events and native dimension widgets', asy
 	const campaigns = breakdownWidget(page, 'Campaigns')
 	await expect(campaigns).toBeVisible()
 	expect([...(await barRows(campaigns)).keys()]).toContain('spring')
+
+	const channels = breakdownWidget(page, 'Channels')
+	await expect(channels).toBeVisible()
+	const channelRows = await barRows(channels)
+	expect(channelRows.size).toBeGreaterThan(0)
+	for (const label of channelRows.keys()) {
+		expect(CHANNEL_LABELS, `"${label}" is a named channel rather than a raw token`).toContain(label)
+	}
 
 	// The seed layout ticks Compare on one trend widget, which is what draws the legend.
 	const legend = page.locator('.analytics-chart__legend').first()
@@ -254,15 +281,14 @@ test('@tenancy the native dimension widgets rank rows for the selected tenant', 
 		expect(value).toBeLessThan(unfiltered.get(label) ?? 0)
 	}
 
-	// The sources tab defaults to `source`, which buckets the traffic channel; the host the
-	// referrers widget ranks is the `referrer` dimension beside it, on this tenant's scope.
-	// The channel is named, not shown raw, and this run is on the default English locale,
-	// so the row reads as `en`'s `channelSearch`.
+	// The sources tab defaults to `channel`; the host the referrers widget ranks is the
+	// `referrer` dimension beside it, on this tenant's scope. The channel is named, not shown
+	// raw, and this run is on the default English locale.
 	await page.goto(`${origin}/admin/analytics?tab=sources`)
 	const breakdown = page.locator('.analytics-view__breakdown')
 	await expect(breakdown).toBeVisible()
 	const rowLabels = breakdown.locator('.analytics-bars__row .analytics-bars__label')
-	await expect(rowLabels.filter({ hasText: /^Search$/ })).toBeVisible()
+	await expect(rowLabels.filter({ hasText: /^Organic search$/ })).toBeVisible()
 	await expect(breakdown).not.toContainText('localhost')
 
 	await page.goto(`${origin}/admin/analytics?tab=sources&dim=referrer`)

@@ -10,7 +10,7 @@ import { keys, type TranslationKey } from '../../translations/keys'
 import { METRIC_KEYS } from '../../translations/metricKeys'
 import { useTranslation } from '../../translations/useTranslation'
 import type { BreakdownTab } from '../gating'
-import { DIMENSION_LABELS, TAB_LABELS, valueLabel } from '../labels'
+import { DIMENSION_LABELS, isUnsetValue, TAB_LABELS, valueLabel } from '../labels'
 import { VIEW_LIMITS, type ViewLimit, type ViewState } from '../state'
 import type { QueryState } from '../useViewQueries'
 import { SectionError, Skeleton } from './EmptyStates'
@@ -49,8 +49,8 @@ const nextIndex = (key: string, at: number, length: number): number | null => {
 /**
  * The dimension tables, one tab per group the source serves, with a group-by picker on any
  * tab that groups by more than one. A row is a button only when the source can filter by
- * the dimension on screen; otherwise the rows are inert and the caption says so, rather
- * than offering a click the endpoint would reject.
+ * the dimension on screen and the row carries a value; otherwise the rows are inert and the
+ * caption says so, rather than offering a click the endpoint would reject.
  */
 export function Breakdowns({
 	tabs,
@@ -207,6 +207,9 @@ export function Breakdowns({
 											: valueLabel({ dimension, value: stored, provider, t }),
 									value,
 									display: formatMetricValue(charted, value, locale),
+									// A filter value is one character at minimum, so the row a source
+									// answered with no value has nothing to filter on.
+									selectable: !isUnsetValue(stored),
 									...(secondary === undefined
 										? {}
 										: { secondary: formatMetricValue(SECONDARY, secondary, locale) }),
@@ -219,7 +222,7 @@ export function Breakdowns({
 										onSelect: (index: number) => {
 											const value =
 												dimension === null ? undefined : rows[index]?.dimensions?.[dimension]
-											if (value !== undefined) {
+											if (value !== undefined && !isUnsetValue(value)) {
 												onRowSelect(value)
 											}
 										},

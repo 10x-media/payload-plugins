@@ -26,6 +26,7 @@ export const DIMENSION_KEYS = [
 	'page',
 	'referrer',
 	'source',
+	'channel',
 	'medium',
 	'campaign',
 	'utmSource',

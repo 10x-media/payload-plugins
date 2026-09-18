@@ -43,6 +43,11 @@ export const analyticsDefaultWidgets = (): WidgetInstance[] => [
 	},
 	{ widgetSlug: 'analytics-breakdown-pages', width: 'medium', data: BREAKDOWN_DATA },
 	{ widgetSlug: 'analytics-breakdown-sources', width: 'medium', data: BREAKDOWN_DATA },
+	{
+		widgetSlug: 'analytics-breakdown-channels',
+		width: 'medium',
+		data: { ...BREAKDOWN_DATA, metric: 'visitors' },
+	},
 	{ widgetSlug: 'analytics-breakdown-devices', width: 'medium', data: BREAKDOWN_DATA },
 	{ widgetSlug: 'analytics-breakdown-countries', width: 'medium', data: BREAKDOWN_DATA },
 	{

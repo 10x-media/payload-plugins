@@ -37,7 +37,8 @@ export default buildConfig({
 | `analytics-trend` | A gradient area chart of one metric over time, with timeframe-aware axis labels and a hover tooltip. | | `pageviews` |
 | `analytics-goals` | Conversions, revenue and conversion rate per [goal](/analytics/goals). See [below](#the-goals-widget). | `goal` | none, it has no metric field |
 | `analytics-breakdown-pages` | Top pages as a filled bar list. | `page` | `pageviews` |
-| `analytics-breakdown-sources` | Top traffic sources. On the [native engine](/analytics/native#dimensions) these are traffic channels, rendered under their translated names while the stored value stays a lowercase token. | `source` | `pageviews` |
+| `analytics-breakdown-sources` | Top origins: the `utm_source` a visit was tagged with, else the host it came from. | `source` | `pageviews` |
+| `analytics-breakdown-channels` | Acquisition channels. On the [native engine](/analytics/native#traffic-channels) these are its own twelve tokens under translated names, while the stored value stays the lowercase token; a provider's rows read in that provider's vocabulary. | `channel` | `visitors` |
 | `analytics-breakdown-devices` | Device classes. | `device` | `pageviews` |
 | `analytics-breakdown-countries` | Countries. | `country` | `pageviews` |
 | `analytics-breakdown-goals` | [Goal](/analytics/goals) completions per goal slug. | `goal` | `conversions` |
@@ -50,7 +51,7 @@ export default buildConfig({
 
 A default metric the selected source cannot serve is not offered, and the select falls to the first one it can.
 
-Every breakdown widget is one component over one dimension, so the five added last (referrers, browsers, operating systems, campaigns, events) behave exactly like the four before them: same fields, same capability gate, same bar list. The gate is what decides whether you see them, and the [native engine](/analytics/native#dimensions) now serves every dimension in the table above, so the referrers, browsers, operating-systems and campaigns widgets register and rank rows on a native-only install rather than being skipped for lack of a source. An adapter that serves less still gates the same way: the widget is not registered at all when no configured adapter can answer it, and with [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) enabled it registers open-world and degrades to "Not available for this data source" wherever the request's own source cannot answer it.
+Every breakdown widget is one component over one dimension, so the ones added last (channels, referrers, browsers, operating systems, campaigns, events) behave exactly like the four before them: same fields, same capability gate, same bar list. The gate is what decides whether you see them, and the [native engine](/analytics/native#dimensions) now serves every dimension in the table above, so the referrers, browsers, operating-systems and campaigns widgets register and rank rows on a native-only install rather than being skipped for lack of a source. An adapter that serves less still gates the same way: the widget is not registered at all when no configured adapter can answer it, and with [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) enabled it registers open-world and degrades to "Not available for this data source" wherever the request's own source cannot answer it.
 
 The metric pickers offer `pageviews`, `visitors`, `sessions`, `avgDuration`, `bounceRate`, `events`, `conversions`, `revenue`, and `scrollDepth`, each narrowed to what the selected source can actually serve. `visits` is not among them, so no widget offers it. A custom widget can group by the `goal` dimension the same way the built-in goals breakdown does (`requires: { dimensions: ['goal'] }`); it is groupable but not filterable, so it never appears in an `AnalyticsQuery.filters` entry.
 
@@ -121,7 +122,7 @@ A source that cannot apply the stored filter renders **"This source cannot apply
 
 A filtered widget states its filter in the caption, after the window: **Last 30 days where Country is DE**. The dimension and the operator are translated, the value is yours verbatim, and both the sentence (`'where {{dimension}} {{operator}} {{value}}'`) and the join that puts it after the window (`'{{window}} {{filter}}'`) are translated templates, so a locale can reorder the parts, and one that does not separate clauses with a space drops it. Both are overridable through the [`translations` option](/analytics/i18n). The caption renders with the data it describes: a widget on any non-ok state shows its title, the message and the link, never a caption for numbers it does not have.
 
-The caption and the view's filter chip word the same filter differently: the card reads **where Country is DE**, a sentence under a number, and the chip the link lands on reads **Country = DE**, a control you can remove. Same filter, two registers. The chip names a `source` value by its channel name (**Source = Search**); the caption quotes the value the editor typed, so a filter on `source` reads **where Source is search** there.
+The caption and the view's filter chip word the same filter differently: the card reads **where Country is DE**, a sentence under a number, and the chip the link lands on reads **Country = DE**, a control you can remove. Same filter, two registers. The chip names a native `channel` value by its translated name (**Channel = Paid search**); the caption quotes the value the editor typed, so a filter on `channel` reads **where Channel is paid-search** there.
 
 ## Open in Analytics
 
@@ -211,6 +212,8 @@ export default async function TopSourcesWidget(props: WidgetServerProps) {
   )
 }
 ```
+
+A `BarList` row with `selectable: false` renders inert even when `onSelect` is set, which is how the view keeps a row with no value from building a filter the endpoint would reject.
 
 Run `payload generate:importmap` after registering. The widget appears only when a configured adapter satisfies its `requires` gate, exactly like the built-ins.
 

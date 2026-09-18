@@ -6,7 +6,11 @@ import { flushBatch } from '../../src/native/ingest/flushBatch'
 import { primaryLanguage } from '../../src/native/ingest/language'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { referrerHost, storedReferrer } from '../../src/native/ingest/referrer'
-import { deriveSource } from '../../src/native/ingest/source'
+import {
+	CHANNEL_TAXONOMY_VERSION,
+	classifyChannel,
+	deriveSource,
+} from '../../src/native/ingest/source'
 import { extractUtm } from '../../src/native/ingest/utm'
 import { syncTask } from '../../src/sync/syncTask'
 import { startOfDayInTz } from '../../src/timeframe/tz'
@@ -58,11 +62,11 @@ const SEED_AGENTS = [
 ]
 
 /**
- * Raw referrers as a browser sends them: two search engines, a social shortener, an unlisted
- * host for the referral channel, one empty value for direct traffic, and one same-site
- * referrer, which contributes no `referrer` row and reads as `direct`. The `source` channel is
- * classified from the same value rather than stated, so the two dimensions cannot drift apart
- * in the seed.
+ * Raw referrers as a browser sends them: two search engines, two social hops, a video
+ * platform, an unlisted host for the referral channel, one empty value for direct traffic,
+ * and one same-site referrer, which contributes no `referrer` row and reads as `direct`. The
+ * `source` and `channel` dimensions are classified from the same value rather than stated, so
+ * they cannot drift apart in the seed.
  */
 const SEED_REFERRERS = [
 	'https://www.google.com/search?q=payload+analytics',
@@ -71,23 +75,41 @@ const SEED_REFERRERS = [
 	'https://news.ycombinator.com/item?id=41000000',
 	'https://www.bing.com/search?q=payload+cms',
 	`http://${SEED_HOSTNAME}/pricing?ref=nav`,
+	'https://www.youtube.com/watch?v=payload-analytics',
+	'https://www.reddit.com/r/nextjs/comments/analytics',
 ]
 
 /**
- * Campaign landings, as the query string the tracker sends on a pageview. Every seventh one
- * carries a campaign, so the campaigns widget ranks them against an unattributed majority; 7
- * shares no factor with the other fixture lists, so a campaign is not pinned to one browser,
- * device or path. The third carries an ad click id instead of a medium, which is what puts a
- * `paid` row in the sources breakdown.
+ * Campaign landings, as the tracker sends them on a pageview: the query string, and the
+ * referrer the click actually arrived through where the channel depends on it. Every seventh
+ * pageview carries one, so the campaigns widget ranks them against an unattributed majority,
+ * and 7 shares no factor with the other fixture lists, so a campaign is not pinned to one
+ * browser, device or path. Between them they cover the paid, email, affiliate and display
+ * channels the referrer list alone cannot produce: the third carries an ad click id and no
+ * medium at all, which is how most paid search actually arrives.
+ *
+ * Which campaign lands is picked by the day rather than by the pageview counter: a 30-day
+ * window, the range every widget opens on, spans only a handful of multiples of seven, so a
+ * counter-keyed pick would leave the last campaigns of this list out of the default view
+ * entirely.
  */
-const SEED_CAMPAIGN_QUERIES = [
-	'utm_source=newsletter&utm_medium=email&utm_campaign=spring',
-	'utm_source=twitter&utm_medium=social&utm_campaign=launch',
-	'utm_source=google&utm_campaign=brand&gclid=abc',
+const SEED_CAMPAIGNS: Array<{ query: string; referrer?: string }> = [
+	{ query: 'utm_source=newsletter&utm_medium=email&utm_campaign=spring' },
+	{ query: 'utm_source=twitter&utm_medium=social&utm_campaign=launch' },
+	{ query: 'utm_source=google&utm_campaign=brand&gclid=abc' },
+	{
+		query: 'utm_source=facebook&utm_medium=paid-social&utm_campaign=retarget',
+		referrer: 'https://www.facebook.com/',
+	},
+	{ query: 'utm_source=partner-network&utm_medium=affiliate&utm_campaign=review' },
+	{ query: 'utm_source=adroll&utm_medium=display&utm_campaign=awareness' },
 ]
 const CAMPAIGN_EVERY = 7
 
-/** Only the optional dimension fields, so spreading one can never blank a required one. */
+/**
+ * The dimension fields only, so spreading one can never blank a required one that is not
+ * attribution. `channel` and `channelVersion` are always derived, so they are always set.
+ */
 type SeedAttribution = Pick<
 	StoredEvent,
 	| 'country'
@@ -95,6 +117,8 @@ type SeedAttribution = Pick<
 	| 'city'
 	| 'device'
 	| 'source'
+	| 'channel'
+	| 'channelVersion'
 	| 'browser'
 	| 'os'
 	| 'language'
@@ -111,16 +135,16 @@ type SeedAttribution = Pick<
  * Everything ingest would classify from a real request, derived here with the ingest
  * helpers themselves: seeded events bypass the endpoint, so a hand-written literal would be
  * the one place the seed and a live hit could disagree on what a bucket is called. `index`
- * walks the fixture lists so the combinations vary across the span deterministically.
+ * walks the fixture lists so the combinations vary across the span deterministically, and
+ * `day` picks the campaign, for the reason {@link SEED_CAMPAIGNS} gives.
  */
-const attributionFor = (index: number): SeedAttribution => {
+const attributionFor = (index: number, day: number): SeedAttribution => {
 	const agent = SEED_AGENTS[index % SEED_AGENTS.length]
 	const geo = SEED_GEO[index % SEED_GEO.length]
-	const referrer = SEED_REFERRERS[index % SEED_REFERRERS.length] ?? ''
-	const query =
-		index % CAMPAIGN_EVERY === 0
-			? SEED_CAMPAIGN_QUERIES[index % SEED_CAMPAIGN_QUERIES.length]
-			: undefined
+	const campaign =
+		index % CAMPAIGN_EVERY === 0 ? SEED_CAMPAIGNS[day % SEED_CAMPAIGNS.length] : undefined
+	const referrer = campaign?.referrer ?? SEED_REFERRERS[index % SEED_REFERRERS.length] ?? ''
+	const query = campaign?.query
 	const browser = agent ? classifyBrowser(agent.ua) : undefined
 	const os = agent ? classifyOs(agent.ua) : undefined
 	const language = agent ? primaryLanguage(agent.acceptLanguage) : undefined
@@ -132,7 +156,14 @@ const attributionFor = (index: number): SeedAttribution => {
 		region: geo?.region,
 		city: geo?.city,
 		device: SEED_DEVICES[index % SEED_DEVICES.length],
-		source: deriveSource({ referrerHost: host, utmMedium: utm.utmMedium, query }),
+		source: deriveSource({ referrerHost: host, utmSource: utm.utmSource }),
+		channel: classifyChannel({
+			referrerHost: host,
+			utmSource: utm.utmSource,
+			utmMedium: utm.utmMedium,
+			query,
+		}),
+		channelVersion: CHANNEL_TAXONOMY_VERSION,
 		...(browser ? { browser } : {}),
 		...(os ? { os } : {}),
 		...(language ? { language } : {}),
@@ -215,7 +246,7 @@ const buildSeedEvents = (
 				visitorHash,
 				sessionId: `${visitorHash}-d${day}`,
 				durationMs: 30_000 + ((day + i) % 5) * 30_000,
-				...attributionFor(day + i),
+				...attributionFor(day + i, day),
 				timezone: DEV_REPORTING_TIMEZONE,
 				...scoped,
 			})
@@ -228,7 +259,7 @@ const buildSeedEvents = (
 			hostname: SEED_HOSTNAME,
 			visitorHash,
 			sessionId: `${visitorHash}-d${day}`,
-			...attributionFor(day),
+			...attributionFor(day, day),
 			timezone: DEV_REPORTING_TIMEZONE,
 			...scoped,
 		}

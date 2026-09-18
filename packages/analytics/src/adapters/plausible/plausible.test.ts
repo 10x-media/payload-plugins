@@ -174,6 +174,52 @@ describe('plausible adapter', () => {
 		])
 	})
 
+	it('maps a channel breakdown to visit:channel rows', async () => {
+		let captured: { dimensions?: string[] } = {}
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				captured = (await request.json()) as typeof captured
+				return HttpResponse.json({
+					results: [
+						{ metrics: [50], dimensions: ['Organic Search'] },
+						{ metrics: [30], dimensions: ['Direct'] },
+					],
+					meta: {},
+					query: {},
+				})
+			})
+		)
+		const adapter = plausible({ siteId: 'example.com', apiKey: 'k' })
+		const result = await adapter.query(q({ metrics: ['visitors'], dimensions: ['channel'] }), {})
+		expect(captured.dimensions).toEqual(['visit:channel'])
+		expect(result.rows).toEqual([
+			{ dimensions: { channel: 'Organic Search' }, metrics: { visitors: 50 } },
+			{ dimensions: { channel: 'Direct' }, metrics: { visitors: 30 } },
+		])
+	})
+
+	it('groups and filters by channel', async () => {
+		let captured: { filters?: unknown } = {}
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				captured = (await request.json()) as typeof captured
+				return HttpResponse.json({
+					results: [{ metrics: [1, 1, 1], dimensions: [] }],
+					meta: {},
+					query: {},
+				})
+			})
+		)
+		const adapter = plausible({ siteId: 'example.com', apiKey: 'k' })
+		expect(adapter.capabilities.dimensions.has('channel')).toBe(true)
+		expect(adapter.capabilities.filters.has('channel')).toBe(true)
+		await adapter.query(
+			q({ filters: [{ dimension: 'channel', operator: 'eq', value: 'Paid Search' }] }),
+			{}
+		)
+		expect(captured.filters).toEqual([['is', 'visit:channel', ['Paid Search']]])
+	})
+
 	it('targets a self-hosted host when provided', async () => {
 		server.use(
 			http.post('https://plausible.acme.io/api/v2/query', () =>
@@ -469,6 +515,34 @@ describe('plausible adapter', () => {
 				{ dimensions: { page: '/pricing' }, metrics: { pageviews: 90, conversions: 4 } },
 				{ dimensions: { page: '/blog' }, metrics: { pageviews: 30 } },
 				{ dimensions: { page: '/thanks' }, metrics: { conversions: 1 } },
+			])
+		})
+
+		it('attaches the conversions of a channel breakdown to the channel rows they belong to', async () => {
+			const bodies = capture((body) =>
+				body.metrics.includes('events')
+					? [
+							{ metrics: [4], dimensions: ['Paid Search'] },
+							{ metrics: [1], dimensions: ['Email'] },
+						]
+					: [
+							{ metrics: [90], dimensions: ['Organic Search'] },
+							{ metrics: [30], dimensions: ['Paid Search'] },
+						]
+			)
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({
+					metrics: ['pageviews', 'conversions'],
+					dimensions: ['channel'],
+					goalSlugs: ['signup'],
+				}),
+				{}
+			)
+			expect(bodies.map((body) => body.dimensions)).toEqual([['visit:channel'], ['visit:channel']])
+			expect(result.rows).toEqual([
+				{ dimensions: { channel: 'Organic Search' }, metrics: { pageviews: 90 } },
+				{ dimensions: { channel: 'Paid Search' }, metrics: { pageviews: 30, conversions: 4 } },
+				{ dimensions: { channel: 'Email' }, metrics: { conversions: 1 } },
 			])
 		})
 

@@ -4,6 +4,7 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { analytics } from '../../src/index'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
+import { CHANNEL_TAXONOMY_VERSION } from '../../src/native/ingest/source'
 import { native } from '../../src/native/nativeAdapter'
 import { getRuntime } from '../../src/plugin/runtime'
 import { WARM_TASK_SLUG, warmTask } from '../../src/plugin/warmTask'
@@ -71,6 +72,8 @@ describeForDb('analytics scheduled warm-cache', {}, (db) => {
 			hostname: 'h',
 			visitorHash: 'v1',
 			sessionId: 'v1',
+			channel: 'direct',
+			channelVersion: CHANNEL_TAXONOMY_VERSION,
 		}
 		await flushBatch(booted.payload, [event])
 

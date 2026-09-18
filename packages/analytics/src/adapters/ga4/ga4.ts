@@ -87,6 +87,7 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 	page: 'pagePath',
 	referrer: 'pageReferrer',
 	source: 'sessionSource',
+	channel: 'sessionDefaultChannelGroup',
 	medium: 'sessionMedium',
 	campaign: 'sessionCampaignName',
 	utmSource: 'sessionSource',

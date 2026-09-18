@@ -30,7 +30,21 @@ Every surface is gated by it:
 - A [display field](/analytics/display-fields) drops unsupported metrics from its request and renders the rest.
 - A custom range that exceeds a provider's `maxLookbackDays` is narrowed to the provider maximum, visibly.
 
-Metric keys: `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate`, `avgDuration`, `scrollDepth`, `events`, `conversions`, `revenue`. Dimension keys include `page`, `referrer`, `source`, `device`, `country`, and the UTM set. No adapter supports all of them; the gating exists so that never matters.
+Metric keys: `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate`, `avgDuration`, `scrollDepth`, `events`, `conversions`, `revenue`. Dimension keys include `page`, `referrer`, `source`, `channel`, `device`, `country`, and the UTM set. No adapter supports all of them; the gating exists so that never matters.
+
+## `source` and `channel`
+
+The two mean the same thing on every adapter. **`source`** is the visit's named origin: the `utm_source` tag when there is one, otherwise the referrer. **`channel`** is the classification of that origin into an acquisition channel, in each source's own vocabulary.
+
+| Adapter | `source` | `channel` | Filterable |
+|---|---|---|---|
+| native | `utm_source` lowercased, else the referrer host, else `direct` | the engine's own [twelve tokens](/analytics/native#traffic-channels), classified at ingest | both, `eq` and `contains` |
+| Plausible | `visit:source`, which Plausible fills from a `utm_source` / `source` / `ref` tag or the `Referer` header | `visit:channel`, Plausible's acquisition channel | both |
+| GA4 | `sessionSource` | `sessionDefaultChannelGroup` (`Direct`, `Organic Search`, `Paid Social`, ...) | both |
+| PostHog | not served | `session.$channel_type`, the sessions table's classification of the session's entry URL, honoring a project's custom channel rules | `channel` only |
+| Umami | not served | `/metrics?type=channel` (`direct`, `organicSearch`, `paidSocial`, ...) | neither: the route takes no channel filter parameter, so `channel` groups and never filters |
+
+Each source reports its own casing: native lowercases the `utm_source` it stores in `source`, so one tag spelled two ways is one row, where a provider answers whatever it holds. Only native's channel tokens are translated in the admin. A provider's values render exactly as that provider reports them, so a channel breakdown reads `Paid Search` on GA4 and `paidSearch` on Umami.
 
 An unconfigured adapter (missing credentials) degrades to an empty state and makes no network calls.
 
@@ -56,10 +70,10 @@ The exact routes and snippets each one declares are on the [proxy page](/analyti
 
 | Adapter | Filterable dimensions | Operators |
 |---|---|---|
-| native | every dimension it serves except `goal`: `page`, `referrer`, `source`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` | `eq`, `contains` |
-| PostHog | `page`, `event` | `eq`, `contains`, `matches` |
-| Plausible | `page`, `source`, `referrer`, `device`, `browser`, `os`, `country`, `region`, `city`, `utmSource`, `utmMedium`, `utmCampaign` | `eq`, `contains`, `matches` |
-| GA4 | `page`, `referrer`, `source`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` | `eq`, `contains`, `matches` |
+| native | every dimension it serves except `goal`: `page`, `referrer`, `source`, `channel`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` | `eq`, `contains` |
+| PostHog | `page`, `channel`, `event` | `eq`, `contains`, `matches` |
+| Plausible | `page`, `source`, `channel`, `referrer`, `device`, `browser`, `os`, `country`, `region`, `city`, `utmSource`, `utmMedium`, `utmCampaign` | `eq`, `contains`, `matches` |
+| GA4 | `page`, `referrer`, `source`, `channel`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` | `eq`, `contains`, `matches` |
 | Umami | `page`, `referrer`, `browser`, `os`, `device`, `country`, `region`, `city`, `language`, `event`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` | `eq`, `contains`, `matches` |
 | `memoryAdapter` (testing) | `page` | `eq` |
 
@@ -79,7 +93,7 @@ import { plausible } from '@10x-media/analytics/adapters/plausible'
 plausible({ siteId: 'example.com', apiKey: process.env.PLAUSIBLE_API_KEY! })
 ```
 
-Uses the Stats API v2 (`POST /api/v2/query`). Pass `host` for a self-hosted Community Edition instance, and `domain` or `scriptId` to capture through it. Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, scrollDepth, conversions, and revenue where `revenueCurrency` is set. Dimensions include `goal`, which maps to `event:goal`. Durations are normalized to milliseconds. Default `maxLookbackDays: 730` (set `null` to disable clamping).
+Uses the Stats API v2 (`POST /api/v2/query`). Pass `host` for a self-hosted Community Edition instance, and `domain` or `scriptId` to capture through it. Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, scrollDepth, conversions, and revenue where `revenueCurrency` is set. Dimensions include `channel`, which maps to `visit:channel`, and `goal`, which maps to `event:goal`. Durations are normalized to milliseconds. Default `maxLookbackDays: 730` (set `null` to disable clamping).
 
 `revenueCurrency` is the ISO code of the site's revenue goals, and it is what turns the `revenue` metric on: Plausible serves `total_revenue` only inside a goal-filtered request on a site that has a revenue goal, and errors the request on a site that has none. Unset, the adapter neither declares `revenue` nor asks for it.
 
@@ -97,7 +111,7 @@ umami({ websiteId: 'xxxx', token: process.env.UMAMI_TOKEN!, host: 'https://analy
 
 Targets Umami 3.x, cloud and self-hosted. Metrics: pageviews, visitors, visits, sessions, plus bounceRate and avgDuration derived from visit totals, and conversions. The `page` dimension maps to `/metrics?type=path` (`type=url` was the 2.x name and 3.x rejects it). Umami has no per-day source for visitors, bounce rate, or duration, so trend series on those metrics are empty while headlines stay correct.
 
-`/metrics` reports one number per row, and on every dimension but `goal` that number is the count of distinct sessions, so **a breakdown row carries `visitors`** whatever metric the read asked for; a breakdown that asks for something else charts the first metric its rows do carry rather than a column of zeros under the wrong name. `event` is filterable but not groupable, since the install-wide `events` metric has no source in `/stats`; `goal` is the reverse, a breakdown the read's own goal slugs narrow, whose rows count event occurrences as `conversions`.
+`/metrics` reports one number per row, and on every dimension but `goal` that number is the count of distinct sessions, so **a breakdown row carries `visitors`** whatever metric the read asked for; a breakdown that asks for something else charts the first metric its rows do carry rather than a column of zeros under the wrong name. `event` is filterable but not groupable, since the install-wide `events` metric has no source in `/stats`; `goal` and `channel` are the reverse, groups with no matching filter parameter. `channel` is `/metrics?type=channel`, Umami's own acquisition classification (`direct`, `organicSearch`, `paidSearch`, `paidSocial`, `email`, `affiliate`, ...), carrying the read's date range and filters like every sibling type.
 
 Filter values carry an operator prefix (`eq.`, `c.`, `re.`), and Umami reads any of its operator names followed by a dot as an operator, so the adapter always writes `eq.` explicitly and a value like `s.example.com` stays literal. Umami splits an `eq.` value on commas into a value list with no escape, so a goal slug containing a comma cannot be asked for and is reported in `meta.unappliedFilters`.
 
@@ -121,7 +135,7 @@ Uses the GA4 Data API (`runReport`) through the official SDK, declared as an opt
 pnpm add @google-analytics/data
 ```
 
-Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, conversions, revenue. Dimensions include `goal`, which maps to `eventName` restricted to the read's own goals. Durations normalize to milliseconds, bounce rate to a percentage. GA4 bills a token quota, so the adapter recommends a long aggregate TTL (6 hours); [cache warming](/analytics/cache) pairs well with it. Default `maxLookbackDays: 425` (GA4's rolling window).
+Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, events, conversions, revenue. Dimensions include `channel`, which maps to `sessionDefaultChannelGroup`, and `goal`, which maps to `eventName` restricted to the read's own goals. Durations normalize to milliseconds, bounce rate to a percentage. GA4 bills a token quota, so the adapter recommends a long aggregate TTL (6 hours); [cache warming](/analytics/cache) pairs well with it. Default `maxLookbackDays: 425` (GA4's rolling window).
 
 `conversions` reads GA4's `keyEvents`, which counts only events the property itself marks as key events: an event that is a goal here but is not marked there reports 0. Set `measurementId` to capture through the same property; see [Capture](/analytics/capture#ga4).
 
@@ -133,7 +147,7 @@ import { posthog } from '@10x-media/analytics/adapters/posthog'
 posthog({ projectId: '123', apiKey: process.env.POSTHOG_API_KEY! })
 ```
 
-Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope and never reaches the browser; capture takes the public `projectToken` (`phc_...`) instead. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted; US Cloud is the default, and `region` pins the proxied capture hosts independently. Metrics: pageviews, visitors, visits, sessions, events. `events` counts every captured event (matching PostHog's own Events definition); requesting it (or the `event` dimension) switches the read off the `$pageview`-only filter, and the pageview-family metrics stay pageview-scoped through conditional aggregation. Dimensions: `page` (top-pages breakdown), `event` (per-event-name breakdown) and `goal`, which is the event name restricted to the read's own goals. `conversions` counts those goal events; PostHog serves no revenue. A binding `hostname` filters on `properties.$host`.
+Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope and never reaches the browser; capture takes the public `projectToken` (`phc_...`) instead. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted; US Cloud is the default, and `region` pins the proxied capture hosts independently. Metrics: pageviews, visitors, visits, sessions, events. `events` counts every captured event (matching PostHog's own Events definition); requesting it (or the `event` dimension) switches the read off the `$pageview`-only filter, and the pageview-family metrics stay pageview-scoped through conditional aggregation. Dimensions: `page` (top-pages breakdown), `channel` (`session.$channel_type`, reached through the events table's own `session` join on `$session_id`), `event` (per-event-name breakdown) and `goal`, which is the event name restricted to the read's own goals. A `channel` read stays pageview-scoped, since a session property is not an event name; a pageview captured with no `$session_id` joins nothing and lands in an empty channel, which the admin shows as **Not set**. `conversions` counts those goal events; PostHog serves no revenue. A binding `hostname` filters on `properties.$host`.
 
 Time bounds are sent as `toDateTime('...', 'UTC')`. A bare HogQL date literal parses in the project's timezone, so a project set to anything but UTC used to read a window shifted by its offset; buckets are still cut in the reporting timezone.
 

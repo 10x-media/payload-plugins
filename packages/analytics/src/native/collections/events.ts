@@ -31,6 +31,10 @@ export const eventsCollection = (scoped = false): CollectionConfig => ({
 		{ name: 'browser', type: 'text' },
 		{ name: 'os', type: 'text' },
 		{ name: 'source', type: 'text' },
+		{ name: 'channel', type: 'text' },
+		// The taxonomy the channel beside it was decided under, so a later reclassify can find
+		// the rows an older rule set wrote.
+		{ name: 'channelVersion', type: 'number' },
 		// Extracted from the pageview's query string at ingest; the raw query is never stored.
 		{ name: 'utmSource', type: 'text' },
 		{ name: 'utmMedium', type: 'text' },
