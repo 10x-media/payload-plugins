@@ -17,7 +17,7 @@ const ingest = (booted: BootedPayload, path: string) =>
 		)
 	)
 
-describeForDb('analytics readForField', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics readForField', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {

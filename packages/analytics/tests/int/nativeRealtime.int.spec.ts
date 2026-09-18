@@ -4,7 +4,7 @@ import { analytics } from '../../src/index'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { native } from '../../src/native/nativeAdapter'
 
-describeForDb('native realtime', { dbs: ['mongo'] }, (db) => {
+describeForDb('native realtime', {}, (db) => {
 	let booted: BootedPayload
 	const adapter = native()
 

@@ -11,7 +11,7 @@ const SLUG = 'analytics-providers'
 
 type ProviderRow = { id: string | number; plausible?: { apiKey?: string | null } }
 
-describeForDb('analytics providers collection', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics providers collection', {}, (db) => {
 	let booted: BootedPayload
 	let plausibleId: string | number
 	let posthogId: string | number
@@ -341,7 +341,7 @@ describeForDb('analytics providers collection', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb('analytics providers.resolve escape hatch', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics providers.resolve escape hatch', {}, (db) => {
 	let booted: BootedPayload
 	const scopesSeen: Array<string | null> = []
 
@@ -385,7 +385,7 @@ type ConfiguredTask = {
 	handler?: (args: { req: PayloadRequest }) => Promise<unknown>
 }
 
-describeForDb('analytics sync tier: runtime provider instance ids', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics sync tier: runtime provider instance ids', {}, (db) => {
 	let booted: BootedPayload
 	const DAY = 86_400_000
 	const mem = memoryAdapter()

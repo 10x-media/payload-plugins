@@ -6,7 +6,7 @@ import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { native } from '../../src/native/nativeAdapter'
 import { readForWidget } from '../../src/widgets/readForWidget'
 
-describeForDb('readForWidget filter pass-through', { dbs: ['mongo'] }, (db) => {
+describeForDb('readForWidget filter pass-through', {}, (db) => {
 	let booted: BootedPayload
 	beforeAll(async () => {
 		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })

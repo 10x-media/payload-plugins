@@ -8,7 +8,7 @@ import { analytics } from '../../src/index'
 import { kvCacheStore } from '../../src/surfacing/cacheStore'
 import { createEngine } from '../../src/surfacing/engine'
 
-describeForDb('analytics provider adapters load', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics provider adapters load', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {

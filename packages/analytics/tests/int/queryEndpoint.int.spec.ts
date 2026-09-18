@@ -101,7 +101,7 @@ const goalsAdapter = (seen: AnalyticsQuery[]): AnalyticsAdapter => ({
 	},
 })
 
-describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics query endpoint', {}, (db) => {
 	let booted: BootedPayload
 	let token: string
 	const mem = memoryAdapter()
@@ -368,7 +368,7 @@ describeForDb('analytics query endpoint', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb('analytics query endpoint - access.read', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics query endpoint - access.read', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -439,7 +439,7 @@ describeForDb('analytics query endpoint - access.read', { dbs: ['mongo'] }, (db)
 	})
 })
 
-describeForDb('analytics query endpoint - platform scope resolver', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics query endpoint - platform scope resolver', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -502,7 +502,7 @@ describeForDb('analytics query endpoint - platform scope resolver', { dbs: ['mon
 	})
 })
 
-describeForDb('analytics query endpoint - scoped install', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics query endpoint - scoped install', {}, (db) => {
 	let booted: BootedPayload
 	const seen: AnalyticsQuery[] = []
 
@@ -624,7 +624,7 @@ describeForDb('analytics query endpoint - scoped install', { dbs: ['mongo'] }, (
 	})
 })
 
-describeForDb('analytics query endpoint - stale passthrough', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics query endpoint - stale passthrough', {}, (db) => {
 	let booted: BootedPayload
 	const mem = memoryAdapter()
 

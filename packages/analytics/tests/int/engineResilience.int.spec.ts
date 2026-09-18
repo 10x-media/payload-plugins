@@ -15,7 +15,7 @@ import { readForWidgetSeries } from '../../src/widgets/readForWidgetSeries'
 // a later attempt, since failNext only fails the next single query() call.
 const injectedFailure = () => new ProviderHttpError(400, 'memory', 'memory: injected failure')
 
-describeForDb('analytics engine resilience', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics engine resilience', {}, (db) => {
 	const mem = memoryAdapter()
 	let booted: BootedPayload
 
@@ -113,7 +113,7 @@ describeForDb('analytics engine resilience', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb('analytics sync tier resilience', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics sync tier resilience', {}, (db) => {
 	const mem = memoryAdapter()
 	let booted: BootedPayload
 

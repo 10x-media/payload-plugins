@@ -26,7 +26,7 @@ const login = async (payload: Payload, email: string) => {
 
 type ProviderRow = { id: string | number; name?: string | null }
 
-describeForDb('analytics sources endpoint', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics sources endpoint', {}, (db) => {
 	let booted: BootedPayload
 	let userA: Awaited<ReturnType<typeof login>>
 	let userB: Awaited<ReturnType<typeof login>>
@@ -151,7 +151,7 @@ describeForDb('analytics sources endpoint', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb('analytics sources endpoint - null scope gating', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics sources endpoint - null scope gating', {}, (db) => {
 	let booted: BootedPayload
 	let tenantUser: Awaited<ReturnType<typeof login>>
 	let platformUser: Awaited<ReturnType<typeof login>>

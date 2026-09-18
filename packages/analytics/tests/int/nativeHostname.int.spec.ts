@@ -27,7 +27,7 @@ const RANGE = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
 const UA1 = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120'
 const UA2 = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile/15E148'
 
-describeForDb('native hostname-scoped rollups', { dbs: ['mongo'] }, (db) => {
+describeForDb('native hostname-scoped rollups', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 

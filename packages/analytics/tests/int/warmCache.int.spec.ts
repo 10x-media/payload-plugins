@@ -32,7 +32,7 @@ const layout: WidgetInstance[] = [
 	},
 ]
 
-describeForDb('analytics scheduled warm-cache', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics scheduled warm-cache', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {

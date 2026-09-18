@@ -21,7 +21,7 @@ const login = async (payload: Payload, email: string) => {
 	return result.user
 }
 
-describeForDb('analytics providers collection: scoped access', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics providers collection: scoped access', {}, (db) => {
 	let booted: BootedPayload
 	let userA: Awaited<ReturnType<typeof login>>
 	let userRoot: Awaited<ReturnType<typeof login>>
@@ -133,7 +133,7 @@ describeForDb('analytics providers collection: scoped access', { dbs: ['mongo'] 
 	})
 })
 
-describeForDb('analytics providers collection: unscoped access', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics providers collection: unscoped access', {}, (db) => {
 	let booted: BootedPayload
 	let user: Awaited<ReturnType<typeof login>>
 

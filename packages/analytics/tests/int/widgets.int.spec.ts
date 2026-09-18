@@ -27,7 +27,7 @@ const registeredWidgets = (booted: BootedPayload): RegisteredWidget[] => {
 	return config.admin?.dashboard?.widgets ?? []
 }
 
-describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics dashboard widgets', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -126,34 +126,30 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb(
-	'analytics dashboard widgets, one adapter with providers.collection',
-	{ dbs: ['mongo'] },
-	(db) => {
-		let booted: BootedPayload
+describeForDb('analytics dashboard widgets, one adapter with providers.collection', {}, (db) => {
+	let booted: BootedPayload
 
-		beforeAll(async () => {
-			booted = await bootPayload({
-				plugin: analytics({ adapters: [native()], providers: { collection: true } }),
-				db,
-			})
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native()], providers: { collection: true } }),
+			db,
 		})
+	})
 
-		afterAll(async () => {
-			await booted.stop()
-		})
+	afterAll(async () => {
+		await booted.stop()
+	})
 
-		it('registers the dataSource field even with a single static adapter, because providers.collection makes runtime providers selectable', () => {
-			const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
-			const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
-			expect(fieldNames).toContain('dataSource')
-		})
-	}
-)
+	it('registers the dataSource field even with a single static adapter, because providers.collection makes runtime providers selectable', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
+		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
+		expect(fieldNames).toContain('dataSource')
+	})
+})
 
 describeForDb(
 	'analytics dashboard widgets, open-world gating with providers.collection',
-	{ dbs: ['mongo'] },
+	{},
 	(db) => {
 		let booted: BootedPayload
 

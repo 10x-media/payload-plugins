@@ -79,7 +79,7 @@ const traffic: Seed[] = [
 	{ path: '/a', country: 'US', ip: '1.1.1.5' },
 ]
 
-describeForDb('widget filters against the native adapter', { dbs: ['mongo'] }, (db) => {
+describeForDb('widget filters against the native adapter', {}, (db) => {
 	let booted: BootedPayload
 	let range: DateRange
 
@@ -220,38 +220,34 @@ const patternAdapter = (over: Partial<AnalyticsCapabilities> = {}): AnalyticsAda
 	}
 }
 
-describeForDb(
-	'widget filters against a provider that matches patterns',
-	{ dbs: ['mongo'] },
-	(db) => {
-		let booted: BootedPayload
+describeForDb('widget filters against a provider that matches patterns', {}, (db) => {
+	let booted: BootedPayload
 
-		beforeAll(async () => {
-			booted = await bootPayload({ plugin: analytics({ adapters: [patternAdapter()] }), db })
-		}, 240_000)
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: analytics({ adapters: [patternAdapter()] }), db })
+	}, 240_000)
 
-		afterAll(async () => {
-			await booted.stop()
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('applies a matches filter the provider declares', async () => {
+		const result = await readForWidget({
+			req: { payload: booted.payload } as unknown as PayloadRequest,
+			metrics: ['pageviews'],
+			timeframe: 'today',
+			now: new Date(),
+			range: windowAround(Date.now()),
+			timezone: 'UTC',
+			comparison: false,
+			filters: [{ dimension: 'page', operator: 'matches', value: '^/docs' }],
 		})
+		expect(result.status).toBe('ok')
+		expect(result.metrics.pageviews).toBe(2)
+	})
+})
 
-		it('applies a matches filter the provider declares', async () => {
-			const result = await readForWidget({
-				req: { payload: booted.payload } as unknown as PayloadRequest,
-				metrics: ['pageviews'],
-				timeframe: 'today',
-				now: new Date(),
-				range: windowAround(Date.now()),
-				timezone: 'UTC',
-				comparison: false,
-				filters: [{ dimension: 'page', operator: 'matches', value: '^/docs' }],
-			})
-			expect(result.status).toBe('ok')
-			expect(result.metrics.pageviews).toBe(2)
-		})
-	}
-)
-
-describeForDb('widget filters against a source that cannot filter', { dbs: ['mongo'] }, (db) => {
+describeForDb('widget filters against a source that cannot filter', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -283,7 +279,7 @@ describeForDb('widget filters against a source that cannot filter', { dbs: ['mon
 	})
 })
 
-describeForDb('widget filters on a scoped install', { dbs: ['mongo'] }, (db) => {
+describeForDb('widget filters on a scoped install', {}, (db) => {
 	let booted: BootedPayload
 	let range: DateRange
 

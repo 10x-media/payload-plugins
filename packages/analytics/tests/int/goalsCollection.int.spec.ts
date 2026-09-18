@@ -33,7 +33,7 @@ const ingestInto = async (
 	expect(res.status).toBe(202)
 }
 
-describeForDb('analytics goals collection: unscoped', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics goals collection: unscoped', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 	let range: { start: Date; end: Date }
@@ -142,7 +142,7 @@ const login = async (payload: Payload, email: string) => {
 	return result.user
 }
 
-describeForDb('analytics goals collection: scoped', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics goals collection: scoped', {}, (db) => {
 	let booted: BootedPayload
 	let userA: Awaited<ReturnType<typeof login>>
 	let userB: Awaited<ReturnType<typeof login>>
@@ -316,7 +316,7 @@ describeForDb('analytics goals collection: scoped', { dbs: ['mongo'] }, (db) => 
 	})
 })
 
-describeForDb('analytics goals collection: tracker config', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics goals collection: tracker config', {}, (db) => {
 	let booted: BootedPayload
 
 	const trackerGoals = async (origin: string): Promise<TrackerConfig['goals']> => {
@@ -390,7 +390,7 @@ describeForDb('analytics goals collection: tracker config', { dbs: ['mongo'] }, 
 	})
 })
 
-describeForDb('analytics goals collection: scope field boot check', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics goals collection: scope field boot check', {}, (db) => {
 	let booted: BootedPayload
 
 	/** Stands in for a tenant plugin, which registers its own field after this plugin runs. */

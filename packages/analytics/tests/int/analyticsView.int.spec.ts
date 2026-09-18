@@ -25,7 +25,7 @@ const login = async (payload: Payload, email: string) => {
 const reqFor = (payload: Payload, user: unknown): PayloadRequest =>
 	({ user, payload, i18n: { language: 'de' } }) as unknown as PayloadRequest
 
-describeForDb('analytics view props: unscoped install', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics view props: unscoped install', {}, (db) => {
 	let booted: BootedPayload
 	let user: Awaited<ReturnType<typeof login>>
 	const options: AnalyticsPluginOptions = {
@@ -83,7 +83,7 @@ describeForDb('analytics view props: unscoped install', { dbs: ['mongo'] }, (db)
 	})
 })
 
-describeForDb('analytics view props: scoped install', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics view props: scoped install', {}, (db) => {
 	let booted: BootedPayload
 	let stranger: Awaited<ReturnType<typeof login>>
 	const options: AnalyticsPluginOptions = {
