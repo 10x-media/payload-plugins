@@ -398,9 +398,9 @@ describe('refreshCache', () => {
 	})
 
 	it('posts to the refresh path with credentials and answers the new epoch', async () => {
-		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 4 }))
+		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 'mfa1-9c2b' }))
 
-		await expect(refreshCache('/api')).resolves.toEqual({ epoch: 4 })
+		await expect(refreshCache('/api')).resolves.toEqual({ epoch: 'mfa1-9c2b' })
 
 		const [url, init] = vi.mocked(fetch).mock.calls[0] ?? []
 		expect(url).toBe('/api/analytics/refresh')
@@ -408,8 +408,14 @@ describe('refreshCache', () => {
 		expect(new Headers((init as RequestInit).headers).get('Accept')).toBe('application/json')
 	})
 
+	it('reports an answer it cannot read as the initial token rather than a typed lie', async () => {
+		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 4 }))
+
+		await expect(refreshCache('/api')).resolves.toEqual({ epoch: '0' })
+	})
+
 	it('joins an apiRoute with a trailing slash without doubling it', async () => {
-		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 1 }))
+		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 'mfa1-0001' }))
 
 		await refreshCache('/api/')
 
@@ -417,7 +423,7 @@ describe('refreshCache', () => {
 	})
 
 	it('carries a named scope in the body and omits it otherwise', async () => {
-		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 1 }))
+		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 'mfa1-0001' }))
 
 		await refreshCache('/api', { scope: 'tenant-b' })
 		const scoped = (vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit).body
@@ -429,7 +435,7 @@ describe('refreshCache', () => {
 	})
 
 	it('hands the abort signal straight to the fetch', async () => {
-		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 1 }))
+		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 'mfa1-0001' }))
 		const controller = new AbortController()
 
 		await refreshCache('/api', { signal: controller.signal })

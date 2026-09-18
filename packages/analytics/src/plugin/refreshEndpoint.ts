@@ -2,6 +2,7 @@ import type { PayloadHandler, PayloadRequest } from 'payload'
 import { readCappedBody } from '../capture/requestBody'
 import { PLATFORM_SCOPE } from '../core/contract'
 import { queryError } from '../query/errors'
+import { INITIAL_EPOCH } from '../surfacing/epoch'
 import { REFRESH_PATH } from './paths'
 import { errorResponse, NO_STORE, RETRY_AFTER } from './responses'
 import { getRuntime, platformReadFor, readAccessFor, resolveScopeFor } from './runtime'
@@ -88,7 +89,7 @@ export const makeRefreshHandler = (): PayloadHandler => async (req: PayloadReque
 		}
 		const resolved = requested ?? (await resolveScopeFor(runtime, req))
 		const scope = resolved === PLATFORM_SCOPE ? null : resolved
-		const epoch = await (runtime.epoch?.bump(scope) ?? Promise.resolve(0))
+		const epoch = await (runtime.epoch?.bump(scope) ?? Promise.resolve(INITIAL_EPOCH))
 		return Response.json({ epoch }, { headers: NO_STORE })
 	} catch (err) {
 		// A counter that cannot be raised leaves the old numbers being served, which is a

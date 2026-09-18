@@ -126,7 +126,7 @@ describeForDb('analytics refresh endpoint', {}, (db) => {
 		expect(((await res.json()) as ErrorBody).error.code).toBe('untrusted_scope')
 	})
 
-	it(`bumps only the caller's own scope and answers the new epoch on ${db}`, async () => {
+	it(`bumps only the caller's own scope and answers the new token on ${db}`, async () => {
 		const [a, b, global] = await Promise.all([
 			epochOf('tenant-a'),
 			epochOf('tenant-b'),
@@ -135,8 +135,10 @@ describeForDb('analytics refresh endpoint', {}, (db) => {
 		const res = await call()
 		expect(res.status).toBe(200)
 		expect(res.headers.get('Cache-Control')).toBe('private, no-store')
-		expect((await res.json()) as { epoch: number }).toEqual({ epoch: a + 1 })
-		expect(await epochOf('tenant-a')).toBe(a + 1)
+		const { epoch } = (await res.json()) as { epoch: string }
+		expect(typeof epoch).toBe('string')
+		expect(epoch).not.toBe(a)
+		expect(await epochOf('tenant-a')).toBe(epoch)
 		expect(await epochOf('tenant-b')).toBe(b)
 		expect(await epochOf(null)).toBe(global)
 	})
@@ -145,24 +147,25 @@ describeForDb('analytics refresh endpoint', {}, (db) => {
 		const before = await epochOf('tenant-b')
 		const res = await call({ email: 'b@t.dev' })
 		expect(res.status).toBe(200)
-		expect(await epochOf('tenant-b')).toBe(before + 1)
+		expect(await epochOf('tenant-b')).not.toBe(before)
 	})
 
 	it(`lets a platform reader name another scope on ${db}`, async () => {
 		const before = await epochOf('tenant-b')
 		const res = await call({ email: 'platform@t.dev', body: { scope: 'tenant-b' } })
 		expect(res.status).toBe(200)
-		expect((await res.json()) as { epoch: number }).toEqual({ epoch: before + 1 })
-		expect(await epochOf('tenant-b')).toBe(before + 1)
+		const { epoch } = (await res.json()) as { epoch: string }
+		expect(epoch).not.toBe(before)
+		expect(await epochOf('tenant-b')).toBe(epoch)
 	})
 
 	// The wildcard is what a cross-scope read resolves to, and a cross-scope read stamps no
-	// scope on its query, so the install-wide counter is the one its entries key on.
-	it(`bumps the install-wide counter for the platform wildcard on ${db}`, async () => {
+	// scope on its query, so the install-wide token is the one its entries key on.
+	it(`bumps the install-wide token for the platform wildcard on ${db}`, async () => {
 		const before = await epochOf(null)
 		const res = await call({ email: 'platform@t.dev', body: { scope: '*' } })
 		expect(res.status).toBe(200)
-		expect(await epochOf(null)).toBe(before + 1)
+		expect(await epochOf(null)).not.toBe(before)
 	})
 
 	it(`sends the next read of the refreshed scope back to the adapter on ${db}`, async () => {

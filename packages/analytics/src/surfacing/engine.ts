@@ -3,7 +3,7 @@ import type { AnalyticsAdapter, AnalyticsQuery, AnalyticsResult } from '../core/
 import { DEFAULT_TIMEZONE, startOfDayInTz } from '../timeframe/tz'
 import type { CacheStore } from './cacheStore'
 import { createCoalescer } from './coalesce'
-import type { EpochStore } from './epoch'
+import { type EpochStore, INITIAL_EPOCH } from './epoch'
 import { createQueue, type QueueOptions } from './queue'
 import { limiterFor, type RateLimiter } from './rateLimiter'
 import { PROVIDER_READ_TIMEOUT_MESSAGE, shouldRetryProviderError } from './retryPolicy'
@@ -35,8 +35,9 @@ export interface EngineOptions {
 	/** Called once per failed adapter fetch, before falling back to a stale cache entry. */
 	onError?: (err: unknown, adapterId: string) => void
 	/**
-	 * Per-scope cache epoch carried by every key. Absent, every read keys on epoch 0 and a
-	 * provider change only clears the in-process maps, as it did before the epoch shipped.
+	 * Per-scope cache epoch carried by every key. Absent, every read keys on the initial
+	 * token and a provider change only clears the in-process maps, as it did before the
+	 * epoch shipped.
 	 */
 	epoch?: Pick<EpochStore, 'get'>
 }
@@ -71,7 +72,7 @@ export function createEngine(opts: EngineOptions): Engine {
 			const q = clamped ? { ...query, dateRange: range } : query
 			// Resolved before the key so the coalescer key carries the epoch too: two reads
 			// across a bump must not share one in-flight answer.
-			const epoch = (await opts.epoch?.get(q.scope)) ?? 0
+			const epoch = (await opts.epoch?.get(q.scope)) ?? INITIAL_EPOCH
 			const key = buildCacheKey(adapter.id, q, { epoch })
 			return coalesce(key, async () => {
 				let fresh: AnalyticsResult

@@ -9,8 +9,8 @@ import { type AnalyticsRuntime, setRuntime } from './runtime'
 type ErrorBody = { error: { code: string; message: string; param?: string } }
 
 const epochStore = (overrides: Partial<EpochStore> = {}): EpochStore => ({
-	get: async () => 0,
-	bump: async () => 1,
+	get: async () => '0',
+	bump: async () => 'tok-1',
 	...overrides,
 })
 
@@ -49,16 +49,16 @@ const encode = (value: unknown): ArrayBuffer =>
 
 describe('makeRefreshHandler', () => {
 	it('answers the new epoch for a request with no body at all', async () => {
-		const bump = vi.fn(async () => 7)
+		const bump = vi.fn(async () => 'tok-7')
 		const res = await makeRefreshHandler()(reqWith(runtimeWith({ epoch: epochStore({ bump }) })))
 		expect(res.status).toBe(200)
-		expect(await res.json()).toEqual({ epoch: 7 })
+		expect(await res.json()).toEqual({ epoch: 'tok-7' })
 		expect(res.headers.get('Cache-Control')).toBe('private, no-store')
 		expect(bump).toHaveBeenCalledWith(null)
 	})
 
 	it('reads the scope out of the body for a caller allowed to name one', async () => {
-		const bump = vi.fn(async () => 3)
+		const bump = vi.fn(async () => 'tok-3')
 		const res = await makeRefreshHandler()(
 			reqWith(runtimeWith({ epoch: epochStore({ bump }), platformRead: () => true }), {
 				bytes: encode({ scope: 'tenant-b' }),
@@ -69,7 +69,7 @@ describe('makeRefreshHandler', () => {
 	})
 
 	it('ignores a body that is not an object, rather than failing the refresh', async () => {
-		const bump = vi.fn(async () => 1)
+		const bump = vi.fn(async () => 'tok-1')
 		const res = await makeRefreshHandler()(
 			reqWith(runtimeWith({ epoch: epochStore({ bump }) }), { bytes: encode('nonsense') })
 		)
@@ -95,7 +95,7 @@ describe('makeRefreshHandler', () => {
 		expect(((await res.json()) as ErrorBody).error.code).toBe('invalid_param')
 	})
 
-	it('503s with a retry delay when the counter cannot be raised', async () => {
+	it('503s with a retry delay when the token cannot be written', async () => {
 		const res = await makeRefreshHandler()(
 			reqWith(
 				runtimeWith({
@@ -119,8 +119,8 @@ describe('makeRefreshHandler', () => {
 		expect(((await res.json()) as ErrorBody).error.code).toBe('unavailable')
 	})
 
-	it('401s an anonymous request before it reaches the counter', async () => {
-		const bump = vi.fn(async () => 1)
+	it('401s an anonymous request before it reaches the token store', async () => {
+		const bump = vi.fn(async () => 'tok-1')
 		const req = reqWith(runtimeWith({ epoch: epochStore({ bump }) }))
 		const res = await makeRefreshHandler()({
 			...req,
@@ -131,7 +131,7 @@ describe('makeRefreshHandler', () => {
 	})
 
 	it('403s a reader the access gate denies', async () => {
-		const bump = vi.fn(async () => 1)
+		const bump = vi.fn(async () => 'tok-1')
 		const res = await makeRefreshHandler()(
 			reqWith(runtimeWith({ epoch: epochStore({ bump }), readAccess: () => false }))
 		)

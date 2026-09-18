@@ -31,8 +31,8 @@ const goalKey = (goalSlugs: AnalyticsQuery['goalSlugs']): string[] => {
 }
 
 export interface CacheKeyOptions {
-	/** The scope's cache epoch; raising it retires every entry keyed on the old one. */
-	epoch?: number
+	/** The scope's cache epoch token; bumping it retires every entry keyed on the old one. */
+	epoch?: string
 }
 
 export function buildCacheKey(
@@ -51,7 +51,7 @@ export function buildCacheKey(
 		'analytics',
 		// Fixed second segment, always written, so there is one key format rather than two;
 		// its position keeps an adapter id spelled like an epoch from ever colliding with one.
-		`e${opts.epoch ?? 0}`,
+		`e${opts.epoch ?? '0'}`,
 		provider,
 		q.hostname ?? '_',
 		pathKey,

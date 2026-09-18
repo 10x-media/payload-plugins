@@ -41,6 +41,26 @@ declare module 'payload' {
 	}
 }
 
+/** How long a collection write waits on one cache epoch bump before giving up on it. */
+const EPOCH_BUMP_DEADLINE_MS = 2_000
+
+/**
+ * Settles with `work`, or rejects once `ms` has passed. A KV that hangs rather than failing
+ * would otherwise hold an editor's save open for as long as it hangs; the race keeps a
+ * handler on `work`, so a rejection arriving after the deadline stays handled.
+ */
+const withDeadline = async (work: Promise<unknown>, ms: number): Promise<void> => {
+	let timer: ReturnType<typeof setTimeout> | undefined
+	const deadline = new Promise<never>((_resolve, reject) => {
+		timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
+	})
+	try {
+		await Promise.race([work, deadline])
+	} finally {
+		clearTimeout(timer)
+	}
+}
+
 export const analytics = definePlugin<AnalyticsPluginOptions>({
 	slug: '@10x-media/analytics',
 	plugin: async ({ config, plugins: _plugins, ...options }): Promise<Config> => {
@@ -62,8 +82,9 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		/**
 		 * Retires the cached reads of every scope a collection write touched. Bound at init,
 		 * where the epoch store exists; goals defined in plugin config cannot change at
-		 * runtime, so only the collections ever bump. A failed bump is logged and swallowed:
-		 * an unreachable counter must never fail an editor's save.
+		 * runtime, so only the collections ever bump. A bump that fails or outlives its
+		 * deadline is logged and swallowed: an unreachable token store must never fail or
+		 * stall an editor's save.
 		 */
 		let bumpScopes: (change: ScopeChange) => Promise<void> = async () => {}
 		const providersResolve = resolved.providers.resolve
@@ -297,7 +318,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				}
 				for (const scope of scopes) {
 					try {
-						await epoch.bump(scope)
+						await withDeadline(epoch.bump(scope), EPOCH_BUMP_DEADLINE_MS)
 					} catch (err) {
 						payload.logger?.warn(
 							`analytics: cache epoch bump failed for scope "${scope ?? 'global'}", cached reads stay until their ttl: ${String(err)}`
