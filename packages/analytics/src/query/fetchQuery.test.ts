@@ -303,6 +303,21 @@ describe('fetchQuery', () => {
 		}
 	})
 
+	it('leaves error undefined for a code no release of this package ever sent', async () => {
+		vi.mocked(fetch).mockResolvedValue(
+			errorResponse(418, { error: { code: 'teapot', message: 'short and stout' } })
+		)
+
+		try {
+			await fetchQuery('/api', baseRequest)
+			throw new Error('expected fetchQuery to reject')
+		} catch (err) {
+			const queryErr = err as QueryFetchError
+			expect(queryErr.status).toBe(418)
+			expect(queryErr.error).toBeUndefined()
+		}
+	})
+
 	it('leaves error undefined for an error object missing code or message', async () => {
 		vi.mocked(fetch).mockResolvedValue(errorResponse(400, { error: { code: 'invalid_param' } }))
 

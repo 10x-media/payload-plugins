@@ -1,4 +1,5 @@
 import type { SerializedCapabilities } from '../../core/capabilities'
+import { readResponseError } from '../../plugin/errors'
 import { SOURCES_PATH } from '../../plugin/paths'
 
 export interface WireSource {
@@ -32,9 +33,15 @@ export const fetchSources = (
 	const hit = cache.get(key)
 	if (hit) return hit
 	const p = fetch(url, { credentials: 'include' })
-		.then((res) => {
-			if (!res.ok) throw new Error(`sources ${res.status}`)
-			return res.json() as Promise<SourcesResponse>
+		.then(async (res) => {
+			if (!res.ok) {
+				// The picker shows one failed state either way, so the code rides in the message
+				// rather than inventing a second: a denied listing and a down one read alike in
+				// the console otherwise.
+				const code = (await readResponseError(res))?.code
+				throw new Error(`analytics: sources ${res.status}${code ? ` ${code}` : ''}`)
+			}
+			return (await res.json()) as SourcesResponse
 		})
 		.catch((err) => {
 			cache.delete(key)

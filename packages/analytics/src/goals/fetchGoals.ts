@@ -1,3 +1,4 @@
+import { readResponseError } from '../plugin/errors'
 import { GOALS_PATH } from '../plugin/paths'
 import type { GoalSource } from './resolver'
 
@@ -32,9 +33,14 @@ export const fetchGoals = (
 	const hit = cache.get(key)
 	if (hit) return hit
 	const pending = fetch(url, { credentials: 'include' })
-		.then((res) => {
-			if (!res.ok) throw new Error(`goals ${res.status}`)
-			return res.json() as Promise<GoalsResponse>
+		.then(async (res) => {
+			if (!res.ok) {
+				// One failed state covers every refusal the picker can get, so the code rides in
+				// the message rather than becoming a second state nothing would render.
+				const code = (await readResponseError(res))?.code
+				throw new Error(`analytics: goals ${res.status}${code ? ` ${code}` : ''}`)
+			}
+			return (await res.json()) as GoalsResponse
 		})
 		.catch((err) => {
 			cache.delete(key)

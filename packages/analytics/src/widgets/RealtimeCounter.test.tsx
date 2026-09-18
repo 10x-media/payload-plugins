@@ -76,6 +76,41 @@ describe('RealtimeCounter', () => {
 		expect(screen.getByText(SAMPLED_LABEL)).toBeDefined()
 	})
 
+	it('stops polling once the endpoint refuses this reader, and still says paused', async () => {
+		const refused = {
+			ok: false,
+			json: () => Promise.resolve({ error: { code: 'forbidden', message: 'no' } }),
+		} as unknown as Response
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(() => Promise.resolve(refused))
+		)
+		render(<RealtimeCounter {...required} />)
+
+		await tick()
+		expect(screen.getByText('paused')).toBeDefined()
+		expect(fetch).toHaveBeenCalledTimes(1)
+
+		await tick()
+		expect(fetch).toHaveBeenCalledTimes(1)
+	})
+
+	it('keeps polling through an outage and recovers on the next reading', async () => {
+		const down = {
+			ok: false,
+			json: () => Promise.resolve({ error: { code: 'unavailable', message: 'down' } }),
+		} as unknown as Response
+		vi.stubGlobal('fetch', vi.fn().mockResolvedValueOnce(down).mockResolvedValueOnce(poll(11)))
+		render(<RealtimeCounter {...required} />)
+
+		await tick()
+		expect(screen.getByText('paused')).toBeDefined()
+
+		await tick()
+		expect(screen.getByText('11')).toBeDefined()
+		expect(fetch).toHaveBeenCalledTimes(2)
+	})
+
 	it('picks the flag up from a poll and drops it again on a clean one', async () => {
 		vi.stubGlobal(
 			'fetch',

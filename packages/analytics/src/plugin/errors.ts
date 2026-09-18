@@ -88,3 +88,16 @@ export const readError = (body: unknown): AnalyticsError | undefined => {
 /** The code an endpoint answered with, or undefined when the body is not the envelope. */
 export const readErrorCode = (body: unknown): AnalyticsErrorCode | undefined =>
 	readError(body)?.code
+
+/**
+ * {@link readError} over a response whose body has yet to be read. A body that is not JSON
+ * at all, including an empty one, reads as no error rather than throwing: the status still
+ * carries the failure.
+ */
+export const readResponseError = async (res: Response): Promise<AnalyticsError | undefined> => {
+	try {
+		return readError(await res.json())
+	} catch {
+		return undefined
+	}
+}
