@@ -6,7 +6,7 @@ import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
 import { makeRealtimeHandler } from '../../src/plugin/realtimeEndpoint'
 
-describeForDb('realtime endpoint', { dbs: ['mongo'] }, (db) => {
+describeForDb('realtime endpoint', {}, (db) => {
 	let booted: BootedPayload
 	beforeAll(async () => {
 		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
@@ -52,7 +52,7 @@ describeForDb('realtime endpoint', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb('realtime endpoint access control', { dbs: ['mongo'] }, (db) => {
+describeForDb('realtime endpoint access control', {}, (db) => {
 	let booted: BootedPayload
 	beforeAll(async () => {
 		booted = await bootPayload({
@@ -111,7 +111,7 @@ const failingRealtime = (): AnalyticsAdapter => {
 	}
 }
 
-describeForDb('realtime endpoint with a failing source', { dbs: ['mongo'] }, (db) => {
+describeForDb('realtime endpoint with a failing source', {}, (db) => {
 	let booted: BootedPayload
 	beforeAll(async () => {
 		booted = await bootPayload({ plugin: analytics({ adapters: [failingRealtime()] }), db })

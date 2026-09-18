@@ -27,7 +27,7 @@ const readOnlyVendor = () => ({
 	label: 'vendor',
 })
 
-describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics tracker endpoint', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -160,7 +160,7 @@ describeForDb('analytics tracker endpoint', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb('analytics tracker endpoint with query capture off', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics tracker endpoint with query capture off', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {

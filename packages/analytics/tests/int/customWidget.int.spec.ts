@@ -8,7 +8,7 @@ const slugs = (booted: BootedPayload): string[] =>
 		(w) => w.slug
 	)
 
-describeForDb('custom widget registration', { dbs: ['mongo'] }, (db) => {
+describeForDb('custom widget registration', {}, (db) => {
 	let supported: BootedPayload
 	let gatedOut: BootedPayload
 	beforeAll(async () => {

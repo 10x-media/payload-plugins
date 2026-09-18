@@ -6,7 +6,7 @@ import { kvCacheStore } from '../../src/surfacing/cacheStore'
 import { createEngine } from '../../src/surfacing/engine'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
-describeForDb('analytics engine integration', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics engine integration', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {

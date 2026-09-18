@@ -33,7 +33,7 @@ const pageview = (timestamp: string, visitor: string): StoredEvent => ({
 	timezone: TZ,
 })
 
-describeForDb('custom ranges in the reporting timezone', { dbs: ['mongo'] }, (db) => {
+describeForDb('custom ranges in the reporting timezone', {}, (db) => {
 	let booted: BootedPayload
 	let pageId: string
 	const fakeUser = { id: 'test-user', collection: 'users' } as unknown as TypedUser

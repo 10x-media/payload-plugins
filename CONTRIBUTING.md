@@ -67,7 +67,8 @@ Everything is safe to run in parallel across multiple git worktrees, with no per
 Integration tests use the `@10x-media/payload-test-harness` helpers:
 
 - `bootPayload({ plugin, db, seed?, collections?, configOverrides? })`: boots a real Payload instance on the given DB (`'mongo'` or `'postgres'`) and returns `{ payload, db, stop }`. Always call `stop()` in `afterAll`.
-- `describeForDb(name, { dbs? }, (db) => { ... })`: runs the block once per DB. Omit `dbs` to honor the `DB_MATRIX` env (defaults to Mongo); the `test:matrix` and `test:container` scripts set it to `mongo,postgres`.
+- `describeForDb(name, { dbs? }, (db) => { ... })`: runs the block once per DB. Omit `dbs` to honor the `DB_MATRIX` env (defaults to Mongo); `test:matrix` and `test:container` run the suite twice, once per lane. A `dbs` pin overrides the env, so a spec pinned to `['mongo']` never runs on Postgres: pin only what is genuinely single-DB, and say why in a comment.
+- A suite that boots Payload many times can share one Postgres server across the whole run instead of starting a container per boot: start `startSharedPostgresServer()` from a vitest `globalSetup` and publish its URL on `PAYLOAD_TEST_POSTGRES_SERVER` (see `packages/analytics/tests/setup/sharedPostgres.ts`). Each boot then takes its own database on it.
 - `expectForDb(db, { mongo, postgres })` and `skipForDb(...)`: assert or skip per adapter when behavior legitimately differs (for example, Mongo lacks native cascade deletes).
 
 ## Adding a plugin

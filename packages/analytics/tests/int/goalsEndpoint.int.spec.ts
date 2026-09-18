@@ -33,7 +33,7 @@ const configGoals = [
 	{ slug: 'signup', name: 'Signup', match: { kind: 'event' as const, name: 'signup' } },
 ]
 
-describeForDb('analytics goals endpoint', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics goals endpoint', {}, (db) => {
 	let booted: BootedPayload
 	let userA: Awaited<ReturnType<typeof login>>
 	let userB: Awaited<ReturnType<typeof login>>
@@ -193,7 +193,7 @@ describeForDb('analytics goals endpoint', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb('analytics goals endpoint - no collection', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics goals endpoint - no collection', {}, (db) => {
 	let booted: BootedPayload
 	let user: Awaited<ReturnType<typeof login>>
 

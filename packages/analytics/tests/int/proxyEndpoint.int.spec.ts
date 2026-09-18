@@ -61,7 +61,7 @@ const recordUpstream = (fetched: Fetched[]) => {
 	return [http.all(`${ASSETS}/*`, record), http.all(`${INGEST}/*`, record)]
 }
 
-describeForDb('analytics capture proxy endpoint', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics capture proxy endpoint', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -377,7 +377,7 @@ describeForDb('analytics capture proxy endpoint', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb('analytics capture proxy - undeclared paths', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics capture proxy - undeclared paths', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -444,7 +444,7 @@ describeForDb('analytics capture proxy - undeclared paths', { dbs: ['mongo'] }, 
 	})
 })
 
-describeForDb('analytics capture proxy - tenant slot', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics capture proxy - tenant slot', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -507,7 +507,7 @@ describeForDb('analytics capture proxy - tenant slot', { dbs: ['mongo'] }, (db) 
 
 // A dashboard-only PostHog install carries the private query key and nothing public, so it
 // must not get a public forward proxy to PostHog's ingest hosts.
-describeForDb('analytics capture proxy - read-only PostHog install', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics capture proxy - read-only PostHog install', {}, (db) => {
 	let booted: BootedPayload
 
 	// The vendor adapter mounts the proxy; the global slot names the read-only PostHog one,

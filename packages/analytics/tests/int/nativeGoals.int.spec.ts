@@ -20,7 +20,7 @@ const goals: Goal[] = [
 	},
 ]
 
-describeForDb('native goals: config goals through ingest to reads', { dbs: ['mongo'] }, (db) => {
+describeForDb('native goals: config goals through ingest to reads', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 	let range: { start: Date; end: Date }
