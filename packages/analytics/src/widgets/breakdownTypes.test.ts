@@ -3,10 +3,10 @@ import { DIMENSION_KEYS } from '../core/contract'
 import { BREAKDOWN_SPECS } from './breakdownTypes'
 
 describe('BREAKDOWN_SPECS', () => {
-	// 5 pre-existing (pages, sources, devices, countries, goals) + 5 new (referrers,
-	// browsers, os, campaigns, events); the spec's decision 3 enumerates both groups.
-	it('has ten entries', () => {
-		expect(BREAKDOWN_SPECS).toHaveLength(10)
+	// 5 pre-existing (pages, sources, devices, countries, goals) + 5 from the spec's decision 3
+	// (referrers, browsers, os, campaigns, events) + channels.
+	it('has eleven entries', () => {
+		expect(BREAKDOWN_SPECS).toHaveLength(11)
 	})
 
 	it('has unique slugs', () => {
@@ -25,10 +25,20 @@ describe('BREAKDOWN_SPECS', () => {
 		}
 	})
 
-	it('sets preferredDefault only on the goals and events specs', () => {
+	it('sets preferredDefault only where pageviews is the wrong question', () => {
 		const withDefault = BREAKDOWN_SPECS.filter((s) => s.preferredDefault)
 			.map((s) => s.slug)
 			.sort()
-		expect(withDefault).toEqual(['analytics-breakdown-events', 'analytics-breakdown-goals'])
+		expect(withDefault).toEqual([
+			'analytics-breakdown-channels',
+			'analytics-breakdown-events',
+			'analytics-breakdown-goals',
+		])
+	})
+
+	it('opens the channels card on visitors', () => {
+		const channels = BREAKDOWN_SPECS.find((s) => s.slug === 'analytics-breakdown-channels')
+		expect(channels?.dimension).toBe('channel')
+		expect(channels?.preferredDefault).toBe('visitors')
 	})
 })

@@ -30,6 +30,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.widgetTrendLabel]: 'الاتجاه',
 	[keys.widgetBreakdownPages]: 'أهم الصفحات',
 	[keys.widgetBreakdownSources]: 'أهم المصادر',
+	[keys.widgetBreakdownChannels]: 'القنوات',
 	[keys.widgetBreakdownDevices]: 'الأجهزة',
 	[keys.widgetBreakdownCountries]: 'الدول',
 	[keys.widgetBreakdownGoals]: 'الأهداف',

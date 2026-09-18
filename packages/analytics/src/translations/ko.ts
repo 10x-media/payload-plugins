@@ -30,6 +30,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.widgetTrendLabel]: '추이',
 	[keys.widgetBreakdownPages]: '인기 페이지',
 	[keys.widgetBreakdownSources]: '인기 유입 경로',
+	[keys.widgetBreakdownChannels]: '채널',
 	[keys.widgetBreakdownDevices]: '기기',
 	[keys.widgetBreakdownCountries]: '국가',
 	[keys.widgetBreakdownGoals]: '목표',

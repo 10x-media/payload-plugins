@@ -30,6 +30,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.widgetTrendLabel]: '趋势',
 	[keys.widgetBreakdownPages]: '热门页面',
 	[keys.widgetBreakdownSources]: '热门来源',
+	[keys.widgetBreakdownChannels]: '渠道',
 	[keys.widgetBreakdownDevices]: '设备',
 	[keys.widgetBreakdownCountries]: '国家/地区',
 	[keys.widgetBreakdownGoals]: '目标',

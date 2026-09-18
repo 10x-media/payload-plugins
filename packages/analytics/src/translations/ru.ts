@@ -30,6 +30,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.widgetTrendLabel]: 'Динамика',
 	[keys.widgetBreakdownPages]: 'Топ страниц',
 	[keys.widgetBreakdownSources]: 'Топ источников',
+	[keys.widgetBreakdownChannels]: 'Каналы привлечения',
 	[keys.widgetBreakdownDevices]: 'Устройства',
 	[keys.widgetBreakdownCountries]: 'Страны',
 	[keys.widgetBreakdownGoals]: 'Цели',

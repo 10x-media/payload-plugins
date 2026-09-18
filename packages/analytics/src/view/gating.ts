@@ -44,16 +44,15 @@ export const BREAKDOWN_TABS: BreakdownTab[] = [
  * which the reader changes through the breakdown's group-by picker, so the order decides what
  * a link carrying no `dim` opens on and is not free to change.
  *
- * `sources` leads with `source` rather than `referrer`: for a provider serving both (Plausible,
- * GA4) that moves the tab's default off the referring host it used to open on, which is the one
- * default this ordering does move. It is the right one: `source` is what every source serves,
- * and `referrer` is one pick away.
+ * `sources` leads with `channel` rather than `referrer`: a channel mix is the acquisition
+ * question a reader opens this tab to ask, and it answers in a dozen buckets where the origins
+ * below it run to hundreds of rows. `source` and `referrer` are each one pick away.
  */
 export const TAB_DIMENSIONS: Record<BreakdownTab, DimensionKey[]> = {
 	pages: ['page'],
 	sources: [
-		'source',
 		'channel',
+		'source',
 		'referrer',
 		'medium',
 		'campaign',
