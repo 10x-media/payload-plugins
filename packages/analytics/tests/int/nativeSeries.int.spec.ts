@@ -4,6 +4,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
+import { CHANNEL_TAXONOMY_VERSION } from '../../src/native/ingest/source'
 import { native } from '../../src/native/nativeAdapter'
 import { readForWidgetSeries } from '../../src/widgets/readForWidgetSeries'
 
@@ -18,6 +19,8 @@ const pageview = (daysAgo: number, visitor: string): StoredEvent => ({
 	visitorHash: visitor,
 	sessionId: `${visitor}-s`,
 	durationMs: 1000,
+	channel: 'direct',
+	channelVersion: CHANNEL_TAXONOMY_VERSION,
 })
 
 describeForDb('native time-series query', {}, (db) => {

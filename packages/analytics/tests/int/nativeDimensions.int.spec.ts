@@ -19,6 +19,7 @@ const CAMPAIGN_QUERY =
 /** The dimensions this branch adds, with the value each fixture ingest should report. */
 const ADDED: ReadonlyArray<readonly [DimensionKey, string]> = [
 	['referrer', 'example.org'],
+	['channel', 'email'],
 	['region', 'CA'],
 	['city', 'San Francisco'],
 	['browser', 'chrome'],
@@ -168,9 +169,11 @@ describeForDb('native dimensions: ingest to breakdowns', {}, (db) => {
 			{ 'user-agent': `${CHROME_MAC} internal` }
 		)
 		expect(Object.keys(await breakdown('referrer'))).toEqual(['example.org'])
-		// The campaign visitors' referrer is external but their `utm_medium` is email, which
-		// outranks it; the plain visitor and this internal hop are the only direct ones.
-		expect(await breakdown('source')).toMatchObject({ direct: 2, email: 2 })
+		// `source` names the origin, so the campaign visitors report their `utm_source`; the
+		// plain visitor and this internal hop have none and read as direct.
+		expect(await breakdown('source')).toMatchObject({ direct: 2, newsletter: 2 })
+		// The same two visitors' `utm_medium` is email, which outranks their referrer host.
+		expect(await breakdown('channel')).toMatchObject({ direct: 2, email: 2 })
 	})
 
 	it('answers 202 and stores no referrer for a body whose referrer is not a string', async () => {

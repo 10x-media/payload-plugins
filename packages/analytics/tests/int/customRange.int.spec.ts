@@ -4,6 +4,7 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { analytics } from '../../src/index'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
+import { CHANNEL_TAXONOMY_VERSION } from '../../src/native/ingest/source'
 import { native } from '../../src/native/nativeAdapter'
 import { DOCUMENT_PATH } from '../../src/plugin/paths'
 import { getRuntime } from '../../src/plugin/runtime'
@@ -29,6 +30,8 @@ const pageview = (timestamp: string, visitor: string): StoredEvent => ({
 	hostname: 'example.com',
 	visitorHash: visitor,
 	sessionId: `${visitor}-s`,
+	channel: 'direct',
+	channelVersion: CHANNEL_TAXONOMY_VERSION,
 	// Ingest stamps the reporting timezone on each event so rollups bucket on that zone's day.
 	timezone: TZ,
 })

@@ -312,6 +312,8 @@ export interface AnalyticsEvent {
   browser?: string | null;
   os?: string | null;
   source?: string | null;
+  channel?: string | null;
+  channelVersion?: number | null;
   utmSource?: string | null;
   utmMedium?: string | null;
   utmCampaign?: string | null;
@@ -770,6 +772,8 @@ export interface AnalyticsEventsSelect<T extends boolean = true> {
   browser?: T;
   os?: T;
   source?: T;
+  channel?: T;
+  channelVersion?: T;
   utmSource?: T;
   utmMedium?: T;
   utmCampaign?: T;

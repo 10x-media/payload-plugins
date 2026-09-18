@@ -183,6 +183,7 @@ export const keys = {
 	viewDimensionPage: 'analytics:viewDimensionPage',
 	viewDimensionReferrer: 'analytics:viewDimensionReferrer',
 	viewDimensionSource: 'analytics:viewDimensionSource',
+	viewDimensionChannel: 'analytics:viewDimensionChannel',
 	viewDimensionMedium: 'analytics:viewDimensionMedium',
 	viewDimensionCampaign: 'analytics:viewDimensionCampaign',
 	viewDimensionUtmSource: 'analytics:viewDimensionUtmSource',
@@ -200,11 +201,17 @@ export const keys = {
 	viewDimensionEvent: 'analytics:viewDimensionEvent',
 	viewDimensionGoal: 'analytics:viewDimensionGoal',
 	channelDirect: 'analytics:channelDirect',
-	channelSearch: 'analytics:channelSearch',
-	channelSocial: 'analytics:channelSocial',
+	channelOrganicSearch: 'analytics:channelOrganicSearch',
+	channelPaidSearch: 'analytics:channelPaidSearch',
+	channelOrganicSocial: 'analytics:channelOrganicSocial',
+	channelPaidSocial: 'analytics:channelPaidSocial',
+	channelOrganicVideo: 'analytics:channelOrganicVideo',
+	channelPaidVideo: 'analytics:channelPaidVideo',
 	channelEmail: 'analytics:channelEmail',
-	channelPaid: 'analytics:channelPaid',
+	channelAffiliate: 'analytics:channelAffiliate',
+	channelDisplay: 'analytics:channelDisplay',
 	channelReferral: 'analytics:channelReferral',
+	channelPaidOther: 'analytics:channelPaidOther',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

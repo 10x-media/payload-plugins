@@ -226,21 +226,30 @@ describe('AnalyticsBreakdownWidget filter', () => {
 		expect(html).not.toContain('analytics:stateFiltersUnapplied')
 	})
 
-	it('names a native source row as a channel', async () => {
+	it('names the native direct source, which is the one origin that is not a name', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({ provider: 'native', rows: [{ label: 'direct', value: 9 }] })
+		)
+		const html = await render('analytics-breakdown-sources')
+		expect(html).toContain('analytics:channelDirect')
+	})
+
+	it('leaves a native source row that is a utm_source tag as it was stored', async () => {
 		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
 			result({ provider: 'native', rows: [{ label: 'email', value: 9 }] })
 		)
 		const html = await render('analytics-breakdown-sources')
-		expect(html).toContain('analytics:channelEmail')
-	})
-
-	it('leaves a provider source row as the raw utm_source it is', async () => {
-		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
-			result({ provider: 'plausible', rows: [{ label: 'email', value: 9 }] })
-		)
-		const html = await render('analytics-breakdown-sources')
 		expect(html).not.toContain('analytics:channelEmail')
 		expect(html).toContain('email')
+	})
+
+	it('leaves a provider source row as the raw value it is', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({ provider: 'plausible', rows: [{ label: 'direct', value: 9 }] })
+		)
+		const html = await render('analytics-breakdown-sources')
+		expect(html).not.toContain('analytics:channelDirect')
+		expect(html).toContain('direct')
 	})
 
 	it('says the goals could not be read instead of showing an empty goal table', async () => {

@@ -14,7 +14,7 @@ import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
-import type { TrafficChannel } from '../../src/native/ingest/source'
+import { CHANNEL_TAXONOMY_VERSION, type TrafficChannel } from '../../src/native/ingest/source'
 import { native } from '../../src/native/nativeAdapter'
 import { applyRollupDeltas } from '../../src/native/rollups/applyRollupDeltas'
 import { bucketKey } from '../../src/native/rollups/bucketKey'
@@ -323,6 +323,8 @@ describeForDb('native distinct counting', {}, (db) => {
 				hostname: 'h',
 				visitorHash,
 				sessionId: `sess-${visitorHash}`,
+				channel: 'direct',
+				channelVersion: CHANNEL_TAXONOMY_VERSION,
 				country,
 				durationMs: 100,
 			},
@@ -410,6 +412,8 @@ describeForDb('native flushBatch parity with the serial write path', {}, (db) =>
 			os: 'macos',
 			language: 'en-us',
 			source: 'example.org',
+			channel: 'referral',
+			channelVersion: CHANNEL_TAXONOMY_VERSION,
 			referrerHost: 'example.org',
 			utmSource: 'newsletter',
 			utmCampaign: 'spring',
@@ -426,6 +430,8 @@ describeForDb('native flushBatch parity with the serial write path', {}, (db) =>
 			device: 'desktop',
 			browser: 'chrome',
 			os: 'macos',
+			channel: 'direct',
+			channelVersion: CHANNEL_TAXONOMY_VERSION,
 		},
 		{
 			timestamp: new Date(`${day}T11:00:00Z`),
@@ -440,6 +446,8 @@ describeForDb('native flushBatch parity with the serial write path', {}, (db) =>
 			browser: 'firefox',
 			os: 'android',
 			language: 'de-de',
+			channel: 'direct',
+			channelVersion: CHANNEL_TAXONOMY_VERSION,
 		},
 		{
 			timestamp: new Date(`${day}T11:10:00Z`),
@@ -449,6 +457,8 @@ describeForDb('native flushBatch parity with the serial write path', {}, (db) =>
 			hostname: 'two.example',
 			visitorHash: 'p-v2',
 			sessionId: 'p-s2',
+			channel: 'direct',
+			channelVersion: CHANNEL_TAXONOMY_VERSION,
 		},
 		{
 			timestamp: new Date(`${day}T11:20:00Z`),
@@ -458,6 +468,8 @@ describeForDb('native flushBatch parity with the serial write path', {}, (db) =>
 			hostname: 'two.example',
 			visitorHash: 'p-v3',
 			sessionId: 'p-s3',
+			channel: 'direct',
+			channelVersion: CHANNEL_TAXONOMY_VERSION,
 			goals: [{ slug: 'purchase', value: 25.5 }],
 		},
 	]
@@ -547,6 +559,8 @@ describeForDb('native flushBatch coalescing', {}, (db) => {
 		visitorHash,
 		sessionId: `sess-${visitorHash}`,
 		durationMs: 100,
+		channel: 'direct',
+		channelVersion: CHANNEL_TAXONOMY_VERSION,
 	})
 
 	it(`coalesces a batch into correct per-page rollups on ${db}`, async () => {
@@ -784,21 +798,68 @@ describeForDb('native dimension columns and breakdowns', {}, (db) => {
 	})
 })
 
-describeForDb('native source channels', {}, (db) => {
+describeForDb('native channels and sources', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 
+	interface Hit {
+		path: string
+		referrer?: string
+		query?: string
+	}
+
 	// One hit per channel, each reaching the classifier through the real ingest endpoint, so
-	// every bucket the `source` dimension can hold is written and read back on either database.
-	const hits: ReadonlyArray<
-		readonly [TrafficChannel, { path: string; referrer?: string; query?: string }]
-	> = [
-		['direct', { path: '/direct' }],
-		['search', { path: '/search', referrer: 'https://www.google.com/search?q=x' }],
-		['social', { path: '/social', referrer: 'https://t.co/abc' }],
-		['email', { path: '/email', query: 'utm_source=newsletter&utm_medium=email' }],
-		['paid', { path: '/paid', referrer: 'https://www.bing.com/', query: 'msclkid=abc' }],
-		['referral', { path: '/referral', referrer: 'https://news.ycombinator.com/item?id=1' }],
+	// every bucket the `channel` dimension can hold is written and read back on either
+	// database, beside the named origin the same hit puts in `source`.
+	const hits: ReadonlyArray<readonly [TrafficChannel, string, Hit]> = [
+		['direct', 'direct', { path: '/direct' }],
+		[
+			'organic-search',
+			'google.com',
+			{ path: '/organic-search', referrer: 'https://www.google.com/search?q=x' },
+		],
+		[
+			'paid-search',
+			'bing.com',
+			{ path: '/paid-search', referrer: 'https://www.bing.com/', query: 'msclkid=abc' },
+		],
+		['organic-social', 't.co', { path: '/organic-social', referrer: 'https://t.co/abc' }],
+		[
+			'paid-social',
+			'facebook',
+			{
+				path: '/paid-social',
+				referrer: 'https://m.facebook.com/',
+				query: 'utm_source=facebook&utm_medium=cpc',
+			},
+		],
+		[
+			'organic-video',
+			'youtube.com',
+			{ path: '/organic-video', referrer: 'https://www.youtube.com/watch?v=x' },
+		],
+		[
+			'paid-video',
+			'youtu.be',
+			{ path: '/paid-video', referrer: 'https://youtu.be/x', query: 'utm_medium=paid-video' },
+		],
+		['email', 'newsletter', { path: '/email', query: 'utm_source=newsletter&utm_medium=email' }],
+		[
+			'affiliate',
+			'partner-co',
+			{ path: '/affiliate', query: 'utm_source=partner-co&utm_medium=affiliate' },
+		],
+		['display', 'adnet', { path: '/display', query: 'utm_source=adnet&utm_medium=banner' }],
+		[
+			'referral',
+			'news.ycombinator.com',
+			{ path: '/referral', referrer: 'https://news.ycombinator.com/item?id=1' },
+		],
+		[
+			'paid-other',
+			'ads.example',
+			{ path: '/paid-other', referrer: 'https://ads.example/x', query: 'utm_medium=cpc' },
+		],
 	]
 
 	beforeAll(async () => {
@@ -809,7 +870,7 @@ describeForDb('native source channels', {}, (db) => {
 		if (!endpoint || typeof endpoint.handler !== 'function') {
 			throw new Error('ingest endpoint not registered')
 		}
-		for (const [, hit] of hits) {
+		for (const [, , hit] of hits) {
 			const res = await endpoint.handler(
 				ingestRequest(
 					booted.payload,
@@ -825,8 +886,8 @@ describeForDb('native source channels', {}, (db) => {
 		await booted.stop()
 	})
 
-	it(`stores the channel, not the referrer host, on ${db}`, async () => {
-		for (const [channel, hit] of hits) {
+	it(`stores the channel beside the named origin on ${db}`, async () => {
+		for (const [channel, source, hit] of hits) {
 			const { docs } = await booted.payload.find({
 				collection: EVENTS_SLUG as never,
 				where: { path: { equals: hit.path } } as never,
@@ -834,32 +895,63 @@ describeForDb('native source channels', {}, (db) => {
 				overrideAccess: true,
 			})
 			expect(docs).toHaveLength(1)
-			expect(docs[0]).toMatchObject({ source: channel })
+			expect(docs[0]).toMatchObject({ channel, source, channelVersion: CHANNEL_TAXONOMY_VERSION })
 		}
 	})
 
 	it(`serves a rollup and a raw-event breakdown per channel on ${db}`, async () => {
 		const range = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
 		const rollups = await adapter.query(
-			{ metrics: ['pageviews'], dimensions: ['source'], dateRange: range },
+			{ metrics: ['pageviews'], dimensions: ['channel'], dateRange: range },
 			{}
 		)
 		expect(
-			Object.fromEntries(rollups.rows.map((row) => [row.dimensions?.source, row.metrics.pageviews]))
+			Object.fromEntries(
+				rollups.rows.map((row) => [row.dimensions?.channel, row.metrics.pageviews])
+			)
 		).toEqual(Object.fromEntries(hits.map(([channel]) => [channel, 1])))
 		for (const [channel] of hits) {
 			// A filter forces the raw-event path, which must agree with the rollups.
 			const events = await adapter.query(
 				{
 					metrics: ['pageviews'],
-					dimensions: ['source'],
+					dimensions: ['channel'],
 					dateRange: range,
-					filters: [{ dimension: 'source', operator: 'eq', value: channel }],
+					filters: [{ dimension: 'channel', operator: 'eq', value: channel }],
 				},
 				{}
 			)
-			expect(events.rows).toEqual([{ dimensions: { source: channel }, metrics: { pageviews: 1 } }])
+			expect(events.rows).toEqual([{ dimensions: { channel }, metrics: { pageviews: 1 } }])
 		}
+	})
+
+	it(`breaks the same hits down by their named origin on ${db}`, async () => {
+		const range = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
+		const expected: Record<string, number> = {}
+		for (const [, source] of hits) {
+			expected[source] = (expected[source] ?? 0) + 1
+		}
+		const rollups = await adapter.query(
+			{ metrics: ['pageviews'], dimensions: ['source'], dateRange: range },
+			{}
+		)
+		expect(
+			Object.fromEntries(rollups.rows.map((row) => [row.dimensions?.source, row.metrics.pageviews]))
+		).toEqual(expected)
+	})
+
+	it(`filters channels with contains as well as eq on ${db}`, async () => {
+		const range = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
+		const paid = await adapter.query(
+			{
+				metrics: ['pageviews'],
+				dateRange: range,
+				filters: [{ dimension: 'channel', operator: 'contains', value: 'paid-' }],
+			},
+			{}
+		)
+		// paid-search, paid-social, paid-video and paid-other, and no organic row with them.
+		expect(paid.totals).toEqual({ pageviews: 4 })
 	})
 })
 
@@ -1168,6 +1260,8 @@ describeForDb('custom range end bound', {}, (db) => {
 		hostname: 'h',
 		visitorHash: visitor,
 		sessionId: `${visitor}-s`,
+		channel: 'direct',
+		channelVersion: CHANNEL_TAXONOMY_VERSION,
 		timezone: TZ,
 	})
 

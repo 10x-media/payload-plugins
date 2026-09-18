@@ -57,14 +57,17 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 	'scrollDepth',
 ])
 /**
- * Everything the tracker can know about a hit. `source` is the traffic channel (`direct`,
- * `search`, `social`, `email`, `paid`, `referral`) and `referrer` the host it came from, so a
- * report can ask how much of the month was paid without reading a list of hostnames.
+ * Everything the tracker can know about a hit. `source` is the visit's named origin (its
+ * `utm_source`, else the referrer host, else `direct`), `channel` the acquisition channel that
+ * origin classifies into (`organic-search`, `paid-social`, ...) and `referrer` the host it came
+ * from, so a report can ask how much of the month was paid search without reading a list of
+ * hostnames.
  */
 const dimensions: ReadonlySet<DimensionKey> = new Set([
 	'page',
 	'referrer',
 	'source',
+	'channel',
 	'utmSource',
 	'utmMedium',
 	'utmCampaign',
