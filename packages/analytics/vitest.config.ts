@@ -18,6 +18,9 @@ export default mergeConfig(
 	sharedVitestConfig,
 	defineConfig({
 		test: {
+			// One Postgres server for the whole run instead of one per Payload boot; a no-op
+			// unless DB_MATRIX asks for Postgres.
+			globalSetup: ['./tests/setup/sharedPostgres.ts'],
 			projects: [
 				{
 					extends: true,
