@@ -386,9 +386,18 @@ if (!res.ok) {
 }
 ```
 
+`readResponseError` is the same read over a `Response` nothing has parsed yet, so the `catch` above is not yours to write: it answers the whole error (`code`, `message` and `param`), and `undefined` for a body that is not JSON, an empty one and an already-consumed one included, rather than throwing.
+
+```ts
+import { readResponseError } from '@10x-media/analytics/client'
+
+const res = await fetch(`${api}/analytics/sources`, { credentials: 'include' })
+const error = res.ok ? undefined : await readResponseError(res)
+```
+
 `fetchQuery` and `refreshCache` already do this: `QueryFetchError.error` is the same parsed envelope. The plugin's own pickers and the realtime counter read the code the same way, which is why the counter stops polling on a `401` or a `403` and keeps polling through a `503`.
 
-`readErrorCode` is exported from `@10x-media/analytics/client` and `@10x-media/analytics/types`, both of which also export the `AnalyticsError` and `AnalyticsErrorCode` types; `ANALYTICS_ERROR_CODES` comes from `@10x-media/analytics/types` and the package root, and the builder `analyticsError` from the root. `QueryError` and `QueryErrorCode` are aliases of `AnalyticsError` and `AnalyticsErrorCode`, kept so existing imports keep compiling.
+`readErrorCode` is exported from `@10x-media/analytics/client` and `@10x-media/analytics/types`, both of which also export the `AnalyticsError` and `AnalyticsErrorCode` types; `readResponseError` from `@10x-media/analytics/client`; `ANALYTICS_ERROR_CODES` comes from `@10x-media/analytics/types` and the package root, and the builder `analyticsError` from the root. `QueryError` and `QueryErrorCode` are aliases of `AnalyticsError` and `AnalyticsErrorCode`, kept so existing imports keep compiling.
 
 ### The one endpoint with no envelope
 

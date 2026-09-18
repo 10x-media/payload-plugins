@@ -29,6 +29,7 @@ export {
 	type AnalyticsError,
 	type AnalyticsErrorCode,
 	readErrorCode,
+	readResponseError,
 } from '../plugin/errors'
 export {
 	buildQueryUrl,
