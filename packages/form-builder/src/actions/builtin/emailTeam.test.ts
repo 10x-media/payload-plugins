@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from 'vitest'
 import type { SubmissionValue } from '../../submissions/types'
 import { makeRenderBody } from '../body/serializeBody'
 import type { ActionRunArgs } from '../defineAction'
+import type { EmailRenderArgs } from '../emailRender'
 import type { RecipientSource } from '../recipientSources'
+import { buildConfirmation } from './confirmation'
 import { buildEmailTeam, emailTeam } from './emailTeam'
 
 const form = { id: 'form-1', title: 'Test Form' }
@@ -30,6 +32,60 @@ const baseArgs = (overrides: Partial<ActionRunArgs<Record<string, unknown>>> = {
 		...overrides,
 	} as ActionRunArgs<Record<string, unknown>>
 }
+
+describe('email.render', () => {
+	it('wraps the serialized body with the subject, locale, action type, and raw body', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof emailTeam.run>[0]['payload']
+		const render = vi.fn(
+			({ html, subject, locale: l, actionType }: EmailRenderArgs) =>
+				`<main lang="${l}" data-action="${actionType}" title="${subject}">${html}</main>`
+		)
+		const action = buildEmailTeam({ localize: true, render })
+
+		await action.run(
+			baseArgs({
+				config: { to: ['team@example.com'], subject: 'Hi {{name}}', body: 'From {{name}}' },
+				values: [{ field: 'name', value: 'Ada' }],
+				payload,
+				locale: 'de',
+			})
+		)
+
+		expect(render).toHaveBeenCalledWith(
+			expect.objectContaining({
+				body: 'From {{name}}',
+				form,
+				submissionId,
+				values: [{ field: 'name', value: 'Ada' }],
+			})
+		)
+		expect(sendEmail).toHaveBeenCalledWith({
+			to: 'team@example.com',
+			subject: 'Hi Ada',
+			html: '<main lang="de" data-action="emailTeam" title="Hi Ada">From Ada</main>',
+		})
+	})
+
+	it('runs for the confirmation too and fails the action when it throws', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		const payload = { sendEmail } as unknown as Parameters<typeof emailTeam.run>[0]['payload']
+		const render = vi.fn().mockRejectedValue(new Error('template down'))
+		const action = buildConfirmation({ localize: true, render })
+
+		await expect(
+			action.run(
+				baseArgs({
+					config: { toField: 'email', subject: 'Thanks', body: 'x' },
+					values: [{ field: 'email', value: 'a@b.com' }],
+					payload,
+				})
+			)
+		).rejects.toThrow('template down')
+		expect(render).toHaveBeenCalledWith(expect.objectContaining({ actionType: 'confirmation' }))
+		expect(sendEmail).not.toHaveBeenCalled()
+	})
+})
 
 describe('emailTeam', () => {
 	it('calls sendEmail with interpolated subject and legacy string body', async () => {

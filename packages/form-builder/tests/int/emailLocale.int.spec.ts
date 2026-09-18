@@ -3,6 +3,7 @@ import type { PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import type { SerializeBodyArgs } from '../../src/actions/body/serializeBody'
 import { buildDefaultActionDefinitions } from '../../src/actions/builtin'
+import type { EmailRenderArgs } from '../../src/actions/emailRender'
 import { resolveActions } from '../../src/actions/registry'
 import { runActionsForSubmission } from '../../src/actions/task'
 import { formBuilder } from '../../src/index'
@@ -16,10 +17,12 @@ describeForDb('form-builder email locale', { dbs: ['mongo'] }, (db) => {
 	const serialize = vi.fn(({ body, locale, actionType }: SerializeBodyArgs) => {
 		return `<div lang="${locale}" data-action="${actionType}">${String(body)}</div>`
 	})
+	// Wraps whatever serialize produced, so the assertions below prove the two compose.
+	const render = ({ html, subject }: EmailRenderArgs) => `<main title="${subject}">${html}</main>`
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: formBuilder({ richText: { serialize } }),
+			plugin: formBuilder({ richText: { serialize }, email: { render } }),
 			db,
 			configOverrides: { localization },
 		})
@@ -71,7 +74,7 @@ describeForDb('form-builder email locale', { dbs: ['mongo'] }, (db) => {
 		serialize.mockClear()
 		await runActionsForSubmission({
 			input: { formId: form.id, submissionId: submission.id },
-			registry: resolveActions(buildDefaultActionDefinitions({ localize: true })),
+			registry: resolveActions(buildDefaultActionDefinitions({ localize: true, render })),
 			payload: booted.payload,
 			// The job runner's request carries another locale; the submission's own must win.
 			req: { locale: 'en', payload: booted.payload } as unknown as PayloadRequest,
@@ -86,14 +89,14 @@ describeForDb('form-builder email locale', { dbs: ['mongo'] }, (db) => {
 			expect.objectContaining({
 				to: 'team@example.com',
 				subject: 'Neu',
-				html: '<div lang="de" data-action="emailTeam">team de</div>',
+				html: '<main title="Neu"><div lang="de" data-action="emailTeam">team de</div></main>',
 			})
 		)
 		expect(sendEmail).toHaveBeenCalledWith(
 			expect.objectContaining({
 				to: 'visitor@example.com',
 				subject: 'Danke',
-				html: '<div lang="de" data-action="confirmation">visitor de</div>',
+				html: '<main title="Danke"><div lang="de" data-action="confirmation">visitor de</div></main>',
 			})
 		)
 	})
