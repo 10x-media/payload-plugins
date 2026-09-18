@@ -199,9 +199,11 @@ That last rule cuts both ways. A platform reader passing `scope=<tenant>` for a 
 
 ### Refresh endpoint
 
-The [refresh endpoint](/analytics/data-sources#refresh-endpoint) retires cached reads rather than serving them, and it is gated on the same two rules: `access.read` first, then scope. A caller that names no scope refreshes its own resolved scope, which is what the **Refresh** button in the analytics view sends. Naming any scope in the body requires `access.platformRead`, and anyone else gets `400 untrusted_scope`, so a tenant can neither retire another tenant's cache nor learn that the scope exists.
+The [refresh endpoint](/analytics/data-sources#refresh-endpoint) retires cached reads rather than serving them, and it decides scope through the same code the query endpoint reads with, so it refuses every request that endpoint refuses. `access.read` gates it first, then scope. A caller that names no scope refreshes its own resolved scope, which is what the **Refresh** button in the analytics view sends. Naming any scope in the body requires `access.platformRead`, and anyone else gets `400 untrusted_scope`, so a tenant can neither retire another tenant's cache nor learn that the scope exists.
 
-`scope: '*'` bumps the install-wide [cache epoch](/analytics/cache#invalidation), not every tenant's. That is the token a cross-scope read's entries key on, including a platform reader's scoped read through a shared config adapter that cannot narrow the query. Retiring one tenant's entries means naming that tenant.
+A request that resolves no scope at all on a scoped install is refused the same way, with `400 untrusted_scope`, unless the caller has `access.platformRead`. It is the rule the query endpoint applies when it answers `404 unknown_source`: `null` means no tenant is selected rather than "everything". Without it, any authenticated reader with no tenant selected could retire the install-wide cache on demand.
+
+`scope: '*'` bumps the install-wide [cache epoch](/analytics/cache#invalidation) and nothing else. That is the token a cross-scope read's entries key on, including a platform reader's scoped read through a shared config adapter that cannot narrow the query. A tenant's own reads key on that tenant's token, so the wildcard does not refresh them: retiring one tenant's entries means naming that tenant.
 
 Saving or deleting a provider or goal document bumps that document's scope on its own, with no request and no gate, so an editor correcting their own tenant's credentials never needs the endpoint.
 
