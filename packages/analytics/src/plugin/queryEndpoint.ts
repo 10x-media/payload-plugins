@@ -7,14 +7,13 @@ import {
 	PLATFORM_SCOPE,
 } from '../core/contract'
 import { resolveQueryScope, resolveRequestedScope } from '../core/scopedRead'
-import { queryError } from '../query/errors'
 import { parseQueryParams, readParam } from '../query/parse'
 import type { QueryResponse, SerializedAnalyticsQuery } from '../query/response'
 import { previousWindow, withinLookback } from '../widgets/comparison'
+import { analyticsError, errorResponse, NO_STORE, RETRY_AFTER } from './errors'
 import { goalSlugsFor } from './goalHint'
 import { QUERY_PATH } from './paths'
 import { resolveSourcesForRequest } from './readContextForRequest'
-import { errorResponse, NO_STORE, RETRY_AFTER } from './responses'
 import { getRuntime, platformReadGate, readAccessFor, resolveTimezoneFor } from './runtime'
 
 export { QUERY_PATH }
@@ -46,18 +45,22 @@ export const serializeQuery = (query: AnalyticsQuery): SerializedAnalyticsQuery 
  */
 export const makeQueryHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
-		return errorResponse(401, queryError('unauthorized', 'analytics: authentication required'))
+		return errorResponse(401, analyticsError('unauthorized', 'analytics: authentication required'))
 	}
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
 		// Both `unavailable` answers are retryable, so both carry the same delay: a client
 		// backs off identically whether the plugin is still booting or a provider is down.
-		return errorResponse(503, queryError('unavailable', 'analytics: not available'), RETRY_AFTER)
+		return errorResponse(
+			503,
+			analyticsError('unavailable', 'analytics: not available'),
+			RETRY_AFTER
+		)
 	}
 	let adapterId = 'unresolved'
 	try {
 		if (!(await readAccessFor(runtime, req))) {
-			return errorResponse(403, queryError('forbidden', 'analytics: read access denied'))
+			return errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
 		}
 		const params = new URL(req.url ?? '', 'http://localhost').searchParams
 		const platformRead = platformReadGate(runtime, req)
@@ -73,7 +76,7 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			return requested.reason === 'named'
 				? errorResponse(
 						400,
-						queryError(
+						analyticsError(
 							'untrusted_scope',
 							'analytics: scope is not permitted for this request',
 							'scope'
@@ -81,20 +84,23 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 					)
 				: errorResponse(
 						404,
-						queryError('unknown_source', 'analytics: no source is available for this request')
+						analyticsError('unknown_source', 'analytics: no source is available for this request')
 					)
 		}
 		const context = await resolveSourcesForRequest(req, { platformRead, scope: requested.scope })
 		if (context.adapters.size === 0) {
 			return errorResponse(
 				404,
-				queryError('unknown_source', 'analytics: no source is available for this request')
+				analyticsError('unknown_source', 'analytics: no source is available for this request')
 			)
 		}
 		const requestedSource = readParam(params, 'source')
 		const adapter = context.adapters.get(requestedSource ?? context.defaultId ?? '')
 		if (!adapter) {
-			return errorResponse(404, queryError('unknown_source', 'analytics: unknown source', 'source'))
+			return errorResponse(
+				404,
+				analyticsError('unknown_source', 'analytics: unknown source', 'source')
+			)
 		}
 		adapterId = adapter.id
 		const queryScope = await resolveQueryScope({
@@ -107,7 +113,11 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 		if (!queryScope.ok) {
 			return errorResponse(
 				403,
-				queryError('forbidden', 'analytics: this source cannot be read for your scope', 'source')
+				analyticsError(
+					'forbidden',
+					'analytics: this source cannot be read for your scope',
+					'source'
+				)
 			)
 		}
 		const capabilities = serializeCapabilities(adapter.capabilities)
@@ -138,7 +148,7 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			if (!comparisonRange) {
 				return errorResponse(
 					400,
-					queryError(
+					analyticsError(
 						'invalid_param',
 						'analytics: the range is too long to compare against a previous period',
 						'compare'
@@ -172,7 +182,7 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			)
 			return errorResponse(
 				503,
-				queryError('unavailable', 'analytics: source is temporarily unavailable'),
+				analyticsError('unavailable', 'analytics: source is temporarily unavailable'),
 				RETRY_AFTER
 			)
 		}
@@ -190,6 +200,6 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 		return Response.json(body, { headers: NO_STORE })
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: query failed for adapter "${adapterId}": ${String(err)}`)
-		return errorResponse(500, queryError('internal', 'analytics: query failed'))
+		return errorResponse(500, analyticsError('internal', 'analytics: query failed'))
 	}
 }

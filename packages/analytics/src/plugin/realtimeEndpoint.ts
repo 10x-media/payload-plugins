@@ -1,9 +1,8 @@
 import type { PayloadHandler } from 'payload'
 import type { MetricKey } from '../core/contract'
-import { queryError } from '../query/errors'
 import { readForWidgetRealtime } from '../widgets/readForWidgetRealtime'
+import { analyticsError, errorResponse, NO_STORE, RETRY_AFTER } from './errors'
 import { REALTIME_PATH } from './paths'
-import { errorResponse, NO_STORE, RETRY_AFTER } from './responses'
 import { getRuntime, readAccessFor } from './runtime'
 
 export { REALTIME_PATH }
@@ -54,12 +53,12 @@ export const makeRealtimeHandler = (): PayloadHandler => async (req) => {
 			req.payload.logger?.warn(`analytics: realtime read failed: ${String(err)}`)
 			return errorResponse(
 				503,
-				queryError('unavailable', 'analytics: source is temporarily unavailable'),
+				analyticsError('unavailable', 'analytics: source is temporarily unavailable'),
 				RETRY_AFTER
 			)
 		}
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: realtime request failed: ${String(err)}`)
-		return errorResponse(500, queryError('internal', 'analytics: realtime read failed'))
+		return errorResponse(500, analyticsError('internal', 'analytics: realtime read failed'))
 	}
 }

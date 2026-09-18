@@ -10,10 +10,10 @@ import {
 	type MetricKey,
 } from '../core/contract'
 import { GRANULARITY_ORDER } from '../core/granularity'
+import { type AnalyticsError, analyticsError } from '../plugin/errors'
 import { isValidTimeZone } from '../timeframe/tz'
 import { METRIC_KEYS } from '../translations/metricKeys'
 import { parseDayOrInstant } from './dates'
-import { type QueryError, queryError } from './errors'
 import {
 	DEFAULT_QUERY_LIMIT,
 	MAX_QUERY_DIMENSIONS,
@@ -36,7 +36,7 @@ export interface ParsedQuery {
 	compare: 'previous' | null
 }
 
-export type ParseResult = { ok: true; value: ParsedQuery } | { ok: false; error: QueryError }
+export type ParseResult = { ok: true; value: ParsedQuery } | { ok: false; error: AnalyticsError }
 
 export interface ParseQueryArgs {
 	capabilities: SerializedCapabilities
@@ -50,9 +50,9 @@ const KNOWN_OPERATORS = new Set<string>(FILTER_OPERATORS)
 const KNOWN_GRANULARITIES = new Set<string>(GRANULARITY_ORDER)
 const DAY_MS = 86_400_000
 
-const fail = (code: QueryError['code'], message: string, param: string): ParseResult => ({
+const fail = (code: AnalyticsError['code'], message: string, param: string): ParseResult => ({
 	ok: false,
-	error: queryError(code, message, param),
+	error: analyticsError(code, message, param),
 })
 
 /** Echo a rejected value back in a message without letting a caller inflate the response. */
