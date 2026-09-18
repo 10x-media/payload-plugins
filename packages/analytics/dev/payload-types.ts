@@ -117,6 +117,7 @@ export interface Config {
     'analytics-goals': AnalyticsGoalsWidget;
     'analytics-breakdown-pages': AnalyticsBreakdownPagesWidget;
     'analytics-breakdown-sources': AnalyticsBreakdownSourcesWidget;
+    'analytics-breakdown-channels': AnalyticsBreakdownChannelsWidget;
     'analytics-breakdown-devices': AnalyticsBreakdownDevicesWidget;
     'analytics-breakdown-countries': AnalyticsBreakdownCountriesWidget;
     'analytics-breakdown-goals': AnalyticsBreakdownGoalsWidget;
@@ -1117,6 +1118,47 @@ export interface AnalyticsBreakdownPagesWidget {
  * via the `definition` "analytics-breakdown-sources_widget".
  */
 export interface AnalyticsBreakdownSourcesWidget {
+  data?: {
+    title?: string | null;
+    metric:
+      | 'pageviews'
+      | 'visitors'
+      | 'sessions'
+      | 'avgDuration'
+      | 'bounceRate'
+      | 'events'
+      | 'conversions'
+      | 'revenue'
+      | 'scrollDepth';
+    timeframe:
+      | 'today'
+      | 'last7days'
+      | 'last30days'
+      | 'last90days'
+      | 'thisMonth'
+      | 'thisYear'
+      | 'lastYear'
+      | 'allTime'
+      | 'custom';
+    range?: {
+      from?: string | null;
+      to?: string | null;
+    };
+    limit?: number | null;
+    dataSource?: ('native' | 'memory') | null;
+    filter?: {
+      dimension?: string | null;
+      operator?: string | null;
+      value?: string | null;
+    };
+  };
+  width: 'small' | 'medium' | 'large';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "analytics-breakdown-channels_widget".
+ */
+export interface AnalyticsBreakdownChannelsWidget {
   data?: {
     title?: string | null;
     metric:

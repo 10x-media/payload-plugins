@@ -30,6 +30,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.widgetTrendLabel]: 'Динаміка',
 	[keys.widgetBreakdownPages]: 'Топ сторінок',
 	[keys.widgetBreakdownSources]: 'Топ джерел',
+	[keys.widgetBreakdownChannels]: 'Канали залучення',
 	[keys.widgetBreakdownDevices]: 'Пристрої',
 	[keys.widgetBreakdownCountries]: 'Країни',
 	[keys.widgetBreakdownGoals]: 'Цілі',

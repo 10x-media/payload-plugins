@@ -30,6 +30,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.widgetTrendLabel]: 'Tendência',
 	[keys.widgetBreakdownPages]: 'Páginas principais',
 	[keys.widgetBreakdownSources]: 'Origens principais',
+	[keys.widgetBreakdownChannels]: 'Canais',
 	[keys.widgetBreakdownDevices]: 'Dispositivos',
 	[keys.widgetBreakdownCountries]: 'Países',
 	[keys.widgetBreakdownGoals]: 'Metas',

@@ -30,6 +30,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.widgetTrendLabel]: 'Tren',
 	[keys.widgetBreakdownPages]: 'Halaman teratas',
 	[keys.widgetBreakdownSources]: 'Sumber teratas',
+	[keys.widgetBreakdownChannels]: 'Kanal',
 	[keys.widgetBreakdownDevices]: 'Perangkat',
 	[keys.widgetBreakdownCountries]: 'Negara',
 	[keys.widgetBreakdownGoals]: 'Sasaran',

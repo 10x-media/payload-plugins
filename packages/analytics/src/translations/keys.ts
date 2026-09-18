@@ -33,6 +33,7 @@ export const keys = {
 	widgetTrendLabel: 'analytics:widgetTrendLabel',
 	widgetBreakdownPages: 'analytics:widgetBreakdownPages',
 	widgetBreakdownSources: 'analytics:widgetBreakdownSources',
+	widgetBreakdownChannels: 'analytics:widgetBreakdownChannels',
 	widgetBreakdownDevices: 'analytics:widgetBreakdownDevices',
 	widgetBreakdownCountries: 'analytics:widgetBreakdownCountries',
 	widgetBreakdownGoals: 'analytics:widgetBreakdownGoals',

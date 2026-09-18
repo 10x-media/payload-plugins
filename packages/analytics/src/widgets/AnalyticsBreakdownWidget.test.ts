@@ -252,6 +252,24 @@ describe('AnalyticsBreakdownWidget filter', () => {
 		expect(html).toContain('direct')
 	})
 
+	it('names a native channel row in the reader language', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({ provider: 'native', rows: [{ label: 'paid-search', value: 9 }] })
+		)
+		const html = await render('analytics-breakdown-channels')
+		expect(html).toContain('analytics:channelPaidSearch')
+		expect(html).not.toContain('paid-search')
+	})
+
+	it("leaves a provider channel row in the provider's own vocabulary", async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({ provider: 'ga4', rows: [{ label: 'Paid Search', value: 9 }] })
+		)
+		const html = await render('analytics-breakdown-channels')
+		expect(html).not.toContain('analytics:channelPaidSearch')
+		expect(html).toContain('Paid Search')
+	})
+
 	it('says the goals could not be read instead of showing an empty goal table', async () => {
 		vi.mocked(readForWidgetBreakdown).mockResolvedValue(result({ rows: [], goalsUnresolved: true }))
 		const html = await render('analytics-breakdown-goals')

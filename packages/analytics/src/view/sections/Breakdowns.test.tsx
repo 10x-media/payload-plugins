@@ -287,6 +287,28 @@ describe('Breakdowns rows', () => {
 		expect(onRowSelect).toHaveBeenCalledWith('organic-search')
 	})
 
+	it("leaves a provider's channel row in the vocabulary that provider reports", () => {
+		const channels: AnalyticsRow[] = [
+			{ dimensions: { channel: 'Paid Search' }, metrics: { pageviews: 9 } },
+		]
+		renderBreakdowns({
+			dimension: 'channel',
+			dimensions: ['channel', 'referrer'],
+			query: state({
+				data: {
+					...answer(),
+					result: {
+						rows: channels,
+						meta: { provider: 'ga4', fetchedAt: '2026-09-14T00:00:00.000Z' },
+					},
+				},
+			}),
+			tab: 'sources',
+		})
+		expect(screen.getByText('Paid Search')).toBeDefined()
+		expect(screen.queryByText(keys.channelPaidSearch)).toBeNull()
+	})
+
 	it('sorts on a column header, and flips the direction on a second click', () => {
 		const onSortChange = vi.fn()
 		const { rerender } = renderBreakdowns({ onSortChange })

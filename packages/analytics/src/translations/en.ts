@@ -35,6 +35,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.widgetTrendLabel]: 'Trend',
 	[keys.widgetBreakdownPages]: 'Top pages',
 	[keys.widgetBreakdownSources]: 'Top sources',
+	[keys.widgetBreakdownChannels]: 'Channels',
 	[keys.widgetBreakdownDevices]: 'Devices',
 	[keys.widgetBreakdownCountries]: 'Countries',
 	[keys.widgetBreakdownGoals]: 'Goals',
