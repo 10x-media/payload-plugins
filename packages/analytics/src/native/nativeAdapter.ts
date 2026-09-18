@@ -52,9 +52,9 @@ export interface NativeOptions {
 	retentionDays?: number
 	/**
 	 * Rollup rows older than this many days are deleted by the nightly task. Off by default,
-	 * since rollups are the long-term store. It cannot be shorter than `retentionDays`: a window
-	 * reaching past raw-event retention is answered from rollups, so a shorter rollup window
-	 * would make a long window report less than a short one.
+	 * since rollups are the long-term store. It requires `retentionDays` and cannot be shorter
+	 * than it: a window reaching past raw-event retention is answered from rollups, so a shorter
+	 * rollup window would make a long window report less than a short one.
 	 */
 	rollupRetentionDays?: number
 	/** Opt-in in-process write batching. `true` uses defaults (maxSize 50, maxAgeMs 2000). */
@@ -243,6 +243,11 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 		options.retentionDays !== undefined && options.retentionDays > 0
 			? options.retentionDays
 			: undefined
+	if (rollupRetentionDays !== undefined && retentionDays === undefined) {
+		throw new Error(
+			'analytics: rollupRetentionDays requires retentionDays, since pruning rollups while keeping raw events forever would make an unfiltered long window answer less than the same window filtered'
+		)
+	}
 	if (
 		rollupRetentionDays !== undefined &&
 		retentionDays !== undefined &&
@@ -349,13 +354,17 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 					}),
 				},
 			]
-			// Always registered: the salt sweep applies to every install, retention or not.
-			config.jobs = {
-				...config.jobs,
-				tasks: [
-					...(config.jobs?.tasks ?? []),
-					pruneEventsTask({ retentionDays, rollupRetentionDays }),
-				],
+			// Only with a window: payload derives jobs.enabled from the task count, so registering
+			// unconditionally would add the jobs collection and stats global (a migration on
+			// migrate-mode Postgres) to installs that asked for neither jobs nor retention.
+			if (retentionDays !== undefined || rollupRetentionDays !== undefined) {
+				config.jobs = {
+					...config.jobs,
+					tasks: [
+						...(config.jobs?.tasks ?? []),
+						pruneEventsTask({ retentionDays, rollupRetentionDays }),
+					],
+				}
 			}
 			const prevOnInit = config.onInit
 			// payloadRef is set before the app's own onInit so consumer init code can

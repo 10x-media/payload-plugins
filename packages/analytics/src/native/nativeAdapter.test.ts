@@ -58,17 +58,36 @@ describe('native adapter', () => {
 })
 
 describe('native retention options', () => {
-	it('registers the prune task on an install with no retention options at all', () => {
-		expect(registeredTasks()).toContain(PRUNE_TASK_SLUG)
+	// A task registers the payload-jobs collection and, with a schedule, the stats global, so an
+	// install that asked for no retention must not be handed jobs it never configured.
+	it('registers the prune task only once a retention window is configured', () => {
+		expect(registeredTasks()).not.toContain(PRUNE_TASK_SLUG)
+		expect(registeredTasks({ retentionDays: 0 })).not.toContain(PRUNE_TASK_SLUG)
+		expect(registeredTasks({ retentionDays: 30 })).toContain(PRUNE_TASK_SLUG)
 		expect(registeredTasks({ retentionDays: 30, rollupRetentionDays: 365 })).toContain(
 			PRUNE_TASK_SLUG
 		)
 	})
 
+	it('leaves the jobs config untouched on an install with no retention window', () => {
+		const config = {} as Config
+		native().register?.(config)
+		expect(config.jobs).toBeUndefined()
+	})
+
 	it('rejects a rollup window that is not a whole number of days above zero', () => {
 		for (const rollupRetentionDays of [0, -1, 1.5, Number.NaN]) {
-			expect(() => native({ rollupRetentionDays })).toThrow(/rollupRetentionDays/)
+			expect(() => native({ retentionDays: 1, rollupRetentionDays })).toThrow(/rollupRetentionDays/)
 		}
+	})
+
+	it('rejects a rollup window without a raw-event window', () => {
+		expect(() => native({ rollupRetentionDays: 365 })).toThrow(
+			/rollupRetentionDays requires retentionDays/
+		)
+		expect(() => native({ retentionDays: 0, rollupRetentionDays: 365 })).toThrow(
+			/rollupRetentionDays requires retentionDays/
+		)
 	})
 
 	it('rejects a rollup window shorter than the raw-event window', () => {

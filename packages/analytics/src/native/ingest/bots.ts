@@ -72,20 +72,13 @@ export const isBot = (ua: string): boolean => {
 export type BotFilter = (ua: string) => boolean
 
 /**
- * The `filterBots` option as one predicate. A host filter that throws keeps the event: a
- * broken predicate must not quietly discard a site's traffic, and the ingest path has no
- * answer to give it either way.
+ * The `filterBots` option as one predicate. A host filter that throws throws through to the
+ * handler, which keeps the event and says so once: swallowing it here would leave a broken
+ * predicate silent for the life of the process.
  */
 export const resolveBotFilter = (option: boolean | BotFilter | undefined): BotFilter => {
 	if (option === false) {
 		return () => false
 	}
-	const decide = typeof option === 'function' ? option : isBot
-	return (ua) => {
-		try {
-			return decide(ua)
-		} catch {
-			return false
-		}
-	}
+	return typeof option === 'function' ? option : isBot
 }

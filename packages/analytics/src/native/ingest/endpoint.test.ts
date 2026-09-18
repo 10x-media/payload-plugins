@@ -377,4 +377,35 @@ describe('makeIngestHandler drop warnings', () => {
 		expect(events).toEqual([])
 		expect(warn).not.toHaveBeenCalled()
 	})
+
+	// A stripped agent zeroes an install's numbers, so it is the one drop worth a line.
+	it('warns once for a beacon with no user agent and stays silent after', async () => {
+		const warn = vi.fn()
+		const { buffer, events } = capture()
+		const handler = makeIngestHandler({ geoResolver: noopResolver, getBuffer: () => buffer })
+		const res = await handler(withLogger({ host: 'a.example', 'user-agent': '' }, warn))
+		await handler(withLogger({ host: 'a.example', 'user-agent': '' }, warn))
+		expect(res.status).toBe(202)
+		expect(events).toEqual([])
+		expect(warn).toHaveBeenCalledTimes(1)
+		expect(warn.mock.calls[0]?.[0]).toMatch(/no user agent/)
+	})
+
+	it('keeps the event and warns once when the bot filter throws', async () => {
+		const warn = vi.fn()
+		const { buffer, events } = capture()
+		const handler = makeIngestHandler({
+			geoResolver: noopResolver,
+			getBuffer: () => buffer,
+			filterBots: () => {
+				throw new Error('boom')
+			},
+		})
+		const res = await handler(withLogger({ host: 'a.example' }, warn))
+		await handler(withLogger({ host: 'a.example' }, warn))
+		expect(res.status).toBe(202)
+		expect(events).toHaveLength(2)
+		expect(warn).toHaveBeenCalledTimes(1)
+		expect(warn.mock.calls[0]?.[0]).toMatch(/filterBots/)
+	})
 })

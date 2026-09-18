@@ -36,17 +36,22 @@ const accepted = (): Response => Response.json({ ok: true }, { status: 202 })
 const REQUEST_HOSTNAME: ResolvedHostnameOption = { kind: 'request' }
 
 /**
- * Why a drop happened, and the line that tells an operator where to look. A misconfigured
- * resolver otherwise discards every event in silence, since the response cannot say so.
+ * What an operator has to hear about once, and the line that tells them where to look. A
+ * misconfigured resolver, a broken filter or a header-stripping proxy otherwise costs an
+ * install its traffic in silence, since the response cannot say any of it.
  */
-const DROP_REASONS = {
+const WARN_REASONS = {
 	'no scope resolved':
 		'analytics: ingest is dropping events because scopeResolver answered no scope for them. Check that resolver, and list any platform domain in platformHostnames so it ingests under the null scope. Logged once per process.',
 	'hostname refused':
 		'analytics: ingest is dropping events because the hostname option refused the request host. Check that option, and platformHostnames for a platform domain. Logged once per process.',
+	'bot filter threw':
+		'analytics: the filterBots function threw, so the event was kept. Check that function; every beacon counts while it throws. Logged once per process.',
+	'no user agent':
+		'analytics: a beacon arrived with no user agent and was not recorded: an intermediary may be stripping the header. Logged once per process.',
 } as const
 
-type DropReason = keyof typeof DROP_REASONS
+type WarnReason = keyof typeof WARN_REASONS
 
 /** One event, not a session replay: far above any legitimate payload, far below a DoS. */
 export const MAX_INGEST_BODY_BYTES = 64 * 1024
@@ -94,12 +99,15 @@ export const makeIngestHandler = ({
 }: IngestHandlerOptions): PayloadHandler => {
 	// One line per reason for the life of the handler, which is the life of the process: a
 	// public endpoint must not be a log amplifier, and an attacker chooses how often it drops.
-	const warned = new Set<DropReason>()
-	const drop = (req: PayloadRequest, reason: DropReason): Response => {
+	const warned = new Set<WarnReason>()
+	const warnOnce = (req: PayloadRequest, reason: WarnReason): void => {
 		if (!warned.has(reason)) {
 			warned.add(reason)
-			req.payload.logger?.warn(DROP_REASONS[reason])
+			req.payload.logger?.warn(WARN_REASONS[reason])
 		}
+	}
+	const drop = (req: PayloadRequest, reason: WarnReason): Response => {
+		warnOnce(req, reason)
 		return accepted()
 	}
 
@@ -107,7 +115,19 @@ export const makeIngestHandler = ({
 		// First, before the body is even read, so a crawler costs one header lookup. Its beacon
 		// is answered exactly like a kept one and nothing is logged: bots are expected traffic
 		// rather than a misconfiguration an operator has to hear about once per process.
-		if (filterBots(req.headers.get('user-agent') ?? '')) {
+		const userAgent = req.headers.get('user-agent') ?? ''
+		let automated = false
+		try {
+			automated = filterBots(userAgent)
+		} catch {
+			warnOnce(req, 'bot filter threw')
+		}
+		if (automated) {
+			// The exception to the silence: an agent-less beacon is indistinguishable from an
+			// intermediary stripping the header, which would zero an install's numbers.
+			if (userAgent.trim() === '') {
+				warnOnce(req, 'no user agent')
+			}
 			return accepted()
 		}
 		const { scope: resolveScope, timezone: resolveTimezone, goals: resolveGoals } = resolvers

@@ -24,8 +24,9 @@ export interface PruneOptions {
 }
 
 /**
- * The nightly sweep of everything the native engine stores. It registers on every install,
- * because the daily salts accumulate whether or not a retention window is configured.
+ * The nightly sweep of everything the native engine stores. It registers only on an install
+ * that configured a retention window, and sweeps the daily salts whenever it runs; an install
+ * without one sweeps its salts at ingest instead, so no install needs a jobs runner for that.
  *
  * Deletes go through the database adapter's bulk delete, so no document is loaded to be
  * deleted and nothing is reported that would cost a read to count. That bypasses collection

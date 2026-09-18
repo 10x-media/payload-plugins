@@ -192,10 +192,12 @@ describe('resolveBotFilter', () => {
 		expect(filter(bot)).toBe(false)
 	})
 
-	it('keeps the event when a host filter throws', () => {
+	// The handler catches it, keeps the event and warns once; swallowing it here would make a
+	// broken predicate indistinguishable from one that simply keeps everything.
+	it('lets a host filter throw through', () => {
 		const filter = resolveBotFilter(() => {
 			throw new Error('boom')
 		})
-		expect(filter(bot)).toBe(false)
+		expect(() => filter(bot)).toThrow(/boom/)
 	})
 })
