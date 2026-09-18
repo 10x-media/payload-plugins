@@ -58,6 +58,8 @@ Set to `n`, the entry `n` from the **right** is read: the address the outermost 
 
 `1` is not the default, deliberately. An install behind a CDN plus a proxy has two hops, so a default of `1` would read the CDN's address for every visitor and collapse geo and the visitor hash onto a single value, which is worse than a spoofable one. Count your own deployment's hops: one reverse proxy is `1`, a CDN in front of it is `2`.
 
+**Leave it unset if your proxy sets only `x-real-ip`.** The count is read off `x-forwarded-for` alone, and at `n >= 1` that chain is the only source: a proxy that forwards the client address in `x-real-ip` and writes no chain yields no address at all, and every visitor then hashes and geo-locates as one. Unset, `x-real-ip` is still consulted. The same applies to the hostname [native ingest](/analytics/native#where-the-hostname-comes-from) stores: `x-forwarded-host` is read only at one hop or more, so a proxy that does not send it leaves the `Host` header in charge either way.
+
 ## Next rewrites
 
 `captureRewrites` maps each mounted adapter's declared routes onto Next rewrite entries. The two dialects are the same `path-to-regexp` one, so nothing is translated beyond prefixing each `source` with the mount path.

@@ -34,7 +34,7 @@ interface RawEventInput {
 }
 ```
 
-An event is rejected only on its required fields: a known `type`, a non-empty string `path`, and a non-empty string `name` on everything but a pageview. `hostname` is not one of them: it is optional on the wire, and a body that carries one is only type-checked, since the stored value comes from the request rather than from the body (see [Where the hostname comes from](#where-the-hostname-comes-from)). Optional fields are sanitized rather than rejected, so one malformed attribute costs an attribute instead of the whole event: `value` must be a finite number `>= 0`, `currency` must match `/^[A-Z]{3}$/`, `scrollDepth` is clamped to 100 and rounded, `durationMs` must be a finite number between 0 and 86,400,000 (a day) or it is dropped, `name` is truncated to 128 characters (it is the `event` dimension's bucket key), `path` to 512 and the resolved hostname to 253 (both are rollup bucket keys), and `props` keeps at most 20 flat scalar entries with keys up to 64 characters and string values truncated to 256. The request body is capped at 64 KiB (`413 payload_too_large` above it) and unparseable JSON answers `400 invalid_param`.
+An event is rejected only on its required fields: a known `type`, a non-empty string `path`, and a non-empty string `name` on everything but a pageview. `hostname` is not one of them: it is optional on the wire, and a body that carries one is only type-checked, since the stored value comes from the request rather than from the body (see [Where the hostname comes from](#where-the-hostname-comes-from)). Optional fields are sanitized rather than rejected, so one malformed attribute costs an attribute instead of the whole event: `value` must be a finite number `>= 0`, `currency` must match `/^[A-Z]{3}$/`, `scrollDepth` is clamped to 100 and rounded, `durationMs` must be a finite number between 0 and 86,400,000 (a day) or it is dropped, `name` is truncated to 128 characters (it is the `event` dimension's bucket key) and `path` to 512 (another rollup bucket key; the hostname is a third, and is [refused rather than truncated](#what-counts-as-a-hostname) past 253), and `props` keeps at most 20 flat scalar entries with keys up to 64 characters and string values truncated to 256. The request body is capped at 64 KiB (`413 payload_too_large` above it) and unparseable JSON answers `400 invalid_param`.
 
 The server derives the rest at ingest time: the hostname the event is stored under, the [dimensions](#dimensions) below, a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days), and the [goals](/analytics/goals) the event completed, stamped onto the stored event. The endpoint responds `202` on success and `400` on an invalid body.
 
@@ -48,9 +48,17 @@ Events are written atomically, via `$inc` on Mongo and `ON CONFLICT DO UPDATE` o
 
 ### Where the hostname comes from
 
-The stored hostname is the host the request itself carried, not the one its body claims. That is `x-forwarded-host`'s first value when the plugin's [`trustedProxyHops`](#trusted-proxies) is 1 or more, and the `Host` header otherwise, lowercased, with the port and a trailing root dot stripped and the result capped at 253 characters. A request that yields no usable host at all is dropped.
+The stored hostname is the host the request itself carried, not the one its body claims. That is `x-forwarded-host`'s first value when the plugin's [`trustedProxyHops`](#trusted-proxies) is 1 or more, and the `Host` header otherwise. A request that yields no usable hostname at all is dropped.
 
 The `Origin` header is deliberately never read. A scripted client can pair a valid `Host` with any `Origin` it likes, so reading it would leave the hole this closes: one client minting unlimited hostname bucket families inside a scope it is legitimately allowed to send to. The request host is what the edge routes on, so it can only ever be a host that reaches the install.
+
+#### What counts as a hostname
+
+One shape, everywhere: the request's host, a `hostname` list entry, a `platformHostnames` entry and a resolver's answer are all held to it, because two spellings of one host would open two rollup bucket families and [nothing prunes those](#retention-pruning).
+
+A value is lowercased, loses its port, its brackets and every trailing root dot, and must then be either dot-separated labels of `a-z`, `0-9`, `_` and `-` (which covers every IPv4 literal) or an IPv6 literal of hex groups and colons, within 253 characters. `Example.COM:3000`, `example.com.` and `example.com..` are therefore one hostname, and `[::1]:3000` is stored as `::1`. Anything else is not a hostname and the event is dropped: a leading or doubled dot, an unclosed bracket, a percent-encoded or non-ASCII spelling, a port that is not digits, a scheme, or a name over the cap, which is refused rather than truncated into a name of its own.
+
+A list or `platformHostnames` entry is held to the same shape at boot, minus the port stripping, so an entry carrying one fails the boot instead of silently never matching.
 
 The body's `hostname` is therefore optional, and the tracker keeps sending it: a [resolver](#a-resolver) receives it as `claimed`. [`trackServerEvent`](/analytics/goals#4-track-from-server-code) is trusted server code with no request to attribute to, so it keeps supplying its own hostname and still requires one.
 
@@ -88,7 +96,7 @@ native({
 })
 ```
 
-It receives the body's claim, the request, and the scope the request already resolved to, and returns the hostname to store or `null` to drop the event. The answer is normalized and capped like any other, and a resolver that throws drops the event too: ingest is a public path, so a broken lookup loses one event rather than the response.
+It receives the body's claim, the request, and the scope the request already resolved to, and returns the hostname to store or `null` to drop the event. **The answer must be a [hostname](#what-counts-as-a-hostname)**: it is normalized and then held to the same shape a request host is, and anything else drops the event. A resolver answering a tenant id, a slug or a label would otherwise write free text per event and reopen exactly the unbounded bucket families this closes. A resolver that throws drops the event too: ingest is a public path, so a broken lookup loses one event rather than the response.
 
 #### Scoped installs and `platformHostnames`
 
@@ -103,7 +111,9 @@ native({ platformHostnames: ['app.example.com', 'www.example.com'] })
 Those are the platform's own domains, which are infrastructure rather than tenants: they change with a deploy, not with a signup, so listing them costs nothing. A request from one of them ingests under the null scope even though it resolves no tenant. Tenant domains never belong here.
 
 <Callout type="info">
-**A dropped event answers exactly what an accepted one answers**: `202` with `{ "ok": true }`, the same headers, and nothing logged. A prober therefore learns nothing about which hosts or tenants exist, and a public endpoint is not a log amplifier. The cost is that a misconfigured `hostname` list or resolver is silent: if events stop arriving, check the option before the tracker.
+**A dropped event answers exactly what an accepted one answers**: `202` with `{ "ok": true }`, the same headers, and nothing per event in the log. A prober therefore learns nothing about which hosts or tenants exist, and a public endpoint is not a log amplifier, since an attacker would otherwise choose how much it writes.
+
+The server log still says it once. The first drop of each reason (`scopeResolver` answered no scope, or the `hostname` option refused the request host) writes one `warn` line naming the option to check, and every later drop of that reason is silent for the life of the process. So if events stop arriving, that line is where to start; past it, the endpoint is deliberately quiet.
 </Callout>
 
 ### Trusted proxies

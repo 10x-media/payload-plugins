@@ -182,8 +182,18 @@ Each form then gets a **Track analytics goal** block under its Actions tab:
 
 The completion is recorded against `/forms/<form id>` and carries `formId`, `formTitle` and `submissionId` as event props. Pass `path` to attribute it to the page the form lives on instead. Both `hostname` and `path` also take a function of the run arguments, for one Payload serving several sites: `hostname: ({ req }) => req?.headers.get('x-site') ?? 'example.com'`.
 
+### Where the action's hostname comes from
+
+A form submission is a public request whose `Host` the visitor chose, so the action does not store it as given. In order:
+
+1. The `hostname` option, normalized to [what counts as a hostname](/analytics/native#what-counts-as-a-hostname). An option that is not one is skipped rather than stored.
+2. The submitting request's host, judged by the native adapter's own [`hostname` policy](/analytics/native#where-the-hostname-comes-from): `'request'` stores it, a list stores it only when the list holds it, and a resolver decides. A forged host that the endpoint would have refused is refused here too, so a conversion cannot mint a hostname a beacon could not.
+3. The host of the install's `serverURL`.
+
+The scoped-install drop rule does not apply: a submission's scope comes from the form document, not from its host. And a refused host costs the conversion its hostname, never the conversion: the last rung is an empty hostname, because losing a real conversion over the name of the site it happened on would be the worse trade.
+
 <Callout type="warn">
-Set `hostname` on any install with a jobs runner. Form-builder queues every non-essential action, and a queued run carries the runner's request rather than the submitter's. The hostname falls back to the request's `Host` header, then to the host of `serverURL`, then throws, so an install that queues actions and does not configure either records nothing.
+Set `hostname` on any install with a jobs runner. Form-builder queues every non-essential action, and a queued run carries the runner's request rather than the submitter's, so the fall-through lands on `serverURL` and every site's conversions pile up under the CMS host.
 
 On a scoped install, pass `scope` for the same reason: the submitter's tenant cannot be recovered from the runner's request, so an unset scope resolves install-wide. It takes a literal, `null` for install-wide, or a function of the run arguments.
 </Callout>
