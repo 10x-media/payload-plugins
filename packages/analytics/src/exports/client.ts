@@ -25,7 +25,15 @@ export { DateRangeField } from '../fields/dateRange/ui'
 export type { GoalsResponse, WireGoal } from '../goals/fetchGoals'
 export { GoalSelectField } from '../goals/GoalSelectField'
 export { useAnalyticsGoals } from '../goals/useAnalyticsGoals'
-export { buildQueryUrl, fetchQuery, QueryFetchError, type QueryRequest } from '../query/fetchQuery'
+export {
+	buildQueryUrl,
+	fetchQuery,
+	QueryFetchError,
+	type QueryRequest,
+	type RefreshRequest,
+	type RefreshResponse,
+	refreshCache,
+} from '../query/fetchQuery'
 export { AnalyticsNavLink, type AnalyticsNavLinkProps } from '../view/AnalyticsNavLink'
 export { AnalyticsViewClient } from '../view/AnalyticsViewClient'
 export { RealtimeCounter } from '../widgets/RealtimeCounter'

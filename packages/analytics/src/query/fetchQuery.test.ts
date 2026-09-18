@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { buildQueryUrl, fetchQuery, QueryFetchError, type QueryRequest } from './fetchQuery'
+import {
+	buildQueryUrl,
+	fetchQuery,
+	QueryFetchError,
+	type QueryRequest,
+	refreshCache,
+} from './fetchQuery'
 import type { QueryResponse } from './response'
 
 const baseRequest: QueryRequest = {
@@ -379,5 +385,90 @@ describe('fetchQuery', () => {
 		vi.mocked(fetch).mockRejectedValue(networkError)
 
 		await expect(fetchQuery('/api', baseRequest)).rejects.toBe(networkError)
+	})
+})
+
+describe('refreshCache', () => {
+	beforeEach(() => {
+		vi.stubGlobal('fetch', vi.fn())
+	})
+
+	afterEach(() => {
+		vi.unstubAllGlobals()
+	})
+
+	it('posts to the refresh path with credentials and answers the new epoch', async () => {
+		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 4 }))
+
+		await expect(refreshCache('/api')).resolves.toEqual({ epoch: 4 })
+
+		const [url, init] = vi.mocked(fetch).mock.calls[0] ?? []
+		expect(url).toBe('/api/analytics/refresh')
+		expect(init).toMatchObject({ method: 'POST', credentials: 'include' })
+		expect(new Headers((init as RequestInit).headers).get('Accept')).toBe('application/json')
+	})
+
+	it('joins an apiRoute with a trailing slash without doubling it', async () => {
+		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 1 }))
+
+		await refreshCache('/api/')
+
+		expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe('/api/analytics/refresh')
+	})
+
+	it('carries a named scope in the body and omits it otherwise', async () => {
+		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 1 }))
+
+		await refreshCache('/api', { scope: 'tenant-b' })
+		const scoped = (vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit).body
+		expect(JSON.parse(String(scoped))).toEqual({ scope: 'tenant-b' })
+
+		await refreshCache('/api')
+		const bare = (vi.mocked(fetch).mock.calls[1]?.[1] as RequestInit).body
+		expect(JSON.parse(String(bare))).toEqual({})
+	})
+
+	it('hands the abort signal straight to the fetch', async () => {
+		vi.mocked(fetch).mockResolvedValue(okResponse({ epoch: 1 }))
+		const controller = new AbortController()
+
+		await refreshCache('/api', { signal: controller.signal })
+
+		expect((vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit).signal).toBe(controller.signal)
+	})
+
+	it('throws QueryFetchError with the endpoint error body on a refusal', async () => {
+		vi.mocked(fetch).mockResolvedValue(
+			errorResponse(400, {
+				error: { code: 'untrusted_scope', message: 'analytics: scope', param: 'scope' },
+			})
+		)
+
+		try {
+			await refreshCache('/api', { scope: 'tenant-b' })
+			throw new Error('expected refreshCache to reject')
+		} catch (err) {
+			expect(err).toBeInstanceOf(QueryFetchError)
+			const queryErr = err as QueryFetchError
+			expect(queryErr.status).toBe(400)
+			expect(queryErr.error?.code).toBe('untrusted_scope')
+		}
+	})
+
+	it('reads Retry-After off a 503 like a failed read does', async () => {
+		vi.mocked(fetch).mockResolvedValue(
+			errorResponse(
+				503,
+				{ error: { code: 'unavailable', message: 'down' } },
+				{ 'Retry-After': '30' }
+			)
+		)
+
+		try {
+			await refreshCache('/api')
+			throw new Error('expected refreshCache to reject')
+		} catch (err) {
+			expect((err as QueryFetchError).retryAfter).toBe(30)
+		}
 	})
 })

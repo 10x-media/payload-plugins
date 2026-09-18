@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
 	replace: vi.fn<(url: string) => void>(),
 	push: vi.fn<(url: string) => void>(),
 	fetchQueryMock: vi.fn<(apiRoute: string, request: QueryRequest) => Promise<unknown>>(),
+	refreshCacheMock: vi.fn<(apiRoute: string) => Promise<{ epoch: number }>>(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -26,7 +27,7 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('../query/fetchQuery', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../query/fetchQuery')>()
-	return { ...actual, fetchQuery: mocks.fetchQueryMock }
+	return { ...actual, fetchQuery: mocks.fetchQueryMock, refreshCache: mocks.refreshCacheMock }
 })
 
 vi.mock('@payloadcms/ui', () => ({
@@ -34,13 +35,15 @@ vi.mock('@payloadcms/ui', () => ({
 	Button: ({
 		children,
 		onClick,
+		disabled,
 		extraButtonProps,
 	}: {
 		children?: ReactNode
 		onClick?: () => void
+		disabled?: boolean
 		extraButtonProps?: Record<string, unknown>
 	}) => (
-		<button onClick={onClick} {...extraButtonProps}>
+		<button disabled={disabled} onClick={onClick} {...extraButtonProps}>
 			{children}
 		</button>
 	),
@@ -148,6 +151,8 @@ beforeEach(() => {
 	mocks.push.mockReset()
 	mocks.fetchQueryMock.mockReset()
 	mocks.fetchQueryMock.mockImplementation((_route, request) => Promise.resolve(answer(request)))
+	mocks.refreshCacheMock.mockReset()
+	mocks.refreshCacheMock.mockResolvedValue({ epoch: 1 })
 	vi.stubGlobal('ResizeObserver', ResizeObserverStub)
 	vi.stubGlobal(
 		'fetch',
@@ -342,5 +347,59 @@ describe('AnalyticsViewClient', () => {
 			.find((request) => request.dimensions !== undefined)
 		expect(breakdown?.dimensions).toEqual(['country'])
 		expect(breakdown?.limit).toBe(25)
+	})
+
+	const clickRefresh = async (): Promise<void> => {
+		await act(async () => {
+			fireEvent.click(screen.getByRole('button', { name: keys.viewRefresh }))
+		})
+	}
+
+	it('refreshes the cache and reissues every section read', async () => {
+		await renderView()
+		const before = mocks.fetchQueryMock.mock.calls.length
+		expect(before).toBe(4)
+
+		await clickRefresh()
+
+		expect(mocks.refreshCacheMock).toHaveBeenCalledTimes(1)
+		expect(mocks.refreshCacheMock.mock.calls[0]?.[0]).toBe('/api')
+		expect(mocks.fetchQueryMock.mock.calls.length).toBe(before + 4)
+	})
+
+	it('leaves the reads alone and reports a refresh that failed', async () => {
+		mocks.refreshCacheMock.mockRejectedValue(new Error('refresh down'))
+		await renderView()
+		const before = mocks.fetchQueryMock.mock.calls.length
+
+		await clickRefresh()
+
+		expect(screen.getByText(keys.viewRefreshFailed)).toBeDefined()
+		expect(mocks.fetchQueryMock.mock.calls.length).toBe(before)
+
+		mocks.refreshCacheMock.mockResolvedValue({ epoch: 2 })
+		await clickRefresh()
+		expect(screen.queryByText(keys.viewRefreshFailed)).toBeNull()
+	})
+
+	it('disables the button while the refresh is in flight', async () => {
+		let settle: ((value: { epoch: number }) => void) | undefined
+		mocks.refreshCacheMock.mockImplementation(
+			() =>
+				new Promise<{ epoch: number }>((resolve) => {
+					settle = resolve
+				})
+		)
+		await renderView()
+		await clickRefresh()
+
+		const pending = screen.getByRole('button', { name: keys.viewRefreshing })
+		expect(pending.hasAttribute('disabled')).toBe(true)
+
+		await act(async () => {
+			settle?.({ epoch: 2 })
+		})
+		expect(screen.getByRole('button', { name: keys.viewRefresh })).toBeDefined()
+		expect(mocks.refreshCacheMock).toHaveBeenCalledTimes(1)
 	})
 })

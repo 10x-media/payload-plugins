@@ -16,13 +16,15 @@ vi.mock('@payloadcms/ui', () => ({
 	Button: ({
 		children,
 		onClick,
+		disabled,
 		extraButtonProps,
 	}: {
 		children?: ReactNode
 		onClick?: () => void
+		disabled?: boolean
 		extraButtonProps?: Record<string, unknown>
 	}) => (
-		<button onClick={onClick} {...extraButtonProps}>
+		<button disabled={disabled} onClick={onClick} {...extraButtonProps}>
 			{children}
 		</button>
 	),
@@ -108,6 +110,9 @@ const renderToolbar = (
 		provider?: string
 		onChange?: (next: ViewState) => void
 		onChangeDeferred?: (next: ViewState) => void
+		onRefresh?: () => void
+		refreshing?: boolean
+		refreshFailed?: boolean
 	} = {}
 ) => {
 	const caps = overrides.caps ?? nativeCaps
@@ -121,8 +126,11 @@ const renderToolbar = (
 			now={NOW}
 			onChange={overrides.onChange ?? (() => {})}
 			onChangeDeferred={overrides.onChangeDeferred ?? (() => {})}
+			onRefresh={overrides.onRefresh ?? (() => {})}
 			provider={overrides.provider ?? 'native'}
 			range={{ from: '2026-08-16', to: '2026-09-14' }}
+			refreshFailed={overrides.refreshFailed ?? false}
+			refreshing={overrides.refreshing ?? false}
 			sampled={overrides.sampled ?? false}
 			sourceId="native"
 			sources={overrides.sources ?? [source('native', caps)]}
@@ -288,5 +296,34 @@ describe('Toolbar controls', () => {
 		renderToolbar({ state, provider: 'plausible' })
 		expect(screen.queryByText(new RegExp(keys.channelOrganicSearch))).toBeNull()
 		expect(screen.getByText(/organic-search/)).toBeDefined()
+	})
+})
+
+describe('Toolbar refresh', () => {
+	it('asks the view to refresh when the button is clicked', () => {
+		const onRefresh = vi.fn()
+		renderToolbar({ onRefresh })
+		const button = screen.getByRole('button', { name: keys.viewRefresh })
+		expect(button.hasAttribute('disabled')).toBe(false)
+		fireEvent.click(button)
+		expect(onRefresh).toHaveBeenCalledTimes(1)
+	})
+
+	it('disables the button and renames it while the refresh is pending', () => {
+		const onRefresh = vi.fn()
+		renderToolbar({ onRefresh, refreshing: true })
+		expect(screen.queryByRole('button', { name: keys.viewRefresh })).toBeNull()
+		const button = screen.getByRole('button', { name: keys.viewRefreshing })
+		expect(button.hasAttribute('disabled')).toBe(true)
+		fireEvent.click(button)
+		expect(onRefresh).not.toHaveBeenCalled()
+	})
+
+	it('reports a refresh that failed, and says nothing otherwise', () => {
+		renderToolbar()
+		expect(screen.queryByText(keys.viewRefreshFailed)).toBeNull()
+		cleanup()
+		renderToolbar({ refreshFailed: true })
+		expect(screen.getByText(keys.viewRefreshFailed)).toBeDefined()
 	})
 })
