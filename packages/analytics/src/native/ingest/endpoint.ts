@@ -1,11 +1,12 @@
 import type { PayloadHandler, PayloadRequest } from 'payload'
 import { readCappedBody } from '../../capture/requestBody'
 import type { Goal } from '../../goals/types'
+import { analyticsError, errorResponse } from '../../plugin/errors'
 import type { GeoResolver } from '../geo/geoResolver'
 import { flushBatch } from './flushBatch'
 import { normalizeEvent, type RawEventInput, type StoredEvent } from './normalizeEvent'
 import { dailySalt } from './salt'
-import { validateRawEvent } from './validate'
+import { rawEventError, validateRawEvent } from './validate'
 import type { WriteBuffer } from './writeBuffer'
 
 export interface IngestResolvers {
@@ -44,14 +45,25 @@ export const makeIngestHandler =
 		// dies in transit (a beacon from an unloading tab) answers 400 rather than throwing.
 		const read = await readCappedBody(req, MAX_INGEST_BODY_BYTES)
 		if (!read.ok) {
-			return Response.json(
-				{ error: read.reason === 'too-large' ? 'payload too large' : 'invalid payload' },
-				{ status: read.reason === 'too-large' ? 413 : 400 }
-			)
+			return read.reason === 'too-large'
+				? errorResponse(
+						413,
+						analyticsError('payload_too_large', 'analytics: the event body is too large')
+					)
+				: errorResponse(
+						400,
+						analyticsError('invalid_param', 'analytics: the event body could not be read')
+					)
 		}
 		const raw = parseBody(read.body)
 		if (!validateRawEvent(raw)) {
-			return Response.json({ error: 'invalid payload' }, { status: 400 })
+			// The validator decided on a field, so naming it costs nothing and saves a tracker
+			// author guessing which one of four the endpoint refused.
+			const param = rawEventError(raw) ?? 'type'
+			return errorResponse(
+				400,
+				analyticsError('invalid_param', `analytics: ${param} is missing or invalid`, param)
+			)
 		}
 		const now = new Date()
 		const salt = await dailySalt(req.payload, now)

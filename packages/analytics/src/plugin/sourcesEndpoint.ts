@@ -1,5 +1,5 @@
 import type { PayloadHandler } from 'payload'
-import { NO_STORE } from './errors'
+import { analyticsError, errorResponse, NO_STORE } from './errors'
 import { SOURCES_PATH } from './paths'
 import { resolveSourcesForRequest } from './readContextForRequest'
 import { getRuntime, readAccessFor } from './runtime'
@@ -17,12 +17,12 @@ export { SOURCES_PATH }
  */
 export const makeSourcesHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
-		return Response.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE })
+		return errorResponse(401, analyticsError('unauthorized', 'analytics: authentication required'))
 	}
 	const runtime = getRuntime(req.payload)
 	// No runtime means the plugin served nothing to gate: the listing below is empty anyway.
 	if (runtime && !(await readAccessFor(runtime, req))) {
-		return Response.json({ error: 'forbidden' }, { status: 403, headers: NO_STORE })
+		return errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
 	}
 	const { sources, defaultId } = await resolveSourcesForRequest(req)
 	return Response.json({ defaultId, sources }, { headers: NO_STORE })

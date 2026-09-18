@@ -1,4 +1,5 @@
 import type { PayloadHandler } from 'payload'
+import { analyticsError, errorResponse, NO_STORE } from '../plugin/errors'
 import { GOALS_PATH } from '../plugin/paths'
 import {
 	getRuntime,
@@ -22,17 +23,21 @@ export { GOALS_PATH }
  * answers empty unless `platformRead` grants it; and a failed resolution on a scoped
  * install is indistinguishable from a forged one, so it answers empty too, while an
  * unscoped install falls back to the static config goals.
+ *
+ * Every answer is `no-store`: which goals a caller sees depends on its own scope.
  */
 export const makeGoalsHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
-		return Response.json({ error: 'unauthorized' }, { status: 401 })
+		return errorResponse(401, analyticsError('unauthorized', 'analytics: authentication required'))
 	}
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
-		return Response.json({ goals: [], collection: null } satisfies GoalsResponse)
+		return Response.json({ goals: [], collection: null } satisfies GoalsResponse, {
+			headers: NO_STORE,
+		})
 	}
 	if (!(await readAccessFor(runtime, req))) {
-		return Response.json({ error: 'forbidden' }, { status: 403 })
+		return errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
 	}
 	const collection = runtime.goalsCollectionSlug ? { slug: runtime.goalsCollectionSlug } : null
 	const configGoals = (): WireGoal[] =>
@@ -44,7 +49,7 @@ export const makeGoalsHandler = (): PayloadHandler => async (req) => {
 	try {
 		const scope = await resolveScopeFor(runtime, req)
 		if (runtime.scoped && scope === null && !(await platformReadFor(runtime, req))) {
-			return Response.json({ goals: [], collection } satisfies GoalsResponse)
+			return Response.json({ goals: [], collection } satisfies GoalsResponse, { headers: NO_STORE })
 		}
 		const resolved = await resolveGoalsDetailedFor(runtime, req, scope)
 		const goals = resolved.map(({ goal, source }) => ({
@@ -52,12 +57,15 @@ export const makeGoalsHandler = (): PayloadHandler => async (req) => {
 			name: goal.name,
 			source,
 		}))
-		return Response.json({ goals, collection } satisfies GoalsResponse)
+		return Response.json({ goals, collection } satisfies GoalsResponse, { headers: NO_STORE })
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: goals listing failed: ${String(err)}`)
-		return Response.json({
-			goals: runtime.scoped ? [] : configGoals(),
-			collection,
-		} satisfies GoalsResponse)
+		return Response.json(
+			{
+				goals: runtime.scoped ? [] : configGoals(),
+				collection,
+			} satisfies GoalsResponse,
+			{ headers: NO_STORE }
+		)
 	}
 }
