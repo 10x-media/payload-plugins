@@ -3,6 +3,7 @@ import type { PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { EVENTS_SLUG } from '../../src/native/collections/events'
+import { requestHostname } from '../../src/native/ingest/requestHost'
 import { native } from '../../src/native/nativeAdapter'
 import { getRuntime, resolveRegistryFor, resolveScopeFor } from '../../src/plugin/runtime'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
@@ -243,5 +244,105 @@ describeForDb('analytics scope seam: native ingest attribution', {}, (db) => {
 	it('keeps a platform hostname under the null scope', async () => {
 		await ingest('/platform', 'platform.example')
 		expect(await rows('/platform')).toEqual([['platform.example', '']])
+	})
+})
+
+const TENANT_BY_HOST = new Map<string, string>([
+	['t1.example', 't1'],
+	['t2.example', 't2'],
+])
+
+/** Attribution and tenancy have to read the same host, or an event lands in another tenant. */
+const tenantFor = (req: PayloadRequest, trustedProxyHops?: number): string | null =>
+	TENANT_BY_HOST.get(requestHostname(req.headers, { trustedProxyHops }) ?? '') ?? null
+
+const ingestWith = (booted: BootedPayload, path: string, headers: Record<string, string>) => {
+	const endpoint = booted.payload.config.endpoints?.find((e) => e.path === '/analytics/ingest')
+	if (!endpoint) {
+		throw new Error('ingest endpoint not registered')
+	}
+	return endpoint.handler(
+		ingestRequest(booted.payload, { type: 'pageview', path, hostname: 'claimed.example' }, headers)
+	)
+}
+
+const attributionRows = async (
+	booted: BootedPayload,
+	path: string
+): Promise<Array<[string, string | undefined]>> => {
+	const { docs } = await booted.payload.find({
+		collection: EVENTS_SLUG as never,
+		where: { path: { equals: path } },
+		pagination: false,
+	})
+	return (docs as unknown as Array<{ hostname: string; scope?: string }>).map((row) => [
+		row.hostname,
+		row.scope,
+	])
+}
+
+describeForDb('analytics scope seam: forwarded host at a trusted hop', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			plugin: analytics({
+				adapters: [native()],
+				trustedProxyHops: 1,
+				scopeResolver: ({ req }) => tenantFor(req, 1),
+			}),
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('picks the tenant and the hostname out of x-forwarded-host', async () => {
+		await ingestWith(booted, '/forwarded', {
+			host: 'proxy.internal',
+			'x-forwarded-host': 't1.example',
+		})
+		expect(await attributionRows(booted, '/forwarded')).toEqual([['t1.example', 't1']])
+	})
+
+	it('falls back to Host when the trusted proxy forwarded none', async () => {
+		await ingestWith(booted, '/direct', { host: 't2.example' })
+		expect(await attributionRows(booted, '/direct')).toEqual([['t2.example', 't2']])
+	})
+})
+
+describeForDb('analytics scope seam: forwarded host with no trusted hop', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			plugin: analytics({
+				adapters: [native()],
+				scopeResolver: ({ req }) => tenantFor(req),
+			}),
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('ignores x-forwarded-host entirely, keeping the Host tenant', async () => {
+		await ingestWith(booted, '/untrusted', {
+			host: 't1.example',
+			'x-forwarded-host': 't2.example',
+		})
+		expect(await attributionRows(booted, '/untrusted')).toEqual([['t1.example', 't1']])
+	})
+
+	it('drops an event a forwarded host would otherwise have claimed a tenant for', async () => {
+		await ingestWith(booted, '/spoofed', {
+			host: 'proxy.internal',
+			'x-forwarded-host': 't1.example',
+		})
+		expect(await attributionRows(booted, '/spoofed')).toEqual([])
 	})
 })

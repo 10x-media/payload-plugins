@@ -10,6 +10,7 @@ import type {
 	DimensionKey,
 	MetricKey,
 } from '../core/contract'
+import type { IngestHostnameResolver } from '../core/serverEvent'
 import { INGEST_PATH } from '../plugin/paths'
 import { EVENTS_SLUG, eventsCollection } from './collections/events'
 import { ROLLUPS_SLUG, rollupsCollection } from './collections/rollups'
@@ -21,7 +22,12 @@ import { maxmindResolver } from './geo/maxmindResolver'
 import { type IngestAttribution, type IngestResolvers, makeIngestHandler } from './ingest/endpoint'
 import { flushBatch } from './ingest/flushBatch'
 import type { StoredEvent } from './ingest/normalizeEvent'
-import { type HostnameOption, hostnameSet, resolveHostnameOption } from './ingest/resolveHostname'
+import {
+	type HostnameOption,
+	hostnameSet,
+	resolveEventHostname,
+	resolveHostnameOption,
+} from './ingest/resolveHostname'
 import { makeServerTrack } from './ingest/serverTrack'
 import { createWriteBuffer, type WriteBuffer } from './ingest/writeBuffer'
 import { aggregateEvents, type EventLike, filtersToWhere } from './query/eventAgg'
@@ -244,6 +250,16 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 			getResolvers: () => resolvers,
 			getAttribution: () => attribution,
 		}),
+		// The endpoint's own hostname policy, minus the scoped-install drop rule: a caller on
+		// this seam already knows the boundary its event belongs to.
+		hostname: (args: Parameters<IngestHostnameResolver>[0]) =>
+			resolveEventHostname({
+				option: hostname,
+				claimed: args.claimed,
+				req: args.req,
+				scope: args.scope ?? null,
+				trustedProxyHops: attribution.trustedProxyHops,
+			}),
 	}
 
 	return {

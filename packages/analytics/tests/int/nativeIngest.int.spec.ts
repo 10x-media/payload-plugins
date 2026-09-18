@@ -140,6 +140,41 @@ describeForDb('native ingest endpoint', {}, (db) => {
 		expect((docs[0] as { country?: string } | undefined)?.country).toBe('US')
 	})
 
+	// Every distinct stored hostname opens a rollup bucket family that nothing prunes, so the
+	// spellings of one host have to land in one family and junk has to land in none.
+	it('lands every spelling of one host in one bucket family', async () => {
+		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver })
+		const spellings = ['Site.Example', 'site.example:3000', 'site.example.', 'SITE.EXAMPLE..:443']
+		const junk = ['site..example', '.site.example', 'site example', `${'a'.repeat(300)}.example`]
+		for (const host of [...spellings, ...junk]) {
+			const res = await handler(
+				ingestRequest(booted.payload, { type: 'pageview', path: '/spelling' }, { host })
+			)
+			expect(res.status, host).toBe(202)
+		}
+
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/spelling' } },
+			pagination: false,
+		})
+		expect(docs).toHaveLength(spellings.length)
+		expect([
+			...new Set((docs as unknown as Array<{ hostname: string }>).map((d) => d.hostname)),
+		]).toEqual(['site.example'])
+
+		const rollups = await booted.payload.find({
+			collection: ROLLUPS_SLUG as never,
+			where: { path: { equals: '/spelling' } },
+			pagination: false,
+		})
+		const families = new Set(
+			(rollups.docs as unknown as Array<{ hostname: string }>).map((d) => d.hostname)
+		)
+		// The hostname-less family every delta also writes, and exactly one named family.
+		expect([...families].sort()).toEqual(['', 'site.example'])
+	})
+
 	it('serves a site-wide country breakdown through the native adapter', async () => {
 		await ingest(booted, '/country-a')
 		await ingest(booted, '/country-b')

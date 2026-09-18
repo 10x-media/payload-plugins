@@ -30,15 +30,24 @@ describe('resolveHostnameOption', () => {
 		expect(resolveHostnameOption('request')).toEqual({ kind: 'request' })
 	})
 
-	it('lowercases a list on the way in', () => {
-		const option = resolveHostnameOption(['A.Example', 'b.example.'])
+	it('lowercases a list on the way in and strips every trailing dot', () => {
+		const option = resolveHostnameOption(['A.Example', 'b.example..'])
 		expect(option.kind).toBe('list')
 		expect(option.kind === 'list' && [...option.hosts]).toEqual(['a.example', 'b.example'])
 	})
 
 	it('throws on a list entry that is not a usable hostname', () => {
-		for (const entry of ['', '   ', 'a example', 'https://a.example']) {
-			expect(() => resolveHostnameOption([entry])).toThrow(/hostname/i)
+		for (const entry of [
+			'',
+			'   ',
+			'a example',
+			'https://a.example',
+			'a.example:3000',
+			'.a.example',
+			'a..example',
+			`${'a'.repeat(300)}.example`,
+		]) {
+			expect(() => resolveHostnameOption([entry]), entry).toThrow(/hostname/i)
 		}
 	})
 
@@ -107,14 +116,13 @@ describe('resolveEventHostname', () => {
 		expect(fn.mock.calls[0]?.[0]?.scope).toBe('t1')
 	})
 
-	it('caps a resolver answer and drops an unusable or null one', async () => {
-		const long = `${'a'.repeat(300)}.example`
+	it('normalizes a resolver answer and drops a null or blank one', async () => {
 		expect(
 			await resolve(
-				resolveHostnameOption(() => long),
+				resolveHostnameOption(() => 'Chosen.Example.:8443'),
 				{ host: 'a.example' }
 			)
-		).toHaveLength(253)
+		).toBe('chosen.example')
 		expect(
 			await resolve(
 				resolveHostnameOption(() => null),
@@ -127,6 +135,26 @@ describe('resolveEventHostname', () => {
 				{ host: 'a.example' }
 			)
 		).toBeNull()
+	})
+
+	// A resolver is application code, and the value it hands back is stored per event: an id or
+	// a label would reintroduce exactly the unbounded bucket families request attribution closed.
+	it('drops the event when a resolver answers something that is not a hostname', async () => {
+		for (const answer of [
+			'tenant 7',
+			'site/alpha',
+			'https://a.example',
+			'Tenant #4',
+			`${'a'.repeat(300)}.example`,
+		]) {
+			expect(
+				await resolve(
+					resolveHostnameOption(() => answer),
+					{ host: 'a.example' }
+				),
+				answer
+			).toBeNull()
+		}
 	})
 
 	it('drops the event when a resolver throws', async () => {

@@ -1,34 +1,48 @@
 /** Longest legal DNS name, and the cap every stored hostname carries. */
 export const MAX_HOSTNAME_LENGTH = 253
 
-/** Whitespace, a slash or an at sign: none of them can appear in a host, so the value is junk. */
-const ILLEGAL = /[\s/@]/
+/** Dot-separated labels, which is also every IPv4 literal. */
+const DNS_NAME = /^[a-z0-9_-]+(\.[a-z0-9_-]+)*$/
 
-/** A bracketed IPv6 literal keeps its brackets, which is how a Host header spells one. */
+/** An IPv6 literal as a `Host` header spells it, minus the brackets: hex groups and colons. */
+const IPV6 = /^[0-9a-f]{0,4}(:[0-9a-f]{0,4}){2,7}$/
+
+/**
+ * The one shape a hostname has anywhere in this plugin: config entries, `platformHostnames`,
+ * the host a request carried and a resolver's answer are all held to it. A host that can only
+ * be spelled one way can only open one rollup bucket family, and nothing prunes those, so a
+ * public endpoint that accepted several spellings of one name would hand a client an unbounded
+ * write.
+ */
+export const isHostname = (value: string): boolean =>
+	value.length > 0 &&
+	value.length <= MAX_HOSTNAME_LENGTH &&
+	(DNS_NAME.test(value) || IPV6.test(value))
+
+/** `host[:port]`, or the bracketed IPv6 form a `Host` header uses, which loses its brackets. */
 const stripPort = (value: string): string => {
-	if (value.startsWith('[')) {
-		const end = value.indexOf(']')
-		return end === -1 ? value : value.slice(0, end + 1)
+	const bracketed = /^\[([^\]]*)\](?::\d+)?$/.exec(value)
+	if (bracketed) {
+		return bracketed[1] ?? ''
 	}
-	const colon = value.indexOf(':')
-	return colon === -1 ? value : value.slice(0, colon)
+	const named = /^([^:]*)(?::\d+)?$/.exec(value)
+	return named?.[1] ?? value
 }
 
 /**
- * A hostname as it is stored and compared: lowercased, without port or trailing root dot, and
- * capped. Null for anything that cannot be one, so a caller drops it rather than opening a
- * rollup bucket family for junk.
+ * A hostname as it is stored and compared: lowercased, without port, brackets or trailing root
+ * dots. Null for anything that is not {@link isHostname} afterwards, so a caller drops it
+ * rather than opening a rollup bucket family for junk.
  */
 export const normalizeHostname = (value: string | null | undefined): string | null => {
-	const raw = value?.trim()
+	const raw = value?.trim().toLowerCase()
 	if (!raw) {
 		return null
 	}
-	const host = stripPort(raw.toLowerCase()).replace(/\.$/, '')
-	if (!host || ILLEGAL.test(host)) {
-		return null
-	}
-	return host.slice(0, MAX_HOSTNAME_LENGTH)
+	// Every trailing dot rather than one: `example.com.` and `example.com..` name the same
+	// host, and each extra spelling left standing would be its own bucket family.
+	const host = stripPort(raw).replace(/\.+$/, '')
+	return isHostname(host) ? host : null
 }
 
 export interface RequestHostnameOptions {

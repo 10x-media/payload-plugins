@@ -197,18 +197,38 @@ describe('trackGoalAction: hostname', () => {
 		expect(tracked[0]?.event.hostname).toBe('localhost')
 	})
 
-	it('keeps the brackets around an IPv6 request host', async () => {
+	it('unwraps a bracketed IPv6 request host and strips its port', async () => {
 		await trackGoalAction().run(runArgs(withHost('[::1]:3000')))
-		expect(tracked[0]?.event.hostname).toBe('[::1]')
+		expect(tracked[0]?.event.hostname).toBe('::1')
 
 		tracked.length = 0
 		await trackGoalAction().run(runArgs(withHost('[2001:db8::1]')))
-		expect(tracked[0]?.event.hostname).toBe('[2001:db8::1]')
+		expect(tracked[0]?.event.hostname).toBe('2001:db8::1')
 	})
 
 	it('does not truncate a bracketless IPv6 request host at its last colon', async () => {
 		await trackGoalAction().run(runArgs(withHost('2001:db8::1')))
 		expect(tracked[0]?.event.hostname).toBe('2001:db8::1')
+	})
+
+	// The submission's `Host` is as forgeable here as it is on the ingest endpoint, so a host
+	// that is not a hostname falls through to the install's own rather than being stored.
+	it('refuses a request host that is not a hostname and takes the serverURL instead', async () => {
+		for (const host of ['a.example/../b', 'shop example', '.shop.example', 'shop.example:port']) {
+			tracked.length = 0
+			await trackGoalAction().run(
+				runArgs({ payload: payloadWith('https://cms.example'), ...withHost(host) })
+			)
+			expect(tracked[0]?.event.hostname, host).toBe('cms.example')
+		}
+	})
+
+	it('collapses the spellings of one request host onto one hostname', async () => {
+		for (const host of ['Shop.Example', 'shop.example.', 'shop.example..:8443']) {
+			tracked.length = 0
+			await trackGoalAction().run(runArgs(withHost(host)))
+			expect(tracked[0]?.event.hostname, host).toBe('shop.example')
+		}
 	})
 
 	it('falls back to the serverURL host when the queued run has no request', async () => {
@@ -236,16 +256,23 @@ describe('trackGoalAction: hostname', () => {
 		expect(tracked[0]?.event.hostname).toBe('shop.example')
 	})
 
-	it('throws when there is no option, no request host and no serverURL', async () => {
-		await expect(trackGoalAction().run(runArgs())).rejects.toBeInstanceOf(AnalyticsTrackError)
-		expect(tracked).toHaveLength(0)
+	it('ignores an option that is not a hostname rather than storing it', async () => {
+		await trackGoalAction({ hostname: 'Shop Example' }).run(
+			runArgs({ payload: payloadWith('https://cms.example') })
+		)
+		expect(tracked[0]?.event.hostname).toBe('cms.example')
 	})
 
-	it('throws when the serverURL is not a parsable URL', async () => {
-		await expect(
-			trackGoalAction().run(runArgs({ payload: payloadWith('not a url') }))
-		).rejects.toBeInstanceOf(AnalyticsTrackError)
-		expect(tracked).toHaveLength(0)
+	// Last resort, and deliberately not a throw: a conversion is a real event, and losing it
+	// over the name of the site it happened on would be the worse trade.
+	it('falls back to an empty hostname with no option, no request host and no serverURL', async () => {
+		await trackGoalAction().run(runArgs())
+		expect(tracked[0]?.event.hostname).toBe('')
+	})
+
+	it('falls back the same way when the serverURL is not a parsable URL', async () => {
+		await trackGoalAction().run(runArgs({ payload: payloadWith('not a url') }))
+		expect(tracked[0]?.event.hostname).toBe('')
 	})
 })
 

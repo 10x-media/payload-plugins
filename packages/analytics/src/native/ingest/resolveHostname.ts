@@ -1,10 +1,14 @@
 import type { PayloadRequest } from 'payload'
-import { MAX_HOSTNAME_LENGTH, normalizeHostname, requestHostname } from './requestHost'
+import { isHostname, normalizeHostname, requestHostname } from './requestHost'
 
 /**
  * Decides the hostname an event is stored under, or null to drop it. `claimed` is what the
  * body sent, which is never trusted on its own; `scope` is the scope the request already
  * resolved to, so a split deployment can validate `Origin` against that tenant's own domains.
+ *
+ * The answer must be a hostname: it is normalized and then held to the same shape a request
+ * host is, and anything else (a slug, a tenant id, free text) drops the event rather than
+ * storing per-event text no rollup family can ever be pruned from.
  */
 export type HostnameResolver = (args: {
 	claimed: string | undefined
@@ -25,17 +29,15 @@ export type ResolvedHostnameOption =
 	| { kind: 'resolver'; resolve: HostnameResolver }
 
 /**
- * Dot-separated labels and nothing else. Stricter than what a request host is normalized to,
- * because a configured entry carrying a scheme or a port would silently never match.
+ * Config-time list validation: entries are lowercased here, so the ingest compare is exact.
+ * The port is not stripped the way a request host's is, because an entry carrying one would
+ * otherwise be accepted and then silently never match what is stored.
  */
-const HOSTNAME = /^[a-z0-9_-]+(\.[a-z0-9_-]+)*$/
-
-/** Config-time list validation: entries are lowercased here, so the ingest compare is exact. */
 export const hostnameSet = (values: string[] | undefined, option: string): ReadonlySet<string> => {
 	const hosts = new Set<string>()
 	for (const value of values ?? []) {
-		const host = typeof value === 'string' ? value.trim().toLowerCase().replace(/\.$/, '') : ''
-		if (!host || host.length > MAX_HOSTNAME_LENGTH || !HOSTNAME.test(host)) {
+		const host = typeof value === 'string' ? value.trim().toLowerCase().replace(/\.+$/, '') : ''
+		if (!isHostname(host)) {
 			throw new Error(
 				`analytics: ${option} entries must each be a bare hostname, got "${String(value)}"`
 			)

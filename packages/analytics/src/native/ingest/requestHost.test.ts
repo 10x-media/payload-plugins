@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { requestHostname } from './requestHost'
+import { isHostname, normalizeHostname, requestHostname } from './requestHost'
 
 const headers = (init: Record<string, string>) => new Headers(init)
 
@@ -43,18 +43,19 @@ describe('requestHostname', () => {
 		expect(requestHostname(headers({ host: 'A.Example:3000' }), {})).toBe('a.example')
 	})
 
-	it('keeps a bracketed IPv6 host and strips its port', () => {
-		expect(requestHostname(headers({ host: '[::1]:3000' }), {})).toBe('[::1]')
-		expect(requestHostname(headers({ host: '[2001:DB8::1]' }), {})).toBe('[2001:db8::1]')
+	it('unwraps a bracketed IPv6 host and strips its port', () => {
+		expect(requestHostname(headers({ host: '[::1]:3000' }), {})).toBe('::1')
+		expect(requestHostname(headers({ host: '[2001:DB8::1]' }), {})).toBe('2001:db8::1')
 	})
 
-	it('strips the trailing root dot', () => {
-		expect(requestHostname(headers({ host: 'a.example.:443' }), {})).toBe('a.example')
+	it('refuses an unclosed bracket rather than storing it as its own host', () => {
+		expect(requestHostname(headers({ host: '[::1' }), {})).toBeNull()
+		expect(requestHostname(headers({ host: '[::1]junk' }), {})).toBeNull()
+		expect(requestHostname(headers({ host: '::1]' }), {})).toBeNull()
 	})
 
-	it('caps an over-long value at the longest legal DNS name', () => {
-		const long = `${'a'.repeat(300)}.example`
-		expect(requestHostname(headers({ host: long }), {})).toHaveLength(253)
+	it('refuses an over-long value rather than truncating it into a new host', () => {
+		expect(requestHostname(headers({ host: `${'a'.repeat(300)}.example` }), {})).toBeNull()
 	})
 
 	it('answers null for an empty header set, a blank host, or a bare port', () => {
@@ -67,5 +68,63 @@ describe('requestHostname', () => {
 		expect(requestHostname(headers({ host: 'a.example/../b' }), {})).toBeNull()
 		expect(requestHostname(headers({ host: 'user@a.example' }), {})).toBeNull()
 		expect(requestHostname(headers({ host: 'a example' }), {})).toBeNull()
+	})
+})
+
+// Each distinct stored hostname starts a rollup bucket family, and nothing prunes those, so a
+// spelling this collapses is a write an unauthenticated client cannot repeat for free.
+describe('normalizeHostname spellings', () => {
+	it('collapses case, port and every trailing dot onto one hostname', () => {
+		for (const spelling of [
+			'a.example',
+			'A.Example',
+			'a.example.',
+			'a.example..',
+			'a.example...',
+			'a.example:3000',
+			'A.EXAMPLE.:443',
+			'  a.example  ',
+		]) {
+			expect(normalizeHostname(spelling), spelling).toBe('a.example')
+		}
+	})
+
+	it('refuses a leading or doubled dot, which name no host at all', () => {
+		for (const spelling of ['.a.example', 'a..example', '.', '..']) {
+			expect(normalizeHostname(spelling), spelling).toBeNull()
+		}
+	})
+
+	it('refuses a percent-encoded or non-ASCII spelling of a name', () => {
+		for (const spelling of ['a%2eexample', '%61.example', 'ä.example', 'a.example​']) {
+			expect(normalizeHostname(spelling), spelling).toBeNull()
+		}
+	})
+
+	it('refuses a port that is not a port', () => {
+		expect(normalizeHostname('a.example:port')).toBeNull()
+		expect(normalizeHostname('a.example:')).toBeNull()
+	})
+
+	it('keeps an IPv4 literal, which is already a dot-separated name', () => {
+		expect(normalizeHostname('203.0.113.7:8080')).toBe('203.0.113.7')
+	})
+})
+
+describe('isHostname', () => {
+	it('accepts a single label, a dotted name and an IPv6 literal', () => {
+		expect(isHostname('localhost')).toBe(true)
+		expect(isHostname('alpha.localhost')).toBe(true)
+		expect(isHostname('a_b-c.example')).toBe(true)
+		expect(isHostname('::1')).toBe(true)
+	})
+
+	it('refuses free text, a scheme, a port and anything over the DNS cap', () => {
+		expect(isHostname('')).toBe(false)
+		expect(isHostname('tenant 7')).toBe(false)
+		expect(isHostname('https://a.example')).toBe(false)
+		expect(isHostname('a.example:3000')).toBe(false)
+		expect(isHostname('A.example')).toBe(false)
+		expect(isHostname(`${'a'.repeat(254)}`)).toBe(false)
 	})
 })

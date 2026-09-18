@@ -1,6 +1,8 @@
 import type { Field, Payload, PayloadRequest } from 'payload'
 import { AnalyticsTrackError } from '../core/serverEvent'
+import { normalizeHostname, requestHostname } from '../native/ingest/requestHost'
 import { trackServerEvent } from '../native/ingest/serverTrack'
+import { getRuntime } from '../plugin/runtime'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import { validateCurrency } from './currency'
@@ -41,9 +43,10 @@ export interface GoalActionDefinition {
 
 export interface TrackGoalActionOptions {
 	/**
-	 * Site the completion belongs to. Falls back to the submitting request's host, then to
-	 * the host of `serverURL`. Set it whenever a jobs runner queues actions: the runner's
-	 * request carries the CMS host at best, and often no host at all.
+	 * Site the completion belongs to. Falls back to the submitting request's host as the
+	 * native adapter's `hostname` policy judges it, then to the host of `serverURL`. Set it
+	 * whenever a jobs runner queues actions: the runner's request carries the CMS host at
+	 * best, and often no host at all.
 	 */
 	hostname?: string | ((args: GoalActionRunArgs) => string)
 	/** Page the completion is attributed to. Defaults to `/forms/<form id>`. */
@@ -104,56 +107,56 @@ const fromOption = (
 ): string | undefined =>
 	nonEmpty(typeof option === 'function' ? option(args) : (option ?? undefined))
 
-/**
- * The host out of a `Host` header. An IPv6 literal keeps its brackets, which is what the URL
- * spec and every other hostname in the pipeline use; only a bracketed or single-colon host
- * can carry a port, so a bare `::1` is left whole rather than truncated at its last colon.
- */
-const stripPort = (host: string): string => {
-	const bracketed = /^(\[[^\]]+\])(?::\d+)?$/.exec(host)
-	if (bracketed?.[1]) {
-		return bracketed[1]
-	}
-	if (host.indexOf(':') !== host.lastIndexOf(':')) {
-		return host
-	}
-	return host.replace(/:\d+$/, '')
-}
-
-const serverUrlHost = (payload: Payload): string | undefined => {
+const serverUrlHost = (payload: Payload): string | null => {
 	const serverURL = nonEmpty(payload.config?.serverURL)
 	if (!serverURL) {
-		return undefined
+		return null
 	}
 	try {
-		return nonEmpty(new URL(serverURL).hostname)
+		return normalizeHostname(new URL(serverURL).hostname)
 	} catch {
-		return undefined
+		return null
 	}
 }
 
 /**
- * The option, then the submitting request, then the install's own `serverURL`. The queued
- * dispatch path reaches the last two with the runner's request, so an install that queues
- * actions and serves more than one site has to say which site in the option.
+ * The submitting request's host as the native adapter's own `hostname` policy judges it: a
+ * `Host` header is forgeable, and a conversion must not be able to mint a hostname the ingest
+ * endpoint would have refused. Without an adapter exposing that seam the request's own host
+ * stands in, which is the policy's default anyway.
  */
-const hostnameFor = (options: TrackGoalActionOptions, args: GoalActionRunArgs): string => {
-	const configured = fromOption(options.hostname, args)
+const policyHostname = async (
+	args: GoalActionRunArgs,
+	scope: string | null
+): Promise<string | null> => {
+	if (!args.req) {
+		return null
+	}
+	const runtime = getRuntime(args.payload)
+	const policy = runtime?.registry.all().find((adapter) => adapter.ingest?.hostname)
+		?.ingest?.hostname
+	return policy
+		? policy({ req: args.req, scope })
+		: requestHostname(args.req.headers, { trustedProxyHops: runtime?.trustedProxyHops })
+}
+
+/**
+ * The option, then the submitting request under the ingest hostname policy, then the install's
+ * own `serverURL`, then nothing at all. Every rung is normalized to the one hostname shape, and
+ * a refused host costs the conversion its hostname rather than the conversion itself. The
+ * queued dispatch path reaches the last two with the runner's request, so an install that
+ * queues actions and serves more than one site has to say which site in the option.
+ */
+const hostnameFor = async (
+	options: TrackGoalActionOptions,
+	args: GoalActionRunArgs,
+	scope: string | null
+): Promise<string> => {
+	const configured = normalizeHostname(fromOption(options.hostname, args))
 	if (configured) {
-		return configured.toLowerCase()
+		return configured
 	}
-	const header = nonEmpty(args.req?.headers.get('host'))
-	const fromHeader = header ? nonEmpty(stripPort(header)) : undefined
-	if (fromHeader) {
-		return fromHeader.toLowerCase()
-	}
-	const fromServerUrl = serverUrlHost(args.payload)
-	if (fromServerUrl) {
-		return fromServerUrl.toLowerCase()
-	}
-	throw new AnalyticsTrackError(
-		'analytics: trackGoalAction could not resolve a hostname; set the `hostname` option, or configure `serverURL`, since a queued run has no submitting request'
-	)
+	return (await policyHostname(args, scope)) ?? serverUrlHost(args.payload) ?? ''
 }
 
 /** The fixed value wins; otherwise the named answer, and only when it reads as a number. */
@@ -214,17 +217,18 @@ export const trackGoalAction = (options: TrackGoalActionOptions = {}): GoalActio
 		if (!slug) {
 			throw new AnalyticsTrackError('analytics: trackGoalAction has no goal configured')
 		}
+		const scope = await scopeFor(options, args)
 		await trackServerEvent(
 			args.payload,
 			{
 				type: 'goal',
 				name: slug,
 				path: fromOption(options.path, args) ?? `/forms/${args.form.id}`,
-				hostname: hostnameFor(options, args),
+				hostname: await hostnameFor(options, args, scope.scope ?? null),
 				value: valueFor(args),
 				currency: nonEmpty(args.config.currency),
 				props: propsFor(args),
-				...(await scopeFor(options, args)),
+				...scope,
 			},
 			{ req: args.req }
 		)

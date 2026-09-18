@@ -275,6 +275,17 @@ describe('makeIngestHandler attribution', () => {
 		expect(events.map((event) => [event.hostname, event.scope])).toEqual([['platform.example', '']])
 	})
 
+	it('reads x-forwarded-host only once a proxy hop is trusted', async () => {
+		const forwarded = { host: 'a.example', 'x-forwarded-host': 'b.example' }
+		const ignored = handlerWithAttribution({ trustedProxyHops: 0 })
+		await ignored.handler(withHost(pageview, forwarded))
+		expect(ignored.events[0]?.hostname).toBe('a.example')
+
+		const trusted = handlerWithAttribution({ trustedProxyHops: 1 })
+		await trusted.handler(withHost(pageview, forwarded))
+		expect(trusted.events[0]?.hostname).toBe('b.example')
+	})
+
 	it('pays for neither the timezone nor the goals resolver on a drop', async () => {
 		const timezone = vi.fn(async () => 'Europe/Berlin')
 		const goals = vi.fn(async () => [])
@@ -282,5 +293,66 @@ describe('makeIngestHandler attribution', () => {
 		await handler(withHost(pageview, {}))
 		expect(timezone).not.toHaveBeenCalled()
 		expect(goals).not.toHaveBeenCalled()
+	})
+})
+
+// The response cannot say a drop happened without telling a prober which hosts exist, so the
+// log says it instead: once per reason for the life of the process, never once per event.
+describe('makeIngestHandler drop warnings', () => {
+	const withLogger = (
+		headers: Record<string, string>,
+		warn: (message: string) => void
+	): PayloadRequest =>
+		Object.assign(
+			new Request('http://localhost/api/analytics/ingest', {
+				method: 'POST',
+				body: JSON.stringify({ type: 'pageview', path: '/p' }),
+				headers: { 'content-type': 'application/json', ...headers },
+			}),
+			{
+				payload: {
+					kv: { get: async () => ({ salt: 'salt' }), set: async () => undefined },
+					logger: { warn },
+				},
+			}
+		) as unknown as PayloadRequest
+
+	it('warns once for a refused hostname and stays silent on every later drop', async () => {
+		const warn = vi.fn()
+		const { buffer } = capture()
+		const handler = makeIngestHandler({ geoResolver: noopResolver, getBuffer: () => buffer })
+		await handler(withLogger({}, warn))
+		await handler(withLogger({}, warn))
+		await handler(withLogger({ host: 'a.example' }, warn))
+		expect(warn).toHaveBeenCalledTimes(1)
+		expect(warn.mock.calls[0]?.[0]).toMatch(/hostname option/)
+	})
+
+	it('warns once for an unresolved scope, naming scopeResolver and platformHostnames', async () => {
+		const warn = vi.fn()
+		const { buffer } = capture()
+		const handler = makeIngestHandler({
+			geoResolver: noopResolver,
+			getBuffer: () => buffer,
+			resolvers: { scope: async () => null },
+		})
+		await handler(withLogger({ host: 'a.example' }, warn))
+		await handler(withLogger({ host: 'b.example' }, warn))
+		expect(warn).toHaveBeenCalledTimes(1)
+		expect(warn.mock.calls[0]?.[0]).toMatch(/scopeResolver/)
+		expect(warn.mock.calls[0]?.[0]).toMatch(/platformHostnames/)
+	})
+
+	it('keeps each reason on its own budget', async () => {
+		const warn = vi.fn()
+		const { buffer } = capture()
+		const handler = makeIngestHandler({
+			geoResolver: noopResolver,
+			getBuffer: () => buffer,
+			resolvers: { scope: async () => null },
+		})
+		await handler(withLogger({}, warn))
+		await handler(withLogger({ host: 'a.example' }, warn))
+		expect(warn).toHaveBeenCalledTimes(2)
 	})
 })

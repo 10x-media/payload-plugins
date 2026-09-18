@@ -27,12 +27,25 @@ export interface IngestAttribution {
 
 /**
  * What an accepted beacon answers, and what a dropped one answers too: same status, same body,
- * no header of its own and nothing logged, so the endpoint never tells a prober which hosts or
- * tenants exist.
+ * no header of its own and nothing logged per event, so the endpoint never tells a prober which
+ * hosts or tenants exist.
  */
 const accepted = (): Response => Response.json({ ok: true }, { status: 202 })
 
 const REQUEST_HOSTNAME: ResolvedHostnameOption = { kind: 'request' }
+
+/**
+ * Why a drop happened, and the line that tells an operator where to look. A misconfigured
+ * resolver otherwise discards every event in silence, since the response cannot say so.
+ */
+const DROP_REASONS = {
+	'no scope resolved':
+		'analytics: ingest is dropping events because scopeResolver answered no scope for them. Check that resolver, and list any platform domain in platformHostnames so it ingests under the null scope. Logged once per process.',
+	'hostname refused':
+		'analytics: ingest is dropping events because the hostname option refused the request host. Check that option, and platformHostnames for a platform domain. Logged once per process.',
+} as const
+
+type DropReason = keyof typeof DROP_REASONS
 
 /** One event, not a session replay: far above any legitimate payload, far below a DoS. */
 export const MAX_INGEST_BODY_BYTES = 64 * 1024
@@ -69,14 +82,24 @@ export interface IngestHandlerOptions {
 	attribution?: IngestAttribution
 }
 
-export const makeIngestHandler =
-	({
-		geoResolver,
-		getBuffer = () => null,
-		resolvers = {},
-		attribution = {},
-	}: IngestHandlerOptions): PayloadHandler =>
-	async (req) => {
+export const makeIngestHandler = ({
+	geoResolver,
+	getBuffer = () => null,
+	resolvers = {},
+	attribution = {},
+}: IngestHandlerOptions): PayloadHandler => {
+	// One line per reason for the life of the handler, which is the life of the process: a
+	// public endpoint must not be a log amplifier, and an attacker chooses how often it drops.
+	const warned = new Set<DropReason>()
+	const drop = (req: PayloadRequest, reason: DropReason): Response => {
+		if (!warned.has(reason)) {
+			warned.add(reason)
+			req.payload.logger?.warn(DROP_REASONS[reason])
+		}
+		return accepted()
+	}
+
+	return async (req) => {
 		const { scope: resolveScope, timezone: resolveTimezone, goals: resolveGoals } = resolvers
 		// Read like the capture proxy does, and for the same reasons: this is a public,
 		// unauthenticated path, so the body is capped before it is buffered and a body that
@@ -111,14 +134,17 @@ export const makeIngestHandler =
 			scope: resolvedScope,
 			trustedProxyHops: attribution.trustedProxyHops,
 		})
+		if (hostname === null) {
+			return drop(req, 'hostname refused')
+		}
 		// A scoped install keeps only what a scope answers for. Its platform hostnames are
 		// infrastructure rather than tenants, so they ingest under the null scope.
 		const unscoped =
 			resolveScope !== undefined &&
 			resolvedScope === null &&
-			!(attribution.platformHostnames?.has(hostname ?? '') ?? false)
-		if (hostname === null || unscoped) {
-			return accepted()
+			!(attribution.platformHostnames?.has(hostname) ?? false)
+		if (unscoped) {
+			return drop(req, 'no scope resolved')
 		}
 		const salt = await dailySalt(req.payload, now)
 		const timezone = resolveTimezone ? await resolveTimezone(req, scope ?? null) : undefined
@@ -145,3 +171,4 @@ export const makeIngestHandler =
 		}
 		return accepted()
 	}
+}
