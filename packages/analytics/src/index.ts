@@ -14,6 +14,7 @@ import { makeQueryHandler, QUERY_PATH } from './plugin/queryEndpoint'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
+import type { ScopeChange } from './plugin/scopeChange'
 import { validateScopeField } from './plugin/scopeFieldBoot'
 import { makeSourcesHandler, SOURCES_PATH } from './plugin/sourcesEndpoint'
 import { warmTask } from './plugin/warmTask'
@@ -57,6 +58,13 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		const registryBase = { adapters: resolved.adapters, defaultId: resolved.defaultAdapter }
 		let resolveRegistry = staticRegistryResolver(registry)
 		let invalidateProviders = () => {}
+		/**
+		 * Retires the cached reads of every scope a collection write touched. Bound at init,
+		 * where the epoch store exists; goals defined in plugin config cannot change at
+		 * runtime, so only the collections ever bump. A failed bump is logged and swallowed:
+		 * an unreachable counter must never fail an editor's save.
+		 */
+		let bumpScopes: (change: ScopeChange) => Promise<void> = async () => {}
 		const providersResolve = resolved.providers.resolve
 		if (providersResolve) {
 			resolveRegistry = async (args) =>
@@ -99,7 +107,10 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				slug: resolved.providers.collection.slug,
 				access: resolved.providers.collection.access,
 				overrides: resolved.providers.collection.overrides,
-				onChange: () => invalidateProviders(),
+				onChange: (change) => {
+					invalidateProviders()
+					return bumpScopes(change)
+				},
 				scoped: resolved.scoped,
 				scopeField: resolved.providers.collection.scopeField,
 				resolveScope,
@@ -134,7 +145,10 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 					slug: resolved.goalsCollection.slug,
 					access: resolved.goalsCollection.access,
 					overrides: resolved.goalsCollection.overrides,
-					onChange: () => goalsResolver.invalidate(),
+					onChange: (change) => {
+						goalsResolver.invalidate()
+						return bumpScopes(change)
+					},
 					scoped: resolved.scoped,
 					scopeField: resolved.goalsCollection.scopeField,
 					resolveScope,
@@ -274,6 +288,21 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				await validateEncryptedBoot(payload, resolved.providers.collection.encryption?.keys)
 			}
 			const epoch = createEpochStore(payload)
+			bumpScopes = async (change) => {
+				const scopes = new Set<string | null>([change.scope])
+				if (change.previousScope !== undefined) {
+					scopes.add(change.previousScope)
+				}
+				for (const scope of scopes) {
+					try {
+						await epoch.bump(scope)
+					} catch (err) {
+						payload.logger?.warn(
+							`analytics: cache epoch bump failed for scope "${scope ?? 'global'}", cached reads stay until their ttl: ${String(err)}`
+						)
+					}
+				}
+			}
 			const engine = createEngine({
 				store: kvCacheStore(payload.kv),
 				queue: { concurrency: 4 },
