@@ -39,6 +39,21 @@ A token that cannot be read falls back to `0`, the value every scope starts on, 
 
 A bump that fails, or that has not settled after two seconds, is logged and dropped rather than failing the document save that triggered it. The save goes through and that scope's cached reads stay until their TTL runs out.
 
+An instance bumps a given scope at most once every five seconds for the refresh endpoint; inside that window the endpoint answers the token already in force and retires nothing again. A looped `POST` therefore costs one round trip rather than one cold provider read per cached query. The two document hooks are not debounced, so a save is always visible on the next read. This is a debounce of invalidation, not request rate limiting: how often a caller may ask is the edge's decision, not the plugin's.
+
+### The refresh endpoint is state-changing and cookie-authenticated
+
+`POST /api/analytics/refresh` changes server state and Payload authenticates it from the admin session cookie, so configure Payload's [`csrf`](https://payloadcms.com/docs/authentication/cookies#csrf-attacks) allowlist on any install that exposes it:
+
+```ts
+buildConfig({
+  csrf: ['https://admin.example.com'],
+  // ...
+})
+```
+
+With Payload's default `csrf: []` there is no allowlist to check, so a request carrying any `Origin` at all is accepted on its cookie. What stops a forged cross-site `POST` then is browser behavior rather than a check: the auth cookie's `SameSite=Lax` default keeps it off a cross-site `POST` in the first place, and the `Content-Type: application/json` a real client sends forces a CORS preflight no foreign origin passes. Only the first of those covers a forger, who picks the content type. An allowlist is the check itself, and it costs one line.
+
 <Callout type="warn">
 **Every entry cached by an earlier release is invalidated once on upgrade.** The epoch segment changed the key format, so entries written before it are never read again: the first read of each query after the upgrade reaches the source, and caching resumes normally from there. Nothing has to be cleared by hand, and the orphaned entries expire on their own.
 </Callout>

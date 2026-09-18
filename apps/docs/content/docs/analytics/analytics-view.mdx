@@ -137,7 +137,7 @@ A section that fails on its own keeps whatever it was showing and adds a retry: 
 
 ## Refresh
 
-**Refresh** retires the reader's own scope's cached reads through [`POST /api/analytics/refresh`](/analytics/data-sources#refresh-endpoint), then reissues the cards, the trend, the breakdown and the goals table, which reach the source rather than the cache. The button reads **Refreshing** and is disabled until the call settles, and a failure leaves an error banner in the toolbar rather than changing what is on screen. It sends no scope, so a tenant refreshes their own scope and nothing else.
+**Refresh** retires the reader's own scope's cached reads through [`POST /api/analytics/refresh`](/analytics/data-sources#refresh-endpoint), then reissues the cards, the trend, the breakdown and the goals table, which reach the source rather than the cache. The button reads **Refreshing** and ignores further presses until the call settles. It is marked `aria-disabled` rather than `disabled`, so a keyboard user is still on it when it comes back. A failure leaves an error banner in the toolbar, in a live region, rather than changing what is on screen. It sends no scope, so a tenant refreshes their own scope and nothing else.
 
 Two things it does not reissue:
 

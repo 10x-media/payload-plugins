@@ -288,19 +288,22 @@ It bumps one scope's [cache epoch](/analytics/cache#invalidation), which retires
 
 The token is opaque. It is a value to compare for change, never one to parse, order or count with. The answer carries `Cache-Control: private, no-store`.
 
-The body is optional and carries one optional `scope`. An empty body, a body that is not a JSON object, and a body with no `scope` all mean the caller's own resolved scope, so a bare `POST` with nothing at all is the ordinary call. A body larger than 4 KiB, or one that could not be read, answers `400 invalid_param` with `param: 'scope'`.
+The body is optional and carries one optional `scope`. An empty body, a body that is not a JSON object, a body with no `scope`, and a `scope` that is blank once trimmed all mean the caller's own resolved scope, so a bare `POST` with nothing at all is the ordinary call. A body larger than 4 KiB answers `413 payload_too_large`; one that could not be read answers `400 invalid_param` with `param: 'scope'`.
 
-Authentication and `access.read` gate it exactly as they gate the read endpoints. Scope follows the query endpoint: naming any scope is a cross-scope decision and requires `access.platformRead`, so a tenant naming another tenant's scope gets `400 untrusted_scope` rather than a silent no-op.
+Authentication and `access.read` gate it exactly as they gate the read endpoints. Scope is then decided by the same code the query endpoint reads with, so this endpoint refuses every request that endpoint refuses. Naming any scope is a cross-scope decision and requires `access.platformRead`, so a tenant naming another tenant's scope gets `400 untrusted_scope` rather than a silent no-op. A request that resolves no scope at all on a scoped install is `untrusted_scope` too, unless the caller has `access.platformRead`: null usually means no tenant is selected rather than "everything", and the install-wide token it would otherwise bump is the one every cross-scope read keys on.
 
 | Status | `error.code` | `param` | When |
 |---|---|---|---|
-| `400` | `invalid_param` | `scope` | `scope` is present but not a string, or the body is over 4 KiB or unreadable |
-| `400` | `untrusted_scope` | `scope` | a `scope` in the body from a caller `access.platformRead` denies, the platform wildcard included |
+| `400` | `invalid_param` | `scope` | `scope` is present but not a string, or the body could not be read |
+| `400` | `untrusted_scope` | `scope` | a `scope` in the body from a caller `access.platformRead` denies, the platform wildcard included, or a request resolving no scope on a scoped install from a caller it denies |
 | `401` | `unauthorized` | | no signed-in user |
 | `403` | `forbidden` | | `access.read` denied the request |
+| `413` | `payload_too_large` | | the body is over 4 KiB |
 | `503` | `unavailable` | | the plugin runtime is not ready on this Payload instance, or the token could not be written. Carries `Retry-After: 30` |
 
 `scope: "*"` bumps the install-wide token rather than every scope's, because a cross-scope read stamps no scope on its query and its entries key on exactly that token. See [Cross-scope entries](/analytics/cache#cross-scope-entries-key-on-the-install-wide-token).
+
+An instance bumps a given scope at most once every five seconds for this endpoint. Inside that window the call answers `200` with the token already in force, without retiring anything again, so a looped `POST` cannot turn one scope's cached reads into provider calls over and over. The collection hooks are not debounced: a saved provider or goal document is always visible on the next read. This is a debounce of invalidation, not request rate limiting, which belongs in front of Payload.
 
 `refreshCache` wraps it for client components, beside `fetchQuery`:
 
