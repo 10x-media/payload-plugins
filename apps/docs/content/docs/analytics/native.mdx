@@ -36,7 +36,7 @@ interface RawEventInput {
 
 An event is rejected only on its required fields: a known `type`, a non-empty string `path`, and a non-empty string `name` on everything but a pageview. `hostname` is not one of them: it is optional on the wire, and a body that carries one is only type-checked, since the stored value comes from the request rather than from the body (see [Where the hostname comes from](#where-the-hostname-comes-from)). Optional fields are sanitized rather than rejected, so one malformed attribute costs an attribute instead of the whole event: `value` must be a finite number `>= 0`, `currency` must match `/^[A-Z]{3}$/`, `scrollDepth` is clamped to 100 and rounded, `durationMs` must be a finite number between 0 and 86,400,000 (a day) or it is dropped, `name` is truncated to 128 characters (it is the `event` dimension's bucket key) and `path` to 512 (another rollup bucket key; the hostname is a third, and is [refused rather than truncated](#what-counts-as-a-hostname) past 253), and `props` keeps at most 20 flat scalar entries with keys up to 64 characters and string values truncated to 256. The request body is capped at 64 KiB (`413 payload_too_large` above it) and unparseable JSON answers `400 invalid_param`.
 
-The server derives the rest at ingest time: the hostname the event is stored under, the [dimensions](#dimensions) below, a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days), and the [goals](/analytics/goals) the event completed, stamped onto the stored event. The endpoint responds `202` on success and `400` on an invalid body.
+The server derives the rest at ingest time: the hostname the event is stored under, the [dimensions](#dimensions) below, a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days), and the [goals](/analytics/goals) the event completed, stamped onto the stored event. The endpoint responds `202` on success and `400` on an invalid body. A beacon whose user agent belongs to automated traffic is answered with that same `202` and stored nowhere; see [bot filtering](#bot-filtering).
 
 A refusal is the same [error envelope](/analytics/data-sources#errors) the authenticated endpoints answer: `{ "error": { "code", "message", "param"? } }`. The `400` names the first field the event failed on in `param`, checked as `type`, `path`, `hostname`, `name`, so a tracker author is not left guessing which one was refused; a missing `hostname` never lands there, only a non-string one does. Unparseable JSON names `type`, and a body that died in transit (a beacon from an unloading tab) names nothing. The `413` is `payload_too_large` and names nothing either.
 
@@ -54,7 +54,7 @@ The `Origin` header is deliberately never read. A scripted client can pair a val
 
 #### What counts as a hostname
 
-One shape, everywhere: the request's host, a `hostname` list entry, a `platformHostnames` entry and a resolver's answer are all held to it, because two spellings of one host would open two rollup bucket families and [nothing prunes those](#retention-pruning).
+One shape, everywhere: the request's host, a `hostname` list entry, a `platformHostnames` entry and a resolver's answer are all held to it, because two spellings of one host would open two rollup bucket families, and [pruning rollups](#retention-pruning) is opt-in.
 
 A value is lowercased, loses its port, its brackets and every trailing root dot, and must then be either dot-separated labels of `a-z`, `0-9`, `_` and `-` (which covers every IPv4 literal) or an IPv6 literal of hex groups and colons, within 253 characters. `Example.COM:3000`, `example.com.` and `example.com..` are therefore one hostname, and `[::1]:3000` is stored as `::1`. Anything else is not a hostname and the event is dropped: a leading or doubled dot, an unclosed bracket, a percent-encoded or non-ASCII spelling, a port that is not digits, a scheme, or a name over the cap, which is refused rather than truncated into a name of its own.
 
@@ -128,6 +128,52 @@ Unset, the leftmost `x-forwarded-for` entry is used, which is correct for honest
 
 There is no default of 1. An install behind a CDN plus a proxy would then read the CDN's address for every visitor, collapsing geo and the visitor hash onto one value, which is worse than a spoofable one. Count the hops your own deployment actually has.
 
+## Bot filtering
+
+Crawlers, link-preview fetchers, monitors and headless clients are dropped at ingest by default, decided from the request's `user-agent` before the body is even read. **A dropped beacon answers exactly what a kept one answers**: `202` with `{ "ok": true }`, the same headers, and, for a recognized marker, nothing in the log. Automated traffic is expected on a public endpoint rather than a misconfiguration an operator has to hear about.
+
+The decision is one pass over the lowercased agent for a small built-in set of markers:
+
+| Family | Markers |
+|---|---|
+| Crawlers | `bot`, `crawl`, `spider`, `slurp` |
+| Link-preview fetchers | `facebookexternalhit`, `whatsapp`, `embedly` |
+| Monitors and audits | `lighthouse`, `pagespeed`, `gtmetrix`, `pingdom`, `statuscake`, `datadog`, `newrelic` |
+| Headless and automation | `headless`, `phantomjs`, `puppeteer`, `playwright`, `selenium` |
+| HTTP libraries | `python-requests`, `curl/`, `wget/`, `go-http-client`, `okhttp`, `axios/`, `node-fetch`, `java/`, `libwww`, `httpclient` |
+
+Each marker is a plain substring, matched anywhere in the agent, which is what makes `bot` cover `Googlebot`, `AhrefsBot`, `Twitterbot`, `Slackbot`, `LinkedInBot`, `Discordbot`, `TelegramBot` and `UptimeRobot` without an entry of its own. The slash in `curl/`, `wget/`, `axios/` and `java/` is part of the marker, so those match the version that follows and nothing else. The list is deliberately small and hand-held rather than a vendor feed: every entry is justified against a real agent and pinned by a table of them, alongside a table of real browser and in-app-browser agents none of them may match.
+
+Two consequences of matching mid-word. `Cubot` handset models are removed from the agent before the scan, so a Cubot phone is a visitor rather than a crawler. And **an empty or absent user agent counts as automated**, since every real browser sends one.
+
+That last one is the single drop that does say something. A beacon with no agent at all is answered and stored like any other bot, and warns once per process that an intermediary may be stripping the header, because a proxy that strips it would otherwise take an install's numbers to zero with nothing to look at. A recognized marker stays silent.
+
+A headless browser is caught only when it says so. `HeadlessChrome` and a run that appends `Playwright/1.60` are dropped; a headless browser driven with an ordinary desktop Chrome agent is indistinguishable from a visitor and is counted, which is also why the plugin's own Playwright suite still captures.
+
+`filterBots` decides:
+
+```ts
+native()                                    // on, the built-in list
+native({ filterBots: false })               // count every beacon
+native({ filterBots: (ua) => ua.includes('internal-probe') })
+```
+
+A function **replaces** the built-in rule rather than extending it. Compose them by importing it:
+
+```ts
+import { isBot } from '@10x-media/analytics/adapters/native'
+
+native({ filterBots: (ua) => isBot(ua) || ua.includes('internal-probe') })
+```
+
+`isBot(ua)` and the `BotFilter` type are exported from that subpath, so the same rule can run in your own middleware or edge config. The marker set itself is not exported: the table above documents it, and pinning it as an API would freeze an implementation detail. A filter that throws keeps the event and warns once per process, naming `filterBots`: a broken predicate must not discard a site's traffic, and it must not do it in silence either, since the response has nothing to say about it.
+
+[`trackServerEvent`](/analytics/goals#4-track-from-server-code) is never filtered. It writes through its own path rather than the endpoint, whatever agent it attributes the event to, because it is host code the install wrote rather than a request off the internet. The synthetic server agent is not a bot to `isBot` either.
+
+<Callout type="warn">
+**Your numbers fall on upgrade**, to what real visitors did. Nothing is backfilled, so hits already stored keep counting and a range spanning the upgrade mixes filtered days with unfiltered ones. The `browser` breakdown's `other` bucket drops the most: that is where an agent the classifier did not recognize used to land, and a crawler's agent is the common case of one.
+</Callout>
+
 ## Dimensions
 
 Everything the engine can know about a hit is classified once, at ingest, and stored on the event row. A breakdown then reads the stored value rather than re-deriving it, so the day-bucketed rollups and the raw-event path can never disagree about what a bucket is called.
@@ -149,7 +195,7 @@ Everything the engine can know about a hit is classified once, at ingest, and st
 
 A dimension the event does not carry emits no bucket at all, so an unattributed hit never lands in an "unknown" row. Keys are capped because each value becomes a rollup bucket key: an uncapped one exceeds Mongo's index key limit, and on Postgres a btree key over 2704 bytes fails the write outright.
 
-Every cap is applied server-side, on a public endpoint, so a hand-rolled body cannot get past it. `browser`, `os` and `language` come off the request headers, so a [server-side event](/analytics/goals#4-track-from-server-code) without a request reports none of them rather than inventing a visitor.
+Every cap is applied server-side, on a public endpoint, so a hand-rolled body cannot get past it. `browser`, `os` and `language` come off the request headers, so a [server-side event](/analytics/goals#4-track-from-server-code) without a request reports none of them rather than inventing a visitor. `browser` answers `other` for any agent it does not recognize, which is where a crawler's hit used to land; with [bot filtering](#bot-filtering) on, which is the default, that hit never reaches the pipeline at all.
 
 ### Referrers
 
@@ -235,16 +281,41 @@ The engine resolves country, region, and city per event: platform headers first 
 
 ## Retention pruning
 
-Raw events are kept indefinitely unless you opt in to pruning:
+One Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) sweeps every store the engine owns. **It is registered only when you set a window**, so an install that sets neither option registers no task at all:
 
 ```ts
-native({ retentionDays: 90 })
+native({ retentionDays: 90, rollupRetentionDays: 730 })
 ```
 
-This registers a Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) that deletes raw `analytics-events` and `analytics-seen` rows older than the window. Rollups are untouched, so long-range aggregates survive pruning. Like all scheduled work here, the task fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler).
+| Store | Deleted | Option |
+|---|---|---|
+| `analytics-events`, `analytics-seen` | rows older than the window | `retentionDays`, unset keeps them forever |
+| `analytics-rollups` | rows whose `period` is older than the window | `rollupRetentionDays`, requires `retentionDays` |
+| the daily visitor salts in `payload.kv` | the days 2 to 62 before today | none, swept whenever the task runs |
+
+Like all scheduled work here, the task fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler); run it on demand with `payload.jobs.queue({ task: 'analytics-prune-events' })` followed by `payload.jobs.run()`. It prunes the whole install, across every scope: it is infrastructure rather than a per-tenant policy.
+
+Deletes go through the database adapter's bulk delete, so no document is loaded in order to be deleted, whatever the window matches. That is also why the task reports no count: knowing one would cost exactly the read the bulk delete avoids. It bypasses collection hooks and access control, which these three collections do not use.
+
+### The daily salts
+
+The salt of a UTC day is what that day's visitor hashes are salted with, and nothing reads one older than yesterday's, since an event arriving just before midnight is still hashed with yesterday's. Keys are deleted by computed name rather than by listing them, so a sweep costs no scan, works on every kv adapter, and a day already gone is a no-op.
+
+They are swept from two places, because they accumulate whether or not you set a window and no install should need a jobs runner to stop that:
+
+- **At ingest**, when a first event opens a new UTC day, the seven days before the two most recent are deleted. No jobs, no schedule, at most seven deletes per instance per day, and the hash never waits on them.
+- **In the nightly task**, the days 2 to 62 back, which covers the nightly runs a stopped jobs runner could have missed.
+
+An install that is down for longer than 62 days keeps the salts older than that: nothing lists keys to find them, and they are inert, one small value per day. Delete them by hand if they bother you.
+
+`rollupRetentionDays` is off by default because rollups are the long-term store: they are what an unfiltered, day-granularity read is served from, and they outlive the raw events they were built from. It takes a whole number of days above zero, and **it requires `retentionDays`**: pruning rollups while keeping raw events forever would make an unfiltered long window answer less than the same window filtered, since a filtered read goes to the events that are still there. For the same reason **it may not be shorter than `retentionDays`**. Both rules fail the boot rather than the sweep. Once a rollup row is pruned, the day it covered reports nothing rather than falling back to raw events, which have their own, shorter, window.
 
 <Callout type="info">
-`retentionDays` covers the events and the seen ledger, and nothing else. **Rollups are never pruned**, by design, and they now grow per day with the cardinality of the new dimensions: one row per distinct referrer host, `source`, city, campaign, `utmContent` and `utmTerm` you receive, plus one extra bucket set per distinct hostname you ingest from. `source` is the one to watch, since it holds whatever `utm_source` a visit was tagged with: its cardinality is bounded only by the 128-character cap, not by a fixed vocabulary the way `channel` is. A site with a long tail of campaign URLs should plan storage for that tail rather than assume a retention window bounds it.
+Rollups grow per day with the cardinality of the dimensions: one row per distinct referrer host, `source`, city, campaign, `utmContent` and `utmTerm` you receive, plus one extra bucket set per distinct hostname you ingest from. `source` is the one to watch, since it holds whatever `utm_source` a visit was tagged with: its cardinality is bounded only by the 128-character cap, not by a fixed vocabulary the way `channel` is. A site with a long tail of campaign URLs should plan storage for that tail, or bound it with `rollupRetentionDays`.
+</Callout>
+
+<Callout type="warn">
+**Setting a window gives an install with no jobs of its own the jobs collection.** Payload registers `payload-jobs` as soon as one task exists, plus the `payload-jobs-stats` global for a task carrying a schedule, so an install that had no tasks or workflows at all gains both the moment it sets `retentionDays` or `rollupRetentionDays`. Push-mode installs pick the tables up on the next boot; a migrate-mode Postgres install needs a migration creating them, the same as for any other new collection. This has always been true of `retentionDays`; setting no window registers no task and changes nothing.
 </Callout>
 
 ## Upgrading an existing install
@@ -386,11 +457,13 @@ Every statement is `ADD COLUMN IF NOT EXISTS`, so the migration is re-runnable a
 | Option | Type | Default | Description |
 |---|---|---|---|
 | `buffer` | `boolean \| { maxSize?, maxAgeMs? }` | off | In-memory write batching (50 events / 2000 ms). |
+| `filterBots` | `boolean \| ((ua: string) => boolean)` | `true` | Drop automated traffic at ingest by its [user agent](#bot-filtering). `false` counts every beacon; a function replaces the built-in rule. |
 | `geoDbPath` | `string` | none | Path to a MaxMind `.mmdb`; enables IP-level geo lookup. |
 | `geoResolver` | `GeoResolver` | platform headers (+ MaxMind when `geoDbPath` set) | Custom geo pipeline. |
 | `hostname` | `'request' \| string[] \| EventHostnameResolver` | `'request'` | Where a stored event's [hostname comes from](#where-the-hostname-comes-from). A list keeps only the hostnames it names; a resolver decides per event and `null` drops it. |
 | `ingestPath` | `string` | `/analytics/ingest` | Beacon endpoint path (served under `/api`). The tracker config follows it, so the browser posts to the moved mount. |
 | `platformHostnames` | `string[]` | `[]` | On a [scoped install](#scoped-installs-and-platformhostnames), the platform's own domains, which ingest under the null scope instead of being dropped. |
-| `retentionDays` | `number` | keep forever | Nightly pruning window for raw events. |
+| `retentionDays` | `number` | keep forever | Nightly [pruning window](#retention-pruning) for raw events and the seen ledger. Zero or less keeps them forever, anything else is a whole number of days. Setting it registers the prune task. |
+| `rollupRetentionDays` | `number` | keep forever | Nightly [pruning window](#retention-pruning) for rollup rows. A whole number of days above zero, requires `retentionDays` and never shorter than it. |
 
 `trustedProxyHops` sits on `analytics()` rather than here; see [Trusted proxies](#trusted-proxies).

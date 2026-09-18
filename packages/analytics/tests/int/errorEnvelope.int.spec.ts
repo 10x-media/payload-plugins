@@ -299,7 +299,11 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 				new Request('http://x/api/analytics/ingest', {
 					method: 'POST',
 					body: dyingBody(),
-					headers: { 'content-type': 'application/json' },
+					// A visitor's agent: the bot filter answers 202 before a body is ever read.
+					headers: {
+						'content-type': 'application/json',
+						'user-agent': 'Mozilla/5.0 Firefox/126.0',
+					},
 					// @ts-expect-error duplex is required for a stream body and absent from lib.dom
 					duplex: 'half',
 				}),

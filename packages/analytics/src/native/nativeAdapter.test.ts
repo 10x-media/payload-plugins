@@ -1,5 +1,13 @@
+import type { Config } from 'payload'
 import { describe, expect, it } from 'vitest'
-import { native } from './nativeAdapter'
+import { type NativeOptions, native } from './nativeAdapter'
+import { PRUNE_TASK_SLUG } from './retention/pruneTask'
+
+const registeredTasks = (options: NativeOptions = {}): string[] => {
+	const config = {} as Config
+	native(options).register?.(config)
+	return (config.jobs?.tasks ?? []).map((task) => task.slug)
+}
 
 describe('native adapter', () => {
 	it('advertises visitors, sessions, and the country dimension', () => {
@@ -46,6 +54,58 @@ describe('native adapter', () => {
 
 	it('still constructs with a (possibly missing) geo database path', () => {
 		expect(typeof native({ geoDbPath: '/nonexistent/GeoLite2-City.mmdb' }).query).toBe('function')
+	})
+})
+
+describe('native retention options', () => {
+	// A task registers the payload-jobs collection and, with a schedule, the stats global, so an
+	// install that asked for no retention must not be handed jobs it never configured.
+	it('registers the prune task only once a retention window is configured', () => {
+		expect(registeredTasks()).not.toContain(PRUNE_TASK_SLUG)
+		expect(registeredTasks({ retentionDays: 0 })).not.toContain(PRUNE_TASK_SLUG)
+		expect(registeredTasks({ retentionDays: 30 })).toContain(PRUNE_TASK_SLUG)
+		expect(registeredTasks({ retentionDays: 30, rollupRetentionDays: 365 })).toContain(
+			PRUNE_TASK_SLUG
+		)
+	})
+
+	it('leaves the jobs config untouched on an install with no retention window', () => {
+		const config = {} as Config
+		native().register?.(config)
+		expect(config.jobs).toBeUndefined()
+	})
+
+	it('rejects a rollup window that is not a whole number of days above zero', () => {
+		for (const rollupRetentionDays of [0, -1, 1.5, Number.NaN]) {
+			expect(() => native({ retentionDays: 1, rollupRetentionDays })).toThrow(/rollupRetentionDays/)
+		}
+	})
+
+	it('rejects a raw-event window it could never build a cutoff from', () => {
+		for (const retentionDays of [Number.NaN, Number.POSITIVE_INFINITY, 1.5]) {
+			expect(() => native({ retentionDays })).toThrow(/retentionDays/)
+		}
+		// Zero and below still mean "keep everything" rather than a bad window.
+		for (const retentionDays of [0, -1, Number.NEGATIVE_INFINITY]) {
+			expect(() => native({ retentionDays })).not.toThrow()
+			expect(registeredTasks({ retentionDays })).not.toContain(PRUNE_TASK_SLUG)
+		}
+	})
+
+	it('rejects a rollup window without a raw-event window', () => {
+		expect(() => native({ rollupRetentionDays: 365 })).toThrow(
+			/rollupRetentionDays requires retentionDays/
+		)
+		expect(() => native({ retentionDays: 0, rollupRetentionDays: 365 })).toThrow(
+			/rollupRetentionDays requires retentionDays/
+		)
+	})
+
+	it('rejects a rollup window shorter than the raw-event window', () => {
+		expect(() => native({ retentionDays: 90, rollupRetentionDays: 30 })).toThrow(
+			/rollupRetentionDays/
+		)
+		expect(() => native({ retentionDays: 90, rollupRetentionDays: 90 })).not.toThrow()
 	})
 })
 
