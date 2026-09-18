@@ -130,7 +130,7 @@ There is no default of 1. An install behind a CDN plus a proxy would then read t
 
 ## Bot filtering
 
-Crawlers, link-preview fetchers, monitors and headless clients are dropped at ingest by default, decided from the request's `user-agent` before the body is even read. **A dropped beacon answers exactly what a kept one answers**: `202` with `{ "ok": true }`, the same headers, and nothing in the log, not even once per process. Automated traffic is expected on a public endpoint rather than a misconfiguration an operator has to hear about.
+Crawlers, link-preview fetchers, monitors and headless clients are dropped at ingest by default, decided from the request's `user-agent` before the body is even read. **A dropped beacon answers exactly what a kept one answers**: `202` with `{ "ok": true }`, the same headers, and, for a recognized marker, nothing in the log. Automated traffic is expected on a public endpoint rather than a misconfiguration an operator has to hear about.
 
 The decision is one pass over the lowercased agent for a small built-in set of markers:
 
@@ -146,6 +146,8 @@ Each marker is a plain substring, matched anywhere in the agent, which is what m
 
 Two consequences of matching mid-word. `Cubot` handset models are removed from the agent before the scan, so a Cubot phone is a visitor rather than a crawler. And **an empty or absent user agent counts as automated**, since every real browser sends one.
 
+That last one is the single drop that does say something. A beacon with no agent at all is answered and stored like any other bot, and warns once per process that an intermediary may be stripping the header, because a proxy that strips it would otherwise take an install's numbers to zero with nothing to look at. A recognized marker stays silent.
+
 A headless browser is caught only when it says so. `HeadlessChrome` and a run that appends `Playwright/1.60` are dropped; a headless browser driven with an ordinary desktop Chrome agent is indistinguishable from a visitor and is counted, which is also why the plugin's own Playwright suite still captures.
 
 `filterBots` decides:
@@ -159,12 +161,12 @@ native({ filterBots: (ua) => ua.includes('internal-probe') })
 A function **replaces** the built-in rule rather than extending it. Compose them by importing it:
 
 ```ts
-import { BOT_MARKERS, isBot } from '@10x-media/analytics/adapters/native'
+import { isBot } from '@10x-media/analytics/adapters/native'
 
 native({ filterBots: (ua) => isBot(ua) || ua.includes('internal-probe') })
 ```
 
-`isBot(ua)`, `BOT_MARKERS` (the set above) and the `BotFilter` type are exported from that subpath, so the same rule can run in your own middleware or edge config. A filter that throws keeps the event: a broken predicate must not discard a site's traffic in silence, and the response has nothing to say about it either way.
+`isBot(ua)` and the `BotFilter` type are exported from that subpath, so the same rule can run in your own middleware or edge config. The marker set itself is not exported: the table above documents it, and pinning it as an API would freeze an implementation detail. A filter that throws keeps the event and warns once per process, naming `filterBots`: a broken predicate must not discard a site's traffic, and it must not do it in silence either, since the response has nothing to say about it.
 
 [`trackServerEvent`](/analytics/goals#4-track-from-server-code) is never filtered. It writes through its own path rather than the endpoint, whatever agent it attributes the event to, because it is host code the install wrote rather than a request off the internet. The synthetic server agent is not a bot to `isBot` either.
 
@@ -279,7 +281,7 @@ The engine resolves country, region, and city per event: platform headers first 
 
 ## Retention pruning
 
-One Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) sweeps every store the engine owns. Both windows are opt-in, so nothing is deleted on an install that sets neither:
+One Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) sweeps every store the engine owns. **It is registered only when you set a window**, so an install that sets neither option registers no task at all:
 
 ```ts
 native({ retentionDays: 90, rollupRetentionDays: 730 })
@@ -288,23 +290,32 @@ native({ retentionDays: 90, rollupRetentionDays: 730 })
 | Store | Deleted | Option |
 |---|---|---|
 | `analytics-events`, `analytics-seen` | rows older than the window | `retentionDays`, unset keeps them forever |
-| `analytics-rollups` | rows whose `period` is older than the window | `rollupRetentionDays`, unset keeps them forever |
-| the daily visitor salts in `payload.kv` | the days 2 to 62 before today | none, always swept |
+| `analytics-rollups` | rows whose `period` is older than the window | `rollupRetentionDays`, requires `retentionDays` |
+| the daily visitor salts in `payload.kv` | the days 2 to 62 before today | none, swept whenever the task runs |
 
-**The task registers on every native install**, with or without a window, because the salts accumulate either way. Like all scheduled work here, it fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler); run it on demand with `payload.jobs.queue({ task: 'analytics-prune-events' })` followed by `payload.jobs.run()`.
+Like all scheduled work here, the task fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler); run it on demand with `payload.jobs.queue({ task: 'analytics-prune-events' })` followed by `payload.jobs.run()`. It prunes the whole install, across every scope: it is infrastructure rather than a per-tenant policy.
 
 Deletes go through the database adapter's bulk delete, so no document is loaded in order to be deleted, whatever the window matches. That is also why the task reports no count: knowing one would cost exactly the read the bulk delete avoids. It bypasses collection hooks and access control, which these three collections do not use.
 
-The salt of a UTC day is what that day's visitor hashes are salted with, and nothing reads one older than yesterday's, since an event arriving just before midnight is still hashed with yesterday's. Keys are deleted by computed name rather than by listing them, so the sweep costs no scan, works on every kv adapter, and a day already gone is a no-op. Sixty-two days back covers the nightly runs a stopped jobs runner could have missed.
+### The daily salts
 
-`rollupRetentionDays` is off by default because rollups are the long-term store: they are what an unfiltered, day-granularity read is served from, and they outlive the raw events they were built from. It takes a whole number of days above zero, and **it may not be shorter than `retentionDays`**, which fails the boot rather than the sweep: a range reaching past raw-event retention is answered from rollups, so a shorter rollup window would make a two-year report show less than a three-month one. Once a rollup row is pruned, the day it covered reports nothing rather than falling back to raw events, which have their own, shorter, window.
+The salt of a UTC day is what that day's visitor hashes are salted with, and nothing reads one older than yesterday's, since an event arriving just before midnight is still hashed with yesterday's. Keys are deleted by computed name rather than by listing them, so a sweep costs no scan, works on every kv adapter, and a day already gone is a no-op.
+
+They are swept from two places, because they accumulate whether or not you set a window and no install should need a jobs runner to stop that:
+
+- **At ingest**, when a first event opens a new UTC day, the seven days before the two most recent are deleted. No jobs, no schedule, at most seven deletes per instance per day, and the hash never waits on them.
+- **In the nightly task**, the days 2 to 62 back, which covers the nightly runs a stopped jobs runner could have missed.
+
+An install that is down for longer than 62 days keeps the salts older than that: nothing lists keys to find them, and they are inert, one small value per day. Delete them by hand if they bother you.
+
+`rollupRetentionDays` is off by default because rollups are the long-term store: they are what an unfiltered, day-granularity read is served from, and they outlive the raw events they were built from. It takes a whole number of days above zero, and **it requires `retentionDays`**: pruning rollups while keeping raw events forever would make an unfiltered long window answer less than the same window filtered, since a filtered read goes to the events that are still there. For the same reason **it may not be shorter than `retentionDays`**. Both rules fail the boot rather than the sweep. Once a rollup row is pruned, the day it covered reports nothing rather than falling back to raw events, which have their own, shorter, window.
 
 <Callout type="info">
 Rollups grow per day with the cardinality of the dimensions: one row per distinct referrer host, `source`, city, campaign, `utmContent` and `utmTerm` you receive, plus one extra bucket set per distinct hostname you ingest from. `source` is the one to watch, since it holds whatever `utm_source` a visit was tagged with: its cardinality is bounded only by the 128-character cap, not by a fixed vocabulary the way `channel` is. A site with a long tail of campaign URLs should plan storage for that tail, or bound it with `rollupRetentionDays`.
 </Callout>
 
 <Callout type="warn">
-**An install with no jobs of its own gains the jobs collection.** Payload registers `payload-jobs` as soon as one task exists, plus the `payload-jobs-stats` global for a task carrying a schedule, so an install that had no tasks or workflows at all now has both. Push-mode installs pick the tables up on the next boot; a migrate-mode Postgres install needs a migration creating them, the same as for any other new collection.
+**Setting a window gives an install with no jobs of its own the jobs collection.** Payload registers `payload-jobs` as soon as one task exists, plus the `payload-jobs-stats` global for a task carrying a schedule, so an install that had no tasks or workflows at all gains both the moment it sets `retentionDays` or `rollupRetentionDays`. Push-mode installs pick the tables up on the next boot; a migrate-mode Postgres install needs a migration creating them, the same as for any other new collection. This has always been true of `retentionDays`; setting no window registers no task and changes nothing.
 </Callout>
 
 ## Upgrading an existing install
@@ -452,7 +463,7 @@ Every statement is `ADD COLUMN IF NOT EXISTS`, so the migration is re-runnable a
 | `hostname` | `'request' \| string[] \| EventHostnameResolver` | `'request'` | Where a stored event's [hostname comes from](#where-the-hostname-comes-from). A list keeps only the hostnames it names; a resolver decides per event and `null` drops it. |
 | `ingestPath` | `string` | `/analytics/ingest` | Beacon endpoint path (served under `/api`). The tracker config follows it, so the browser posts to the moved mount. |
 | `platformHostnames` | `string[]` | `[]` | On a [scoped install](#scoped-installs-and-platformhostnames), the platform's own domains, which ingest under the null scope instead of being dropped. |
-| `retentionDays` | `number` | keep forever | Nightly [pruning window](#retention-pruning) for raw events and the seen ledger. Zero or less keeps them forever. |
-| `rollupRetentionDays` | `number` | keep forever | Nightly [pruning window](#retention-pruning) for rollup rows. A whole number of days above zero, never shorter than `retentionDays`. |
+| `retentionDays` | `number` | keep forever | Nightly [pruning window](#retention-pruning) for raw events and the seen ledger. Zero or less keeps them forever. Setting it registers the prune task. |
+| `rollupRetentionDays` | `number` | keep forever | Nightly [pruning window](#retention-pruning) for rollup rows. A whole number of days above zero, requires `retentionDays` and never shorter than it. |
 
 `trustedProxyHops` sits on `analytics()` rather than here; see [Trusted proxies](#trusted-proxies).
