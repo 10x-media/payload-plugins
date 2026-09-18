@@ -35,7 +35,7 @@ Both layers are merged into one registry per scope: the config adapters in confi
 }
 ```
 
-It requires a signed-in user (`401` otherwise) and passes `access.read` (`403` otherwise); both answer a flat `{ "error": "unauthorized" }` string rather than the query endpoint's coded errors. It takes **no scope parameter**, deliberately, so a tenant can never enumerate another tenant's sources. On a scoped install, a request whose scope cannot be resolved, or whose resolution throws, gets `{ "defaultId": null, "sources": [] }` rather than a fallback list: a failed resolution is indistinguishable from a forged one, so it fails closed. An unscoped install has no scope to get wrong and falls back to the config registry.
+It requires a signed-in user (`401 unauthorized` otherwise) and passes `access.read` (`403 forbidden` otherwise), both in the plugin-wide [error envelope](#errors), and every answer carries `Cache-Control: private, no-store`. It takes **no scope parameter**, deliberately, so a tenant can never enumerate another tenant's sources. On a scoped install, a request whose scope cannot be resolved, or whose resolution throws, gets `{ "defaultId": null, "sources": [] }` rather than a fallback list: a failed resolution is indistinguishable from a forged one, so it fails closed. An unscoped install has no scope to get wrong and falls back to the config registry.
 
 ## Capability gating
 
@@ -67,7 +67,7 @@ Validation is always against the selected source, never against the union of the
 
 `GET /api/analytics/query` is the authenticated read primitive: one audited path through access control, scope gating, capability validation and the [cached surfacing engine](/analytics/cache). Build your own dashboard on it, script a report against it, or read it from an admin component. Every section of the [analytics view](/analytics/analytics-view) but its realtime strip reads through it, so whatever those sections show, your own code can read the same way; the strip polls `GET /api/analytics/realtime`, and the view's server shell resolves that request's sources and goal names before rendering.
 
-It requires a signed-in user and `access.read`. Every answer, success or failure, carries `Cache-Control: private, no-store`: the engine already caches, and the scope of an answer depends on the caller's cookies, so no shared cache may ever hold one.
+It requires a signed-in user and `access.read`. Every answer, success or failure, carries `Cache-Control: private, no-store`: the engine already caches, and the scope of an answer depends on the caller's cookies, so no shared cache may ever hold one. Every refusal is the plugin-wide [error envelope](#errors), whose table lists each code this endpoint answers and when.
 
 ### Parameters
 
@@ -142,32 +142,6 @@ Windows longer than 366 days answer `range_too_long`. Shorter ones can still be 
 
 <Callout type="info">
 **An unconfigured source answers `200`, not an error.** A source whose credentials are unset returns an empty `rows` array, no `totals`, and `meta.provider` set to its adapter id. The read is short-circuited before any network call, so nothing distinguishes it from a real window with no traffic. If that matters to your surface, check the source's configuration rather than inferring it from an empty result.
-</Callout>
-
-### Errors
-
-Every non-2xx answer is an `{ error }` object carrying a `code`, a `message`, and a `param` naming the query parameter at fault when one is. Messages are safe to show: adapter configuration and upstream error text never reach the response.
-
-| Status | `error.code` | `param` | When |
-|---|---|---|---|
-| `400` | `invalid_param` | the parameter at fault | any malformed parameter, including `compare=previous` on a source whose adapter set `comparison: false` or on a range too long to have a previous window. A previous window beyond the source's lookback is not an error: it is omitted from the answer |
-| `400` | `unsupported_metric` | `metrics` | a known metric this source does not serve |
-| `400` | `unsupported_dimension` | `dimensions` | a known dimension this source cannot break down by |
-| `400` | `unsupported_filter` | `filters` | a dimension outside `capabilities.filters` |
-| `400` | `unsupported_operator` | `filters` | an operator outside `capabilities.filterOperators` |
-| `400` | `unsupported_granularity` | `granularity` | finer than `capabilities.minGranularity` |
-| `400` | `range_too_long` | `to` | the window exceeds 366 days |
-| `400` | `untrusted_scope` | `scope` | a `scope` parameter from a caller `access.platformRead` denies |
-| `401` | `unauthorized` | | no signed-in user |
-| `403` | `forbidden` | | `access.read` denied the request |
-| `403` | `forbidden` | `source` | a listed shared source that cannot filter by scope, read under a scope, without `platformRead` |
-| `404` | `unknown_source` | | no source resolves for this request at all |
-| `404` | `unknown_source` | `source` | a `source` id outside this request's own registry |
-| `503` | `unavailable` | | the plugin runtime is not ready on this Payload instance, or the source failed with no cached entry to fall back on. Always carries `Retry-After: 30`, so a client backs off identically either way |
-| `500` | `internal` | | an unexpected failure; the detail is logged with the adapter id, never returned |
-
-<Callout type="warn">
-`403` with `param: 'source'` is not an error state to shout about. The sources endpoint lists a shared config adapter for every scope (it always has), but **reading** it under a tenant scope would be a cross-scope read, so it fails closed behind `access.platformRead`. The picker and the endpoint agree on which sources exist, not on which are readable; treat it as "this source is not readable for your scope" and let the user pick another.
 </Callout>
 
 ### Examples
@@ -265,7 +239,7 @@ export const TopPages = () => {
 
 - `buildQueryUrl(apiRoute, request)` returns the same URL without fetching it, written in a fixed field order so two requests with identical values always produce the same string. A trailing slash on `apiRoute` is normalized, so `routes.api` in either form produces one URL and one dedupe key.
 - Concurrent calls for one URL share a single fetch; the entry clears on settle, so a later call refetches and a failed one retries. A caller's `AbortSignal` (`fetchQuery(api, request, { signal })`) rejects that caller alone and deliberately leaves the shared fetch running for everyone else waiting on it.
-- Any non-2xx throws `QueryFetchError` with `status` always set. `error` is set only when the body is the query endpoint's own shape, an `error` object carrying a string `code` and a string `message` (plus `param` when one applies). The plugin's other read endpoints answer a flat `{ "error": "forbidden" }`, which deliberately leaves `error` undefined rather than putting a bare string where a `QueryError` is declared, so branch on `status` for those. `retryAfter` is a whole number of seconds: a fractional header floors, and the HTTP-date form of `Retry-After` yields no value at all. A network-level failure propagates as itself.
+- Any non-2xx throws `QueryFetchError` with `status` always set. `error` carries the [envelope](#errors)'s `code` and `message` (plus `param` when one applies), so branch on `error.code` and fall back to `status`. It is left undefined for a body this release cannot read: one that is not the envelope, and one carrying a code a newer server added, which is reported as a generic failure rather than typed into a lie. `retryAfter` is a whole number of seconds: a fractional header floors, and the HTTP-date form of `Retry-After` yields no value at all. A network-level failure propagates as itself.
 
 `QueryRequest` takes an optional `scope`. Omit it and the helper reads the caller's own scope, which is what an admin surface wants. Set it and the endpoint honors it only for platform readers; everyone else gets `400 untrusted_scope`.
 
@@ -292,14 +266,7 @@ The body is optional and carries one optional `scope`. An empty body, a body tha
 
 Authentication and `access.read` gate it exactly as they gate the read endpoints. Scope is then decided by the same code the query endpoint reads with, so this endpoint refuses every request that endpoint refuses. Naming any scope is a cross-scope decision and requires `access.platformRead`, so a tenant naming another tenant's scope gets `400 untrusted_scope` rather than a silent no-op. A request that resolves no scope at all on a scoped install is `untrusted_scope` too, unless the caller has `access.platformRead`: null usually means no tenant is selected rather than "everything", and the install-wide token it would otherwise bump is the one every cross-scope read keys on.
 
-| Status | `error.code` | `param` | When |
-|---|---|---|---|
-| `400` | `invalid_param` | `scope` | `scope` is present but not a string, or the body could not be read |
-| `400` | `untrusted_scope` | `scope` | a `scope` in the body from a caller `access.platformRead` denies, the platform wildcard included, or a request resolving no scope on a scoped install from a caller it denies |
-| `401` | `unauthorized` | | no signed-in user |
-| `403` | `forbidden` | | `access.read` denied the request |
-| `413` | `payload_too_large` | | the body is over 4 KiB |
-| `503` | `unavailable` | | the plugin runtime is not ready on this Payload instance, or the token could not be written. Carries `Retry-After: 30` |
+Its refusals are the same [error envelope](#errors) every other endpoint answers, listed there with the rest.
 
 `scope: "*"` bumps the install-wide token rather than every scope's, because a cross-scope read stamps no scope on its query and its entries key on exactly that token. See [Cross-scope entries](/analytics/cache#cross-scope-entries-key-on-the-install-wide-token).
 
@@ -317,6 +284,115 @@ await refreshCache(api, { scope: 'acme', signal })              // platform read
 Unlike `fetchQuery` it is not deduped: a reader pressing Refresh twice means it twice, and the `AbortSignal` goes straight to the fetch because no other caller shares it. Any non-2xx throws `QueryFetchError`, with the same `status`, `error` and `retryAfter` a failed read carries. An answer whose `epoch` this client cannot read is reported as `'0'` rather than typed into a lie, since callers act on the refresh having happened rather than on the token.
 
 A refresh invalidates; it does not re-read. Nothing is fetched from the source until a surface asks, so the next read of that scope pays the cold round trip.
+
+## Errors
+
+Every endpoint the plugin registers answers a refusal in one shape, with one vocabulary of codes, whatever it refused. This section is the reference for all of them: the endpoints described here, and the [document](/analytics/display-fields), [realtime](/analytics/widgets), [goals](/analytics/goals) and [native ingest](/analytics/native#the-ingest-endpoint) endpoints described elsewhere.
+
+```jsonc
+{
+  "error": {
+    "code": "unsupported_metric",                 // one of the codes below
+    "message": "source does not serve revenue",   // safe to render
+    "param": "metrics"                            // absent when nothing single is at fault
+  }
+}
+```
+
+`code` is what to branch on, `message` is what to show, and `param` names the query parameter, body field or event field at fault when one is. Messages are safe to display: adapter configuration and upstream error text never reach the response.
+
+Every error answer carries `Cache-Control: private, no-store`, the public ingest endpoint's included, and so does every successful answer whose content depends on the caller's scope: query, refresh, sources, goals, document and realtime. The [tracker config](/analytics/capture) endpoint is the one scope-dependent answer that is cached at all, and privately: `private, max-age=60` with `Vary: Host, Cookie`. Every `503 unavailable` carries `Retry-After: 30`, so a client backs off identically whether the plugin is still booting or a source is down.
+
+### The codes
+
+| `error.code` | Status | What it means |
+|---|---|---|
+| `invalid_param` | `400` | a parameter, body field or event field is missing or malformed |
+| `unsupported_metric` | `400` | a known metric the selected source does not serve |
+| `unsupported_dimension` | `400` | a known dimension the source cannot break down by |
+| `unsupported_filter` | `400` | a dimension outside `capabilities.filters` |
+| `unsupported_operator` | `400` | an operator outside `capabilities.filterOperators` |
+| `unsupported_granularity` | `400` | finer than `capabilities.minGranularity` |
+| `range_too_long` | `400` | the window exceeds 366 days |
+| `untrusted_scope` | `400` | a scope this caller may not read or refresh |
+| `unauthorized` | `401` | no signed-in user |
+| `forbidden` | `403` | `access.read` denied the request, or the source is not readable under this scope |
+| `not_found` | `404` | the document asked about is unbound, missing, or not this caller's to read |
+| `unknown_source` | `404` | no source resolves for the request, or the named one is outside its registry |
+| `payload_too_large` | `413` | the request body is over that endpoint's cap |
+| `internal` | `500` | an unexpected failure; the detail is logged, never returned |
+| `unavailable` | `503` | the plugin runtime is not ready, or a source failed with no cached entry to serve |
+
+The union is exported as `AnalyticsErrorCode`, with the values as `ANALYTICS_ERROR_CODES`. It is open to additions, so treat a code you do not recognize as a generic failure of its status rather than exhausting over it.
+
+### Which endpoint answers which
+
+| Endpoint | Status | `error.code` | `param` | When |
+|---|---|---|---|---|
+| `/analytics/query` | `400` | `invalid_param` | the parameter at fault | any malformed parameter, including `compare=previous` on a source whose adapter set `comparison: false` or on a range too long to have a previous window. A previous window beyond the source's lookback is not an error: it is omitted from the answer |
+| `/analytics/query` | `400` | `unsupported_metric` | `metrics` | a known metric this source does not serve |
+| `/analytics/query` | `400` | `unsupported_dimension` | `dimensions` | a known dimension this source cannot break down by |
+| `/analytics/query` | `400` | `unsupported_filter` | `filters` | a dimension outside `capabilities.filters` |
+| `/analytics/query` | `400` | `unsupported_operator` | `filters` | an operator outside `capabilities.filterOperators` |
+| `/analytics/query` | `400` | `unsupported_granularity` | `granularity` | finer than `capabilities.minGranularity` |
+| `/analytics/query` | `400` | `range_too_long` | `to` | the window exceeds 366 days |
+| `/analytics/query` | `400` | `untrusted_scope` | `scope` | a `scope` parameter from a caller `access.platformRead` denies |
+| `/analytics/query` | `401` | `unauthorized` | | no signed-in user |
+| `/analytics/query` | `403` | `forbidden` | | `access.read` denied the request |
+| `/analytics/query` | `403` | `forbidden` | `source` | a listed shared source that cannot filter by scope, read under a scope, without `platformRead` |
+| `/analytics/query` | `404` | `unknown_source` | | no source resolves for this request at all |
+| `/analytics/query` | `404` | `unknown_source` | `source` | a `source` id outside this request's own registry |
+| `/analytics/query` | `500` | `internal` | | an unexpected failure; the detail is logged with the adapter id |
+| `/analytics/query` | `503` | `unavailable` | | the plugin runtime is not ready on this Payload instance, or the source failed with no cached entry to fall back on |
+| `/analytics/refresh` | `400` | `invalid_param` | `scope` | `scope` is present but not a string, or the body could not be read |
+| `/analytics/refresh` | `400` | `untrusted_scope` | `scope` | a `scope` in the body from a caller `access.platformRead` denies, the platform wildcard included, or a request resolving no scope on a scoped install from a caller it denies |
+| `/analytics/refresh` | `401` | `unauthorized` | | no signed-in user |
+| `/analytics/refresh` | `403` | `forbidden` | | `access.read` denied the request |
+| `/analytics/refresh` | `413` | `payload_too_large` | | the body is over 4 KiB |
+| `/analytics/refresh` | `503` | `unavailable` | | the plugin runtime is not ready, or the token could not be written |
+| `/analytics/sources` | `401` | `unauthorized` | | no signed-in user |
+| `/analytics/sources` | `403` | `forbidden` | | `access.read` denied the request |
+| `/analytics/goals` | `401` | `unauthorized` | | no signed-in user |
+| `/analytics/goals` | `403` | `forbidden` | | `access.read` denied the request |
+| `/analytics/realtime` | `401` | `unauthorized` | | no signed-in user |
+| `/analytics/realtime` | `403` | `forbidden` | | `access.read` denied the request |
+| `/analytics/realtime` | `500` | `internal` | | the request failed before the read, which is a configuration bug rather than an outage: an `access.read` resolver that throws is the case to look for |
+| `/analytics/realtime` | `503` | `unavailable` | | the source threw; the widget polls every few seconds, so an outage is retryable rather than a stack trace per poll |
+| `/analytics/document` | `400` | `invalid_param` | `from` or `to` | `timeframe=custom` with a bound that will not parse. An inverted window blames `to`, since `from` is the one the reader picked first |
+| `/analytics/document` | `401` | `unauthorized` | | no signed-in user |
+| `/analytics/document` | `403` | `forbidden` | | `access.read` denied the request |
+| `/analytics/document` | `404` | `not_found` | | the collection is not bound, the `id` is missing, the document does not exist, or this caller may not read it. The four are deliberately one answer |
+| `/analytics/document` | `500` | `internal` | | the document read failed for any other reason; logged with the collection slug |
+| `/analytics/document` | `503` | `unavailable` | | the plugin runtime is not ready on this Payload instance |
+| `/analytics/ingest` | `400` | `invalid_param` | the first field at fault | `type`, `path`, `hostname` or `name` is missing or invalid, checked in that order. Unparseable JSON names `type`. A body that died in transit sends no `param` |
+| `/analytics/ingest` | `413` | `payload_too_large` | | the body is over 64 KiB |
+
+<Callout type="warn">
+`403` with `param: 'source'` is not an error state to shout about. The sources endpoint lists a shared config adapter for every scope (it always has), but **reading** it under a tenant scope would be a cross-scope read, so it fails closed behind `access.platformRead`. The picker and the endpoint agree on which sources exist, not on which are readable; treat it as "this source is not readable for your scope" and let the user pick another.
+</Callout>
+
+### Reading a code from admin code
+
+`readErrorCode` answers the code of a parsed body, and `undefined` for anything it cannot read: a body that is not the envelope, and a code this release does not know. A client therefore never branches on a word it cannot act on.
+
+```ts
+import { readErrorCode } from '@10x-media/analytics/client'
+
+const res = await fetch(`${api}/analytics/sources`, { credentials: 'include' })
+if (!res.ok) {
+  const code = readErrorCode(await res.json().catch(() => null))
+  // 'unauthorized' and 'forbidden' will not fix themselves on a retry; anything else may
+  const permanent = code === 'unauthorized' || code === 'forbidden'
+}
+```
+
+`fetchQuery` and `refreshCache` already do this: `QueryFetchError.error` is the same parsed envelope. The plugin's own pickers and the realtime counter read the code the same way, which is why the counter stops polling on a `401` or a `403` and keeps polling through a `503`.
+
+`readErrorCode` is exported from `@10x-media/analytics/client` and `@10x-media/analytics/types`, both of which also export the `AnalyticsError` and `AnalyticsErrorCode` types; `ANALYTICS_ERROR_CODES` comes from `@10x-media/analytics/types` and the package root, and the builder `analyticsError` from the root. `QueryError` and `QueryErrorCode` are aliases of `AnalyticsError` and `AnalyticsErrorCode`, kept so existing imports keep compiling.
+
+### The one endpoint with no envelope
+
+The [capture proxy](/analytics/proxy) (`/analytics/p/:slot/*`) answers its `400`, `404`, `405`, `413` and `502` with no body at all, and no code. It relays a vendor SDK's own traffic, and that SDK, not admin code, reads the answer; a JSON envelope in the middle of a PostHog batch response would be noise to the only consumer there is. Read those statuses as [the proxy documents them](/analytics/proxy#runtime-endpoint), and expect nothing to parse: the `405` carries `Allow: GET, POST, OPTIONS` and that is the whole answer.
 
 ## Multi-tenancy
 
