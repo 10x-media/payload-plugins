@@ -84,6 +84,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 				departments,
 				recipients: options.email?.recipients,
 				recipientSources: options.email?.recipientSources,
+				render: options.email?.render,
 			}),
 			options.actions
 		)
@@ -167,6 +168,7 @@ export type {
 } from './actions/defineAction'
 export { ActionError, defineAction } from './actions/defineAction'
 export { INLINE_DISPATCH_DEADLINE_MS } from './actions/dispatch'
+export type { EmailActionType, EmailRender, EmailRenderArgs } from './actions/emailRender'
 export type {
 	FromAddressesResolver,
 	FromAddressOption,

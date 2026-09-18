@@ -1,6 +1,7 @@
 import type { CollectionSlug } from 'payload'
 import type { RichTextBodyOption } from './actions/body/serializeBody'
 import type { RecipientsConfig } from './actions/emailRecipients'
+import type { EmailRender } from './actions/emailRender'
 import type { FromAddressesResolver, FromAddressSourceRegistry } from './actions/fromAddresses'
 import type { RecipientSourceRegistry } from './actions/recipientSources'
 import type { ActionsConfig } from './actions/registry'
@@ -82,8 +83,9 @@ export type FormBuilderPluginOptions = {
 	 * back to `editor`. `converters` spread over the default
 	 * Lexical node converters; `serialize` replaces the whole action-body pipeline (e.g. to
 	 * target chat or plain-text channels instead of email HTML). A custom `serialize` receives
-	 * the submitted `form` (id/title) and `req`, enabling per-tenant lookups or handing the raw
-	 * body off to a renderer like react-email.
+	 * the submitted `form` (id/title), `req`, the submission `locale`, and the rendering
+	 * `actionType`, enabling per-tenant lookups or handing the raw body off to a renderer like
+	 * react-email. To only wrap emails in a layout, use `email.render` instead.
 	 */
 	richText?: RichTextBodyOption
 	/**
@@ -130,6 +132,14 @@ export type FormBuilderPluginOptions = {
 		 * collide with an address); its `resolve` receives the verified form context. See {@link RecipientSource}.
 		 */
 		recipientSources?: RecipientSourceRegistry
+		/**
+		 * Produces the final `html` of every `emailTeam` and `confirmation` email from the already
+		 * serialized body, e.g. to wrap it in a branded layout localized by the submission's `locale`
+		 * and varied by `actionType`. Runs after `richText.serialize` (when set), so the two compose:
+		 * `serialize` replaces how an action body is rendered for any channel, `render` only wraps
+		 * email. Absent, the serialized body is sent as is. See {@link EmailRender}.
+		 */
+		render?: EmailRender
 	}
 	/**
 	 * Where the consent statements a form can reference come from. Absent (the default): no sources,

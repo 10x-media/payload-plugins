@@ -28,13 +28,20 @@ export type SerializeBodyArgs = {
 	descriptors: SubmissionDescriptor[]
 	form: SerializeBodyForm
 	req?: PayloadRequest
+	/**
+	 * The submission's own stored locale, the one the form (and so `body`) was loaded at. Use it for
+	 * a wrapper's own strings rather than `req.locale`, which on the queued path is the job runner's.
+	 */
+	locale: string
+	/** The `blockType` of the action rendering this body (e.g. `emailTeam`, `confirmation`). */
+	actionType: string
 }
 
 /**
  * Customizes how the plugin's rich text is authored and rendered. `converters` spread over the
  * default Lexical node converters; `serialize` replaces the whole action-body pipeline (for
  * non-HTML channels like chat or plain text, or to hand the body plus the submitted `form`/`req`
- * off to a renderer like react-email). `editor` is the default Lexical/richText editor for every
+ * off to a renderer like react-email). Wrapping emails in a layout is `email.render`'s job. `editor` is the default Lexical/richText editor for every
  * plugin-authored richText field: message content, consent statement, the response message, and
  * the action body fields. `bodyEditor` overrides the action body fields specifically (emailTeam
  * and confirmation), and `responseEditor` overrides the success `response` message field; both fall
@@ -130,6 +137,8 @@ export const makeRenderBody =
 		descriptors: SubmissionDescriptor[]
 		form: SerializeBodyForm
 		req?: PayloadRequest
+		locale: string
+		actionType: string
 		richText?: RichTextBodyOption
 	}) =>
 	async (body: unknown): Promise<string> => {
@@ -140,6 +149,8 @@ export const makeRenderBody =
 				descriptors: args.descriptors,
 				form: args.form,
 				req: args.req,
+				locale: args.locale,
+				actionType: args.actionType,
 			})
 		}
 		return serializeBody(body, {
