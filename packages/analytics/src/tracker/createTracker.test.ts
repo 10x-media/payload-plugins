@@ -566,6 +566,86 @@ describe('staff exclusion', () => {
 		expect(optIn).toHaveBeenCalledTimes(1)
 	})
 
+	it('re-asserts GA4 own switch on a boot that carries no parameter', () => {
+		window.localStorage.setItem(EXCLUSION_STORAGE_KEY, '1')
+
+		expect(boot(configWith([ga4Slot])).excluded).toBe(true)
+		expect(Reflect.get(window, `${GA4_DISABLE_PREFIX}G-TEST`)).toBe(true)
+	})
+
+	it('sends nothing for an auto-captured outbound click or scroll', () => {
+		const original = Object.getOwnPropertyDescriptor(
+			window.Element.prototype,
+			'scrollHeight'
+		) as PropertyDescriptor
+		Object.defineProperty(document.documentElement, 'scrollHeight', {
+			configurable: true,
+			value: 1000,
+		})
+		Object.defineProperty(window, 'innerHeight', { configurable: true, value: 300 })
+		Object.defineProperty(window, 'scrollY', { configurable: true, value: 700 })
+		// jsdom would try to follow the href, which it cannot do.
+		const swallowNavigation = (event: Event) => event.preventDefault()
+		document.addEventListener('click', swallowNavigation)
+		document.body.innerHTML = '<a href="https://example.org/pricing">go</a>'
+		openWith('?analytics_exclude=1')
+
+		boot(
+			configWith([nativeSlot], {
+				autoCapture: {
+					scrollDepth: true,
+					outboundLinks: true,
+					fileDownloads: false,
+					goalAttribute: false,
+					query: true,
+				},
+			})
+		)
+		document.body.firstElementChild?.dispatchEvent(
+			new MouseEvent('click', { bubbles: true, cancelable: true })
+		)
+		window.dispatchEvent(new Event('scroll'))
+
+		expect(fetchMock).not.toHaveBeenCalled()
+		document.body.innerHTML = ''
+		document.removeEventListener('click', swallowNavigation)
+		Object.defineProperty(document.documentElement, 'scrollHeight', original)
+	})
+
+	it('sends nothing for an SPA navigation', () => {
+		openWith('?analytics_exclude=1')
+		boot(configWith([nativeSlot]))
+
+		window.history.pushState(null, '', '/checkout')
+		window.dispatchEvent(new Event('pagehide'))
+
+		expect(fetchMock).not.toHaveBeenCalled()
+	})
+
+	it('empties a consent queue that already held events', async () => {
+		const tracker = boot(configWith([posthogSlot]))
+		tracker.track('before')
+		tracker.exclude(true)
+		tracker.consent('granted')
+		await Promise.resolve()
+
+		expect(capture).not.toHaveBeenCalled()
+	})
+
+	it('reads a renamed parameter whose name needs encoding', () => {
+		openWith('?a.b%5B%5D=1')
+		expect(boot(configWith([nativeSlot]), { exclusionParam: 'a.b[]' }).excluded).toBe(true)
+	})
+
+	it('treats a stored value that is not the flag as not excluded', () => {
+		window.localStorage.setItem(EXCLUSION_STORAGE_KEY, 'yes')
+		const tracker = boot(configWith([nativeSlot]))
+		tracker.track('signup')
+
+		expect(tracker.excluded).toBe(false)
+		expect(posted()).toHaveLength(1)
+	})
+
 	it('never clears a vendor switch it did not set', () => {
 		window.localStorage.setItem(PLAUSIBLE_IGNORE_KEY, 'true')
 		window.localStorage.setItem(UMAMI_DISABLED_KEY, '1')

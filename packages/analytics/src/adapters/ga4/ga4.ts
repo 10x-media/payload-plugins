@@ -24,6 +24,7 @@ import {
 	splitGoalMetrics,
 } from '../goalRead'
 import { dayIso } from '../series'
+import { ga4ExcludeGuard } from './disableKey'
 import { ga4EventName } from './eventName'
 import { MEASUREMENT_ID_PATTERN } from './measurementId'
 
@@ -51,6 +52,10 @@ export interface Ga4Config {
  * Google's CDN with the id in the query string, so there is nothing to proxy and `routes`
  * stays empty; the snippet is rendered from an absolute `src` and the slot's proxy mount
  * answers 404.
+ *
+ * The exclusion guard leads, ahead of the first `gtag()` call, because that is the only place
+ * GA4's disable switch counts and the tracker boots too late to set it for a snippet the
+ * server rendered.
  */
 function buildCapture(measurementId: string): CaptureSupport {
 	const id = JSON.stringify(measurementId)
@@ -59,7 +64,7 @@ function buildCapture(measurementId: string): CaptureSupport {
 		snippet: () => ({
 			scripts: [
 				{
-					inline: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config",${id})`,
+					inline: `${ga4ExcludeGuard(measurementId)}window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config",${id})`,
 				},
 				{
 					src: `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`,

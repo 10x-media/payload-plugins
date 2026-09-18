@@ -1,19 +1,13 @@
+import { ga4DisableKey } from '../../adapters/ga4/disableKey'
 import { ga4EventName } from '../../adapters/ga4/eventName'
 import type { Sink, TrackerWindow } from '../types'
 import { createVendorSink, flatProps, type VendorSinkArgs, vendorEventName } from './vendor'
 
+export { GA4_DISABLE_PREFIX } from '../../adapters/ga4/disableKey'
+
 type GtagWindow = TrackerWindow & {
 	gtag?: (command: 'event', name: string, params?: Record<string, unknown>) => void
 }
-
-/**
- * GA4's own kill switch: `window['ga-disable-<measurementId>'] = true` stops the tag sending
- * anything (https://developers.google.com/tag-platform/security/guides/privacy). Google
- * requires it before any `gtag()` call and on every page, so for a slot whose snippet the
- * server rendered it only bites from the next page load; a gated slot never loads while the
- * tracker is excluded.
- */
-export const GA4_DISABLE_PREFIX = 'ga-disable-'
 
 export interface Ga4SinkArgs extends VendorSinkArgs {
 	/** From the slot's client descriptor: the switch is per measurement id. */
@@ -37,8 +31,10 @@ export const createGa4Sink = ({ measurementId, ...args }: Ga4SinkArgs): Sink =>
 	createVendorSink(args, {
 		...(measurementId
 			? {
+					// The rendered snippet sets this for itself; re-asserting it covers a gated slot,
+					// whose snippet this sink injects, and a runtime flip either way.
 					exclude: (excluded: boolean) => {
-						Reflect.set(args.win, `${GA4_DISABLE_PREFIX}${measurementId}`, excluded)
+						Reflect.set(args.win, ga4DisableKey(measurementId), excluded)
 					},
 				}
 			: {}),
