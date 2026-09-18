@@ -1,5 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import type { MetricKey } from '../core/contract'
+import { cacheEpochFor } from '../plugin/runtime'
 import { kvCacheStore } from '../surfacing/cacheStore'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { prepareWidgetRead } from './prepareWidgetRead'
@@ -81,7 +82,9 @@ export const readForWidgetRealtime = async (
 	const ttlSeconds = runtime.ttl.realtime ?? adapter.capabilities.recommendedTtl.realtime
 	const bucket = Math.floor(now.getTime() / 1000 / Math.max(1, ttlSeconds))
 	const scopeKey = queryScope === undefined ? '' : `:${encodeURIComponent(queryScope)}`
-	const key = `rt:${adapter.id}:${metric}:${windowMinutes}:${bucket}${scopeKey}`
+	// This key is built outside the engine, so it carries the scope's epoch itself.
+	const epoch = await cacheEpochFor(runtime, queryScope)
+	const key = `rt:e${epoch}:${adapter.id}:${metric}:${windowMinutes}:${bucket}${scopeKey}`
 	const store = kvCacheStore(req.payload.kv)
 	const cached = await store.get<WidgetRealtimeResult>(key)
 	if (cached) {
