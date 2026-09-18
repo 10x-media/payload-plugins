@@ -1,4 +1,9 @@
-import { APIError, type CollectionBeforeValidateHook, ValidationError } from 'payload'
+import {
+	APIError,
+	type CollectionBeforeValidateHook,
+	type TypedLocale,
+	ValidationError,
+} from 'payload'
 import { calcExpressionOf } from '../calc/computeCalcFields'
 import type { CalcResolved } from '../calc/evaluate'
 import type { CalcFunction, CalcSource } from '../calc/registry'
@@ -86,15 +91,16 @@ export const validateSubmission =
 
 		// `req.locale` comes from the visitor's `?locale=`. Clamp it before anything reads it (the form
 		// load below, the host's consent and calc resolvers, the inline action dispatch) so a visitor
-		// cannot run the pipeline under `all` or an unconfigured code.
+		// cannot run the pipeline under `all` or an unconfigured code. Cast where Payload takes it: the
+		// clamped value is one of the host's own codes, but its concrete `TypedLocale` union is unknowable here.
 		const locale = resolveSubmissionLocale(req.locale, req.payload.config.localization)
-		req.locale = locale
+		req.locale = locale as TypedLocale
 
 		const form = await req.payload.findByID({
 			collection: FORMS_SLUG,
 			id: formId as string | number,
 			depth: 0,
-			locale,
+			locale: locale as TypedLocale,
 			req,
 		})
 
