@@ -88,6 +88,33 @@ test('a frontend visit and two goal clicks land as a pageview and conversions', 
 	expect(activeNow).toBeGreaterThanOrEqual(1)
 })
 
+test('the exclusion link stops beacons in this browser until it is cleared', async ({ page }) => {
+	const posts: string[] = []
+	page.on('request', (req) => {
+		if (req.method() === 'POST' && req.url().includes('/api/analytics/ingest')) {
+			posts.push(req.url())
+		}
+	})
+
+	await page.goto('/?analytics_exclude=1')
+	// The tracker reads the parameter and leaves the address bar alone, so the link a staff
+	// member was given still reads as the page they asked for.
+	expect(page.url()).toContain('analytics_exclude=1')
+	await page.getByRole('button', { name: 'Book a demo' }).click()
+	// The navigation is the barrier: a pageview held for its duration is flushed on
+	// `pagehide`, and the goal click above would already have gone out on its own.
+	await page.goto('/thank-you')
+	expect(posts, 'no beacon while excluded').toEqual([])
+
+	await page.goto('/?analytics_exclude=0')
+	const resumed = ingested(page)
+	await page.goto('/thank-you')
+	await resumed
+	// Only the cleared visit can have sent anything: the excluded pages were checked above
+	// and this beacon is ordered after them in the same browser.
+	expect(posts.length, 'beacons resume once the flag is cleared').toBeGreaterThanOrEqual(1)
+})
+
 test('@tenancy an anonymous visit is attributed to the hostname tenant', async ({
 	browser,
 	baseURL,

@@ -1,9 +1,17 @@
+import { ga4DisableKey } from '../../adapters/ga4/disableKey'
 import { ga4EventName } from '../../adapters/ga4/eventName'
 import type { Sink, TrackerWindow } from '../types'
 import { createVendorSink, flatProps, type VendorSinkArgs, vendorEventName } from './vendor'
 
+export { GA4_DISABLE_PREFIX } from '../../adapters/ga4/disableKey'
+
 type GtagWindow = TrackerWindow & {
 	gtag?: (command: 'event', name: string, params?: Record<string, unknown>) => void
+}
+
+export interface Ga4SinkArgs extends VendorSinkArgs {
+	/** From the slot's client descriptor: the switch is per measurement id. */
+	measurementId?: string
 }
 
 /**
@@ -19,8 +27,17 @@ type GtagWindow = TrackerWindow & {
  * default and switchable per stream. An install that turned that option off should turn it
  * back on: this sink forwards no pageview, because on a default stream it would double-count.
  */
-export const createGa4Sink = (args: VendorSinkArgs): Sink =>
+export const createGa4Sink = ({ measurementId, ...args }: Ga4SinkArgs): Sink =>
 	createVendorSink(args, {
+		...(measurementId
+			? {
+					// The rendered snippet sets this for itself; re-asserting it covers a gated slot,
+					// whose snippet this sink injects, and a runtime flip either way.
+					exclude: (excluded: boolean) => {
+						Reflect.set(args.win, ga4DisableKey(measurementId), excluded)
+					},
+				}
+			: {}),
 		has: () => typeof (args.win as GtagWindow).gtag === 'function',
 		dispatch: (event) => {
 			;(args.win as GtagWindow).gtag?.(

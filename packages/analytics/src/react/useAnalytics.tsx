@@ -1,12 +1,23 @@
 'use client'
 
-import { useContext, useMemo } from 'react'
+import { useContext, useMemo, useSyncExternalStore } from 'react'
+import { readExclusion, subscribeExclusion } from '../tracker/exclusion'
 import { liveTracker } from '../tracker/registry'
 import type { Tracker } from '../tracker/types'
-import { type AnalyticsApi, AnalyticsContext } from './AnalyticsProvider'
+import { type AnalyticsApi, type AnalyticsCommands, AnalyticsContext } from './AnalyticsProvider'
 
 const NO_TRACKER =
 	'analytics: useAnalytics found no tracker. Render <AnalyticsScripts /> (or <AnalyticsProvider>) above this component.'
+
+/** The live tracker's flag, so a blocked storage still reports this page's exclusion. */
+const exclusionSnapshot = (): boolean => {
+	if (typeof window === 'undefined') {
+		return false
+	}
+	return liveTracker(window)?.excluded ?? readExclusion(window)
+}
+
+const serverSnapshot = (): boolean => false
 
 /**
  * The window's tracker: the surrounding `<AnalyticsProvider>`'s when there is one, else
@@ -17,10 +28,14 @@ const NO_TRACKER =
  * run when a sibling renders, and an eagerly resolved null would never recover. A call that
  * finds neither a provider nor a booted tracker throws, because a silently dead `track` is
  * worse than a build-time mistake.
+ *
+ * `excluded` is read from the tracker rather than held in state, so every component sees the
+ * same flag however it was flipped.
  */
 export const useAnalytics = (): AnalyticsApi => {
 	const provided = useContext(AnalyticsContext)
-	return useMemo<AnalyticsApi>(() => {
+	const excluded = useSyncExternalStore(subscribeExclusion, exclusionSnapshot, serverSnapshot)
+	const commands = useMemo<AnalyticsCommands>(() => {
 		if (provided) {
 			return provided
 		}
@@ -35,6 +50,9 @@ export const useAnalytics = (): AnalyticsApi => {
 			track: (name, props) => tracker().track(name, props),
 			trackGoal: (slug, opts) => tracker().trackGoal(slug, opts),
 			consent: (state) => tracker().consent(state),
+			setExcluded: (next) => tracker().exclude(next),
 		}
 	}, [provided])
+
+	return useMemo<AnalyticsApi>(() => ({ ...commands, excluded }), [commands, excluded])
 }

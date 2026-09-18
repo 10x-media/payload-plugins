@@ -155,7 +155,7 @@ describe('useAnalytics', () => {
 		onError.mockRestore()
 	})
 
-	it('exposes track, trackGoal and consent', () => {
+	it('exposes the tracker surface and nothing else', () => {
 		let api: ReturnType<typeof useAnalytics> | null = null
 		const Probe = () => {
 			api = useAnalytics()
@@ -167,6 +167,12 @@ describe('useAnalytics', () => {
 			</AnalyticsProvider>
 		)
 
-		expect(Object.keys(api ?? {}).sort()).toEqual(['consent', 'track', 'trackGoal'])
+		expect(Object.keys(api ?? {}).sort()).toEqual([
+			'consent',
+			'excluded',
+			'setExcluded',
+			'track',
+			'trackGoal',
+		])
 	})
 })

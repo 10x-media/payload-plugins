@@ -1,6 +1,8 @@
 import type { protos } from '@google-analytics/data'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AnalyticsQuery } from '../../core/contract'
+import { EXCLUSION_STORAGE_KEY } from '../../tracker/exclusion'
+import { GA4_DISABLE_PREFIX } from './disableKey'
 
 const { runReport } = vi.hoisted(() => ({ runReport: vi.fn() }))
 
@@ -667,12 +669,25 @@ describe('ga4 capture', () => {
 		// Inline first: `gtag` and its queue exist before the tag lands, and survive a tag that
 		// never lands at all.
 		expect(scripts[0]?.inline).toBe(
-			'window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","G-AB12CD34")'
+			'try{if(localStorage.getItem("analytics:exclude")==="1")window["ga-disable-G-AB12CD34"]=true}catch(e){}window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","G-AB12CD34")'
 		)
 		expect(scripts[1]).toEqual({
 			src: 'https://www.googletagmanager.com/gtag/js?id=G-AB12CD34',
 			async: true,
 		})
+	})
+
+	it('sets GA4 own disable switch from the stored flag before the first gtag call', () => {
+		const inline =
+			ga4({ ...config, measurementId: 'G-AB12CD34' }).capture?.snippet({
+				path: '/api/analytics/p/global',
+			}).scripts[0]?.inline ?? ''
+
+		const guardEnd = inline.indexOf('}catch(e){}')
+		expect(guardEnd).toBeGreaterThan(-1)
+		expect(guardEnd).toBeLessThan(inline.indexOf('gtag('))
+		expect(inline.slice(0, guardEnd)).toContain(`getItem("${EXCLUSION_STORAGE_KEY}")`)
+		expect(inline.slice(0, guardEnd)).toContain(`window["${GA4_DISABLE_PREFIX}G-AB12CD34"]=true`)
 	})
 
 	// The id reaches an inline script and a URL, so anything that is not a bare token is

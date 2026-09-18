@@ -111,6 +111,59 @@ capture: {
 
 An adapter entry wins over a slot entry, and both win over the per-family default. A bare adapter id must name a config adapter; a runtime provider instance id (`<provider>:<instance>`) is taken on trust, since those only exist once a scope resolves.
 
+## Excluding your own visits
+
+A site's own staff are in its numbers unless they take themselves out. Any page with `?analytics_exclude=1` does that for the browser it is opened in, and `?analytics_exclude=0` puts it back (`true` and `false` work too):
+
+```
+https://example.com/?analytics_exclude=1
+```
+
+The tracker reads the parameter on boot and leaves the URL alone: nothing is rewritten, so the link stays shareable and the address bar reads as the visitor typed it. The flag is stored in `localStorage` under `analytics:exclude`, which makes it per browser and per site: repeat it in each browser and profile that should be excluded, and expect it to go when that browser's site data is cleared. A browser with storage blocked is excluded for the page the link was opened on and no further.
+
+While the flag is set the tracker delivers nothing: no native beacon, no event to any vendor, nothing queued for a pending consent decision, and no vendor script injected even once consent is granted. Clearing resumes from that point rather than replaying what was skipped.
+
+Exclusion applies to events from the moment it is switched on. A page view already open when it is switched on at runtime (`exclude(true)` or `setExcluded(true)`) still completes with its duration, because that view was dispatched before the flag; a boot with `?analytics_exclude=1` has nothing open, so nothing is sent at all. A flip in one tab reaches another open tab on its next load, not live: the flag is read when a tracker boots, and there is no cross-tab broadcast.
+
+```ts
+const tracker = await initTracker()
+tracker.exclude(true)   // same flag, set from your own code
+tracker.excluded        // true
+
+// React
+const { excluded, setExcluded } = useAnalytics()
+```
+
+`EXCLUSION_STORAGE_KEY`, `DEFAULT_EXCLUSION_PARAM`, `readExclusion`, `writeExclusion`, `readExclusionParam` and `subscribeExclusion` are exported from `@10x-media/analytics/tracker` for a host that wants to render its own switch. Flip the flag through `tracker.exclude()` or `setExcluded` whenever a tracker is live: that is what stops the current page and sets the vendor switches. `writeExclusion` only persists the flag, which takes effect on the next boot. Rename the parameter or turn it off with `exclusionParam`, which sits beside `persistConsent`:
+
+```ts
+createTracker(config, { exclusionParam: 'no_stats' })
+createTracker(config, { exclusionParam: false }) // the parameter is ignored; an existing flag still holds
+```
+
+### The vendor slots
+
+A vendor snippet for a slot that does not require consent is server-rendered into the HTML, so it runs before the tracker boots and would count its own page view. The tracker's own gate cannot reach that, so setting or clearing the flag also sets or clears each vendor's own opt-out switch, for the slots the config actually has:
+
+| Vendor | Switch |
+|---|---|
+| Plausible | `localStorage.plausible_ignore = 'true'` |
+| Umami | `localStorage['umami.disabled'] = '1'` |
+| PostHog | `posthog.opt_out_capturing()`, queued by the snippet's stub |
+| GA4 | `window['ga-disable-<measurementId>'] = true`, and the rendered snippet sets it from the flag itself |
+
+What an ungated slot can still record, because its snippet ran before the tracker booted:
+
+- **Plausible and Umami** read their key before each event, so their automatic page view for the page the link was opened on may already have been sent. Their key is in `localStorage`, so it is there before their script runs on every later page and they are silent from then on.
+- **PostHog**'s stub queues the opt-out, so its own page view for that first page may be captured before the opt-out is replayed. PostHog persists the opt-out itself, so later loads start opted out.
+- **GA4**'s switch is a window property rather than stored state, so it has to be set on every load, before the first `gtag()` call, which is the only place GA4 honours it. The rendered snippet therefore reads `analytics:exclude` itself, ahead of its own `gtag('config', ...)`, rather than waiting for the tracker. The page the link is opened on may still be measured, because that page's snippet ran before the flag existed; from the next page load on the snippet sets the switch itself and nothing is measured. GA4 defaults to consent `required`, and a gated slot is never loaded while the browser is excluded.
+
+A vendor key the tracker did not set is never cleared on its own, so a key a staff member set by hand through the vendor's own instructions survives an ordinary visit. An explicit `?analytics_exclude=0` or `exclude(false)` clears the vendor keys even if one was set by hand, which is the cost of off meaning off.
+
+<Callout type="warn">
+**Anyone who knows the link can use it,** so a third party can send `?analytics_exclude=1` to real visitors and drop them from the numbers, one browser at a time. There is no server-side record of who was excluded, so there is nothing to audit either. Rename the parameter, or set `exclusionParam: false` and flip the flag from your own UI, if that matters for your site.
+</Callout>
+
 ## Auto-capture
 
 | Toggle | Default | Sends |

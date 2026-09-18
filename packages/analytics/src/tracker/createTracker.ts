@@ -2,6 +2,12 @@ import type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
 import { MAX_QUERY_LENGTH } from '../query/limits'
 import { type AutoCapture, createAutoCapture } from './autoCapture'
 import { createConsentQueue, readConsent, writeConsent } from './consent'
+import {
+	DEFAULT_EXCLUSION_PARAM,
+	readExclusion,
+	readExclusionParam,
+	writeExclusion,
+} from './exclusion'
 import { createScriptLoader } from './loadScript'
 import { createPageTracking } from './pageTracking'
 import { createGa4Sink } from './sinks/ga4'
@@ -25,6 +31,8 @@ export const createNoopTracker = (): Tracker => ({
 	track: () => undefined,
 	trackGoal: () => undefined,
 	consent: () => undefined,
+	excluded: false,
+	exclude: () => undefined,
 	flush: () => undefined,
 	destroy: () => undefined,
 })
@@ -47,8 +55,13 @@ const buildSink = (args: {
 			return createPlausibleSink(vendor)
 		case 'umami':
 			return createUmamiSink(vendor)
-		case 'ga4':
-			return createGa4Sink(vendor)
+		case 'ga4': {
+			const { measurementId } = slot.client
+			return createGa4Sink({
+				...vendor,
+				...(typeof measurementId === 'string' ? { measurementId } : {}),
+			})
+		}
 	}
 }
 
@@ -66,10 +79,12 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 		return createNoopTracker()
 	}
 	const persist = options.persistConsent !== false
+	const exclusionParam = options.exclusionParam ?? DEFAULT_EXCLUSION_PARAM
 	const loadScript = options.loadScript ?? createScriptLoader(win, options.nonce)
 	const queue = createConsentQueue<{ sink: Sink; event: TrackerEvent }>()
 	let auto: AutoCapture | null = null
 	let state: ConsentState | null = persist ? readConsent(win) : null
+	let excluded = readExclusion(win)
 
 	const entries = config.slots.map((slot) => ({
 		requiresConsent: slot.requiresConsent,
@@ -83,6 +98,9 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 	}))
 
 	const load = (sink: Sink) => {
+		if (excluded) {
+			return
+		}
 		void sink.ready().catch(() => undefined)
 	}
 
@@ -104,6 +122,9 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 	}
 
 	const dispatch = (event: TrackerEvent) => {
+		if (excluded) {
+			return
+		}
 		for (const entry of entries) {
 			if (!entry.requiresConsent || state === 'granted') {
 				deliver(entry.sink, event)
@@ -161,6 +182,17 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 		}
 	}
 
+	/**
+	 * Mirrors the flag into each vendor's own opt-out. The tracker's gate covers what it
+	 * delivers and the scripts it injects; a snippet the server rendered for an ungated slot
+	 * is already running and only the vendor's own switch reaches it.
+	 */
+	const syncVendors = (next: boolean) => {
+		for (const entry of entries) {
+			guard(() => entry.sink.exclude?.(next))
+		}
+	}
+
 	auto = createAutoCapture({
 		win,
 		options: config.autoCapture,
@@ -168,6 +200,18 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 	})
 	const pageTracking = createPageTracking(win, page)
 	win.addEventListener('pagehide', flush)
+
+	const requested =
+		exclusionParam === false ? null : readExclusionParam(win.location.search, exclusionParam)
+	if (requested !== null) {
+		excluded = requested
+		writeExclusion(win, requested)
+	}
+	// Only an explicit request clears a vendor switch: one a staff member set through the
+	// vendor's own instructions has to survive a visit that says nothing about exclusion.
+	if (excluded || requested === false) {
+		syncVendors(excluded)
+	}
 
 	for (const entry of entries) {
 		if (!entry.requiresConsent || state === 'granted') {
@@ -197,6 +241,23 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 			}
 			for (const queued of queue.drain()) {
 				deliver(queued.sink, queued.event)
+			}
+		},
+		get excluded() {
+			return excluded
+		},
+		exclude(next) {
+			excluded = next
+			writeExclusion(win, next)
+			syncVendors(next)
+			if (next) {
+				queue.clear()
+				return
+			}
+			for (const entry of entries) {
+				if (!entry.requiresConsent || state === 'granted') {
+					load(entry.sink)
+				}
 			}
 		},
 		destroy() {

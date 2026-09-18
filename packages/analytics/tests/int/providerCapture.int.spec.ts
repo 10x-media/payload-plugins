@@ -5,6 +5,7 @@ import { handleEndpoints } from 'payload'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
+import { ga4ExcludeGuard } from '../../src/adapters/ga4/disableKey'
 import type { TrackerConfig } from '../../src/capture/trackerConfig'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
@@ -169,7 +170,7 @@ describeForDb('analytics ga4 capture from a provider document', {}, (db) => {
 		expect(slot.client).toEqual({ kind: 'ga4', measurementId: MEASUREMENT_ID })
 		expect(slot.snippet.scripts).toEqual([
 			{
-				inline: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","${MEASUREMENT_ID}")`,
+				inline: `${ga4ExcludeGuard(MEASUREMENT_ID)}window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config","${MEASUREMENT_ID}")`,
 			},
 			{ src: `https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}`, async: true },
 		])
@@ -204,5 +205,6 @@ describeForDb('analytics ga4 capture from a provider document', {}, (db) => {
 		)
 		expect(granted).toContain(`src="https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}"`)
 		expect(granted).toContain(`gtag("config","${MEASUREMENT_ID}")`)
+		expect(granted.indexOf('ga-disable-')).toBeLessThan(granted.indexOf('gtag('))
 	})
 })

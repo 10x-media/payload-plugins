@@ -1,7 +1,9 @@
 import { act, cleanup, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
+import { EXCLUSION_STORAGE_KEY } from '../tracker/exclusion'
 import type { TrackerEvent } from '../tracker/types'
+import { AnalyticsProvider } from './AnalyticsProvider'
 import { TrackerBoot } from './TrackerBoot'
 import { useAnalytics } from './useAnalytics'
 
@@ -101,6 +103,42 @@ describe('useAnalytics without a provider', () => {
 		expect(posted()).toEqual([expect.objectContaining({ type: 'goal', name: 'book-demo' })])
 	})
 
+	it('reports the exclusion flag, flips it, and re-renders the caller', () => {
+		const latest: { api: ReturnType<typeof useAnalytics> | null } = { api: null }
+		render(
+			<>
+				<TrackerBoot config={config} />
+				<Probe
+					onApi={(a) => {
+						latest.api = a
+					}}
+				/>
+			</>
+		)
+		expect(latest.api?.excluded).toBe(false)
+
+		act(() => {
+			latest.api?.setExcluded(true)
+		})
+
+		expect(latest.api?.excluded).toBe(true)
+		expect(window.localStorage.getItem(EXCLUSION_STORAGE_KEY)).toBe('1')
+		act(() => {
+			latest.api?.track('skipped')
+		})
+		expect(posted()).toEqual([])
+
+		act(() => {
+			latest.api?.setExcluded(false)
+		})
+
+		expect(latest.api?.excluded).toBe(false)
+		act(() => {
+			latest.api?.track('signup')
+		})
+		expect(posted()).toEqual([expect.objectContaining({ name: 'signup' })])
+	})
+
 	it('renders fine with no tracker at all and throws only when a call is made', () => {
 		let api: ReturnType<typeof useAnalytics> | null = null
 		expect(() =>
@@ -115,5 +153,30 @@ describe('useAnalytics without a provider', () => {
 
 		expect(() => api?.track('signup')).toThrow(/AnalyticsProvider|AnalyticsScripts/)
 		expect(fetchMock).not.toHaveBeenCalled()
+	})
+})
+
+describe('useAnalytics under a provider', () => {
+	it('flips the exclusion flag through the provider tracker', () => {
+		const latest: { api: ReturnType<typeof useAnalytics> | null } = { api: null }
+		render(
+			<AnalyticsProvider config={config}>
+				<Probe
+					onApi={(a) => {
+						latest.api = a
+					}}
+				/>
+			</AnalyticsProvider>
+		)
+
+		act(() => {
+			latest.api?.setExcluded(true)
+		})
+
+		expect(latest.api?.excluded).toBe(true)
+		act(() => {
+			latest.api?.track('skipped')
+		})
+		expect(posted()).toEqual([])
 	})
 })
