@@ -3,7 +3,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { createRegistry } from '../core/registry'
 import type { EpochStore } from '../surfacing/epoch'
 import { memoryAdapter } from '../testing/memoryAdapter'
-import { MAX_REFRESH_BODY_BYTES, makeRefreshHandler, REFRESH_DEBOUNCE_MS } from './refreshEndpoint'
+import {
+	createRefreshDebounce,
+	MAX_REFRESH_BODY_BYTES,
+	makeRefreshHandler,
+	REFRESH_DEBOUNCE_MS,
+} from './refreshEndpoint'
 import { type AnalyticsRuntime, setRuntime } from './runtime'
 
 type ErrorBody = { error: { code: string; message: string; param?: string } }
@@ -211,6 +216,22 @@ describe('makeRefreshHandler debounce', () => {
 		await handler(reqWith(runtime))
 
 		expect(bump).toHaveBeenCalledTimes(2)
+	})
+
+	it('holds only the scopes still inside the window', () => {
+		let at = 1_000
+		const debounce = createRefreshDebounce(() => at)
+
+		debounce.record('scope-a')
+		at += REFRESH_DEBOUNCE_MS - 1
+		debounce.record('scope-b')
+		expect(debounce.size).toBe(2)
+
+		at += REFRESH_DEBOUNCE_MS
+		debounce.record('scope-c')
+		expect(debounce.size).toBe(1)
+		expect(debounce.allows('scope-a')).toBe(true)
+		expect(debounce.allows('scope-c')).toBe(false)
 	})
 
 	it('debounces one scope at a time', async () => {
