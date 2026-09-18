@@ -19,7 +19,13 @@ const baseArgs = (overrides: Partial<ActionRunArgs<Record<string, unknown>>> = {
 		t,
 		descriptors: [],
 		context: null,
-		renderBody: makeRenderBody({ values, descriptors: [], form }),
+		renderBody: makeRenderBody({
+			values,
+			descriptors: [],
+			form,
+			locale,
+			actionType: 'emailTeam',
+		}),
 		req: undefined,
 		...overrides,
 	} as ActionRunArgs<Record<string, unknown>>

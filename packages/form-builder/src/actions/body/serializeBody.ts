@@ -28,6 +28,13 @@ export type SerializeBodyArgs = {
 	descriptors: SubmissionDescriptor[]
 	form: SerializeBodyForm
 	req?: PayloadRequest
+	/**
+	 * The submission's own stored locale, the one the form (and so `body`) was loaded at. Use it for
+	 * a wrapper's own strings rather than `req.locale`, which on the queued path is the job runner's.
+	 */
+	locale: string
+	/** The `blockType` of the action rendering this body (e.g. `emailTeam`, `confirmation`). */
+	actionType: string
 }
 
 /**
@@ -130,6 +137,8 @@ export const makeRenderBody =
 		descriptors: SubmissionDescriptor[]
 		form: SerializeBodyForm
 		req?: PayloadRequest
+		locale: string
+		actionType: string
 		richText?: RichTextBodyOption
 	}) =>
 	async (body: unknown): Promise<string> => {
@@ -140,6 +149,8 @@ export const makeRenderBody =
 				descriptors: args.descriptors,
 				form: args.form,
 				req: args.req,
+				locale: args.locale,
+				actionType: args.actionType,
 			})
 		}
 		return serializeBody(body, {

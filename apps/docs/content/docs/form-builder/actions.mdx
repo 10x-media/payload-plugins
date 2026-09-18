@@ -77,20 +77,29 @@ formBuilder({
 })
 ```
 
-Beyond `body`, `values`, and `descriptors`, `serialize` receives the submitted `form` (`{ id, title }`) and the `req`, so the replacement can branch on context: look up a per-tenant template, or hand the raw body off to a component renderer like react-email:
+Beyond `body`, `values`, and `descriptors`, `serialize` receives the submitted `form` (`{ id, title }`), the `req`, the submission's `locale`, and the `actionType` rendering the body (`emailTeam`, `confirmation`, or a custom action's type), so the replacement can branch on context: look up a per-tenant template, pick a separate layout for the visitor's confirmation, or hand the raw body off to a component renderer like react-email:
 
 ```tsx
 formBuilder({
   richText: {
-    serialize: async ({ body, values, form, req }) => {
+    serialize: async ({ body, values, form, req, locale, actionType }) => {
       const tenant = await tenantFromRequest(req)
       return render(
-        <SubmissionEmail body={body} values={values} formTitle={form.title} branding={tenant.branding} />
+        <SubmissionEmail
+          body={body}
+          values={values}
+          formTitle={form.title}
+          branding={tenant.branding}
+          locale={locale}
+          audience={actionType === 'confirmation' ? 'visitor' : 'team'}
+        />
       )
     },
   },
 })
 ```
+
+`locale` is the submission's own stored locale, the one `body` was loaded at, so a wrapper's own strings (a greeting, a footer) match the content inside it. Prefer it over `req.locale`: on the queued path `req` is the job runner's request, not the visitor's. A submission stores the locale of the request that created it, which `<Form>` sets from its [`locale` prop](/form-builder/rendering#transport).
 
 The building blocks are exported from the root for custom pipelines: `serializeBody`, `defaultBodyConverters`, `sanitizeUrl`, `escapeHtml`, `renderAllValues`, and `renderAllValuesTable`.
 

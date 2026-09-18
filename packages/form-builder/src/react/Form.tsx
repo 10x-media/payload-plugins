@@ -135,6 +135,11 @@ export type FormProps = {
 	calcFunctions?: Record<string, (args: number[]) => number>
 	events?: FormEventSink
 	t?: RendererTranslate
+	/**
+	 * The visitor's locale: drives renderer strings and value formatting (`'en'` when absent) and,
+	 * when passed, is sent with the submission so the server stores it and the post-submit actions
+	 * (confirmation emails included) render in it. Absent, the submission takes the host's default locale.
+	 */
 	locale?: string
 	layout?: boolean
 	/** Submit button label. Precedence: this prop, then the form's `buttons.submitLabel`, then the translated default. */
@@ -249,7 +254,7 @@ export const Form = ({
 	calcFunctions,
 	events,
 	t,
-	locale = 'en',
+	locale: localeProp,
 	layout,
 	submitLabel,
 	nextLabel,
@@ -275,6 +280,7 @@ export const Form = ({
 	backButtonClassName,
 	adapters,
 }: FormProps) => {
+	const locale = localeProp ?? 'en'
 	const honeypotName = honeypot === false ? null : (honeypot?.name ?? DEFAULT_HONEYPOT_FIELD)
 	const honeypotRef = useRef<HTMLInputElement>(null)
 	const registry = useMemo(() => buildFieldTypeRegistry(fieldTypes), [fieldTypes])
@@ -764,8 +770,8 @@ export const Form = ({
 			values.push({ field: CONTEXT_KEY, value: context })
 		}
 		const result: SubmitFormResult = onSubmit
-			? await onSubmit({ formId: form.id, values })
-			: await submitForm({ formId: form.id, values, apiRoute })
+			? await onSubmit({ formId: form.id, values, ...(localeProp ? { locale: localeProp } : {}) })
+			: await submitForm({ formId: form.id, values, apiRoute, locale: localeProp })
 		submittingRef.current = false
 		if (result.ok) {
 			// A submission happened, so the unmount effect must not emit `form.abandoned`, in either mode.

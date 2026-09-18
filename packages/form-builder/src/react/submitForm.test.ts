@@ -70,4 +70,20 @@ describe('submitForm', () => {
 		await submitForm({ formId: 'f1', values, fetchImpl })
 		expect(fetchImpl.mock.calls[0]?.[0]).toBe('/api/form-submissions')
 	})
+
+	it('sends an explicit locale as an encoded ?locale= query and keeps the body unchanged', async () => {
+		const fetchImpl = vi.fn<typeof fetch>(
+			async () => new Response(JSON.stringify({ doc: { id: '1' } }), { status: 201 })
+		)
+		await submitForm({ formId: 'f1', values, locale: 'pt-BR', fetchImpl })
+		const call = fetchImpl.mock.calls[0]
+		expect(call?.[0]).toBe('/api/form-submissions?locale=pt-BR')
+		expect(JSON.parse(String((call?.[1] as RequestInit | undefined)?.body))).toEqual({
+			form: 'f1',
+			values,
+		})
+
+		await submitForm({ formId: 'f1', values, locale: 'a&b', fetchImpl })
+		expect(fetchImpl.mock.calls[1]?.[0]).toBe('/api/form-submissions?locale=a%26b')
+	})
 })
