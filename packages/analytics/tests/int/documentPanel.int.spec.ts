@@ -5,6 +5,7 @@ import { readForField } from '../../src/fields/readForDocument'
 import { analytics } from '../../src/index'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
+import { CHANNEL_TAXONOMY_VERSION } from '../../src/native/ingest/source'
 import { native } from '../../src/native/nativeAdapter'
 import { DOCUMENT_PATH } from '../../src/plugin/paths'
 
@@ -22,6 +23,8 @@ const pageview = (daysAgo: number, visitor: string): StoredEvent => ({
 	visitorHash: visitor,
 	sessionId: `${visitor}-s`,
 	durationMs: 30_000,
+	channel: 'direct',
+	channelVersion: CHANNEL_TAXONOMY_VERSION,
 })
 
 describeForDb('document analytics endpoint', {}, (db) => {

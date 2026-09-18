@@ -7,7 +7,7 @@ import { clientIpFromHeaders } from './clientIp'
 import { classifyDevice, type DeviceType } from './device'
 import { primaryLanguage } from './language'
 import { referrerHost, storedReferrer } from './referrer'
-import { deriveSource } from './source'
+import { CHANNEL_TAXONOMY_VERSION, classifyChannel, deriveSource } from './source'
 import { extractUtm } from './utm'
 import { dailyVisitorHash, deriveSessionId } from './visitorHash'
 
@@ -55,11 +55,18 @@ export interface StoredEvent {
 	browser?: BrowserName
 	os?: OsName
 	/**
-	 * The hit's traffic channel (`TrafficChannel`). Typed as a string because rows written
-	 * before the channel classifier hold a referrer host here instead, and they are never
-	 * rewritten.
+	 * The visit's named origin: its `utm_source`, else the referrer host, else `direct`.
+	 * Typed as a string because a row written before this classification holds whatever the
+	 * rules of its day decided, and rows are never rewritten.
 	 */
 	source?: string
+	/** The hit's acquisition channel (`TrafficChannel`), classified from the origin above. */
+	channel: string
+	/**
+	 * The taxonomy the `channel` beside it was decided under, so a later reclassify can find
+	 * the rows an older rule set wrote.
+	 */
+	channelVersion: number
 	/** The five campaign keys extracted from the wire `query`; absent when it carried none. */
 	utmSource?: string
 	utmMedium?: string
@@ -236,7 +243,14 @@ export async function normalizeEvent({
 		...(device ? { device } : {}),
 		...(browser ? { browser } : {}),
 		...(os ? { os } : {}),
-		source: deriveSource({ referrerHost: refHost, utmMedium: utm.utmMedium, query }),
+		source: deriveSource({ referrerHost: refHost, utmSource: utm.utmSource }),
+		channel: classifyChannel({
+			referrerHost: refHost,
+			utmSource: utm.utmSource,
+			utmMedium: utm.utmMedium,
+			query,
+		}),
+		channelVersion: CHANNEL_TAXONOMY_VERSION,
 		...utm,
 		country: geoValue(geo.country),
 		region: geoValue(geo.region),

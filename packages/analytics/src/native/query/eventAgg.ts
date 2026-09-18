@@ -16,6 +16,7 @@ export interface EventLike {
 	browser?: string | null
 	os?: string | null
 	source?: string | null
+	channel?: string | null
 	/** The referrer host derived at ingest; the raw referrer is never grouped or filtered on. */
 	referrerHost?: string | null
 	country?: string | null
@@ -47,6 +48,7 @@ type EventStringField =
 	| 'os'
 	| 'language'
 	| 'source'
+	| 'channel'
 	| 'referrerHost'
 	| 'utmSource'
 	| 'utmMedium'
@@ -70,6 +72,7 @@ const EVENT_FIELD: Partial<Record<DimensionKey, EventStringField>> = {
 	os: 'os',
 	language: 'language',
 	source: 'source',
+	channel: 'channel',
 	referrer: 'referrerHost',
 	utmSource: 'utmSource',
 	utmMedium: 'utmMedium',

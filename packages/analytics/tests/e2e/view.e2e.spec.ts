@@ -125,14 +125,25 @@ test('the sources tab ranks referrer hosts and never the site itself', async ({ 
 /**
  * Every channel the seed produces, named as `en` names them: the run is on the default
  * English locale, so a row reads as the `channel*` translation of the token it stores.
+ * There are exactly ten of them, which is the row limit the view opens on, so the URLs below
+ * widen it rather than leaving the last one to whichever way a tie broke.
  */
-const SEED_CHANNELS = ['Direct', 'Search', 'Social', 'Email', 'Paid', 'Referral']
+const SEED_CHANNELS = [
+	'Direct',
+	'Organic search',
+	'Organic social',
+	'Organic video',
+	'Referral',
+	'Email',
+	'Affiliate',
+	'Display',
+	'Paid search',
+	'Paid social',
+]
 
-test('the sources tab buckets traffic into named channels and filters on the raw token', async ({
-	page,
-}) => {
+test('the sources tab opens on channels and filters on the raw token', async ({ page }) => {
 	await login(page, PLATFORM)
-	await page.goto('/admin/analytics?tab=sources')
+	await page.goto('/admin/analytics?tab=sources&limit=25')
 
 	const breakdown = page.locator('.analytics-view__breakdown')
 	// `has` matches inside the row it filters, so its locator is rooted at the page rather
@@ -144,12 +155,12 @@ test('the sources tab buckets traffic into named channels and filters on the raw
 			breakdown.locator('.analytics-bars__label', { hasText: new RegExp(`^${channel}$`) })
 		).toBeVisible()
 	}
-	// The channel replaces the host the dimension used to store, so no row is a hostname.
+	// A channel classifies the origin rather than naming it, so no row here is a hostname.
 	await expect(breakdown).not.toContainText('google.com')
 
 	await breakdown
 		.locator('.analytics-bars__row--action')
-		.filter({ has: label('Search') })
+		.filter({ has: label('Paid search') })
 		.click()
 
 	// The filter and the URL carry the stored token; only the row and the chip are named.
@@ -157,8 +168,23 @@ test('the sources tab buckets traffic into named channels and filters on the raw
 		const raw = new URLSearchParams(await search(page)).get('filters')
 		return raw === null ? null : JSON.parse(raw)
 	}
-	await expect.poll(filters).toEqual([{ dimension: 'source', operator: 'eq', value: 'search' }])
-	await expect(page.getByRole('button', { name: 'Remove filter: Source = Search' })).toBeVisible()
+	await expect
+		.poll(filters)
+		.toEqual([{ dimension: 'channel', operator: 'eq', value: 'paid-search' }])
+	await expect(
+		page.getByRole('button', { name: 'Remove filter: Channel = Paid search' })
+	).toBeVisible()
+})
+
+test('the source dimension names the origin a visit arrived from', async ({ page }) => {
+	await login(page, PLATFORM)
+	await page.goto('/admin/analytics?tab=sources&dim=source&limit=25')
+
+	// `utm_source` when the landing was tagged, the referring host when it was not, so both
+	// kinds of name rank side by side in the one column.
+	const breakdown = page.locator('.analytics-view__breakdown')
+	await expect(breakdown.getByText('newsletter', { exact: true })).toBeVisible()
+	await expect(breakdown.getByText('google.com', { exact: true })).toBeVisible()
 })
 
 test('the group-by picker regroups a tab and writes the pick to the URL', async ({ page }) => {

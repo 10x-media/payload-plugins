@@ -277,16 +277,16 @@ describe('Toolbar controls', () => {
 		expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ filters: [] }))
 	})
 
-	it('names a native source chip as a channel and leaves a provider one as its raw token', () => {
+	it('names a native channel chip in the reader language and leaves a provider one raw', () => {
 		const state: ViewState = {
 			...baseState,
-			filters: [{ dimension: 'source', operator: 'eq', value: 'search' }],
+			filters: [{ dimension: 'channel', operator: 'eq', value: 'organic-search' }],
 		}
 		renderToolbar({ state })
-		expect(screen.getByText(new RegExp(keys.channelSearch))).toBeDefined()
+		expect(screen.getByText(new RegExp(keys.channelOrganicSearch))).toBeDefined()
 		cleanup()
 		renderToolbar({ state, provider: 'plausible' })
-		expect(screen.queryByText(new RegExp(keys.channelSearch))).toBeNull()
-		expect(screen.getByText(/search/)).toBeDefined()
+		expect(screen.queryByText(new RegExp(keys.channelOrganicSearch))).toBeNull()
+		expect(screen.getByText(/organic-search/)).toBeDefined()
 	})
 })

@@ -23,6 +23,13 @@ export interface BreakdownSpec {
 export const BREAKDOWN_SPECS: BreakdownSpec[] = [
 	{ slug: 'analytics-breakdown-pages', dimension: 'page', label: keys.widgetBreakdownPages },
 	{ slug: 'analytics-breakdown-sources', dimension: 'source', label: keys.widgetBreakdownSources },
+	{
+		slug: 'analytics-breakdown-channels',
+		dimension: 'channel',
+		label: keys.widgetBreakdownChannels,
+		// Channels are an acquisition mix, which is a question about people rather than pages.
+		preferredDefault: 'visitors',
+	},
 	{ slug: 'analytics-breakdown-devices', dimension: 'device', label: keys.widgetBreakdownDevices },
 	{
 		slug: 'analytics-breakdown-countries',

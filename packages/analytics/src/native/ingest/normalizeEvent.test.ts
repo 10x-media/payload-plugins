@@ -8,6 +8,7 @@ import {
 	MAX_REFERRER_LENGTH,
 	normalizeEvent,
 } from './normalizeEvent'
+import { CHANNEL_TAXONOMY_VERSION } from './source'
 
 const headers = (h: Record<string, string>) => new Headers(h)
 
@@ -44,7 +45,7 @@ describe('normalizeEvent', () => {
 		expect(ev.country).toBeUndefined()
 	})
 
-	it('derives device from the user-agent header and the source channel from the referrer', async () => {
+	it('derives device from the user-agent header, and the source and channel from the referrer', async () => {
 		const event = await normalizeEvent({
 			raw: {
 				type: 'pageview',
@@ -60,7 +61,27 @@ describe('normalizeEvent', () => {
 			now: new Date('2026-06-01T00:00:00.000Z'),
 		})
 		expect(event.device).toBe('mobile')
-		expect(event.source).toBe('search')
+		expect(event.source).toBe('google.com')
+		expect(event.channel).toBe('organic-search')
+		expect(event.channelVersion).toBe(CHANNEL_TAXONOMY_VERSION)
+	})
+
+	it('reports the utm_source lowercased as the origin, keeping the tag as written', async () => {
+		const event = await normalizeEvent({
+			raw: {
+				type: 'pageview',
+				path: '/p',
+				hostname: 'example.com',
+				query: 'utm_source=Google&utm_medium=cpc',
+			},
+			headers: new Headers({ 'user-agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/126.0.0.0' }),
+			geoResolver: async () => ({}),
+			salt: 'salt',
+			now: new Date('2026-06-01T00:00:00.000Z'),
+		})
+		expect(event.source).toBe('google')
+		expect(event.utmSource).toBe('Google')
+		expect(event.channel).toBe('paid-search')
 	})
 
 	it('omits device entirely for a user agent that is not a device', async () => {
@@ -379,7 +400,8 @@ describe('normalizeEvent native dimensions', () => {
 		)
 		expect(ev.referrer).toHaveLength(MAX_REFERRER_LENGTH)
 		expect(ev.referrerHost).toBe('news.example.org')
-		expect(ev.source).toBe('referral')
+		expect(ev.source).toBe('news.example.org')
+		expect(ev.channel).toBe('referral')
 	})
 
 	it('reports no referrer host for internal navigation, as source reports direct', async () => {

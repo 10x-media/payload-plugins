@@ -1,9 +1,10 @@
 import type { MigrateDownArgs, MigrateUpArgs } from '@payloadcms/db-mongodb'
 
 /**
- * Adds the nine dimension columns the native engine now classifies at ingest: the browser,
- * OS and language families, the five campaign keys, and the referrer host the `referrer`
- * dimension groups and filters on. Rollup rows are keyed by dimension name, so the rollups
+ * Adds the eleven dimension columns the native engine now classifies at ingest: the browser,
+ * OS and language families, the five campaign keys, the referrer host the `referrer`
+ * dimension groups and filters on, and the acquisition channel with the taxonomy version it
+ * was decided under. Rollup rows are keyed by dimension name, so the rollups
  * collection is unchanged, and Mongo needs nothing at all: the fields are optional, and an
  * event written before this release simply carries none of them, which is exactly what "no
  * bucket for that dimension" already means.
@@ -28,11 +29,15 @@ export async function up({ payload }: MigrateUpArgs): Promise<void> {
 		'utm_content',
 		'utm_term',
 		'referrer_host',
+		'channel',
 	]) {
 		await db.drizzle.execute(
 			`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS ${column} varchar`
 		)
 	}
+	await db.drizzle.execute(
+		`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS channel_version numeric`
+	)
 }
 
 /** Deliberately irreversible: dropping the columns would discard already-attributed events. */

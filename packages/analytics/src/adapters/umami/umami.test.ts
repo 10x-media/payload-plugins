@@ -331,8 +331,82 @@ describe('umami adapter', () => {
 		expect(caps.filters.has('event')).toBe(true)
 		expect(caps.dimensions.has('event')).toBe(false)
 		expect([...caps.filters].filter((dimension) => dimension !== 'event')).toEqual(
-			[...caps.dimensions].filter((dimension) => dimension !== 'goal')
+			[...caps.dimensions].filter((dimension) => dimension !== 'goal' && dimension !== 'channel')
 		)
+	})
+
+	describe('channel', () => {
+		it('groups by channel but never filters by it, since umami has no channel filter param', () => {
+			const caps = umami({ websiteId: 'w', apiKey: 'k' }).capabilities
+			expect(caps.dimensions.has('channel')).toBe(true)
+			expect(caps.filters.has('channel')).toBe(false)
+		})
+
+		it('reads channel rows from /metrics?type=channel, carrying the range and filters', async () => {
+			server.use(
+				http.get('https://api.umami.is/v1/websites/w/metrics', ({ request }) => {
+					const url = new URL(request.url)
+					expect(url.searchParams.get('type')).toBe('channel')
+					expect(url.searchParams.get('startAt')).toBe(String(Date.UTC(2026, 0, 1)))
+					expect(url.searchParams.get('endAt')).toBe(String(Date.UTC(2026, 0, 31)))
+					expect(url.searchParams.get('country')).toBe('eq.DE')
+					return HttpResponse.json([
+						{ x: 'organicSearch', y: 22 },
+						{ x: 'direct', y: 9 },
+					])
+				})
+			)
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({
+					metrics: ['visitors'],
+					dimensions: ['channel'],
+					filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }],
+				}),
+				{}
+			)
+			expect(result.rows).toEqual([
+				{ dimensions: { channel: 'organicSearch' }, metrics: { visitors: 22 } },
+				{ dimensions: { channel: 'direct' }, metrics: { visitors: 9 } },
+			])
+			expect(result.totals).toBeUndefined()
+		})
+
+		it('reports y as visitors whatever metric was asked for, since y counts sessions', async () => {
+			server.use(
+				http.get('https://api.umami.is/v1/websites/w/metrics', () =>
+					HttpResponse.json([{ x: 'paidSearch', y: 4 }])
+				)
+			)
+			const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({ metrics: ['pageviews'], dimensions: ['channel'] }),
+				{}
+			)
+			expect(result.rows).toEqual([
+				{ dimensions: { channel: 'paidSearch' }, metrics: { visitors: 4 } },
+			])
+		})
+
+		it('sends no channel query param for a channel filter', async () => {
+			server.use(
+				http.get('https://api.umami.is/v1/websites/w/stats', ({ request }) => {
+					expect(new URL(request.url).searchParams.get('channel')).toBeNull()
+					return HttpResponse.json({
+						pageviews: 1,
+						visitors: 1,
+						visits: 1,
+						bounces: 0,
+						totaltime: 0,
+					})
+				})
+			)
+			await umami({ websiteId: 'w', apiKey: 'k' }).query(
+				q({
+					metrics: ['pageviews'],
+					filters: [{ dimension: 'channel', operator: 'eq', value: 'organicSearch' }],
+				}),
+				{}
+			)
+		})
 	})
 
 	it.each([

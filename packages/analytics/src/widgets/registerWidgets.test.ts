@@ -424,6 +424,7 @@ describe('registerWidgets', () => {
 				'analytics-trend',
 				'analytics-breakdown-pages',
 				'analytics-breakdown-sources',
+				'analytics-breakdown-channels',
 				'analytics-breakdown-devices',
 				'analytics-breakdown-countries',
 				'analytics-breakdown-goals',

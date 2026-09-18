@@ -264,11 +264,11 @@ describe('Breakdowns rows', () => {
 	it('names a traffic channel in the reader language and still filters on the stored value', () => {
 		const onRowSelect = vi.fn()
 		const channels: AnalyticsRow[] = [
-			{ dimensions: { source: 'search' }, metrics: { pageviews: 9 } },
+			{ dimensions: { channel: 'organic-search' }, metrics: { pageviews: 9 } },
 		]
 		renderBreakdowns({
-			dimension: 'source',
-			dimensions: ['source', 'referrer'],
+			dimension: 'channel',
+			dimensions: ['channel', 'referrer'],
 			onRowSelect,
 			query: state({
 				data: {
@@ -281,10 +281,60 @@ describe('Breakdowns rows', () => {
 			}),
 			tab: 'sources',
 		})
-		expect(screen.getByText(keys.channelSearch)).toBeDefined()
-		expect(screen.queryByText('search')).toBeNull()
-		fireEvent.click(screen.getByRole('button', { name: new RegExp(keys.channelSearch) }))
-		expect(onRowSelect).toHaveBeenCalledWith('search')
+		expect(screen.getByText(keys.channelOrganicSearch)).toBeDefined()
+		expect(screen.queryByText('organic-search')).toBeNull()
+		fireEvent.click(screen.getByRole('button', { name: new RegExp(keys.channelOrganicSearch) }))
+		expect(onRowSelect).toHaveBeenCalledWith('organic-search')
+	})
+
+	it("leaves a provider's channel row in the vocabulary that provider reports", () => {
+		const channels: AnalyticsRow[] = [
+			{ dimensions: { channel: 'Paid Search' }, metrics: { pageviews: 9 } },
+		]
+		renderBreakdowns({
+			dimension: 'channel',
+			dimensions: ['channel', 'referrer'],
+			query: state({
+				data: {
+					...answer(),
+					result: {
+						rows: channels,
+						meta: { provider: 'ga4', fetchedAt: '2026-09-14T00:00:00.000Z' },
+					},
+				},
+			}),
+			tab: 'sources',
+		})
+		expect(screen.getByText('Paid Search')).toBeDefined()
+		expect(screen.queryByText(keys.channelPaidSearch)).toBeNull()
+	})
+
+	it('names a row the source answered with no value, and does not offer it as a filter', () => {
+		const onRowSelect = vi.fn()
+		const channels: AnalyticsRow[] = [
+			{ dimensions: { channel: '' }, metrics: { pageviews: 9 } },
+			{ dimensions: { channel: 'Paid Search' }, metrics: { pageviews: 4 } },
+		]
+		renderBreakdowns({
+			dimension: 'channel',
+			dimensions: ['channel', 'referrer'],
+			onRowSelect,
+			query: state({
+				data: {
+					...answer(),
+					result: {
+						rows: channels,
+						meta: { provider: 'posthog', fetchedAt: '2026-09-14T00:00:00.000Z' },
+					},
+				},
+			}),
+			tab: 'sources',
+		})
+		expect(screen.getByText(keys.valueNotSet)).toBeDefined()
+		expect(screen.queryByRole('button', { name: new RegExp(keys.valueNotSet) })).toBeNull()
+		// The rows beside it keep the click the source can serve.
+		fireEvent.click(screen.getByRole('button', { name: /Paid Search/ }))
+		expect(onRowSelect).toHaveBeenCalledWith('Paid Search')
 	})
 
 	it('sorts on a column header, and flips the direction on a second click', () => {

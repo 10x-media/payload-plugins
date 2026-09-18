@@ -9,6 +9,7 @@ export const DIMENSION_LABELS: Record<DimensionKey, TranslationKey> = {
 	page: keys.viewDimensionPage,
 	referrer: keys.viewDimensionReferrer,
 	source: keys.viewDimensionSource,
+	channel: keys.viewDimensionChannel,
 	medium: keys.viewDimensionMedium,
 	campaign: keys.viewDimensionCampaign,
 	utmSource: keys.viewDimensionUtmSource,
@@ -47,11 +48,17 @@ export const GRANULARITY_LABELS: Record<Granularity, TranslationKey> = {
 
 export const CHANNEL_LABELS: Record<TrafficChannel, TranslationKey> = {
 	direct: keys.channelDirect,
-	search: keys.channelSearch,
-	social: keys.channelSocial,
+	'organic-search': keys.channelOrganicSearch,
+	'paid-search': keys.channelPaidSearch,
+	'organic-social': keys.channelOrganicSocial,
+	'paid-social': keys.channelPaidSocial,
+	'organic-video': keys.channelOrganicVideo,
+	'paid-video': keys.channelPaidVideo,
 	email: keys.channelEmail,
-	paid: keys.channelPaid,
+	affiliate: keys.channelAffiliate,
+	display: keys.channelDisplay,
 	referral: keys.channelReferral,
+	'paid-other': keys.channelPaidOther,
 }
 
 const isTrafficChannel = (value: string): value is TrafficChannel =>
@@ -65,16 +72,27 @@ export interface ValueLabelArgs {
 	t: Translate
 }
 
+/** A row a source answered with no value for the dimension it was grouped by. */
+export const isUnsetValue = (value: string): boolean => value.trim() === ''
+
 /**
- * A dimension value as it is shown. Only the native source's `source` holds a fixed set of
- * buckets worth naming in the reader's language: a provider serves that dimension as a raw
- * `utm_source` (Plausible's `visit:source`, GA4's `sessionSource`), where a row reading
- * `email` is the campaign parameter and not the Email channel. Every other dimension, and
- * any host a rollup written before `source` became a channel still carries, reads as the
- * value that was stored. The stored value is what a filter and the URL keep, so only the
- * display changes.
+ * A dimension value as it is shown. Only the native engine's `channel` holds a fixed set of
+ * buckets worth naming in the reader's language; a provider classifies into its own
+ * vocabulary and its rows read raw. Native `source` names an origin rather than a channel,
+ * so only its `direct` token translates: a row reading `email` there is a `utm_source` tag.
+ * The stored value is what a filter and the URL keep, so only the display changes.
  */
-export const valueLabel = ({ dimension, value, provider, t }: ValueLabelArgs): string =>
-	provider === 'native' && dimension === 'source' && isTrafficChannel(value)
-		? t(CHANNEL_LABELS[value])
-		: value
+export const valueLabel = ({ dimension, value, provider, t }: ValueLabelArgs): string => {
+	// Any source can answer a row with no value (PostHog reports an empty channel for a
+	// pageview outside a session), and an unlabeled bar reads as a missing row.
+	if (isUnsetValue(value)) {
+		return t(keys.valueNotSet)
+	}
+	if (provider !== 'native') {
+		return value
+	}
+	if (dimension === 'channel' && isTrafficChannel(value)) {
+		return t(CHANNEL_LABELS[value])
+	}
+	return dimension === 'source' && value === 'direct' ? t(keys.channelDirect) : value
+}
