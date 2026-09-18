@@ -213,6 +213,8 @@ export default async function TopSourcesWidget(props: WidgetServerProps) {
 }
 ```
 
+A `BarList` row with `selectable: false` renders inert even when `onSelect` is set, which is how the view keeps a row with no value from building a filter the endpoint would reject.
+
 Run `payload generate:importmap` after registering. The widget appears only when a configured adapter satisfies its `requires` gate, exactly like the built-ins.
 
 ### Filtering a custom widget
