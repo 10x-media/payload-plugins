@@ -67,7 +67,7 @@ analytics({
 })
 ```
 
-`false` disables a slot outright: nothing fills it, its proxy mount 404s, and the tracker config omits it. An unknown `global` id throws at config time; a `tenant` id may also name a runtime provider instance, so it is resolved per request instead.
+`false` disables a slot outright: nothing fills it, its proxy mount 404s (bodyless, like every [proxy](/analytics/proxy) refusal, which is the one answer the plugin sends with no [error envelope](/analytics/data-sources#errors)), and the tracker config omits it. An unknown `global` id throws at config time; a `tenant` id may also name a runtime provider instance, so it is resolved per request instead.
 
 `capture.paths` moves a slot's mount off the runtime proxy, for installs serving it through Next rewrites instead. Pass the same path [`captureRewrites`](/analytics/proxy#next-rewrites) was mounted at.
 
