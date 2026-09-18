@@ -126,9 +126,15 @@ const METRIC_SQL_GOAL: Partial<Record<MetricKey, string>> = {
 	events: 'count()',
 }
 
-/** A goal is an event name here, so a plugin goal's slug must equal the captured event's name. */
+/**
+ * A goal is an event name here, so a plugin goal's slug must equal the captured event's name.
+ * `channel` reads PostHog's own acquisition classification: the events table declares a
+ * `session` join on `$session_id`, and the sessions table computes `$channel_type` from the
+ * session's entry URL, honouring a project's custom channel rules.
+ */
 const DIMENSION_SQL: Partial<Record<DimensionKey, string>> = {
 	page: 'properties.$pathname',
+	channel: 'session.$channel_type',
 	event: 'event',
 	goal: 'event',
 }

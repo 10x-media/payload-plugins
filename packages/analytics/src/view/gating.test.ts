@@ -191,6 +191,19 @@ describe('gate', () => {
 		expect(g.tabs).toContain('goals')
 		expect(g.metrics).toContain('conversions')
 	})
+
+	// Every provider maps `channel` onto its own acquisition-channel concept, so the sources
+	// tab offers it everywhere, PostHog included, where it is the tab's only dimension.
+	it.each([
+		['plausible', plausible({ siteId: 's', apiKey: 'k' })],
+		['ga4', ga4({ propertyId: '1', credentials: { client_email: 'a', private_key: 'b' } })],
+		['posthog', posthog({ projectId: '1', apiKey: 'phx_k' })],
+		['umami', umami({ websiteId: 'w', apiKey: 'k' })],
+	])('serves channel on the sources tab for %s', (_id, adapter) => {
+		const g = gate(serializeCapabilities(adapter.capabilities))
+		expect(g.tabs).toContain('sources')
+		expect(g.dimensionsFor('sources')).toContain('channel')
+	})
 })
 
 describe('autoGranularity', () => {

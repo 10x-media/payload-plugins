@@ -275,6 +275,54 @@ describe('ga4 adapter', () => {
 		expect(result.rows).toEqual([{ dimensions: { country: 'DE' }, metrics: { pageviews: 12 } }])
 	})
 
+	it('maps the channel dimension to sessionDefaultChannelGroup', async () => {
+		runReport.mockResolvedValue([
+			{
+				dimensionHeaders: [{ name: 'sessionDefaultChannelGroup' }],
+				metricHeaders: [{ name: 'totalUsers', type: 'TYPE_INTEGER' }],
+				rows: [
+					{ dimensionValues: [{ value: 'Organic Search' }], metricValues: [{ value: '90' }] },
+					{ dimensionValues: [{ value: 'Direct' }], metricValues: [{ value: '40' }] },
+				],
+				rowCount: 2,
+			},
+		])
+		const result = await ga4(config).query(
+			q({ metrics: ['visitors'], dimensions: ['channel'] }),
+			{}
+		)
+		expect(sentRequest().dimensions).toEqual([{ name: 'sessionDefaultChannelGroup' }])
+		expect(result.rows).toEqual([
+			{ dimensions: { channel: 'Organic Search' }, metrics: { visitors: 90 } },
+			{ dimensions: { channel: 'Direct' }, metrics: { visitors: 40 } },
+		])
+	})
+
+	it('groups and filters by channel', async () => {
+		runReport.mockResolvedValue([
+			{
+				metricHeaders: [{ name: 'screenPageViews', type: 'TYPE_INTEGER' }],
+				rows: [{ dimensionValues: [], metricValues: [{ value: '1' }] }],
+			},
+		])
+		const caps = ga4(config).capabilities
+		expect(caps.dimensions.has('channel')).toBe(true)
+		expect(caps.filters.has('channel')).toBe(true)
+		await ga4(config).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'channel', operator: 'eq', value: 'Paid Social' }],
+			}),
+			{}
+		)
+		expect(sentRequest().dimensionFilter).toEqual({
+			filter: {
+				fieldName: 'sessionDefaultChannelGroup',
+				stringFilter: { matchType: 'EXACT', value: 'Paid Social', caseSensitive: true },
+			},
+		})
+	})
+
 	it('returns a per-day series with range totals when granularity is day', async () => {
 		runReport.mockResolvedValue([
 			{
