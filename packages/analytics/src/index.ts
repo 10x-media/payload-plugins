@@ -26,6 +26,7 @@ import {
 } from './providers/resolver'
 import { kvCacheStore } from './surfacing/cacheStore'
 import { createEngine } from './surfacing/engine'
+import { createEpochStore } from './surfacing/epoch'
 import { syncCollection } from './sync/collection'
 import { syncTask } from './sync/syncTask'
 import { DEFAULT_TIMEZONE, isValidTimeZone } from './timeframe/tz'
@@ -272,11 +273,13 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				const { validateEncryptedBoot } = await import('@10x-media/fields/encrypted')
 				await validateEncryptedBoot(payload, resolved.providers.collection.encryption?.keys)
 			}
+			const epoch = createEpochStore(payload)
 			const engine = createEngine({
 				store: kvCacheStore(payload.kv),
 				queue: { concurrency: 4 },
 				ttl: resolved.cache.ttl,
 				timeoutMs: resolved.cache.timeoutMs,
+				epoch,
 				onError: (err, adapterId) => {
 					payload.logger?.warn(`analytics: read failed for adapter "${adapterId}": ${String(err)}`)
 				},
@@ -306,6 +309,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				readAccess: resolved.access.read,
 				bindings: resolved.bindings,
 				engine,
+				epoch,
 				ttl: resolved.cache.ttl,
 				comparison: resolved.widgets.comparison,
 			})
