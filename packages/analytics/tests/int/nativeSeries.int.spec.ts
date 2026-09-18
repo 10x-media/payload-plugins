@@ -20,7 +20,7 @@ const pageview = (daysAgo: number, visitor: string): StoredEvent => ({
 	durationMs: 1000,
 })
 
-describeForDb('native time-series query', { dbs: ['mongo'] }, (db) => {
+describeForDb('native time-series query', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 

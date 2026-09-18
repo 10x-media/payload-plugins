@@ -24,7 +24,7 @@ const pageview = (daysAgo: number, visitor: string): StoredEvent => ({
 	durationMs: 30_000,
 })
 
-describeForDb('document analytics endpoint', { dbs: ['mongo'] }, (db) => {
+describeForDb('document analytics endpoint', {}, (db) => {
 	let booted: BootedPayload
 	let pageId: string
 	const fakeUser = { id: 'test-user', collection: 'users' } as unknown as TypedUser

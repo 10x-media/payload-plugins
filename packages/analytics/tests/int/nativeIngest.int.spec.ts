@@ -24,7 +24,7 @@ const ingest = (booted: BootedPayload, path: string) =>
 		)
 	)
 
-describeForDb('native ingest endpoint', { dbs: ['mongo'] }, (db) => {
+describeForDb('native ingest endpoint', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 
@@ -161,7 +161,7 @@ describeForDb('native ingest endpoint', { dbs: ['mongo'] }, (db) => {
 
 // The ingest endpoint is public and unauthenticated, so its input guards are asserted
 // through the real router rather than against the handler in isolation.
-describeForDb('native ingest through the router', { dbs: ['mongo'] }, (db) => {
+describeForDb('native ingest through the router', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -241,7 +241,7 @@ describeForDb('native ingest through the router', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb('native retention', { dbs: ['mongo'] }, (db) => {
+describeForDb('native retention', {}, (db) => {
 	let booted: BootedPayload
 	beforeAll(async () => {
 		booted = await bootPayload({
@@ -270,7 +270,7 @@ describeForDb('native retention', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-describeForDb('native write buffer', { dbs: ['mongo'] }, (db) => {
+describeForDb('native write buffer', {}, (db) => {
 	const adapter = native({ buffer: { maxSize: 10, maxAgeMs: 60_000 } })
 	let booted: BootedPayload
 

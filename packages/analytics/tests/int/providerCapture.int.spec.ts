@@ -33,7 +33,7 @@ const tenantDoc = {
 
 // A document's adapter carries its instance id (provider:docId), which is what the tenant
 // slot names; the config adapter stays the default, so the slot has to be explicit.
-describeForDb('analytics capture from a provider document', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics capture from a provider document', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -106,7 +106,7 @@ describeForDb('analytics capture from a provider document', { dbs: ['mongo'] }, 
 })
 
 /** The GA4 tag is served from Google's own CDN, so the slot has a snippet but no proxy. */
-describeForDb('analytics ga4 capture from a provider document', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics ga4 capture from a provider document', {}, (db) => {
 	let booted: BootedPayload
 
 	const ga4Doc = {

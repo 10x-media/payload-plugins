@@ -35,7 +35,7 @@ const DESKTOP = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120'
 const PHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile/15E148'
 const RANGE = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
 
-describeForDb('native dimension breakdowns', { dbs: ['mongo'] }, (db) => {
+describeForDb('native dimension breakdowns', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 

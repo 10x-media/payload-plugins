@@ -17,7 +17,7 @@ const configGoals: Goal[] = [{ slug: 'book-demo', name: 'Book a demo', match: { 
 
 const metrics: MetricKey[] = ['conversions', 'revenue']
 
-describeForDb('analytics trackGoalAction', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics trackGoalAction', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 	let range: { start: Date; end: Date }
