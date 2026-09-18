@@ -12,6 +12,7 @@ import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
 import { isModuleNotFoundError } from './plugin/peerImportError'
 import { makeQueryHandler, QUERY_PATH } from './plugin/queryEndpoint'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
+import { makeRefreshHandler, REFRESH_PATH } from './plugin/refreshEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
 import type { ScopeChange } from './plugin/scopeChange'
@@ -202,6 +203,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			{ method: 'get', path: SOURCES_PATH, handler: makeSourcesHandler() },
 			{ method: 'get', path: GOALS_PATH, handler: makeGoalsHandler() },
 			{ method: 'get', path: QUERY_PATH, handler: makeQueryHandler() },
+			{ method: 'post', path: REFRESH_PATH, handler: makeRefreshHandler() },
 		]
 		// A runtime provider's capture support is unknown at config time, so providers
 		// alone are enough to mount the proxy; every slot is still resolved per request.

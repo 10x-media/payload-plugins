@@ -9,6 +9,8 @@ export const SOURCES_PATH = '/analytics/sources'
 export const GOALS_PATH = '/analytics/goals'
 /** Authenticated read endpoint over the surfacing engine, per-request scope. */
 export const QUERY_PATH = '/analytics/query'
+/** Authenticated POST raising a scope's cache epoch, which retires its cached reads. */
+export const REFRESH_PATH = '/analytics/refresh'
 export const REALTIME_PATH = '/analytics/realtime'
 /** Mount of the public capture proxy; each slot is served under `${PROXY_PATH}/<slot>`. */
 export const PROXY_PATH = '/analytics/p'

@@ -16,6 +16,8 @@ const VIEW_CSS = `
 .analytics-view__date:hover { border-color: var(--theme-elevation-250); }
 .analytics-view__date:focus { outline: 0; border-color: var(--theme-elevation-400); }
 .analytics-view__toggle { height: 40px; align-items: center; margin: 0; }
+/* Wide enough for the pending label in every locale, so the row never moves mid-refresh. */
+.analytics-view__refresh { height: 40px; min-width: 10.5rem; align-items: center; justify-content: center; margin: 0; }
 .analytics-view__captions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-inline-start: auto; font-size: 0.8125rem; color: var(--theme-elevation-500); }
 .analytics-view__chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
 .analytics-view__chip-remove { display: inline-flex; align-items: center; justify-content: center; margin-inline-start: 0.15rem; padding: 0; background: none; border: 0; color: inherit; cursor: pointer; }

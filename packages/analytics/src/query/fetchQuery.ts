@@ -1,5 +1,5 @@
 import type { AnalyticsFilter, DimensionKey, Granularity, MetricKey } from '../core/contract'
-import { QUERY_PATH } from '../plugin/paths'
+import { QUERY_PATH, REFRESH_PATH } from '../plugin/paths'
 import type { QueryError } from './errors'
 import type { QueryErrorResponse, QueryResponse } from './response'
 
@@ -24,6 +24,9 @@ export interface QueryRequest {
 	hostname?: string
 	timezone?: string
 }
+
+const apiBase = (apiRoute: string): string =>
+	apiRoute.endsWith('/') ? apiRoute.slice(0, -1) : apiRoute
 
 /**
  * Builds the query endpoint URL from a fixed field order (not object insertion order),
@@ -68,8 +71,7 @@ export const buildQueryUrl = (apiRoute: string, request: QueryRequest): string =
 	if (request.timezone !== undefined) {
 		params.set('timezone', request.timezone)
 	}
-	const base = apiRoute.endsWith('/') ? apiRoute.slice(0, -1) : apiRoute
-	return `${base}${QUERY_PATH}?${params.toString()}`
+	return `${apiBase(apiRoute)}${QUERY_PATH}?${params.toString()}`
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -110,20 +112,24 @@ const readRetryAfter = (res: Response): number | undefined => {
 	return Number.isFinite(seconds) ? Math.floor(seconds) : undefined
 }
 
+const failure = async (res: Response): Promise<QueryFetchError> => {
+	let error: QueryError | undefined
+	try {
+		const body: unknown = await res.json()
+		if (isQueryErrorResponse(body)) error = body.error
+	} catch {
+		// Body wasn't JSON; error stays undefined and the status still carries the failure.
+	}
+	return new QueryFetchError(res.status, error, readRetryAfter(res))
+}
+
 const runFetch = async (url: string): Promise<QueryResponse> => {
 	const res = await fetch(url, {
 		credentials: 'include',
 		headers: { Accept: 'application/json' },
 	})
 	if (!res.ok) {
-		let error: QueryError | undefined
-		try {
-			const body: unknown = await res.json()
-			if (isQueryErrorResponse(body)) error = body.error
-		} catch {
-			// Body wasn't JSON; error stays undefined and the status still carries the failure.
-		}
-		throw new QueryFetchError(res.status, error, readRetryAfter(res))
+		throw await failure(res)
 	}
 	return (await res.json()) as QueryResponse
 }
@@ -173,4 +179,45 @@ export const fetchQuery = (
 			}
 		)
 	})
+}
+
+/** What `POST /analytics/refresh` answers: the scope's epoch after the bump. */
+export interface RefreshResponse {
+	epoch: number
+}
+
+export interface RefreshRequest {
+	/**
+	 * Refresh another scope. Platform readers only: the endpoint answers
+	 * `400 untrusted_scope` for any caller that may not read across scopes. Omitted, the
+	 * request's own resolved scope is refreshed.
+	 */
+	scope?: string
+	signal?: AbortSignal
+}
+
+/**
+ * Raises the scope's cache epoch, so every later read of it misses the cache and reaches
+ * the provider again. Not deduped, unlike `fetchQuery`: a reader pressing Refresh twice
+ * means it twice, and the signal can go straight to the fetch because no other caller
+ * shares it. Rejects with a `QueryFetchError` for any non-2xx answer, the same as a read.
+ */
+export const refreshCache = async (
+	apiRoute: string,
+	request: RefreshRequest = {}
+): Promise<RefreshResponse> => {
+	const res = await fetch(`${apiBase(apiRoute)}${REFRESH_PATH}`, {
+		method: 'POST',
+		credentials: 'include',
+		headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+		body: JSON.stringify(request.scope === undefined ? {} : { scope: request.scope }),
+		...(request.signal === undefined ? {} : { signal: request.signal }),
+	})
+	if (!res.ok) {
+		throw await failure(res)
+	}
+	const body: unknown = await res.json()
+	// The caller acts on the refresh having happened, not on the number, so an answer this
+	// client cannot read is reported as epoch 0 rather than typed into a lie.
+	return { epoch: isRecord(body) && typeof body.epoch === 'number' ? body.epoch : 0 }
 }

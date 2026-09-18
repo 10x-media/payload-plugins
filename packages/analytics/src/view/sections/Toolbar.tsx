@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, Pill, SelectInput } from '@payloadcms/ui'
+import { Banner, Button, Pill, SelectInput } from '@payloadcms/ui'
 import { useEffect, useRef } from 'react'
 import type { WireSource } from '../../fields/config/fetchSources'
 import type { TimeframePreset } from '../../timeframe/presets'
@@ -41,6 +41,10 @@ export interface ToolbarProps {
 	onChange: (next: ViewState) => void
 	/** Committed after a pause: the day inputs fire on every keystroke. */
 	onChangeDeferred: (next: ViewState) => void
+	/** Retires the scope's cached reads; the view owns the call and the refetch. */
+	onRefresh: () => void
+	refreshing: boolean
+	refreshFailed: boolean
 }
 
 const CUSTOM = 'custom'
@@ -74,6 +78,9 @@ export function Toolbar({
 	stateKey,
 	onChange,
 	onChangeDeferred,
+	onRefresh,
+	refreshing,
+	refreshFailed,
 }: ToolbarProps) {
 	const { t } = useTranslation()
 	const uncommitted = useRef<ViewState | null>(null)
@@ -200,6 +207,15 @@ export function Toolbar({
 						{t(keys.viewCompare)}
 					</Button>
 				) : null}
+				<Button
+					buttonStyle="secondary"
+					className="analytics-view__refresh"
+					disabled={refreshing}
+					onClick={onRefresh}
+					size="medium"
+				>
+					{t(refreshing ? keys.viewRefreshing : keys.viewRefresh)}
+				</Button>
 				<div className="analytics-view__captions">
 					<span>{dayRangeCaption(range, locale, timezone)}</span>
 					<span title={t(keys.viewTimezone)}>{timezone}</span>
@@ -213,6 +229,7 @@ export function Toolbar({
 					{sampled ? <span>{t(keys.stateSampled)}</span> : null}
 				</div>
 			</div>
+			{refreshFailed ? <Banner type="error">{t(keys.viewRefreshFailed)}</Banner> : null}
 			<FilterChips
 				filters={state.filters}
 				provider={provider}
