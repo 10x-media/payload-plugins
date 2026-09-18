@@ -27,6 +27,8 @@ Each adapter recommends its own TTLs through its capabilities (GA4 suggests 6 ho
 
 A TTL alone means a corrected provider document keeps serving the old numbers until every entry it fed expires, up to an hour on most sources. Every cache key therefore carries a **cache epoch** as its second segment: an opaque token, one per scope, stored in `payload.kv` under `analytics:epoch:global` for the install-wide token and `analytics:epoch:s:<scope>` for a named scope, URL-encoded. Bumping a scope's token retires that scope's cached reads at once, on every instance, because the keys those entries sit under stop being built. Nothing is deleted; the old entries expire on their own TTL under keys no read asks for any more.
 
+A bump also retires that scope's [stale-fallback](#stale-while-error) entries, which sit under the same keys: a source that fails right after a bump has no expired entry to fall back on and answers unavailable until it recovers.
+
 Three things bump a token:
 
 - Saving or deleting a document in the [providers collection](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant). That document's own scope is bumped, and an update that moved it between scopes bumps the scope it left as well.
@@ -35,9 +37,9 @@ Three things bump a token:
 
 An instance reads a scope's token at most once every ten seconds and serves that reading from memory in between, so one KV get covers a burst of reads and a bump made on one instance reaches every other within ten seconds. The interval is fixed and not an option.
 
-A token that cannot be read falls back to `0`, the value every scope starts on, and one warning is logged. The read still answers: an unreachable counter never turns into a failed analytics read. That fallback is memoized like a successful reading, so a broken KV costs one get per scope per ten seconds rather than one per read, and for that window the instance keeps serving entries written before the bump it could not see.
+A token that cannot be read falls back to `0`, the value every scope starts on, and a warning is logged once per process rather than once per incident: a KV that stays unreachable is reported the first time and silent after that. The read still answers: an unreachable counter never turns into a failed analytics read. That fallback is memoized like a successful reading, so a broken KV costs one get per scope per ten seconds rather than one per read, and for that window the instance keeps serving entries written before the bump it could not see.
 
-A bump that fails, or that has not settled after two seconds, is logged and dropped rather than failing the document save that triggered it. The save goes through and that scope's cached reads stay until their TTL runs out.
+A bump that fails, or that has not settled after two seconds, is logged and dropped rather than failing the document save that triggered it. The save goes through and that scope's cached reads stay until their TTL runs out. The two seconds are the budget for the whole save: a document that moved between scopes bumps both of them at once, under that one deadline, rather than waiting out a deadline each.
 
 An instance bumps a given scope at most once every five seconds for the refresh endpoint; inside that window the endpoint answers the token already in force and retires nothing again. A looped `POST` therefore costs one round trip rather than one cold provider read per cached query. The two document hooks are not debounced, so a save is always visible on the next read. This is a debounce of invalidation, not request rate limiting: how often a caller may ask is the edge's decision, not the plugin's.
 
