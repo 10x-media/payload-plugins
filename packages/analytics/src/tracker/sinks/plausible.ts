@@ -1,5 +1,17 @@
 import type { Sink, TrackerWindow } from '../types'
-import { createVendorSink, type VendorSinkArgs, vendorEventName } from './vendor'
+import {
+	createVendorSink,
+	type VendorSinkArgs,
+	vendorEventName,
+	vendorStorageExclusion,
+} from './vendor'
+
+/**
+ * Plausible's own opt-out flag, which its script checks before every event
+ * (https://plausible.io/docs/excluding-localstorage). Set it and the script logs
+ * "Ignoring Event: localStorage flag" instead of counting the visit.
+ */
+export const PLAUSIBLE_IGNORE_KEY = 'plausible_ignore'
 
 interface PlausibleOptions {
 	props?: Record<string, unknown>
@@ -18,6 +30,7 @@ type PlausibleWindow = TrackerWindow & {
  */
 export const createPlausibleSink = (args: VendorSinkArgs): Sink =>
 	createVendorSink(args, {
+		exclude: vendorStorageExclusion(args.win, PLAUSIBLE_IGNORE_KEY, 'true'),
 		has: () => typeof (args.win as PlausibleWindow).plausible === 'function',
 		dispatch: (event) => {
 			const options: PlausibleOptions = {

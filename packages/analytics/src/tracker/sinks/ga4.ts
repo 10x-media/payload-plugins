@@ -7,6 +7,20 @@ type GtagWindow = TrackerWindow & {
 }
 
 /**
+ * GA4's own kill switch: `window['ga-disable-<measurementId>'] = true` stops the tag sending
+ * anything (https://developers.google.com/tag-platform/security/guides/privacy). Google
+ * requires it before any `gtag()` call and on every page, so for a slot whose snippet the
+ * server rendered it only bites from the next page load; a gated slot never loads while the
+ * tracker is excluded.
+ */
+export const GA4_DISABLE_PREFIX = 'ga-disable-'
+
+export interface Ga4SinkArgs extends VendorSinkArgs {
+	/** From the slot's client descriptor: the switch is per measurement id. */
+	measurementId?: string
+}
+
+/**
  * Forwards events and goals to `gtag('event', name, params)`, under the name GA4 accepts for
  * them rather than the kebab-case slug: the other vendors take hyphens, GA4 does not. Revenue
  * rides along as the `value` and `currency` params, which is what GA4's own ecommerce reports
@@ -19,8 +33,15 @@ type GtagWindow = TrackerWindow & {
  * default and switchable per stream. An install that turned that option off should turn it
  * back on: this sink forwards no pageview, because on a default stream it would double-count.
  */
-export const createGa4Sink = (args: VendorSinkArgs): Sink =>
+export const createGa4Sink = ({ measurementId, ...args }: Ga4SinkArgs): Sink =>
 	createVendorSink(args, {
+		...(measurementId
+			? {
+					exclude: (excluded: boolean) => {
+						Reflect.set(args.win, `${GA4_DISABLE_PREFIX}${measurementId}`, excluded)
+					},
+				}
+			: {}),
 		has: () => typeof (args.win as GtagWindow).gtag === 'function',
 		dispatch: (event) => {
 			;(args.win as GtagWindow).gtag?.(

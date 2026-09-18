@@ -39,6 +39,13 @@ export interface Sink {
 	ready(): Promise<void>
 	send(event: TrackerEvent): void
 	flush?(): void
+	/**
+	 * Sets or clears the vendor's own opt-out switch, for the vendors that have one. The
+	 * tracker's gate stops what it delivers itself; a snippet the server rendered for an
+	 * ungated slot runs before the tracker boots and counts its own pageview, and only the
+	 * vendor's switch reaches that.
+	 */
+	exclude?(excluded: boolean): void
 }
 
 export type ConsentState = 'granted' | 'denied'
@@ -56,6 +63,12 @@ export interface TrackerOptions {
 	nonce?: string
 	/** Persist the consent decision in `localStorage`. Default true. */
 	persistConsent?: boolean
+	/**
+	 * Query parameter that takes this browser out of capture (`=1`) or puts it back (`=0`).
+	 * Default `analytics_exclude`; `false` ignores the parameter but still honours a flag
+	 * an earlier visit set.
+	 */
+	exclusionParam?: string | false
 }
 
 export interface Tracker {
@@ -63,6 +76,13 @@ export interface Tracker {
 	track(name: string, props?: Record<string, unknown>): void
 	trackGoal(slug: string, opts?: { value?: number; currency?: string }): void
 	consent(state: ConsentState): void
+	/** True while this browser is excluded from capture. */
+	readonly excluded: boolean
+	/**
+	 * Takes this browser out of capture, or puts it back. Clearing resumes from that point:
+	 * what was skipped is gone, never replayed.
+	 */
+	exclude(next: boolean): void
 	/** Sends whatever is buffered right now, chiefly the open pageview and its duration. */
 	flush(): void
 	/** Flushes the buffered pageview, then detaches every listener and history patch. */

@@ -13,14 +13,22 @@ import type { TrackerConfig } from '../capture/trackerConfig'
 import { acquireTracker, type TrackerLease } from '../tracker/registry'
 import type { LoadScript, Tracker } from '../tracker/types'
 
-/** The tracker surface a component gets from `useAnalytics`. */
-export interface AnalyticsApi {
+/** What a component can ask the tracker to do. Stable for the life of the provider. */
+export interface AnalyticsCommands {
 	track: Tracker['track']
 	trackGoal: Tracker['trackGoal']
 	consent: Tracker['consent']
+	/** Takes this browser out of capture, or puts it back. */
+	setExcluded: Tracker['exclude']
 }
 
-export const AnalyticsContext = createContext<AnalyticsApi | null>(null)
+/** The tracker surface a component gets from `useAnalytics`. */
+export interface AnalyticsApi extends AnalyticsCommands {
+	/** True while this browser is excluded from capture. Flipping it re-renders the caller. */
+	excluded: boolean
+}
+
+export const AnalyticsContext = createContext<AnalyticsCommands | null>(null)
 
 export interface AnalyticsProviderProps {
 	/** Resolved server-side by `getTrackerConfig`, or fetched from the tracker endpoint. */
@@ -76,11 +84,12 @@ export const AnalyticsProvider = ({
 		}
 	}, [ensure])
 
-	const api = useMemo<AnalyticsApi>(
+	const api = useMemo<AnalyticsCommands>(
 		() => ({
 			track: (name, props) => ensure()?.track(name, props),
 			trackGoal: (slug, opts) => ensure()?.trackGoal(slug, opts),
 			consent: (state) => ensure()?.consent(state),
+			setExcluded: (next) => ensure()?.exclude(next),
 		}),
 		[ensure]
 	)

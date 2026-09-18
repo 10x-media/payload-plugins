@@ -19,7 +19,28 @@ export interface VendorTarget {
 	/** True once the global is callable, stub or fully loaded SDK alike. */
 	has(): boolean
 	dispatch(event: TrackerEvent): void
+	/** The vendor's own opt-out switch, for the vendors that document one. */
+	exclude?(excluded: boolean): void
 }
+
+/**
+ * A vendor's `exclude` for the vendors whose opt-out is a `localStorage` key: it writes the
+ * key their script checks, or removes it. Blocked storage is not a failure, because that
+ * script reads the same storage and finds the same nothing.
+ */
+export const vendorStorageExclusion =
+	(win: TrackerWindow, key: string, value: string) =>
+	(excluded: boolean): void => {
+		try {
+			if (excluded) {
+				win.localStorage?.setItem(key, value)
+				return
+			}
+			win.localStorage?.removeItem(key)
+		} catch {
+			// Storage disabled; the vendor cannot read a flag that could not be written.
+		}
+	}
 
 const whenPresent = (win: TrackerWindow, target: VendorTarget): Promise<boolean> => {
 	if (target.has()) {
@@ -69,6 +90,7 @@ export const createVendorSink = (args: VendorSinkArgs, target: VendorTarget): Si
 	return {
 		slot: args.slot,
 		ready,
+		...(target.exclude ? { exclude: target.exclude } : {}),
 		send(event) {
 			if (event.type === 'pageview') {
 				return

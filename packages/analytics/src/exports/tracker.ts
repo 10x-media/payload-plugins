@@ -24,15 +24,23 @@ export {
 	writeConsent,
 } from '../tracker/consent'
 export { createNoopTracker, createTracker } from '../tracker/createTracker'
+export {
+	DEFAULT_EXCLUSION_PARAM,
+	EXCLUSION_STORAGE_KEY,
+	readExclusion,
+	readExclusionParam,
+	subscribeExclusion,
+	writeExclusion,
+} from '../tracker/exclusion'
 export { DEFAULT_TRACKER_ENDPOINT, type InitTrackerArgs, initTracker } from '../tracker/initTracker'
 export { createScriptLoader } from '../tracker/loadScript'
 export { createPageTracking, type PageTracking } from '../tracker/pageTracking'
 export { acquireTracker, type TrackerLease } from '../tracker/registry'
-export { createGa4Sink } from '../tracker/sinks/ga4'
+export { createGa4Sink, GA4_DISABLE_PREFIX, type Ga4SinkArgs } from '../tracker/sinks/ga4'
 export { createNativeSink, PAGEVIEW_BUFFER_MS } from '../tracker/sinks/native'
-export { createPlausibleSink } from '../tracker/sinks/plausible'
+export { createPlausibleSink, PLAUSIBLE_IGNORE_KEY } from '../tracker/sinks/plausible'
 export { createPosthogSink } from '../tracker/sinks/posthog'
-export { createUmamiSink } from '../tracker/sinks/umami'
+export { createUmamiSink, UMAMI_DISABLED_KEY } from '../tracker/sinks/umami'
 export type { VendorSinkArgs } from '../tracker/sinks/vendor'
 export type {
 	ConsentState,

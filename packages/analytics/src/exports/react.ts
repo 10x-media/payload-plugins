@@ -2,6 +2,7 @@
 
 export {
 	type AnalyticsApi,
+	type AnalyticsCommands,
 	AnalyticsProvider,
 	type AnalyticsProviderProps,
 } from '../react/AnalyticsProvider'
