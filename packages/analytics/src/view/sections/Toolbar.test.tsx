@@ -304,17 +304,22 @@ describe('Toolbar refresh', () => {
 		const onRefresh = vi.fn()
 		renderToolbar({ onRefresh })
 		const button = screen.getByRole('button', { name: keys.viewRefresh })
-		expect(button.hasAttribute('disabled')).toBe(false)
+		expect(button.getAttribute('aria-disabled')).toBe('false')
 		fireEvent.click(button)
 		expect(onRefresh).toHaveBeenCalledTimes(1)
 	})
 
-	it('disables the button and renames it while the refresh is pending', () => {
+	// The button stays focusable while the refresh runs, so the keyboard user who pressed it
+	// is still on it when it comes back rather than back at the top of the document.
+	it('marks the button aria-disabled and renames it while the refresh is pending', () => {
 		const onRefresh = vi.fn()
 		renderToolbar({ onRefresh, refreshing: true })
 		expect(screen.queryByRole('button', { name: keys.viewRefresh })).toBeNull()
 		const button = screen.getByRole('button', { name: keys.viewRefreshing })
-		expect(button.hasAttribute('disabled')).toBe(true)
+		expect(button.getAttribute('aria-disabled')).toBe('true')
+		expect(button.hasAttribute('disabled')).toBe(false)
+		button.focus()
+		expect(document.activeElement).toBe(button)
 		fireEvent.click(button)
 		expect(onRefresh).not.toHaveBeenCalled()
 	})
@@ -325,5 +330,14 @@ describe('Toolbar refresh', () => {
 		cleanup()
 		renderToolbar({ refreshFailed: true })
 		expect(screen.getByText(keys.viewRefreshFailed)).toBeDefined()
+	})
+
+	it('keeps the failure notice in a live region that is mounted before it has text', () => {
+		renderToolbar()
+		const region = screen.getByRole('status')
+		expect(region.textContent).toBe('')
+		cleanup()
+		renderToolbar({ refreshFailed: true })
+		expect(screen.getByRole('status').textContent).toContain(keys.viewRefreshFailed)
 	})
 })
