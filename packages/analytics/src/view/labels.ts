@@ -72,6 +72,9 @@ export interface ValueLabelArgs {
 	t: Translate
 }
 
+/** A row a source answered with no value for the dimension it was grouped by. */
+export const isUnsetValue = (value: string): boolean => value.trim() === ''
+
 /**
  * A dimension value as it is shown. Only the native engine's `channel` holds a fixed set of
  * buckets worth naming in the reader's language; a provider classifies into its own
@@ -80,6 +83,11 @@ export interface ValueLabelArgs {
  * The stored value is what a filter and the URL keep, so only the display changes.
  */
 export const valueLabel = ({ dimension, value, provider, t }: ValueLabelArgs): string => {
+	// Any source can answer a row with no value (PostHog reports an empty channel for a
+	// pageview outside a session), and an unlabeled bar reads as a missing row.
+	if (isUnsetValue(value)) {
+		return t(keys.valueNotSet)
+	}
 	if (provider !== 'native') {
 		return value
 	}

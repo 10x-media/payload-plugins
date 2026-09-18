@@ -8,8 +8,9 @@ export interface BarListProps {
 	data: BarDatum[]
 	emptyLabel: string
 	/**
-	 * Makes every row a button reporting its index. Left out, rows are inert: a source that
-	 * cannot filter by the dimension must not offer a click that would do nothing.
+	 * Makes every row a button reporting its index, bar the rows marked unselectable. Left
+	 * out, every row is inert: a source that cannot filter by the dimension must not offer a
+	 * click that would do nothing.
 	 */
 	onSelect?: (index: number) => void
 	/**
@@ -67,7 +68,7 @@ export function BarList({ data, emptyLabel, onSelect, fill = 'solid' }: BarListP
 			<ChartStyles />
 			<div className={`analytics-bars${fill === 'soft' ? ' analytics-bars--soft' : ''}`}>
 				{rows.map((row, i) =>
-					onSelect ? (
+					onSelect && row.selectable !== false ? (
 						<button
 							className="analytics-bars__row analytics-bars__row--action"
 							key={rowKey(row, i)}

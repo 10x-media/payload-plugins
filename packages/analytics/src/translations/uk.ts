@@ -215,4 +215,5 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.channelDisplay]: 'Медійна реклама',
 	[keys.channelReferral]: 'Переходи',
 	[keys.channelPaidOther]: 'Інші платні',
+	[keys.valueNotSet]: 'Не задано',
 }

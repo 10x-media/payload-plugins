@@ -155,6 +155,29 @@ describe('posthog adapter', () => {
 			)
 			expect(body.query?.query ?? '').toContain(clause)
 		})
+
+		it('keeps the pageview scope in the WHERE of a channel-filtered read', async () => {
+			let body: { query?: { query?: string } } = {}
+			server.use(
+				http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+					body = (await request.json()) as typeof body
+					return HttpResponse.json({ columns: ['m0'], types: ['UInt64'], results: [[5]] })
+				})
+			)
+			await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({
+					metrics: ['pageviews'],
+					filters: [{ dimension: 'channel', operator: 'eq', value: 'Paid Search' }],
+				}),
+				{}
+			)
+			const sql = body.query?.query ?? ''
+			// `channel` reads a session property rather than the event name, so it must not
+			// widen the scan the way an `event` or `goal` read does.
+			expect(sql).toContain("WHERE event = '$pageview'")
+			expect(sql).toContain("session.$channel_type = 'Paid Search'")
+			expect(sql).toContain('count() AS m0')
+		})
 	})
 
 	it('supports the events metric with all-event conditional aggregation', async () => {

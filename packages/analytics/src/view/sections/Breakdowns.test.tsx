@@ -309,6 +309,34 @@ describe('Breakdowns rows', () => {
 		expect(screen.queryByText(keys.channelPaidSearch)).toBeNull()
 	})
 
+	it('names a row the source answered with no value, and does not offer it as a filter', () => {
+		const onRowSelect = vi.fn()
+		const channels: AnalyticsRow[] = [
+			{ dimensions: { channel: '' }, metrics: { pageviews: 9 } },
+			{ dimensions: { channel: 'Paid Search' }, metrics: { pageviews: 4 } },
+		]
+		renderBreakdowns({
+			dimension: 'channel',
+			dimensions: ['channel', 'referrer'],
+			onRowSelect,
+			query: state({
+				data: {
+					...answer(),
+					result: {
+						rows: channels,
+						meta: { provider: 'posthog', fetchedAt: '2026-09-14T00:00:00.000Z' },
+					},
+				},
+			}),
+			tab: 'sources',
+		})
+		expect(screen.getByText(keys.valueNotSet)).toBeDefined()
+		expect(screen.queryByRole('button', { name: new RegExp(keys.valueNotSet) })).toBeNull()
+		// The rows beside it keep the click the source can serve.
+		fireEvent.click(screen.getByRole('button', { name: /Paid Search/ }))
+		expect(onRowSelect).toHaveBeenCalledWith('Paid Search')
+	})
+
 	it('sorts on a column header, and flips the direction on a second click', () => {
 		const onSortChange = vi.fn()
 		const { rerender } = renderBreakdowns({ onSortChange })

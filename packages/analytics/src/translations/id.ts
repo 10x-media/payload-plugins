@@ -215,4 +215,5 @@ export const id: Record<TranslationKey, string> = {
 	[keys.channelDisplay]: 'Display',
 	[keys.channelReferral]: 'Rujukan',
 	[keys.channelPaidOther]: 'Berbayar lainnya',
+	[keys.valueNotSet]: 'Tidak diatur',
 }

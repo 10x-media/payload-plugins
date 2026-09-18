@@ -556,6 +556,36 @@ describe('ga4 adapter', () => {
 			])
 		})
 
+		it('attaches the conversions of a channel breakdown to the channel rows they belong to', async () => {
+			respond((metrics) =>
+				metrics.includes('keyEvents')
+					? [
+							{ dimensionValues: [{ value: 'Paid Search' }], metricValues: [{ value: '4' }] },
+							{ dimensionValues: [{ value: 'Email' }], metricValues: [{ value: '1' }] },
+						]
+					: [
+							{ dimensionValues: [{ value: 'Organic Search' }], metricValues: [{ value: '90' }] },
+							{ dimensionValues: [{ value: 'Paid Search' }], metricValues: [{ value: '30' }] },
+						]
+			)
+			const result = await ga4(config).query(
+				q({
+					metrics: ['pageviews', 'conversions'],
+					dimensions: ['channel'],
+					goalSlugs: ['signup'],
+				}),
+				{}
+			)
+			const [site, goals] = requests()
+			expect(site?.dimensions).toEqual([{ name: 'sessionDefaultChannelGroup' }])
+			expect(goals?.dimensions).toEqual([{ name: 'sessionDefaultChannelGroup' }])
+			expect(result.rows).toEqual([
+				{ dimensions: { channel: 'Organic Search' }, metrics: { pageviews: 90 } },
+				{ dimensions: { channel: 'Paid Search' }, metrics: { pageviews: 30, conversions: 4 } },
+				{ dimensions: { channel: 'Email' }, metrics: { conversions: 1 } },
+			])
+		})
+
 		it('asks for the GA4 event names its slugs normalize to, and maps the rows back', async () => {
 			respond(() => [
 				{ dimensionValues: [{ value: 'checkout_complete' }], metricValues: [{ value: '7' }] },

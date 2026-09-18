@@ -216,4 +216,5 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.channelDisplay]: 'Медийная реклама',
 	[keys.channelReferral]: 'Переходы',
 	[keys.channelPaidOther]: 'Прочие платные',
+	[keys.valueNotSet]: 'Не задано',
 }

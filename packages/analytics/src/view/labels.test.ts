@@ -45,6 +45,17 @@ describe('valueLabel', () => {
 		)
 	})
 
+	it('names an empty value on any dimension and any source', () => {
+		expect(native('channel', '')).toBe(`t(${keys.valueNotSet})`)
+		expect(native('source', '   ')).toBe(`t(${keys.valueNotSet})`)
+		expect(valueLabel({ dimension: 'channel', value: '', provider: 'posthog', t })).toBe(
+			`t(${keys.valueNotSet})`
+		)
+		expect(valueLabel({ dimension: 'page', value: '\t', provider: 'plausible', t })).toBe(
+			`t(${keys.valueNotSet})`
+		)
+	})
+
 	it('leaves every other dimension raw', () => {
 		expect(native('referrer', 'direct')).toBe('direct')
 		expect(native('page', '/pricing')).toBe('/pricing')

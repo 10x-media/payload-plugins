@@ -518,6 +518,34 @@ describe('plausible adapter', () => {
 			])
 		})
 
+		it('attaches the conversions of a channel breakdown to the channel rows they belong to', async () => {
+			const bodies = capture((body) =>
+				body.metrics.includes('events')
+					? [
+							{ metrics: [4], dimensions: ['Paid Search'] },
+							{ metrics: [1], dimensions: ['Email'] },
+						]
+					: [
+							{ metrics: [90], dimensions: ['Organic Search'] },
+							{ metrics: [30], dimensions: ['Paid Search'] },
+						]
+			)
+			const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+				q({
+					metrics: ['pageviews', 'conversions'],
+					dimensions: ['channel'],
+					goalSlugs: ['signup'],
+				}),
+				{}
+			)
+			expect(bodies.map((body) => body.dimensions)).toEqual([['visit:channel'], ['visit:channel']])
+			expect(result.rows).toEqual([
+				{ dimensions: { channel: 'Organic Search' }, metrics: { pageviews: 90 } },
+				{ dimensions: { channel: 'Paid Search' }, metrics: { pageviews: 30, conversions: 4 } },
+				{ dimensions: { channel: 'Email' }, metrics: { conversions: 1 } },
+			])
+		})
+
 		it('merges goal-filtered conversions into a daily series by day', async () => {
 			const bodies = capture((body) => {
 				const goal = body.metrics.includes('events')
