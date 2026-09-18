@@ -5,7 +5,7 @@ import { GOALS_SLUG } from '../../src/goals/collection'
 import { analytics } from '../../src/index'
 import { getRuntime } from '../../src/plugin/runtime'
 import { PROVIDERS_SLUG } from '../../src/providers/collection'
-import { createEpochStore } from '../../src/surfacing/epoch'
+import { createEpochStore, epochKeyFor } from '../../src/surfacing/epoch'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
 const providerData = (name: string, scope: string) => ({
@@ -164,6 +164,11 @@ describeForDb('analytics cache epoch: bump on change', {}, (db) => {
 		expect(await epochOf('tenant-b')).not.toBe(b)
 	})
 
+	// The save succeeding proves nothing on its own: it would pass with no bump attempted at
+	// all, so the write to the scope's epoch key is asserted too.
+	const bumpedKeys = (set: { mock: { calls: unknown[][] } }): unknown[] =>
+		set.mock.calls.map((call) => call[0])
+
 	it('keeps the save when the bump throws', async () => {
 		const set = vi
 			.spyOn(booted.payload.kv, 'set')
@@ -175,6 +180,7 @@ describeForDb('analytics cache epoch: bump on change', {}, (db) => {
 				overrideAccess: true,
 			})
 			expect((created as { id: string | number }).id).toBeDefined()
+			expect(bumpedKeys(set)).toContain(epochKeyFor('tenant-a'))
 		} finally {
 			set.mockRestore()
 		}
@@ -190,6 +196,7 @@ describeForDb('analytics cache epoch: bump on change', {}, (db) => {
 				overrideAccess: true,
 			})
 			expect((created as { id: string | number }).id).toBeDefined()
+			expect(bumpedKeys(set)).toContain(epochKeyFor('tenant-a'))
 		} finally {
 			set.mockRestore()
 		}

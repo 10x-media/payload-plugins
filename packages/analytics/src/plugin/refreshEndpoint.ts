@@ -28,6 +28,45 @@ export interface RefreshHandlerOptions {
 	now?: () => number
 }
 
+export interface RefreshDebounce {
+	/** Whether this scope may be bumped now; recording a bump is `record`'s job. */
+	allows(key: string): boolean
+	/** Marks the scope bumped, dropping every entry the window has already left. */
+	record(key: string): void
+	/** Entries currently held, which is one window's distinct scopes at most. */
+	readonly size: number
+}
+
+/**
+ * Per-scope debounce state. Entries are pruned on every write rather than kept, so an
+ * instance that refreshes thousands of scopes over its life holds only the ones a bump
+ * could still be debounced against.
+ */
+export const createRefreshDebounce = (
+	now: () => number,
+	windowMs: number = REFRESH_DEBOUNCE_MS
+): RefreshDebounce => {
+	const bumpedAt = new Map<string, number>()
+	return {
+		allows(key) {
+			const last = bumpedAt.get(key)
+			return last === undefined || now() - last >= windowMs
+		},
+		record(key) {
+			const at = now()
+			for (const [seen, when] of bumpedAt) {
+				if (at - when >= windowMs) {
+					bumpedAt.delete(seen)
+				}
+			}
+			bumpedAt.set(key, at)
+		},
+		get size() {
+			return bumpedAt.size
+		},
+	}
+}
+
 type ParsedBody = { ok: true; scope?: string } | { ok: false }
 
 /**
@@ -72,7 +111,7 @@ const parseBody = (bytes: ArrayBuffer): ParsedBody => {
  */
 export const makeRefreshHandler = (opts: RefreshHandlerOptions = {}): PayloadHandler => {
 	const now = opts.now ?? Date.now
-	const bumpedAt = new Map<string, number>()
+	const debounce = createRefreshDebounce(now)
 
 	return async (req: PayloadRequest) => {
 		if (!req.user) {
@@ -123,14 +162,12 @@ export const makeRefreshHandler = (opts: RefreshHandlerOptions = {}): PayloadHan
 			}
 			const scope = requested.scope === PLATFORM_SCOPE ? null : requested.scope
 			const key = epochKeyFor(scope)
-			const at = now()
-			const last = bumpedAt.get(key)
-			if (last !== undefined && at - last < REFRESH_DEBOUNCE_MS) {
+			if (!debounce.allows(key)) {
 				const debounced: RefreshResponse = { epoch: await cacheEpochFor(runtime, scope) }
 				return Response.json(debounced, { headers: NO_STORE })
 			}
 			const epoch = await (runtime.epoch?.bump(scope) ?? Promise.resolve(INITIAL_EPOCH))
-			bumpedAt.set(key, at)
+			debounce.record(key)
 			const answer: RefreshResponse = { epoch }
 			return Response.json(answer, { headers: NO_STORE })
 		} catch (err) {

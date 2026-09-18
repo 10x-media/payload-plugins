@@ -41,7 +41,7 @@ declare module 'payload' {
 	}
 }
 
-/** How long a collection write waits on one cache epoch bump before giving up on it. */
+/** How long a collection write waits on its cache epoch bumps, however many scopes they cover. */
 const EPOCH_BUMP_DEADLINE_MS = 2_000
 
 /**
@@ -316,14 +316,24 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				if (change.previousScope !== undefined) {
 					scopes.add(change.previousScope)
 				}
-				for (const scope of scopes) {
+				const bumps = [...scopes].map(async (scope) => {
 					try {
-						await withDeadline(epoch.bump(scope), EPOCH_BUMP_DEADLINE_MS)
+						await epoch.bump(scope)
 					} catch (err) {
 						payload.logger?.warn(
 							`analytics: cache epoch bump failed for scope "${scope ?? 'global'}", cached reads stay until their ttl: ${String(err)}`
 						)
 					}
+				})
+				// One deadline covers every scope a save touches: a document moving between two
+				// of them must not be able to hold the write open for one deadline each.
+				try {
+					await withDeadline(Promise.allSettled(bumps), EPOCH_BUMP_DEADLINE_MS)
+				} catch (err) {
+					const named = [...scopes].map((scope) => `"${scope ?? 'global'}"`).join(', ')
+					payload.logger?.warn(
+						`analytics: cache epoch bump did not settle for ${named}, cached reads stay until their ttl: ${String(err)}`
+					)
 				}
 			}
 			const engine = createEngine({

@@ -4,7 +4,7 @@ import type { AnalyticsRuntime } from '../plugin/runtime'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { PLATFORM_SCOPE } from './contract'
 import { createRegistry } from './registry'
-import { resolveQueryScope, resolveReadContext } from './scopedRead'
+import { resolveQueryScope, resolveReadContext, resolveRequestedScope } from './scopedRead'
 
 const runtimeWith = (overrides: Partial<AnalyticsRuntime> = {}): AnalyticsRuntime => ({
 	registry: createRegistry([memoryAdapter()]),
@@ -181,6 +181,18 @@ describe('resolveReadContext scoped-install null-scope gating', () => {
 		const runtime = runtimeWith({ platformRead: () => false })
 		const ctx = await resolveReadContext({ runtime, req: userReq })
 		expect(ctx.ok).toBe(true)
+	})
+
+	// The widgets path and the endpoints must refuse the same requests, so the two answers
+	// are compared rather than each asserted on its own.
+	it('agrees with resolveRequestedScope on a scoped install that resolves no scope', async () => {
+		for (const grants of [false, true]) {
+			const runtime = runtimeWith({ scoped: true, platformRead: () => grants })
+			const requested = await resolveRequestedScope({ runtime, req: userReq })
+			const ctx = await resolveReadContext({ runtime, req: userReq })
+			expect(requested.ok).toBe(grants)
+			expect(ctx.ok).toBe(requested.ok)
+		}
 	})
 })
 

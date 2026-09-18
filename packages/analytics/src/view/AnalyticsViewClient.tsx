@@ -72,7 +72,11 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 	 * through the aggregate cache the epoch keys. Starting an attempt clears the previous
 	 * failure notice, so the notice always describes the attempt that is in flight.
 	 */
-	const refresh = (): void => {
+	const refreshCards = queries.cards.refetch
+	const refreshTrend = queries.trend.refetch
+	const refreshBreakdown = queries.breakdown.refetch
+	const refreshGoals = queries.goals?.refetch
+	const refresh = useCallback((): void => {
 		if (refreshPending) {
 			return
 		}
@@ -84,10 +88,10 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 			() => {
 				if (controller.signal.aborted) return
 				setRefreshPending(false)
-				queries.cards.refetch()
-				queries.trend.refetch()
-				queries.breakdown.refetch()
-				queries.goals?.refetch()
+				refreshCards()
+				refreshTrend()
+				refreshBreakdown()
+				refreshGoals?.()
 			},
 			() => {
 				if (controller.signal.aborted) return
@@ -95,7 +99,7 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 				setRefreshFailed(true)
 			}
 		)
-	}
+	}, [props.apiRoute, refreshPending, refreshCards, refreshTrend, refreshBreakdown, refreshGoals])
 
 	/**
 	 * A click is a step the reader took, so Back undoes it rather than leaving the view. It
