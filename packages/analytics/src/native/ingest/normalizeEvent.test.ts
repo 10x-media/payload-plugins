@@ -66,7 +66,7 @@ describe('normalizeEvent', () => {
 		expect(event.channelVersion).toBe(CHANNEL_TAXONOMY_VERSION)
 	})
 
-	it('reports the utm_source as the origin and classifies the channel around it', async () => {
+	it('reports the utm_source lowercased as the origin, keeping the tag as written', async () => {
 		const event = await normalizeEvent({
 			raw: {
 				type: 'pageview',
@@ -79,7 +79,8 @@ describe('normalizeEvent', () => {
 			salt: 'salt',
 			now: new Date('2026-06-01T00:00:00.000Z'),
 		})
-		expect(event.source).toBe('Google')
+		expect(event.source).toBe('google')
+		expect(event.utmSource).toBe('Google')
 		expect(event.channel).toBe('paid-search')
 	})
 
