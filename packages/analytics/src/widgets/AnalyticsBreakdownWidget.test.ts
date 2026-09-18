@@ -270,6 +270,14 @@ describe('AnalyticsBreakdownWidget filter', () => {
 		expect(html).toContain('Paid Search')
 	})
 
+	it('names a row the source answered with no value', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({ provider: 'posthog', rows: [{ label: '', value: 9 }] })
+		)
+		const html = await render('analytics-breakdown-channels')
+		expect(html).toContain('analytics:valueNotSet')
+	})
+
 	it('says the goals could not be read instead of showing an empty goal table', async () => {
 		vi.mocked(readForWidgetBreakdown).mockResolvedValue(result({ rows: [], goalsUnresolved: true }))
 		const html = await render('analytics-breakdown-goals')

@@ -213,6 +213,7 @@ export const keys = {
 	channelDisplay: 'analytics:channelDisplay',
 	channelReferral: 'analytics:channelReferral',
 	channelPaidOther: 'analytics:channelPaidOther',
+	valueNotSet: 'analytics:valueNotSet',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

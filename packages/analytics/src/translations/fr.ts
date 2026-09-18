@@ -221,4 +221,5 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.channelDisplay]: 'Display',
 	[keys.channelReferral]: 'Référence',
 	[keys.channelPaidOther]: 'Autre payant',
+	[keys.valueNotSet]: 'Non défini',
 }

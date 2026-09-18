@@ -211,4 +211,5 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.channelDisplay]: 'إعلانات مصورة',
 	[keys.channelReferral]: 'إحالة',
 	[keys.channelPaidOther]: 'مدفوع آخر',
+	[keys.valueNotSet]: 'غير محدد',
 }

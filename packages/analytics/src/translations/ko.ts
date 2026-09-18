@@ -211,4 +211,5 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.channelDisplay]: '디스플레이',
 	[keys.channelReferral]: '참조',
 	[keys.channelPaidOther]: '기타 유료',
+	[keys.valueNotSet]: '설정되지 않음',
 }

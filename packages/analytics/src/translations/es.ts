@@ -215,4 +215,5 @@ export const es: Record<TranslationKey, string> = {
 	[keys.channelDisplay]: 'Display',
 	[keys.channelReferral]: 'Referencia',
 	[keys.channelPaidOther]: 'Otros de pago',
+	[keys.valueNotSet]: 'Sin definir',
 }

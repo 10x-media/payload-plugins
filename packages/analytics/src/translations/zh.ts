@@ -211,4 +211,5 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.channelDisplay]: '展示广告',
 	[keys.channelReferral]: '引荐',
 	[keys.channelPaidOther]: '其他付费',
+	[keys.valueNotSet]: '未设置',
 }
