@@ -27,7 +27,7 @@ export default buildConfig({
 
 ## How it fits together
 
-Everything reads through one [adapter contract](/analytics/adapters) with a capabilities model: run the [native engine](/analytics/native), a provider, or several at once, and every surface hides what the active adapter cannot answer. The native engine gives you self-hosted, cookieless analytics stored in Payload collections, with atomic rollups, exact daily uniques, [geo resolution](/analytics/geo), retention pruning, and optional write batching.
+Everything reads through one [adapter contract](/analytics/adapters) with a capabilities model: run the [native engine](/analytics/native), a provider, or several at once, and every surface hides what the active adapter cannot answer. The native engine gives you self-hosted, cookieless analytics stored in Payload collections, with atomic rollups, exact daily uniques, [geo resolution](/analytics/geo), [bot filtering](/analytics/native#bot-filtering) on by default, retention pruning across every store it owns, and optional write batching.
 
 Getting the events in is part of the package too: a dependency-free browser [tracker](/analytics/capture) with consent gating and auto-capture, and a [first-party proxy](/analytics/proxy) so a vendor's own SDK loads through your origin instead of theirs. [Goals](/analytics/goals) turn conversions and revenue into readable metrics, completed from a data attribute, a `goalField()` picker in your own blocks, a form-builder action, or `trackServerEvent` from server code, and declared in config or in an opt-in collection editors manage themselves.
 
