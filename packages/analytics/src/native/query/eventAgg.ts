@@ -1,31 +1,35 @@
 import type { AnalyticsFilter, AnalyticsRow, DimensionKey, MetricKey } from '../../core/contract'
 import { DEFAULT_TIMEZONE, startOfDayInTz } from '../../timeframe/tz'
 
-/** Raw event shape aggregateEvents/filtersToWhere operate on; matches StoredEvent as read back from the events collection (timestamp comes back as an ISO string). */
+/**
+ * Raw event shape aggregateEvents/filtersToWhere operate on; matches StoredEvent as read back
+ * from the events collection (timestamp comes back as an ISO string). Every column the ingest
+ * may leave unset is `| null` as well as optional: Postgres reads an unwritten column back as
+ * null, Mongo leaves the key off entirely, and both spellings mean "not recorded".
+ */
 export interface EventLike {
 	timestamp: string | Date
 	type: 'pageview' | 'event' | 'goal'
-	name?: string
+	name?: string | null
 	path: string
-	device?: string
-	browser?: string
-	os?: string
-	source?: string
+	device?: string | null
+	browser?: string | null
+	os?: string | null
+	source?: string | null
 	/** The referrer host derived at ingest; the raw referrer is never grouped or filtered on. */
-	referrerHost?: string
-	country?: string
-	region?: string
-	city?: string
-	language?: string
-	utmSource?: string
-	utmMedium?: string
-	utmCampaign?: string
-	utmContent?: string
-	utmTerm?: string
+	referrerHost?: string | null
+	country?: string | null
+	region?: string | null
+	city?: string | null
+	language?: string | null
+	utmSource?: string | null
+	utmMedium?: string | null
+	utmCampaign?: string | null
+	utmContent?: string | null
+	utmTerm?: string | null
 	visitorHash: string
 	sessionId: string
 	durationMs?: number | null
-	/** Postgres reads an unreported depth back as null, Mongo leaves the field off entirely. */
 	scrollDepth?: number | null
 	/** Goal completions stamped at ingest; the source of conversions/revenue on this path. */
 	goals?: Array<{ slug: string; value: number }>

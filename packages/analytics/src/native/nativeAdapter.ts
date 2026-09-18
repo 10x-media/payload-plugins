@@ -160,6 +160,9 @@ async function queryEvents(
 		depth: 0,
 		sort: '-timestamp',
 	})
+	// The events collection is registered at runtime, so `payload.find` hands back
+	// `JsonObject & TypeWithID`: a field-by-field mapping would read `any` per column and
+	// duplicate the ingest schema without adding a check. This is the one typed boundary.
 	const events = docs as unknown as EventLike[]
 	const dim = q.dimensions?.find((d) => dimensions.has(d))
 	const granularity =
