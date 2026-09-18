@@ -1,0 +1,39 @@
+---
+title: Security
+description: Origin gate, access.impersonate, session binding, and what is not automatic.
+---
+
+## Access
+
+`access.impersonate` is required. Config throws if it is not a function. `disabled: true` skips the check.
+
+Only the literal `true` allows. A Payload `Where` object is deny, never allow-all. `() => {}` is deny. Start loads the target with `overrideAccess: true` (and `trash: true` when the collection supports it). Missing is `forbidden`, not `targetNotFound`. `access.impersonate` then runs. Trash, unverified, and unreadable still 403 after an allow. The start JSON `user` is that readable document, not the minted `db.findOne` row (no hash, salt, reset tokens, or sessions).
+
+`access.terminate` and `access.readRecords` default deny. Exit is binding, not a role.
+
+## Origin gate
+
+Cookie POSTs to start, exit, and end must be same-origin. The plugin does **not** use host `config.csrf` as its only gate.
+
+- `Authorization: JWT` or `Bearer` skips the gate only when `auth.jwtOrder` ranks that scheme before `cookie` **and** the header carries a non-empty token. An empty `JWT ` / `Bearer ` prefix does not skip: Payload then authenticates the cookie.
+- `Sec-Fetch-Site: cross-site` and `same-site` are denied. Stricter than Payload's cookie CSRF and than dual-session, so a subdomain XSS cannot start an impersonation.
+- Allowlist is `serverURL` + `config.csrf` + `security.trustedOrigins`. Empty allowlist falls back to Origin host equals `Host`.
+- JSON `Content-Type` is required (forces a CORS preflight on cross-origin form posts).
+- The plugin never reads `X-Forwarded-Host` or `X-Forwarded-Proto`. If a proxy rewrites Host, set `serverURL` or `trustedOrigins`.
+
+## Sessions
+
+- Hint cookie holds the row id and is never trusted alone. Its name must not start with `cookiePrefix` (`@payloadcms/next` refresh/logout take the first matching cookie).
+- Active = open row + `targetSid === req.user._sid`. Never a start-time `expiresAt` on the row. Payload refresh extends `user.sessions[].expiresAt` and the JWT; filtering on a frozen expiry was the PWW prototype bug.
+- `maxDuration` is an optional absolute cap. **Unset, an impersonation never expires on its own** because refresh keeps extending the minted session.
+- Call `closeStaleImpersonations(payload)` from a cron (or rely on `onInit`) to close rows whose minted sid vanished, whose target is gone, or whose `maxDuration` cap has passed. Authenticated requests also expire a past `absoluteExpiresAt`.
+- The impersonator's original session is **not** refreshed while they act as the target. If it expires, Exit returns `impersonatorSessionExpired` and forces a login. Exit never mints a fresh admin session.
+- On end, only the minted target sid is revoked. The target's other sessions are untouched. Locks created in the session window are released.
+
+## Parallel mode
+
+When `@10x-media/dual-session` isolated the target, start writes that cookie and leaves `` `${cookiePrefix}-token` `` alone. Admin requests still authenticate as the impersonator (`adminSessionPriority`). Frontend requests authenticate as the target. Current/bar/`_impersonation` resolve from either `targetSid` or `impersonatorSid`. A past `maxDuration` expires the isolated cookie and the hint; the impersonator's cookie stays.
+
+## Writes
+
+Writes, emails, prefs, and locks run as the target. The actor is `req.user._impersonation` plus the record plus `onStart`/`onEnd`. Payload versions will not auto-stamp the admin. SOC2 write-attribution is not automatic.

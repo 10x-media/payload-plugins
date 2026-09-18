@@ -1,0 +1,28 @@
+---
+title: Impersonation
+description: Let an authorised account sign in as another user, then return. Every session is recorded.
+---
+
+`@10x-media/impersonation` lets an authorised account sign in as another user without that user's password. After start, `req.user` is the target. This is not a view-as overlay. Exit, logout, or remote terminate ends it. Every start is a closed-never-deleted row.
+
+<Callout type="warn">
+**Experimental.** This plugin mints and revokes sessions. It is covered by unit, integration and end-to-end tests against Payload's real routing on Mongo and Postgres, but auth surfaces differ a lot between projects. Try it in staging first.
+</Callout>
+
+## What it does
+
+- A host `access.impersonate` function is mandatory. The plugin never compares roles.
+- Start mints a real target session (`addSessionToUser` + JWT + cookie). Payload then authenticates the target on every request.
+- `req.user._impersonation` is painted on afterwards by wrapping `payload.authStrategies` in `onInit`.
+- Active means an open row (`endedAt` null) whose `targetSid` matches `req.user._sid`. Refresh extending the minted session cannot hide the bar.
+- Swap replaces the shared auth cookie. Parallel writes an isolated cookie only when `@10x-media/dual-session` isolated the target.
+- List this plugin **after** any plugin that adds auth collections. `onInit` throws if a live auth collection was missing at plugin-build time.
+
+## Next
+
+- [Quick start](/impersonation/quick-start)
+- [Configuration](/impersonation/configuration)
+- [Custom auth](/impersonation/custom-auth)
+- [Security](/impersonation/security)
+- [Multi-tenancy](/impersonation/multi-tenancy)
+- [Limits](/impersonation/limits)

@@ -1,0 +1,25 @@
+---
+title: Configuration
+description: Options for access, cookies, duration, UI, and session seams.
+---
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `access.impersonate` | `({ req, target, targetCollection }) => true \| false` | required | Only literal `true` allows. Missing, unreadable, and access-deny all return `forbidden`. |
+| `access.terminate` | `({ req }) => true \| false` | deny | Remote end of an open row. |
+| `access.readRecords` | Payload `Access` | deny | Read the `impersonation-sessions` collection. |
+| `disabled` | `boolean` | `false` | Return the incoming config unchanged. Skips the impersonate check. |
+| `collectionSlug` | `string` | `impersonation-sessions` | Record collection. |
+| `apiPath` | `string` | `/impersonation` | Root endpoint prefix. Must not collide with a collection slug. |
+| `hintCookieName` | `string` | `impersonation-hint` | Row id hint. Must not start with `cookiePrefix`. |
+| `decorateRequests` | `boolean` | `true` | Wrap `payload.authStrategies` to set `req.user._impersonation`. Nesting checks still hit the database when this is `false`. |
+| `reason` | `'off' \| 'optional' \| 'required'` | `'off'` | Ticket / SOC2 note stored on the row. |
+| `maxDuration` | `number` (seconds) | unset | Absolute cap from `startedAt`. Unset means refresh can keep the impersonation alive forever. |
+| `cookies.clearOnSwitch` | `string[]` | `` [`${cookiePrefix}-tenant`] `` | Extra cookies expired on start and exit. The default tenant cookie is snapshotted and restored on swap, left alone in parallel. See [Multi-tenancy](/impersonation/multi-tenancy). |
+| `security.trustedOrigins` | `string[]` | `[]` | Extra Origins allowed for cookie POSTs, on top of `serverURL` and `config.csrf`. |
+| `targets` | `string[]` | every local-strategy auth collection | Collections that can be impersonated. |
+| `session.issue` / `revoke` / `binding` | functions | Payload local-auth | Custom auth seams. |
+| `ui` | `false` or per-surface flags | all true | Header action, bar, document action, record End session. |
+| `translations` | per-locale map | built-ins | See [Translations](/concepts/translations). |
+
+Copy: **Switch to user** opens a Payload drawer, then the native confirmation modal. **Acting as `{{name}}`** / **Return to `{{name}}`**. The bar locale is `impersonatorLocale` snapped at start, not the target's language.

@@ -1,0 +1,24 @@
+---
+title: Custom auth
+description: Session seams for collections that do not use Payload local login.
+---
+
+Default minting is `db.findOne` (not `findByID`, which strips `sessions`) then `addSessionToUser`, `getFieldsToSign`, `jwtSign`, `generatePayloadCookie`.
+
+Collections with `useSessions: false` or `disableLocalStrategy` are excluded from default targets, the header picker, and the document action unless you pass all three seams:
+
+```ts
+impersonation({
+  access: { impersonate: () => true },
+  targets: ['sso-users'],
+  session: {
+    binding: (user) => user._sid,
+    issue: async ({ collection, payload, req, userId }) => { /* mint */ },
+    revoke: async ({ collection, payload, req, sid, userId }) => { /* drop sid */ },
+  },
+})
+```
+
+`binding` defaults to `user._sid`. API-key callers have no sid and are refused.
+
+On dual-session isolated targets, start writes `generateIsolatedAuthCookie` instead of the shared cookie (parallel mode). A role-split collection that returns the shared name for that user falls back to swap. Pass the loaded target as `user` into `resolveIsolatedCookieName`.
