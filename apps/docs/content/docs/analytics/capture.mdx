@@ -125,13 +125,13 @@ An adapter entry wins over a slot entry, and both win over the per-family defaul
 capture: { autoCapture: { scrollDepth: true, fileDownloads: false } }
 ```
 
-`query` carries `location.search` without its leading `?`, capped at 512 characters, on pageviews only: an event fired later in the page's life would attribute the same visit twice. The [native ingest](/analytics/native#dimensions) reads the five `utm_*` keys out of it and discards the rest, so the raw query is never stored. Set it false when your URLs carry identifiers you would rather not put on the wire at all:
+`query` carries `location.search` without its leading `?`, capped at 512 characters, on pageviews only: an event fired later in the page's life would attribute the same visit twice. The [native ingest](/analytics/native#dimensions) reads the five `utm_*` keys and the ad click ids out of it and discards the rest, so the raw query is never stored. Set it false when your URLs carry identifiers you would rather not put on the wire at all:
 
 ```ts
 capture: { autoCapture: { query: false } }
 ```
 
-That costs the install its `utmSource`, `utmMedium`, `utmCampaign`, `utmContent` and `utmTerm` breakdowns, since nothing else carries them. The tracker treats an absent key as on, so a config snapshot rendered before this option existed keeps the documented default.
+That costs the install its `utmSource`, `utmMedium`, `utmCampaign`, `utmContent` and `utmTerm` breakdowns, since nothing else carries them, and leaves the [channel](/analytics/native#traffic-channels) classifier with the referrer alone: no campaign medium, no `utm_source`, no click ids, so a paid visit reads as whatever its referring host is. The tracker treats an absent key as on, so a config snapshot rendered before this option existed keeps the documented default.
 
 Listeners are delegated: one `click` and one `submit` handler on `document`, both in the capture phase, so a handler that stops propagation (or a link that navigates away) cannot swallow them first, and the listener set never grows with the DOM. A link that is both outbound and a download reports both.
 

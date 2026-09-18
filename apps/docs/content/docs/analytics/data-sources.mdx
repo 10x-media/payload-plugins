@@ -57,6 +57,8 @@ The pickers use it to hide what a source cannot answer; the query endpoint uses 
 
 The [native engine](/analytics/native#dimensions) declares the widest set here: every dimension it classifies at ingest is groupable, and all of them are filterable with `eq` and `contains` except `goal`, whose completions live in a json column rather than a field a `where` can compare. A vendor adapter declares whatever its own API serves, which is usually less.
 
+The contract's dimension keys are `page`, `referrer`, `source`, `channel`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` and `goal`. `source` is the visit's named origin and `channel` its acquisition channel on every adapter that serves them; see [`source` and `channel`](/analytics/adapters#source-and-channel).
+
 <Callout type="info">
 Validation is always against the selected source, never against the union of the configured adapters. An install with [runtime providers](/analytics/multi-tenancy) enabled is open-world: a tenant's own adapter serving `revenue` reads it through this endpoint even when no config adapter declares that metric.
 </Callout>

@@ -12,7 +12,7 @@ import { native } from '@10x-media/analytics/adapters/native'
 analytics({ adapters: [native()] })
 ```
 
-Registering it adds three hidden collections (`analytics-events`, `analytics-rollups`, `analytics-seen`) and a public beacon endpoint. Metrics served: `pageviews`, `visitors`, `sessions`, `events`, `avgDuration`, `conversions`, `revenue`, `scrollDepth`. Dimensions: `page`, `referrer`, `source`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event`, `goal`, each of them detailed under [dimensions](#dimensions). Realtime is supported.
+Registering it adds three hidden collections (`analytics-events`, `analytics-rollups`, `analytics-seen`) and a public beacon endpoint. Metrics served: `pageviews`, `visitors`, `sessions`, `events`, `avgDuration`, `conversions`, `revenue`, `scrollDepth`. Dimensions: `page`, `referrer`, `source`, `channel`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event`, `goal`, each of them detailed under [dimensions](#dimensions). Realtime is supported.
 
 ## The ingest endpoint
 
@@ -38,7 +38,7 @@ An event is rejected only on its required fields: a known `type`, a non-empty st
 
 The server derives the rest at ingest time: the [dimensions](#dimensions) below, a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days), and the [goals](/analytics/goals) the event completed, stamped onto the stored event. The endpoint responds `202` on success and `400` on an invalid body.
 
-`query` never reaches storage. It is capped at 512 characters, parsed for its five `utm_*` keys, and thrown away, so a session token or an email address that happens to be in the URL is not written to the events collection. The endpoint reads it on any event type; the tracker only sends it with pageviews, and sending it at all is optional: [`capture.autoCapture.query: false`](/analytics/capture#auto-capture) stops the tracker putting it on the wire.
+`query` never reaches storage. It is capped at 512 characters, parsed for its five `utm_*` keys and for the [ad click ids](#traffic-channels) the channel classifier reads, and thrown away, so a session token or an email address that happens to be in the URL is not written to the events collection. The endpoint reads it on any event type; the tracker only sends it with pageviews, and sending it at all is optional: [`capture.autoCapture.query: false`](/analytics/capture#auto-capture) stops the tracker putting it on the wire.
 
 A `goal` event counts under `events`, never under `pageviews`, and is kept out of the `event` dimension breakdown: its name is a goal slug, and it appears under the `goal` dimension instead. `revenue` is summed as a plain number in the event's own currency, with no conversion; see the currency note on [Goals](/analytics/goals#how-native-reports-them). `scrollDepth` averages over the pageviews that actually reported one, tracked by its own sample counter so a pageview whose tracker never sent a depth does not drag the average down.
 
@@ -52,7 +52,8 @@ Everything the engine can know about a hit is classified once, at ingest, and st
 |---|---|---|
 | `page` | the event's `path` | verbatim, capped at 512 |
 | `referrer` | the referring URL's host | lowercased, `www.` stripped, capped at 253; nothing for a same-site referral |
-| `source` | `utm_medium`, the ad click ids, and the referrer host | the traffic channel: `direct`, `search`, `social`, `email`, `paid` or `referral`, lowercase |
+| `source` | `utm_source`, else the referrer host | the visit's named origin: the tag as sent (capped at 128), the host lowercased, or `direct` when it has neither |
+| `channel` | `utm_medium`, the ad click ids, `utm_source` and the referrer host | one of the twelve [traffic channel](#traffic-channels) tokens, lowercase |
 | `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` | the `query` field's `utm_*` keys | decoded, trimmed, case as sent, capped at 128 |
 | `device` | `user-agent` | `desktop`, `mobile`, `tablet` |
 | `browser` | `user-agent` | `chrome`, `safari`, `firefox`, `edge`, `opera`, `samsung`, `other` |
@@ -72,26 +73,38 @@ Three things happen to a referrer:
 
 - **`referrer` on the event row** keeps the origin and the path, with everything from the first `#` or `?` onwards removed, capped at 512. A same-origin navigation puts the previous page's whole URL in `document.referrer`, so the query string routinely carries a reset token or an email address; stripping it is what keeps that out of the events collection.
 - **The `referrer` dimension** groups by the bare host: lowercased, no scheme, port, path or `www.`. A **same-site referral reports no host at all**, so a site's own domain can never top its referrers breakdown.
-- **The `source` dimension** is the traffic channel the hit arrived through, which is what a report is usually asked for ("how much of last month was paid?"), while the host it came from stays the `referrer` dimension's job.
+- **The `source` dimension** is the visit's named origin: its `utm_source` tag when it carries one, else the referrer host, else `direct`. That is what `source` means on Plausible (`visit:source`) and GA4 (`sessionSource`), so a report reads the same column whichever source answered it. The tag keeps the case it was sent in and is capped at 128 characters like every other campaign key; the host arrives lowercased and `www.`-stripped from the `referrer` dimension's own derivation. A campaign tagged `utm_source=direct` shares the `direct` bucket with untagged traffic.
+- **The `channel` dimension** is the acquisition channel that origin classifies into, which is what a report is usually asked for ("how much of last month was paid search?").
 
 ### Traffic channels
 
-`source` holds one of six lowercase tokens: `direct`, `search`, `social`, `email`, `paid`, `referral`. They are classified once, at ingest, in this order:
+`channel` holds one of twelve lowercase tokens: `direct`, `organic-search`, `paid-search`, `organic-social`, `paid-social`, `organic-video`, `paid-video`, `email`, `affiliate`, `display`, `referral`, `paid-other`. Paid is split per platform rather than pooled, because that is the split every vendor reports and the one a budget question is asked in.
 
-1. **`utm_medium`**, trimmed and lowercased. Anything starting with `paid` is `paid`; then `cpc`, `ppc`, `display` and `retargeting` are `paid`, `email` and `newsletter` are `email`, `social`, `social-media` and `sm` are `social`, `organic` and `search` are `search`. A campaign states its own channel, and the referrer host is then only its last hop. Any other medium falls through, so `utm_medium=referral` with no referrer is `direct` rather than `referral`.
-2. **An ad click id** in the page's query string with a non-empty value: `gclid`, `fbclid`, `msclkid` or `ttclid`, matched case-insensitively. An ad click carries one whatever host it bounced through. A valueless `?gclid=` is not a click.
-3. **The referrer host**, against a built-in list. Search: `bing.com`, `duckduckgo.com`, `baidu.com`, `ecosia.org`, `search.brave.com`, `qwant.com`, `startpage.com`, `naver.com`, `seznam.cz`, `sogou.com`, plus the `google`, `yahoo` and `yandex` brands. Social: `facebook.com`, `fb.com`, `instagram.com`, `twitter.com`, `x.com`, `t.co`, `linkedin.com`, `lnkd.in`, `reddit.com`, `tiktok.com`, `youtube.com`, `youtu.be`, `threads.net`, `mastodon.social`, `bsky.app`, `web.telegram.org`, `t.me`, `wa.me`, `whatsapp.com`, plus the `pinterest` brand. Subdomains of a listed host count.
-4. **`direct`** when there is no usable host (none sent, unparseable, or the site itself), **`referral`** for every other host.
+A hit is classified once, at ingest. First the **platform** is resolved, then the rules run in order:
 
-The three brands that run one site per country are matched on the label rather than a fixed suffix: `google.de`, `google.co.uk` and `news.google.com` are search, while `google.evil.com` is not, because the label must be followed by exactly one more label, or by two when the first is a registrar second level (`co`, `com`, `net`, `org`, `ac`, `gov`, `edu`).
+- **Platform** is the family the visit's origin belongs to: `search`, `social` or `video`. It comes from the referrer host matched against the built-in lists below, and from `utm_source` matched by name when there is no referrer host at all. An `fbclid` with no referrer host also names `social`, which is the in-app browser case it exists to cover.
 
-Webmail hosts (`mail.google.com`, `mail.yahoo.com`, `outlook.live.com`, `outlook.office.com`, `mail.proton.me`) are `referral`, not `email`. A referrer proves a link was opened in a mail client, never that the mail was the newsletter an `email` bucket would take credit for.
+1. **A paid `utm_medium`** wins outright, because a campaign states its own channel and the referrer host is then only its last hop. `cpc` and `ppc` say "paid" and nothing more; `paidsearch`, `paid-search`, `paid_search`, `paidsocial`, `paid-social`, `paid_social`, `paidvideo`, `paid-video` and `paid_video` name their platform themselves, and any other medium starting with `paid` says "paid" and nothing more. The platform is taken from the medium, else from a paid click id, else from the platform resolved above, else from `utm_source` by name, which is what keeps an ad click arriving through a network's own redirect host on its platform. With no platform at all the visit is `paid-other`.
+2. **Any other known `utm_medium`**, trimmed and lowercased, classifies directly: `email` and `newsletter` are `email`, `affiliate` and `affiliates` are `affiliate`, `display`, `banner`, `cpm`, `retargeting` and `remarketing` are `display`, `social`, `social-media` and `sm` are `organic-social`, `organic` and `search` are `organic-search`. Any other medium falls through to the rules below, so `utm_medium=referral` with no referrer is `direct` rather than `referral`.
+3. **A paid click id** in the page's query string with a non-empty value, matched case-insensitively: `gclid`, `gbraid` and `wbraid` (Google Ads) and `msclkid` (Microsoft Ads) are `paid-search`; `ttclid` (TikTok Ads) is `paid-social`. An ad click carries one whatever host it bounced through. A valueless `?gclid=` is not a click.
+4. **The platform**, organically: `organic-search`, `organic-social` or `organic-video`.
+5. **`referral`** for any other referrer host, and **`direct`** when there is no usable host at all (none sent, unparseable, or the site itself).
+
+`fbclid` is **not** a paid signal. Facebook appends it to every outbound link, organic posts included, so it proves the platform and never the spend: with no referrer host it names the social platform inside whichever branch the other signals chose (`utm_medium=cpc` and an `fbclid` is `paid-social`), and a hit carrying nothing but `fbclid` is `organic-social`.
+
+The host lists: search is `bing.com`, `duckduckgo.com`, `baidu.com`, `ecosia.org`, `search.brave.com`, `qwant.com`, `startpage.com`, `naver.com`, `seznam.cz`, `sogou.com`, plus the `google`, `yahoo` and `yandex` brands. Social is `facebook.com`, `fb.com`, `instagram.com`, `twitter.com`, `x.com`, `t.co`, `linkedin.com`, `lnkd.in`, `reddit.com`, `tiktok.com`, `threads.net`, `mastodon.social`, `bsky.app`, `web.telegram.org`, `t.me`, `wa.me`, `whatsapp.com`, plus the `pinterest` brand. Video is `youtube.com`, `youtu.be` and `vimeo.com`. Subdomains of a listed host count. The same platforms are matched by name for `utm_source`, and a `utm_source` spelled as a domain is matched as one, so `utm_source=google.com` is not an unknown.
+
+The brands that run one site per country are matched on the label rather than a fixed suffix: `google.de`, `google.co.uk` and `news.google.com` are search, while `google.evil.com` is not, because the label must be followed by exactly one more label, or by two when the first is a registrar second level (`co`, `com`, `net`, `org`, `ac`, `gov`, `edu`).
+
+Webmail hosts (`mail.google.com`, `mail.yahoo.com`, `outlook.live.com`, `outlook.office.com`, `mail.proton.me`) belong to no platform, so a visit from one is `referral` rather than `email`. A referrer proves a link was opened in a mail client, never that the mail was the newsletter an `email` bucket would take credit for.
+
+Every event also stores `channelVersion`, the version of the rules that classified it. It exists so that a later task that reclassifies stored rows can find the ones an older rule set decided; nothing reads it today, and it is stamped on events only, never on rollups.
 
 <Callout type="warn">
-**Rows written before this shipped keep the host `source` used to store**, and nothing is backfilled. A Sources tab spanning the upgrade mixes channels and hostnames until the older days age out of the window. A stored value that is not one of the six tokens is shown verbatim.
+**Nothing is backfilled.** Rows written before this release stored a traffic channel in `source` (one of the earlier six tokens: `direct`, `search`, `social`, `email`, `paid`, `referral`) and carry no `channel` at all. A Sources tab spanning the upgrade therefore mixes those tokens with origins until the older days age out of the window, and a channel breakdown starts at the upgrade rather than at the beginning of your data.
 </Callout>
 
-The six tokens are what is stored, filtered and put in a URL; the admin renders them through [typed translations](/analytics/i18n), so a Sources tab reads **Search** or **Direct** in the reader's language.
+The tokens are what is stored, filtered and put in a URL; the admin renders them through [typed translations](/analytics/i18n), so a channel breakdown reads **Paid search** or **Direct** in the reader's language. A `source` row is shown as it was stored, except `direct`, which renders through the same translated label.
 
 ## Write batching (opt-in)
 
@@ -147,7 +160,7 @@ native({ retentionDays: 90 })
 This registers a Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) that deletes raw `analytics-events` and `analytics-seen` rows older than the window. Rollups are untouched, so long-range aggregates survive pruning. Like all scheduled work here, the task fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler).
 
 <Callout type="info">
-`retentionDays` covers the events and the seen ledger, and nothing else. **Rollups are never pruned**, by design, and they now grow per day with the cardinality of the new dimensions: one row per distinct referrer host, city, campaign, `utmContent` and `utmTerm` you receive, plus one extra bucket set per distinct hostname you ingest from. A site with a long tail of campaign URLs should plan storage for that tail rather than assume a retention window bounds it.
+`retentionDays` covers the events and the seen ledger, and nothing else. **Rollups are never pruned**, by design, and they now grow per day with the cardinality of the new dimensions: one row per distinct referrer host, `source`, city, campaign, `utmContent` and `utmTerm` you receive, plus one extra bucket set per distinct hostname you ingest from. `source` is the one to watch, since it holds whatever `utm_source` a visit was tagged with: its cardinality is bounded only by the 128-character cap, not by a fixed vocabulary the way `channel` is. A site with a long tail of campaign URLs should plan storage for that tail rather than assume a retention window bounds it.
 </Callout>
 
 ## Upgrading an existing install
@@ -245,7 +258,7 @@ Rows written before the migration read back as zero rather than `NaN`, so an ins
 
 ## Upgrading for dimension columns
 
-Serving the dimensions above adds nine optional text fields to `analytics-events`: `browser`, `os`, `language`, the five `utm*` keys, and `referrerHost` (the bare host the `referrer` dimension reads, derived at ingest because a `where` cannot reduce a URL to its host at read time). The rollups collection is unchanged, since its rows are keyed by `(dimension, dimvalue)` text columns.
+Serving the dimensions above adds eleven optional fields to `analytics-events`: `browser`, `os`, `language`, the five `utm*` keys, `referrerHost` (the bare host the `referrer` dimension reads, derived at ingest because a `where` cannot reduce a URL to its host at read time), `channel`, and the numeric `channelVersion` beside it. The rollups collection is unchanged, since its rows are keyed by `(dimension, dimvalue)` text columns.
 
 Mongo needs nothing: the fields are optional, and an event written before this release simply carries none of them, which is already what "no bucket for that dimension" means. Push-mode dev installs pick the columns up on the next boot. A migrate-mode Postgres install needs this, which is the plugin's own migration statement for statement:
 
@@ -267,11 +280,15 @@ export async function up({ payload }: MigrateUpArgs): Promise<void> {
     'utm_content',
     'utm_term',
     'referrer_host',
+    'channel',
   ]) {
     await db.drizzle.execute(
       `ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS ${column} varchar`
     )
   }
+  await db.drizzle.execute(
+    `ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS channel_version numeric`
+  )
 }
 
 /** Deliberately irreversible: dropping the columns would discard already-attributed events. */
