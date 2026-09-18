@@ -1,8 +1,9 @@
 'use client'
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { MetricKey } from '../core/contract'
+import { refreshCache } from '../query/fetchQuery'
 import { MAX_QUERY_FILTERS } from '../query/limits'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
@@ -61,6 +62,44 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 	)
 
 	const pending = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const refreshing = useRef<AbortController | null>(null)
+	const [refreshPending, setRefreshPending] = useState(false)
+	const [refreshFailed, setRefreshFailed] = useState(false)
+
+	/**
+	 * Retires this scope's cached reads, then reissues every section against the new epoch.
+	 * The realtime strip is left alone: it polls its own short-lived window and never reads
+	 * through the aggregate cache the epoch keys. Starting an attempt clears the previous
+	 * failure notice, so the notice always describes the attempt that is in flight.
+	 */
+	const refreshCards = queries.cards.refetch
+	const refreshTrend = queries.trend.refetch
+	const refreshBreakdown = queries.breakdown.refetch
+	const refreshGoals = queries.goals?.refetch
+	const refresh = useCallback((): void => {
+		if (refreshPending) {
+			return
+		}
+		const controller = new AbortController()
+		refreshing.current = controller
+		setRefreshPending(true)
+		setRefreshFailed(false)
+		refreshCache(props.apiRoute, { signal: controller.signal }).then(
+			() => {
+				if (controller.signal.aborted) return
+				setRefreshPending(false)
+				refreshCards()
+				refreshTrend()
+				refreshBreakdown()
+				refreshGoals?.()
+			},
+			() => {
+				if (controller.signal.aborted) return
+				setRefreshPending(false)
+				setRefreshFailed(true)
+			}
+		)
+	}, [props.apiRoute, refreshPending, refreshCards, refreshTrend, refreshBreakdown, refreshGoals])
 
 	/**
 	 * A click is a step the reader took, so Back undoes it rather than leaving the view. It
@@ -99,6 +138,7 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 			if (pending.current !== null) {
 				clearTimeout(pending.current)
 			}
+			refreshing.current?.abort()
 		},
 		[]
 	)
@@ -159,8 +199,11 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 				now={now}
 				onChange={write}
 				onChangeDeferred={writeLater}
+				onRefresh={refresh}
 				provider={provider}
 				range={range}
+				refreshFailed={refreshFailed}
+				refreshing={refreshPending}
 				sampled={sections.some((section) => section.data?.result.meta.sampled === true)}
 				sourceId={source.id}
 				sources={props.sources.sources}

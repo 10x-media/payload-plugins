@@ -12,8 +12,10 @@ import { DOCUMENT_PATH, makeDocumentHandler } from './plugin/documentEndpoint'
 import { isModuleNotFoundError } from './plugin/peerImportError'
 import { makeQueryHandler, QUERY_PATH } from './plugin/queryEndpoint'
 import { makeRealtimeHandler, REALTIME_PATH } from './plugin/realtimeEndpoint'
+import { makeRefreshHandler, REFRESH_PATH } from './plugin/refreshEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRuntime } from './plugin/runtime'
+import type { ScopeChange } from './plugin/scopeChange'
 import { validateScopeField } from './plugin/scopeFieldBoot'
 import { makeSourcesHandler, SOURCES_PATH } from './plugin/sourcesEndpoint'
 import { warmTask } from './plugin/warmTask'
@@ -26,6 +28,7 @@ import {
 } from './providers/resolver'
 import { kvCacheStore } from './surfacing/cacheStore'
 import { createEngine } from './surfacing/engine'
+import { createEpochStore } from './surfacing/epoch'
 import { syncCollection } from './sync/collection'
 import { syncTask } from './sync/syncTask'
 import { DEFAULT_TIMEZONE, isValidTimeZone } from './timeframe/tz'
@@ -35,6 +38,26 @@ import { registerWidgets } from './widgets/registerWidgets'
 declare module 'payload' {
 	interface RegisteredPlugins {
 		'@10x-media/analytics': AnalyticsPluginOptions
+	}
+}
+
+/** How long a collection write waits on its cache epoch bumps, however many scopes they cover. */
+const EPOCH_BUMP_DEADLINE_MS = 2_000
+
+/**
+ * Settles with `work`, or rejects once `ms` has passed. A KV that hangs rather than failing
+ * would otherwise hold an editor's save open for as long as it hangs; the race keeps a
+ * handler on `work`, so a rejection arriving after the deadline stays handled.
+ */
+const withDeadline = async (work: Promise<unknown>, ms: number): Promise<void> => {
+	let timer: ReturnType<typeof setTimeout> | undefined
+	const deadline = new Promise<never>((_resolve, reject) => {
+		timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms`)), ms)
+	})
+	try {
+		await Promise.race([work, deadline])
+	} finally {
+		clearTimeout(timer)
 	}
 }
 
@@ -56,6 +79,14 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		const registryBase = { adapters: resolved.adapters, defaultId: resolved.defaultAdapter }
 		let resolveRegistry = staticRegistryResolver(registry)
 		let invalidateProviders = () => {}
+		/**
+		 * Retires the cached reads of every scope a collection write touched. Bound at init,
+		 * where the epoch store exists; goals defined in plugin config cannot change at
+		 * runtime, so only the collections ever bump. A bump that fails or outlives its
+		 * deadline is logged and swallowed: an unreachable token store must never fail or
+		 * stall an editor's save.
+		 */
+		let bumpScopes: (change: ScopeChange) => Promise<void> = async () => {}
 		const providersResolve = resolved.providers.resolve
 		if (providersResolve) {
 			resolveRegistry = async (args) =>
@@ -98,7 +129,10 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				slug: resolved.providers.collection.slug,
 				access: resolved.providers.collection.access,
 				overrides: resolved.providers.collection.overrides,
-				onChange: () => invalidateProviders(),
+				onChange: (change) => {
+					invalidateProviders()
+					return bumpScopes(change)
+				},
 				scoped: resolved.scoped,
 				scopeField: resolved.providers.collection.scopeField,
 				resolveScope,
@@ -133,7 +167,10 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 					slug: resolved.goalsCollection.slug,
 					access: resolved.goalsCollection.access,
 					overrides: resolved.goalsCollection.overrides,
-					onChange: () => goalsResolver.invalidate(),
+					onChange: (change) => {
+						goalsResolver.invalidate()
+						return bumpScopes(change)
+					},
 					scoped: resolved.scoped,
 					scopeField: resolved.goalsCollection.scopeField,
 					resolveScope,
@@ -187,6 +224,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			{ method: 'get', path: SOURCES_PATH, handler: makeSourcesHandler() },
 			{ method: 'get', path: GOALS_PATH, handler: makeGoalsHandler() },
 			{ method: 'get', path: QUERY_PATH, handler: makeQueryHandler() },
+			{ method: 'post', path: REFRESH_PATH, handler: makeRefreshHandler() },
 		]
 		// A runtime provider's capture support is unknown at config time, so providers
 		// alone are enough to mount the proxy; every slot is still resolved per request.
@@ -272,11 +310,38 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				const { validateEncryptedBoot } = await import('@10x-media/fields/encrypted')
 				await validateEncryptedBoot(payload, resolved.providers.collection.encryption?.keys)
 			}
+			const epoch = createEpochStore(payload)
+			bumpScopes = async (change) => {
+				const scopes = new Set<string | null>([change.scope])
+				if (change.previousScope !== undefined) {
+					scopes.add(change.previousScope)
+				}
+				const bumps = [...scopes].map(async (scope) => {
+					try {
+						await epoch.bump(scope)
+					} catch (err) {
+						payload.logger?.warn(
+							`analytics: cache epoch bump failed for scope "${scope ?? 'global'}", cached reads stay until their ttl: ${String(err)}`
+						)
+					}
+				})
+				// One deadline covers every scope a save touches: a document moving between two
+				// of them must not be able to hold the write open for one deadline each.
+				try {
+					await withDeadline(Promise.allSettled(bumps), EPOCH_BUMP_DEADLINE_MS)
+				} catch (err) {
+					const named = [...scopes].map((scope) => `"${scope ?? 'global'}"`).join(', ')
+					payload.logger?.warn(
+						`analytics: cache epoch bump did not settle for ${named}, cached reads stay until their ttl: ${String(err)}`
+					)
+				}
+			}
 			const engine = createEngine({
 				store: kvCacheStore(payload.kv),
 				queue: { concurrency: 4 },
 				ttl: resolved.cache.ttl,
 				timeoutMs: resolved.cache.timeoutMs,
+				epoch,
 				onError: (err, adapterId) => {
 					payload.logger?.warn(`analytics: read failed for adapter "${adapterId}": ${String(err)}`)
 				},
@@ -306,6 +371,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				readAccess: resolved.access.read,
 				bindings: resolved.bindings,
 				engine,
+				epoch,
 				ttl: resolved.cache.ttl,
 				comparison: resolved.widgets.comparison,
 			})

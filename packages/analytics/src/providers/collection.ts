@@ -7,6 +7,7 @@ import type {
 } from 'payload'
 import { validateMeasurementId } from '../adapters/ga4/measurementId'
 import { validateCurrency } from '../goals/currency'
+import { docScope, type ScopeChange } from '../plugin/scopeChange'
 import { keys, type TranslationKey } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ProviderAccessArgs } from './access'
@@ -23,8 +24,11 @@ export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 	slug: string
 	access?: Partial<CollectionConfig['access']>
 	overrides?: (collection: CollectionConfig) => CollectionConfig
-	/** Called after any change or delete so the per-scope registry cache drops stale adapters. */
-	onChange: () => void
+	/**
+	 * Called after any change or delete with the scopes the write touched, so the per-scope
+	 * registry cache drops stale adapters and the scope's cached reads are retired.
+	 */
+	onChange: (change: ScopeChange) => void | Promise<void>
 	buildSecret: BuildSecretField
 }
 
@@ -129,14 +133,19 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 		hooks: {
 			beforeChange: [stampScope(args)],
 			afterChange: [
-				({ doc }) => {
-					args.onChange()
+				async ({ doc, operation, previousDoc }) => {
+					await args.onChange({
+						scope: docScope(doc, args.scopeField),
+						...(operation === 'update'
+							? { previousScope: docScope(previousDoc, args.scopeField) }
+							: {}),
+					})
 					return doc
 				},
 			],
 			afterDelete: [
-				({ doc }) => {
-					args.onChange()
+				async ({ doc }) => {
+					await args.onChange({ scope: docScope(doc, args.scopeField) })
 					return doc
 				},
 			],

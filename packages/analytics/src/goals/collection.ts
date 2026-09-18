@@ -8,6 +8,7 @@ import type {
 	Where,
 } from 'payload'
 import { ValidationError } from 'payload'
+import { docScope, type ScopeChange } from '../plugin/scopeChange'
 import type { ProviderAccessArgs } from '../providers/access'
 import { providerCreateAccess, providerRowAccess } from '../providers/access'
 import { stampScope } from '../providers/stampScope'
@@ -23,8 +24,11 @@ export interface BuildGoalsCollectionArgs extends ProviderAccessArgs {
 	slug: string
 	access?: Partial<CollectionConfig['access']>
 	overrides?: (collection: CollectionConfig) => CollectionConfig
-	/** Called after any change or delete so the merged resolver drops its cached goals. */
-	onChange: () => void
+	/**
+	 * Called after any change or delete with the scopes the write touched, so the merged
+	 * resolver drops its cached goals and the scope's cached reads are retired.
+	 */
+	onChange: (change: ScopeChange) => void | Promise<void>
 }
 
 const validateSlug: TextFieldSingleValidation = (value, { req }) =>
@@ -238,14 +242,19 @@ export const buildGoalsCollection = (args: BuildGoalsCollectionArgs): Collection
 			beforeValidate: [uniqueSlug(args)],
 			beforeChange: [stampScope(args)],
 			afterChange: [
-				({ doc }) => {
-					args.onChange()
+				async ({ doc, operation, previousDoc }) => {
+					await args.onChange({
+						scope: docScope(doc, args.scopeField),
+						...(operation === 'update'
+							? { previousScope: docScope(previousDoc, args.scopeField) }
+							: {}),
+					})
 					return doc
 				},
 			],
 			afterDelete: [
-				({ doc }) => {
-					args.onChange()
+				async ({ doc }) => {
+					await args.onChange({ scope: docScope(doc, args.scopeField) })
 					return doc
 				},
 			],
