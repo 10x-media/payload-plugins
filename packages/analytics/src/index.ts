@@ -202,6 +202,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				resolveScope,
 				resolveTimezone,
 				resolveGoals: goalsResolver.resolve,
+				trustedProxyHops: resolved.trustedProxyHops,
 			})
 		}
 		if (
@@ -355,6 +356,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				captureSlots: resolved.capture.slots,
 				capturePaths: resolved.capture.paths,
 				captureProxy: resolved.capture.proxy,
+				trustedProxyHops: resolved.trustedProxyHops,
 				consentFor: resolved.capture.consent,
 				autoCapture: resolved.capture.autoCapture,
 				goals: resolved.goals,

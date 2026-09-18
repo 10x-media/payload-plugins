@@ -1,3 +1,4 @@
+import { normalizeHostname } from '../native/ingest/requestHost'
 import type { AnalyticsBinding, BindingContext, BindingDoc } from './types'
 
 const getByPath = (doc: BindingDoc, dotPath: string): unknown =>
@@ -65,6 +66,24 @@ export const resolvePathCached = (
 }
 
 /**
+ * A binding's hostname as the stored events spell it, since a tenant's domain field often
+ * carries a scheme, a port or mixed case and the native engine compares hostnames exactly.
+ * A value that is no hostname at all is passed through untouched, so a provider that filters
+ * on something else keeps whatever the binding gave it.
+ */
+export const hostnameFromBinding = (raw: string): string => {
+	let candidate = raw
+	if (raw.includes('://')) {
+		try {
+			candidate = new URL(raw).host
+		} catch {
+			return raw
+		}
+	}
+	return normalizeHostname(candidate) ?? raw
+}
+
+/**
  * Resolve a binding's hostname filter for one document. A function hostname is
  * awaited with the same `(doc, ctx)` a path resolver receives; a nullish or empty
  * result means no hostname filter is applied to the adapter query.
@@ -76,7 +95,7 @@ export const resolveHostname = async (
 ): Promise<string | undefined> => {
 	if (typeof binding.hostname === 'function') {
 		const resolved = await binding.hostname(doc, ctx)
-		return nonEmptyString(resolved) ? resolved : undefined
+		return nonEmptyString(resolved) ? hostnameFromBinding(resolved) : undefined
 	}
-	return binding.hostname
+	return binding.hostname === undefined ? undefined : hostnameFromBinding(binding.hostname)
 }

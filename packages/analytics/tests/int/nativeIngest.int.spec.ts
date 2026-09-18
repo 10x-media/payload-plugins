@@ -13,10 +13,10 @@ import { native } from '../../src/native/nativeAdapter'
 import { pruneEventsTask } from '../../src/native/retention/pruneTask'
 import { kvCacheStore } from '../../src/surfacing/cacheStore'
 import { createEngine } from '../../src/surfacing/engine'
-import { ingestRequest } from './ingestRequest'
+import { INGEST_HOST, ingestRequest } from './ingestRequest'
 
 const ingest = (booted: BootedPayload, path: string) =>
-	makeIngestHandler(platformHeaderResolver)(
+	makeIngestHandler({ geoResolver: platformHeaderResolver })(
 		ingestRequest(
 			booted.payload,
 			{ type: 'pageview', path, hostname: 'h', durationMs: 500 },
@@ -83,7 +83,7 @@ describeForDb('native ingest endpoint', {}, (db) => {
 	})
 
 	it('persists browser, os, language and the utm keys, and never the raw query', async () => {
-		const res = await makeIngestHandler(platformHeaderResolver)(
+		const res = await makeIngestHandler({ geoResolver: platformHeaderResolver })(
 			ingestRequest(
 				booted.payload,
 				{
@@ -124,7 +124,7 @@ describeForDb('native ingest endpoint', {}, (db) => {
 			platformHeaderResolver,
 			maxmindResolver({ dbPath: '/nonexistent/GeoLite2-City.mmdb' })
 		)
-		const res = await makeIngestHandler(composed)(
+		const res = await makeIngestHandler({ geoResolver: composed })(
 			ingestRequest(
 				booted.payload,
 				{ type: 'pageview', path: '/geo', hostname: 'h' },
@@ -138,6 +138,41 @@ describeForDb('native ingest endpoint', {}, (db) => {
 			pagination: false,
 		})
 		expect((docs[0] as { country?: string } | undefined)?.country).toBe('US')
+	})
+
+	// Every distinct stored hostname opens a rollup bucket family that nothing prunes, so the
+	// spellings of one host have to land in one family and junk has to land in none.
+	it('lands every spelling of one host in one bucket family', async () => {
+		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver })
+		const spellings = ['Site.Example', 'site.example:3000', 'site.example.', 'SITE.EXAMPLE..:443']
+		const junk = ['site..example', '.site.example', 'site example', `${'a'.repeat(300)}.example`]
+		for (const host of [...spellings, ...junk]) {
+			const res = await handler(
+				ingestRequest(booted.payload, { type: 'pageview', path: '/spelling' }, { host })
+			)
+			expect(res.status, host).toBe(202)
+		}
+
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/spelling' } },
+			pagination: false,
+		})
+		expect(docs).toHaveLength(spellings.length)
+		expect([
+			...new Set((docs as unknown as Array<{ hostname: string }>).map((d) => d.hostname)),
+		]).toEqual(['site.example'])
+
+		const rollups = await booted.payload.find({
+			collection: ROLLUPS_SLUG as never,
+			where: { path: { equals: '/spelling' } },
+			pagination: false,
+		})
+		const families = new Set(
+			(rollups.docs as unknown as Array<{ hostname: string }>).map((d) => d.hostname)
+		)
+		// The hostname-less family every delta also writes, and exactly one named family.
+		expect([...families].sort()).toEqual(['', 'site.example'])
 	})
 
 	it('serves a site-wide country breakdown through the native adapter', async () => {
@@ -179,7 +214,7 @@ describeForDb('native ingest through the router', {}, (db) => {
 			request: new Request('http://localhost:3000/api/analytics/ingest', {
 				method: 'POST',
 				body,
-				headers: { 'content-type': contentType, 'user-agent': 'UA' },
+				headers: { 'content-type': contentType, 'user-agent': 'UA', host: INGEST_HOST },
 			}),
 		})
 

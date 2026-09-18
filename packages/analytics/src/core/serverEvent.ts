@@ -8,8 +8,13 @@ import type { RawEventInput } from '../native/ingest/normalizeEvent'
  */
 export type ServerEventInput = Pick<
 	RawEventInput,
-	'type' | 'name' | 'path' | 'hostname' | 'referrer' | 'query' | 'props' | 'value' | 'currency'
+	'type' | 'name' | 'path' | 'referrer' | 'query' | 'props' | 'value' | 'currency'
 > & {
+	/**
+	 * The site the event belongs to. Required, and stored as given: there is no request behind
+	 * a server event to attribute it to, so the caller owns the value.
+	 */
+	hostname: string
 	/**
 	 * Attribution inputs, overlaid on `opts.req`'s own headers when there is a request.
 	 * With neither, the event is attributed to the day's synthetic server visitor and
@@ -41,6 +46,19 @@ export interface ServerTrackOptions {
 }
 
 export type ServerTrack = (event: ServerEventInput, opts?: ServerTrackOptions) => Promise<void>
+
+/**
+ * Applies an adapter's own hostname policy to a request, answering null when it refuses the
+ * host. Server code that stands in for a browser event (a form action recording a conversion)
+ * attributes through this rather than through a forgeable `Host`, so one policy decides what a
+ * hostname may be on every public path.
+ */
+export type IngestHostnameResolver = (args: {
+	req: PayloadRequest
+	/** What the caller believes the host is, never trusted on its own. */
+	claimed?: string
+	scope?: string | null
+}) => Promise<string | null>
 
 /** Thrown instead of dropping the event: a server caller can handle a rejected promise. */
 export class AnalyticsTrackError extends Error {

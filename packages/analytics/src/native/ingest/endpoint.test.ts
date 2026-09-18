@@ -12,7 +12,7 @@ const rawReq = (body: BodyInit, contentType = 'application/json'): PayloadReques
 		new Request('http://localhost/api/analytics/ingest', {
 			method: 'POST',
 			body,
-			headers: { 'content-type': contentType },
+			headers: { 'content-type': contentType, host: 'site.example' },
 		}),
 		{ payload: { kv: { get: async () => ({ salt: 'salt' }), set: async () => undefined } } }
 	) as unknown as PayloadRequest
@@ -31,17 +31,17 @@ const capture = (): { buffer: WriteBuffer<StoredEvent>; events: StoredEvent[] } 
 
 const handlerWith = (goals?: Goal[]) => {
 	const { buffer, events } = capture()
-	const handler = makeIngestHandler(
-		noopResolver,
-		() => buffer,
-		goals ? { goals: async () => goals } : {}
-	)
+	const handler = makeIngestHandler({
+		geoResolver: noopResolver,
+		getBuffer: () => buffer,
+		resolvers: goals ? { goals: async () => goals } : {},
+	})
 	return { handler, events }
 }
 
 describe('makeIngestHandler validation', () => {
 	it('returns 400 for an invalid body', async () => {
-		const handler = makeIngestHandler(noopResolver)
+		const handler = makeIngestHandler({ geoResolver: noopResolver })
 		expect((await handler(req({}))).status).toBe(400)
 	})
 
@@ -91,11 +91,12 @@ describe('makeIngestHandler validation', () => {
 		expect((await handler(req({ type: 'event', path: '/p', hostname: 'h' }))).status).toBe(400)
 	})
 
-	it('400s an unknown type, a missing path, and a missing hostname', async () => {
-		const { handler } = handlerWith()
+	it('400s an unknown type and a missing path, and accepts a body with no hostname', async () => {
+		const { handler, events } = handlerWith()
 		expect((await handler(req({ type: 'nope', path: '/p', hostname: 'h' }))).status).toBe(400)
 		expect((await handler(req({ type: 'pageview', hostname: 'h' }))).status).toBe(400)
-		expect((await handler(req({ type: 'pageview', path: '/p' }))).status).toBe(400)
+		expect((await handler(req({ type: 'pageview', path: '/p' }))).status).toBe(202)
+		expect(events[0]?.hostname).toBe('site.example')
 	})
 
 	it('400s a non-string path, hostname, or name rather than letting it reach matching', async () => {
@@ -182,9 +183,10 @@ describe('makeIngestHandler goal matching', () => {
 	it('resolves goals with the same scope the event is stamped with', async () => {
 		const { buffer, events } = capture()
 		const resolveGoals = vi.fn(async (_req: PayloadRequest, _scope?: string | null) => goals)
-		const handler = makeIngestHandler(noopResolver, () => buffer, {
-			scope: async () => 't1',
-			goals: resolveGoals,
+		const handler = makeIngestHandler({
+			geoResolver: noopResolver,
+			getBuffer: () => buffer,
+			resolvers: { scope: async () => 't1', goals: resolveGoals },
 		})
 		await handler(req({ type: 'pageview', path: '/thank-you', hostname: 'h' }))
 		expect(resolveGoals.mock.calls[0]?.[1]).toBe('t1')
@@ -197,5 +199,160 @@ describe('makeIngestHandler goal matching', () => {
 			(await handler(req({ type: 'pageview', path: '/thank-you', hostname: 'h' }))).status
 		).toBe(202)
 		expect(events[0]?.goals).toBeUndefined()
+	})
+})
+
+describe('makeIngestHandler attribution', () => {
+	const withHost = (body: unknown, headers: Record<string, string>): PayloadRequest =>
+		Object.assign(
+			new Request('http://localhost/api/analytics/ingest', {
+				method: 'POST',
+				body: JSON.stringify(body),
+				headers: { 'content-type': 'application/json', ...headers },
+			}),
+			{ payload: { kv: { get: async () => ({ salt: 'salt' }), set: async () => undefined } } }
+		) as unknown as PayloadRequest
+
+	const handlerWithAttribution = (
+		attribution: Parameters<typeof makeIngestHandler>[0]['attribution'],
+		resolvers: Parameters<typeof makeIngestHandler>[0]['resolvers'] = {}
+	) => {
+		const { buffer, events } = capture()
+		return {
+			events,
+			handler: makeIngestHandler({
+				geoResolver: noopResolver,
+				getBuffer: () => buffer,
+				resolvers,
+				attribution,
+			}),
+		}
+	}
+
+	const pageview = { type: 'pageview', path: '/p', hostname: 'evil.example' }
+
+	it('stores the request host and ignores the body claim and Origin', async () => {
+		const { handler, events } = handlerWithAttribution({})
+		const res = await handler(
+			withHost(pageview, { host: 'a.example:3000', origin: 'https://other.example' })
+		)
+		expect(res.status).toBe(202)
+		expect(events[0]?.hostname).toBe('a.example')
+	})
+
+	it('answers a drop exactly as it answers an accepted event', async () => {
+		const { handler, events } = handlerWithAttribution({})
+		const kept = await handler(withHost(pageview, { host: 'a.example' }))
+		const dropped = await handler(withHost(pageview, {}))
+		expect(dropped.status).toBe(kept.status)
+		expect(await dropped.text()).toBe(await kept.text())
+		expect([...dropped.headers].sort()).toEqual([...kept.headers].sort())
+		expect(events).toHaveLength(1)
+	})
+
+	it('drops an event whose request resolves no scope on a scoped install', async () => {
+		const { handler, events } = handlerWithAttribution(
+			{},
+			{
+				scope: async (req) => {
+					const host = req.headers.get('host') ?? ''
+					return host.includes('.') ? (host.split('.')[0] ?? null) : null
+				},
+			}
+		)
+		await handler(withHost(pageview, { host: 'unknown' }))
+		await handler(withHost(pageview, { host: 't1.example' }))
+		expect(events.map((event) => [event.hostname, event.scope])).toEqual([['t1.example', 't1']])
+	})
+
+	it('keeps a platform hostname under the null scope', async () => {
+		const { handler, events } = handlerWithAttribution(
+			{ platformHostnames: new Set(['platform.example']) },
+			{ scope: async () => null }
+		)
+		await handler(withHost(pageview, { host: 'platform.example' }))
+		await handler(withHost(pageview, { host: 'tenant.example' }))
+		expect(events.map((event) => [event.hostname, event.scope])).toEqual([['platform.example', '']])
+	})
+
+	it('reads x-forwarded-host only once a proxy hop is trusted', async () => {
+		const forwarded = { host: 'a.example', 'x-forwarded-host': 'b.example' }
+		const ignored = handlerWithAttribution({ trustedProxyHops: 0 })
+		await ignored.handler(withHost(pageview, forwarded))
+		expect(ignored.events[0]?.hostname).toBe('a.example')
+
+		const trusted = handlerWithAttribution({ trustedProxyHops: 1 })
+		await trusted.handler(withHost(pageview, forwarded))
+		expect(trusted.events[0]?.hostname).toBe('b.example')
+	})
+
+	it('pays for neither the timezone nor the goals resolver on a drop', async () => {
+		const timezone = vi.fn(async () => 'Europe/Berlin')
+		const goals = vi.fn(async () => [])
+		const { handler } = handlerWithAttribution({}, { timezone, goals })
+		await handler(withHost(pageview, {}))
+		expect(timezone).not.toHaveBeenCalled()
+		expect(goals).not.toHaveBeenCalled()
+	})
+})
+
+// The response cannot say a drop happened without telling a prober which hosts exist, so the
+// log says it instead: once per reason for the life of the process, never once per event.
+describe('makeIngestHandler drop warnings', () => {
+	const withLogger = (
+		headers: Record<string, string>,
+		warn: (message: string) => void
+	): PayloadRequest =>
+		Object.assign(
+			new Request('http://localhost/api/analytics/ingest', {
+				method: 'POST',
+				body: JSON.stringify({ type: 'pageview', path: '/p' }),
+				headers: { 'content-type': 'application/json', ...headers },
+			}),
+			{
+				payload: {
+					kv: { get: async () => ({ salt: 'salt' }), set: async () => undefined },
+					logger: { warn },
+				},
+			}
+		) as unknown as PayloadRequest
+
+	it('warns once for a refused hostname and stays silent on every later drop', async () => {
+		const warn = vi.fn()
+		const { buffer } = capture()
+		const handler = makeIngestHandler({ geoResolver: noopResolver, getBuffer: () => buffer })
+		await handler(withLogger({}, warn))
+		await handler(withLogger({}, warn))
+		await handler(withLogger({ host: 'a.example' }, warn))
+		expect(warn).toHaveBeenCalledTimes(1)
+		expect(warn.mock.calls[0]?.[0]).toMatch(/hostname option/)
+	})
+
+	it('warns once for an unresolved scope, naming scopeResolver and platformHostnames', async () => {
+		const warn = vi.fn()
+		const { buffer } = capture()
+		const handler = makeIngestHandler({
+			geoResolver: noopResolver,
+			getBuffer: () => buffer,
+			resolvers: { scope: async () => null },
+		})
+		await handler(withLogger({ host: 'a.example' }, warn))
+		await handler(withLogger({ host: 'b.example' }, warn))
+		expect(warn).toHaveBeenCalledTimes(1)
+		expect(warn.mock.calls[0]?.[0]).toMatch(/scopeResolver/)
+		expect(warn.mock.calls[0]?.[0]).toMatch(/platformHostnames/)
+	})
+
+	it('keeps each reason on its own budget', async () => {
+		const warn = vi.fn()
+		const { buffer } = capture()
+		const handler = makeIngestHandler({
+			geoResolver: noopResolver,
+			getBuffer: () => buffer,
+			resolvers: { scope: async () => null },
+		})
+		await handler(withLogger({}, warn))
+		await handler(withLogger({ host: 'a.example' }, warn))
+		expect(warn).toHaveBeenCalledTimes(2)
 	})
 })

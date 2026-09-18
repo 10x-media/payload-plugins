@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import { resolveHostname, resolvePath, resolvePathCached } from './resolvePath'
+import { hostnameFromBinding, resolveHostname, resolvePath, resolvePathCached } from './resolvePath'
 import type { AnalyticsBinding } from './types'
 
 const ctx = () => ({ req: { context: {} } as unknown as PayloadRequest, locale: undefined })
@@ -43,6 +43,28 @@ describe('resolveHostname', () => {
 	})
 	it('returns undefined when the binding has no hostname', async () => {
 		expect(await resolveHostname({}, {}, ctx())).toBeUndefined()
+	})
+	it('spells a URL-ish hostname the way the stored events do', async () => {
+		expect(await resolveHostname({ hostname: 'https://Example.com:443/' }, {}, ctx())).toBe(
+			'example.com'
+		)
+		expect(await resolveHostname({ hostname: () => 'Example.com' }, {}, ctx())).toBe('example.com')
+	})
+})
+
+describe('hostnameFromBinding', () => {
+	it('takes the host out of a URL and normalizes it', () => {
+		expect(hostnameFromBinding('https://Example.com:443/')).toBe('example.com')
+		expect(hostnameFromBinding('http://a.example/path?q=1')).toBe('a.example')
+	})
+	it('normalizes a bare hostname', () => {
+		expect(hostnameFromBinding('Example.com')).toBe('example.com')
+		expect(hostnameFromBinding('a.example:3000')).toBe('a.example')
+	})
+	it('keeps anything that is no hostname exactly as it was', () => {
+		for (const raw of ['tenant 7', 'https://', 'ä.example', '://broken']) {
+			expect(hostnameFromBinding(raw), raw).toBe(raw)
+		}
 	})
 })
 

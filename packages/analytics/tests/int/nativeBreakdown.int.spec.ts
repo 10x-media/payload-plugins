@@ -16,7 +16,7 @@ interface IngestOpts {
 }
 
 const ingest = (booted: BootedPayload, opts: IngestOpts) =>
-	makeIngestHandler(platformHeaderResolver)(
+	makeIngestHandler({ geoResolver: platformHeaderResolver })(
 		ingestRequest(
 			booted.payload,
 			{

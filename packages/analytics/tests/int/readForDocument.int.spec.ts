@@ -9,7 +9,7 @@ import { native } from '../../src/native/nativeAdapter'
 import { ingestRequest } from './ingestRequest'
 
 const ingest = (booted: BootedPayload, path: string) =>
-	makeIngestHandler(platformHeaderResolver)(
+	makeIngestHandler({ geoResolver: platformHeaderResolver })(
 		ingestRequest(
 			booted.payload,
 			{ type: 'pageview', path, hostname: 'h', durationMs: 400 },

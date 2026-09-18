@@ -1,4 +1,5 @@
 import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
+import type { AnalyticsAdapter } from '../../core/contract'
 import {
 	AnalyticsTrackError,
 	type ServerEventInput,
@@ -8,7 +9,7 @@ import {
 import { getRuntime } from '../../plugin/runtime'
 import type { GeoResolver } from '../geo/geoResolver'
 import { SERVER_USER_AGENT } from './device'
-import type { IngestResolvers } from './endpoint'
+import type { IngestAttribution, IngestResolvers } from './endpoint'
 import { flushBatch } from './flushBatch'
 import { normalizeEvent, type StoredEvent } from './normalizeEvent'
 import { dailySalt } from './salt'
@@ -22,6 +23,8 @@ export interface ServerTrackDeps {
 	getBuffer: () => WriteBuffer<StoredEvent> | null
 	/** Read late: the register context that carries them arrives after the adapter is built. */
 	getResolvers: () => IngestResolvers
+	/** Read late for the same reason: the plugin option arrives with the register context. */
+	getAttribution: () => IngestAttribution
 }
 
 /**
@@ -77,7 +80,9 @@ export const makeServerTrack =
 		if (!payload) {
 			throw new AnalyticsTrackError('analytics: trackServerEvent called before init')
 		}
-		const invalid = rawEventError(event)
+		// Trusted server code: it supplies its own hostname, so the resolver the HTTP endpoint
+		// runs is bypassed and the hostname stays required here.
+		const invalid = rawEventError(event, { requireHostname: true })
 		if (invalid) {
 			throw new AnalyticsTrackError(`analytics: trackServerEvent needs a valid "${invalid}"`)
 		}
@@ -107,13 +112,13 @@ export const makeServerTrack =
 				type: event.type,
 				name: event.name,
 				path: event.path,
-				hostname: event.hostname,
 				referrer: event.referrer,
 				query: event.query,
 				props: event.props,
 				value: event.value,
 				currency: event.currency,
 			},
+			hostname: event.hostname,
 			headers: attributionHeaders(event, opts?.req),
 			geoResolver: deps.geoResolver,
 			salt: await dailySalt(payload, now),
@@ -121,6 +126,7 @@ export const makeServerTrack =
 			scope,
 			timezone,
 			goals,
+			trustedProxyHops: deps.getAttribution().trustedProxyHops,
 		})
 		const buffer = deps.getBuffer()
 		if (!buffer) {
@@ -132,6 +138,18 @@ export const makeServerTrack =
 			await buffer.flush()
 		}
 	}
+
+/**
+ * The adapter {@link trackServerEvent} writes through: the first registered one with a server
+ * ingestion seam. Every caller that needs a second seam beside `track` (the hostname policy a
+ * goal action applies) reads it off this same adapter, so an event cannot be judged by one
+ * adapter and written by another. The registry here is the static config one, so a per-tenant
+ * runtime provider never supplies either seam.
+ */
+export const ingestAdapter = (payload: Payload): AnalyticsAdapter | undefined =>
+	getRuntime(payload)
+		?.registry.all()
+		.find((adapter) => adapter.ingest?.track)
 
 /**
  * Records an analytics event from server code: a webhook, a job, a server action. The event
@@ -150,9 +168,7 @@ export const trackServerEvent = async (
 	event: ServerEventInput,
 	opts?: ServerTrackOptions
 ): Promise<void> => {
-	const track = getRuntime(payload)
-		?.registry.all()
-		.find((adapter) => adapter.ingest?.track)?.ingest?.track
+	const track = ingestAdapter(payload)?.ingest?.track
 	if (!track) {
 		throw new AnalyticsTrackError(
 			'analytics: trackServerEvent needs the native adapter; provider-slot server tracking is not supported yet'

@@ -5,7 +5,13 @@ import { defineConfig, mergeConfig } from 'vitest/config'
 // emits a benign teardown rejection after the tests have already passed. Ignore
 // unhandled errors only then; the default `test` path and unit tests stay strict.
 // biome-ignore lint/plugin/noProcessEnv: vitest config env boundary
-const isMatrixRun = Boolean(process.env.DB_MATRIX)
+const dbMatrix = process.env.DB_MATRIX ?? ''
+const isMatrixRun = Boolean(dbMatrix)
+
+// One Postgres server serves the whole run, and every worker boots Payload against it. A
+// many-core machine otherwise opens enough connections at once to push that server into
+// recovery mode, which fails specs that changed nothing.
+const POSTGRES_MAX_WORKERS = 4
 
 /** Browser-only modules; everything else runs in the node project. */
 const JSDOM_TESTS = ['src/tracker/**/*.test.ts', 'src/**/*.test.tsx']
@@ -29,6 +35,7 @@ export default mergeConfig(
 						// because a root globalSetup is loaded and run once per project.
 						globalSetup: ['./tests/setup/sharedPostgres.ts'],
 						dangerouslyIgnoreUnhandledErrors: isMatrixRun,
+						...(dbMatrix.includes('postgres') ? { maxWorkers: POSTGRES_MAX_WORKERS } : {}),
 						include: ['tests/int/**/*.int.spec.ts', 'src/**/*.test.ts'],
 						exclude: ['node_modules', 'dist', '.next', 'tests/e2e/**', ...JSDOM_TESTS],
 						// The admin view's server shell pulls in Payload's own admin chrome, whose

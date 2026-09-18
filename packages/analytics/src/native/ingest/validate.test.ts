@@ -28,9 +28,16 @@ describe('rawEventError', () => {
 		expect(rawEventError(raw({ path: ['/p'] }))).toBe('path')
 	})
 
-	it('names hostname for a missing or non-string hostname', () => {
-		expect(rawEventError(raw({ hostname: undefined }))).toBe('hostname')
+	it('accepts a missing hostname and names it for a non-string one', () => {
+		expect(rawEventError(raw({ hostname: undefined }))).toBeUndefined()
 		expect(rawEventError(raw({ hostname: 7 }))).toBe('hostname')
+		expect(rawEventError(raw({ hostname: {} }))).toBe('hostname')
+	})
+
+	it('demands a hostname where the caller supplies its own', () => {
+		expect(rawEventError(raw({ hostname: undefined }), { requireHostname: true })).toBe('hostname')
+		expect(rawEventError(raw({ hostname: '' }), { requireHostname: true })).toBe('hostname')
+		expect(rawEventError(raw({}), { requireHostname: true })).toBeUndefined()
 	})
 
 	it('names name for an event or goal without one', () => {

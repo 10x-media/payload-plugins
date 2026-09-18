@@ -1,1 +1,6 @@
-export { type NativeOptions, native } from '../../native/nativeAdapter'
+export {
+	type EventHostnameResolver,
+	type HostnameOption,
+	type NativeOptions,
+	native,
+} from '../../native/nativeAdapter'

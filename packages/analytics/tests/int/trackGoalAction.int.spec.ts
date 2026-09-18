@@ -1,5 +1,6 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import type { PayloadRequest } from 'payload'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import type { MetricKey } from '../../src/core/contract'
 import { GOALS_SLUG } from '../../src/goals/collection'
 import type { GoalActionRunArgs } from '../../src/goals/trackGoalAction'
@@ -128,5 +129,102 @@ describeForDb('analytics trackGoalAction', {}, (db) => {
 				} as never,
 			})
 		).rejects.toThrow()
+	})
+})
+
+// A form submission carries a `Host` the visitor chose, so the action is held to the same
+// hostname policy the ingest endpoint applies rather than storing what the request claimed.
+describeForDb('analytics trackGoalAction hostname policy', {}, (db) => {
+	const adapter = native({ hostname: [HOST] })
+	let booted: BootedPayload
+
+	const reqWithHost = (host: string): PayloadRequest =>
+		({ payload: booted.payload, headers: new Headers({ host }) }) as unknown as PayloadRequest
+
+	const hostnameOf = async (path: string): Promise<string | undefined> => {
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: path } },
+			pagination: false,
+		})
+		return (docs as unknown as Array<{ hostname: string }>)[0]?.hostname
+	}
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			configOverrides: { serverURL: 'https://cms.example' },
+			plugin: analytics({ adapters: [adapter], goals: { defaults: configGoals } }),
+		})
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('stores the listed host a real submission carried', async () => {
+		await trackGoalAction({ path: '/listed' }).run({
+			form: { id: 'listed-form' },
+			submissionId: 'sub-listed',
+			values: [],
+			config: { goal: 'book-demo' },
+			payload: booted.payload,
+			req: reqWithHost(`${HOST}:3000`),
+		})
+		expect(await hostnameOf('/listed')).toBe(HOST)
+	})
+
+	it('stores the serverURL host when the policy refuses a forged one', async () => {
+		await trackGoalAction({ path: '/forged' }).run({
+			form: { id: 'forged-form' },
+			submissionId: 'sub-forged',
+			values: [],
+			config: { goal: 'book-demo' },
+			payload: booted.payload,
+			req: reqWithHost('attacker.example'),
+		})
+		expect(await hostnameOf('/forged')).toBe('cms.example')
+	})
+})
+
+// With no `serverURL` and a request carrying no usable host, nothing names the site the
+// conversion happened on. The submission is what matters, so the goal is skipped quietly.
+describeForDb('analytics trackGoalAction with nothing to attribute to', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			plugin: analytics({ adapters: [native()], goals: { defaults: configGoals } }),
+		})
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('writes nothing, warns once per process, and still returns', async () => {
+		const warn = vi.spyOn(booted.payload.logger, 'warn')
+		const action = trackGoalAction({ path: '/hostless' })
+		const args: GoalActionRunArgs = {
+			form: { id: 'hostless-form' },
+			submissionId: 'sub-hostless',
+			values: [],
+			config: { goal: 'book-demo' },
+			payload: booted.payload,
+			req: { payload: booted.payload, headers: new Headers() } as unknown as PayloadRequest,
+		}
+
+		await expect(action.run(args)).resolves.toBeUndefined()
+		await expect(action.run({ ...args, submissionId: 'sub-hostless-2' })).resolves.toBeUndefined()
+
+		const { docs } = await booted.payload.find({
+			collection: EVENTS_SLUG as never,
+			where: { path: { equals: '/hostless' } },
+			pagination: false,
+		})
+		expect(docs).toHaveLength(0)
+		expect(warn).toHaveBeenCalledTimes(1)
+		warn.mockRestore()
 	})
 })

@@ -9,7 +9,7 @@ description: Per-tenant analytics providers, a shared platform provider, and sco
 
 | Option | What it does |
 |---|---|
-| `scopeResolver` | Maps each request to its scope (e.g. the tenant id). Reads, widget data, and native ingest all resolve through it. |
+| `scopeResolver` | Maps each request to its scope (e.g. the tenant id). Reads, widget data, and native ingest all resolve through it, and native ingest drops an event whose request resolves none. |
 | `scopes` | Enumerates every tenant scope so the cache-warm and sync cron tiers fan out per tenant. See [Cron tiers](#5-cron-tiers). |
 | `providers.collection` | Opt-in admin collection where providers are configured at runtime (per scope). |
 | `platformAdapter` | Names one config adapter shared by every scope: the platform's own analytics. |
@@ -57,6 +57,8 @@ analytics({
 ```
 
 With a `scopeResolver` configured, the native engine adds an indexed `scope` column to its events and rollups: ingest stamps every event with the resolved scope, and every read filters by the request's scope. Enabling this on an **existing** native install requires a migration for the new column (`pnpm payload migrate:create` in your app).
+
+The resolver does more than stamp. On a scoped install, a native event whose request resolves no scope is **dropped**, unless its hostname is one of the native adapter's [`platformHostnames`](/analytics/native#scoped-installs-and-platformhostnames). So the resolver decides which traffic is stored at all, and a tenant lookup that fails closed is what keeps an unknown host out of the events collection rather than parking it in the install-wide bucket.
 
 The tenant-selector cookie is set client-side, so a `scopeResolver` must never trust it alone: validate it against `req.user`'s own tenant assignments (`getUserTenantIDs`, shown above) before treating it as that request's scope, and throw when it names a tenant the user does not belong to, the same fail-closed handling every scopeResolver failure gets (reads degrade to unavailable, provider access denies, provider writes reject). A platform admin bypasses the check, since they are allowed to select any tenant.
 
@@ -147,27 +149,59 @@ Two consequences. A resolver that derives the scope from something a client cont
 **The hostname is a request header too.** `Host` is as forgeable as any other header, so hostname resolution is only trustworthy when something upstream guarantees it: the deployment rejects unknown hosts at the edge (a platform that routes by verified domain, or an explicit `server_name` allowlist), or the resolver itself matches the host against domains it already knows. Do both if you can. A resolver that looks a tenant up by whatever label the header happens to carry is the same spoof with extra steps.
 
 So: resolve public traffic from the hostname, match it against the tenant's own stored domain rather than parsing a label out of it, and fail closed to the null scope on no match. The admin-session path can still win where it applies, so an admin browsing a tenant's own domain is attributed by their selector rather than by the host.
+
+That resolver is also what keeps the events collection clean. The native engine stores an event under the host the request carried, never under the one the body claims, and on a scoped install it drops an event whose request resolves no scope. So a forged `Host` naming a domain no tenant owns writes nothing at all, rather than a hostname bucket in the install-wide scope. The two native options beside it are [`platformHostnames`](/analytics/native#scoped-installs-and-platformhostnames), for the platform's own domains, which resolve no tenant and should still be counted, and the [`hostname` resolver form](/analytics/native#a-resolver), for a split deployment whose page host is not the host the beacon lands on.
 </Callout>
 
+A worked resolver for a platform whose tenants bring their own domains. The tenant document holds the domain; nothing about it is listed in config:
+
 ```ts
-scopeResolver: async ({ req }) => {
-  if (req.user) {
-    return resolveFromSelector(req) // the admin path from step 1
+import { getTenantFromCookie, getUserTenantIDs } from '@payloadcms/plugin-multi-tenant/utilities'
+import type { PayloadRequest } from 'payload'
+
+const tenantByHost = async (req: PayloadRequest): Promise<string | null> => {
+  const host = req.headers.get('host')?.split(':')[0]?.toLowerCase()
+  if (!host) {
+    return null
   }
-  // Matched against a stored domain, never a parsed label: an unknown Host
-  // finds no tenant and falls through to the null scope.
-  const host = req.headers.get('host')?.split(':')[0].toLowerCase() ?? ''
+  // Matched against a stored domain, never a parsed label: an unknown Host finds
+  // no tenant and the request resolves no scope.
   const { docs } = await req.payload.find({
     collection: 'tenants',
     where: { domain: { equals: host } },
     limit: 1,
+    depth: 0,
     overrideAccess: true,
   })
   return docs[0] ? String(docs[0].id) : null
 }
+
+analytics({
+  // ...
+  scopeResolver: async ({ req }) => {
+    // Public traffic is attributed by the host it arrived on. An admin session is
+    // attributed by its own selector instead, so an admin browsing a tenant's domain
+    // still reads the tenant they selected.
+    if (!req.user) {
+      return await tenantByHost(req)
+    }
+    const tenant = getTenantFromCookie(req.headers, req.payload.db.defaultIDType)
+    if (req.user.roles?.includes('platform-admin')) {
+      return tenant === null ? null : String(tenant)
+    }
+    // Never the client-set cookie alone: it has to name a tenant this user belongs to.
+    const tenantIds = getUserTenantIDs(req.user).map(String)
+    if (tenant !== null && tenantIds.includes(String(tenant))) {
+      return String(tenant)
+    }
+    throw new Error('no valid tenant selected')
+  },
+})
 ```
 
-Pair that with an edge that refuses requests for hosts you do not serve. Without it, an attacker who can reach your origin directly sets `Host: alpha.example.com` and books conversions against alpha, and the resolver above cannot tell the difference: it is matching a value the deployment was supposed to have already vouched for.
+**A tenant's new custom domain is tracked the moment its document is saved.** There is no list to maintain and no redeploy: the rule is "the request resolved to a tenant", and the lookup that answers it is the install's own query against its own data. Whatever admin flow adds the domain is the whole integration.
+
+Pair it with an edge that refuses hosts belonging to no tenant. Caddy's on-demand TLS is the shape to copy: it asks your app before issuing a certificate for a host, so an endpoint that answers `200` for a domain some tenant owns and `404` otherwise means an unknown host never gets a certificate and never reaches the origin. Without an edge like that, an attacker who can reach your origin directly sets `Host: alpha.example.com` and books conversions against alpha, and the resolver above cannot tell the difference: it is matching a value the deployment was supposed to have already vouched for.
 
 `capture.slots.<slot>: false` opts a slot out entirely: it fills with nothing, its proxy mount 404s, and the tracker config omits it.
 
@@ -265,7 +299,7 @@ The plugin's dev app (`packages/analytics/dev`) is the reference wiring for this
 
 The dev app's `platformAdapter` is the in-memory config adapter, which declares no `scopedQueries`, so alpha and beta cannot read it as a data source: it is gated behind `access.platformRead` like any other non-scope-filtering config adapter (see [Who sees what](#4-who-sees-what)), and only `dev@10xmedia.de` passes that gate. A real platform adapter needs a `scopeProperty` (PostHog) or to be `native` to serve tenants directly, the same requirement called out there.
 
-The dev app's tenancy resolver is the two-branch shape above: an admin session resolves through the tenant selector, and anonymous frontend traffic resolves from the first hostname label, so `alpha.localhost:<port>` fills the tenant slot with alpha's native adapter. Plain `localhost` matches no tenant and captures nothing. The global slot is always empty: the dev `platformAdapter` is the in-memory demo source, which declares no capture support. The label parsing is a playground shortcut, not the pattern to copy; a real install matches the host against a stored domain, as [above](#capture-slots-per-tenant).
+The dev app's tenancy resolver is the two-branch shape above: an admin session resolves through the tenant selector, and anonymous frontend traffic resolves from the first hostname label, so `alpha.localhost:<port>` fills the tenant slot with alpha's native adapter. Plain `localhost` matches no tenant and captures nothing, and that now holds for the ingest endpoint too: a beacon posted by hand to `localhost` resolves no scope and is dropped, answering the same `202` a kept one does. The global slot is always empty: the dev `platformAdapter` is the in-memory demo source, which declares no capture support. The label parsing is a playground shortcut, not the pattern to copy; a real install matches the host against a stored domain, as [above](#capture-slots-per-tenant).
 
 Both tenant admins' "Analytics providers" nav link redirects straight to their own tenant's document rather than a list, and so does the platform admin's, to whichever tenant is currently selected: the `isGlobal: true` behavior from [step 2](#2-register-the-provider-collection-per-tenant) applies uniformly.
 

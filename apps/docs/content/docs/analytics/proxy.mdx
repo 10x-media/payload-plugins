@@ -25,7 +25,7 @@ What it does with a request:
 - **Only declared routes forward.** The slot's adapter is resolved, its `capture.proxy.routes` are matched in declaration order, and the upstream URL is compiled from the route's own template. An unknown slot, an unfilled slot, an adapter without capture, or a path outside the declared routes is a `404` and nothing leaves the server. Upstream hosts come only from the descriptor, so this is never an open proxy. A matched wildcard whose segment is `.` or `..` is refused, so a request cannot walk out of the route's prefix on the vendor host.
 - **Methods.** `GET` and `POST` are proxied. `OPTIONS` is answered locally with `204` and `Allow: GET, POST, OPTIONS`, before slot resolution, so a preflight leaks nothing about which slots exist. `PUT`, `PATCH`, and `DELETE` answer `405`.
 - **Request headers.** Allowlisted: `content-type`, `accept`, `accept-encoding`, `accept-language`, `user-agent`, `origin`, `referer`, `if-none-match`, `if-modified-since`, plus anything the descriptor names in `forwardHeaders`. `cookie`, `authorization`, and `proxy-authorization` are never forwarded, whatever a descriptor asks for, so Payload's own session never reaches a vendor.
-- **Client IP.** `X-Forwarded-For` is set from the resolved client IP, and the incoming forwarding chain (`x-forwarded-*`, `forwarded`, `x-real-ip`) is never passed through. Without this every visitor would geo-locate to your server. Confirm your platform gives the app a real client IP; most do by default.
+- **Client IP.** `X-Forwarded-For` is set from the resolved client IP, and the incoming forwarding chain (`x-forwarded-*`, `forwarded`, `x-real-ip`) is never passed through. Without this every visitor would geo-locate to your server. Confirm your platform gives the app a real client IP; most do by default. Which entry of the incoming chain counts as that client IP is the plugin's [`trustedProxyHops`](#trusted-proxies), below.
 - **Response.** Status and body stream back. Headers are allowlisted to `content-type`, `cache-control`, `etag`, `last-modified`, `vary`. `set-cookie` never comes back. `content-encoding` and `content-length` are deliberately dropped, because `fetch` decodes the body but leaves both describing the compressed bytes. `location` is not forwarded either, so an upstream 3xx arrives without it rather than redirecting off your origin.
 - **Body cap.** A `POST` over `capture.proxy.maxBodyBytes` (default 1 MiB, which clears a PostHog batch carrying session-replay data) is refused with `413` before anything is forwarded, and a body that dies in transit answers `400`. Bodies are buffered, not streamed, since the cap has to be enforced before forwarding anyway.
 - **Timeout.** `capture.proxy.timeoutMs` (default 10000) is a deadline for the upstream response *headers* only, so a large tracker bundle still streams to completion. A timeout or a network failure answers `502` with no body and no echo of the upstream URL.
@@ -43,6 +43,22 @@ analytics({
 <Callout type="warn">
 The endpoint is public and carries every beacon, so it is not rate limited: a per-adapter limiter would throttle the whole install's traffic rather than an abuser. Put a per-IP limit in front of it at the edge if you need one.
 </Callout>
+
+## Trusted proxies
+
+`trustedProxyHops` is a plugin option, not a per-adapter one, because one helper reads the client address for this proxy, for the native visitor hash, and for the [geo resolvers](/analytics/geo):
+
+```ts
+analytics({ adapters: [posthog({ /* ... */ })], trustedProxyHops: 1 })
+```
+
+Unset, the **leftmost** `x-forwarded-for` entry is read. That is the originating client for honest traffic and is whatever the client wrote otherwise, so the address this endpoint forwards upstream, and the one geo runs on, are both spoofable.
+
+Set to `n`, the entry `n` from the **right** is read: the address the outermost trusted proxy saw, which no client can write past. A chain shorter than `n` yields no address at all rather than falling back to `x-real-ip`, which the client can write too. The value must be a non-negative integer or the boot fails.
+
+`1` is not the default, deliberately. An install behind a CDN plus a proxy has two hops, so a default of `1` would read the CDN's address for every visitor and collapse geo and the visitor hash onto a single value, which is worse than a spoofable one. Count your own deployment's hops: one reverse proxy is `1`, a CDN in front of it is `2`.
+
+**Leave it unset if your proxy sets only `x-real-ip`.** The count is read off `x-forwarded-for` alone, and at `n >= 1` that chain is the only source: a proxy that forwards the client address in `x-real-ip` and writes no chain yields no address at all, and every visitor then hashes and geo-locates as one. Unset, `x-real-ip` is still consulted. The same applies to the hostname [native ingest](/analytics/native#where-the-hostname-comes-from) stores: `x-forwarded-host` is read only at one hop or more, so a proxy that does not send it leaves the `Host` header in charge either way.
 
 ## Next rewrites
 

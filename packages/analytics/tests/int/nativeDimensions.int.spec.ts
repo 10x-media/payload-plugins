@@ -53,7 +53,8 @@ describeForDb('native dimensions: ingest to breakdowns', {}, (db) => {
 		headers: Record<string, string>
 	): Promise<void> => {
 		const res = await ingestHandler(booted)(
-			ingestRequest(booted.payload, { hostname: 'site.com', ...body }, headers)
+			// The hostname is the request's own host: the self-referral check below reads it.
+			ingestRequest(booted.payload, body, { host: 'site.com', ...headers })
 		)
 		expect(res.status).toBe(202)
 	}

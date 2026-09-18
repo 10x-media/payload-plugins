@@ -364,7 +364,7 @@ The union is exported as `AnalyticsErrorCode`, with the values as `ANALYTICS_ERR
 | `/analytics/document` | `404` | `not_found` | | the collection is not bound, the `id` is missing, the document does not exist, or this caller may not read it. The four are deliberately one answer |
 | `/analytics/document` | `500` | `internal` | | the document read failed for any other reason; logged with the collection slug |
 | `/analytics/document` | `503` | `unavailable` | | the plugin runtime is not ready on this Payload instance |
-| `/analytics/ingest` | `400` | `invalid_param` | the first field at fault | `type`, `path`, `hostname` or `name` is missing or invalid, checked in that order. Unparseable JSON names `type`. A body that died in transit sends no `param` |
+| `/analytics/ingest` | `400` | `invalid_param` | the first field at fault | `type`, `path` or `name` is missing or invalid (`name` only on a non-pageview), or `hostname` is present and not a string, checked in that order. `hostname` is optional on the wire, so a missing one is never refused. Unparseable JSON names `type`. A body that died in transit sends no `param` |
 | `/analytics/ingest` | `413` | `payload_too_large` | | the body is over 64 KiB |
 
 <Callout type="warn">

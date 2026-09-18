@@ -285,7 +285,7 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 	})
 
 	it(`names the first field an invalid event fails on, in the envelope, on ${db}`, async () => {
-		const handler = makeIngestHandler(platformHeaderResolver)
+		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver })
 		const res = await handler(ingestRequest(booted.payload, { type: 'pageview', hostname: 'h' }))
 		expect(res.status).toBe(400)
 		expect(await errorOf(res)).toMatchObject({ code: 'invalid_param', param: 'path' })
@@ -293,7 +293,7 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 
 	// A body that died in transit names no field, because none of them was ever read.
 	it(`answers an unreadable event body as an invalid_param naming nothing on ${db}`, async () => {
-		const handler = makeIngestHandler(platformHeaderResolver)
+		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver })
 		const res = await handler(
 			Object.assign(
 				new Request('http://x/api/analytics/ingest', {
@@ -314,7 +314,7 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 	})
 
 	it(`answers an event body over the cap as payload_too_large on ${db}`, async () => {
-		const handler = makeIngestHandler(platformHeaderResolver)
+		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver })
 		const res = await handler(
 			ingestRequest(booted.payload, {
 				type: 'pageview',

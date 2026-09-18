@@ -199,7 +199,7 @@ One JSON object per event, `content-type: application/json`, `POST`ed to the con
   "type": "pageview" | "event" | "goal",  // required
   "name": "signup",        // event name, or the goal slug; absent on a pageview
   "path": "/pricing",      // required
-  "hostname": "shop.test", // required
+  "hostname": "shop.test", // optional; ingest stores the request's own host, not this
   "referrer": "https://google.com/",  // absent when empty
   "query": "utm_source=newsletter",   // pageviews only, no leading '?', capped at 512
   "props": { "plan": "pro" },
@@ -211,3 +211,15 @@ One JSON object per event, `content-type: application/json`, `POST`ed to the con
 ```
 
 Events and goals post immediately. A pageview is buffered so it can carry `durationMs` and the page's deepest scroll, and is sent on the first of: the next navigation, `pagehide`, or 10 seconds. A tab killed without firing `pagehide` loses that one pageview rather than only its duration.
+
+The tracker still sends `hostname`, and native ingest still ignores it: the stored value is the host the request carried, so a hand-rolled body cannot open a hostname bucket of its own. A [`hostname` resolver](/analytics/native#a-resolver) receives what the body sent as `claimed`, which is the one place it is readable. [Where the hostname comes from](/analytics/native#where-the-hostname-comes-from) has the rule and the two options that change it.
+
+## Trusted proxies
+
+The client address behind a beacon (the visitor hash, [geo](/analytics/geo), and the address the [capture proxy](/analytics/proxy#runtime-endpoint) forwards upstream) comes from `x-forwarded-for`, and `trustedProxyHops` on `analytics()` decides which entry:
+
+```ts
+analytics({ adapters: [native()], trustedProxyHops: 1 })
+```
+
+Unset reads the leftmost entry, which honest traffic gets right and a client can otherwise write. `n` reads the entry `n` from the right, the address the outermost trusted proxy saw, and a chain shorter than `n` yields no address rather than falling back to the client-writable `x-real-ip`. It also lets native ingest read `x-forwarded-host` for the event's hostname. `1` is not the default: an install behind a CDN plus a proxy would then read the CDN's address for every visitor. Details in [Trusted proxies](/analytics/proxy#trusted-proxies).

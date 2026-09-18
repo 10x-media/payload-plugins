@@ -60,6 +60,21 @@ describe('resolveOptions', () => {
 		const r = resolveOptions({ adapters: [memoryAdapter()], cache: { timeoutMs: 5_000 } })
 		expect(r.cache.timeoutMs).toBe(5_000)
 	})
+	it('leaves trustedProxyHops unset so the leftmost forwarded-for entry keeps applying', () => {
+		expect(resolveOptions({ adapters: [memoryAdapter()] }).trustedProxyHops).toBeUndefined()
+	})
+	it('keeps an explicit trustedProxyHops count', () => {
+		expect(
+			resolveOptions({ adapters: [memoryAdapter()], trustedProxyHops: 2 }).trustedProxyHops
+		).toBe(2)
+	})
+	it('throws on a trustedProxyHops that is not a non-negative integer', () => {
+		for (const hops of [-1, 1.5, Number.NaN]) {
+			expect(() => resolveOptions({ adapters: [memoryAdapter()], trustedProxyHops: hops })).toThrow(
+				/trustedProxyHops must be a non-negative integer/i
+			)
+		}
+	})
 })
 
 describe('resolveOptions scopes', () => {

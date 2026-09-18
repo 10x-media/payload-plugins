@@ -24,7 +24,7 @@ analytics({
 
 - `path` maps a document to the pathname its analytics were recorded under. Return `null` when the document has no URL yet (unsaved, unpublished); fields then render a "New" state instead of querying.
 - `pathField` names a document field whose stored value is the path. It is a fallback, used only when `path` is absent or returns `null`. A binding must define at least one of the two (validated at startup).
-- `hostname` filters adapter queries to one site in multi-domain setups: a static string, or a resolver with the same signature as `path`. Omit it (or return `null`) to query across every domain the data source records.
+- `hostname` filters adapter queries to one site in multi-domain setups: a static string, or a resolver with the same signature as `path`. Omit it (or return `null`) to query across every domain the data source records. A value that carries a scheme, a port or capitals is reduced to the bare lowercased host first, so a tenant's `https://Example.com/` domain field still matches what the native engine [stored](/analytics/native#what-counts-as-a-hostname); a value that is no hostname at all reaches the adapter unchanged.
 
 The `collections` keys are typed against your generated `CollectionSlug` union, and with generated types present each binding's resolvers receive that collection's document type. Without generated types, `doc` degrades to `Record<string, unknown>`.
 

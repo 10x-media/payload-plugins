@@ -16,6 +16,7 @@ describe('normalizeEvent', () => {
 	it('builds a stored event with geo, hash, and no ip', async () => {
 		const ev = await normalizeEvent({
 			raw: { type: 'pageview', path: '/pricing', hostname: 'site.com', durationMs: 1200 },
+			hostname: 'site.com',
 			headers: headers({
 				'x-vercel-ip-country': 'US',
 				'x-forwarded-for': '9.9.9.9',
@@ -37,6 +38,7 @@ describe('normalizeEvent', () => {
 	it('honors a noop geo resolver', async () => {
 		const ev = await normalizeEvent({
 			raw: { type: 'pageview', path: '/', hostname: 'site.com' },
+			hostname: 'site.com',
 			headers: headers({ 'x-vercel-ip-country': 'US', 'user-agent': 'UA' }),
 			geoResolver: noopResolver,
 			salt: 's',
@@ -53,6 +55,7 @@ describe('normalizeEvent', () => {
 				hostname: 'example.com',
 				referrer: 'https://www.google.com/',
 			},
+			hostname: 'example.com',
 			headers: new Headers({
 				'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile/15E148',
 			}),
@@ -74,6 +77,7 @@ describe('normalizeEvent', () => {
 				hostname: 'example.com',
 				query: 'utm_source=Google&utm_medium=cpc',
 			},
+			hostname: 'example.com',
 			headers: new Headers({ 'user-agent': 'Mozilla/5.0 (Windows NT 10.0) Chrome/126.0.0.0' }),
 			geoResolver: async () => ({}),
 			salt: 'salt',
@@ -87,6 +91,7 @@ describe('normalizeEvent', () => {
 	it('omits device entirely for a user agent that is not a device', async () => {
 		const event = await normalizeEvent({
 			raw: { type: 'pageview', path: '/p', hostname: 'example.com' },
+			hostname: 'example.com',
 			headers: new Headers({ 'user-agent': SERVER_USER_AGENT }),
 			geoResolver: async () => ({}),
 			salt: 'salt',
@@ -100,6 +105,7 @@ describe('normalizeEvent contract growth', () => {
 	const build = async (raw: Record<string, unknown>, goals?: Goal[]) =>
 		normalizeEvent({
 			raw: raw as never,
+			hostname: String(raw.hostname ?? 'site.com'),
 			headers: headers({ 'user-agent': 'UA' }),
 			geoResolver: noopResolver,
 			salt: 's',
@@ -266,6 +272,7 @@ describe('normalizeEvent native dimensions', () => {
 	const build = async (raw: Record<string, unknown>, h: Record<string, string>) =>
 		normalizeEvent({
 			raw: raw as never,
+			hostname: String(raw.hostname ?? 'site.com'),
 			headers: headers(h),
 			geoResolver: noopResolver,
 			salt: 's',
@@ -430,6 +437,7 @@ describe('normalizeEvent native dimensions', () => {
 	it('caps the geo values, which become rollup dimvalues and seen-ledger keys', async () => {
 		const ev = await normalizeEvent({
 			raw: { type: 'pageview', path: '/p', hostname: 'site.com' },
+			hostname: 'site.com',
 			headers: headers({ 'user-agent': CHROME_UA }),
 			geoResolver: () => ({
 				country: 'U'.repeat(MAX_GEO_LENGTH + 50),

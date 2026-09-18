@@ -30,7 +30,7 @@ import { startOfDayInTz } from '../../src/timeframe/tz'
 import { resolveCustomRange } from '../../src/widgets/range'
 import { readForWidget } from '../../src/widgets/readForWidget'
 import { ACTION_HOST_SLUG, actionHost } from './actionHost'
-import { ingestRequest } from './ingestRequest'
+import { INGEST_HOST, ingestRequest } from './ingestRequest'
 
 describeForDb('analytics cross-db', {}, (db) => {
 	let booted: BootedPayload
@@ -1042,7 +1042,7 @@ describeForDb('analytics per-document read', {}, (db) => {
 	})
 
 	const ingest = (path: string) =>
-		makeIngestHandler(platformHeaderResolver)(
+		makeIngestHandler({ geoResolver: platformHeaderResolver })(
 			ingestRequest(
 				booted.payload,
 				{ type: 'pageview', path, hostname: 'h', durationMs: 200 },
@@ -1073,7 +1073,7 @@ describeForDb('native scoped ingest and reads', {}, (db) => {
 	beforeAll(async () => {
 		booted = await bootPayload({
 			plugin: analytics({
-				adapters: [native()],
+				adapters: [native({ platformHostnames: [INGEST_HOST] })],
 				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
 				access: { platformRead: ({ req }) => Boolean(req.user) },
 			}),
@@ -1085,6 +1085,8 @@ describeForDb('native scoped ingest and reads', {}, (db) => {
 		await booted.stop()
 	})
 
+	// A scoped install drops what resolves no scope, so the tenant-less case rides in on the
+	// platform hostname this install declares, which is the null scope by design.
 	const ingest = async (tenant: string | null, path: string, ua = 'UA'): Promise<void> => {
 		const endpoint = (booted.payload.config.endpoints ?? []).find(
 			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
@@ -1095,7 +1097,7 @@ describeForDb('native scoped ingest and reads', {}, (db) => {
 		const res = await endpoint.handler(
 			ingestRequest(
 				booted.payload,
-				{ type: 'pageview', path, hostname: 'h', durationMs: 100 },
+				{ type: 'pageview', path, durationMs: 100 },
 				{ 'user-agent': ua, ...(tenant ? { 'x-tenant': tenant } : {}) }
 			)
 		)
@@ -1316,7 +1318,7 @@ describeForDb('reportingTimezone resolver (per-tenant)', {}, (db) => {
 	beforeAll(async () => {
 		booted = await bootPayload({
 			plugin: analytics({
-				adapters: [native()],
+				adapters: [native({ platformHostnames: [INGEST_HOST] })],
 				scopeResolver: ({ req }) => req.headers.get('x-tenant-id'),
 				reportingTimezone: ({ scope }) => {
 					if (scope === TENANT_A) return TZ_A
@@ -1342,7 +1344,7 @@ describeForDb('reportingTimezone resolver (per-tenant)', {}, (db) => {
 		const res = await endpoint.handler(
 			ingestRequest(
 				booted.payload,
-				{ type: 'pageview', path, hostname: 'h', durationMs: 100 },
+				{ type: 'pageview', path, durationMs: 100 },
 				{ 'x-tenant-id': tenantId }
 			)
 		)
@@ -1617,11 +1619,11 @@ describeForDb('native hostname family uniqueness', {}, (db) => {
 	})
 
 	const ingest = (path: string, hostname: string, ua: string) =>
-		makeIngestHandler(platformHeaderResolver)(
+		makeIngestHandler({ geoResolver: platformHeaderResolver })(
 			ingestRequest(
 				booted.payload,
-				{ type: 'pageview', path, hostname, durationMs: 100 },
-				{ 'user-agent': ua }
+				{ type: 'pageview', path, durationMs: 100 },
+				{ 'user-agent': ua, host: hostname }
 			)
 		)
 

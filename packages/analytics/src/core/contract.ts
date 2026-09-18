@@ -1,7 +1,7 @@
 import type { Config, PayloadRequest } from 'payload'
 import type { Goal } from '../goals/types'
 import type { CaptureSupport } from './capture'
-import type { ServerTrack } from './serverEvent'
+import type { IngestHostnameResolver, ServerTrack } from './serverEvent'
 
 /**
  * Explicit cross-scope read marker: pass as a read's `scope` to aggregate over every
@@ -198,6 +198,8 @@ export interface AdapterRegisterContext {
 	 * merged over them per scope once the install enables it.
 	 */
 	resolveGoals: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>
+	/** The plugin's `trustedProxyHops`, for adapters that read a request's client address. */
+	trustedProxyHops?: number
 }
 
 export interface AnalyticsAdapter {
@@ -212,7 +214,7 @@ export interface AnalyticsAdapter {
 	 * pipeline without an HTTP round trip. Server-side only: the tracker learns the path
 	 * from `TrackerConfig.ingestPath`, and this object is never serialized.
 	 */
-	readonly ingest?: { path: string; track?: ServerTrack }
+	readonly ingest?: { path: string; track?: ServerTrack; hostname?: IngestHostnameResolver }
 	isConfigured(): boolean
 	query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
 	realtime?(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
