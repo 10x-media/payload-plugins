@@ -277,6 +277,14 @@ export type AnalyticsPluginOptions = {
 	 * require `access.platformRead`.
 	 */
 	platformAdapter?: string
+	/**
+	 * How many proxies in front of the app are trusted, counted from the right of
+	 * `x-forwarded-for`, when the plugin reads a request's client address (the native visitor
+	 * hash, geo, and the address the capture proxy forwards upstream). It also lets the native
+	 * ingest read `x-forwarded-host` for the event's hostname. Unset keeps the leftmost
+	 * forwarded entry, which the client controls.
+	 */
+	trustedProxyHops?: number
 	access?: AnalyticsAccessOptions
 	/**
 	 * The analytics admin view and its nav link, on by default. `false` registers neither;
@@ -356,6 +364,8 @@ export interface ResolvedOptions {
 	/** Raw reportingTimezone option; normalized into a resolver at init. */
 	reportingTimezone?: string | TimezoneResolver
 	platformAdapter?: string
+	/** Raw trustedProxyHops option; undefined keeps the leftmost forwarded-for entry. */
+	trustedProxyHops?: number
 	access: {
 		platformRead: PlatformReadAccess
 		read: AnalyticsReadAccess
@@ -572,6 +582,12 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 			)
 		}
 	}
+	const hops = options.trustedProxyHops
+	if (hops !== undefined && (!Number.isInteger(hops) || hops < 0)) {
+		throw new Error(
+			`analytics: trustedProxyHops must be a non-negative integer, got ${String(hops)}`
+		)
+	}
 	const globalSlot = options.capture?.slots?.global
 	// A tenant id may name a runtime provider instance, which only exists once a scope
 	// resolves; a global one can only come from the config registry, so it is checked here.
@@ -673,6 +689,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 		scopes: options.scopes,
 		reportingTimezone: options.reportingTimezone,
 		platformAdapter: options.platformAdapter,
+		trustedProxyHops: hops,
 		access: {
 			platformRead:
 				options.access?.platformRead ?? (scoped ? () => false : ({ req }) => Boolean(req.user)),

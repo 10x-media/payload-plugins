@@ -112,6 +112,8 @@ export interface NormalizeArgs {
 	timezone?: string
 	/** Goals to match this event against; omitted means no goal matching. */
 	goals?: Goal[]
+	/** Trusted proxies in front of the app, for the client address the hash and geo read. */
+	trustedProxyHops?: number
 }
 
 const MAX_PROPS = 20
@@ -203,9 +205,10 @@ export async function normalizeEvent({
 	scope,
 	timezone,
 	goals,
+	trustedProxyHops,
 }: NormalizeArgs): Promise<StoredEvent> {
-	const geo = await geoResolver(headers)
-	const ip = clientIpFromHeaders(headers) ?? ''
+	const geo = await geoResolver(headers, { trustedProxyHops })
+	const ip = clientIpFromHeaders(headers, { trustedProxyHops }) ?? ''
 	const ua = headers.get('user-agent') ?? ''
 	// Everything that becomes a rollup dimvalue or a seen-ledger key is capped before anything
 	// derives from it: an uncapped value exceeds Mongo's index key limit, and on Postgres a

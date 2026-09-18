@@ -124,7 +124,7 @@ export const makeProxyHandler = (): PayloadHandler => async (req) => {
 			method,
 			headers: buildUpstreamHeaders(
 				req.headers,
-				clientIpFromHeaders(req.headers),
+				clientIpFromHeaders(req.headers, { trustedProxyHops: runtime.trustedProxyHops }),
 				descriptor.forwardHeaders ?? []
 			),
 			body,

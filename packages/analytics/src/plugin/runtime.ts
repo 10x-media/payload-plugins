@@ -61,6 +61,8 @@ export interface AnalyticsRuntime {
 	 * queries, this is a public request path with entirely different traffic.
 	 */
 	captureProxy?: { timeoutMs: number; maxBodyBytes: number }
+	/** The plugin's `trustedProxyHops`, read wherever a request's client address is. */
+	trustedProxyHops?: number
 	/** True when the app configured a scopeResolver (scoped install); mirrors `resolved.scoped`. */
 	scoped?: boolean
 	/**

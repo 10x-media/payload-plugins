@@ -16,7 +16,7 @@ import { createEngine } from '../../src/surfacing/engine'
 import { ingestRequest } from './ingestRequest'
 
 const ingest = (booted: BootedPayload, path: string) =>
-	makeIngestHandler(platformHeaderResolver)(
+	makeIngestHandler({ geoResolver: platformHeaderResolver })(
 		ingestRequest(
 			booted.payload,
 			{ type: 'pageview', path, hostname: 'h', durationMs: 500 },
@@ -83,7 +83,7 @@ describeForDb('native ingest endpoint', {}, (db) => {
 	})
 
 	it('persists browser, os, language and the utm keys, and never the raw query', async () => {
-		const res = await makeIngestHandler(platformHeaderResolver)(
+		const res = await makeIngestHandler({ geoResolver: platformHeaderResolver })(
 			ingestRequest(
 				booted.payload,
 				{
@@ -124,7 +124,7 @@ describeForDb('native ingest endpoint', {}, (db) => {
 			platformHeaderResolver,
 			maxmindResolver({ dbPath: '/nonexistent/GeoLite2-City.mmdb' })
 		)
-		const res = await makeIngestHandler(composed)(
+		const res = await makeIngestHandler({ geoResolver: composed })(
 			ingestRequest(
 				booted.payload,
 				{ type: 'pageview', path: '/geo', hostname: 'h' },

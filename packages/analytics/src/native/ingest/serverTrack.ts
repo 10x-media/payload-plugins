@@ -8,7 +8,7 @@ import {
 import { getRuntime } from '../../plugin/runtime'
 import type { GeoResolver } from '../geo/geoResolver'
 import { SERVER_USER_AGENT } from './device'
-import type { IngestResolvers } from './endpoint'
+import type { IngestAttribution, IngestResolvers } from './endpoint'
 import { flushBatch } from './flushBatch'
 import { normalizeEvent, type StoredEvent } from './normalizeEvent'
 import { dailySalt } from './salt'
@@ -22,6 +22,8 @@ export interface ServerTrackDeps {
 	getBuffer: () => WriteBuffer<StoredEvent> | null
 	/** Read late: the register context that carries them arrives after the adapter is built. */
 	getResolvers: () => IngestResolvers
+	/** Read late for the same reason: the plugin option arrives with the register context. */
+	getAttribution: () => IngestAttribution
 }
 
 /**
@@ -121,6 +123,7 @@ export const makeServerTrack =
 			scope,
 			timezone,
 			goals,
+			trustedProxyHops: deps.getAttribution().trustedProxyHops,
 		})
 		const buffer = deps.getBuffer()
 		if (!buffer) {

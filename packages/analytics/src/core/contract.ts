@@ -198,6 +198,8 @@ export interface AdapterRegisterContext {
 	 * merged over them per scope once the install enables it.
 	 */
 	resolveGoals: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>
+	/** The plugin's `trustedProxyHops`, for adapters that read a request's client address. */
+	trustedProxyHops?: number
 }
 
 export interface AnalyticsAdapter {

@@ -1042,7 +1042,7 @@ describeForDb('analytics per-document read', {}, (db) => {
 	})
 
 	const ingest = (path: string) =>
-		makeIngestHandler(platformHeaderResolver)(
+		makeIngestHandler({ geoResolver: platformHeaderResolver })(
 			ingestRequest(
 				booted.payload,
 				{ type: 'pageview', path, hostname: 'h', durationMs: 200 },
@@ -1617,7 +1617,7 @@ describeForDb('native hostname family uniqueness', {}, (db) => {
 	})
 
 	const ingest = (path: string, hostname: string, ua: string) =>
-		makeIngestHandler(platformHeaderResolver)(
+		makeIngestHandler({ geoResolver: platformHeaderResolver })(
 			ingestRequest(
 				booted.payload,
 				{ type: 'pageview', path, hostname, durationMs: 100 },

@@ -541,3 +541,31 @@ describeForDb('analytics capture proxy - read-only PostHog install', {}, (db) =>
 		expect(fetched).toEqual([])
 	})
 })
+
+describeForDb('analytics capture proxy - trustedProxyHops', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			plugin: analytics({ adapters: [vendorAdapter()], trustedProxyHops: 1 }),
+		})
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('forwards the address the trusted proxy saw, not the one the client wrote', async () => {
+		const fetched: Fetched[] = []
+		server.use(...recordUpstream(fetched))
+		await handleEndpoints({
+			config: booted.payload.config,
+			payloadInstanceCacheKey: booted.cacheKey,
+			request: new Request(`${ORIGIN}/api/analytics/p/global/e`, {
+				headers: { 'x-forwarded-for': 'spoofed, 9.9.9.9' },
+			}),
+		})
+		expect(fetched[0]?.headers['x-forwarded-for']).toBe('9.9.9.9')
+	})
+})

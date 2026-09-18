@@ -57,6 +57,7 @@ const setup = (
 			geoResolver,
 			getBuffer: () => (buffered ? buffer : null),
 			getResolvers: () => resolvers,
+			getAttribution: () => ({}),
 		}),
 	}
 }
@@ -190,6 +191,7 @@ describe('makeServerTrack validation', () => {
 			geoResolver: noopResolver,
 			getBuffer: () => null,
 			getResolvers: () => ({}),
+			getAttribution: () => ({}),
 		})
 		await expect(track(pageview)).rejects.toThrow(AnalyticsTrackError)
 	})

@@ -31,17 +31,17 @@ const capture = (): { buffer: WriteBuffer<StoredEvent>; events: StoredEvent[] } 
 
 const handlerWith = (goals?: Goal[]) => {
 	const { buffer, events } = capture()
-	const handler = makeIngestHandler(
-		noopResolver,
-		() => buffer,
-		goals ? { goals: async () => goals } : {}
-	)
+	const handler = makeIngestHandler({
+		geoResolver: noopResolver,
+		getBuffer: () => buffer,
+		resolvers: goals ? { goals: async () => goals } : {},
+	})
 	return { handler, events }
 }
 
 describe('makeIngestHandler validation', () => {
 	it('returns 400 for an invalid body', async () => {
-		const handler = makeIngestHandler(noopResolver)
+		const handler = makeIngestHandler({ geoResolver: noopResolver })
 		expect((await handler(req({}))).status).toBe(400)
 	})
 
@@ -182,9 +182,10 @@ describe('makeIngestHandler goal matching', () => {
 	it('resolves goals with the same scope the event is stamped with', async () => {
 		const { buffer, events } = capture()
 		const resolveGoals = vi.fn(async (_req: PayloadRequest, _scope?: string | null) => goals)
-		const handler = makeIngestHandler(noopResolver, () => buffer, {
-			scope: async () => 't1',
-			goals: resolveGoals,
+		const handler = makeIngestHandler({
+			geoResolver: noopResolver,
+			getBuffer: () => buffer,
+			resolvers: { scope: async () => 't1', goals: resolveGoals },
 		})
 		await handler(req({ type: 'pageview', path: '/thank-you', hostname: 'h' }))
 		expect(resolveGoals.mock.calls[0]?.[1]).toBe('t1')

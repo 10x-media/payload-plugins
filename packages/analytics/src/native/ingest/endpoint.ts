@@ -15,6 +15,11 @@ export interface IngestResolvers {
 	goals?: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>
 }
 
+/** How the handler reads the request behind an event, as opposed to what the body claims. */
+export interface IngestAttribution {
+	trustedProxyHops?: number
+}
+
 /** One event, not a session replay: far above any legitimate payload, far below a DoS. */
 export const MAX_INGEST_BODY_BYTES = 64 * 1024
 
@@ -43,12 +48,20 @@ const invalidField = (param: RawEventField): Response =>
 		analyticsError('invalid_param', `analytics: ${param} is missing or invalid`, param)
 	)
 
+export interface IngestHandlerOptions {
+	geoResolver: GeoResolver
+	getBuffer?: () => WriteBuffer<StoredEvent> | null
+	resolvers?: IngestResolvers
+	attribution?: IngestAttribution
+}
+
 export const makeIngestHandler =
-	(
-		geoResolver: GeoResolver,
-		getBuffer: () => WriteBuffer<StoredEvent> | null = () => null,
-		resolvers: IngestResolvers = {}
-	): PayloadHandler =>
+	({
+		geoResolver,
+		getBuffer = () => null,
+		resolvers = {},
+		attribution = {},
+	}: IngestHandlerOptions): PayloadHandler =>
 	async (req) => {
 		const { scope: resolveScope, timezone: resolveTimezone, goals: resolveGoals } = resolvers
 		// Read like the capture proxy does, and for the same reasons: this is a public,
@@ -90,6 +103,7 @@ export const makeIngestHandler =
 			scope,
 			timezone,
 			goals,
+			trustedProxyHops: attribution.trustedProxyHops,
 		})
 		const buffer = getBuffer()
 		if (buffer) {

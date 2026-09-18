@@ -18,7 +18,7 @@ import { EVENT_SCAN_LIMIT, eventScanMeta } from './eventScan'
 import { composeGeoResolvers } from './geo/composeGeoResolvers'
 import { type GeoResolver, platformHeaderResolver } from './geo/geoResolver'
 import { maxmindResolver } from './geo/maxmindResolver'
-import { type IngestResolvers, makeIngestHandler } from './ingest/endpoint'
+import { type IngestAttribution, type IngestResolvers, makeIngestHandler } from './ingest/endpoint'
 import { flushBatch } from './ingest/flushBatch'
 import type { StoredEvent } from './ingest/normalizeEvent'
 import { makeServerTrack } from './ingest/serverTrack'
@@ -212,6 +212,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 	// The plugin's resolvers arrive in register(); server tracking reads them late so it
 	// resolves the same scope, timezone and goals the endpoint does.
 	let resolvers: IngestResolvers = {}
+	let attribution: IngestAttribution = {}
 
 	const ingest = {
 		path: options.ingestPath ?? INGEST_PATH,
@@ -220,6 +221,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 			geoResolver,
 			getBuffer: () => buffer,
 			getResolvers: () => resolvers,
+			getAttribution: () => attribution,
 		}),
 	}
 
@@ -247,12 +249,18 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				timezone: context?.resolveTimezone,
 				goals: context?.resolveGoals,
 			}
+			attribution = { trustedProxyHops: context?.trustedProxyHops }
 			config.endpoints = [
 				...(config.endpoints ?? []),
 				{
 					method: 'post',
 					path: ingest.path,
-					handler: makeIngestHandler(geoResolver, () => buffer, resolvers),
+					handler: makeIngestHandler({
+						geoResolver,
+						getBuffer: () => buffer,
+						resolvers,
+						attribution,
+					}),
 				},
 			]
 			if (options.retentionDays && options.retentionDays > 0) {
