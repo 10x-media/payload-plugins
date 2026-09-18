@@ -135,6 +135,12 @@ export const sharedDashboardLayout: DashboardLayout = [
 		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
 	},
 	{
+		// Visitors rather than pageviews: an acquisition mix is a question about people.
+		widgetSlug: 'analytics-breakdown-channels',
+		width: 'medium',
+		data: { metric: 'visitors', timeframe: 'last30days', limit: 5 },
+	},
+	{
 		widgetSlug: 'analytics-breakdown-devices',
 		width: 'medium',
 		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
