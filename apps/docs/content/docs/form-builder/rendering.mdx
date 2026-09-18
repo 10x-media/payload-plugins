@@ -112,7 +112,7 @@ Submission is also guarded against double activation: while a submit is in fligh
 
 ### Transport
 
-By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). When a `locale` prop is passed, the request carries it as `?locale=`, so the server stores the visitor's locale on the submission and the post-submit actions (the confirmation email included) render in it. Without the prop the submission takes your default locale. Override the prefix with `apiRoute`, or replace the transport entirely, forwarding `locale` yourself:
+By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). When a `locale` prop is passed, the request carries it as `?locale=`, so the server stores the visitor's locale on the submission and the post-submit actions (the confirmation email included) render in it. Without the prop the submission takes your default locale. The server clamps what it receives: on a host with `localization` only a configured locale code is kept (`all`, `*`, and any other code become the default locale); without `localization` any plain language tag such as `uk` or `pt-BR` is kept and anything else becomes `en`. Override the prefix with `apiRoute`, or replace the transport entirely, forwarding `locale` yourself:
 
 ```tsx
 <Form

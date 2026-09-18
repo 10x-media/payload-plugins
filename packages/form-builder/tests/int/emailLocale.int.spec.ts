@@ -97,4 +97,54 @@ describeForDb('form-builder email locale', { dbs: ['mongo'] }, (db) => {
 			})
 		)
 	})
+
+	it('stores the default locale for all, *, or a code the host does not configure', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: { title: 'Plain', fields: [] },
+			overrideAccess: true,
+		})
+		for (const locale of ['all', '*', 'fr']) {
+			const submission = await booted.payload.create({
+				collection: 'form-submissions',
+				locale: locale as 'en',
+				data: { form: form.id, values: [] },
+			})
+			expect(submission.locale).toBe('en')
+		}
+	})
+})
+
+describeForDb('form-builder submission locale without localization', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({ plugin: formBuilder({}), db })
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('keeps a plain language tag and drops anything else to en', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: { title: 'Plain', fields: [] },
+			overrideAccess: true,
+		})
+		// Without localization the local API drops its `locale` arg; a REST `?locale=` still lands on
+		// `req.locale` unsanitized, which a pre-set request reproduces.
+		const stored = async (locale: string) =>
+			(
+				await booted.payload.create({
+					collection: 'form-submissions',
+					req: { locale } as PayloadRequest,
+					data: { form: form.id, values: [] },
+				})
+			).locale
+		expect(await stored('uk')).toBe('uk')
+		expect(await stored('pt-BR')).toBe('pt-BR')
+		expect(await stored('all')).toBe('en')
+		expect(await stored('<b>x</b>')).toBe('en')
+	})
 })
