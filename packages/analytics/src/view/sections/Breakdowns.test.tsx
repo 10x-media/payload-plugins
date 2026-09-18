@@ -264,11 +264,11 @@ describe('Breakdowns rows', () => {
 	it('names a traffic channel in the reader language and still filters on the stored value', () => {
 		const onRowSelect = vi.fn()
 		const channels: AnalyticsRow[] = [
-			{ dimensions: { source: 'search' }, metrics: { pageviews: 9 } },
+			{ dimensions: { channel: 'organic-search' }, metrics: { pageviews: 9 } },
 		]
 		renderBreakdowns({
-			dimension: 'source',
-			dimensions: ['source', 'referrer'],
+			dimension: 'channel',
+			dimensions: ['channel', 'referrer'],
 			onRowSelect,
 			query: state({
 				data: {
@@ -281,10 +281,10 @@ describe('Breakdowns rows', () => {
 			}),
 			tab: 'sources',
 		})
-		expect(screen.getByText(keys.channelSearch)).toBeDefined()
-		expect(screen.queryByText('search')).toBeNull()
-		fireEvent.click(screen.getByRole('button', { name: new RegExp(keys.channelSearch) }))
-		expect(onRowSelect).toHaveBeenCalledWith('search')
+		expect(screen.getByText(keys.channelOrganicSearch)).toBeDefined()
+		expect(screen.queryByText('organic-search')).toBeNull()
+		fireEvent.click(screen.getByRole('button', { name: new RegExp(keys.channelOrganicSearch) }))
+		expect(onRowSelect).toHaveBeenCalledWith('organic-search')
 	})
 
 	it('sorts on a column header, and flips the direction on a second click', () => {

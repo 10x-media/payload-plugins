@@ -12,7 +12,7 @@ describe('public surface for the GA4 sink and traffic channels', () => {
 		expect(ga4EventName('sign-up')).toBe('sign_up')
 	})
 
-	it('exports the traffic channels a native source row can hold', () => {
-		expect(TRAFFIC_CHANNELS).toContain('search')
+	it('exports the traffic channels a native channel row can hold', () => {
+		expect(TRAFFIC_CHANNELS).toContain('organic-search')
 	})
 })

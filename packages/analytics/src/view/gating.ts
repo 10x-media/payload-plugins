@@ -53,6 +53,7 @@ export const TAB_DIMENSIONS: Record<BreakdownTab, DimensionKey[]> = {
 	pages: ['page'],
 	sources: [
 		'source',
+		'channel',
 		'referrer',
 		'medium',
 		'campaign',

@@ -6,7 +6,11 @@ import { flushBatch } from '../../src/native/ingest/flushBatch'
 import { primaryLanguage } from '../../src/native/ingest/language'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
 import { referrerHost, storedReferrer } from '../../src/native/ingest/referrer'
-import { deriveSource } from '../../src/native/ingest/source'
+import {
+	CHANNEL_TAXONOMY_VERSION,
+	classifyChannel,
+	deriveSource,
+} from '../../src/native/ingest/source'
 import { extractUtm } from '../../src/native/ingest/utm'
 import { syncTask } from '../../src/sync/syncTask'
 import { startOfDayInTz } from '../../src/timeframe/tz'
@@ -87,7 +91,10 @@ const SEED_CAMPAIGN_QUERIES = [
 ]
 const CAMPAIGN_EVERY = 7
 
-/** Only the optional dimension fields, so spreading one can never blank a required one. */
+/**
+ * The dimension fields only, so spreading one can never blank a required one that is not
+ * attribution. `channel` and `channelVersion` are always derived, so they are always set.
+ */
 type SeedAttribution = Pick<
 	StoredEvent,
 	| 'country'
@@ -95,6 +102,8 @@ type SeedAttribution = Pick<
 	| 'city'
 	| 'device'
 	| 'source'
+	| 'channel'
+	| 'channelVersion'
 	| 'browser'
 	| 'os'
 	| 'language'
@@ -132,7 +141,14 @@ const attributionFor = (index: number): SeedAttribution => {
 		region: geo?.region,
 		city: geo?.city,
 		device: SEED_DEVICES[index % SEED_DEVICES.length],
-		source: deriveSource({ referrerHost: host, utmMedium: utm.utmMedium, query }),
+		source: deriveSource({ referrerHost: host, utmSource: utm.utmSource }),
+		channel: classifyChannel({
+			referrerHost: host,
+			utmSource: utm.utmSource,
+			utmMedium: utm.utmMedium,
+			query,
+		}),
+		channelVersion: CHANNEL_TAXONOMY_VERSION,
 		...(browser ? { browser } : {}),
 		...(os ? { os } : {}),
 		...(language ? { language } : {}),

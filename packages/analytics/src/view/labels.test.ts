@@ -10,34 +10,43 @@ const native = (dimension: Parameters<typeof valueLabel>[0]['dimension'], value:
 	valueLabel({ dimension, value, provider: 'native', t })
 
 describe('valueLabel', () => {
-	it('names every traffic channel the native source dimension can hold', () => {
+	it('names every traffic channel the native channel dimension can hold', () => {
 		for (const channel of TRAFFIC_CHANNELS) {
-			expect(native('source', channel)).toBe(`t(${CHANNEL_LABELS[channel]})`)
+			expect(native('channel', channel)).toBe(`t(${CHANNEL_LABELS[channel]})`)
 		}
 	})
 
 	it('translates a channel through its own key', () => {
-		expect(native('source', 'search')).toBe(`t(${keys.channelSearch})`)
+		expect(native('channel', 'organic-search')).toBe(`t(${keys.channelOrganicSearch})`)
 	})
 
-	it('reads a legacy host row under source as it was stored', () => {
+	it('names the direct source, which is the one origin that is not a name', () => {
+		expect(native('source', 'direct')).toBe(`t(${keys.channelDirect})`)
+	})
+
+	it('reads a host or a campaign tag under source as it was stored', () => {
 		expect(native('source', 'google.com')).toBe('google.com')
+		// A `utm_source` reading `email` is the tag, not the Email channel.
+		expect(native('source', 'email')).toBe('email')
 	})
 
 	it('answers a prototype member name as itself', () => {
+		expect(native('channel', 'constructor')).toBe('constructor')
+		expect(native('channel', '__proto__')).toBe('__proto__')
 		expect(native('source', 'constructor')).toBe('constructor')
-		expect(native('source', '__proto__')).toBe('__proto__')
 	})
 
-	it('leaves a provider source row raw, since it is a utm_source and not a channel', () => {
-		expect(valueLabel({ dimension: 'source', value: 'email', provider: 'plausible', t })).toBe(
-			'email'
+	it("leaves a provider's own vocabulary raw on both dimensions", () => {
+		expect(valueLabel({ dimension: 'source', value: 'direct', provider: 'plausible', t })).toBe(
+			'direct'
 		)
-		expect(valueLabel({ dimension: 'source', value: 'search', provider: 'ga4', t })).toBe('search')
+		expect(valueLabel({ dimension: 'channel', value: 'Paid Search', provider: 'ga4', t })).toBe(
+			'Paid Search'
+		)
 	})
 
 	it('leaves every other dimension raw', () => {
-		expect(native('referrer', 'search')).toBe('search')
+		expect(native('referrer', 'direct')).toBe('direct')
 		expect(native('page', '/pricing')).toBe('/pricing')
 		expect(native('utmMedium', 'email')).toBe('email')
 	})

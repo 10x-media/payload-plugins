@@ -64,6 +64,7 @@ const DIMENSION_FIELDS: ReadonlyArray<
 	['os', 'os'],
 	['language', 'language'],
 	['source', 'source'],
+	['channel', 'channel'],
 	['referrer', 'referrerHost'],
 	['utmSource', 'utmSource'],
 	['utmMedium', 'utmMedium'],

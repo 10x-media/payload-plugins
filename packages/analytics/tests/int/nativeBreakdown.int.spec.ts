@@ -53,7 +53,20 @@ describeForDb('native dimension breakdowns', {}, (db) => {
 		await booted.stop()
 	})
 
-	it('breaks pageviews down by source channel, not by referrer host', async () => {
+	it('breaks pageviews down by acquisition channel, not by referrer host', async () => {
+		const result = await adapter.query(
+			{ metrics: ['pageviews'], dimensions: ['channel'], dateRange: RANGE },
+			{}
+		)
+		const byChannel = Object.fromEntries(
+			result.rows.map((r) => [r.dimensions?.channel, r.metrics.pageviews])
+		)
+		expect(byChannel).toMatchObject({ 'organic-search': 2, 'organic-social': 1 })
+		expect(byChannel['google.com']).toBeUndefined()
+		expect(byChannel['t.co']).toBeUndefined()
+	})
+
+	it('breaks pageviews down by the origin each visit was named by', async () => {
 		const result = await adapter.query(
 			{ metrics: ['pageviews'], dimensions: ['source'], dateRange: RANGE },
 			{}
@@ -61,9 +74,7 @@ describeForDb('native dimension breakdowns', {}, (db) => {
 		const bySource = Object.fromEntries(
 			result.rows.map((r) => [r.dimensions?.source, r.metrics.pageviews])
 		)
-		expect(bySource).toMatchObject({ search: 2, social: 1 })
-		expect(bySource['google.com']).toBeUndefined()
-		expect(bySource['t.co']).toBeUndefined()
+		expect(bySource).toMatchObject({ 'google.com': 2, 't.co': 1 })
 	})
 
 	it('breaks pageviews down by device', async () => {

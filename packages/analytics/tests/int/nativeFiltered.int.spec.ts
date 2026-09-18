@@ -3,6 +3,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
+import { CHANNEL_TAXONOMY_VERSION } from '../../src/native/ingest/source'
 import { native } from '../../src/native/nativeAdapter'
 
 const HOUR_MS = 3_600_000
@@ -22,8 +23,12 @@ const RANGE = {
 // names. Fed through flushBatch (not the ingest endpoint) so both the raw events and
 // their same-day rollups exist, letting one fixture cover the events path and the
 // rollup-path parity check below.
+/** Every stored event carries a channel; nothing in this fixture is attributed. */
+const direct = { channel: 'direct', channelVersion: CHANNEL_TAXONOMY_VERSION }
+
 const events: StoredEvent[] = [
 	{
+		...direct,
 		timestamp: new Date(H0 + 5 * MIN_MS),
 		type: 'pageview',
 		path: '/a',
@@ -34,6 +39,7 @@ const events: StoredEvent[] = [
 		durationMs: 1000,
 	},
 	{
+		...direct,
 		timestamp: new Date(H0 + 50 * MIN_MS),
 		type: 'pageview',
 		path: '/blog/intro',
@@ -44,6 +50,7 @@ const events: StoredEvent[] = [
 		durationMs: 500,
 	},
 	{
+		...direct,
 		timestamp: new Date(H1 + 5 * MIN_MS),
 		type: 'pageview',
 		path: '/a',
@@ -54,6 +61,7 @@ const events: StoredEvent[] = [
 		durationMs: 2000,
 	},
 	{
+		...direct,
 		timestamp: new Date(H1 + 30 * MIN_MS),
 		type: 'event',
 		name: 'signup',
@@ -64,6 +72,7 @@ const events: StoredEvent[] = [
 		sessionId: 'v5-s1',
 	},
 	{
+		...direct,
 		timestamp: new Date(H2 + 5 * MIN_MS),
 		type: 'pageview',
 		path: '/blog/intro',
@@ -74,6 +83,7 @@ const events: StoredEvent[] = [
 		durationMs: 1500,
 	},
 	{
+		...direct,
 		timestamp: new Date(H2 + 40 * MIN_MS),
 		type: 'event',
 		name: 'login',
@@ -88,6 +98,7 @@ const events: StoredEvent[] = [
 	// event-name assertions above; it lands inside the existing H1 bucket (not a pageview,
 	// so it doesn't shift the hour-granularity pageview counts either).
 	{
+		...direct,
 		timestamp: new Date(H1 + 40 * MIN_MS),
 		type: 'event',
 		name: 'ping',

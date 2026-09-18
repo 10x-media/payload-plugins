@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { StoredEvent } from '../ingest/normalizeEvent'
+import { CHANNEL_TAXONOMY_VERSION } from '../ingest/source'
 import { computeRollupDeltas } from './deltas'
 
 const ev = (over: Partial<StoredEvent>): StoredEvent => ({
@@ -9,6 +10,8 @@ const ev = (over: Partial<StoredEvent>): StoredEvent => ({
 	hostname: '',
 	visitorHash: 'v',
 	sessionId: 's',
+	channel: 'direct',
+	channelVersion: CHANNEL_TAXONOMY_VERSION,
 	...over,
 })
 
@@ -26,7 +29,8 @@ const base = {
 describe('computeRollupDeltas', () => {
 	it('emits a per-page and a site bucket for a pageview with no geo', () => {
 		const deltas = computeRollupDeltas(ev({ durationMs: 500 }))
-		expect(deltas).toHaveLength(2)
+		// Page and site, plus the channel bucket every event carries.
+		expect(deltas).toHaveLength(3)
 		const page = deltas.find((d) => d.key.path === '/p' && d.key.dimension === '')
 		const site = deltas.find((d) => d.key.path === '' && d.key.dimension === '')
 		expect(page?.key).toEqual({
@@ -43,7 +47,7 @@ describe('computeRollupDeltas', () => {
 
 	it('counts an event-type hit under events, not pageviews, in every bucket', () => {
 		const deltas = computeRollupDeltas(ev({ type: 'event' }))
-		expect(deltas).toHaveLength(2)
+		expect(deltas).toHaveLength(3)
 		for (const d of deltas) {
 			expect(d.inc).toEqual({ ...base, events: 1 })
 		}
@@ -51,7 +55,7 @@ describe('computeRollupDeltas', () => {
 
 	it('adds a site-wide country bucket when geo is present', () => {
 		const deltas = computeRollupDeltas(ev({ country: 'US', durationMs: 500 }))
-		expect(deltas).toHaveLength(3)
+		expect(deltas).toHaveLength(4)
 		const country = deltas.find((d) => d.key.dimension === 'country')
 		expect(country?.key).toEqual({
 			granularity: 'day',
@@ -71,12 +75,13 @@ describe('computeRollupDeltas', () => {
 
 	it('dual-emits a hostname-scoped clone of every bucket when hostname is set', () => {
 		const deltas = computeRollupDeltas(ev({ country: 'US', hostname: 'a.example' }))
-		// 3 buckets in the '' family (page, site, country) + 3 mirrored in the 'a.example' family.
-		expect(deltas).toHaveLength(6)
+		// 4 buckets in the '' family (page, site, country, channel) + 4 mirrored in the
+		// 'a.example' family.
+		expect(deltas).toHaveLength(8)
 		const withoutHostname = deltas.filter((d) => d.key.hostname === '')
 		const withHostname = deltas.filter((d) => d.key.hostname === 'a.example')
-		expect(withoutHostname).toHaveLength(3)
-		expect(withHostname).toHaveLength(3)
+		expect(withoutHostname).toHaveLength(4)
+		expect(withHostname).toHaveLength(4)
 		const bucketShape = (d: (typeof deltas)[number]) => ({
 			path: d.key.path,
 			dimension: d.key.dimension,
@@ -90,7 +95,7 @@ describe('computeRollupDeltas', () => {
 
 	it('emits only the hostname-less family when hostname is empty', () => {
 		const deltas = computeRollupDeltas(ev({ country: 'US', hostname: '' }))
-		expect(deltas).toHaveLength(3)
+		expect(deltas).toHaveLength(4)
 		expect(deltas.every((d) => d.key.hostname === '')).toBe(true)
 	})
 
@@ -112,7 +117,7 @@ describe('computeRollupDeltas', () => {
 		}
 	})
 
-	it('emits device and source buckets when present', () => {
+	it('emits device, source and channel buckets when present', () => {
 		const deltas = computeRollupDeltas({
 			timestamp: new Date('2026-06-01T10:00:00.000Z'),
 			type: 'pageview',
@@ -123,10 +128,17 @@ describe('computeRollupDeltas', () => {
 			country: 'US',
 			device: 'mobile',
 			source: 'google.com',
+			channel: 'organic-search',
+			channelVersion: CHANNEL_TAXONOMY_VERSION,
 		})
 		const dims = deltas.map((d) => `${d.key.dimension}:${d.key.dimvalue}`)
 		expect(dims).toEqual(
-			expect.arrayContaining(['country:US', 'device:mobile', 'source:google.com'])
+			expect.arrayContaining([
+				'country:US',
+				'device:mobile',
+				'source:google.com',
+				'channel:organic-search',
+			])
 		)
 	})
 
@@ -149,6 +161,7 @@ describe('computeRollupDeltas', () => {
 		const dims = deltas.map((d) => `${d.key.dimension}:${d.key.dimvalue}`)
 		expect(dims).toEqual(
 			expect.arrayContaining([
+				'channel:direct',
 				'referrer:example.org',
 				'region:CA',
 				'city:San Francisco',
@@ -162,8 +175,9 @@ describe('computeRollupDeltas', () => {
 				'utmTerm:shoes',
 			])
 		)
-		// The two base buckets (page, site) plus one per dimension carried.
-		expect(deltas).toHaveLength(13)
+		// The two base buckets (page, site) plus one per dimension carried; every event carries
+		// a channel, so its bucket is always among them.
+		expect(deltas).toHaveLength(14)
 		for (const delta of deltas) {
 			expect(delta.inc).toMatchObject({ pageviews: 1, samples: 1 })
 		}
@@ -202,8 +216,8 @@ describe('computeRollupDeltas', () => {
 		const deltas = computeRollupDeltas(
 			ev({ hostname: 'a.example', scope: 't1', browser: 'firefox', utmCampaign: 'spring' })
 		)
-		// page, site, browser, utmCampaign in each of the two families.
-		expect(deltas).toHaveLength(8)
+		// page, site, channel, browser, utmCampaign in each of the two families.
+		expect(deltas).toHaveLength(10)
 		const browsers = deltas.filter((d) => d.key.dimension === 'browser')
 		expect(browsers.map((d) => d.key.hostname).sort()).toEqual(['', 'a.example'])
 		expect(browsers.every((d) => d.key.scope === 't1')).toBe(true)
@@ -214,7 +228,7 @@ describe('computeRollupDeltas', () => {
 
 	it('emits an event-name bucket for a custom event with name', () => {
 		const deltas = computeRollupDeltas(ev({ type: 'event', name: 'signup' }))
-		expect(deltas).toHaveLength(3)
+		expect(deltas).toHaveLength(4)
 		const eventBucket = deltas.find((d) => d.key.dimension === 'event')
 		expect(eventBucket?.key).toEqual({
 			granularity: 'day',
@@ -239,12 +253,13 @@ describe('computeRollupDeltas', () => {
 
 	it('dual-emits the event-name bucket when hostname is set', () => {
 		const deltas = computeRollupDeltas(ev({ type: 'event', name: 'signup', hostname: 'a.example' }))
-		// 3 buckets in the '' family (page, site, event) + 3 mirrored in the 'a.example' family.
-		expect(deltas).toHaveLength(6)
+		// 4 buckets in the '' family (page, site, event, channel) + 4 mirrored in the
+		// 'a.example' family.
+		expect(deltas).toHaveLength(8)
 		const withoutHostname = deltas.filter((d) => d.key.hostname === '')
 		const withHostname = deltas.filter((d) => d.key.hostname === 'a.example')
-		expect(withoutHostname).toHaveLength(3)
-		expect(withHostname).toHaveLength(3)
+		expect(withoutHostname).toHaveLength(4)
+		expect(withHostname).toHaveLength(4)
 		const eventBucketWithout = withoutHostname.find((d) => d.key.dimension === 'event')
 		const eventBucketWith = withHostname.find((d) => d.key.dimension === 'event')
 		expect(eventBucketWithout?.key.dimvalue).toBe('signup')
