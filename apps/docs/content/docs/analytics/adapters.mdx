@@ -38,13 +38,13 @@ The two mean the same thing on every adapter. **`source`** is the visit's named 
 
 | Adapter | `source` | `channel` | Filterable |
 |---|---|---|---|
-| native | `utm_source`, else the referrer host, else `direct` | the engine's own [twelve tokens](/analytics/native#traffic-channels), classified at ingest | both, `eq` and `contains` |
+| native | `utm_source` lowercased, else the referrer host, else `direct` | the engine's own [twelve tokens](/analytics/native#traffic-channels), classified at ingest | both, `eq` and `contains` |
 | Plausible | `visit:source`, which Plausible fills from a `utm_source` / `source` / `ref` tag or the `Referer` header | `visit:channel`, Plausible's acquisition channel | both |
 | GA4 | `sessionSource` | `sessionDefaultChannelGroup` (`Direct`, `Organic Search`, `Paid Social`, ...) | both |
 | PostHog | not served | `session.$channel_type`, the sessions table's classification of the session's entry URL, honoring a project's custom channel rules | `channel` only |
 | Umami | not served | `/metrics?type=channel` (`direct`, `organicSearch`, `paidSocial`, ...) | neither: the route takes no channel filter parameter, so `channel` groups and never filters |
 
-Only native's tokens are translated in the admin. A provider's values render exactly as that provider reports them, so a channel breakdown reads `Paid Search` on GA4 and `paidSearch` on Umami.
+Each source reports its own casing: native lowercases the `utm_source` it stores in `source`, so one tag spelled two ways is one row, where a provider answers whatever it holds. Only native's channel tokens are translated in the admin. A provider's values render exactly as that provider reports them, so a channel breakdown reads `Paid Search` on GA4 and `paidSearch` on Umami.
 
 An unconfigured adapter (missing credentials) degrades to an empty state and makes no network calls.
 
