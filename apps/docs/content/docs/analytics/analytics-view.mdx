@@ -11,7 +11,7 @@ It is on by default. Set `view: false` to remove the route and the nav link.
 
 ## What it shows
 
-**Toolbar.** The data source (only when the request resolves more than one), the date range (the presets plus **Custom range**, which reveals two day pickers), and a **Compare** toggle for the previous period. Beside them sit the window caption, the [reporting timezone](/analytics/timezone) the numbers are cut on, and any filter chips.
+**Toolbar.** The data source (only when the request resolves more than one), the date range (the presets plus **Custom range**, which reveals two day pickers), a **Compare** toggle for the previous period, and a **Refresh** button. Beside them sit the window caption, the [reporting timezone](/analytics/timezone) the numbers are cut on, and any filter chips.
 
 **Overview cards.** One card per metric the source serves, with a period-over-period delta when comparison is on. Clicking a card charts that metric in the trend and sorts the breakdown by it. A source serving both `visitors` and `visits` (Plausible does) gets a card each, labelled **Visitors** and **Visits**; `visits` used to carry the visitors label, wherever a metric label is rendered.
 
@@ -134,6 +134,17 @@ Two notes can appear beside the range caption:
 - "Showing the maximum range the provider supports": at least one section read a shorter window than the one you asked for, because the source cannot look back that far. The cards and the chart describe the narrower window.
 
 A section that fails on its own keeps whatever it was showing and adds a retry: a transient `503` dims a panel rather than blanking the page, and a source that cannot answer one section at all leaves that section empty while the rest of the view carries on.
+
+## Refresh
+
+**Refresh** retires the reader's own scope's cached reads through [`POST /api/analytics/refresh`](/analytics/data-sources#refresh-endpoint), then reissues the cards, the trend, the breakdown and the goals table, which reach the source rather than the cache. The button reads **Refreshing** and is disabled until the call settles, and a failure leaves an error banner in the toolbar rather than changing what is on screen. It sends no scope, so a tenant refreshes their own scope and nothing else.
+
+Two things it does not reissue:
+
+- **The realtime strip.** It polls on its own schedule and is bucketed to the realtime TTL, minutes at most. Its next poll reads through to the source, the same as every other surface.
+- **Dashboard widgets already rendered.** They are server-rendered, so each picks the bump up on its next render; a dashboard open in another tab keeps the numbers it drew until it re-renders.
+
+Nothing is fetched by the refresh itself. It invalidates, and the reissued sections are what pay the cold round trip. See [Invalidation](/analytics/cache#invalidation) for what else bumps the same token.
 
 ## Composing it yourself
 

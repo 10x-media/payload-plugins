@@ -23,6 +23,32 @@ analytics({
 
 Each adapter recommends its own TTLs through its capabilities (GA4 suggests 6 hours because its quota is token-billed; the native engine suggests short TTLs because reads are local). Those recommendations are the default. A value you set in `cache.ttl` overrides the adapter recommendation for every adapter; leave a value unset to keep each adapter's own recommendation.
 
+## Invalidation
+
+A TTL alone means a corrected provider document keeps serving the old numbers until every entry it fed expires, up to an hour on most sources. Every cache key therefore carries a **cache epoch** as its second segment: an opaque token, one per scope, stored in `payload.kv` under `analytics:epoch:global` for the install-wide token and `analytics:epoch:s:<scope>` for a named scope, URL-encoded. Bumping a scope's token retires that scope's cached reads at once, on every instance, because the keys those entries sit under stop being built. Nothing is deleted; the old entries expire on their own TTL under keys no read asks for any more.
+
+Three things bump a token:
+
+- Saving or deleting a document in the [providers collection](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant). That document's own scope is bumped, and an update that moved it between scopes bumps the scope it left as well.
+- Saving or deleting a [goal](/analytics/goals) document, the same way. Goals declared in the plugin's `goals` option are fixed at config time and cannot change while the process runs, so they never bump.
+- [`POST /api/analytics/refresh`](/analytics/data-sources#refresh-endpoint), which the **Refresh** button in the [analytics view](/analytics/analytics-view) calls.
+
+An instance reads a scope's token at most once every ten seconds and serves that reading from memory in between, so one KV get covers a burst of reads and a bump made on one instance reaches every other within ten seconds. The interval is fixed and not an option.
+
+A token that cannot be read falls back to `0`, the value every scope starts on, and one warning is logged. The read still answers: an unreachable counter never turns into a failed analytics read. That fallback is memoized like a successful reading, so a broken KV costs one get per scope per ten seconds rather than one per read, and for that window the instance keeps serving entries written before the bump it could not see.
+
+A bump that fails, or that has not settled after two seconds, is logged and dropped rather than failing the document save that triggered it. The save goes through and that scope's cached reads stay until their TTL runs out.
+
+<Callout type="warn">
+**Every entry cached by an earlier release is invalidated once on upgrade.** The epoch segment changed the key format, so entries written before it are never read again: the first read of each query after the upgrade reaches the source, and caching resumes normally from there. Nothing has to be cleared by hand, and the orphaned entries expire on their own.
+</Callout>
+
+### Cross-scope entries key on the install-wide token
+
+A cross-scope read stamps no scope on its query, so its entries key on `analytics:epoch:global`. That covers a platform reader passing `scope=*`, and a scoped read through a shared config adapter that cannot narrow to one scope, which answers install-wide totals rather than that tenant's (see [Multi-tenancy](/analytics/multi-tenancy#4-who-sees-what)).
+
+A tenant saving a provider document bumps that tenant's token, which leaves such an entry in place. It expires on its TTL, or a platform reader retires it by refreshing with `scope: '*'`.
+
 ## Scheduled warming (opt-in)
 
 For provider-backed dashboards, the first load after an entry expires pays a cold provider round trip. The warm job pre-runs the dashboard's reads on a cron so that first load hits a warm cache:
