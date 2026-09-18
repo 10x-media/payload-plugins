@@ -438,6 +438,13 @@ export type {
 export { GOAL_ACTION_TYPE, trackGoalAction } from './goals/trackGoalAction'
 export type { Goal, GoalMatch, TrackerGoal } from './goals/types'
 export { trackServerEvent } from './native/ingest/serverTrack'
+export {
+	ANALYTICS_ERROR_CODES,
+	type AnalyticsError,
+	type AnalyticsErrorCode,
+	analyticsError,
+	readErrorCode,
+} from './plugin/errors'
 export type { QueryError, QueryErrorCode } from './query/errors'
 export type {
 	QueryErrorResponse,

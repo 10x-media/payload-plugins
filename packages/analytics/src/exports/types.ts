@@ -31,6 +31,12 @@ export type {
 export type { Goal, GoalMatch, TrackerGoal } from '../goals/types'
 export type { AnalyticsPluginOptions } from '../index'
 export { TRAFFIC_CHANNELS, type TrafficChannel } from '../native/ingest/source'
+export {
+	ANALYTICS_ERROR_CODES,
+	type AnalyticsError,
+	type AnalyticsErrorCode,
+	readErrorCode,
+} from '../plugin/errors'
 export type { QueryError, QueryErrorCode } from '../query/errors'
 export type { QueryRequest, RefreshRequest, RefreshResponse } from '../query/fetchQuery'
 export type { ParsedQuery, ParseResult } from '../query/parse'
