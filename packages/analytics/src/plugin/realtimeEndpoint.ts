@@ -24,13 +24,13 @@ const DEFAULT_WINDOW = 30
  */
 export const makeRealtimeHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
-		return Response.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE })
+		return errorResponse(401, analyticsError('unauthorized', 'analytics: authentication required'))
 	}
 	try {
 		const runtime = getRuntime(req.payload)
 		// No runtime means no adapter to read, so the skipped gate protects no data.
 		if (runtime && !(await readAccessFor(runtime, req))) {
-			return Response.json({ error: 'forbidden' }, { status: 403, headers: NO_STORE })
+			return errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
 		}
 		const params = new URL(req.url ?? '', 'http://localhost').searchParams
 		const rawMetric = params.get('metric')
