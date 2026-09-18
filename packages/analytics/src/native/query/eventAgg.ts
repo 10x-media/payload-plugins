@@ -24,8 +24,9 @@ export interface EventLike {
 	utmTerm?: string
 	visitorHash: string
 	sessionId: string
-	durationMs?: number
-	scrollDepth?: number
+	durationMs?: number | null
+	/** Postgres reads an unreported depth back as null, Mongo leaves the field off entirely. */
+	scrollDepth?: number | null
 	/** Goal completions stamped at ingest; the source of conversions/revenue on this path. */
 	goals?: Array<{ slug: string; value: number }>
 }
@@ -138,7 +139,8 @@ const addEvent = (bucket: Bucket, event: EventLike, completions = event.goals ??
 	} else {
 		bucket.events++
 	}
-	if (event.scrollDepth !== undefined) {
+	// A reported 0 is a sample; a missing depth is not, however the driver spells "missing".
+	if (typeof event.scrollDepth === 'number') {
 		bucket.scrollDepthSum += event.scrollDepth
 		bucket.scrollSamples++
 	}

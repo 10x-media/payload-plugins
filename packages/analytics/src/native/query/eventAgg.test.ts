@@ -378,4 +378,11 @@ describe('aggregateEvents scroll depth', () => {
 			scrollDepth: 25,
 		})
 	})
+
+	it('does not count a null depth as a sample', () => {
+		const events: EventLike[] = [pageview({ scrollDepth: 80 }), pageview({ scrollDepth: null })]
+		expect(aggregateEvents(events, { metrics: ['scrollDepth'] }).totals).toEqual({
+			scrollDepth: 80,
+		})
+	})
 })
