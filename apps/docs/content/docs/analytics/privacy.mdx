@@ -46,7 +46,7 @@ The tracker's only browser storage is `localStorage`, and it holds at most these
 | `analytics:exclude` | a visit carries the [exclusion link](/analytics/capture#excluding-your-own-visits) | `1` or `0` |
 | `plausible_ignore`, `umami.disabled` | exclusion is set, on an install with that vendor's slot | the vendor's own opt-out value |
 
-A browser with storage blocked reads as "no decision" and is never asked to store anything twice; nothing throws.
+A browser with storage blocked reads as "no decision" and is never asked to store anything twice; nothing throws. `analytics:exclude` is also read by a server-rendered GA4 snippet, which is how an excluded browser turns that tag off before it reports anything.
 
 The beacon is a same-origin `POST`, so the browser attaches the site's own cookies to it the way it attaches them to any same-origin request. Ingest reads no cookie and stores nothing from one.
 
@@ -141,4 +141,4 @@ A slot filled by GA4, Plausible, Umami or PostHog is that vendor collecting the 
 Two things the plugin does change there:
 
 - Its SDK is served through your origin by the [first-party proxy](/analytics/proxy), so the requests are first-party rather than third-party. The proxy relays the visitor's address to the vendor in `x-forwarded-for`, which is what keeps the vendor's geo correct. It never forwards the request's `cookie` or `authorization` header upstream, and never passes a `set-cookie` back down; the vendor's script sets its own storage directly, in the browser.
-- Consent gating and the exclusion link cover the vendor slot too, as far as they reach: no vendor script is injected while consent is withheld or the browser is excluded, and the exclusion also sets each vendor's own opt-out switch. [Excluding your own visits](/analytics/capture#excluding-your-own-visits) states exactly what a slot whose snippet the server rendered can still record.
+- Consent gating and the exclusion link cover the vendor slot too, as far as they reach: no vendor script is injected while consent is withheld or the browser is excluded, and the exclusion also sets each vendor's own opt-out switch. A GA4 snippet the server rendered reads the exclusion flag itself, before its own first `gtag()` call, since that is the only point GA4 honours the switch. [Excluding your own visits](/analytics/capture#excluding-your-own-visits) states exactly what a slot whose snippet the server rendered can still record.
