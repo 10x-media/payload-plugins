@@ -1,7 +1,8 @@
 import type { AnalyticsFilter, DimensionKey, Granularity, MetricKey } from '../core/contract'
+import { readResponseError } from '../plugin/errors'
 import { QUERY_PATH, REFRESH_PATH } from '../plugin/paths'
 import type { QueryError } from './errors'
-import type { QueryErrorResponse, QueryResponse } from './response'
+import type { QueryResponse } from './response'
 
 /** A client-side mirror of the parameters `parseQueryParams` reads off the request. */
 export interface QueryRequest {
@@ -77,17 +78,6 @@ export const buildQueryUrl = (apiRoute: string, request: QueryRequest): string =
 const isRecord = (value: unknown): value is Record<string, unknown> =>
 	typeof value === 'object' && value !== null
 
-/**
- * Only the query endpoint's structured body counts. The plugin's other read endpoints
- * answer a flat `{ "error": "forbidden" }`, which must not land in `QueryFetchError.error`
- * as a string where a `QueryError` is declared.
- */
-const isQueryErrorResponse = (value: unknown): value is QueryErrorResponse => {
-	if (!isRecord(value)) return false
-	const error = value.error
-	return isRecord(error) && typeof error.code === 'string' && typeof error.message === 'string'
-}
-
 /** Thrown by `fetchQuery` for any non-2xx response; `error` is set only when the body parsed as the endpoint's error shape. */
 export class QueryFetchError extends Error {
 	readonly status: number
@@ -112,16 +102,8 @@ const readRetryAfter = (res: Response): number | undefined => {
 	return Number.isFinite(seconds) ? Math.floor(seconds) : undefined
 }
 
-const failure = async (res: Response): Promise<QueryFetchError> => {
-	let error: QueryError | undefined
-	try {
-		const body: unknown = await res.json()
-		if (isQueryErrorResponse(body)) error = body.error
-	} catch {
-		// Body wasn't JSON; error stays undefined and the status still carries the failure.
-	}
-	return new QueryFetchError(res.status, error, readRetryAfter(res))
-}
+const failure = async (res: Response): Promise<QueryFetchError> =>
+	new QueryFetchError(res.status, await readResponseError(res), readRetryAfter(res))
 
 const runFetch = async (url: string): Promise<QueryResponse> => {
 	const res = await fetch(url, {

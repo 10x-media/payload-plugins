@@ -43,4 +43,28 @@ describe('fetchSources', () => {
 		await expect(fetchSources('http://x', '/api', 'user-retry')).resolves.toBeTruthy()
 		expect(fetch).toHaveBeenCalledTimes(2)
 	})
+
+	it('carries the code the endpoint answered with, so a denied listing reads as denied', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce({
+			ok: false,
+			status: 403,
+			json: () => Promise.resolve({ error: { code: 'forbidden', message: 'denied' } }),
+		} as unknown as Response)
+
+		await expect(fetchSources('http://x', '/api', 'user-code')).rejects.toMatchObject({
+			message: 'analytics: sources 403 forbidden',
+		})
+	})
+
+	it('reports a legacy string body as a plain failure rather than inventing a code', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce({
+			ok: false,
+			status: 403,
+			json: () => Promise.resolve({ error: 'forbidden' }),
+		} as unknown as Response)
+
+		await expect(fetchSources('http://x', '/api', 'user-legacy')).rejects.toMatchObject({
+			message: 'analytics: sources 403',
+		})
+	})
 })

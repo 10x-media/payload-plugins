@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { TrendChart } from '../charts/TrendChart'
 import type { RealtimePoint } from './readForWidgetRealtime'
-import { buildPollPath, toRealtimePoints } from './realtimePoll'
+import { buildPollPath, isPollRefusalFinal, toRealtimePoints } from './realtimePoll'
 
 export interface RealtimeCounterProps {
 	endpoint: string
@@ -41,11 +41,18 @@ export function RealtimeCounter(props: RealtimeCounterProps) {
 
 	useEffect(() => {
 		let cancelled = false
+		let timer: ReturnType<typeof setInterval> | undefined
+		const stop = () => {
+			if (timer !== undefined) clearInterval(timer)
+		}
 		const path = buildPollPath(endpoint, { metric, windowMinutes, dataSource })
 		const tick = async () => {
 			try {
 				const res = await fetch(path, { credentials: 'same-origin' })
 				if (!res.ok) {
+					// A refusal aimed at this reader never becomes an allowance, so repeating it
+					// every few seconds only burns requests; the counter pauses on it either way.
+					if (await isPollRefusalFinal(res)) stop()
 					if (!cancelled) setPaused(true)
 					return
 				}
@@ -64,10 +71,10 @@ export function RealtimeCounter(props: RealtimeCounterProps) {
 				if (!cancelled) setPaused(true)
 			}
 		}
-		const id = setInterval(tick, intervalMs)
+		timer = setInterval(tick, intervalMs)
 		return () => {
 			cancelled = true
-			clearInterval(id)
+			stop()
 		}
 	}, [endpoint, intervalMs, metric, windowMinutes, dataSource])
 

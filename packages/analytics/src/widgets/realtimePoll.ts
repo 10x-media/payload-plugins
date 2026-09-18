@@ -1,3 +1,4 @@
+import { type AnalyticsErrorCode, readResponseError } from '../plugin/errors'
 import { REALTIME_PATH } from '../plugin/paths'
 import type { RealtimePoint } from './readForWidgetRealtime'
 
@@ -27,6 +28,22 @@ export const buildPollPath = (endpoint: string, config: PollConfig): string => {
 		params.set('dataSource', config.dataSource)
 	}
 	return `${endpoint}?${params.toString()}`
+}
+
+/** Codes no later tick can talk its way out of, so the poller stops rather than repeats. */
+const TERMINAL: ReadonlySet<AnalyticsErrorCode> = new Set<AnalyticsErrorCode>([
+	'unauthorized',
+	'forbidden',
+])
+
+/**
+ * Whether a refused poll is worth repeating. A provider outage, an unreadable answer and a
+ * legacy body all keep polling, since the next tick may well succeed; only a refusal aimed
+ * at this reader is final. The counter shows the same paused state either way.
+ */
+export const isPollRefusalFinal = async (res: Response): Promise<boolean> => {
+	const code = (await readResponseError(res))?.code
+	return code !== undefined && TERMINAL.has(code)
 }
 
 /** Map a minute series to TrendChart points (HH:MM labels, locale-formatted values). */

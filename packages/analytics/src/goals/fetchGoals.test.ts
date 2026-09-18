@@ -67,4 +67,28 @@ describe('fetchGoals', () => {
 		await expect(fetchGoals('http://x', '/api', 'user-retry')).resolves.toBeTruthy()
 		expect(fetch).toHaveBeenCalledTimes(2)
 	})
+
+	it('carries the code the endpoint answered with', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce({
+			ok: false,
+			status: 403,
+			json: () => Promise.resolve({ error: { code: 'forbidden', message: 'denied' } }),
+		} as unknown as Response)
+
+		await expect(fetchGoals('http://x', '/api', 'user-code')).rejects.toMatchObject({
+			message: 'analytics: goals 403 forbidden',
+		})
+	})
+
+	it('reports a legacy string body as a plain failure rather than inventing a code', async () => {
+		vi.mocked(fetch).mockResolvedValueOnce({
+			ok: false,
+			status: 403,
+			json: () => Promise.resolve({ error: 'forbidden' }),
+		} as unknown as Response)
+
+		await expect(fetchGoals('http://x', '/api', 'user-legacy')).rejects.toMatchObject({
+			message: 'analytics: goals 403',
+		})
+	})
 })
