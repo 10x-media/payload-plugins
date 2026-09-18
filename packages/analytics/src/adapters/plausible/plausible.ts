@@ -116,6 +116,7 @@ const GOAL_METRICS: ReadonlySet<MetricKey> = new Set(['conversions', 'revenue'])
 const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 	page: 'event:page',
 	source: 'visit:source',
+	channel: 'visit:channel',
 	referrer: 'visit:referrer',
 	device: 'visit:device',
 	browser: 'visit:browser',

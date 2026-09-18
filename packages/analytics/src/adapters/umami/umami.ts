@@ -105,6 +105,17 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, UmamiDimension>> = {
 const GOAL_DIMENSION: UmamiDimension = { param: 'event', metric: 'conversions' }
 
 /**
+ * `/metrics?type=channel` is its own branch of the route, answering Umami's acquisition
+ * classification (direct, organicSearch, paidSocial, ...) and applying the same date range
+ * and filter params as every sibling type. `channel` is not one of those filter params, so it
+ * groups and never filters, which is why it sits outside {@link DIMENSION_MAP}.
+ */
+const CHANNEL_DIMENSION: UmamiDimension = { param: 'channel', metric: 'visitors' }
+
+const breakdownFor = (dimension: DimensionKey): UmamiDimension | undefined =>
+	dimension === 'channel' ? CHANNEL_DIMENSION : DIMENSION_MAP[dimension]
+
+/**
  * Umami's `re.` is `~*`: a case-insensitive partial match, so an unanchored pattern hits
  * anywhere in the value. `c.` is `ilike`, also case-insensitive.
  */
@@ -120,10 +131,12 @@ const umamiFilters: ReadonlySet<DimensionKey> = new Set(
 
 // `event` is filterable but not a group: /metrics counts event occurrences for it, and the
 // adapter cannot declare `events` as a metric because /stats reports no such number. `goal`
-// is the reverse, a group the read's own slugs narrow rather than a filter a caller writes.
-const umamiDimensions: ReadonlySet<DimensionKey> = new Set([
+// and `channel` are the reverse, groups Umami serves through their own /metrics types with
+// no matching filter param.
+const umamiDimensions: ReadonlySet<DimensionKey> = new Set<DimensionKey>([
 	...[...umamiFilters].filter((dimension) => dimension !== 'event'),
-	'goal' as DimensionKey,
+	'goal',
+	'channel',
 ])
 
 interface UmamiParams {
@@ -247,7 +260,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			const plan = params(q)
 			let breakdown: ({ dimension: DimensionKey } & UmamiDimension) | undefined
 			for (const dimension of q.dimensions ?? []) {
-				const mapped = DIMENSION_MAP[dimension]
+				const mapped = breakdownFor(dimension)
 				if (mapped) {
 					breakdown = { dimension, ...mapped }
 					break

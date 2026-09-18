@@ -102,6 +102,61 @@ describe('posthog adapter', () => {
 		expect(result.totals).toBeUndefined()
 	})
 
+	describe('channel', () => {
+		it('breaks down by the session channel type, staying pageview-scoped', async () => {
+			let body: { query?: { query?: string } } = {}
+			server.use(
+				http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+					body = (await request.json()) as typeof body
+					return HttpResponse.json({
+						columns: ['dim', 'm0'],
+						types: ['String', 'UInt64'],
+						results: [
+							['Organic Search', 310],
+							['Direct', 88],
+						],
+					})
+				})
+			)
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['visitors'], dimensions: ['channel'] }),
+				{}
+			)
+			const sql = body.query?.query ?? ''
+			expect(sql).toContain('session.$channel_type AS dim')
+			expect(sql).toContain('GROUP BY dim')
+			expect(sql).toContain("event = '$pageview'")
+			expect(result.rows).toEqual([
+				{ dimensions: { channel: 'Organic Search' }, metrics: { visitors: 310 } },
+				{ dimensions: { channel: 'Direct' }, metrics: { visitors: 88 } },
+			])
+			expect(result.totals).toBeUndefined()
+		})
+
+		it.each([
+			['eq' as const, "session.$channel_type = 'Paid Search'"],
+			['contains' as const, "session.$channel_type ILIKE '%Paid%'"],
+			['matches' as const, "match(session.$channel_type, 'Paid .*')"],
+		])('sends a %s channel filter as %s', async (operator, clause) => {
+			let body: { query?: { query?: string } } = {}
+			server.use(
+				http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+					body = (await request.json()) as typeof body
+					return HttpResponse.json({ columns: ['m0'], types: ['UInt64'], results: [[5]] })
+				})
+			)
+			const value = { eq: 'Paid Search', contains: 'Paid', matches: 'Paid .*' }[operator]
+			const caps = posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities
+			expect(caps.dimensions.has('channel')).toBe(true)
+			expect(caps.filters.has('channel')).toBe(true)
+			await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['pageviews'], filters: [{ dimension: 'channel', operator, value }] }),
+				{}
+			)
+			expect(body.query?.query ?? '').toContain(clause)
+		})
+	})
+
 	it('supports the events metric with all-event conditional aggregation', async () => {
 		let body: { query?: { query?: string } } = {}
 		server.use(
@@ -438,7 +493,7 @@ describe('posthog adapter', () => {
 
 	it('declares filters as the DIMENSION_SQL key set and hour as minGranularity', () => {
 		const caps = posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities
-		expect(caps.filters).toEqual(new Set(['page', 'event']))
+		expect(caps.filters).toEqual(new Set(['page', 'channel', 'event']))
 		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
 		expect(caps.minGranularity).toBe('hour')
 	})
