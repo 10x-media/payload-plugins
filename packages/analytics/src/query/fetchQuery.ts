@@ -181,9 +181,9 @@ export const fetchQuery = (
 	})
 }
 
-/** What `POST /analytics/refresh` answers: the scope's epoch after the bump. */
+/** What `POST /analytics/refresh` answers: the scope's epoch token after the bump. */
 export interface RefreshResponse {
-	epoch: number
+	epoch: string
 }
 
 export interface RefreshRequest {
@@ -217,7 +217,7 @@ export const refreshCache = async (
 		throw await failure(res)
 	}
 	const body: unknown = await res.json()
-	// The caller acts on the refresh having happened, not on the number, so an answer this
-	// client cannot read is reported as epoch 0 rather than typed into a lie.
-	return { epoch: isRecord(body) && typeof body.epoch === 'number' ? body.epoch : 0 }
+	// The caller acts on the refresh having happened, not on the token, so an answer this
+	// client cannot read is reported as the initial token rather than typed into a lie.
+	return { epoch: isRecord(body) && typeof body.epoch === 'string' ? body.epoch : '0' }
 }

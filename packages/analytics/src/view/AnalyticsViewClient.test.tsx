@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 	replace: vi.fn<(url: string) => void>(),
 	push: vi.fn<(url: string) => void>(),
 	fetchQueryMock: vi.fn<(apiRoute: string, request: QueryRequest) => Promise<unknown>>(),
-	refreshCacheMock: vi.fn<(apiRoute: string) => Promise<{ epoch: number }>>(),
+	refreshCacheMock: vi.fn<(apiRoute: string) => Promise<{ epoch: string }>>(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -152,7 +152,7 @@ beforeEach(() => {
 	mocks.fetchQueryMock.mockReset()
 	mocks.fetchQueryMock.mockImplementation((_route, request) => Promise.resolve(answer(request)))
 	mocks.refreshCacheMock.mockReset()
-	mocks.refreshCacheMock.mockResolvedValue({ epoch: 1 })
+	mocks.refreshCacheMock.mockResolvedValue({ epoch: 'tok-1' })
 	vi.stubGlobal('ResizeObserver', ResizeObserverStub)
 	vi.stubGlobal(
 		'fetch',
@@ -377,16 +377,16 @@ describe('AnalyticsViewClient', () => {
 		expect(screen.getByText(keys.viewRefreshFailed)).toBeDefined()
 		expect(mocks.fetchQueryMock.mock.calls.length).toBe(before)
 
-		mocks.refreshCacheMock.mockResolvedValue({ epoch: 2 })
+		mocks.refreshCacheMock.mockResolvedValue({ epoch: 'tok-2' })
 		await clickRefresh()
 		expect(screen.queryByText(keys.viewRefreshFailed)).toBeNull()
 	})
 
 	it('disables the button while the refresh is in flight', async () => {
-		let settle: ((value: { epoch: number }) => void) | undefined
+		let settle: ((value: { epoch: string }) => void) | undefined
 		mocks.refreshCacheMock.mockImplementation(
 			() =>
-				new Promise<{ epoch: number }>((resolve) => {
+				new Promise<{ epoch: string }>((resolve) => {
 					settle = resolve
 				})
 		)
@@ -397,7 +397,7 @@ describe('AnalyticsViewClient', () => {
 		expect(pending.hasAttribute('disabled')).toBe(true)
 
 		await act(async () => {
-			settle?.({ epoch: 2 })
+			settle?.({ epoch: 'tok-2' })
 		})
 		expect(screen.getByRole('button', { name: keys.viewRefresh })).toBeDefined()
 		expect(mocks.refreshCacheMock).toHaveBeenCalledTimes(1)
