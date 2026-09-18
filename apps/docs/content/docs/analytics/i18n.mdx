@@ -24,7 +24,9 @@ analytics({
 
 `@10x-media/analytics/i18n` exports `keys` (constants covering metrics, widget labels, breakdowns, timeframes, and field states), the built-in `translations`, and the `TranslationKey` / `TranslationsOption` types. A typo'd key fails to compile.
 
-A handful of keys name data rather than chrome: `channelDirect`, `channelSearch`, `channelSocial`, `channelEmail`, `channelPaid` and `channelReferral` are how the native engine's [traffic channels](/analytics/native#traffic-channels) are shown. Override them to rename a channel in the admin; the stored value, the filters and the URL keep their lowercase tokens either way.
+A handful of keys name data rather than chrome. Twelve of them are how the native engine's [traffic channels](/analytics/native#traffic-channels) are shown: `channelDirect`, `channelOrganicSearch`, `channelPaidSearch`, `channelOrganicSocial`, `channelPaidSocial`, `channelOrganicVideo`, `channelPaidVideo`, `channelEmail`, `channelAffiliate`, `channelDisplay`, `channelReferral` and `channelPaidOther`. `channelDirect` doubles as the label for the native `source` value `direct`, which is the one origin that is not a name. `valueNotSet` is what a row a source answered with no value at all reads as ("Not set" in English), on any dimension and any source.
+
+Override them to rename a channel in the admin; the stored value, the filters and the URL keep their lowercase tokens either way. Only native's tokens go through these keys: a provider classifies into its own vocabulary and its rows render exactly as it reports them.
 
 Because [display-field labels](/analytics/display-fields#labels) default to these translations, overriding a metric's key here renames it everywhere at once; per-field `label`/`labels` options are the targeted alternative. Widget titles are editor-entered content, not translations; localize those with the [`widgets.localizeText` option](/analytics/widgets#options).
 

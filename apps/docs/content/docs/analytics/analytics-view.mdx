@@ -19,7 +19,11 @@ It is on by default. Set `view: false` to remove the route and the nav link.
 
 **Breakdowns.** A tab per dimension group the source serves: pages, sources, technology, geography, events and goals. Each tab is a ranked bar list with the selected metric, a visitors column where the source serves one, sortable columns and a row limit of 10, 25, 50 or 100. Clicking a row adds an `eq` filter for that value and every section re-reads through it; the chip above removes it again.
 
-The Sources tab's own `source` rows are [traffic channels](/analytics/native#traffic-channels) on the native engine, and they read as translated names (**Search**, **Direct**) while the stored value, the filter and the URL keep the lowercase token. A row a source cannot name, including a host a rollup written before channels still holds, reads verbatim.
+The Sources tab opens on `channel` wherever the source serves one, so the first thing it answers is the acquisition mix. Native's rows are its own [traffic channel](/analytics/native#traffic-channels) tokens and read as translated names (**Paid search**, **Direct**) while the stored value, the filter and the URL keep the lowercase token; a provider classifies into its own vocabulary and its rows read exactly as that provider reports them. `source`, the visit's named origin, and `referrer`, the host it came from, are each one pick away in **Group by**.
+
+A row the source answered with no value at all reads **Not set** and is not clickable, since a filter value cannot be empty. PostHog answers that for a pageview captured outside a session.
+
+PostHog has a Sources tab at all only because of `channel`: it serves no other dimension in that group, so the tab carries no **Group by** select there.
 
 A source can group by a dimension without serving the selected metric per row (Umami's `/metrics` reports distinct sessions and nothing else). The list then charts the first metric of the read that its rows do carry, under that metric's own name, rather than a column of zeros under the name you picked.
 
@@ -28,7 +32,7 @@ A tab opens on the first dimension of its group the source can answer, and a **G
 | Tab | Groups by |
 |---|---|
 | Pages | `page` |
-| Sources | `source`, `referrer`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` |
+| Sources | `channel`, `source`, `referrer`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` |
 | Technology | `device`, `browser`, `os` |
 | Geography | `country`, `region`, `city`, `language` |
 | Events | `event` |
