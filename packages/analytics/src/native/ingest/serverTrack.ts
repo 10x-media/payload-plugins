@@ -79,7 +79,9 @@ export const makeServerTrack =
 		if (!payload) {
 			throw new AnalyticsTrackError('analytics: trackServerEvent called before init')
 		}
-		const invalid = rawEventError(event)
+		// Trusted server code: it supplies its own hostname, so the resolver the HTTP endpoint
+		// runs is bypassed and the hostname stays required here.
+		const invalid = rawEventError(event, { requireHostname: true })
 		if (invalid) {
 			throw new AnalyticsTrackError(`analytics: trackServerEvent needs a valid "${invalid}"`)
 		}
@@ -109,13 +111,13 @@ export const makeServerTrack =
 				type: event.type,
 				name: event.name,
 				path: event.path,
-				hostname: event.hostname,
 				referrer: event.referrer,
 				query: event.query,
 				props: event.props,
 				value: event.value,
 				currency: event.currency,
 			},
+			hostname: event.hostname,
 			headers: attributionHeaders(event, opts?.req),
 			geoResolver: deps.geoResolver,
 			salt: await dailySalt(payload, now),

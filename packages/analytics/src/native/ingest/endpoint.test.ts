@@ -12,7 +12,7 @@ const rawReq = (body: BodyInit, contentType = 'application/json'): PayloadReques
 		new Request('http://localhost/api/analytics/ingest', {
 			method: 'POST',
 			body,
-			headers: { 'content-type': contentType },
+			headers: { 'content-type': contentType, host: 'site.example' },
 		}),
 		{ payload: { kv: { get: async () => ({ salt: 'salt' }), set: async () => undefined } } }
 	) as unknown as PayloadRequest
@@ -91,11 +91,12 @@ describe('makeIngestHandler validation', () => {
 		expect((await handler(req({ type: 'event', path: '/p', hostname: 'h' }))).status).toBe(400)
 	})
 
-	it('400s an unknown type, a missing path, and a missing hostname', async () => {
-		const { handler } = handlerWith()
+	it('400s an unknown type and a missing path, and accepts a body with no hostname', async () => {
+		const { handler, events } = handlerWith()
 		expect((await handler(req({ type: 'nope', path: '/p', hostname: 'h' }))).status).toBe(400)
 		expect((await handler(req({ type: 'pageview', hostname: 'h' }))).status).toBe(400)
-		expect((await handler(req({ type: 'pageview', path: '/p' }))).status).toBe(400)
+		expect((await handler(req({ type: 'pageview', path: '/p' }))).status).toBe(202)
+		expect(events[0]?.hostname).toBe('site.example')
 	})
 
 	it('400s a non-string path, hostname, or name rather than letting it reach matching', async () => {
@@ -198,5 +199,88 @@ describe('makeIngestHandler goal matching', () => {
 			(await handler(req({ type: 'pageview', path: '/thank-you', hostname: 'h' }))).status
 		).toBe(202)
 		expect(events[0]?.goals).toBeUndefined()
+	})
+})
+
+describe('makeIngestHandler attribution', () => {
+	const withHost = (body: unknown, headers: Record<string, string>): PayloadRequest =>
+		Object.assign(
+			new Request('http://localhost/api/analytics/ingest', {
+				method: 'POST',
+				body: JSON.stringify(body),
+				headers: { 'content-type': 'application/json', ...headers },
+			}),
+			{ payload: { kv: { get: async () => ({ salt: 'salt' }), set: async () => undefined } } }
+		) as unknown as PayloadRequest
+
+	const handlerWithAttribution = (
+		attribution: Parameters<typeof makeIngestHandler>[0]['attribution'],
+		resolvers: Parameters<typeof makeIngestHandler>[0]['resolvers'] = {}
+	) => {
+		const { buffer, events } = capture()
+		return {
+			events,
+			handler: makeIngestHandler({
+				geoResolver: noopResolver,
+				getBuffer: () => buffer,
+				resolvers,
+				attribution,
+			}),
+		}
+	}
+
+	const pageview = { type: 'pageview', path: '/p', hostname: 'evil.example' }
+
+	it('stores the request host and ignores the body claim and Origin', async () => {
+		const { handler, events } = handlerWithAttribution({})
+		const res = await handler(
+			withHost(pageview, { host: 'a.example:3000', origin: 'https://other.example' })
+		)
+		expect(res.status).toBe(202)
+		expect(events[0]?.hostname).toBe('a.example')
+	})
+
+	it('answers a drop exactly as it answers an accepted event', async () => {
+		const { handler, events } = handlerWithAttribution({})
+		const kept = await handler(withHost(pageview, { host: 'a.example' }))
+		const dropped = await handler(withHost(pageview, {}))
+		expect(dropped.status).toBe(kept.status)
+		expect(await dropped.text()).toBe(await kept.text())
+		expect([...dropped.headers].sort()).toEqual([...kept.headers].sort())
+		expect(events).toHaveLength(1)
+	})
+
+	it('drops an event whose request resolves no scope on a scoped install', async () => {
+		const { handler, events } = handlerWithAttribution(
+			{},
+			{
+				scope: async (req) => {
+					const host = req.headers.get('host') ?? ''
+					return host.includes('.') ? (host.split('.')[0] ?? null) : null
+				},
+			}
+		)
+		await handler(withHost(pageview, { host: 'unknown' }))
+		await handler(withHost(pageview, { host: 't1.example' }))
+		expect(events.map((event) => [event.hostname, event.scope])).toEqual([['t1.example', 't1']])
+	})
+
+	it('keeps a platform hostname under the null scope', async () => {
+		const { handler, events } = handlerWithAttribution(
+			{ platformHostnames: new Set(['platform.example']) },
+			{ scope: async () => null }
+		)
+		await handler(withHost(pageview, { host: 'platform.example' }))
+		await handler(withHost(pageview, { host: 'tenant.example' }))
+		expect(events.map((event) => [event.hostname, event.scope])).toEqual([['platform.example', '']])
+	})
+
+	it('pays for neither the timezone nor the goals resolver on a drop', async () => {
+		const timezone = vi.fn(async () => 'Europe/Berlin')
+		const goals = vi.fn(async () => [])
+		const { handler } = handlerWithAttribution({}, { timezone, goals })
+		await handler(withHost(pageview, {}))
+		expect(timezone).not.toHaveBeenCalled()
+		expect(goals).not.toHaveBeenCalled()
 	})
 })

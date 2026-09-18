@@ -7,6 +7,7 @@ import { clientIpFromHeaders } from './clientIp'
 import { classifyDevice, type DeviceType } from './device'
 import { primaryLanguage } from './language'
 import { referrerHost, storedReferrer } from './referrer'
+import { MAX_HOSTNAME_LENGTH } from './requestHost'
 import { CHANNEL_TAXONOMY_VERSION, classifyChannel, deriveSource } from './source'
 import { extractUtm } from './utm'
 import { dailyVisitorHash, deriveSessionId } from './visitorHash'
@@ -21,7 +22,11 @@ export interface RawEventInput {
 	/** Event name, or the goal slug on a `goal`. Absent on pageviews. */
 	name?: string
 	path: string
-	hostname: string
+	/**
+	 * The hostname the client claims. Ignored by the HTTP ingest, which attributes an event to
+	 * the request that carried it; `trackServerEvent` supplies its own and it is used as sent.
+	 */
+	hostname?: string
 	referrer?: string
 	/**
 	 * The page's query string, without its leading `?`. Read for its utm keys and then
@@ -104,6 +109,8 @@ export interface StoredEvent {
 
 export interface NormalizeArgs {
 	raw: RawEventInput
+	/** Already resolved and capped: what the event is attributed to, not what it claimed. */
+	hostname: string
 	headers: Headers
 	geoResolver: GeoResolver
 	salt: string
@@ -121,8 +128,6 @@ const MAX_KEY_LENGTH = 64
 const MAX_VALUE_LENGTH = 256
 const MAX_NAME_LENGTH = 128
 const MAX_PATH_LENGTH = 512
-/** Longest legal DNS name. */
-const MAX_HOSTNAME_LENGTH = 253
 /** 24 hours. A longer duration is a broken clock, not a session. */
 const MAX_DURATION_MS = 86_400_000
 const CURRENCY = /^[A-Z]{3}$/
@@ -198,6 +203,7 @@ const sanitizeProps = (raw: unknown): Record<string, unknown> | undefined => {
 
 export async function normalizeEvent({
 	raw,
+	hostname: rawHostname,
 	headers,
 	geoResolver,
 	salt,
@@ -216,7 +222,7 @@ export async function normalizeEvent({
 	// the geo values below (a client can set the headers a resolver reads), and the event name,
 	// query and referrer in their own sanitizers.
 	const path = raw.path.slice(0, MAX_PATH_LENGTH)
-	const hostname = raw.hostname.slice(0, MAX_HOSTNAME_LENGTH)
+	const hostname = rawHostname.slice(0, MAX_HOSTNAME_LENGTH)
 	const visitorHash = dailyVisitorHash({ ip, ua, site: hostname, salt })
 	const hourBucket = now.toISOString().slice(0, 13)
 	const props = sanitizeProps(raw.props)

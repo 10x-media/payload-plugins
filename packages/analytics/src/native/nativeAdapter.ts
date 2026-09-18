@@ -21,6 +21,7 @@ import { maxmindResolver } from './geo/maxmindResolver'
 import { type IngestAttribution, type IngestResolvers, makeIngestHandler } from './ingest/endpoint'
 import { flushBatch } from './ingest/flushBatch'
 import type { StoredEvent } from './ingest/normalizeEvent'
+import { type HostnameOption, hostnameSet, resolveHostnameOption } from './ingest/resolveHostname'
 import { makeServerTrack } from './ingest/serverTrack'
 import { createWriteBuffer, type WriteBuffer } from './ingest/writeBuffer'
 import { aggregateEvents, type EventLike, filtersToWhere } from './query/eventAgg'
@@ -35,6 +36,8 @@ import {
 	seriesFromRollups,
 } from './rollupAcc'
 
+export type { HostnameOption, HostnameResolver } from './ingest/resolveHostname'
+
 export interface NativeOptions {
 	geoResolver?: GeoResolver
 	geoDbPath?: string
@@ -42,6 +45,21 @@ export interface NativeOptions {
 	retentionDays?: number
 	/** Opt-in in-process write batching. `true` uses defaults (maxSize 50, maxAgeMs 2000). */
 	buffer?: boolean | { maxSize?: number; maxAgeMs?: number }
+	/**
+	 * Where an event's hostname comes from. `'request'` (the default) stores the host the
+	 * request carried and ignores the body's claim, so a scripted client cannot mint hostname
+	 * buckets. A list stores the request host only when it is one of those, for an install
+	 * behind no host validation at all. A resolver decides per event, and returning null drops
+	 * it. A dropped event is answered exactly like an accepted one.
+	 */
+	hostname?: HostnameOption
+	/**
+	 * Hostnames that keep ingesting on a scoped install even when the request resolves no
+	 * scope: the platform's own domains, which are infrastructure rather than tenants. Their
+	 * events are stored under the null scope. Tenant domains need no entry here, since the
+	 * install's own `scopeResolver` already answers for them.
+	 */
+	platformHostnames?: string[]
 }
 
 export type NativeAdapter = AnalyticsAdapter & { flush: () => Promise<void> }
@@ -182,6 +200,9 @@ async function queryEvents(
 }
 
 export function native(options: NativeOptions = {}): NativeAdapter {
+	// Validated here so a bad list fails the boot rather than dropping every event at runtime.
+	const hostname = resolveHostnameOption(options.hostname)
+	const platformHostnames = hostnameSet(options.platformHostnames, 'platformHostnames')
 	const geoResolver =
 		options.geoResolver ??
 		(options.geoDbPath
@@ -249,7 +270,11 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				timezone: context?.resolveTimezone,
 				goals: context?.resolveGoals,
 			}
-			attribution = { trustedProxyHops: context?.trustedProxyHops }
+			attribution = {
+				trustedProxyHops: context?.trustedProxyHops,
+				hostname,
+				platformHostnames,
+			}
 			config.endpoints = [
 				...(config.endpoints ?? []),
 				{

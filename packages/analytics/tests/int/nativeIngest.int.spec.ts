@@ -13,7 +13,7 @@ import { native } from '../../src/native/nativeAdapter'
 import { pruneEventsTask } from '../../src/native/retention/pruneTask'
 import { kvCacheStore } from '../../src/surfacing/cacheStore'
 import { createEngine } from '../../src/surfacing/engine'
-import { ingestRequest } from './ingestRequest'
+import { INGEST_HOST, ingestRequest } from './ingestRequest'
 
 const ingest = (booted: BootedPayload, path: string) =>
 	makeIngestHandler({ geoResolver: platformHeaderResolver })(
@@ -179,7 +179,7 @@ describeForDb('native ingest through the router', {}, (db) => {
 			request: new Request('http://localhost:3000/api/analytics/ingest', {
 				method: 'POST',
 				body,
-				headers: { 'content-type': contentType, 'user-agent': 'UA' },
+				headers: { 'content-type': contentType, 'user-agent': 'UA', host: INGEST_HOST },
 			}),
 		})
 

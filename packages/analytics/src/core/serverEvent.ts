@@ -8,8 +8,13 @@ import type { RawEventInput } from '../native/ingest/normalizeEvent'
  */
 export type ServerEventInput = Pick<
 	RawEventInput,
-	'type' | 'name' | 'path' | 'hostname' | 'referrer' | 'query' | 'props' | 'value' | 'currency'
+	'type' | 'name' | 'path' | 'referrer' | 'query' | 'props' | 'value' | 'currency'
 > & {
+	/**
+	 * The site the event belongs to. Required, and stored as given: there is no request behind
+	 * a server event to attribute it to, so the caller owns the value.
+	 */
+	hostname: string
 	/**
 	 * Attribution inputs, overlaid on `opts.req`'s own headers when there is a request.
 	 * With neither, the event is attributed to the day's synthetic server visitor and

@@ -5,6 +5,7 @@ import { analyticsError, errorResponse } from '../../plugin/errors'
 import type { GeoResolver } from '../geo/geoResolver'
 import { flushBatch } from './flushBatch'
 import { normalizeEvent, type RawEventInput, type StoredEvent } from './normalizeEvent'
+import { type ResolvedHostnameOption, resolveEventHostname } from './resolveHostname'
 import { dailySalt } from './salt'
 import { type RawEventField, rawEventError } from './validate'
 import type { WriteBuffer } from './writeBuffer'
@@ -18,7 +19,20 @@ export interface IngestResolvers {
 /** How the handler reads the request behind an event, as opposed to what the body claims. */
 export interface IngestAttribution {
 	trustedProxyHops?: number
+	/** Resolved `hostname` option; absent attributes the event to the request's own host. */
+	hostname?: ResolvedHostnameOption
+	/** Hostnames that ingest on a scoped install even when the request resolves no scope. */
+	platformHostnames?: ReadonlySet<string>
 }
+
+/**
+ * What an accepted beacon answers, and what a dropped one answers too: same status, same body,
+ * no header of its own and nothing logged, so the endpoint never tells a prober which hosts or
+ * tenants exist.
+ */
+const accepted = (): Response => Response.json({ ok: true }, { status: 202 })
+
+const REQUEST_HOSTNAME: ResolvedHostnameOption = { kind: 'request' }
 
 /** One event, not a session replay: far above any legitimate payload, far below a DoS. */
 export const MAX_INGEST_BODY_BYTES = 64 * 1024
@@ -88,14 +102,32 @@ export const makeIngestHandler =
 			return invalidField(param)
 		}
 		const now = new Date()
+		const resolvedScope = resolveScope ? await resolveScope(req) : null
+		const scope = resolveScope ? (resolvedScope ?? '') : undefined
+		const hostname = await resolveEventHostname({
+			option: attribution.hostname ?? REQUEST_HOSTNAME,
+			claimed: raw.hostname,
+			req,
+			scope: resolvedScope,
+			trustedProxyHops: attribution.trustedProxyHops,
+		})
+		// A scoped install keeps only what a scope answers for. Its platform hostnames are
+		// infrastructure rather than tenants, so they ingest under the null scope.
+		const unscoped =
+			resolveScope !== undefined &&
+			resolvedScope === null &&
+			!(attribution.platformHostnames?.has(hostname ?? '') ?? false)
+		if (hostname === null || unscoped) {
+			return accepted()
+		}
 		const salt = await dailySalt(req.payload, now)
-		const scope = resolveScope ? ((await resolveScope(req)) ?? '') : undefined
 		const timezone = resolveTimezone ? await resolveTimezone(req, scope ?? null) : undefined
 		// Goals resolve under the same scope the event is stamped with, so a tenant's event
 		// can only ever complete that tenant's goals.
 		const goals = resolveGoals ? await resolveGoals(req, scope ?? null) : undefined
 		const event = await normalizeEvent({
 			raw,
+			hostname,
 			headers: req.headers,
 			geoResolver,
 			salt,
@@ -111,5 +143,5 @@ export const makeIngestHandler =
 		} else {
 			await flushBatch(req.payload, [event])
 		}
-		return Response.json({ ok: true }, { status: 202 })
+		return accepted()
 	}
