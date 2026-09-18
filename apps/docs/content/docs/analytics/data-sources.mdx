@@ -301,7 +301,7 @@ Every endpoint the plugin registers answers a refusal in one shape, with one voc
 
 `code` is what to branch on, `message` is what to show, and `param` names the query parameter, body field or event field at fault when one is. Messages are safe to display: adapter configuration and upstream error text never reach the response.
 
-Every error answer carries `Cache-Control: private, no-store`, the public ingest endpoint's included, and so does every successful answer whose content depends on the caller's scope: query, refresh, sources, goals, document and realtime. The [tracker config](/analytics/capture) endpoint is the one scope-dependent answer that is cached at all, and privately: `private, max-age=60` with `Vary: Host, Cookie`. Every `503 unavailable` carries `Retry-After: 30`, so a client backs off identically whether the plugin is still booting or a source is down.
+Every error answer built from the envelope carries `Cache-Control: private, no-store`, the public ingest endpoint's included (the capture proxy below is the exception on both counts), and so does every successful answer whose content depends on the caller's scope: query, refresh, sources, goals, document and realtime. The [tracker config](/analytics/capture) endpoint is the one scope-dependent answer that is cached at all, and privately: `private, max-age=60` with `Vary: Host, Cookie`. It has no refusal of its own, which is why it has no row below. Every `503 unavailable` carries `Retry-After: 30`, so a client backs off identically whether the plugin is still booting or a source is down.
 
 ### The codes
 
@@ -340,7 +340,7 @@ The union is exported as `AnalyticsErrorCode`, with the values as `ANALYTICS_ERR
 | `/analytics/query` | `401` | `unauthorized` | | no signed-in user |
 | `/analytics/query` | `403` | `forbidden` | | `access.read` denied the request |
 | `/analytics/query` | `403` | `forbidden` | `source` | a listed shared source that cannot filter by scope, read under a scope, without `platformRead` |
-| `/analytics/query` | `404` | `unknown_source` | | no source resolves for this request at all |
+| `/analytics/query` | `404` | `unknown_source` | | no source resolves for this request at all, a scoped install whose request resolves no scope included |
 | `/analytics/query` | `404` | `unknown_source` | `source` | a `source` id outside this request's own registry |
 | `/analytics/query` | `500` | `internal` | | an unexpected failure; the detail is logged with the adapter id |
 | `/analytics/query` | `503` | `unavailable` | | the plugin runtime is not ready on this Payload instance, or the source failed with no cached entry to fall back on |
