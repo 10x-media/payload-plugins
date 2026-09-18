@@ -6,7 +6,7 @@ import {
 	type DateRange,
 	PLATFORM_SCOPE,
 } from '../core/contract'
-import { resolveQueryScope } from '../core/scopedRead'
+import { resolveQueryScope, resolveRequestedScope } from '../core/scopedRead'
 import { queryError } from '../query/errors'
 import { parseQueryParams, readParam } from '../query/parse'
 import type { QueryResponse, SerializedAnalyticsQuery } from '../query/response'
@@ -61,17 +61,30 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 		}
 		const params = new URL(req.url ?? '', 'http://localhost').searchParams
 		const platformRead = platformReadGate(runtime, req)
-		const requestedScope = readParam(params, 'scope')
-		if (requestedScope !== null && !(await platformRead())) {
-			return errorResponse(
-				400,
-				queryError('untrusted_scope', 'analytics: scope is not permitted for this request', 'scope')
-			)
-		}
-		const context = await resolveSourcesForRequest(req, {
+		const requested = await resolveRequestedScope({
+			runtime,
+			req,
+			raw: params.get('scope'),
 			platformRead,
-			...(requestedScope === null ? {} : { scope: requestedScope }),
 		})
+		if (!requested.ok) {
+			// A request whose own scope will not resolve answers like a scope with no sources.
+			// Only a scope the caller itself named is ever named back to it.
+			return requested.reason === 'named'
+				? errorResponse(
+						400,
+						queryError(
+							'untrusted_scope',
+							'analytics: scope is not permitted for this request',
+							'scope'
+						)
+					)
+				: errorResponse(
+						404,
+						queryError('unknown_source', 'analytics: no source is available for this request')
+					)
+		}
+		const context = await resolveSourcesForRequest(req, { platformRead, scope: requested.scope })
 		if (context.adapters.size === 0) {
 			return errorResponse(
 				404,

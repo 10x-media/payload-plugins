@@ -69,7 +69,8 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 	/**
 	 * Retires this scope's cached reads, then reissues every section against the new epoch.
 	 * The realtime strip is left alone: it polls its own short-lived window and never reads
-	 * through the aggregate cache the epoch keys.
+	 * through the aggregate cache the epoch keys. Starting an attempt clears the previous
+	 * failure notice, so the notice always describes the attempt that is in flight.
 	 */
 	const refresh = (): void => {
 		if (refreshPending) {
@@ -78,11 +79,11 @@ export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
 		const controller = new AbortController()
 		refreshing.current = controller
 		setRefreshPending(true)
+		setRefreshFailed(false)
 		refreshCache(props.apiRoute, { signal: controller.signal }).then(
 			() => {
 				if (controller.signal.aborted) return
 				setRefreshPending(false)
-				setRefreshFailed(false)
 				queries.cards.refetch()
 				queries.trend.refetch()
 				queries.breakdown.refetch()

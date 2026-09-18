@@ -382,7 +382,28 @@ describe('AnalyticsViewClient', () => {
 		expect(screen.queryByText(keys.viewRefreshFailed)).toBeNull()
 	})
 
-	it('disables the button while the refresh is in flight', async () => {
+	it('clears the failure notice as soon as the next attempt starts', async () => {
+		mocks.refreshCacheMock.mockRejectedValue(new Error('refresh down'))
+		await renderView()
+		await clickRefresh()
+		expect(screen.getByText(keys.viewRefreshFailed)).toBeDefined()
+
+		let settle: ((value: { epoch: string }) => void) | undefined
+		mocks.refreshCacheMock.mockImplementation(
+			() =>
+				new Promise<{ epoch: string }>((resolve) => {
+					settle = resolve
+				})
+		)
+		await clickRefresh()
+
+		expect(screen.queryByText(keys.viewRefreshFailed)).toBeNull()
+		await act(async () => {
+			settle?.({ epoch: 'tok-2' })
+		})
+	})
+
+	it('marks the button aria-disabled while the refresh is in flight', async () => {
 		let settle: ((value: { epoch: string }) => void) | undefined
 		mocks.refreshCacheMock.mockImplementation(
 			() =>
@@ -394,7 +415,8 @@ describe('AnalyticsViewClient', () => {
 		await clickRefresh()
 
 		const pending = screen.getByRole('button', { name: keys.viewRefreshing })
-		expect(pending.hasAttribute('disabled')).toBe(true)
+		expect(pending.getAttribute('aria-disabled')).toBe('true')
+		expect(pending.hasAttribute('disabled')).toBe(false)
 
 		await act(async () => {
 			settle?.({ epoch: 'tok-2' })

@@ -207,11 +207,18 @@ export function Toolbar({
 						{t(keys.viewCompare)}
 					</Button>
 				) : null}
+				{/* aria-disabled rather than disabled: a keyboard user keeps focus on the button
+				    they pressed instead of losing it to the body while the refresh runs. */}
 				<Button
 					buttonStyle="secondary"
 					className="analytics-view__refresh"
-					disabled={refreshing}
-					onClick={onRefresh}
+					extraButtonProps={{ 'aria-disabled': refreshing }}
+					onClick={() => {
+						if (refreshing) {
+							return
+						}
+						onRefresh()
+					}}
 					size="medium"
 				>
 					{t(refreshing ? keys.viewRefreshing : keys.viewRefresh)}
@@ -229,7 +236,11 @@ export function Toolbar({
 					{sampled ? <span>{t(keys.stateSampled)}</span> : null}
 				</div>
 			</div>
-			{refreshFailed ? <Banner type="error">{t(keys.viewRefreshFailed)}</Banner> : null}
+			{/* Mounted whether or not it has anything to say: a live region added at the same
+			    moment as its text is not announced. */}
+			<div role="status">
+				{refreshFailed ? <Banner type="error">{t(keys.viewRefreshFailed)}</Banner> : null}
+			</div>
 			<FilterChips
 				filters={state.filters}
 				provider={provider}

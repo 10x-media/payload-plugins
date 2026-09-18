@@ -10,9 +10,14 @@ import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
 type ErrorBody = { error: { code: string; message: string; param?: string } }
 
+// One scope per test that bumps: the endpoint debounces repeat bumps of the same scope, so
+// two tests sharing a scope would race that window rather than assert their own behavior.
 const scopeByEmail: Record<string, string> = {
 	'a@t.dev': 'tenant-a',
 	'b@t.dev': 'tenant-b',
+	'c@t.dev': 'tenant-c',
+	'd@t.dev': 'tenant-d',
+	'e@t.dev': 'tenant-e',
 	'platform@t.dev': 'tenant-a',
 }
 
@@ -151,12 +156,22 @@ describeForDb('analytics refresh endpoint', {}, (db) => {
 	})
 
 	it(`lets a platform reader name another scope on ${db}`, async () => {
-		const before = await epochOf('tenant-b')
-		const res = await call({ email: 'platform@t.dev', body: { scope: 'tenant-b' } })
+		const before = await epochOf('tenant-c')
+		const res = await call({ email: 'platform@t.dev', body: { scope: '  tenant-c  ' } })
 		expect(res.status).toBe(200)
 		const { epoch } = (await res.json()) as { epoch: string }
 		expect(epoch).not.toBe(before)
-		expect(await epochOf('tenant-b')).toBe(epoch)
+		expect(await epochOf('tenant-c')).toBe(epoch)
+	})
+
+	// A debounce of invalidation: the second press answers the token the first one wrote,
+	// rather than retiring the scope's entries again before anything has been cached.
+	it(`answers the current token instead of bumping twice in a row on ${db}`, async () => {
+		const first = (await (await call({ email: 'e@t.dev' })).json()) as { epoch: string }
+		const res = await call({ email: 'e@t.dev' })
+		expect(res.status).toBe(200)
+		expect(((await res.json()) as { epoch: string }).epoch).toBe(first.epoch)
+		expect(await epochOf('tenant-e')).toBe(first.epoch)
 	})
 
 	// The wildcard is what a cross-scope read resolves to, and a cross-scope read stamps no
@@ -174,14 +189,14 @@ describeForDb('analytics refresh endpoint', {}, (db) => {
 		const query: AnalyticsQuery = {
 			metrics: ['pageviews'],
 			dateRange: { start: new Date('2026-02-01'), end: new Date('2026-02-28') },
-			scope: 'tenant-a',
+			scope: 'tenant-d',
 		}
 		seen.length = 0
 		await runtime.engine.read(recording, query)
 		await runtime.engine.read(recording, query)
 		expect(seen.length).toBe(1)
 
-		expect((await call()).status).toBe(200)
+		expect((await call({ email: 'd@t.dev' })).status).toBe(200)
 		await runtime.engine.read(recording, query)
 		expect(seen.length).toBe(2)
 	})
