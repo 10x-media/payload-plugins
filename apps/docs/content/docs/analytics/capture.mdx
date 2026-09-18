@@ -111,6 +111,57 @@ capture: {
 
 An adapter entry wins over a slot entry, and both win over the per-family default. A bare adapter id must name a config adapter; a runtime provider instance id (`<provider>:<instance>`) is taken on trust, since those only exist once a scope resolves.
 
+## Excluding your own visits
+
+A site's own staff are in its numbers unless they take themselves out. Any page with `?analytics_exclude=1` does that for the browser it is opened in, and `?analytics_exclude=0` puts it back (`true` and `false` work too):
+
+```
+https://example.com/?analytics_exclude=1
+```
+
+The tracker reads the parameter on boot and leaves the URL alone: nothing is rewritten, so the link stays shareable and the address bar reads as the visitor typed it. The flag is stored in `localStorage` under `analytics:exclude`, which makes it per browser and per site: repeat it in each browser and profile that should be excluded, and expect it to go when that browser's site data is cleared. A browser with storage blocked is excluded for the page the link was opened on and no further.
+
+While the flag is set the tracker delivers nothing: no native beacon, no event to any vendor, nothing queued for a pending consent decision, and no vendor script injected even once consent is granted. Clearing resumes from that point rather than replaying what was skipped.
+
+```ts
+const tracker = await initTracker()
+tracker.exclude(true)   // same flag, set from your own code
+tracker.excluded        // true
+
+// React
+const { excluded, setExcluded } = useAnalytics()
+```
+
+`EXCLUSION_STORAGE_KEY`, `DEFAULT_EXCLUSION_PARAM`, `readExclusion`, `writeExclusion`, `readExclusionParam` and `subscribeExclusion` are exported from `@10x-media/analytics/tracker` for a host that wants to render its own switch. Rename the parameter or turn it off with `exclusionParam`, which sits beside `persistConsent`:
+
+```ts
+createTracker(config, { exclusionParam: 'no_stats' })
+createTracker(config, { exclusionParam: false }) // the parameter is ignored; an existing flag still holds
+```
+
+### The vendor slots
+
+A vendor snippet for a slot that does not require consent is server-rendered into the HTML, so it runs before the tracker boots and counts its own page view. The tracker's own gate cannot reach that, so setting or clearing the flag also sets or clears each vendor's own opt-out switch, for the slots the config actually has:
+
+| Vendor | Switch |
+|---|---|
+| Plausible | `localStorage.plausible_ignore = 'true'` |
+| Umami | `localStorage['umami.disabled'] = '1'` |
+| PostHog | `posthog.opt_out_capturing()`, queued by the snippet's stub |
+| GA4 | `window['ga-disable-<measurementId>'] = true` |
+
+What an ungated slot can still record, because its snippet ran before the tracker booted:
+
+- **Plausible and Umami** read their key before each event, so their automatic page view for the page the link was opened on may already have been sent. Their key is in `localStorage`, so it is there before their script runs on every later page and they are silent from then on.
+- **PostHog**'s stub queues the opt-out, so its own page view for that first page may be captured before the opt-out is replayed. PostHog persists the opt-out itself, so later loads start opted out.
+- **GA4** is the one that does not settle after the first page. `ga-disable-<measurementId>` is a window property rather than stored state, so it has to be set again on every load, and on an ungated slot the tracker sets it only after the server-rendered snippet has already queued `gtag('config', ...)`. Whether that beats gtag.js processing the queue is a race the plugin does not control, so an ungated GA4 slot can record a page view on any page, not only the first. Everything the tracker itself would have sent is off regardless. GA4 defaults to consent `required`, and a gated slot is never loaded while the browser is excluded, so the reliable answer for GA4 is to leave that default in place.
+
+A vendor key the tracker did not set is never cleared on its own: only an explicit `?analytics_exclude=0` or `exclude(false)` clears one, so a key a staff member set by hand through the vendor's own instructions survives an ordinary visit.
+
+<Callout type="warn">
+**Anyone can send anyone that link.** The parameter is honoured from any URL, so a link carrying it costs the site that visitor's data in that browser until they clear their site data or open a `=0` link. There is no server-side record of who was excluded, so there is nothing to audit either. On a site where that matters, rename the parameter to something unguessable, or set `exclusionParam: false` and flip the flag from your own admin-only UI with `tracker.exclude(true)`.
+</Callout>
+
 ## Auto-capture
 
 | Toggle | Default | Sends |
