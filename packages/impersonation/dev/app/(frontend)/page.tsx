@@ -3,7 +3,6 @@ import { headers as nextHeaders } from 'next/headers'
 import { getPayload } from 'payload'
 import { DEV_CUSTOMER, DEV_PARTNER, DEV_SSO } from '../../helpers/seed'
 import config from '../../payload.config'
-import { ExitButton } from './_components/ExitButton'
 import { SessionPanel } from './_components/SessionPanel'
 
 export const dynamic = 'force-dynamic'
@@ -32,7 +31,6 @@ export default async function FrontendPage() {
 					? `impersonating as ${impersonation.target?.collection}/${impersonation.target?.id}`
 					: 'not impersonating'}
 			</p>
-			{impersonation.active ? <ExitButton /> : null}
 			<p>
 				Customer login writes the shared cookie (swap). Partner login writes an isolated cookie
 				(parallel). SSO has no password; it uses the callback below.

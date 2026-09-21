@@ -13,5 +13,8 @@ export const REASON_MAX_LENGTH = 500
 /** Client POSTs that busy-gate a control abort after this. */
 export const CLIENT_FETCH_TIMEOUT_MS = 15_000
 export const ADMIN_GROUP = 'System'
+/** Prefixed onto minted target sids so decorateAuth can skip the DB on normal traffic. */
+export const IMPERSONATION_SID_PREFIX = 'imp_'
+export const SWITCHER_PAGE_SIZE = 20
 
 export const RESERVED_API_SEGMENTS = ['graphql', 'graphql-playground'] as const

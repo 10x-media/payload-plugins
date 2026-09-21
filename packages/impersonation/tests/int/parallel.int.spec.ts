@@ -95,7 +95,7 @@ describeForDb('impersonation parallel', {}, (db) => {
 		expect((me.body as { user?: { email?: string } }).user?.email).toBe(ADMIN.email)
 	})
 
-	it('sets _impersonation on the impersonator after a parallel start', async () => {
+	it('does not set _impersonation on the impersonator after a parallel start', async () => {
 		const client = createRestClient(booted)
 		await client.post('/api/users/login', { body: ADMIN })
 		await client.get('/api/users/me')
@@ -108,9 +108,7 @@ describeForDb('impersonation parallel', {}, (db) => {
 		})
 		const { user } = await booted.payload.auth({ headers })
 		expect((user as { email?: string } | null)?.email).toBe(ADMIN.email)
-		expect((user as { _impersonation?: { mode?: string } } | null)?._impersonation?.mode).toBe(
-			'parallel'
-		)
+		expect((user as { _impersonation?: unknown } | null)?._impersonation).toBeUndefined()
 		await client.post('/api/impersonation/exit', { body: {} })
 	})
 

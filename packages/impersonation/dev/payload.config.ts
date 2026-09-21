@@ -6,7 +6,7 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig } from 'payload'
 import { impersonation } from '../src/index'
-import { canImpersonate, customers, partners, ssoUsers, users } from './collections'
+import { canImpersonate, customers, partners, posts, ssoUsers, users } from './collections'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -34,7 +34,7 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users, customers, partners, ssoUsers],
+	collections: [users, customers, partners, posts, ssoUsers],
 	plugins: [
 		dualSession({ collections: ['partners'] }),
 		impersonation({

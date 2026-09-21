@@ -13,10 +13,17 @@ const options = {
 	hintCookieName: 'impersonation-hint',
 	maxDuration: undefined,
 	reason: 'off',
+	retention: undefined,
 	security: { trustedOrigins: [] },
 	session: {},
 	targets: undefined,
-	ui: { bar: false, documentAction: false, headerAction: false, recordAction: false },
+	ui: {
+		bar: false,
+		cardEmail: false,
+		documentAction: false,
+		headerAction: false,
+		recordAction: false,
+	},
 } satisfies ResolvedOptions
 
 const row = {

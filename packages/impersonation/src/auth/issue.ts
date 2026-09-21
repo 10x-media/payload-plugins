@@ -1,12 +1,69 @@
 import type { CollectionSlug, Payload, PayloadRequest, TypedUser } from 'payload'
 import { getFieldsToSign, jwtSign } from 'payload'
-import { addSessionToUser, generatePayloadCookie } from 'payload/shared'
+import { generatePayloadCookie } from 'payload/shared'
 
+import { IMPERSONATION_SID_PREFIX } from '../plugin/constants'
 import type { IssuedSession, SessionIssueArgs } from '../types'
 import { sharedCookieName } from './cookies'
 import { isolatedAuthCookie, resolveMode } from './mode'
 
-type RawUser = TypedUser & { email?: string; sessions?: { expiresAt: Date | string; id: string }[] }
+type RawUser = TypedUser & {
+	email?: string
+	sessions?: { createdAt?: null | string; expiresAt: string; id: string }[] | null
+}
+
+const tokenExpirationOf = (auth: boolean | { tokenExpiration?: number; useSessions?: boolean }) => {
+	if (auth === true || auth === false) {
+		return 7200
+	}
+	return auth.tokenExpiration ?? 7200
+}
+
+/**
+ * Mint a target session with a prefixed sid so decorateAuth can skip the DB
+ * on requests that cannot be impersonation.
+ */
+const mintPrefixedSession = async ({
+	collection,
+	collectionConfig,
+	payload,
+	raw,
+	req,
+}: {
+	collection: CollectionSlug
+	collectionConfig: { auth: boolean | { tokenExpiration?: number; useSessions?: boolean } }
+	payload: Payload
+	raw: RawUser
+	req: PayloadRequest
+}): Promise<string> => {
+	if (typeof collectionConfig.auth === 'object' && collectionConfig.auth.useSessions === false) {
+		throw new Error(
+			`@10x-media/impersonation: "${collection}" did not mint a session id (useSessions is off)`
+		)
+	}
+
+	const now = new Date()
+	const sid = `${IMPERSONATION_SID_PREFIX}${crypto.randomUUID()}`
+	const sessions = [
+		...(raw.sessions ?? []).filter((session) => new Date(session.expiresAt) > now),
+		{
+			createdAt: now.toISOString(),
+			expiresAt: new Date(
+				now.getTime() + tokenExpirationOf(collectionConfig.auth) * 1000
+			).toISOString(),
+			id: sid,
+		},
+	]
+	await payload.db.updateOne({
+		collection,
+		data: { sessions },
+		id: raw.id,
+		req,
+		returning: false,
+	})
+	raw.sessions = sessions as RawUser['sessions']
+	return sid
+}
 
 export const issueSession = async ({
 	collection,
@@ -31,18 +88,13 @@ export const issueSession = async ({
 	}
 
 	raw.collection = collectionConfig.slug as TypedUser['collection']
-	const { sid } = await addSessionToUser({
+	const sid = await mintPrefixedSession({
+		collection: collection as CollectionSlug,
 		collectionConfig,
 		payload,
+		raw,
 		req,
-		user: raw,
 	})
-
-	if (!sid) {
-		throw new Error(
-			`@10x-media/impersonation: "${collection}" did not mint a session id (useSessions is off)`
-		)
-	}
 
 	const fieldsToSign = getFieldsToSign({
 		collectionConfig,
@@ -53,7 +105,7 @@ export const issueSession = async ({
 	const { exp, token } = await jwtSign({
 		fieldsToSign,
 		secret: payload.secret,
-		tokenExpiration: collectionConfig.auth.tokenExpiration,
+		tokenExpiration: tokenExpirationOf(collectionConfig.auth),
 	})
 
 	const { cookieName, isolated } = await resolveMode({ collection, payload, user: raw })
@@ -129,7 +181,7 @@ export const resignSession = async ({
 	const { exp, token } = await jwtSign({
 		fieldsToSign,
 		secret: payload.secret,
-		tokenExpiration: collectionConfig.auth.tokenExpiration,
+		tokenExpiration: tokenExpirationOf(collectionConfig.auth),
 	})
 
 	return {

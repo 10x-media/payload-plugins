@@ -2,4 +2,4 @@
 '@10x-media/impersonation': patch
 ---
 
-Fix empty JWT/Bearer origin skip, stop leaking password hashes from start, keep the impersonator cookie when a parallel session hits maxDuration, and close a session when Postgres CASCADE-deletes its impersonator relationship.
+Rebuild the Impersonate UI (Payload SearchFilter, compact Button margins, card drawer/document actions, pagination, nav-aware bar, countdown), always register the provider with `useImpersonation`, add `filterTargets`, a frontend banner, opt-in retention, and skip session lookups on ordinary traffic.

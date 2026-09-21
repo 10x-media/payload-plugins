@@ -1,5 +1,5 @@
 import type { CollectionSlug, Endpoint, PayloadRequest } from 'payload'
-
+import { resolveTargetFilters, targetMatchesFilter } from '../access/filterTargets'
 import { expireCookies, generateHintCookie } from '../auth/cookies'
 import { issueSession } from '../auth/issue'
 import { revokeSession } from '../auth/revoke'
@@ -77,6 +77,28 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 
 	if (!allowedTargets(req, options).has(collection)) {
 		return fail({ error: 'unsupportedCollection', req, status: 400 })
+	}
+
+	if (options.access.filterTargets) {
+		const filters = await resolveTargetFilters({
+			collections: [collection as CollectionSlug],
+			options,
+			req,
+		})
+		const filter = filters[collection]
+		if (filter === undefined) {
+			return fail({ error: 'forbidden', req, status: 403 })
+		}
+		if (
+			!(await targetMatchesFilter({
+				collection: collection as CollectionSlug,
+				filter,
+				req,
+				targetId,
+			}))
+		) {
+			return fail({ error: 'forbidden', req, status: 403 })
+		}
 	}
 
 	const registered = collectionBySlug(req.payload, collection)

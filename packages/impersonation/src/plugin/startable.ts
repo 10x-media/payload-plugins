@@ -35,3 +35,11 @@ export const isStartableAuthCollection = (
 	}
 	return true
 }
+
+export const startableCollectionSlugs = (
+	collections: { auth?: Authish; slug: string }[] | undefined,
+	options: Pick<ResolvedOptions, 'collectionSlug' | 'session' | 'targets'>
+): CollectionSlug[] =>
+	(collections ?? [])
+		.filter((collection) => isStartableAuthCollection(collection, options))
+		.map(({ slug }) => slug as CollectionSlug)

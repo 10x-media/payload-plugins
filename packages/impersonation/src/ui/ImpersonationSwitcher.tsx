@@ -3,207 +3,274 @@
 import {
 	Button,
 	Drawer,
-	type ReactSelectOption,
+	SearchFilter,
+	SearchIcon,
 	SelectInput,
-	ShimmerEffect,
-	TextInput,
 	toast,
 	useConfig,
-	useDrawerSlug,
+	useDocumentDrawer,
 	useModal,
-	useTranslation as usePayloadTranslation,
 } from '@payloadcms/ui'
-import { type ChangeEvent, useCallback, useEffect, useRef, useState } from 'react'
+import type { CollectionSlug, Where } from 'payload'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
-import { CLIENT_FETCH_TIMEOUT_MS } from '../plugin/constants'
+import { SWITCHER_PAGE_SIZE } from '../plugin/constants'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
+import { ImpersonateIcon } from './ImpersonateIcon'
+import { ImpersonationUserCard } from './ImpersonationUserCard'
 import { StartConfirmModal, type StartTarget } from './StartConfirmModal'
+import { useImpersonation } from './useImpersonation'
 import './impersonation.css'
 
-const CONFIRM_SLUG = 'impersonation-confirm-switcher'
-
-type UserHit = { email?: string; id: number | string; name?: string }
+export type SwitcherCollection = {
+	label: string
+	slug: string
+	useAsTitle: string
+}
 
 export type ImpersonationSwitcherProps = {
-	apiPath: string
-	collections: { label: string; slug: string }[]
-	reasonMode: 'off' | 'optional' | 'required'
+	apiPath?: string
+	collections: SwitcherCollection[]
+	reasonMode?: 'off' | 'optional' | 'required'
 	viewerId: number | string
 }
 
-const labelOf = (doc: UserHit) => String(doc.name ?? doc.email ?? doc.id ?? '')
+type ListedUser = Record<string, unknown> & { id: number | string }
 
-const optionValue = (selected: ReactSelectOption | ReactSelectOption[] | null) => {
-	const option = Array.isArray(selected) ? selected[0] : selected
-	const value = option?.value
-	return typeof value === 'string' || typeof value === 'number' ? String(value) : null
+const drawerSlug = 'impersonation-switcher'
+const confirmSlug = 'impersonation-confirm-start'
+
+const andWhere = (clauses: Where[]): Where => {
+	const compact = clauses.filter((clause) => Object.keys(clause).length > 0)
+	if (compact.length === 0) {
+		return {}
+	}
+	if (compact.length === 1) {
+		return compact[0] as Where
+	}
+	return { and: compact }
 }
 
-export const ImpersonationSwitcher = ({
-	apiPath,
-	collections,
-	reasonMode,
-	viewerId,
-}: ImpersonationSwitcherProps) => {
-	const { t } = useTranslation()
-	const { t: tAdmin } = usePayloadTranslation()
+const PreviewDrawer = ({ collectionSlug, id }: { collectionSlug: string; id: number | string }) => {
+	const [DocumentDrawer, , { openDrawer }] = useDocumentDrawer({
+		collectionSlug: collectionSlug as CollectionSlug,
+		id: String(id),
+	})
+
+	useEffect(() => {
+		openDrawer()
+	}, [openDrawer])
+
+	return <DocumentDrawer />
+}
+
+export const ImpersonationSwitcher = ({ collections, viewerId }: ImpersonationSwitcherProps) => {
 	const { config } = useConfig()
+	const { t } = useTranslation()
 	const { closeModal, isModalOpen, openModal } = useModal()
-	const drawerSlug = useDrawerSlug('impersonation-switcher')
-	const drawerOpen = isModalOpen(drawerSlug)
-
+	const { apiPath, cardEmail, reasonMode, targets } = useImpersonation()
 	const [collection, setCollection] = useState(collections[0]?.slug ?? '')
-	const [query, setQuery] = useState('')
-	const [hits, setHits] = useState<UserHit[]>([])
-	const [busy, setBusy] = useState(false)
+	const [search, setSearch] = useState('')
+	const [page, setPage] = useState(1)
+	const [docs, setDocs] = useState<ListedUser[]>([])
+	const [hasNext, setHasNext] = useState(false)
+	const [hasPrev, setHasPrev] = useState(false)
+	const [loading, setLoading] = useState(false)
 	const [target, setTarget] = useState<null | StartTarget>(null)
-	const abortRef = useRef<AbortController | null>(null)
+	const [preview, setPreview] = useState<null | { collection: string; id: number | string }>(null)
 
-	const collectionOptions = collections.map((entry) => ({
-		label: entry.label,
-		value: entry.slug,
-	}))
-
-	const search = useCallback(
-		async (term: string) => {
-			if (!collection) {
-				return
-			}
-			abortRef.current?.abort()
-			const controller = new AbortController()
-			abortRef.current = controller
-			const timeout = window.setTimeout(() => controller.abort(), CLIENT_FETCH_TIMEOUT_MS)
-			setBusy(true)
-			try {
-				const params = new URLSearchParams({ depth: '0', limit: '20' })
-				const trimmed = term.trim()
-				if (trimmed) {
-					const titleField = config.collections.find((entry) => entry.slug === collection)?.admin
-						?.useAsTitle
-					const clauses: Record<string, unknown>[] = [{ email: { like: trimmed } }]
-					if (titleField && titleField !== 'email' && titleField !== 'id') {
-						clauses.push({ [titleField]: { like: trimmed } })
-					}
-					params.set('where', JSON.stringify({ or: clauses }))
-				}
-				const response = await fetch(`${config.routes.api}/${collection}?${params}`, {
-					credentials: 'include',
-					signal: controller.signal,
-				})
-				if (controller.signal.aborted) {
-					return
-				}
-				if (!response.ok) {
-					toast.error(t(keys.errorFailed))
-					setHits([])
-					return
-				}
-				const body = (await response.json()) as { docs?: UserHit[] }
-				setHits((body.docs ?? []).filter((doc) => String(doc.id) !== String(viewerId)))
-			} catch {
-				if (controller.signal.aborted) {
-					return
-				}
-				toast.error(t(keys.errorFailed))
-				setHits([])
-			} finally {
-				window.clearTimeout(timeout)
-				if (abortRef.current === controller) {
-					setBusy(false)
-				}
-			}
-		},
-		[collection, config.collections, config.routes.api, t, viewerId]
+	const visibleCollections = useMemo(
+		() => collections.filter((entry) => targets[entry.slug] !== undefined),
+		[collections, targets]
 	)
 
 	useEffect(() => {
-		if (!drawerOpen) {
-			abortRef.current?.abort()
+		if (visibleCollections.some((entry) => entry.slug === collection)) {
 			return
 		}
-		const handle = window.setTimeout(() => {
-			void search(query)
-		}, 250)
-		return () => window.clearTimeout(handle)
-	}, [drawerOpen, query, search])
+		setCollection(visibleCollections[0]?.slug ?? '')
+	}, [collection, visibleCollections])
 
-	const pick = (hit: UserHit) => {
-		setTarget({ collection, id: hit.id, label: labelOf(hit) })
+	const collectionMeta = visibleCollections.find((entry) => entry.slug === collection)
+	const useAsTitle = collectionMeta?.useAsTitle ?? 'email'
+
+	const onSearch = useCallback((value: string) => {
+		setPage(1)
+		setSearch(value ?? '')
+	}, [])
+
+	const load = useCallback(async () => {
+		if (!collection || !isModalOpen(drawerSlug)) {
+			return
+		}
+		setLoading(true)
+		try {
+			const filter = targets[collection]
+			const clauses: Where[] = []
+			if (filter && filter !== true) {
+				clauses.push(filter)
+			}
+			const trimmed = search.trim()
+			if (trimmed) {
+				const fields = new Set(['email', useAsTitle])
+				clauses.push({
+					or: [...fields].map((field) => ({ [field]: { like: trimmed } })),
+				})
+			}
+			const params = new URLSearchParams({
+				depth: '0',
+				limit: String(SWITCHER_PAGE_SIZE),
+				page: String(page),
+				sort: useAsTitle,
+				where: JSON.stringify(andWhere(clauses)),
+			})
+			const response = await fetch(`${config.routes.api}/${collection}?${params.toString()}`, {
+				credentials: 'include',
+			})
+			if (!response.ok) {
+				throw new Error(String(response.status))
+			}
+			const body = (await response.json()) as {
+				docs?: ListedUser[]
+				hasNextPage?: boolean
+				hasPrevPage?: boolean
+			}
+			setDocs(body.docs ?? [])
+			setHasNext(Boolean(body.hasNextPage))
+			setHasPrev(Boolean(body.hasPrevPage))
+		} catch {
+			toast.error(t(keys.errorFailed))
+			setDocs([])
+			setHasNext(false)
+			setHasPrev(false)
+		} finally {
+			setLoading(false)
+		}
+	}, [collection, config.routes.api, isModalOpen, page, search, t, targets, useAsTitle])
+
+	useEffect(() => {
+		void load()
+	}, [load])
+
+	const pick = (doc: ListedUser) => {
+		const title = String(doc[useAsTitle] ?? doc.email ?? doc.id)
+		setTarget({ collection, id: doc.id, label: title })
 		closeModal(drawerSlug)
-		openModal(CONFIRM_SLUG)
+		openModal(confirmSlug)
+	}
+
+	if (visibleCollections.length === 0) {
+		return null
 	}
 
 	return (
 		<>
-			<Button buttonStyle="pill" onClick={() => openModal(drawerSlug)} size="small">
-				<span data-testid="impersonation-switcher">{t(keys.switchToUser)}</span>
+			<Button
+				buttonStyle="none"
+				margin={false}
+				onClick={() => {
+					setPage(1)
+					openModal(drawerSlug)
+				}}
+			>
+				<span className="impersonation-header-action" data-testid="impersonation-switcher">
+					<ImpersonateIcon />
+					{t(keys.switchToUser)}
+				</span>
 			</Button>
 			<Drawer slug={drawerSlug} title={t(keys.switchToUser)}>
 				<div className="impersonation-switcher">
-					{collections.length > 1 ? (
-						<SelectInput
-							isClearable={false}
-							label={tAdmin('general:collections')}
-							name="impersonation-collection"
-							onChange={(selected) => {
-								const value = optionValue(selected)
-								if (value) {
-									setCollection(value)
-								}
-							}}
-							options={collectionOptions}
-							path="impersonation-collection"
-							value={collection}
-						/>
-					) : null}
-					<TextInput
-						label={t(keys.searchUsers)}
-						onChange={(event: ChangeEvent<HTMLInputElement>) => setQuery(event.target.value)}
-						onKeyDown={(event) => {
-							if (event.key === 'Enter') {
-								event.preventDefault()
-								void search(query)
-							}
-						}}
-						path="impersonation-search"
-						placeholder={t(keys.searchUsers)}
-						value={query}
-					/>
+					<div className="search-bar impersonation-toolbar">
+						<SearchIcon />
+						<SearchFilter handleChange={onSearch} key={collection} label={t(keys.searchByName)} />
+						{visibleCollections.length > 1 ? (
+							<div className="search-bar__actions impersonation-collection">
+								<SelectInput
+									isClearable={false}
+									name="impersonation-collection"
+									onChange={(incoming) => {
+										const next = Array.isArray(incoming) ? incoming[0] : incoming
+										const value =
+											next && typeof next === 'object' && 'value' in next
+												? String(next.value)
+												: String(next ?? '')
+										setCollection(value)
+										setPage(1)
+										setSearch('')
+									}}
+									options={visibleCollections.map((entry) => ({
+										label: entry.label,
+										value: entry.slug,
+									}))}
+									path="impersonation-collection"
+									value={collection}
+								/>
+							</div>
+						) : null}
+					</div>
 					<div className="impersonation-switcher__results">
-						{busy && hits.length === 0 ? <ShimmerEffect height="2rem" /> : null}
-						{!busy && hits.length === 0 ? (
+						{docs.length === 0 && !loading ? (
 							<p className="impersonation-switcher__empty">{t(keys.noResults)}</p>
 						) : null}
-						{hits.map((hit) => (
+						{docs.map((doc) => {
+							if (String(doc.id) === String(viewerId) && collection === config.admin.user) {
+								return null
+							}
+							const title = String(doc[useAsTitle] ?? doc.email ?? doc.id)
+							const email = typeof doc.email === 'string' ? doc.email : undefined
+							const showEmail = cardEmail && email && email !== title
+							return (
+								<ImpersonationUserCard
+									collectionSlug={collection}
+									doc={doc}
+									documentHref={`${config.routes.admin}/collections/${collection}/${doc.id}`}
+									email={showEmail ? email : undefined}
+									key={String(doc.id)}
+									onOpenDrawer={() => setPreview({ collection, id: doc.id })}
+									onSelect={() => pick(doc)}
+									openDocumentLabel={t(keys.openDocument)}
+									openDrawerLabel={t(keys.openDrawer)}
+									title={title}
+								/>
+							)
+						})}
+					</div>
+					{hasPrev || hasNext ? (
+						<div className="impersonation-switcher__pager">
 							<Button
 								buttonStyle="secondary"
-								disabled={busy}
-								key={String(hit.id)}
+								disabled={!hasPrev || loading}
 								margin={false}
-								onClick={() => pick(hit)}
+								onClick={() => setPage((current) => Math.max(1, current - 1))}
 								size="small"
 							>
-								{labelOf(hit)}
+								{t(keys.previousPage)}
 							</Button>
-						))}
-					</div>
-					<div className="impersonation-switcher__controls">
-						<Button
-							buttonStyle="secondary"
-							margin={false}
-							onClick={() => closeModal(drawerSlug)}
-							size="large"
-						>
-							{t(keys.cancel)}
-						</Button>
-					</div>
+							<Button
+								buttonStyle="secondary"
+								disabled={!hasNext || loading}
+								margin={false}
+								onClick={() => setPage((current) => current + 1)}
+								size="small"
+							>
+								{t(keys.nextPage)}
+							</Button>
+						</div>
+					) : null}
 				</div>
 			</Drawer>
+			{preview ? (
+				<PreviewDrawer
+					collectionSlug={preview.collection}
+					id={preview.id}
+					key={`${preview.collection}:${preview.id}`}
+				/>
+			) : null}
 			<StartConfirmModal
 				apiPath={apiPath}
 				key={target ? `${target.collection}:${target.id}` : 'idle'}
-				modalSlug={CONFIRM_SLUG}
+				modalSlug={confirmSlug}
 				reasonMode={reasonMode}
 				target={target}
 			/>

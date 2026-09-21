@@ -70,4 +70,52 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		await payload.create({ collection: 'sso-users', data: DEV_SSO })
 		payload.logger.info(`Seeded SSO user: ${DEV_SSO.email} (header x-dev-sso-email)`)
 	}
+
+	const postCount = await payload.count({ collection: 'posts' })
+	if (postCount.totalDocs < 100) {
+		const admin = (
+			await payload.find({
+				collection: 'users',
+				limit: 1,
+				pagination: false,
+				where: { email: { equals: DEV_ADMIN.email } },
+			})
+		).docs[0]
+		const editor = (
+			await payload.find({
+				collection: 'users',
+				limit: 1,
+				pagination: false,
+				where: { email: { equals: DEV_EDITOR.email } },
+			})
+		).docs[0]
+		if (postCount.totalDocs === 0) {
+			await payload.create({
+				collection: 'posts',
+				data: { author: admin?.id, title: 'Staff only', visibility: 'staff' },
+			})
+			await payload.create({
+				collection: 'posts',
+				data: { author: editor?.id, title: 'Partner brief', visibility: 'partners' },
+			})
+			await payload.create({
+				collection: 'posts',
+				data: { author: editor?.id, title: 'Public announcement', visibility: 'public' },
+			})
+		}
+		const visibilities = ['staff', 'partners', 'public'] as const
+		const afterNamed = (await payload.count({ collection: 'posts' })).totalDocs
+		for (let index = afterNamed; index < 100; index += 1) {
+			const n = index + 1
+			await payload.create({
+				collection: 'posts',
+				data: {
+					author: n % 2 === 0 ? editor?.id : admin?.id,
+					title: `Post ${n}`,
+					visibility: visibilities[n % visibilities.length],
+				},
+			})
+		}
+		payload.logger.info('Seeded posts for impersonation access checks')
+	}
 }

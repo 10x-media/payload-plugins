@@ -1,4 +1,4 @@
-import type { Access, CollectionConfig, TypedUser } from 'payload'
+import type { Access, CollectionConfig, TypedUser, Where } from 'payload'
 
 import { devSsoCallback, devSsoStrategy } from './sso'
 
@@ -61,6 +61,46 @@ export const partners: CollectionConfig = {
 	auth: true,
 	admin: { useAsTitle: 'name' },
 	fields: [{ name: 'name', type: 'text' }],
+}
+
+/**
+ * Non-auth collection so impersonating a customer, partner, or non-staff user
+ * actually changes what `/admin/collections/posts` returns.
+ */
+export const posts: CollectionConfig = {
+	slug: 'posts',
+	admin: { useAsTitle: 'title', defaultColumns: ['title', 'visibility', 'author'] },
+	access: {
+		read: ({ req }): boolean | Where => {
+			if (!req.user) {
+				return false
+			}
+			if (req.user.collection === 'users' && hasStaffRole(req.user)) {
+				return true
+			}
+			if (req.user.collection === 'users') {
+				return { author: { equals: req.user.id } }
+			}
+			if (req.user.collection === 'partners') {
+				return { visibility: { in: ['public', 'partners'] } }
+			}
+			if (req.user.collection === 'customers') {
+				return { visibility: { equals: 'public' } }
+			}
+			return false
+		},
+	},
+	fields: [
+		{ name: 'title', type: 'text', required: true },
+		{ name: 'author', type: 'relationship', relationTo: 'users' },
+		{
+			name: 'visibility',
+			type: 'select',
+			defaultValue: 'staff',
+			options: ['public', 'partners', 'staff'],
+			required: true,
+		},
+	],
 }
 
 /**

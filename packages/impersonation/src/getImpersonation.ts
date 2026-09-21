@@ -2,7 +2,13 @@ import type { Payload, PayloadRequest, TypedUser } from 'payload'
 
 import { getRegistry } from './plugin/registry'
 import { closeAndRevoke } from './session/close'
-import { isPastAbsoluteExpiry, relationOf, resolveCurrent } from './session/resolve'
+import {
+	impersonationSide,
+	isPastAbsoluteExpiry,
+	relationOf,
+	resolveCurrent,
+} from './session/resolve'
+import type { ImpersonationRecord } from './types'
 import { boundSid } from './types'
 
 export type ImpersonationStatus =
@@ -12,6 +18,7 @@ export type ImpersonationStatus =
 			impersonator: { collection: string; id: number | string } | null
 			impersonatorLocale: null | string
 			mode: 'parallel' | 'swap'
+			side: 'impersonator' | 'target'
 			startedAt: string
 			target: { collection: string; id: number | string } | null
 	  }
@@ -19,11 +26,34 @@ export type ImpersonationStatus =
 
 const inactive = (): ImpersonationStatus => ({ active: false })
 
+export const statusFromRow = (row: ImpersonationRecord, sid: string): ImpersonationStatus => ({
+	absoluteExpiresAt: row.absoluteExpiresAt ?? null,
+	active: true,
+	impersonator: relationOf(row.impersonator),
+	impersonatorLocale: row.impersonatorLocale ?? null,
+	mode: row.mode,
+	side: impersonationSide(row, sid),
+	startedAt: row.startedAt,
+	target: relationOf(row.target),
+})
+
 /**
- * Read the active impersonation for a request. Resolves from the database by
- * sid (and an optional hint cookie), never from `user._impersonation` alone.
- * A past `maxDuration` cap is closed here so local callers do not leave the
- * row open when no decorated auth request runs.
+ * Active impersonation for this request, if any.
+ *
+ * Pass `user` when you already called `payload.auth`, so this helper does not
+ * authenticate again. Omit `user` to authenticate from `headers`. Pass
+ * `user: null` when you already know the request is anonymous; that skips auth
+ * and returns `{ active: false }`.
+ *
+ * `side` is `target` when this request is the impersonated session, and
+ * `impersonator` when it is the admin side of a parallel session.
+ *
+ * Frontend (RSC):
+ *
+ * ```ts
+ * const { user } = await payload.auth({ headers })
+ * const impersonation = await getImpersonation({ headers, payload, user })
+ * ```
  */
 export async function getImpersonation(
 	args: PayloadRequest | { headers: Headers; payload: Payload; user?: null | TypedUser }
@@ -35,10 +65,7 @@ export async function getImpersonation(
 		return inactive()
 	}
 
-	let user = 'user' in args ? args.user : undefined
-	if (!user) {
-		;({ user } = await payload.auth({ headers }))
-	}
+	const user = 'user' in args ? args.user : (await payload.auth({ headers })).user
 
 	const sid = boundSid(user, options.session.binding)
 	if (!user || !sid) {
@@ -54,13 +81,5 @@ export async function getImpersonation(
 		return inactive()
 	}
 
-	return {
-		absoluteExpiresAt: row.absoluteExpiresAt ?? null,
-		active: true,
-		impersonator: relationOf(row.impersonator),
-		impersonatorLocale: row.impersonatorLocale ?? null,
-		mode: row.mode,
-		startedAt: row.startedAt,
-		target: relationOf(row.target),
-	}
+	return statusFromRow(row, sid)
 }

@@ -73,6 +73,7 @@ export interface Config {
     users: User;
     customers: Customer;
     partners: Partner;
+    posts: Post;
     'sso-users': SsoUser;
     'impersonation-sessions': ImpersonationSession;
     'payload-kv': PayloadKv;
@@ -85,6 +86,7 @@ export interface Config {
     users: UsersSelect<false> | UsersSelect<true>;
     customers: CustomersSelect<false> | CustomersSelect<true>;
     partners: PartnersSelect<false> | PartnersSelect<true>;
+    posts: PostsSelect<false> | PostsSelect<true>;
     'sso-users': SsoUsersSelect<false> | SsoUsersSelect<true>;
     'impersonation-sessions': ImpersonationSessionsSelect<false> | ImpersonationSessionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -261,6 +263,18 @@ export interface Partner {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts".
+ */
+export interface Post {
+  id: string;
+  title: string;
+  author?: (string | null) | User;
+  visibility: 'public' | 'partners' | 'staff';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "sso-users".
  */
 export interface SsoUser {
@@ -330,6 +344,7 @@ export interface ImpersonationSession {
   mode: 'swap' | 'parallel';
   targetSid: string;
   impersonatorSid: string;
+  impersonatorTenantCookie?: string | null;
   startedAt: string;
   endedAt?: string | null;
   endedBy?: ('exit' | 'logout' | 'terminated' | 'expired' | 'impersonatorGone' | 'targetGone' | 'failed') | null;
@@ -377,6 +392,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'partners';
         value: string | Partner;
+      } | null)
+    | ({
+        relationTo: 'posts';
+        value: string | Post;
       } | null)
     | ({
         relationTo: 'sso-users';
@@ -526,6 +545,17 @@ export interface PartnersSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "posts_select".
+ */
+export interface PostsSelect<T extends boolean = true> {
+  title?: T;
+  author?: T;
+  visibility?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "sso-users_select".
  */
 export interface SsoUsersSelect<T extends boolean = true> {
@@ -559,6 +589,7 @@ export interface ImpersonationSessionsSelect<T extends boolean = true> {
   mode?: T;
   targetSid?: T;
   impersonatorSid?: T;
+  impersonatorTenantCookie?: T;
   startedAt?: T;
   endedAt?: T;
   endedBy?: T;

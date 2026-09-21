@@ -72,13 +72,24 @@ export const findOpenByImpersonatorSid = async ({
 }): Promise<ImpersonationRecord | null> =>
 	findOpenWhere({ options, payload, req, where: openByImpersonatorSid(sid) })
 
+export const openBySid = (sid: string): Where => ({
+	and: [
+		{ endedAt: { exists: false } },
+		{ or: [{ targetSid: { equals: sid } }, { impersonatorSid: { equals: sid } }] },
+	],
+})
+
 export const findOpenBySid = async (args: {
 	options: ResolvedOptions
 	payload: Payload
 	req?: PayloadRequest
 	sid: string
-}): Promise<ImpersonationRecord | null> =>
-	(await findOpenByTargetSid(args)) ?? (await findOpenByImpersonatorSid(args))
+}): Promise<ImpersonationRecord | null> => findOpenWhere({ ...args, where: openBySid(args.sid) })
+
+export const impersonationSide = (
+	row: ImpersonationRecord,
+	sid: string
+): 'impersonator' | 'target' => (row.targetSid === sid ? 'target' : 'impersonator')
 
 const rowMatchesSid = (row: ImpersonationRecord, sid: string): boolean =>
 	row.targetSid === sid || row.impersonatorSid === sid

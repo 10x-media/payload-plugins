@@ -12,9 +12,9 @@ description: Let an authorised account sign in as another user, then return. Eve
 ## What it does
 
 - A host `access.impersonate` function is mandatory. The plugin never compares roles.
-- Start mints a real target session (`addSessionToUser` + JWT + cookie). Payload then authenticates the target on every request.
-- `req.user._impersonation` is painted on afterwards by wrapping `payload.authStrategies` in `onInit`.
-- Active means an open row (`endedAt` null) whose `targetSid` matches `req.user._sid`. Refresh extending the minted session cannot hide the bar.
+- Start mints a real target session (prefixed sid + JWT + cookie). Payload then authenticates the target on every request.
+- `req.user._impersonation` is set on the **target** session only (the minted sid). Parallel admin requests stay the impersonator.
+- Active means an open row whose `targetSid` matches this request, or (for the admin bar) whose `impersonatorSid` matches in parallel mode.
 - Swap replaces the shared auth cookie. Parallel writes an isolated cookie only when `@10x-media/dual-session` isolated the target.
 - List this plugin **after** any plugin that adds auth collections. `onInit` throws if a live auth collection was missing at plugin-build time.
 
@@ -25,4 +25,5 @@ description: Let an authorised account sign in as another user, then return. Eve
 - [Custom auth](/impersonation/custom-auth)
 - [Security](/impersonation/security)
 - [Multi-tenancy](/impersonation/multi-tenancy)
+- [Frontend](/impersonation/frontend)
 - [Limits](/impersonation/limits)

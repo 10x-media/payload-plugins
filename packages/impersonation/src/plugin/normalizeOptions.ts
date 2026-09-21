@@ -29,10 +29,17 @@ const firstApiSegment = (apiPath: string): string =>
 
 const resolveUi = (ui: EnabledOptions['ui']): ResolvedUi => {
 	if (ui === false) {
-		return { bar: false, documentAction: false, headerAction: false, recordAction: false }
+		return {
+			bar: false,
+			cardEmail: false,
+			documentAction: false,
+			headerAction: false,
+			recordAction: false,
+		}
 	}
 	return {
 		bar: ui?.bar !== false,
+		cardEmail: ui?.cardEmail !== false,
 		documentAction: ui?.documentAction !== false,
 		headerAction: ui?.headerAction !== false,
 		recordAction: ui?.recordAction !== false,
@@ -88,6 +95,7 @@ export const normalizeOptions = (options: EnabledOptions, config: Config): Resol
 
 	return {
 		access: {
+			filterTargets: options.access.filterTargets,
 			impersonate: options.access.impersonate,
 			readRecords: options.access.readRecords ?? (() => false),
 			terminate: options.access.terminate ?? (() => false),
@@ -103,6 +111,7 @@ export const normalizeOptions = (options: EnabledOptions, config: Config): Resol
 		onEnd: options.onEnd,
 		onStart: options.onStart,
 		reason: options.reason ?? 'off',
+		retention: options.retention ? options.retention : undefined,
 		security: { trustedOrigins: options.security?.trustedOrigins ?? [] },
 		session: options.session ?? {},
 		targets: options.targets,

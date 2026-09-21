@@ -39,6 +39,14 @@ describe('impersonation factory', () => {
 		expect(i18n.en?.impersonation?.pluginName).toBe('Impersonation')
 	})
 
+	it('registers the provider even when ui is false', () => {
+		const out = impersonation({ ...allowAll, ui: false })(fakeConfig()) as Config
+		expect(out.admin?.components?.providers).toEqual(
+			expect.arrayContaining(['@10x-media/impersonation/rsc#ImpersonationProvider'])
+		)
+		expect(out.admin?.components?.actions ?? []).toEqual([])
+	})
+
 	it('registers the records collection and root endpoints', () => {
 		const out = impersonation(allowAll)(fakeConfig()) as Config
 		expect(

@@ -1,16 +1,17 @@
 'use client'
 
-import { PopupList, useDocumentInfo, useDocumentTitle, useModal } from '@payloadcms/ui'
+import { Button, useDocumentInfo, useDocumentTitle, useModal } from '@payloadcms/ui'
 import { useMemo } from 'react'
 
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
+import { ImpersonateIcon } from './ImpersonateIcon'
 import { StartConfirmModal, type StartTarget } from './StartConfirmModal'
 import { useImpersonation } from './useImpersonation'
 
 const CONFIRM_SLUG = 'impersonation-confirm-document'
 
-export const SwitchToUserMenuItem = () => {
+export const ImpersonationDocumentButton = () => {
 	const { collectionSlug, data, id } = useDocumentInfo()
 	const { title } = useDocumentTitle()
 	const { t } = useTranslation()
@@ -42,12 +43,21 @@ export const SwitchToUserMenuItem = () => {
 
 	return (
 		<>
-			<PopupList.Button onClick={() => openModal(CONFIRM_SLUG)}>
-				<span data-testid="impersonation-document-action">{t(keys.switchToUser)}</span>
-			</PopupList.Button>
+			<Button
+				buttonStyle="secondary"
+				className="impersonation-document-button"
+				margin={false}
+				onClick={() => openModal(CONFIRM_SLUG)}
+				size="small"
+			>
+				<span className="impersonation-header-action">
+					<ImpersonateIcon />
+					<span data-testid="impersonation-document-action">{t(keys.switchToUser)}</span>
+				</span>
+			</Button>
 			<StartConfirmModal
 				apiPath={apiPath}
-				key={target ? `${target.collection}:${target.id}` : 'idle'}
+				key={`${target.collection}:${target.id}`}
 				modalSlug={CONFIRM_SLUG}
 				reasonMode={reasonMode}
 				target={target}

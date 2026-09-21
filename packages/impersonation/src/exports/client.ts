@@ -2,5 +2,10 @@
 
 export { EndSessionMenuItem } from '../ui/EndSessionMenuItem'
 export { ImpersonationBar } from '../ui/ImpersonationBar'
+export { ImpersonationDocumentButton } from '../ui/ImpersonationDocumentButton'
+export { ImpersonationFrontendExit } from '../ui/ImpersonationFrontendExit'
 export { ImpersonationSwitcher } from '../ui/ImpersonationSwitcher'
+export { ImpersonationUserCard } from '../ui/ImpersonationUserCard'
+export { StartConfirmModal } from '../ui/StartConfirmModal'
 export { SwitchToUserMenuItem } from '../ui/SwitchToUserMenuItem'
+export { useImpersonation } from '../ui/useImpersonation'

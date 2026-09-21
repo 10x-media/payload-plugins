@@ -1,7 +1,8 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 
+import { statusFromRow } from '../getImpersonation'
 import { closeAndRevoke } from '../session/close'
-import { isPastAbsoluteExpiry, relationOf, resolveCurrent } from '../session/resolve'
+import { isPastAbsoluteExpiry, resolveCurrent } from '../session/resolve'
 import { boundSid } from '../types'
 import { getOptions, json } from './shared'
 
@@ -33,19 +34,8 @@ export const currentHandler = async (req: PayloadRequest): Promise<Response> => 
 		return json({ body: { active: false }, req, status: 200 })
 	}
 
-	const impersonator = relationOf(row.impersonator)
-	const target = relationOf(row.target)
-
 	return json({
-		body: {
-			absoluteExpiresAt: row.absoluteExpiresAt ?? null,
-			active: true,
-			impersonator,
-			impersonatorLocale: row.impersonatorLocale ?? null,
-			mode: row.mode,
-			startedAt: row.startedAt,
-			target,
-		},
+		body: statusFromRow(row, sid),
 		req,
 		status: 200,
 	})

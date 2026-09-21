@@ -22,20 +22,10 @@ const startAs = async (page: Page, name: string, collection?: string) => {
 		await drawer.locator('.react-select').first().click()
 		await page.getByRole('option', { name: collectionLabel(collection), exact: true }).click()
 	}
-	await drawer.getByRole('button', { name, exact: true }).click()
+	await drawer.locator('.impersonation-card__pick').filter({ hasText: name }).click()
 	const confirm = page.locator('.confirmation-modal')
 	await expect(confirm).toBeVisible()
-	await confirm.getByRole('button', { name: 'Switch', exact: true }).click()
-}
-
-const revealMenuItem = async (page: Page, testId: string) => {
-	const item = page.getByTestId(testId)
-	if (await item.isVisible()) {
-		return item
-	}
-	await page.locator('.popup-button').last().click()
-	await expect(item).toBeVisible()
-	return item
+	await confirm.getByRole('button', { name: 'Impersonate', exact: true }).click()
 }
 
 test('admin panel loads with impersonation plugin enabled', async ({ page }) => {
@@ -74,10 +64,10 @@ test('document action starts impersonation', async ({ page }) => {
 	expect(listed.ok()).toBeTruthy()
 	const id = (await listed.json()).docs[0].id
 	await page.goto(`/admin/collections/users/${id}`)
-	await (await revealMenuItem(page, 'impersonation-document-action')).click()
+	await page.getByTestId('impersonation-document-action').click()
 	const confirm = page.locator('.confirmation-modal')
 	await expect(confirm).toBeVisible()
-	await confirm.getByRole('button', { name: 'Switch', exact: true }).click()
+	await confirm.getByRole('button', { name: 'Impersonate', exact: true }).click()
 	await expect(page.getByTestId('impersonation-bar')).toContainText('Acting as')
 })
 

@@ -7,9 +7,9 @@ description: Origin gate, access.impersonate, session binding, and what is not a
 
 `access.impersonate` is required. Config throws if it is not a function. `disabled: true` skips the check.
 
-Only the literal `true` allows. A Payload `Where` object is deny, never allow-all. `() => {}` is deny. Start loads the target with `overrideAccess: true` (and `trash: true` when the collection supports it). Missing is `forbidden`, not `targetNotFound`. `access.impersonate` then runs. Trash, unverified, and unreadable still 403 after an allow. The start JSON `user` is that readable document, not the minted `db.findOne` row (no hash, salt, reset tokens, or sessions).
+Only the literal `true` allows. A Payload `Where` is deny. Missing, trashed, unverified, or unreadable targets are `forbidden`. The JSON `user` on start is the document the viewer can read, not the raw database row.
 
-`access.terminate` and `access.readRecords` default deny. Exit is binding, not a role.
+`access.terminate` and `access.readRecords` default deny. Exit is binding, not a role. `access.filterTargets` only shapes the switcher; start still requires `impersonate`.
 
 ## Origin gate
 
@@ -32,7 +32,7 @@ Cookie POSTs to start, exit, and end must be same-origin. The plugin does **not*
 
 ## Parallel mode
 
-When `@10x-media/dual-session` isolated the target, start writes that cookie and leaves `` `${cookiePrefix}-token` `` alone. Admin requests still authenticate as the impersonator (`adminSessionPriority`). Frontend requests authenticate as the target. Current/bar/`_impersonation` resolve from either `targetSid` or `impersonatorSid`. A past `maxDuration` expires the isolated cookie and the hint; the impersonator's cookie stays.
+When `@10x-media/dual-session` isolated the target, start writes that cookie and leaves `` `${cookiePrefix}-token` `` alone. Admin requests still authenticate as the impersonator. Frontend requests authenticate as the target. `req.user._impersonation` is set only on the target sid. A past `maxDuration` expires the isolated cookie and the hint; the impersonator's cookie stays.
 
 ## Writes
 

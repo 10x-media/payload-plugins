@@ -34,6 +34,7 @@ describe('normalizeOptions', () => {
 		expect(resolved.maxDuration).toBeUndefined()
 		expect(resolved.ui).toEqual({
 			bar: true,
+			cardEmail: true,
 			documentAction: true,
 			headerAction: true,
 			recordAction: true,

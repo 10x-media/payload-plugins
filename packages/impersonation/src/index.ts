@@ -9,6 +9,7 @@ import { registerAdmin } from './plugin/registerAdmin'
 import { registerCollection } from './plugin/registerCollection'
 import { registerEndpoints } from './plugin/registerEndpoints'
 import { registerHooks } from './plugin/registerHooks'
+import { registerRetention } from './plugin/registerRetention'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setRegistry } from './plugin/registry'
 import { closeStaleImpersonations } from './session/closeStale'
@@ -50,6 +51,7 @@ export const impersonation = definePlugin<ImpersonationPluginOptions>({
 		registerEndpoints(config, resolved)
 		registerHooks(config, resolved)
 		registerAdmin(config, resolved)
+		registerRetention(config, resolved)
 
 		const priorOnInit = config.onInit
 		config.onInit = async (payload) => {

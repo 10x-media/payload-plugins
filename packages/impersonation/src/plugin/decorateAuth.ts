@@ -12,6 +12,7 @@ import type {
 	ResolvedOptions,
 } from '../types'
 import { boundSid } from '../types'
+import { shouldLookupImpersonation } from './lookup'
 
 /**
  * Runtime wrap of `payload.authStrategies` (assembled in `init()`, not a config
@@ -47,6 +48,10 @@ const wrapStrategy = ({
 			return result
 		}
 
+		if (!shouldLookupImpersonation({ headers: args.headers, options, sid })) {
+			return result
+		}
+
 		const row = await findOpenBySid({ options, payload, sid })
 		if (!row) {
 			return result
@@ -65,13 +70,16 @@ const wrapStrategy = ({
 		}
 
 		const impersonator = relationOf(row.impersonator)
-		if (impersonator) {
+		const target = relationOf(row.target)
+		if (impersonator && target && sid === row.targetSid) {
 			const actor: ImpersonationActor = {
+				absoluteExpiresAt: row.absoluteExpiresAt ?? null,
 				id: row.id,
 				impersonator,
 				mode: row.mode,
 				reason: row.reason,
 				startedAt: row.startedAt,
+				target,
 			}
 			user._impersonation = actor
 		}

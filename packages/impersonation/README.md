@@ -33,7 +33,7 @@ export default buildConfig({
 
 `access.impersonate` is required. Only the literal `true` allows.
 
-The admin header gets **Switch to user**, which opens a Payload drawer, then the native confirmation modal. While impersonating, a bar on every admin route (including `/admin/unauthorized`) shows **Acting as** and **Return to**.
+The admin header gets **Impersonate**. Confirm, and you are that user until you exit. A bar on every admin route (including `/admin/unauthorized`) shows **Acting as** and **Return to**.
 
 ## Documentation
 
