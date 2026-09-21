@@ -1,5 +1,13 @@
 # @10x-media/form-builder
 
+## 0.1.0-beta.25
+
+### Minor Changes
+
+- Emails follow the visitor's locale. `<Form>` now sends an explicit `locale` prop with the submission as `?locale=` (and hands it to a custom `onSubmit` as `locale`), so the submission stores the visitor's locale instead of the host's default, and the post-submit actions, the confirmation email included, render its subject and body in it. Without the prop nothing changes. The server clamps the visitor-controlled locale before anything reads it: a localized host keeps only its configured locale codes (`all`, `*`, and unknown codes become the default locale), a host without localization keeps any plain language tag and otherwise stores `en`. A custom `richText.serialize` also receives that `locale` and the `actionType` rendering the body (`emailTeam`, `confirmation`, or a custom action's type), so an email wrapper can localize its own strings and give the visitor's confirmation a different layout than the team notification.
+
+- Add `email.render`, a hook producing the final html of every `emailTeam` and `confirmation` email from the already serialized body, so a host can wrap emails in a branded, localized layout without re-implementing the rich text pipeline. It receives the serialized `html`, the raw `body`, the interpolated `subject`, the `actionType`, and the submission context (`locale`, `form`, `submissionId`, `values`, `descriptors`, `context`, `payload`, `req`). It runs after `richText.serialize`, so the two compose.
+
 ## 0.1.0-beta.24
 
 ### Patch Changes
