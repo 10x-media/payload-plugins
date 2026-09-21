@@ -2,7 +2,7 @@ import type { Config, Payload, PayloadRequest, TaskConfig } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import type { FormContextReference } from '../context/formContext'
 import type { Translate } from '../fields/types'
-import { findFormAtLocale } from '../form/findFormAtLocale'
+import { findFormAtLocale, missingFormOnReadError } from '../form/findFormAtLocale'
 import { resolveSubmissionLocale } from '../submissions/submissionLocale'
 import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types'
 import { asFieldTranslate } from '../translations/server'
@@ -87,7 +87,7 @@ export const runActionsForSubmission = async (args: {
 		locale,
 		req,
 		overrideAccess: true,
-	}).catch(() => null)
+	}).catch(missingFormOnReadError)
 	if (!form) {
 		return []
 	}

@@ -55,10 +55,17 @@ export const createSubmission = (
 		req?: PayloadRequest
 		context?: Record<string, unknown>
 	}) => Promise<CreatedSubmission>
-	return create({
+	const created = create({
 		collection: FORM_SUBMISSIONS_SLUG,
 		data: { form: args.form, values: args.values },
 		req: args.req,
 		...(args.locale ? { context: { [SUBMISSION_LOCALE_CONTEXT_KEY]: args.locale } } : {}),
 	})
+	// `validateSubmission` consumes the key, but a create rejected before it runs (the spam guard's
+	// rate limit) would leave it on the host's `req.context` for its next create.
+	return args.locale && args.req
+		? created.finally(() => {
+				delete args.req?.context?.[SUBMISSION_LOCALE_CONTEXT_KEY]
+			})
+		: created
 }

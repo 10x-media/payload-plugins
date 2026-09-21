@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
+import { FallbackLocaleError, stashFallbackLocale } from '../form/findFormAtLocale'
 import type { AnyActionDefinition } from './defineAction'
 import type { ActionRegistry } from './registry'
 import { runActionsForSubmission } from './task'
@@ -49,6 +50,35 @@ describe('runActionsForSubmission', () => {
 
 		expect(run).toHaveBeenCalledWith(expect.objectContaining({ form }))
 		expect(findByID).toHaveBeenCalledTimes(2)
+	})
+
+	it('fails the run instead of dropping it when the fallbackLocale resolver throws', async () => {
+		const run = vi.fn()
+		const registry: ActionRegistry = new Map([['spy', { type: 'spy', label: 'Spy', run }]])
+		const findByID = vi
+			.fn()
+			.mockResolvedValueOnce({ id: 's1', values: [], descriptors: [], locale: 'de' })
+			.mockResolvedValueOnce({ id: 'f1', actions: [{ blockType: 'spy' }] })
+		const payload = {
+			config: {
+				localization: {
+					defaultLocale: 'en',
+					localeCodes: ['en', 'de'],
+					locales: [{ code: 'en' }, { code: 'de' }],
+					fallback: true,
+				},
+				custom: stashFallbackLocale(undefined, () => {
+					throw new Error('tenant lookup down')
+				}),
+			},
+			findByID,
+			logger: { error: vi.fn() },
+		} as unknown as Payload
+
+		await expect(
+			runActionsForSubmission({ input: { formId: 'f1', submissionId: 's1' }, registry, payload })
+		).rejects.toBeInstanceOf(FallbackLocaleError)
+		expect(run).not.toHaveBeenCalled()
 	})
 
 	it('returns an empty list and logs nothing when the submission is missing', async () => {

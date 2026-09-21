@@ -1,4 +1,10 @@
-import type { Payload, PayloadRequest, SanitizedConfig, TypedLocale } from 'payload'
+import {
+	type Payload,
+	type PayloadRequest,
+	sanitizeFallbackLocale,
+	type TypedFallbackLocale,
+	type TypedLocale,
+} from 'payload'
 import type { SubmissionForm } from '../actions/submissionContext'
 import { FORMS_SLUG } from '../collections/forms'
 import { customStateOf, stashCustomState } from '../plugin/customState'
@@ -48,23 +54,32 @@ export type FindFormAtLocaleArgs = {
 	overrideAccess?: boolean
 }
 
-type Localization = Exclude<SanitizedConfig['localization'], false>
+/**
+ * A host `fallbackLocale` resolver threw. Kept distinct so callers that read a failed form load as a
+ * deleted form (and skip quietly) let this one through instead: a transient failure in host I/O must
+ * fail the action run (and retry it on the queued path), never drop it.
+ */
+export class FallbackLocaleError extends Error {
+	constructor(cause: unknown) {
+		super(
+			`@10x-media/form-builder: fallbackLocale resolver failed: ${
+				cause instanceof Error ? cause.message : String(cause)
+			}`,
+			{ cause }
+		)
+		this.name = 'FallbackLocaleError'
+	}
+}
 
 /**
- * The fallback Payload applies to a plain read at `locale`: a locale's own `fallbackLocale`, else the
- * default locale, with `localization.fallback` on; none (`false`) with it off or at the default locale.
+ * `.catch` handler for callers that treat a form that cannot be read as missing: `null` for a read
+ * failure, rethrowing a `FallbackLocaleError`.
  */
-const configFallbackOf = (
-	localization: Localization,
-	locale: string
-): string | string[] | false => {
-	if (!localization.fallback || locale === localization.defaultLocale) {
-		return false
+export const missingFormOnReadError = (error: unknown): null => {
+	if (error instanceof FallbackLocaleError) {
+		throw error
 	}
-	return (
-		localization.locales.find((entry) => entry.code === locale)?.fallbackLocale ??
-		localization.defaultLocale
-	)
+	return null
 }
 
 /**
@@ -78,7 +93,9 @@ const configFallbackOf = (
  * already applied.
  *
  * Payload's local API writes `locale` and `fallbackLocale` onto the `req` it is handed. Both are
- * restored afterwards, so a host (or job runner) request passed in comes back unchanged.
+ * restored afterwards, so a host (or job runner) request passed in comes back unchanged. The restore
+ * assumes one operation per `req` at a time: concurrent reads sharing a `req` (a `Promise.all` of
+ * creates at different locales) can interleave it, so give each its own request.
  */
 export const findFormAtLocale = async ({
 	payload,
@@ -110,19 +127,26 @@ export const findFormAtLocale = async ({
 		if (!resolver) {
 			return form
 		}
-		const chosen = await resolver({
-			// Double cast: a host's generated Form interface has no index signature.
-			form: form as unknown as SubmissionForm,
+		let chosen: FormFallbackLocaleResult
+		try {
+			chosen = await resolver({
+				// Double cast: a host's generated Form interface has no index signature.
+				form: form as unknown as SubmissionForm,
+				locale,
+				payload,
+				req,
+			})
+		} catch (error) {
+			throw new FallbackLocaleError(error)
+		}
+		// Falling back to the read's own locale, or to the fallback Payload already applied (resolved by
+		// Payload's own sanitizer, so the two cannot drift), changes nothing.
+		const applied = sanitizeFallbackLocale({
+			fallbackLocale: undefined as unknown as TypedFallbackLocale,
 			locale,
-			payload,
-			req,
+			localization,
 		})
-		// Falling back to the read's own locale, or to the fallback already applied, changes nothing.
-		if (
-			chosen === undefined ||
-			chosen === locale ||
-			chosen === configFallbackOf(localization, locale)
-		) {
+		if (chosen === undefined || chosen === locale || chosen === applied) {
 			return form
 		}
 		return await read(chosen)

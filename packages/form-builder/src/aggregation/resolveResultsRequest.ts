@@ -1,5 +1,5 @@
 import type { Payload, PayloadRequest, TypedLocale } from 'payload'
-import { findFormAtLocale } from '../form/findFormAtLocale'
+import { findFormAtLocale, missingFormOnReadError } from '../form/findFormAtLocale'
 import { isPollClosed, pollConfigOf } from '../form/pollState'
 import { type PollFormLike, shouldAutoResolvePoll } from '../poll/closeJob'
 import type { PollOption } from '../poll/definePollOptionSource'
@@ -91,7 +91,7 @@ const resolveAtLocale = async (
 		locale,
 		req,
 		overrideAccess: true,
-	}).catch(() => null)
+	}).catch(missingFormOnReadError)
 	if (!form) {
 		return { status: 404, body: { errors: [{ message: 'Not found' }] } }
 	}
