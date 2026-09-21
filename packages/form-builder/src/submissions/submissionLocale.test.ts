@@ -19,14 +19,34 @@ describe('resolveSubmissionLocale', () => {
 		}
 	})
 
-	it('keeps any plain language tag without localization', () => {
-		for (const locale of ['uk', 'pt-BR', 'zh_Hant', 'sr-Latn-RS']) {
+	it('keeps any valid language tag without localization', () => {
+		for (const locale of ['uk', 'pt-BR', 'zh-Hant', 'sr-Latn-RS']) {
 			expect(resolveSubmissionLocale(locale, false)).toBe(locale)
 		}
 	})
 
+	it('stores an Intl-safe canonical tag without localization', () => {
+		expect(resolveSubmissionLocale('zh_Hant', false)).toBe('zh-Hant')
+		expect(resolveSubmissionLocale('en_us', false)).toBe('en-US')
+		for (const locale of ['zh_Hant', 'en_us', 'pt-br']) {
+			const stored = resolveSubmissionLocale(locale, false)
+			expect(() => new Intl.DateTimeFormat(stored)).not.toThrow()
+		}
+	})
+
 	it('falls back to en for all and anything that is not a plain tag without localization', () => {
-		for (const locale of ['all', '*', 'x', '<script>', 'en\r\nX', 'a'.repeat(40), '', undefined]) {
+		for (const locale of [
+			'all',
+			'*',
+			'x',
+			'<script>',
+			'en\r\nX',
+			'a'.repeat(40),
+			'en--US',
+			'en-',
+			'',
+			undefined,
+		]) {
 			expect(resolveSubmissionLocale(locale, false)).toBe('en')
 		}
 	})

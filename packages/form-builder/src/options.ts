@@ -15,6 +15,7 @@ import type { ConsentSourcesResolver } from './consent/types'
 import type { DepartmentEmailsResolver } from './email/departments'
 import type { FormEventSink } from './events/types'
 import type { FieldTypesConfig } from './fields/registry'
+import type { FormFallbackLocale } from './form/findFormAtLocale'
 import type { CollectionOverrides } from './plugin/collectionOverrides'
 import type { UploadsOption } from './plugin/uploadsCollection'
 import type { OutcomeFieldsOverride } from './poll/outcomeFields'
@@ -47,6 +48,19 @@ export type FormBuilderPluginOptions = {
 	 * `consentSourcesField()`, which carries its own `localized` option.
 	 */
 	localizeContent?: boolean
+	/**
+	 * Chooses the fallback locale per form for the plugin's server-side reads of it (validating a
+	 * submission, running its actions, serving poll results), for hosts where the right fallback
+	 * depends on the form's owner rather than on the config, e.g. a tenant whose default locale is not
+	 * the config-wide one, or to force one on a host with `localization.fallback: false`. It receives
+	 * the form as read with the config's own fallback (depth 0, so a
+	 * non-localized owner relationship such as `form.tenant` is on it) and returns a locale code, an
+	 * ordered list of codes, `false` for no fallback, or `undefined` to keep the default. The form is
+	 * read again only when the result differs from the fallback already applied. Absent, a form falls
+	 * back like any Payload read. Render the form on your page with the same fallback so what the
+	 * visitor sees matches what the server validates and sends. See {@link FormFallbackLocale}.
+	 */
+	fallbackLocale?: FormFallbackLocale
 	/** Add, override, or remove field types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	fields?: FieldTypesConfig
 	/** Add, override, or remove validation rule types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
@@ -126,6 +140,15 @@ export type FormBuilderPluginOptions = {
 		departments?: DepartmentEmailsResolver
 		/** Narrows the recipient fields' behavior (free-typed emails, field tokens). See {@link RecipientsConfig}. */
 		recipients?: RecipientsConfig
+		/**
+		 * Localize the email actions' recipient lists (`to`, `cc`, `bcc`, `replyTo`), so each locale
+		 * stores and routes to its own addresses or departments. Off by default: routing is usually the
+		 * same in every locale, and with per-locale lists a locale the editor never filled in has no
+		 * recipients unless it falls back (mind `localization.fallback: false`; see `fallbackLocale`).
+		 * Ignored with `localizeContent: false`. Switching it on or off changes how existing
+		 * forms store these fields, so it needs a data migration.
+		 */
+		localizeRecipients?: boolean
 		/**
 		 * Server-resolved recipients, offered in every recipient field as their own option group and
 		 * resolved to addresses at send time. Each source's `value` is a namespaced string (so it cannot

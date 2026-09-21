@@ -78,6 +78,7 @@ describe('dispatchActions', () => {
 			const payload = {
 				jobs: { queue },
 				logger: { error: vi.fn() },
+				config: {},
 				findByID: vi.fn().mockImplementation(({ collection }: { collection: string }) => {
 					if (collection === 'forms') {
 						return Promise.resolve({ id: 'form-2', actions: [{ blockType: 'recorder' }] })
@@ -140,6 +141,7 @@ describe('dispatchActions', () => {
 			const payload = {
 				jobs: {},
 				logger: { error: vi.fn() },
+				config: {},
 				findByID: vi.fn().mockImplementation(({ collection }: { collection: string }) => {
 					if (collection === 'forms') {
 						return Promise.resolve({ id: 'form-1', actions: [{ blockType: 'recorder' }] })
@@ -205,6 +207,7 @@ describe('dispatchActions', () => {
 			({
 				jobs: { queue },
 				logger: { error: vi.fn(), warn: vi.fn() },
+				config: {},
 				findByID: vi
 					.fn()
 					.mockImplementation(({ collection }: { collection: string }) =>
@@ -368,6 +371,7 @@ describe('dispatchActions', () => {
 			({
 				jobs: { queue },
 				logger: { error: vi.fn(), info: vi.fn() },
+				config: {},
 				findByID: vi
 					.fn()
 					.mockImplementation(({ collection }: { collection: string }) =>

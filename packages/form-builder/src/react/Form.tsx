@@ -135,12 +135,16 @@ export type FormProps = {
 	calcFunctions?: Record<string, (args: number[]) => number>
 	events?: FormEventSink
 	t?: RendererTranslate
-	/**
-	 * The visitor's locale: drives renderer strings and value formatting (`'en'` when absent) and,
-	 * when passed, is sent with the submission so the server stores it and the post-submit actions
-	 * (confirmation emails included) render in it. Absent, the submission takes the host's default locale.
-	 */
+	/** The visitor's locale for renderer strings and value formatting, e.g. `en-US` (`'en'` when absent). */
 	locale?: string
+	/**
+	 * The Payload content locale to submit under, one of the host's `localization` codes (`en`, `de`),
+	 * sent as `?locale=` so the server stores it on the submission and the post-submit actions
+	 * (confirmation emails included) render in it. A `<Poll>` also reads its results in it. Separate
+	 * from `locale` because a formatting tag like `en-US` is usually not a content locale code.
+	 * Absent, the submission takes the host's default locale.
+	 */
+	submissionLocale?: string
 	layout?: boolean
 	/** Submit button label. Precedence: this prop, then the form's `buttons.submitLabel`, then the translated default. */
 	submitLabel?: string
@@ -255,6 +259,7 @@ export const Form = ({
 	events,
 	t,
 	locale: localeProp,
+	submissionLocale,
 	layout,
 	submitLabel,
 	nextLabel,
@@ -769,9 +774,14 @@ export const Form = ({
 			// never merged into the answers.
 			values.push({ field: CONTEXT_KEY, value: context })
 		}
+		const input = {
+			formId: form.id,
+			values,
+			...(submissionLocale ? { locale: submissionLocale } : {}),
+		}
 		const result: SubmitFormResult = onSubmit
-			? await onSubmit({ formId: form.id, values, ...(localeProp ? { locale: localeProp } : {}) })
-			: await submitForm({ formId: form.id, values, apiRoute, locale: localeProp })
+			? await onSubmit(input)
+			: await submitForm({ ...input, apiRoute })
 		submittingRef.current = false
 		if (result.ok) {
 			// A submission happened, so the unmount effect must not emit `form.abandoned`, in either mode.

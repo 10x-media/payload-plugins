@@ -14,7 +14,9 @@ export type FromAddressOption = { label: string; value: string }
  * audit-stable while the address it resolves to follows the host; `label` is what the editor sees
  * in the from select. `resolve` returns the address to send from right now (reduced to a single
  * address), or null/empty to send with the email adapter's default sender. A throw fails the
- * action loudly (and retries on the queued path) rather than sending as the wrong identity.
+ * action loudly (and retries on the queued path) rather than sending as the wrong identity. Its
+ * `form` is the whole form document (see `SubmissionForm`), so a per-tenant sender reads the tenant
+ * off it rather than reading the form back.
  */
 export type FromAddressSource = {
 	value: string

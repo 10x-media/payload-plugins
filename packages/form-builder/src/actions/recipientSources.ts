@@ -1,19 +1,10 @@
-import type { Payload, PayloadRequest } from 'payload'
-import type { FormContextReference } from '../context/formContext'
-import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types'
+import type { SubmissionContextArgs } from './submissionContext'
 
-/** Arguments a recipient source's `resolve` receives when a submission's email actions run. */
-export type RecipientResolveArgs = {
-	/** The verified form-context reference, or null when the form was rendered without one. */
-	context: FormContextReference | null
-	values: SubmissionValue[]
-	descriptors: SubmissionDescriptor[]
-	form: { id: number | string; title?: string }
-	submissionId: number | string
-	payload: Payload
-	req?: PayloadRequest
-	locale: string
-}
+/**
+ * Arguments a recipient source's `resolve` receives when a submission's email actions run. `form` is
+ * the whole form document (see `SubmissionForm`).
+ */
+export type RecipientResolveArgs = SubmissionContextArgs
 
 /**
  * A recipient the plugin resolves server-side at send time (plugin option `email.recipientSources`).

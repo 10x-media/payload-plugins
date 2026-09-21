@@ -77,7 +77,7 @@ formBuilder({
 })
 ```
 
-Beyond `body`, `values`, and `descriptors`, `serialize` receives the submitted `form` (`{ id, title }`), the `req`, the submission's `locale`, and the `actionType` rendering the body (`emailTeam`, `confirmation`, or a custom action's type), so the replacement can branch on context: look up a per-tenant template, or hand the raw body off to a component renderer like react-email. To only wrap the email around the default output, reach for [`email.render`](#email-layout) instead:
+Beyond `body`, `values`, and `descriptors`, `serialize` receives the submitted `form` (the [whole document](#the-form-document)), the `req`, the submission's `locale`, and the `actionType` rendering the body (`emailTeam`, `confirmation`, or a custom action's type), so the replacement can branch on context: look up a per-tenant template, or hand the raw body off to a component renderer like react-email. To only wrap the email around the default output, reach for [`email.render`](#email-layout) instead:
 
 ```tsx
 formBuilder({
@@ -99,7 +99,7 @@ formBuilder({
 })
 ```
 
-`locale` is the submission's own stored locale, the one `body` was loaded at, so a wrapper's own strings (a greeting, a footer) match the content inside it. Prefer it over `req.locale`: on the queued path `req` is the job runner's request, not the visitor's. A submission stores the locale of the request that created it, which `<Form>` sets from its [`locale` prop](/form-builder/rendering#transport).
+`locale` is the submission's own stored locale, the one `body` was loaded at, so a wrapper's own strings (a greeting, a footer) match the content inside it. Prefer it over `req.locale`: on the queued path `req` is the job runner's request, not the visitor's. A submission stores the locale of the request that created it, which `<Form>` sets from its [`submissionLocale` prop](/form-builder/rendering#submission-locale). Content never authored in that locale falls back as your `localization.fallback` allows, or as the [`fallbackLocale`](/form-builder/rendering#submission-locale) option chooses.
 
 The building blocks are exported from the root for custom pipelines: `serializeBody`, `defaultBodyConverters`, `sanitizeUrl`, `escapeHtml`, `renderAllValues`, and `renderAllValuesTable`.
 
@@ -125,9 +125,11 @@ It receives the serialized `html`, the raw `body` it came from, the interpolated
 
 The two hooks compose rather than compete: `richText.serialize` decides how an action body is rendered for any channel, custom actions included, and `email.render` then wraps what it produced for email only. A throwing `render` fails the action like a send failure, and absent, the serialized body is sent as is.
 
+An email whose subject and body both come out empty is never sent: the action fails with `empty subject and body`, like a missing **To**, rather than mailing a blank message. The check runs before `email.render`, so a layout frame around an empty body does not count as content. It usually means the form was never filled in for the submission's locale or its [fallback](/form-builder/rendering#submission-locale).
+
 ## CC, BCC, and reply-to
 
-`emailTeam` and `confirmation` both carry **CC**, **BCC**, and **Reply-to** fields alongside **To**/**Subject**. Each is localized like `subject` (a submission's own locale selects the stored value at send) and interpolated with the same [recall tokens](#rich-text-bodies) as the body (`{{field}}`, `{{field|fallback}}`). Pass more than one address as a plain comma-separated string; it is forwarded to `payload.sendEmail`, and from there to your nodemailer transport, exactly as typed.
+`emailTeam` and `confirmation` both carry **CC**, **BCC**, and **Reply-to** fields alongside **To**/**Subject**. Like **To**, they are shared across locales by default (see [Per-locale recipients](#per-locale-recipients)) and interpolated with the same [recall tokens](#rich-text-bodies) as the body (`{{field}}`, `{{field|fallback}}`). Pass more than one address as a plain comma-separated string; it is forwarded to `payload.sendEmail`, and from there to your nodemailer transport, exactly as typed.
 
 ## From addresses
 
@@ -166,7 +168,9 @@ formBuilder({
         value: 'tenant:default',
         label: 'Tenant default sender',
         resolve: async ({ form, payload }) => {
-          const tenant = await tenantOfForm(form, payload)
+          const tenant = await payload.findByID({
+            collection: 'tenants', id: form.tenant as string, depth: 0, overrideAccess: true,
+          })
           return tenant?.fromAddress ?? null
         },
       },
@@ -177,7 +181,7 @@ formBuilder({
 
 Sources appear in the same **From** select, listed ahead of the `fromAddresses` literals, and either option can be set without the other. What the editor picks decides the behaviour: a source stores its `value` (`tenant:default` above, audit-stable in the saved form), a literal stores and sends the address as before and never touches a source.
 
-`resolve` receives the same run-time arguments as a [recipient source](#recipient-sources): the form, the submission's values and descriptors, the verified context, `payload`, and the request. Derive the tenant from the form document rather than the request where you can; on the queued path the request is the job runner's, while the form is the same document the action was saved on. The result is reduced to a single sender: anything past a line break is cut, a whole line that already reads as one sender passes through (`Name <addr@example.com>` form included, quoted display names with commas too), and a comma-joined list is clamped to its first entry. Returning `null` or an empty string sends with the adapter's default sender, and a throw fails the action rather than sending as an identity the host no longer vouches for; on the queued path that failure retries.
+`resolve` receives the same run-time arguments as a [recipient source](#recipient-sources): the form, the submission's values and descriptors, the verified context, `payload`, and the request. Derive the tenant from the [form document](#the-form-document) rather than the request where you can; on the queued path the request is the job runner's, while the form is the same document the action was saved on. The result is reduced to a single sender: anything past a line break is cut, a whole line that already reads as one sender passes through (`Name <addr@example.com>` form included, quoted display names with commas too), and a comma-joined list is clamped to its first entry. Returning `null` or an empty string sends with the adapter's default sender, and a throw fails the action rather than sending as an identity the host no longer vouches for; on the queued path that failure retries.
 
 The namespaced `value` is the whole trick: it cannot collide with a literal address, so the send path can tell "re-resolve this" from "send this" by a map lookup, with no flags stored on the form. Pick values like `tenant:default` and keep them stable. Renaming or removing a source orphans every form that stored its value: the stored string then reads as a literal, reaches the adapter as an invalid sender, and fails the send loudly, which is the intended failure mode, visible rather than silently sending as the wrong identity.
 
@@ -202,7 +206,19 @@ formBuilder({
 
 With `email.departments` set, **To** becomes a select backed by an authenticated `GET /api/forms/departments` endpoint (request-scoped and id-less, so the departments are pickable while the form is still being created), validated on save against the resolver's current options (fails closed, the same trade-off as `fromAddresses`: a resolver outage blocks saving a form whose email action has a **To** set, rather than persisting a routing target the host can no longer vouch for). Leave `email.departments` unset and **To** stays the plain text field it always was.
 
-Either way, **To** is localized: each admin locale stores its own address (or department choice), and a submission routes to the address stored for its own locale, exactly like the subject and body already do. This holds on the queued (job-runner) dispatch path too: the form is loaded at the submission's own stored locale, not the job runner's request locale, so a German visitor's submission still reaches the German department when the job that sends it runs with no locale of its own.
+### Per-locale recipients
+
+Either way, **To**, **CC**, **BCC**, and **Reply-to** are shared across locales by default: routing is usually the same whatever language the visitor wrote in, and a per-locale list the editor never filled in would leave that locale with no recipient at all. When the routing does differ per locale, opt in:
+
+```ts title="payload.config.ts"
+formBuilder({ email: { localizeRecipients: true } })
+```
+
+Each admin locale then stores its own addresses (or department choice), and a submission routes to the list stored for its own locale, exactly like the subject and body. This holds on the queued (job-runner) dispatch path too: the form is loaded at the submission's own stored locale, not the job runner's request locale, so a German visitor's submission still reaches the German department when the job that sends it runs with no locale of its own. The option has no effect with `localizeContent: false`. Toggling it changes how existing forms store these fields, like toggling `localized` on any Payload field.
+
+<Callout type="warn">
+A per-locale list is empty in every locale the editor did not fill it in for, and it falls back only as your `localization.fallback` allows. With fallback off, a submission in such a locale has no **To**, so `emailTeam` fails there with `missing "to" address` on every submission. Either fill the recipients in for each locale, turn fallback on, or force a fallback for these reads with the [`fallbackLocale`](/form-builder/rendering#submission-locale) option, for example to each tenant's default locale.
+</Callout>
 
 ## Recipient sources
 
@@ -248,6 +264,10 @@ const context = signFormContext({ payload, relationTo: 'people', value: person.i
 
 The token is **signed, not encrypted** (with `payload.secret` by default, and a one-day expiry you can override with `expiresIn`): the reference is not a secret, since the id is already in the URL, and the address never enters the token. Signing only stops the browser from rewriting the recipient. On submit the plugin verifies the signature and expiry, stores the verified `{ relationTo, value }` on the submission (a legible audit record of which document it came through), and hands it to every source's `resolve`. A missing context is normal; an invalid one is rejected, so a tampered reference cannot quietly degrade into a send to the static recipients. The context is never an answer: it does not appear in `values`, the answers view, or `{{*}}` body output.
 
+## The form document
+
+Every hook a send runs through, a recipient source, a from source, `richText.serialize`, `email.render`, and a custom action's `run`, receives `form` as the whole form document the plugin loaded for the run, not just its `id` and `title`. It is read once per run, at depth 0 and in the submission's locale: localized fields (a subject, an option label) hold that locale's value, and relationships hold ids, so a multi-tenant host reads `form.tenant` straight off it instead of loading the form again. Cast for your own fields (`form.tenant as string`), and populate a related document yourself when you need more than its id. Every hook of the run shares the one object, so treat it as read-only. The type is exported as `SubmissionForm`.
+
 ## Custom actions
 
 ```ts title="payload.config.ts"
@@ -274,7 +294,7 @@ const slackNotify = defineAction({
 formBuilder({ actions: { slackNotify, confirmation: false } })
 ```
 
-`config` becomes the block's authoring fields in the form editor. `run` receives the form, submission id, `values`, `descriptors`, the verified form `context` (or `null`), the stored `config`, `payload`, `req`, `locale`, a translate helper, and `renderBody`, an async function that serializes a rich text (or legacy string) body config into channel-ready HTML through the same pipeline the built-in emails use, honoring the plugin's [`richText` option](#custom-nodes-and-non-html-channels). Give a custom action a `richText` config field and call `renderBody(config.body)` to get the built-in templating for free. The `actions` option follows the [opt-in convention](/concepts#the-opt-in-convention).
+`config` becomes the block's authoring fields in the form editor. `run` receives the [form document](#the-form-document), submission id, `values`, `descriptors`, the verified form `context` (or `null`), the stored `config`, `payload`, `req`, `locale`, a translate helper, and `renderBody`, an async function that serializes a rich text (or legacy string) body config into channel-ready HTML through the same pipeline the built-in emails use, honoring the plugin's [`richText` option](#custom-nodes-and-non-html-channels). Give a custom action a `richText` config field and call `renderBody(config.body)` to get the built-in templating for free. The `actions` option follows the [opt-in convention](/concepts#the-opt-in-convention).
 
 When a failure has more context than a message, throw an `ActionError` (or any error with a `detail` property): `throw new ActionError('provider rejected', { status: 502, body })`. The `detail` lands on the failed `ActionResult` and in the plugin's failure log as a structured field, so the thrown message can stay free of whatever the provider quoted back.
 
