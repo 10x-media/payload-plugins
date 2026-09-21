@@ -112,7 +112,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				data: {
 					author: n % 2 === 0 ? editor?.id : admin?.id,
 					title: `Post ${n}`,
-					visibility: visibilities[n % visibilities.length],
+					visibility: visibilities[n % visibilities.length] ?? 'public',
 				},
 			})
 		}
