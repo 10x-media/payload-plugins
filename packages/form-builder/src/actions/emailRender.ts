@@ -7,7 +7,8 @@ export type EmailActionType = 'emailTeam' | 'confirmation'
  * What `email.render` receives per outgoing email: the finished body `html` (the default pipeline's
  * output, or `richText.serialize`'s when set), the raw `body` it was rendered from, the interpolated
  * `subject`, the `actionType` sending it, and the submission context: `locale` (the submission's
- * own), `form` (the whole document, see `SubmissionForm`), `submissionId`, `values`, `descriptors`, `context`, `payload`, and `req`.
+ * own), `form` (the whole document, see `SubmissionForm`), `submissionId`, `values`,
+ * `descriptors`, `context`, `payload`, and `req`.
  */
 export type EmailRenderArgs = SubmissionContextArgs & {
 	html: string

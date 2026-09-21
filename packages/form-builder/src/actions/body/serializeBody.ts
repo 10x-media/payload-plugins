@@ -42,9 +42,9 @@ export type SerializeBodyArgs = {
  * non-HTML channels like chat or plain text, or to hand the body plus the submitted `form`/`req`
  * off to a renderer like react-email). Wrapping emails in a layout is `email.render`'s job.
  * `editor` is the default Lexical/richText editor for every plugin-authored richText field: message
- * content, consent statement, the response message, and the action body fields. `bodyEditor` overrides the action body fields specifically (emailTeam
- * and confirmation), and `responseEditor` overrides the success `response` message field; both fall
- * back to `editor` when absent.
+ * content, consent statement, the response message, and the action body fields. `bodyEditor`
+ * overrides the action body fields specifically (emailTeam and confirmation), and `responseEditor`
+ * overrides the success `response` message field; both fall back to `editor` when absent.
  */
 export type RichTextBodyOption = {
 	converters?: Record<string, BodyConverter>

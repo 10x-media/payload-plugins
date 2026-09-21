@@ -3,13 +3,17 @@ import type { SubmissionForm } from '../actions/submissionContext'
 import { FORMS_SLUG } from '../collections/forms'
 import { customStateOf, stashCustomState } from '../plugin/customState'
 
-/** What a `fallbackLocale` resolver returns: a locale code, an ordered list of codes, `false` for no fallback, or `undefined` to keep the default. */
+/**
+ * What a `fallbackLocale` resolver returns: a locale code, an ordered list of codes, `false` for no
+ * fallback, or `undefined` to keep the default.
+ */
 export type FormFallbackLocaleResult = string | string[] | false | undefined
 
 export type FormFallbackLocaleArgs = {
 	/**
 	 * The form as first read at `locale` with the default fallback, at depth 0: a non-localized owner
-	 * relationship (a multi-tenant host's `form.tenant`) is already on it, so no read of your own is needed.
+	 * relationship (a multi-tenant host's `form.tenant`) is already on it, so no read of your own is
+	 * needed.
 	 */
 	form: SubmissionForm
 	/** The locale the form is being read at (the submission's, clamped). */
@@ -51,15 +55,20 @@ type Localization = Exclude<SanitizedConfig['localization'], false>
  * the default locale) with fallback enabled; otherwise the default locale, passed explicitly so
  * content the author never filled in at `locale` is not read as empty.
  */
-const defaultFallbackOf = (localization: Localization, locale: string): string | undefined => {
+const defaultFallbackOf = (
+	localization: Localization,
+	locale: string
+): string | string[] | undefined => {
 	if (locale === localization.defaultLocale) {
 		return undefined
 	}
 	if (!localization.fallback) {
 		return localization.defaultLocale
 	}
-	const own = localization.locales.find((entry) => entry.code === locale)?.fallbackLocale
-	return typeof own === 'string' ? own : localization.defaultLocale
+	return (
+		localization.locales.find((entry) => entry.code === locale)?.fallbackLocale ??
+		localization.defaultLocale
+	)
 }
 
 /**
@@ -102,7 +111,7 @@ export const findFormAtLocale = async ({
 			return await read(undefined)
 		}
 		const applied = defaultFallbackOf(localization, locale)
-		// With fallback enabled Payload already applies `applied` on its own; only a disabled one needs it explicitly.
+		// With fallback enabled Payload applies `applied` on its own; a disabled one needs it explicitly.
 		const form = await read(localization.fallback ? undefined : applied)
 		const resolver = customStateOf<FallbackState>(payload).fallbackLocale
 		if (!resolver) {
