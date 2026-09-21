@@ -99,7 +99,7 @@ formBuilder({
 })
 ```
 
-`locale` is the submission's own stored locale, the one `body` was loaded at, so a wrapper's own strings (a greeting, a footer) match the content inside it. Prefer it over `req.locale`: on the queued path `req` is the job runner's request, not the visitor's. A submission stores the locale of the request that created it, which `<Form>` sets from its [`locale` prop](/form-builder/rendering#transport).
+`locale` is the submission's own stored locale, the one `body` was loaded at, so a wrapper's own strings (a greeting, a footer) match the content inside it. Prefer it over `req.locale`: on the queued path `req` is the job runner's request, not the visitor's. A submission stores the locale of the request that created it, which `<Form>` sets from its [`submissionLocale` prop](/form-builder/rendering#submission-locale). Content never authored in that locale falls back to the default locale field by field, even with `localization.fallback: false`.
 
 The building blocks are exported from the root for custom pipelines: `serializeBody`, `defaultBodyConverters`, `sanitizeUrl`, `escapeHtml`, `renderAllValues`, and `renderAllValuesTable`.
 

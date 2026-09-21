@@ -112,18 +112,32 @@ Submission is also guarded against double activation: while a submit is in fligh
 
 ### Transport
 
-By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). When a `locale` prop is passed, the request carries it as `?locale=`, so the server stores the visitor's locale on the submission and the post-submit actions (the confirmation email included) render in it. Without the prop the submission takes your default locale. The server clamps what it receives: on a host with `localization` only a configured locale code is kept (`all`, `*`, and any other code become the default locale); without `localization` any plain language tag such as `uk` or `pt-BR` is kept and anything else becomes `en`. Override the prefix with `apiRoute`, or replace the transport entirely, forwarding `locale` yourself:
+By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Override the prefix with `apiRoute`, or replace the transport entirely (see [Submission locale](#submission-locale) for the `locale` it receives):
 
 ```tsx
 <Form
   form={form}
-  locale={locale}
+  submissionLocale={contentLocale}
   onSubmit={async ({ formId, values, locale }) => {
     const res = await myClient.submitForm(formId, values, { locale })
     return res.ok ? { ok: true } : { ok: false, message: res.error }
   }}
 />
 ```
+
+### Submission locale
+
+`submissionLocale` is the Payload content locale the visitor submits under, one of your `localization` locale codes (`en`, `de`). The request carries it as `?locale=`, so the server stores it on the submission and the post-submit actions (the confirmation email included) load their subject, body, and recipients in it. A custom `onSubmit` receives it as `locale`. Without the prop the submission takes your default locale.
+
+It is separate from `locale` on purpose. `locale` is a formatting tag handed to renderers and to each field type's `format` (often a full tag such as `en-US` for `Intl`), and it is never sent. A formatting tag is usually not a content locale code, so a site that renders `en-US` but stores content under `en` passes both:
+
+```tsx
+<Form form={form} locale="en-US" submissionLocale="en" t={t} />
+```
+
+The server clamps what it receives: on a host with `localization` only a configured locale code is kept (`all`, `*`, and any other code become the default locale); without `localization` any valid language tag such as `uk` or `pt-BR` is kept in its canonical form (`zh_Hant` is stored as `zh-Hant`) and anything else becomes `en`.
+
+Content the author never filled in for that locale falls back to the default locale field by field, even on a host with `localization.fallback: false`, so a German submission to a form whose emails exist only in English still sends the English email instead of a blank one (or none, when the missing value is the `emailTeam` recipient). With fallback enabled, Payload's own resolution applies, per-locale `fallbackLocale` included.
 
 ### Props
 
@@ -137,7 +151,8 @@ By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Whe
 | `onSubmit` | `SubmitHandler` | none | Custom transport. |
 | `onSuccess` / `onError` | callbacks | none | Submission outcome hooks. |
 | `events` | `FormEventSink` | none | Lifecycle event sink; see [Actions and events](/form-builder/actions#lifecycle-events). |
-| `t` / `locale` | translator / `string` | identity / `'en'` | Localization for renderer strings and formatting. An explicit `locale` is also sent with the submission (see [Transport](#transport)). |
+| `t` / `locale` | translator / `string` | identity / `'en'` | Localization for renderer strings and formatting. |
+| `submissionLocale` | `string` | none | Content locale the submission is stored and its emails are rendered in; see [Submission locale](#submission-locale). |
 | `layout` | `boolean` | `true` | Disable the grid wrapper with `false`. |
 | `className` | `string` | none | Extra CSS classes on the root `<form>` element (and the post-submit success node). |
 | `submitLabel`, `nextLabel`, `prevLabel`, `closeLabel` | `string` | built-ins | Button labels. Submit, next, and prev each resolve prop, then the form's `buttons` value, then the translated default. |
@@ -206,10 +221,11 @@ const submission = await createSubmission(payload, {
   form: formId,
   values: [{ field: 'email', value: 'ada@example.com' }],
   req, // thread the incoming req when there is one
+  locale: 'de', // optional: the submission locale, as `submissionLocale` sets it in the browser
 })
 ```
 
-`createSubmission` exists for parity, not new behavior: a script, a queued job, or another collection's hook gets a documented, typed entry point instead of hand-rolling the collection slug and body shape. Pass the incoming `req` when you have one so [spam metadata](/form-builder/spam) (client IP, user agent) and per-identity rate limiting see the real request; without one the submission still runs the full pipeline, just with no request to read those signals from.
+`createSubmission` exists for parity, not new behavior: a script, a queued job, or another collection's hook gets a documented, typed entry point instead of hand-rolling the collection slug and body shape. Pass the incoming `req` when you have one so [spam metadata](/form-builder/spam) (client IP, user agent) and per-identity rate limiting see the real request; without one the submission still runs the full pipeline, just with no request to read those signals from. `locale` is clamped exactly like a browser's `?locale=`; absent, the submission takes `req.locale` (or your default locale). The `req` you pass comes back with its own `locale` unchanged.
 
 `form-submissions` access is `create: () => true` (anonymous submissions are the point of a public form), `read` is logged-in users only, and `update` is disabled entirely, so nothing about a submission is readable or editable through the API by the visitor who sent it. This mirrors Payload's own `@payloadcms/plugin-form-builder`: an open create endpoint backed entirely by collection hooks, not a custom controller in front of it.
 

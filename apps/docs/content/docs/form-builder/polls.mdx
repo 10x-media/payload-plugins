@@ -37,8 +37,10 @@ Semantics worth knowing:
 Anonymous voters cannot read raw submissions, so public results are served as aggregate counts through a gated endpoint:
 
 ```
-GET /api/forms/:id/results?field=<name>   ->   { results: FieldAggregation[] }
+GET /api/forms/:id/results?field=<name>[&locale=<code>]   ->   { results: FieldAggregation[] }
 ```
+
+`locale` selects the language of the option labels, clamped like a [submission locale](/form-builder/rendering#submission-locale); absent, labels come back in your default locale.
 
 Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted; for a poll-enabled form the results field's effective options (source-resolved, `resolveOptions`-backed, or authored) are injected too, so a sourced poll renders labels in the admin rather than raw stored values (best-effort: a resolve failure there degrades to raw values rather than blocking the trusted read). Anonymous callers are served only when the form's `pollEnabled` toggle is on, only when `poll.resultsVisibility` permits (`afterVote`, the default, serves any time; `afterClose` serves only once `poll.closesAt` has passed), only for the configured `poll.resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured. A poll with an [option source](#option-sources) is enumerable through its resolved options instead: the endpoint resolves the source server-side, seeds buckets in resolved order with the source's labels, forbids results while resolution is empty, and fails closed with a 503 when resolution fails.
 
@@ -279,7 +281,7 @@ import { FormResults } from '@10x-media/form-builder/react'
 <FormResults results={results} />   // one field or an array
 ```
 
-`fetchFormResults({ formId, field })` is the client helper for the endpoint.
+`fetchFormResults({ formId, field, locale })` is the client helper for the endpoint.
 
 ## `<Poll>`
 
@@ -290,6 +292,8 @@ import { Poll } from '@10x-media/form-builder/react'
 
 <Poll form={form} resultsField="colour" />
 ```
+
+`<Poll>` takes every `<Form>` prop. Its `submissionLocale` is also sent with the results request, so a German voter sees German option labels in the results as well as in the form.
 
 The localStorage guard is UX, not integrity: it stops the same browser re-seeing the form and nothing more. Server-enforced one-per-identity composes from what already ships: gate on `req.user` for authenticated forms, use the `notAlreadySubmitted` [validation rule](/form-builder/validation) to dedupe by a field value (such as email), and [rate limiting](/form-builder/spam) caps anonymous repeat voting per identity.
 

@@ -65,10 +65,12 @@ describe('Form', () => {
 		expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty('locale')
 	})
 
-	it('hands an explicit locale prop to the transport', async () => {
+	it('hands submissionLocale, never the formatting locale, to the transport', async () => {
 		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '1' })
 		const fields: FormFieldInstance[] = [{ blockType: 'text', name: 'name', label: 'Name' }]
-		render(<Form form={doc(fields, 7)} onSubmit={onSubmit} locale="de" />)
+		const { unmount } = render(
+			<Form form={doc(fields, 7)} onSubmit={onSubmit} locale="de-DE" submissionLocale="de" />
+		)
 
 		fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Ada' } })
 		fireEvent.click(screen.getByRole('button', { name: /submit|absenden/i }))
@@ -79,6 +81,13 @@ describe('Form', () => {
 			values: [{ field: 'name', value: 'Ada' }],
 			locale: 'de',
 		})
+		unmount()
+
+		render(<Form form={doc(fields, 7)} onSubmit={onSubmit} locale="de" />)
+		fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Ada' } })
+		fireEvent.click(screen.getByRole('button', { name: /submit|absenden/i }))
+		await screen.findByRole('status')
+		expect(onSubmit.mock.calls[1]?.[0]).not.toHaveProperty('locale')
 	})
 
 	const responseMessageForm = (fields: FormFieldInstance[]): FormDocument => ({

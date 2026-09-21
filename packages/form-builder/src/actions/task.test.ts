@@ -19,7 +19,7 @@ describe('runActionsForSubmission', () => {
 			.fn()
 			.mockResolvedValueOnce({ id: 's1', values: [], descriptors: [], locale: 'en' })
 			.mockResolvedValueOnce({ id: 'f1', title: 'F', actions: [{ blockType: 'boom' }] })
-		const payload = { findByID, logger } as unknown as Payload
+		const payload = { config: {}, findByID, logger } as unknown as Payload
 
 		const results = await runActionsForSubmission({
 			input: { formId: 'f1', submissionId: 's1' },
@@ -34,7 +34,7 @@ describe('runActionsForSubmission', () => {
 	it('returns an empty list and logs nothing when the submission is missing', async () => {
 		const logger = { error: vi.fn(), warn: vi.fn(), info: vi.fn() }
 		const findByID = vi.fn().mockResolvedValue(null)
-		const payload = { findByID, logger } as unknown as Payload
+		const payload = { config: {}, findByID, logger } as unknown as Payload
 
 		const results = await runActionsForSubmission({
 			input: { formId: 'f1', submissionId: 's1' },
@@ -55,6 +55,7 @@ describe('runActionsForSubmission', () => {
 	it('prunes the submission after the pass when the form opts out of persistence', async () => {
 		const del = vi.fn().mockResolvedValue(undefined)
 		const payload = {
+			config: {},
 			findByID: submissionThenForm({ actions: [], persistSubmissions: false }),
 			delete: del,
 			logger: { error: vi.fn() },
@@ -72,6 +73,7 @@ describe('runActionsForSubmission', () => {
 	it('keeps the submission when the form persists (the default)', async () => {
 		const del = vi.fn()
 		const payload = {
+			config: {},
 			findByID: submissionThenForm({ actions: [] }),
 			delete: del,
 			logger: { error: vi.fn() },
@@ -94,6 +96,7 @@ describe('runActionsForSubmission', () => {
 		}
 		const del = vi.fn().mockResolvedValue(undefined)
 		const payload = {
+			config: {},
 			findByID: submissionThenForm({ actions: [{ blockType: 'boom' }], persistSubmissions: false }),
 			delete: del,
 			logger: { error: vi.fn() },

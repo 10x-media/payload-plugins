@@ -6,9 +6,9 @@ export type SubmitFormInput = {
 	/** Payload API route prefix; defaults to `/api`. */
 	apiRoute?: string
 	/**
-	 * The visitor's content locale, sent as `?locale=` so the server stamps it on the submission and
-	 * the post-submit actions (confirmation emails included) render in it. Absent, the server falls
-	 * back to the host's default locale.
+	 * The Payload content locale (a `localization` code), sent as `?locale=` so the server stamps it on
+	 * the submission and the post-submit actions (confirmation emails included) render in it. Absent,
+	 * the server falls back to the host's default locale.
 	 */
 	locale?: string
 	/** Injectable for testing; defaults to global `fetch`. */
@@ -78,7 +78,7 @@ export const submitForm = async (input: SubmitFormInput): Promise<SubmitFormResu
 
 /**
  * A consumer override for the transport: given the form id + values, resolve to a submit result.
- * `locale` is the `<Form>`'s explicit `locale` prop (absent when the prop was not passed); forward
+ * `locale` is the `<Form>`'s `submissionLocale` prop (absent when the prop was not passed); forward
  * it as `?locale=` so the submission and its emails carry the visitor's locale.
  */
 export type SubmitHandler = (input: {

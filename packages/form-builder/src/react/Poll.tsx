@@ -133,6 +133,7 @@ export const Poll = ({
 			formId: formProps.form.id,
 			field: resultsField,
 			apiRoute,
+			locale: formProps.submissionLocale,
 		})
 		// A failed load surfaces as an error, not an empty result set: `[]` would read as "no votes yet".
 		if (result.ok) {
@@ -141,7 +142,7 @@ export const Poll = ({
 		} else {
 			setLoadFailed(true)
 		}
-	}, [fetchResultsImpl, formProps.form.id, resultsField, apiRoute])
+	}, [fetchResultsImpl, formProps.form.id, resultsField, apiRoute, formProps.submissionLocale])
 
 	const resultsError = (
 		<p className="fb-poll__error" role="alert">

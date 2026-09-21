@@ -184,6 +184,7 @@ export type { ActionOption, ActionRegistry, ActionsConfig } from './actions/regi
 export { resolveActions } from './actions/registry'
 export type { ActionResult } from './actions/runActions'
 export { SIGNATURE_HEADER, signPayload } from './actions/sign'
+export type { SubmissionContextArgs } from './actions/submissionContext'
 export type {
 	AggregateFieldResponsesArgs,
 	AggregateFormResponsesArgs,

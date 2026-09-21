@@ -6,13 +6,16 @@ import { buildDefaultActionDefinitions } from '../../src/actions/builtin'
 import type { EmailRenderArgs } from '../../src/actions/emailRender'
 import { resolveActions } from '../../src/actions/registry'
 import { runActionsForSubmission } from '../../src/actions/task'
-import { formBuilder } from '../../src/index'
+import { resolveFormResultsRequest } from '../../src/aggregation/resolveResultsRequest'
+import { createSubmission, formBuilder } from '../../src/index'
 
 const localization = { locales: ['en', 'de'], defaultLocale: 'en' }
 
 type Block = { id?: string; blockType: string; [key: string]: unknown }
 
-describeForDb('form-builder email locale', { dbs: ['mongo'] }, (db) => {
+// Empty options: Mongo by default, both DBs under the matrix tier (DB_MATRIX), since localized
+// writes are where the Postgres adapter differs (`_locales` tables).
+describeForDb('form-builder email locale', {}, (db) => {
 	let booted: BootedPayload
 	const serialize = vi.fn(({ body, locale, actionType }: SerializeBodyArgs) => {
 		return `<div lang="${locale}" data-action="${actionType}">${String(body)}</div>`
@@ -116,6 +119,72 @@ describeForDb('form-builder email locale', { dbs: ['mongo'] }, (db) => {
 			expect(submission.locale).toBe('en')
 		}
 	})
+	it('takes the locale from createSubmission and leaves the host req as it was', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: { title: 'Server', fields: [] },
+			overrideAccess: true,
+		})
+		const req = { payload: booted.payload, locale: 'en' } as unknown as PayloadRequest
+		const submission = await createSubmission(booted.payload, {
+			form: form.id,
+			values: [],
+			locale: 'de',
+			req,
+		})
+		expect(submission.locale).toBe('de')
+		expect(req.locale).toBe('en')
+		// The explicit locale must not stick to the next create on the same request.
+		const next = await createSubmission(booted.payload, { form: form.id, values: [], req })
+		expect(next.locale).toBe('en')
+	})
+
+	it('serves poll results with option labels in the requested locale', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'Poll',
+				fields: [
+					{
+						blockType: 'select',
+						name: 'vote',
+						label: 'Vote',
+						options: [{ label: 'Red', value: 'red' }],
+					},
+				],
+				pollEnabled: true,
+				poll: { resultsField: 'vote' },
+			},
+			overrideAccess: true,
+		})
+		const [field] = form.fields as Block[]
+		const [option] = (field?.options ?? []) as Block[]
+		await booted.payload.update({
+			collection: 'forms',
+			id: form.id,
+			locale: 'de',
+			data: { fields: [{ ...field, options: [{ ...option, label: 'Rot' }] }] },
+			overrideAccess: true,
+		})
+		await booted.payload.create({
+			collection: 'form-submissions',
+			data: { form: form.id, values: [{ field: 'vote', value: 'red' }] },
+		})
+
+		const results = async (locale: string) => {
+			const { status, body } = await resolveFormResultsRequest({
+				payload: booted.payload,
+				formId: form.id,
+				field: 'vote',
+				isAuthed: false,
+				req: { payload: booted.payload, locale } as unknown as PayloadRequest,
+			})
+			expect(status).toBe(200)
+			return 'results' in body ? body.results[0]?.buckets.map((bucket) => bucket.label) : undefined
+		}
+		expect(await results('de')).toEqual(['Rot'])
+		expect(await results('all')).toEqual(['Red'])
+	})
 })
 
 describeForDb('form-builder submission locale without localization', { dbs: ['mongo'] }, (db) => {
@@ -129,7 +198,7 @@ describeForDb('form-builder submission locale without localization', { dbs: ['mo
 		await booted.stop()
 	})
 
-	it('keeps a plain language tag and drops anything else to en', async () => {
+	it('keeps a canonical language tag, drops anything else to en, and leaves req.locale unset', async () => {
 		const form = await booted.payload.create({
 			collection: 'forms',
 			data: { title: 'Plain', fields: [] },
@@ -147,7 +216,83 @@ describeForDb('form-builder submission locale without localization', { dbs: ['mo
 			).locale
 		expect(await stored('uk')).toBe('uk')
 		expect(await stored('pt-BR')).toBe('pt-BR')
+		expect(await stored('zh_Hant')).toBe('zh-Hant')
 		expect(await stored('all')).toBe('en')
 		expect(await stored('<b>x</b>')).toBe('en')
+	})
+
+	it('keeps the createSubmission locale and never writes a locale onto the host req', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: { title: 'Server', fields: [] },
+			overrideAccess: true,
+		})
+		const req = { payload: booted.payload } as unknown as PayloadRequest
+		const submission = await createSubmission(booted.payload, {
+			form: form.id,
+			values: [],
+			locale: 'uk',
+			req,
+		})
+		expect(submission.locale).toBe('uk')
+		expect(req.locale).toBeUndefined()
+	})
+})
+
+describeForDb('form-builder email locale without fallback', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: formBuilder({}),
+			db,
+			configOverrides: { localization: { ...localization, fallback: false } },
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('falls back to the default locale for email content never authored in the submission locale', async () => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title: 'English only',
+				fields: [],
+				actions: [
+					{ blockType: 'emailTeam', to: ['team@example.com'], subject: 'New', body: 'team en' },
+				],
+			},
+			overrideAccess: true,
+		})
+		const submission = await booted.payload.create({
+			collection: 'form-submissions',
+			locale: 'de',
+			data: { form: form.id, values: [] },
+		})
+		expect(submission.locale).toBe('de')
+
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		booted.payload.sendEmail = sendEmail as unknown as typeof booted.payload.sendEmail
+		const req = {
+			locale: 'en',
+			fallbackLocale: false,
+			payload: booted.payload,
+		} as unknown as PayloadRequest
+		const results = await runActionsForSubmission({
+			input: { formId: form.id, submissionId: submission.id },
+			registry: resolveActions(buildDefaultActionDefinitions({ localize: true })),
+			payload: booted.payload,
+			req,
+		})
+
+		expect(results).toEqual([{ type: 'emailTeam', ok: true }])
+		expect(sendEmail).toHaveBeenCalledWith(
+			expect.objectContaining({ to: 'team@example.com', subject: 'New' })
+		)
+		// The job runner's request comes back as it was handed in.
+		expect(req.locale).toBe('en')
+		expect(req.fallbackLocale).toBe(false)
 	})
 })

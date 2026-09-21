@@ -1,11 +1,12 @@
-import type { Payload, PayloadRequest } from 'payload'
-import { FORMS_SLUG } from '../collections/forms'
+import type { Payload, PayloadRequest, TypedLocale } from 'payload'
+import { findFormAtLocale } from '../form/findFormAtLocale'
 import { isPollClosed, pollConfigOf } from '../form/pollState'
 import { type PollFormLike, shouldAutoResolvePoll } from '../poll/closeJob'
 import type { PollOption } from '../poll/definePollOptionSource'
 import { resolveEffectivePollOptions } from '../poll/effectivePollOptions'
 import { resolvePollOutcome } from '../poll/resolvePollOutcome'
 import { aggregateFromVotes } from '../poll/votes/aggregateFromVotes'
+import { resolveSubmissionLocale } from '../submissions/submissionLocale'
 import type { FormFieldInstance } from '../submissions/types'
 import { aggregateFormResponses, fieldHasOptions } from './aggregateResponses'
 import type { FieldAggregation } from './types'
@@ -76,31 +77,21 @@ const tallyMetaOf = (
 	fieldType: instance?.blockType,
 })
 
-/**
- * Authorize and resolve a poll/survey results request. Authed callers may aggregate any field (or all
- * enumerable fields) and bypass the `access` seam; for a poll-enabled form they also get the results
- * field's effective options injected so sourced/resolver-backed polls render labels (best-effort, a
- * resolve failure degrades to raw values rather than blocking the trusted read). Anonymous callers are
- * allowed only when the form's poll is enabled, the poll's `resultsVisibility` permits it (`afterVote`:
- * any time; `afterClose`: only once `closesAt` has passed), and the optional host `access` seam
- * approves; and then only for the configured `poll.resultsField`, and only if that field is enumerable
- * so a misconfigured `resultsField` pointing at a free-text or PII field can never be dumped publicly. A
- * static poll is enumerable through its authored options; a poll whose options come from an
- * `optionSource` or the field type's own `resolveOptions` resolves them here (registry via
- * `config.custom`, per-request cache), gated by `eligibleTypes` and enumerable only when resolution
- * yields any, with the resolved options driving bucket order and labels. Resolution failure fails
- * closed (503) on the anonymous path. Returns only aggregate counts, never raw submissions.
- */
-export const resolveFormResultsRequest = async (
-	args: ResolveResultsRequestArgs
+const resolveAtLocale = async (
+	args: ResolveResultsRequestArgs,
+	locale: string
 ): Promise<ResolveResultsRequestResult> => {
 	const { payload, formId, field, isAuthed, req, access, eligibleTypes, pollVotesEnabled } = args
 	if (formId == null) {
 		return { status: 400, body: { errors: [{ message: 'Missing form id' }] } }
 	}
-	const form = await payload
-		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
-		.catch(() => null)
+	const form = await findFormAtLocale({
+		payload,
+		id: formId,
+		locale,
+		req,
+		overrideAccess: true,
+	}).catch(() => null)
 	if (!form) {
 		return { status: 404, body: { errors: [{ message: 'Not found' }] } }
 	}
@@ -222,4 +213,41 @@ export const resolveFormResultsRequest = async (
 
 	const results = await aggregateFormResponses({ payload, formId, fields, req, resolvedOptions })
 	return { status: 200, body: { results } }
+}
+
+/**
+ * Authorize and resolve a poll/survey results request. Authed callers may aggregate any field (or all
+ * enumerable fields) and bypass the `access` seam; for a poll-enabled form they also get the results
+ * field's effective options injected so sourced/resolver-backed polls render labels (best-effort, a
+ * resolve failure degrades to raw values rather than blocking the trusted read). Anonymous callers are
+ * allowed only when the form's poll is enabled, the poll's `resultsVisibility` permits it (`afterVote`:
+ * any time; `afterClose`: only once `closesAt` has passed), and the optional host `access` seam
+ * approves; and then only for the configured `poll.resultsField`, and only if that field is enumerable
+ * so a misconfigured `resultsField` pointing at a free-text or PII field can never be dumped publicly. A
+ * static poll is enumerable through its authored options; a poll whose options come from an
+ * `optionSource` or the field type's own `resolveOptions` resolves them here (registry via
+ * `config.custom`, per-request cache), gated by `eligibleTypes` and enumerable only when resolution
+ * yields any, with the resolved options driving bucket order and labels. Resolution failure fails
+ * closed (503) on the anonymous path. Returns only aggregate counts, never raw submissions.
+ */
+export const resolveFormResultsRequest = async (
+	args: ResolveResultsRequestArgs
+): Promise<ResolveResultsRequestResult> => {
+	// The visitor's `?locale=` (sent by `<Poll>`'s `submissionLocale`), clamped like a submission's so
+	// option labels come back in the language the poll was rendered in. A localized `req` carries the
+	// clamped value while resolving, so an option source reading `req.locale` agrees with the form, and
+	// gets its own back afterwards: a host may hand in its own request.
+	const { payload, req } = args
+	const { localization } = payload.config
+	const locale = resolveSubmissionLocale(req?.locale, localization)
+	if (!req || !localization) {
+		return resolveAtLocale(args, locale)
+	}
+	const previousLocale = req.locale
+	req.locale = locale as TypedLocale
+	try {
+		return await resolveAtLocale(args, locale)
+	} finally {
+		req.locale = previousLocale
+	}
 }

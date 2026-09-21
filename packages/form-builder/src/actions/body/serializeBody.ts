@@ -41,9 +41,9 @@ export type SerializeBodyArgs = {
  * Customizes how the plugin's rich text is authored and rendered. `converters` spread over the
  * default Lexical node converters; `serialize` replaces the whole action-body pipeline (for
  * non-HTML channels like chat or plain text, or to hand the body plus the submitted `form`/`req`
- * off to a renderer like react-email). Wrapping emails in a layout is `email.render`'s job. `editor` is the default Lexical/richText editor for every
- * plugin-authored richText field: message content, consent statement, the response message, and
- * the action body fields. `bodyEditor` overrides the action body fields specifically (emailTeam
+ * off to a renderer like react-email). Wrapping emails in a layout is `email.render`'s job.
+ * `editor` is the default Lexical/richText editor for every plugin-authored richText field: message
+ * content, consent statement, the response message, and the action body fields. `bodyEditor` overrides the action body fields specifically (emailTeam
  * and confirmation), and `responseEditor` overrides the success `response` message field; both fall
  * back to `editor` when absent.
  */
@@ -132,30 +132,14 @@ export const serializeBody = (body: unknown, ctx: BodyContext): string => {
 
 /** Build the `renderBody` passed to actions, honoring a plugin-level `richText` customization. */
 export const makeRenderBody =
-	(args: {
-		values: SubmissionValue[]
-		descriptors: SubmissionDescriptor[]
-		form: SerializeBodyForm
-		req?: PayloadRequest
-		locale: string
-		actionType: string
-		richText?: RichTextBodyOption
-	}) =>
+	({ richText, ...args }: Omit<SerializeBodyArgs, 'body'> & { richText?: RichTextBodyOption }) =>
 	async (body: unknown): Promise<string> => {
-		if (args.richText?.serialize) {
-			return await args.richText.serialize({
-				body,
-				values: args.values,
-				descriptors: args.descriptors,
-				form: args.form,
-				req: args.req,
-				locale: args.locale,
-				actionType: args.actionType,
-			})
+		if (richText?.serialize) {
+			return await richText.serialize({ ...args, body })
 		}
 		return serializeBody(body, {
 			values: args.values,
 			descriptors: args.descriptors,
-			converters: args.richText?.converters,
+			converters: richText?.converters,
 		})
 	}

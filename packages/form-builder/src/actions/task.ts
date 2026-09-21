@@ -1,8 +1,9 @@
-import type { Config, Payload, PayloadRequest, TaskConfig, TypedLocale } from 'payload'
+import type { Config, Payload, PayloadRequest, TaskConfig } from 'payload'
 import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
-import { FORMS_SLUG } from '../collections/forms'
 import type { FormContextReference } from '../context/formContext'
 import type { Translate } from '../fields/types'
+import { findFormAtLocale } from '../form/findFormAtLocale'
+import { resolveSubmissionLocale } from '../submissions/submissionLocale'
 import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types'
 import { asFieldTranslate } from '../translations/server'
 import type { RichTextBodyOption } from './body/serializeBody'
@@ -72,22 +73,20 @@ export const runActionsForSubmission = async (args: {
 	// The submission's own stored locale (set from req.locale at submit) is authoritative, so the form
 	// is loaded at it. A localized action config, notably the emailTeam `to`, then resolves to the
 	// submission's locale even on the queued path, where the job runner's req may carry a different
-	// (or no) locale than the visitor who submitted.
-	const locale = typeof submission.locale === 'string' ? submission.locale : (req?.locale ?? 'en')
+	// (or no) locale than the visitor who submitted. Re-clamped, since a host may have dropped that
+	// locale since the submission was stored.
+	const locale = resolveSubmissionLocale(
+		typeof submission.locale === 'string' ? submission.locale : req?.locale,
+		payload.config.localization
+	)
 
-	const form = await payload
-		.findByID({
-			collection: FORMS_SLUG,
-			id: input.formId,
-			depth: 0,
-			overrideAccess: true,
-			// Cast: the stored locale is a plain string; a host's concrete locale union is unknowable from
-			// the plugin, and an unrecognized code just falls back on read, so this narrows (zero runtime
-			// delta) to satisfy a host whose `findByID` locale is a real union.
-			locale: locale as TypedLocale,
-			req,
-		})
-		.catch(() => null)
+	const form = await findFormAtLocale({
+		payload,
+		id: input.formId,
+		locale,
+		req,
+		overrideAccess: true,
+	}).catch(() => null)
 	if (!form) {
 		return []
 	}
