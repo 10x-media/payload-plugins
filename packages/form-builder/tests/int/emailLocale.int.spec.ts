@@ -241,10 +241,15 @@ describeForDb('form-builder submission locale without localization', { dbs: ['mo
 
 describeForDb('form-builder email locale without fallback', {}, (db) => {
 	let booted: BootedPayload
+	// Keyed by id: at `de` with fallback off, a localized field such as `title` reads empty.
+	const forced = new Set<number | string>()
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: formBuilder({}),
+			// The documented way to force a fallback on a host that turned it off, here per form.
+			plugin: formBuilder({
+				fallbackLocale: ({ form }) => (forced.has(form.id) ? 'en' : undefined),
+			}),
 			db,
 			configOverrides: { localization: { ...localization, fallback: false } },
 		})
@@ -254,11 +259,14 @@ describeForDb('form-builder email locale without fallback', {}, (db) => {
 		await booted.stop()
 	})
 
-	it('falls back to the default locale for email content never authored in the submission locale', async () => {
+	const runInDe = async (
+		title: string,
+		{ force = false, req }: { force?: boolean; req?: PayloadRequest } = {}
+	) => {
 		const form = await booted.payload.create({
 			collection: 'forms',
 			data: {
-				title: 'English only',
+				title,
 				fields: [],
 				actions: [
 					{ blockType: 'emailTeam', to: ['team@example.com'], subject: 'New', body: 'team en' },
@@ -266,13 +274,24 @@ describeForDb('form-builder email locale without fallback', {}, (db) => {
 			},
 			overrideAccess: true,
 		})
+		if (force) {
+			forced.add(form.id)
+		}
 		const submission = await booted.payload.create({
 			collection: 'form-submissions',
 			locale: 'de',
 			data: { form: form.id, values: [] },
 		})
 		expect(submission.locale).toBe('de')
+		return runActionsForSubmission({
+			input: { formId: form.id, submissionId: submission.id },
+			registry: resolveActions(buildDefaultActionDefinitions({ localize: true })),
+			payload: booted.payload,
+			req,
+		})
+	}
 
+	it('respects the host: content never authored in the submission locale stays empty and fails loudly', async () => {
 		const sendEmail = vi.fn().mockResolvedValue(undefined)
 		booted.payload.sendEmail = sendEmail as unknown as typeof booted.payload.sendEmail
 		const req = {
@@ -280,20 +299,30 @@ describeForDb('form-builder email locale without fallback', {}, (db) => {
 			fallbackLocale: false,
 			payload: booted.payload,
 		} as unknown as PayloadRequest
-		const results = await runActionsForSubmission({
-			input: { formId: form.id, submissionId: submission.id },
-			registry: resolveActions(buildDefaultActionDefinitions({ localize: true })),
-			payload: booted.payload,
-			req,
-		})
 
-		expect(results).toEqual([{ type: 'emailTeam', ok: true }])
-		expect(sendEmail).toHaveBeenCalledWith(
-			expect.objectContaining({ to: 'team@example.com', subject: 'New' })
-		)
+		expect(await runInDe('English only', { req })).toEqual([
+			expect.objectContaining({
+				type: 'emailTeam',
+				ok: false,
+				error: 'emailTeam: empty subject and body',
+			}),
+		])
+		expect(sendEmail).not.toHaveBeenCalled()
 		// The job runner's request comes back as it was handed in.
 		expect(req.locale).toBe('en')
 		expect(req.fallbackLocale).toBe(false)
+	})
+
+	it('falls back when the fallbackLocale resolver forces one', async () => {
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		booted.payload.sendEmail = sendEmail as unknown as typeof booted.payload.sendEmail
+
+		expect(await runInDe('Forced fallback', { force: true })).toEqual([
+			{ type: 'emailTeam', ok: true },
+		])
+		expect(sendEmail).toHaveBeenCalledWith(
+			expect.objectContaining({ to: 'team@example.com', subject: 'New' })
+		)
 	})
 })
 

@@ -31,8 +31,8 @@ export type EmailActionOptions = {
 	/**
 	 * Localize the recipient lists (`to`, `cc`, `bcc`, `replyTo`) too, so each locale routes to its
 	 * own addresses (plugin option `email.localizeRecipients`). Off by default: routing is usually
-	 * the same in every locale, and a list left empty in one locale would otherwise fail `emailTeam`
-	 * there. Only applies while `localize` is on.
+	 * the same in every locale, and a list left empty in a locale that does not fall back fails
+	 * `emailTeam` there. Only applies while `localize` is on.
 	 */
 	localizeRecipients?: boolean
 	editor?: RichTextField['editor']

@@ -11,9 +11,9 @@ export type FormFallbackLocaleResult = string | string[] | false | undefined
 
 export type FormFallbackLocaleArgs = {
 	/**
-	 * The form as first read at `locale` with the default fallback, at depth 0: a non-localized owner
-	 * relationship (a multi-tenant host's `form.tenant`) is already on it, so no read of your own is
-	 * needed.
+	 * The form as first read at `locale` with the config's own fallback, at depth 0: a non-localized
+	 * owner relationship (a multi-tenant host's `form.tenant`) is already on it, so no read of your own
+	 * is needed. Decide from non-localized fields: a localized one may be empty at `locale`.
 	 */
 	form: SubmissionForm
 	/** The locale the form is being read at (the submission's, clamped). */
@@ -51,19 +51,15 @@ export type FindFormAtLocaleArgs = {
 type Localization = Exclude<SanitizedConfig['localization'], false>
 
 /**
- * The fallback a default read applies: Payload's own resolution (a locale's `fallbackLocale`, else
- * the default locale) with fallback enabled; otherwise the default locale, passed explicitly so
- * content the author never filled in at `locale` is not read as empty.
+ * The fallback Payload applies to a plain read at `locale`: a locale's own `fallbackLocale`, else the
+ * default locale, with `localization.fallback` on; none (`false`) with it off or at the default locale.
  */
-const defaultFallbackOf = (
+const configFallbackOf = (
 	localization: Localization,
 	locale: string
-): string | string[] | undefined => {
-	if (locale === localization.defaultLocale) {
-		return undefined
-	}
-	if (!localization.fallback) {
-		return localization.defaultLocale
+): string | string[] | false => {
+	if (!localization.fallback || locale === localization.defaultLocale) {
+		return false
 	}
 	return (
 		localization.locales.find((entry) => entry.code === locale)?.fallbackLocale ??
@@ -73,14 +69,13 @@ const defaultFallbackOf = (
 
 /**
  * Loads a form (depth 0) at `locale` for server work done on a visitor's behalf: validating a
- * submission, running its actions, serving poll results. A host with `localization.fallback: false`
- * would otherwise get empty values for anything the author never filled in at that locale, which
- * sends a blank email or fails `emailTeam` on an empty `to` for every submission in it, so the
- * default locale is passed as an explicit per-field fallback there. A host with fallback enabled
- * keeps Payload's own resolution, locale-specific fallbacks included.
+ * submission, running its actions, serving poll results. The read falls back exactly like any other
+ * Payload read, so with `localization.fallback: false` content the author never filled in at
+ * `locale` stays empty, matching what the host's own page renders.
  *
  * With the plugin's `fallbackLocale` resolver set, it gets the form as read and may choose another
- * fallback; the form is read again only when that differs from the one already applied.
+ * fallback (the way a host forces one); the form is read again only when that differs from the one
+ * already applied.
  *
  * Payload's local API writes `locale` and `fallbackLocale` onto the `req` it is handed. Both are
  * restored afterwards, so a host (or job runner) request passed in comes back unchanged.
@@ -110,9 +105,7 @@ export const findFormAtLocale = async ({
 		if (!localization) {
 			return await read(undefined)
 		}
-		const applied = defaultFallbackOf(localization, locale)
-		// With fallback enabled Payload applies `applied` on its own; a disabled one needs it explicitly.
-		const form = await read(localization.fallback ? undefined : applied)
+		const form = await read(undefined)
 		const resolver = customStateOf<FallbackState>(payload).fallbackLocale
 		if (!resolver) {
 			return form
@@ -125,7 +118,11 @@ export const findFormAtLocale = async ({
 			req,
 		})
 		// Falling back to the read's own locale, or to the fallback already applied, changes nothing.
-		if (chosen === undefined || chosen === locale || chosen === (applied ?? false)) {
+		if (
+			chosen === undefined ||
+			chosen === locale ||
+			chosen === configFallbackOf(localization, locale)
+		) {
 			return form
 		}
 		return await read(chosen)

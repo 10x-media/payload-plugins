@@ -21,6 +21,6 @@ A per-form fallback locale, shared recipient lists by default, and no more blank
   ```
 
   On Postgres the switch is a schema change: generate a migration with `payload migrate:create` and make sure each list keeps its default-locale rows.
-- **`fallbackLocale`** chooses the fallback locale per form for every server-side read of it (validating a submission, running its actions, serving poll results), e.g. a tenant's own default locale instead of the config-wide one. It receives the form as already read, so a non-localized owner such as `form.tenant` needs no read of your own, and the form is read again only when the result differs from the fallback already applied.
+- **`fallbackLocale`** chooses the fallback locale per form for every server-side read of it (validating a submission, running its actions, serving poll results), e.g. a tenant's own default locale instead of the config-wide one, or a forced fallback on a host with `localization.fallback: false`. Without it those reads fall back exactly like any Payload read, as your config says. It receives the form as already read, so a non-localized owner such as `form.tenant` needs no read of your own, and the form is read again only when the result differs from the fallback already applied.
 - An email whose subject and body are both empty now fails its action with `empty subject and body` instead of being sent blank.
 - The recipient fields, and the plugin's other custom selects, show Payload's localized badge when they are localized.

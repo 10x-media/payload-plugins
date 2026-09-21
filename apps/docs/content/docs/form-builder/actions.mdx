@@ -99,7 +99,7 @@ formBuilder({
 })
 ```
 
-`locale` is the submission's own stored locale, the one `body` was loaded at, so a wrapper's own strings (a greeting, a footer) match the content inside it. Prefer it over `req.locale`: on the queued path `req` is the job runner's request, not the visitor's. A submission stores the locale of the request that created it, which `<Form>` sets from its [`submissionLocale` prop](/form-builder/rendering#submission-locale). Content never authored in that locale falls back to the default locale field by field, even with `localization.fallback: false`.
+`locale` is the submission's own stored locale, the one `body` was loaded at, so a wrapper's own strings (a greeting, a footer) match the content inside it. Prefer it over `req.locale`: on the queued path `req` is the job runner's request, not the visitor's. A submission stores the locale of the request that created it, which `<Form>` sets from its [`submissionLocale` prop](/form-builder/rendering#submission-locale). Content never authored in that locale falls back as your `localization.fallback` allows, or as the [`fallbackLocale`](/form-builder/rendering#submission-locale) option chooses.
 
 The building blocks are exported from the root for custom pipelines: `serializeBody`, `defaultBodyConverters`, `sanitizeUrl`, `escapeHtml`, `renderAllValues`, and `renderAllValuesTable`.
 
@@ -214,7 +214,11 @@ Either way, **To**, **CC**, **BCC**, and **Reply-to** are shared across locales 
 formBuilder({ email: { localizeRecipients: true } })
 ```
 
-Each admin locale then stores its own addresses (or department choice), and a submission routes to the list stored for its own locale, exactly like the subject and body. This holds on the queued (job-runner) dispatch path too: the form is loaded at the submission's own stored locale, not the job runner's request locale, so a German visitor's submission still reaches the German department when the job that sends it runs with no locale of its own. A list left empty in a locale falls back like any other localized content (see [Submission locale](/form-builder/rendering#submission-locale)). The option has no effect with `localizeContent: false`. Toggling it changes how existing forms store these fields, like toggling `localized` on any Payload field.
+Each admin locale then stores its own addresses (or department choice), and a submission routes to the list stored for its own locale, exactly like the subject and body. This holds on the queued (job-runner) dispatch path too: the form is loaded at the submission's own stored locale, not the job runner's request locale, so a German visitor's submission still reaches the German department when the job that sends it runs with no locale of its own. The option has no effect with `localizeContent: false`. Toggling it changes how existing forms store these fields, like toggling `localized` on any Payload field.
+
+<Callout type="warn">
+A per-locale list is empty in every locale the editor did not fill it in for, and it falls back only as your `localization.fallback` allows. With fallback off, a submission in such a locale has no **To**, so `emailTeam` fails there with `missing "to" address` on every submission. Either fill the recipients in for each locale, turn fallback on, or force a fallback for these reads with the [`fallbackLocale`](/form-builder/rendering#submission-locale) option, for example to each tenant's default locale.
+</Callout>
 
 ## Recipient sources
 
