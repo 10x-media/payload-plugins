@@ -5,6 +5,12 @@ export type SubmitFormInput = {
 	values: SubmissionValue[]
 	/** Payload API route prefix; defaults to `/api`. */
 	apiRoute?: string
+	/**
+	 * The visitor's content locale, sent as `?locale=` so the server stamps it on the submission and
+	 * the post-submit actions (confirmation emails included) render in it. Absent, the server falls
+	 * back to the host's default locale.
+	 */
+	locale?: string
 	/** Injectable for testing; defaults to global `fetch`. */
 	fetchImpl?: typeof fetch
 }
@@ -32,15 +38,17 @@ const toFieldErrors = (body: ValidationErrorBody): Record<string, string[]> => {
 }
 
 /**
- * The default submission transport: POST `{apiRoute}/form-submissions` with `{ form, values }`. On 201
+ * The default submission transport: POST `{apiRoute}/form-submissions` (with `?locale=` when a
+ * `locale` is given) carrying `{ form, values }`. On 201
  * returns the created submission id; on a 400 Payload `ValidationError` maps `data.errors[].path` to
  * per-field messages; otherwise returns a generic message. Pure: inject `fetchImpl` in tests.
  */
 export const submitForm = async (input: SubmitFormInput): Promise<SubmitFormResult> => {
-	const { formId, values, apiRoute = '/api', fetchImpl = fetch } = input
+	const { formId, values, apiRoute = '/api', locale, fetchImpl = fetch } = input
+	const query = locale ? `?locale=${encodeURIComponent(locale)}` : ''
 	let response: Response
 	try {
-		response = await fetchImpl(`${apiRoute}/form-submissions`, {
+		response = await fetchImpl(`${apiRoute}/form-submissions${query}`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ form: formId, values }),
@@ -68,8 +76,13 @@ export const submitForm = async (input: SubmitFormInput): Promise<SubmitFormResu
 	return { ok: false, message: message ?? `Request failed (${response.status})` }
 }
 
-/** A consumer override for the transport: given the form id + values, resolve to a submit result. */
+/**
+ * A consumer override for the transport: given the form id + values, resolve to a submit result.
+ * `locale` is the `<Form>`'s explicit `locale` prop (absent when the prop was not passed); forward
+ * it as `?locale=` so the submission and its emails carry the visitor's locale.
+ */
 export type SubmitHandler = (input: {
 	formId: number | string
 	values: SubmissionValue[]
+	locale?: string
 }) => Promise<SubmitFormResult>

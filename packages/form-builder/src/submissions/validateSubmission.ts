@@ -1,4 +1,9 @@
-import { APIError, type CollectionBeforeValidateHook, ValidationError } from 'payload'
+import {
+	APIError,
+	type CollectionBeforeValidateHook,
+	type TypedLocale,
+	ValidationError,
+} from 'payload'
 import { calcExpressionOf } from '../calc/computeCalcFields'
 import type { CalcResolved } from '../calc/evaluate'
 import type { CalcFunction, CalcSource } from '../calc/registry'
@@ -20,6 +25,7 @@ import { asFieldTranslate, asTranslate } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import { formIdOf } from './formIdOf'
 import { runSubmission } from './runSubmission'
+import { resolveSubmissionLocale } from './submissionLocale'
 import type { FormFieldInstance, SubmissionValue } from './types'
 import { POLL_CONTEXT_KEY, type PollContextState, voteChangeTargetOf } from './votedCookie'
 
@@ -83,11 +89,18 @@ export const validateSubmission =
 			}
 		}
 
+		// `req.locale` comes from the visitor's `?locale=`. Clamp it before anything reads it (the form
+		// load below, the host's consent and calc resolvers, the inline action dispatch) so a visitor
+		// cannot run the pipeline under `all` or an unconfigured code. Cast where Payload takes it: the
+		// clamped value is one of the host's own codes, but its concrete `TypedLocale` union is unknowable here.
+		const locale = resolveSubmissionLocale(req.locale, req.payload.config.localization)
+		req.locale = locale as TypedLocale
+
 		const form = await req.payload.findByID({
 			collection: FORMS_SLUG,
 			id: formId as string | number,
 			depth: 0,
-			locale: req.locale,
+			locale: locale as TypedLocale,
 			req,
 		})
 
@@ -108,7 +121,6 @@ export const validateSubmission =
 
 		let fields = ((form.fields as FormFieldInstance[] | undefined) ?? []) as FormFieldInstance[]
 		const incoming = ((data.values as SubmissionValue[] | undefined) ?? []) as SubmissionValue[]
-		const locale = req.locale ?? 'en'
 		const t = asFieldTranslate(req.i18n.t)
 
 		// With a resolved choice set for the results field (a poll `optionSource`, or the field type's

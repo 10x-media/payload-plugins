@@ -11,6 +11,7 @@ import {
 	type RecipientsConfig,
 	resolveRecipientEntries,
 } from '../emailRecipients'
+import type { EmailActionType, EmailRender } from '../emailRender'
 import {
 	buildFromField,
 	type FromAddressesResolver,
@@ -35,6 +36,8 @@ export type EmailActionOptions = {
 	recipients?: RecipientsConfig
 	/** Server-resolved recipient sources offered in every recipient list (plugin option `email.recipientSources`). */
 	recipientSources?: RecipientSourceRegistry
+	/** Produces the final html from the serialized body (plugin option `email.render`). */
+	render?: EmailRender
 }
 
 /** The config fields shared by every built-in email action (each action adds its own `to` target). */
@@ -62,7 +65,7 @@ type ResolveToArgs<TConfig extends EmailActionConfig> = {
 
 /** What distinguishes one email action from another: identity, its primary target, and how it resolves/guards that target. */
 type EmailActionSpec<TConfig extends EmailActionConfig> = {
-	type: string
+	type: EmailActionType
 	label: string
 	/** The first cell of the opening row (paired with `replyTo`): a recipient list, or an email-field select. */
 	target: (recip: RecipientFieldBuilder) => Field
@@ -82,7 +85,8 @@ type EmailActionSpec<TConfig extends EmailActionConfig> = {
  * config (a first row pairing the action's target with `replyTo`, an optional `from` select, a
  * cc/bcc row, a subject, and a rich text body, content and recipient fields carrying `localized`
  * when `localize`) and an identical send (interpolate the subject, render the body, resolve
- * cc/bcc/replyTo, and hand a single comma-joined string per list to `payload.sendEmail`). Only the
+ * cc/bcc/replyTo, pass the html through `options.render` when set, and hand a single comma-joined
+ * string per list to `payload.sendEmail`). Only the
  * primary `to` target and its missing-value behavior differ, threaded through `spec`.
  */
 export const buildEmailAction = <TConfig extends EmailActionConfig>(
@@ -97,6 +101,7 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 		departments,
 		recipients,
 		recipientSources,
+		render,
 	} = options
 	const fromSourcesByValue = sourcesByValue(fromSources)
 	const endpoint = departments ? 'departments' : undefined
@@ -164,7 +169,16 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 			}
 
 			const subject = interpolate(config.subject ?? '', resolve)
-			const html = await args.renderBody(config.body)
+			const serialized = await args.renderBody(config.body)
+			const html = render
+				? await render({
+						...sourceArgs,
+						html: serialized,
+						body: config.body,
+						subject,
+						actionType: spec.type,
+					})
+				: serialized
 			const cc = (await resolveRecipientEntries(config.cc, { resolve, sources, sourceArgs })).join(
 				', '
 			)

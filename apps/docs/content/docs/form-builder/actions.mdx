@@ -77,22 +77,53 @@ formBuilder({
 })
 ```
 
-Beyond `body`, `values`, and `descriptors`, `serialize` receives the submitted `form` (`{ id, title }`) and the `req`, so the replacement can branch on context: look up a per-tenant template, or hand the raw body off to a component renderer like react-email:
+Beyond `body`, `values`, and `descriptors`, `serialize` receives the submitted `form` (`{ id, title }`), the `req`, the submission's `locale`, and the `actionType` rendering the body (`emailTeam`, `confirmation`, or a custom action's type), so the replacement can branch on context: look up a per-tenant template, or hand the raw body off to a component renderer like react-email. To only wrap the email around the default output, reach for [`email.render`](#email-layout) instead:
 
 ```tsx
 formBuilder({
   richText: {
-    serialize: async ({ body, values, form, req }) => {
+    serialize: async ({ body, values, form, req, locale, actionType }) => {
       const tenant = await tenantFromRequest(req)
       return render(
-        <SubmissionEmail body={body} values={values} formTitle={form.title} branding={tenant.branding} />
+        <SubmissionEmail
+          body={body}
+          values={values}
+          formTitle={form.title}
+          branding={tenant.branding}
+          locale={locale}
+          audience={actionType === 'confirmation' ? 'visitor' : 'team'}
+        />
       )
     },
   },
 })
 ```
 
+`locale` is the submission's own stored locale, the one `body` was loaded at, so a wrapper's own strings (a greeting, a footer) match the content inside it. Prefer it over `req.locale`: on the queued path `req` is the job runner's request, not the visitor's. A submission stores the locale of the request that created it, which `<Form>` sets from its [`locale` prop](/form-builder/rendering#transport).
+
 The building blocks are exported from the root for custom pipelines: `serializeBody`, `defaultBodyConverters`, `sanitizeUrl`, `escapeHtml`, `renderAllValues`, and `renderAllValuesTable`.
+
+## Email layout
+
+`email.render` produces the final `html` of every `emailTeam` and `confirmation` email. It runs after the body is serialized, so it wraps the finished body (a header, a footer, branding) without re-rendering any rich text:
+
+```ts title="payload.config.ts"
+formBuilder({
+  email: {
+    render: ({ html, subject, locale, actionType }) =>
+      renderLayout({
+        content: html,
+        title: subject,
+        locale,
+        variant: actionType === 'confirmation' ? 'visitor' : 'team',
+      }),
+  },
+})
+```
+
+It receives the serialized `html`, the raw `body` it came from, the interpolated `subject`, the `actionType` (`emailTeam` or `confirmation`), and the submission context: `locale`, `form`, `submissionId`, `values`, `descriptors`, the verified form `context`, `payload`, and `req`. `locale` is the submission's own, so the layout's strings match the localized subject and body inside it.
+
+The two hooks compose rather than compete: `richText.serialize` decides how an action body is rendered for any channel, custom actions included, and `email.render` then wraps what it produced for email only. A throwing `render` fails the action like a send failure, and absent, the serialized body is sent as is.
 
 ## CC, BCC, and reply-to
 
