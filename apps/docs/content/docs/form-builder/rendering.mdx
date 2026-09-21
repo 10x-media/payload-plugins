@@ -137,7 +137,22 @@ It is separate from `locale` on purpose. `locale` is a formatting tag handed to 
 
 The server clamps what it receives: on a host with `localization` only a configured locale code is kept (`all`, `*`, and any other code become the default locale); without `localization` any valid language tag such as `uk` or `pt-BR` is kept in its canonical form (`zh_Hant` is stored as `zh-Hant`) and anything else becomes `en`.
 
-Content the author never filled in for that locale falls back to the default locale field by field, even on a host with `localization.fallback: false`, so a German submission to a form whose emails exist only in English still sends the English email instead of a blank one (or none, when the missing value is the `emailTeam` recipient). With fallback enabled, Payload's own resolution applies, per-locale `fallbackLocale` included.
+Content the author never filled in for that locale falls back to the default locale field by field, even on a host with `localization.fallback: false`, so a German submission to a form whose emails exist only in English still sends the English email instead of a blank one (or none, when the missing value is a [per-locale](/form-builder/actions#per-locale-recipients) `emailTeam` recipient). With fallback enabled, Payload's own resolution applies, per-locale `fallbackLocale` included.
+
+When the right fallback depends on the form rather than the config, for example a multi-tenant app whose tenants each have their own default locale, choose it per form with the `fallbackLocale` option. It applies wherever the server acts on a form: validating a submission, running its actions, serving poll results.
+
+```ts title="payload.config.ts"
+formBuilder({
+  fallbackLocale: async ({ form, payload }) => {
+    const tenant = await payload.findByID({
+      collection: 'tenants', id: form.tenant as string, depth: 0, overrideAccess: true,
+    })
+    return tenant?.defaultLocale
+  },
+})
+```
+
+It receives the form as already read with the default fallback, at depth 0, so a non-localized owner relationship is on it without a read of your own, plus the `locale` it is being read at, `payload`, and `req`. Return a locale code, an ordered list of codes, `false` for no fallback, or `undefined` to keep the default. The form is read a second time only when the result differs from the fallback already applied, so a tenant writing in its own default locale costs nothing extra. The resolver runs on every server-side read of a form, so cache what it looks up if that is expensive. Render the form on your page with the same fallback, so what the visitor sees is what the server validates and sends.
 
 ### Props
 

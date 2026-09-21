@@ -24,7 +24,11 @@ import { toStaticLabel } from './toStaticLabel'
 export type EndpointOptionsSelectProps = {
 	/** The field path within the document (Payload-injected, not the endpoint path). */
 	path?: string
-	field?: { label?: unknown; admin?: { description?: unknown; width?: string } }
+	field?: {
+		label?: unknown
+		localized?: boolean
+		admin?: { description?: unknown; width?: string }
+	}
 	label?: unknown
 	/**
 	 * Endpoint subpath under the current document's collection API route; `'poll-options'` fetches
@@ -151,7 +155,7 @@ export const EndpointOptionsSelect = (props: EndpointOptionsSelectProps) => {
 
 	return (
 		<div className="field-type" style={{ marginBlockEnd: '1rem', ...fieldStyle }}>
-			<FieldLabel label={label} path={path} />
+			<FieldLabel label={label} localized={props.field?.localized} path={path} />
 			<ReactSelect
 				options={allOptions}
 				value={isMulti ? selectedOptions : (selectedOptions[0] ?? undefined)}

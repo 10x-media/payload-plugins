@@ -6,6 +6,7 @@ import { assertNoCalcFunctionCollision, assertValidCalcSourceKeys } from './calc
 import { stashConsentSources } from './consent/resolveConsentEntries'
 import { buildDefaultFieldDefinitions } from './fields/builtin'
 import { resolveFieldTypes, stashFieldTypes } from './fields/registry'
+import { stashFallbackLocale } from './form/findFormAtLocale'
 import type { FormBuilderPluginOptions } from './options'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
@@ -82,6 +83,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 				fromAddresses,
 				fromSources,
 				departments,
+				localizeRecipients: options.email?.localizeRecipients,
 				recipients: options.email?.recipients,
 				recipientSources: options.email?.recipientSources,
 				render: options.email?.render,
@@ -104,6 +106,9 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		config.custom = stashFieldTypes(config.custom, registry)
 		if (consentSources) {
 			config.custom = stashConsentSources(config.custom, consentSources)
+		}
+		if (options.fallbackLocale) {
+			config.custom = stashFallbackLocale(config.custom, options.fallbackLocale)
 		}
 		registerTranslations(config, options.translations)
 		registerCollections({
@@ -310,6 +315,11 @@ export type {
 	OmittableSharedField,
 	ResolveFieldOptionsArgs,
 } from './fields/types'
+export type {
+	FormFallbackLocale,
+	FormFallbackLocaleArgs,
+	FormFallbackLocaleResult,
+} from './form/findFormAtLocale'
 export { isPollClosed } from './form/pollState'
 export type { ToFormDocumentOptions } from './form/toFormDocument'
 export { toFormDocument } from './form/toFormDocument'

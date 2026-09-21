@@ -371,18 +371,20 @@ describe('confirmation', () => {
 				| undefined
 			expect(field?.type).toBe('text')
 			expect(field?.hasMany).toBe(true)
-			expect(field?.localized).toBe(true)
+			expect(field?.localized).toBeUndefined()
 			expect(field?.admin?.width).toBe('50%')
 			expect(field?.admin?.components?.Field?.path).toBe(RECIPIENTS_REF)
 		}
 	})
 
-	it('drops the localized flag on cc, bcc, and replyTo when localize is false', () => {
+	it('localizes cc, bcc, and replyTo only with localizeRecipients, and never without localize', () => {
 		for (const name of ['cc', 'bcc', 'replyTo']) {
-			const field = fieldNamed(buildConfirmation({ localize: false }), name) as
-				| { localized?: boolean }
-				| undefined
-			expect(field?.localized).toBeUndefined()
+			const localized = (options: Parameters<typeof buildConfirmation>[0]) =>
+				(fieldNamed(buildConfirmation(options), name) as { localized?: boolean } | undefined)
+					?.localized
+			expect(localized({ localize: true, localizeRecipients: true })).toBe(true)
+			expect(localized({ localize: false, localizeRecipients: true })).toBeUndefined()
+			expect(localized({ localize: false })).toBeUndefined()
 		}
 	})
 

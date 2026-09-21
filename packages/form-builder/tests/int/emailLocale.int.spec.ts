@@ -296,3 +296,87 @@ describeForDb('form-builder email locale without fallback', {}, (db) => {
 		expect(req.fallbackLocale).toBe(false)
 	})
 })
+
+describeForDb('form-builder per-form fallback locale', {}, (db) => {
+	let booted: BootedPayload
+	const fallbackLocale = vi.fn(({ form }: { form: { title?: string } }) =>
+		form.title === 'Tenant uk' ? 'uk' : undefined
+	)
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: formBuilder({ fallbackLocale }),
+			db,
+			configOverrides: { localization: { locales: ['en', 'de', 'uk'], defaultLocale: 'en' } },
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	/** A form whose email content exists only in `uk`, the owner's own default. */
+	const ukOnlyForm = async (title: string) => {
+		const form = await booted.payload.create({
+			collection: 'forms',
+			data: {
+				title,
+				fields: [],
+				actions: [{ blockType: 'emailTeam', to: ['team@example.com'], subject: '', body: '' }],
+			},
+			overrideAccess: true,
+		})
+		const [team] = form.actions as Block[]
+		await booted.payload.update({
+			collection: 'forms',
+			id: form.id,
+			locale: 'uk',
+			data: { actions: [{ ...team, subject: 'Нова заявка', body: 'uk body' }] },
+			overrideAccess: true,
+		})
+		return form
+	}
+
+	const runFor = async (formId: number | string) => {
+		const submission = await booted.payload.create({
+			collection: 'form-submissions',
+			locale: 'de',
+			data: { form: formId, values: [] },
+		})
+		return runActionsForSubmission({
+			input: { formId, submissionId: submission.id },
+			registry: resolveActions(buildDefaultActionDefinitions({ localize: true })),
+			payload: booted.payload,
+		})
+	}
+
+	it('falls back to the locale the resolver picks for the form', async () => {
+		const form = await ukOnlyForm('Tenant uk')
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		booted.payload.sendEmail = sendEmail as unknown as typeof booted.payload.sendEmail
+		fallbackLocale.mockClear()
+
+		expect(await runFor(form.id)).toEqual([{ type: 'emailTeam', ok: true }])
+		expect(sendEmail).toHaveBeenCalledWith(
+			expect.objectContaining({ to: 'team@example.com', subject: 'Нова заявка' })
+		)
+		expect(fallbackLocale).toHaveBeenCalledWith(
+			expect.objectContaining({ locale: 'de', form: expect.objectContaining({ id: form.id }) })
+		)
+	})
+
+	it('keeps the default fallback, and fails rather than sending an empty email, when it picks none', async () => {
+		const form = await ukOnlyForm('Other tenant')
+		const sendEmail = vi.fn().mockResolvedValue(undefined)
+		booted.payload.sendEmail = sendEmail as unknown as typeof booted.payload.sendEmail
+
+		expect(await runFor(form.id)).toEqual([
+			expect.objectContaining({
+				type: 'emailTeam',
+				ok: false,
+				error: 'emailTeam: empty subject and body',
+			}),
+		])
+		expect(sendEmail).not.toHaveBeenCalled()
+	})
+})
