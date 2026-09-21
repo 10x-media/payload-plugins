@@ -1,6 +1,9 @@
 import type { SubmissionContextArgs } from './submissionContext'
 
-/** Arguments a recipient source's `resolve` receives when a submission's email actions run. */
+/**
+ * Arguments a recipient source's `resolve` receives when a submission's email actions run. `form` is
+ * the whole form document (see `SubmissionForm`).
+ */
 export type RecipientResolveArgs = SubmissionContextArgs
 
 /**

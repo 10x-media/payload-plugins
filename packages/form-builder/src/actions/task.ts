@@ -10,6 +10,7 @@ import type { RichTextBodyOption } from './body/serializeBody'
 import { type ActionRegistry, isEssentialAction } from './registry'
 import type { ActionInstance, ActionResult } from './runActions'
 import { runActions } from './runActions'
+import type { SubmissionForm } from './submissionContext'
 
 export const ACTIONS_TASK_SLUG = 'form-builder-actions'
 
@@ -106,7 +107,10 @@ export const runActionsForSubmission = async (args: {
 		actions: selected,
 		registry,
 		richText,
-		form: { id: form.id, title: typeof form.title === 'string' ? form.title : undefined },
+		// The whole document, not just its identity, so a send-time hook reads a field off it (a
+		// multi-tenant host's `tenant`) instead of loading the same form again. Double cast: a host's
+		// generated Form interface has no index signature.
+		form: form as unknown as SubmissionForm,
 		submissionId: submission.id,
 		values: asValues(submission.values),
 		descriptors: asDescriptors(submission.descriptors),

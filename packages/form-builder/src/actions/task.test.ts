@@ -31,6 +31,26 @@ describe('runActionsForSubmission', () => {
 		expect(logger.error).toHaveBeenCalledTimes(1)
 	})
 
+	it('hands actions the whole loaded form document, not just its identity', async () => {
+		const run = vi.fn()
+		const registry: ActionRegistry = new Map([['spy', { type: 'spy', label: 'Spy', run }]])
+		const form = { id: 'f1', title: 'F', tenant: 't1', actions: [{ blockType: 'spy' }] }
+		const findByID = vi
+			.fn()
+			.mockResolvedValueOnce({ id: 's1', values: [], descriptors: [], locale: 'en' })
+			.mockResolvedValueOnce(form)
+		const payload = { config: {}, findByID, logger: { error: vi.fn() } } as unknown as Payload
+
+		await runActionsForSubmission({
+			input: { formId: 'f1', submissionId: 's1' },
+			registry,
+			payload,
+		})
+
+		expect(run).toHaveBeenCalledWith(expect.objectContaining({ form }))
+		expect(findByID).toHaveBeenCalledTimes(2)
+	})
+
 	it('returns an empty list and logs nothing when the submission is missing', async () => {
 		const logger = { error: vi.fn(), warn: vi.fn(), info: vi.fn() }
 		const findByID = vi.fn().mockResolvedValue(null)
