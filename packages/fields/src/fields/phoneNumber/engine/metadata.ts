@@ -22,7 +22,11 @@ const cache = new Map<MetadataSet, Promise<PhoneMetadata>>()
 export const loadMetadata = (set: MetadataSet): Promise<PhoneMetadata> => {
 	const cached = cache.get(set)
 	if (cached) return cached
-	const loading = loaders[set]()
+	const loader = loaders[set]
+	// An out-of-union set arrives from unvalidated config; rejecting rather than throwing keeps
+	// every caller's degrade path in charge instead of taking the render down with it.
+	if (!loader) return Promise.reject(new Error(`unknown phone metadata set "${String(set)}"`))
+	const loading = loader()
 		.then((module) => module.default)
 		.catch((err: unknown) => {
 			cache.delete(set)

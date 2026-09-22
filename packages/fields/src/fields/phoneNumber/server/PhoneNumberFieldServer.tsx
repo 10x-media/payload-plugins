@@ -42,8 +42,13 @@ export const PhoneNumberFieldServer = async (props: PhoneNumberFieldServerCompon
 	const raw = 'name' in field ? storedNumber(siblingData, String(field.name)) : ''
 	let seed: null | PhoneSeed = null
 	if (raw !== '') {
-		const metadata = await loadMetadata(resolved.metadata)
-		seed = phoneSeed(raw, { defaultCountry: resolved.defaultCountry, metadata })
+		try {
+			const metadata = await loadMetadata(resolved.metadata)
+			seed = phoneSeed(raw, { defaultCountry: resolved.defaultCountry, metadata })
+		} catch {
+			// The seed is an optimization; a failed load degrades the first frame, never the view
+			seed = null
+		}
 	}
 
 	return (
