@@ -105,6 +105,16 @@
 			"development": "./src/exports/measurement-utils.ts",
 			"types": "./src/exports/measurement-utils.ts",
 			"default": "./dist/exports/measurement-utils.js"
+		},
+		"./phone": {
+			"development": "./src/exports/phone.ts",
+			"types": "./src/exports/phone.ts",
+			"default": "./dist/exports/phone.js"
+		},
+		"./phone/utils": {
+			"development": "./src/exports/phone-utils.ts",
+			"types": "./src/exports/phone-utils.ts",
+			"default": "./dist/exports/phone-utils.js"
 		}
 	},
 	"files": [
@@ -286,6 +296,16 @@
 				"types": "./dist/exports/measurement-utils.d.ts",
 				"import": "./dist/exports/measurement-utils.js",
 				"default": "./dist/exports/measurement-utils.js"
+			},
+			"./phone": {
+				"types": "./dist/exports/phone.d.ts",
+				"import": "./dist/exports/phone.js",
+				"default": "./dist/exports/phone.js"
+			},
+			"./phone/utils": {
+				"types": "./dist/exports/phone-utils.d.ts",
+				"import": "./dist/exports/phone-utils.js",
+				"default": "./dist/exports/phone-utils.js"
 			}
 		}
 	}

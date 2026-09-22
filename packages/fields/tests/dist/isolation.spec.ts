@@ -11,7 +11,7 @@ if (process.env.REQUIRE_DIST === '1' && !hasDist) {
 	throw new Error('dist/ not found. Run `pnpm build fields` before `pnpm --filter @10x-media/fields test:dist`.')
 }
 
-type Family = 'color' | 'icon' | 'encrypted' | 'measurement'
+type Family = 'color' | 'icon' | 'encrypted' | 'measurement' | 'phoneNumber'
 
 const familyEntries: Record<Family, string[]> = {
 	color: ['exports/color.js', 'exports/color-utils.js'],
@@ -25,6 +25,7 @@ const familyEntries: Record<Family, string[]> = {
 	],
 	encrypted: ['exports/encrypted.js'],
 	measurement: ['exports/measurement.js', 'exports/measurement-utils.js'],
+	phoneNumber: ['exports/phone.js', 'exports/phone-utils.js'],
 }
 
 const sharedEntries = [
@@ -35,7 +36,7 @@ const sharedEntries = [
 	'exports/i18n.js',
 ]
 
-const allFamilies: Family[] = ['color', 'icon', 'encrypted', 'measurement']
+const allFamilies: Family[] = ['color', 'icon', 'encrypted', 'measurement', 'phoneNumber']
 
 /** Families whose engine has landed under dist/fields/<family>; grows as families ship. */
 const familiesWithSource: Family[] = allFamilies
@@ -178,6 +179,23 @@ describe.skipIf(!hasDist)('dist bundle isolation', () => {
 		// measurement-utils is the frontend-safe surface and must stay pure of them.
 		const clientPrefix = join(distDir, 'fields', 'measurement', 'client') + sep
 		const offenders = [...importGraph('exports/measurement-utils.js')].filter((file) =>
+			file.startsWith(clientPrefix)
+		)
+		expect(offenders).toEqual([])
+	})
+
+	it('frontend-safe phone utils stay dependency-free of admin code', () => {
+		const offenders = [...importGraph('exports/phone-utils.js')].filter(
+			(file) =>
+				file.startsWith(join(distDir, 'plugin') + sep) ||
+				file.startsWith(join(distDir, 'translations') + sep)
+		)
+		expect(offenders).toEqual([])
+	})
+
+	it('phone utils never reach the phone client graph', () => {
+		const clientPrefix = join(distDir, 'fields', 'phoneNumber', 'client') + sep
+		const offenders = [...importGraph('exports/phone-utils.js')].filter((file) =>
 			file.startsWith(clientPrefix)
 		)
 		expect(offenders).toEqual([])
