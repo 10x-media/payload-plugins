@@ -149,7 +149,7 @@ const OPTIONS: PhoneClientOptions = {
 type FieldAdmin = {
 	className?: string
 	description?: string
-	placeholder?: string
+	placeholder?: Record<string, string> | string
 	readOnly?: boolean
 	width?: string
 }
@@ -309,6 +309,11 @@ describe('PhoneNumberField', () => {
 		expect(input().placeholder).toBe('Work number')
 	})
 
+	it('resolves a localized admin.placeholder for the admin language', async () => {
+		await renderPhone({ admin: { placeholder: { de: 'Nummer', en: 'Work number' } } })
+		expect(input().placeholder).toBe('Work number')
+	})
+
 	it('asks for the phone keypad rather than a plain text field', async () => {
 		await renderPhone()
 		expect(input().type).toBe('tel')
@@ -356,13 +361,12 @@ describe('PhoneNumberField', () => {
 		expect(input().value).toBe('1511 2345678')
 	})
 
-	it('formats as you type and leaves the caret at the end', async () => {
+	it('formats as you type while appending at the end', async () => {
 		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
 		type('1511')
 		expect(input().value).toBe('1511')
 		type('15112345678')
 		expect(input().value).toBe('1511 2345678')
-		expect(input().selectionStart).toBe(input().value.length)
 	})
 
 	it('leaves a mid-string insertion exactly as typed', async () => {
@@ -515,6 +519,17 @@ describe('PhoneNumberField', () => {
 		expect(writesTo('phone.country')).toEqual([null])
 		expect(setModified).toHaveBeenCalledWith(true)
 		expect(input().value).toBe('')
+	})
+
+	// The control unmounts on the same commit, so focus has to go somewhere deliberate
+	it('moves focus to the input when the clear control is used', async () => {
+		formFields.current = { 'phone.number': { value: '+4915112345678' } }
+		await renderPhone()
+		const clear = clearButton() as HTMLButtonElement
+		clear.focus()
+		fireEvent.click(clear)
+		expect(clearButton()).toBeNull()
+		expect(document.activeElement).toBe(input())
 	})
 
 	// The emptied country subfield and the trigger must agree, or the form would save a

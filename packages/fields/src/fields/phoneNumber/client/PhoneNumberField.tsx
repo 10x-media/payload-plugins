@@ -12,11 +12,12 @@ import {
 	XIcon,
 } from '@payloadcms/ui'
 import { mergeFieldStyles } from '@payloadcms/ui/shared'
-import type { GroupFieldClientProps, TextFieldClientProps } from 'payload'
+import type { GroupFieldClientProps, StaticLabel, TextFieldClientProps } from 'payload'
 import type React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
+import { resolveStaticLabel } from '../../../utils/resolveStaticLabel'
 import { countryOptions } from '../engine/countries'
 import { loadMetadata, type PhoneMetadata } from '../engine/metadata'
 import {
@@ -25,6 +26,7 @@ import {
 	formatAsYouType,
 	type ParsedPhone,
 	parsePhone,
+	salvagePhone,
 } from '../engine/phone'
 import type { PhoneClientOptions } from '../options'
 import { type CountryOptionGroups, CountryPicker } from './CountryPicker'
@@ -42,13 +44,16 @@ type PhoneEntry = { country: CountryCode | undefined; number: null | string }
  * `GroupFieldClient` types neither; the e164 variant is a `TextFieldClient` and types both.
  */
 type PhonePassthrough = {
-	admin?: { placeholder?: Record<string, string> | string; readOnly?: boolean }
+	admin?: { placeholder?: StaticLabel; readOnly?: boolean }
 	required?: boolean
 }
 
 const isInternational = (draft: string): boolean => draft.trimStart().startsWith('+')
 
-/** What as-you-type is allowed to reflow. Anything else (letters, an extension) stays verbatim. */
+/**
+ * What as-you-type may reflow. Letters and an `x123` extension stay verbatim while typing,
+ * but a commit stores E.164, which cannot carry an extension, so the repaint drops it.
+ */
 const PHONE_CHARS = /^[\d\s+()./-]*$/
 
 /** The number without its calling code, so it reads as one phrase beside the prefix. */
@@ -87,22 +92,6 @@ const formatDraft = (args: {
 	return formatted.startsWith(prefix) ? formatted.slice(prefix.length).trimStart() : formatted
 }
 
-/**
- * `detectCountry` proves a valid number is in there; this finds the longest leading
- * candidate that parses, so a doubled paste keeps the first number rather than erroring.
- */
-const salvagePhone = (draft: string, metadata: PhoneMetadata): null | ParsedPhone => {
-	const country = detectCountry(draft, { metadata })
-	if (country === undefined) return null
-	const plus = draft.indexOf('+')
-	const tail = plus === -1 ? draft.trim() : draft.slice(plus)
-	for (let end = Math.min(tail.length, 18); end > 2; end--) {
-		const candidate = parsePhone(tail.slice(0, end), { defaultCountry: country, metadata })
-		if (candidate?.valid) return candidate
-	}
-	return null
-}
-
 const resolveCommit = (args: {
 	country: CountryCode | undefined
 	draft: string
@@ -114,8 +103,9 @@ const resolveCommit = (args: {
 	const { country, draft, isClearable, lastValid, metadata, salvage } = args
 	const trimmed = draft.trim()
 	if (metadata === null) return { country, number: trimmed === '' ? null : trimmed }
-	const direct = parsePhone(trimmed, { defaultCountry: country, metadata })
-	const resolved = direct?.valid ? direct : salvage ? salvagePhone(trimmed, metadata) : null
+	const opts = { defaultCountry: country, metadata }
+	const direct = parsePhone(trimmed, opts)
+	const resolved = direct?.valid ? direct : salvage ? salvagePhone(trimmed, opts) : null
 	if (resolved) return { country: resolved.country ?? country, number: resolved.e164 }
 	// isClearable false means the value cannot be removed, only replaced
 	if (trimmed === '') return !isClearable && lastValid ? lastValid : { country, number: null }
@@ -311,12 +301,16 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 		[cancelPending, commit, draft, metadata]
 	)
 
+	// The clear control unmounts on the same commit that empties the field, so focus moves to
+	// the input first; otherwise a keyboard viewer is dropped back to the document body.
+	const inputRef = useRef<HTMLInputElement>(null)
 	const onClear = useCallback(() => {
 		cancelPending()
 		editingRef.current = false
 		setPickedCountry(undefined)
 		setDraft('')
 		write({ country: undefined, number: null })
+		inputRef.current?.focus()
 	}, [cancelPending, write])
 
 	// renderField only maps permissions into the readOnly clientProp; admin.readOnly reaches
@@ -369,8 +363,9 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 						name={path}
 						onBlur={onBlur}
 						onChange={onChange}
-						placeholder={typeof placeholder === 'string' ? placeholder : undefined}
+						placeholder={resolveStaticLabel(placeholder, i18n.language)}
 						readOnly={isReadOnly}
+						ref={inputRef}
 						type="tel"
 						value={draft}
 					/>
