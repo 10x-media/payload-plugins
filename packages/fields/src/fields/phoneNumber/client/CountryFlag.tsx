@@ -5,8 +5,8 @@ import type React from 'react'
 import { useState } from 'react'
 import { emojiFlag } from '../engine/countries'
 import type { CountryCode } from '../engine/phone'
-import type { PhoneFlagMode } from '../options'
-import { countryFlagSrc } from '../server/flagsEndpoint'
+import { countryFlagSrc, type PhoneFlagMode } from '../options'
+import './phoneNumberField.css'
 
 const baseClass = 'fields-phone'
 

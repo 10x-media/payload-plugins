@@ -139,6 +139,22 @@ describe.skipIf(!hasDist)('dist bundle isolation', () => {
 		expect(offenders).toEqual([])
 	})
 
+	it('client barrel graph never reaches a family server directory', () => {
+		// A server/ directory holds route handlers and the heavy assets they defer-import
+		// (the flags endpoint alone reaches ~266 modules of artwork). Whether that stays out
+		// of the admin bundle must not depend on a consumer's tree shaking, so anything both
+		// sides need belongs in a module neither side has to import the other to reach.
+		const serverDirs = allFamilies.map((family) => join(distDir, 'fields', family, 'server') + sep)
+		expect(
+			serverDirs.some((dir) => existsSync(dir)),
+			'no family ships a server/ directory, this check is vacuous'
+		).toBe(true)
+		const offenders = [...importGraph('exports/client.js')].filter((file) =>
+			serverDirs.some((dir) => file.startsWith(dir))
+		)
+		expect(offenders).toEqual([])
+	})
+
 	it('client barrel graph never imports the lexical editor package', () => {
 		// The richText reveal gate is client, but the editor loads through the app
 		// import map (server RSC delegation), never a static client import. A stray

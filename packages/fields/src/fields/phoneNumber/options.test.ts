@@ -1,5 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { resolvePhoneOptions } from './options'
+import { countryFlagSrc, resolvePhoneOptions } from './options'
+
+describe('countryFlagSrc', () => {
+	it('builds from serverURL and the configured api route', () => {
+		expect(countryFlagSrc('https://cms.test', '/api', 'DE')).toBe(
+			'https://cms.test/api/10x-fields/flags/de.svg'
+		)
+	})
+
+	it('stays relative when no serverURL is configured', () => {
+		expect(countryFlagSrc('', '/api', 'de')).toBe('/api/10x-fields/flags/de.svg')
+	})
+})
 
 describe('resolvePhoneOptions', () => {
 	it('applies documented defaults with no field or global input', () => {

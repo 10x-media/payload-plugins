@@ -59,11 +59,3 @@ export const makeFlagsHandler = (): PayloadHandler => async (req) => {
 	}
 	return new Response(svg, { headers: SVG_HEADERS, status: 200 })
 }
-
-/**
- * The flag route's URL for one ISO 3166-1 alpha-2 code, built from the app's own API
- * route rather than assumed, so an install that moved `routes.api` still resolves its
- * flags. The `.svg` suffix is there for a reader who opens the URL directly.
- */
-export const countryFlagSrc = (serverURL: string, apiRoute: string, code: string): string =>
-	`${serverURL}${apiRoute}${FLAGS_PATH}/${encodeURIComponent(code.toLowerCase())}.svg`

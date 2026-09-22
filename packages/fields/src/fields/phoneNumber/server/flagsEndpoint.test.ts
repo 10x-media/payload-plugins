@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { countryFlagSrc, makeFlagsHandler } from './flagsEndpoint'
+import { makeFlagsHandler } from './flagsEndpoint'
 
 const call = (code: unknown) =>
 	makeFlagsHandler()({ routeParams: { code } } as never) as Promise<Response>
@@ -63,17 +63,5 @@ describe('flags handler', () => {
 			vi.doUnmock('country-flag-icons/string/3x2')
 			vi.resetModules()
 		}
-	})
-})
-
-describe('countryFlagSrc', () => {
-	it('builds from serverURL and the configured api route', () => {
-		expect(countryFlagSrc('https://cms.test', '/api', 'DE')).toBe(
-			'https://cms.test/api/10x-fields/flags/de.svg'
-		)
-	})
-
-	it('stays relative when no serverURL is configured', () => {
-		expect(countryFlagSrc('', '/api', 'de')).toBe('/api/10x-fields/flags/de.svg')
 	})
 })
