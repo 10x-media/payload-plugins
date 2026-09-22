@@ -16,6 +16,7 @@ import type {
 	FieldsPluginRegistry,
 	IconGlobalConfig,
 	MeasurementGlobalConfig,
+	PhoneNumberGlobalConfig,
 } from './types'
 
 export type FieldsPluginOptions = {
@@ -39,6 +40,8 @@ export type FieldsPluginOptions = {
 	encrypted?: EncryptedGlobalConfig
 	/** Global defaults for measurementField(). Per-field options always win. */
 	measurement?: MeasurementGlobalConfig
+	/** Global defaults for phoneNumberField(). Per-field options always win. */
+	phoneNumber?: PhoneNumberGlobalConfig
 }
 
 declare module 'payload' {
@@ -70,6 +73,20 @@ const normalizeRegistry = (options: FieldsPluginOptions): FieldsPluginRegistry =
 			}
 		}
 		registry.measurement = options.measurement
+	}
+	if (options.phoneNumber) {
+		const { countries, defaultCountry, metadata, validation } = options.phoneNumber
+		if (validation === 'mobile' && metadata === 'min') {
+			throw new Error(
+				"fields plugin: phoneNumber.validation 'mobile' needs metadata 'max' or 'mobile'; 'min' carries no number types."
+			)
+		}
+		if (defaultCountry && countries && !countries.includes(defaultCountry)) {
+			throw new Error(
+				`fields plugin: phoneNumber.defaultCountry "${defaultCountry}" is not in phoneNumber.countries.`
+			)
+		}
+		registry.phoneNumber = options.phoneNumber
 	}
 	return registry
 }
@@ -138,5 +155,6 @@ export type {
 	KeysConfig,
 	MeasurementDefaultUnitsResolver,
 	MeasurementGlobalConfig,
+	PhoneNumberGlobalConfig,
 } from './types'
 export type { FieldsPluginOptions as PluginOptions }

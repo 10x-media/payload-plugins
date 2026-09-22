@@ -1,6 +1,13 @@
 import type { Payload, PayloadRequest, StaticLabel } from 'payload'
 import type { MeasurementPrecision, PrecisionMode } from './fields/measurement/engine/precision'
 import type { MeasurementUnitId } from './fields/measurement/engine/units'
+import type { MetadataSet } from './fields/phoneNumber/engine/metadata'
+import type {
+	CountryCode,
+	PhoneFormat,
+	PhoneValidationMode,
+} from './fields/phoneNumber/engine/phone'
+import type { PhoneFlagMode, PhoneStorageMode } from './fields/phoneNumber/options'
 
 /** Args passed to async per-document resolvers (color presets, icon availability). */
 export type FieldsResolverArgs = {
@@ -245,10 +252,30 @@ export type MeasurementGlobalConfig = {
 	precision?: MeasurementPrecision | PrecisionMode
 }
 
+/** Plugin-level defaults for phoneNumberField(). Per-field options always win. */
+export type PhoneNumberGlobalConfig = {
+	/** Default for every phoneNumberField(); a field's own option always wins. */
+	defaultCountry?: CountryCode
+	countries?: readonly CountryCode[]
+	preferredCountries?: readonly CountryCode[]
+	validation?: PhoneValidationMode
+	flags?: PhoneFlagMode
+	cellFormat?: PhoneFormat
+	storage?: PhoneStorageMode
+	/**
+	 * Install-wide, with no per-field form: the parser is a process-wide singleton, so two
+	 * sets would mean two copies and two verdicts on the same number.
+	 */
+	metadata?: MetadataSet
+	/** Mount the flag SVG route. Defaults to true. */
+	serveFlags?: boolean
+}
+
 /** Normalized plugin options written to `config.custom['@10x-media/fields']`. */
 export type FieldsPluginRegistry = {
 	color?: ColorGlobalConfig
 	icon?: IconGlobalConfig
 	encrypted?: EncryptedGlobalConfig
 	measurement?: MeasurementGlobalConfig
+	phoneNumber?: PhoneNumberGlobalConfig
 }
