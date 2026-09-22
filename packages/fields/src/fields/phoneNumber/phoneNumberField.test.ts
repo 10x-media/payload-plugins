@@ -1,5 +1,6 @@
 import type { NamedGroupField, TextField } from 'payload'
 import { describe, expect, it } from 'vitest'
+import { FIELDS_REGISTRY_KEY } from '../../plugin/registry'
 import type { CountryCode } from './engine/phone'
 import { phoneNumberField } from './phoneNumberField'
 
@@ -12,6 +13,10 @@ const group = (opts: Parameters<typeof phoneNumberField>[0]) =>
 /** A minimal `t` stub: validators only interpolate the key, never look up a bundle. */
 const t = (key: string) => key
 const validateArgs = { req: { t } } as never
+
+/** A hook only ever needs `req.payload.config` to read the plugin registry. */
+const reqWithRegistry = (custom?: Record<string, unknown>) =>
+	({ payload: { config: { custom } } }) as never
 
 describe('phoneNumberField, object storage', () => {
 	it('returns a group named after the field', () => {
@@ -151,6 +156,7 @@ describe('phoneNumberField derived read hook', () => {
 		// from the stored string, so a hook that clobbered `number` with the parsed form
 		// (instead of spreading the stored value first) would fail this assertion.
 		const result = (await hook?.({
+			req: reqWithRegistry(),
 			value: { country: 'DE', number: '0151 12345678' },
 		} as never)) as Record<string, unknown>
 		expect(result).toMatchObject({ country: 'DE', number: '0151 12345678' })
@@ -165,6 +171,35 @@ describe('phoneNumberField derived read hook', () => {
 		const field = group({ name: 'phone' })
 		const hook = field.hooks?.afterRead?.[0]
 		const value = { country: 'DE' }
-		expect(await hook?.({ value } as never)).toBe(value)
+		expect(await hook?.({ req: reqWithRegistry(), value } as never)).toBe(value)
+	})
+
+	it('reads the registry metadata set at request time, not the factory default', async () => {
+		const field = group({ name: 'phone' })
+		const hook = field.hooks?.afterRead?.[0]
+		const req = reqWithRegistry({
+			[FIELDS_REGISTRY_KEY]: { phoneNumber: { metadata: 'min' } },
+		})
+		// 'min' metadata carries no per-type patterns, so `type` is honestly undefined here,
+		// while every other derived field still resolves the same as under 'max'.
+		const result = (await hook?.({
+			req,
+			value: { country: 'DE', number: '0151 12345678' },
+		} as never)) as Record<string, unknown>
+		expect(result.type).toBeUndefined()
+		expect(result.national).toBe('01511 2345678')
+		expect(result.callingCode).toBe('49')
+	})
+
+	it('degrades to the default metadata set when the registry value is missing', async () => {
+		const field = group({ name: 'phone' })
+		const hook = field.hooks?.afterRead?.[0]
+		const result = (await hook?.({
+			req: reqWithRegistry(),
+			value: { country: 'DE', number: '0151 12345678' },
+		} as never)) as Record<string, unknown>
+		// No registry entry at all resolves to DEFAULT_METADATA_SET ('max'), which is the
+		// only set carrying number-type patterns, so `type` comes back populated.
+		expect(result.type).toBe('MOBILE')
 	})
 })

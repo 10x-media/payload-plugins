@@ -1,5 +1,12 @@
+import { getCountries } from 'libphonenumber-js/core'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { countryOptions, emojiFlag, isSupported } from './countries'
+import {
+	countryOptions,
+	emojiFlag,
+	isKnownCountry,
+	isSupported,
+	KNOWN_COUNTRY_CODES,
+} from './countries'
 import { loadMetadata, type PhoneMetadata } from './metadata'
 import type { CountryCode } from './phone'
 
@@ -91,5 +98,20 @@ describe('isSupported', () => {
 
 	it('rejects a non-country', () => {
 		expect(isSupported('ZZ', max)).toBe(false)
+	})
+})
+
+describe('isKnownCountry', () => {
+	it('accepts a real country', () => {
+		expect(isKnownCountry('DE')).toBe(true)
+	})
+
+	it('rejects a non-country', () => {
+		expect(isKnownCountry('ZZ')).toBe(false)
+	})
+
+	it('stays in step with the metadata libphonenumber actually ships', async () => {
+		const metadata = await loadMetadata('max')
+		expect([...KNOWN_COUNTRY_CODES].sort()).toEqual([...getCountries(metadata as never)].sort())
 	})
 })

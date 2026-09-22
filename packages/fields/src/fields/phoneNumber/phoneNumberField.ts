@@ -1,7 +1,16 @@
-import type { FieldHook, GroupField, TextField, TextFieldValidation, Validate } from 'payload'
+import type {
+	FieldHook,
+	GroupField,
+	SanitizedConfig,
+	TextField,
+	TextFieldValidation,
+	Validate,
+} from 'payload'
+import { getFieldsRegistry } from '../../plugin/registry'
 import { keys } from '../../translations/keys'
 import { asTranslate } from '../../translations/server'
-import { loadMetadata, type MetadataSet } from './engine/metadata'
+import { isKnownCountry } from './engine/countries'
+import { DEFAULT_METADATA_SET, loadMetadata, type MetadataSet } from './engine/metadata'
 import { type CountryCode, checkPhone, type PhoneValidationMode, parsePhone } from './engine/phone'
 import {
 	type AnyPhoneNumberFieldOptions,
@@ -11,23 +20,6 @@ import {
 	resolvePhoneOptions,
 } from './options'
 
-/**
- * Mirrors libphonenumber-js's CountryCode union. Real metadata only loads async, but the
- * eager guards below run synchronously at config-build time, so they cannot await it.
- */
-const KNOWN_COUNTRY_CODES = new Set<string>(
-	(
-		'AC AD AE AF AG AI AL AM AO AR AS AT AU AW AX AZ BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR ' +
-		'BS BT BW BY BZ CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ DE DJ DK DM DO DZ EC ' +
-		'EE EG EH ER ES ET FI FJ FK FM FO FR GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GT GU GW GY HK ' +
-		'HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP KE KG KH KI KM KN KP KR KW KY KZ LA LB ' +
-		'LC LI LK LR LS LT LU LV LY MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY ' +
-		'MZ NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PR PS PT PW PY QA RE RO RS ' +
-		'RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ TA TC TD TG TH TJ TK TL ' +
-		'TM TN TO TR TT TV TW TZ UA UG US UY UZ VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW'
-	).split(' ')
-)
-
 const assertCountries = (opts: {
 	countries: readonly CountryCode[] | undefined
 	defaultCountry: CountryCode | undefined
@@ -35,14 +27,14 @@ const assertCountries = (opts: {
 }): void => {
 	const { countries, defaultCountry, name } = opts
 	for (const code of countries ?? []) {
-		if (!KNOWN_COUNTRY_CODES.has(code)) {
+		if (!isKnownCountry(code)) {
 			throw new Error(
 				`phoneNumberField(${name}): countries entry "${code}" is not a supported country`
 			)
 		}
 	}
 	if (defaultCountry === undefined) return
-	if (!KNOWN_COUNTRY_CODES.has(defaultCountry)) {
+	if (!isKnownCountry(defaultCountry)) {
 		throw new Error(
 			`phoneNumberField(${name}): defaultCountry "${defaultCountry}" is not a supported country`
 		)
@@ -54,28 +46,38 @@ const assertCountries = (opts: {
 	}
 }
 
-const buildDerivedHook =
-	(metadataSet: MetadataSet): FieldHook =>
-	async ({ value }) => {
-		const stored = (value ?? {}) as { country?: CountryCode; number?: string }
-		if (typeof stored.number !== 'string' || stored.number === '') return value
-		const parsed = parsePhone(stored.number, {
-			defaultCountry: stored.country,
-			metadata: await loadMetadata(metadataSet),
-		})
-		if (!parsed) return value
-		// Persisted keys spread first: this hook enriches the group, it never rewrites it.
-		return {
-			...stored,
-			callingCode: parsed.callingCode,
-			international: parsed.international,
-			national: parsed.national,
-			uri: parsed.uri,
-			// 'min'/'mobile' metadata carries no type patterns; a stray undefined would be
-			// worse than the key being absent, so only 'max' ever adds it.
-			...(metadataSet === 'max' ? { type: parsed.type } : {}),
-		}
+/**
+ * The registry's install-wide metadata choice, read at request time (never at field-build
+ * time: the factory runs before the plugin's normalizeRegistry ever sees the config, so it
+ * has no other way to observe it). Degrades to the default the same way resolvePrecisionSafe
+ * does, for a config mutated after the plugin ran or assembled without it.
+ */
+const resolveMetadataSetSafe = (config: SanitizedConfig): MetadataSet => {
+	try {
+		return getFieldsRegistry(config)?.phoneNumber?.metadata ?? DEFAULT_METADATA_SET
+	} catch {
+		return DEFAULT_METADATA_SET
 	}
+}
+
+const derivedHook: FieldHook = async ({ req, value }) => {
+	const stored = (value ?? {}) as { country?: CountryCode; number?: string }
+	if (typeof stored.number !== 'string' || stored.number === '') return value
+	const parsed = parsePhone(stored.number, {
+		defaultCountry: stored.country,
+		metadata: await loadMetadata(resolveMetadataSetSafe(req.payload.config)),
+	})
+	if (!parsed) return value
+	// Persisted keys spread first: this hook enriches the group, it never rewrites it.
+	return {
+		...stored,
+		callingCode: parsed.callingCode,
+		international: parsed.international,
+		national: parsed.national,
+		type: parsed.type,
+		uri: parsed.uri,
+	}
+}
 
 const buildValidate =
 	(opts: { metadataSet: MetadataSet; mode: PhoneValidationMode; required: boolean }): Validate =>
@@ -213,18 +215,9 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 			{ admin: { disableListColumn: true }, name: 'international', type: 'text', virtual: true },
 			{ admin: { disableListColumn: true }, name: 'callingCode', type: 'text', virtual: true },
 			{ admin: { disableListColumn: true }, name: 'uri', type: 'text', virtual: true },
-			...(metadataSet === 'max'
-				? [
-						{
-							admin: { disableListColumn: true },
-							name: 'type',
-							type: 'text',
-							virtual: true,
-						} as const,
-					]
-				: []),
+			{ admin: { disableListColumn: true }, name: 'type', type: 'text', virtual: true },
 		],
-		hooks: { afterRead: [buildDerivedHook(metadataSet)] },
+		hooks: { afterRead: [derivedHook] },
 		validate: buildValidate({
 			metadataSet,
 			mode: clientOptions.validation,
