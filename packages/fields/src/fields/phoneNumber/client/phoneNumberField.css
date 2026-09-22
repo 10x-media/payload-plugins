@@ -101,6 +101,54 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	white-space: nowrap;
 }
 
+.fields-phone__prefix {
+	flex-shrink: 0;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+/* Chrome-less: the container owns the border, background and focus ring */
+.fields-phone__input {
+	flex: 1;
+	min-width: 0;
+	height: 100%;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-family: var(--font-body);
+	font-size: 1rem;
+	line-height: 20px;
+	outline: 0;
+	-webkit-appearance: none;
+}
+
+.fields-phone__input::placeholder {
+	color: var(--theme-elevation-400);
+	font-weight: normal;
+	font-size: 1rem;
+}
+
+/* Matches the native select's clear indicator: bare icon, no button chrome */
+.fields-phone__clear {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--theme-elevation-500);
+	cursor: pointer;
+}
+
+.fields-phone__clear:hover {
+	color: var(--theme-elevation-800);
+}
+
+.fields-phone__clear:focus-visible {
+	outline: var(--accessibility-outline);
+}
+
 .fields-phone__flag {
 	display: block;
 	flex-shrink: 0;
