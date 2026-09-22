@@ -1,0 +1,96 @@
+import { AsYouType, type CountryCode, parsePhoneNumberFromString } from 'libphonenumber-js/core'
+import type { PhoneMetadata } from './metadata'
+
+export type { CountryCode }
+export type PhoneFormat = 'e164' | 'international' | 'national'
+export type PhoneValidationMode = 'mobile' | 'possible' | 'valid'
+export type PhoneCheck = 'empty' | 'invalid' | 'notMobile' | 'ok'
+
+export type ParsedPhone = {
+	callingCode: string
+	country: CountryCode | undefined
+	e164: string
+	ext: string | undefined
+	international: string
+	national: string
+	possible: boolean
+	type: string | undefined
+	uri: string
+	valid: boolean
+}
+
+export type PhoneOptions = { defaultCountry?: CountryCode; metadata: PhoneMetadata }
+
+const MOBILE_TYPES = new Set(['MOBILE', 'FIXED_LINE_OR_MOBILE'])
+
+export const parsePhone = (input: string, opts: PhoneOptions): null | ParsedPhone => {
+	if (input === '') return null
+	const parsed = parsePhoneNumberFromString(
+		input,
+		{ defaultCountry: opts.defaultCountry },
+		opts.metadata as never
+	)
+	if (!parsed) return null
+	return {
+		callingCode: parsed.countryCallingCode,
+		country: parsed.country,
+		e164: parsed.number,
+		ext: parsed.ext,
+		international: parsed.formatInternational(),
+		national: parsed.formatNational(),
+		possible: parsed.isPossible(),
+		type: parsed.getType(),
+		uri: parsed.getURI(),
+		valid: parsed.isValid(),
+	}
+}
+
+export const formatPhone = (input: string, format: PhoneFormat, opts: PhoneOptions): string => {
+	const parsed = parsePhone(input, opts)
+	if (!parsed) return input
+	if (format === 'e164') return parsed.e164
+	return format === 'national' ? parsed.national : parsed.international
+}
+
+export const phoneUri = (input: string, opts: PhoneOptions): null | string =>
+	parsePhone(input, opts)?.uri ?? null
+
+/**
+ * Salvages the first parseable candidate rather than stripping characters, so a
+ * doubled paste or one wrapped in punctuation cannot fabricate a number.
+ */
+export const detectCountry = (input: string, opts: PhoneOptions): CountryCode | undefined => {
+	const trimmed = input.trim()
+	const direct = parsePhone(trimmed, opts)
+	if (direct?.country) return direct.country
+	const plus = trimmed.indexOf('+')
+	if (plus === -1) return undefined
+	const tail = trimmed.slice(plus)
+	for (let end = tail.length; end > 2; end--) {
+		const candidate = parsePhone(tail.slice(0, end), opts)
+		if (candidate?.valid && candidate.country) return candidate.country
+	}
+	return undefined
+}
+
+export const checkPhone = (
+	input: string,
+	mode: PhoneValidationMode,
+	opts: PhoneOptions
+): PhoneCheck => {
+	if (input.trim() === '') return 'empty'
+	const parsed = parsePhone(input, opts)
+	if (!parsed) return 'invalid'
+	if (mode === 'possible') return parsed.possible ? 'ok' : 'invalid'
+	if (!parsed.valid) return 'invalid'
+	if (mode === 'mobile') {
+		return parsed.type !== undefined && MOBILE_TYPES.has(parsed.type) ? 'ok' : 'notMobile'
+	}
+	return 'ok'
+}
+
+export const formatAsYouType = (
+	input: string,
+	country: CountryCode | undefined,
+	opts: PhoneOptions
+): string => new AsYouType(country, opts.metadata as never).input(input)
