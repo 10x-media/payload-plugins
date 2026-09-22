@@ -101,6 +101,14 @@ describe('detectCountry', () => {
 	it('is undefined for a national number with no country context', () => {
 		expect(detectCountry('0151 12345678', { metadata: max })).toBeUndefined()
 	})
+
+	it('still resolves a legitimate number through the validated fast path', () => {
+		expect(detectCountry('+4915112345678', { metadata: max })).toBe('DE')
+	})
+
+	it('recovers the salvageable country from an implausible-length number instead of an unvalidated guess', () => {
+		expect(detectCountry('+491511234567800000', { metadata: max })).toBe('DE')
+	})
 })
 
 describe('checkPhone', () => {
@@ -119,8 +127,12 @@ describe('checkPhone', () => {
 		expect(checkPhone('+49301234567', 'mobile', { metadata: max })).toBe('notMobile')
 	})
 
-	it('rejects a too-short number as invalid', () => {
+	it('rejects a too-short number as invalid in valid mode', () => {
 		expect(checkPhone('+4915', 'valid', { metadata: max })).toBe('invalid')
+	})
+
+	it('rejects a too-short number as invalid in possible mode', () => {
+		expect(checkPhone('+4915', 'possible', { metadata: max })).toBe('invalid')
 	})
 
 	it('accepts a too-long number as possible even though it fails full validation', () => {

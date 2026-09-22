@@ -62,11 +62,12 @@ export const phoneUri = (input: string, opts: PhoneOptions): null | string =>
 export const detectCountry = (input: string, opts: PhoneOptions): CountryCode | undefined => {
 	const trimmed = input.trim()
 	const direct = parsePhone(trimmed, opts)
-	if (direct?.country) return direct.country
+	if (direct?.valid && direct.country) return direct.country
 	const plus = trimmed.indexOf('+')
 	if (plus === -1) return undefined
 	const tail = trimmed.slice(plus)
-	for (let end = tail.length; end > 2; end--) {
+	// E.164 numbers max out at 15 digits; 18 bounds the scan without truncating a real one.
+	for (let end = Math.min(tail.length, 18); end > 2; end--) {
 		const candidate = parsePhone(tail.slice(0, end), opts)
 		if (candidate?.valid && candidate.country) return candidate.country
 	}
