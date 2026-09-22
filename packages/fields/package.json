@@ -167,7 +167,9 @@
 	},
 	"dependencies": {
 		"@tanstack/react-virtual": "catalog:",
-		"dompurify": "catalog:"
+		"country-flag-icons": "^1.6.20",
+		"dompurify": "catalog:",
+		"libphonenumber-js": "^1.11.0"
 	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
