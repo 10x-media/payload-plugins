@@ -647,6 +647,50 @@ describe('PhoneNumberField', () => {
 		expect(input().value).toBe('15112345678')
 	})
 
+	// The first frame has to equal the frame the engine paints, or the prefix pops in and
+	// shoves the entry sideways a quarter second after every document load.
+	it('paints the first frame from the virtuals, identically to the engine', async () => {
+		formFields.current = {
+			'phone.callingCode': { value: '49' },
+			'phone.country': { value: 'DE' },
+			'phone.international': { value: '+49 1511 2345678' },
+			'phone.number': { value: '+4915112345678' },
+		}
+		const rendered = render(element({}))
+		const beforeMetadata = { prefix: prefix(), value: input().value }
+		await act(async () => {
+			await loadMetadata('max')
+		})
+		expect(beforeMetadata).toEqual({ prefix: '+49', value: '1511 2345678' })
+		expect({ prefix: prefix(), value: input().value }).toEqual(beforeMetadata)
+		rendered.unmount()
+	})
+
+	it('ignores virtuals that do not belong to the stored number', async () => {
+		formFields.current = {
+			'phone.callingCode': { value: '41' },
+			'phone.country': { value: 'DE' },
+			'phone.international': { value: '+41 44 668 18 00' },
+			'phone.number': { value: '+4915112345678' },
+		}
+		const rendered = render(element({}))
+		expect(prefix()).toBeNull()
+		expect(input().value).toBe('+4915112345678')
+		rendered.unmount()
+	})
+
+	it('has no virtuals to paint from under e164 storage', async () => {
+		fieldStub.current = { ...fieldStub.current, value: '+4915112345678' }
+		formFields.current = {
+			'phone.callingCode': { value: '49' },
+			'phone.international': { value: '+49 1511 2345678' },
+		}
+		const rendered = render(element({ phoneOptions: { storage: 'e164' } }))
+		expect(prefix()).toBeNull()
+		expect(input().value).toBe('+4915112345678')
+		rendered.unmount()
+	})
+
 	it('activates formatting once the metadata lands, without losing the draft', async () => {
 		const rendered = render(element({ phoneOptions: { defaultCountry: 'DE' } }))
 		type('1511234')

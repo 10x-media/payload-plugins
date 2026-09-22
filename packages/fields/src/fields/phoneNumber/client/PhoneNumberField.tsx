@@ -186,9 +186,27 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 			?.country
 	}, [countryState, defaultCountry, isE164, metadata, pickedCountry, storedNumber])
 
+	// The virtuals hold the server's own derivation, so painting the first frame from them is what
+	// stops the prefix reflowing; they go stale mid-edit, hence the digit match and metadata guard.
+	const callingCodeState = useFormFields(([fields]) => fields?.[`${path}.callingCode`]?.value)
+	const internationalState = useFormFields(([fields]) => fields?.[`${path}.international`]?.value)
+	const seeded = useMemo<null | { callingCode: string; national: string }>(() => {
+		if (metadata || isE164) return null
+		if (typeof callingCodeState !== 'string' || typeof internationalState !== 'string') return null
+		if (`+${internationalState.replace(/\D/g, '')}` !== storedNumber) return null
+		const prefix = `+${callingCodeState}`
+		if (!internationalState.startsWith(prefix)) return null
+		return {
+			callingCode: callingCodeState,
+			national: internationalState.slice(prefix.length).trimStart(),
+		}
+	}, [callingCodeState, internationalState, isE164, metadata, storedNumber])
+
 	const display = useMemo(
-		() => displayFor({ country: storedCountry, number: storedNumber || null }, metadata),
-		[metadata, storedCountry, storedNumber]
+		() =>
+			seeded?.national ??
+			displayFor({ country: storedCountry, number: storedNumber || null }, metadata),
+		[metadata, seeded, storedCountry, storedNumber]
 	)
 	const [draft, setDraft] = useState(display)
 	const editingRef = useRef(false)
@@ -212,8 +230,8 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 	const callingCode = useMemo(
 		() =>
 			[...options.preferred, ...options.rest].find((option) => option.code === country)
-				?.callingCode,
-		[country, options]
+				?.callingCode ?? seeded?.callingCode,
+		[country, options, seeded]
 	)
 
 	// The revert target for a non-clearable commit, tracked from stored values so a picked
