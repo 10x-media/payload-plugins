@@ -700,6 +700,30 @@ describe('PhoneNumberField', () => {
 		rendered.unmount()
 	})
 
+	// A `countries` allowlist filters the picker, not what a pasted number may commit, so the
+	// prefix has to come off the country itself or the row reflows back when metadata lands.
+	it('keeps the prefix for a stored country the allowlist does not offer', async () => {
+		formFields.current = {
+			'phone.country': { value: 'JP' },
+			'phone.number': { value: '+819012345678' },
+		}
+		const seed: PhoneSeed = {
+			callingCode: '81',
+			country: 'JP',
+			national: '90 1234 5678',
+			number: '+819012345678',
+		}
+		const rendered = render(element({ phoneOptions: { countries: ['DE', 'FR'] }, seed }))
+		const beforeMetadata = { prefix: prefix(), value: input().value }
+		await act(async () => {
+			await loadMetadata('max')
+		})
+		expect(picker().dataset.total).toBe('2')
+		expect(beforeMetadata).toEqual({ prefix: '+81', value: '90 1234 5678' })
+		expect({ prefix: prefix(), value: input().value }).toEqual(beforeMetadata)
+		rendered.unmount()
+	})
+
 	it('drops the seed the moment the metadata lands', async () => {
 		formFields.current = {
 			'phone.country': { value: 'CH' },

@@ -1,6 +1,7 @@
 import { getCountries } from 'libphonenumber-js/core'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
+	callingCodeFor,
 	countryOptions,
 	emojiFlag,
 	isKnownCountry,
@@ -113,5 +114,27 @@ describe('isKnownCountry', () => {
 	it('stays in step with the metadata libphonenumber actually ships', async () => {
 		const metadata = await loadMetadata('max')
 		expect([...KNOWN_COUNTRY_CODES].sort()).toEqual([...getCountries(metadata as never)].sort())
+	})
+})
+
+describe('callingCodeFor', () => {
+	it.each([
+		['DE', '49'],
+		['US', '1'],
+		['JP', '81'],
+	])('reads %s off the country itself', (code, expected) => {
+		expect(callingCodeFor(code as CountryCode, max)).toBe(expected)
+	})
+
+	// The field's `countries` allowlist scopes the picker, never what a calling code IS
+	it('answers for a country an allowlist would not offer', () => {
+		const offered = countryOptions({ countries: ['DE', 'FR'], locale: 'en', metadata: max })
+		const codes = [...offered.preferred, ...offered.rest].map((option) => option.code)
+		expect(codes).not.toContain('JP')
+		expect(callingCodeFor('JP', max)).toBe('81')
+	})
+
+	it('returns undefined rather than throwing for a code the set does not carry', () => {
+		expect(callingCodeFor('ZZ' as CountryCode, max)).toBeUndefined()
 	})
 })

@@ -17,6 +17,18 @@ export const isSupported = (code: string, metadata: PhoneMetadata): boolean =>
 	isSupportedCountry(code as CountryCode, metadata as never)
 
 /**
+ * A property of the country itself, so it holds for a stored country the field's `countries`
+ * allowlist does not offer. Undefined rather than a throw for one this set does not carry.
+ */
+export const callingCodeFor = (code: CountryCode, metadata: PhoneMetadata): string | undefined => {
+	try {
+		return getCountryCallingCode(code, metadata as never)
+	} catch {
+		return undefined
+	}
+}
+
+/**
  * Every code libphonenumber-js ships, identical across all three metadata sets (pinned
  * against the real 'max' set below). Unlike `isSupported`, this needs no metadata, so
  * synchronous config-time guards can use it without awaiting `loadMetadata`.

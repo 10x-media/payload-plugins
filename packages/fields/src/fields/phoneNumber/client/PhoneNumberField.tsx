@@ -18,7 +18,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import { resolveStaticLabel } from '../../../utils/resolveStaticLabel'
-import { countryOptions } from '../engine/countries'
+import { callingCodeFor, countryOptions } from '../engine/countries'
 import { loadMetadata, type PhoneMetadata } from '../engine/metadata'
 import {
 	type CountryCode,
@@ -211,11 +211,12 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 				: NO_COUNTRIES,
 		[countries, i18n.language, metadata, preferredCountries]
 	)
+	// Off the country, not off `options`: an allowlist that does not offer the stored country
+	// would otherwise drop the prefix once metadata lands, reflowing the row back.
 	const callingCode = useMemo(
 		() =>
-			[...options.preferred, ...options.rest].find((option) => option.code === country)
-				?.callingCode ?? seeded?.callingCode,
-		[country, options, seeded]
+			(country && metadata ? callingCodeFor(country, metadata) : undefined) ?? seeded?.callingCode,
+		[country, metadata, seeded]
 	)
 
 	// The revert target for a non-clearable commit, tracked from stored values so a picked
