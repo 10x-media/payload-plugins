@@ -1,3 +1,9 @@
+export type { MetadataSet } from '../fields/phoneNumber/engine/metadata'
+export type {
+	CountryCode,
+	PhoneFormat,
+	PhoneValidationMode,
+} from '../fields/phoneNumber/engine/phone'
 export {
 	type AnyPhoneNumberFieldOptions,
 	FLAGS_PATH,
