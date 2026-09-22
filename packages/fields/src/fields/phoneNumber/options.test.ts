@@ -20,8 +20,13 @@ describe('resolvePhoneOptions', () => {
 		expect(resolvePhoneOptions({ flags: 'none' }, { flags: 'emoji' }).flags).toBe('none')
 	})
 
-	it('keeps metadata global-only, ignoring any field-level attempt', () => {
+	it('resolves metadata from the global config', () => {
 		expect(resolvePhoneOptions({}, { metadata: 'min' }).metadata).toBe('min')
+	})
+
+	it('rejects a field-level metadata at compile time', () => {
+		// @ts-expect-error metadata is plugin-level only; a field may not carry it
+		resolvePhoneOptions({ metadata: 'min' }, undefined)
 	})
 
 	it('treats an explicit undefined on a field as absent, not as a reset', () => {

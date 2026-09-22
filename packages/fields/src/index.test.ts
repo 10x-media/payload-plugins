@@ -90,4 +90,26 @@ describe('fields factory', () => {
 		const out = fields({ measurement: { precision: 'exact' } })(fakeConfig()) as Config
 		expect(getFieldsRegistry(asSanitized(out))?.measurement?.precision).toBe('exact')
 	})
+
+	it('throws at plugin build when phoneNumber.validation is mobile with metadata min', () => {
+		expect(() =>
+			fields({ phoneNumber: { validation: 'mobile', metadata: 'min' } })(fakeConfig())
+		).toThrow(/phoneNumber\.validation/)
+	})
+
+	it('throws at plugin build when phoneNumber.defaultCountry is outside phoneNumber.countries', () => {
+		expect(() =>
+			fields({ phoneNumber: { countries: ['US', 'CA'], defaultCountry: 'FR' } })(fakeConfig())
+		).toThrow(/phoneNumber\.defaultCountry/)
+	})
+
+	it('writes a valid phoneNumber config to the registry', () => {
+		const phoneNumber = {
+			countries: ['US', 'CA'],
+			defaultCountry: 'US',
+			validation: 'valid',
+		} as const
+		const out = fields({ phoneNumber })(fakeConfig()) as Config
+		expect(getFieldsRegistry(asSanitized(out))?.phoneNumber).toEqual(phoneNumber)
+	})
 })

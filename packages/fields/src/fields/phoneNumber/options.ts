@@ -49,6 +49,10 @@ export type PhoneClientOptions = {
 	countries?: readonly CountryCode[]
 	defaultCountry?: CountryCode
 	flags: PhoneFlagMode
+	/**
+	 * False means the value cannot be removed, not merely that the clear affordance is
+	 * hidden: emptying the input and committing reverts to the last valid value.
+	 */
 	isClearable: boolean
 	metadata: MetadataSet
 	preferredCountries?: readonly CountryCode[]
