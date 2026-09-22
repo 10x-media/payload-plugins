@@ -133,8 +133,13 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			collection: 'phone-numbers',
 			data: {
 				title: 'Showcase',
-				allowlisted: { country: 'CH', number: '+41780123456' },
+				// JP is deliberately outside this field's own allowlist: the prefix has to survive
+				allowlisted: { country: 'JP', number: '+819012345678' },
 				conditionalPhone: { country: 'AT', number: '+431234567890' },
+				contacts: [
+					{ phone: { country: 'CH', number: '+41446681800' }, role: 'Support' },
+					{ phone: { country: 'US', number: '+12125552368' }, role: 'Sales' },
+				],
 				customComponents: { country: 'FR', number: '+33123456789' },
 				e164Cell: { country: 'AU', number: '+61499999999' },
 				e164Phone: '+4915123456789',

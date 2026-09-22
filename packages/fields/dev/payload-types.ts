@@ -444,7 +444,7 @@ export interface PhoneNumber {
     type?: string | null;
   };
   /**
-   * countries allowlist of six, defaulting to CH
+   * countries allowlist of six, defaulting to CH, seeded with a JP number the allowlist does not offer: an allowlist scopes the picker, not what a pasted number may commit
    */
   allowlisted?: {
     number?: string | null;
@@ -455,6 +455,24 @@ export interface PhoneNumber {
     uri?: string | null;
     type?: string | null;
   };
+  /**
+   * The seed is sibling-scoped, so a row must read its own value
+   */
+  contacts?:
+    | {
+        role?: string | null;
+        phone?: {
+          number?: string | null;
+          country?: string | null;
+          national?: string | null;
+          international?: string | null;
+          callingCode?: string | null;
+          uri?: string | null;
+          type?: string | null;
+        };
+        id?: string | null;
+      }[]
+    | null;
   /**
    * preferredCountries overriding the plugin-wide DE/AT/CH, so the picker heads with JP/KR/SG
    */
@@ -950,6 +968,23 @@ export interface PhoneNumbersSelect<T extends boolean = true> {
         callingCode?: T;
         uri?: T;
         type?: T;
+      };
+  contacts?:
+    | T
+    | {
+        role?: T;
+        phone?:
+          | T
+          | {
+              number?: T;
+              country?: T;
+              national?: T;
+              international?: T;
+              callingCode?: T;
+              uri?: T;
+              type?: T;
+            };
+        id?: T;
       };
   preferredFirst?:
     | T

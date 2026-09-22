@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { BlocksFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
+import { ar } from '@payloadcms/translations/languages/ar'
 import { de } from '@payloadcms/translations/languages/de'
 import { en } from '@payloadcms/translations/languages/en'
 import { buildConfig, type CollectionConfig } from 'payload'
@@ -86,7 +87,8 @@ export default buildConfig({
 		users,
 	],
 	globals: [smtpSettings],
-	i18n: { supportedLanguages: { de, en } },
+	// ar is carried for the RTL pass: the phone row is a flex composite, so dir=rtl is a real case
+	i18n: { supportedLanguages: { ar, de, en } },
 	localization: { defaultLocale: 'en', locales: ['en', 'de'] },
 	plugins: [
 		fields({

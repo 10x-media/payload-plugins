@@ -113,9 +113,19 @@ export const phoneNumbers: CollectionConfig = {
 			name: 'allowlisted',
 			overrides: ({ field }) => ({
 				...field,
-				admin: { ...field.admin, description: 'countries allowlist of six, defaulting to CH' },
+				admin: {
+					...field.admin,
+					description:
+						'countries allowlist of six, defaulting to CH, seeded with a JP number the allowlist does not offer: an allowlist scopes the picker, not what a pasted number may commit',
+				},
 			}),
 		}),
+		{
+			name: 'contacts',
+			type: 'array',
+			admin: { description: 'The seed is sibling-scoped, so a row must read its own value' },
+			fields: [{ name: 'role', type: 'text' }, phoneNumberField({ name: 'phone' })],
+		},
 		phoneNumberField({
 			name: 'preferredFirst',
 			preferredCountries: ['JP', 'KR', 'SG'],
