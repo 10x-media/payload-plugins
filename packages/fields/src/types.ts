@@ -7,7 +7,7 @@ import type {
 	PhoneFormat,
 	PhoneValidationMode,
 } from './fields/phoneNumber/engine/phone'
-import type { PhoneFlagMode, PhoneStorageMode } from './fields/phoneNumber/options'
+import type { PhoneFlagMode } from './fields/phoneNumber/options'
 
 /** Args passed to async per-document resolvers (color presets, icon availability). */
 export type FieldsResolverArgs = {
@@ -261,7 +261,6 @@ export type PhoneNumberGlobalConfig = {
 	validation?: PhoneValidationMode
 	flags?: PhoneFlagMode
 	cellFormat?: PhoneFormat
-	storage?: PhoneStorageMode
 	/**
 	 * Install-wide, with no per-field form: the parser is a process-wide singleton, so two
 	 * sets would mean two copies and two verdicts on the same number.

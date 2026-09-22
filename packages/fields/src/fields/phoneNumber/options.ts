@@ -60,7 +60,8 @@ export type PhoneClientOptions = {
 	validation: PhoneValidationMode
 }
 
-type ResolvablePhoneFieldOptions = Pick<
+/** The field's own, unresolved layer: exactly what the author wrote, no defaults applied. */
+export type ResolvablePhoneFieldOptions = Pick<
 	CommonPhoneOptions,
 	| 'cellFormat'
 	| 'countries'
@@ -75,7 +76,9 @@ type ResolvablePhoneFieldOptions = Pick<
 
 /**
  * Field beats global beats these defaults, via `??` so an explicit `undefined`
- * on a field falls through rather than resetting it. `metadata` is global-only.
+ * on a field falls through rather than resetting it. `metadata` is global-only;
+ * `storage` is field-only, since the factory's return type is fixed at build time
+ * and a plugin-wide storage choice could never be honoured.
  */
 export const resolvePhoneOptions = (
 	field: ResolvablePhoneFieldOptions,
@@ -88,6 +91,6 @@ export const resolvePhoneOptions = (
 	isClearable: field.isClearable ?? true,
 	metadata: global?.metadata ?? DEFAULT_METADATA_SET,
 	preferredCountries: field.preferredCountries ?? global?.preferredCountries,
-	storage: field.storage ?? global?.storage ?? 'object',
+	storage: field.storage ?? 'object',
 	validation: field.validation ?? global?.validation ?? 'valid',
 })
