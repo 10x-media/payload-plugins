@@ -148,8 +148,8 @@ const CountryPanel: React.FC<CountryPanelProps> = ({ close, flags, onSelect, opt
 						rows[activeRow]?.kind === 'option' ? optionId(activeRow) : undefined
 					}
 					aria-autocomplete="list"
-					aria-controls={listId}
-					aria-expanded="true"
+					aria-controls={populated ? listId : undefined}
+					aria-expanded={populated}
 					aria-label={t(keys.searchCountries)}
 					className={`${baseClass}__search-input`}
 					onChange={(event) => setQuery(event.target.value)}
@@ -192,7 +192,11 @@ const CountryPanel: React.FC<CountryPanelProps> = ({ close, flags, onSelect, opt
 							}
 							return (
 								<button
+									// Only a dozen rows are ever in the DOM, so a screen reader would otherwise
+									// count the window instead of the list and announce "1 of 12" for 250 countries.
+									aria-posinset={optionRows.indexOf(item.index) + 1}
 									aria-selected={row.option.code === value}
+									aria-setsize={optionRows.length}
 									className={`${baseClass}__option`}
 									data-active={item.index === activeRow || undefined}
 									id={optionId(item.index)}

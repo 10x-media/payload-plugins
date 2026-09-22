@@ -13,6 +13,33 @@ import type { PhoneFlagMode } from '../options'
 Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 400 })
 Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 280 })
 
+// jsdom has no layout, so scrollTo does not exist, scrollTop never moves, and scrollHeight
+// clamps every scroll to zero. These give the list a 400px window over the spacer the
+// component itself sized, which is enough for scrolling to behave: a long list moves and
+// re-renders its window, a list shorter than the window stays put.
+const scrollTo = vi.fn<(options?: ScrollToOptions) => void>()
+Object.defineProperty(HTMLElement.prototype, 'scrollTop', {
+	configurable: true,
+	value: 0,
+	writable: true,
+})
+Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 400 })
+Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+	configurable: true,
+	get(this: HTMLElement) {
+		const spacer = this.firstElementChild
+		return spacer instanceof HTMLElement ? Number.parseFloat(spacer.style.height) || 0 : 0
+	},
+})
+Object.defineProperty(HTMLElement.prototype, 'scrollTo', {
+	configurable: true,
+	value(this: HTMLElement, options?: ScrollToOptions) {
+		scrollTo(options)
+		this.scrollTop = options?.top ?? 0
+		this.dispatchEvent(new Event('scroll'))
+	},
+})
+
 type PopupDoubleProps = {
 	button: ReactNode
 	buttonClassName?: string
@@ -91,6 +118,21 @@ const OPTIONS: { preferred: CountryOption[]; rest: CountryOption[] } = {
 
 const REGIONAL_INDICATORS = /\p{Regional_Indicator}{2}/u
 
+/** Forty real codes, so a stored country can sit far below the visible window. */
+const LONG_CODES = (
+	'AD AE AF AG AI AL AM AO AR AT AU AW AZ BA BB BD BE BF BG BH ' +
+	'BI BJ BM BN BO BR BS BT BW BY BZ CA CD CF CG CH CI CL CM CN'
+).split(' ') as CountryCode[]
+
+const LONG = {
+	preferred: [],
+	rest: LONG_CODES.map((code, index) => ({
+		callingCode: String(200 + index),
+		code,
+		name: `Country ${code}`,
+	})),
+}
+
 type PickerProps = {
 	disabled?: boolean
 	flags?: PhoneFlagMode
@@ -138,6 +180,13 @@ const search = () => screen.getByRole('combobox')
 
 const type = (query: string) => fireEvent.change(search(), { target: { value: query } })
 
+/** The scroll that won: virtual-core also syncs the element's own offset when it attaches. */
+const lastScrollTop = (): number => {
+	const call = scrollTo.mock.lastCall
+	if (!call) throw new Error('the list was never scrolled')
+	return call[0]?.top ?? -1
+}
+
 const activeOptionText = (): string => {
 	const id = search().getAttribute('aria-activedescendant')
 	if (!id) throw new Error('the search box points at no active option')
@@ -149,7 +198,10 @@ const activeOptionText = (): string => {
 describe('CountryPicker', () => {
 	// `globals: false` in the vitest config means testing-library registers no
 	// auto-cleanup, so renders would otherwise stack across cases.
-	afterEach(cleanup)
+	afterEach(() => {
+		cleanup()
+		scrollTo.mockClear()
+	})
 
 	// Payload's Popup calls `render` whether or not the popup is open, so a panel that
 	// did not gate on its own open state would build every row for every closed field.
@@ -251,6 +303,38 @@ describe('CountryPicker', () => {
 			value: 'DE',
 		})
 		expect(activeOptionText()).toContain('France')
+	})
+
+	// aria-activedescendant has to name a rendered element, and the virtualizer renders
+	// only what is in view.
+	it('scrolls a stored country far below the window into view', () => {
+		renderPicker({ options: LONG, value: 'CM' })
+		open()
+		expect(lastScrollTop()).toBeGreaterThan(0)
+		expect(activeOptionText()).toContain('Country CM')
+	})
+
+	it('leaves the list at the top when the stored country is the first one', () => {
+		renderPicker({ options: LONG, value: 'AD' })
+		open()
+		expect(lastScrollTop()).toBe(0)
+	})
+
+	it('counts options over the whole list, not over the rendered window', () => {
+		renderPicker()
+		open()
+		const australia = screen.getAllByRole('option')[2]
+		expect(australia?.getAttribute('aria-posinset')).toBe('3')
+		expect(australia?.getAttribute('aria-setsize')).toBe('5')
+	})
+
+	it('reports the combobox as collapsed while nothing matches', () => {
+		renderPicker()
+		open()
+		expect(search().getAttribute('aria-expanded')).toBe('true')
+		type('zzzz')
+		expect(search().getAttribute('aria-expanded')).toBe('false')
+		expect(search().getAttribute('aria-controls')).toBeNull()
 	})
 
 	it('reports the active option on Enter', () => {
