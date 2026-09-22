@@ -199,6 +199,7 @@
 		"readme-root-docs-urls",
 		"settings-overlay-history",
 		"settings-overlay-initial",
+		"settings-overlay-provider-after-login",
 		"unbundled-plugin-builds",
 		"undo-redo-initial-controls",
 		"undo-redo-locales",
