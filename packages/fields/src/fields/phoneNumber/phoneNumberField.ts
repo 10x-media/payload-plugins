@@ -50,7 +50,9 @@ const assertCountries = (opts: {
  * The registry's install-wide metadata choice, read at request time (never at field-build
  * time: the factory runs before the plugin's normalizeRegistry ever sees the config, so it
  * has no other way to observe it). Degrades to the default the same way resolvePrecisionSafe
- * does, for a config mutated after the plugin ran or assembled without it.
+ * does, for a config mutated after the plugin ran or assembled without it. Shared by validate
+ * and the read hook so both parse against the same set the client bag advertises; a mismatch
+ * here is how a number the admin UI shows as valid ends up rejected on save.
  */
 const resolveMetadataSetSafe = (config: SanitizedConfig): MetadataSet => {
 	try {
@@ -80,13 +82,13 @@ const derivedHook: FieldHook = async ({ req, value }) => {
 }
 
 const buildValidate =
-	(opts: { metadataSet: MetadataSet; mode: PhoneValidationMode; required: boolean }): Validate =>
+	(opts: { mode: PhoneValidationMode; required: boolean }): Validate =>
 	async (value, args) => {
 		const stored = (value ?? {}) as { country?: CountryCode; number?: string }
 		const raw = typeof stored.number === 'string' ? stored.number : ''
 		const check = checkPhone(raw, opts.mode, {
 			defaultCountry: stored.country,
-			metadata: await loadMetadata(opts.metadataSet),
+			metadata: await loadMetadata(resolveMetadataSetSafe(args.req.payload.config)),
 		})
 		if (check === 'empty') {
 			return opts.required ? asTranslate(args.req.t)(keys.phoneRequired) : true
@@ -99,7 +101,6 @@ const buildValidate =
 const buildTextValidate =
 	(opts: {
 		defaultCountry: CountryCode | undefined
-		metadataSet: MetadataSet
 		mode: PhoneValidationMode
 		required: boolean
 	}): TextFieldValidation =>
@@ -107,7 +108,7 @@ const buildTextValidate =
 		const raw = typeof value === 'string' ? value : ''
 		const check = checkPhone(raw, opts.mode, {
 			defaultCountry: opts.defaultCountry,
-			metadata: await loadMetadata(opts.metadataSet),
+			metadata: await loadMetadata(resolveMetadataSetSafe(args.req.payload.config)),
 		})
 		if (check === 'empty') {
 			return opts.required ? asTranslate(args.req.t)(keys.phoneRequired) : true
@@ -155,7 +156,6 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 		},
 		undefined
 	)
-	const metadataSet = clientOptions.metadata
 
 	if (options.storage === 'e164') {
 		const base: TextField = {
@@ -180,7 +180,6 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 			custom: { [PHONE_CUSTOM_KEY]: clientOptions },
 			validate: buildTextValidate({
 				defaultCountry,
-				metadataSet,
 				mode: clientOptions.validation,
 				required: required ?? false,
 			}),
@@ -219,7 +218,6 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 		],
 		hooks: { afterRead: [derivedHook] },
 		validate: buildValidate({
-			metadataSet,
 			mode: clientOptions.validation,
 			required: required ?? false,
 		}),

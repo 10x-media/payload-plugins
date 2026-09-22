@@ -1,6 +1,7 @@
 import type { NamedGroupField, TextField } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { FIELDS_REGISTRY_KEY } from '../../plugin/registry'
+import type { MetadataSet } from './engine/metadata'
 import type { CountryCode } from './engine/phone'
 import { phoneNumberField } from './phoneNumberField'
 
@@ -12,11 +13,18 @@ const group = (opts: Parameters<typeof phoneNumberField>[0]) =>
 
 /** A minimal `t` stub: validators only interpolate the key, never look up a bundle. */
 const t = (key: string) => key
-const validateArgs = { req: { t } } as never
 
-/** A hook only ever needs `req.payload.config` to read the plugin registry. */
+/** A request stub carrying `t` (for validate) and `payload.config` (for the registry). */
 const reqWithRegistry = (custom?: Record<string, unknown>) =>
-	({ payload: { config: { custom } } }) as never
+	({ payload: { config: { custom } }, t }) as never
+
+const validateArgs = { req: reqWithRegistry() } as never
+
+/** A registry configured with an explicit phoneNumber metadata set, for validate calls. */
+const argsWithMetadata = (metadata: MetadataSet) =>
+	({
+		req: reqWithRegistry({ [FIELDS_REGISTRY_KEY]: { phoneNumber: { metadata } } }),
+	}) as never
 
 describe('phoneNumberField, object storage', () => {
 	it('returns a group named after the field', () => {
@@ -134,6 +142,17 @@ describe('phoneNumberField, object storage validate behaviour', () => {
 		const result = await field.validate?.({ country: 'DE', number: '+49301234567' }, validateArgs)
 		expect(result).not.toBe(true)
 	})
+
+	it('resolves the metadata set from the registry, not a build-time default', async () => {
+		const field = group({ name: 'phone' })
+		const value = { country: 'DE', number: '+4915112345' }
+		// 'max' and 'min' genuinely disagree on this number's validity. If validate ever
+		// hardcodes a metadata set again, one side of this pair silently starts failing.
+		const underMin = await field.validate?.(value, argsWithMetadata('min'))
+		const underMax = await field.validate?.(value, validateArgs)
+		expect(underMin).toBe(true)
+		expect(underMax).not.toBe(true)
+	})
 })
 
 describe('phoneNumberField, e164 storage validate behaviour', () => {
@@ -145,6 +164,14 @@ describe('phoneNumberField, e164 storage validate behaviour', () => {
 	it('accepts a valid e164 number', async () => {
 		const field = phoneNumberField({ name: 'phone', storage: 'e164' }) as TextField
 		expect(await field.validate?.('+4915112345678' as never, validateArgs)).toBe(true)
+	})
+
+	it('resolves the metadata set from the registry, not a build-time default', async () => {
+		const field = phoneNumberField({ name: 'phone', storage: 'e164' }) as TextField
+		const underMin = await field.validate?.('+4915112345' as never, argsWithMetadata('min'))
+		const underMax = await field.validate?.('+4915112345' as never, validateArgs)
+		expect(underMin).toBe(true)
+		expect(underMax).not.toBe(true)
 	})
 })
 
