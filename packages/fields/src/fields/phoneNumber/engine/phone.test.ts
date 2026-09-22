@@ -7,6 +7,7 @@ import {
 	formatPhone,
 	parsePhone,
 	phoneUri,
+	salvagePhone,
 } from './phone'
 
 let max: PhoneMetadata
@@ -112,6 +113,41 @@ describe('detectCountry', () => {
 
 	it('recovers the country embedded in an implausible-length number through the salvage loop', () => {
 		expect(detectCountry('+491511234567800000', { metadata: max })).toBe('DE')
+	})
+})
+
+describe('salvagePhone', () => {
+	it('returns the whole input when it parses directly', () => {
+		expect(salvagePhone('  (+41) 44-668-1800  ', { metadata: max })?.e164).toBe('+41446681800')
+	})
+
+	it('keeps the first number out of a doubled paste rather than the concatenation', () => {
+		expect(salvagePhone('+41446681800+41446681800', { metadata: max })?.e164).toBe('+41446681800')
+	})
+
+	it('recovers a number buried in text that does not parse as a whole', () => {
+		const parsed = salvagePhone('tel:+41446681800 tel:+41446681800', { metadata: max })
+		expect(parsed).toMatchObject({ country: 'CH', e164: '+41446681800' })
+	})
+
+	it('returns null rather than a guess when nothing valid parses', () => {
+		expect(salvagePhone('not a number', { metadata: max })).toBeNull()
+		expect(salvagePhone('+4915', { metadata: max })).toBeNull()
+	})
+
+	// detectCountry is defined as this function's country, so a candidate without one is
+	// not an answer: the scan has to keep going, exactly as it did before the two merged
+	it('holds out for a candidate that carries a country', () => {
+		expect(salvagePhone('+80012345678', { metadata: max })).toBeNull()
+		expect(detectCountry('+80012345678', { metadata: max })).toBeUndefined()
+	})
+
+	it('answers the country detectCountry reports, since that reads this', () => {
+		for (const input of ['+41 44 668 1800', '+41446681800+41446681800', '0151 12345678']) {
+			expect(salvagePhone(input, { metadata: max })?.country).toBe(
+				detectCountry(input, { metadata: max })
+			)
+		}
 	})
 })
 

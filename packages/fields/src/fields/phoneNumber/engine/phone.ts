@@ -56,23 +56,27 @@ export const phoneUri = (input: string, opts: PhoneOptions): null | string =>
 	parsePhone(input, opts)?.uri ?? null
 
 /**
- * Salvages the first parseable candidate rather than stripping characters, so a
- * doubled paste or one wrapped in punctuation cannot fabricate a number.
+ * The longest leading candidate that parses to a valid, country-bearing number, so a
+ * doubled paste or one wrapped in punctuation cannot fabricate a number by stripping
+ * characters out of it.
  */
-export const detectCountry = (input: string, opts: PhoneOptions): CountryCode | undefined => {
+export const salvagePhone = (input: string, opts: PhoneOptions): null | ParsedPhone => {
 	const trimmed = input.trim()
 	const direct = parsePhone(trimmed, opts)
-	if (direct?.valid && direct.country) return direct.country
+	if (direct?.valid && direct.country) return direct
 	const plus = trimmed.indexOf('+')
-	if (plus === -1) return undefined
+	if (plus === -1) return null
 	const tail = trimmed.slice(plus)
 	// E.164 numbers max out at 15 digits; 18 bounds the scan without truncating a real one.
 	for (let end = Math.min(tail.length, 18); end > 2; end--) {
 		const candidate = parsePhone(tail.slice(0, end), opts)
-		if (candidate?.valid && candidate.country) return candidate.country
+		if (candidate?.valid && candidate.country) return candidate
 	}
-	return undefined
+	return null
 }
+
+export const detectCountry = (input: string, opts: PhoneOptions): CountryCode | undefined =>
+	salvagePhone(input, opts)?.country
 
 export const checkPhone = (
 	input: string,
