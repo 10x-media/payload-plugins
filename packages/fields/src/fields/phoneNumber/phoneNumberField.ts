@@ -1,24 +1,17 @@
-import type {
-	FieldHook,
-	GroupField,
-	SanitizedConfig,
-	TextField,
-	TextFieldValidation,
-	Validate,
-} from 'payload'
-import { getFieldsRegistry } from '../../plugin/registry'
+import type { FieldHook, GroupField, TextField, TextFieldValidation, Validate } from 'payload'
 import { keys } from '../../translations/keys'
 import { asTranslate } from '../../translations/server'
 import { isKnownCountry } from './engine/countries'
-import { DEFAULT_METADATA_SET, loadMetadata, type MetadataSet } from './engine/metadata'
-import { type CountryCode, checkPhone, type PhoneValidationMode, parsePhone } from './engine/phone'
+import { loadMetadata } from './engine/metadata'
+import { type CountryCode, checkPhone, parsePhone } from './engine/phone'
 import {
 	type AnyPhoneNumberFieldOptions,
 	PHONE_CUSTOM_KEY,
 	type PhoneNumberE164FieldOptions,
 	type PhoneNumberFieldOptions,
-	resolvePhoneOptions,
+	type ResolvablePhoneFieldOptions,
 } from './options'
+import { resolvePhoneOptionsSafe } from './server/resolvePhoneOptionsSafe'
 
 const assertCountries = (opts: {
 	countries: readonly CountryCode[] | undefined
@@ -46,74 +39,83 @@ const assertCountries = (opts: {
 	}
 }
 
-/**
- * The registry's install-wide metadata choice, read at request time (never at field-build
- * time: the factory runs before the plugin's normalizeRegistry ever sees the config, so it
- * has no other way to observe it). Degrades to the default the same way resolvePrecisionSafe
- * does, for a config mutated after the plugin ran or assembled without it. Shared by validate
- * and the read hook so both parse against the same set the client bag advertises; a mismatch
- * here is how a number the admin UI shows as valid ends up rejected on save.
- */
-const resolveMetadataSetSafe = (config: SanitizedConfig): MetadataSet => {
-	try {
-		return getFieldsRegistry(config)?.phoneNumber?.metadata ?? DEFAULT_METADATA_SET
-	} catch {
-		return DEFAULT_METADATA_SET
-	}
-}
+/** Configuration errors return a message rather than throw: writes must fail either way. */
+const mobileMetadataMismatch = (name: string): string =>
+	`phoneNumberField(${name}): validation "mobile" requires metadata "max" or "mobile", but this install is configured "min"`
 
-const derivedHook: FieldHook = async ({ req, value }) => {
-	const stored = (value ?? {}) as { country?: CountryCode; number?: string }
-	if (typeof stored.number !== 'string' || stored.number === '') return value
-	const parsed = parsePhone(stored.number, {
-		defaultCountry: stored.country,
-		metadata: await loadMetadata(resolveMetadataSetSafe(req.payload.config)),
-	})
-	if (!parsed) return value
-	// Persisted keys spread first: this hook enriches the group, it never rewrites it.
-	return {
-		...stored,
-		callingCode: parsed.callingCode,
-		international: parsed.international,
-		national: parsed.national,
-		type: parsed.type,
-		uri: parsed.uri,
+const buildDerivedHook =
+	(fieldLayer: ResolvablePhoneFieldOptions): FieldHook =>
+	async ({ req, value }) => {
+		const stored = (value ?? {}) as { country?: CountryCode; number?: string }
+		if (typeof stored.number !== 'string' || stored.number === '') return value
+		const resolved = resolvePhoneOptionsSafe({ fieldOptions: fieldLayer, payload: req.payload })
+		const parsed = parsePhone(stored.number, {
+			defaultCountry: stored.country,
+			metadata: await loadMetadata(resolved.metadata),
+		})
+		if (!parsed) return value
+		// Persisted keys spread first: this hook enriches the group, it never rewrites it.
+		return {
+			...stored,
+			callingCode: parsed.callingCode,
+			international: parsed.international,
+			national: parsed.national,
+			type: parsed.type,
+			uri: parsed.uri,
+		}
 	}
-}
 
 const buildValidate =
-	(opts: { mode: PhoneValidationMode; required: boolean }): Validate =>
+	(opts: { fieldLayer: ResolvablePhoneFieldOptions; name: string; required: boolean }): Validate =>
 	async (value, args) => {
 		const stored = (value ?? {}) as { country?: CountryCode; number?: string }
 		const raw = typeof stored.number === 'string' ? stored.number : ''
-		const check = checkPhone(raw, opts.mode, {
+		const resolved = resolvePhoneOptionsSafe({
+			fieldOptions: opts.fieldLayer,
+			payload: args.req.payload,
+		})
+		const check = checkPhone(raw, resolved.validation, {
 			defaultCountry: stored.country,
-			metadata: await loadMetadata(resolveMetadataSetSafe(args.req.payload.config)),
+			metadata: await loadMetadata(resolved.metadata),
 		})
 		if (check === 'empty') {
 			return opts.required ? asTranslate(args.req.t)(keys.phoneRequired) : true
 		}
-		if (check === 'notMobile') return asTranslate(args.req.t)(keys.phoneNotMobile)
+		if (check === 'notMobile') {
+			if (resolved.validation === 'mobile' && resolved.metadata === 'min') {
+				return mobileMetadataMismatch(opts.name)
+			}
+			return asTranslate(args.req.t)(keys.phoneNotMobile)
+		}
 		if (check === 'invalid') return asTranslate(args.req.t)(keys.invalidPhoneNumber)
 		return true
 	}
 
 const buildTextValidate =
 	(opts: {
-		defaultCountry: CountryCode | undefined
-		mode: PhoneValidationMode
+		fieldLayer: ResolvablePhoneFieldOptions
+		name: string
 		required: boolean
 	}): TextFieldValidation =>
 	async (value, args) => {
 		const raw = typeof value === 'string' ? value : ''
-		const check = checkPhone(raw, opts.mode, {
-			defaultCountry: opts.defaultCountry,
-			metadata: await loadMetadata(resolveMetadataSetSafe(args.req.payload.config)),
+		const resolved = resolvePhoneOptionsSafe({
+			fieldOptions: opts.fieldLayer,
+			payload: args.req.payload,
+		})
+		const check = checkPhone(raw, resolved.validation, {
+			defaultCountry: resolved.defaultCountry,
+			metadata: await loadMetadata(resolved.metadata),
 		})
 		if (check === 'empty') {
 			return opts.required ? asTranslate(args.req.t)(keys.phoneRequired) : true
 		}
-		if (check === 'notMobile') return asTranslate(args.req.t)(keys.phoneNotMobile)
+		if (check === 'notMobile') {
+			if (resolved.validation === 'mobile' && resolved.metadata === 'min') {
+				return mobileMetadataMismatch(opts.name)
+			}
+			return asTranslate(args.req.t)(keys.phoneNotMobile)
+		}
 		if (check === 'invalid') return asTranslate(args.req.t)(keys.invalidPhoneNumber)
 		return true
 	}
@@ -143,19 +145,18 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 
 	assertCountries({ countries, defaultCountry, name })
 
-	const clientOptions = resolvePhoneOptions(
-		{
-			cellFormat,
-			countries,
-			defaultCountry,
-			flags,
-			isClearable,
-			preferredCountries,
-			storage: options.storage,
-			validation,
-		},
-		undefined
-	)
+	// The field's own options, exactly as written, with no defaults applied: registry
+	// defaults are only visible at request time, via resolvePhoneOptionsSafe below.
+	const fieldLayer: ResolvablePhoneFieldOptions = {
+		...(cellFormat !== undefined ? { cellFormat } : {}),
+		...(countries !== undefined ? { countries } : {}),
+		...(defaultCountry !== undefined ? { defaultCountry } : {}),
+		...(flags !== undefined ? { flags } : {}),
+		...(isClearable !== undefined ? { isClearable } : {}),
+		...(preferredCountries !== undefined ? { preferredCountries } : {}),
+		...(options.storage !== undefined ? { storage: options.storage } : {}),
+		...(validation !== undefined ? { validation } : {}),
+	}
 
 	if (options.storage === 'e164') {
 		const base: TextField = {
@@ -168,21 +169,17 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 			admin: {
 				components: {
 					Cell: {
-						clientProps: { phoneOptions: clientOptions },
+						clientProps: { phoneOptions: fieldLayer },
 						path: '@10x-media/fields/rsc#PhoneNumberCellServer',
 					},
 					Field: {
-						clientProps: { phoneOptions: clientOptions },
+						clientProps: { phoneOptions: fieldLayer },
 						path: '@10x-media/fields/rsc#PhoneNumberFieldServer',
 					},
 				},
 			},
-			custom: { [PHONE_CUSTOM_KEY]: clientOptions },
-			validate: buildTextValidate({
-				defaultCountry,
-				mode: clientOptions.validation,
-				required: required ?? false,
-			}),
+			custom: { [PHONE_CUSTOM_KEY]: fieldLayer },
+			validate: buildTextValidate({ fieldLayer, name, required: required ?? false }),
 		}
 		return typeof options.overrides === 'function' ? options.overrides({ field: base }) : base
 	}
@@ -197,16 +194,16 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 		admin: {
 			components: {
 				Cell: {
-					clientProps: { phoneOptions: clientOptions },
+					clientProps: { phoneOptions: fieldLayer },
 					path: '@10x-media/fields/rsc#PhoneNumberCellServer',
 				},
 				Field: {
-					clientProps: { phoneOptions: clientOptions },
+					clientProps: { phoneOptions: fieldLayer },
 					path: '@10x-media/fields/rsc#PhoneNumberFieldServer',
 				},
 			},
 		},
-		custom: { [PHONE_CUSTOM_KEY]: clientOptions },
+		custom: { [PHONE_CUSTOM_KEY]: fieldLayer },
 		fields: [
 			{ admin: { disableListColumn: true }, name: 'number', type: 'text' },
 			{ admin: { disableListColumn: true }, name: 'country', type: 'text' },
@@ -216,11 +213,8 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 			{ admin: { disableListColumn: true }, name: 'uri', type: 'text', virtual: true },
 			{ admin: { disableListColumn: true }, name: 'type', type: 'text', virtual: true },
 		],
-		hooks: { afterRead: [derivedHook] },
-		validate: buildValidate({
-			mode: clientOptions.validation,
-			required: required ?? false,
-		}),
+		hooks: { afterRead: [buildDerivedHook(fieldLayer)] },
+		validate: buildValidate({ fieldLayer, name, required: required ?? false }),
 	}
 
 	return typeof options.overrides === 'function' ? options.overrides({ field: base }) : base

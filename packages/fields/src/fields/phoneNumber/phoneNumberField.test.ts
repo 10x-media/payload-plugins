@@ -20,11 +20,21 @@ const reqWithRegistry = (custom?: Record<string, unknown>) =>
 
 const validateArgs = { req: reqWithRegistry() } as never
 
-/** A registry configured with an explicit phoneNumber metadata set, for validate calls. */
-const argsWithMetadata = (metadata: MetadataSet) =>
-	({
-		req: reqWithRegistry({ [FIELDS_REGISTRY_KEY]: { phoneNumber: { metadata } } }),
-	}) as never
+/** Validate args backed by a registry configured with the given phoneNumber layer. */
+const argsWithPhoneRegistry = (phoneNumber: Record<string, unknown>) =>
+	({ req: reqWithRegistry({ [FIELDS_REGISTRY_KEY]: { phoneNumber } }) }) as never
+
+const argsWithMetadata = (metadata: MetadataSet) => argsWithPhoneRegistry({ metadata })
+
+/** Reads `admin.components.<Field|Cell>.clientProps.phoneOptions`, the wire contract Task 10/11 build on. */
+const phoneOptionsOf = (
+	field: { admin?: { components?: { Cell?: unknown; Field?: unknown } } },
+	component: 'Cell' | 'Field'
+): unknown => {
+	const entry = field.admin?.components?.[component]
+	if (!entry || typeof entry !== 'object' || !('clientProps' in entry)) return undefined
+	return (entry as { clientProps?: { phoneOptions?: unknown } }).clientProps?.phoneOptions
+}
 
 describe('phoneNumberField, object storage', () => {
 	it('returns a group named after the field', () => {
@@ -59,10 +69,11 @@ describe('phoneNumberField, object storage', () => {
 		expect(components?.Cell).toMatchObject({ path: '@10x-media/fields/rsc#PhoneNumberCellServer' })
 	})
 
-	it('stamps resolved options under the custom key for hand-authored configs', () => {
-		expect(group({ name: 'phone' }).custom?.['@10x-media/fields']).toMatchObject({
-			flags: 'svg',
-			storage: 'object',
+	it("stamps the field's own options unresolved under the custom key, for hand-authored configs", () => {
+		// Exact equality, not toMatchObject: proves no default (storage, validation, ...) got
+		// baked in alongside the one option actually set, which is the whole point of Finding 1.
+		expect(group({ flags: 'emoji', name: 'phone' }).custom?.['@10x-media/fields']).toEqual({
+			flags: 'emoji',
 		})
 	})
 
@@ -91,6 +102,41 @@ describe('phoneNumberField, e164 storage', () => {
 	})
 })
 
+// FINDING 3: nothing above reads clientProps at all, so deleting it (or dropping a key from
+// the bag) left every other test green. This is the contract Task 10 renders from and Task 11
+// forwards, so it gets its own direct coverage on both storage shapes and both components.
+describe('phoneNumberField clientProps.phoneOptions contract', () => {
+	const authored = {
+		countries: ['DE', 'FR'] as const,
+		defaultCountry: 'DE' as const,
+		isClearable: false,
+		preferredCountries: ['DE'] as const,
+	}
+
+	it('threads field options into Field and Cell clientProps.phoneOptions, group storage', () => {
+		const field = group({ ...authored, name: 'phone' })
+		expect(phoneOptionsOf(field, 'Field')).toMatchObject(authored)
+		expect(phoneOptionsOf(field, 'Cell')).toMatchObject(authored)
+	})
+
+	it('threads field options into Field and Cell clientProps.phoneOptions, e164 storage', () => {
+		const field = phoneNumberField({ ...authored, name: 'phone', storage: 'e164' }) as TextField
+		expect(phoneOptionsOf(field, 'Field')).toMatchObject(authored)
+		expect(phoneOptionsOf(field, 'Cell')).toMatchObject(authored)
+	})
+
+	it('never resolves a default into the bag, so a registry default can still win downstream', () => {
+		const phoneOptions = phoneOptionsOf(group({ name: 'phone' }), 'Field') as Record<
+			string,
+			unknown
+		>
+		expect(phoneOptions).not.toHaveProperty('flags')
+		expect(phoneOptions).not.toHaveProperty('validation')
+		expect(phoneOptions).not.toHaveProperty('metadata')
+		expect(phoneOptions).not.toHaveProperty('storage')
+	})
+})
+
 describe('phoneNumberField validation guards', () => {
 	it('rejects an unsupported country in the allowlist at build time', () => {
 		expect(() => group({ countries: ['DE', 'ZZ' as CountryCode], name: 'phone' })).toThrow(/ZZ/)
@@ -114,7 +160,7 @@ describe('phoneNumberField validation guards', () => {
 describe('phoneNumberField, object storage validate behaviour', () => {
 	it('rejects an empty stored group when required, by inspecting number, not the object', async () => {
 		const field = group({ name: 'phone', required: true })
-		expect(await field.validate?.({}, validateArgs)).not.toBe(true)
+		expect(await field.validate?.({}, validateArgs)).toBe('fields:phoneRequired')
 	})
 
 	it('accepts an empty stored group when not required', async () => {
@@ -128,7 +174,7 @@ describe('phoneNumberField, object storage validate behaviour', () => {
 			{ country: 'DE', number: 'not a phone number' },
 			validateArgs
 		)
-		expect(result).not.toBe(true)
+		expect(result).toBe('fields:invalidPhoneNumber')
 	})
 
 	it('accepts a valid stored number', async () => {
@@ -140,7 +186,7 @@ describe('phoneNumberField, object storage validate behaviour', () => {
 	it('rejects a valid landline when validation is mobile-only', async () => {
 		const field = group({ name: 'phone', validation: 'mobile' })
 		const result = await field.validate?.({ country: 'DE', number: '+49301234567' }, validateArgs)
-		expect(result).not.toBe(true)
+		expect(result).toBe('fields:phoneNotMobile')
 	})
 
 	it('resolves the metadata set from the registry, not a build-time default', async () => {
@@ -151,14 +197,37 @@ describe('phoneNumberField, object storage validate behaviour', () => {
 		const underMin = await field.validate?.(value, argsWithMetadata('min'))
 		const underMax = await field.validate?.(value, validateArgs)
 		expect(underMin).toBe(true)
-		expect(underMax).not.toBe(true)
+		expect(underMax).toBe('fields:invalidPhoneNumber')
+	})
+
+	it("honours a plugin-level validation default, not just the field's own (Finding 1)", async () => {
+		const field = group({ name: 'phone' })
+		const mobileOnly = argsWithPhoneRegistry({ validation: 'mobile' })
+		// A genuine landline: only rejected as not-mobile if the registry's validation
+		// default actually reached the validator, since the field itself never set it.
+		const result = await field.validate?.({ country: 'DE', number: '+49301234567' }, mobileOnly)
+		expect(result).toBe('fields:phoneNotMobile')
+	})
+
+	it('reports a configuration error, not a false rejection, when mobile-only meets metadata min (Finding 2)', async () => {
+		const field = group({ name: 'phone', validation: 'mobile' })
+		// A genuinely valid mobile number: 'min' metadata just can't detect its type.
+		const result = await field.validate?.(
+			{ country: 'DE', number: '+4915112345678' },
+			argsWithMetadata('min')
+		)
+		expect(result).toBe(
+			'phoneNumberField(phone): validation "mobile" requires metadata "max" or "mobile", but this install is configured "min"'
+		)
 	})
 })
 
 describe('phoneNumberField, e164 storage validate behaviour', () => {
 	it('rejects a malformed number', async () => {
 		const field = phoneNumberField({ name: 'phone', storage: 'e164' }) as TextField
-		expect(await field.validate?.('not a phone number' as never, validateArgs)).not.toBe(true)
+		expect(await field.validate?.('not a phone number' as never, validateArgs)).toBe(
+			'fields:invalidPhoneNumber'
+		)
 	})
 
 	it('accepts a valid e164 number', async () => {
@@ -171,11 +240,36 @@ describe('phoneNumberField, e164 storage validate behaviour', () => {
 		const underMin = await field.validate?.('+4915112345' as never, argsWithMetadata('min'))
 		const underMax = await field.validate?.('+4915112345' as never, validateArgs)
 		expect(underMin).toBe(true)
-		expect(underMax).not.toBe(true)
+		expect(underMax).toBe('fields:invalidPhoneNumber')
+	})
+
+	it("honours a plugin-level defaultCountry, not just the field's own (Finding 1)", async () => {
+		const field = phoneNumberField({ name: 'phone', storage: 'e164' }) as TextField
+		const args = argsWithPhoneRegistry({ defaultCountry: 'DE' })
+		// National-format, no country code of its own: unparseable without a defaultCountry
+		// from somewhere, and the field itself never set one.
+		const result = await field.validate?.('0151 12345678' as never, args)
+		expect(result).toBe(true)
+	})
+
+	it('reports a configuration error, not a false rejection, when mobile-only meets metadata min (Finding 2)', async () => {
+		const field = phoneNumberField({
+			name: 'phone',
+			storage: 'e164',
+			validation: 'mobile',
+		}) as TextField
+		const result = await field.validate?.('+4915112345678' as never, argsWithMetadata('min'))
+		expect(result).toBe(
+			'phoneNumberField(phone): validation "mobile" requires metadata "max" or "mobile", but this install is configured "min"'
+		)
 	})
 })
 
 describe('phoneNumberField derived read hook', () => {
+	it('installs exactly one afterRead hook, not one per derived subfield', () => {
+		expect(group({ name: 'phone' }).hooks?.afterRead).toHaveLength(1)
+	})
+
 	it('enriches a stored number without clobbering number or country', async () => {
 		const field = group({ name: 'phone' })
 		const hook = field.hooks?.afterRead?.[0]
