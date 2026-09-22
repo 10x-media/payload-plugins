@@ -106,7 +106,11 @@ describe('detectCountry', () => {
 		expect(detectCountry('+4915112345678', { metadata: max })).toBe('DE')
 	})
 
-	it('recovers the salvageable country from an implausible-length number instead of an unvalidated guess', () => {
+	it('does not guess a country from a calling code alone when nothing valid parses', () => {
+		expect(detectCountry('+4915', { metadata: max })).toBeUndefined()
+	})
+
+	it('recovers the country embedded in an implausible-length number through the salvage loop', () => {
 		expect(detectCountry('+491511234567800000', { metadata: max })).toBe('DE')
 	})
 })
