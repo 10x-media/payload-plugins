@@ -4,7 +4,7 @@ import type React from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { CountryOption } from '../engine/countries'
 import { loadMetadata } from '../engine/metadata'
-import type { CountryCode } from '../engine/phone'
+import type { CountryCode, PhoneSeed } from '../engine/phone'
 import type { PhoneClientOptions } from '../options'
 
 type FieldAction = { path: string; type: string; value: unknown }
@@ -174,6 +174,7 @@ type RenderArgs = {
 	phoneOptions?: Partial<PhoneClientOptions>
 	readOnly?: boolean
 	required?: boolean
+	seed?: null | PhoneSeed
 }
 
 const element = (args: RenderArgs) => (
@@ -182,6 +183,7 @@ const element = (args: RenderArgs) => (
 		path="phone"
 		phoneOptions={{ ...OPTIONS, ...args.phoneOptions }}
 		readOnly={args.readOnly ?? false}
+		seed={args.seed ?? null}
 	/>
 )
 
@@ -647,47 +649,70 @@ describe('PhoneNumberField', () => {
 		expect(input().value).toBe('15112345678')
 	})
 
+	const DE_SEED: PhoneSeed = {
+		callingCode: '49',
+		country: 'DE',
+		national: '1511 2345678',
+		number: '+4915112345678',
+	}
+
 	// The first frame has to equal the frame the engine paints, or the prefix pops in and
 	// shoves the entry sideways a quarter second after every document load.
-	it('paints the first frame from the virtuals, identically to the engine', async () => {
+	it.each([
+		['object storage', {} as RenderArgs],
+		['e164 storage', { phoneOptions: { storage: 'e164' } } as RenderArgs],
+	])('paints the first frame from the server seed under %s', async (_label, args) => {
+		fieldStub.current = { ...fieldStub.current, value: DE_SEED.number }
 		formFields.current = {
-			'phone.callingCode': { value: '49' },
 			'phone.country': { value: 'DE' },
-			'phone.international': { value: '+49 1511 2345678' },
-			'phone.number': { value: '+4915112345678' },
+			'phone.number': { value: DE_SEED.number },
 		}
-		const rendered = render(element({}))
-		const beforeMetadata = { prefix: prefix(), value: input().value }
+		const rendered = render(element({ ...args, seed: DE_SEED }))
+		const beforeMetadata = {
+			country: picker().dataset.value,
+			prefix: prefix(),
+			value: input().value,
+		}
 		await act(async () => {
 			await loadMetadata('max')
 		})
-		expect(beforeMetadata).toEqual({ prefix: '+49', value: '1511 2345678' })
-		expect({ prefix: prefix(), value: input().value }).toEqual(beforeMetadata)
+		expect(beforeMetadata).toEqual({ country: 'DE', prefix: '+49', value: '1511 2345678' })
+		expect({ country: picker().dataset.value, prefix: prefix(), value: input().value }).toEqual(
+			beforeMetadata
+		)
 		rendered.unmount()
 	})
 
-	it('ignores virtuals that do not belong to the stored number', async () => {
+	it('ignores a seed that does not describe the stored number', async () => {
 		formFields.current = {
-			'phone.callingCode': { value: '41' },
 			'phone.country': { value: 'DE' },
-			'phone.international': { value: '+41 44 668 18 00' },
 			'phone.number': { value: '+4915112345678' },
 		}
-		const rendered = render(element({}))
+		const seed: PhoneSeed = {
+			callingCode: '41',
+			country: 'CH',
+			national: '44 668 18 00',
+			number: '+41446681800',
+		}
+		const rendered = render(element({ seed }))
 		expect(prefix()).toBeNull()
 		expect(input().value).toBe('+4915112345678')
 		rendered.unmount()
 	})
 
-	it('has no virtuals to paint from under e164 storage', async () => {
-		fieldStub.current = { ...fieldStub.current, value: '+4915112345678' }
+	it('drops the seed the moment the metadata lands', async () => {
 		formFields.current = {
-			'phone.callingCode': { value: '49' },
-			'phone.international': { value: '+49 1511 2345678' },
+			'phone.country': { value: 'CH' },
+			'phone.number': { value: '+41446681800' },
 		}
-		const rendered = render(element({ phoneOptions: { storage: 'e164' } }))
-		expect(prefix()).toBeNull()
-		expect(input().value).toBe('+4915112345678')
+		// A seed left over from a number that is no longer the one in form state
+		const rendered = render(element({ seed: { ...DE_SEED, number: '+41446681800' } }))
+		expect(input().value).toBe('1511 2345678')
+		await act(async () => {
+			await loadMetadata('max')
+		})
+		expect(input().value).toBe('44 668 18 00')
+		expect(prefix()).toBe('+41')
 		rendered.unmount()
 	})
 

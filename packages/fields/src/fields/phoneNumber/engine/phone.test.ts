@@ -5,7 +5,9 @@ import {
 	detectCountry,
 	formatAsYouType,
 	formatPhone,
+	nationalPart,
 	parsePhone,
+	phoneSeed,
 	phoneUri,
 	salvagePhone,
 } from './phone'
@@ -197,5 +199,33 @@ describe('formatAsYouType', () => {
 
 	it('returns the input unchanged when no country is selected and it carries no calling code', () => {
 		expect(formatAsYouType('01511234', undefined, { metadata: max })).toBe('01511234')
+	})
+})
+
+describe('phoneSeed', () => {
+	it.each([
+		{ callingCode: '49', country: 'DE', national: '1511 2345678', number: '+4915112345678' },
+		{ callingCode: '41', country: 'CH', national: '44 668 18 00', number: '+41446681800' },
+		{ callingCode: '1', country: 'US', national: '212 555 2368', number: '+12125552368' },
+	] as const)('splits $number the way the admin row lays it out', (expected) => {
+		expect(phoneSeed(expected.number, { metadata: max })).toEqual(expected)
+	})
+
+	it('carries the raw input back, so a caller can tell which number it describes', () => {
+		expect(phoneSeed('0151 12345678', { defaultCountry: 'DE', metadata: max })?.number).toBe(
+			'0151 12345678'
+		)
+	})
+
+	it.each(['abc', ''])('returns null for input the engine cannot parse: %s', (raw) => {
+		expect(phoneSeed(raw, { metadata: max })).toBeNull()
+	})
+})
+
+describe('nationalPart', () => {
+	it('falls back to the national format when the international one carries no calling code', () => {
+		const parsed = parsePhone('+4915112345678', { metadata: max })
+		if (!parsed) throw new Error('expected a parsed number')
+		expect(nationalPart({ ...parsed, international: 'no plus here' })).toBe(parsed.national)
 	})
 })

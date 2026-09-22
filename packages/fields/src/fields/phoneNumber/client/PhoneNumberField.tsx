@@ -24,7 +24,8 @@ import {
 	type CountryCode,
 	detectCountry,
 	formatAsYouType,
-	type ParsedPhone,
+	nationalPart,
+	type PhoneSeed,
 	parsePhone,
 	salvagePhone,
 } from '../engine/phone'
@@ -55,14 +56,6 @@ const isInternational = (draft: string): boolean => draft.trimStart().startsWith
  * but a commit stores E.164, which cannot carry an extension, so the repaint drops it.
  */
 const PHONE_CHARS = /^[\d\s+()./-]*$/
-
-/** The number without its calling code, so it reads as one phrase beside the prefix. */
-const nationalPart = (parsed: ParsedPhone): string => {
-	const prefix = `+${parsed.callingCode}`
-	return parsed.international.startsWith(prefix)
-		? parsed.international.slice(prefix.length).trimStart()
-		: parsed.national
-}
 
 const displayFor = (entry: PhoneEntry, metadata: null | PhoneMetadata): string => {
 	if (!entry.number) return ''
@@ -116,6 +109,8 @@ const resolveCommit = (args: {
 export type PhoneNumberFieldProps = {
 	field: GroupFieldClientProps['field'] | TextFieldClientProps['field']
 	phoneOptions: PhoneClientOptions
+	/** The stored row as the server already split it, painted until metadata lands. */
+	seed?: null | PhoneSeed
 } & Omit<GroupFieldClientProps, 'field'>
 
 /**
@@ -124,7 +119,7 @@ export type PhoneNumberFieldProps = {
  * the field's own stamped layer carries no defaults and would render the wrong chrome.
  */
 export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
-	const { field, path, phoneOptions, readOnly: readOnlyFromProps } = props
+	const { field, path, phoneOptions, readOnly: readOnlyFromProps, seed } = props
 	const { admin: { className, description } = {}, label, localized } = field
 	const passthrough: PhonePassthrough = field
 	const { placeholder, readOnly: readOnlyFromAdmin } = passthrough.admin ?? {}
@@ -186,21 +181,9 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 			?.country
 	}, [countryState, defaultCountry, isE164, metadata, pickedCountry, storedNumber])
 
-	// The virtuals hold the server's own derivation, so painting the first frame from them is what
-	// stops the prefix reflowing; they go stale mid-edit, hence the digit match and metadata guard.
-	const callingCodeState = useFormFields(([fields]) => fields?.[`${path}.callingCode`]?.value)
-	const internationalState = useFormFields(([fields]) => fields?.[`${path}.international`]?.value)
-	const seeded = useMemo<null | { callingCode: string; national: string }>(() => {
-		if (metadata || isE164) return null
-		if (typeof callingCodeState !== 'string' || typeof internationalState !== 'string') return null
-		if (`+${internationalState.replace(/\D/g, '')}` !== storedNumber) return null
-		const prefix = `+${callingCodeState}`
-		if (!internationalState.startsWith(prefix)) return null
-		return {
-			callingCode: callingCodeState,
-			national: internationalState.slice(prefix.length).trimStart(),
-		}
-	}, [callingCodeState, internationalState, isE164, metadata, storedNumber])
+	// The server's own derivation of the row, painted until the lazy metadata import lands so the
+	// prefix and the entry never reflow. It describes one stored number, hence the match.
+	const seeded = metadata === null && seed?.number === storedNumber ? seed : null
 
 	const display = useMemo(
 		() =>
@@ -218,7 +201,8 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 		() => (metadata && isInternational(draft) ? detectCountry(draft, { metadata }) : undefined),
 		[draft, metadata]
 	)
-	const country = draftCountry ?? storedCountry ?? pickedCountry ?? defaultCountry
+	const country =
+		draftCountry ?? storedCountry ?? seeded?.country ?? pickedCountry ?? defaultCountry
 
 	const options = useMemo(
 		() =>
