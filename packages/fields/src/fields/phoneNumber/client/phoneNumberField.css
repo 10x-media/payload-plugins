@@ -1,0 +1,244 @@
+/* Mirrors Payload's formInput mixin (packages/ui/src/scss/vars.scss) so the composite
+   row reads as one native text input; focus rides :focus-within.
+   Dimensions are static px on purpose: Payload compiles scss base() to literal px
+   (native inputs stay 40px tall at every breakpoint), while the runtime --base var
+   is rem-based and shrinks with the responsive html font-size. */
+.fields-phone__container {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	width: 100%;
+	height: 40px;
+	padding: 0 8px 0 6px;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
+	color: var(--theme-elevation-800);
+	font-family: var(--font-body);
+	font-size: 1rem;
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
+	transition-property: border, box-shadow, background-color;
+	transition-duration: 100ms, 100ms, 500ms;
+	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
+}
+
+.fields-phone__container:hover {
+	border-color: var(--theme-elevation-250);
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
+}
+
+.fields-phone__container:focus-within {
+	border-color: var(--theme-elevation-400);
+	outline: 0;
+}
+
+html[data-theme="light"] .fields-phone.error .fields-phone__container {
+	background-color: var(--theme-error-50);
+	border-color: var(--theme-error-500);
+}
+
+html[data-theme="dark"] .fields-phone.error .fields-phone__container {
+	background-color: var(--theme-error-100);
+	border-color: var(--theme-error-400);
+}
+
+html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
+	border-color: var(--theme-error-500);
+}
+
+.fields-phone.read-only .fields-phone__container,
+.fields-phone.read-only .fields-phone__container:hover {
+	border-color: var(--theme-elevation-150);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-400);
+	box-shadow: none;
+}
+
+/* Popup's own root, stretched so its trigger fills the container's 40px */
+.fields-phone__picker {
+	display: flex;
+	align-self: stretch;
+}
+
+.fields-phone__trigger {
+	display: inline-flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: 4px;
+	min-width: 34px;
+	padding: 0 4px;
+	border: 0;
+	border-radius: var(--style-radius-s);
+	background: transparent;
+	color: var(--theme-elevation-500);
+	cursor: pointer;
+}
+
+.fields-phone__trigger:hover {
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-800);
+}
+
+.fields-phone__trigger:focus-visible {
+	outline: var(--accessibility-outline);
+}
+
+.fields-phone__trigger:disabled {
+	background: transparent;
+	cursor: not-allowed;
+}
+
+.fields-phone__caret {
+	display: flex;
+	flex-shrink: 0;
+	width: 12px;
+	height: 12px;
+}
+
+.fields-phone__code {
+	color: var(--theme-elevation-800);
+	font-size: 0.85rem;
+	white-space: nowrap;
+}
+
+.fields-phone__flag {
+	display: block;
+	flex-shrink: 0;
+	width: 20px;
+	height: 15px;
+	border-radius: 1px;
+	object-fit: cover;
+}
+
+.fields-phone__flag--emoji {
+	width: auto;
+	font-size: 15px;
+	line-height: 1;
+}
+
+.fields-phone__sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	margin: -1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+	border-width: 0;
+}
+
+/* Payload portals popup content to document.body, and caps that scroll container at
+   calc(var(--base) * 10); a country list is taller than that and would be clipped behind
+   a hidden scrollbar. The panel bounds its own height, and this lifts the outer cap to
+   match so only the list itself ever scrolls. */
+.popup__scroll-container:has(> .fields-phone__panel) {
+	max-height: 340px;
+}
+
+.fields-phone__panel {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	width: 260px;
+}
+
+.fields-phone__search {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	gap: 6px;
+	height: 32px;
+	padding: 0 8px;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
+}
+
+.fields-phone__search:focus-within {
+	border-color: var(--theme-elevation-400);
+}
+
+.fields-phone__search-icon {
+	display: flex;
+	flex-shrink: 0;
+	width: 14px;
+	height: 14px;
+	color: var(--theme-elevation-400);
+}
+
+.fields-phone__search-input {
+	flex: 1;
+	min-width: 0;
+	border: 0;
+	background: transparent;
+	color: inherit;
+	font-family: var(--font-body);
+	font-size: 0.9rem;
+	outline: 0;
+}
+
+.fields-phone__search-input::placeholder {
+	color: var(--theme-elevation-400);
+}
+
+.fields-phone__list {
+	max-height: 280px;
+	overflow-y: auto;
+}
+
+.fields-phone__group {
+	display: flex;
+	align-items: center;
+	padding: 0 8px;
+	border-top: 1px solid var(--theme-elevation-100);
+	color: var(--theme-elevation-500);
+	font-size: 0.7rem;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+}
+
+.fields-phone__option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 0 8px;
+	border: 0;
+	border-radius: var(--style-radius-s);
+	background: transparent;
+	color: var(--theme-elevation-800);
+	font-family: var(--font-body);
+	font-size: 0.9rem;
+	text-align: left;
+	cursor: pointer;
+}
+
+.fields-phone__option:hover,
+.fields-phone__option[data-active="true"] {
+	background: var(--theme-elevation-100);
+}
+
+.fields-phone__option[aria-selected="true"] {
+	background: var(--theme-elevation-150);
+}
+
+.fields-phone__option-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.fields-phone__option-code {
+	flex-shrink: 0;
+	color: var(--theme-elevation-500);
+	font-variant-numeric: tabular-nums;
+}
+
+.fields-phone__empty {
+	padding: 12px 8px;
+	color: var(--theme-elevation-500);
+	font-size: 0.9rem;
+	text-align: center;
+}

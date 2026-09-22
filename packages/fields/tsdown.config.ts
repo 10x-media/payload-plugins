@@ -37,5 +37,9 @@ export default definePluginBuild({
 			from: 'src/fields/measurement/client/measurementCell.css',
 			to: 'dist/fields/measurement/client',
 		},
+		{
+			from: 'src/fields/phoneNumber/client/phoneNumberField.css',
+			to: 'dist/fields/phoneNumber/client',
+		},
 	],
 })
