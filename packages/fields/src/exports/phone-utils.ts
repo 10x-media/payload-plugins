@@ -25,4 +25,5 @@ export {
 	type PhoneValidationMode,
 	parsePhone,
 	phoneUri,
+	salvagePhone,
 } from '../fields/phoneNumber/engine/phone'

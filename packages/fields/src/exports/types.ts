@@ -6,6 +6,15 @@ export type {
 	ColorPresetsSource,
 	ResolvedColorPreset,
 } from '../fields/color/options'
+export type {
+	AnyPhoneNumberFieldOptions,
+	PhoneClientOptions,
+	PhoneFlagMode,
+	PhoneNumberE164FieldOptions,
+	PhoneNumberFieldOptions,
+	PhoneStorageMode,
+	ResolvablePhoneFieldOptions,
+} from '../fields/phoneNumber/options'
 export type { FieldsPluginOptions } from '../index'
 export type {
 	ColorFormat,
@@ -22,4 +31,5 @@ export type {
 	IconNode,
 	IconNodeMap,
 	KeysConfig,
+	PhoneNumberGlobalConfig,
 } from '../types'
