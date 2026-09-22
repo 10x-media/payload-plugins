@@ -101,8 +101,11 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	white-space: nowrap;
 }
 
+/* A calling code is LTR wherever it is shown: under an RTL page the leading + is a neutral and
+   bidi reorders "+49" to "49+". The UA stylesheet does the same for input[type="tel"]. */
 .fields-phone__prefix {
 	flex-shrink: 0;
+	direction: ltr;
 	font-variant-numeric: tabular-nums;
 	white-space: nowrap;
 }
@@ -280,6 +283,7 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 
 .fields-phone__option-code {
 	flex-shrink: 0;
+	direction: ltr;
 	color: var(--theme-elevation-500);
 	font-variant-numeric: tabular-nums;
 }
