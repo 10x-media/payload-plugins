@@ -1,6 +1,6 @@
 ---
 title: Security model
-description: Trust boundaries, SSRF exposure, and what to tighten in hostile environments.
+description: Trust boundaries, secret storage, key management, and SSRF exposure.
 ---
 
 The plugin's security posture is simple to state: **admin access is the trust boundary**. Everything below follows from it.
@@ -16,16 +16,166 @@ Deliveries POST to whatever URL a subscription specifies, including private and 
 ## Access defaults
 
 - Both collections require a logged-in user for every permitted operation; delivery rows additionally refuse create and update from any user (server-only writes).
-- The redeliver endpoint authorizes by login only: any authenticated user may redeliver any delivery.
+- **Rotate secret** runs the subscriptions collection's configured `update` access for the target document. Overriding that access, including scoping it per tenant, governs the endpoint as well, so rotation cannot outlive the rule that guards ordinary writes.
+- **Redeliver** authorizes by login only: any authenticated user may redeliver any delivery. It cannot defer to the deliveries collection's access the way rotation does, because that collection denies create and update to everyone by design. Gate it at the network or reverse-proxy layer if that matters to you.
 
-Tighten either with your own access control by overriding the collections through standard Payload config if you need role-based rules.
+Tighten either through the plugin's own [collection overrides](/webhooks/subscriptions#collection-overrides), which is also the supported way to add role-based or tenant-scoped rules:
 
-## Secrets
+```ts title="payload.config.ts"
+webhooks({
+  subscriptionsCollection: {
+    overrides: {
+      access: { update: ({ req }) => req.user?.role === 'admin' },
+    },
+  },
+})
+```
 
-Signing secrets are reveal-once and masked on every read, but stored unencrypted at rest for now. See [Signing](/webhooks/signing). Keep code-subscription secrets in your secret manager, not in the config file.
+### Cross-site requests
+
+Both endpoints authenticate the way every other Payload route does, so Payload's own CSRF handling applies before `req.user` is set: a cookie-authenticated request is accepted only if its `Origin` is in `config.csrf`, or, when no `Origin` is sent, if `Sec-Fetch-Site` says it is not cross-site.
+
+That allowlist is **empty by default**, which means any origin is accepted for cookie auth. Set it in your Payload config, and rotation and redelivery are covered along with every ordinary write:
+
+```ts title="payload.config.ts"
+export default buildConfig({
+  csrf: ['https://admin.example.com'],
+})
+```
+
+## Secrets at rest
+
+Signing secrets are stored through `encryptedField` from `@10x-media/fields`, at `protection: 'writeOnly'`. The database holds an AES-256-GCM sealed value carrying an authentication tag and a key id, under a key derived from your `PAYLOAD_SECRET` or from a key ring you configure. A dump, a backup, or a read replica contains sealed values rather than usable signing keys.
+
+<Callout>
+`@10x-media/fields` is a **peer dependency**. The admin components are import-map paths into `@10x-media/fields/client` and `/rsc`, and under pnpm your app cannot import a transitive dependency, so install it alongside this plugin: `pnpm add @10x-media/fields`.
+</Callout>
+
+Write-only means the field is stripped from every read result: admin, REST, GraphQL, exports, and the create response too. A read carries `secret_set` (a boolean saying whether one is stored) and `secret_hint`, and nothing else.
+
+The hint is the **last six characters** of the secret, stored beside it at seal time. Six is deliberately fewer than the field's default: on a signing secret every character is key material rather than an identifier, so the hint exposes the minimum that still lets an operator tell two keys apart in the admin. It is not stripped from responses, so treat it as public.
+
+The plaintext leaves the server on exactly three paths:
+
+- the create response, under `generatedSecret`, revealing a generated secret once
+- the rotation response, revealing the new secret once
+- internal delivery signing, which unseals in memory to compute the HMAC
+
+### What this does and does not protect
+
+Encryption at rest defends against **read** exposure of the database: dumps, backups, replicas, a stolen disk.
+
+It is not a defence against an attacker who can **write** to your database. Such an attacker can already point a subscription at their own URL and receive your events. If your database is writable by an untrusted party, the webhook secrets are not the first thing to worry about.
+
+What the sealed form adds is binding and detection. The ciphertext is bound by AAD to `10x-webhooks:subscriptions.secret`, so a value cannot be moved to a different field, and the GCM tag means a deliberate edit fails authentication rather than decrypting to plausible garbage. Copying one subscription's sealed secret into another row still works, because both rows share that binding: the AAD is per field, not per document.
+
+That scope is pinned rather than derived from the collection slug, because the slug is a plugin option. Renaming the collection would otherwise make every stored secret fail authentication, with nothing able to recover them. **It must never change once secrets exist.**
+
+### A secret that cannot be recovered refuses the delivery
+
+The row is marked `dead`, an error is logged naming the subscription, and nothing is sent. The error says which of three things happened, because each has a different fix:
+
+| What the log says | What happened | What to do |
+|---|---|---|
+| `no configured key authenticates it` | `PAYLOAD_SECRET` changed, or a key was dropped from the ring | Pin the previous key in `secretEncryption.keys`, or rotate the secret |
+| `key id that is not in secretEncryption.keys` | The value was sealed under a key that is no longer configured | Put that key back in the ring, or rotate the secret |
+| `not a canonical 'whsec_' secret` | The row predates encryption at rest | Run [`encryptExistingSecrets`](#then-the-adoption-utility), or rotate the secret |
+
+<Callout type="warn">
+A subscription that is supposed to be signed is never downgraded to an unsigned delivery. Receivers commonly verify only when a signature header is present, so an unsigned POST would sail through that check. A refused delivery is a visible failure you can act on; a silently unsigned one is not.
+</Callout>
+
+That refusal is about the **current** secret. If only a retired secret inside an open [rotation window](/webhooks/signing#rotation) is unreadable, the delivery still goes out signed with the current secret and a warning names what was dropped: a correctly signed delivery beats no delivery, and the only loss is the overlap for receivers that have not switched over yet.
+
+Subscriptions with no secret at all are unaffected and continue to deliver unsigned, which is what they always did.
+
+## The encryption key
+
+With no configuration the encryption key derives from `PAYLOAD_SECRET`, which means **changing `PAYLOAD_SECRET` makes every stored webhook secret unreadable**. Configure the key ring explicitly and it stops depending on it:
+
+```ts title="payload.config.ts"
+webhooks({
+  secretEncryption: {
+    keys: {
+      active: 'k1',
+      keys: { k1: process.env.WEBHOOKS_ENCRYPTION_KEY! },
+    },
+  },
+})
+```
+
+Every configured key can decrypt; the active one is used to seal. The key id travels inside the stored value, so a row sealed under `k1` keeps opening after `k2` becomes active.
+
+### Rotating the encryption key
+
+This is [not the same thing](/webhooks/signing#two-different-things-are-called-rotation) as rotating a signing secret. It re-seals what is already stored and changes nothing a receiver can observe.
+
+1. Add the new key to the ring and mark it active, keeping the old one:
+
+   ```ts
+   keys: { active: 'k2', keys: { k1: OLD, k2: NEW } }
+   ```
+
+2. Re-seal every stored value under the new key:
+
+   ```ts
+   import { rotateEncryptedFields } from '@10x-media/fields/encrypted'
+
+   await rotateEncryptedFields(payload, { collections: ['webhook-subscriptions'] })
+   ```
+
+3. Drop `k1` from the ring.
+
+### Changing PAYLOAD_SECRET
+
+If you never configured `secretEncryption.keys`, pin your current key **before** changing `PAYLOAD_SECRET`:
+
+```ts
+keys: { active: 'k0', keys: { k0: process.env.PAYLOAD_SECRET! } }
+```
+
+Deploy that, then change `PAYLOAD_SECRET`. Stored secrets keep opening under `k0`, and you can move to fresh key material with the rotation above whenever you like.
+
+If `PAYLOAD_SECRET` has already changed and the old key was not pinned, the stored secrets are gone: [rotate](/webhooks/signing#rotation) each subscription and distribute the new secrets to receivers. Set `graceSeconds: 0` for those, since the old secret is already unusable and there is nothing to overlap with.
+
+## Migrating subscriptions created before encryption
+
+Subscriptions created before this release hold plaintext secrets, and **their deliveries fail until you migrate or rotate them**, because an unsealed secret is refused rather than sent unsigned.
+
+### Step zero: the schema migration
+
+This release adds columns to the subscriptions collection: `previous_secret`, `previous_secret_expires_at`, and `secret_hint`. (`secret_set` is virtual, computed on read from whether the sealed value is present, so it has no column.) On MongoDB that is free and there is nothing to do. **On any SQL adapter (Postgres, SQLite, Vercel Postgres) the migration has to run first**, or the adoption utility below writes into columns that do not exist yet.
+
+```bash
+pnpm payload migrate:create add-webhook-secret-columns
+pnpm payload migrate
+```
+
+### Then the adoption utility
+
+Run it once, ideally after a dry run:
+
+```ts
+import { encryptExistingSecrets } from '@10x-media/webhooks'
+
+const report = await encryptExistingSecrets(payload, { dryRun: true })
+// { scanned, migrated, alreadyEncrypted, noSecret, failed: [{ id, field, reason }] }
+```
+
+Drop `dryRun` to write. It is idempotent, so re-running is safe.
+
+The utility does not invent new secrets: a legacy 48-character hex secret is already valid base64, so it keeps its characters and gains a `whsec_` prefix. Anything it cannot normalize is reported by row id and field name; rotate those subscriptions. A row's other secret field still migrates, so one unusable value does not strand a recoverable one in plaintext, which is why a row can appear in both `migrated` and `failed`.
+
+<Callout type="warn">
+Receivers must be updated regardless of this migration. The signature format, the header names, and the key derivation all changed, so an unchanged receiver will reject every delivery. See [Signing](/webhooks/signing).
+</Callout>
 
 ## Receiver-side checklist
 
-- Verify the signature and enforce a timestamp tolerance ([example](/webhooks/signing#verifying-in-your-receiver)).
+- Prefer an off-the-shelf Standard Webhooks library over hand-rolled verification.
+- Verify against the raw body, before any JSON parsing.
+- Enforce a timestamp tolerance (300 seconds is the usual choice).
+- Accept any of the signatures in the header, so rotation does not break you.
+- Compare in constant time, never with `===`.
 - Treat `data` as untrusted input; it is whatever the document (or your `transform`) contained.
 - Respond quickly and process async. The sender aborts at `timeoutMs` (default 10s) and a slow receiver burns retry attempts.
