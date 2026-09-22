@@ -127,6 +127,42 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		payload.logger.info('Seeded measurement showcase document')
 	}
 
+	const phoneCount = await payload.count({ collection: 'phone-numbers' })
+	if (phoneCount.totalDocs === 0) {
+		await payload.create({
+			collection: 'phone-numbers',
+			data: {
+				title: 'Showcase',
+				allowlisted: { country: 'CH', number: '+41780123456' },
+				conditionalPhone: { country: 'AT', number: '+431234567890' },
+				customComponents: { country: 'FR', number: '+33123456789' },
+				e164Cell: { country: 'AU', number: '+61499999999' },
+				e164Phone: '+4915123456789',
+				emojiFlags: { country: 'FR', number: '+33612345678' },
+				labelled: { country: 'JP', number: '+819012345678' },
+				localizedPhone: { country: 'DE', number: '+4915123456789' },
+				// A landline here would fail the field's own mobile-only validation
+				mobileOnly: { country: 'GB', number: '+447400123456' },
+				nationalCell: { country: 'BR', number: '+551155256325' },
+				nativeReadOnly: 'Native read-only text field',
+				nativeStacked: 'Native text field, for the stacked margin comparison',
+				nativeText: '+49 30 123456',
+				noFlags: { country: 'AT', number: '+43664123456' },
+				notClearable: { country: 'GB', number: '+441212345678' },
+				phone: { country: 'DE', number: '+4930123456' },
+				possibleValidation: { country: 'DE', number: '+493090182' },
+				preferredFirst: { country: 'JP', number: '+819012345678' },
+				readOnlyPhone: { country: 'KR', number: '+821012345678' },
+				requiredPhone: { country: 'SG', number: '+6591234567' },
+				showConditional: true,
+				strictValidation: { country: 'GB', number: '+441212345678' },
+				svgFlags: { country: 'CH', number: '+41446681800' },
+				usDefault: { country: 'US', number: '+12125552368' },
+			},
+		})
+		payload.logger.info('Seeded phone number showcase document')
+	}
+
 	const encryptedCount = await payload.count({ collection: 'encrypted' })
 	if (encryptedCount.totalDocs === 0) {
 		await payload.create({

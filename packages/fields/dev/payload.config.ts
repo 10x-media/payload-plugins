@@ -15,6 +15,7 @@ import { colors } from './collections/colors'
 import { encrypted } from './collections/encrypted'
 import { icons } from './collections/icons'
 import { measurements } from './collections/measurements'
+import { phoneNumbers } from './collections/phoneNumbers'
 import { tenants } from './collections/tenants'
 import { writeOnlyStories } from './collections/writeOnlyStories'
 import { smtpSettings } from './globals/smtpSettings'
@@ -74,7 +75,16 @@ export default buildConfig({
 	// Payload orders the admin sidebar by this array. Field-example collections
 	// (colors, icons) come first so a reviewer lands on them; infrastructure
 	// collections (tenants, users) sit at the bottom. Each group is alphabetical.
-	collections: [colors, encrypted, icons, measurements, writeOnlyStories, tenants, users],
+	collections: [
+		colors,
+		encrypted,
+		icons,
+		measurements,
+		phoneNumbers,
+		writeOnlyStories,
+		tenants,
+		users,
+	],
 	globals: [smtpSettings],
 	i18n: { supportedLanguages: { de, en } },
 	localization: { defaultLocale: 'en', locales: ['en', 'de'] },
@@ -88,6 +98,13 @@ export default buildConfig({
 				defaultLibrary: 'lucide',
 			},
 			measurement: { defaultUnits: { volume: 'l' } },
+			phoneNumber: {
+				cellFormat: 'international',
+				defaultCountry: 'DE',
+				metadata: 'max',
+				preferredCountries: ['DE', 'AT', 'CH'],
+				validation: 'valid',
+			},
 		}),
 	],
 	telemetry: false,
