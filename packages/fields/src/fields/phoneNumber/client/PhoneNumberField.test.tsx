@@ -104,7 +104,7 @@ vi.mock('../../../translations/useTranslation', () => ({
 }))
 
 /** Countries the picker double offers, enough to drive every selection this file needs. */
-const PICKABLE: CountryCode[] = ['CH', 'DE', 'US']
+const PICKABLE: CountryCode[] = ['CA', 'CH', 'DE', 'US']
 
 type PickerDoubleProps = {
 	disabled: boolean
@@ -559,6 +559,63 @@ describe('PhoneNumberField', () => {
 		expect(writesTo('phone.country')).toEqual(['US'])
 		expect(input().value).toBe('415 555 2671')
 		expect(prefix()).toBe('+1')
+	})
+
+	// libphonenumber reads the country back off the area code, which for a shared calling code
+	// answers a different country than the one the viewer just chose
+	it('keeps a picked country the stored number would re-derive away from', async () => {
+		formFields.current = {
+			'phone.country': { value: 'US' },
+			'phone.number': { value: '+12125552368' },
+		}
+		await renderPhone()
+		expect(picker().dataset.value).toBe('US')
+		fireEvent.click(screen.getByText('pick-CA'))
+		expect(writesTo('phone.country')).toEqual(['CA'])
+		expect(picker().dataset.value).toBe('CA')
+	})
+
+	// e164 storage has no country column, so component state is the only place a pick can live
+	it('keeps a picked country under e164 storage, where the number re-derives another', async () => {
+		fieldStub.current = { ...fieldStub.current, value: '+12125552368' }
+		await renderPhone({ phoneOptions: { storage: 'e164' } })
+		expect(picker().dataset.value).toBe('US')
+		fireEvent.click(screen.getByText('pick-CA'))
+		expect(picker().dataset.value).toBe('CA')
+	})
+
+	// A pick answers for one number, it is not a mode the field stays in
+	it('drops a picked country once a committed number names its own', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		fireEvent.click(screen.getByText('pick-CA'))
+		expect(picker().dataset.value).toBe('CA')
+		type('+41 44 668 1800')
+		fireEvent.blur(input())
+		expect(writesTo('phone.country')).toEqual(['CA', 'CH'])
+		expect(picker().dataset.value).toBe('CH')
+	})
+
+	it('lets a typed international draft outrank a picked country', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		fireEvent.click(screen.getByText('pick-CA'))
+		type('+41 44 668 1800')
+		expect(picker().dataset.value).toBe('CH')
+	})
+
+	// Switching documents remounts the field, which must read the row rather than the pick
+	it('starts a remounted field from the stored country, not the pick', async () => {
+		const stored = {
+			'phone.country': { value: 'US' },
+			'phone.number': { value: '+12125552368' },
+		}
+		formFields.current = { ...stored }
+		const { unmount } = await renderPhone()
+		fireEvent.click(screen.getByText('pick-CA'))
+		expect(picker().dataset.value).toBe('CA')
+		unmount()
+		formFields.current = { ...stored }
+		await renderPhone()
+		expect(picker().dataset.value).toBe('US')
 	})
 
 	// The pick wins over the calling code already in the draft, which is dropped with it

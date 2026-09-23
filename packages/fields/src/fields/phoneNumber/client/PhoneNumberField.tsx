@@ -90,24 +90,39 @@ const formatDraft = (args: {
 	return formatted.startsWith(prefix) ? formatted.slice(prefix.length).trimStart() : formatted
 }
 
+/** `derived` marks a commit whose country came out of the number rather than off the row. */
+type PhoneCommit = PhoneEntry & { derived: boolean }
+
 const resolveCommit = (args: {
 	country: CountryCode | undefined
 	draft: string
 	isClearable: boolean
 	lastValid: null | PhoneEntry
 	metadata: null | PhoneMetadata
+	picked: boolean
 	salvage: boolean
-}): PhoneEntry => {
-	const { country, draft, isClearable, lastValid, metadata, salvage } = args
+}): PhoneCommit => {
+	const { country, draft, isClearable, lastValid, metadata, picked, salvage } = args
 	const trimmed = draft.trim()
-	if (metadata === null) return { country, number: trimmed === '' ? null : trimmed }
+	if (metadata === null) {
+		return { country, derived: false, number: trimmed === '' ? null : trimmed }
+	}
 	const opts = { defaultCountry: country, metadata }
 	const direct = parsePhone(trimmed, opts)
 	const resolved = direct?.valid ? direct : salvage ? salvagePhone(trimmed, opts) : null
-	if (resolved) return { country: resolved.country ?? country, number: resolved.e164 }
+	if (resolved) {
+		// A calling code several countries share reads back as whichever one owns the area code,
+		// so re-reading it would undo the answer the viewer just gave the picker.
+		const read = picked ? undefined : resolved.country
+		return { country: read ?? country, derived: read !== undefined, number: resolved.e164 }
+	}
 	// isClearable false means the value cannot be removed, only replaced
-	if (trimmed === '') return !isClearable && lastValid ? lastValid : { country, number: null }
-	return { country, number: trimmed }
+	if (trimmed === '') {
+		return !isClearable && lastValid
+			? { ...lastValid, derived: true }
+			: { country, derived: false, number: null }
+	}
+	return { country, derived: false, number: trimmed }
 }
 
 /** A group under object storage, a text field under e164; the row is identical either way. */
@@ -206,8 +221,10 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 		() => (metadata && isInternational(draft) ? detectCountry(draft, { metadata }) : undefined),
 		[draft, metadata]
 	)
+	// The pick outranks the stored country because e164 storage has no country column to write
+	// it to: there the stored country is re-read off the number, which cannot know about a pick.
 	const country =
-		draftCountry ?? storedCountry ?? seeded?.country ?? pickedCountry ?? defaultCountry
+		draftCountry ?? pickedCountry ?? storedCountry ?? seeded?.country ?? defaultCountry
 
 	const options = useMemo(
 		() =>
@@ -250,14 +267,18 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 
 	const commit = useCallback(
 		(raw: string, opts: { country?: CountryCode; salvage?: boolean } = {}): PhoneEntry => {
-			const entry = resolveCommit({
+			const { derived, ...entry } = resolveCommit({
 				country: opts.country ?? country,
 				draft: raw,
 				isClearable,
 				lastValid: lastValidRef.current,
 				metadata,
+				picked: opts.country !== undefined,
 				salvage: opts.salvage === true,
 			})
+			// A pick speaks for the country only until the value speaks for itself, or it would
+			// keep overriding every number committed after it.
+			if (derived) setPickedCountry(undefined)
 			write(entry)
 			return entry
 		},
