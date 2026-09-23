@@ -243,7 +243,8 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	align-items: center;
 	padding: 0 8px;
 	border-top: 1px solid var(--theme-elevation-100);
-	color: var(--theme-elevation-500);
+	/* elevation-500 fails 4.5:1 at this font size against the panel background */
+	color: var(--theme-elevation-700);
 	font-size: 0.7rem;
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
@@ -284,13 +285,14 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 .fields-phone__option-code {
 	flex-shrink: 0;
 	direction: ltr;
-	color: var(--theme-elevation-500);
+	/* elevation-500 fails 4.5:1 at this font size against the panel background */
+	color: var(--theme-elevation-700);
 	font-variant-numeric: tabular-nums;
 }
 
 .fields-phone__empty {
 	padding: 12px 8px;
-	color: var(--theme-elevation-500);
+	color: var(--theme-elevation-700);
 	font-size: 0.9rem;
 	text-align: center;
 }
