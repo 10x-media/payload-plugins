@@ -28,7 +28,7 @@ The field renders one 40px row: a country trigger with a flag, the calling-code 
 
 ## Storage shapes
 
-`storage: 'object'` (the default) returns a `group` field: two real columns, `number` and `country` (ISO 3166-1 alpha-2), plus five `virtual: true` subfields recomputed on every read, covered in [Derived read shape](#derived-read-shape) below. The admin UI always commits `number` in E.164; a document written directly through the Local API or REST can store another format, since validation parses `number` against the stored `country` rather than requiring a fixed format.
+`storage: 'object'` (the default) returns a `group` field: two real columns, `number` and `country` (ISO 3166-1 alpha-2), plus five `virtual: true` subfields recomputed on every read, covered in [Derived read shape](#derived-read-shape) below. The admin UI commits `number` in E.164 once the draft parses; an unparseable draft (including the brief window before the lazily loaded metadata resolves) commits the raw trimmed text instead, which fails the field's own validation on a normal save. A collection saving drafts with `versions.drafts.validate` left at its default `false` skips that validation, so an unparseable string can still reach the database through a draft. A document written directly through the Local API or REST can likewise store another format, since validation (when it runs) parses `number` against the stored `country` rather than requiring a fixed format.
 
 `storage: 'e164'` returns a plain `text` field holding the E.164 string alone, with no `country` column. There's no sibling field to read a derived value from here; call the exported utils (see [Frontend use](#frontend-use)) against the stored string instead, passing a `defaultCountry` if the string you have isn't already E.164.
 
@@ -68,9 +68,21 @@ phoneNumberField(phone): validation "mobile" requires metadata "max" or "mobile"
 
 ## Country restriction and pinning
 
-`countries` scopes the picker's list; it does not restrict what can be saved. A number from outside the allowlist still parses, validates, and persists normally if it reaches the field through a default value, a migration, or a direct API write, since the allowlist is a UI convenience over `getCountries()`, not a validation rule. `preferredCountries` pins a subset above the alphabetized rest, in the order given, and both narrow correctly together: a preferred country outside `countries` is dropped rather than shown out of scope.
+`countries` scopes the picker's list; it does not restrict what can be saved. A number from outside the allowlist still parses, validates, and persists normally if it reaches the field through a default value, a migration, or a direct API write, since the allowlist is a UI convenience over `getCountries()`, not a validation rule. Every entry still has to be a real, known country: an unsupported code throws at field-definition time:
 
-`defaultCountry` seeds the picker and the calling-code prefix while the field is empty. Setting both `countries` and `defaultCountry` on the same field throws at field-definition time if `defaultCountry` isn't in the list:
+```
+phoneNumberField(phone): countries entry "ZZ" is not a supported country
+```
+
+`preferredCountries` pins a subset above the alphabetized rest, in the order given, and both narrow correctly together: a preferred country outside `countries` is dropped rather than shown out of scope.
+
+`defaultCountry` seeds the picker and the calling-code prefix while the field is empty. It has to be a real, known country too:
+
+```
+phoneNumberField(phone): defaultCountry "ZZ" is not a supported country
+```
+
+Setting both `countries` and `defaultCountry` on the same field additionally throws at field-definition time if `defaultCountry` isn't in the list:
 
 ```
 phoneNumberField(phone): defaultCountry "US" is not in countries
@@ -143,6 +155,7 @@ fields plugin: phoneNumber.defaultCountry "US" is not in phoneNumber.countries.
 
 ## Limitations
 
+- `number` isn't guaranteed to be E.164: an unparseable draft commits raw text instead, and a draft save skips the field's own validation by default (`versions.drafts.validate: false`), so raw text can reach the database that way.
 - An extension typed into the input is accepted and shown, but never persists: E.164 has no extension slot, so a commit drops it.
 - The five derived subfields are `virtual: true`. Payload rejects a query or sort against them; filter and sort on `number` or `country` instead.
 - `storage: 'e164'` has no `country` column, so there's no sibling field a frontend can read a derived value from; use the exported utils against the stored string.
@@ -151,4 +164,4 @@ fields plugin: phoneNumber.defaultCountry "US" is not in phoneNumber.countries.
 
 ## Frontend use
 
-`number` (E.164 from the admin UI, or whatever a direct API write provided) is the only value you need off the record. Parse, format, or re-detect its country for your frontend with [`/phone/utils`](/fields/phone/utils), the same engine the field runs.
+`number` (E.164 once the admin UI's draft parsed, raw text otherwise; see [Storage shapes](#storage-shapes)) is the only value you need off the record. Parse, format, or re-detect its country for your frontend with [`/phone/utils`](/fields/phone/utils), the same engine the field runs.

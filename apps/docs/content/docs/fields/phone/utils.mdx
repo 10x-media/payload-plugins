@@ -41,7 +41,7 @@ parsePhone('+4915112345678', { metadata })
 // }
 ```
 
-`parsePhone(input, options)` parses a string with libphonenumber-js, returning `null` for input it can't parse at all. `options.defaultCountry` disambiguates a national-format number (`'0151 12345678'` needs one; `'+4915112345678'` doesn't, since the calling code already names a country). `type` needs metadata `'max'` to be reliable; see the field's [Metadata sets](/fields/phone#metadata-sets).
+`parsePhone(input, options)` parses a string with libphonenumber-js, returning `null` for input it can't parse at all. `options.defaultCountry` disambiguates a national-format number (`'0151 12345678'` needs one; `'+4915112345678'` doesn't, since the calling code already names a country). `type` is fully populated only under metadata `'max'`; `'mobile'` resolves it for numbers that are genuinely mobile, and `'min'` only for some countries. See the field's [Metadata sets](/fields/phone#metadata-sets) for the full distinction.
 
 ## Format
 
