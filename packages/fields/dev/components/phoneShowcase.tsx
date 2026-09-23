@@ -8,8 +8,12 @@ const note: React.CSSProperties = {
 	fontSize: '0.8rem',
 }
 
-export const PhoneShowcaseLabel: React.FC = () => (
-	<span className="field-label">Custom Label component</span>
+// htmlFor must match PhoneNumberField's own id convention (dots become double underscores)
+// so the label stays associated with the input it names.
+export const PhoneShowcaseLabel: React.FC<{ path?: string }> = ({ path }) => (
+	<label className="field-label" htmlFor={path && `field-${path.replace(/\./g, '__')}`}>
+		Custom Label component
+	</label>
 )
 
 export const PhoneShowcaseDescription: React.FC = () => (
