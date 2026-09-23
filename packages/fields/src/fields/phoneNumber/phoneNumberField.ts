@@ -3,7 +3,7 @@ import { keys } from '../../translations/keys'
 import { asTranslate } from '../../translations/server'
 import { isKnownCountry } from './engine/countries'
 import { loadMetadata, type PhoneMetadata } from './engine/metadata'
-import { type CountryCode, checkPhone, parsePhone } from './engine/phone'
+import { type CountryCode, checkPhone, type ParsedPhone, parsePhone } from './engine/phone'
 import {
 	type AnyPhoneNumberFieldOptions,
 	PHONE_CUSTOM_KEY,
@@ -39,6 +39,31 @@ const assertCountries = (opts: {
 		)
 	}
 }
+
+/**
+ * The values the read hook derives, driving both the group's schema and the hook itself: a
+ * name the group has no field for would otherwise be written and silently stripped.
+ */
+const DERIVED = [
+	'national',
+	'international',
+	'callingCode',
+	'uri',
+	'type',
+] as const satisfies readonly (keyof ParsedPhone)[]
+
+type DerivedPhone = Pick<ParsedPhone, (typeof DERIVED)[number]>
+
+const derivedFrom = (parsed: ParsedPhone): DerivedPhone =>
+	Object.fromEntries(DERIVED.map((key) => [key, parsed[key]])) as DerivedPhone
+
+/** Stored and derived alike stay out of the list, so the group reads as one column. */
+const subfield = (name: string, extra: { virtual?: true } = {}): TextField => ({
+	admin: { disableListColumn: true },
+	name,
+	type: 'text',
+	...extra,
+})
 
 /** Both storage shapes render through the same pair, so neither path can drift from it. */
 const phoneComponents = (fieldLayer: ResolvablePhoneFieldOptions) => ({
@@ -77,14 +102,7 @@ const buildDerivedHook =
 		const parsed = parsePhone(stored.number, { defaultCountry: stored.country, metadata })
 		if (!parsed) return value
 		// Persisted keys spread first: this hook enriches the group, it never rewrites it.
-		return {
-			...stored,
-			callingCode: parsed.callingCode,
-			international: parsed.international,
-			national: parsed.national,
-			type: parsed.type,
-			uri: parsed.uri,
-		}
+		return { ...stored, ...derivedFrom(parsed) }
 	}
 
 /** How one storage shape yields the number to check and the country to read it under. */
@@ -205,13 +223,9 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 		admin: { components: phoneComponents(fieldLayer) },
 		custom: { [PHONE_CUSTOM_KEY]: fieldLayer },
 		fields: [
-			{ admin: { disableListColumn: true }, name: 'number', type: 'text' },
-			{ admin: { disableListColumn: true }, name: 'country', type: 'text' },
-			{ admin: { disableListColumn: true }, name: 'national', type: 'text', virtual: true },
-			{ admin: { disableListColumn: true }, name: 'international', type: 'text', virtual: true },
-			{ admin: { disableListColumn: true }, name: 'callingCode', type: 'text', virtual: true },
-			{ admin: { disableListColumn: true }, name: 'uri', type: 'text', virtual: true },
-			{ admin: { disableListColumn: true }, name: 'type', type: 'text', virtual: true },
+			subfield('number'),
+			subfield('country'),
+			...DERIVED.map((name) => subfield(name, { virtual: true })),
 		],
 		hooks: { afterRead: [buildDerivedHook(fieldLayer)] },
 		validate: buildValidate({
