@@ -6,6 +6,7 @@ export type {
 } from '../fields/phoneNumber/engine/phone'
 export {
 	type AnyPhoneNumberFieldOptions,
+	countryFlagSrc,
 	FLAGS_PATH,
 	PHONE_CUSTOM_KEY,
 	type PhoneFlagMode,

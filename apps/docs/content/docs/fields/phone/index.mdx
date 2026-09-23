@@ -101,6 +101,15 @@ phoneNumberField(phone): defaultCountry "US" is not in countries
 
 `flags` chooses what the country trigger and picker rows draw: `'svg'` (default) requests real flag artwork from the plugin's own endpoint, `'emoji'` draws the two-codepoint Unicode regional-indicator sequence for the country, and `'none'` shows the ISO code instead of any artwork. Every OS that ships a flag emoji font combines that sequence into one glyph; Windows doesn't ship one, so `'emoji'` renders as two separate letter tiles there. `'svg'` has no such gap, which is why it's the default. Every flag image is decorative (`aria-hidden`), since the country name is always available beside it.
 
+To render the same artwork on your own frontend, build the URL with `countryFlagSrc`, exported from `@10x-media/fields/phone`, rather than assembling it by hand: it encodes the whole contract, including the lowercasing and the `.svg` suffix the route expects. `FLAGS_PATH` is exported alongside it for an install that needs the bare route segment.
+
+```ts
+import { countryFlagSrc } from '@10x-media/fields/phone'
+
+countryFlagSrc('https://cms.example.com', '/api', 'DE') // 'https://cms.example.com/api/10x-fields/flags/de.svg'
+countryFlagSrc('', '/api', 'DE') // '/api/10x-fields/flags/de.svg', relative when no serverURL is set
+```
+
 `'svg'` fetches from `/10x-fields/flags/:code` under the app's API base, mounted by the `fields()` plugin and served unauthenticated by design: a flag is public, static artwork identical for every caller, and the handler touches no database, user, or request scope, only an in-memory map of SVGs loaded once per process. `fields({ phoneNumber: { serveFlags: false } })` skips mounting it entirely, for an install that wants no such route; fields using `flags: 'emoji'` or `flags: 'none'` don't need it either way, since only `'svg'` calls it. Like `metadata`, `serveFlags` is install-wide only, since the route is mounted once, before any field on the config has necessarily been read.
 
 ## Overrides
