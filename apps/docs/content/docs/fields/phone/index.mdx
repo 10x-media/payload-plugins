@@ -38,7 +38,7 @@ An extension typed as `x123` after the number is accepted and reformatted while 
 
 Under `storage: 'object'`, a single `afterRead` hook (one hook, not one per subfield) parses the stored `number` and enriches the group with `national`, `international`, `callingCode`, `uri`, and `type`, without touching the persisted `number`/`country` pair. These five fields are `virtual: true`, so they exist only on read: Payload rejects a `where` clause that filters or sorts on them. Filter and sort on `number` or `country`, the two real columns, instead.
 
-`type` is libphonenumber-js's number-type classification (`'MOBILE'`, `'FIXED_LINE'`, and so on) and needs metadata beyond the default admin bundle to resolve reliably; see [Metadata sets](#metadata-sets). The subfield is always present in the schema regardless of the install's metadata, since a field's generated TypeScript type can't vary by a plugin option: it simply reads `undefined` wherever the loaded metadata can't classify the number.
+`type` is libphonenumber-js's number-type classification (`'MOBILE'`, `'FIXED_LINE'`, and so on); how reliably it resolves depends on the install's metadata set, covered in [Metadata sets](#metadata-sets). The subfield is always present in the schema regardless, since a field's generated TypeScript type can't vary by a plugin option: it simply reads `undefined` wherever the loaded metadata can't classify the number.
 
 ## Validation modes
 
@@ -62,9 +62,9 @@ phoneNumberField(phone): validation "mobile" requires metadata "max" or "mobile"
 
 ## Metadata sets
 
-`metadata` picks which of libphonenumber-js's three bundled data sets the install loads: `'max'` (default, about 145 kB, every pattern including per-number-type classification), `'min'` (about 80 kB, drops the patterns needed for `type` and for `isValid()`'s strict digit checks), and `'mobile'` (about 95 kB, tuned for validating mobile numbers specifically). It's a `fields({ phoneNumber: { metadata } })` option only, with no per-field override: the parser is a process-wide singleton, so a per-field set would mean loading several copies of it and letting two fields disagree about the same number.
+`metadata` picks which of libphonenumber-js's three bundled data sets the install loads: `'max'` (default, about 145 kB, every pattern including per-number-type classification), `'min'` (about 80 kB, drops most of the patterns needed for `type` and for `isValid()`'s strict digit checks), and `'mobile'` (about 95 kB, tuned for validating mobile numbers specifically). It's a `fields({ phoneNumber: { metadata } })` option only, with no per-field override: the parser is a process-wide singleton, so a per-field set would mean loading several copies of it and letting two fields disagree about the same number.
 
-Treat `type` as reliable only under `'max'`. Under `'min'` it is always `undefined`. Under `'mobile'` it resolves for a number that genuinely is mobile, and `undefined` otherwise, which for most countries means most non-mobile numbers read `undefined` too. This is also why `validation: 'mobile'` only accepts metadata `'max'` or `'mobile'`, covered above.
+`type` is fully populated under `'max'`. Under `'mobile'` it resolves for a number that genuinely is mobile and reads `undefined` for other line types, which is the set being mobile-only by design. Under `'min'` whether `type` resolves depends on the country: it works for some (Great Britain, the United States) and not others (Germany, France), so treat `'min'` as unable to classify at all rather than relying on it per country. This is also why `validation: 'mobile'` only accepts metadata `'max'` or `'mobile'`, covered above.
 
 ## Country restriction and pinning
 
@@ -146,7 +146,7 @@ fields plugin: phoneNumber.defaultCountry "US" is not in phoneNumber.countries.
 - An extension typed into the input is accepted and shown, but never persists: E.164 has no extension slot, so a commit drops it.
 - The five derived subfields are `virtual: true`. Payload rejects a query or sort against them; filter and sort on `number` or `country` instead.
 - `storage: 'e164'` has no `country` column, so there's no sibling field a frontend can read a derived value from; use the exported utils against the stored string.
-- `type` is only reliable under metadata `'max'`. It's always `undefined` under `'min'`, and only resolves under `'mobile'` for numbers that already are mobile.
+- `type` is fully populated only under metadata `'max'`. Under `'mobile'` it resolves for numbers that are genuinely mobile and reads `undefined` for other line types. Under `'min'` it resolves for some countries and not others, so treat it as unavailable there.
 - `metadata` and `serveFlags` are install-wide only, set through `fields({ phoneNumber: {...} })`; neither has a per-field override.
 
 ## Frontend use

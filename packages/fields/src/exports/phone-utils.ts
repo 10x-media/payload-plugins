@@ -1,5 +1,6 @@
 export {
 	type CountryOption,
+	callingCodeFor,
 	countryOptions,
 	emojiFlag,
 	isKnownCountry,
