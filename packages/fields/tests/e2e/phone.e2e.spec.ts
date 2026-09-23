@@ -12,6 +12,7 @@ const login = async (page: Page): Promise<void> => {
 
 /** The seeded values every other test reads back, restored after anything that saves. */
 const SEEDED = {
+	e164Phone: '+4915123456789',
 	phone: { country: 'DE', number: '+4930123456' },
 }
 
@@ -121,6 +122,59 @@ test.describe('phone number field', () => {
 			await expect(reopened.locator('.fields-phone__prefix')).toHaveText('+33')
 			await expect(reopened.locator('.fields-phone__input')).toHaveValue('6 12 34 56 78')
 		})
+
+		// e164 storage is the only mode that writes through setValue rather than dispatchFields,
+		// and that path had never run in a browser.
+		test('an e164 field persists the E.164 string and reads it back split', async ({ page }) => {
+			await openShowcaseDoc(page)
+			const field = phoneField(page, 'e164Phone')
+			const input = field.locator('.fields-phone__input')
+
+			await input.fill('+41446681800')
+			await input.blur()
+			await expect(field.locator('.fields-phone__prefix')).toHaveText('+41')
+			await expect(input).toHaveValue('44 668 18 00')
+
+			await saveDoc(page)
+			await page.reload()
+			const reopened = phoneField(page, 'e164Phone')
+			await expect(reopened.locator('.fields-phone__prefix')).toHaveText('+41')
+			await expect(reopened.locator('.fields-phone__input')).toHaveValue('44 668 18 00')
+		})
+	})
+
+	// A dispatched click never reproduces this: only a real one lets React flush Popup's own
+	// close between the two listeners, which is what used to unmount the row mid-click.
+	test('selects a country by clicking its row', async ({ page }) => {
+		await openShowcaseDoc(page)
+		const field = phoneField(page, 'phone')
+		await openPicker(field)
+
+		await panel(page).locator('.fields-phone__search-input').fill('switzer')
+		await panel(page).locator('.fields-phone__option').first().click()
+
+		await expect(panel(page)).toHaveCount(0)
+		await expect(field.locator('.fields-phone__prefix')).toHaveText('+41')
+		await expect(field.locator('.fields-phone__sr-only')).toHaveText('Country: Switzerland')
+	})
+
+	// The unit test proves scrollToIndex was called, not that the row is readable. Dropping
+	// its `align: 'center'` leaves the row flush against the list's edge with that test green.
+	test('centres the stored country when the picker opens on it', async ({ page }) => {
+		await openShowcaseDoc(page)
+		const field = phoneField(page, 'usDefault')
+		await openPicker(field)
+
+		const list = panel(page).locator('.fields-phone__list')
+		const active = panel(page).locator('.fields-phone__option[data-active="true"]')
+		await expect(active.locator('.fields-phone__option-name')).toHaveText('United States')
+
+		const listBox = await list.boundingBox()
+		const activeBox = await active.boundingBox()
+		if (!listBox || !activeBox) throw new Error('the picker list did not lay out')
+		const offset = Math.abs(activeBox.y + activeBox.height / 2 - (listBox.y + listBox.height / 2))
+		// Aligned to the nearest edge instead, the row sits about 119px off centre.
+		expect(offset).toBeLessThan(40)
 	})
 
 	test('the flag artwork endpoint really serves an SVG, not just an unbroken img element', async ({
