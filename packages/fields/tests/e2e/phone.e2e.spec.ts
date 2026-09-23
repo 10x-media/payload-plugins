@@ -136,6 +136,25 @@ test.describe('phone number field', () => {
 		expect(res.headers()['content-type']).toContain('image/svg+xml')
 	})
 
+	test('list view renders each cellFormat and flag mode', async ({ page }) => {
+		await page.goto(`/admin/collections/${FIXTURES.collection}`)
+
+		const phoneCell = page.locator('.cell-phone').first()
+		await expect(phoneCell).toHaveText('+49 30 123456')
+		await expect(phoneCell.locator('img')).toHaveAttribute('src', /\/flags\/de\.svg$/)
+
+		await expect(page.locator('.cell-nationalCell').first()).toHaveText('(11) 5525-6325')
+		await expect(page.locator('.cell-e164Cell').first()).toHaveText('+61499999999')
+
+		const emojiCell = page.locator('.cell-emojiFlags').first()
+		await expect(emojiCell).toHaveText(`${String.fromCodePoint(0x1f1eb, 0x1f1f7)}+33 6 12 34 56 78`)
+		await expect(emojiCell.locator('img')).toHaveCount(0)
+
+		const noFlagsCell = page.locator('.cell-noFlags').first()
+		await expect(noFlagsCell).toHaveText('+43 664 123456')
+		await expect(noFlagsCell.locator('img')).toHaveCount(0)
+	})
+
 	test('the clear control empties the field, drops the button, and refocuses the input', async ({
 		page,
 	}) => {
