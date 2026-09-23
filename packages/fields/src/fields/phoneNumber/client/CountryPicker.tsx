@@ -302,7 +302,8 @@ export const CountryPicker: React.FC<CountryPickerProps> = ({
 					{renderFace()}
 					<span className={`${baseClass}__sr-only`}>{label}</span>
 					<span aria-hidden="true" className={`${baseClass}__caret`}>
-						<ChevronIcon />
+						{/* Unsized, the icon is --base tall and overflows its 12px box downwards */}
+						<ChevronIcon size="small" />
 					</span>
 				</>
 			}

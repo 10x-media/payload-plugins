@@ -9,7 +9,7 @@
 	gap: 6px;
 	width: 100%;
 	height: 40px;
-	padding: 0 8px 0 6px;
+	padding: 0 8px 0 4px;
 	border: 1px solid var(--theme-elevation-150);
 	border-radius: var(--style-radius-s);
 	background: var(--theme-input-bg);
@@ -54,19 +54,21 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	box-shadow: none;
 }
 
-/* Popup's own root, stretched so its trigger fills the container's 40px */
+/* Popup's own root. The trigger is inset rather than stretched, so its hover fill clears the
+   container's border by the same 4px on the left, top and bottom instead of bleeding into it. */
 .fields-phone__picker {
 	display: flex;
-	align-self: stretch;
+	align-self: center;
 }
 
+/* 10px of padding puts the flag on the 15px text column every native input starts at. */
 .fields-phone__trigger {
 	display: inline-flex;
 	flex-shrink: 0;
 	align-items: center;
 	gap: 4px;
-	min-width: 34px;
-	padding: 0 4px;
+	height: 30px;
+	padding: 0 10px;
 	border: 0;
 	border-radius: var(--style-radius-s);
 	background: transparent;
@@ -91,6 +93,8 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 .fields-phone__caret {
 	display: flex;
 	flex-shrink: 0;
+	align-items: center;
+	justify-content: center;
 	width: 12px;
 	height: 12px;
 }
