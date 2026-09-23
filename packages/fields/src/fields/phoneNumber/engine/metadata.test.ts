@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_METADATA_SET, loadMetadata, type MetadataSet } from './metadata'
 
 describe('loadMetadata', () => {
@@ -36,5 +36,26 @@ describe('loadMetadata', () => {
 		const set = 'also-nope' as unknown as MetadataSet
 		await expect(loadMetadata(set)).rejects.toThrow()
 		await expect(loadMetadata(set)).rejects.toThrow()
+	})
+
+	// The case above returns before the cache is ever written, so it cannot see an eviction.
+	// This one makes the import itself fail, which is the failure the eviction exists for:
+	// a chunk a deploy briefly could not serve would otherwise poison the set for the process.
+	it('evicts a failed import, so a later call loads the set instead of inheriting the failure', async () => {
+		vi.resetModules()
+		let attempt = 0
+		vi.doMock('libphonenumber-js/metadata.min.json', () => {
+			attempt += 1
+			if (attempt === 1) throw new Error('chunk unavailable')
+			return { default: { countries: {} } }
+		})
+		try {
+			const fresh = await import('./metadata')
+			await expect(fresh.loadMetadata('min')).rejects.toThrow()
+			await expect(fresh.loadMetadata('min')).resolves.toEqual({ countries: {} })
+		} finally {
+			vi.doUnmock('libphonenumber-js/metadata.min.json')
+			vi.resetModules()
+		}
 	})
 })
