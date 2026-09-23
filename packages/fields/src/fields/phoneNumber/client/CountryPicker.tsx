@@ -19,6 +19,11 @@ const baseClass = 'fields-phone'
 const ROW_HEIGHT = 34
 const estimateRow = () => ROW_HEIGHT
 
+// The cap is published from here rather than written into the stylesheet: a fractional one
+// clips the last row against the panel edge, which reads as tighter padding at the bottom.
+const VISIBLE_ROWS = 8
+const LIST_MAX_HEIGHT = ROW_HEIGHT * VISIBLE_ROWS
+
 export type CountryOptionGroups = {
 	priority: CountryOption[]
 	rest: CountryOption[]
@@ -188,7 +193,13 @@ const CountryPanel: React.FC<CountryPanelProps> = ({
 					value={query}
 				/>
 			</div>
-			<div className={`${baseClass}__list`} id={listId} ref={listRef} {...listA11y}>
+			<div
+				className={`${baseClass}__list`}
+				id={listId}
+				ref={listRef}
+				style={{ maxHeight: LIST_MAX_HEIGHT }}
+				{...listA11y}
+			>
 				{populated ? (
 					<div
 						role="presentation"

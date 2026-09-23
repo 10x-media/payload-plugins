@@ -185,10 +185,10 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 
 /* Payload portals popup content to document.body, and caps that scroll container at
    calc(var(--base) * 10); a country list is taller than that and would be clipped behind
-   a hidden scrollbar. The panel bounds its own height, and this lifts the outer cap to
-   match so only the list itself ever scrolls. */
+   a hidden scrollbar. The panel already bounds its own height, so the outer cap comes off
+   entirely rather than being kept in step with it by arithmetic. */
 .popup__scroll-container:has(> .fields-phone__panel) {
-	max-height: 340px;
+	max-height: none;
 }
 
 /* The gap matches Popup's own content padding, so the search clears the panel edge by the
@@ -240,10 +240,8 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	color: var(--theme-elevation-400);
 }
 
-/* Eight whole rows of 34px: a fractional cap clips the last one against the panel edge,
-   which reads as the bottom padding being tighter than the top. */
+/* max-height comes from the component, off the same row height the virtualizer measures with. */
 .fields-phone__list {
-	max-height: 272px;
 	overflow-y: auto;
 }
 
