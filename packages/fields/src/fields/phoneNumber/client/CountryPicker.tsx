@@ -85,8 +85,10 @@ const CountryPanel: React.FC<CountryPanelProps> = ({
 	const searchRef = useRef<HTMLInputElement>(null)
 	const listId = useId()
 
+	// The panel is portalled to the body and absolutely positioned, so a plain focus scrolls
+	// the page to it and drags the row the viewer is reading out from under them.
 	useEffect(() => {
-		searchRef.current?.focus()
+		searchRef.current?.focus({ preventScroll: true })
 	}, [])
 
 	const rows = useMemo(
