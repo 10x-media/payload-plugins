@@ -927,6 +927,17 @@ describe('PhoneNumberField', () => {
 		rendered.unmount()
 	})
 
+	// Every other committing case flushes the metadata first, so the field's whole degraded
+	// mode went unexercised: with no parser loaded a commit has to store the draft verbatim.
+	it('commits the trimmed draft verbatim while the metadata is still loading', () => {
+		const rendered = render(element({ phoneOptions: { defaultCountry: 'DE' } }))
+		type('  0151 12345678  ')
+		fireEvent.blur(input())
+		expect(writesTo('phone.number')).toEqual(['0151 12345678'])
+		expect(writesTo('phone.country')).toEqual(['DE'])
+		rendered.unmount()
+	})
+
 	it('activates formatting once the metadata lands, without losing the draft', async () => {
 		const rendered = render(element({ phoneOptions: { defaultCountry: 'DE' } }))
 		type('1511234')
