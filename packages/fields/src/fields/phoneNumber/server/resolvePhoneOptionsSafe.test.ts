@@ -50,4 +50,34 @@ describe('resolvePhoneOptionsSafe', () => {
 			expect(resolvePhoneOptionsSafe({ fieldOptions: {}, payload }).metadata).toBe(set)
 		}
 	})
+
+	// Exact equality over the whole bag rather than one key at a time: countries,
+	// priorityCountries and priorityCountriesLabel each had no case of their own, so
+	// dropping any of their `?? global?.` fallbacks left the suite green.
+	it('falls back to the plugin layer for every key the field leaves unset', () => {
+		const payload = payloadWithRegistry({
+			phoneNumber: {
+				cellFormat: 'national',
+				countries: ['AT', 'CH', 'DE'],
+				defaultCountry: 'AT',
+				flags: 'emoji',
+				metadata: 'mobile',
+				priorityCountries: ['CH'],
+				priorityCountriesLabel: 'Popular',
+				validation: 'possible',
+			},
+		})
+		expect(resolvePhoneOptionsSafe({ fieldOptions: {}, payload })).toEqual({
+			cellFormat: 'national',
+			countries: ['AT', 'CH', 'DE'],
+			defaultCountry: 'AT',
+			flags: 'emoji',
+			isClearable: true,
+			metadata: 'mobile',
+			priorityCountries: ['CH'],
+			priorityCountriesLabel: 'Popular',
+			storage: 'object',
+			validation: 'possible',
+		})
+	})
 })
