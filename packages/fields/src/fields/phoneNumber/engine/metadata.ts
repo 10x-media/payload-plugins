@@ -16,6 +16,9 @@ const loaders: Record<MetadataSet, () => Promise<{ default: PhoneMetadata }>> = 
 	mobile: () => import('libphonenumber-js/metadata.mobile.json'),
 }
 
+/** Whether a string is one of the sets `loadMetadata` can actually load. */
+export const isMetadataSet = (value: string): value is MetadataSet => value in loaders
+
 const cache = new Map<MetadataSet, Promise<PhoneMetadata>>()
 
 /** A rejection is evicted so a later call retries instead of inheriting the failure. */

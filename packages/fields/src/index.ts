@@ -7,6 +7,8 @@ import {
 } from './fields/encrypted/queryRewrite'
 import { registerIcon } from './fields/icon/plugin'
 import { resolvePrecision } from './fields/measurement/engine/precision'
+import { isKnownCountry } from './fields/phoneNumber/engine/countries'
+import { isMetadataSet } from './fields/phoneNumber/engine/metadata'
 import { FLAGS_ENDPOINT_PATH, makeFlagsHandler } from './fields/phoneNumber/server/flagsEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setFieldsRegistry } from './plugin/registry'
@@ -77,6 +79,23 @@ const normalizeRegistry = (options: FieldsPluginOptions): FieldsPluginRegistry =
 	}
 	if (options.phoneNumber) {
 		const { countries, defaultCountry, metadata, validation } = options.phoneNumber
+		for (const code of countries ?? []) {
+			if (!isKnownCountry(code)) {
+				throw new Error(
+					`fields plugin: phoneNumber.countries entry "${code}" is not a supported country.`
+				)
+			}
+		}
+		if (defaultCountry !== undefined && !isKnownCountry(defaultCountry)) {
+			throw new Error(
+				`fields plugin: phoneNumber.defaultCountry "${defaultCountry}" is not a supported country.`
+			)
+		}
+		if (metadata !== undefined && !isMetadataSet(metadata)) {
+			throw new Error(
+				`fields plugin: phoneNumber.metadata "${metadata}" must be "max", "min", or "mobile".`
+			)
+		}
 		if (validation === 'mobile' && metadata === 'min') {
 			throw new Error(
 				"fields plugin: phoneNumber.validation 'mobile' needs metadata 'max' or 'mobile'; 'min' carries no number types."

@@ -2,6 +2,8 @@ import type { Config, SanitizedConfig } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { lucideAdapter } from './fields/icon/adapters/lucide/adapter'
+import type { MetadataSet } from './fields/phoneNumber/engine/metadata'
+import type { CountryCode } from './fields/phoneNumber/engine/phone'
 import { fields } from './index'
 import { getFieldsRegistry } from './plugin/registry'
 import { keys } from './translations'
@@ -101,6 +103,24 @@ describe('fields factory', () => {
 		expect(() =>
 			fields({ phoneNumber: { countries: ['US', 'CA'], defaultCountry: 'FR' } })(fakeConfig())
 		).toThrow(/phoneNumber\.defaultCountry/)
+	})
+
+	it('throws at plugin build when a phoneNumber.countries entry is not a supported country', () => {
+		expect(() =>
+			fields({ phoneNumber: { countries: ['US', 'ZZ' as CountryCode] } })(fakeConfig())
+		).toThrow(/phoneNumber\.countries/)
+	})
+
+	it('throws at plugin build when phoneNumber.defaultCountry is not a supported country', () => {
+		expect(() =>
+			fields({ phoneNumber: { defaultCountry: 'ZZ' as CountryCode } })(fakeConfig())
+		).toThrow(/phoneNumber\.defaultCountry/)
+	})
+
+	it('throws at plugin build when phoneNumber.metadata is not a supported set', () => {
+		expect(() =>
+			fields({ phoneNumber: { metadata: 'nope' as MetadataSet } })(fakeConfig())
+		).toThrow(/phoneNumber\.metadata/)
 	})
 
 	it('writes a valid phoneNumber config to the registry', () => {

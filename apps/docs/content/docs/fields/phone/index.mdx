@@ -128,10 +128,18 @@ fields({
 })
 ```
 
-`label`, `required`, `localized`, `index`, and `isClearable` have no plugin-level form: they're inherently per-field, so they're only ever set on `phoneNumberField()` itself. Setting `defaultCountry` and `countries` at the plugin level is checked the same way as on a field, throwing when the plugin builds if `defaultCountry` isn't in `countries`:
+`label`, `required`, `localized`, `index`, and `isClearable` have no plugin-level form: they're inherently per-field, so they're only ever set on `phoneNumberField()` itself. Setting `defaultCountry` and `countries` at the plugin level is checked the same way as on a field: every `countries` entry and `defaultCountry` itself must be a real, known country, and `defaultCountry` must be in `countries` when both are set, each throwing when the plugin builds:
 
 ```
+fields plugin: phoneNumber.countries entry "ZZ" is not a supported country.
+fields plugin: phoneNumber.defaultCountry "ZZ" is not a supported country.
 fields plugin: phoneNumber.defaultCountry "US" is not in phoneNumber.countries.
+```
+
+`metadata` is checked against its three-value union too, throwing the same way:
+
+```
+fields plugin: phoneNumber.metadata "nope" must be "max", "min", or "mobile".
 ```
 
 ## Options
