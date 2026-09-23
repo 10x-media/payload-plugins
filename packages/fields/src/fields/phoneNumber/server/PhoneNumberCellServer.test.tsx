@@ -5,6 +5,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FIELDS_REGISTRY_KEY } from '../../../plugin/registry'
 import { PHONE_CUSTOM_KEY, type ResolvablePhoneFieldOptions } from '../options'
 
+// The happy path keeps the real loader; one case swaps in a rejection to prove the degrade.
+vi.mock('../engine/metadata', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../engine/metadata')>()
+	return { ...actual, loadMetadata: vi.fn(actual.loadMetadata) }
+})
+
+const { loadMetadata } = await import('../engine/metadata')
 const { PhoneNumberCellServer } = await import('./PhoneNumberCellServer')
 
 const DE_E164 = '+4915112345678'
@@ -37,7 +44,10 @@ const buildProps = (args: {
 })
 
 describe('PhoneNumberCellServer', () => {
-	afterEach(cleanup)
+	afterEach(() => {
+		cleanup()
+		vi.mocked(loadMetadata).mockClear()
+	})
 
 	it.each([
 		['e164', DE_E164],
@@ -107,6 +117,37 @@ describe('PhoneNumberCellServer', () => {
 		)
 		render(node)
 		expect(screen.getByText('not-a-phone-number')).toBeDefined()
+	})
+
+	// A rejected chunk must cost this one cell, not the list page: there is no error boundary above it.
+	it('degrades to the raw value and logs when the metadata load rejects', async () => {
+		vi.mocked(loadMetadata).mockRejectedValueOnce(new Error('chunk failed'))
+		const payload = fakePayload()
+		const node = await PhoneNumberCellServer(
+			buildProps({
+				cellData: DE_E164,
+				payload,
+				phoneOptions: { cellFormat: 'national', flags: 'none' },
+			})
+		)
+		render(node)
+		expect(screen.getByText(DE_E164)).toBeDefined()
+		expect(payload.logger.error).toHaveBeenCalledWith(
+			{ err: expect.any(Error) },
+			'[fields] phoneNumber metadata failed to load for a list cell'
+		)
+	})
+
+	it('degrades to the raw value for a metadata set that does not exist', async () => {
+		const node = await PhoneNumberCellServer(
+			buildProps({
+				cellData: DE_E164,
+				payload: fakePayload({ metadata: 'nope' }),
+				phoneOptions: { cellFormat: 'national', flags: 'none' },
+			})
+		)
+		render(node)
+		expect(screen.getByText(DE_E164)).toBeDefined()
 	})
 
 	it('still flags the stored country when the number itself fails to parse', async () => {

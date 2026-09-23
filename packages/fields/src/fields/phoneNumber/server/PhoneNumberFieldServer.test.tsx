@@ -128,9 +128,14 @@ describe('PhoneNumberFieldServer', () => {
 
 	// A rejected chunk, or an out-of-union metadata set from unvalidated config, must cost the
 	// first frame rather than the whole edit view: there is no error boundary above this.
-	it('degrades to no seed when the metadata load rejects', async () => {
+	it('degrades to no seed and logs when the metadata load rejects', async () => {
 		vi.mocked(loadMetadata).mockRejectedValueOnce(new Error('chunk failed'))
-		expect(await seedOf(buildProps({ siblingData: { phone: DE_E164 } }))).toBeNull()
+		const payload = fakePayload()
+		expect(await seedOf(buildProps({ payload, siblingData: { phone: DE_E164 } }))).toBeNull()
+		expect(payload.logger.error).toHaveBeenCalledWith(
+			{ err: expect.any(Error) },
+			'[fields] phoneNumber metadata failed to load for a field seed'
+		)
 	})
 
 	it('degrades to no seed for a metadata set that does not exist', async () => {

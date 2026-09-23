@@ -66,8 +66,18 @@ export const PhoneNumberCellServer = async (props: PhoneNumberCellServerComponen
 		typeof cellData === 'object' && cellData?.country
 			? (cellData.country as CountryCode)
 			: undefined
-	const metadata = await loadMetadata(resolved.metadata)
-	const parsed = parsePhone(raw, { defaultCountry: storedCountry, metadata })
+	// An async server component that throws has no error boundary of its own here; a rejected
+	// chunk degrades this one cell to the raw value instead of failing the whole list page.
+	let parsed: ParsedPhone | null = null
+	try {
+		const metadata = await loadMetadata(resolved.metadata)
+		parsed = parsePhone(raw, { defaultCountry: storedCountry, metadata })
+	} catch (error) {
+		payload.logger.error(
+			{ err: error },
+			'[fields] phoneNumber metadata failed to load for a list cell'
+		)
+	}
 	const country = parsed?.country ?? storedCountry
 
 	return (

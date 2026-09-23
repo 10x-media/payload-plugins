@@ -45,7 +45,11 @@ export const PhoneNumberFieldServer = async (props: PhoneNumberFieldServerCompon
 		try {
 			const metadata = await loadMetadata(resolved.metadata)
 			seed = phoneSeed(raw, { defaultCountry: resolved.defaultCountry, metadata })
-		} catch {
+		} catch (error) {
+			req.payload.logger.error(
+				{ err: error },
+				'[fields] phoneNumber metadata failed to load for a field seed'
+			)
 			// The seed is an optimization; a failed load degrades the first frame, never the view
 			seed = null
 		}
