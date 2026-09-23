@@ -40,6 +40,18 @@ const assertCountries = (opts: {
 	}
 }
 
+/** Both storage shapes render through the same pair, so neither path can drift from it. */
+const phoneComponents = (fieldLayer: ResolvablePhoneFieldOptions) => ({
+	Cell: {
+		clientProps: { phoneOptions: fieldLayer },
+		path: '@10x-media/fields/rsc#PhoneNumberCellServer',
+	},
+	Field: {
+		clientProps: { phoneOptions: fieldLayer },
+		path: '@10x-media/fields/rsc#PhoneNumberFieldServer',
+	},
+})
+
 /** Configuration errors return a message rather than throw: writes must fail either way. */
 const mobileMetadataMismatch = (name: string): string =>
 	`phoneNumberField(${name}): validation "mobile" requires metadata "max" or "mobile", but this install is configured "min"`
@@ -171,18 +183,7 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 			...(required !== undefined ? { required } : {}),
 			...(localized !== undefined ? { localized } : {}),
 			...(index !== undefined ? { index } : {}),
-			admin: {
-				components: {
-					Cell: {
-						clientProps: { phoneOptions: fieldLayer },
-						path: '@10x-media/fields/rsc#PhoneNumberCellServer',
-					},
-					Field: {
-						clientProps: { phoneOptions: fieldLayer },
-						path: '@10x-media/fields/rsc#PhoneNumberFieldServer',
-					},
-				},
-			},
+			admin: { components: phoneComponents(fieldLayer) },
 			custom: { [PHONE_CUSTOM_KEY]: fieldLayer },
 			validate: buildValidate({
 				fieldLayer,
@@ -201,18 +202,7 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 		...(required !== undefined ? { required } : {}),
 		...(localized !== undefined ? { localized } : {}),
 		...(index !== undefined ? { index } : {}),
-		admin: {
-			components: {
-				Cell: {
-					clientProps: { phoneOptions: fieldLayer },
-					path: '@10x-media/fields/rsc#PhoneNumberCellServer',
-				},
-				Field: {
-					clientProps: { phoneOptions: fieldLayer },
-					path: '@10x-media/fields/rsc#PhoneNumberFieldServer',
-				},
-			},
-		},
+		admin: { components: phoneComponents(fieldLayer) },
 		custom: { [PHONE_CUSTOM_KEY]: fieldLayer },
 		fields: [
 			{ admin: { disableListColumn: true }, name: 'number', type: 'text' },
