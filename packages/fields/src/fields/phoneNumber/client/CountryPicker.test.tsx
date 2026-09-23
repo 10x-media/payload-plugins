@@ -211,6 +211,19 @@ describe('CountryPicker', () => {
 		expect(screen.queryAllByRole('option')).toHaveLength(0)
 	})
 
+	// The panel is portalled to the body and absolutely positioned, so a plain focus scrolls
+	// the page to it and drags the row the viewer is reading out from under them.
+	it('focuses the search on open, without scrolling the page to the panel', () => {
+		const focus = vi.spyOn(HTMLInputElement.prototype, 'focus')
+		try {
+			renderPicker()
+			open()
+			expect(focus).toHaveBeenCalledWith({ preventScroll: true })
+		} finally {
+			focus.mockRestore()
+		}
+	})
+
 	it('lists the priority countries above the rest, heading them with the given label', () => {
 		renderPicker({ priorityLabel: 'Popular' })
 		open()
