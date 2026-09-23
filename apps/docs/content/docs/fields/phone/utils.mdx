@@ -82,9 +82,9 @@ formatAsYouType('+491511234', undefined, { metadata }) // '+49 1511 234'
 ## Countries
 
 ```ts
-countryOptions({ locale: 'en-US', metadata, countries: ['DE', 'FR', 'US'], preferredCountries: ['US'] })
+countryOptions({ locale: 'en-US', metadata, countries: ['DE', 'FR', 'US'], priorityCountries: ['US'] })
 // {
-//   preferred: [{ callingCode: '1', code: 'US', name: 'United States' }],
+//   priority: [{ callingCode: '1', code: 'US', name: 'United States' }],
 //   rest: [
 //     { callingCode: '33', code: 'FR', name: 'France' },
 //     { callingCode: '49', code: 'DE', name: 'Germany' },
@@ -99,7 +99,7 @@ callingCodeFor('DE', metadata) // '49'
 callingCodeFor('US', metadata) // '1'
 ```
 
-`countryOptions(args)` builds the picker's own list: `rest` alphabetized by localized country name via `Intl.DisplayNames`, `preferred` kept in the order given and excluded from `rest`. `emojiFlag(code)` derives the two-codepoint regional-indicator sequence arithmetically, no artwork involved; see the field's [Flags](/fields/phone#flags) section for why that sequence renders as two letters on Windows. `isKnownCountry(code)` checks against `KNOWN_COUNTRY_CODES`, every country libphonenumber-js ships, identical across all three metadata sets; it's synchronous and needs no `loadMetadata` first, so it's safe for a config-time guard.
+`countryOptions(args)` builds the picker's own list: `rest` alphabetized by localized country name via `Intl.DisplayNames`, `priority` kept in the order given and excluded from `rest`. `emojiFlag(code)` derives the two-codepoint regional-indicator sequence arithmetically, no artwork involved; see the field's [Flags](/fields/phone#flags) section for why that sequence renders as two letters on Windows. `isKnownCountry(code)` checks against `KNOWN_COUNTRY_CODES`, every country libphonenumber-js ships, identical across all three metadata sets; it's synchronous and needs no `loadMetadata` first, so it's safe for a config-time guard.
 
 `callingCodeFor(code, metadata)` looks up a country's calling code directly, without parsing a number: it's a property of the country itself, so it holds even for a code the field's own `countries` allowlist doesn't offer. It returns `undefined` rather than throwing for a code the given metadata set doesn't carry, so a frontend building its own country input can call it unconditionally.
 

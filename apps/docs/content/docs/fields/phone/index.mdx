@@ -11,7 +11,8 @@ phoneNumberField({
   storage: 'object',                   // 'object' (default): group of number + country + 5 derived fields. 'e164': plain text field, see Storage shapes
   defaultCountry: 'DE',                // dial-code and picker default while the field is empty
   countries: ['AT', 'CH', 'DE', 'FR'], // scopes the picker only; a number outside this list still parses, validates and saves
-  preferredCountries: ['DE', 'AT'],    // pinned above the rest of the list, in this order
+  priorityCountries: ['DE', 'AT'],     // pinned above the rest of the list, in this order
+  priorityCountriesLabel: 'Popular',   // optional heading over the pinned group; string or per-locale map. No label, no heading: just the group divider
   validation: 'valid',                 // 'possible' | 'valid' (default) | 'mobile'; 'mobile' needs metadata 'max' or 'mobile'
   flags: 'svg',                        // 'svg' (default, served by the plugin's endpoint) | 'emoji' (renders as letters on Windows) | 'none'
   cellFormat: 'international',         // list column format: 'national' | 'international' (default) | 'e164'
@@ -82,7 +83,7 @@ phoneNumberField(phone): validation "mobile" requires metadata "max" or "mobile"
 phoneNumberField(phone): countries entry "ZZ" is not a supported country
 ```
 
-`preferredCountries` pins a subset above the alphabetized rest, in the order given, and both narrow correctly together: a preferred country outside `countries` is dropped rather than shown out of scope.
+`priorityCountries` pins a subset above the alphabetized rest, in the order given, and both narrow correctly together: a priority country outside `countries` is dropped rather than shown out of scope. `priorityCountriesLabel` headings that pinned group in the picker, a string or a per-locale map resolved the same way as the field's own `label`; leaving it unset renders no heading at all, since the field never invents wording like "Frequently used" on the integrator's behalf. Either way the pinned group still reads as distinct from the rest of the list: a plain divider marks the split whether or not a label is set.
 
 `defaultCountry` seeds the picker and the calling-code prefix while the field is empty. It has to be a real, known country too:
 
@@ -126,7 +127,8 @@ fields({
   phoneNumber: {
     defaultCountry: 'DE',                 // same meaning as the field option; a field's own value always wins
     countries: ['AT', 'CH', 'DE', 'FR'],
-    preferredCountries: ['DE', 'AT', 'CH'],
+    priorityCountries: ['DE', 'AT', 'CH'],
+    priorityCountriesLabel: 'Popular',
     validation: 'valid',
     flags: 'svg',
     cellFormat: 'international',
@@ -158,7 +160,8 @@ fields plugin: phoneNumber.metadata "nope" must be "max", "min", or "mobile".
 | `storage` | `'object'` | `'object'` returns a `GroupField`; `'e164'` returns a `TextField`. Fixed per field; not resolvable from the plugin. |
 | `defaultCountry` | none | Picker and calling-code default while the field is empty. Must be in `countries` when both are set on the same field. Also consulted by `storage: 'e164'` validation, but not `storage: 'object'`; see [Storage shapes](#storage-shapes). |
 | `countries` | every supported country | Scopes the picker only; see [Country restriction and pinning](#country-restriction-and-pinning). |
-| `preferredCountries` | none | Pinned above the rest of the picker list, in the given order. |
+| `priorityCountries` | none | Pinned above the rest of the picker list, in the given order. |
+| `priorityCountriesLabel` | none | Heading over the pinned group; a string or a per-locale map. No label, no heading: just the group divider. |
 | `validation` | `'valid'` | `'possible'` \| `'valid'` \| `'mobile'`. `'mobile'` requires metadata `'max'` or `'mobile'`. |
 | `flags` | `'svg'` | `'svg'` \| `'emoji'` \| `'none'`. See [Flags](#flags). |
 | `cellFormat` | `'international'` | List column format: `'national'` \| `'international'` \| `'e164'`. |
