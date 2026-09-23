@@ -43,3 +43,14 @@ describe.skipIf(!hasDist)('phone metadata dist laziness', () => {
 		expect([...externals]).toContain('libphonenumber-js/core')
 	})
 })
+
+describe.skipIf(!hasDist)('phone flag artwork dist laziness', () => {
+	// The ~266-module country-flag-icons barrel must stay behind the dynamic import in
+	// flagsEndpoint.ts; this is the property that comment claims.
+	it('index.js never statically reaches country-flag-icons', () => {
+		const offenders = [...collectExternals(join(distDir, 'index.js'))].filter((specifier) =>
+			specifier.startsWith('country-flag-icons')
+		)
+		expect(offenders).toEqual([])
+	})
+})
