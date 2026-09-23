@@ -224,6 +224,14 @@ describe('CountryPicker', () => {
 		}
 	})
 
+	// Without this attribute, Payload's Popup closes on the click before the row's onClick
+	// fires, and mouse selection of a country silently does nothing.
+	it('opts the panel out of Popup closing on an inner click', () => {
+		renderPicker()
+		open()
+		expect(panel().hasAttribute('data-popup-prevent-close')).toBe(true)
+	})
+
 	it('lists the priority countries above the rest, heading them with the given label', () => {
 		renderPicker({ priorityLabel: 'Popular' })
 		open()
