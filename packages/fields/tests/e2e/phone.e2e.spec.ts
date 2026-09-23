@@ -10,14 +10,23 @@ const login = async (page: Page): Promise<void> => {
 	expect(res.ok()).toBeTruthy()
 }
 
-const openShowcaseDoc = async (page: Page): Promise<void> => {
+/** The seeded values every other test reads back, restored after anything that saves. */
+const SEEDED = {
+	phone: { country: 'DE', number: '+4930123456' },
+}
+
+const showcaseId = async (page: Page): Promise<string> => {
 	const res = await page.request.get(
 		`/api/${FIXTURES.collection}?where[title][equals]=${FIXTURES.docTitle}&limit=1`
 	)
 	const { docs } = (await res.json()) as { docs: { id: string }[] }
 	const doc = docs[0]
 	if (!doc) throw new Error(`no ${FIXTURES.collection} doc titled ${FIXTURES.docTitle}`)
-	await page.goto(`/admin/collections/${FIXTURES.collection}/${doc.id}`)
+	return doc.id
+}
+
+const openShowcaseDoc = async (page: Page): Promise<void> => {
+	await page.goto(`/admin/collections/${FIXTURES.collection}/${await showcaseId(page)}`)
 	await expect(page.locator('#field-phone')).toBeVisible()
 }
 
@@ -76,42 +85,42 @@ test.describe('phone number field', () => {
 		await expect(field.locator('.fields-phone__sr-only')).toHaveText('Country: United States')
 	})
 
-	test('entering an international number in one shot switches the country, reformats, and persists', async ({
-		page,
-	}) => {
-		await openShowcaseDoc(page)
-		const field = phoneField(page, 'phone')
-		const input = field.locator('.fields-phone__input')
-
-		// A single .fill() commits the whole string in one change event, the same shape a
-		// paste produces; the field has no onPaste handler, so this exercises the identical path.
-		await input.fill('+33612345678')
-		await expect(field.locator('.fields-phone__flag')).toHaveAttribute('src', /\/flags\/fr\.svg/)
-		await expect(input).toHaveValue('+33 6 12 34 56 78')
-
-		await input.blur()
-		// Blur re-splits the international draft: the calling code moves back into its own
-		// prefix span and the input keeps only the national digits.
-		await expect(field.locator('.fields-phone__prefix')).toHaveText('+33')
-		await expect(input).toHaveValue('6 12 34 56 78')
-
-		await saveDoc(page)
-		await page.reload()
-		const reopened = phoneField(page, 'phone')
-		await expect(reopened.locator('.fields-phone__prefix')).toHaveText('+33')
-		await expect(reopened.locator('.fields-phone__input')).toHaveValue('6 12 34 56 78')
-
-		// Restore the seed so later runs against this database start from the documented value.
-		const res = await page.request.get(
-			`/api/${FIXTURES.collection}?where[title][equals]=${FIXTURES.docTitle}&limit=1`
-		)
-		const { docs } = (await res.json()) as { docs: { id: string }[] }
-		const id = docs[0]?.id
-		if (!id) throw new Error('showcase doc vanished mid-test')
-		const restored = await page.request.patch(`/api/${FIXTURES.collection}/${id}`, {
-			data: { phone: { country: 'DE', number: '+4930123456' } },
+	// These save. Restoring inside the test would be skipped by a failure before it, leaving
+	// another number behind to fail the list-view test on the next run and mask the real one.
+	test.describe('persisting', () => {
+		test.afterEach(async ({ page }) => {
+			const res = await page.request.patch(
+				`/api/${FIXTURES.collection}/${await showcaseId(page)}`,
+				{ data: SEEDED }
+			)
+			expect(res.ok()).toBeTruthy()
 		})
-		expect(restored.ok()).toBeTruthy()
+
+		test('entering an international number in one shot switches the country, reformats, and persists', async ({
+			page,
+		}) => {
+			await openShowcaseDoc(page)
+			const field = phoneField(page, 'phone')
+			const input = field.locator('.fields-phone__input')
+
+			// A single .fill() commits the whole string in one change event, the same shape a
+			// paste produces; the field has no onPaste handler, so this exercises the identical path.
+			await input.fill('+33612345678')
+			await expect(field.locator('.fields-phone__flag')).toHaveAttribute('src', /\/flags\/fr\.svg/)
+			await expect(input).toHaveValue('+33 6 12 34 56 78')
+
+			await input.blur()
+			// Blur re-splits the international draft: the calling code moves back into its own
+			// prefix span and the input keeps only the national digits.
+			await expect(field.locator('.fields-phone__prefix')).toHaveText('+33')
+			await expect(input).toHaveValue('6 12 34 56 78')
+
+			await saveDoc(page)
+			await page.reload()
+			const reopened = phoneField(page, 'phone')
+			await expect(reopened.locator('.fields-phone__prefix')).toHaveText('+33')
+			await expect(reopened.locator('.fields-phone__input')).toHaveValue('6 12 34 56 78')
+		})
 	})
 
 	test('the flag artwork endpoint really serves an SVG, not just an unbroken img element', async ({
