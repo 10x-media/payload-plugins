@@ -1,4 +1,4 @@
-import type { FieldHook, GroupField, TextField, TextFieldValidation, Validate } from 'payload'
+import type { FieldHook, GroupField, TextField, Validate } from 'payload'
 import { keys } from '../../translations/keys'
 import { asTranslate } from '../../translations/server'
 import { isKnownCountry } from './engine/countries'
@@ -10,6 +10,7 @@ import {
 	type PhoneNumberE164FieldOptions,
 	type PhoneNumberFieldOptions,
 	type ResolvablePhoneFieldOptions,
+	type ResolvedPhoneOptions,
 } from './options'
 import { resolvePhoneOptionsSafe } from './server/resolvePhoneOptionsSafe'
 
@@ -74,46 +75,39 @@ const buildDerivedHook =
 		}
 	}
 
-const buildValidate =
-	(opts: { fieldLayer: ResolvablePhoneFieldOptions; name: string; required: boolean }): Validate =>
-	async (value, args) => {
-		const stored = (value ?? {}) as { country?: CountryCode; number?: string }
-		const raw = typeof stored.number === 'string' ? stored.number : ''
-		const resolved = resolvePhoneOptionsSafe({
-			fieldOptions: opts.fieldLayer,
-			payload: args.req.payload,
-		})
-		const check = checkPhone(raw, resolved.validation, {
-			defaultCountry: stored.country,
-			metadata: await loadMetadata(resolved.metadata),
-		})
-		if (check === 'empty') {
-			return opts.required ? asTranslate(args.req.t)(keys.phoneRequired) : true
-		}
-		if (check === 'notMobile') {
-			if (resolved.validation === 'mobile' && resolved.metadata === 'min') {
-				return mobileMetadataMismatch(opts.name)
-			}
-			return asTranslate(args.req.t)(keys.phoneNotMobile)
-		}
-		if (check === 'invalid') return asTranslate(args.req.t)(keys.invalidPhoneNumber)
-		return true
-	}
+/** How one storage shape yields the number to check and the country to read it under. */
+type PhoneInputReader = (
+	value: unknown,
+	resolved: ResolvedPhoneOptions
+) => { country: CountryCode | undefined; raw: string }
 
-const buildTextValidate =
+/** Object storage keeps the country beside the number, so the stored row speaks for itself. */
+const readStoredPhone: PhoneInputReader = (value) => {
+	const stored = (value ?? {}) as { country?: CountryCode; number?: string }
+	return { country: stored.country, raw: typeof stored.number === 'string' ? stored.number : '' }
+}
+
+/** e164 storage has no country of its own, so a national number needs the resolved default. */
+const readE164Phone: PhoneInputReader = (value, resolved) => ({
+	country: resolved.defaultCountry,
+	raw: typeof value === 'string' ? value : '',
+})
+
+const buildValidate =
 	(opts: {
 		fieldLayer: ResolvablePhoneFieldOptions
 		name: string
+		read: PhoneInputReader
 		required: boolean
-	}): TextFieldValidation =>
+	}): Validate =>
 	async (value, args) => {
-		const raw = typeof value === 'string' ? value : ''
 		const resolved = resolvePhoneOptionsSafe({
 			fieldOptions: opts.fieldLayer,
 			payload: args.req.payload,
 		})
+		const { country, raw } = opts.read(value, resolved)
 		const check = checkPhone(raw, resolved.validation, {
-			defaultCountry: resolved.defaultCountry,
+			defaultCountry: country,
 			metadata: await loadMetadata(resolved.metadata),
 		})
 		if (check === 'empty') {
@@ -190,7 +184,12 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 				},
 			},
 			custom: { [PHONE_CUSTOM_KEY]: fieldLayer },
-			validate: buildTextValidate({ fieldLayer, name, required: required ?? false }),
+			validate: buildValidate({
+				fieldLayer,
+				name,
+				read: readE164Phone,
+				required: required ?? false,
+			}),
 		}
 		return typeof options.overrides === 'function' ? options.overrides({ field: base }) : base
 	}
@@ -225,7 +224,12 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 			{ admin: { disableListColumn: true }, name: 'type', type: 'text', virtual: true },
 		],
 		hooks: { afterRead: [buildDerivedHook(fieldLayer)] },
-		validate: buildValidate({ fieldLayer, name, required: required ?? false }),
+		validate: buildValidate({
+			fieldLayer,
+			name,
+			read: readStoredPhone,
+			required: required ?? false,
+		}),
 	}
 
 	return typeof options.overrides === 'function' ? options.overrides({ field: base }) : base
