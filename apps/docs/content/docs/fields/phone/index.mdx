@@ -32,6 +32,8 @@ The field renders one 40px row: a country trigger with a flag, the calling-code 
 
 `storage: 'e164'` returns a plain `text` field holding the E.164 string alone, with no `country` column. There's no sibling field to read a derived value from here; call the exported utils (see [Frontend use](#frontend-use)) against the stored string instead, passing a `defaultCountry` if the string you have isn't already E.164.
 
+`defaultCountry` is consulted differently by the two storage modes, and the difference is deliberate, not an oversight. With no `country` column to read, `storage: 'e164'` validation falls back to `defaultCountry` as its only hint for a country-less national-format write: `phoneNumberField({ name: 'phone', storage: 'e164', defaultCountry: 'DE' })` accepts `'030 123456'`. `storage: 'object'` never falls back this way: its validation and its derived-read hook both parse `number` against the stored `country` alone, so the identical write with no `country` set is rejected under otherwise identical options. Falling back to `defaultCountry` there would attribute the number to a country nobody actually chose and then derive `international`/`national` from that guess.
+
 An extension typed as `x123` after the number is accepted and reformatted while typing, but E.164 has no slot for one: committing the field drops it, so it disappears from the input on blur rather than being silently discarded on save. Neither storage mode carries an extension.
 
 ## Derived read shape
@@ -148,7 +150,7 @@ fields plugin: phoneNumber.metadata "nope" must be "max", "min", or "mobile".
 |---|---|---|
 | `name` | required | |
 | `storage` | `'object'` | `'object'` returns a `GroupField`; `'e164'` returns a `TextField`. Fixed per field; not resolvable from the plugin. |
-| `defaultCountry` | none | Picker and calling-code default while the field is empty. Must be in `countries` when both are set on the same field. |
+| `defaultCountry` | none | Picker and calling-code default while the field is empty. Must be in `countries` when both are set on the same field. Also consulted by `storage: 'e164'` validation, but not `storage: 'object'`; see [Storage shapes](#storage-shapes). |
 | `countries` | every supported country | Scopes the picker only; see [Country restriction and pinning](#country-restriction-and-pinning). |
 | `preferredCountries` | none | Pinned above the rest of the picker list, in the given order. |
 | `validation` | `'valid'` | `'possible'` \| `'valid'` \| `'mobile'`. `'mobile'` requires metadata `'max'` or `'mobile'`. |
@@ -167,6 +169,7 @@ fields plugin: phoneNumber.metadata "nope" must be "max", "min", or "mobile".
 - An extension typed into the input is accepted and shown, but never persists: E.164 has no extension slot, so a commit drops it.
 - The five derived subfields are `virtual: true`. Payload rejects a query or sort against them; filter and sort on `number` or `country` instead.
 - `storage: 'e164'` has no `country` column, so there's no sibling field a frontend can read a derived value from; use the exported utils against the stored string.
+- `defaultCountry` is not consulted the same way by both storage modes: `storage: 'e164'` validation falls back to it for a country-less national-format write, while `storage: 'object'` never does, since it parses `number` against the stored `country` alone. See [Storage shapes](#storage-shapes).
 - `type` is fully populated only under metadata `'max'`. Under `'mobile'` it resolves for numbers that are genuinely mobile and reads `undefined` for other line types. Under `'min'` it resolves for some countries and not others, so treat it as unavailable there.
 - `metadata` and `serveFlags` are install-wide only, set through `fields({ phoneNumber: {...} })`; neither has a per-field override.
 
