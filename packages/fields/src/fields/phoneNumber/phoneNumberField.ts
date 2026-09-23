@@ -2,7 +2,7 @@ import type { FieldHook, GroupField, TextField, TextFieldValidation, Validate } 
 import { keys } from '../../translations/keys'
 import { asTranslate } from '../../translations/server'
 import { isKnownCountry } from './engine/countries'
-import { loadMetadata } from './engine/metadata'
+import { loadMetadata, type PhoneMetadata } from './engine/metadata'
 import { type CountryCode, checkPhone, parsePhone } from './engine/phone'
 import {
 	type AnyPhoneNumberFieldOptions,
@@ -49,10 +49,19 @@ const buildDerivedHook =
 		const stored = (value ?? {}) as { country?: CountryCode; number?: string }
 		if (typeof stored.number !== 'string' || stored.number === '') return value
 		const resolved = resolvePhoneOptionsSafe({ fieldOptions: fieldLayer, payload: req.payload })
-		const parsed = parsePhone(stored.number, {
-			defaultCountry: stored.country,
-			metadata: await loadMetadata(resolved.metadata),
-		})
+		// A throwing afterRead fails the whole request, so one unloadable chunk would take down
+		// every read of the collection; degrading costs the derived values on this field alone.
+		let metadata: PhoneMetadata
+		try {
+			metadata = await loadMetadata(resolved.metadata)
+		} catch (error) {
+			req.payload.logger.error(
+				{ err: error },
+				'[fields] phoneNumber metadata failed to load for a derived read'
+			)
+			return value
+		}
+		const parsed = parsePhone(stored.number, { defaultCountry: stored.country, metadata })
 		if (!parsed) return value
 		// Persisted keys spread first: this hook enriches the group, it never rewrites it.
 		return {
