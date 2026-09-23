@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	collectExternals,
 	collectStaticFiles,
+	collectUnresolved,
 	distDir,
 	hasDist,
 	staticImportsOf,
@@ -33,6 +34,13 @@ describe.skipIf(!hasDist)('phone dist import graph', () => {
 	it.each(ENTRIES)('%s really traverses the phone family', (entry) => {
 		const files = collectStaticFiles(join(distDir, entry))
 		expect(files.has(METADATA_MODULE), `${entry} reaches no phone module at all`).toBe(true)
+	})
+
+	// The check above only pins today's specific paths; this closes the whole class by
+	// failing on any specifier the walk would otherwise drop without a sound.
+	it('never silently drops an unresolvable relative import', () => {
+		const unresolved = ENTRIES.flatMap((entry) => collectUnresolved(join(distDir, entry)))
+		expect(unresolved).toEqual([])
 	})
 })
 
