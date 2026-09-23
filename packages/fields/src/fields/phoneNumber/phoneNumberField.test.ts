@@ -14,9 +14,9 @@ const group = (opts: Parameters<typeof phoneNumberField>[0]) =>
 /** A minimal `t` stub: validators only interpolate the key, never look up a bundle. */
 const t = (key: string) => key
 
-/** A request stub carrying `t` (for validate) and `payload.config` (for the registry). */
+/** A request stub carrying `t` (for validate), `payload.config` (for the registry) and a logger. */
 const reqWithRegistry = (custom?: Record<string, unknown>) =>
-	({ payload: { config: { custom } }, t }) as never
+	({ payload: { config: { custom }, logger: { error: () => undefined } }, t }) as never
 
 const validateArgs = { req: reqWithRegistry() } as never
 
@@ -310,6 +310,18 @@ describe('phoneNumberField derived read hook', () => {
 		expect(result.type).toBeUndefined()
 		expect(result.national).toBe('01511 2345678')
 		expect(result.callingCode).toBe('49')
+	})
+
+	// The hook awaits loadMetadata bare: a rejected set would surface as a failed afterRead,
+	// which fails the whole request, so every read of the collection would break at once.
+	it('still reads a document when the registry carries a metadata set that cannot load', async () => {
+		const field = group({ name: 'phone' })
+		const hook = field.hooks?.afterRead?.[0]
+		const result = (await hook?.({
+			req: reqWithRegistry({ [FIELDS_REGISTRY_KEY]: { phoneNumber: { metadata: 'nope' } } }),
+			value: { country: 'DE', number: '0151 12345678' },
+		} as never)) as Record<string, unknown>
+		expect(result.international).toBe('+49 1511 2345678')
 	})
 
 	it('degrades to the default metadata set when the registry value is missing', async () => {

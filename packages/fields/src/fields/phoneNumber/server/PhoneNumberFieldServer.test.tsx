@@ -138,14 +138,17 @@ describe('PhoneNumberFieldServer', () => {
 		)
 	})
 
-	it('degrades to no seed for a metadata set that does not exist', async () => {
+	// The resolver drops a set the loader cannot carry, so the seed survives rather than
+	// costing the first frame over a registry the plugin never normalized.
+	it('falls back to the default set for a metadata set that does not exist', async () => {
 		const seed = await seedOf(
 			buildProps({
 				payload: fakePayload({ metadata: 'nope' }),
 				siblingData: { phone: DE_E164 },
 			})
 		)
-		expect(seed).toBeNull()
+		expect(loadMetadata).toHaveBeenCalledWith('max')
+		expect(seed).toEqual(DE_SEED)
 	})
 
 	it('still throws when the field carries no phone options at all', async () => {

@@ -138,7 +138,9 @@ describe('PhoneNumberCellServer', () => {
 		)
 	})
 
-	it('degrades to the raw value for a metadata set that does not exist', async () => {
+	// The resolver drops a set the loader cannot carry, so the column still formats rather
+	// than falling back to raw E.164 across every row of the list.
+	it('falls back to the default set for a metadata set that does not exist', async () => {
 		const node = await PhoneNumberCellServer(
 			buildProps({
 				cellData: DE_E164,
@@ -147,7 +149,8 @@ describe('PhoneNumberCellServer', () => {
 			})
 		)
 		render(node)
-		expect(screen.getByText(DE_E164)).toBeDefined()
+		expect(loadMetadata).toHaveBeenCalledWith('max')
+		expect(screen.getByText('01511 2345678')).toBeDefined()
 	})
 
 	it('still flags the stored country when the number itself fails to parse', async () => {
