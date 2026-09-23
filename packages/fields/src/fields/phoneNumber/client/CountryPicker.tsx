@@ -162,7 +162,10 @@ const CountryPanel: React.FC<CountryPanelProps> = ({
 		: {}
 
 	return (
-		<div className={`${baseClass}__panel`}>
+		// Popup closes itself on any click reaching a button inside it, which unmounts this
+		// panel before React dispatches the row's own onClick and loses the selection
+		// entirely. The rows close through `select` instead, so it opts out.
+		<div className={`${baseClass}__panel`} data-popup-prevent-close>
 			<div className={`${baseClass}__search`}>
 				<span aria-hidden="true" className={`${baseClass}__search-icon`}>
 					<SearchIcon />
