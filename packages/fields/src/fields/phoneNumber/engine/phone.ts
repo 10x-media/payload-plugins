@@ -1,4 +1,9 @@
-import { AsYouType, type CountryCode, parsePhoneNumberFromString } from 'libphonenumber-js/core'
+import {
+	AsYouType,
+	type CountryCode,
+	parsePhoneNumberFromString,
+	validatePhoneNumberLength,
+} from 'libphonenumber-js/core'
 import type { PhoneMetadata } from './metadata'
 
 export type { CountryCode }
@@ -22,6 +27,42 @@ export type ParsedPhone = {
 export type PhoneOptions = { defaultCountry?: CountryCode; metadata: PhoneMetadata }
 
 const MOBILE_TYPES = new Set(['MOBILE', 'FIXED_LINE_OR_MOBILE'])
+
+/** E.164 allows 15 digits after the `+`, the country calling code counted among them. */
+const E164_MAX_DIGITS = 15
+
+/** Digits, spacing and the separators real-world sources wrap a number in. */
+const PHONE_INPUT_PATTERN = /^[\d\s+()./-]*$/
+
+/** Whether a draft holds only characters a phone number can be written with. */
+export const isPhoneInput = (input: string): boolean => PHONE_INPUT_PATTERN.test(input)
+
+export const isInternational = (input: string): boolean => input.trimStart().startsWith('+')
+
+export const digitCount = (input: string): number => (input.match(/\d/g) ?? []).length
+
+/** A national draft spends the calling code's digits before its own. */
+export type PhoneLengthOptions = PhoneOptions & { callingCode?: string }
+
+/**
+ * Whether a draft is already longer than any number it could still become. The country's own
+ * ceiling decides wherever the metadata defines one, and E.164's 15 digits backstop the rest:
+ * several countries, Germany among them, carry no upper bound of their own.
+ */
+export const exceedsPhoneLength = (input: string, opts: PhoneLengthOptions): boolean => {
+	const digits = digitCount(input)
+	if (digits === 0) return false
+	const carried = isInternational(input) ? 0 : digitCount(opts.callingCode ?? '')
+	if (digits + carried > E164_MAX_DIGITS) return true
+	const length = validatePhoneNumberLength(
+		input,
+		{ defaultCountry: opts.defaultCountry },
+		opts.metadata as never
+	)
+	// Only TOO_LONG: INVALID_LENGTH lands on any country whose possible lengths have a gap,
+	// which a half-typed number passes through on its way to a longer valid one.
+	return length === 'TOO_LONG'
+}
 
 export const parsePhone = (input: string, opts: PhoneOptions): null | ParsedPhone => {
 	if (input === '') return null

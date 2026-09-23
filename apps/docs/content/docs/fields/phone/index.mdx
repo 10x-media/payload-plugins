@@ -34,7 +34,11 @@ The field renders one 40px row: a country trigger with a flag, the calling-code 
 
 `defaultCountry` is consulted differently by the two storage modes, and the difference is deliberate, not an oversight. With no `country` column to read, `storage: 'e164'` validation falls back to `defaultCountry` as its only hint for a country-less national-format write: `phoneNumberField({ name: 'phone', storage: 'e164', defaultCountry: 'DE' })` accepts `'030 123456'`. `storage: 'object'` never falls back this way: its validation and its derived-read hook both parse `number` against the stored `country` alone, so the identical write with no `country` set is rejected under otherwise identical options. Falling back to `defaultCountry` there would attribute the number to a country nobody actually chose and then derive `international`/`national` from that guess.
 
-An extension typed as `x123` after the number is accepted and reformatted while typing, but E.164 has no slot for one: committing the field drops it, so it disappears from the input on blur rather than being silently discarded on save. Neither storage mode carries an extension.
+## What the input accepts
+
+The entry takes digits, spacing, and the separators numbers are written with (`+`, `(`, `)`, `.`, `/`, `-`). Anything else is refused as it arrives, an `x123` extension included: E.164 has no slot for an extension, so neither storage mode could carry one anyway.
+
+Entry also stops growing once the draft is longer than any number it could still become. The country's own ceiling decides wherever libphonenumber defines one, and E.164's fifteen digits, calling code counted among them, backstop the rest: several countries, Germany among them, carry no upper bound at all. Digits are what spend that budget, so formatting costs nothing. The ceiling bounds typing rather than pasting: a paste that overruns it still lands, because committing the field salvages the first valid number out of a doubled or decorated one.
 
 ## Derived read shape
 
@@ -166,7 +170,7 @@ fields plugin: phoneNumber.metadata "nope" must be "max", "min", or "mobile".
 ## Limitations
 
 - `number` isn't guaranteed to be E.164: an unparseable draft commits raw text instead, and a draft save skips the field's own validation by default (`versions.drafts.validate: false`), so raw text can reach the database that way.
-- An extension typed into the input is accepted and shown, but never persists: E.164 has no extension slot, so a commit drops it.
+- An extension can't be entered: E.164 has no extension slot, so the input refuses the characters one is written with. See [What the input accepts](#what-the-input-accepts).
 - The five derived subfields are `virtual: true`. Payload rejects a query or sort against them; filter and sort on `number` or `country` instead.
 - `storage: 'e164'` has no `country` column, so there's no sibling field a frontend can read a derived value from; use the exported utils against the stored string.
 - `defaultCountry` is not consulted the same way by both storage modes: `storage: 'e164'` validation falls back to it for a country-less national-format write, while `storage: 'object'` never does, since it parses `number` against the stored `country` alone. See [Storage shapes](#storage-shapes).

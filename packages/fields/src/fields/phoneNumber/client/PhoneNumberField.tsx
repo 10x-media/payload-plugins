@@ -23,7 +23,11 @@ import { loadMetadata, type PhoneMetadata } from '../engine/metadata'
 import {
 	type CountryCode,
 	detectCountry,
+	digitCount,
+	exceedsPhoneLength,
 	formatAsYouType,
+	isInternational,
+	isPhoneInput,
 	nationalPart,
 	type PhoneSeed,
 	parsePhone,
@@ -49,14 +53,6 @@ type PhonePassthrough = {
 	required?: boolean
 }
 
-const isInternational = (draft: string): boolean => draft.trimStart().startsWith('+')
-
-/**
- * What as-you-type may reflow. Letters and an `x123` extension stay verbatim while typing,
- * but a commit stores E.164, which cannot carry an extension, so the repaint drops it.
- */
-const PHONE_CHARS = /^[\d\s+()./-]*$/
-
 const displayFor = (entry: PhoneEntry, metadata: null | PhoneMetadata): string => {
 	if (!entry.number) return ''
 	if (!metadata) return entry.number
@@ -67,17 +63,26 @@ const displayFor = (entry: PhoneEntry, metadata: null | PhoneMetadata): string =
 /**
  * As-you-type only while appending at the end, where the caret already sits: a mid-string
  * edit or a deletion is stored exactly as typed, so the caret never moves under the viewer.
+ * Null refuses the input outright, leaving the draft as it was.
  */
 const formatDraft = (args: {
 	atEnd: boolean
 	callingCode: string | undefined
+	country: CountryCode | undefined
 	metadata: null | PhoneMetadata
 	previous: string
 	raw: string
-}): string => {
-	const { atEnd, callingCode, metadata, previous, raw } = args
-	if (!metadata || !atEnd || raw.length <= previous.length) return raw
-	if (!PHONE_CHARS.test(raw)) return raw
+}): null | string => {
+	const { atEnd, callingCode, country, metadata, previous, raw } = args
+	if (!isPhoneInput(raw)) return null
+	if (!metadata) return raw
+	// The ceiling bounds typing. A bulk paste is let through so the blur salvage can still
+	// recover a number out of a doubled or decorated one.
+	const oneMore = raw.length === previous.length + 1 && digitCount(raw) > digitCount(previous)
+	if (oneMore && exceedsPhoneLength(raw, { callingCode, defaultCountry: country, metadata })) {
+		return null
+	}
+	if (!atEnd || raw.length <= previous.length) return raw
 	if (isInternational(raw)) return formatAsYouType(raw, undefined, { metadata })
 	if (callingCode === undefined) return raw
 	const prefix = `+${callingCode}`
@@ -268,20 +273,31 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 
 	const onChange = useCallback(
 		(event: React.ChangeEvent<HTMLInputElement>) => {
-			const raw = event.target.value
+			const input = event.target
+			const raw = input.value
+			const caret = input.selectionStart
 			const next = formatDraft({
-				atEnd: event.target.selectionStart === null || event.target.selectionStart === raw.length,
+				atEnd: caret === null || caret === raw.length,
 				callingCode,
+				country,
 				metadata,
 				previous: draft,
 				raw,
 			})
+			if (next === null) {
+				// React re-renders nothing when the state is unchanged, so the refused line is put
+				// back here, with the caret where the refused characters would have gone.
+				const at = Math.max((caret ?? raw.length) - (raw.length - draft.length), 0)
+				input.value = draft
+				input.setSelectionRange(at, at)
+				return
+			}
 			editingRef.current = true
 			setDraft(next)
 			cancelPending()
 			debounceRef.current = setTimeout(() => commit(next), COMMIT_DELAY)
 		},
-		[callingCode, cancelPending, commit, draft, metadata]
+		[callingCode, cancelPending, commit, country, draft, metadata]
 	)
 
 	const onBlur = useCallback(() => {

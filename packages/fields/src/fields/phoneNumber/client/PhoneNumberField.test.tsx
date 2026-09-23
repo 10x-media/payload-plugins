@@ -220,6 +220,9 @@ const type = (value: string, selectionStart?: number) =>
 		selectionStart === undefined ? { target: { value } } : { target: { selectionStart, value } }
 	)
 
+/** One keystroke at the end of the line, which is what the length ceiling bounds. */
+const press = (char: string) => type(`${input().value}${char}`)
+
 /** Renders and flushes the lazy metadata load, so formatting is active. */
 const renderPhone = async (args: RenderArgs = {}) => {
 	const rendered = render(element(args))
@@ -468,11 +471,10 @@ describe('PhoneNumberField', () => {
 		expect(prefix()).toBe('+41')
 	})
 
-	// Text that as-you-type leaves verbatim, so only the blur salvage can recover it
+	// A paste no single parse can read, so only the blur salvage can recover it
 	it('salvages the first valid number out of a doubled paste on blur', async () => {
 		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
-		type('tel:+41446681800 tel:+41446681800')
-		expect(input().value).toBe('tel:+41446681800 tel:+41446681800')
+		type('+41446681800 +41446681800')
 		fireEvent.blur(input())
 		expect(writesTo('phone.number')).toEqual(['+41446681800'])
 		expect(writesTo('phone.country')).toEqual(['CH'])
@@ -481,10 +483,72 @@ describe('PhoneNumberField', () => {
 
 	it('keeps an unparseable draft so validation can surface it', async () => {
 		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
-		type('not a number')
+		type('+999 123')
 		fireEvent.blur(input())
-		expect(writesTo('phone.number')).toEqual(['not a number'])
-		expect(input().value).toBe('not a number')
+		expect(writesTo('phone.number')).toEqual(['+999123'])
+		expect(input().value).toBe('+999123')
+	})
+
+	it.each([
+		['a letter', 'not a number'],
+		['an extension', '1511 2345678 x99'],
+		['a tel URI', 'tel:+4915112345678'],
+	])('refuses %s rather than letting it into the draft', async (_label, raw) => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('1511 2345678')
+		type(raw)
+		expect(input().value).toBe('1511 2345678')
+	})
+
+	// Refusing by re-rendering the old value would drop the caret to the end of the line
+	it('leaves the caret at the edit point when a character is refused', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('15112345678')
+		expect(input().value).toBe('1511 2345678')
+		type('1511a 2345678', 5)
+		expect(input().value).toBe('1511 2345678')
+		expect(input().selectionStart).toBe(4)
+	})
+
+	// The United States caps its national numbers at ten digits
+	it('refuses a typed digit past the ceiling the country defines', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'US' } })
+		type('2025550123')
+		const full = input().value
+		press('4')
+		expect(input().value).toBe(full)
+	})
+
+	// Germany defines no upper bound, so only E.164's fifteen digits stop the entry growing
+	it('refuses a typed digit past E.164 where the country defines no ceiling', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('151123456789')
+		press('0')
+		const full = input().value
+		expect(full.replace(/\D/g, '')).toBe('1511234567890')
+		press('1')
+		expect(input().value).toBe(full)
+	})
+
+	it('lets a refused entry shrink and grow again', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'US' } })
+		type('2025550123')
+		const full = input().value
+		press('4')
+		expect(input().value).toBe(full)
+		type('202 555 012')
+		expect(input().value).toBe('202 555 012')
+		press('4')
+		expect(input().value.replace(/\D/g, '')).toBe('2025550124')
+	})
+
+	// The ceiling bounds typing; a paste has to land for the blur salvage to read it
+	it('lets a bulk paste past the ceiling through', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('+41446681800 +41446681800')
+		expect(input().value).not.toBe('')
+		fireEvent.blur(input())
+		expect(writesTo('phone.number')).toEqual(['+41446681800'])
 	})
 
 	it('re-reads a typed number under a country picked from the list', async () => {

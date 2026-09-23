@@ -3,8 +3,11 @@ import { loadMetadata, type PhoneMetadata } from './metadata'
 import {
 	checkPhone,
 	detectCountry,
+	digitCount,
+	exceedsPhoneLength,
 	formatAsYouType,
 	formatPhone,
+	isPhoneInput,
 	nationalPart,
 	parsePhone,
 	phoneSeed,
@@ -219,6 +222,87 @@ describe('phoneSeed', () => {
 
 	it.each(['abc', ''])('returns null for input the engine cannot parse: %s', (raw) => {
 		expect(phoneSeed(raw, { metadata: max })).toBeNull()
+	})
+})
+
+describe('isPhoneInput', () => {
+	it.each([
+		'',
+		'+49 151 1234-5678',
+		'(030) 123.456/78',
+		'+1 (212) 555-2368',
+	])('accepts %s', (input) => {
+		expect(isPhoneInput(input)).toBe(true)
+	})
+
+	it.each([
+		'0151 x123',
+		'tel:+4915112345678',
+		'not a number',
+		'+49 151 1234 5678 ext. 9',
+	])('rejects %s', (input) => {
+		expect(isPhoneInput(input)).toBe(false)
+	})
+})
+
+describe('digitCount', () => {
+	it('counts digits rather than characters, so formatting spends no budget', () => {
+		expect(digitCount('+49 (151) 1234-5678')).toBe(13)
+		expect(digitCount(' ()./-+')).toBe(0)
+	})
+})
+
+describe('exceedsPhoneLength', () => {
+	it('stays false for an empty draft and for a complete number', () => {
+		expect(exceedsPhoneLength('', { metadata: max })).toBe(false)
+		expect(exceedsPhoneLength('+41 44 668 18 00', { metadata: max })).toBe(false)
+		expect(
+			exceedsPhoneLength('1511 2345678', { callingCode: '49', defaultCountry: 'DE', metadata: max })
+		).toBe(false)
+	})
+
+	it('uses the country ceiling where the metadata defines one', () => {
+		expect(
+			exceedsPhoneLength('2025550123', { callingCode: '1', defaultCountry: 'US', metadata: max })
+		).toBe(false)
+		expect(
+			exceedsPhoneLength('20255501239', { callingCode: '1', defaultCountry: 'US', metadata: max })
+		).toBe(true)
+		expect(exceedsPhoneLength('+120255501239', { metadata: max })).toBe(true)
+	})
+
+	// Germany's metadata carries no upper bound at all, so only the E.164 ceiling stops it
+	it('falls back to E.164 for a country with no ceiling of its own', () => {
+		const atCeiling = '1511234567890'
+		expect(digitCount(atCeiling)).toBe(13)
+		const opts = { callingCode: '49', defaultCountry: 'DE', metadata: max } as const
+		expect(exceedsPhoneLength(atCeiling, opts)).toBe(false)
+		expect(exceedsPhoneLength(`${atCeiling}1`, opts)).toBe(true)
+		expect(exceedsPhoneLength('+49 1511 234 567 890 1', { metadata: max })).toBe(true)
+	})
+
+	// The calling code shown beside a national draft is part of the same 15-digit budget
+	it('charges a national draft for the calling code it is entered under', () => {
+		const thirteen = '1234567890123'
+		expect(exceedsPhoneLength(thirteen, { callingCode: '998', metadata: max })).toBe(true)
+		expect(exceedsPhoneLength(thirteen, { metadata: max })).toBe(false)
+	})
+
+	it('spends the budget on digits, not on the separators between them', () => {
+		const opts = { callingCode: '49', defaultCountry: 'DE', metadata: max } as const
+		expect(exceedsPhoneLength('1-5-1-1-2-3-4-5-6-7-8-9-0', opts)).toBe(false)
+		expect(exceedsPhoneLength('1-5-1-1-2-3-4-5-6-7-8-9-0-1', opts)).toBe(true)
+	})
+
+	// A half-typed number of a country whose possible lengths have a gap reads INVALID_LENGTH
+	it('lets a draft through a gap in a country possible lengths', () => {
+		expect(
+			exceedsPhoneLength('44 668 18 000', {
+				callingCode: '41',
+				defaultCountry: 'CH',
+				metadata: max,
+			})
+		).toBe(false)
 	})
 })
 
