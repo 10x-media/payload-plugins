@@ -14,9 +14,8 @@ export const FLAGS_PATH = '/10x-fields/flags'
  * route rather than assumed, so an install that moved `routes.api` still resolves its
  * flags. The `.svg` suffix is there for a reader who opens the URL directly.
  *
- * Lives here rather than beside the handler so the admin client can build a URL without
- * importing the server module, which carries the whole flag artwork package behind a
- * deferred import.
+ * Lives here, not beside the handler, so the admin client can build a URL without
+ * importing the server module and its deferred flag artwork.
  */
 export const countryFlagSrc = (serverURL: string, apiRoute: string, code: string): string =>
 	`${serverURL}${apiRoute}${FLAGS_PATH}/${encodeURIComponent(code.toLowerCase())}.svg`

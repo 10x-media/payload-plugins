@@ -26,7 +26,7 @@ const argsWithPhoneRegistry = (phoneNumber: Record<string, unknown>) =>
 
 const argsWithMetadata = (metadata: MetadataSet) => argsWithPhoneRegistry({ metadata })
 
-/** Reads `admin.components.<Field|Cell>.clientProps.phoneOptions`, the wire contract Task 10/11 build on. */
+/** Reads `admin.components.<Field|Cell>.clientProps.phoneOptions`, the wire contract the field and cell components build on. */
 const phoneOptionsOf = (
 	field: { admin?: { components?: { Cell?: unknown; Field?: unknown } } },
 	component: 'Cell' | 'Field'
@@ -71,7 +71,7 @@ describe('phoneNumberField, object storage', () => {
 
 	it("stamps the field's own options unresolved under the custom key, for hand-authored configs", () => {
 		// Exact equality, not toMatchObject: proves no default (storage, validation, ...) got
-		// baked in alongside the one option actually set, which is the whole point of Finding 1.
+		// baked in alongside the one option actually set.
 		expect(group({ flags: 'emoji', name: 'phone' }).custom?.['@10x-media/fields']).toEqual({
 			flags: 'emoji',
 		})
@@ -102,9 +102,8 @@ describe('phoneNumberField, e164 storage', () => {
 	})
 })
 
-// FINDING 3: nothing above reads clientProps at all, so deleting it (or dropping a key from
-// the bag) left every other test green. This is the contract Task 10 renders from and Task 11
-// forwards, so it gets its own direct coverage on both storage shapes and both components.
+// Nothing above reads clientProps, so deleting it left every other test green anyway. This
+// is the field/cell render contract, so it gets its own direct coverage on both storage shapes.
 describe('phoneNumberField clientProps.phoneOptions contract', () => {
 	const authored = {
 		countries: ['DE', 'FR'] as const,
@@ -200,7 +199,7 @@ describe('phoneNumberField, object storage validate behaviour', () => {
 		expect(underMax).toBe('fields:invalidPhoneNumber')
 	})
 
-	it("honours a plugin-level validation default, not just the field's own (Finding 1)", async () => {
+	it("honours a plugin-level validation default, not just the field's own", async () => {
 		const field = group({ name: 'phone' })
 		const mobileOnly = argsWithPhoneRegistry({ validation: 'mobile' })
 		// A genuine landline: only rejected as not-mobile if the registry's validation
@@ -209,7 +208,7 @@ describe('phoneNumberField, object storage validate behaviour', () => {
 		expect(result).toBe('fields:phoneNotMobile')
 	})
 
-	it('reports a configuration error, not a false rejection, when mobile-only meets metadata min (Finding 2)', async () => {
+	it('reports a configuration error, not a false rejection, when mobile-only meets metadata min', async () => {
 		const field = group({ name: 'phone', validation: 'mobile' })
 		// A genuinely valid mobile number: 'min' metadata just can't detect its type.
 		const result = await field.validate?.(
@@ -243,7 +242,7 @@ describe('phoneNumberField, e164 storage validate behaviour', () => {
 		expect(underMax).toBe('fields:invalidPhoneNumber')
 	})
 
-	it("honours a plugin-level defaultCountry, not just the field's own (Finding 1)", async () => {
+	it("honours a plugin-level defaultCountry, not just the field's own", async () => {
 		const field = phoneNumberField({ name: 'phone', storage: 'e164' }) as TextField
 		const args = argsWithPhoneRegistry({ defaultCountry: 'DE' })
 		// National-format, no country code of its own: unparseable without a defaultCountry
@@ -252,7 +251,7 @@ describe('phoneNumberField, e164 storage validate behaviour', () => {
 		expect(result).toBe(true)
 	})
 
-	it('reports a configuration error, not a false rejection, when mobile-only meets metadata min (Finding 2)', async () => {
+	it('reports a configuration error, not a false rejection, when mobile-only meets metadata min', async () => {
 		const field = phoneNumberField({
 			name: 'phone',
 			storage: 'e164',

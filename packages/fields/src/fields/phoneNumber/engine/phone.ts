@@ -87,9 +87,8 @@ export const phoneUri = (input: string, opts: PhoneOptions): null | string =>
 	parsePhone(input, opts)?.uri ?? null
 
 /**
- * The longest leading candidate that parses to a valid, country-bearing number, so a
- * doubled paste or one wrapped in punctuation cannot fabricate a number by stripping
- * characters out of it.
+ * The longest leading candidate that parses to a valid, country-bearing number, protecting
+ * a doubled paste or a punctuation-wrapped one from fabricating a number by stripping characters.
  */
 export const salvagePhone = (input: string, opts: PhoneOptions): null | ParsedPhone => {
 	const trimmed = input.trim()

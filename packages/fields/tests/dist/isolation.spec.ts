@@ -140,10 +140,8 @@ describe.skipIf(!hasDist)('dist bundle isolation', () => {
 	})
 
 	it('client barrel graph never reaches a family server directory', () => {
-		// A server/ directory holds route handlers and the heavy assets they defer-import
-		// (the flags endpoint alone reaches ~266 modules of artwork). Whether that stays out
-		// of the admin bundle must not depend on a consumer's tree shaking, so anything both
-		// sides need belongs in a module neither side has to import the other to reach.
+		// server/ holds heavy defer-imported assets (flags alone reaches ~266 modules); keeping
+		// them out of the admin bundle must be structural, not incidental tree-shaking.
 		const serverDirs = allFamilies.map((family) => join(distDir, 'fields', family, 'server') + sep)
 		expect(
 			serverDirs.some((dir) => existsSync(dir)),

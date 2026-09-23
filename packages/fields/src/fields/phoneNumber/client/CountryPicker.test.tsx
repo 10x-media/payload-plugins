@@ -13,10 +13,8 @@ import type { PhoneFlagMode } from '../options'
 Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, value: 400 })
 Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 280 })
 
-// jsdom has no layout, so scrollTo does not exist, scrollTop never moves, and scrollHeight
-// clamps every scroll to zero. These give the list a 400px window over the spacer the
-// component itself sized, which is enough for scrolling to behave: a long list moves and
-// re-renders its window, a list shorter than the window stays put.
+// jsdom has no layout, so scrollTo/scrollTop/scrollHeight are stubbed to fake a 400px window
+// over the spacer: enough for a long list to scroll and re-render, a short one to stay put.
 const scrollTo = vi.fn<(options?: ScrollToOptions) => void>()
 Object.defineProperty(HTMLElement.prototype, 'scrollTop', {
 	configurable: true,

@@ -180,10 +180,8 @@ test.describe('phone number field', () => {
 		const response = await saved
 		expect(response.status()).toBe(400)
 
-		// Asserted on the toast rather than the field's own inline .field-error: under this
-		// tier's transactional Mongo connection, Payload's PATCH response for this group
-		// field's validate error inconsistently omits the per-field data.errors breakdown
-		// that .field-error depends on, even though the field-naming toast is always present.
+		// Asserted on the toast, not .field-error: this tier's transactional Mongo connection
+		// makes Payload's PATCH response inconsistently omit the per-field breakdown .field-error needs.
 		await expect(page.getByTestId('field-error')).toHaveText('Strict Validation')
 	})
 
@@ -260,10 +258,8 @@ test.describe('phone number field', () => {
 		expect(blocking).toEqual([])
 	})
 
-	// color-contrast is disabled: the only sub-threshold text in a closed row is the field
-	// description, styled with a core elevation token the plugin adopts for Payload's native
-	// look. This guards closed-row structural a11y (roles, names); the open-panel scan above
-	// keeps color-contrast enforced on plugin-owned surfaces.
+	// color-contrast is disabled: the closed row's only sub-threshold text is the field
+	// description's core elevation token; the open-panel scan above still covers color-contrast.
 	test('closed phone fields have no serious or critical structural axe violations', async ({
 		page,
 	}) => {

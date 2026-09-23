@@ -126,7 +126,7 @@ describe('callingCodeFor', () => {
 		expect(callingCodeFor(code as CountryCode, max)).toBe(expected)
 	})
 
-	// The field's `countries` allowlist scopes the picker, never what a calling code IS
+	// The field's `countries` allowlist scopes the picker, never what a calling code is
 	it('answers for a country an allowlist would not offer', () => {
 		const offered = countryOptions({ countries: ['DE', 'FR'], locale: 'en', metadata: max })
 		const codes = [...offered.preferred, ...offered.rest].map((option) => option.code)
