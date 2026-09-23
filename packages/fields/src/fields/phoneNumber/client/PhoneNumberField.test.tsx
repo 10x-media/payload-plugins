@@ -110,17 +110,26 @@ type PickerDoubleProps = {
 	disabled: boolean
 	flags: string
 	onSelect: (code: CountryCode) => void
-	options: { preferred: CountryOption[]; rest: CountryOption[] }
+	options: { priority: CountryOption[]; rest: CountryOption[] }
+	priorityLabel?: string
 	value: CountryCode | undefined
 }
 
-const CountryPickerDouble = ({ disabled, flags, onSelect, options, value }: PickerDoubleProps) => (
+const CountryPickerDouble = ({
+	disabled,
+	flags,
+	onSelect,
+	options,
+	priorityLabel,
+	value,
+}: PickerDoubleProps) => (
 	<div
 		data-disabled={String(disabled)}
 		data-flags={flags}
-		data-preferred={options.preferred.map((option) => option.code).join(',')}
+		data-priority={options.priority.map((option) => option.code).join(',')}
+		data-priority-label={priorityLabel ?? ''}
 		data-testid="picker"
-		data-total={String(options.preferred.length + options.rest.length)}
+		data-total={String(options.priority.length + options.rest.length)}
 		data-value={value ?? ''}
 	>
 		{PICKABLE.map((code) => (
@@ -798,12 +807,27 @@ describe('PhoneNumberField', () => {
 			phoneOptions: {
 				countries: ['CH', 'DE', 'US'],
 				flags: 'emoji',
-				preferredCountries: ['DE'],
+				priorityCountries: ['DE'],
 			},
 		})
 		expect(picker().dataset.total).toBe('3')
-		expect(picker().dataset.preferred).toBe('DE')
+		expect(picker().dataset.priority).toBe('DE')
 		expect(picker().dataset.flags).toBe('emoji')
+	})
+
+	it('resolves the priority countries label for the active locale before handing it to the picker', async () => {
+		await renderPhone({
+			phoneOptions: {
+				priorityCountries: ['DE'],
+				priorityCountriesLabel: { de: 'Beliebt', en: 'Popular' },
+			},
+		})
+		expect(picker().dataset.priorityLabel).toBe('Popular')
+	})
+
+	it('hands the picker no priority label at all when none is configured', async () => {
+		await renderPhone({ phoneOptions: { priorityCountries: ['DE'] } })
+		expect(picker().dataset.priorityLabel).toBe('')
 	})
 
 	it('renders the full row before the metadata lands and keeps the first keystroke', () => {

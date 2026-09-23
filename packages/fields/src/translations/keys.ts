@@ -53,8 +53,6 @@ export const keys = {
 	selectCountry: 'fields:selectCountry',
 	searchCountries: 'fields:searchCountries',
 	noCountriesFound: 'fields:noCountriesFound',
-	preferredCountries: 'fields:preferredCountries',
-	allCountries: 'fields:allCountries',
 	phoneRequired: 'fields:phoneRequired',
 	invalidPhoneNumber: 'fields:invalidPhoneNumber',
 	phoneNotMobile: 'fields:phoneNotMobile',

@@ -109,7 +109,8 @@ describe('phoneNumberField clientProps.phoneOptions contract', () => {
 		countries: ['DE', 'FR'] as const,
 		defaultCountry: 'DE' as const,
 		isClearable: false,
-		preferredCountries: ['DE'] as const,
+		priorityCountries: ['DE'] as const,
+		priorityCountriesLabel: { en: 'Popular' },
 	}
 
 	it('threads field options into Field and Cell clientProps.phoneOptions, group storage', () => {

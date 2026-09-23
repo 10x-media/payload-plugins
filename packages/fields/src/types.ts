@@ -257,7 +257,9 @@ export type PhoneNumberGlobalConfig = {
 	/** Default for every phoneNumberField(); a field's own option always wins. */
 	defaultCountry?: CountryCode
 	countries?: readonly CountryCode[]
-	preferredCountries?: readonly CountryCode[]
+	priorityCountries?: readonly CountryCode[]
+	/** Heading over `priorityCountries` in the picker. No label renders no heading, only the group separator. */
+	priorityCountriesLabel?: StaticLabel
 	validation?: PhoneValidationMode
 	flags?: PhoneFlagMode
 	cellFormat?: PhoneFormat

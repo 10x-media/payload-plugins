@@ -41,7 +41,7 @@ import './phoneNumberField.css'
 
 const baseClass = 'fields-phone'
 const COMMIT_DELAY = 250
-const NO_COUNTRIES: CountryOptionGroups = { preferred: [], rest: [] }
+const NO_COUNTRIES: CountryOptionGroups = { priority: [], rest: [] }
 
 /** What one commit boundary stores: the E.164 number and the country it was read under. */
 type PhoneEntry = { country: CountryCode | undefined; number: null | string }
@@ -166,7 +166,8 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 		flags,
 		isClearable,
 		metadata: metadataSet,
-		preferredCountries,
+		priorityCountries,
+		priorityCountriesLabel,
 		storage,
 	} = phoneOptions
 
@@ -248,14 +249,14 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 		draftCountry ?? pickedCountry ?? storedCountry ?? seeded?.country ?? defaultCountry
 
 	const countriesKey = countries?.join()
-	const preferredKey = preferredCountries?.join()
+	const priorityKey = priorityCountries?.join()
 	// biome-ignore lint/correctness/useExhaustiveDependencies: a form-state round trip hands the same allowlist back as a new array, so the contents are the dependency, not the identity
 	const options = useMemo(
 		() =>
 			metadata
-				? countryOptions({ countries, locale: i18n.language, metadata, preferredCountries })
+				? countryOptions({ countries, locale: i18n.language, metadata, priorityCountries })
 				: NO_COUNTRIES,
-		[countriesKey, i18n.language, metadata, preferredKey]
+		[countriesKey, i18n.language, metadata, priorityKey]
 	)
 	// Off the country, not off `options`: an allowlist that does not offer the stored country
 	// would otherwise drop the prefix once metadata lands, reflowing the row back.
@@ -415,6 +416,7 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 						flags={flags}
 						onSelect={selectCountry}
 						options={options}
+						priorityLabel={resolveStaticLabel(priorityCountriesLabel, i18n.language)}
 						value={country}
 					/>
 					{showPrefix ? <span className={`${baseClass}__prefix`}>{`+${callingCode}`}</span> : null}

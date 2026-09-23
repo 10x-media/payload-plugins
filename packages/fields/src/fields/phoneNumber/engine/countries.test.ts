@@ -37,8 +37,8 @@ describe('emojiFlag', () => {
 
 describe('countryOptions', () => {
 	it('lists every country libphonenumber supports when unrestricted', () => {
-		const { preferred, rest } = countryOptions({ locale: 'en', metadata: max })
-		expect(preferred).toEqual([])
+		const { priority, rest } = countryOptions({ locale: 'en', metadata: max })
+		expect(priority).toEqual([])
 		expect(rest.length).toBeGreaterThan(200)
 	})
 
@@ -67,14 +67,14 @@ describe('countryOptions', () => {
 		expect(rest.map((o) => o.code)).toEqual(['AT', 'DE', 'CH'])
 	})
 
-	it('splits preferred countries out in the order given', () => {
-		const { preferred, rest } = countryOptions({
+	it('splits priority countries out in the order given', () => {
+		const { priority, rest } = countryOptions({
 			countries: ['AT', 'CH', 'DE'],
 			locale: 'en',
 			metadata: max,
-			preferredCountries: ['DE', 'CH'],
+			priorityCountries: ['DE', 'CH'],
 		})
-		expect(preferred.map((o) => o.code)).toEqual(['DE', 'CH'])
+		expect(priority.map((o) => o.code)).toEqual(['DE', 'CH'])
 		expect(rest.map((o) => o.code)).toEqual(['AT'])
 	})
 
@@ -130,7 +130,7 @@ describe('callingCodeFor', () => {
 	// The field's `countries` allowlist scopes the picker, never what a calling code is
 	it('answers for a country an allowlist would not offer', () => {
 		const offered = countryOptions({ countries: ['DE', 'FR'], locale: 'en', metadata: max })
-		const codes = [...offered.preferred, ...offered.rest].map((option) => option.code)
+		const codes = [...offered.priority, ...offered.rest].map((option) => option.code)
 		expect(codes).not.toContain('JP')
 		expect(callingCodeFor('JP', max)).toBe('81')
 	})

@@ -127,14 +127,27 @@ export const phoneNumbers: CollectionConfig = {
 			fields: [{ name: 'role', type: 'text' }, phoneNumberField({ name: 'phone' })],
 		},
 		phoneNumberField({
-			name: 'preferredFirst',
-			preferredCountries: ['JP', 'KR', 'SG'],
+			name: 'priorityFirst',
+			priorityCountries: ['JP', 'KR', 'SG'],
+			priorityCountriesLabel: { de: 'Beliebt', en: 'Popular' },
 			overrides: ({ field }) => ({
 				...field,
 				admin: {
 					...field.admin,
 					description:
-						'preferredCountries overriding the plugin-wide DE/AT/CH, so the picker heads with JP/KR/SG',
+						'priorityCountries overriding the plugin-wide DE/AT/CH, headed by priorityCountriesLabel ("Popular")',
+				},
+			}),
+		}),
+		phoneNumberField({
+			name: 'priorityFirstNoLabel',
+			priorityCountries: ['JP', 'KR', 'SG'],
+			overrides: ({ field }) => ({
+				...field,
+				admin: {
+					...field.admin,
+					description:
+						'priorityCountries with no priorityCountriesLabel: the group still leads the list, split from the rest only by the divider, no heading text',
 				},
 			}),
 		}),

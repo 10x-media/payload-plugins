@@ -50,8 +50,6 @@ export const es: Record<TranslationKey, string> = {
 	[keys.selectCountry]: 'Seleccionar país',
 	[keys.searchCountries]: 'Buscar países',
 	[keys.noCountriesFound]: 'No se encontraron países',
-	[keys.preferredCountries]: 'Frecuentes',
-	[keys.allCountries]: 'Todos los países',
 	[keys.phoneRequired]: 'Este campo es obligatorio.',
 	[keys.invalidPhoneNumber]: 'Introduzca un número de teléfono válido.',
 	[keys.phoneNotMobile]: 'Introduzca un número de teléfono móvil.',

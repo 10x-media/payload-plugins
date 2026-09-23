@@ -80,8 +80,8 @@ export const countryOptions = (opts: {
 	countries?: readonly CountryCode[]
 	locale: string
 	metadata: PhoneMetadata
-	preferredCountries?: readonly CountryCode[]
-}): { preferred: CountryOption[]; rest: CountryOption[] } => {
+	priorityCountries?: readonly CountryCode[]
+}): { priority: CountryOption[]; rest: CountryOption[] } => {
 	const names = displayNames(opts.locale)
 	const available = new Set(getCountries(opts.metadata as never))
 	const selected = (opts.countries ?? [...available]).filter((code) => available.has(code))
@@ -92,13 +92,13 @@ export const countryOptions = (opts: {
 		name: names?.of(code) ?? code,
 	})
 
-	const preferredCodes = (opts.preferredCountries ?? []).filter((code) => selected.includes(code))
-	const preferredSet = new Set(preferredCodes)
+	const priorityCodes = (opts.priorityCountries ?? []).filter((code) => selected.includes(code))
+	const prioritySet = new Set(priorityCodes)
 
 	return {
-		preferred: preferredCodes.map(toOption),
+		priority: priorityCodes.map(toOption),
 		rest: selected
-			.filter((code) => !preferredSet.has(code))
+			.filter((code) => !prioritySet.has(code))
 			.map(toOption)
 			.sort((a, b) => a.name.localeCompare(b.name, opts.locale)),
 	}

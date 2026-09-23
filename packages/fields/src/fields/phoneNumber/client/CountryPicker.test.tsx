@@ -102,8 +102,8 @@ vi.mock('../../../translations/useTranslation', () => ({
 
 const { CountryPicker } = await import('./CountryPicker')
 
-const OPTIONS: { preferred: CountryOption[]; rest: CountryOption[] } = {
-	preferred: [
+const OPTIONS: { priority: CountryOption[]; rest: CountryOption[] } = {
+	priority: [
 		{ callingCode: '49', code: 'DE', name: 'Germany' },
 		{ callingCode: '33', code: 'FR', name: 'France' },
 	],
@@ -123,7 +123,7 @@ const LONG_CODES = (
 ).split(' ') as CountryCode[]
 
 const LONG = {
-	preferred: [],
+	priority: [],
 	rest: LONG_CODES.map((code, index) => ({
 		callingCode: String(200 + index),
 		code,
@@ -134,7 +134,8 @@ const LONG = {
 type PickerProps = {
 	disabled?: boolean
 	flags?: PhoneFlagMode
-	options?: { preferred: CountryOption[]; rest: CountryOption[] }
+	options?: { priority: CountryOption[]; rest: CountryOption[] }
+	priorityLabel?: string
 	value?: CountryCode
 }
 
@@ -144,6 +145,7 @@ const picker = (props: PickerProps, onSelect: (code: CountryCode) => void) => (
 		flags={props.flags ?? 'svg'}
 		onSelect={onSelect}
 		options={props.options ?? OPTIONS}
+		priorityLabel={props.priorityLabel}
 		value={props.value}
 	/>
 )
@@ -209,25 +211,43 @@ describe('CountryPicker', () => {
 		expect(screen.queryAllByRole('option')).toHaveLength(0)
 	})
 
-	it('lists the preferred countries above the rest, separated by group headings', () => {
-		renderPicker()
+	it('lists the priority countries above the rest, heading them with the given label', () => {
+		renderPicker({ priorityLabel: 'Popular' })
 		open()
 		expect(rowTexts()).toEqual([
-			'fields:preferredCountries',
+			'Popular',
 			'Germany+49',
 			'France+33',
-			'fields:allCountries',
+			'',
 			'Australia+61',
 			'Japan+81',
 			'United States+1',
 		])
 	})
 
-	it('drops the headings when no preferred countries are configured', () => {
-		renderPicker({ options: { preferred: [], rest: OPTIONS.rest } })
+	it('separates the priority countries with a plain divider when no label is given', () => {
+		renderPicker()
+		open()
+		// Not just "no heading text": a group element still renders as the divider between
+		// the two clusters, distinct from rendering nothing at all.
+		const groups = panel().querySelectorAll('.fields-phone__group')
+		expect(groups).toHaveLength(1)
+		expect(groups[0]?.textContent).toBe('')
+		expect(optionNames()).toEqual(['Germany', 'France', 'Australia', 'Japan', 'United States'])
+	})
+
+	it('drops the separator entirely when no priority countries are configured', () => {
+		renderPicker({ options: { priority: [], rest: OPTIONS.rest } })
 		open()
 		expect(panel().querySelectorAll('.fields-phone__group')).toHaveLength(0)
 		expect(optionNames()).toEqual(['Australia', 'Japan', 'United States'])
+	})
+
+	it('drops the separator when every offered country is a priority country', () => {
+		renderPicker({ options: { priority: OPTIONS.priority, rest: [] }, priorityLabel: 'Popular' })
+		open()
+		expect(panel().querySelectorAll('.fields-phone__group')).toHaveLength(0)
+		expect(optionNames()).toEqual(['Germany', 'France'])
 	})
 
 	it('filters by localized name', () => {
@@ -269,7 +289,7 @@ describe('CountryPicker', () => {
 		expect(screen.queryAllByRole('option')).toHaveLength(0)
 	})
 
-	it('moves the active option with the arrow keys, stepping over group headings', () => {
+	it('moves the active option with the arrow keys, stepping over the divider', () => {
 		renderPicker({ value: 'DE' })
 		open()
 		expect(activeOptionText()).toContain('Germany')
@@ -297,7 +317,7 @@ describe('CountryPicker', () => {
 		fireEvent.keyDown(search(), { key: 'ArrowDown' })
 		expect(activeOptionText()).toContain('France')
 		rerender({
-			options: { preferred: [...OPTIONS.preferred], rest: [...OPTIONS.rest] },
+			options: { priority: [...OPTIONS.priority], rest: [...OPTIONS.rest] },
 			value: 'DE',
 		})
 		expect(activeOptionText()).toContain('France')

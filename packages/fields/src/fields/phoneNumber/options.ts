@@ -31,7 +31,9 @@ type CommonPhoneOptions = {
 	index?: boolean
 	defaultCountry?: CountryCode
 	countries?: readonly CountryCode[]
-	preferredCountries?: readonly CountryCode[]
+	priorityCountries?: readonly CountryCode[]
+	/** Heading over `priorityCountries` in the picker. No label renders no heading, only the group separator. */
+	priorityCountriesLabel?: StaticLabel
 	validation?: PhoneValidationMode
 	flags?: PhoneFlagMode
 	cellFormat?: PhoneFormat
@@ -66,7 +68,8 @@ export type PhoneClientOptions = {
 	 */
 	isClearable: boolean
 	metadata: MetadataSet
-	preferredCountries?: readonly CountryCode[]
+	priorityCountries?: readonly CountryCode[]
+	priorityCountriesLabel?: StaticLabel
 	storage: PhoneStorageMode
 	validation: PhoneValidationMode
 }
@@ -79,7 +82,8 @@ export type ResolvablePhoneFieldOptions = Pick<
 	| 'defaultCountry'
 	| 'flags'
 	| 'isClearable'
-	| 'preferredCountries'
+	| 'priorityCountries'
+	| 'priorityCountriesLabel'
 	| 'validation'
 > & {
 	storage?: PhoneStorageMode
@@ -101,7 +105,8 @@ export const resolvePhoneOptions = (
 	flags: field.flags ?? global?.flags ?? 'svg',
 	isClearable: field.isClearable ?? true,
 	metadata: global?.metadata ?? DEFAULT_METADATA_SET,
-	preferredCountries: field.preferredCountries ?? global?.preferredCountries,
+	priorityCountries: field.priorityCountries ?? global?.priorityCountries,
+	priorityCountriesLabel: field.priorityCountriesLabel ?? global?.priorityCountriesLabel,
 	storage: field.storage ?? 'object',
 	validation: field.validation ?? global?.validation ?? 'valid',
 })
