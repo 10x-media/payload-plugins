@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from 'vitest'
 import { loadMetadata, type PhoneMetadata } from './metadata'
 import {
+	callingCodeOf,
 	checkPhone,
 	detectCountry,
 	digitCount,
@@ -12,6 +13,7 @@ import {
 	parsePhone,
 	phoneSeed,
 	phoneUri,
+	provisionalCountry,
 	salvagePhone,
 } from './phone'
 
@@ -222,6 +224,65 @@ describe('phoneSeed', () => {
 
 	it.each(['abc', ''])('returns null for input the engine cannot parse: %s', (raw) => {
 		expect(phoneSeed(raw, { metadata: max })).toBeNull()
+	})
+})
+
+describe('callingCodeOf', () => {
+	it.each([
+		['+41', '41'],
+		['+4144', '41'],
+		['+1', '1'],
+		['+44', '44'],
+	])('reads %s as +%s', (input, expected) => {
+		expect(callingCodeOf(input, { metadata: max })).toBe(expected)
+	})
+
+	it.each([
+		'+',
+		'+4',
+		'+9',
+		'+999',
+		'',
+		'0151 12345678',
+	])('identifies no calling code in %s', (input) => {
+		expect(callingCodeOf(input, { metadata: max })).toBeUndefined()
+	})
+})
+
+describe('provisionalCountry', () => {
+	// The first country a shared calling code lists is the one it stands for
+	it.each([
+		['+41', 'CH'],
+		['+4144', 'CH'],
+		['+41446681800', 'CH'],
+		['+1', 'US'],
+		['+1604', 'US'],
+		['+16045551234', 'CA'],
+		['+7', 'RU'],
+		['+77', 'KZ'],
+		['+79', 'RU'],
+		['+44', 'GB'],
+		['+4477', 'GB'],
+	])('reads %s as %s', (input, expected) => {
+		expect(provisionalCountry(input, { metadata: max })).toBe(expected)
+	})
+
+	it.each([
+		'+',
+		'+4',
+		'+9',
+		'+999',
+		'',
+		'0151 12345678',
+		'not a number',
+	])('names no country for %s, so junk still fabricates none', (input) => {
+		expect(provisionalCountry(input, { metadata: max })).toBeUndefined()
+	})
+
+	// detectCountry answers only for a complete valid number, which is the whole gap this fills
+	it('answers where the validated read cannot', () => {
+		expect(detectCountry('+41', { metadata: max })).toBeUndefined()
+		expect(provisionalCountry('+41', { metadata: max })).toBe('CH')
 	})
 })
 

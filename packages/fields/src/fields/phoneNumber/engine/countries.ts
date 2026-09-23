@@ -49,6 +49,22 @@ export const KNOWN_COUNTRY_CODES: ReadonlySet<string> = new Set(
 export const isKnownCountry = (code: string): boolean => KNOWN_COUNTRY_CODES.has(code)
 
 /**
+ * The country a calling code belongs to when it belongs to several, which libphonenumber
+ * records as the first of the list. No exported accessor reaches that list, so the metadata
+ * is read directly here and its shape is pinned by a test rather than trusted.
+ */
+export const mainCountryForCallingCode = (
+	callingCode: string,
+	metadata: PhoneMetadata
+): CountryCode | undefined => {
+	const map: unknown = metadata.country_calling_codes
+	if (typeof map !== 'object' || map === null) return undefined
+	const listed: unknown = (map as Record<string, unknown>)[callingCode]
+	const first: unknown = Array.isArray(listed) ? (listed as readonly unknown[])[0] : undefined
+	return typeof first === 'string' && isKnownCountry(first) ? (first as CountryCode) : undefined
+}
+
+/**
  * Intl.DisplayNames covers every admin locale natively, so no translation keys are needed.
  * Only a malformed tag throws; a well-formed but unrecognized one resolves to a default.
  */

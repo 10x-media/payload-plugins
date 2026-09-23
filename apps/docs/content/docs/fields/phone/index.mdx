@@ -40,6 +40,8 @@ The entry takes digits, spacing, and the separators numbers are written with (`+
 
 Entry also stops growing once the draft is longer than any number it could still become. The country's own ceiling decides wherever libphonenumber defines one, and E.164's fifteen digits, calling code counted among them, backstop the rest: several countries, Germany among them, carry no upper bound at all. Digits are what spend that budget, so formatting costs nothing. The ceiling bounds typing rather than pasting: a paste that overruns it still lands, because committing the field salvages the first valid number out of a doubled or decorated one.
 
+Typing a `+` resolves the country as soon as the digits identify a calling code, rather than waiting for a complete number. A code several countries share adopts its main country first (`+1` reads as the United States, `+44` as the United Kingdom, `+7` as Russia) and moves to a specific one once the leading digits distinguish it (`+7 7` is Kazakhstan, `+1 604 555 1234` is Canada). A calling code no country claims resolves nothing. The picker always overrides whatever was resolved.
+
 ## Derived read shape
 
 Under `storage: 'object'`, a single `afterRead` hook (one hook, not one per subfield) parses the stored `number` and enriches the group with `national`, `international`, `callingCode`, `uri`, and `type`, without touching the persisted `number`/`country` pair. These five fields are `virtual: true`, so they exist only on read: Payload rejects a `where` clause that filters or sorts on them. Filter and sort on `number` or `country`, the two real columns, instead.

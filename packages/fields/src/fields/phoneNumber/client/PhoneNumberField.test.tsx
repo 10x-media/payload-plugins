@@ -561,6 +561,50 @@ describe('PhoneNumberField', () => {
 		expect(prefix()).toBe('+1')
 	})
 
+	it.each([
+		['+41', 'CH'],
+		['+1', 'US'],
+		['+7', 'RU'],
+		['+44', 'GB'],
+	])('adopts the country %s identifies before the number is complete', async (draft, expected) => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type(draft)
+		expect(picker().dataset.value).toBe(expected)
+	})
+
+	it('refines the country once the digits name one within the calling code', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('+1')
+		expect(picker().dataset.value).toBe('US')
+		type('+16045551234')
+		expect(picker().dataset.value).toBe('CA')
+	})
+
+	it('leaves the country alone for a calling code no country claims', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('+999')
+		expect(picker().dataset.value).toBe('DE')
+	})
+
+	// Without shedding the code, the draft would name the old country straight back over the pick
+	it('sheds the calling code of a draft too short to parse when a country is picked', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('+1')
+		expect(picker().dataset.value).toBe('US')
+		fireEvent.click(screen.getByText('pick-CH'))
+		expect(picker().dataset.value).toBe('CH')
+		expect(prefix()).toBe('+41')
+		expect(input().value).toBe('')
+	})
+
+	it('keeps the digits after the calling code when a country is picked', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('+1604')
+		fireEvent.click(screen.getByText('pick-CH'))
+		expect(picker().dataset.value).toBe('CH')
+		expect(input().value).toBe('604')
+	})
+
 	// libphonenumber reads the country back off the area code, which for a shared calling code
 	// answers a different country than the one the viewer just chose
 	it('keeps a picked country the stored number would re-derive away from', async () => {

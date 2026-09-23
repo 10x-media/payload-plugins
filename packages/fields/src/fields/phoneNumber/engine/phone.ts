@@ -4,6 +4,7 @@ import {
 	parsePhoneNumberFromString,
 	validatePhoneNumberLength,
 } from 'libphonenumber-js/core'
+import { mainCountryForCallingCode } from './countries'
 import type { PhoneMetadata } from './metadata'
 
 export type { CountryCode }
@@ -148,6 +149,33 @@ export const salvagePhone = (input: string, opts: PhoneOptions): null | ParsedPh
 
 export const detectCountry = (input: string, opts: PhoneOptions): CountryCode | undefined =>
 	salvagePhone(input, opts)?.country
+
+const readTyping = (
+	input: string,
+	metadata: PhoneMetadata
+): { callingCode: string | undefined; country: CountryCode | undefined } => {
+	const typing = new AsYouType(undefined, metadata as never)
+	typing.input(input)
+	return { callingCode: typing.getCallingCode(), country: typing.getCountry() }
+}
+
+/** The calling code the typed digits already identify, undefined while none fits them. */
+export const callingCodeOf = (input: string, opts: PhoneOptions): string | undefined =>
+	readTyping(input, opts.metadata).callingCode
+
+/**
+ * The country a partial international draft already implies. Which calling code this is settles
+ * on sight; which country within a shared one takes more digits, so the code's main country
+ * stands in until the leading digits distinguish a specific one. Undefined for anything that
+ * carries no calling code at all, so junk still names no country.
+ */
+export const provisionalCountry = (input: string, opts: PhoneOptions): CountryCode | undefined => {
+	const { callingCode, country } = readTyping(input, opts.metadata)
+	if (country !== undefined) return country
+	return callingCode === undefined
+		? undefined
+		: mainCountryForCallingCode(callingCode, opts.metadata)
+}
 
 export const checkPhone = (
 	input: string,

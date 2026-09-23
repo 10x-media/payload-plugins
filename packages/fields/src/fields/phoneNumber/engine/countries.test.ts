@@ -1,4 +1,4 @@
-import { getCountries } from 'libphonenumber-js/core'
+import { getCountries, getCountryCallingCode } from 'libphonenumber-js/core'
 import { beforeAll, describe, expect, it } from 'vitest'
 import {
 	callingCodeFor,
@@ -7,6 +7,7 @@ import {
 	isKnownCountry,
 	isSupported,
 	KNOWN_COUNTRY_CODES,
+	mainCountryForCallingCode,
 } from './countries'
 import { loadMetadata, type PhoneMetadata } from './metadata'
 import type { CountryCode } from './phone'
@@ -136,5 +137,55 @@ describe('callingCodeFor', () => {
 
 	it('returns undefined rather than throwing for a code the set does not carry', () => {
 		expect(callingCodeFor('ZZ' as CountryCode, max)).toBeUndefined()
+	})
+})
+
+/** The one shape this module reads straight out of the metadata rather than through an API. */
+const callingCodeMap = (metadata: PhoneMetadata): Record<string, readonly string[]> => {
+	const map = metadata.country_calling_codes
+	if (typeof map !== 'object' || map === null) throw new Error('country_calling_codes is missing')
+	return map as Record<string, readonly string[]>
+}
+
+describe('mainCountryForCallingCode', () => {
+	it.each([
+		['1', 'US'],
+		['7', 'RU'],
+		['41', 'CH'],
+		['44', 'GB'],
+		['49', 'DE'],
+	])('reads +%s as %s', (callingCode, expected) => {
+		expect(mainCountryForCallingCode(callingCode, max)).toBe(expected)
+	})
+
+	it.each(['', '9', '999', '882'])('has no main country for +%s', (callingCode) => {
+		expect(mainCountryForCallingCode(callingCode, max)).toBeUndefined()
+	})
+
+	it('answers the same way across every metadata set', async () => {
+		const [min, mobile] = await Promise.all([loadMetadata('min'), loadMetadata('mobile')])
+		for (const set of [min, mobile]) {
+			expect(mainCountryForCallingCode('1', set)).toBe('US')
+			expect(mainCountryForCallingCode('44', set)).toBe('GB')
+		}
+	})
+
+	// A library upgrade that reshapes the map has to fail here rather than silently read nothing
+	it('pins the metadata shape it reads', () => {
+		const entries = Object.entries(callingCodeMap(max))
+		expect(entries.length).toBeGreaterThan(200)
+		for (const [callingCode, listed] of entries) {
+			expect(callingCode).toMatch(/^\d+$/)
+			expect(Array.isArray(listed)).toBe(true)
+			expect(listed.length).toBeGreaterThan(0)
+			expect(mainCountryForCallingCode(callingCode, max)).toBe(listed[0])
+		}
+	})
+
+	it('lists every supported country under the calling code it belongs to', () => {
+		const map = callingCodeMap(max)
+		for (const code of getCountries(max as never)) {
+			expect(map[getCountryCallingCode(code, max as never)]).toContain(code)
+		}
 	})
 })

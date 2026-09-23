@@ -22,6 +22,7 @@ import { callingCodeFor, countryOptions } from '../engine/countries'
 import { loadMetadata, type PhoneMetadata } from '../engine/metadata'
 import {
 	type CountryCode,
+	callingCodeOf,
 	detectCountry,
 	digitCount,
 	exceedsPhoneLength,
@@ -31,6 +32,7 @@ import {
 	nationalPart,
 	type PhoneSeed,
 	parsePhone,
+	provisionalCountry,
 	salvagePhone,
 } from '../engine/phone'
 import type { PhoneClientOptions } from '../options'
@@ -88,6 +90,20 @@ const formatDraft = (args: {
 	const prefix = `+${callingCode}`
 	const formatted = formatAsYouType(`${prefix}${raw}`, undefined, { metadata })
 	return formatted.startsWith(prefix) ? formatted.slice(prefix.length).trimStart() : formatted
+}
+
+/**
+ * An international draft carries its own calling code, which a picked country replaces. A draft
+ * too short to parse still has to shed it, or the code left behind would name the country back.
+ */
+const dropCallingCode = (draft: string, metadata: null | PhoneMetadata): string => {
+	if (!metadata || !isInternational(draft)) return draft
+	const parsed = parsePhone(draft, { metadata })
+	if (parsed) return nationalPart(parsed)
+	const callingCode = callingCodeOf(draft, { metadata })
+	if (callingCode === undefined) return draft
+	const digits = draft.replace(/\D/g, '')
+	return digits.startsWith(callingCode) ? digits.slice(callingCode.length) : draft
 }
 
 /** `derived` marks a commit whose country came out of the number rather than off the row. */
@@ -217,8 +233,13 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 		if (!editingRef.current) setDraft(display)
 	}, [display])
 
+	// The validated read refines the provisional one: `+1` is the United States on sight, and
+	// stays so until enough digits arrive for libphonenumber to name Canada instead.
 	const draftCountry = useMemo(
-		() => (metadata && isInternational(draft) ? detectCountry(draft, { metadata }) : undefined),
+		() =>
+			metadata && isInternational(draft)
+				? (detectCountry(draft, { metadata }) ?? provisionalCountry(draft, { metadata }))
+				: undefined,
 		[draft, metadata]
 	)
 	// The pick outranks the stored country because e164 storage has no country column to write
@@ -333,9 +354,7 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 			cancelPending()
 			editingRef.current = false
 			setPickedCountry(code)
-			// An international draft carries its own calling code; the new country replaces it
-			const parsed = metadata && isInternational(draft) ? parsePhone(draft, { metadata }) : null
-			const entry = commit(parsed ? nationalPart(parsed) : draft, { country: code })
+			const entry = commit(dropCallingCode(draft, metadata), { country: code })
 			setDraft(displayFor(entry, metadata))
 		},
 		[cancelPending, commit, draft, metadata]
