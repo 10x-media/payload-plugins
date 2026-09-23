@@ -191,19 +191,22 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	max-height: 340px;
 }
 
+/* The gap matches Popup's own content padding, so the search clears the panel edge by the
+   same 10px on all four sides. */
 .fields-phone__panel {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: 10px;
 	width: 260px;
 }
 
+/* Native input size: Payload's scale carries nothing smaller than 40px at 1rem */
 .fields-phone__search {
 	display: flex;
 	flex-shrink: 0;
 	align-items: center;
 	gap: 6px;
-	height: 32px;
+	height: 40px;
 	padding: 0 8px;
 	border: 1px solid var(--theme-elevation-150);
 	border-radius: var(--style-radius-s);
@@ -229,7 +232,7 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	background: transparent;
 	color: inherit;
 	font-family: var(--font-body);
-	font-size: 0.9rem;
+	font-size: 1rem;
 	outline: 0;
 }
 
@@ -237,8 +240,10 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	color: var(--theme-elevation-400);
 }
 
+/* Eight whole rows of 34px: a fractional cap clips the last one against the panel edge,
+   which reads as the bottom padding being tighter than the top. */
 .fields-phone__list {
-	max-height: 280px;
+	max-height: 272px;
 	overflow-y: auto;
 }
 
