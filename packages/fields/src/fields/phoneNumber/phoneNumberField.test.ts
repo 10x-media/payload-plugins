@@ -295,6 +295,16 @@ describe('phoneNumberField derived read hook', () => {
 		expect(await hook?.({ req: reqWithRegistry(), value } as never)).toBe(value)
 	})
 
+	// Bulk imports and migrations are how phone data actually arrives, and neither goes
+	// through the field's validation. Without the guard, reading one such row throws inside
+	// afterRead, which fails the whole request rather than that one field.
+	it('returns a stored number it cannot parse unchanged, rather than failing the read', async () => {
+		const field = group({ name: 'phone' })
+		const hook = field.hooks?.afterRead?.[0]
+		const value = { country: 'DE', number: 'not a phone number' }
+		expect(await hook?.({ req: reqWithRegistry(), value } as never)).toBe(value)
+	})
+
 	it('reads the registry metadata set at request time, not the factory default', async () => {
 		const field = group({ name: 'phone' })
 		const hook = field.hooks?.afterRead?.[0]
