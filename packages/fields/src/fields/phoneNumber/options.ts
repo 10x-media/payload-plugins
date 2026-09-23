@@ -56,8 +56,8 @@ export type PhoneNumberE164FieldOptions = CommonPhoneOptions & {
 
 export type AnyPhoneNumberFieldOptions = PhoneNumberE164FieldOptions | PhoneNumberFieldOptions
 
-/** Serializable subset shipped to the admin client via clientProps. */
-export type PhoneClientOptions = {
+/** Every phone option with its layers merged and its defaults applied. Server-side. */
+export type ResolvedPhoneOptions = {
 	cellFormat: PhoneFormat
 	countries?: readonly CountryCode[]
 	defaultCountry?: CountryCode
@@ -98,7 +98,7 @@ export type ResolvablePhoneFieldOptions = Pick<
 export const resolvePhoneOptions = (
 	field: ResolvablePhoneFieldOptions,
 	global: PhoneNumberGlobalConfig | undefined
-): PhoneClientOptions => ({
+): ResolvedPhoneOptions => ({
 	cellFormat: field.cellFormat ?? global?.cellFormat ?? 'international',
 	countries: field.countries ?? global?.countries,
 	defaultCountry: field.defaultCountry ?? global?.defaultCountry,

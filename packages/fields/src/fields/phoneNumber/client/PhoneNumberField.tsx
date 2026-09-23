@@ -35,7 +35,7 @@ import {
 	provisionalCountry,
 	salvagePhone,
 } from '../engine/phone'
-import type { PhoneClientOptions } from '../options'
+import type { ResolvedPhoneOptions } from '../options'
 import { type CountryOptionGroups, CountryPicker } from './CountryPicker'
 import './phoneNumberField.css'
 
@@ -141,10 +141,17 @@ const resolveCommit = (args: {
 	return { country, derived: false, number: trimmed }
 }
 
+/**
+ * `cellFormat` and `validation` are read only on the server, so they are neither shipped
+ * nor readable here: reading `validation` client-side would state a verdict the server
+ * has not reached.
+ */
+export type PhoneFieldClientOptions = Omit<ResolvedPhoneOptions, 'cellFormat' | 'validation'>
+
 /** A group under object storage, a text field under e164; the row is identical either way. */
 export type PhoneNumberFieldProps = {
 	field: GroupFieldClientProps['field'] | TextFieldClientProps['field']
-	phoneOptions: PhoneClientOptions
+	phoneOptions: PhoneFieldClientOptions
 	/** The stored row as the server already split it, painted until metadata lands. */
 	seed?: null | PhoneSeed
 } & Omit<GroupFieldClientProps, 'field'>

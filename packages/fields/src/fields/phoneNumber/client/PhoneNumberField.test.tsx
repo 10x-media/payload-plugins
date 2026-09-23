@@ -5,7 +5,7 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { CountryOption } from '../engine/countries'
 import { loadMetadata } from '../engine/metadata'
 import type { CountryCode, PhoneSeed } from '../engine/phone'
-import type { PhoneClientOptions } from '../options'
+import type { PhoneFieldClientOptions } from './PhoneNumberField'
 
 type FieldAction = { path: string; type: string; value: unknown }
 
@@ -146,13 +146,11 @@ const { PhoneNumberField } = await import('./PhoneNumberField')
 
 type PhoneFieldProps = Parameters<typeof PhoneNumberField>[0]
 
-const OPTIONS: PhoneClientOptions = {
-	cellFormat: 'international',
+const OPTIONS: PhoneFieldClientOptions = {
 	flags: 'svg',
 	isClearable: true,
 	metadata: 'max',
 	storage: 'object',
-	validation: 'valid',
 }
 
 type FieldAdmin = {
@@ -180,7 +178,7 @@ const makeField = (
 type RenderArgs = {
 	admin?: FieldAdmin
 	localized?: boolean
-	phoneOptions?: Partial<PhoneClientOptions>
+	phoneOptions?: Partial<PhoneFieldClientOptions>
 	readOnly?: boolean
 	required?: boolean
 	seed?: null | PhoneSeed

@@ -2,8 +2,8 @@ import type { Payload } from 'payload'
 import { getFieldsRegistry } from '../../../plugin/registry'
 import { isMetadataSet } from '../engine/metadata'
 import {
-	type PhoneClientOptions,
 	type ResolvablePhoneFieldOptions,
+	type ResolvedPhoneOptions,
 	resolvePhoneOptions,
 } from '../options'
 
@@ -22,7 +22,7 @@ import {
 export const resolvePhoneOptionsSafe = (args: {
 	fieldOptions: ResolvablePhoneFieldOptions
 	payload: Payload
-}): PhoneClientOptions => {
+}): ResolvedPhoneOptions => {
 	const { fieldOptions, payload } = args
 	const registryConfig = getFieldsRegistry(payload.config)?.phoneNumber
 	// Widened deliberately: the union only holds for a config the plugin actually normalized.

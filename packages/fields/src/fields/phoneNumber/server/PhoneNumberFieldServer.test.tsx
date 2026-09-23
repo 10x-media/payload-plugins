@@ -151,6 +151,20 @@ describe('PhoneNumberFieldServer', () => {
 		expect(seed).toEqual(DE_SEED)
 	})
 
+	// The client cannot read either one, so shipping them would put two dead values in the
+	// clientProps of every phone field on the config.
+	it('ships the resolved options without the two the client never reads', async () => {
+		const node = (await PhoneNumberFieldServer(
+			buildProps({ payload: fakePayload({ cellFormat: 'national' }), siblingData: {} })
+		)) as React.ReactElement<{ phoneOptions: Record<string, unknown> }>
+		expect(node.props.phoneOptions).toEqual({
+			flags: 'svg',
+			isClearable: true,
+			metadata: 'max',
+			storage: 'object',
+		})
+	})
+
 	it('still throws when the field carries no phone options at all', async () => {
 		const props = buildProps({ siblingData: { phone: DE_E164 } })
 		await expect(PhoneNumberFieldServer({ ...props, phoneOptions: undefined })).rejects.toThrow(

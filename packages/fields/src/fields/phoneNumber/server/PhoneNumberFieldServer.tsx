@@ -36,6 +36,9 @@ export const PhoneNumberFieldServer = async (props: PhoneNumberFieldServerCompon
 		)
 	}
 	const resolved = resolvePhoneOptionsSafe({ fieldOptions: phoneOptions, payload: req.payload })
+	// cellFormat belongs to the list cell and validation is decided server-side; shipping
+	// either would put a value in every field's clientProps that nothing there may read.
+	const { cellFormat, validation, ...clientOptions } = resolved
 
 	// Metadata is free here and lazy on the client, so the split row is derived once on the
 	// server and handed over: without it the first client frame paints the raw E.164 and reflows.
@@ -60,7 +63,7 @@ export const PhoneNumberFieldServer = async (props: PhoneNumberFieldServerCompon
 			field={clientField}
 			path={path}
 			permissions={permissions}
-			phoneOptions={resolved}
+			phoneOptions={clientOptions}
 			readOnly={readOnly}
 			seed={seed}
 		/>

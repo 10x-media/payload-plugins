@@ -8,12 +8,12 @@ export type {
 } from '../fields/color/options'
 export type {
 	AnyPhoneNumberFieldOptions,
-	PhoneClientOptions,
 	PhoneFlagMode,
 	PhoneNumberE164FieldOptions,
 	PhoneNumberFieldOptions,
 	PhoneStorageMode,
 	ResolvablePhoneFieldOptions,
+	ResolvedPhoneOptions,
 } from '../fields/phoneNumber/options'
 export type { FieldsPluginOptions } from '../index'
 export type {
