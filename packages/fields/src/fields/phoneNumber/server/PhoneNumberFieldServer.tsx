@@ -2,7 +2,8 @@ import type { GroupFieldServerProps, TextFieldServerProps } from 'payload'
 import { PhoneNumberField } from '../client/PhoneNumberField'
 import { loadMetadata } from '../engine/metadata'
 import { type PhoneSeed, phoneSeed } from '../engine/phone'
-import { PHONE_CUSTOM_KEY, type ResolvablePhoneFieldOptions } from '../options'
+import type { ResolvablePhoneFieldOptions } from '../options'
+import { readPhoneOptions } from './readPhoneOptions'
 import { resolvePhoneOptionsSafe } from './resolvePhoneOptionsSafe'
 
 type PhoneNumberFieldServerComponentProps = {
@@ -26,15 +27,11 @@ const storedNumber = (sibling: unknown, name: string): string => {
  */
 export const PhoneNumberFieldServer = async (props: PhoneNumberFieldServerComponentProps) => {
 	const { clientField, field, path, permissions, readOnly, req, siblingData } = props
-	const phoneOptions =
-		props.phoneOptions ??
-		(field.custom?.[PHONE_CUSTOM_KEY] as ResolvablePhoneFieldOptions | undefined)
-	if (!phoneOptions) {
-		const name = 'name' in field ? String(field.name) : ''
-		throw new Error(
-			`PhoneNumberFieldServer: field "${name}" has no phoneOptions clientProp and no custom['${PHONE_CUSTOM_KEY}']`
-		)
-	}
+	const phoneOptions = readPhoneOptions({
+		component: 'PhoneNumberFieldServer',
+		field,
+		propOptions: props.phoneOptions,
+	})
 	const resolved = resolvePhoneOptionsSafe({ fieldOptions: phoneOptions, payload: req.payload })
 	// cellFormat belongs to the list cell and validation is decided server-side; shipping
 	// either would put a value in every field's clientProps that nothing there may read.

@@ -2,12 +2,8 @@ import type { ClientField, DefaultServerCellComponentProps } from 'payload'
 import { emojiFlag } from '../engine/countries'
 import { loadMetadata } from '../engine/metadata'
 import { type CountryCode, type ParsedPhone, type PhoneFormat, parsePhone } from '../engine/phone'
-import {
-	countryFlagSrc,
-	PHONE_CUSTOM_KEY,
-	type PhoneFlagMode,
-	type ResolvablePhoneFieldOptions,
-} from '../options'
+import { countryFlagSrc, type PhoneFlagMode, type ResolvablePhoneFieldOptions } from '../options'
+import { readPhoneOptions } from './readPhoneOptions'
 import { resolvePhoneOptionsSafe } from './resolvePhoneOptionsSafe'
 
 type PhoneNumberCellRawValue = { country?: string; number?: string } | null | string | undefined
@@ -48,15 +44,11 @@ const renderFlag = (args: {
  */
 export const PhoneNumberCellServer = async (props: PhoneNumberCellServerComponentProps) => {
 	const { cellData, field, payload } = props
-	const phoneOptions =
-		props.phoneOptions ??
-		(field.custom?.[PHONE_CUSTOM_KEY] as ResolvablePhoneFieldOptions | undefined)
-	if (!phoneOptions) {
-		const name = 'name' in field ? String(field.name) : ''
-		throw new Error(
-			`PhoneNumberCellServer: field "${name}" has no phoneOptions clientProp and no custom['${PHONE_CUSTOM_KEY}']`
-		)
-	}
+	const phoneOptions = readPhoneOptions({
+		component: 'PhoneNumberCellServer',
+		field,
+		propOptions: props.phoneOptions,
+	})
 	const resolved = resolvePhoneOptionsSafe({ fieldOptions: phoneOptions, payload })
 
 	const raw = typeof cellData === 'string' ? cellData : (cellData?.number ?? '')
