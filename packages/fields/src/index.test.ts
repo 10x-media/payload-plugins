@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { lucideAdapter } from './fields/icon/adapters/lucide/adapter'
 import type { MetadataSet } from './fields/phoneNumber/engine/metadata'
 import type { CountryCode } from './fields/phoneNumber/engine/phone'
+import { FLAGS_ENDPOINT_PATH } from './fields/phoneNumber/server/flagsEndpoint'
 import { fields } from './index'
 import { getFieldsRegistry } from './plugin/registry'
 import { keys } from './translations'
@@ -131,5 +132,19 @@ describe('fields factory', () => {
 		} as const
 		const out = fields({ phoneNumber })(fakeConfig()) as Config
 		expect(getFieldsRegistry(asSanitized(out))?.phoneNumber).toEqual(phoneNumber)
+	})
+
+	it('mounts the flags endpoint by default', () => {
+		const out = fields({})(fakeConfig()) as Config
+		expect(out.endpoints).toContainEqual(
+			expect.objectContaining({ method: 'get', path: FLAGS_ENDPOINT_PATH })
+		)
+	})
+
+	it('skips the flags endpoint when phoneNumber.serveFlags is false', () => {
+		const out = fields({ phoneNumber: { serveFlags: false } })(fakeConfig()) as Config
+		expect(out.endpoints ?? []).not.toContainEqual(
+			expect.objectContaining({ path: FLAGS_ENDPOINT_PATH })
+		)
 	})
 })
