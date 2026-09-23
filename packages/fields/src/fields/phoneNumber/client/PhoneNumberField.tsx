@@ -247,12 +247,15 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 	const country =
 		draftCountry ?? pickedCountry ?? storedCountry ?? seeded?.country ?? defaultCountry
 
+	const countriesKey = countries?.join()
+	const preferredKey = preferredCountries?.join()
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a form-state round trip hands the same allowlist back as a new array, so the contents are the dependency, not the identity
 	const options = useMemo(
 		() =>
 			metadata
 				? countryOptions({ countries, locale: i18n.language, metadata, preferredCountries })
 				: NO_COUNTRIES,
-		[countries, i18n.language, metadata, preferredCountries]
+		[countriesKey, i18n.language, metadata, preferredKey]
 	)
 	// Off the country, not off `options`: an allowlist that does not offer the stored country
 	// would otherwise drop the prefix once metadata lands, reflowing the row back.
