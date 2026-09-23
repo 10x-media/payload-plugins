@@ -19,15 +19,9 @@ import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import { resolveStaticLabel } from '../../../utils/resolveStaticLabel'
 import { callingCodeFor, countryOptions } from '../engine/countries'
+import { isInternational, type PhoneSeed, provisionalCountry } from '../engine/draft'
 import { loadMetadata, type PhoneMetadata } from '../engine/metadata'
-import {
-	type CountryCode,
-	detectCountry,
-	isInternational,
-	type PhoneSeed,
-	parsePhone,
-	provisionalCountry,
-} from '../engine/phone'
+import { type CountryCode, detectCountry, parsePhone } from '../engine/phone'
 import type { ResolvedPhoneOptions } from '../options'
 import { type CountryOptionGroups, CountryPicker } from './CountryPicker'
 import {

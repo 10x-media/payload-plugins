@@ -2,7 +2,7 @@ import type { Payload, SanitizedConfig } from 'payload'
 import type React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FIELDS_REGISTRY_KEY } from '../../../plugin/registry'
-import type { PhoneSeed } from '../engine/phone'
+import type { PhoneSeed } from '../engine/draft'
 import { PHONE_CUSTOM_KEY, type ResolvablePhoneFieldOptions } from '../options'
 
 // The subject is what the server derives and hands over, so the client field is a stub: the real

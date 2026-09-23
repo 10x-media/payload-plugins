@@ -3,8 +3,9 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type React from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { CountryOption } from '../engine/countries'
+import type { PhoneSeed } from '../engine/draft'
 import { loadMetadata } from '../engine/metadata'
-import type { CountryCode, PhoneSeed } from '../engine/phone'
+import type { CountryCode } from '../engine/phone'
 import type { PhoneFieldClientOptions } from './PhoneNumberField'
 
 type FieldAction = { path: string; type: string; value: unknown }

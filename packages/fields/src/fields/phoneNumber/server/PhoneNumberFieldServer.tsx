@@ -1,7 +1,7 @@
 import type { GroupFieldServerProps, TextFieldServerProps } from 'payload'
 import { PhoneNumberField } from '../client/PhoneNumberField'
+import { type PhoneSeed, phoneSeed } from '../engine/draft'
 import { loadMetadata } from '../engine/metadata'
-import { type PhoneSeed, phoneSeed } from '../engine/phone'
 import type { ResolvablePhoneFieldOptions } from '../options'
 import { readPhoneOptions } from './readPhoneOptions'
 import { resolvePhoneOptionsSafe } from './resolvePhoneOptionsSafe'

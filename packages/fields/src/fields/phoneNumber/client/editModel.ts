@@ -1,16 +1,13 @@
-import type { PhoneMetadata } from '../engine/metadata'
 import {
-	type CountryCode,
 	callingCodeOf,
 	digitCount,
 	exceedsPhoneLength,
-	formatAsYouType,
 	isInternational,
 	isPhoneInput,
 	nationalPart,
-	parsePhone,
-	salvagePhone,
-} from '../engine/phone'
+} from '../engine/draft'
+import type { PhoneMetadata } from '../engine/metadata'
+import { type CountryCode, formatAsYouType, parsePhone, salvagePhone } from '../engine/phone'
 
 /** What one commit boundary stores: the E.164 number and the country it was read under. */
 export type PhoneEntry = { country: CountryCode | undefined; number: null | string }
