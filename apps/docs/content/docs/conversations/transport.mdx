@@ -1,0 +1,39 @@
+---
+title: Transport
+description: How the client learns about new messages, and where a realtime adapter plugs in.
+---
+
+## Polling, the default
+
+- Only conversations on screen are polled, and only while their tab is visible.
+- **One tab per key.** Each key has a Web Lock (`conversations:<instance>:<key>`). The visible tab holding it polls, and a hidden tab lets it go. When the leader closes or hides, a waiting tab takes over and keeps the old clock rather than polling on arrival.
+- **One request per tick.** A tab polls every key it leads in a single `POST /poll`. Results reach every tab over a `BroadcastChannel`, so tabs that do not lead a key still hear about it.
+- **Intervals.** 60 s while only triggers are mounted, 15 s while a feed of the key is open in any tab. A tab returning after longer than an interval checks at once. Your own send, edit or read updates your tab immediately and tells the other tabs.
+- **No access code per tick.** `subscribe` returns an HMAC-signed token per key, naming the user, key and readable channels, valid for 10 minutes. The poll verifies tokens and runs one query: which keys have a message in a readable channel with `updatedAt` after `since` minus 10 seconds. Loading messages always runs full access, so revocation only delays the "something changed" signal, by at most the token lifetime.
+- Without Web Locks or `BroadcastChannel`, each visible tab polls for itself.
+
+```ts
+pollingTransport({ intervals: { idle: 60_000, active: 15_000 } })
+```
+
+## A realtime adapter
+
+The transport has two halves. The server half is the `transport` option: `publish({ instance, key, req })` runs after every write. The client half goes to `ChatProvider`:
+
+```ts
+type ConversationsClientTransport = {
+  connect: (args: {
+    instance: string
+    poll: (body: { since: string; tokens: string[] }) => Promise<PollResponse>
+    onChange: (keys: string[]) => void
+    onExpired: (keys: string[]) => void
+  }) => {
+    watch: (entries: Array<{ key: string; token: string }>, since: string) => void
+    setActive: (key: string, active: boolean) => void
+    notify: (keys: string[]) => void
+    destroy: () => void
+  }
+}
+```
+
+An SSE or websocket adapter subscribes to the watched keys, authorizing with the same tokens, and calls `onChange` when `publish` fires for one of them. On a serverless host, `publish` can call a hosted pub/sub. The plugin ships only polling for now.

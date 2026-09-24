@@ -1,0 +1,71 @@
+---
+title: UI primitives
+description: Admin components, headless hooks for a website, and slots.
+---
+
+The package ships pieces, not a page. The admin drawer that `comments()` mounts is built from the same components you can arrange yourself.
+
+## Admin components (`/client`)
+
+| Component | Does | Slots (props) |
+|---|---|---|
+| `ChatTrigger` | Button with count and unread dot; opens `ChatDrawer`. Hidden without a readable channel | |
+| `ChatDrawer` | Payload drawer: header, channel tabs, feed, composer. Threads open as a stacked drawer | `header`, `renderType` |
+| `ChatChannelTabs` | Tabs with unread counts; hidden with one channel | |
+| `ChatFeed` | Scroll window: load earlier, keeps its place, "New messages" divider, "N new" pill, day separators, grouping | `renderMessage`, `items`, `empty`, `renderType` |
+| `ChatMessage` | Avatar, name, time, body, edited mark, thread summary, deleted placeholder, inline edit | `header`, `actions`, `footer` |
+| `ChatComposer` | Payload's own rich text field in a plugin form, channel cue, send-failed with Retry | `above`, `actions`, `submitOn` |
+| `ChatThread` | Root, replies, reply composer | |
+
+The composer is Payload's rich text field, with the instance's editor, loaded through `getFormState`. Toolbar, links and lists behave as in any document. Enter sends and Shift+Enter breaks the line. In a list, Enter adds an item. `submitOn: 'mod+enter'` makes only Ctrl/Cmd+Enter send.
+
+A custom view (a ticket inbox, a room) combines them under the admin provider the plugin registers:
+
+```tsx
+'use client'
+import { ChatComposer, ChatFeed } from '@10x-media/conversations/client'
+import { ChatScope, useConversation } from '@10x-media/conversations/react'
+
+export const Room = ({ roomId }: { roomId: string }) => (
+  <ChatScope instance="rooms">
+    <RoomFeed conversationKey={`collection:rooms:${roomId}`} />
+  </ChatScope>
+)
+
+const RoomFeed = ({ conversationKey }: { conversationKey: string }) => {
+  const conversation = useConversation({ key: conversationKey, channel: 'general' })
+  return (
+    <>
+      <ChatFeed conversation={conversation} instance="rooms" />
+      <ChatComposer channel="general" conversationKey={conversationKey} instance="rooms" />
+    </>
+  )
+}
+```
+
+## Headless (`/react`)
+
+No `@payloadcms/ui` import, so these work on a website. Wrap the tree once per instance:
+
+```tsx
+import { ChatProvider, pollingTransport } from '@10x-media/conversations/react'
+
+<ChatProvider instance="comments" apiRoute="/api" transport={pollingTransport()}>
+  {children}
+</ChatProvider>
+```
+
+| Hook | Returns |
+|---|---|
+| `useChannels(key)` | readable channels with `canCreate`, label, cue and unread, plus `count` and `viewer`. Mounts in one tick share one request |
+| `useUnread(keys)` | `{ [key]: { [channel]: number } }` |
+| `useConversation({ key, channel \| channels, parent? })` | `messages`, `authors`, `hasOlder`, `hasNewer`, `loadOlder`, `loadNewer`, `jumpToLatest`, `dividerBefore`, `markSeen`, `status` |
+| `useSend({ key, channel, parent? })` | `send({ body } \| { text })` with an idempotent `clientId` and an optimistic message; `retry(clientId)` |
+| `useMessageActions()` | `edit`, `remove` |
+| `useMentionSearch({ key, channel, query })` | candidates, debounced |
+
+`MessageBody` renders a message through Lexical's JSX converters, with mentions read from the live `authors` projection. A website that has no Lexical editor can send `{ text }`, which the server wraps into a body.
+
+## Config-level slots
+
+`slots` in the options takes Payload component paths, resolved through the import map: `composerAbove`, `drawerHeader`, `messageActions` and `messageFooter`. A client component renders directly with `{ conversationKey, instance, channel?, message? }`. A server component renders through `render-widget`, like a custom message type. Per-message slots then cost one request per message, so prefer client components for `messageActions` and `messageFooter`.

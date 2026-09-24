@@ -1,0 +1,47 @@
+---
+title: Conversations
+description: Messages bound to any document, with channels, threads, mentions and read state. Comments are the first extension.
+---
+
+`@10x-media/conversations` adds conversations to Payload. A conversation belongs to a target (a document, a global, or a key of your own), and its messages live in channels that decide who reads what. Threads are one level deep. Mentions go through a Lexical feature and end in a hook. Every user has their own read state.
+
+The core has no opinion on what a conversation is for. `comments()` turns it into a Comments button on edit views. A ticket system or a chat room is another configuration of the same core, with a view you build from the primitives.
+
+```ts title="payload.config.ts"
+import { conversations, perTarget } from '@10x-media/conversations'
+import { comments } from '@10x-media/conversations/comments'
+
+export default buildConfig({
+  plugins: [
+    conversations({
+      slug: 'comments',
+      access: perTarget(({ req }) => Boolean(req.user)),
+      channels: [
+        {
+          slug: 'internal',
+          label: 'Internal',
+          access: { read: ({ req }) => req.user?.collection === 'users', create: ({ req }) => req.user?.collection === 'users' },
+        },
+      ],
+      extensions: [comments({ collections: { posts: true } })],
+    }),
+  ],
+})
+```
+
+## The model
+
+- **Instance.** One `conversations()` call, named by `slug`. It registers `<slug>-messages` and `<slug>-reads` and serves the endpoints under `/api/conversations/<slug>`. Call it again for another use case.
+- **Key.** A conversation is a string: `collection:<slug>:<id>`, `global:<slug>` or `custom:<anything>`. The target holds no reference to it, so no field is added to your collections.
+- **Channel.** An attribute of each message, with its own `read`, `create`, `update` and `delete` access. A target offers the channels you list for it.
+- **Thread.** A reply points at its root. Roots count their replies atomically on both adapters.
+- **Read state.** A cursor per user, conversation and channel, plus one per opened thread.
+
+## Where to go next
+
+- [Quick start](/conversations/quick-start): install, configure access and channels, and add comments.
+- [Access](/conversations/access): conversation access, channel access, mentions, and why REST is closed.
+- [Extensions](/conversations/extensions): `comments()`, writing your own, and custom message types.
+- [UI primitives](/conversations/primitives): the admin components, the headless hooks, and slots.
+- [Transport](/conversations/transport): how polling works and where a realtime adapter plugs in.
+- [Configuration](/conversations/configuration): every option, and the limits to know about.

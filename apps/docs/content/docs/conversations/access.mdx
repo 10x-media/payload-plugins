@@ -1,0 +1,64 @@
+---
+title: Access
+description: Conversation access, channel access, mentions, and the closed collections.
+---
+
+Access is checked twice. **Conversation access** decides whether the user sees a conversation at all. **Channel access** then decides which of its channels they can read and write. Effective access is both together.
+
+## Conversation access
+
+`access` is required, and the plugin fails closed without it: nobody sees anything. It is a batch function, so a list view with 25 triggers costs one call rather than 25:
+
+```ts
+access: async ({ req, targets }) => {
+  // targets: [{ key, kind: 'collection' | 'global' | 'custom', slug, id? }]
+  const ids = targets.filter((t) => t.slug === 'persons').map((t) => t.id)
+  const allowed = await req.payload.find({
+    collection: 'persons',
+    where: { and: [{ id: { in: ids } }, { team: { equals: req.user?.team } }] },
+    depth: 0,
+    pagination: false,
+  })
+  return allowed.docs.map((doc) => `collection:persons:${doc.id}`)
+}
+```
+
+For simple cases, `perTarget` wraps a per-target predicate. With `{ load: true }` it loads the targets first, one query per collection at depth 0, and denies a target that does not exist:
+
+```ts
+access: perTarget(({ req, doc }) => doc?.owner === req.user?.id, { load: true })
+```
+
+Conversation access is not delegated to the target collection's own `read` access. That access often depends on the whole document or on population, and it would run once per key. Reuse it yourself if it fits.
+
+## Channel access
+
+```ts
+{
+  slug: 'shared',
+  label: { en: 'Shared', de: 'Geteilt' },
+  cue: { label: 'Visible to the customer', tone: 'warning' },
+  access: {
+    read: ({ req, key, target }) => true,
+    create: ({ req, key, target }) => true,
+    update: ({ req, message }) => message.authorKey === `users:${req.user?.id}`, // default: the author
+    delete: ({ req, message }) => req.user?.role === 'admin', // default: the author
+  },
+}
+```
+
+`target` is the parsed key, not a loaded document: channel access is about the user (roles, memberships). Anything that depends on the target belongs in conversation access. When a user can read no channel of a target, its trigger does not render.
+
+## Mentions
+
+`mentions.users` narrows who can be mentioned, per users collection, as a `Where`. The search also drops users who cannot read the channel, and saving applies the same rule. A mention of a user who cannot read the channel stays in the text but notifies nobody. So `afterMention` can promise that each user it names can read the message.
+
+## Closed collections
+
+Both collections deny every operation over REST and GraphQL. Payload's collection `read` access gets only `{ req }` on a `find`, which is not enough to check a conversation. Every read and write goes through the instance endpoints, which run instance access and then call the Local API with `overrideAccess`.
+
+A project that stores what its access needs on the message itself, such as a `tenant` field added through `overrides.messages.fields`, may open REST through `overrides.messages.access`. That becomes the project's responsibility. The endpoints keep checking regardless.
+
+## Authors across auth collections
+
+`users` lists every auth collection whose users take part (default: `admin.user`). Messages store `authorKey` as `<collection>:<id>`. Responses carry an `authors` map, projected once per response through each collection's `display` (default: its `useAsTitle`). A deleted user reads as "Deleted user".

@@ -1,0 +1,82 @@
+---
+title: Quick start
+description: Install the plugin, decide who sees which conversation, and add comments to a collection.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/conversations@beta
+```
+
+The plugin needs `@payloadcms/richtext-lexical`, which the message editor is built on.
+
+## Configure an instance
+
+```ts title="payload.config.ts"
+import { conversations, perTarget } from '@10x-media/conversations'
+import { comments } from '@10x-media/conversations/comments'
+
+const isStaff = ({ req }) => req.user?.collection === 'users'
+
+export default buildConfig({
+  collections: [users, customers, persons],
+  plugins: [
+    conversations({
+      slug: 'comments',
+      users: ['users', 'customers'],
+      // Staff see every person; a customer sees the persons they own.
+      access: perTarget(
+        ({ doc, req }) => isStaff({ req }) || doc?.owner === req.user?.id,
+        { load: true }
+      ),
+      channels: [
+        {
+          slug: 'internal',
+          label: 'Internal',
+          cue: { label: 'Internal · staff only', tone: 'neutral' },
+          access: { read: isStaff, create: isStaff },
+        },
+        {
+          slug: 'shared',
+          label: 'Shared',
+          cue: { label: 'Shared · visible to the customer', tone: 'warning' },
+          access: { read: () => true, create: () => true },
+        },
+      ],
+      hooks: {
+        afterMention: async ({ req, users, message }) => {
+          // Notify through your own system.
+        },
+      },
+      extensions: [comments({ collections: { persons: true } })],
+    }),
+  ],
+})
+```
+
+Run `payload generate:importmap`. Open a person: the document controls now show a Comments button with a count and an unread dot. It opens a drawer with a tab for each channel you can read, the feed, and a composer. Threads open as a second drawer on top.
+
+## What you get
+
+- Two hidden collections, `comments-messages` and `comments-reads`, closed over REST.
+- Endpoints under `/api/conversations/comments`.
+- A provider in the admin that polls the conversations on screen, and nothing else.
+
+## Server code
+
+Post a message of any type from a hook, a job or a seed:
+
+```ts
+import { postMessage } from '@10x-media/conversations'
+
+await postMessage(req, {
+  instance: 'comments',
+  key: `collection:persons:${person.id}`,
+  channel: 'internal',
+  author: `users:${req.user.id}`,
+  text: 'Passport verified.',
+})
+```
+
+Collection hooks still run, so validation, mentions and `afterMessage` behave as they do for a message sent from the admin.

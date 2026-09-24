@@ -1,0 +1,39 @@
+---
+title: Configuration
+description: Every option of conversations(), and the limits to know about.
+---
+
+| Option | Type | Default | |
+|---|---|---|---|
+| `slug` | `string` | required | Names the collections (`<slug>-messages`, `<slug>-reads`) and endpoints |
+| `access` | `ConversationsAccess` | required | Batch conversation access; fails closed without it |
+| `channels` | `ConversationsChannel[]` | required | Slug, label, optional cue, access |
+| `targets` | `{ collections?, globals?, custom? }` | `{}` | Channels per target; extensions add to it |
+| `users` | `Array<string \| { collection, display? }>` | `[admin.user]` | Auth collections that take part |
+| `mentions` | `{ users?, max? }` | `max: 20` | Who can be mentioned, per users collection |
+| `hooks` | `{ afterMessage?, afterMention? }` | | `afterMention` sees only new mentions on edit |
+| `editor` | `({ defaultFeatures }) => features` | | Extend the message editor, e.g. with a glossary feature |
+| `types` | `MessageTypeDefinition[]` | `[]` | Custom message types |
+| `limits.bodyLength` | `number` | `10000` | Characters of the plain-text projection |
+| `deleted` | `'placeholder' \| 'placeholderIfReplies'` | `'placeholderIfReplies'` | What a deleted message leaves behind |
+| `deleteWithTarget` | `boolean \| fn` | `true` | Cascade when a target document is deleted |
+| `reads` | `boolean` | `true` | Per-user read state and unread counts |
+| `transport` | `{ publish }` | | Server half of a realtime transport |
+| `slots` | `{ composerAbove?, drawerHeader?, messageActions?, messageFooter? }` | | Payload component paths |
+| `overrides` | `{ messages?, reads? }` | | `fields` (composition seam), `hooks`, `admin`, `access` |
+| `extensions` | `ConversationsExtension[]` | `[]` | `comments()` and your own |
+| `translations` | per-locale overrides | | Keys from `@10x-media/conversations/i18n` |
+| `disabled` | `boolean` | `false` | Returns the config untouched |
+
+## Message fields
+
+`key`, `channel`, `parent` (root id or null), `type`, `body` (rich text), `data` (json, for custom types), `text` (plain-text projection, derived), `mentions` (user keys, derived), `authorKey`, `clientId` (idempotent sends), `editedAt`, `deletedAt`, `replyCount` and `lastReplyAt` (roots). `channel` and `type` are text rather than select, so adding either needs no migration.
+
+## Limits
+
+- **Cascade skips hooks.** Deleting a target runs one `deleteMany` per collection with no per-row hooks. Pass a function to `deleteWithTarget` to run your own, for example a batch job.
+- **REST is closed** on both collections. See [Access](/conversations/access).
+- **Deleting wipes content.** Body, text, mentions and data are cleared on the server. The row stays for thread counters and placeholders.
+- **Read cursor races.** On Postgres, raising a cursor is a select then an update. Two concurrent raises by one user can leave it a few seconds behind until the next raise. First creation is guarded by a unique index.
+- **Writes skip transactions.** The plugin writes messages with `disableTransaction`. Concurrent replies to one root would otherwise abort each other on Mongo, and exhaust the pool on Postgres. The reply counter is still one atomic `$inc`.
+- **Audit logs.** If you use `@10x-media/audit-logs`, leave the messages collection out of it, or every message becomes an audit entry.

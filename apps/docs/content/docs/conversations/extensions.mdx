@@ -1,0 +1,61 @@
+---
+title: Extensions
+description: comments(), writing an extension, and custom message types.
+---
+
+An extension shapes an instance before and after it is resolved:
+
+```ts
+import { defineExtension } from '@10x-media/conversations'
+
+export const reactions = defineExtension({
+  name: 'reactions',
+  options: { emoji: ['👍', '🎉'] },
+  before: (options, { extensions }) => ({ ...options /* add targets, types */ }),
+  after: ({ config, instance, extensions }) => config /* add collections, components */,
+})
+```
+
+- `before` phases run first, in array order, each receiving the previous result. Then the instance is resolved. Then the `after` phases run, in order.
+- `extensions` shows the others by name and options, so extensions can cooperate. It is also on the client, as `extensions` in the `subscribe` response.
+- Conflicts throw at startup and name both parties: two extensions with one name, one message type registered twice, or one target given different channel lists.
+
+## comments()
+
+```ts
+import { comments } from '@10x-media/conversations/comments'
+
+comments({
+  collections: { persons: ['internal', 'shared'], media: true }, // true: every channel
+  globals: { settings: ['internal'] },
+})
+```
+
+Pure composition, with no components of its own. `before` adds the targets. `after` puts `ChatTrigger` into `beforeDocumentControls` of each collection's edit view and each global. The trigger hides on create views, where there is no id yet. Drafts and the published version share one conversation. Comments are not localized, and Duplicate does not copy them.
+
+## Custom message types
+
+```ts
+import { defineMessageType } from '@10x-media/conversations'
+
+export const statusChange = defineMessageType<{ from: string; to: string }>()({
+  slug: 'ticket.status',
+  Component: '/components/StatusChange#StatusChange', // client or server component
+  validate: (data) => (data.to ? true : 'to is required'),
+  clientCreatable: false,
+})
+```
+
+Pass it in `types`, or register it from an extension's `before`. `data` is typed by the definition. The type has no visibility rule of its own: a message's channel decides who sees it. Clients may send a type only when `clientCreatable` is true and `validate` passes. Server code sends any type with `postMessage`.
+
+A server component receives `{ message, conversationKey, instance, req, locale, permissions }` and renders after mount through Payload's `render-widget`. It is registered as a dashboard widget, so one "Conversations (internal)" row appears in the dashboard's Add widget drawer. A client component receives `{ message, conversationKey, instance }` and renders directly.
+
+## Keeping feeds fresh
+
+Polling asks "did anything under this key change?" by comparing `updatedAt`. An extension that keeps its own collection (reactions, receipts) must move the message's `updatedAt` for anything it shows in a feed:
+
+```ts
+import { touchMessage } from '@10x-media/conversations'
+
+await touchMessage(req, { instance: 'comments', id: message.id })
+```
