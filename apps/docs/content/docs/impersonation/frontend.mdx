@@ -1,0 +1,52 @@
+---
+title: Frontend
+description: Shipped banner, and how to build your own with getImpersonation.
+---
+
+The admin bar is Payload-only. On the website, drop in the shipped banner or copy the two calls it makes.
+
+## Shipped banner
+
+Server component. Renders nothing when this request is not the impersonated session. Own styles, no admin CSS.
+
+```tsx title="app/(frontend)/layout.tsx"
+import { ImpersonationFrontendBanner } from '@10x-media/impersonation/rsc'
+import { headers } from 'next/headers'
+import { getPayload } from 'payload'
+import config from '@payload-config'
+
+export default async function Layout({ children }) {
+  const payload = await getPayload({ config })
+  return (
+    <html>
+      <body>
+        <ImpersonationFrontendBanner payload={payload} headers={await headers()} />
+        {children}
+      </body>
+    </html>
+  )
+}
+```
+
+Pass `user` if you already called `payload.auth`, so the banner does not authenticate again.
+
+## Build your own
+
+Status on the server, one POST to exit:
+
+```tsx
+import { getImpersonation } from '@10x-media/impersonation'
+
+const status = await getImpersonation({ headers, payload, user })
+if (!status.active || status.side !== 'target') return null
+
+// Exit:
+await fetch('/api/impersonation/exit', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: '{}',
+})
+```
+
+`side: 'target'` is the impersonated session. `side: 'impersonator'` is the admin side of a parallel session (you are still yourself).

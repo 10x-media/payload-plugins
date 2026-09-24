@@ -1,0 +1,43 @@
+---
+title: Limits
+description: What this plugin cannot do, and the edges that stay your problem.
+---
+
+## GraphQL is not covered
+
+Start, exit, and end are REST. GraphQL `login` / `me` / mutations are untouched. Impersonation does not mint or restore sessions through GraphQL.
+
+## Parallel mode only changes frontend auth
+
+When the target collection is isolated by `@10x-media/dual-session`, start writes that cookie and leaves the admin cookie alone. In the admin panel you are still yourself. The frontend is the target. The admin bar in that case says the website session is active, not "Acting as".
+
+There is no read-only impersonation. Writes, emails, prefs, and locks run as the target.
+
+## `_impersonation` is target-side only
+
+`req.user._impersonation` is set when this request's sid is the minted `targetSid`. Parallel admin requests do not get it, because you are still the admin. `getImpersonation` still reports the parallel admin side as `side: 'impersonator'`. The actor includes the target email and the impersonator email.
+
+Audit-log attribution from this field belongs in `@10x-media/audit-logs`, not here.
+
+## Authorization headers win
+
+A non-empty `Authorization: JWT` or `Bearer` token is authenticated before cookies. An API-key caller cannot start. Same as Payload without this plugin.
+
+## Records are an audit trail
+
+Every start inserts a row. Closed rows are never deleted unless you opt into `retention`. The collection stays hidden unless `ui.sessionsCollection` is true, and delete stays denied in admin. Local API with `overrideAccess` is the other way out.
+
+## Custom `session.issue` skips the sid prefix
+
+Default mint prefixes the target sid with `imp_` so ordinary traffic does not hit the sessions collection. A custom `session.issue` is not prefixed, so every authenticated request looks up an open row again.
+
+## Nested impersonation is refused
+
+You cannot start while a session is already open, including the admin side of a parallel session.
+
+## What the plugin will not do
+
+- Step-up password, notify-the-target emails, or an email kill-switch
+- Preference isolation or BroadcastChannel across tabs
+- Rewrite Payload versions / `lastModifiedBy` to the impersonator
+- GraphQL mutations for start / exit / end

@@ -15,6 +15,7 @@
 		"automations",
 		"dual-session",
 		"settings-overlay",
-		"form-variants"
+		"form-variants",
+		"impersonation"
 	]
 }

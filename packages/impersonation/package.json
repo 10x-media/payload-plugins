@@ -1,0 +1,136 @@
+{
+	"name": "@10x-media/impersonation",
+	"version": "0.0.0",
+	"description": "Let an authorised account sign in as another user without their password, then return. Every session is recorded.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/10x-media/payload-plugins.git",
+		"directory": "packages/impersonation"
+	},
+	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/impersonation",
+	"bugs": "https://github.com/10x-media/payload-plugins/issues",
+	"keywords": ["payload", "payloadcms", "plugin", "impersonation", "auth", "session"],
+	"author": "10x-media",
+	"engines": {
+		"node": ">=22.18.0"
+	},
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"development": "./src/index.ts",
+			"types": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./types": {
+			"development": "./src/exports/types.ts",
+			"types": "./src/exports/types.ts",
+			"default": "./dist/exports/types.js"
+		},
+		"./client": {
+			"development": "./src/exports/client.ts",
+			"types": "./src/exports/client.ts",
+			"default": "./dist/exports/client.js"
+		},
+		"./rsc": {
+			"development": "./src/exports/rsc.ts",
+			"types": "./src/exports/rsc.ts",
+			"default": "./dist/exports/rsc.js"
+		},
+		"./i18n": {
+			"development": "./src/exports/i18n.ts",
+			"types": "./src/exports/i18n.ts",
+			"default": "./dist/exports/i18n.js"
+		}
+	},
+	"files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+	"scripts": {
+		"build": "tsdown",
+		"lint": "biome check src tests dev",
+		"lint:fix": "biome check --write src tests dev",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"test": "vitest run",
+		"test:unit": "vitest run src",
+		"test:int": "vitest run tests/int",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int && DB_MATRIX=postgres vitest run tests/int",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
+		"test:e2e": "bash scripts/e2e.sh",
+		"dev": "pnpm --filter @10x-media/impersonation-dev dev",
+		"start": "pnpm --filter @10x-media/impersonation-dev start",
+		"generate": "pnpm --filter @10x-media/impersonation-dev generate",
+		"generate:types": "pnpm --filter @10x-media/impersonation-dev generate:types",
+		"generate:importmap": "pnpm --filter @10x-media/impersonation-dev generate:importmap",
+		"migrate": "pnpm --filter @10x-media/impersonation-dev migrate",
+		"migrate:create": "pnpm --filter @10x-media/impersonation-dev migrate:create",
+		"migrate:down": "pnpm --filter @10x-media/impersonation-dev migrate:down",
+		"migrate:refresh": "pnpm --filter @10x-media/impersonation-dev migrate:refresh",
+		"migrate:reset": "pnpm --filter @10x-media/impersonation-dev migrate:reset",
+		"migrate:status": "pnpm --filter @10x-media/impersonation-dev migrate:status",
+		"migrate:fresh": "pnpm --filter @10x-media/impersonation-dev migrate:fresh",
+		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
+	},
+	"peerDependencies": {
+		"@10x-media/dual-session": ">=0.1.0-beta.0",
+		"@payloadcms/ui": "^3.83.0",
+		"payload": "^3.83.0",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	},
+	"peerDependenciesMeta": {
+		"@10x-media/dual-session": {
+			"optional": true
+		}
+	},
+	"devDependencies": {
+		"@10x-media/dual-session": "workspace:*",
+		"@10x-media/payload-test-harness": "workspace:*",
+		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/tsdown-config": "workspace:*",
+		"@10x-media/vitest-config": "workspace:*",
+		"@payloadcms/db-mongodb": "catalog:",
+		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/ui": "catalog:",
+		"@playwright/test": "catalog:",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"payload": "catalog:",
+		"playwright": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:",
+		"tsdown": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"import": "./dist/index.js",
+				"default": "./dist/index.js"
+			},
+			"./types": {
+				"types": "./dist/exports/types.d.ts",
+				"import": "./dist/exports/types.js",
+				"default": "./dist/exports/types.js"
+			},
+			"./client": {
+				"types": "./dist/exports/client.d.ts",
+				"import": "./dist/exports/client.js",
+				"default": "./dist/exports/client.js"
+			},
+			"./rsc": {
+				"types": "./dist/exports/rsc.d.ts",
+				"import": "./dist/exports/rsc.js",
+				"default": "./dist/exports/rsc.js"
+			},
+			"./i18n": {
+				"types": "./dist/exports/i18n.d.ts",
+				"import": "./dist/exports/i18n.js",
+				"default": "./dist/exports/i18n.js"
+			}
+		}
+	}
+}
