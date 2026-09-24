@@ -1,1 +1,1 @@
-export type { ConversationsPluginOptions } from '../index'
+export type * from '../types'

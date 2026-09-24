@@ -40,7 +40,15 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	collections: [users],
-	plugins: [conversations({})],
+	plugins: [
+		conversations({
+			access: ({ req, targets }) => (req.user ? targets.map((target) => target.key) : []),
+			channels: [
+				{ access: { create: () => true, read: () => true }, label: 'Internal', slug: 'internal' },
+			],
+			slug: 'comments',
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

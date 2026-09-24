@@ -1,7 +1,7 @@
 {
 	"name": "@10x-media/conversations",
 	"version": "0.0.0",
-	"description": "",
+	"description": "Conversations for Payload: messages bound to any document, with channels, threads, mentions and read state",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -10,7 +10,14 @@
 	},
 	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/conversations",
 	"bugs": "https://github.com/10x-media/payload-plugins/issues",
-	"keywords": ["payload", "payloadcms", "plugin"],
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin",
+		"comments",
+		"chat",
+		"conversations"
+	],
 	"author": "10x-media",
 	"engines": {
 		"node": ">=22.18.0"
@@ -39,7 +46,12 @@
 			"default": "./dist/exports/i18n.js"
 		}
 	},
-	"files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
 	"scripts": {
 		"build": "tsdown",
 		"lint": "biome check src tests dev",
@@ -66,6 +78,7 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
+		"@payloadcms/richtext-lexical": "^3.83.0",
 		"@payloadcms/ui": "^3.83.0",
 		"payload": "^3.83.0",
 		"react": "^19.0.0",
@@ -78,6 +91,7 @@
 		"@10x-media/vitest-config": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/richtext-lexical": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
 		"@types/node": "catalog:",
