@@ -15,6 +15,7 @@ export type UseImpersonation = {
 	exit: () => Promise<{ error?: FailureCode; ok: boolean; status: number }>
 	reasonMode: 'off' | 'optional' | 'required'
 	sessionCollection: string
+	setStatus: (status: ImpersonationStatus) => void
 	start: (args: {
 		collection: string
 		id: number | string
@@ -38,6 +39,7 @@ export const useImpersonation = (): UseImpersonation => {
 	const targets = plugin?.targets ?? {}
 	const cardEmail = plugin?.cardEmail ?? true
 	const status = plugin?.status ?? { active: false }
+	const setStatus = plugin?.setStatus ?? (() => undefined)
 
 	return {
 		apiPath,
@@ -46,6 +48,7 @@ export const useImpersonation = (): UseImpersonation => {
 		exit: () => postImpersonation(`${apiPath}/exit`, {}),
 		reasonMode,
 		sessionCollection,
+		setStatus,
 		start: (args) => postImpersonation(`${apiPath}/start`, args),
 		status,
 		targets,

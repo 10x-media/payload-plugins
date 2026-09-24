@@ -1,5 +1,6 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 
+import { absoluteExpiryCookies } from '../auth/expiryCookies'
 import { statusFromRow } from '../getImpersonation'
 import { closeAndRevoke } from '../session/close'
 import { isPastAbsoluteExpiry, resolveCurrent } from '../session/resolve'
@@ -30,6 +31,14 @@ export const currentHandler = async (req: PayloadRequest): Promise<Response> => 
 				record: row,
 				req,
 			})
+			const cookies = await absoluteExpiryCookies({
+				options,
+				payload: req.payload,
+				row,
+				sid,
+				user,
+			})
+			return json({ body: { active: false }, cookies, req, status: 200 })
 		}
 		return json({ body: { active: false }, req, status: 200 })
 	}

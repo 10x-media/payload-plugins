@@ -7,13 +7,13 @@ description: Options for access, cookies, duration, UI, and session seams.
 |---|---|---|---|
 | `access.impersonate` | `({ req, target, targetCollection }) => true \| false` | required | Start gate. Only literal `true` allows. |
 | `access.filterTargets` | `({ req, targetCollection }) => Where \| boolean` | unset | Who the switcher lists. `true` = whole collection, `false` = hide it, `Where` = filter the list. Start re-checks this. Omit to show everyone the viewer can read. |
-| `access.terminate` | `({ req }) => true \| false` | deny | Remote end of an open row. |
-| `access.readRecords` | Payload `Access` | deny | Read the `impersonation-sessions` collection. Passing a function puts the collection in the nav. Create, update, and delete stay denied. |
+| `access.terminate` | `({ req }) => true \| false` | deny | Remote end of an open row. Only literal `true` allows, and that principal can end any open row by id. |
+| `access.readRecords` | Payload `Access` | deny | Read the `impersonation-sessions` collection. Does not put the collection in the nav. Create, update, and delete stay denied. |
 | `disabled` | `boolean` | `false` | Return the incoming config unchanged. |
-| `collectionSlug` | `string` | `impersonation-sessions` | Record collection. Create, update, and delete are denied. Hidden until `access.readRecords` is set. |
+| `collectionSlug` | `string` | `impersonation-sessions` | Record collection. Create, update, and delete are denied. Hidden until `ui.sessionsCollection` is true. |
 | `apiPath` | `string` | `/impersonation` | Root endpoint prefix. Must not collide with a collection slug. |
 | `hintCookieName` | `string` | `impersonation-hint` | Row id hint. Must not start with `cookiePrefix`. |
-| `decorateRequests` | `boolean` | `true` | Paint `req.user._impersonation` on the **target** session. |
+| `decorateRequests` | `boolean` | `true` | Paint `req.user._impersonation` on the **target** session, including both emails. |
 | `reason` | `'off' \| 'optional' \| 'required'` | `'off'` | Note stored on the row. |
 | `maxDuration` | `number` (seconds) | unset | Absolute cap from `startedAt`. Unset means refresh can keep the session alive. |
 | `retention` | `{ deleteAfterDays, cron?, queue? }` | off | Opt-in job: close stale open rows, then delete **closed** rows older than N days. Host must run the queue (`jobs.autoRun`). Open rows are never deleted. |
@@ -31,13 +31,14 @@ Each flag is independent. `ui: false` turns all of them off. The provider still 
 | Flag | Default | What it does |
 |---|---|---|
 | `ui.headerAction` | `true` | **Impersonate** in the admin header. Opens the user drawer. |
-| `ui.bar` | `true` | Bottom bar while a session is open. |
-| `ui.documentAction` | `true` | **Impersonate** next to Save on a target document (`beforeDocumentControls`, so it still shows when the dots menu is hidden). |
-| `ui.recordAction` | `true` | **End session** beside Save on an `impersonation-sessions` document (`beforeDocumentControls`). Shows once `access.readRecords` puts the collection in the nav. Create, update, and delete stay denied. |
-| `ui.card` | unset | Replacement for the default switcher row. Same props as `ImpersonationUserCard` (`collectionSlug`, `doc`, `onSelect`, `onOpenDrawer`, `documentHref`, `title`, `email`). A string path is added to `admin.dependencies`. Omit to keep the default card. |
+| `ui.bar` | `true` | Bottom bar while a session is open. It sits beside the nav, not over it. Collapse keeps an Impersonation chip that snaps to the edges of the content area. |
+| `ui.documentAction` | `true` | **Impersonate** next to Save on a target document (`beforeDocumentControls`, so it still shows when the dots menu is hidden). Hidden while a session is already open. |
+| `ui.recordAction` | `true` | **End session** beside Save on an `impersonation-sessions` document (`beforeDocumentControls`). Hidden when the row already has `endedAt`. Create, update, and delete stay denied. |
+| `ui.sessionsCollection` | `false` | Put `impersonation-sessions` in the admin nav. `access.readRecords` still decides who can read a row. |
+| `ui.card` | unset | Replacement for the default switcher row. Same props as `ImpersonationUserCard`: `collectionSlug`, `doc`, `onSelect`, `onOpenDrawer`, `documentHref`, `title`, `email`, `openDocumentLabel`, `openDrawerLabel`. A string path, or `{ path, exportName }`, is added to `admin.dependencies` as `path#exportName` when a named export is set. Omit to keep the default card. |
 | `ui.cardEmail` | `true` | Show email under `useAsTitle` on default switcher cards. |
 
-Build your own control with `useImpersonation` from `@10x-media/impersonation/client`. It returns `{ status, start, exit, end, reasonMode, targets, apiPath }`. `StartConfirmModal` is exported too.
+Build your own control with `useImpersonation` from `@10x-media/impersonation/client`. It returns `{ status, setStatus, start, exit, end, reasonMode, targets, apiPath, cardEmail, sessionCollection }`. `status` starts from the server render and updates after the bar checks the live session. `StartConfirmModal` is exported too.
 
 ## `getImpersonation`
 

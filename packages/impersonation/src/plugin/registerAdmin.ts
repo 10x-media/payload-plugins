@@ -8,7 +8,7 @@ export const pathOf = (component: PayloadComponent): string | undefined => {
 		return component
 	}
 	if (component && typeof component === 'object' && 'path' in component) {
-		return component.path
+		return component.exportName ? `${component.path}#${component.exportName}` : component.path
 	}
 	return undefined
 }

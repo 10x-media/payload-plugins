@@ -11,13 +11,17 @@ import { useImpersonation } from './useImpersonation'
 const CONFIRM_SLUG = 'impersonation-confirm-end'
 
 export const EndSessionMenuItem = () => {
-	const { collectionSlug, id } = useDocumentInfo()
+	const { collectionSlug, data, id } = useDocumentInfo()
 	const { t } = useTranslation()
 	const { openModal } = useModal()
 	const { end, sessionCollection } = useImpersonation()
 	const [generation, setGeneration] = useState(0)
 
-	if (!id || collectionSlug !== sessionCollection) {
+	const endedAt =
+		data && typeof data === 'object' && 'endedAt' in data
+			? (data as { endedAt?: null | string }).endedAt
+			: undefined
+	if (!id || collectionSlug !== sessionCollection || endedAt) {
 		return null
 	}
 

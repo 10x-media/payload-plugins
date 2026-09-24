@@ -15,7 +15,7 @@ There is no read-only impersonation. Writes, emails, prefs, and locks run as the
 
 ## `_impersonation` is target-side only
 
-`req.user._impersonation` is set when this request's sid is the minted `targetSid`. Parallel admin requests do not get it, because you are still the admin. `getImpersonation` still reports the parallel admin side as `side: 'impersonator'`.
+`req.user._impersonation` is set when this request's sid is the minted `targetSid`. Parallel admin requests do not get it, because you are still the admin. `getImpersonation` still reports the parallel admin side as `side: 'impersonator'`. The actor includes the target email and the impersonator email.
 
 Audit-log attribution from this field belongs in `@10x-media/audit-logs`, not here.
 
@@ -25,7 +25,7 @@ A non-empty `Authorization: JWT` or `Bearer` token is authenticated before cooki
 
 ## Records are an audit trail
 
-Every start inserts a row. Closed rows are never deleted unless you opt into `retention`. The collection is hidden and delete is denied in admin; Local API with `overrideAccess` is the other way out.
+Every start inserts a row. Closed rows are never deleted unless you opt into `retention`. The collection stays hidden unless `ui.sessionsCollection` is true, and delete stays denied in admin. Local API with `overrideAccess` is the other way out.
 
 ## Custom `session.issue` skips the sid prefix
 

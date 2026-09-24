@@ -5,7 +5,6 @@ import type { ReactNode } from 'react'
 import { resolveTargetFilters } from '../access/filterTargets'
 import { IMPERSONATION_SID_PREFIX } from '../plugin/constants'
 import { readHintCookie } from '../plugin/lookup'
-import { pathOf } from '../plugin/registerAdmin'
 import { getRegistry } from '../plugin/registry'
 import { startableCollectionSlugs } from '../plugin/startable'
 import {
@@ -15,7 +14,7 @@ import {
 	relationOf,
 } from '../session/resolve'
 import { keys } from '../translations/keys'
-import { messageFor } from '../translations/lookup'
+import { fillTemplate, messageFor } from '../translations/lookup'
 import { asAuthUser, boundSid } from '../types'
 import { ImpersonationBar } from './ImpersonationBar'
 import { ImpersonationClientConfig } from './ImpersonationConfig'
@@ -113,7 +112,6 @@ export const ImpersonationProvider = async ({
 			value={{
 				apiPath,
 				cardEmail: options.ui.cardEmail,
-				cardPath: options.ui.card ? pathOf(options.ui.card) : undefined,
 				reasonMode: options.reason,
 				sessionCollection: options.collectionSlug,
 				status,
@@ -133,11 +131,11 @@ export const ImpersonationProvider = async ({
 	const impersonatorLabel = barSource.impersonatorEmail ?? barSource.impersonatorId ?? ''
 	const isImpersonatorSide = barSource.side === 'impersonator' && barSource.mode === 'parallel'
 	const actingAs = isImpersonatorSide
-		? messageFor(locale, keys.sessionActiveOnSite).replace('{{name}}', String(targetName))
-		: messageFor(locale, keys.actingAs).replace('{{name}}', String(targetName))
+		? fillTemplate(messageFor(locale, keys.sessionActiveOnSite), '{{name}}', String(targetName))
+		: fillTemplate(messageFor(locale, keys.actingAs), '{{name}}', String(targetName))
 	const returnTo = isImpersonatorSide
 		? messageFor(locale, keys.endSession)
-		: messageFor(locale, keys.returnTo).replace('{{name}}', String(impersonatorLabel))
+		: fillTemplate(messageFor(locale, keys.returnTo), '{{name}}', String(impersonatorLabel))
 
 	return (
 		<>

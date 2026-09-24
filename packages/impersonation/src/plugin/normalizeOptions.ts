@@ -35,6 +35,7 @@ const resolveUi = (ui: EnabledOptions['ui']): ResolvedUi => {
 			documentAction: false,
 			headerAction: false,
 			recordAction: false,
+			sessionsCollection: false,
 		}
 	}
 	return {
@@ -44,6 +45,7 @@ const resolveUi = (ui: EnabledOptions['ui']): ResolvedUi => {
 		documentAction: ui?.documentAction !== false,
 		headerAction: ui?.headerAction !== false,
 		recordAction: ui?.recordAction !== false,
+		sessionsCollection: ui?.sessionsCollection === true,
 	}
 }
 
@@ -99,7 +101,6 @@ export const normalizeOptions = (options: EnabledOptions, config: Config): Resol
 			filterTargets: options.access.filterTargets,
 			impersonate: options.access.impersonate,
 			readRecords: options.access.readRecords ?? (() => false),
-			recordsListed: typeof options.access.readRecords === 'function',
 			terminate: options.access.terminate ?? (() => false),
 		},
 		apiPath,

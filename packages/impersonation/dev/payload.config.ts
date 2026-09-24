@@ -44,6 +44,7 @@ export default buildConfig({
 				terminate: ({ req }) => canImpersonate(req.user),
 			},
 			cookies: { clearOnSwitch: ['payload-tenant'] },
+			ui: { sessionsCollection: true },
 		}),
 	],
 	telemetry: false,

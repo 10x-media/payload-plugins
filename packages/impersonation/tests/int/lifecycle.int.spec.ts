@@ -710,12 +710,23 @@ describeForDb('impersonation refusals', {}, (db) => {
 				overrideAccess: true,
 				sort: '-startedAt',
 			})
+			const recordId = rows.docs[0]?.id as number | string
+			const end = await client.post(`/api/impersonation/${recordId}/end`, { body: {} })
+			expect(end.status).toBe(403)
+			expect(end.body).toMatchObject({ error: 'forbidden' })
 			await booted.payload.update({
-				id: rows.docs[0]?.id as number | string,
+				id: recordId,
 				collection: 'impersonation-sessions',
 				data: { absoluteExpiresAt: new Date(0).toISOString() } as never,
 				overrideAccess: true,
 			})
+			const current = await client.get('/api/impersonation')
+			expect(current.body).toMatchObject({ active: false })
+			expect(
+				current.setCookies.some(
+					(cookie) => cookie.startsWith('payload-token=') && /expires=/i.test(cookie)
+				)
+			).toBe(true)
 			const me = await client.get('/api/users/me')
 			expect((me.body as { user?: unknown }).user).toBeFalsy()
 			const after = await booted.payload.find({

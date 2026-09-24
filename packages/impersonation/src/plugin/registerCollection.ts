@@ -27,7 +27,7 @@ export const buildRecordsCollection = ({
 		admin: {
 			defaultColumns: ['target', 'impersonator', 'startedAt', 'endedAt', 'endedBy'],
 			group: ADMIN_GROUP,
-			hidden: !options.access.recordsListed,
+			hidden: !options.ui.sessionsCollection,
 			useAsTitle: 'targetEmail',
 			...(options.ui.recordAction
 				? {

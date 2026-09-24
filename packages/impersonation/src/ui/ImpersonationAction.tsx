@@ -67,6 +67,11 @@ export const ImpersonationAction = async ({ payload, user }: ServerProps) => {
 				silent: true,
 			})
 		: undefined
+	if (options.ui.card && !Card) {
+		payload.logger.warn(
+			'@10x-media/impersonation: ui.card is not in the admin import map. Run generate:importmap. The default card is shown until then.'
+		)
+	}
 
 	return <ImpersonationSwitcher Card={Card} collections={collections} viewerId={user.id} />
 }

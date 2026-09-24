@@ -16,7 +16,7 @@ export const ImpersonationDocumentButton = () => {
 	const { title } = useDocumentTitle()
 	const { t } = useTranslation()
 	const { openModal } = useModal()
-	const { apiPath, reasonMode, targets } = useImpersonation()
+	const { apiPath, reasonMode, status, targets } = useImpersonation()
 
 	const target = useMemo<null | StartTarget>(() => {
 		if (!collectionSlug || id === undefined || targets[collectionSlug] === undefined) {
@@ -37,7 +37,7 @@ export const ImpersonationDocumentButton = () => {
 		}
 	}, [collectionSlug, data, id, targets, title])
 
-	if (!target) {
+	if (!target || status.active) {
 		return null
 	}
 

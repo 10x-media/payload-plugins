@@ -1,5 +1,6 @@
 import type { Payload, PayloadRequest, TypedUser } from 'payload'
 
+import { absoluteExpiryCookies } from './auth/expiryCookies'
 import { getRegistry } from './plugin/registry'
 import { closeAndRevoke } from './session/close'
 import {
@@ -78,6 +79,13 @@ export async function getImpersonation(
 	}
 	if (isPastAbsoluteExpiry(row)) {
 		await closeAndRevoke({ endedBy: 'expired', options, payload, record: row })
+		if ('payloadAPI' in args && user) {
+			const cookies = await absoluteExpiryCookies({ options, payload, row, sid, user })
+			args.responseHeaders ??= new Headers()
+			for (const cookie of cookies) {
+				args.responseHeaders.append('Set-Cookie', cookie)
+			}
+		}
 		return inactive()
 	}
 

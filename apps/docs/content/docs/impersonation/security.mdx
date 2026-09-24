@@ -9,7 +9,7 @@ description: Origin gate, access.impersonate, session binding, and what is not a
 
 Only the literal `true` allows. A Payload `Where` is deny. Missing, trashed, unverified, or unreadable targets are `forbidden`. The JSON `user` on start is the document the viewer can read, not the raw database row.
 
-`access.terminate` and `access.readRecords` default deny. Exit is binding, not a role. `access.filterTargets` only shapes the switcher; start still requires `impersonate`.
+`access.terminate` and `access.readRecords` default deny. A terminate result of literal `true` can end any open row by id. Exit is binding, not a role. `access.filterTargets` only shapes the switcher; start still requires `impersonate`. `ui.sessionsCollection` is what puts the collection in the nav.
 
 ## Origin gate
 

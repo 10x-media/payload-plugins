@@ -7,7 +7,6 @@ const options = {
 	access: {
 		impersonate: () => true,
 		readRecords: () => false,
-		recordsListed: false,
 		terminate: () => false,
 	},
 	apiPath: '/impersonation',
@@ -27,6 +26,7 @@ const options = {
 		documentAction: false,
 		headerAction: false,
 		recordAction: false,
+		sessionsCollection: false,
 	},
 } satisfies ResolvedOptions
 

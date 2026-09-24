@@ -14,7 +14,7 @@ import {
 	useModal,
 } from '@payloadcms/ui'
 import type { CollectionSlug, Where } from 'payload'
-import { type ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
+import { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { SWITCHER_PAGE_SIZE } from '../plugin/constants'
 import { keys } from '../translations/keys'
@@ -108,10 +108,15 @@ export const ImpersonationSwitcher = ({
 		setSearch(value ?? '')
 	}, [])
 
+	const listAbort = useRef<AbortController | null>(null)
+
 	const load = useCallback(async () => {
 		if (!collection || !isModalOpen(drawerSlug)) {
 			return
 		}
+		listAbort.current?.abort()
+		const controller = new AbortController()
+		listAbort.current = controller
 		setLoading(true)
 		try {
 			const filter = targets[collection]
@@ -135,6 +140,7 @@ export const ImpersonationSwitcher = ({
 			})
 			const response = await fetch(`${config.routes.api}/${collection}?${params.toString()}`, {
 				credentials: 'include',
+				signal: controller.signal,
 			})
 			if (!response.ok) {
 				throw new Error(String(response.status))
@@ -149,14 +155,22 @@ export const ImpersonationSwitcher = ({
 			setHasNext(Boolean(body.hasNextPage))
 			setHasPrev(Boolean(body.hasPrevPage))
 			setTotalPages(body.totalPages ?? 1)
-		} catch {
+		} catch (error) {
+			if (
+				controller.signal.aborted ||
+				(error instanceof DOMException && error.name === 'AbortError')
+			) {
+				return
+			}
 			toast.error(t(keys.errorFailed))
 			setDocs([])
 			setHasNext(false)
 			setHasPrev(false)
 			setTotalPages(1)
 		} finally {
-			setLoading(false)
+			if (!controller.signal.aborted) {
+				setLoading(false)
+			}
 		}
 	}, [collection, config.routes.api, isModalOpen, page, search, t, targets, useAsTitle])
 

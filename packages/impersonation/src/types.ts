@@ -134,11 +134,17 @@ export type UiOptions = {
 	headerAction?: boolean
 	/**
 	 * "End session" beside Save on an `impersonation-sessions` document
-	 * (`beforeDocumentControls`). Visible once `access.readRecords` un-hides the
-	 * collection. Create, update, and delete stay denied.
+	 * (`beforeDocumentControls`). Hidden when the row already has `endedAt`.
+	 * Create, update, and delete stay denied.
 	 * @default true
 	 */
 	recordAction?: boolean
+	/**
+	 * Put `impersonation-sessions` in the admin nav. `access.readRecords` still
+	 * decides who can read a row. Omit to keep the collection hidden.
+	 * @default false
+	 */
+	sessionsCollection?: boolean
 }
 
 export type RetentionOptions = {
@@ -157,7 +163,7 @@ export type EnabledOptions = {
 		 * is deny, never allow-all.
 		 */
 		impersonate: ImpersonateAccess
-		/** Who can list `impersonation-sessions`. Omit to deny and keep the collection hidden. */
+		/** Who can read `impersonation-sessions`. Omit to deny. Does not un-hide the collection. */
 		readRecords?: Access
 		/** Who can POST `/end` on someone else's session. Default deny. */
 		terminate?: BooleanAccess
@@ -209,6 +215,7 @@ export type ResolvedUi = {
 	documentAction: boolean
 	headerAction: boolean
 	recordAction: boolean
+	sessionsCollection: boolean
 }
 
 export type ResolvedOptions = {
@@ -216,8 +223,6 @@ export type ResolvedOptions = {
 		filterTargets?: FilterTargets
 		impersonate: ImpersonateAccess
 		readRecords: Access
-		/** True when the host passed `access.readRecords`. Un-hides the sessions collection. */
-		recordsListed: boolean
 		terminate: BooleanAccess
 	}
 	apiPath: string

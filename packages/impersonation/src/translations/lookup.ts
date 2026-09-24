@@ -11,3 +11,7 @@ export const messageFor = (locale: null | string | undefined, key: TranslationKe
 	const rest = key.slice(separator + 1)
 	return nestedOf(code)?.[namespace]?.[rest] ?? nestedOf('en')?.[namespace]?.[rest] ?? key
 }
+
+/** Replace every `token` without interpreting `$` in `value`. */
+export const fillTemplate = (template: string, token: string, value: string): string =>
+	template.split(token).join(value)

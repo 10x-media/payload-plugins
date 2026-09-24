@@ -32,7 +32,6 @@ describe('normalizeOptions', () => {
 		expect(resolved.reason).toBe('off')
 		expect(resolved.cookies.clearOnSwitch).toEqual(['payload-tenant'])
 		expect(resolved.maxDuration).toBeUndefined()
-		expect(resolved.access.recordsListed).toBe(false)
 		expect(resolved.ui).toEqual({
 			bar: true,
 			card: undefined,
@@ -40,6 +39,7 @@ describe('normalizeOptions', () => {
 			documentAction: true,
 			headerAction: true,
 			recordAction: true,
+			sessionsCollection: false,
 		})
 	})
 
@@ -81,6 +81,20 @@ describe('normalizeOptions', () => {
 
 	it('disables every UI surface when ui is false', () => {
 		expect(normalizeOptions(enabled({ ui: false }), config()).ui.bar).toBe(false)
+	})
+
+	it('keeps the sessions collection hidden unless ui.sessionsCollection is true', () => {
+		expect(normalizeOptions(enabled(), config()).ui.sessionsCollection).toBe(false)
+		expect(
+			normalizeOptions(
+				enabled({ access: { impersonate: () => true, readRecords: () => false } }),
+				config()
+			).ui.sessionsCollection
+		).toBe(false)
+		expect(
+			normalizeOptions(enabled({ ui: { sessionsCollection: true } }), config()).ui
+				.sessionsCollection
+		).toBe(true)
 	})
 
 	it('derives the tenant cookie from cookiePrefix', () => {
