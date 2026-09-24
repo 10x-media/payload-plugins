@@ -1,0 +1,178 @@
+---
+title: Phone number field
+description: A country-aware phone number field with a searchable picker, live formatting, and validation and metadata sized to the install.
+---
+
+```ts
+import { phoneNumberField } from '@10x-media/fields/phone'
+
+phoneNumberField({
+  name: 'phone',
+  storage: 'object',                   // 'object' (default): group of number + country + 5 derived fields. 'e164': plain text field, see Storage shapes
+  defaultCountry: 'DE',                // dial-code and picker default while the field is empty
+  countries: ['AT', 'CH', 'DE', 'FR'], // scopes the picker only; a number outside this list still parses, validates and saves
+  preferredCountries: ['DE', 'AT'],    // pinned above the rest of the list, in this order
+  validation: 'valid',                 // 'possible' | 'valid' (default) | 'mobile'; 'mobile' needs metadata 'max' or 'mobile'
+  flags: 'svg',                        // 'svg' (default, served by the plugin's endpoint) | 'emoji' (renders as letters on Windows) | 'none'
+  cellFormat: 'international',         // list column format: 'national' | 'international' (default) | 'e164'
+  isClearable: true,                   // default true; false keeps the last valid value instead of allowing empty
+  label: 'Phone number',
+  required: true,
+  localized: false,
+  index: false,
+  overrides: ({ field }) => field,     // ({ field }) => field escape hatch, typed to whichever shape `storage` returns
+})
+```
+
+The field renders one 40px row: a country trigger with a flag, the calling-code prefix, a borderless input, and a clear affordance when the value can be cleared. Opening the trigger shows a searchable list, matching by country name, ISO code, or calling code.
+
+## Storage shapes
+
+`storage: 'object'` (the default) returns a `group` field: two real columns, `number` and `country` (ISO 3166-1 alpha-2), plus five `virtual: true` subfields recomputed on every read, covered in [Derived read shape](#derived-read-shape) below. The admin UI commits `number` in E.164 once the draft parses; an unparseable draft (including the brief window before the lazily loaded metadata resolves) commits the raw trimmed text instead, which fails the field's own validation on a normal save. A collection saving drafts with `versions.drafts.validate` left at its default `false` skips that validation, so an unparseable string can still reach the database through a draft. A document written directly through the Local API or REST can likewise store another format, since validation (when it runs) parses `number` against the stored `country` rather than requiring a fixed format.
+
+`storage: 'e164'` returns a plain `text` field holding the E.164 string alone, with no `country` column. There's no sibling field to read a derived value from here; call the exported utils (see [Frontend use](#frontend-use)) against the stored string instead, passing a `defaultCountry` if the string you have isn't already E.164.
+
+`defaultCountry` is consulted differently by the two storage modes, and the difference is deliberate, not an oversight. With no `country` column to read, `storage: 'e164'` validation falls back to `defaultCountry` as its only hint for a country-less national-format write: `phoneNumberField({ name: 'phone', storage: 'e164', defaultCountry: 'DE' })` accepts `'030 123456'`. `storage: 'object'` never falls back this way: its validation and its derived-read hook both parse `number` against the stored `country` alone, so the identical write with no `country` set is rejected under otherwise identical options. Falling back to `defaultCountry` there would attribute the number to a country nobody actually chose and then derive `international`/`national` from that guess.
+
+An extension typed as `x123` after the number is accepted and reformatted while typing, but E.164 has no slot for one: committing the field drops it, so it disappears from the input on blur rather than being silently discarded on save. Neither storage mode carries an extension.
+
+## Derived read shape
+
+Under `storage: 'object'`, a single `afterRead` hook (one hook, not one per subfield) parses the stored `number` and enriches the group with `national`, `international`, `callingCode`, `uri`, and `type`, without touching the persisted `number`/`country` pair. These five fields are `virtual: true`, so they exist only on read: Payload rejects a `where` clause that filters or sorts on them. Filter and sort on `number` or `country`, the two real columns, instead.
+
+`type` is libphonenumber-js's number-type classification (`'MOBILE'`, `'FIXED_LINE'`, and so on); how reliably it resolves depends on the install's metadata set, covered in [Metadata sets](#metadata-sets). The subfield is always present in the schema regardless, since a field's generated TypeScript type can't vary by a plugin option: it simply reads `undefined` wherever the loaded metadata can't classify the number.
+
+## Validation modes
+
+`validation` accepts three modes, all requiring the input to at least parse into a country-bearing number first:
+
+- `'possible'`: length-only plausibility (`isPossible()`). Loosest mode; still rejects a string that doesn't parse at all.
+- `'valid'` (default): the number must fall in a real, allocated range (`isValid()`).
+- `'mobile'`: `'valid'`, plus the classified `type` must be mobile-capable (`MOBILE` or `FIXED_LINE_OR_MOBILE`).
+
+Because `'mobile'` depends on `type`, it requires metadata `'max'` or `'mobile'`; pairing it with metadata `'min'` is unsatisfiable. Rather than rejecting every number as not-mobile, the field surfaces this as a configuration error. Setting it at the plugin level throws immediately when the plugin builds:
+
+```
+fields plugin: phoneNumber.validation 'mobile' needs metadata 'max' or 'mobile'; 'min' carries no number types.
+```
+
+A field that sets `validation: 'mobile'` on its own, while the install's metadata resolves to `'min'` some other way, fails at validation time instead, naming the field:
+
+```
+phoneNumberField(phone): validation "mobile" requires metadata "max" or "mobile", but this install is configured "min"
+```
+
+## Metadata sets
+
+`metadata` picks which of libphonenumber-js's three bundled data sets the install loads: `'max'` (default, about 145 kB, every pattern including per-number-type classification), `'min'` (about 80 kB, drops most of the patterns needed for `type` and for `isValid()`'s strict digit checks), and `'mobile'` (about 95 kB, tuned for validating mobile numbers specifically). It's a `fields({ phoneNumber: { metadata } })` option only, with no per-field override: the parser is a process-wide singleton, so a per-field set would mean loading several copies of it and letting two fields disagree about the same number.
+
+`type` is fully populated under `'max'`. Under `'mobile'` it resolves for a number that genuinely is mobile and reads `undefined` for other line types, which is the set being mobile-only by design. Under `'min'` whether `type` resolves depends on the country: it works for some (Great Britain, the United States) and not others (Germany, France), so treat `'min'` as unable to classify at all rather than relying on it per country. This is also why `validation: 'mobile'` only accepts metadata `'max'` or `'mobile'`, covered above.
+
+## Country restriction and pinning
+
+`countries` scopes the picker's list; it does not restrict what can be saved. A number from outside the allowlist still parses, validates, and persists normally if it reaches the field through a default value, a migration, or a direct API write, since the allowlist is a UI convenience over `getCountries()`, not a validation rule. Every entry still has to be a real, known country: an unsupported code throws at field-definition time:
+
+```
+phoneNumberField(phone): countries entry "ZZ" is not a supported country
+```
+
+`preferredCountries` pins a subset above the alphabetized rest, in the order given, and both narrow correctly together: a preferred country outside `countries` is dropped rather than shown out of scope.
+
+`defaultCountry` seeds the picker and the calling-code prefix while the field is empty. It has to be a real, known country too:
+
+```
+phoneNumberField(phone): defaultCountry "ZZ" is not a supported country
+```
+
+Setting both `countries` and `defaultCountry` on the same field additionally throws at field-definition time if `defaultCountry` isn't in the list:
+
+```
+phoneNumberField(phone): defaultCountry "US" is not in countries
+```
+
+## Flags
+
+`flags` chooses what the country trigger and picker rows draw: `'svg'` (default) requests real flag artwork from the plugin's own endpoint, `'emoji'` draws the two-codepoint Unicode regional-indicator sequence for the country, and `'none'` shows the ISO code instead of any artwork. Every OS that ships a flag emoji font combines that sequence into one glyph; Windows doesn't ship one, so `'emoji'` renders as two separate letter tiles there. `'svg'` has no such gap, which is why it's the default. Every flag image is decorative (`aria-hidden`), since the country name is always available beside it.
+
+`'svg'` fetches from `/10x-fields/flags/:code` under the app's API base, mounted by the `fields()` plugin and served unauthenticated by design: a flag is public, static artwork identical for every caller, and the handler touches no database, user, or request scope, only an in-memory map of SVGs loaded once per process. `fields({ phoneNumber: { serveFlags: false } })` skips mounting it entirely, for an install that wants no such route; fields using `flags: 'emoji'` or `flags: 'none'` don't need it either way, since only `'svg'` calls it. Like `metadata`, `serveFlags` is install-wide only, since the route is mounted once, before any field on the config has necessarily been read.
+
+## Overrides
+
+The factory takes no `admin` option directly. Reach `placeholder`, `className`, `style`, `condition`, `readOnly`, `width`, or a custom component through `overrides`, spreading the field's own `admin` first so the factory's `components.Field`/`components.Cell` survive:
+
+```ts
+phoneNumberField({
+  name: 'phone',
+  overrides: ({ field }) => ({ ...field, admin: { ...field.admin, width: '50%' } }),
+})
+```
+
+`overrides` is typed to whichever shape the factory returns: `({ field: GroupField }) => GroupField` under the default storage, `({ field: TextField }) => TextField` under `storage: 'e164'`, matching the overload TypeScript picks from the `storage` you passed.
+
+## Plugin-level defaults
+
+`fields({ phoneNumber: {...} })` sets install-wide defaults every `phoneNumberField()` inherits; a field's own option always wins, so a field only needs to state where it diverges from the install:
+
+```ts
+import { fields } from '@10x-media/fields'
+
+fields({
+  phoneNumber: {
+    defaultCountry: 'DE',                 // same meaning as the field option; a field's own value always wins
+    countries: ['AT', 'CH', 'DE', 'FR'],
+    preferredCountries: ['DE', 'AT', 'CH'],
+    validation: 'valid',
+    flags: 'svg',
+    cellFormat: 'international',
+    metadata: 'max',                      // 'max' (default) | 'min' | 'mobile'; install-wide only, see Metadata sets
+    serveFlags: true,                     // default true; mounts the flags SVG route, see Flags
+  },
+})
+```
+
+`label`, `required`, `localized`, `index`, and `isClearable` have no plugin-level form: they're inherently per-field, so they're only ever set on `phoneNumberField()` itself. Setting `defaultCountry` and `countries` at the plugin level is checked the same way as on a field: every `countries` entry and `defaultCountry` itself must be a real, known country, and `defaultCountry` must be in `countries` when both are set, each throwing when the plugin builds:
+
+```
+fields plugin: phoneNumber.countries entry "ZZ" is not a supported country.
+fields plugin: phoneNumber.defaultCountry "ZZ" is not a supported country.
+fields plugin: phoneNumber.defaultCountry "US" is not in phoneNumber.countries.
+```
+
+`metadata` is checked against its three-value union too, throwing the same way:
+
+```
+fields plugin: phoneNumber.metadata "nope" must be "max", "min", or "mobile".
+```
+
+## Options
+
+| Option | Default | Notes |
+|---|---|---|
+| `name` | required | |
+| `storage` | `'object'` | `'object'` returns a `GroupField`; `'e164'` returns a `TextField`. Fixed per field; not resolvable from the plugin. |
+| `defaultCountry` | none | Picker and calling-code default while the field is empty. Must be in `countries` when both are set on the same field. Also consulted by `storage: 'e164'` validation, but not `storage: 'object'`; see [Storage shapes](#storage-shapes). |
+| `countries` | every supported country | Scopes the picker only; see [Country restriction and pinning](#country-restriction-and-pinning). |
+| `preferredCountries` | none | Pinned above the rest of the picker list, in the given order. |
+| `validation` | `'valid'` | `'possible'` \| `'valid'` \| `'mobile'`. `'mobile'` requires metadata `'max'` or `'mobile'`. |
+| `flags` | `'svg'` | `'svg'` \| `'emoji'` \| `'none'`. See [Flags](#flags). |
+| `cellFormat` | `'international'` | List column format: `'national'` \| `'international'` \| `'e164'`. |
+| `isClearable` | `true` | `false` means the value can't be removed, only replaced: emptying the input and committing reverts to the last valid value. |
+| `label` | humanized `name` | A string or a per-locale map. |
+| `required` | `false` | |
+| `localized` | `false` | |
+| `index` | `false` | |
+| `overrides` | none | `({ field }) => field` escape hatch; see [Overrides](#overrides). |
+
+## Limitations
+
+- `number` isn't guaranteed to be E.164: an unparseable draft commits raw text instead, and a draft save skips the field's own validation by default (`versions.drafts.validate: false`), so raw text can reach the database that way.
+- An extension typed into the input is accepted and shown, but never persists: E.164 has no extension slot, so a commit drops it.
+- The five derived subfields are `virtual: true`. Payload rejects a query or sort against them; filter and sort on `number` or `country` instead.
+- `storage: 'e164'` has no `country` column, so there's no sibling field a frontend can read a derived value from; use the exported utils against the stored string.
+- `defaultCountry` is not consulted the same way by both storage modes: `storage: 'e164'` validation falls back to it for a country-less national-format write, while `storage: 'object'` never does, since it parses `number` against the stored `country` alone. See [Storage shapes](#storage-shapes).
+- `type` is fully populated only under metadata `'max'`. Under `'mobile'` it resolves for numbers that are genuinely mobile and reads `undefined` for other line types. Under `'min'` it resolves for some countries and not others, so treat it as unavailable there.
+- `metadata` and `serveFlags` are install-wide only, set through `fields({ phoneNumber: {...} })`; neither has a per-field override.
+
+## Frontend use
+
+`number` (E.164 once the admin UI's draft parsed, raw text otherwise; see [Storage shapes](#storage-shapes)) is the only value you need off the record. Parse, format, or re-detect its country for your frontend with [`/phone/utils`](/fields/phone/utils), the same engine the field runs.

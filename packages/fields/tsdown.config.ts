@@ -18,6 +18,8 @@ export default definePluginBuild({
 		'exports/encrypted': 'src/exports/encrypted.ts',
 		'exports/measurement': 'src/exports/measurement.ts',
 		'exports/measurement-utils': 'src/exports/measurement-utils.ts',
+		'exports/phone': 'src/exports/phone.ts',
+		'exports/phone-utils': 'src/exports/phone-utils.ts',
 	},
 	copy: [
 		{ from: 'src/fields/color/client/colorField.css', to: 'dist/fields/color/client' },
@@ -34,6 +36,10 @@ export default definePluginBuild({
 		{
 			from: 'src/fields/measurement/client/measurementCell.css',
 			to: 'dist/fields/measurement/client',
+		},
+		{
+			from: 'src/fields/phoneNumber/client/phoneNumberField.css',
+			to: 'dist/fields/phoneNumber/client',
 		},
 	],
 })

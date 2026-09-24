@@ -2,6 +2,9 @@ import type { Config, SanitizedConfig } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { lucideAdapter } from './fields/icon/adapters/lucide/adapter'
+import type { MetadataSet } from './fields/phoneNumber/engine/metadata'
+import type { CountryCode } from './fields/phoneNumber/engine/phone'
+import { FLAGS_ENDPOINT_PATH } from './fields/phoneNumber/server/flagsEndpoint'
 import { fields } from './index'
 import { getFieldsRegistry } from './plugin/registry'
 import { keys } from './translations'
@@ -89,5 +92,59 @@ describe('fields factory', () => {
 	it('accepts a valid measurement.precision', () => {
 		const out = fields({ measurement: { precision: 'exact' } })(fakeConfig()) as Config
 		expect(getFieldsRegistry(asSanitized(out))?.measurement?.precision).toBe('exact')
+	})
+
+	it('throws at plugin build when phoneNumber.validation is mobile with metadata min', () => {
+		expect(() =>
+			fields({ phoneNumber: { validation: 'mobile', metadata: 'min' } })(fakeConfig())
+		).toThrow(/phoneNumber\.validation/)
+	})
+
+	it('throws at plugin build when phoneNumber.defaultCountry is outside phoneNumber.countries', () => {
+		expect(() =>
+			fields({ phoneNumber: { countries: ['US', 'CA'], defaultCountry: 'FR' } })(fakeConfig())
+		).toThrow(/phoneNumber\.defaultCountry/)
+	})
+
+	it('throws at plugin build when a phoneNumber.countries entry is not a supported country', () => {
+		expect(() =>
+			fields({ phoneNumber: { countries: ['US', 'ZZ' as CountryCode] } })(fakeConfig())
+		).toThrow(/phoneNumber\.countries/)
+	})
+
+	it('throws at plugin build when phoneNumber.defaultCountry is not a supported country', () => {
+		expect(() =>
+			fields({ phoneNumber: { defaultCountry: 'ZZ' as CountryCode } })(fakeConfig())
+		).toThrow(/phoneNumber\.defaultCountry/)
+	})
+
+	it('throws at plugin build when phoneNumber.metadata is not a supported set', () => {
+		expect(() =>
+			fields({ phoneNumber: { metadata: 'nope' as MetadataSet } })(fakeConfig())
+		).toThrow(/phoneNumber\.metadata/)
+	})
+
+	it('writes a valid phoneNumber config to the registry', () => {
+		const phoneNumber = {
+			countries: ['US', 'CA'],
+			defaultCountry: 'US',
+			validation: 'valid',
+		} as const
+		const out = fields({ phoneNumber })(fakeConfig()) as Config
+		expect(getFieldsRegistry(asSanitized(out))?.phoneNumber).toEqual(phoneNumber)
+	})
+
+	it('mounts the flags endpoint by default', () => {
+		const out = fields({})(fakeConfig()) as Config
+		expect(out.endpoints).toContainEqual(
+			expect.objectContaining({ method: 'get', path: FLAGS_ENDPOINT_PATH })
+		)
+	})
+
+	it('skips the flags endpoint when phoneNumber.serveFlags is false', () => {
+		const out = fields({ phoneNumber: { serveFlags: false } })(fakeConfig()) as Config
+		expect(out.endpoints ?? []).not.toContainEqual(
+			expect.objectContaining({ path: FLAGS_ENDPOINT_PATH })
+		)
 	})
 })

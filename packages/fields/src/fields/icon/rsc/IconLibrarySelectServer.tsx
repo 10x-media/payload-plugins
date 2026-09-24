@@ -1,9 +1,9 @@
 import type { TextFieldServerProps } from 'payload'
 import type { ReactNode } from 'react'
 import type { IconAdapter } from '../../../types'
+import { resolveStaticLabel } from '../../../utils/resolveStaticLabel'
 import { IconLibrarySelect } from '../client/IconLibrarySelect'
 import { getIconLibraryOptions } from '../server/libraryOptions'
-import { resolveStaticLabel } from '../shared/resolveStaticLabel'
 
 type ServerProps = { adapters?: IconAdapter[] } & TextFieldServerProps
 

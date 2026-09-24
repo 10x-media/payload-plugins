@@ -1,0 +1,121 @@
+---
+title: Phone number utilities
+description: The parsing, formatting, and validation engine behind the field, exported for frontend use.
+---
+
+`@10x-media/fields/phone/utils` is the engine the field itself runs, exported standalone. It wraps `libphonenumber-js/core` and has no Payload import, so it's safe in any bundle: server, client, or worker. Every function takes its own `metadata`, loaded on demand with `loadMetadata`, rather than bundling one set by default.
+
+```ts
+import {
+  parsePhone,
+  formatPhone,
+  phoneUri,
+  detectCountry,
+  salvagePhone,
+  checkPhone,
+  formatAsYouType,
+  countryOptions,
+  callingCodeFor,
+  emojiFlag,
+  isKnownCountry,
+  loadMetadata,
+} from '@10x-media/fields/phone/utils'
+```
+
+## Metadata
+
+```ts
+const metadata = await loadMetadata('max') // 'max' | 'min' | 'mobile'; each is a separate dynamic import
+```
+
+`loadMetadata(set)` dynamically imports one of libphonenumber-js's three metadata sets and caches the result per set for the life of the process, so calling it again for the same set after the first await is free. A rejected import is evicted from the cache so a later call retries instead of inheriting the failure. `DEFAULT_METADATA_SET` (`'max'`) is the constant the field itself falls back to when no plugin config says otherwise. `PhoneMetadata` is an opaque `Readonly<Record<string, unknown>>`; only libphonenumber-js reads its shape. `isSupported(code, metadata)` checks a code against a specific loaded set rather than the static list below, useful mainly if a set's country coverage might not match; for this package's three built-in sets it agrees with `isKnownCountry` today.
+
+## Parse
+
+```ts
+parsePhone('+4915112345678', { metadata })
+// {
+//   callingCode: '49', country: 'DE', e164: '+4915112345678', ext: undefined,
+//   international: '+49 1511 2345678', national: '01511 2345678', possible: true,
+//   type: 'MOBILE', uri: 'tel:+4915112345678', valid: true,
+// }
+```
+
+`parsePhone(input, options)` parses a string with libphonenumber-js, returning `null` for input it can't parse at all. `options.defaultCountry` disambiguates a national-format number (`'0151 12345678'` needs one; `'+4915112345678'` doesn't, since the calling code already names a country). `type` is fully populated only under metadata `'max'`; `'mobile'` resolves it for numbers that are genuinely mobile, and `'min'` only for some countries. See the field's [Metadata sets](/fields/phone#metadata-sets) for the full distinction.
+
+## Format
+
+```ts
+formatPhone('+4915112345678', 'national', { metadata })      // '01511 2345678'
+formatPhone('+4915112345678', 'international', { metadata }) // '+49 1511 2345678'
+formatPhone('+4915112345678', 'e164', { metadata })           // '+4915112345678'
+phoneUri('+4915112345678', { metadata })                      // 'tel:+4915112345678'
+```
+
+`formatPhone(input, format, options)` reformats a parseable string; input that doesn't parse is returned unchanged rather than throwing. `phoneUri(input, options)` returns a `tel:` URI, or `null` when the input doesn't parse.
+
+## Detect and salvage
+
+```ts
+detectCountry('Call me at +1 (213) 373-4253 today', { metadata }) // 'US'
+```
+
+`detectCountry(input, options)` finds a country from free text by delegating to `salvagePhone`, which scans leading substrings starting at the first `+` for the longest one that parses to a valid, country-bearing number. That length-scan is what protects a doubled paste, or a number wrapped in punctuation, from fabricating a different number by having characters stripped from it. Both return `undefined` (`detectCountry`) or `null` (`salvagePhone`) when nothing in the string parses.
+
+## Validate
+
+```ts
+checkPhone('+4915112345678', 'valid', { metadata })     // 'ok'
+checkPhone('not a phone number', 'valid', { metadata }) // 'invalid'
+```
+
+`checkPhone(input, mode, options)` runs the same three-mode check (`'possible' | 'valid' | 'mobile'`) the field's own validator uses, returning `'empty' | 'invalid' | 'notMobile' | 'ok'` rather than a translated message. Empty input always returns `'empty'` regardless of mode, leaving the required/optional decision to the caller.
+
+## As-you-type
+
+```ts
+formatAsYouType('+491511234', undefined, { metadata }) // '+49 1511 234'
+```
+
+`formatAsYouType(input, country, options)` reformats a partial string the way the field's own input does while the viewer is still typing, given a country to assume when the string has no leading `+`.
+
+## Countries
+
+```ts
+countryOptions({ locale: 'en-US', metadata, countries: ['DE', 'FR', 'US'], preferredCountries: ['US'] })
+// {
+//   preferred: [{ callingCode: '1', code: 'US', name: 'United States' }],
+//   rest: [
+//     { callingCode: '33', code: 'FR', name: 'France' },
+//     { callingCode: '49', code: 'DE', name: 'Germany' },
+//   ],
+// }
+
+emojiFlag('DE')      // '🇩🇪'
+isKnownCountry('DE') // true
+isKnownCountry('ZZ') // false
+
+callingCodeFor('DE', metadata) // '49'
+callingCodeFor('US', metadata) // '1'
+```
+
+`countryOptions(args)` builds the picker's own list: `rest` alphabetized by localized country name via `Intl.DisplayNames`, `preferred` kept in the order given and excluded from `rest`. `emojiFlag(code)` derives the two-codepoint regional-indicator sequence arithmetically, no artwork involved; see the field's [Flags](/fields/phone#flags) section for why that sequence renders as two letters on Windows. `isKnownCountry(code)` checks against `KNOWN_COUNTRY_CODES`, every country libphonenumber-js ships, identical across all three metadata sets; it's synchronous and needs no `loadMetadata` first, so it's safe for a config-time guard.
+
+`callingCodeFor(code, metadata)` looks up a country's calling code directly, without parsing a number: it's a property of the country itself, so it holds even for a code the field's own `countries` allowlist doesn't offer. It returns `undefined` rather than throwing for a code the given metadata set doesn't carry, so a frontend building its own country input can call it unconditionally.
+
+## Frontend example
+
+Rendering a clickable, formatted number from a `storage: 'e164'` field's stored string:
+
+```tsx
+import { formatPhone, loadMetadata, phoneUri } from '@10x-media/fields/phone/utils'
+
+export const ContactNumber = async ({ e164 }: { e164: string }) => {
+  const metadata = await loadMetadata('max')
+  return (
+    <a href={phoneUri(e164, { metadata }) ?? undefined}>
+      {formatPhone(e164, 'international', { metadata })}
+    </a>
+  )
+}
+```
