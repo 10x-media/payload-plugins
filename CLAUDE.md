@@ -77,6 +77,8 @@ pnpm changeset                          # author a changeset
 # Process hygiene
 pnpm check:processes                    # dry-run stale-process scan
 pnpm clean:processes                    # kill them
+pnpm check:mongo-temp                   # dry-run: list orphaned mongo-mem-* dirs in the OS temp dir
+pnpm clean:mongo-temp                   # delete them (--min-age=<minutes>, default 60)
 ```
 
 `<name>` is a plugin directory under `packages/` (e.g. `automations`) or an app under `apps/` (e.g. `docs`, so `pnpm dev docs` and `pnpm build docs` work). `scripts/run.ts` runs cacheable tasks (`build`/`lint`/`typecheck`/`test*`) through turbo and routes `dev`/`start`/`generate*`/`migrate*` to a plugin's `-dev` package via pnpm; apps have no `-dev` companion and do not support `generate`/`migrate`. Unknown names get a "Did you mean: ..." suggestion.

@@ -41,6 +41,8 @@
 		"clean": "turbo run clean && rm -rf node_modules",
 		"clean:processes": "bash scripts/cleanup.sh",
 		"check:processes": "bash scripts/cleanup.sh --dry-run",
+		"clean:mongo-temp": "tsx scripts/clean-mongo-temp.ts",
+		"check:mongo-temp": "tsx scripts/clean-mongo-temp.ts --dry-run",
 		"check:dist": "tsx scripts/verify-dist.ts",
 		"check:registry": "pnpm --filter @10x-media/form-builder registry:build && git diff --exit-code -- packages/form-builder/registry/r",
 		"check:template": "tsx scripts/check-template.ts",
