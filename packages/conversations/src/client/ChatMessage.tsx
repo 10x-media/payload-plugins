@@ -149,6 +149,9 @@ export const ChatMessage = ({
 						<div className="conversations-message__placeholder">{t(keys.unknownType)}</div>
 					))
 				)}
+				{compact && message.editedAt && !deleted && !editing ? (
+					<span className="conversations-message__edited">({t(keys.edited)})</span>
+				) : null}
 				{message.sendStatus === 'sending' ? (
 					<div className="conversations-message__status">{t(keys.sending)}</div>
 				) : null}

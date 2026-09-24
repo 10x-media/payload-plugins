@@ -17,6 +17,8 @@ export type ChatComposerProps = {
 	above?: ReactNode
 	/** Extra buttons next to Send. */
 	actions?: ReactNode
+	/** Focus the editor on mount. Default: when editing. */
+	autoFocus?: boolean
 	channel: string
 	/** Shown above the editor: which channel this goes to, and who reads it. */
 	cue?: { label: LocalizedLabel; tone: 'neutral' | 'warning' } | null
@@ -103,6 +105,7 @@ const ComposerInner = ({
 export const ChatComposer = ({
 	above,
 	actions,
+	autoFocus,
 	channel,
 	cue,
 	disabledReason,
@@ -184,6 +187,7 @@ export const ChatComposer = ({
 
 	const context = useMemo<ComposerContextValue>(
 		() => ({
+			autoFocus: autoFocus ?? Boolean(onSave),
 			channel,
 			instance,
 			key: conversationKey,
@@ -197,7 +201,7 @@ export const ChatComposer = ({
 			submit: () => void submit(),
 			submitOn,
 		}),
-		[channel, conversationKey, instance, submit, submitOn]
+		[autoFocus, channel, conversationKey, instance, onSave, submit, submitOn]
 	)
 
 	// A fresh form after a send: put the caret back so the next message can follow.

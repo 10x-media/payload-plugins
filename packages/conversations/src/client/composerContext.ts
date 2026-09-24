@@ -4,6 +4,8 @@ import { createContext, useContext } from 'react'
 
 /** What the editor plugins inside a composer need from it. */
 export type ComposerContextValue = {
+	/** Focus the editor, caret at the end, as soon as it mounts. */
+	autoFocus: boolean
 	channel: string
 	instance: string
 	key: string

@@ -48,6 +48,10 @@ const SubmitOnEnter = ({ composer }: { composer: ComposerContextValue }) => {
 		composer.registerEditor(editor)
 		return () => composer.registerEditor(null)
 	}, [composer, editor])
+	const { autoFocus } = composer
+	useEffect(() => {
+		if (autoFocus) editor.focus(undefined, { defaultSelection: 'rootEnd' })
+	}, [autoFocus, editor])
 	useEffect(
 		() =>
 			editor.registerCommand<KeyboardEvent | null>(
