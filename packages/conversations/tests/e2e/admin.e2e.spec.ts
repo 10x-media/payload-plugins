@@ -60,7 +60,12 @@ test.describe('comments drawer', () => {
 	test('channel tabs switch feeds and show the channel cue', async ({ page }) => {
 		await login(page, ME)
 		await openDrawer(page)
-		await expect(page.locator('.conversations-composer__banner--neutral')).toContainText('Internal')
+		// Internal sets no cue, so nothing sits above its composer.
+		await expect(
+			page.locator(
+				'.conversations-drawer > .conversations-composer .conversations-composer__banner'
+			)
+		).toHaveCount(0)
 		await page.click('.conversations-tabs__tab >> text=Shared')
 		await expect(page.locator('.conversations-composer__banner--warning')).toContainText(
 			'visible to the customer'

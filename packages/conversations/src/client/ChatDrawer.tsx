@@ -81,10 +81,7 @@ const DrawerBody = ({
 	}, [openModal, thread, threadSlug])
 
 	const label = current ? resolveLabel(current.label, i18n.language) : ''
-	const cue =
-		current && (channels.length > 1 || current.cue)
-			? (current.cue ?? { label: current.label, tone: 'neutral' as const })
-			: null
+	const cue = current?.cue ?? null
 	return (
 		<div className="conversations-drawer">
 			<DrawerHeader

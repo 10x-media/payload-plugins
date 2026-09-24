@@ -86,7 +86,6 @@ export default buildConfig({
 				{
 					slug: 'internal',
 					label: 'Internal',
-					cue: { label: 'Internal · staff only', tone: 'neutral' },
 					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
 				},
 				{
