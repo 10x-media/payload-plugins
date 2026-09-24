@@ -1,4 +1,12 @@
-import type { Access, CollectionSlug, Payload, PayloadRequest, TypedUser, Where } from 'payload'
+import type {
+	Access,
+	CollectionSlug,
+	Payload,
+	PayloadComponent,
+	PayloadRequest,
+	TypedUser,
+	Where,
+} from 'payload'
 
 import type { TranslationsOption } from './translations'
 
@@ -19,10 +27,13 @@ export type ImpersonationActor = {
 	absoluteExpiresAt?: null | string
 	id: number | string
 	impersonator: { collection: string; id: number | string }
+	impersonatorEmail?: null | string
+	impersonatorLocale?: null | string
 	mode: ImpersonationMode
 	reason?: null | string
 	startedAt: string
 	target: { collection: string; id: number | string }
+	targetEmail?: null | string
 }
 
 export type ImpersonateAccessArgs = {
@@ -97,6 +108,13 @@ export type UiOptions = {
 	 */
 	bar?: boolean
 	/**
+	 * Replacement for the default switcher row. Receives the same props as
+	 * `ImpersonationUserCard` (`collectionSlug`, `doc`, and the pick/drawer/document
+	 * actions). A string path is registered on `admin.dependencies` so the import
+	 * map can load it. Omit to keep the default card.
+	 */
+	card?: PayloadComponent
+	/**
 	 * Show email under `useAsTitle` on default switcher cards. Hidden when the
 	 * title is already the email.
 	 * @default true
@@ -115,9 +133,9 @@ export type UiOptions = {
 	 */
 	headerAction?: boolean
 	/**
-	 * "End session" on an `impersonation-sessions` document. The collection is
-	 * hidden and read-only by default, so this only appears if you un-hide it
-	 * and grant create or delete (Payload hides the dots menu otherwise).
+	 * "End session" beside Save on an `impersonation-sessions` document
+	 * (`beforeDocumentControls`). Visible once `access.readRecords` un-hides the
+	 * collection. Create, update, and delete stay denied.
 	 * @default true
 	 */
 	recordAction?: boolean
@@ -139,7 +157,7 @@ export type EnabledOptions = {
 		 * is deny, never allow-all.
 		 */
 		impersonate: ImpersonateAccess
-		/** Who can list `impersonation-sessions`. Default deny. The collection is hidden. */
+		/** Who can list `impersonation-sessions`. Omit to deny and keep the collection hidden. */
 		readRecords?: Access
 		/** Who can POST `/end` on someone else's session. Default deny. */
 		terminate?: BooleanAccess
@@ -186,6 +204,7 @@ export type ImpersonationPluginOptions =
 
 export type ResolvedUi = {
 	bar: boolean
+	card?: PayloadComponent
 	cardEmail: boolean
 	documentAction: boolean
 	headerAction: boolean
@@ -197,6 +216,8 @@ export type ResolvedOptions = {
 		filterTargets?: FilterTargets
 		impersonate: ImpersonateAccess
 		readRecords: Access
+		/** True when the host passed `access.readRecords`. Un-hides the sessions collection. */
+		recordsListed: boolean
 		terminate: BooleanAccess
 	}
 	apiPath: string

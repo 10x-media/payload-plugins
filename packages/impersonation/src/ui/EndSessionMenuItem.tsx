@@ -1,6 +1,6 @@
 'use client'
 
-import { ConfirmationModal, PopupList, toast, useDocumentInfo, useModal } from '@payloadcms/ui'
+import { Button, ConfirmationModal, toast, useDocumentInfo, useModal } from '@payloadcms/ui'
 import { useState } from 'react'
 
 import { keys } from '../translations/keys'
@@ -33,9 +33,14 @@ export const EndSessionMenuItem = () => {
 
 	return (
 		<>
-			<PopupList.Button onClick={() => openModal(CONFIRM_SLUG)}>
+			<Button
+				buttonStyle="secondary"
+				margin={false}
+				onClick={() => openModal(CONFIRM_SLUG)}
+				size="small"
+			>
 				<span data-testid="impersonation-end-session">{t(keys.endSession)}</span>
-			</PopupList.Button>
+			</Button>
 			<ConfirmationModal
 				body={t(keys.endSessionBody)}
 				className="impersonation-confirm-modal"

@@ -76,10 +76,13 @@ const wrapStrategy = ({
 				absoluteExpiresAt: row.absoluteExpiresAt ?? null,
 				id: row.id,
 				impersonator,
+				impersonatorEmail: row.impersonatorEmail,
+				impersonatorLocale: row.impersonatorLocale,
 				mode: row.mode,
 				reason: row.reason,
 				startedAt: row.startedAt,
 				target,
+				targetEmail: row.targetEmail,
 			}
 			user._impersonation = actor
 		}

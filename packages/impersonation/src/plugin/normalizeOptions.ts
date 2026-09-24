@@ -39,6 +39,7 @@ const resolveUi = (ui: EnabledOptions['ui']): ResolvedUi => {
 	}
 	return {
 		bar: ui?.bar !== false,
+		card: ui?.card,
 		cardEmail: ui?.cardEmail !== false,
 		documentAction: ui?.documentAction !== false,
 		headerAction: ui?.headerAction !== false,
@@ -98,6 +99,7 @@ export const normalizeOptions = (options: EnabledOptions, config: Config): Resol
 			filterTargets: options.access.filterTargets,
 			impersonate: options.access.impersonate,
 			readRecords: options.access.readRecords ?? (() => false),
+			recordsListed: typeof options.access.readRecords === 'function',
 			terminate: options.access.terminate ?? (() => false),
 		},
 		apiPath,

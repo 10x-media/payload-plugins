@@ -32,8 +32,10 @@ describe('normalizeOptions', () => {
 		expect(resolved.reason).toBe('off')
 		expect(resolved.cookies.clearOnSwitch).toEqual(['payload-tenant'])
 		expect(resolved.maxDuration).toBeUndefined()
+		expect(resolved.access.recordsListed).toBe(false)
 		expect(resolved.ui).toEqual({
 			bar: true,
+			card: undefined,
 			cardEmail: true,
 			documentAction: true,
 			headerAction: true,

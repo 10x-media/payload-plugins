@@ -1,4 +1,6 @@
 import type { ServerProps } from 'payload'
+import { getFromImportMap } from 'payload/shared'
+import type { ComponentType } from 'react'
 
 import { collectionBySlug } from '../ids'
 import { IMPERSONATION_SID_PREFIX } from '../plugin/constants'
@@ -8,6 +10,7 @@ import { isStartableAuthCollection } from '../plugin/startable'
 import { findOpenBySid } from '../session/resolve'
 import { asAuthUser, boundSid } from '../types'
 import { ImpersonationSwitcher } from './ImpersonationSwitcher'
+import type { ImpersonationUserCardProps } from './ImpersonationUserCard'
 
 export const ImpersonationAction = async ({ payload, user }: ServerProps) => {
 	const options = getRegistry(payload.config)
@@ -57,5 +60,13 @@ export const ImpersonationAction = async ({ payload, user }: ServerProps) => {
 		return null
 	}
 
-	return <ImpersonationSwitcher collections={collections} viewerId={user.id} />
+	const Card = options.ui.card
+		? getFromImportMap<ComponentType<ImpersonationUserCardProps>>({
+				importMap: payload.importMap,
+				PayloadComponent: options.ui.card,
+				silent: true,
+			})
+		: undefined
+
+	return <ImpersonationSwitcher Card={Card} collections={collections} viewerId={user.id} />
 }

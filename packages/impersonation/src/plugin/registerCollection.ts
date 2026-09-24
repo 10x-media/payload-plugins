@@ -27,13 +27,13 @@ export const buildRecordsCollection = ({
 		admin: {
 			defaultColumns: ['target', 'impersonator', 'startedAt', 'endedAt', 'endedBy'],
 			group: ADMIN_GROUP,
-			hidden: true,
+			hidden: !options.access.recordsListed,
 			useAsTitle: 'targetEmail',
 			...(options.ui.recordAction
 				? {
 						components: {
 							edit: {
-								editMenuItems: ['@10x-media/impersonation/client#EndSessionMenuItem'],
+								beforeDocumentControls: ['@10x-media/impersonation/client#EndSessionMenuItem'],
 							},
 						},
 					}

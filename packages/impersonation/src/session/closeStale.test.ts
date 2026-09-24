@@ -5,7 +5,12 @@ import type { ImpersonationRecord, ResolvedOptions } from '../types'
 import { closeStaleImpersonations } from './closeStale'
 
 const options = {
-	access: { impersonate: () => true, readRecords: () => false, terminate: () => false },
+	access: {
+		impersonate: () => true,
+		readRecords: () => false,
+		recordsListed: false,
+		terminate: () => false,
+	},
 	apiPath: '/impersonation',
 	collectionSlug: 'impersonation-sessions',
 	cookies: { clearOnSwitch: [] },

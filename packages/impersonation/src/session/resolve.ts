@@ -138,7 +138,10 @@ export const relationOf = (
 	return null
 }
 
-export const isPastAbsoluteExpiry = (row: ImpersonationRecord, now = Date.now()): boolean => {
+export const isPastAbsoluteExpiry = (
+	row: { absoluteExpiresAt?: null | string },
+	now = Date.now()
+): boolean => {
 	if (!row.absoluteExpiresAt) {
 		return false
 	}

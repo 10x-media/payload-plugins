@@ -1,11 +1,30 @@
 'use client'
 
 import { Button, Pill, toast } from '@payloadcms/ui'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 
 import { messageFor } from '../translations/lookup'
 import { errorKey, goAfterSwitch, postImpersonation } from './api'
 import './impersonation.css'
+
+const subscribeToPath = (onChange: () => void): (() => void) => {
+	window.addEventListener('popstate', onChange)
+	const push = history.pushState.bind(history)
+	const replace = history.replaceState.bind(history)
+	history.pushState = (...args) => {
+		push(...args)
+		onChange()
+	}
+	history.replaceState = (...args) => {
+		replace(...args)
+		onChange()
+	}
+	return () => {
+		window.removeEventListener('popstate', onChange)
+		history.pushState = push
+		history.replaceState = replace
+	}
+}
 
 const formatCountdown = (expiresAt: string, now: number): string | null => {
 	const remaining = new Date(expiresAt).getTime() - now
@@ -54,11 +73,48 @@ export const ImpersonationBar = ({
 	sessionEndsInTemplate,
 	showFrontendLink,
 }: ImpersonationBarProps) => {
+	const pathname = useSyncExternalStore(
+		subscribeToPath,
+		() => window.location.pathname,
+		() => adminRoute
+	)
+	const onLogin = pathname === `${adminRoute}/login` || pathname.endsWith('/login')
 	const [busy, setBusy] = useState(false)
+	const [visible, setVisible] = useState(!onLogin)
 	const [now, setNow] = useState(() => Date.now())
 	const rootRef = useRef<HTMLDivElement>(null)
 
 	useEffect(() => {
+		if (onLogin) {
+			setVisible(false)
+			return
+		}
+		let cancelled = false
+		void fetch(apiPath, { credentials: 'include' })
+			.then(async (response) => {
+				const body = (await response.json().catch(() => ({ active: false }))) as {
+					active?: boolean
+				}
+				if (!cancelled) {
+					setVisible(Boolean(body.active))
+				}
+			})
+			.catch(() => {
+				if (!cancelled) {
+					setVisible(false)
+				}
+			})
+		return () => {
+			cancelled = true
+		}
+	}, [apiPath, onLogin])
+
+	useEffect(() => {
+		if (!visible || onLogin) {
+			document.body.classList.remove('impersonation--active')
+			document.documentElement.style.removeProperty('--impersonation-bar-height')
+			return
+		}
 		document.body.classList.add('impersonation--active')
 		const node = rootRef.current
 		const applyHeight = () => {
@@ -84,7 +140,7 @@ export const ImpersonationBar = ({
 			document.documentElement.style.removeProperty('--impersonation-bar-height')
 			observer.disconnect()
 		}
-	}, [])
+	}, [onLogin, visible])
 
 	useEffect(() => {
 		if (!sessionEndsAt) {
@@ -102,16 +158,27 @@ export const ImpersonationBar = ({
 		try {
 			const result = await postImpersonation(`${apiPath}/exit`, {})
 			if (!result.ok) {
-				toast.error(messageFor(impersonatorLocale, errorKey(result.error ?? 'failed')))
-				if (result.error === 'impersonatorSessionExpired' || result.error === 'impersonatorGone') {
+				if (
+					result.error === 'notImpersonating' ||
+					result.error === 'forbidden' ||
+					result.error === 'impersonatorSessionExpired' ||
+					result.error === 'impersonatorGone'
+				) {
+					setVisible(false)
 					goAfterSwitch(adminRoute)
+					return
 				}
+				toast.error(messageFor(impersonatorLocale, errorKey(result.error ?? 'failed')))
 				return
 			}
 			goAfterSwitch(adminRoute)
 		} finally {
 			setBusy(false)
 		}
+	}
+
+	if (!visible || onLogin) {
+		return null
 	}
 
 	const countdown = sessionEndsAt ? formatCountdown(sessionEndsAt, now) : null

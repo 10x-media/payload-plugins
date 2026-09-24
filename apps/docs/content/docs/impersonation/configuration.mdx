@@ -8,9 +8,9 @@ description: Options for access, cookies, duration, UI, and session seams.
 | `access.impersonate` | `({ req, target, targetCollection }) => true \| false` | required | Start gate. Only literal `true` allows. |
 | `access.filterTargets` | `({ req, targetCollection }) => Where \| boolean` | unset | Who the switcher lists. `true` = whole collection, `false` = hide it, `Where` = filter the list. Start re-checks this. Omit to show everyone the viewer can read. |
 | `access.terminate` | `({ req }) => true \| false` | deny | Remote end of an open row. |
-| `access.readRecords` | Payload `Access` | deny | Read the `impersonation-sessions` collection. |
+| `access.readRecords` | Payload `Access` | deny | Read the `impersonation-sessions` collection. Passing a function puts the collection in the nav. Create, update, and delete stay denied. |
 | `disabled` | `boolean` | `false` | Return the incoming config unchanged. |
-| `collectionSlug` | `string` | `impersonation-sessions` | Record collection. Hidden, create/update/delete denied. |
+| `collectionSlug` | `string` | `impersonation-sessions` | Record collection. Create, update, and delete are denied. Hidden until `access.readRecords` is set. |
 | `apiPath` | `string` | `/impersonation` | Root endpoint prefix. Must not collide with a collection slug. |
 | `hintCookieName` | `string` | `impersonation-hint` | Row id hint. Must not start with `cookiePrefix`. |
 | `decorateRequests` | `boolean` | `true` | Paint `req.user._impersonation` on the **target** session. |
@@ -33,7 +33,8 @@ Each flag is independent. `ui: false` turns all of them off. The provider still 
 | `ui.headerAction` | `true` | **Impersonate** in the admin header. Opens the user drawer. |
 | `ui.bar` | `true` | Bottom bar while a session is open. |
 | `ui.documentAction` | `true` | **Impersonate** next to Save on a target document (`beforeDocumentControls`, so it still shows when the dots menu is hidden). |
-| `ui.recordAction` | `true` | **End session** on an `impersonation-sessions` document. The collection is hidden and read-only, so Payload will not show this unless you un-hide the collection and grant create or delete. |
+| `ui.recordAction` | `true` | **End session** beside Save on an `impersonation-sessions` document (`beforeDocumentControls`). Shows once `access.readRecords` puts the collection in the nav. Create, update, and delete stay denied. |
+| `ui.card` | unset | Replacement for the default switcher row. Same props as `ImpersonationUserCard` (`collectionSlug`, `doc`, `onSelect`, `onOpenDrawer`, `documentHref`, `title`, `email`). A string path is added to `admin.dependencies`. Omit to keep the default card. |
 | `ui.cardEmail` | `true` | Show email under `useAsTitle` on default switcher cards. |
 
 Build your own control with `useImpersonation` from `@10x-media/impersonation/client`. It returns `{ status, start, exit, end, reasonMode, targets, apiPath }`. `StartConfirmModal` is exported too.

@@ -10,6 +10,7 @@ export type TargetFilterMap = Record<string, true | Where>
 export type ImpersonationClientOptions = {
 	apiPath: string
 	cardEmail: boolean
+	cardPath?: string
 	reasonMode: 'off' | 'optional' | 'required'
 	sessionCollection: string
 	status: ImpersonationStatus

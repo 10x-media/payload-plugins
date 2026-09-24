@@ -105,8 +105,8 @@ body.impersonation--active {
 }
 
 .impersonation-collection {
-	min-width: 7rem;
-	width: 8.5rem;
+	max-width: min(16rem, 46%);
+	width: max-content;
 }
 
 .impersonation-collection .field-type__wrap,
@@ -121,6 +121,19 @@ body.impersonation--active {
 	box-shadow: none;
 	min-height: 0;
 	padding-block: 0;
+	width: max-content;
+}
+
+.impersonation-collection .rs__value-container {
+	overflow: hidden;
+}
+
+.impersonation-collection .rs__single-value {
+	max-width: 12rem;
+	overflow: hidden;
+	position: static;
+	text-overflow: ellipsis;
+	transform: none;
 }
 
 .impersonation-collection .rs__control:hover,
@@ -174,8 +187,7 @@ body.impersonation--active {
 	}
 
 	.impersonation-collection {
-		min-width: 6.5rem;
-		width: 7.5rem;
+		max-width: min(12rem, 42%);
 	}
 }
 

@@ -3,6 +3,8 @@
 import {
 	Button,
 	Drawer,
+	Pagination,
+	RenderCustomComponent,
 	SearchFilter,
 	SearchIcon,
 	SelectInput,
@@ -12,13 +14,13 @@ import {
 	useModal,
 } from '@payloadcms/ui'
 import type { CollectionSlug, Where } from 'payload'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { type ComponentType, useCallback, useEffect, useMemo, useState } from 'react'
 
 import { SWITCHER_PAGE_SIZE } from '../plugin/constants'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { ImpersonateIcon } from './ImpersonateIcon'
-import { ImpersonationUserCard } from './ImpersonationUserCard'
+import { ImpersonationUserCard, type ImpersonationUserCardProps } from './ImpersonationUserCard'
 import { StartConfirmModal, type StartTarget } from './StartConfirmModal'
 import { useImpersonation } from './useImpersonation'
 import './impersonation.css'
@@ -30,6 +32,7 @@ export type SwitcherCollection = {
 }
 
 export type ImpersonationSwitcherProps = {
+	Card?: ComponentType<ImpersonationUserCardProps>
 	apiPath?: string
 	collections: SwitcherCollection[]
 	reasonMode?: 'off' | 'optional' | 'required'
@@ -65,7 +68,11 @@ const PreviewDrawer = ({ collectionSlug, id }: { collectionSlug: string; id: num
 	return <DocumentDrawer />
 }
 
-export const ImpersonationSwitcher = ({ collections, viewerId }: ImpersonationSwitcherProps) => {
+export const ImpersonationSwitcher = ({
+	Card,
+	collections,
+	viewerId,
+}: ImpersonationSwitcherProps) => {
 	const { config } = useConfig()
 	const { t } = useTranslation()
 	const { closeModal, isModalOpen, openModal } = useModal()
@@ -76,6 +83,7 @@ export const ImpersonationSwitcher = ({ collections, viewerId }: ImpersonationSw
 	const [docs, setDocs] = useState<ListedUser[]>([])
 	const [hasNext, setHasNext] = useState(false)
 	const [hasPrev, setHasPrev] = useState(false)
+	const [totalPages, setTotalPages] = useState(1)
 	const [loading, setLoading] = useState(false)
 	const [target, setTarget] = useState<null | StartTarget>(null)
 	const [preview, setPreview] = useState<null | { collection: string; id: number | string }>(null)
@@ -135,15 +143,18 @@ export const ImpersonationSwitcher = ({ collections, viewerId }: ImpersonationSw
 				docs?: ListedUser[]
 				hasNextPage?: boolean
 				hasPrevPage?: boolean
+				totalPages?: number
 			}
 			setDocs(body.docs ?? [])
 			setHasNext(Boolean(body.hasNextPage))
 			setHasPrev(Boolean(body.hasPrevPage))
+			setTotalPages(body.totalPages ?? 1)
 		} catch {
 			toast.error(t(keys.errorFailed))
 			setDocs([])
 			setHasNext(false)
 			setHasPrev(false)
+			setTotalPages(1)
 		} finally {
 			setLoading(false)
 		}
@@ -183,7 +194,7 @@ export const ImpersonationSwitcher = ({ collections, viewerId }: ImpersonationSw
 				<div className="impersonation-switcher">
 					<div className="search-bar impersonation-toolbar">
 						<SearchIcon />
-						<SearchFilter handleChange={onSearch} key={collection} label={t(keys.searchByName)} />
+						<SearchFilter handleChange={onSearch} label={t(keys.searchByName)} />
 						{visibleCollections.length > 1 ? (
 							<div className="search-bar__actions impersonation-collection">
 								<SelectInput
@@ -197,7 +208,6 @@ export const ImpersonationSwitcher = ({ collections, viewerId }: ImpersonationSw
 												: String(next ?? '')
 										setCollection(value)
 										setPage(1)
-										setSearch('')
 									}}
 									options={visibleCollections.map((entry) => ({
 										label: entry.label,
@@ -220,42 +230,37 @@ export const ImpersonationSwitcher = ({ collections, viewerId }: ImpersonationSw
 							const title = String(doc[useAsTitle] ?? doc.email ?? doc.id)
 							const email = typeof doc.email === 'string' ? doc.email : undefined
 							const showEmail = cardEmail && email && email !== title
+							const cardProps: ImpersonationUserCardProps = {
+								collectionSlug: collection,
+								doc,
+								documentHref: `${config.routes.admin}/collections/${collection}/${doc.id}`,
+								email: showEmail ? email : undefined,
+								onOpenDrawer: () => setPreview({ collection, id: doc.id }),
+								onSelect: () => pick(doc),
+								openDocumentLabel: t(keys.openDocument),
+								openDrawerLabel: t(keys.openDrawer),
+								title,
+							}
 							return (
-								<ImpersonationUserCard
-									collectionSlug={collection}
-									doc={doc}
-									documentHref={`${config.routes.admin}/collections/${collection}/${doc.id}`}
-									email={showEmail ? email : undefined}
+								<RenderCustomComponent
+									CustomComponent={Card ? <Card {...cardProps} /> : undefined}
+									Fallback={<ImpersonationUserCard {...cardProps} />}
 									key={String(doc.id)}
-									onOpenDrawer={() => setPreview({ collection, id: doc.id })}
-									onSelect={() => pick(doc)}
-									openDocumentLabel={t(keys.openDocument)}
-									openDrawerLabel={t(keys.openDrawer)}
-									title={title}
 								/>
 							)
 						})}
 					</div>
-					{hasPrev || hasNext ? (
+					{totalPages > 1 ? (
 						<div className="impersonation-switcher__pager">
-							<Button
-								buttonStyle="secondary"
-								disabled={!hasPrev || loading}
-								margin={false}
-								onClick={() => setPage((current) => Math.max(1, current - 1))}
-								size="small"
-							>
-								{t(keys.previousPage)}
-							</Button>
-							<Button
-								buttonStyle="secondary"
-								disabled={!hasNext || loading}
-								margin={false}
-								onClick={() => setPage((current) => current + 1)}
-								size="small"
-							>
-								{t(keys.nextPage)}
-							</Button>
+							<Pagination
+								hasNextPage={hasNext}
+								hasPrevPage={hasPrev}
+								nextPage={page + 1}
+								onChange={setPage}
+								page={page}
+								prevPage={Math.max(1, page - 1)}
+								totalPages={totalPages}
+							/>
 						</div>
 					) : null}
 				</div>
