@@ -210,7 +210,7 @@ export const buildMessagesCollection = (instance: ConversationsInstance): Collec
 		{ name: 'channel', required: true, type: 'text' },
 		{ index: true, name: 'parent', type: 'text' },
 		{ defaultValue: TEXT_TYPE, name: 'type', required: true, type: 'text' },
-		{ editor: buildConversationEditor(instance), name: 'body', type: 'richText' },
+		{ editor: buildConversationEditor(instance), label: false, name: 'body', type: 'richText' },
 		{ name: 'data', type: 'json' },
 		{ admin: { readOnly: true }, name: 'text', type: 'textarea' },
 		{ admin: { readOnly: true }, hasMany: true, name: 'mentions', type: 'text' },

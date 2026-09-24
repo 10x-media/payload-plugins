@@ -2,7 +2,13 @@ import type { PayloadRequest, Where } from 'payload'
 
 import type { ConversationsInstance } from '../types'
 
-type ReadRow = { id: number | string; key: string; lastReadAt: string; thread?: null | string }
+type ReadRow = {
+	channel?: null | string
+	id: number | string
+	key: string
+	lastReadAt: string
+	thread?: null | string
+}
 
 /** Unread counts stop here; the UI shows "99+". */
 export const UNREAD_CAP = 100
@@ -27,7 +33,14 @@ const findCursor = async (
 export const raiseCursor = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
-	args: { at: Date | string; key: string; thread?: string; userKey: string }
+	args: {
+		at: Date | string
+		/** The channel of a conversation cursor; empty for a thread cursor. */
+		channel?: string
+		key: string
+		thread?: string
+		userKey: string
+	}
 ): Promise<void> => {
 	const collection = instance.readsSlug
 	if (!collection) {
@@ -35,10 +48,13 @@ export const raiseCursor = async (
 	}
 	const at = new Date(args.at).toISOString()
 	const thread = args.thread ?? ''
+	// A thread cursor belongs to its root, whatever the channel.
+	const channel = thread ? '' : (args.channel ?? '')
 	const where: Where = {
 		and: [
 			{ userKey: { equals: args.userKey } },
 			{ key: { equals: args.key } },
+			{ channel: { equals: channel } },
 			{ thread: { equals: thread } },
 		],
 	}
@@ -58,7 +74,7 @@ export const raiseCursor = async (
 		try {
 			await req.payload.db.create({
 				collection,
-				data: { key: args.key, lastReadAt: at, thread, userKey: args.userKey },
+				data: { channel, key: args.key, lastReadAt: at, thread, userKey: args.userKey },
 				returning: false,
 			})
 			return
@@ -70,13 +86,13 @@ export const raiseCursor = async (
 	}
 }
 
-/** Conversation cursors (`thread` empty) of one user for many keys, in one query. */
+/** Per-channel cursors of one user for many keys, in one query: `key -> channel -> at`. */
 export const conversationCursors = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
 	{ keys, userKey }: { keys: string[]; userKey: string }
-): Promise<Map<string, string>> => {
-	const cursors = new Map<string, string>()
+): Promise<Map<string, Record<string, string>>> => {
+	const cursors = new Map<string, Record<string, string>>()
 	if (!instance.readsSlug || keys.length === 0) {
 		return cursors
 	}
@@ -89,7 +105,10 @@ export const conversationCursors = async (
 		},
 	})
 	for (const row of result.docs as ReadRow[]) {
-		cursors.set(row.key, new Date(row.lastReadAt).toISOString())
+		if (!row.channel) continue
+		const byChannel = cursors.get(row.key) ?? {}
+		byChannel[row.channel] = new Date(row.lastReadAt).toISOString()
+		cursors.set(row.key, byChannel)
 	}
 	return cursors
 }
@@ -126,7 +145,8 @@ export const threadCursors = async (
 
 /**
  * Unread root messages per channel for each key: other people's, not deleted,
- * newer than the cursor. One capped query per key, run in parallel.
+ * newer than that channel's cursor. One capped query per key and channel, run
+ * in parallel.
  */
 export const unreadCounts = async (
 	req: PayloadRequest,
@@ -136,40 +156,39 @@ export const unreadCounts = async (
 		entries,
 		userKey,
 	}: {
-		cursors: Map<string, string>
+		cursors: Map<string, Record<string, string>>
 		entries: Array<{ channels: string[]; key: string }>
 		userKey: string
 	}
 ): Promise<Record<string, Record<string, number>>> => {
 	const out: Record<string, Record<string, number>> = {}
+	for (const { channels, key } of entries) {
+		out[key] = Object.fromEntries(channels.map((channel) => [channel, 0]))
+	}
 	await Promise.all(
-		entries.map(async ({ channels, key }) => {
-			const counts: Record<string, number> = Object.fromEntries(channels.map((c) => [c, 0]))
-			out[key] = counts
-			if (channels.length === 0) {
-				return
-			}
-			const cursor = cursors.get(key)
-			const result = await req.payload.db.find({
-				collection: instance.messagesSlug,
-				limit: UNREAD_CAP,
-				pagination: false,
-				select: { channel: true },
-				where: {
-					and: [
-						{ key: { equals: key } },
-						{ channel: { in: channels } },
-						{ parent: { equals: null } },
-						{ deletedAt: { equals: null } },
-						{ authorKey: { not_equals: userKey } },
-						...(cursor ? [{ createdAt: { greater_than: cursor } }] : []),
-					],
-				},
+		entries.flatMap(({ channels, key }) =>
+			channels.map(async (channel) => {
+				const cursor = cursors.get(key)?.[channel]
+				const result = await req.payload.db.find({
+					collection: instance.messagesSlug,
+					limit: UNREAD_CAP,
+					pagination: false,
+					select: { id: true },
+					where: {
+						and: [
+							{ key: { equals: key } },
+							{ channel: { equals: channel } },
+							{ parent: { equals: null } },
+							{ deletedAt: { equals: null } },
+							{ authorKey: { not_equals: userKey } },
+							...(cursor ? [{ createdAt: { greater_than: cursor } }] : []),
+						],
+					},
+				})
+				const counts = out[key]
+				if (counts) counts[channel] = result.docs.length
 			})
-			for (const row of result.docs as unknown as Array<{ channel: string }>) {
-				counts[row.channel] = (counts[row.channel] ?? 0) + 1
-			}
-		})
+		)
 	)
 	return out
 }

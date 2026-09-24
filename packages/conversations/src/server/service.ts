@@ -14,7 +14,7 @@ import type { AuthorsMap, ConversationMessage, ConversationsInstance } from '../
 import { filterReaders } from './audience'
 import { projectAuthors } from './authors'
 import { isLexicalBody, textToBody } from './body'
-import { changedKeys, type FeedWindow, loadFeed } from './feed'
+import { changedKeys, type FeedWindow, loadFeed, messageCounts } from './feed'
 import { conversationCursors, raiseCursor, threadCursors, unreadCounts } from './reads'
 import { signToken, TOKEN_TTL_MS, verifyToken } from './tokens'
 
@@ -97,10 +97,16 @@ export const subscribe = async (
 				userKey: viewer,
 			})
 		: undefined
+	const totals = await messageCounts(
+		req,
+		instance,
+		list.map((entry) => ({ channels: entry.channels.map((c) => c.slug), key: entry.key }))
+	)
 	const exp = Date.now() + TOKEN_TTL_MS
 	return {
 		entries: list.map((entry) => ({
 			channels: entry.channels,
+			count: totals[entry.key] ?? 0,
 			key: entry.key,
 			token: signToken(req.payload.secret, {
 				channels: entry.channels.map((c) => c.slug),
@@ -162,10 +168,13 @@ export const listMessages = async (
 						})
 					)[params.parent] ?? null
 			} else {
-				cursor =
+				// Several channels in one feed open at the earliest of their cursors.
+				const byChannel =
 					(await conversationCursors(req, instance, { keys: [params.key], userKey: viewer })).get(
 						params.key
-					) ?? null
+					) ?? {}
+				const each = channels.map((channel) => byChannel[channel])
+				cursor = each.every(Boolean) ? ([...(each as string[])].sort()[0] ?? null) : null
 			}
 		}
 		window = { mode: 'latest' }
@@ -276,6 +285,7 @@ export const sendMessage = async (
 	})
 	await raiseCursor(req, instance, {
 		at: message.createdAt,
+		channel: message.channel,
 		key: message.key,
 		thread: message.parent ?? '',
 		userKey: message.authorKey,
@@ -369,28 +379,44 @@ export const deleteMessage = async (
 	return { message: isRemoved(instance, message) ? { ...message, removed: true } : message }
 }
 
-/** Raise the viewer's cursor for a conversation or one thread of it. */
+/** Raise the viewer's cursor for channels of a conversation, or for one thread of it. */
 export const markRead = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
-	input: { at?: unknown; key: string; thread?: unknown }
+	input: { at?: unknown; channels?: unknown; key: string; thread?: unknown }
 ): Promise<void> => {
 	const viewer = viewerKey(req)
 	if (!instance.readsSlug) {
 		return
 	}
-	await accessFor(req, instance, input.key)
+	const access = await accessFor(req, instance, input.key)
 	const at = new Date(typeof input.at === 'string' ? input.at : Date.now())
 	if (Number.isNaN(at.getTime())) {
 		fail('Invalid time', 400)
 	}
 	const now = Date.now()
-	await raiseCursor(req, instance, {
-		at: at.getTime() > now ? new Date(now) : at,
-		key: input.key,
-		thread: typeof input.thread === 'string' ? input.thread : '',
-		userKey: viewer,
-	})
+	const capped = at.getTime() > now ? new Date(now) : at
+	if (typeof input.thread === 'string' && input.thread) {
+		await raiseCursor(req, instance, {
+			at: capped,
+			key: input.key,
+			thread: input.thread,
+			userKey: viewer,
+		})
+		return
+	}
+	const readable = new Set(access.channels.map((channel) => channel.slug))
+	const channels = (Array.isArray(input.channels) ? input.channels : []).filter(
+		(channel): channel is string => typeof channel === 'string' && readable.has(channel)
+	)
+	if (channels.length === 0) {
+		fail('channels is required', 400)
+	}
+	await Promise.all(
+		channels.map((channel) =>
+			raiseCursor(req, instance, { at: capped, channel, key: input.key, userKey: viewer })
+		)
+	)
 }
 
 /** How far back a poll looks past `since`: covers late commits and clock skew. */

@@ -26,6 +26,7 @@ export { browserPollerEnv, type PollerEnv, type PollerIntervals } from '../react
 export {
 	ChatProvider,
 	type ChatProviderProps,
+	ChatScope,
 	useChatStore,
 	useOptionalChatStore,
 } from '../react/provider'

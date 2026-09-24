@@ -139,6 +139,7 @@ export const buildEndpoints = (instance: ConversationsInstance): Endpoint[] => {
 				const body = await readJson(req)
 				await markRead(req, instance, {
 					at: body.at,
+					channels: body.channels,
 					key: requireString(body.key, 'key'),
 					thread: body.thread,
 				})

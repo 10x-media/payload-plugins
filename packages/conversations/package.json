@@ -49,6 +49,11 @@
 			"development": "./src/exports/react.ts",
 			"types": "./src/exports/react.ts",
 			"default": "./dist/exports/react.js"
+		},
+		"./comments": {
+			"development": "./src/exports/comments.ts",
+			"types": "./src/exports/comments.ts",
+			"default": "./dist/exports/comments.js"
 		}
 	},
 	"files": [
@@ -137,6 +142,11 @@
 				"types": "./dist/exports/react.d.ts",
 				"import": "./dist/exports/react.js",
 				"default": "./dist/exports/react.js"
+			},
+			"./comments": {
+				"types": "./dist/exports/comments.d.ts",
+				"import": "./dist/exports/comments.js",
+				"default": "./dist/exports/comments.js"
 			}
 		}
 	}

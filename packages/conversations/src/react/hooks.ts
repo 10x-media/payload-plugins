@@ -35,10 +35,14 @@ export type ChannelView = ChannelMeta & { canCreate: boolean; slug: string; unre
 export type UseChannelsResult = {
 	/** Readable channels of the key, in instance order. Empty: render nothing. */
 	channels: ChannelView[]
+	/** Visible root messages across the readable channels. */
+	count: number
 	error?: Error
 	/** False with `reads: false`: hide unread UI. */
 	reads: boolean
 	status: 'error' | 'loading' | 'ready'
+	/** Unread root messages across the readable channels. */
+	unread: number
 	viewer: null | string
 }
 
@@ -63,9 +67,11 @@ export const useChannels = (key: null | string | undefined): UseChannelsResult =
 		}))
 		return {
 			channels,
+			count: entry?.count ?? 0,
 			error,
 			reads: meta?.reads ?? false,
 			status: entry ? 'ready' : error ? 'error' : 'loading',
+			unread: channels.reduce((sum, channel) => sum + channel.unread, 0),
 			viewer: meta?.viewer ?? null,
 		}
 	}, [entry, error, meta])
@@ -294,10 +300,10 @@ export const useConversation = ({
 		if (current.seenAt && new Date(current.seenAt) >= new Date(newest.createdAt)) return
 		dispatch({ at: newest.createdAt, type: 'seen' })
 		void store.api
-			.read({ at: newest.createdAt, key, ...(parent ? { thread: parent } : {}) })
+			.read({ at: newest.createdAt, key, ...(parent ? { thread: parent } : { channels }) })
 			.then(() => store.touched([key]))
 			.catch(() => undefined)
-	}, [key, parent, store])
+	}, [channels, key, parent, store])
 
 	return {
 		authors,
@@ -368,7 +374,10 @@ export const useSend = ({
 				return result.message
 			} catch (caught) {
 				store.emitLocal(key, { clientId, type: 'failed' })
-				throw caught
+				// The id travels with the error, so a caller can offer `retry(clientId)`.
+				throw Object.assign(caught instanceof Error ? caught : new Error(String(caught)), {
+					clientId,
+				})
 			}
 		},
 		[channel, key, parent, store]

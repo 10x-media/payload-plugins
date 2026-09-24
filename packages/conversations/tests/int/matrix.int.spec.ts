@@ -333,14 +333,14 @@ describeForDb('conversations core', {}, (db) => {
 			await Promise.all(
 				Array.from({ length: 5 }, () =>
 					call(booted, 'POST /conversations/comments/read', {
-						body: { at, key },
+						body: { at, channels: ['internal'], key },
 						session: staff2,
 					})
 				)
 			)
 			expect(await unread(staff2)).toEqual({ internal: 0, shared: 0 })
 			await call(booted, 'POST /conversations/comments/read', {
-				body: { at: '2000-01-01T00:00:00.000Z', key },
+				body: { at: '2000-01-01T00:00:00.000Z', channels: ['internal'], key },
 				session: staff2,
 			})
 			expect(await unread(staff2)).toEqual({ internal: 0, shared: 0 })
@@ -349,6 +349,24 @@ describeForDb('conversations core', {}, (db) => {
 				where: { and: [{ userKey: { equals: staff2.userKey } }, { key: { equals: key } }] },
 			})
 			expect(rows.totalDocs).toBe(1)
+		})
+	})
+
+	describe('read state per channel', () => {
+		it('keeps another channel unread when the viewer posts in one', async () => {
+			const person = await booted.payload.create({
+				collection: 'persons',
+				data: { name: 'Channels' },
+			})
+			const key = `collection:persons:${person.id}`
+			await send(staff2, { channel: 'shared', key, text: 'for the customer' })
+			await send(staff, { channel: 'internal', key, text: 'staff note' })
+			const res = await call<{ entries: Array<{ unread?: Record<string, number> }> }>(
+				booted,
+				'POST /conversations/comments/subscribe',
+				{ body: { keys: [key] }, session: staff }
+			)
+			expect(res.json.entries[0]?.unread).toEqual({ internal: 0, shared: 1 })
 		})
 	})
 

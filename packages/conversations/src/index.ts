@@ -49,6 +49,15 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 			...(instance.readsSlug ? [buildReadsCollection(instance, instance.readsSlug)] : []),
 		]
 		config.endpoints = [...(config.endpoints ?? []), ...buildEndpoints(instance)]
+		config.admin ??= {}
+		config.admin.components ??= {}
+		config.admin.components.providers = [
+			...(config.admin.components.providers ?? []),
+			{
+				clientProps: { instance: instance.slug },
+				path: '@10x-media/conversations/client#ChatAdminProvider',
+			},
+		]
 
 		const targetCollections = Object.keys(instance.targets.collections)
 		config.collections = config.collections.map((collection) => {

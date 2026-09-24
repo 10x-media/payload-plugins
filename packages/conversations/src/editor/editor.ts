@@ -10,6 +10,8 @@ import {
 } from '@payloadcms/richtext-lexical'
 import type { CollectionSlug } from 'payload'
 
+import { keys } from '../translations/keys'
+import { labelForKey } from '../translations/server'
 import type { ConversationsEditorFeature, ConversationsInstance } from '../types'
 import { ConversationsMentionFeature } from './mention/server'
 
@@ -34,6 +36,14 @@ export const buildConversationEditor = (
 	instance: ConversationsInstance
 ): ReturnType<typeof lexicalEditor> =>
 	lexicalEditor({
+		// A chat composer, not a document: no gutter, drag handles or block buttons.
+		admin: {
+			hideAddBlockButton: true,
+			hideDraggableBlockElement: true,
+			hideGutter: true,
+			hideInsertParagraphAtEnd: true,
+			placeholder: labelForKey(keys.composerPlaceholder),
+		},
 		features: () =>
 			instance.editorFeatures({ defaultFeatures: defaultConversationFeatures(instance.slug) }),
 	})

@@ -12,6 +12,7 @@ const response = (keys: string[]): SubscribeResponse => ({
 		.filter((key) => key !== 'denied')
 		.map((key) => ({
 			channels: [{ canCreate: true, slug: 'internal' }],
+			count: 1,
 			key,
 			token: `t:${key}`,
 			unread: { internal: 1 },

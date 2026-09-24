@@ -3,8 +3,10 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { buildConfig, type CollectionConfig } from 'payload'
-import { conversations } from '../src/index'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { buildConfig, type CollectionConfig, type PayloadRequest, type Where } from 'payload'
+import { comments } from '../src/exports/comments'
+import { conversations, perTarget } from '../src/index'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -16,9 +18,36 @@ const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
 const users: CollectionConfig = {
 	slug: 'users',
 	auth: true,
-	admin: { useAsTitle: 'email' },
-	fields: [],
+	admin: { useAsTitle: 'name' },
+	fields: [{ name: 'name', type: 'text' }],
 }
+
+/** Website accounts: they read and write the shared channel of their own persons only. */
+const customers: CollectionConfig = {
+	slug: 'customers',
+	auth: true,
+	admin: { useAsTitle: 'name' },
+	fields: [{ name: 'name', type: 'text' }],
+}
+
+const persons: CollectionConfig = {
+	slug: 'persons',
+	admin: { useAsTitle: 'name' },
+	versions: { drafts: true },
+	fields: [
+		{ name: 'name', type: 'text', required: true },
+		{ name: 'owner', type: 'relationship', relationTo: 'customers' },
+		{ name: 'notes', type: 'textarea' },
+	],
+}
+
+const media: CollectionConfig = {
+	slug: 'media',
+	admin: { useAsTitle: 'title' },
+	fields: [{ name: 'title', type: 'text', required: true }],
+}
+
+const isStaff = (req: PayloadRequest) => req.user?.collection === 'users'
 
 const db =
 	useDb === 'postgres'
@@ -39,14 +68,47 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users],
+	editor: lexicalEditor(),
+	collections: [users, customers, persons, media],
 	plugins: [
 		conversations({
-			access: ({ req, targets }) => (req.user ? targets.map((target) => target.key) : []),
-			channels: [
-				{ access: { create: () => true, read: () => true }, label: 'Internal', slug: 'internal' },
-			],
 			slug: 'comments',
+			users: ['users', 'customers'],
+			// Staff see every conversation; a customer only those of persons they own.
+			access: perTarget(
+				({ doc, req }) =>
+					isStaff(req) ||
+					(req.user?.collection === 'customers' &&
+						String(doc?.owner ?? '') === String(req.user.id)),
+				{ load: true }
+			),
+			channels: [
+				{
+					slug: 'internal',
+					label: 'Internal',
+					cue: { label: 'Internal · staff only', tone: 'neutral' },
+					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
+				},
+				{
+					slug: 'shared',
+					label: 'Shared',
+					cue: { label: 'Shared · visible to the customer', tone: 'warning' },
+					access: { read: () => true, create: () => true },
+				},
+			],
+			mentions: {
+				// Customers are mentionable only by staff; the channel rule filters the rest.
+				users: ({ collection, req }): Where =>
+					collection === 'customers' && !isStaff(req) ? { id: { exists: false } } : {},
+			},
+			hooks: {
+				afterMention: ({ req, users: mentioned, key }) => {
+					req.payload.logger.info(
+						`[dev] mentioned ${mentioned.map((u) => `${u.collection}:${u.id}`).join(', ')} in ${key}`
+					)
+				},
+			},
+			extensions: [comments({ collections: { persons: true, media: ['internal'] } })],
 		}),
 	],
 	telemetry: false,
@@ -55,6 +117,7 @@ export default buildConfig({
 	},
 	typescript: { autoGenerate },
 	admin: {
+		user: 'users',
 		importMap: {
 			autoGenerate,
 			baseDir: path.resolve(dirname),

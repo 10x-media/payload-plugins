@@ -118,7 +118,7 @@ export const createApi = ({
 			),
 		poll: (body: { since: string; tokens: string[] }) =>
 			request<PollResponse>('/poll', json('POST', body)),
-		read: (body: { at: string; key: string; thread?: string }) =>
+		read: (body: { at: string; channels?: string[]; key: string; thread?: string }) =>
 			request<{ ok: true }>('/read', json('POST', body)),
 		send: (body: SendBody) => request<MessageResponse>('/messages', json('POST', body)),
 		subscribe: (keys: string[]) => request<SubscribeResponse>('/subscribe', json('POST', { keys })),

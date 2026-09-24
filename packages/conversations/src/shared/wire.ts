@@ -16,6 +16,8 @@ export type ChannelMeta = {
 
 export type SubscribeEntry = {
 	channels: ChannelAccess[]
+	/** Visible root messages across the readable channels. */
+	count: number
 	key: string
 	token: string
 	/** Unread root messages per channel; absent with `reads: false`. */

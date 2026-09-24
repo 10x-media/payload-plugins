@@ -72,6 +72,35 @@ const visible = (instance: ConversationsInstance, parent: null | string): Where 
 	return { or: [{ deletedAt: { equals: null } }, { replyCount: { greater_than: 0 } }] }
 }
 
+/**
+ * Visible root messages per key across its readable channels, for trigger
+ * badges. One count per key, run in parallel.
+ */
+export const messageCounts = async (
+	req: PayloadRequest,
+	instance: ConversationsInstance,
+	entries: Array<{ channels: string[]; key: string }>
+): Promise<Record<string, number>> => {
+	const shown = visible(instance, null)
+	const counts = await Promise.all(
+		entries.map(async ({ channels, key }) => {
+			const result = await req.payload.db.count({
+				collection: instance.messagesSlug,
+				where: {
+					and: [
+						{ key: { equals: key } },
+						{ channel: { in: channels } },
+						{ parent: { equals: null } },
+						...(shown ? [shown] : []),
+					],
+				},
+			})
+			return [key, result.totalDocs] as const
+		})
+	)
+	return Object.fromEntries(counts)
+}
+
 const toWire = (instance: ConversationsInstance, message: ConversationMessage): WireMessage =>
 	isRemoved(instance, message) ? { ...message, removed: true } : message
 

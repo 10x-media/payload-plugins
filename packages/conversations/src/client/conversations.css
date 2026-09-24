@@ -1,0 +1,529 @@
+/* Conversations admin UI. Built on Payload's theme variables, so light and dark follow the admin. */
+
+.conversations-trigger {
+	position: relative;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.375rem;
+	height: calc(var(--base) * 1.6);
+	padding: 0 0.625rem;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s, 4px);
+	background: var(--theme-elevation-50);
+	color: var(--theme-text);
+	font-size: 0.8125rem;
+	cursor: pointer;
+}
+
+.conversations-trigger:hover {
+	background: var(--theme-elevation-100);
+}
+
+.conversations-trigger__count {
+	min-width: 1.25rem;
+	padding: 0 0.3rem;
+	border-radius: 999px;
+	background: var(--theme-elevation-150);
+	font-size: 0.6875rem;
+	text-align: center;
+}
+
+.conversations-trigger__dot {
+	position: absolute;
+	top: -3px;
+	right: -3px;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--theme-error-500, #e5484d);
+}
+
+.conversations-drawer-shell .drawer__content {
+	max-width: min(40rem, 100vw);
+}
+
+.conversations-drawer-shell .drawer__content-children {
+	height: 100%;
+	overflow: hidden;
+}
+
+.conversations-drawer {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	padding: 0 1.75rem 1.25rem;
+	background: var(--theme-elevation-50);
+}
+
+.conversations-drawer__header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 1.75rem 0 1rem;
+}
+
+.conversations-drawer__title {
+	margin: 0;
+	font-size: 1.5rem;
+	line-height: 1.2;
+}
+
+.conversations-drawer__subtitle {
+	margin-top: 0.25rem;
+	color: var(--theme-elevation-600);
+	font-size: 0.8125rem;
+}
+
+.conversations-drawer__close {
+	font-size: 1.5rem;
+	line-height: 1;
+}
+
+.conversations-tabs {
+	display: flex;
+	gap: 0.5rem;
+	padding-bottom: 0.875rem;
+	border-bottom: 1px solid var(--theme-elevation-100);
+}
+
+.conversations-tabs__tab {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	padding: 0.375rem 0.75rem;
+	border: 1px solid transparent;
+	border-radius: var(--style-radius-s, 4px);
+	background: transparent;
+	color: var(--theme-elevation-700);
+	font-size: 0.8125rem;
+	cursor: pointer;
+}
+
+.conversations-tabs__tab:hover {
+	background: var(--theme-elevation-100);
+}
+
+.conversations-tabs__tab--active {
+	border-color: var(--theme-elevation-150);
+	background: var(--theme-elevation-100);
+	color: var(--theme-text);
+	font-weight: 600;
+}
+
+.conversations-tabs__count {
+	color: var(--theme-elevation-600);
+	font-size: 0.75rem;
+	font-weight: 500;
+}
+
+.conversations-feed {
+	position: relative;
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.conversations-feed__scroller {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 0.125rem;
+	min-height: 0;
+	padding: 1rem 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+/* Few messages sit at the bottom, next to the composer, as in any chat. */
+.conversations-feed__scroller > :first-child {
+	margin-top: auto;
+}
+
+.conversations-feed__older {
+	display: flex;
+	justify-content: center;
+	padding: 0.5rem 0;
+}
+
+.conversations-feed__empty {
+	margin: auto;
+	padding: 2rem 1rem;
+	color: var(--theme-elevation-600);
+	font-size: 0.875rem;
+	text-align: center;
+}
+
+.conversations-feed__skeleton {
+	flex: 1;
+	min-height: 8rem;
+	margin: 1rem 0;
+	border-radius: var(--style-radius-m, 4px);
+	background: linear-gradient(
+		90deg,
+		var(--theme-elevation-50),
+		var(--theme-elevation-100),
+		var(--theme-elevation-50)
+	);
+	background-size: 200% 100%;
+	animation: conversations-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes conversations-shimmer {
+	from {
+		background-position: 200% 0;
+	}
+	to {
+		background-position: -200% 0;
+	}
+}
+
+.conversations-feed__day,
+.conversations-feed__divider {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin: 0.75rem 0 0.25rem;
+	color: var(--theme-elevation-600);
+	font-size: 0.75rem;
+}
+
+.conversations-feed__day::before,
+.conversations-feed__day::after,
+.conversations-feed__divider::before,
+.conversations-feed__divider::after {
+	content: "";
+	flex: 1;
+	height: 1px;
+	background: var(--theme-elevation-100);
+}
+
+.conversations-feed__divider {
+	color: var(--theme-error-500, #e5484d);
+	font-weight: 600;
+}
+
+.conversations-feed__divider::before,
+.conversations-feed__divider::after {
+	background: color-mix(in srgb, var(--theme-error-500, #e5484d) 45%, transparent);
+}
+
+.conversations-feed__pill {
+	position: absolute;
+	bottom: 0.75rem;
+	left: 50%;
+	transform: translateX(-50%);
+	padding: 0.3rem 0.875rem;
+	border: 1px solid var(--theme-elevation-200);
+	border-radius: 999px;
+	background: var(--theme-elevation-100);
+	color: var(--theme-text);
+	font-size: 0.75rem;
+	cursor: pointer;
+	box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+}
+
+.conversations-avatar {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: hsl(var(--conversations-avatar-hue, 0) 35% 28%);
+	color: hsl(var(--conversations-avatar-hue, 0) 70% 82%);
+	font-weight: 600;
+	object-fit: cover;
+}
+
+.conversations-message {
+	position: relative;
+	display: flex;
+	gap: 0.75rem;
+	padding: 0.5rem 0.5rem 0.375rem;
+	border-radius: var(--style-radius-m, 4px);
+}
+
+.conversations-message--compact {
+	padding-top: 0.125rem;
+}
+
+.conversations-message:hover {
+	background: var(--theme-elevation-100);
+}
+
+.conversations-message__gutter {
+	flex: none;
+	width: 28px;
+}
+
+.conversations-message__main {
+	flex: 1;
+	min-width: 0;
+}
+
+.conversations-message__header {
+	display: flex;
+	align-items: baseline;
+	gap: 0.5rem;
+	margin-bottom: 0.125rem;
+}
+
+.conversations-message__author {
+	font-size: 0.875rem;
+	font-weight: 600;
+}
+
+.conversations-message__time,
+.conversations-message__edited,
+.conversations-message__status {
+	color: var(--theme-elevation-600);
+	font-size: 0.75rem;
+}
+
+.conversations-message__body {
+	font-size: 0.875rem;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+.conversations-message__body p {
+	margin: 0;
+}
+
+.conversations-message__body p + p,
+.conversations-message__body ul,
+.conversations-message__body ol {
+	margin-top: 0.375rem;
+}
+
+.conversations-message__body ul,
+.conversations-message__body ol {
+	margin-bottom: 0;
+	padding-left: 1.25rem;
+}
+
+.conversations-message__body a {
+	color: var(--theme-success-500, #2d7ff9);
+	text-decoration: underline;
+}
+
+.conversations-message__placeholder {
+	color: var(--theme-elevation-600);
+	font-size: 0.875rem;
+	font-style: italic;
+}
+
+.conversations-message--sending {
+	opacity: 0.6;
+}
+
+.conversations-message__thread {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
+	margin-top: 0.375rem;
+	padding: 0.25rem 0.625rem;
+	border: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-s, 4px);
+	background: var(--theme-elevation-50);
+	color: var(--theme-elevation-600);
+	font-size: 0.75rem;
+	cursor: pointer;
+}
+
+.conversations-message__thread:hover {
+	border-color: var(--theme-elevation-200);
+}
+
+.conversations-message__thread-count {
+	color: var(--theme-success-500, #2d7ff9);
+	font-weight: 500;
+}
+
+.conversations-message__thread-new {
+	padding: 0 0.375rem;
+	border-radius: 999px;
+	background: var(--theme-error-500, #e5484d);
+	color: #fff;
+	font-size: 0.6875rem;
+	font-weight: 600;
+}
+
+.conversations-message__actions {
+	position: absolute;
+	top: 0.25rem;
+	right: 0.25rem;
+	display: none;
+	gap: 0.125rem;
+	padding: 0.125rem;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s, 4px);
+	background: var(--theme-elevation-50);
+}
+
+.conversations-message:hover .conversations-message__actions,
+.conversations-message:focus-within .conversations-message__actions {
+	display: flex;
+}
+
+.conversations-icon-button {
+	padding: 0.25rem 0.5rem;
+	border: 0;
+	border-radius: var(--style-radius-s, 4px);
+	background: transparent;
+	color: var(--theme-elevation-700);
+	font-size: 0.75rem;
+	cursor: pointer;
+}
+
+.conversations-icon-button:hover {
+	background: var(--theme-elevation-100);
+	color: var(--theme-text);
+}
+
+.conversations-button {
+	padding: 0.3rem 0.75rem;
+	border: 1px solid var(--theme-elevation-200);
+	border-radius: var(--style-radius-s, 4px);
+	background: var(--theme-elevation-100);
+	color: var(--theme-text);
+	font-size: 0.8125rem;
+	cursor: pointer;
+}
+
+.conversations-button:disabled {
+	opacity: 0.5;
+	cursor: default;
+}
+
+.conversations-button--primary {
+	border-color: var(--theme-text);
+	background: var(--theme-text);
+	color: var(--theme-bg);
+	font-weight: 500;
+}
+
+.conversations-thread {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.conversations-thread__root {
+	padding: 0.25rem;
+	border: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-m, 4px);
+	background: var(--theme-elevation-100);
+}
+
+.conversations-composer {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5rem;
+	padding-top: 0.75rem;
+	border-top: 1px solid var(--theme-elevation-100);
+}
+
+.conversations-composer__editor {
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-m, 4px);
+	background: var(--theme-input-bg, var(--theme-elevation-0));
+}
+
+.conversations-composer__banner {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.75rem;
+	padding: 0.4rem 0.75rem;
+	border-radius: var(--style-radius-s, 4px);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-700);
+	font-size: 0.8125rem;
+}
+
+.conversations-composer__banner--warning {
+	background: color-mix(in srgb, var(--theme-warning-500, #f5a623) 18%, transparent);
+	color: var(--theme-warning-500, #f5a623);
+}
+
+.conversations-composer__banner--error {
+	background: color-mix(in srgb, var(--theme-error-500, #e5484d) 20%, transparent);
+	color: var(--theme-error-500, #e5484d);
+}
+
+.conversations-composer--warning .conversations-composer__editor {
+	border-color: color-mix(in srgb, var(--theme-warning-500, #f5a623) 60%, transparent);
+}
+
+.conversations-composer--failed .conversations-composer__editor {
+	border-color: color-mix(in srgb, var(--theme-error-500, #e5484d) 60%, transparent);
+}
+
+.conversations-composer__disabled {
+	padding: 0.875rem 1rem;
+	border: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-m, 4px);
+	color: var(--theme-elevation-600);
+	font-size: 0.8125rem;
+}
+
+.conversations-composer__loading {
+	height: 5.5rem;
+	border: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-m, 4px);
+}
+
+.conversations-composer__actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 0.625rem;
+}
+
+.conversations-composer__hint {
+	margin-right: auto;
+	color: var(--theme-elevation-500);
+	font-size: 0.75rem;
+}
+
+/* Payload's rich text field, compacted into a chat composer. */
+.conversations-composer .field-type.rich-text-lexical {
+	margin: 0;
+}
+
+.conversations-composer .rich-text-lexical .editor-container {
+	margin: 0;
+}
+
+.conversations-composer .rich-text-lexical .editor-scroller {
+	min-height: 2.75rem;
+	max-height: 12rem;
+	overflow-y: auto;
+}
+
+.conversations-composer [contenteditable="true"] {
+	min-height: 2.75rem;
+	padding: 0.625rem 0.75rem;
+	font-family: var(--font-body);
+	font-size: 0.875rem;
+	line-height: 1.5;
+}
+
+.conversations-composer .LexicalEditorTheme__placeholder {
+	top: 0.625rem;
+	left: 0.75rem;
+	font-family: var(--font-body);
+	font-size: 0.875rem;
+	line-height: 1.5;
+}
+
+.conversations-composer .rich-text-lexical .fixed-toolbar {
+	margin: 0;
+	border: 0;
+	border-bottom: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-m, 4px) var(--style-radius-m, 4px) 0 0;
+}

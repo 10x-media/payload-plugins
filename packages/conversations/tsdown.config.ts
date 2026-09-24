@@ -6,6 +6,8 @@ export default definePluginBuild({
 		'exports/types': 'src/exports/types.ts',
 		'exports/client': 'src/exports/client.ts',
 		'exports/react': 'src/exports/react.ts',
+		'exports/comments': 'src/exports/comments.ts',
 		'exports/i18n': 'src/exports/i18n.ts',
 	},
+	copy: [{ flatten: false, from: 'src/**/*.css', to: 'dist' }],
 })
