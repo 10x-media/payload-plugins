@@ -11,6 +11,7 @@ import { useTranslation } from '../translations/useTranslation'
 import type { AuthorsMap } from '../types'
 import { Avatar } from './Avatar'
 import { ChatComposer } from './ChatComposer'
+import { ChatSlot, useTypeRenderer } from './components'
 import { absoluteTime, relativeTime } from './time'
 import './conversations.css'
 
@@ -55,6 +56,7 @@ export const ChatMessage = ({
 }: ChatMessageProps) => {
 	const { i18n, t } = useTranslation()
 	const { edit, remove } = useMessageActions()
+	const renderConfiguredType = useTypeRenderer(instance)
 	const [editing, setEditing] = useState(false)
 	const author = authors[message.authorKey]
 	const own = viewer !== null && message.authorKey === viewer
@@ -142,7 +144,8 @@ export const ChatMessage = ({
 						message={message}
 					/>
 				) : (
-					(renderType?.(message) ?? (
+					(renderType?.(message) ??
+					renderConfiguredType(message) ?? (
 						<div className="conversations-message__placeholder">{t(keys.unknownType)}</div>
 					))
 				)}
@@ -150,6 +153,15 @@ export const ChatMessage = ({
 					<div className="conversations-message__status">{t(keys.sending)}</div>
 				) : null}
 				{footer}
+				{deleted ? null : (
+					<ChatSlot
+						channel={message.channel}
+						conversationKey={message.key}
+						instance={instance}
+						message={message}
+						name="messageFooter"
+					/>
+				)}
 				{threadSummary}
 			</div>
 			{deleted || editing || message.sendStatus ? null : (
@@ -187,6 +199,13 @@ export const ChatMessage = ({
 						</button>
 					) : null}
 					{actions}
+					<ChatSlot
+						channel={message.channel}
+						conversationKey={message.key}
+						instance={instance}
+						message={message}
+						name="messageActions"
+					/>
 				</div>
 			)}
 		</div>

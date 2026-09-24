@@ -8,6 +8,7 @@ import { resolveLabel, useSend } from '../react/hooks'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { LocalizedLabel } from '../types'
+import { ChatSlot } from './components'
 import { ComposerContext, type ComposerContextValue } from './composerContext'
 import './conversations.css'
 
@@ -236,6 +237,14 @@ export const ChatComposer = ({
 				</div>
 			) : null}
 			{above}
+			{onSave ? null : (
+				<ChatSlot
+					channel={channel}
+					conversationKey={conversationKey}
+					instance={instance}
+					name="composerAbove"
+				/>
+			)}
 			{disabledReason ? (
 				<div className="conversations-composer__disabled">{disabledReason}</div>
 			) : state && field ? (

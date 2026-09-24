@@ -54,6 +54,11 @@
 			"development": "./src/exports/comments.ts",
 			"types": "./src/exports/comments.ts",
 			"default": "./dist/exports/comments.js"
+		},
+		"./rsc": {
+			"development": "./src/exports/rsc.ts",
+			"types": "./src/exports/rsc.ts",
+			"default": "./dist/exports/rsc.js"
 		}
 	},
 	"files": [
@@ -147,6 +152,11 @@
 				"types": "./dist/exports/comments.d.ts",
 				"import": "./dist/exports/comments.js",
 				"default": "./dist/exports/comments.js"
+			},
+			"./rsc": {
+				"types": "./dist/exports/rsc.d.ts",
+				"import": "./dist/exports/rsc.js",
+				"default": "./dist/exports/rsc.js"
 			}
 		}
 	}

@@ -133,6 +133,14 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			text,
 		})
 	}
+	await postMessage(req, {
+		author: `users:${me.id}`,
+		channel: 'internal',
+		data: { from: 'draft', to: 'in review' },
+		instance: 'comments',
+		key,
+		type: 'person.status',
+	})
 	for (const [author, text] of [
 		[`customers:${customer.id}`, 'We uploaded the new medical form, can you check?'],
 		[`users:${anna.id}`, 'Thanks, it looks good. Please also send a full-page passport scan.'],

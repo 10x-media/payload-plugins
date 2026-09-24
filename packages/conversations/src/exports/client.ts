@@ -9,6 +9,15 @@ export { ChatFeed, type ChatFeedProps, type FeedItem } from '../client/ChatFeed'
 export { ChatMessage, type ChatMessageProps } from '../client/ChatMessage'
 export { ChatThread, type ChatThreadProps } from '../client/ChatThread'
 export { ChatTrigger, type ChatTriggerProps } from '../client/ChatTrigger'
+export {
+	type ChatComponents,
+	ChatComponentsProvider,
+	ChatSlot,
+	type ChatSlotName,
+	type ChatSlotProps,
+	useChatComponents,
+	useTypeRenderer,
+} from '../client/components'
 export { type ComposerContextValue, useComposerContext } from '../client/composerContext'
 export {
 	$createMentionNode,

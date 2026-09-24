@@ -7,6 +7,7 @@ import { registerTranslations } from './plugin/registerTranslations'
 import { resolveInstance, runAfterPhases, runBeforePhases } from './plugin/resolveOptions'
 import { cascadeHook } from './server/cascade'
 import type { InstanceRegistry } from './server/service'
+import { SLOT_WIDGET_SLUG } from './shared/constants'
 import type { ConversationsPluginOptions } from './types'
 
 declare module 'payload' {
@@ -55,9 +56,49 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 			...(config.admin.components.providers ?? []),
 			{
 				clientProps: { instance: instance.slug },
-				path: '@10x-media/conversations/client#ChatAdminProvider',
+				path: '@10x-media/conversations/rsc#ChatAdminProviderServer',
 			},
 		]
+		// Paths that live only in plugin options: the import map finds them through here.
+		const dependencies: NonNullable<typeof config.admin.dependencies> = {}
+		for (const [name, component] of Object.entries(instance.slots)) {
+			const path =
+				typeof component === 'string' ? component : component ? component.path : undefined
+			if (path)
+				dependencies[`conversations-${instance.slug}-slot-${name}`] = { path, type: 'component' }
+		}
+		for (const type of instance.types.values()) {
+			const path =
+				typeof type.Component === 'string'
+					? type.Component
+					: type.Component
+						? type.Component.path
+						: undefined
+			if (path)
+				dependencies[`conversations-${instance.slug}-type-${type.slug}`] = {
+					path,
+					type: 'component',
+				}
+		}
+		config.admin.dependencies = { ...config.admin.dependencies, ...dependencies }
+		const hasComponents =
+			Object.values(instance.slots).some(Boolean) ||
+			[...instance.types.values()].some((type) => type.Component)
+		const dashboard = config.admin.dashboard
+		const widgetRegistered = dashboard?.widgets?.some((widget) => widget.slug === SLOT_WIDGET_SLUG)
+		if (hasComponents && !widgetRegistered) {
+			config.admin.dashboard = {
+				...dashboard,
+				widgets: [
+					...(dashboard?.widgets ?? []),
+					{
+						Component: '@10x-media/conversations/rsc#ConversationsSlotDispatcher',
+						label: 'Conversations (internal)',
+						slug: SLOT_WIDGET_SLUG,
+					},
+				],
+			}
+		}
 
 		const targetCollections = Object.keys(instance.targets.collections)
 		config.collections = config.collections.map((collection) => {

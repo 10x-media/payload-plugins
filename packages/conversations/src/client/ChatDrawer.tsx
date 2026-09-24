@@ -11,6 +11,7 @@ import { ChatChannelTabs } from './ChatChannelTabs'
 import { ChatComposer } from './ChatComposer'
 import { ChatFeed } from './ChatFeed'
 import { ChatThread } from './ChatThread'
+import { ChatSlot } from './components'
 
 export type ChatDrawerProps = {
 	conversationKey: string
@@ -92,6 +93,12 @@ const DrawerBody = ({
 				title={title ?? t(keys.comments)}
 			>
 				{header}
+				<ChatSlot
+					channel={current?.slug}
+					conversationKey={conversationKey}
+					instance={instance}
+					name="drawerHeader"
+				/>
 			</DrawerHeader>
 			<ChatChannelTabs
 				active={current?.slug ?? ''}

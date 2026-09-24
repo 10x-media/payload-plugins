@@ -6,7 +6,7 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig, type PayloadRequest, type Where } from 'payload'
 import { comments } from '../src/exports/comments'
-import { conversations, perTarget } from '../src/index'
+import { conversations, defineMessageType, perTarget } from '../src/index'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -108,6 +108,13 @@ export default buildConfig({
 					)
 				},
 			},
+			types: [
+				defineMessageType<{ from: string; to: string }>()({
+					slug: 'person.status',
+					Component: '/components/StatusChange#StatusChange',
+					validate: (data) => (data?.from && data.to ? true : 'from and to are required'),
+				}),
+			],
 			extensions: [comments({ collections: { persons: true, media: ['internal'] } })],
 		}),
 	],

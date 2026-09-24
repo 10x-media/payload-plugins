@@ -10,8 +10,10 @@ import { LinkFeatureClient as LinkFeatureClient_e70f5e05f09f93e00b997edb1ef0c864
 import { BoldFeatureClient as BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { ParagraphFeatureClient as ParagraphFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
-import { ChatAdminProvider as ChatAdminProvider_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
+import { ChatAdminProviderServer as ChatAdminProviderServer_7345af0c80d81d7368c532bb4469972c } from '@10x-media/conversations/rsc'
+import { ConversationsSlotDispatcher as ConversationsSlotDispatcher_7345af0c80d81d7368c532bb4469972c } from '@10x-media/conversations/rsc'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
+import { StatusChange as StatusChange_31eb553b5a0efb219e39dcd1f84fa727 } from '../../../components/StatusChange'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -27,6 +29,8 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#BoldFeatureClient": BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#ItalicFeatureClient": ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#ParagraphFeatureClient": ParagraphFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
-  "@10x-media/conversations/client#ChatAdminProvider": ChatAdminProvider_63b29dbabe93a0fc3d3dbd1a91acf947,
-  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
+  "@10x-media/conversations/rsc#ChatAdminProviderServer": ChatAdminProviderServer_7345af0c80d81d7368c532bb4469972c,
+  "@10x-media/conversations/rsc#ConversationsSlotDispatcher": ConversationsSlotDispatcher_7345af0c80d81d7368c532bb4469972c,
+  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
+  "/components/StatusChange#StatusChange": StatusChange_31eb553b5a0efb219e39dcd1f84fa727
 }
