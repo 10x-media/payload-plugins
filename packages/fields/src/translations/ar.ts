@@ -50,8 +50,6 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.selectCountry]: 'اختر دولة',
 	[keys.searchCountries]: 'ابحث عن الدول',
 	[keys.noCountriesFound]: 'لم يتم العثور على دول',
-	[keys.preferredCountries]: 'الأكثر استخدامًا',
-	[keys.allCountries]: 'جميع الدول',
 	[keys.phoneRequired]: 'هذا الحقل مطلوب.',
 	[keys.invalidPhoneNumber]: 'أدخل رقم هاتف صالحًا.',
 	[keys.phoneNotMobile]: 'أدخل رقم هاتف محمول.',

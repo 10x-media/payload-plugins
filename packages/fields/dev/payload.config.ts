@@ -104,7 +104,7 @@ export default buildConfig({
 				cellFormat: 'international',
 				defaultCountry: 'DE',
 				metadata: 'max',
-				preferredCountries: ['DE', 'AT', 'CH'],
+				priorityCountries: ['DE', 'AT', 'CH'],
 				validation: 'valid',
 			},
 		}),

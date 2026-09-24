@@ -50,8 +50,6 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.selectCountry]: 'Вибрати країну',
 	[keys.searchCountries]: 'Пошук країн',
 	[keys.noCountriesFound]: 'Країни не знайдені',
-	[keys.preferredCountries]: 'Часто використовувані',
-	[keys.allCountries]: 'Всі країни',
 	[keys.phoneRequired]: 'Це поле є обов’язковим.',
 	[keys.invalidPhoneNumber]: 'Введіть дійсний номер телефону.',
 	[keys.phoneNotMobile]: 'Введіть номер мобільного телефону.',

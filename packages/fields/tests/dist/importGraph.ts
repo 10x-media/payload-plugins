@@ -31,7 +31,13 @@ export const staticImportsOf = (source: string): string[] => {
 	return specifiers
 }
 
-const walk = (entry: string, onExternal?: (specifier: string) => void): Set<string> => {
+export type UnresolvedImport = { from: string; specifier: string }
+
+const walk = (
+	entry: string,
+	onExternal?: (specifier: string) => void,
+	onUnresolved?: (unresolved: UnresolvedImport) => void
+): Set<string> => {
 	const visited = new Set<string>()
 	const queue = [entry]
 	while (queue.length > 0) {
@@ -45,6 +51,7 @@ const walk = (entry: string, onExternal?: (specifier: string) => void): Set<stri
 				if (specifier.endsWith('.css')) continue
 				let resolved = resolve(dirname(file), specifier)
 				if (!resolved.endsWith('.js')) resolved = `${resolved}.js`
+				if (!existsSync(resolved)) onUnresolved?.({ from: file, specifier })
 				queue.push(resolved)
 			} else {
 				onExternal?.(specifier)
@@ -63,3 +70,13 @@ export const collectExternals = (entry: string): Set<string> => {
 
 /** Static (non-dynamic) file closure of an entry, so dynamic `import()` chunks stay out. */
 export const collectStaticFiles = (entry: string): Set<string> => walk(entry)
+
+/**
+ * Relative specifiers `walk` could not resolve to a file on disk. Nonempty means the walk
+ * truncated silently and every graph assertion built on it may be vacuous.
+ */
+export const collectUnresolved = (entry: string): UnresolvedImport[] => {
+	const unresolved: UnresolvedImport[] = []
+	walk(entry, undefined, (item) => unresolved.push(item))
+	return unresolved
+}

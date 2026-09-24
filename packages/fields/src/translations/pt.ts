@@ -51,8 +51,6 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.selectCountry]: 'Selecionar país',
 	[keys.searchCountries]: 'Pesquisar países',
 	[keys.noCountriesFound]: 'Nenhum país encontrado',
-	[keys.preferredCountries]: 'Frequentes',
-	[keys.allCountries]: 'Todos os países',
 	[keys.phoneRequired]: 'Este campo é obrigatório.',
 	[keys.invalidPhoneNumber]: 'Introduza um número de telefone válido.',
 	[keys.phoneNotMobile]: 'Introduza um número de telemóvel.',

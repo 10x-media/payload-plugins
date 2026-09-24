@@ -31,7 +31,9 @@ type CommonPhoneOptions = {
 	index?: boolean
 	defaultCountry?: CountryCode
 	countries?: readonly CountryCode[]
-	preferredCountries?: readonly CountryCode[]
+	priorityCountries?: readonly CountryCode[]
+	/** Heading over `priorityCountries` in the picker. No label renders no heading, only the group separator. */
+	priorityCountriesLabel?: StaticLabel
 	validation?: PhoneValidationMode
 	flags?: PhoneFlagMode
 	cellFormat?: PhoneFormat
@@ -54,19 +56,17 @@ export type PhoneNumberE164FieldOptions = CommonPhoneOptions & {
 
 export type AnyPhoneNumberFieldOptions = PhoneNumberE164FieldOptions | PhoneNumberFieldOptions
 
-/** Serializable subset shipped to the admin client via clientProps. */
-export type PhoneClientOptions = {
+/** Every phone option with its layers merged and its defaults applied. Server-side. */
+export type ResolvedPhoneOptions = {
 	cellFormat: PhoneFormat
 	countries?: readonly CountryCode[]
 	defaultCountry?: CountryCode
 	flags: PhoneFlagMode
-	/**
-	 * False means the value cannot be removed, not merely that the clear affordance is
-	 * hidden: emptying the input and committing reverts to the last valid value.
-	 */
+	/** See {@link CommonPhoneOptions.isClearable}. */
 	isClearable: boolean
 	metadata: MetadataSet
-	preferredCountries?: readonly CountryCode[]
+	priorityCountries?: readonly CountryCode[]
+	priorityCountriesLabel?: StaticLabel
 	storage: PhoneStorageMode
 	validation: PhoneValidationMode
 }
@@ -79,7 +79,8 @@ export type ResolvablePhoneFieldOptions = Pick<
 	| 'defaultCountry'
 	| 'flags'
 	| 'isClearable'
-	| 'preferredCountries'
+	| 'priorityCountries'
+	| 'priorityCountriesLabel'
 	| 'validation'
 > & {
 	storage?: PhoneStorageMode
@@ -94,14 +95,15 @@ export type ResolvablePhoneFieldOptions = Pick<
 export const resolvePhoneOptions = (
 	field: ResolvablePhoneFieldOptions,
 	global: PhoneNumberGlobalConfig | undefined
-): PhoneClientOptions => ({
+): ResolvedPhoneOptions => ({
 	cellFormat: field.cellFormat ?? global?.cellFormat ?? 'international',
 	countries: field.countries ?? global?.countries,
 	defaultCountry: field.defaultCountry ?? global?.defaultCountry,
 	flags: field.flags ?? global?.flags ?? 'svg',
 	isClearable: field.isClearable ?? true,
 	metadata: global?.metadata ?? DEFAULT_METADATA_SET,
-	preferredCountries: field.preferredCountries ?? global?.preferredCountries,
+	priorityCountries: field.priorityCountries ?? global?.priorityCountries,
+	priorityCountriesLabel: field.priorityCountriesLabel ?? global?.priorityCountriesLabel,
 	storage: field.storage ?? 'object',
 	validation: field.validation ?? global?.validation ?? 'valid',
 })

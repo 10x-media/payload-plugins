@@ -474,9 +474,21 @@ export interface PhoneNumber {
       }[]
     | null;
   /**
-   * preferredCountries overriding the plugin-wide DE/AT/CH, so the picker heads with JP/KR/SG
+   * priorityCountries overriding the plugin-wide DE/AT/CH, headed by priorityCountriesLabel ("Popular")
    */
-  preferredFirst?: {
+  priorityFirst?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * priorityCountries with no priorityCountriesLabel: the group still leads the list, split from the rest only by the divider, no heading text
+   */
+  priorityFirstNoLabel?: {
     number?: string | null;
     country?: string | null;
     national?: string | null;
@@ -986,7 +998,18 @@ export interface PhoneNumbersSelect<T extends boolean = true> {
             };
         id?: T;
       };
-  preferredFirst?:
+  priorityFirst?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  priorityFirstNoLabel?:
     | T
     | {
         number?: T;

@@ -1,15 +1,16 @@
-import type { FieldHook, GroupField, TextField, TextFieldValidation, Validate } from 'payload'
+import type { FieldHook, GroupField, TextField, Validate } from 'payload'
 import { keys } from '../../translations/keys'
 import { asTranslate } from '../../translations/server'
 import { isKnownCountry } from './engine/countries'
-import { loadMetadata } from './engine/metadata'
-import { type CountryCode, checkPhone, parsePhone } from './engine/phone'
+import { loadMetadata, type PhoneMetadata } from './engine/metadata'
+import { type CountryCode, checkPhone, type ParsedPhone, parsePhone } from './engine/phone'
 import {
 	type AnyPhoneNumberFieldOptions,
 	PHONE_CUSTOM_KEY,
 	type PhoneNumberE164FieldOptions,
 	type PhoneNumberFieldOptions,
 	type ResolvablePhoneFieldOptions,
+	type ResolvedPhoneOptions,
 } from './options'
 import { resolvePhoneOptionsSafe } from './server/resolvePhoneOptionsSafe'
 
@@ -39,6 +40,43 @@ const assertCountries = (opts: {
 	}
 }
 
+/**
+ * The values the read hook derives, driving both the group's schema and the hook itself: a
+ * name the group has no field for would otherwise be written and silently stripped.
+ */
+const DERIVED = [
+	'national',
+	'international',
+	'callingCode',
+	'uri',
+	'type',
+] as const satisfies readonly (keyof ParsedPhone)[]
+
+type DerivedPhone = Pick<ParsedPhone, (typeof DERIVED)[number]>
+
+const derivedFrom = (parsed: ParsedPhone): DerivedPhone =>
+	Object.fromEntries(DERIVED.map((key) => [key, parsed[key]])) as DerivedPhone
+
+/** Stored and derived alike stay out of the list, so the group reads as one column. */
+const subfield = (name: string, extra: { virtual?: true } = {}): TextField => ({
+	admin: { disableListColumn: true },
+	name,
+	type: 'text',
+	...extra,
+})
+
+/** Both storage shapes render through the same pair, so neither path can drift from it. */
+const phoneComponents = (fieldLayer: ResolvablePhoneFieldOptions) => ({
+	Cell: {
+		clientProps: { phoneOptions: fieldLayer },
+		path: '@10x-media/fields/rsc#PhoneNumberCellServer',
+	},
+	Field: {
+		clientProps: { phoneOptions: fieldLayer },
+		path: '@10x-media/fields/rsc#PhoneNumberFieldServer',
+	},
+})
+
 /** Configuration errors return a message rather than throw: writes must fail either way. */
 const mobileMetadataMismatch = (name: string): string =>
 	`phoneNumberField(${name}): validation "mobile" requires metadata "max" or "mobile", but this install is configured "min"`
@@ -49,62 +87,57 @@ const buildDerivedHook =
 		const stored = (value ?? {}) as { country?: CountryCode; number?: string }
 		if (typeof stored.number !== 'string' || stored.number === '') return value
 		const resolved = resolvePhoneOptionsSafe({ fieldOptions: fieldLayer, payload: req.payload })
-		const parsed = parsePhone(stored.number, {
-			defaultCountry: stored.country,
-			metadata: await loadMetadata(resolved.metadata),
-		})
+		// A throwing afterRead fails the whole request, so one unloadable chunk would take down
+		// every read of the collection; degrading costs the derived values on this field alone.
+		let metadata: PhoneMetadata
+		try {
+			metadata = await loadMetadata(resolved.metadata)
+		} catch (error) {
+			req.payload.logger.error(
+				{ err: error },
+				'[fields] phoneNumber metadata failed to load for a derived read'
+			)
+			return value
+		}
+		const parsed = parsePhone(stored.number, { defaultCountry: stored.country, metadata })
 		if (!parsed) return value
 		// Persisted keys spread first: this hook enriches the group, it never rewrites it.
-		return {
-			...stored,
-			callingCode: parsed.callingCode,
-			international: parsed.international,
-			national: parsed.national,
-			type: parsed.type,
-			uri: parsed.uri,
-		}
+		return { ...stored, ...derivedFrom(parsed) }
 	}
+
+/** How one storage shape yields the number to check and the country to read it under. */
+type PhoneInputReader = (
+	value: unknown,
+	resolved: ResolvedPhoneOptions
+) => { country: CountryCode | undefined; raw: string }
+
+/** Object storage keeps the country beside the number, so the stored row speaks for itself. */
+const readStoredPhone: PhoneInputReader = (value) => {
+	const stored = (value ?? {}) as { country?: CountryCode; number?: string }
+	return { country: stored.country, raw: typeof stored.number === 'string' ? stored.number : '' }
+}
+
+/** e164 storage has no country of its own, so a national number needs the resolved default. */
+const readE164Phone: PhoneInputReader = (value, resolved) => ({
+	country: resolved.defaultCountry,
+	raw: typeof value === 'string' ? value : '',
+})
 
 const buildValidate =
-	(opts: { fieldLayer: ResolvablePhoneFieldOptions; name: string; required: boolean }): Validate =>
-	async (value, args) => {
-		const stored = (value ?? {}) as { country?: CountryCode; number?: string }
-		const raw = typeof stored.number === 'string' ? stored.number : ''
-		const resolved = resolvePhoneOptionsSafe({
-			fieldOptions: opts.fieldLayer,
-			payload: args.req.payload,
-		})
-		const check = checkPhone(raw, resolved.validation, {
-			defaultCountry: stored.country,
-			metadata: await loadMetadata(resolved.metadata),
-		})
-		if (check === 'empty') {
-			return opts.required ? asTranslate(args.req.t)(keys.phoneRequired) : true
-		}
-		if (check === 'notMobile') {
-			if (resolved.validation === 'mobile' && resolved.metadata === 'min') {
-				return mobileMetadataMismatch(opts.name)
-			}
-			return asTranslate(args.req.t)(keys.phoneNotMobile)
-		}
-		if (check === 'invalid') return asTranslate(args.req.t)(keys.invalidPhoneNumber)
-		return true
-	}
-
-const buildTextValidate =
 	(opts: {
 		fieldLayer: ResolvablePhoneFieldOptions
 		name: string
+		read: PhoneInputReader
 		required: boolean
-	}): TextFieldValidation =>
+	}): Validate =>
 	async (value, args) => {
-		const raw = typeof value === 'string' ? value : ''
 		const resolved = resolvePhoneOptionsSafe({
 			fieldOptions: opts.fieldLayer,
 			payload: args.req.payload,
 		})
+		const { country, raw } = opts.read(value, resolved)
 		const check = checkPhone(raw, resolved.validation, {
-			defaultCountry: resolved.defaultCountry,
+			defaultCountry: country,
 			metadata: await loadMetadata(resolved.metadata),
 		})
 		if (check === 'empty') {
@@ -136,7 +169,8 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 		index,
 		defaultCountry,
 		countries,
-		preferredCountries,
+		priorityCountries,
+		priorityCountriesLabel,
 		validation,
 		flags,
 		cellFormat,
@@ -153,7 +187,8 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 		...(defaultCountry !== undefined ? { defaultCountry } : {}),
 		...(flags !== undefined ? { flags } : {}),
 		...(isClearable !== undefined ? { isClearable } : {}),
-		...(preferredCountries !== undefined ? { preferredCountries } : {}),
+		...(priorityCountries !== undefined ? { priorityCountries } : {}),
+		...(priorityCountriesLabel !== undefined ? { priorityCountriesLabel } : {}),
 		...(options.storage !== undefined ? { storage: options.storage } : {}),
 		...(validation !== undefined ? { validation } : {}),
 	}
@@ -166,20 +201,14 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 			...(required !== undefined ? { required } : {}),
 			...(localized !== undefined ? { localized } : {}),
 			...(index !== undefined ? { index } : {}),
-			admin: {
-				components: {
-					Cell: {
-						clientProps: { phoneOptions: fieldLayer },
-						path: '@10x-media/fields/rsc#PhoneNumberCellServer',
-					},
-					Field: {
-						clientProps: { phoneOptions: fieldLayer },
-						path: '@10x-media/fields/rsc#PhoneNumberFieldServer',
-					},
-				},
-			},
+			admin: { components: phoneComponents(fieldLayer) },
 			custom: { [PHONE_CUSTOM_KEY]: fieldLayer },
-			validate: buildTextValidate({ fieldLayer, name, required: required ?? false }),
+			validate: buildValidate({
+				fieldLayer,
+				name,
+				read: readE164Phone,
+				required: required ?? false,
+			}),
 		}
 		return typeof options.overrides === 'function' ? options.overrides({ field: base }) : base
 	}
@@ -191,30 +220,20 @@ export function phoneNumberField(options: AnyPhoneNumberFieldOptions): GroupFiel
 		...(required !== undefined ? { required } : {}),
 		...(localized !== undefined ? { localized } : {}),
 		...(index !== undefined ? { index } : {}),
-		admin: {
-			components: {
-				Cell: {
-					clientProps: { phoneOptions: fieldLayer },
-					path: '@10x-media/fields/rsc#PhoneNumberCellServer',
-				},
-				Field: {
-					clientProps: { phoneOptions: fieldLayer },
-					path: '@10x-media/fields/rsc#PhoneNumberFieldServer',
-				},
-			},
-		},
+		admin: { components: phoneComponents(fieldLayer) },
 		custom: { [PHONE_CUSTOM_KEY]: fieldLayer },
 		fields: [
-			{ admin: { disableListColumn: true }, name: 'number', type: 'text' },
-			{ admin: { disableListColumn: true }, name: 'country', type: 'text' },
-			{ admin: { disableListColumn: true }, name: 'national', type: 'text', virtual: true },
-			{ admin: { disableListColumn: true }, name: 'international', type: 'text', virtual: true },
-			{ admin: { disableListColumn: true }, name: 'callingCode', type: 'text', virtual: true },
-			{ admin: { disableListColumn: true }, name: 'uri', type: 'text', virtual: true },
-			{ admin: { disableListColumn: true }, name: 'type', type: 'text', virtual: true },
+			subfield('number'),
+			subfield('country'),
+			...DERIVED.map((name) => subfield(name, { virtual: true })),
 		],
 		hooks: { afterRead: [buildDerivedHook(fieldLayer)] },
-		validate: buildValidate({ fieldLayer, name, required: required ?? false }),
+		validate: buildValidate({
+			fieldLayer,
+			name,
+			read: readStoredPhone,
+			required: required ?? false,
+		}),
 	}
 
 	return typeof options.overrides === 'function' ? options.overrides({ field: base }) : base

@@ -2,7 +2,7 @@ import type { Payload, SanitizedConfig } from 'payload'
 import type React from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FIELDS_REGISTRY_KEY } from '../../../plugin/registry'
-import type { PhoneSeed } from '../engine/phone'
+import type { PhoneSeed } from '../engine/draft'
 import { PHONE_CUSTOM_KEY, type ResolvablePhoneFieldOptions } from '../options'
 
 // The subject is what the server derives and hands over, so the client field is a stub: the real
@@ -138,14 +138,31 @@ describe('PhoneNumberFieldServer', () => {
 		)
 	})
 
-	it('degrades to no seed for a metadata set that does not exist', async () => {
+	// The resolver drops a set the loader cannot carry, so the seed survives rather than
+	// costing the first frame over a registry the plugin never normalized.
+	it('falls back to the default set for a metadata set that does not exist', async () => {
 		const seed = await seedOf(
 			buildProps({
 				payload: fakePayload({ metadata: 'nope' }),
 				siblingData: { phone: DE_E164 },
 			})
 		)
-		expect(seed).toBeNull()
+		expect(loadMetadata).toHaveBeenCalledWith('max')
+		expect(seed).toEqual(DE_SEED)
+	})
+
+	// The client cannot read either one, so shipping them would put two dead values in the
+	// clientProps of every phone field on the config.
+	it('ships the resolved options without the two the client never reads', async () => {
+		const node = (await PhoneNumberFieldServer(
+			buildProps({ payload: fakePayload({ cellFormat: 'national' }), siblingData: {} })
+		)) as React.ReactElement<{ phoneOptions: Record<string, unknown> }>
+		expect(node.props.phoneOptions).toEqual({
+			flags: 'svg',
+			isClearable: true,
+			metadata: 'max',
+			storage: 'object',
+		})
 	})
 
 	it('still throws when the field carries no phone options at all', async () => {

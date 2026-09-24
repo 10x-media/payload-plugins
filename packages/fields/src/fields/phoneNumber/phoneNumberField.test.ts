@@ -1,9 +1,33 @@
 import type { NamedGroupField, TextField } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { FIELDS_REGISTRY_KEY } from '../../plugin/registry'
 import type { MetadataSet } from './engine/metadata'
 import type { CountryCode } from './engine/phone'
 import { phoneNumberField } from './phoneNumberField'
+
+// A rejected metadata chunk is the one failure resolvePhoneOptionsSafe cannot absorb, and
+// no registry value can provoke it: an out-of-union set is coerced away before it is loaded.
+const { failLoad } = vi.hoisted(() => ({ failLoad: { current: false } }))
+vi.mock('./engine/metadata', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('./engine/metadata')>()
+	return {
+		...actual,
+		loadMetadata: (set: MetadataSet) =>
+			failLoad.current
+				? Promise.reject(new Error('metadata chunk failed to load'))
+				: actual.loadMetadata(set),
+	}
+})
+
+/** Runs `run` with the metadata import rejecting, restoring it however `run` ends. */
+const withFailingMetadata = async <T>(run: () => Promise<T>): Promise<T> => {
+	failLoad.current = true
+	try {
+		return await run()
+	} finally {
+		failLoad.current = false
+	}
+}
 
 // phoneNumberField's group branch always receives a `name`, so the result is always a
 // NamedGroupField; that (rather than the wider GroupField union) is what lets `.name` and
@@ -14,9 +38,11 @@ const group = (opts: Parameters<typeof phoneNumberField>[0]) =>
 /** A minimal `t` stub: validators only interpolate the key, never look up a bundle. */
 const t = (key: string) => key
 
-/** A request stub carrying `t` (for validate) and `payload.config` (for the registry). */
-const reqWithRegistry = (custom?: Record<string, unknown>) =>
-	({ payload: { config: { custom } }, t }) as never
+/** A request stub carrying `t` (for validate), `payload.config` (for the registry) and a logger. */
+const reqWithRegistry = (
+	custom?: Record<string, unknown>,
+	error: (...args: unknown[]) => void = () => undefined
+) => ({ payload: { config: { custom }, logger: { error } }, t }) as never
 
 const validateArgs = { req: reqWithRegistry() } as never
 
@@ -109,7 +135,8 @@ describe('phoneNumberField clientProps.phoneOptions contract', () => {
 		countries: ['DE', 'FR'] as const,
 		defaultCountry: 'DE' as const,
 		isClearable: false,
-		preferredCountries: ['DE'] as const,
+		priorityCountries: ['DE'] as const,
+		priorityCountriesLabel: { en: 'Popular' },
 	}
 
 	it('threads field options into Field and Cell clientProps.phoneOptions, group storage', () => {
@@ -294,6 +321,16 @@ describe('phoneNumberField derived read hook', () => {
 		expect(await hook?.({ req: reqWithRegistry(), value } as never)).toBe(value)
 	})
 
+	// Bulk imports and migrations are how phone data actually arrives, and neither goes
+	// through the field's validation. Without the guard, reading one such row throws inside
+	// afterRead, which fails the whole request rather than that one field.
+	it('returns a stored number it cannot parse unchanged, rather than failing the read', async () => {
+		const field = group({ name: 'phone' })
+		const hook = field.hooks?.afterRead?.[0]
+		const value = { country: 'DE', number: 'not a phone number' }
+		expect(await hook?.({ req: reqWithRegistry(), value } as never)).toBe(value)
+	})
+
 	it('reads the registry metadata set at request time, not the factory default', async () => {
 		const field = group({ name: 'phone' })
 		const hook = field.hooks?.afterRead?.[0]
@@ -311,6 +348,18 @@ describe('phoneNumberField derived read hook', () => {
 		expect(result.callingCode).toBe('49')
 	})
 
+	// The hook awaits loadMetadata bare: a rejected set would surface as a failed afterRead,
+	// which fails the whole request, so every read of the collection would break at once.
+	it('still reads a document when the registry carries a metadata set that cannot load', async () => {
+		const field = group({ name: 'phone' })
+		const hook = field.hooks?.afterRead?.[0]
+		const result = (await hook?.({
+			req: reqWithRegistry({ [FIELDS_REGISTRY_KEY]: { phoneNumber: { metadata: 'nope' } } }),
+			value: { country: 'DE', number: '0151 12345678' },
+		} as never)) as Record<string, unknown>
+		expect(result.international).toBe('+49 1511 2345678')
+	})
+
 	it('degrades to the default metadata set when the registry value is missing', async () => {
 		const field = group({ name: 'phone' })
 		const hook = field.hooks?.afterRead?.[0]
@@ -321,5 +370,41 @@ describe('phoneNumberField derived read hook', () => {
 		// No registry entry at all resolves to DEFAULT_METADATA_SET ('max'), which is the
 		// only set carrying number-type patterns, so `type` comes back populated.
 		expect(result.type).toBe('MOBILE')
+	})
+
+	// The whole collection reads through this hook, so a failed chunk must cost the derived
+	// values on one field rather than every read of every document.
+	it('hands the stored value back, and reports, when the metadata import rejects', async () => {
+		const field = group({ name: 'phone' })
+		const hook = field.hooks?.afterRead?.[0]
+		const error = vi.fn()
+		const value = { country: 'DE', number: '0151 12345678' }
+		const result = await withFailingMetadata(async () =>
+			hook?.({ req: reqWithRegistry(undefined, error), value } as never)
+		)
+		expect(result).toBe(value)
+		expect(error).toHaveBeenCalledOnce()
+	})
+})
+
+describe('phoneNumberField validate under an unloadable metadata import', () => {
+	// The mirror of the read hook's degrade: swallowing here would let the write through
+	// unvalidated, so the rejection is the point.
+	it('fails an object-storage write rather than accepting it unchecked', async () => {
+		const field = group({ name: 'phone' })
+		await withFailingMetadata(async () => {
+			await expect(
+				field.validate?.({ country: 'DE', number: 'not a phone number' }, validateArgs)
+			).rejects.toThrow(/metadata/)
+		})
+	})
+
+	it('fails an e164 write rather than accepting it unchecked', async () => {
+		const field = phoneNumberField({ name: 'phone', storage: 'e164' }) as TextField
+		await withFailingMetadata(async () => {
+			await expect(field.validate?.('not a phone number' as never, validateArgs)).rejects.toThrow(
+				/metadata/
+			)
+		})
 	})
 })

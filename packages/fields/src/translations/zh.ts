@@ -50,8 +50,6 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.selectCountry]: '选择国家/地区',
 	[keys.searchCountries]: '搜索国家/地区',
 	[keys.noCountriesFound]: '未找到国家/地区',
-	[keys.preferredCountries]: '常用国家/地区',
-	[keys.allCountries]: '全部国家/地区',
 	[keys.phoneRequired]: '此字段为必填项。',
 	[keys.invalidPhoneNumber]: '请输入有效的电话号码。',
 	[keys.phoneNotMobile]: '请输入手机号码。',

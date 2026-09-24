@@ -19,26 +19,23 @@ import { keys } from '../../../translations/keys'
 import { useTranslation } from '../../../translations/useTranslation'
 import { resolveStaticLabel } from '../../../utils/resolveStaticLabel'
 import { callingCodeFor, countryOptions } from '../engine/countries'
+import { isInternational, type PhoneSeed, provisionalCountry } from '../engine/draft'
 import { loadMetadata, type PhoneMetadata } from '../engine/metadata'
-import {
-	type CountryCode,
-	detectCountry,
-	formatAsYouType,
-	nationalPart,
-	type PhoneSeed,
-	parsePhone,
-	salvagePhone,
-} from '../engine/phone'
-import type { PhoneClientOptions } from '../options'
+import { type CountryCode, detectCountry, parsePhone } from '../engine/phone'
+import type { ResolvedPhoneOptions } from '../options'
 import { type CountryOptionGroups, CountryPicker } from './CountryPicker'
+import {
+	displayFor,
+	dropCallingCode,
+	formatDraft,
+	type PhoneEntry,
+	resolveCommit,
+} from './editModel'
 import './phoneNumberField.css'
 
 const baseClass = 'fields-phone'
 const COMMIT_DELAY = 250
-const NO_COUNTRIES: CountryOptionGroups = { preferred: [], rest: [] }
-
-/** What one commit boundary stores: the E.164 number and the country it was read under. */
-type PhoneEntry = { country: CountryCode | undefined; number: null | string }
+const NO_COUNTRIES: CountryOptionGroups = { priority: [], rest: [] }
 
 /**
  * Payload copies `required` and `admin.placeholder` onto the client field at runtime, but
@@ -49,66 +46,17 @@ type PhonePassthrough = {
 	required?: boolean
 }
 
-const isInternational = (draft: string): boolean => draft.trimStart().startsWith('+')
-
 /**
- * What as-you-type may reflow. Letters and an `x123` extension stay verbatim while typing,
- * but a commit stores E.164, which cannot carry an extension, so the repaint drops it.
+ * `cellFormat` and `validation` are read only on the server, so they are neither shipped
+ * nor readable here: reading `validation` client-side would state a verdict the server
+ * has not reached.
  */
-const PHONE_CHARS = /^[\d\s+()./-]*$/
-
-const displayFor = (entry: PhoneEntry, metadata: null | PhoneMetadata): string => {
-	if (!entry.number) return ''
-	if (!metadata) return entry.number
-	const parsed = parsePhone(entry.number, { defaultCountry: entry.country, metadata })
-	return parsed ? nationalPart(parsed) : entry.number
-}
-
-/**
- * As-you-type only while appending at the end, where the caret already sits: a mid-string
- * edit or a deletion is stored exactly as typed, so the caret never moves under the viewer.
- */
-const formatDraft = (args: {
-	atEnd: boolean
-	callingCode: string | undefined
-	metadata: null | PhoneMetadata
-	previous: string
-	raw: string
-}): string => {
-	const { atEnd, callingCode, metadata, previous, raw } = args
-	if (!metadata || !atEnd || raw.length <= previous.length) return raw
-	if (!PHONE_CHARS.test(raw)) return raw
-	if (isInternational(raw)) return formatAsYouType(raw, undefined, { metadata })
-	if (callingCode === undefined) return raw
-	const prefix = `+${callingCode}`
-	const formatted = formatAsYouType(`${prefix}${raw}`, undefined, { metadata })
-	return formatted.startsWith(prefix) ? formatted.slice(prefix.length).trimStart() : formatted
-}
-
-const resolveCommit = (args: {
-	country: CountryCode | undefined
-	draft: string
-	isClearable: boolean
-	lastValid: null | PhoneEntry
-	metadata: null | PhoneMetadata
-	salvage: boolean
-}): PhoneEntry => {
-	const { country, draft, isClearable, lastValid, metadata, salvage } = args
-	const trimmed = draft.trim()
-	if (metadata === null) return { country, number: trimmed === '' ? null : trimmed }
-	const opts = { defaultCountry: country, metadata }
-	const direct = parsePhone(trimmed, opts)
-	const resolved = direct?.valid ? direct : salvage ? salvagePhone(trimmed, opts) : null
-	if (resolved) return { country: resolved.country ?? country, number: resolved.e164 }
-	// isClearable false means the value cannot be removed, only replaced
-	if (trimmed === '') return !isClearable && lastValid ? lastValid : { country, number: null }
-	return { country, number: trimmed }
-}
+export type PhoneFieldClientOptions = Omit<ResolvedPhoneOptions, 'cellFormat' | 'validation'>
 
 /** A group under object storage, a text field under e164; the row is identical either way. */
 export type PhoneNumberFieldProps = {
 	field: GroupFieldClientProps['field'] | TextFieldClientProps['field']
-	phoneOptions: PhoneClientOptions
+	phoneOptions: PhoneFieldClientOptions
 	/** The stored row as the server already split it, painted until metadata lands. */
 	seed?: null | PhoneSeed
 } & Omit<GroupFieldClientProps, 'field'>
@@ -130,7 +78,8 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 		flags,
 		isClearable,
 		metadata: metadataSet,
-		preferredCountries,
+		priorityCountries,
+		priorityCountriesLabel,
 		storage,
 	} = phoneOptions
 
@@ -197,19 +146,29 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 		if (!editingRef.current) setDraft(display)
 	}, [display])
 
+	// The validated read refines the provisional one: `+1` is the United States on sight, and
+	// stays so until enough digits arrive for libphonenumber to name Canada instead.
 	const draftCountry = useMemo(
-		() => (metadata && isInternational(draft) ? detectCountry(draft, { metadata }) : undefined),
+		() =>
+			metadata && isInternational(draft)
+				? (detectCountry(draft, { metadata }) ?? provisionalCountry(draft, { metadata }))
+				: undefined,
 		[draft, metadata]
 	)
+	// The pick outranks the stored country because e164 storage has no country column to write
+	// it to: there the stored country is re-read off the number, which cannot know about a pick.
 	const country =
-		draftCountry ?? storedCountry ?? seeded?.country ?? pickedCountry ?? defaultCountry
+		draftCountry ?? pickedCountry ?? storedCountry ?? seeded?.country ?? defaultCountry
 
+	const countriesKey = countries?.join()
+	const priorityKey = priorityCountries?.join()
+	// biome-ignore lint/correctness/useExhaustiveDependencies: a form-state round trip hands the same allowlist back as a new array, so the contents are the dependency, not the identity
 	const options = useMemo(
 		() =>
 			metadata
-				? countryOptions({ countries, locale: i18n.language, metadata, preferredCountries })
+				? countryOptions({ countries, locale: i18n.language, metadata, priorityCountries })
 				: NO_COUNTRIES,
-		[countries, i18n.language, metadata, preferredCountries]
+		[countriesKey, i18n.language, metadata, priorityKey]
 	)
 	// Off the country, not off `options`: an allowlist that does not offer the stored country
 	// would otherwise drop the prefix once metadata lands, reflowing the row back.
@@ -245,14 +204,18 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 
 	const commit = useCallback(
 		(raw: string, opts: { country?: CountryCode; salvage?: boolean } = {}): PhoneEntry => {
-			const entry = resolveCommit({
+			const { derived, ...entry } = resolveCommit({
 				country: opts.country ?? country,
 				draft: raw,
 				isClearable,
 				lastValid: lastValidRef.current,
 				metadata,
+				picked: opts.country !== undefined,
 				salvage: opts.salvage === true,
 			})
+			// A pick speaks for the country only until the value speaks for itself, or it would
+			// keep overriding every number committed after it.
+			if (derived) setPickedCountry(undefined)
 			write(entry)
 			return entry
 		},
@@ -268,20 +231,31 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 
 	const onChange = useCallback(
 		(event: React.ChangeEvent<HTMLInputElement>) => {
-			const raw = event.target.value
+			const input = event.target
+			const raw = input.value
+			const caret = input.selectionStart
 			const next = formatDraft({
-				atEnd: event.target.selectionStart === null || event.target.selectionStart === raw.length,
+				atEnd: caret === null || caret === raw.length,
 				callingCode,
+				country,
 				metadata,
 				previous: draft,
 				raw,
 			})
+			if (next === null) {
+				// React re-renders nothing when the state is unchanged, so the refused line is put
+				// back here, with the caret where the refused characters would have gone.
+				const at = Math.max((caret ?? raw.length) - (raw.length - draft.length), 0)
+				input.value = draft
+				input.setSelectionRange(at, at)
+				return
+			}
 			editingRef.current = true
 			setDraft(next)
 			cancelPending()
 			debounceRef.current = setTimeout(() => commit(next), COMMIT_DELAY)
 		},
-		[callingCode, cancelPending, commit, draft, metadata]
+		[callingCode, cancelPending, commit, country, draft, metadata]
 	)
 
 	const onBlur = useCallback(() => {
@@ -296,9 +270,7 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 			cancelPending()
 			editingRef.current = false
 			setPickedCountry(code)
-			// An international draft carries its own calling code; the new country replaces it
-			const parsed = metadata && isInternational(draft) ? parsePhone(draft, { metadata }) : null
-			const entry = commit(parsed ? nationalPart(parsed) : draft, { country: code })
+			const entry = commit(dropCallingCode(draft, metadata), { country: code })
 			setDraft(displayFor(entry, metadata))
 		},
 		[cancelPending, commit, draft, metadata]
@@ -356,6 +328,7 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 						flags={flags}
 						onSelect={selectCountry}
 						options={options}
+						priorityLabel={resolveStaticLabel(priorityCountriesLabel, i18n.language)}
 						value={country}
 					/>
 					{showPrefix ? <span className={`${baseClass}__prefix`}>{`+${callingCode}`}</span> : null}

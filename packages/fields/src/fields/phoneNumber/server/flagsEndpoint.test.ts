@@ -64,4 +64,25 @@ describe('flags handler', () => {
 			vi.resetModules()
 		}
 	})
+
+	// The artwork is held for the life of the process, so without the eviction one failed
+	// import would 500 every flag request until the next deploy.
+	it('evicts a failed artwork import, so a later request serves instead of inheriting it', async () => {
+		vi.resetModules()
+		let attempt = 0
+		vi.doMock('country-flag-icons/string/3x2', () => {
+			attempt += 1
+			if (attempt === 1) throw new Error('chunk unavailable')
+			return { DE: '<svg>mock</svg>' }
+		})
+		try {
+			const handler = (await import('./flagsEndpoint')).makeFlagsHandler()
+			const request = { routeParams: { code: 'de' } } as never
+			await expect(handler(request)).rejects.toThrow()
+			expect(((await handler(request)) as Response).status).toBe(200)
+		} finally {
+			vi.doUnmock('country-flag-icons/string/3x2')
+			vi.resetModules()
+		}
+	})
 })

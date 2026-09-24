@@ -27,31 +27,57 @@ describe('resolvePhoneOptionsSafe', () => {
 		})
 	})
 
-	it('degrades to the field-only layer and logs when the registry layer throws on read', () => {
+	// normalizeRegistry rejects this set, so reaching here means a config assembled without
+	// the plugin or mutated after it ran. Left alone it rejects in loadMetadata, which the
+	// read hook and both validators await with no degrade path of their own.
+	it('drops a metadata set the loader cannot carry, and logs, rather than passing it on', () => {
 		const logger = { error: vi.fn() }
-		// A registry slice that throws on property access, simulating a config mutated
-		// into a hostile shape after the plugin ran; resolvePhoneOptions reads several
-		// of its properties via `??`, any of which would surface this.
-		const throwingPhoneNumber = new Proxy(
-			{},
-			{
-				get() {
-					throw new Error('boom')
-				},
-			}
-		)
 		const config = {
-			custom: { [FIELDS_REGISTRY_KEY]: { phoneNumber: throwingPhoneNumber } },
+			custom: { [FIELDS_REGISTRY_KEY]: { phoneNumber: { flags: 'none', metadata: 'nope' } } },
 		} as unknown as SanitizedConfig
 		const payload = { config, logger } as unknown as Payload
-		expect(resolvePhoneOptionsSafe({ fieldOptions: { flags: 'emoji' }, payload })).toMatchObject({
-			flags: 'emoji',
+		// The rest of the layer survives: only the unloadable key is dropped.
+		expect(resolvePhoneOptionsSafe({ fieldOptions: {}, payload })).toMatchObject({
+			flags: 'none',
 			metadata: 'max',
 		})
 		expect(logger.error).toHaveBeenCalledTimes(1)
-		expect(logger.error).toHaveBeenCalledWith(
-			{ err: expect.any(Error) },
-			'[fields] phoneNumber registry default is invalid'
-		)
+	})
+
+	it('keeps every set the loader does carry', () => {
+		for (const set of ['max', 'min', 'mobile'] as const) {
+			const payload = payloadWithRegistry({ phoneNumber: { metadata: set } })
+			expect(resolvePhoneOptionsSafe({ fieldOptions: {}, payload }).metadata).toBe(set)
+		}
+	})
+
+	// Exact equality over the whole bag rather than one key at a time: countries,
+	// priorityCountries and priorityCountriesLabel each had no case of their own, so
+	// dropping any of their `?? global?.` fallbacks left the suite green.
+	it('falls back to the plugin layer for every key the field leaves unset', () => {
+		const payload = payloadWithRegistry({
+			phoneNumber: {
+				cellFormat: 'national',
+				countries: ['AT', 'CH', 'DE'],
+				defaultCountry: 'AT',
+				flags: 'emoji',
+				metadata: 'mobile',
+				priorityCountries: ['CH'],
+				priorityCountriesLabel: 'Popular',
+				validation: 'possible',
+			},
+		})
+		expect(resolvePhoneOptionsSafe({ fieldOptions: {}, payload })).toEqual({
+			cellFormat: 'national',
+			countries: ['AT', 'CH', 'DE'],
+			defaultCountry: 'AT',
+			flags: 'emoji',
+			isClearable: true,
+			metadata: 'mobile',
+			priorityCountries: ['CH'],
+			priorityCountriesLabel: 'Popular',
+			storage: 'object',
+			validation: 'possible',
+		})
 	})
 })

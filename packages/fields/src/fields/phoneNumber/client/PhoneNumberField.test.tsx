@@ -3,9 +3,10 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type React from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { CountryOption } from '../engine/countries'
+import type { PhoneSeed } from '../engine/draft'
 import { loadMetadata } from '../engine/metadata'
-import type { CountryCode, PhoneSeed } from '../engine/phone'
-import type { PhoneClientOptions } from '../options'
+import type { CountryCode } from '../engine/phone'
+import type { PhoneFieldClientOptions } from './PhoneNumberField'
 
 type FieldAction = { path: string; type: string; value: unknown }
 
@@ -104,23 +105,32 @@ vi.mock('../../../translations/useTranslation', () => ({
 }))
 
 /** Countries the picker double offers, enough to drive every selection this file needs. */
-const PICKABLE: CountryCode[] = ['CH', 'DE', 'US']
+const PICKABLE: CountryCode[] = ['CA', 'CH', 'DE', 'US']
 
 type PickerDoubleProps = {
 	disabled: boolean
 	flags: string
 	onSelect: (code: CountryCode) => void
-	options: { preferred: CountryOption[]; rest: CountryOption[] }
+	options: { priority: CountryOption[]; rest: CountryOption[] }
+	priorityLabel?: string
 	value: CountryCode | undefined
 }
 
-const CountryPickerDouble = ({ disabled, flags, onSelect, options, value }: PickerDoubleProps) => (
+const CountryPickerDouble = ({
+	disabled,
+	flags,
+	onSelect,
+	options,
+	priorityLabel,
+	value,
+}: PickerDoubleProps) => (
 	<div
 		data-disabled={String(disabled)}
 		data-flags={flags}
-		data-preferred={options.preferred.map((option) => option.code).join(',')}
+		data-priority={options.priority.map((option) => option.code).join(',')}
+		data-priority-label={priorityLabel ?? ''}
 		data-testid="picker"
-		data-total={String(options.preferred.length + options.rest.length)}
+		data-total={String(options.priority.length + options.rest.length)}
 		data-value={value ?? ''}
 	>
 		{PICKABLE.map((code) => (
@@ -137,13 +147,11 @@ const { PhoneNumberField } = await import('./PhoneNumberField')
 
 type PhoneFieldProps = Parameters<typeof PhoneNumberField>[0]
 
-const OPTIONS: PhoneClientOptions = {
-	cellFormat: 'international',
+const OPTIONS: PhoneFieldClientOptions = {
 	flags: 'svg',
 	isClearable: true,
 	metadata: 'max',
 	storage: 'object',
-	validation: 'valid',
 }
 
 type FieldAdmin = {
@@ -171,7 +179,7 @@ const makeField = (
 type RenderArgs = {
 	admin?: FieldAdmin
 	localized?: boolean
-	phoneOptions?: Partial<PhoneClientOptions>
+	phoneOptions?: Partial<PhoneFieldClientOptions>
 	readOnly?: boolean
 	required?: boolean
 	seed?: null | PhoneSeed
@@ -219,6 +227,9 @@ const type = (value: string, selectionStart?: number) =>
 		input(),
 		selectionStart === undefined ? { target: { value } } : { target: { selectionStart, value } }
 	)
+
+/** One keystroke at the end of the line, which is what the length ceiling bounds. */
+const press = (char: string) => type(`${input().value}${char}`)
 
 /** Renders and flushes the lazy metadata load, so formatting is active. */
 const renderPhone = async (args: RenderArgs = {}) => {
@@ -468,11 +479,10 @@ describe('PhoneNumberField', () => {
 		expect(prefix()).toBe('+41')
 	})
 
-	// Text that as-you-type leaves verbatim, so only the blur salvage can recover it
+	// A paste no single parse can read, so only the blur salvage can recover it
 	it('salvages the first valid number out of a doubled paste on blur', async () => {
 		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
-		type('tel:+41446681800 tel:+41446681800')
-		expect(input().value).toBe('tel:+41446681800 tel:+41446681800')
+		type('+41446681800 +41446681800')
 		fireEvent.blur(input())
 		expect(writesTo('phone.number')).toEqual(['+41446681800'])
 		expect(writesTo('phone.country')).toEqual(['CH'])
@@ -481,10 +491,72 @@ describe('PhoneNumberField', () => {
 
 	it('keeps an unparseable draft so validation can surface it', async () => {
 		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
-		type('not a number')
+		type('+999 123')
 		fireEvent.blur(input())
-		expect(writesTo('phone.number')).toEqual(['not a number'])
-		expect(input().value).toBe('not a number')
+		expect(writesTo('phone.number')).toEqual(['+999123'])
+		expect(input().value).toBe('+999123')
+	})
+
+	it.each([
+		['a letter', 'not a number'],
+		['an extension', '1511 2345678 x99'],
+		['a tel URI', 'tel:+4915112345678'],
+	])('refuses %s rather than letting it into the draft', async (_label, raw) => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('1511 2345678')
+		type(raw)
+		expect(input().value).toBe('1511 2345678')
+	})
+
+	// Refusing by re-rendering the old value would drop the caret to the end of the line
+	it('leaves the caret at the edit point when a character is refused', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('15112345678')
+		expect(input().value).toBe('1511 2345678')
+		type('1511a 2345678', 5)
+		expect(input().value).toBe('1511 2345678')
+		expect(input().selectionStart).toBe(4)
+	})
+
+	// The United States caps its national numbers at ten digits
+	it('refuses a typed digit past the ceiling the country defines', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'US' } })
+		type('2025550123')
+		const full = input().value
+		press('4')
+		expect(input().value).toBe(full)
+	})
+
+	// Germany defines no upper bound, so only E.164's fifteen digits stop the entry growing
+	it('refuses a typed digit past E.164 where the country defines no ceiling', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('151123456789')
+		press('0')
+		const full = input().value
+		expect(full.replace(/\D/g, '')).toBe('1511234567890')
+		press('1')
+		expect(input().value).toBe(full)
+	})
+
+	it('lets a refused entry shrink and grow again', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'US' } })
+		type('2025550123')
+		const full = input().value
+		press('4')
+		expect(input().value).toBe(full)
+		type('202 555 012')
+		expect(input().value).toBe('202 555 012')
+		press('4')
+		expect(input().value.replace(/\D/g, '')).toBe('2025550124')
+	})
+
+	// The ceiling bounds typing; a paste has to land for the blur salvage to read it
+	it('lets a bulk paste past the ceiling through', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('+41446681800 +41446681800')
+		expect(input().value).not.toBe('')
+		fireEvent.blur(input())
+		expect(writesTo('phone.number')).toEqual(['+41446681800'])
 	})
 
 	it('re-reads a typed number under a country picked from the list', async () => {
@@ -495,6 +567,107 @@ describe('PhoneNumberField', () => {
 		expect(writesTo('phone.country')).toEqual(['US'])
 		expect(input().value).toBe('415 555 2671')
 		expect(prefix()).toBe('+1')
+	})
+
+	it.each([
+		['+41', 'CH'],
+		['+1', 'US'],
+		['+7', 'RU'],
+		['+44', 'GB'],
+	])('adopts the country %s identifies before the number is complete', async (draft, expected) => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type(draft)
+		expect(picker().dataset.value).toBe(expected)
+	})
+
+	it('refines the country once the digits name one within the calling code', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('+1')
+		expect(picker().dataset.value).toBe('US')
+		type('+16045551234')
+		expect(picker().dataset.value).toBe('CA')
+	})
+
+	it('leaves the country alone for a calling code no country claims', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('+999')
+		expect(picker().dataset.value).toBe('DE')
+	})
+
+	// Without shedding the code, the draft would name the old country straight back over the pick
+	it('sheds the calling code of a draft too short to parse when a country is picked', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('+1')
+		expect(picker().dataset.value).toBe('US')
+		fireEvent.click(screen.getByText('pick-CH'))
+		expect(picker().dataset.value).toBe('CH')
+		expect(prefix()).toBe('+41')
+		expect(input().value).toBe('')
+	})
+
+	it('keeps the digits after the calling code when a country is picked', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		type('+1604')
+		fireEvent.click(screen.getByText('pick-CH'))
+		expect(picker().dataset.value).toBe('CH')
+		expect(input().value).toBe('604')
+	})
+
+	// libphonenumber reads the country back off the area code, which for a shared calling code
+	// answers a different country than the one the viewer just chose
+	it('keeps a picked country the stored number would re-derive away from', async () => {
+		formFields.current = {
+			'phone.country': { value: 'US' },
+			'phone.number': { value: '+12125552368' },
+		}
+		await renderPhone()
+		expect(picker().dataset.value).toBe('US')
+		fireEvent.click(screen.getByText('pick-CA'))
+		expect(writesTo('phone.country')).toEqual(['CA'])
+		expect(picker().dataset.value).toBe('CA')
+	})
+
+	// e164 storage has no country column, so component state is the only place a pick can live
+	it('keeps a picked country under e164 storage, where the number re-derives another', async () => {
+		fieldStub.current = { ...fieldStub.current, value: '+12125552368' }
+		await renderPhone({ phoneOptions: { storage: 'e164' } })
+		expect(picker().dataset.value).toBe('US')
+		fireEvent.click(screen.getByText('pick-CA'))
+		expect(picker().dataset.value).toBe('CA')
+	})
+
+	// A pick answers for one number, it is not a mode the field stays in
+	it('drops a picked country once a committed number names its own', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		fireEvent.click(screen.getByText('pick-CA'))
+		expect(picker().dataset.value).toBe('CA')
+		type('+41 44 668 1800')
+		fireEvent.blur(input())
+		expect(writesTo('phone.country')).toEqual(['CA', 'CH'])
+		expect(picker().dataset.value).toBe('CH')
+	})
+
+	it('lets a typed international draft outrank a picked country', async () => {
+		await renderPhone({ phoneOptions: { defaultCountry: 'DE' } })
+		fireEvent.click(screen.getByText('pick-CA'))
+		type('+41 44 668 1800')
+		expect(picker().dataset.value).toBe('CH')
+	})
+
+	// Switching documents remounts the field, which must read the row rather than the pick
+	it('starts a remounted field from the stored country, not the pick', async () => {
+		const stored = {
+			'phone.country': { value: 'US' },
+			'phone.number': { value: '+12125552368' },
+		}
+		formFields.current = { ...stored }
+		const { unmount } = await renderPhone()
+		fireEvent.click(screen.getByText('pick-CA'))
+		expect(picker().dataset.value).toBe('CA')
+		unmount()
+		formFields.current = { ...stored }
+		await renderPhone()
+		expect(picker().dataset.value).toBe('US')
 	})
 
 	// The pick wins over the calling code already in the draft, which is dropped with it
@@ -633,12 +806,27 @@ describe('PhoneNumberField', () => {
 			phoneOptions: {
 				countries: ['CH', 'DE', 'US'],
 				flags: 'emoji',
-				preferredCountries: ['DE'],
+				priorityCountries: ['DE'],
 			},
 		})
 		expect(picker().dataset.total).toBe('3')
-		expect(picker().dataset.preferred).toBe('DE')
+		expect(picker().dataset.priority).toBe('DE')
 		expect(picker().dataset.flags).toBe('emoji')
+	})
+
+	it('resolves the priority countries label for the active locale before handing it to the picker', async () => {
+		await renderPhone({
+			phoneOptions: {
+				priorityCountries: ['DE'],
+				priorityCountriesLabel: { de: 'Beliebt', en: 'Popular' },
+			},
+		})
+		expect(picker().dataset.priorityLabel).toBe('Popular')
+	})
+
+	it('hands the picker no priority label at all when none is configured', async () => {
+		await renderPhone({ phoneOptions: { priorityCountries: ['DE'] } })
+		expect(picker().dataset.priorityLabel).toBe('')
 	})
 
 	it('renders the full row before the metadata lands and keeps the first keystroke', () => {
@@ -737,6 +925,17 @@ describe('PhoneNumberField', () => {
 		})
 		expect(input().value).toBe('44 668 18 00')
 		expect(prefix()).toBe('+41')
+		rendered.unmount()
+	})
+
+	// Every other committing case flushes the metadata first, so the field's whole degraded
+	// mode went unexercised: with no parser loaded a commit has to store the draft verbatim.
+	it('commits the trimmed draft verbatim while the metadata is still loading', () => {
+		const rendered = render(element({ phoneOptions: { defaultCountry: 'DE' } }))
+		type('  0151 12345678  ')
+		fireEvent.blur(input())
+		expect(writesTo('phone.number')).toEqual(['0151 12345678'])
+		expect(writesTo('phone.country')).toEqual(['DE'])
 		rendered.unmount()
 	})
 

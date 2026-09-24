@@ -45,37 +45,6 @@ export const parsePhone = (input: string, opts: PhoneOptions): null | ParsedPhon
 	}
 }
 
-/** The number without its calling code, so it reads as one phrase beside the prefix. */
-export const nationalPart = (parsed: ParsedPhone): string => {
-	const prefix = `+${parsed.callingCode}`
-	return parsed.international.startsWith(prefix)
-		? parsed.international.slice(prefix.length).trimStart()
-		: parsed.national
-}
-
-/** What the admin row shows for a stored number, split the way the row lays it out. */
-export type PhoneSeed = {
-	callingCode: string
-	country: CountryCode | undefined
-	national: string
-	number: string
-}
-
-/**
- * Derived wherever metadata is already free (the server), so the first client frame can
- * match the frame the engine paints once the lazy metadata import resolves.
- */
-export const phoneSeed = (raw: string, opts: PhoneOptions): null | PhoneSeed => {
-	const parsed = parsePhone(raw, opts)
-	if (!parsed) return null
-	return {
-		callingCode: parsed.callingCode,
-		country: parsed.country,
-		national: nationalPart(parsed),
-		number: raw,
-	}
-}
-
 export const formatPhone = (input: string, format: PhoneFormat, opts: PhoneOptions): string => {
 	const parsed = parsePhone(input, opts)
 	if (!parsed) return input

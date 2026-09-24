@@ -6,14 +6,15 @@ export type {
 } from '../fields/phoneNumber/engine/phone'
 export {
 	type AnyPhoneNumberFieldOptions,
+	countryFlagSrc,
 	FLAGS_PATH,
 	PHONE_CUSTOM_KEY,
-	type PhoneClientOptions,
 	type PhoneFlagMode,
 	type PhoneNumberE164FieldOptions,
 	type PhoneNumberFieldOptions,
 	type PhoneStorageMode,
 	type ResolvablePhoneFieldOptions,
+	type ResolvedPhoneOptions,
 } from '../fields/phoneNumber/options'
 export { phoneNumberField } from '../fields/phoneNumber/phoneNumberField'
 export type { PhoneNumberGlobalConfig } from '../types'

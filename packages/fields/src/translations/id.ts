@@ -50,8 +50,6 @@ export const id: Record<TranslationKey, string> = {
 	[keys.selectCountry]: 'Pilih negara',
 	[keys.searchCountries]: 'Cari negara',
 	[keys.noCountriesFound]: 'Negara tidak ditemukan',
-	[keys.preferredCountries]: 'Sering digunakan',
-	[keys.allCountries]: 'Semua negara',
 	[keys.phoneRequired]: 'Kolom ini wajib diisi.',
 	[keys.invalidPhoneNumber]: 'Masukkan nomor telepon yang valid.',
 	[keys.phoneNotMobile]: 'Masukkan nomor ponsel.',

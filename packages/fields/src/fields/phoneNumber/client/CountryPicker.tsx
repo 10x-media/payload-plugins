@@ -14,18 +14,24 @@ import './phoneNumberField.css'
 
 const baseClass = 'fields-phone'
 
-// Headings and options share one height, so the virtualizer's estimate is exact and the
-// rows it positions can never drift from what the CSS paints.
+// Headings, the divider, and options share one height, so the virtualizer's estimate is
+// exact and the rows it positions can never drift from what the CSS paints.
 const ROW_HEIGHT = 34
 const estimateRow = () => ROW_HEIGHT
 
+// The cap is published from here rather than written into the stylesheet: a fractional one
+// clips the last row against the panel edge, which reads as tighter padding at the bottom.
+const VISIBLE_ROWS = 8
+const LIST_MAX_HEIGHT = ROW_HEIGHT * VISIBLE_ROWS
+
 export type CountryOptionGroups = {
-	preferred: CountryOption[]
+	priority: CountryOption[]
 	rest: CountryOption[]
 }
 
 type PickerRow =
-	| { group: 'all' | 'preferred'; kind: 'group' }
+	| { kind: 'divider' }
+	| { kind: 'heading'; label: string }
 	| { kind: 'option'; option: CountryOption }
 
 const matchesQuery = (option: CountryOption, query: string): boolean => {
@@ -38,17 +44,27 @@ const matchesQuery = (option: CountryOption, query: string): boolean => {
 const filterOptions = (options: CountryOption[], query: string): CountryOption[] =>
 	query === '' ? options : options.filter((option) => matchesQuery(option, query))
 
-const buildRows = (options: CountryOptionGroups, query: string): PickerRow[] => {
-	const preferred = filterOptions(options.preferred, query)
+/**
+ * The priority heading renders only with a caller-given label; the plain divider before
+ * `rest` carries the split otherwise. Neither appears when either group is empty, since
+ * there is then nothing to separate from.
+ */
+const buildRows = (
+	options: CountryOptionGroups,
+	query: string,
+	priorityLabel: string | undefined
+): PickerRow[] => {
+	const priority = filterOptions(options.priority, query)
 	const rest = filterOptions(options.rest, query)
-	// A lone heading over the whole list is noise, so headings appear only where they
-	// actually separate two groups.
-	const grouped = preferred.length > 0 && rest.length > 0
-	const section = (members: CountryOption[], group: 'all' | 'preferred'): PickerRow[] => [
-		...(grouped ? [{ group, kind: 'group' } as const] : []),
-		...members.map((option) => ({ kind: 'option', option }) as const),
+	const split = priority.length > 0 && rest.length > 0
+	return [
+		...(split && priorityLabel !== undefined
+			? [{ kind: 'heading', label: priorityLabel } as const]
+			: []),
+		...priority.map((option) => ({ kind: 'option', option }) as const),
+		...(split ? [{ kind: 'divider' } as const] : []),
+		...rest.map((option) => ({ kind: 'option', option }) as const),
 	]
-	return [...section(preferred, 'preferred'), ...section(rest, 'all')]
 }
 
 type CountryPanelProps = {
@@ -56,21 +72,34 @@ type CountryPanelProps = {
 	flags: PhoneFlagMode
 	onSelect: (code: CountryCode) => void
 	options: CountryOptionGroups
+	priorityLabel?: string
 	value: CountryCode | undefined
 }
 
-const CountryPanel: React.FC<CountryPanelProps> = ({ close, flags, onSelect, options, value }) => {
+const CountryPanel: React.FC<CountryPanelProps> = ({
+	close,
+	flags,
+	onSelect,
+	options,
+	priorityLabel,
+	value,
+}) => {
 	const { t } = useTranslation()
 	const [query, setQuery] = useState('')
 	const listRef = useRef<HTMLDivElement>(null)
 	const searchRef = useRef<HTMLInputElement>(null)
 	const listId = useId()
 
+	// The panel is portalled to the body and absolutely positioned, so a plain focus scrolls
+	// the page to it and drags the row the viewer is reading out from under them.
 	useEffect(() => {
-		searchRef.current?.focus()
+		searchRef.current?.focus({ preventScroll: true })
 	}, [])
 
-	const rows = useMemo(() => buildRows(options, query.trim().toLowerCase()), [options, query])
+	const rows = useMemo(
+		() => buildRows(options, query.trim().toLowerCase(), priorityLabel),
+		[options, priorityLabel, query]
+	)
 	const optionRows = useMemo(
 		() => rows.flatMap((row, index) => (row.kind === 'option' ? [index] : [])),
 		[rows]
@@ -138,7 +167,10 @@ const CountryPanel: React.FC<CountryPanelProps> = ({ close, flags, onSelect, opt
 		: {}
 
 	return (
-		<div className={`${baseClass}__panel`}>
+		// Popup closes itself on any click reaching a button inside it, which unmounts this
+		// panel before React dispatches the row's own onClick and loses the selection
+		// entirely. The rows close through `select` instead, so it opts out.
+		<div className={`${baseClass}__panel`} data-popup-prevent-close>
 			<div className={`${baseClass}__search`}>
 				<span aria-hidden="true" className={`${baseClass}__search-icon`}>
 					<SearchIcon />
@@ -161,7 +193,13 @@ const CountryPanel: React.FC<CountryPanelProps> = ({ close, flags, onSelect, opt
 					value={query}
 				/>
 			</div>
-			<div className={`${baseClass}__list`} id={listId} ref={listRef} {...listA11y}>
+			<div
+				className={`${baseClass}__list`}
+				id={listId}
+				ref={listRef}
+				style={{ maxHeight: LIST_MAX_HEIGHT }}
+				{...listA11y}
+			>
 				{populated ? (
 					<div
 						role="presentation"
@@ -178,16 +216,26 @@ const CountryPanel: React.FC<CountryPanelProps> = ({ close, flags, onSelect, opt
 								transform: `translateY(${item.start}px)`,
 								width: '100%',
 							}
-							if (row.kind === 'group') {
+							if (row.kind === 'heading') {
 								return (
 									<div
 										className={`${baseClass}__group`}
-										key={row.group}
+										key="heading"
 										role="presentation"
 										style={style}
 									>
-										{row.group === 'preferred' ? t(keys.preferredCountries) : t(keys.allCountries)}
+										{row.label}
 									</div>
+								)
+							}
+							if (row.kind === 'divider') {
+								return (
+									<div
+										className={`${baseClass}__group`}
+										key="divider"
+										role="presentation"
+										style={style}
+									/>
 								)
 							}
 							return (
@@ -229,6 +277,7 @@ export type CountryPickerProps = {
 	flags: PhoneFlagMode
 	onSelect: (code: CountryCode) => void
 	options: CountryOptionGroups
+	priorityLabel?: string
 	value: CountryCode | undefined
 }
 
@@ -237,6 +286,7 @@ export const CountryPicker: React.FC<CountryPickerProps> = ({
 	flags,
 	onSelect,
 	options,
+	priorityLabel,
 	value,
 }) => {
 	const { t } = useTranslation()
@@ -245,7 +295,7 @@ export const CountryPicker: React.FC<CountryPickerProps> = ({
 	const [open, setOpen] = useState(false)
 
 	const selected = useMemo(
-		() => [...options.preferred, ...options.rest].find((option) => option.code === value),
+		() => [...options.priority, ...options.rest].find((option) => option.code === value),
 		[options, value]
 	)
 	const label =
@@ -266,7 +316,8 @@ export const CountryPicker: React.FC<CountryPickerProps> = ({
 					{renderFace()}
 					<span className={`${baseClass}__sr-only`}>{label}</span>
 					<span aria-hidden="true" className={`${baseClass}__caret`}>
-						<ChevronIcon />
+						{/* Unsized, the icon is --base tall and overflows its 12px box downwards */}
+						<ChevronIcon size="small" />
 					</span>
 				</>
 			}
@@ -285,6 +336,7 @@ export const CountryPicker: React.FC<CountryPickerProps> = ({
 						flags={flags}
 						onSelect={onSelect}
 						options={options}
+						priorityLabel={priorityLabel}
 						value={value}
 					/>
 				) : null

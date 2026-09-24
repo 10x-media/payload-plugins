@@ -257,13 +257,16 @@ export type PhoneNumberGlobalConfig = {
 	/** Default for every phoneNumberField(); a field's own option always wins. */
 	defaultCountry?: CountryCode
 	countries?: readonly CountryCode[]
-	preferredCountries?: readonly CountryCode[]
+	priorityCountries?: readonly CountryCode[]
+	/** Heading over `priorityCountries` in the picker. No label renders no heading, only the group separator. */
+	priorityCountriesLabel?: StaticLabel
 	validation?: PhoneValidationMode
 	flags?: PhoneFlagMode
 	cellFormat?: PhoneFormat
 	/**
-	 * Install-wide, with no per-field form: the parser is a process-wide singleton, so two
-	 * sets would mean two copies and two verdicts on the same number.
+	 * Install-wide, with no per-field form. A cost decision, not a technical one: a second
+	 * set is another 80-145 kB loaded for marginal gain, and two fields on one document
+	 * could then reach different verdicts about the same number.
 	 */
 	metadata?: MetadataSet
 	/** Mount the flag SVG route. Defaults to true. */

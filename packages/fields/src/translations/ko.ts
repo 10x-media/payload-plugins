@@ -51,8 +51,6 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.selectCountry]: '국가 선택',
 	[keys.searchCountries]: '국가 검색',
 	[keys.noCountriesFound]: '국가를 찾을 수 없습니다',
-	[keys.preferredCountries]: '자주 사용',
-	[keys.allCountries]: '모든 국가',
 	[keys.phoneRequired]: '필수 항목입니다.',
 	[keys.invalidPhoneNumber]: '올바른 전화번호를 입력하세요.',
 	[keys.phoneNotMobile]: '휴대전화 번호를 입력하세요.',
