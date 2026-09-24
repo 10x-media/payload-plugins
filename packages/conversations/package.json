@@ -44,6 +44,11 @@
 			"development": "./src/exports/i18n.ts",
 			"types": "./src/exports/i18n.ts",
 			"default": "./dist/exports/i18n.js"
+		},
+		"./react": {
+			"development": "./src/exports/react.ts",
+			"types": "./src/exports/react.ts",
+			"default": "./dist/exports/react.js"
 		}
 	},
 	"files": [
@@ -127,6 +132,11 @@
 				"types": "./dist/exports/i18n.d.ts",
 				"import": "./dist/exports/i18n.js",
 				"default": "./dist/exports/i18n.js"
+			},
+			"./react": {
+				"types": "./dist/exports/react.d.ts",
+				"import": "./dist/exports/react.js",
+				"default": "./dist/exports/react.js"
 			}
 		}
 	}

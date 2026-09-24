@@ -1,6 +1,7 @@
 import type { PayloadRequest, Where } from 'payload'
 
 import { isRemoved } from '../collections/messages'
+import type { WireMessage } from '../shared/wire'
 import type { ConversationMessage, ConversationsInstance } from '../types'
 
 /** A keyset position: a message's `createdAt` and `id`, ties broken by id. */
@@ -21,9 +22,6 @@ export type FeedQuery = {
 	window: FeedWindow
 }
 
-/** A message as sent to clients: `removed` tells a client to drop it from its window. */
-export type WireMessage = ConversationMessage & { removed?: boolean }
-
 export type FeedResult = {
 	hasNewer: boolean
 	hasOlder: boolean
@@ -32,9 +30,6 @@ export type FeedResult = {
 
 export const MAX_LIMIT = 100
 export const CHANGES_LIMIT = 200
-
-export const formatCursor = (message: Pick<ConversationMessage, 'createdAt' | 'id'>): string =>
-	`${new Date(message.createdAt).toISOString()},${String(message.id)}`
 
 export const parseCursor = (value: unknown): FeedCursor | null => {
 	if (typeof value !== 'string') {

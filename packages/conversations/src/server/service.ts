@@ -1,17 +1,20 @@
 import { APIError, type PayloadRequest, type Where } from 'payload'
 
+import { isRemoved } from '../collections/messages'
 import { AUTHOR_CONTEXT, TEXT_TYPE } from '../shared/constants'
 import { userKey as formatUserKey, type ParsedKey, parseKey } from '../shared/keys'
 import type {
-	AuthorProjection,
-	AuthorsMap,
-	ConversationMessage,
-	ConversationsInstance,
-} from '../types'
+	ChannelAccess,
+	ListResponse,
+	MentionCandidate,
+	SubscribeResponse,
+	WireMessage,
+} from '../shared/wire'
+import type { AuthorsMap, ConversationMessage, ConversationsInstance } from '../types'
 import { filterReaders } from './audience'
 import { projectAuthors } from './authors'
 import { isLexicalBody, textToBody } from './body'
-import { changedKeys, type FeedWindow, loadFeed, type WireMessage } from './feed'
+import { changedKeys, type FeedWindow, loadFeed } from './feed'
 import { conversationCursors, raiseCursor, threadCursors, unreadCounts } from './reads'
 import { signToken, TOKEN_TTL_MS, verifyToken } from './tokens'
 
@@ -26,8 +29,6 @@ export const viewerKey = (req: PayloadRequest): string => {
 	}
 	return formatUserKey(req.user.collection, req.user.id)
 }
-
-export type ChannelAccess = { canCreate: boolean; slug: string }
 
 export type KeyAccess = { channels: ChannelAccess[]; key: string; target: ParsedKey }
 
@@ -74,19 +75,12 @@ const accessFor = async (
 	return access ?? fail('Not found', 404)
 }
 
-export type SubscribeEntry = {
-	channels: ChannelAccess[]
-	key: string
-	token: string
-	unread?: Record<string, number>
-}
-
 /** Batch access for mounted conversations: channels, unread counts, poll tokens. */
 export const subscribe = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
 	keys: string[]
-): Promise<{ entries: SubscribeEntry[]; now: string; reads: boolean }> => {
+): Promise<SubscribeResponse> => {
 	const viewer = viewerKey(req)
 	const access = await resolveAccess(req, instance, keys.slice(0, 200))
 	const list = [...access.values()]
@@ -117,20 +111,18 @@ export const subscribe = async (
 			}),
 			...(counts ? { unread: counts[entry.key] } : {}),
 		})),
+		channels: Object.fromEntries(
+			[...instance.channels.values()].map((channel) => [
+				channel.slug,
+				{ label: channel.label, ...(channel.cue ? { cue: channel.cue } : {}) },
+			])
+		),
+		deleted: instance.deleted,
+		extensions: [...instance.extensions.keys()],
 		now: new Date().toISOString(),
 		reads: instance.readsSlug !== null,
+		viewer,
 	}
-}
-
-export type ListResult = {
-	authors: AuthorsMap
-	/** The viewer's cursor before this load, for the "New messages" divider. */
-	cursor?: null | string
-	hasNewer: boolean
-	hasOlder: boolean
-	messages: WireMessage[]
-	/** The viewer's thread cursors for the roots in this page. */
-	threadReads?: Record<string, string>
 }
 
 export type ListParams = {
@@ -147,7 +139,7 @@ export const listMessages = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
 	params: ListParams
-): Promise<ListResult> => {
+): Promise<ListResponse> => {
 	const viewer = viewerKey(req)
 	const access = await accessFor(req, instance, params.key)
 	const readable = new Set(access.channels.map((channel) => channel.slug))
@@ -374,7 +366,7 @@ export const deleteMessage = async (
 		id: existing.id,
 		req,
 	})) as unknown as ConversationMessage
-	return { message }
+	return { message: isRemoved(instance, message) ? { ...message, removed: true } : message }
 }
 
 /** Raise the viewer's cursor for a conversation or one thread of it. */
@@ -438,8 +430,6 @@ export const poll = async (
 	})
 	return { changed, expired, now: now.toISOString() }
 }
-
-export type MentionCandidate = AuthorProjection & { userKey: string }
 
 /** Mention candidates across the users collections, minus anyone who cannot read the channel. */
 export const searchMentions = async (
