@@ -1,5 +1,6 @@
 'use client'
 
+import { ConfirmationModal, useModal } from '@payloadcms/ui'
 import { type ReactNode, useState } from 'react'
 
 import { useMessageActions } from '../react/hooks'
@@ -58,6 +59,8 @@ export const ChatMessage = ({
 	const { edit, remove } = useMessageActions()
 	const renderConfiguredType = useTypeRenderer(instance)
 	const [editing, setEditing] = useState(false)
+	const { openModal } = useModal()
+	const deleteSlug = `conversations-delete-${instance}-${String(message.id)}`
 	const author = authors[message.authorKey]
 	const own = viewer !== null && message.authorKey === viewer
 	const deleted = Boolean(message.deletedAt)
@@ -192,9 +195,7 @@ export const ChatMessage = ({
 					{own ? (
 						<button
 							className="conversations-icon-button"
-							onClick={() => {
-								if (window.confirm(t(keys.deleteConfirm))) void remove(message)
-							}}
+							onClick={() => openModal(deleteSlug)}
 							title={t(keys.delete)}
 							type="button"
 						>
@@ -211,6 +212,17 @@ export const ChatMessage = ({
 					/>
 				</div>
 			)}
+			{own && !deleted ? (
+				<ConfirmationModal
+					body={t(keys.deleteConfirm)}
+					confirmLabel={t(keys.delete)}
+					heading={t(keys.deleteHeading)}
+					modalSlug={deleteSlug}
+					onConfirm={async () => {
+						await remove(message)
+					}}
+				/>
+			) : null}
 		</div>
 	)
 }

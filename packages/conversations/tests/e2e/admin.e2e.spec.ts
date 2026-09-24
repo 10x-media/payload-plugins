@@ -118,9 +118,9 @@ test.describe('comments drawer', () => {
 		const edited = page.locator('.conversations-message', { hasText: `${text} (edited)` }).last()
 		await expect(edited.locator('.conversations-message__edited')).toBeVisible()
 
-		page.once('dialog', (dialog) => void dialog.accept())
 		await edited.hover()
 		await edited.locator('button', { hasText: 'Delete' }).click()
+		await page.locator('.confirmation-modal').getByRole('button', { name: 'Delete' }).click()
 		await expect(
 			page.locator('.conversations-message', { hasText: `${text} (edited)` })
 		).toHaveCount(0)

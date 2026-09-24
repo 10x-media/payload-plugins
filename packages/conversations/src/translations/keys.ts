@@ -14,6 +14,7 @@ export const keys = {
 	couldNotSend: 'conversations:couldNotSend',
 	delete: 'conversations:delete',
 	deleteConfirm: 'conversations:deleteConfirm',
+	deleteHeading: 'conversations:deleteHeading',
 	edit: 'conversations:edit',
 	edited: 'conversations:edited',
 	emptyChannel: 'conversations:emptyChannel',
