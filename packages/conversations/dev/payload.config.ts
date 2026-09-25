@@ -86,6 +86,7 @@ export default buildConfig({
 				{
 					slug: 'internal',
 					label: 'Internal',
+					cue: { label: 'Internal · staff only', tone: 'neutral' },
 					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
 				},
 				{
@@ -124,6 +125,17 @@ export default buildConfig({
 	typescript: { autoGenerate },
 	admin: {
 		user: 'users',
+		components: {
+			afterNavLinks: ['/playground/PlaygroundNavLink#PlaygroundNavLink'],
+			views: {
+				playground: {
+					Component: '/playground/PlaygroundView#PlaygroundView',
+					exact: true,
+					meta: { title: 'UI playground' },
+					path: '/playground',
+				},
+			},
+		},
 		importMap: {
 			autoGenerate,
 			baseDir: path.resolve(dirname),

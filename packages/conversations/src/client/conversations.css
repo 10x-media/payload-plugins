@@ -390,6 +390,7 @@
 	background: var(--theme-elevation-100);
 	color: var(--theme-text);
 	font-size: 1rem;
+	white-space: nowrap;
 	cursor: pointer;
 }
 
@@ -427,39 +428,60 @@
 	border-top: 1px solid var(--theme-elevation-100);
 }
 
-.conversations-composer__editor {
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m, 4px);
-	background: var(--theme-input-bg, var(--theme-elevation-0));
-}
-
 .conversations-composer__banner {
 	display: flex;
 	align-items: center;
-	justify-content: space-between;
-	gap: 0.923rem;
-	padding: 0.492rem 0.923rem;
-	border-radius: var(--style-radius-s, 4px);
+	gap: 0.615rem;
+	padding: 0.615rem 0.923rem;
+	border-radius: var(--style-radius-m, 4px);
 	background: var(--theme-elevation-100);
 	color: var(--theme-elevation-700);
 	font-size: 1rem;
 }
 
 .conversations-composer__banner--warning {
-	background: color-mix(in srgb, var(--theme-warning-500, #f5a623) 18%, transparent);
-	color: var(--theme-warning-500, #f5a623);
+	background: color-mix(in srgb, var(--theme-warning-500, #f5a623) 16%, transparent);
+	color: var(--theme-warning-600, var(--theme-warning-500, #f5a623));
 }
 
 .conversations-composer__banner--error {
-	background: color-mix(in srgb, var(--theme-error-500, #e5484d) 20%, transparent);
+	justify-content: space-between;
+	background: color-mix(in srgb, var(--theme-error-500, #e5484d) 18%, transparent);
 	color: var(--theme-error-500, #e5484d);
 }
 
-.conversations-composer--warning .conversations-composer__editor {
-	border-color: color-mix(in srgb, var(--theme-warning-500, #f5a623) 60%, transparent);
+.conversations-composer__cue-icon {
+	display: inline-flex;
+	flex: none;
+	opacity: 0.85;
 }
 
-.conversations-composer--failed .conversations-composer__editor {
+.conversations-composer__cue-label {
+	flex: 1;
+	min-width: 0;
+}
+
+.conversations-composer__cue-action {
+	flex: none;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.conversations-composer__cue-action:hover {
+	color: var(--theme-text);
+}
+
+.conversations-composer--warning .conversations-editor {
+	border-color: color-mix(in srgb, var(--theme-warning-500, #f5a623) 55%, transparent);
+}
+
+.conversations-composer--failed .conversations-editor {
 	border-color: color-mix(in srgb, var(--theme-error-500, #e5484d) 60%, transparent);
 }
 
@@ -471,59 +493,15 @@
 	font-size: 1rem;
 }
 
-.conversations-composer__loading {
-	height: 6.769rem;
-	border: 1px solid var(--theme-elevation-100);
-	border-radius: var(--style-radius-m, 4px);
-}
-
-.conversations-composer__actions {
-	display: flex;
-	align-items: center;
-	justify-content: flex-end;
-	gap: 0.769rem;
-}
-
 .conversations-composer__hint {
-	margin-right: auto;
 	color: var(--theme-elevation-500);
 	font-size: 0.923rem;
+	white-space: nowrap;
 }
 
-/* Payload's rich text field, compacted into a chat composer. */
-.conversations-composer .field-type.rich-text-lexical {
-	margin: 0;
-}
-
-.conversations-composer .rich-text-lexical .editor-container {
-	margin: 0;
-}
-
-.conversations-composer .rich-text-lexical .editor-scroller {
-	min-height: 3.385rem;
-	max-height: 14.769rem;
-	overflow-y: auto;
-}
-
-.conversations-composer [contenteditable="true"] {
-	min-height: 3.385rem;
-	padding: 0.769rem 0.923rem;
-	font-family: var(--font-body);
-	font-size: 1.077rem;
-	line-height: 1.5;
-}
-
-.conversations-composer .LexicalEditorTheme__placeholder {
-	top: 0.769rem;
-	left: 0.923rem;
-	font-family: var(--font-body);
-	font-size: 1.077rem;
-	line-height: 1.5;
-}
-
-.conversations-composer .rich-text-lexical .fixed-toolbar {
-	margin: 0;
-	border: 0;
-	border-bottom: 1px solid var(--theme-elevation-100);
-	border-radius: var(--style-radius-m, 4px) var(--style-radius-m, 4px) 0 0;
+/* A narrow composer drops the hint before the buttons would wrap. */
+@container (max-width: 26rem) {
+	.conversations-composer__hint {
+		display: none;
+	}
 }

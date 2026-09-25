@@ -14,10 +14,55 @@ The package ships pieces, not a page. The admin drawer that `comments()` mounts 
 | `ChatChannelTabs` | Tabs with unread counts; hidden with one channel | |
 | `ChatFeed` | Scroll window: load earlier, keeps its place, "New messages" divider, "N new" pill, day separators, grouping | `renderMessage`, `items`, `empty`, `renderType` |
 | `ChatMessage` | Avatar, name, time, body, edited mark, thread summary, deleted placeholder, inline edit | `header`, `actions`, `footer` |
-| `ChatComposer` | Payload's own rich text field in a plugin form, channel cue, send-failed with Retry | `above`, `actions`, `submitOn` |
+| `ChatComposer` | The plugin's own Lexical editor under a channel cue, Send in the same box, send-failed with Retry | `above`, `actions`, `cueAction`, `features`, `submitOn`, `toolbar` |
 | `ChatThread` | Root, replies, reply composer | |
 
-The composer is Payload's rich text field, with the instance's editor, loaded through `getFormState`. Toolbar, links and lists behave as in any document. Enter sends and Shift+Enter breaks the line. In a list, Enter adds an item. `submitOn: 'mod+enter'` makes only Ctrl/Cmd+Enter send.
+The composer is the plugin's own Lexical editor, built on the Lexical that Payload re-exports, so a project never has two copies. It writes the same JSON the server validates against the instance editor.
+
+- Enter sends and Shift+Enter breaks the line. In a list, Enter adds an item. `submitOn: 'mod+enter'` makes only Ctrl/Cmd+Enter send.
+- `/` opens the commands of every feature (lists, link, mention), `@` mentions a user who can read the channel. Markdown shortcuts work: `**bold**`, `*italic*`, `- ` and `1. ` for lists, `[text](url)`.
+- Links are external only (http, https, mailto). Ctrl/Cmd+K, the toolbar or `/link` open a small field at the selection; pasting a URL over selected text links it, and typed URLs link themselves.
+- `toolbar` places the formatting buttons: `bottom` (default), `top`, or `none`, which leaves `/` and markdown. `{ placement: 'bottom', items: ['bold', 'italic', 'insert'] }` keeps and orders group or item keys: a group key keeps the whole group, an item key keeps that button. Buttons that do not fit the row move into a "⋯" menu at its end, so the send button always stays in place.
+- `features: ({ defaultFeatures }) => [...]` changes what the editor offers. Its nodes must also be registered in the instance's server editor (`editor` option), or the server rejects the message. Features that live in Payload's own editor UI, such as blocks or upload drawers, are not available in the composer.
+
+### Composer features
+
+A feature is shaped like a Payload editor feature: toolbar groups and `/` menu groups, merged across features by `key` and sorted by `order`. Built-in groups are `format` (bold, italic), `insert` (link, mention) and, with `listsFeature({ toolbar: true })`, `lists`.
+
+```tsx
+'use client'
+import { defineComposerFeature } from '@10x-media/conversations/client'
+
+export const textColorFeature = () =>
+  defineComposerFeature({
+    key: 'textColor',
+    toolbar: {
+      groups: [
+        {
+          type: 'dropdown', // or 'buttons'
+          key: 'color',
+          order: 15,
+          ChildComponent: PaletteIcon,
+          items: [
+            // `Component` replaces the default button; it gets `editor`, `active`, `enabled`, `close`
+            { key: 'palette', label: 'Text color', Component: Palette, isActive: ({ selection }) => hasColor(selection) },
+          ],
+        },
+      ],
+    },
+    slashMenu: {
+      groups: [
+        {
+          key: 'color',
+          label: 'Color',
+          items: [{ key: 'red', label: 'Red text', Icon: RedSwatch, keywords: ['color'], onSelect: ({ editor }) => setColor(editor, 'red') }],
+        },
+      ],
+    },
+  })
+```
+
+Items take `label` as a string or `({ labels, t }) => string`, where `t` is Payload's translation function in the admin. `isActive` and `isEnabled` run inside `editorState.read()` with `{ editor, selection }`; `onSelect` gets `{ editor, isActive }` in the toolbar and `{ editor, queryString }` in the `/` menu. A feature can also bring `nodes`, `markdown` transformers and a `Plugin` rendered inside the editor. Ctrl/Cmd+K and the link button dispatch `OPEN_LINK_EDITOR_COMMAND`, which a feature can dispatch too.
 
 A custom view (a ticket inbox, a room) combines them under the admin provider the plugin registers:
 

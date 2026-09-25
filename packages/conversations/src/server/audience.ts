@@ -1,4 +1,4 @@
-import { createLocalReq, type PayloadRequest, type TypedUser } from 'payload'
+import { type CollectionSlug, createLocalReq, type PayloadRequest, type TypedUser } from 'payload'
 
 import { parseKey, parseUserKey, userKey } from '../shared/keys'
 import type { ConversationsInstance } from '../types'
@@ -23,7 +23,7 @@ export const loadUsers = async (
 	await Promise.all(
 		[...byCollection].map(async ([collection, ids]) => {
 			const result = await req.payload.find({
-				collection,
+				collection: collection as CollectionSlug,
 				depth: 0,
 				limit: ids.size,
 				overrideAccess: true,
@@ -31,7 +31,7 @@ export const loadUsers = async (
 				req,
 				where: { id: { in: [...ids] } },
 			})
-			for (const doc of result.docs as Array<Record<string, unknown>>) {
+			for (const doc of result.docs as unknown as Array<Record<string, unknown>>) {
 				found.set(userKey(collection, doc.id as string), { ...doc, collection })
 			}
 		})

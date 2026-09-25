@@ -1,6 +1,7 @@
 import type { LexicalEditorProps } from '@payloadcms/richtext-lexical'
 import type {
 	CollectionConfig,
+	CollectionSlug,
 	Config,
 	Field,
 	PayloadComponent,
@@ -242,9 +243,10 @@ export type ConversationsInstance = {
 		max: number
 		users?: NonNullable<ConversationsPluginOptions['mentions']>['users']
 	}
-	messagesSlug: string
+	/** Registered by the plugin, so typed as one of the host's collection slugs. */
+	messagesSlug: CollectionSlug
 	overrides: NonNullable<ConversationsPluginOptions['overrides']>
-	readsSlug: null | string
+	readsSlug: CollectionSlug | null
 	slots: ChatSlotConfig
 	slug: string
 	targets: Required<{ [K in keyof ConversationsTargets]: Record<string, string[]> }>

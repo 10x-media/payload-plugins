@@ -1,4 +1,4 @@
-import { APIError, type PayloadRequest, type Where } from 'payload'
+import { APIError, type CollectionSlug, type PayloadRequest, type Where } from 'payload'
 
 import { isRemoved } from '../collections/messages'
 import { AUTHOR_CONTEXT, TEXT_TYPE } from '../shared/constants'
@@ -352,10 +352,12 @@ export const editMessage = async (
 	if (existing.type !== TEXT_TYPE) {
 		return fail('Only text messages can be edited', 400)
 	}
+	// Typed loosely: the body's shape is the host editor's, not the generated type's.
+	const data: Record<string, unknown> = { body: toBody(input), editedAt: new Date().toISOString() }
 	const message = (await req.payload.update({
 		collection: instance.messagesSlug,
 		...writeOptions,
-		data: { body: toBody(input), editedAt: new Date().toISOString() },
+		data,
 		id: existing.id,
 		req,
 	})) as unknown as ConversationMessage
@@ -487,7 +489,7 @@ export const searchMentions = async (
 				where.push({ [users.searchField]: { like: q } })
 			}
 			const result = await req.payload.find({
-				collection: users.collection,
+				collection: users.collection as CollectionSlug,
 				depth: 0,
 				limit: perCollection,
 				overrideAccess: true,
@@ -495,7 +497,7 @@ export const searchMentions = async (
 				req,
 				where: where.length > 0 ? { and: where } : {},
 			})
-			return (result.docs as Array<Record<string, unknown>>).map((doc) => ({
+			return (result.docs as unknown as Array<Record<string, unknown>>).map((doc) => ({
 				doc,
 				userKey: formatUserKey(users.collection, doc.id as string),
 				users,

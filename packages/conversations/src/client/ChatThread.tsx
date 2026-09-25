@@ -60,7 +60,6 @@ export const ChatThread = ({
 				instance={instance}
 				parent={String(root.id)}
 				placeholder={t(keys.replyInThread)}
-				submitLabel={t(keys.reply)}
 			/>
 		</div>
 	)

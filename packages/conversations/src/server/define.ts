@@ -1,4 +1,4 @@
-import type { PayloadRequest } from 'payload'
+import type { CollectionSlug, GlobalSlug, PayloadRequest } from 'payload'
 
 import type {
 	ConversationsAccess,
@@ -48,7 +48,7 @@ export const perTarget =
 			await Promise.all([
 				...[...byCollection].map(async ([collection, list]) => {
 					const result = await req.payload.find({
-						collection,
+						collection: collection as CollectionSlug,
 						depth: 0,
 						limit: list.length,
 						overrideAccess: true,
@@ -57,7 +57,10 @@ export const perTarget =
 						where: { id: { in: list.map((target) => target.id) } },
 					})
 					const byId = new Map(
-						(result.docs as Array<Record<string, unknown>>).map((doc) => [String(doc.id), doc])
+						(result.docs as unknown as Array<Record<string, unknown>>).map((doc) => [
+							String(doc.id),
+							doc,
+						])
 					)
 					for (const target of list) {
 						docs.set(target.key, byId.get(String(target.id)) ?? null)
@@ -70,7 +73,7 @@ export const perTarget =
 							depth: 0,
 							overrideAccess: true,
 							req,
-							slug: target.slug,
+							slug: target.slug as GlobalSlug,
 						})
 						docs.set(target.key, doc as Record<string, unknown>)
 					}),

@@ -1,4 +1,4 @@
-import type { PayloadRequest, Where } from 'payload'
+import type { CollectionSlug, PayloadRequest, Where } from 'payload'
 
 import type { ConversationsInstance } from '../types'
 
@@ -15,7 +15,7 @@ export const UNREAD_CAP = 100
 
 const findCursor = async (
 	req: PayloadRequest,
-	collection: string,
+	collection: CollectionSlug,
 	where: Where
 ): Promise<ReadRow | null> =>
 	(await req.payload.db.findOne({ collection, where })) as ReadRow | null

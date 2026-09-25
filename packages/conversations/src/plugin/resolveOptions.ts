@@ -1,4 +1,4 @@
-import type { Config, PayloadRequest } from 'payload'
+import type { CollectionSlug, Config, PayloadRequest } from 'payload'
 
 import { parseKey } from '../shared/keys'
 import type {
@@ -209,9 +209,9 @@ export const resolveInstance = (
 		hooks: options.hooks ?? {},
 		limits: { bodyLength: options.limits?.bodyLength ?? 10_000 },
 		mentions: { max: options.mentions?.max ?? 20, users: options.mentions?.users },
-		messagesSlug: `${slug}-messages`,
+		messagesSlug: `${slug}-messages` as CollectionSlug,
 		overrides: options.overrides ?? {},
-		readsSlug: options.reads === false ? null : `${slug}-reads`,
+		readsSlug: options.reads === false ? null : (`${slug}-reads` as CollectionSlug),
 		slots: options.slots ?? {},
 		slug,
 		targets,

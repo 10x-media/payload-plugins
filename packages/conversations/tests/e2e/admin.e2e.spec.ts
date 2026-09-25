@@ -57,16 +57,16 @@ test.describe('comments drawer', () => {
 		await expect(composer(page)).toHaveText('')
 	})
 
-	test('channel tabs switch feeds and show the channel cue', async ({ page }) => {
+	test('the cue names the channel and switches to the other one', async ({ page }) => {
 		await login(page, ME)
 		await openDrawer(page)
-		// Internal sets no cue, so nothing sits above its composer.
-		await expect(
-			page.locator(
-				'.conversations-drawer > .conversations-composer .conversations-composer__banner'
-			)
-		).toHaveCount(0)
-		await page.click('.conversations-tabs__tab >> text=Shared')
+		// Each channel's cue sits above the composer; with two channels it offers the other.
+		const cue = page.locator(
+			'.conversations-drawer > .conversations-composer .conversations-composer__banner'
+		)
+		await expect(cue).toContainText('staff only')
+		await cue.getByRole('button', { name: 'Switch to Shared' }).click()
+		await expect(page.locator('.conversations-tabs__tab--active')).toContainText('Shared')
 		await expect(page.locator('.conversations-composer__banner--warning')).toContainText(
 			'visible to the customer'
 		)
@@ -90,7 +90,7 @@ test.describe('comments drawer', () => {
 		await expect(page.locator('.conversations-drawer__title', { hasText: 'Thread' })).toBeVisible()
 		await composer(page).click()
 		await page.keyboard.type('ping @Ann')
-		await page.locator('.conversations-mention-menu__item', { hasText: 'Anna Keller' }).waitFor()
+		await page.locator('.conversations-menu__item', { hasText: 'Anna Keller' }).waitFor()
 		await page.keyboard.press('Enter')
 		const tail = ` ${Date.now()}`
 		await page.keyboard.type(tail)

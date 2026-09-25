@@ -1,0 +1,319 @@
+/* The composer: one box holding the text, the toolbar and the send row. */
+.conversations-editor {
+	container-type: inline-size;
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-m, 4px);
+	background: var(--theme-input-bg, var(--theme-elevation-0));
+	transition: border-color 0.15s ease;
+}
+
+.conversations-editor:hover {
+	border-color: var(--theme-elevation-250, var(--theme-elevation-200));
+}
+
+.conversations-editor:focus-within {
+	border-color: var(--theme-elevation-400);
+}
+
+.conversations-editor__input {
+	position: relative;
+	padding: 0.846rem 1.077rem 0.308rem;
+	cursor: text;
+}
+
+.conversations-editor__content {
+	min-height: 3rem;
+	max-height: 14.769rem;
+	overflow-y: auto;
+	outline: none;
+	color: var(--theme-text);
+	font-family: var(--font-body);
+	font-size: 1.077rem;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+.conversations-editor__placeholder {
+	position: absolute;
+	top: 0.846rem;
+	left: 1.077rem;
+	right: 1.077rem;
+	overflow: hidden;
+	color: var(--theme-elevation-450, var(--theme-elevation-500));
+	font-family: var(--font-body);
+	font-size: 1.077rem;
+	line-height: 1.5;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	pointer-events: none;
+	user-select: none;
+}
+
+.conversations-editor__paragraph {
+	margin: 0;
+}
+
+.conversations-editor__ul,
+.conversations-editor__ol {
+	margin: 0.25em 0;
+	padding-left: 1.5em;
+}
+
+.conversations-editor__listitem {
+	margin: 0;
+}
+
+.conversations-editor__listitem--nested {
+	list-style: none;
+}
+
+.conversations-editor__bold {
+	font-weight: 600;
+}
+
+.conversations-editor__italic {
+	font-style: italic;
+}
+
+.conversations-editor__link {
+	color: inherit;
+	text-decoration: underline;
+	text-decoration-color: var(--theme-elevation-400);
+	text-underline-offset: 2px;
+}
+
+.conversations-editor__footer {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 0.769rem;
+	min-height: 2.769rem;
+	padding: 0.308rem 0.615rem 0.615rem 0.615rem;
+	cursor: text;
+}
+
+.conversations-editor__toolbar {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	overflow: hidden;
+	cursor: default;
+}
+
+/* In the bottom row the toolbar takes what the send buttons leave; the rest goes to "More". */
+.conversations-editor__footer > .conversations-editor__toolbar {
+	flex: 1 1 0;
+}
+
+/* Spacing lives inside each unit, so measured widths add up to the row. */
+.conversations-editor__unit {
+	display: flex;
+	flex: none;
+	align-items: center;
+	padding-right: 0.154rem;
+}
+
+.conversations-editor--toolbar-top > .conversations-editor__toolbar {
+	padding: 0.308rem 0.615rem;
+	border-bottom: 1px solid var(--theme-elevation-100);
+}
+
+.conversations-editor__tool {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 2.154rem;
+	height: 2.154rem;
+	padding: 0;
+	border: 0;
+	border-radius: var(--style-radius-s, 3px);
+	background: transparent;
+	color: var(--theme-elevation-600);
+	cursor: pointer;
+}
+
+.conversations-editor__tool:hover {
+	background: var(--theme-elevation-100);
+	color: var(--theme-text);
+}
+
+.conversations-editor__tool--active {
+	background: var(--theme-elevation-150);
+	color: var(--theme-text);
+}
+
+/* Groups sit apart; a hairline only when the toolbar has its own row. */
+.conversations-editor__divider {
+	width: 0.308rem;
+}
+
+.conversations-editor--toolbar-top .conversations-editor__divider {
+	width: 1px;
+	height: 1.231rem;
+	margin: 0 0.308rem;
+	background: var(--theme-elevation-150);
+}
+
+.conversations-editor__tool--dropdown {
+	gap: 0.154rem;
+	width: auto;
+	padding: 0 0.385rem;
+}
+
+.conversations-editor__tool:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.conversations-editor__end {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 0.769rem;
+	margin-left: auto;
+	cursor: default;
+}
+
+/* `/` and `@` menus and the link field float above drawers and modals. */
+.conversations-menu,
+.conversations-link-editor {
+	z-index: 10000;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-m, 4px);
+	background: var(--theme-input-bg, var(--theme-elevation-0));
+	box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
+	font-family: var(--font-body);
+}
+
+.conversations-menu {
+	display: flex;
+	flex-direction: column;
+	min-width: 15.385rem;
+	max-width: 23rem;
+	max-height: 20rem;
+	padding: 0.308rem;
+	overflow-y: auto;
+}
+
+.conversations-menu__item {
+	display: flex;
+	align-items: center;
+	gap: 0.615rem;
+	width: 100%;
+	padding: 0.462rem 0.615rem;
+	border: 0;
+	border-radius: var(--style-radius-s, 3px);
+	background: transparent;
+	color: var(--theme-text);
+	cursor: pointer;
+	font: inherit;
+	font-size: 1rem;
+	text-align: left;
+}
+
+.conversations-menu__item--selected {
+	background: var(--theme-elevation-100);
+}
+
+.conversations-menu__icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.538rem;
+	height: 1.538rem;
+	border-radius: var(--style-radius-s, 3px);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-700);
+}
+
+.conversations-menu__label {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.conversations-menu__group {
+	padding: 0.462rem 0.615rem 0.231rem;
+	color: var(--theme-elevation-500);
+	font-size: 0.846rem;
+	font-weight: 600;
+	letter-spacing: 0.02em;
+	text-transform: uppercase;
+}
+
+.conversations-menu__group:not(:first-child) {
+	margin-top: 0.231rem;
+	border-top: 1px solid var(--theme-elevation-100);
+}
+
+.conversations-menu__item:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.conversations-menu__empty {
+	padding: 0.462rem 0.615rem;
+	color: var(--theme-elevation-500);
+	font-size: 1rem;
+}
+
+.conversations-link-editor {
+	padding: 0.308rem;
+}
+
+.conversations-link-editor__row {
+	display: flex;
+	align-items: center;
+	gap: 0.231rem;
+}
+
+.conversations-link-editor__input {
+	width: 18rem;
+	max-width: 60vw;
+	padding: 0.385rem 0.462rem;
+	border: 0;
+	background: transparent;
+	color: var(--theme-text);
+	font: inherit;
+	font-size: 1rem;
+	outline: none;
+}
+
+.conversations-link-editor__input[aria-invalid="true"] {
+	color: var(--theme-error-500, #e5484d);
+}
+
+.conversations-link-editor__url {
+	max-width: 16rem;
+	padding: 0.385rem 0.462rem;
+	overflow: hidden;
+	color: var(--theme-text);
+	font-size: 1rem;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.conversations-link-editor__button {
+	padding: 0.385rem 0.615rem;
+	border: 0;
+	border-radius: var(--style-radius-s, 3px);
+	background: transparent;
+	color: var(--theme-elevation-700);
+	cursor: pointer;
+	font: inherit;
+	font-size: 1rem;
+	white-space: nowrap;
+}
+
+.conversations-link-editor__button:hover {
+	background: var(--theme-elevation-100);
+	color: var(--theme-text);
+}
+
+.conversations-link-editor__error {
+	padding: 0.154rem 0.462rem 0.308rem;
+	color: var(--theme-error-500, #e5484d);
+	font-size: 0.923rem;
+}

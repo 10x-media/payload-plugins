@@ -82,6 +82,8 @@ const DrawerBody = ({
 
 	const label = current ? resolveLabel(current.label, i18n.language) : ''
 	const cue = current?.cue ?? null
+	// With two channels the cue offers the other one; with more, the tabs do.
+	const other = channels.length === 2 ? channels.find((channel) => channel !== current) : undefined
 	return (
 		<div className="conversations-drawer">
 			<DrawerHeader
@@ -117,10 +119,17 @@ const DrawerBody = ({
 						channel={current.slug}
 						conversationKey={conversationKey}
 						cue={cue}
+						cueAction={
+							other
+								? {
+										label: t(keys.switchTo, { channel: resolveLabel(other.label, i18n.language) }),
+										onClick: () => setActive(other.slug),
+									}
+								: null
+						}
 						disabledReason={current.canCreate ? undefined : t(keys.readOnlyChannel)}
 						instance={instance}
 						key={`composer:${current.slug}`}
-						submitLabel={channels.length > 1 ? t(keys.sendTo, { channel: label }) : undefined}
 					/>
 				</>
 			) : (
