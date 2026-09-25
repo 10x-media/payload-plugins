@@ -1,12 +1,8 @@
 import { type BootedPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { conversations, databaseBus, sseTransport } from '../../src/index'
-import { parseEvents } from '../../src/react/sse'
-import { boot, call, instanceOptions, type Session, signUp } from './fixture'
-
-type Event = { data: Record<string, unknown>; event: string }
+import { boot, call, instanceOptions, openStream, type Session, signUp } from './fixture'
 
 describeForDb('realtime over SSE', {}, (db) => {
 	let booted: BootedPayload
@@ -23,52 +19,8 @@ describeForDb('realtime over SSE', {}, (db) => {
 		return res.json.entries[0]?.token ?? ''
 	}
 
-	/** Open a stream; `next` waits for the next event (or null after `ms`). */
-	const open = async (session: Session, body: { since?: string; tokens: string[] }) => {
-		const abort = new AbortController()
-		const res = await handleEndpoints({
-			config: booted.payload.config,
-			payloadInstanceCacheKey: booted.cacheKey,
-			request: new Request('http://localhost:3000/api/conversations/comments/events', {
-				body: JSON.stringify(body),
-				headers: { Authorization: `JWT ${session.token}`, 'Content-Type': 'application/json' },
-				method: 'POST',
-				signal: abort.signal,
-			}),
-		})
-		const reader = (res.body as ReadableStream<Uint8Array>).getReader()
-		const decoder = new TextDecoder()
-		const queue: Event[] = []
-		let buffer = ''
-		let pending: null | Promise<void> = null
-		const pump = () => {
-			pending ??= reader.read().then(({ done, value }) => {
-				pending = null
-				if (done) return
-				buffer += decoder.decode(value, { stream: true })
-				const parsed = parseEvents(buffer)
-				buffer = parsed.rest
-				for (const entry of parsed.events) {
-					queue.push({ data: JSON.parse(entry.data), event: entry.event })
-				}
-			})
-			return pending
-		}
-		const next = async (ms = 3000): Promise<Event | null> => {
-			const until = Date.now() + ms
-			while (queue.length === 0) {
-				const left = until - Date.now()
-				if (left <= 0) return null
-				await Promise.race([pump(), new Promise((resolve) => setTimeout(resolve, left))])
-			}
-			return queue.shift() ?? null
-		}
-		const close = async () => {
-			abort.abort()
-			await reader.cancel().catch(() => undefined)
-		}
-		return { close, next, status: res.status }
-	}
+	const open = (session: Session, body: { since?: string; tokens: string[] }) =>
+		openStream(booted, { body, instance: 'comments', session })
 
 	beforeAll(async () => {
 		booted = await boot(

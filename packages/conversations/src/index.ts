@@ -149,6 +149,12 @@ export {
 	type RealtimeSignal,
 } from './realtime/bus'
 export { type PusherTransportOptions, pusherTransport } from './realtime/pusher'
+export {
+	ioredisPubSub,
+	nodeRedisPubSub,
+	type RedisPubSub,
+	redisBus,
+} from './realtime/redis'
 export { sseTransport } from './realtime/sse'
 export { projectUsers } from './server/authors'
 export { defineExtension, defineMessageType, type PerTargetCheck, perTarget } from './server/define'

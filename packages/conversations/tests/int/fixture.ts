@@ -2,6 +2,7 @@ import { type BootedPayload, bootPayload, type SupportedDb } from '@10x-media/pa
 import { type CollectionConfig, handleEndpoints, type Plugin } from 'payload'
 
 import { conversations, perTarget } from '../../src/index'
+import { parseEvents } from '../../src/react/sse'
 import type { ConversationsChannel, ConversationsPluginOptions } from '../../src/types'
 
 export const collections: CollectionConfig[] = [
@@ -162,3 +163,62 @@ export const textNode = (text: string) => ({
 	type: 'text',
 	version: 1,
 })
+
+export type StreamEvent = { data: Record<string, unknown>; event: string }
+
+/**
+ * Open an instance's SSE stream as `session`. `next` waits for the next event,
+ * or resolves `null` after `ms`; `close` aborts it like a closed tab.
+ */
+export const openStream = async (
+	booted: BootedPayload,
+	{
+		body,
+		instance,
+		session,
+	}: { body: { since?: string; tokens: string[] }; instance: string; session: Session }
+) => {
+	const abort = new AbortController()
+	const res = await handleEndpoints({
+		config: booted.payload.config,
+		payloadInstanceCacheKey: booted.cacheKey,
+		request: new Request(`http://localhost:3000/api/conversations/${instance}/events`, {
+			body: JSON.stringify(body),
+			headers: { Authorization: `JWT ${session.token}`, 'Content-Type': 'application/json' },
+			method: 'POST',
+			signal: abort.signal,
+		}),
+	})
+	const reader = (res.body as ReadableStream<Uint8Array>).getReader()
+	const decoder = new TextDecoder()
+	const queue: StreamEvent[] = []
+	let buffer = ''
+	let pending: null | Promise<void> = null
+	const pump = () => {
+		pending ??= reader.read().then(({ done, value }) => {
+			pending = null
+			if (done) return
+			buffer += decoder.decode(value, { stream: true })
+			const parsed = parseEvents(buffer)
+			buffer = parsed.rest
+			for (const entry of parsed.events) {
+				queue.push({ data: JSON.parse(entry.data), event: entry.event })
+			}
+		})
+		return pending
+	}
+	const next = async (ms = 3000): Promise<StreamEvent | null> => {
+		const until = Date.now() + ms
+		while (queue.length === 0) {
+			const left = until - Date.now()
+			if (left <= 0) return null
+			await Promise.race([pump(), new Promise((resolve) => setTimeout(resolve, left))])
+		}
+		return queue.shift() ?? null
+	}
+	const close = async () => {
+		abort.abort()
+		await reader.cancel().catch(() => undefined)
+	}
+	return { close, next, status: res.status }
+}
