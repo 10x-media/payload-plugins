@@ -352,7 +352,12 @@ const messageStorage = (limits: Limits): Storage => {
 		],
 		// The write has moved `updatedAt` already.
 		signal: async ({ instance, req, target }) => {
-			await instance.transport?.publish({ instance: instance.slug, key: target.key, req })
+			await instance.transport?.publish({
+				channel: target.channel,
+				instance: instance.slug,
+				key: target.key,
+				req,
+			})
 		},
 	}
 }

@@ -142,6 +142,13 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 	},
 })
 
+export {
+	type ConversationsBus,
+	databaseBus,
+	memoryBus,
+	type RealtimeSignal,
+} from './realtime/bus'
+export { sseTransport } from './realtime/sse'
 export { projectUsers } from './server/authors'
 export { defineExtension, defineMessageType, type PerTargetCheck, perTarget } from './server/define'
 export {

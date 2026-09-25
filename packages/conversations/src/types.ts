@@ -3,6 +3,7 @@ import type {
 	CollectionConfig,
 	CollectionSlug,
 	Config,
+	Endpoint,
 	Field,
 	PayloadComponent,
 	PayloadRequest,
@@ -134,8 +135,23 @@ export type MessageTypeDefinition<TData = unknown> = {
 	validate?: (data: TData) => Promise<string | true> | string | true
 }
 
+/**
+ * The server half of a realtime transport. `publish` is called after every
+ * change a feed shows (message written, edited, deleted, touched), with the
+ * message's channel when there is one. A transport may serve endpoints of its
+ * own under `/api/conversations/<instance>` (a stream, an auth callback) and
+ * name the client half the admin should use.
+ */
 export type ConversationsServerTransport = {
-	publish: (args: { instance: string; key: string; req: PayloadRequest }) => Promise<void> | void
+	/** Which client transport the admin's provider uses. Default `polling`. */
+	client?: 'polling' | 'sse'
+	endpoints?: (args: { base: string; instance: ConversationsInstance }) => Endpoint[]
+	publish: (args: {
+		channel?: string
+		instance: string
+		key: string
+		req: PayloadRequest
+	}) => Promise<void> | void
 }
 
 /** One component, or several rendered in order. */

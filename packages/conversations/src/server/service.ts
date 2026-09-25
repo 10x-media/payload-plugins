@@ -778,6 +778,11 @@ export const touchMessage = async (
 	})
 	const message = await findRoot(req, instance, String(args.id))
 	if (message) {
-		await instance.transport?.publish({ instance: instance.slug, key: message.key, req })
+		await instance.transport?.publish({
+			channel: message.channel,
+			instance: instance.slug,
+			key: message.key,
+			req,
+		})
 	}
 }

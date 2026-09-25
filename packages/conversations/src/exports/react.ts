@@ -32,10 +32,12 @@ export {
 	useChatStore,
 	useOptionalChatStore,
 } from '../react/provider'
+export { sseClientTransport } from '../react/sse'
 export type { ConversationsStore, InstanceMeta } from '../react/store'
 export {
 	type ConversationsClientTransport,
 	pollingTransport,
+	type TransportConnectArgs,
 	type TransportConnection,
 } from '../react/transport'
 export { dividerBefore, type WindowMessage, type WindowState } from '../react/window'

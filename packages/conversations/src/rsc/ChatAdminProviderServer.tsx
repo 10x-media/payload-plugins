@@ -56,7 +56,11 @@ export const ChatAdminProviderServer = ({
 		else components.types[type.slug] = Component
 	}
 	return (
-		<ChatAdminProvider components={components} instance={slug}>
+		<ChatAdminProvider
+			components={components}
+			instance={slug}
+			transport={instance.transport?.client ?? 'polling'}
+		>
 			{children}
 		</ChatAdminProvider>
 	)

@@ -19,12 +19,17 @@ export type TransportConnection = {
  * that implements `publish`.
  */
 export type ConversationsClientTransport = {
-	connect: (args: {
-		instance: string
-		onChange: (keys: string[]) => void
-		onExpired: (keys: string[]) => void
-		poll: (body: { since: string; tokens: string[] }) => Promise<PollResponse>
-	}) => TransportConnection
+	connect: (args: TransportConnectArgs) => TransportConnection
+}
+
+/** What the store hands a transport: its callbacks and the instance's endpoints. */
+export type TransportConnectArgs = {
+	/** Opens the instance's event stream; throws `ConversationsRequestError` when refused. */
+	events: (body: { since?: string; tokens: string[] }, signal?: AbortSignal) => Promise<Response>
+	instance: string
+	onChange: (keys: string[]) => void
+	onExpired: (keys: string[]) => void
+	poll: (body: { since: string; tokens: string[] }) => Promise<PollResponse>
 }
 
 /**

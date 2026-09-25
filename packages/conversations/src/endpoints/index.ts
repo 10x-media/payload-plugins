@@ -184,5 +184,6 @@ export const buildEndpoints = (instance: ConversationsInstance): Endpoint[] => {
 				}
 			})
 		),
+		...(instance.transport?.endpoints?.({ base, instance }) ?? []),
 	]
 }

@@ -8,7 +8,7 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { comments } from '../src/exports/comments'
 import { reactions } from '../src/exports/reactions'
-import { conversations, defineMessageType, perTarget } from '../src/index'
+import { conversations, defineMessageType, perTarget, sseTransport } from '../src/index'
 import { autoReply } from './helpers/autoReply'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
@@ -105,6 +105,7 @@ export default buildConfig({
 		conversations({
 			slug: 'comments',
 			users: ['users', 'customers'],
+			// No `transport`: comments stay on polling, `chat` below shows realtime.
 			// Everything about the target is decided here, in one batch: staff see the persons of
 			// their tenants, a customer only the persons they own. Media has no tenant.
 			access: perTarget(
@@ -170,6 +171,8 @@ export default buildConfig({
 		conversations({
 			slug: 'chat',
 			users: ['users'],
+			// Realtime: one stream per browser, other processes heard through the database.
+			transport: sseTransport(),
 			// An archived room stays readable but takes no new messages, edits or deletes.
 			access: perTarget(
 				({ doc, req }) => isStaff(req) && (doc?.archived ? { read: true, create: [] } : true),

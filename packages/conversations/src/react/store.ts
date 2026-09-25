@@ -80,6 +80,7 @@ export class ConversationsStore {
 			instance: this.instance,
 			onChange: (keys) => this.changed(keys),
 			onExpired: (keys) => this.request(keys),
+			events: (body, signal) => this.api.events(body, signal),
 			poll: (body) => this.api.poll(body),
 		})
 		this.watch()

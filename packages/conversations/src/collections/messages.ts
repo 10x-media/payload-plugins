@@ -208,7 +208,12 @@ export const buildMessagesCollection = (instance: ConversationsInstance): Collec
 			}
 		}
 
-		await instance.transport?.publish({ instance: instance.slug, key: message.key, req })
+		await instance.transport?.publish({
+			channel: message.channel,
+			instance: instance.slug,
+			key: message.key,
+			req,
+		})
 		return doc
 	}
 

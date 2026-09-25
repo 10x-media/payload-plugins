@@ -124,6 +124,20 @@ export const createApi = ({
 				`/mentions?${new URLSearchParams({ channel: query.channel, key: query.key, q: query.q }).toString()}`,
 				{ signal }
 			),
+		/** Opens the instance's event stream (a realtime transport's endpoint); the raw response. */
+		events: async (body: { since?: string; tokens: string[] }, signal?: AbortSignal) => {
+			const res = await fetcher(`${base}/events`, {
+				body: JSON.stringify(body),
+				credentials: 'include',
+				headers: { Accept: 'text/event-stream', 'Content-Type': 'application/json' },
+				method: 'POST',
+				signal,
+			})
+			if (!res.ok) {
+				throw new ConversationsRequestError(await errorMessage(res), res.status)
+			}
+			return res
+		},
 		poll: (body: { since: string; tokens: string[] }) =>
 			request<PollResponse>('/poll', json('POST', body)),
 		read: (body: { at: string; channels?: string[]; key: string; thread?: string }) =>
