@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { Popup } from '@payloadcms/ui'
 
 import type { ChatSlotProps } from '../client/components'
-import { useFloatingPlacement } from '../composer/Menu'
+import { useMessageMenu } from '../client/MessageMenu'
 import { useExtension, useExtensionApi } from '../react/hooks'
 import { ChatScope, useChatStore } from '../react/provider'
 import type { WindowMessage } from '../react/window'
@@ -91,80 +90,67 @@ const SmileIcon = () => (
 	</svg>
 )
 
-/** A button opening the emoji the instance allows; picking toggles the viewer's reaction. */
-const Picker = ({ className, message }: { className: string; message: ConversationMessage }) => {
+/** The emoji the instance allows, as a row; picking toggles the viewer's reaction. */
+const EmojiRow = ({
+	message,
+	onPicked,
+}: {
+	message: ConversationMessage
+	onPicked?: () => void
+}) => {
 	const { t } = useTranslation()
 	const react = useReact()
 	const data = useExtension<ReactionsClientData>(REACTIONS)
-	const [open, setOpen] = useState(false)
-	const button = useRef<HTMLButtonElement>(null)
-	const { ref, style } = useFloatingPlacement(() => button.current?.getBoundingClientRect() ?? null)
+	if (!data?.emojis.length) return null
 	const mine = new Set(
 		summariesOf(message)
 			.filter((entry) => entry.mine)
 			.map((entry) => entry.emoji)
 	)
-
-	useEffect(() => {
-		if (!open) return
-		const onDown = (event: MouseEvent) => {
-			const target = event.target as Node
-			if (!ref.current?.contains(target) && !button.current?.contains(target)) setOpen(false)
-		}
-		const onKey = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') setOpen(false)
-		}
-		document.addEventListener('mousedown', onDown)
-		document.addEventListener('keydown', onKey)
-		return () => {
-			document.removeEventListener('mousedown', onDown)
-			document.removeEventListener('keydown', onKey)
-		}
-	}, [open, ref])
-
-	if (!data?.emojis.length) return null
 	return (
-		<>
-			<button
-				aria-expanded={open}
-				aria-label={t(keys.addReaction)}
-				className={className}
-				onClick={() => setOpen((value) => !value)}
-				ref={button}
-				title={t(keys.addReaction)}
-				type="button"
-			>
-				<SmileIcon />
-			</button>
-			{open
-				? createPortal(
-						<div className="conversations-reaction-picker" ref={ref} role="menu" style={style}>
-							{data.emojis.map((emoji) => (
-								<button
-									aria-checked={mine.has(emoji)}
-									disabled={blocked(message, emoji, data)}
-									className={`conversations-reaction-picker__emoji${mine.has(emoji) ? ' conversations-reaction-picker__emoji--mine' : ''}`}
-									key={emoji}
-									onClick={() => {
-										setOpen(false)
-										void react(message, emoji)
-									}}
-									role="menuitemcheckbox"
-									title={
-										blocked(message, emoji, data)
-											? t(keys.reactionLimit, { count: data.maxPerUser })
-											: undefined
-									}
-									type="button"
-								>
-									{emoji}
-								</button>
-							))}
-						</div>,
-						document.body
-					)
-				: null}
-		</>
+		<div className="conversations-reaction-row">
+			{data.emojis.map((emoji) => {
+				const refused = blocked(message, emoji, data)
+				return (
+					<button
+						aria-pressed={mine.has(emoji)}
+						className={`conversations-reaction-row__emoji${mine.has(emoji) ? ' conversations-reaction-row__emoji--mine' : ''}`}
+						disabled={refused}
+						key={emoji}
+						onClick={() => {
+							onPicked?.()
+							void react(message, emoji)
+						}}
+						title={refused ? t(keys.reactionLimit, { count: data.maxPerUser }) : undefined}
+						type="button"
+					>
+						{emoji}
+					</button>
+				)
+			})}
+		</div>
+	)
+}
+
+/** The add button at the end of the reactions: the same row, in Payload's popup. */
+const AddReaction = ({ message }: { message: ConversationMessage }) => {
+	const { t } = useTranslation()
+	return (
+		<Popup
+			button={
+				<>
+					<SmileIcon />
+					<span className="conversations-sr-only">{t(keys.addReaction)}</span>
+				</>
+			}
+			buttonClassName="conversations-reactions__add"
+			buttonType="custom"
+			caret={false}
+			horizontalAlign="left"
+			render={({ close }) => <EmojiRow message={message} onPicked={close} />}
+			size="fit-content"
+			verticalAlign="top"
+		/>
 	)
 }
 
@@ -206,7 +192,7 @@ const Bar = ({ message }: { message: ConversationMessage }) => {
 					<span className="conversations-reactions__count">{entry.count}</span>
 				</button>
 			))}
-			{deleted ? null : <Picker className="conversations-reactions__add" message={message} />}
+			{deleted ? null : <AddReaction message={message} />}
 		</div>
 	)
 }
@@ -219,10 +205,12 @@ export const ReactionsBar = ({ instance, message }: ChatSlotProps) =>
 		</ChatScope>
 	) : null
 
-/** `messageActions` slot: the add-reaction button in a message's hover row. */
-export const ReactionPicker = ({ instance, message }: ChatSlotProps) =>
-	message && !message.deletedAt ? (
+/** `messageQuickActions` slot: the emoji row at the top of a message's menu. */
+export const ReactionQuickActions = ({ instance, message }: ChatSlotProps) => {
+	const menu = useMessageMenu()
+	return message && !message.deletedAt ? (
 		<ChatScope instance={instance}>
-			<Picker className="conversations-icon-button" message={message} />
+			<EmojiRow message={message} onPicked={menu?.close} />
 		</ChatScope>
 	) : null
+}

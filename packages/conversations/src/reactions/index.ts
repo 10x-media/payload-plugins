@@ -248,7 +248,7 @@ export const reactions = (options: ReactionsOptions = {}): ConversationsExtensio
 			deleteRows(req, instance, { key: { equals: key } }).then(() => undefined),
 		options,
 		slots: {
-			messageActions: '@10x-media/conversations/client#ReactionPicker',
+			messageQuickActions: '@10x-media/conversations/client#ReactionQuickActions',
 			messageFooter: '@10x-media/conversations/client#ReactionsBar',
 		},
 	}

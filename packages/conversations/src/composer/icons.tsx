@@ -101,3 +101,37 @@ export const EyeIcon = () => (
 		<circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
 	</Svg>
 )
+
+export const CheckIcon = () => (
+	<Svg>
+		<path
+			d="M3.5 8.5l3 3 6-7"
+			stroke="currentColor"
+			strokeLinecap="round"
+			strokeLinejoin="round"
+			strokeWidth="1.5"
+		/>
+	</Svg>
+)
+
+export const PencilIcon = () => (
+	<Svg>
+		<path
+			d="M10.5 3.25l2.25 2.25-7 7H3.5v-2.25zM9.25 4.5l2.25 2.25"
+			stroke="currentColor"
+			strokeLinejoin="round"
+			strokeWidth="1.3"
+		/>
+	</Svg>
+)
+
+export const CrossIcon = () => (
+	<Svg>
+		<path
+			d="M4.5 4.5l7 7M11.5 4.5l-7 7"
+			stroke="currentColor"
+			strokeLinecap="round"
+			strokeWidth="1.4"
+		/>
+	</Svg>
+)

@@ -13,11 +13,12 @@ import type { AuthorsMap } from '../types'
 import { Avatar } from './Avatar'
 import { ChatComposer } from './ChatComposer'
 import { ChatSlot, useTypeRenderer } from './components'
+import { MessageMenu } from './MessageMenu'
 import { absoluteTime, relativeTime } from './time'
 import './conversations.css'
 
 export type ChatMessageProps = {
-	/** Slot: extra actions in the hover row. */
+	/** Slot: extra items in the message's menu, after Reply, Edit and Delete. */
 	actions?: ReactNode
 	authors: AuthorsMap
 	/** Hide avatar and name: a follow-up from the same author. */
@@ -169,48 +170,20 @@ export const ChatMessage = ({
 				/>
 				{threadSummary}
 			</div>
-			{deleted || editing || message.sendStatus ? null : (
-				<div className="conversations-message__actions">
-					{onOpenThread ? (
-						<button
-							className="conversations-icon-button"
-							onClick={() => onOpenThread(message)}
-							title={t(keys.reply)}
-							type="button"
-						>
-							{t(keys.reply)}
-						</button>
-					) : null}
-					{own && message.type === TEXT_TYPE ? (
-						<button
-							className="conversations-icon-button"
-							onClick={() => setEditing(true)}
-							title={t(keys.edit)}
-							type="button"
-						>
-							{t(keys.edit)}
-						</button>
-					) : null}
-					{own ? (
-						<button
-							className="conversations-icon-button"
-							onClick={() => openModal(deleteSlug)}
-							title={t(keys.delete)}
-							type="button"
-						>
-							{t(keys.delete)}
-						</button>
-					) : null}
-					{actions}
-					<ChatSlot
-						channel={message.channel}
-						conversationKey={message.key}
+			{/* Its own column, so it never covers the text; shown on hover, always on touch. */}
+			<div className="conversations-message__side">
+				{deleted || editing || message.sendStatus ? null : (
+					<MessageMenu
+						actions={actions}
 						instance={instance}
 						message={message}
-						name="messageActions"
+						onDelete={() => openModal(deleteSlug)}
+						onEdit={() => setEditing(true)}
+						onOpenThread={onOpenThread}
+						own={own}
 					/>
-				</div>
-			)}
+				)}
+			</div>
 			{own && !deleted ? (
 				<ConfirmationModal
 					body={t(keys.deleteConfirm)}

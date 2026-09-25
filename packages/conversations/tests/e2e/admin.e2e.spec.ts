@@ -1,4 +1,4 @@
-import { type Browser, expect, type Page, test } from '@playwright/test'
+import { type Browser, expect, type Locator, type Page, test } from '@playwright/test'
 
 const PASSWORD = 'password'
 const ME = 'dev@10xmedia.de'
@@ -38,6 +38,12 @@ const send = async (page: Page, text: string) => {
 	await page.keyboard.type(text)
 	await page.keyboard.press('Enter')
 	await expect(page.locator('.conversations-message', { hasText: text }).last()).toBeVisible()
+}
+
+/** A message's "⋯" menu, which shows on hover. */
+const openMenu = async (message: Locator) => {
+	await message.hover()
+	await message.getByRole('button', { name: 'Message actions' }).click()
 }
 
 const asUser = async (browser: Browser, email: string) => {
@@ -107,8 +113,8 @@ test.describe('comments drawer', () => {
 		const text = `to edit ${Date.now()}`
 		await send(page, text)
 		const message = page.locator('.conversations-message', { hasText: text }).last()
-		await message.hover()
-		await message.locator('button', { hasText: 'Edit' }).click()
+		await openMenu(message)
+		await page.locator('.popup__content').getByText('Edit', { exact: true }).click()
 		const editor = page.locator('.conversations-message [contenteditable="true"]')
 		// The edit form loads its state from the server first; it focuses itself once there.
 		await expect(editor).toBeFocused()
@@ -118,8 +124,8 @@ test.describe('comments drawer', () => {
 		const edited = page.locator('.conversations-message', { hasText: `${text} (edited)` }).last()
 		await expect(edited.locator('.conversations-message__edited')).toBeVisible()
 
-		await edited.hover()
-		await edited.locator('button', { hasText: 'Delete' }).click()
+		await openMenu(edited)
+		await page.locator('.popup__content').getByText('Delete', { exact: true }).click()
 		await page.locator('.confirmation-modal').getByRole('button', { name: 'Delete' }).click()
 		await expect(
 			page.locator('.conversations-message', { hasText: `${text} (edited)` })
@@ -199,9 +205,8 @@ test.describe('reactions extension', () => {
 		const text = `react here ${Date.now()}`
 		await send(me, text)
 		const mine = me.locator('.conversations-message', { hasText: text }).last()
-		await mine.hover()
-		await mine.getByRole('button', { name: 'Add reaction' }).first().click()
-		await me.locator('.conversations-reaction-picker').getByText('🎉').click()
+		await openMenu(mine)
+		await me.locator('.popup__content .conversations-reaction-row').getByText('🎉').click()
 		await expect(mine.locator('.conversations-reactions__pill--mine')).toContainText('1')
 
 		const theirs = anna.locator('.conversations-message', { hasText: text }).last()

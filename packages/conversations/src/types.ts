@@ -122,8 +122,10 @@ export type ChatSlotConfig = {
 	composerAbove?: SlotComponents
 	/** Rendered in the drawer header, after the title. */
 	drawerHeader?: SlotComponents
-	/** Rendered in each message's action row. */
+	/** Items in each message's menu, after Reply in thread, Edit and Delete. */
 	messageActions?: SlotComponents
+	/** A row at the top of each message's menu, for one-click actions such as reactions. */
+	messageQuickActions?: SlotComponents
 	/** Rendered under each message body, deleted placeholders included (check `message.deletedAt`). */
 	messageFooter?: SlotComponents
 }

@@ -7,10 +7,8 @@ import {
 	$isRangeSelection,
 	$setSelection,
 	type BaseSelection,
-	BLUR_COMMAND,
 	COMMAND_PRIORITY_LOW,
 	COMMAND_PRIORITY_NORMAL,
-	FOCUS_COMMAND,
 	KEY_MODIFIER_COMMAND,
 } from '@payloadcms/richtext-lexical/lexical'
 import {
@@ -25,6 +23,7 @@ import { $findMatchingParent, mergeRegister } from '@payloadcms/richtext-lexical
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+import { CheckIcon, CrossIcon, PencilIcon } from '../icons'
 import { displayUrl, normalizeUrl } from '../links'
 import { caretRect, useFloatingPlacement } from '../Menu'
 import { OPEN_LINK_EDITOR_COMMAND, useComposerRuntime } from '../runtime'
@@ -81,6 +80,16 @@ export const LinkEditor = () => {
 	const [value, setValue] = useState('')
 	const [invalid, setInvalid] = useState(false)
 	const box = useRef<HTMLDivElement>(null)
+	const input = useRef<HTMLInputElement>(null)
+	const isEditing = editing !== null
+
+	// Focused after the editor has settled: picked from the `/` menu, the menu's
+	// close hands focus back to the editor right after the field mounts.
+	useEffect(() => {
+		if (!isEditing) return
+		const timer = setTimeout(() => input.current?.focus(), 30)
+		return () => clearTimeout(timer)
+	}, [isEditing])
 
 	const open = useCallback(() => {
 		editor.getEditorState().read(() => {
@@ -108,6 +117,27 @@ export const LinkEditor = () => {
 		editor.focus()
 	}, [editor])
 
+	// DOM focus on the editable itself: Lexical's focus commands can be taken
+	// by a handler of higher priority before they reach this plugin.
+	useEffect(() => {
+		const onFocus = () => setFocused(true)
+		const onBlur = () => setFocused(false)
+		let current: HTMLElement | null = null
+		const unregister = editor.registerRootListener((root, previous) => {
+			previous?.removeEventListener('focus', onFocus)
+			previous?.removeEventListener('blur', onBlur)
+			root?.addEventListener('focus', onFocus)
+			root?.addEventListener('blur', onBlur)
+			current = root
+			setFocused(root !== null && document.activeElement === root)
+		})
+		return () => {
+			unregister()
+			current?.removeEventListener('focus', onFocus)
+			current?.removeEventListener('blur', onBlur)
+		}
+	}, [editor])
+
 	useEffect(
 		() =>
 			mergeRegister(
@@ -128,22 +158,6 @@ export const LinkEditor = () => {
 						return true
 					},
 					COMMAND_PRIORITY_NORMAL
-				),
-				editor.registerCommand(
-					FOCUS_COMMAND,
-					() => {
-						setFocused(true)
-						return false
-					},
-					COMMAND_PRIORITY_LOW
-				),
-				editor.registerCommand(
-					BLUR_COMMAND,
-					() => {
-						setFocused(false)
-						return false
-					},
-					COMMAND_PRIORITY_LOW
 				),
 				editor.registerUpdateListener(({ editorState }) => {
 					editorState.read(() => {
@@ -229,9 +243,8 @@ export const LinkEditor = () => {
 					<div className="conversations-link-editor__row">
 						<input
 							aria-invalid={invalid}
-							// biome-ignore lint/a11y/noAutofocus: the field opens on an explicit Ctrl+K or button press.
-							autoFocus
 							className="conversations-link-editor__input"
+							ref={input}
 							onChange={(event) => {
 								setValue(event.target.value)
 								setInvalid(false)
@@ -249,16 +262,24 @@ export const LinkEditor = () => {
 							type="text"
 							value={value}
 						/>
-						<button className="conversations-link-editor__button" onClick={apply} type="button">
-							{labels.linkApply}
+						<button
+							className="conversations-link-editor__button"
+							aria-label={labels.linkApply}
+							title={labels.linkApply}
+							onClick={apply}
+							type="button"
+						>
+							<CheckIcon />
 						</button>
 						{editing.linkKey ? (
 							<button
 								className="conversations-link-editor__button"
+								aria-label={labels.linkRemove}
+								title={labels.linkRemove}
 								onClick={() => remove(editing.linkKey as string)}
 								type="button"
 							>
-								{labels.linkRemove}
+								<CrossIcon />
 							</button>
 						) : null}
 					</div>
@@ -289,15 +310,23 @@ export const LinkEditor = () => {
 					>
 						{displayUrl(current.url)}
 					</a>
-					<button className="conversations-link-editor__button" onClick={open} type="button">
-						{labels.linkEdit}
+					<button
+						className="conversations-link-editor__button"
+						aria-label={labels.linkEdit}
+						title={labels.linkEdit}
+						onClick={open}
+						type="button"
+					>
+						<PencilIcon />
 					</button>
 					<button
 						className="conversations-link-editor__button"
+						aria-label={labels.linkRemove}
+						title={labels.linkRemove}
 						onClick={() => remove(current.key)}
 						type="button"
 					>
-						{labels.linkRemove}
+						<CrossIcon />
 					</button>
 				</div>
 			</Floating>

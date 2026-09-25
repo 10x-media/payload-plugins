@@ -176,56 +176,75 @@
 	cursor: default;
 }
 
-/* `/` and `@` menus and the link field float above drawers and modals. */
+/*
+ * Floating pieces, drawn after Payload's own editor so they sit in the admin
+ * unnoticed: the `/` and `@` menus after its slash menu, the toolbar's
+ * dropdowns after its popups, the link field after its link tooltip. Above
+ * drawers and modals.
+ */
 .conversations-menu,
 .conversations-link-editor {
 	z-index: 10000;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m, 4px);
-	background: var(--theme-input-bg, var(--theme-elevation-0));
-	box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
+	border-radius: 4px;
+	background: var(--theme-input-bg);
+	color: var(--theme-elevation-800);
 	font-family: var(--font-body);
+	box-shadow:
+		0 1px 2px 1px rgb(0 0 0 / 0.05),
+		0 4px 8px rgb(0 0 0 / 0.1);
 }
 
 .conversations-menu {
 	display: flex;
 	flex-direction: column;
-	min-width: 15.385rem;
-	max-width: 23rem;
-	max-height: 20rem;
-	padding: 0.308rem;
+	width: 15.385rem;
+	max-height: 23rem;
+	padding: 0.308rem 0;
 	overflow-y: auto;
+}
+
+/* The toolbar's dropdowns and "More": Payload's popup box. */
+.conversations-menu--dropdown {
+	width: auto;
+	min-width: 11.5rem;
+	padding: calc(var(--base) * 0.5);
+	box-shadow: 0 -2px 16px -2px rgb(0 0 0 / 0.2);
 }
 
 .conversations-menu__item {
 	display: flex;
 	align-items: center;
-	gap: 0.615rem;
+	gap: 0.462rem;
 	width: 100%;
-	padding: 0.462rem 0.615rem;
+	height: 2.308rem;
+	padding: 0 0.923rem;
 	border: 0;
-	border-radius: var(--style-radius-s, 3px);
-	background: transparent;
-	color: var(--theme-text);
+	background: none;
+	color: var(--theme-elevation-900);
 	cursor: pointer;
 	font: inherit;
 	font-size: 1rem;
 	text-align: left;
 }
 
-.conversations-menu__item--selected {
+.conversations-menu--dropdown .conversations-menu__item {
+	height: auto;
+	padding: 0.385rem calc(var(--base) * 0.5);
+	border-radius: 4px;
+}
+
+.conversations-menu__item--selected,
+.conversations-menu__item:hover:not(:disabled) {
 	background: var(--theme-elevation-100);
 }
 
 .conversations-menu__icon {
 	display: inline-flex;
+	flex: none;
 	align-items: center;
 	justify-content: center;
 	width: 1.538rem;
-	height: 1.538rem;
-	border-radius: var(--style-radius-s, 3px);
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-700);
+	color: var(--theme-elevation-500);
 }
 
 .conversations-menu__label {
@@ -235,17 +254,13 @@
 }
 
 .conversations-menu__group {
-	padding: 0.462rem 0.615rem 0.231rem;
-	color: var(--theme-elevation-500);
-	font-size: 0.846rem;
-	font-weight: 600;
-	letter-spacing: 0.02em;
-	text-transform: uppercase;
+	padding: 0.462rem 0.769rem 0.154rem;
+	color: var(--theme-elevation-600);
+	font-size: 0.769rem;
 }
 
 .conversations-menu__group:not(:first-child) {
-	margin-top: 0.231rem;
-	border-top: 1px solid var(--theme-elevation-100);
+	margin-top: 0.308rem;
 }
 
 .conversations-menu__item:disabled {
@@ -254,66 +269,77 @@
 }
 
 .conversations-menu__empty {
-	padding: 0.462rem 0.615rem;
+	padding: 0.462rem 0.923rem;
 	color: var(--theme-elevation-500);
 	font-size: 1rem;
 }
 
+/* The link tooltip: a slim bar, as Payload's own editor shows over a link. */
 .conversations-link-editor {
-	padding: 0.308rem;
+	padding: 0.308rem 0.308rem 0.308rem 0.923rem;
+	font-size: 1rem;
+	line-height: 1.538rem;
 }
 
 .conversations-link-editor__row {
 	display: flex;
 	align-items: center;
-	gap: 0.231rem;
+	gap: 0.154rem;
+	min-height: 2.154rem;
 }
 
 .conversations-link-editor__input {
 	width: 18rem;
 	max-width: 60vw;
-	padding: 0.385rem 0.462rem;
+	padding: 0;
 	border: 0;
 	background: transparent;
 	color: var(--theme-text);
 	font: inherit;
-	font-size: 1rem;
 	outline: none;
 }
 
 .conversations-link-editor__input[aria-invalid="true"] {
-	color: var(--theme-error-500, #e5484d);
+	color: var(--theme-error-500);
 }
 
 .conversations-link-editor__url {
-	max-width: 16rem;
-	padding: 0.385rem 0.462rem;
+	min-width: 0;
+	max-width: 18rem;
+	margin-right: 0.615rem;
 	overflow: hidden;
-	color: var(--theme-text);
-	font-size: 1rem;
+	color: var(--theme-success-750);
+	text-decoration: underline;
 	white-space: nowrap;
 	text-overflow: ellipsis;
 }
 
+.conversations-link-editor__url:hover {
+	color: var(--theme-success-850);
+}
+
 .conversations-link-editor__button {
-	padding: 0.385rem 0.615rem;
+	display: flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	width: 2.308rem;
+	height: 2.308rem;
+	padding: 0;
 	border: 0;
-	border-radius: var(--style-radius-s, 3px);
+	border-radius: 4px;
 	background: transparent;
-	color: var(--theme-elevation-700);
+	color: var(--theme-elevation-600);
 	cursor: pointer;
-	font: inherit;
-	font-size: 1rem;
-	white-space: nowrap;
 }
 
 .conversations-link-editor__button:hover {
 	background: var(--theme-elevation-100);
-	color: var(--theme-text);
+	color: var(--theme-elevation-800);
 }
 
 .conversations-link-editor__error {
-	padding: 0.154rem 0.462rem 0.308rem;
-	color: var(--theme-error-500, #e5484d);
+	padding: 0 0 0.308rem;
+	color: var(--theme-error-500);
 	font-size: 0.923rem;
 }

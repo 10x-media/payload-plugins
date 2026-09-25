@@ -17,8 +17,8 @@ import { ChatView as ChatView_9ff71714c0033d16c2f4e44b53d7abe9 } from '../../../
 import { PlaygroundView as PlaygroundView_794a6abe41de858e73edd23cfa8a8229 } from '../../../playground/PlaygroundView'
 import { ConversationsSlotDispatcher as ConversationsSlotDispatcher_7345af0c80d81d7368c532bb4469972c } from '@10x-media/conversations/rsc'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
-import { ReactionPicker as ReactionPicker_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
 import { ReactionsBar as ReactionsBar_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
+import { ReactionQuickActions as ReactionQuickActions_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
 import { StatusChange as StatusChange_31eb553b5a0efb219e39dcd1f84fa727 } from '../../../components/StatusChange'
 
 /** @type import('payload').ImportMap */
@@ -42,7 +42,7 @@ export const importMap = {
   "/playground/PlaygroundView#PlaygroundView": PlaygroundView_794a6abe41de858e73edd23cfa8a8229,
   "@10x-media/conversations/rsc#ConversationsSlotDispatcher": ConversationsSlotDispatcher_7345af0c80d81d7368c532bb4469972c,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
-  "@10x-media/conversations/client#ReactionPicker": ReactionPicker_63b29dbabe93a0fc3d3dbd1a91acf947,
   "@10x-media/conversations/client#ReactionsBar": ReactionsBar_63b29dbabe93a0fc3d3dbd1a91acf947,
+  "@10x-media/conversations/client#ReactionQuickActions": ReactionQuickActions_63b29dbabe93a0fc3d3dbd1a91acf947,
   "/components/StatusChange#StatusChange": StatusChange_31eb553b5a0efb219e39dcd1f84fa727
 }

@@ -56,22 +56,24 @@
 }
 
 .conversations-message:hover .conversations-reactions__add,
-.conversations-reactions__add[aria-expanded="true"] {
+.conversations-reactions__add:focus-visible {
 	opacity: 1;
 }
 
-.conversations-reaction-picker {
-	z-index: 10000;
-	display: flex;
-	gap: 0.154rem;
-	padding: 0.308rem;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m, 4px);
-	background: var(--theme-input-bg, var(--theme-elevation-0));
-	box-shadow: 0 6px 24px rgb(0 0 0 / 0.18);
+@media (hover: none) {
+	.conversations-reactions__add {
+		opacity: 1;
+	}
 }
 
-.conversations-reaction-picker__emoji {
+/* The emoji row: at the top of a message's menu, and in the add button's popup. */
+.conversations-reaction-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.154rem;
+}
+
+.conversations-reaction-row__emoji {
 	width: 2.308rem;
 	height: 2.308rem;
 	padding: 0;
@@ -83,10 +85,15 @@
 	line-height: 1;
 }
 
-.conversations-reaction-picker__emoji:hover {
-	background: var(--theme-elevation-100);
+.conversations-reaction-row__emoji:hover:not(:disabled) {
+	background: var(--theme-elevation-150);
 }
 
-.conversations-reaction-picker__emoji--mine {
-	background: color-mix(in srgb, var(--theme-success-500, #3e63dd) 16%, transparent);
+.conversations-reaction-row__emoji--mine {
+	background: var(--theme-elevation-150);
+}
+
+.conversations-reaction-row__emoji:disabled {
+	cursor: default;
+	opacity: 0.35;
 }

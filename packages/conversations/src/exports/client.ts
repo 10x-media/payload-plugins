@@ -18,6 +18,7 @@ export {
 	useChatComponents,
 	useTypeRenderer,
 } from '../client/components'
+export { MessageMenu, useMessageMenu } from '../client/MessageMenu'
 export { Composer, type ComposerProps, type ComposerToolbar } from '../composer/Composer'
 export {
 	boldFeature,
@@ -48,4 +49,4 @@ export {
 	ConversationsMentionFeatureClient,
 	MentionNode,
 } from '../editor/mention/client'
-export { ReactionPicker, ReactionsBar } from '../reactions/client'
+export { ReactionQuickActions, ReactionsBar } from '../reactions/client'

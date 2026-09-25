@@ -345,21 +345,67 @@
 	font-weight: 600;
 }
 
-.conversations-message__actions {
-	position: absolute;
-	top: 0.308rem;
-	right: 0.308rem;
-	display: none;
-	gap: 0.154rem;
-	padding: 0.154rem;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s, 4px);
-	background: var(--theme-elevation-50);
+.conversations-message__side {
+	flex: none;
+	width: 1.846rem;
 }
 
-.conversations-message:hover .conversations-message__actions,
-.conversations-message:focus-within .conversations-message__actions {
+/* The "⋯" button: on hover or focus, while its menu is open, and always where nothing hovers. */
+.conversations-message__menu {
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+
+.conversations-message:hover .conversations-message__menu,
+.conversations-message:focus-within .conversations-message__menu,
+.conversations-message__menu--open {
+	opacity: 1;
+}
+
+@media (hover: none) {
+	.conversations-message__menu {
+		opacity: 0.6;
+	}
+}
+
+.conversations-message__menu-button {
 	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.846rem;
+	height: 1.846rem;
+	border-radius: var(--style-radius-s, 4px);
+	color: var(--theme-elevation-600);
+}
+
+.conversations-message__menu-button:hover,
+.conversations-message__menu--open .conversations-message__menu-button {
+	background: var(--theme-elevation-150);
+	color: var(--theme-text);
+}
+
+.conversations-message__menu-button .icon {
+	width: 1.538rem;
+	height: 1.538rem;
+}
+
+/* A row of one-click actions above the menu's list, e.g. reactions. */
+.conversations-message-menu__quick {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.154rem;
+	margin-bottom: calc(var(--base) * 0.25);
+	padding-bottom: calc(var(--base) * 0.25);
+	border-bottom: 1px solid var(--theme-elevation-150);
+}
+
+.conversations-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
 }
 
 .conversations-icon-button {

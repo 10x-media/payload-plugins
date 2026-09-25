@@ -230,7 +230,13 @@ export const resolveInstance = (
 	}
 }
 
-const SLOT_NAMES = ['composerAbove', 'drawerHeader', 'messageActions', 'messageFooter'] as const
+const SLOT_NAMES = [
+	'composerAbove',
+	'drawerHeader',
+	'messageActions',
+	'messageFooter',
+	'messageQuickActions',
+] as const
 
 const asList = (value: SlotComponents | undefined): PayloadComponent[] =>
 	(value === undefined ? [] : Array.isArray(value) ? value : [value]).filter(Boolean)
