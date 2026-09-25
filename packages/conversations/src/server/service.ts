@@ -16,7 +16,8 @@ import type {
 	ConversationsInstance,
 	ExtensionContext,
 } from '../types'
-import { filterReaders } from './audience'
+import { channelAllows } from './access'
+import { readersAmong } from './audience'
 import { projectAuthors } from './authors'
 import { isLexicalBody, textToBody } from './body'
 import { changedKeys, type FeedWindow, loadFeed, MAX_LIMIT, messageCounts } from './feed'
@@ -38,30 +39,36 @@ export const viewerKey = (req: PayloadRequest): string => {
 export type KeyAccess = { channels: ChannelAccess[]; key: string; target: ParsedKey }
 
 /**
- * Effective access for many keys: conversation access once for the batch,
- * then channel `read` / `create` per offered channel. Keys the user may not
- * see, or with no readable channel, are left out.
+ * Effective access for many keys: conversation access once for the batch
+ * (which channels of each target, to read and to write), intersected with
+ * the channel rules, which run once per request and channel. Keys the user
+ * may not see, or with no readable channel, are left out.
  */
 export const resolveAccess = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
 	keys: string[]
 ): Promise<Map<string, KeyAccess>> => {
-	const allowed = await instance.allowedKeys(req, keys)
+	const grants = await instance.grants(req, keys)
 	const out = new Map<string, KeyAccess>()
 	await Promise.all(
-		[...allowed].map(async (key) => {
+		[...grants].map(async ([key, grant]) => {
 			const target = parseKey(key)
 			if (!target) {
 				return
 			}
 			const channels: ChannelAccess[] = []
 			for (const slug of instance.channelsFor(target)) {
-				const channel = instance.channels.get(slug)
-				if (!channel || !(await channel.access.read({ key, req, target }))) {
+				if (
+					!grant.read.has(slug) ||
+					!(await channelAllows(req, instance, { action: 'read', channel: slug }))
+				) {
 					continue
 				}
-				channels.push({ canCreate: await channel.access.create({ key, req, target }), slug })
+				const canCreate =
+					grant.create.has(slug) &&
+					(await channelAllows(req, instance, { action: 'create', channel: slug }))
+				channels.push({ canCreate, slug })
 			}
 			if (channels.length > 0) {
 				out.set(key, { channels, key, target })
@@ -80,11 +87,15 @@ const accessFor = async (
 	return access ?? fail('Not found', 404)
 }
 
-/** Batch access for mounted conversations: channels, unread counts, poll tokens. */
+/**
+ * Batch access for mounted conversations: channels, unread counts, poll
+ * tokens, and message counts for the keys in `count` (all by default; a list
+ * surface that shows no totals passes none and saves a query per key).
+ */
 export const subscribe = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
-	keys: string[]
+	{ count = true, keys }: { count?: boolean | string[]; keys: string[] }
 ): Promise<SubscribeResponse> => {
 	const viewer = viewerKey(req)
 	const access = await resolveAccess(req, instance, keys.slice(0, 200))
@@ -102,16 +113,19 @@ export const subscribe = async (
 				userKey: viewer,
 			})
 		: undefined
+	const counted = count === true ? null : new Set(count === false ? [] : count)
 	const totals = await messageCounts(
 		req,
 		instance,
-		list.map((entry) => ({ channels: entry.channels.map((c) => c.slug), key: entry.key }))
+		list
+			.filter((entry) => !counted || counted.has(entry.key))
+			.map((entry) => ({ channels: entry.channels.map((c) => c.slug), key: entry.key }))
 	)
 	const exp = Date.now() + TOKEN_TTL_MS
 	return {
 		entries: list.map((entry) => ({
 			channels: entry.channels,
-			count: totals[entry.key] ?? 0,
+			...(entry.key in totals ? { count: totals[entry.key] } : {}),
 			key: entry.key,
 			token: signToken(req.payload.secret, {
 				channels: entry.channels.map((c) => c.slug),
@@ -371,8 +385,13 @@ const loadOwned = async (
 		return fail('Not found', 404)
 	}
 	const access = await accessFor(req, instance, message.key)
-	if (!access.channels.some((entry) => entry.slug === message.channel)) {
+	const channel = access.channels.find((entry) => entry.slug === message.channel)
+	if (!channel) {
 		return fail('Not found', 404)
+	}
+	// A read-only conversation takes no edits or deletes either.
+	if (!channel.canCreate) {
+		return fail('Forbidden', 403)
 	}
 	const rule = instance.channels.get(message.channel)?.access[action]
 	const allowed = rule ? await rule({ message, req }) : message.authorKey === viewerKey(req)
@@ -505,7 +524,7 @@ export const poll = async (
 	return { changed, expired, now: now.toISOString() }
 }
 
-/** Mention candidates across the users collections, minus anyone who cannot read the channel. */
+/** Mention candidates across the users collections: `mentions.users`, then the channel rule. */
 export const searchMentions = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
@@ -551,11 +570,15 @@ export const searchMentions = async (
 		})
 	)
 	const flat = found.flat()
+	// Already narrowed by `mentions.users` above, so only the channel rule is left.
 	const readers = new Set(
-		await filterReaders(req, instance, {
+		await readersAmong(req, instance, {
+			candidates: flat.map((entry) => [
+				entry.userKey,
+				{ ...entry.doc, collection: entry.users.collection },
+			]),
 			channel: input.channel,
 			key: input.key,
-			userKeys: flat.map((entry) => entry.userKey),
 		})
 	)
 	return flat

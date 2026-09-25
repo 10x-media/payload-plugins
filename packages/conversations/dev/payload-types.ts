@@ -68,6 +68,7 @@ export interface Config {
   };
   blocks: {};
   collections: {
+    tenants: Tenant;
     users: User;
     customers: Customer;
     persons: Person;
@@ -85,6 +86,7 @@ export interface Config {
   };
   collectionsJoins: {};
   collectionsSelect: {
+    tenants: TenantsSelect<false> | TenantsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     customers: CustomersSelect<false> | CustomersSelect<true>;
     persons: PersonsSelect<false> | PersonsSelect<true>;
@@ -155,11 +157,27 @@ export interface CustomerAuthOperations {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tenants".
+ */
+export interface Tenant {
+  id: string;
+  name: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users".
  */
 export interface User {
   id: string;
   name?: string | null;
+  tenants?:
+    | {
+        tenant: string | Tenant;
+        id?: string | null;
+      }[]
+    | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -186,6 +204,7 @@ export interface User {
 export interface Customer {
   id: string;
   name?: string | null;
+  tenant?: (string | null) | Tenant;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -211,6 +230,7 @@ export interface Customer {
  */
 export interface Person {
   id: string;
+  tenant?: (string | null) | Tenant;
   name: string;
   owner?: (string | null) | Customer;
   notes?: string | null;
@@ -236,6 +256,10 @@ export interface Room {
   id: string;
   name: string;
   topic?: string | null;
+  /**
+   * Archived rooms are read only.
+   */
+  archived?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -405,6 +429,10 @@ export interface PayloadLockedDocument {
   id: string;
   document?:
     | ({
+        relationTo: 'tenants';
+        value: string | Tenant;
+      } | null)
+    | ({
         relationTo: 'users';
         value: string | User;
       } | null)
@@ -498,10 +526,25 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tenants_select".
+ */
+export interface TenantsSelect<T extends boolean = true> {
+  name?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
   name?: T;
+  tenants?:
+    | T
+    | {
+        tenant?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -525,6 +568,7 @@ export interface UsersSelect<T extends boolean = true> {
  */
 export interface CustomersSelect<T extends boolean = true> {
   name?: T;
+  tenant?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -547,6 +591,7 @@ export interface CustomersSelect<T extends boolean = true> {
  * via the `definition` "persons_select".
  */
 export interface PersonsSelect<T extends boolean = true> {
+  tenant?: T;
   name?: T;
   owner?: T;
   notes?: T;
@@ -570,6 +615,7 @@ export interface MediaSelect<T extends boolean = true> {
 export interface RoomsSelect<T extends boolean = true> {
   name?: T;
   topic?: T;
+  archived?: T;
   updatedAt?: T;
   createdAt?: T;
 }

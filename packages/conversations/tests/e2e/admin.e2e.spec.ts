@@ -168,7 +168,7 @@ test.describe('chat example', () => {
 		await login(page, ME)
 		await page.goto('/admin/chat')
 		const rooms = page.locator('.chat-app__room')
-		await expect(rooms).toHaveText([/design/, /general/, /releases/])
+		await expect(rooms).toHaveText([/design/, /general/, /releases/, /winter-cup/])
 		await expect(rooms.filter({ hasText: 'releases' }).locator('.chat-app__badge')).toHaveText('2')
 		await page.screenshot({ path: 'test-results/chat-general.png' })
 

@@ -147,8 +147,12 @@ export const threadCursors = async (
 
 /**
  * Unread root messages per channel for each key: other people's, not deleted,
- * newer than that channel's cursor. One capped query per key and channel, run
- * in parallel.
+ * newer than that channel's cursor, capped at `UNREAD_CAP` each.
+ *
+ * One query for every pair: an `or` of one branch per key and channel, each
+ * served by the `(key, channel, parent, createdAt)` index, counted here. When
+ * that query hits its limit, a busy pair may have crowded out others, so the
+ * pairs still under the cap are counted again one query each.
  */
 export const unreadCounts = async (
 	req: PayloadRequest,
@@ -164,33 +168,53 @@ export const unreadCounts = async (
 	}
 ): Promise<Record<string, Record<string, number>>> => {
 	const out: Record<string, Record<string, number>> = {}
+	const pairs: Array<{ channel: string; cursor?: string; key: string }> = []
 	for (const { channels, key } of entries) {
 		out[key] = Object.fromEntries(channels.map((channel) => [channel, 0]))
+		for (const channel of channels) {
+			pairs.push({ channel, cursor: cursors.get(key)?.[channel], key })
+		}
 	}
-	await Promise.all(
-		entries.flatMap(({ channels, key }) =>
-			channels.map(async (channel) => {
-				const cursor = cursors.get(key)?.[channel]
-				const result = await req.payload.db.find({
-					collection: instance.messagesSlug,
-					limit: UNREAD_CAP,
-					pagination: false,
-					select: { id: true },
-					where: {
-						and: [
-							{ key: { equals: key } },
-							{ channel: { equals: channel } },
-							{ parent: { equals: null } },
-							{ deletedAt: { equals: null } },
-							{ authorKey: { not_equals: userKey } },
-							...(cursor ? [{ createdAt: { greater_than: cursor } }] : []),
-						],
-					},
-				})
-				const counts = out[key]
-				if (counts) counts[channel] = result.docs.length
+	if (pairs.length === 0) return out
+
+	const common: Where[] = [
+		{ parent: { equals: null } },
+		{ deletedAt: { equals: null } },
+		{ authorKey: { not_equals: userKey } },
+	]
+	const branch = ({ channel, cursor, key }: (typeof pairs)[number]): Where => ({
+		and: [
+			{ key: { equals: key } },
+			{ channel: { equals: channel } },
+			...(cursor ? [{ createdAt: { greater_than: cursor } }] : []),
+		],
+	})
+	const find = (where: Where, limit: number) =>
+		req.payload.db.find({
+			collection: instance.messagesSlug,
+			limit,
+			pagination: false,
+			select: { channel: true, key: true },
+			where,
+		})
+
+	const limit = UNREAD_CAP * pairs.length
+	const result = await find({ and: [...common, { or: pairs.map(branch) }] }, limit)
+	for (const row of result.docs as unknown as Array<{ channel: string; key: string }>) {
+		const counts = out[row.key]
+		if (counts && row.channel in counts) {
+			counts[row.channel] = Math.min(UNREAD_CAP, (counts[row.channel] ?? 0) + 1)
+		}
+	}
+	if (result.docs.length >= limit) {
+		const starved = pairs.filter((pair) => (out[pair.key]?.[pair.channel] ?? 0) < UNREAD_CAP)
+		await Promise.all(
+			starved.map(async (pair) => {
+				const exact = await find({ and: [...common, branch(pair)] }, UNREAD_CAP)
+				const counts = out[pair.key]
+				if (counts) counts[pair.channel] = exact.docs.length
 			})
 		)
-	)
+	}
 	return out
 }

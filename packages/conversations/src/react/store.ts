@@ -50,6 +50,8 @@ export class ConversationsStore {
 	private readonly transport: ConversationsClientTransport
 	private connection: TransportConnection | null = null
 	private readonly refs = new Map<string, number>()
+	/** Mounts per key that show the message count; the rest skip that query. */
+	private readonly countRefs = new Map<string, number>()
 	private readonly entries = new Map<string, SubscribeEntry>()
 	private readonly failed = new Map<string, Error>()
 	private readonly active = new Map<string, number>()
@@ -124,14 +126,21 @@ export class ConversationsStore {
 		return this.failed.get(key)
 	}
 
-	/** Mount a key; returns its release. */
-	retain(key: string): () => void {
+	/** Mount a key; `count` when the mount shows its message count. Returns its release. */
+	retain(key: string, { count = false }: { count?: boolean } = {}): () => void {
 		this.refs.set(key, (this.refs.get(key) ?? 0) + 1)
-		if (!this.entries.has(key)) this.request([key])
+		if (count) this.countRefs.set(key, (this.countRefs.get(key) ?? 0) + 1)
+		const entry = this.entries.get(key)
+		if (!entry || (count && entry.count === undefined)) this.request([key])
 		return () => {
-			const count = (this.refs.get(key) ?? 1) - 1
-			if (count > 0) {
-				this.refs.set(key, count)
+			if (count) {
+				const counting = (this.countRefs.get(key) ?? 1) - 1
+				if (counting > 0) this.countRefs.set(key, counting)
+				else this.countRefs.delete(key)
+			}
+			const left = (this.refs.get(key) ?? 1) - 1
+			if (left > 0) {
+				this.refs.set(key, left)
 				return
 			}
 			this.refs.delete(key)
@@ -197,7 +206,10 @@ export class ConversationsStore {
 		this.flushing = false
 		if (keys.length === 0) return
 		try {
-			const response = await this.api.subscribe(keys)
+			const response = await this.api.subscribe(
+				keys,
+				keys.filter((key) => this.countRefs.has(key))
+			)
 			const { entries, now, ...meta } = response
 			this.meta = meta
 			this.since ??= now

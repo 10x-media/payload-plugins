@@ -70,10 +70,11 @@ export const buildEndpoints = (instance: ConversationsInstance): Endpoint[] => {
 		{
 			handler: async (req) => {
 				const body = await readJson(req)
-				const keys = Array.isArray(body.keys)
-					? body.keys.filter((key): key is string => typeof key === 'string')
-					: []
-				return Response.json(await subscribe(req, instance, keys))
+				const strings = (value: unknown) =>
+					Array.isArray(value) ? value.filter((key): key is string => typeof key === 'string') : []
+				// `count` absent or true: every key; a list: those keys only.
+				const count = body.count === undefined || body.count === true ? true : strings(body.count)
+				return Response.json(await subscribe(req, instance, { count, keys: strings(body.keys) }))
 			},
 			method: 'post',
 			path: `${base}/subscribe`,

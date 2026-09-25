@@ -16,7 +16,7 @@ export const projectUsers = async (
 	userKeys: Iterable<string>
 ): Promise<AuthorsMap> => {
 	const keys = new Set(userKeys)
-	const users = await loadUsers(req, instance, keys)
+	const users = await loadUsers(req, instance, { userKeys: keys })
 	const displays = new Map(instance.users.map((entry) => [entry.collection, entry.display]))
 	const projected: AuthorsMap = {}
 	for (const key of keys) {

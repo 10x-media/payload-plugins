@@ -3,14 +3,23 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
+import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { buildConfig, type CollectionConfig, type PayloadRequest, type Where } from 'payload'
+import { buildConfig, type CollectionConfig } from 'payload'
 import { comments } from '../src/exports/comments'
 import { reactions } from '../src/exports/reactions'
 import { conversations, defineMessageType, perTarget } from '../src/index'
 import { autoReply } from './helpers/autoReply'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
+import {
+	isPlatform,
+	isStaff,
+	mentionableInTenant,
+	PLATFORM_EMAIL,
+	tenants,
+	tenantsOf,
+} from './tenancy'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
@@ -24,12 +33,15 @@ const users: CollectionConfig = {
 	fields: [{ name: 'name', type: 'text' }],
 }
 
-/** Website accounts: they read and write the shared channel of their own persons only. */
+/** Website accounts of one tenant: they read and write the shared channel of their own persons only. */
 const customers: CollectionConfig = {
 	slug: 'customers',
 	auth: true,
 	admin: { useAsTitle: 'name' },
-	fields: [{ name: 'name', type: 'text' }],
+	fields: [
+		{ name: 'name', type: 'text' },
+		{ name: 'tenant', type: 'relationship', relationTo: 'tenants' },
+	],
 }
 
 const persons: CollectionConfig = {
@@ -56,10 +68,9 @@ const rooms: CollectionConfig = {
 	fields: [
 		{ name: 'name', type: 'text', required: true },
 		{ name: 'topic', type: 'text' },
+		{ name: 'archived', type: 'checkbox', admin: { description: 'Archived rooms are read only.' } },
 	],
 }
-
-const isStaff = (req: PayloadRequest) => req.user?.collection === 'users'
 
 const db =
 	useDb === 'postgres'
@@ -81,17 +92,31 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	editor: lexicalEditor(),
-	collections: [users, customers, persons, media, rooms],
+	collections: [tenants, users, customers, persons, media, rooms],
 	plugins: [
+		// Persons belong to a tenant; staff to one or more (the dev admin to all of them).
+		multiTenantPlugin({
+			collections: { persons: {} },
+			tenantsSlug: 'tenants',
+			userHasAccessToAllTenants: (user) =>
+				(user as { email?: string } | null)?.email === PLATFORM_EMAIL,
+		}),
 		conversations({
 			slug: 'comments',
 			users: ['users', 'customers'],
-			// Staff see every conversation; a customer only those of persons they own.
+			// Everything about the target is decided here, in one batch: staff see the persons of
+			// their tenants, a customer only the persons they own. Media has no tenant.
 			access: perTarget(
-				({ doc, req }) =>
-					isStaff(req) ||
-					(req.user?.collection === 'customers' &&
-						String(doc?.owner ?? '') === String(req.user.id)),
+				({ doc, req, target }) => {
+					if (isStaff(req)) {
+						if (target.slug !== 'persons' || isPlatform(req)) return true
+						const tenant = doc?.tenant ? String(doc.tenant) : ''
+						return tenantsOf(req).includes(tenant)
+					}
+					return (
+						req.user?.collection === 'customers' && String(doc?.owner ?? '') === String(req.user.id)
+					)
+				},
 				{ load: true }
 			),
 			channels: [
@@ -109,9 +134,9 @@ export default buildConfig({
 				},
 			],
 			mentions: {
-				// Customers are mentionable only by staff; the channel rule filters the rest.
-				users: ({ collection, req }): Where =>
-					collection === 'customers' && !isStaff(req) ? { id: { exists: false } } : {},
+				// Only people of the person's tenant, customers only by staff; the channel rule
+				// filters the rest (a customer is never mentioned in Internal).
+				users: mentionableInTenant,
 			},
 			hooks: {
 				// Whoever you mention answers a few seconds later (dev only).
@@ -142,7 +167,11 @@ export default buildConfig({
 		conversations({
 			slug: 'chat',
 			users: ['users'],
-			access: perTarget(({ req }) => isStaff(req)),
+			// An archived room stays readable but takes no new messages, edits or deletes.
+			access: perTarget(
+				({ doc, req }) => isStaff(req) && (doc?.archived ? { read: true, create: [] } : true),
+				{ load: true }
+			),
 			channels: [
 				{
 					slug: 'messages',

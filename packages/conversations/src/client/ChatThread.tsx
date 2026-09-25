@@ -50,6 +50,7 @@ export const ChatThread = ({
 			<ChatFeed
 				conversation={{ ...conversation, authors: merged }}
 				instance={instance}
+				readOnly={!channel.canCreate}
 				renderType={renderType}
 			/>
 			<ChatComposer

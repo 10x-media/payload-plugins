@@ -183,6 +183,6 @@ describe('instance resolution', () => {
 		])
 		expect(instance.channelsFor({ key: '', kind: 'collection', slug: 'media' })).toEqual([])
 		const req = { user: { collection: 'users', id: 1 } } as never
-		expect(await instance.allowedKeys(req, ['collection:persons:1'])).toEqual(new Set())
+		expect(await instance.grants(req, ['collection:persons:1'])).toEqual(new Map())
 	})
 })

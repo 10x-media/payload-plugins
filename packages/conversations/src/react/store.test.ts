@@ -5,14 +5,14 @@ import type { ConversationsApi } from './api'
 import { ConversationsStore } from './store'
 import type { TransportConnection } from './transport'
 
-const response = (keys: string[]): SubscribeResponse => ({
+const response = (keys: string[], count: string[] = keys): SubscribeResponse => ({
 	channels: { internal: { label: 'Internal' } },
 	deleted: 'placeholderIfReplies',
 	entries: keys
 		.filter((key) => key !== 'denied')
 		.map((key) => ({
 			channels: [{ canCreate: true, slug: 'internal' }],
-			count: 1,
+			...(count.includes(key) ? { count: 1 } : {}),
 			key,
 			token: `t:${key}`,
 			unread: { internal: 1 },
@@ -25,7 +25,7 @@ const response = (keys: string[]): SubscribeResponse => ({
 })
 
 const setup = () => {
-	const subscribe = vi.fn(async (keys: string[]) => response(keys))
+	const subscribe = vi.fn(async (keys: string[], count?: string[]) => response(keys, count))
 	const connection: TransportConnection = {
 		destroy: vi.fn(),
 		notify: vi.fn(),
@@ -57,7 +57,7 @@ describe('conversations store', () => {
 		store.retain('c')
 		await tick()
 		expect(subscribe).toHaveBeenCalledTimes(1)
-		expect(subscribe).toHaveBeenCalledWith(['a', 'b', 'c'])
+		expect(subscribe).toHaveBeenCalledWith(['a', 'b', 'c'], [])
 		expect(store.entry('b')?.unread).toEqual({ internal: 1 })
 		expect(connection.watch).toHaveBeenLastCalledWith(
 			[
@@ -67,6 +67,18 @@ describe('conversations store', () => {
 			],
 			'2026-01-01T00:00:00.000Z'
 		)
+	})
+
+	it('asks for message counts only where a mount shows them', async () => {
+		const { store, subscribe } = setup()
+		store.retain('a')
+		await tick()
+		expect(subscribe).toHaveBeenLastCalledWith(['a'], [])
+		expect(store.entry('a')?.count).toBeUndefined()
+		store.retain('a', { count: true })
+		await tick()
+		expect(subscribe).toHaveBeenLastCalledWith(['a'], ['a'])
+		expect(store.entry('a')?.count).toBe(1)
 	})
 
 	it('marks keys the user may not see', async () => {

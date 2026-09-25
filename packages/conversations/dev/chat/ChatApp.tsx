@@ -15,7 +15,7 @@ import { useState } from 'react'
 
 import './chat.css'
 
-export type ChatRoom = { id: string; name: string; topic: string }
+export type ChatRoom = { archived: boolean; id: string; name: string; topic: string }
 
 const INSTANCE = 'chat'
 const CHANNEL = 'messages'
@@ -79,6 +79,7 @@ const Sidebar = ({
 						>
 							<Hash />
 							<span className="chat-app__room-name">{room.name}</span>
+							{room.archived ? <span className="chat-app__archived">archived</span> : null}
 							{count > 0 && room.id !== activeId ? (
 								<span className="chat-app__badge">{count > 99 ? '99+' : count}</span>
 							) : null}
@@ -122,7 +123,7 @@ const Room = ({
 	thread: null | WindowMessage
 }) => {
 	const key = roomKey(room)
-	const { channels, status, viewer } = useChannels(key)
+	const { channels, status, viewer } = useChannels(key, { count: false })
 	const channel = channels.find((entry) => entry.slug === CHANNEL)
 	const conversation = useConversation({ channel: CHANNEL, key })
 	const root = thread
@@ -151,12 +152,13 @@ const Room = ({
 							}
 							instance={INSTANCE}
 							onOpenThread={onOpenThread}
+							readOnly={!channel.canCreate}
 						/>
 						<div className="chat-app__composer">
 							<ChatComposer
 								channel={CHANNEL}
 								conversationKey={key}
-								disabledReason={channel.canCreate ? undefined : 'You cannot post in this room.'}
+								disabledReason={channel.canCreate ? undefined : 'This room is archived: read only.'}
 								instance={INSTANCE}
 								placeholder={`Message #${room.name}`}
 							/>

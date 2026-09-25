@@ -1,14 +1,32 @@
-import { type CollectionSlug, createLocalReq, type PayloadRequest, type TypedUser } from 'payload'
+import {
+	type CollectionSlug,
+	createLocalReq,
+	type PayloadRequest,
+	type TypedUser,
+	type Where,
+} from 'payload'
 
 import { parseKey, parseUserKey, userKey } from '../shared/keys'
 import type { ConversationsInstance } from '../types'
+import { channelAllows } from './access'
 
-/** Load users by key across the instance's users collections, skipping unknown ones. */
+type LoadedUser = Record<string, unknown> & { collection: string }
+
+/**
+ * Load users by key across the instance's users collections, skipping unknown
+ * ones. `scope` narrows each collection's query further.
+ */
 export const loadUsers = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
-	userKeys: Iterable<string>
-): Promise<Map<string, Record<string, unknown> & { collection: string }>> => {
+	{
+		scope,
+		userKeys,
+	}: {
+		scope?: (collection: string) => Promise<undefined | Where> | undefined | Where
+		userKeys: Iterable<string>
+	}
+): Promise<Map<string, LoadedUser>> => {
 	const byCollection = new Map<string, Set<string>>()
 	const served = new Set(instance.users.map((entry) => entry.collection))
 	for (const key of userKeys) {
@@ -19,9 +37,11 @@ export const loadUsers = async (
 			byCollection.set(ref.collection, ids)
 		}
 	}
-	const found = new Map<string, Record<string, unknown> & { collection: string }>()
+	const found = new Map<string, LoadedUser>()
 	await Promise.all(
 		[...byCollection].map(async ([collection, ids]) => {
+			const narrow = await scope?.(collection)
+			const byId: Where = { id: { in: [...ids] } }
 			const result = await req.payload.find({
 				collection: collection as CollectionSlug,
 				depth: 0,
@@ -29,7 +49,7 @@ export const loadUsers = async (
 				overrideAccess: true,
 				pagination: false,
 				req,
-				where: { id: { in: [...ids] } },
+				where: narrow ? { and: [byId, narrow] } : byId,
 			})
 			for (const doc of result.docs as unknown as Array<Record<string, unknown>>) {
 				found.set(userKey(collection, doc.id as string), { ...doc, collection })
@@ -50,34 +70,69 @@ export const requestAs = async (
 	)
 
 /**
- * The users among `userKeys` who can read `channel` of `key`: conversation
- * access and channel `read`, each run as that user. Used for mentions, so the
- * `afterMention` promise holds: a mentioned user can read the message.
+ * The candidates who may be mentioned in `channel` of `key`: each passes the
+ * channel's `read` rule as themselves, and with `mentions.verifyAccess` also
+ * conversation access. Candidates come in already narrowed by
+ * `mentions.users`. Returns their keys in the given order.
+ */
+export const readersAmong = async (
+	req: PayloadRequest,
+	instance: ConversationsInstance,
+	{
+		candidates,
+		channel,
+		key,
+	}: { candidates: Array<[string, LoadedUser]>; channel: string; key: string }
+): Promise<string[]> => {
+	const readable = await Promise.all(
+		candidates.map(async ([, user]) => {
+			const asUser = await requestAs(req, user)
+			if (!(await channelAllows(asUser, instance, { action: 'read', channel }))) {
+				return false
+			}
+			if (!instance.mentions.verifyAccess) {
+				return true
+			}
+			return (await instance.grants(asUser, [key])).get(key)?.read.has(channel) ?? false
+		})
+	)
+	return candidates.filter((_, index) => readable[index]).map(([candidate]) => candidate)
+}
+
+/** The scope `mentions.users` gives the sender for one users collection. */
+export const mentionScope =
+	(
+		req: PayloadRequest,
+		instance: ConversationsInstance,
+		{ channel, key }: { channel: string; key: string }
+	) =>
+	(collection: string) =>
+		instance.mentions.users?.({ channel, collection, key, req })
+
+/**
+ * The users among `userKeys` who may be mentioned in `channel` of `key`: one
+ * query per users collection with `mentions.users` folded in, then the
+ * channel rule per candidate (see `readersAmong`). Backs the `afterMention`
+ * promise.
  */
 export const filterReaders = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
 	{ channel, key, userKeys }: { channel: string; key: string; userKeys: string[] }
 ): Promise<string[]> => {
-	const target = parseKey(key)
-	const channelConfig = instance.channels.get(channel)
-	if (!target || !channelConfig || userKeys.length === 0) {
+	if (!parseKey(key) || !instance.channels.has(channel) || userKeys.length === 0) {
 		return []
 	}
-	const users = await loadUsers(req, instance, userKeys)
-	const readable = await Promise.all(
-		userKeys.map(async (candidate) => {
+	const users = await loadUsers(req, instance, {
+		scope: mentionScope(req, instance, { channel, key }),
+		userKeys,
+	})
+	return readersAmong(req, instance, {
+		candidates: userKeys.flatMap((candidate) => {
 			const user = users.get(candidate)
-			if (!user) {
-				return false
-			}
-			const asUser = await requestAs(req, user)
-			const allowed = await instance.allowedKeys(asUser, [key])
-			if (!allowed.has(key)) {
-				return false
-			}
-			return channelConfig.access.read({ key, req: asUser, target })
-		})
-	)
-	return userKeys.filter((_, index) => readable[index])
+			return user ? [[candidate, user] as [string, LoadedUser]] : []
+		}),
+		channel,
+		key,
+	})
 }

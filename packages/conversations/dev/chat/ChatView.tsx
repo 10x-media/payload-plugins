@@ -19,7 +19,12 @@ export const ChatView = async ({ initPageResult, params, searchParams }: AdminVi
 			sort: 'name',
 		})
 		for (const doc of result.docs) {
-			rooms.push({ id: String(doc.id), name: doc.name ?? 'untitled', topic: doc.topic ?? '' })
+			rooms.push({
+				archived: Boolean(doc.archived),
+				id: String(doc.id),
+				name: doc.name ?? 'untitled',
+				topic: doc.topic ?? '',
+			})
 		}
 	}
 	return (

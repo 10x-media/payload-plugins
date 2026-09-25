@@ -5,6 +5,7 @@ import type {
 	ConversationsExtension,
 	ConversationsTarget,
 	MessageTypeDefinition,
+	TargetGrant,
 } from '../types'
 
 /**
@@ -22,17 +23,23 @@ export const defineExtension = <TOptions = unknown>(
 	extension: ConversationsExtension & { options?: TOptions }
 ): ConversationsExtension & { options?: TOptions } => extension
 
+/**
+ * Access to one target: `false` denies, `true` gives every offered channel,
+ * a list or `{ read, create }` narrows it (see `TargetGrant`).
+ */
 export type PerTargetCheck = (args: {
 	/** The target document at depth 0 when `load` is set; `null` if it does not exist. */
 	doc?: null | Record<string, unknown>
 	req: PayloadRequest
 	target: ConversationsTarget
-}) => boolean | Promise<boolean>
+}) => false | Promise<false | TargetGrant> | TargetGrant
 
 /**
- * Conversation access from a per-target predicate, for simple cases. With
+ * Conversation access from a per-target check, for simple cases. With
  * `load: true` the target documents are loaded first, one query per
  * collection (depth 0, access overridden), and a missing document is denied.
+ * The check may answer per target with a channel list or `{ read, create }`,
+ * e.g. `{ read: true, create: [] }` once a ticket is closed.
  */
 export const perTarget =
 	(check: PerTargetCheck, options: { load?: boolean } = {}): ConversationsAccess =>
@@ -80,12 +87,12 @@ export const perTarget =
 			])
 		}
 		const results = await Promise.all(
-			targets.map(async (target) => {
+			targets.map(async (target): Promise<false | TargetGrant> => {
 				if (options.load && target.kind === 'collection' && docs.get(target.key) === null) {
 					return false
 				}
 				return check({ doc: docs.get(target.key), req, target })
 			})
 		)
-		return targets.filter((_, index) => results[index]).map((target) => target.key)
+		return Object.fromEntries(targets.map((target, index) => [target.key, results[index] ?? false]))
 	}

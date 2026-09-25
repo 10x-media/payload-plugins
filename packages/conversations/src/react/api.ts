@@ -129,6 +129,8 @@ export const createApi = ({
 		read: (body: { at: string; channels?: string[]; key: string; thread?: string }) =>
 			request<{ ok: true }>('/read', json('POST', body)),
 		send: (body: SendBody) => request<MessageResponse>('/messages', json('POST', body)),
-		subscribe: (keys: string[]) => request<SubscribeResponse>('/subscribe', json('POST', { keys })),
+		/** `count`: the keys whose message count is wanted; omitted, all of them. */
+		subscribe: (keys: string[], count?: string[]) =>
+			request<SubscribeResponse>('/subscribe', json('POST', count ? { count, keys } : { keys })),
 	}
 }

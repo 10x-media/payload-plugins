@@ -9,6 +9,7 @@ import type {
 	Where,
 } from 'payload'
 
+import type { ResolvedGrant } from './server/access'
 import type { ParsedKey, UserRef } from './shared/keys'
 import type { TranslationsOption } from './translations'
 
@@ -58,16 +59,39 @@ export type AuthorsMap = Record<string, AuthorProjection>
 export type ConversationsTarget = Omit<ParsedKey, 'key'> & { key: string }
 
 /**
+ * What one user gets on one target. `true`: every channel the target offers,
+ * to read and write. A list: those channels. `{ read, create }`: read one set
+ * and write another (`create` defaults to `read`; writing implies reading),
+ * e.g. `{ read: true, create: [] }` for a conversation that became read-only.
+ */
+export type TargetGrant = true | string[] | { create?: true | string[]; read: true | string[] }
+
+/**
+ * Either the keys the user may see (every offered channel, read and write),
+ * or a grant per key. A key left out, `false` or `null` is denied.
+ */
+export type ConversationsAccessResult =
+	| string[]
+	| Record<string, false | null | TargetGrant | undefined>
+
+/**
  * Conversation access, batch by design: given the targets a request asks
- * about, return the keys the user may see. A list of 25 targets costs one
- * query, not 25. Required; without it nothing is allowed.
+ * about, answer for all of them at once. A list of 25 targets costs one
+ * query, not 25. Everything that depends on the target (ownership, tenant,
+ * a closed ticket) belongs here; channel rules see only the user. Required;
+ * without it nothing is allowed.
  */
 export type ConversationsAccess = (args: {
 	req: PayloadRequest
 	targets: ConversationsTarget[]
-}) => Promise<string[]> | string[]
+}) => ConversationsAccessResult | Promise<ConversationsAccessResult>
 
-type ChannelArgs = { key: string; req: PayloadRequest; target: ParsedKey }
+/**
+ * A channel rule sees the user, not the target: it runs once per request
+ * and channel however many conversations are asked about. Put anything
+ * target-specific in conversation access instead.
+ */
+type ChannelArgs = { channel: string; req: PayloadRequest }
 type MessageArgs = { message: ConversationMessage; req: PayloadRequest }
 
 export type ConversationsChannel = {
@@ -146,6 +170,11 @@ export type DeleteWithTarget =
 	| ((args: { instance: string; key: string; req: PayloadRequest }) => Promise<void> | void)
 
 export type ConversationsHooks = {
+	/**
+	 * New mentions, after the message is saved. Each user matched
+	 * `mentions.users` and passes the channel's `read` rule; with
+	 * `mentions.verifyAccess` they also pass conversation access.
+	 */
 	afterMention?: (args: {
 		channel: string
 		key: string
@@ -182,13 +211,24 @@ export type ConversationsPluginOptions = {
 	mentions?: {
 		/** Mentions kept per message. Default 20. */
 		max?: number
-		/** Who can be mentioned, per users collection. */
+		/**
+		 * Who can be mentioned, per users collection, as a `Where` built for the
+		 * sender's request. This is where target-level visibility of mentionable
+		 * people goes (same tenant, same team): candidates are the users it
+		 * matches who pass the channel's `read` rule.
+		 */
 		users?: (args: {
 			channel: string
 			collection: string
 			key: string
 			req: PayloadRequest
 		}) => Promise<Where> | Where
+		/**
+		 * Also run conversation access as each candidate, so a mention only ever
+		 * reaches someone who can open the conversation. One access run per
+		 * candidate; default off, `users` is the cheaper place for that rule.
+		 */
+		verifyAccess?: boolean
 	}
 	overrides?: {
 		messages?: CollectionOverride
@@ -313,8 +353,8 @@ export type ResolvedUsersConfig = {
 /** A resolved instance: what endpoints, hooks and extensions work against. */
 export type ConversationsInstance = {
 	access: ConversationsAccess
-	/** Keys among `keys` the request may see (conversation access only). */
-	allowedKeys: (req: PayloadRequest, keys: string[]) => Promise<Set<string>>
+	/** Conversation access for `keys`, as grants within each target's offered channels. */
+	grants: (req: PayloadRequest, keys: string[]) => Promise<Map<string, ResolvedGrant>>
 	channels: Map<string, ConversationsChannel>
 	/** Channels a target offers, in instance order; empty when the target is not served. */
 	channelsFor: (target: ParsedKey) => string[]
@@ -331,6 +371,7 @@ export type ConversationsInstance = {
 	mentions: {
 		max: number
 		users?: NonNullable<ConversationsPluginOptions['mentions']>['users']
+		verifyAccess: boolean
 	}
 	/** Registered by the plugin, so typed as one of the host's collection slugs. */
 	messagesSlug: CollectionSlug

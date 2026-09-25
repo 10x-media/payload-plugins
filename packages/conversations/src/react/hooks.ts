@@ -52,9 +52,13 @@ export type UseChannelsResult = {
  * unread counts. Mounting it subscribes the key; many mounts in one tick share
  * one request.
  */
-export const useChannels = (key: null | string | undefined): UseChannelsResult => {
+export const useChannels = (
+	key: null | string | undefined,
+	/** `count: false` skips the message count (one query per key) when it is not shown. */
+	{ count = true }: { count?: boolean } = {}
+): UseChannelsResult => {
 	const store = useChatStore()
-	useEffect(() => (key ? store.retain(key) : undefined), [key, store])
+	useEffect(() => (key ? store.retain(key, { count }) : undefined), [count, key, store])
 	useSyncExternalStore(store.subscribe, store.getVersion, store.getVersion)
 	const entry = key ? store.entry(key) : undefined
 	const error = key ? store.error(key) : undefined

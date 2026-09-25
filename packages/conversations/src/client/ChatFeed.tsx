@@ -31,6 +31,8 @@ export type ChatFeedProps = {
 	/** Rows from elsewhere, interleaved by timestamp. */
 	items?: FeedItem[]
 	onOpenThread?: (message: WindowMessage) => void
+	/** The channel takes no writes here, so messages offer no Edit or Delete. */
+	readOnly?: boolean
 	/** Replaces the default message renderer. */
 	renderMessage?: (args: {
 		compact: boolean
@@ -68,6 +70,7 @@ export const ChatFeed = ({
 	instance,
 	items = [],
 	onOpenThread,
+	readOnly,
 	renderMessage,
 	renderType,
 }: ChatFeedProps) => {
@@ -250,6 +253,7 @@ export const ChatFeed = ({
 									instance={instance}
 									message={message}
 									onOpenThread={onOpenThread}
+									readOnly={readOnly}
 									renderType={renderType}
 									threadReadAt={conversation.threadReads[String(message.id)]}
 									viewer={conversation.viewer}

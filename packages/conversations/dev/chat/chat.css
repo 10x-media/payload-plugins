@@ -216,3 +216,9 @@
 		background: var(--theme-bg);
 	}
 }
+
+.chat-app__archived {
+	margin-left: auto;
+	font-size: calc(var(--base) * 0.55);
+	color: var(--theme-elevation-500);
+}

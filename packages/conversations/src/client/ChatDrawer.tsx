@@ -71,7 +71,7 @@ const DrawerBody = ({
 }: ChatDrawerProps) => {
 	const { i18n, t } = useTranslation()
 	const { closeModal, openModal } = useModal()
-	const { channels, reads, viewer } = useChannels(conversationKey)
+	const { channels, reads, viewer } = useChannels(conversationKey, { count: false })
 	const [active, setActive] = useState<null | string>(null)
 	const [thread, setThread] = useState<null | WindowMessage>(null)
 	const current = channels.find((channel) => channel.slug === active) ?? channels[0]
@@ -120,6 +120,7 @@ const DrawerBody = ({
 						instance={instance}
 						key={`feed:${current.slug}`}
 						onOpenThread={openThread}
+						readOnly={!current.canCreate}
 						renderType={renderType}
 					/>
 					<ChatComposer

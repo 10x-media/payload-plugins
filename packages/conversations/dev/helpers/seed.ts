@@ -18,19 +18,44 @@ const LINES = [
 
 const ensureUser = async (
 	payload: Payload,
-	{ collection, email, name }: { collection: 'customers' | 'users'; email: string; name: string }
+	{
+		collection,
+		email,
+		name,
+		tenants = [],
+	}: { collection: 'customers' | 'users'; email: string; name: string; tenants?: string[] }
 ) => {
 	const found = await payload.find({ collection, limit: 1, where: { email: { equals: email } } })
 	if (found.docs[0]) return found.docs[0]
-	return payload.create({ collection, data: { email, name, password: DEV_PASSWORD } })
+	const data =
+		collection === 'users'
+			? { tenants: tenants.map((tenant) => ({ tenant })) }
+			: { tenant: tenants[0] ?? null }
+	return payload.create({
+		collection,
+		data: { email, name, password: DEV_PASSWORD, ...data } as never,
+	})
+}
+
+const ensureTenant = async (payload: Payload, name: string): Promise<string> => {
+	const found = await payload.find({
+		collection: 'tenants',
+		limit: 1,
+		where: { name: { equals: name } },
+	})
+	const doc = found.docs[0] ?? (await payload.create({ collection: 'tenants', data: { name } }))
+	return String(doc.id)
 }
 
 /**
- * Seed the dev app: two staff users (log in as the first), a customer, two
- * persons, and one conversation long enough to page through (130 messages,
- * a thread, a mention). Idempotent.
+ * Seed the dev app: two tenants; staff (log in as the first, who sees every
+ * tenant; Anna is in both, Marc only in Rowing); a customer per tenant; a
+ * person per tenant; and one conversation long enough to page through (130
+ * messages, a thread, a mention). Idempotent.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
+	const canoe = await ensureTenant(payload, 'Canoe Federation')
+	const rowing = await ensureTenant(payload, 'Rowing Club')
 	const me = await ensureUser(payload, {
 		collection: 'users',
 		email: DEV_EMAIL,
@@ -40,23 +65,40 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		collection: 'users',
 		email: 'anna@10xmedia.de',
 		name: 'Anna Keller',
+		tenants: [canoe, rowing],
+	})
+	const marc = await ensureUser(payload, {
+		collection: 'users',
+		email: 'marc@10xmedia.de',
+		name: 'Marc Oliveira',
+		tenants: [rowing],
 	})
 	const customer = await ensureUser(payload, {
 		collection: 'customers',
 		email: 'customer@example.com',
 		name: 'Czech Canoe',
+		tenants: [canoe],
+	})
+	await ensureUser(payload, {
+		collection: 'customers',
+		email: 'rowers@example.com',
+		name: 'River Rowers',
+		tenants: [rowing],
 	})
 
-	await seedChat(payload, { anna: String(anna.id), me: String(me.id) })
+	await seedChat(payload, { anna: String(anna.id), marc: String(marc.id), me: String(me.id) })
 
 	if ((await payload.count({ collection: 'persons' })).totalDocs > 0) return
 	payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 
 	const athlete = await payload.create({
 		collection: 'persons',
-		data: { name: 'Jana Nováková', owner: customer.id },
+		data: { name: 'Jana Nováková', owner: customer.id, tenant: canoe } as never,
 	})
-	await payload.create({ collection: 'persons', data: { name: 'Tomás Ruiz' } })
+	await payload.create({
+		collection: 'persons',
+		data: { name: 'Tomás Ruiz', tenant: rowing } as never,
+	})
 	await payload.create({ collection: 'media', data: { title: 'Passport scan' } })
 
 	const key = `collection:persons:${athlete.id}`
@@ -160,7 +202,13 @@ type ChatLine = {
 }
 
 /** `readTo`: minutes ago the dev user last read the room; `null` never, absent all read. */
-const ROOMS: Array<{ lines: ChatLine[]; name: string; readTo?: null | number; topic: string }> = [
+const ROOMS: Array<{
+	archived?: boolean
+	lines: ChatLine[]
+	name: string
+	readTo?: null | number
+	topic: string
+}> = [
 	{
 		lines: [
 			{
@@ -227,24 +275,28 @@ const ROOMS: Array<{ lines: ChatLine[]; name: string; readTo?: null | number; to
 		readTo: null,
 		topic: 'What ships and when',
 	},
+	{
+		archived: true,
+		lines: [
+			{ ago: 90 * 1440, author: 'anna', text: 'Final results are published, thanks everyone!' },
+			{ ago: 90 * 1440 - 10, author: 'marc', text: 'Archiving this room, see you in spring.' },
+		],
+		name: 'winter-cup',
+		topic: 'Last season, archived: read only',
+	},
 ]
 
 /**
- * Seed the `chat` instance: three staff users and three rooms with a few
- * days of history and a thread. Dates are moved back after posting, since
+ * Seed the `chat` instance: four rooms (one archived, so read only) with a
+ * few days of history and a thread. Dates are moved back after posting, since
  * messages are stamped when they are created. Idempotent.
  */
 export const seedChat = async (
 	payload: Payload,
-	{ anna, me }: { anna: string; me: string }
+	{ anna, marc, me }: { anna: string; marc: string; me: string }
 ): Promise<void> => {
-	const marc = await ensureUser(payload, {
-		collection: 'users',
-		email: 'marc@10xmedia.de',
-		name: 'Marc Oliveira',
-	})
 	if ((await payload.count({ collection: 'rooms' })).totalDocs > 0) return
-	const authors = { anna: `users:${anna}`, marc: `users:${marc.id}`, me: `users:${me}` }
+	const authors = { anna: `users:${anna}`, marc: `users:${marc}`, me: `users:${me}` }
 	const req = await createLocalReq({}, payload)
 	const collection = 'chat-messages'
 	const at = (ago: number) => new Date(Date.now() - ago * 60_000).toISOString()
@@ -254,7 +306,7 @@ export const seedChat = async (
 	for (const room of ROOMS) {
 		const doc = await payload.create({
 			collection: 'rooms',
-			data: { name: room.name, topic: room.topic },
+			data: { archived: room.archived ?? false, name: room.name, topic: room.topic },
 		})
 		const key = `collection:rooms:${doc.id}`
 		for (const line of room.lines) {

@@ -1,5 +1,6 @@
 import type { CollectionSlug, Config, PayloadComponent, PayloadRequest } from 'payload'
 
+import { resolveGrants } from '../server/access'
 import { parseKey } from '../shared/keys'
 import type {
 	ConversationsExtension,
@@ -178,23 +179,21 @@ export const resolveInstance = (
 		return table[target.slug] ?? []
 	}
 
-	const allowedKeys: ConversationsInstance['allowedKeys'] = async (
-		req: PayloadRequest,
-		keys: string[]
-	) => {
+	const grants: ConversationsInstance['grants'] = async (req: PayloadRequest, keys: string[]) => {
 		const served: ConversationsTarget[] = []
+		const offered = new Map<string, string[]>()
 		for (const key of new Set(keys)) {
 			const parsed = parseKey(key)
-			if (parsed && channelsFor(parsed).length > 0) {
+			const channels = parsed ? channelsFor(parsed) : []
+			if (parsed && channels.length > 0) {
 				served.push(parsed)
+				offered.set(parsed.key, channels)
 			}
 		}
 		if (served.length === 0 || !req.user) {
-			return new Set()
+			return new Map()
 		}
-		const allowed = await access({ req, targets: served })
-		const requested = new Set(served.map((target) => target.key))
-		return new Set(allowed.filter((key) => requested.has(key)))
+		return resolveGrants(await access({ req, targets: served }), offered)
 	}
 
 	const types = new Map<string, MessageTypeDefinition>()
@@ -207,7 +206,7 @@ export const resolveInstance = (
 
 	return {
 		access,
-		allowedKeys,
+		grants,
 		channels,
 		channelsFor,
 		deleted: options.deleted ?? 'placeholderIfReplies',
@@ -219,7 +218,11 @@ export const resolveInstance = (
 			bodyBytes: options.limits?.bodyBytes ?? 64 * 1024,
 			bodyLength: options.limits?.bodyLength ?? 10_000,
 		},
-		mentions: { max: options.mentions?.max ?? 20, users: options.mentions?.users },
+		mentions: {
+			max: options.mentions?.max ?? 20,
+			users: options.mentions?.users,
+			verifyAccess: options.mentions?.verifyAccess ?? false,
+		},
 		messagesSlug: `${slug}-messages` as CollectionSlug,
 		overrides: options.overrides ?? {},
 		readsSlug: options.reads === false ? null : (`${slug}-reads` as CollectionSlug),

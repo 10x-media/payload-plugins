@@ -31,6 +31,8 @@ export type ChatMessageProps = {
 	message: WindowMessage
 	/** Opens the message's thread; absent inside a thread. */
 	onOpenThread?: (message: WindowMessage) => void
+	/** The channel takes no writes here: no Edit or Delete, even on the viewer's own messages. */
+	readOnly?: boolean
 	/** Renders a message whose `type` is not `text`. */
 	renderType?: (message: WindowMessage) => ReactNode
 	/** When the viewer last read this message's thread. */
@@ -52,6 +54,7 @@ export const ChatMessage = ({
 	instance,
 	message,
 	onOpenThread,
+	readOnly = false,
 	renderType,
 	threadReadAt,
 	viewer,
@@ -180,7 +183,7 @@ export const ChatMessage = ({
 						onDelete={() => openModal(deleteSlug)}
 						onEdit={() => setEditing(true)}
 						onOpenThread={onOpenThread}
-						own={own}
+						own={own && !readOnly}
 					/>
 				)}
 			</div>
