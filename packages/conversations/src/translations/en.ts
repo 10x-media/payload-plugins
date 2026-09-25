@@ -36,7 +36,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.linkPlaceholder]: 'Paste or type a link',
 	[keys.linkRemove]: 'Remove',
 	[keys.loadEarlier]: 'Load earlier',
-	[keys.loadNewer]: 'Load newer',
 	[keys.mention]: 'Mention someone',
 	[keys.mentionNoResults]: 'Nobody found',
 	[keys.messageDeleted]: 'Message deleted',
@@ -67,6 +66,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.today]: 'Today',
 	[keys.unknownType]: 'This message cannot be shown here',
 	[keys.unreadDot]: 'Unread messages',
+	[keys.unseenCount]: '{{count}} new',
 	[keys.yesterday]: 'Yesterday',
 	[keys.you]: 'You',
 }

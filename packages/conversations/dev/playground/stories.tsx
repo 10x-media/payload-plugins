@@ -21,7 +21,7 @@ import {
 	useConversation,
 	type WindowMessage,
 } from '@10x-media/conversations/react'
-import { useModal } from '@payloadcms/ui'
+import { Button, PopupList, useModal } from '@payloadcms/ui'
 import { type ReactNode, useState } from 'react'
 import {
 	ANNA,
@@ -155,18 +155,18 @@ const InlineConversation = ({
 				</Frame>
 				{thread && current ? (
 					<Frame>
-						<div className="conversations-drawer__header">
-							<div className="conversations-drawer__heading">
-								<h2 className="conversations-drawer__title">Thread</h2>
+						<div className="pg-thread-header">
+							<div>
+								<strong>Thread</strong>
 								<div className="conversations-drawer__subtitle">{label}</div>
 							</div>
-							<button
-								className="conversations-icon-button conversations-drawer__close"
+							<Button
+								buttonStyle="transparent"
+								icon={['x']}
+								margin={false}
 								onClick={() => setThread(null)}
-								type="button"
-							>
-								×
-							</button>
+								size="small"
+							/>
 						</div>
 						<ChatThread
 							authors={conversation.authors}
@@ -385,13 +385,9 @@ const MessageGallery = () => {
 			{row('g:plain', 'Compact follow-up', { props: { compact: true } })}
 			{row('g:edited', 'Compact and edited', { props: { compact: true } })}
 			{row('g:plain', 'Slots: header, footer, actions', {
-				note: 'hover for the actions slot',
+				note: 'open ⋯ for the actions slot',
 				props: {
-					actions: (
-						<button className="conversations-icon-button" type="button">
-							Pin
-						</button>
-					),
+					actions: <PopupList.Button>Pin</PopupList.Button>,
 					footer: <div className="pg-slot">footer slot</div>,
 					header: <div className="pg-slot">header slot replaces name and time</div>,
 				},
@@ -692,9 +688,9 @@ export const stories: Story[] = [
 						<ChatComposer
 							above={<div className="pg-slot">above slot</div>}
 							actions={
-								<button className="conversations-button" type="button">
+								<Button buttonStyle="secondary" margin={false} size="small">
 									Attach
-								</button>
+								</Button>
 							}
 							channel="internal"
 							conversationKey={MOCK_KEYS.sandbox}

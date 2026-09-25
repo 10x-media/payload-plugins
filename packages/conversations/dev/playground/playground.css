@@ -186,6 +186,13 @@
 	padding: 0 1rem 1rem;
 }
 
+.pg-thread-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	padding: 1rem 1rem 0.5rem;
+}
+
 .pg-empty {
 	padding: var(--base);
 	color: var(--theme-elevation-500);

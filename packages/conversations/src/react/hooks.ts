@@ -165,6 +165,8 @@ export const useConversation = ({
 	threadReadsRef.current = threadReads
 	/** Which window this is, for the provider's reopen cache. */
 	const cacheId = `${key}|${channelsKey}|${parent ?? ''}|${limit}`
+	/** The window the reducer state belongs to; it lags a render behind a switch. */
+	const owner = useRef<null | string>(null)
 	const generation = useRef(0)
 	const viewer = store.meta?.viewer ?? null
 	useSyncExternalStore(store.subscribe, store.getVersion, store.getVersion)
@@ -240,7 +242,7 @@ export const useConversation = ({
 	useEffect(
 		() => () => {
 			const current = stateRef.current
-			if (current.status !== 'ready') return
+			if (owner.current !== cacheId || current.status !== 'ready') return
 			store.cacheWindow(cacheId, {
 				authors: authorsRef.current,
 				// Unconfirmed sends are not kept: change sync brings the confirmed ones.
@@ -253,6 +255,7 @@ export const useConversation = ({
 
 	// Open from the cache when this window was shown before, then catch up; else load.
 	useEffect(() => {
+		owner.current = cacheId
 		const cached = store.cachedWindow(cacheId)
 		if (cached) {
 			generation.current++
@@ -265,6 +268,7 @@ export const useConversation = ({
 		}
 		setAuthors({})
 		setThreadReads({})
+		dispatch({ type: 'reset' })
 		void load(false)
 	}, [cacheId, load, store, sync])
 
@@ -353,19 +357,29 @@ export const useConversation = ({
 			.catch(() => undefined)
 	}, [channels, key, parent, store])
 
+	// Right after a switch (another channel, another thread) the state is still
+	// the previous feed's: show the new one's cached window, or a loading one.
+	const own = owner.current === cacheId
+	const cachedView = own ? undefined : store.cachedWindow(cacheId)
+	const view = own
+		? state
+		: cachedView
+			? windowReducer(initialWindow, { state: cachedView.state, type: 'restore' })
+			: windowReducer(initialWindow, { type: 'reset' })
+
 	return {
-		authors,
-		dividerBefore: dividerBefore(state, viewer),
-		error,
-		hasNewer: state.hasNewer,
-		hasOlder: state.hasOlder,
+		authors: own ? authors : (cachedView?.authors ?? {}),
+		dividerBefore: dividerBefore(view, viewer),
+		error: own ? error : null,
+		hasNewer: view.hasNewer,
+		hasOlder: view.hasOlder,
 		jumpToLatest: () => load(true),
 		loadNewer,
 		loadOlder,
 		markSeen,
-		messages: state.messages,
-		status: state.status,
-		threadReads,
+		messages: view.messages,
+		status: view.status,
+		threadReads: own ? threadReads : (cachedView?.threadReads ?? {}),
 		viewer,
 	}
 }

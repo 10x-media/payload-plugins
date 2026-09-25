@@ -1,29 +1,22 @@
 /* Conversations admin UI. Built on Payload's theme variables, so light and dark follow the admin. */
 
+/* Payload's subtle button; only room for the unread dot on its corner. */
 .conversations-trigger {
 	position: relative;
-	display: inline-flex;
-	align-items: center;
-	gap: 0.462rem;
-	height: calc(var(--base) * 1.6);
-	padding: 0 0.769rem;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s, 4px);
-	background: var(--theme-elevation-50);
-	color: var(--theme-text);
-	font-size: 1rem;
-	cursor: pointer;
+	--btn-icon-size: calc(var(--base) * 0.85);
 }
 
-.conversations-trigger:hover {
-	background: var(--theme-elevation-100);
+.conversations-trigger .btn__icon svg {
+	width: calc(var(--base) * 0.85);
+	height: calc(var(--base) * 0.85);
 }
 
 .conversations-trigger__count {
 	min-width: 1.538rem;
+	margin-left: calc(var(--base) * 0.3);
 	padding: 0 0.369rem;
 	border-radius: 999px;
-	background: var(--theme-elevation-150);
+	background: var(--theme-elevation-200);
 	font-size: 0.846rem;
 	text-align: center;
 }
@@ -77,36 +70,33 @@
 
 .conversations-tabs {
 	display: flex;
-	gap: 0.615rem;
+	gap: calc(var(--base) * 0.25);
 	padding-bottom: 1.077rem;
 	border-bottom: 1px solid var(--theme-elevation-100);
 }
 
+/* Payload's tab buttons, as channels: a quiet fill when idle, the tab style's own when active. */
 .conversations-tabs__tab {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.615rem;
-	padding: 0.462rem 0.923rem;
-	border: 1px solid transparent;
-	border-radius: var(--style-radius-s, 4px);
-	background: transparent;
-	color: var(--theme-elevation-700);
-	font-size: 1rem;
-	cursor: pointer;
+	--btn-icon-size: calc(var(--base) * 0.85);
 }
 
-.conversations-tabs__tab:hover {
-	background: var(--theme-elevation-100);
+.conversations-tabs__tab .btn__icon svg {
+	width: calc(var(--base) * 0.85);
+	height: calc(var(--base) * 0.85);
 }
 
-.conversations-tabs__tab--active {
-	border-color: var(--theme-elevation-150);
-	background: var(--theme-elevation-100);
-	color: var(--theme-text);
-	font-weight: 600;
+.conversations-tabs__tab.btn--style-tab:not(.btn--disabled) {
+	--bg-color: var(--theme-elevation-50);
+	--hover-bg: var(--theme-elevation-100);
+	--color: var(--theme-elevation-650, var(--theme-elevation-600));
+}
+
+.conversations-tabs__tab.btn--style-tab.btn--disabled {
+	--bg-color: var(--theme-elevation-150);
 }
 
 .conversations-tabs__count {
+	margin-left: calc(var(--base) * 0.3);
 	color: var(--theme-elevation-600);
 	font-size: 0.923rem;
 	font-weight: 500;
@@ -204,19 +194,19 @@
 	background: color-mix(in srgb, var(--theme-error-500, #e5484d) 45%, transparent);
 }
 
-.conversations-feed__pill {
+/* Room under the last message for the floating button, so nothing stays hidden behind it. */
+.conversations-feed--jump .conversations-feed__scroller {
+	padding-bottom: calc(var(--base) * 3);
+}
+
+/* Payload's pill button, floating over the bottom of the feed. */
+.conversations-feed__jump {
 	position: absolute;
-	bottom: 0.923rem;
+	bottom: calc(var(--base) * 0.75);
 	left: 50%;
 	transform: translateX(-50%);
-	padding: 0.369rem 1.077rem;
-	border: 1px solid var(--theme-elevation-200);
 	border-radius: 999px;
-	background: var(--theme-elevation-100);
-	color: var(--theme-text);
-	font-size: 0.923rem;
-	cursor: pointer;
-	box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+	box-shadow: 0 2px 12px -2px rgb(0 0 0 / 0.25);
 }
 
 .conversations-avatar {
@@ -406,44 +396,6 @@
 	overflow: hidden;
 	clip: rect(0 0 0 0);
 	white-space: nowrap;
-}
-
-.conversations-icon-button {
-	padding: 0.308rem 0.615rem;
-	border: 0;
-	border-radius: var(--style-radius-s, 4px);
-	background: transparent;
-	color: var(--theme-elevation-700);
-	font-size: 0.923rem;
-	cursor: pointer;
-}
-
-.conversations-icon-button:hover {
-	background: var(--theme-elevation-100);
-	color: var(--theme-text);
-}
-
-.conversations-button {
-	padding: 0.369rem 0.923rem;
-	border: 1px solid var(--theme-elevation-200);
-	border-radius: var(--style-radius-s, 4px);
-	background: var(--theme-elevation-100);
-	color: var(--theme-text);
-	font-size: 1rem;
-	white-space: nowrap;
-	cursor: pointer;
-}
-
-.conversations-button:disabled {
-	opacity: 0.5;
-	cursor: default;
-}
-
-.conversations-button--primary {
-	border-color: var(--theme-text);
-	background: var(--theme-text);
-	color: var(--theme-bg);
-	font-weight: 500;
 }
 
 .conversations-thread {

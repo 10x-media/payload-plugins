@@ -1,5 +1,8 @@
 'use client'
 
+import { Button } from '@payloadcms/ui'
+
+import { GlobeIcon, LockIcon } from '../composer/icons'
 import { type ChannelView, resolveLabel } from '../react/hooks'
 import { useTranslation } from '../translations/useTranslation'
 
@@ -23,21 +26,29 @@ export const ChatChannelTabs = ({
 	return (
 		<div className="conversations-tabs" role="tablist">
 			{channels.map((channel) => (
-				<button
-					aria-selected={channel.slug === active}
+				// Payload's own tab button, as its list view tabs: the active one is disabled.
+				<Button
+					buttonStyle="tab"
 					className={`conversations-tabs__tab${channel.slug === active ? ' conversations-tabs__tab--active' : ''}`}
+					disabled={channel.slug === active}
+					// Who reads it, from the channel's cue: a lock inside, a globe for outside.
+					icon={
+						channel.cue ? channel.cue.tone === 'warning' ? <GlobeIcon /> : <LockIcon /> : undefined
+					}
+					iconPosition="left"
+					extraButtonProps={{ 'aria-selected': channel.slug === active, role: 'tab' }}
 					key={channel.slug}
+					margin={false}
 					onClick={() => onChange(channel.slug)}
-					role="tab"
-					type="button"
+					size="medium"
 				>
-					<span>{resolveLabel(channel.label, i18n.language)}</span>
+					{resolveLabel(channel.label, i18n.language)}
 					{reads && channel.unread > 0 ? (
 						<span className="conversations-tabs__count">
 							{channel.unread > 99 ? '99+' : channel.unread}
 						</span>
 					) : null}
-				</button>
+				</Button>
 			))}
 		</div>
 	)

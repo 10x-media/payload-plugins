@@ -36,6 +36,8 @@ export type WindowAction =
 	| { message: WindowMessage; type: 'confirmed' }
 	| { at: string; type: 'seen' }
 	| { state: WindowState; type: 'restore' }
+	/** Another feed now: nothing of the previous one may show while it loads. */
+	| { type: 'reset' }
 	| { type: 'loading' }
 	| { type: 'error' }
 
@@ -108,6 +110,8 @@ export const windowReducer = (state: WindowState, action: WindowAction): WindowS
 	switch (action.type) {
 		case 'loading':
 			return { ...state, status: 'loading' }
+		case 'reset':
+			return { ...initialWindow, status: 'loading' }
 		case 'restore':
 			// A window seen before: the divider now starts where the viewer had read to.
 			return {

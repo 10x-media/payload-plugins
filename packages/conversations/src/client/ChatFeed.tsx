@@ -1,5 +1,6 @@
 'use client'
 
+import { Button } from '@payloadcms/ui'
 import {
 	Fragment,
 	type ReactNode,
@@ -73,6 +74,7 @@ export const ChatFeed = ({
 	const { i18n, t } = useTranslation()
 	const scroller = useRef<HTMLDivElement>(null)
 	const top = useRef<HTMLDivElement>(null)
+	const bottom = useRef<HTMLDivElement>(null)
 	const atEnd = useRef(true)
 	const opened = useRef(false)
 	const anchor = useRef<null | { height: number; top: number }>(null)
@@ -151,6 +153,19 @@ export const ChatFeed = ({
 	}, [hasOlder, older, status])
 
 	useEffect(() => {
+		const element = bottom.current
+		if (!element || !hasNewer || status !== 'ready') return
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries.some((entry) => entry.isIntersecting)) void loadNewer()
+			},
+			{ root: scroller.current, rootMargin: '0px 0px 200px 0px' }
+		)
+		observer.observe(element)
+		return () => observer.disconnect()
+	}, [hasNewer, loadNewer, status])
+
+	useEffect(() => {
 		const onVisible = () => checkEnd()
 		document.addEventListener('visibilitychange', onVisible)
 		return () => document.removeEventListener('visibilitychange', onVisible)
@@ -182,14 +197,16 @@ export const ChatFeed = ({
 	let previousDay: null | string = null
 
 	return (
-		<div className="conversations-feed">
+		<div
+			className={`conversations-feed${unseen > 0 || hasNewer ? ' conversations-feed--jump' : ''}`}
+		>
 			<div className="conversations-feed__scroller" onScroll={checkEnd} ref={scroller}>
 				<div ref={top} />
 				{hasOlder ? (
 					<div className="conversations-feed__older">
-						<button className="conversations-button" onClick={() => void older()} type="button">
+						<Button buttonStyle="subtle" margin={false} onClick={() => void older()} size="small">
 							{t(keys.loadEarlier)}
-						</button>
+						</Button>
 					</div>
 				) : null}
 				{skeleton ? <div className="conversations-feed__skeleton" /> : null}
@@ -241,18 +258,22 @@ export const ChatFeed = ({
 						</Fragment>
 					)
 				})}
-				{hasNewer ? (
-					<div className="conversations-feed__older">
-						<button className="conversations-button" onClick={() => void loadNewer()} type="button">
-							{t(keys.loadNewer)}
-						</button>
-					</div>
-				) : null}
+				{/* Reaching it loads the next page when the window is not at the end yet. */}
+				<div ref={bottom} />
 			</div>
 			{unseen > 0 || hasNewer ? (
-				<button className="conversations-feed__pill" onClick={() => void toBottom()} type="button">
-					{hasNewer ? t(keys.jumpToLatest) : `${unseen} ${t(keys.newMessages).toLowerCase()} ↓`}
-				</button>
+				<div className="conversations-feed__jump">
+					<Button
+						buttonStyle="pill"
+						icon={['chevron']}
+						iconPosition="right"
+						margin={false}
+						onClick={() => void toBottom()}
+						size="small"
+					>
+						{hasNewer ? t(keys.jumpToLatest) : t(keys.unseenCount, { count: unseen })}
+					</Button>
+				</div>
 			) : null}
 		</div>
 	)

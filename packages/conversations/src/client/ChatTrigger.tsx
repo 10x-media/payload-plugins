@@ -1,6 +1,6 @@
 'use client'
 
-import { useDocumentInfo, useModal } from '@payloadcms/ui'
+import { Button, useDocumentInfo, useModal } from '@payloadcms/ui'
 
 import { useChannels } from '../react/hooks'
 import { ChatScope } from '../react/provider'
@@ -36,14 +36,21 @@ const TriggerButton = ({ conversationKey, instance }: Required<ChatTriggerProps>
 	const drawerSlug = `conversations-${instance}-${conversationKey.replace(/[^a-zA-Z0-9-]/g, '-')}`
 	return (
 		<>
-			<button className="conversations-trigger" onClick={() => openModal(drawerSlug)} type="button">
-				<CommentIcon />
-				<span>{count === 0 ? t(keys.comment) : t(keys.comments)}</span>
+			<Button
+				buttonStyle="subtle"
+				className="conversations-trigger"
+				icon={<CommentIcon />}
+				iconPosition="left"
+				margin={false}
+				onClick={() => openModal(drawerSlug)}
+				size="medium"
+			>
+				{count === 0 ? t(keys.comment) : t(keys.comments)}
 				{count > 0 ? <span className="conversations-trigger__count">{count}</span> : null}
 				{reads && unread > 0 ? (
 					<span aria-label={t(keys.unreadDot)} className="conversations-trigger__dot" role="img" />
 				) : null}
-			</button>
+			</Button>
 			<ChatDrawer
 				conversationKey={conversationKey}
 				drawerSlug={drawerSlug}

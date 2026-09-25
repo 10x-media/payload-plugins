@@ -90,18 +90,6 @@ export const LockIcon = () => (
 	</Svg>
 )
 
-export const EyeIcon = () => (
-	<Svg>
-		<path
-			d="M1.75 8S4 3.75 8 3.75 14.25 8 14.25 8 12 12.25 8 12.25 1.75 8 1.75 8z"
-			stroke="currentColor"
-			strokeLinejoin="round"
-			strokeWidth="1.3"
-		/>
-		<circle cx="8" cy="8" r="2" stroke="currentColor" strokeWidth="1.3" />
-	</Svg>
-)
-
 export const CheckIcon = () => (
 	<Svg>
 		<path
@@ -132,6 +120,17 @@ export const CrossIcon = () => (
 			stroke="currentColor"
 			strokeLinecap="round"
 			strokeWidth="1.4"
+		/>
+	</Svg>
+)
+
+export const GlobeIcon = () => (
+	<Svg>
+		<circle cx="8" cy="8" r="5.75" stroke="currentColor" strokeWidth="1.3" />
+		<path
+			d="M2.25 8h11.5M8 2.25c1.6 1.6 2.4 3.5 2.4 5.75S9.6 12.15 8 13.75M8 2.25C6.4 3.85 5.6 5.75 5.6 8s.8 4.15 2.4 5.75"
+			stroke="currentColor"
+			strokeWidth="1.3"
 		/>
 	</Svg>
 )

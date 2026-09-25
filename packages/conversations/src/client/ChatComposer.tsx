@@ -5,11 +5,12 @@ import {
 	$getRoot,
 	type LexicalEditor,
 } from '@payloadcms/richtext-lexical/lexical'
+import { Button } from '@payloadcms/ui'
 import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 
 import { Composer, type ComposerToolbar } from '../composer/Composer'
 import { defaultComposerFeatures } from '../composer/features'
-import { EyeIcon, LockIcon } from '../composer/icons'
+import { GlobeIcon, LockIcon } from '../composer/icons'
 import { hasContent, toStoredJSON } from '../composer/json'
 import type { ComposerFeature, ComposerLabels, ComposerTranslate } from '../composer/types'
 import { resolveLabel, useSend } from '../react/hooks'
@@ -188,14 +189,14 @@ export const ChatComposer = ({
 			{failed ? (
 				<div className="conversations-composer__banner conversations-composer__banner--error">
 					<span>{t(keys.couldNotSend)}</span>
-					<button className="conversations-button" onClick={() => void submit()} type="button">
+					<Button buttonStyle="secondary" margin={false} onClick={() => void submit()} size="small">
 						{t(keys.retry)}
-					</button>
+					</Button>
 				</div>
 			) : cueLabel ? (
 				<div className={`conversations-composer__banner conversations-composer__banner--${tone}`}>
 					<span className="conversations-composer__cue-icon">
-						{tone === 'warning' ? <EyeIcon /> : <LockIcon />}
+						{tone === 'warning' ? <GlobeIcon /> : <LockIcon />}
 					</span>
 					<span className="conversations-composer__cue-label">{cueLabel}</span>
 					{cueAction ? (
@@ -233,19 +234,21 @@ export const ChatComposer = ({
 									: t(submitOn === 'enter' ? keys.enterToSend : keys.modEnterToSend)}
 							</span>
 							{onCancel ? (
-								<button className="conversations-button" onClick={onCancel} type="button">
+								<Button buttonStyle="secondary" margin={false} onClick={onCancel} size="small">
 									{t(keys.cancel)}
-								</button>
+								</Button>
 							) : null}
 							{actions}
-							<button
-								className="conversations-button conversations-button--primary"
+							<Button
+								buttonStyle="primary"
+								className="conversations-composer__send"
 								disabled={busy}
+								margin={false}
 								onClick={() => void submit()}
-								type="button"
+								size="small"
 							>
 								{submitLabel ?? t(onSave ? keys.save : keys.send)}
-							</button>
+							</Button>
 						</>
 					}
 					initialBody={startBody}

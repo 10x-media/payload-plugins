@@ -34,7 +34,6 @@ export const keys = {
 	linkPlaceholder: 'conversations:linkPlaceholder',
 	linkRemove: 'conversations:linkRemove',
 	loadEarlier: 'conversations:loadEarlier',
-	loadNewer: 'conversations:loadNewer',
 	mention: 'conversations:mention',
 	mentionNoResults: 'conversations:mentionNoResults',
 	messageDeleted: 'conversations:messageDeleted',
@@ -65,6 +64,7 @@ export const keys = {
 	today: 'conversations:today',
 	unknownType: 'conversations:unknownType',
 	unreadDot: 'conversations:unreadDot',
+	unseenCount: 'conversations:unseenCount',
 	yesterday: 'conversations:yesterday',
 	you: 'conversations:you',
 } as const
