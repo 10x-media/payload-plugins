@@ -14,7 +14,7 @@ import {
 	textNode,
 } from './fixture'
 
-type Sent = { authors: AuthorsMap; message: ConversationMessage }
+type Sent = { authors: AuthorsMap; message: ConversationMessage; root?: ConversationMessage }
 type Page = {
 	authors: AuthorsMap
 	cursor?: null | string
@@ -225,6 +225,27 @@ describeForDb('conversations core', {}, (db) => {
 
 			const thread = await list(staff, { channel: 'internal', key: otherKey, parent: rootId })
 			expect(thread.json.messages).toHaveLength(20)
+		})
+
+		it('answers a reply with its root as it now is, and a root send without one', async () => {
+			const root = await send(staff, { channel: 'internal', key: otherKey, text: 'root' })
+			expect(root.json.root).toBeUndefined()
+			const rootId = String(root.json.message.id)
+			const reply = await send(staff, {
+				channel: 'internal',
+				key: otherKey,
+				parent: rootId,
+				text: 'first',
+			})
+			expect(reply.json.root?.id).toBe(root.json.message.id)
+			expect(reply.json.root?.replyCount).toBe(1)
+			expect(reply.json.root?.lastReplyAt).toBe(reply.json.message.createdAt)
+			const removed = await call<{ root?: ConversationMessage }>(
+				booted,
+				`DELETE /conversations/comments/messages/${String(reply.json.message.id)}`,
+				{ session: staff }
+			)
+			expect(removed.json.root?.replyCount).toBe(0)
 		})
 
 		it('rejects a reply to a reply', async () => {

@@ -125,6 +125,26 @@ describe('feed window', () => {
 		expect(state.seenAt).toBe(at(7))
 	})
 
+	it('reopens a kept window with the divider where the viewer had read to', () => {
+		const kept = loaded([message(1, 1), message(2, 2), message(3, 3)], {
+			cursor: at(0),
+			seenAt: at(2),
+		})
+		const reopened = windowReducer(
+			{ ...initialWindow, status: 'loading' },
+			{ state: kept, type: 'restore' }
+		)
+		expect(reopened.status).toBe('ready')
+		expect(reopened.messages).toHaveLength(3)
+		expect(dividerBefore(reopened, 'users:1')).toBe('3')
+		// Never scrolled to the end: the divider stays where it was.
+		const unread = windowReducer(initialWindow, {
+			state: { ...kept, seenAt: null },
+			type: 'restore',
+		})
+		expect(dividerBefore(unread, 'users:1')).toBe('1')
+	})
+
 	it('finds the newest update, ignoring unsent messages', () => {
 		expect(
 			newestUpdate([

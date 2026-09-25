@@ -47,38 +47,32 @@
 	overflow: hidden;
 }
 
+/*
+ * Inside Payload's drawer (its gutter, background and header markup): only
+ * the layout a chat needs, a column whose feed scrolls between the header
+ * and the composer.
+ */
 .conversations-drawer {
 	display: flex;
 	flex-direction: column;
 	height: 100%;
 	min-height: 0;
-	padding: 0 2.154rem 1.538rem;
-	background: var(--theme-elevation-50);
+	padding-bottom: var(--base);
 }
 
 .conversations-drawer__header {
-	display: flex;
+	flex: none;
 	align-items: flex-start;
-	justify-content: space-between;
-	gap: 1.231rem;
-	padding: 2.154rem 0 1.231rem;
 }
 
-.conversations-drawer__title {
-	margin: 0;
-	font-size: 1.846rem;
-	line-height: 1.2;
+.conversations-drawer__heading {
+	flex-grow: 1;
+	min-width: 0;
 }
 
 .conversations-drawer__subtitle {
-	margin-top: 0.308rem;
-	color: var(--theme-elevation-600);
-	font-size: 1rem;
-}
-
-.conversations-drawer__close {
-	font-size: 1.846rem;
-	line-height: 1;
+	margin-top: calc(var(--base) / 4);
+	color: var(--theme-elevation-500);
 }
 
 .conversations-tabs {

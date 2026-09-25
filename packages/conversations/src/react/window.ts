@@ -35,6 +35,7 @@ export type WindowAction =
 	| { clientId: string; type: 'failed' }
 	| { message: WindowMessage; type: 'confirmed' }
 	| { at: string; type: 'seen' }
+	| { state: WindowState; type: 'restore' }
 	| { type: 'loading' }
 	| { type: 'error' }
 
@@ -107,6 +108,13 @@ export const windowReducer = (state: WindowState, action: WindowAction): WindowS
 	switch (action.type) {
 		case 'loading':
 			return { ...state, status: 'loading' }
+		case 'restore':
+			// A window seen before: the divider now starts where the viewer had read to.
+			return {
+				...action.state,
+				cursor: action.state.seenAt ?? action.state.cursor,
+				status: 'ready',
+			}
 		case 'error':
 			return { ...state, status: 'error' }
 		case 'loaded':

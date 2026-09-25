@@ -16,6 +16,7 @@ import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { ChatMessage } from './ChatMessage'
 import { dayKey } from './time'
+import { useDelayedFlag } from './useDelayedFlag'
 import './conversations.css'
 
 /** A foreign row shown in the feed at its time, e.g. an audit entry. */
@@ -92,10 +93,13 @@ export const ChatFeed = ({
 		}
 	}, [hasNewer, markSeen])
 
+	// A quick load shows nothing in between; a slow one a skeleton that does not blink.
+	const skeleton = useDelayedFlag(status === 'loading' && shown.length === 0)
+
 	// First paint of a loaded window: the divider if there is one, else the bottom.
 	useLayoutEffect(() => {
 		const element = scroller.current
-		if (!element || status !== 'ready' || opened.current) return
+		if (!element || status !== 'ready' || skeleton || opened.current) return
 		opened.current = true
 		const divider = dividerBefore
 			? element.querySelector<HTMLElement>('.conversations-feed__divider')
@@ -106,7 +110,7 @@ export const ChatFeed = ({
 			element.scrollTop = element.scrollHeight
 		}
 		checkEnd()
-	}, [checkEnd, dividerBefore, status])
+	}, [checkEnd, dividerBefore, skeleton, status])
 
 	// Keep the reader's place when rows are added above; follow the bottom when there.
 	useLayoutEffect(() => {
@@ -188,16 +192,14 @@ export const ChatFeed = ({
 						</button>
 					</div>
 				) : null}
-				{status === 'loading' && shown.length === 0 ? (
-					<div className="conversations-feed__skeleton" />
-				) : null}
+				{skeleton ? <div className="conversations-feed__skeleton" /> : null}
 				{status === 'error' ? (
 					<div className="conversations-feed__empty">{t(keys.couldNotLoad)}</div>
 				) : null}
-				{status === 'ready' && rows.length === 0 ? (
+				{status === 'ready' && !skeleton && rows.length === 0 ? (
 					<div className="conversations-feed__empty">{empty}</div>
 				) : null}
-				{rows.map((row) => {
+				{(skeleton ? [] : rows).map((row) => {
 					const day = dayKey(row.at)
 					const showDay = day !== previousDay
 					previousDay = day

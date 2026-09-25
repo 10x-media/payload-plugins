@@ -20,6 +20,7 @@ import {
 	initialWindow,
 	newestUpdate,
 	type WindowMessage,
+	type WindowState,
 	windowReducer,
 } from './window'
 
@@ -158,6 +159,12 @@ export const useConversation = ({
 	const [error, setError] = useState<Error | null>(null)
 	const stateRef = useRef(state)
 	stateRef.current = state
+	const authorsRef = useRef(authors)
+	authorsRef.current = authors
+	const threadReadsRef = useRef(threadReads)
+	threadReadsRef.current = threadReads
+	/** Which window this is, for the provider's reopen cache. */
+	const cacheId = `${key}|${channelsKey}|${parent ?? ''}|${limit}`
 	const generation = useRef(0)
 	const viewer = store.meta?.viewer ?? null
 	useSyncExternalStore(store.subscribe, store.getVersion, store.getVersion)
@@ -202,25 +209,11 @@ export const useConversation = ({
 		[addAuthors, addThreadReads, channelsKey, key, limit, parent, store]
 	)
 
-	useEffect(() => {
-		setAuthors({})
-		setThreadReads({})
-		void load(false)
-	}, [load])
-
-	useEffect(() => {
-		const release = store.retain(key)
-		store.setActive(key, true)
-		return () => {
-			store.setActive(key, false)
-			release()
-		}
-	}, [key, store])
-
-	useEffect(() => {
-		if (!channelsKey) return
-		const sync = async () => {
-			const current = stateRef.current
+	/** Changes since the newest update in `base` (default: the current window), merged in. */
+	const sync = useCallback(
+		async (base?: WindowState) => {
+			if (!channelsKey) return
+			const current = base ?? stateRef.current
 			if (current.status !== 'ready') return
 			const newest = newestUpdate(current.messages)
 			const since = new Date(
@@ -239,11 +232,62 @@ export const useConversation = ({
 			} catch {
 				// The next change signal retries.
 			}
+		},
+		[addAuthors, addThreadReads, channelsKey, key, parent, store]
+	)
+
+	// Keep this window for a reopen when it unmounts or switches to another feed.
+	useEffect(
+		() => () => {
+			const current = stateRef.current
+			if (current.status !== 'ready') return
+			store.cacheWindow(cacheId, {
+				authors: authorsRef.current,
+				// Unconfirmed sends are not kept: change sync brings the confirmed ones.
+				state: { ...current, messages: current.messages.filter((message) => !message.sendStatus) },
+				threadReads: threadReadsRef.current,
+			})
+		},
+		[cacheId, store]
+	)
+
+	// Open from the cache when this window was shown before, then catch up; else load.
+	useEffect(() => {
+		const cached = store.cachedWindow(cacheId)
+		if (cached) {
+			generation.current++
+			setAuthors(cached.authors)
+			setThreadReads(cached.threadReads)
+			setError(null)
+			dispatch({ state: cached.state, type: 'restore' })
+			void sync(cached.state)
+			return
 		}
+		setAuthors({})
+		setThreadReads({})
+		void load(false)
+	}, [cacheId, load, store, sync])
+
+	useEffect(() => {
+		const release = store.retain(key)
+		store.setActive(key, true)
+		return () => {
+			store.setActive(key, false)
+			release()
+		}
+	}, [key, store])
+
+	useEffect(() => {
+		if (!channelsKey) return
 		const offChange = store.onChange(key, () => void sync())
 		const offLocal = store.onLocal(key, (event) => {
 			if (event.type === 'failed') {
 				dispatch(event)
+				return
+			}
+			if (event.type === 'threadRead') {
+				// Only feeds of roots care; a thread window keeps its own cursor.
+				if (!parent) addThreadReads({ [event.root]: event.at })
 				return
 			}
 			const message = event.message
@@ -259,7 +303,7 @@ export const useConversation = ({
 			offChange()
 			offLocal()
 		}
-	}, [addAuthors, addThreadReads, channelsKey, key, parent, store])
+	}, [addThreadReads, channelsKey, key, parent, store, sync])
 
 	const loadOlder = useCallback(async () => {
 		const first = stateRef.current.messages.find((message) => !message.sendStatus)
@@ -299,6 +343,10 @@ export const useConversation = ({
 		if (!newest) return
 		if (current.seenAt && new Date(current.seenAt) >= new Date(newest.createdAt)) return
 		dispatch({ at: newest.createdAt, type: 'seen' })
+		if (parent) {
+			// Reading a thread clears its "new" mark in the feed behind it at once.
+			store.emitLocal(key, { at: newest.createdAt, root: parent, type: 'threadRead' })
+		}
 		void store.api
 			.read({ at: newest.createdAt, key, ...(parent ? { thread: parent } : { channels }) })
 			.then(() => store.touched([key]))
@@ -370,6 +418,16 @@ export const useSend = ({
 				const result = await store.api.send({ channel, clientId, key, parent, ...input })
 				pending.current.delete(clientId)
 				store.emitLocal(key, { message: result.message, type: 'confirmed' })
+				if (result.root) {
+					// The root's reply count and last reply, for feeds showing it; and the
+					// sender has read their own reply.
+					store.emitLocal(key, { message: result.root, type: 'confirmed' })
+					store.emitLocal(key, {
+						at: result.message.createdAt,
+						root: String(result.root.id),
+						type: 'threadRead',
+					})
+				}
 				store.touched([key])
 				return result.message
 			} catch (caught) {
@@ -421,6 +479,7 @@ export const useMessageActions = () => {
 		async (message: WindowMessage) => {
 			const result = await store.api.delete(message.id)
 			store.emitLocal(message.key, { message: result.message, type: 'confirmed' })
+			if (result.root) store.emitLocal(message.key, { message: result.root, type: 'confirmed' })
 			store.touched([message.key])
 			return result.message
 		},

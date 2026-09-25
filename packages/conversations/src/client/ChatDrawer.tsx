@@ -1,7 +1,7 @@
 'use client'
 
-import { Drawer, useModal } from '@payloadcms/ui'
-import { type ReactNode, useEffect, useState } from 'react'
+import { Drawer, useModal, XIcon } from '@payloadcms/ui'
+import { type ReactNode, useState } from 'react'
 
 import { resolveLabel, useChannels, useConversation } from '../react/hooks'
 import type { WindowMessage } from '../react/window'
@@ -12,6 +12,7 @@ import { ChatComposer } from './ChatComposer'
 import { ChatFeed } from './ChatFeed'
 import { ChatThread } from './ChatThread'
 import { ChatSlot } from './components'
+import { useDelayedFlag } from './useDelayedFlag'
 
 export type ChatDrawerProps = {
 	conversationKey: string
@@ -39,20 +40,21 @@ const DrawerHeader = ({
 	title: ReactNode
 }) => {
 	const { t } = useTranslation()
+	// Payload's own drawer header markup and classes, plus a line under the title.
 	return (
-		<div className="conversations-drawer__header">
+		<div className="drawer__header conversations-drawer__header">
 			<div className="conversations-drawer__heading">
-				<h2 className="conversations-drawer__title">{title}</h2>
+				<h2 className="drawer__header__title conversations-drawer__title">{title}</h2>
 				{subtitle ? <div className="conversations-drawer__subtitle">{subtitle}</div> : null}
 				{children}
 			</div>
 			<button
 				aria-label={t(keys.close)}
-				className="conversations-icon-button conversations-drawer__close"
+				className="drawer__header__close"
 				onClick={onClose}
 				type="button"
 			>
-				×
+				<XIcon />
 			</button>
 		</div>
 	)
@@ -73,12 +75,17 @@ const DrawerBody = ({
 	const [active, setActive] = useState<null | string>(null)
 	const [thread, setThread] = useState<null | WindowMessage>(null)
 	const current = channels.find((channel) => channel.slug === active) ?? channels[0]
+	const waiting = useDelayedFlag(!current)
 	const conversation = useConversation({ channel: current?.slug, key: conversationKey })
 	const threadSlug = `${drawerSlug}-thread`
 
-	useEffect(() => {
-		if (thread) openModal(threadSlug)
-	}, [openModal, thread, threadSlug])
+	// Opened from the click, not from an effect on `thread`: Escape and a click
+	// outside close the modal without clearing `thread`, and reopening the same
+	// thread would then change nothing an effect could see.
+	const openThread = (message: WindowMessage) => {
+		setThread(message)
+		openModal(threadSlug)
+	}
 
 	const label = current ? resolveLabel(current.label, i18n.language) : ''
 	const cue = current?.cue ?? null
@@ -112,7 +119,7 @@ const DrawerBody = ({
 						empty={t(keys.emptyChannel, { channel: label })}
 						instance={instance}
 						key={`feed:${current.slug}`}
-						onOpenThread={setThread}
+						onOpenThread={openThread}
 						renderType={renderType}
 					/>
 					<ChatComposer
@@ -132,16 +139,11 @@ const DrawerBody = ({
 						key={`composer:${current.slug}`}
 					/>
 				</>
-			) : (
+			) : waiting ? (
 				<div className="conversations-feed__skeleton" />
-			)}
+			) : null}
 			{thread && current ? (
-				<Drawer
-					className="conversations-drawer-shell"
-					gutter={false}
-					Header={null}
-					slug={threadSlug}
-				>
+				<Drawer className="conversations-drawer-shell" Header={null} slug={threadSlug}>
 					<div className="conversations-drawer">
 						<DrawerHeader
 							onClose={() => {
@@ -171,12 +173,7 @@ const DrawerBody = ({
  * feed, composer. A thread opens as a second drawer stacked on top.
  */
 export const ChatDrawer = (props: ChatDrawerProps) => (
-	<Drawer
-		className="conversations-drawer-shell"
-		gutter={false}
-		Header={null}
-		slug={props.drawerSlug}
-	>
+	<Drawer className="conversations-drawer-shell" Header={null} slug={props.drawerSlug}>
 		<DrawerBody {...props} />
 	</Drawer>
 )

@@ -824,7 +824,7 @@ export class MockServer {
 			conversation.cursors[message.channel] = message.createdAt
 		}
 		conversation.messages.push(message)
-		return json({ authors: AUTHORS, message })
+		return json({ authors: AUTHORS, message, ...(root ? { root } : {}) })
 	}
 
 	private find(id: string) {

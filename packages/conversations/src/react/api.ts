@@ -92,7 +92,7 @@ export const createApi = ({
 	return {
 		base,
 		delete: (id: number | string) =>
-			request<{ message: MessageResponse['message'] }>(
+			request<Pick<MessageResponse, 'message' | 'root'>>(
 				`/messages/${encodeURIComponent(String(id))}`,
 				{ method: 'DELETE' }
 			),

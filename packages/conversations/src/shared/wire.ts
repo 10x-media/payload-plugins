@@ -51,7 +51,12 @@ export type ListResponse = {
 	threadReads?: Record<string, string>
 }
 
-export type MessageResponse = { authors: AuthorsMap; message: WireMessage }
+export type MessageResponse = {
+	authors: AuthorsMap
+	message: WireMessage
+	/** For a reply that was sent or deleted: its root with the new count and last reply. */
+	root?: WireMessage
+}
 
 export type PollResponse = { changed: string[]; expired: string[]; now: string }
 

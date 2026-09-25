@@ -13,6 +13,7 @@ import { EyeIcon, LockIcon } from '../composer/icons'
 import { hasContent, toStoredJSON } from '../composer/json'
 import type { ComposerFeature, ComposerLabels, ComposerTranslate } from '../composer/types'
 import { resolveLabel, useSend } from '../react/hooks'
+import { useChatStore } from '../react/provider'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { LocalizedLabel } from '../types'
@@ -92,6 +93,21 @@ export const ChatComposer = ({
 }: ChatComposerProps) => {
 	const { i18n, t } = useTranslation()
 	const { retry, send } = useSend({ channel, key: conversationKey, parent })
+	const store = useChatStore()
+	// Editing starts from the message; a new message from what was left unsent here.
+	const draftKey = onSave ? null : `${conversationKey}|${channel}|${parent ?? ''}`
+	const [startBody] = useState(() =>
+		initialBody !== undefined ? initialBody : draftKey ? store.drafts.get(draftKey) : undefined
+	)
+	const keepDraft = useCallback(
+		(editor: LexicalEditor) => {
+			if (!draftKey) return
+			const body = toStoredJSON(editor.getEditorState().toJSON())
+			if (hasContent(body)) store.drafts.set(draftKey, body)
+			else store.drafts.delete(draftKey)
+		},
+		[draftKey, store]
+	)
 	const [busy, setBusy] = useState(false)
 	const [failed, setFailed] = useState<null | string>(null)
 	const editorRef = useRef<LexicalEditor | null>(null)
@@ -232,9 +248,10 @@ export const ChatComposer = ({
 							</button>
 						</>
 					}
-					initialBody={initialBody}
+					initialBody={startBody}
 					labels={labels}
 					mentions={{ channel, conversationKey }}
+					onChange={draftKey ? keepDraft : undefined}
 					onSubmit={() => void submit()}
 					placeholder={placeholder ?? t(keys.composerPlaceholder)}
 					submitOn={submitOn}

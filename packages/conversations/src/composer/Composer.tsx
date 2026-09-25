@@ -54,11 +54,13 @@ export type ComposerProps = {
 	features: ComposerFeature[]
 	/** The right side of the bottom row: hint, buttons. */
 	footer?: ReactNode
-	/** A stored body to start from (editing). Read once, on mount. */
+	/** A stored body to start from (editing, a draft). Read once, on mount. */
 	initialBody?: unknown
 	labels: ComposerLabels
 	/** Where `@` searches; null or absent turns mentions off. */
 	mentions?: { channel: string; conversationKey: string } | null
+	/** Every change of the editor's content, e.g. to keep a draft. */
+	onChange?: (editor: LexicalEditor) => void
 	onSubmit: () => void
 	placeholder?: string
 	submitOn?: 'enter' | 'mod+enter'
@@ -127,6 +129,21 @@ const SubmitOnEnter = ({
 	return null
 }
 
+/** Calls `onChange` when the content changes; selection moves alone do not count. */
+const ChangeListener = ({ onChange }: { onChange: (editor: LexicalEditor) => void }) => {
+	const [editor] = useLexicalComposerContext()
+	const latest = useRef(onChange)
+	latest.current = onChange
+	useEffect(
+		() =>
+			editor.registerUpdateListener(({ dirtyElements, dirtyLeaves }) => {
+				if (dirtyElements.size > 0 || dirtyLeaves.size > 0) latest.current(editor)
+			}),
+		[editor]
+	)
+	return null
+}
+
 const AutoFocus = () => {
 	const [editor] = useLexicalComposerContext()
 	useEffect(() => {
@@ -168,6 +185,7 @@ export const Composer = ({
 	initialBody,
 	labels,
 	mentions,
+	onChange,
 	onSubmit,
 	placeholder = '',
 	submitOn = 'enter',
@@ -245,6 +263,7 @@ export const Composer = ({
 				<SubmitOnEnter isOverlayOpen={isOverlayOpen} onSubmit={submit} submitOn={submitOn} />
 				{autoFocus ? <AutoFocus /> : null}
 				{editorRef ? <EditorRefPlugin editorRef={editorRef} /> : null}
+				{onChange ? <ChangeListener onChange={onChange} /> : null}
 			</LexicalComposer>
 		</ComposerRuntimeContext.Provider>
 	)

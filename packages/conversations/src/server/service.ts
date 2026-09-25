@@ -255,7 +255,7 @@ export const sendMessage = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
 	input: SendInput
-): Promise<{ authors: AuthorsMap; message: ConversationMessage }> => {
+): Promise<{ authors: AuthorsMap; message: ConversationMessage; root?: WireMessage }> => {
 	const viewer = viewerKey(req)
 	const access = await accessFor(req, instance, input.key)
 	let channel = input.channel
@@ -303,10 +303,29 @@ export const sendMessage = async (
 		thread: message.parent ?? '',
 		userKey: message.authorKey,
 	})
+	const root = await rootAfterReply(req, instance, { message, viewer })
 	return {
 		authors: await projectAuthors(req, instance, [message]),
 		message: await decorateOne(req, instance, { message, viewer }),
+		...(root ? { root } : {}),
 	}
+}
+
+/**
+ * A reply's root as it is after the reply was written or removed: its count
+ * and last reply moved, so the sender's feed can show that at once instead of
+ * waiting for the next poll.
+ */
+const rootAfterReply = async (
+	req: PayloadRequest,
+	instance: ConversationsInstance,
+	{ message, viewer }: { message: ConversationMessage; viewer: string }
+): Promise<WireMessage | undefined> => {
+	if (!message.parent) return undefined
+	const root = await findRoot(req, instance, message.parent)
+	if (!root) return undefined
+	const decorated = await decorateOne(req, instance, { message: root, viewer })
+	return isRemoved(instance, root) ? { ...decorated, removed: true } : decorated
 }
 
 const toBody = (input: { body?: unknown; text?: string }) => {
@@ -388,7 +407,7 @@ export const deleteMessage = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
 	id: string
-): Promise<{ message: WireMessage }> => {
+): Promise<{ message: WireMessage; root?: WireMessage }> => {
 	const existing = await loadOwned(req, instance, { action: 'delete', id })
 	const message = (await req.payload.update({
 		collection: instance.messagesSlug,
@@ -397,8 +416,13 @@ export const deleteMessage = async (
 		id: existing.id,
 		req,
 	})) as unknown as ConversationMessage
-	const decorated = await decorateOne(req, instance, { message, viewer: viewerKey(req) })
-	return { message: isRemoved(instance, message) ? { ...decorated, removed: true } : decorated }
+	const viewer = viewerKey(req)
+	const decorated = await decorateOne(req, instance, { message, viewer })
+	const root = await rootAfterReply(req, instance, { message, viewer })
+	return {
+		message: isRemoved(instance, message) ? { ...decorated, removed: true } : decorated,
+		...(root ? { root } : {}),
+	}
 }
 
 /** Raise the viewer's cursor for channels of a conversation, or for one thread of it. */

@@ -1,7 +1,8 @@
 import type { SubscribeEntry, SubscribeResponse } from '../shared/wire'
+import type { AuthorsMap } from '../types'
 import type { ConversationsApi } from './api'
 import type { ConversationsClientTransport, TransportConnection } from './transport'
-import type { WindowMessage } from './window'
+import type { WindowMessage, WindowState } from './window'
 
 /** Everything a provider knows about the instance, from the last subscribe. */
 export type InstanceMeta = Omit<SubscribeResponse, 'entries' | 'now'>
@@ -10,6 +11,18 @@ export type InstanceMeta = Omit<SubscribeResponse, 'entries' | 'now'>
 export type LocalEvent =
 	| { message: WindowMessage; type: 'confirmed' | 'optimistic' }
 	| { clientId: string; type: 'failed' }
+	/** The viewer read a thread up to `at` here; feeds showing its root drop the "new" mark. */
+	| { at: string; root: string; type: 'threadRead' }
+
+/** A window kept for reopening: its messages and bounds, and what it had learned. */
+export type CachedWindow = {
+	authors: AuthorsMap
+	state: WindowState
+	threadReads: Record<string, string>
+}
+
+/** How many feed and thread windows a provider keeps for instant reopening. */
+const WINDOW_CACHE_SIZE = 40
 
 /** Renew tokens (and unread counts) this long before they expire. */
 const RENEW_MS = 8 * 60 * 1000
@@ -25,6 +38,12 @@ const RENEW_MS = 8 * 60 * 1000
 export class ConversationsStore {
 	readonly api: ConversationsApi
 	readonly instance: string
+	/**
+	 * Unsent composer content by conversation, channel and thread, for as long
+	 * as the provider lives: closing a drawer or a thread keeps what was typed.
+	 */
+	readonly drafts = new Map<string, unknown>()
+	private readonly windows = new Map<string, CachedWindow>()
 	meta: InstanceMeta | null = null
 	version = 0
 
@@ -72,6 +91,22 @@ export class ConversationsStore {
 		this.connection = null
 		if (this.renewTimer) clearTimeout(this.renewTimer)
 		this.renewTimer = undefined
+	}
+
+	/** A feed or thread window last shown here, to reopen at once instead of loading. */
+	cachedWindow(id: string): CachedWindow | undefined {
+		return this.windows.get(id)
+	}
+
+	/** Keep a window for a later reopen; the least recently kept go first past the cap. */
+	cacheWindow(id: string, entry: CachedWindow): void {
+		this.windows.delete(id)
+		this.windows.set(id, entry)
+		while (this.windows.size > WINDOW_CACHE_SIZE) {
+			const oldest = this.windows.keys().next().value
+			if (oldest === undefined) break
+			this.windows.delete(oldest)
+		}
 	}
 
 	subscribe = (listener: () => void): (() => void) => {
