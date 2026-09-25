@@ -146,6 +146,7 @@ export {
 	type ConversationsBus,
 	databaseBus,
 	memoryBus,
+	payloadKVBus,
 	type RealtimeSignal,
 } from './realtime/bus'
 export { type PusherTransportOptions, pusherTransport } from './realtime/pusher'

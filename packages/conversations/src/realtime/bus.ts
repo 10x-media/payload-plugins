@@ -43,29 +43,25 @@ const BATCH = 500
 type Row = { channel?: string; id: number | string; key: string; updatedAt: string }
 
 /**
- * The database as the bus, with nothing else to run: each process checks the
- * messages it has connections for, once per `intervalMs` (default 1000), in
- * one indexed query, however many people are connected. Works on every
- * adapter and any number of processes.
- *
- * `revision: 'kv'` first reads one `payload.kv` entry that every write bumps,
- * and skips the query while it has not moved (a full check still runs every
- * `fullCheckMs`, default 15 s). Worth it when `payload.kv` is Redis; on the
- * default database KV it trades one query for another.
+ * The shared loop of `databaseBus` and `payloadKVBus`: while a process holds
+ * connections, check the messages of the keys they follow once per
+ * `intervalMs`. With `revision`, a `payload.kv` entry that every write bumps
+ * is read first and the query skipped while it has not moved (a full check
+ * still runs every `fullCheckMs`).
  */
-export const databaseBus = ({
+const checkingBus = ({
 	fullCheckMs = 15_000,
 	intervalMs = 1000,
-	revision,
+	revision = false,
 }: {
 	fullCheckMs?: number
 	intervalMs?: number
-	revision?: 'kv'
-} = {}): ConversationsBus => {
+	revision?: boolean
+}): ConversationsBus => {
 	const revisionKey = (instance: ConversationsInstance) => `conversations:${instance.slug}:revision`
 	return {
 		publish: async ({ instance, payload }) => {
-			if (revision === 'kv') await payload.kv.set(revisionKey(instance), Date.now())
+			if (revision) await payload.kv.set(revisionKey(instance), Date.now())
 		},
 		subscribe: ({ instance, onSignals, payload, watched }) => {
 			let stopped = false
@@ -80,7 +76,7 @@ export const databaseBus = ({
 				const keys = watched()
 				if (keys.length === 0) return
 				const started = Date.now()
-				if (revision === 'kv') {
+				if (revision) {
 					const current = await payload.kv.get(revisionKey(instance))
 					if (current === lastRevision && started - lastFull < fullCheckMs) return
 					lastRevision = current
@@ -129,3 +125,29 @@ export const databaseBus = ({
 		},
 	}
 }
+
+/**
+ * The database as the bus, with nothing else to run and nothing written:
+ * messages already carry `updatedAt`, so each process that holds connections
+ * asks once per `intervalMs` (default 1 s), in one indexed query, what changed
+ * among the keys they follow, however many people are connected. Works on
+ * every adapter and any number of processes. The default.
+ */
+export const databaseBus = ({ intervalMs }: { intervalMs?: number } = {}): ConversationsBus =>
+	checkingBus({ intervalMs })
+
+/**
+ * Payload's KV store as a change flag in front of the database: every write
+ * bumps one `payload.kv` entry per instance, and each process reads it once
+ * per `intervalMs` and queries the messages only when it moved (plus a full
+ * check every `fullCheckMs`, default 15 s). Worth it when `payload.kv` runs on
+ * Redis: the per-second cost becomes a key read. On the default database KV
+ * it trades one query for another, so prefer `databaseBus` there.
+ */
+export const payloadKVBus = ({
+	fullCheckMs,
+	intervalMs,
+}: {
+	fullCheckMs?: number
+	intervalMs?: number
+} = {}): ConversationsBus => checkingBus({ fullCheckMs, intervalMs, revision: true })

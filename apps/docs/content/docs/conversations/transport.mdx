@@ -1,39 +1,174 @@
 ---
-title: Transport
-description: How the client learns about new messages, and where a realtime adapter plugs in.
+title: Transport and realtime
+description: How clients learn about new messages - polling, Server-Sent Events, or a Pusher-compatible service - and how several server processes share changes.
 ---
+
+Every transport sends the same thing: a signal that some keys changed. It never carries messages. The client then loads them through the usual endpoints, which run full access. A transport can therefore never leak a message, only say "look again".
+
+A transport has two halves:
+
+- **Server:** the instance's `transport` option.
+- **Client:** passed to `ChatProvider`.
+
+The admin picks its client half from the server's, so you only configure the server there.
+
+| Transport | Server | Client | Needs | Latency |
+|---|---|---|---|---|
+| Polling (default) | none | `pollingTransport()` | nothing | 15 s with a feed open, 60 s otherwise |
+| Server-Sent Events | `sseTransport()` | `sseClientTransport()` | a long-running Node process | instant in the same process; across processes it depends on the bus |
+| Pusher-compatible | `pusherTransport()` | `pusherClientTransport()` | Pusher, Soketi or another compatible service | instant |
+
+The transport is set per instance. Mixing is fine, for example comments on polling, a chat on SSE and a website support chat on Pusher.
 
 ## Polling, the default
 
 - Only conversations on screen are polled, and only while their tab is visible.
-- **One tab per key.** Each key has a Web Lock (`conversations:<instance>:<key>`). The visible tab holding it polls, and a hidden tab lets it go. When the leader closes or hides, a waiting tab takes over and keeps the old clock rather than polling on arrival.
-- **One request per tick.** A tab polls every key it leads in a single `POST /poll`. Results reach every tab over a `BroadcastChannel`, so tabs that do not lead a key still hear about it.
-- **Intervals.** 60 s while only triggers are mounted, 15 s while a feed of the key is open in any tab. A tab returning after longer than an interval checks at once. Your own send, edit or read updates your tab immediately and tells the other tabs.
-- **No access code per tick.** `subscribe` returns an HMAC-signed token per key, naming the user, key and readable channels, valid for 10 minutes. The poll verifies tokens and runs one query: which keys have a message in a readable channel with `updatedAt` after `since` minus 10 seconds. Loading messages always runs full access, so revocation only delays the "something changed" signal, by at most the token lifetime.
-- Without Web Locks or `BroadcastChannel`, each visible tab polls for itself.
+- **One tab per key.** Each key has a Web Lock (`conversations:<instance>:<key>`). The visible tab holding the lock polls for that key, and a hidden tab gives the lock up. When the leader closes or hides, a waiting tab takes over and keeps the old clock rather than polling on arrival.
+- **One request per tick.** A tab polls every key it leads in a single `POST /poll`. Results reach every tab over a `BroadcastChannel`.
+- **No access code per tick.** `subscribe` returns an HMAC-signed token per key. The token names the user, the key and the readable channels, and is valid for 10 minutes. The poll verifies the tokens and runs one query.
 
 ```ts
 pollingTransport({ intervals: { idle: 60_000, active: 15_000 } })
 ```
 
-## A realtime adapter
-
-The transport has two halves. The server half is the `transport` option: `publish({ instance, key, req })` runs after every write. The client half goes to `ChatProvider`:
+## Server-Sent Events
 
 ```ts
-type ConversationsClientTransport = {
-  connect: (args: {
-    instance: string
-    poll: (body: { since: string; tokens: string[] }) => Promise<PollResponse>
-    onChange: (keys: string[]) => void
-    onExpired: (keys: string[]) => void
-  }) => {
-    watch: (entries: Array<{ key: string; token: string }>, since: string) => void
-    setActive: (key: string, active: boolean) => void
-    notify: (keys: string[]) => void
-    destroy: () => void
-  }
+import { sseTransport } from '@10x-media/conversations'
+
+conversations({
+  slug: 'chat',
+  // ...
+  transport: sseTransport(),
+})
+```
+
+Payload serves the stream itself at `POST /api/conversations/<instance>/events`. No separate server or service is involved.
+
+**How it works:**
+
+1. **Opening the stream.** One tab per browser holds the stream for all tabs, using a Web Lock and a `BroadcastChannel`. It sends the subscription tokens of every key the tabs follow, and the server verifies them without a query.
+2. **A write in the same process.** The write calls `publish`, and the connections of that process that follow the key hear about it at once.
+3. **A write in another process.** It arrives through the **bus** (see below).
+4. **Channel filtering.** Each connection hears only its keys, and only in the channels its tokens allow. A customer is never signalled about an internal note.
+5. **Resuming after a drop.** The client reconnects with backoff (1, 2, 5, 10, 30 s). It sends the time of its last news, and the server replays what changed since then.
+6. **While the stream is down.** Each tab polls. While the stream is up, polling is off.
+
+On a website, pass the client half yourself:
+
+```tsx
+import { ChatProvider, sseClientTransport } from '@10x-media/conversations/react'
+
+<ChatProvider instance="chat" transport={sseClientTransport()}>…</ChatProvider>
+```
+
+**Hosting:**
+
+- **A long-running Node process.** Use `next start`, Docker, a VM, Railway, Fly and similar.
+- **Serverless functions** are cut off at a time limit. The client reconnects, so SSE works there, but every open connection keeps a function running. Prefer Pusher on such hosts.
+- **Proxies and balancers.** Responses carry `X-Accel-Buffering: no` for nginx and `Cache-Control: no-transform` against compression. A `: ping` comment every 20 s (`heartbeatMs`) keeps idle connections open. With a balancer idle timeout shorter than that, lower `heartbeatMs`.
+- **Browser connection limit.** Over HTTP/1.1 a browser keeps at most 6 connections per domain. Each instance on SSE takes one per browser, not one per tab.
+
+### Buses: several server processes
+
+A browser's stream lives in one process. When another process writes, the **bus** carries the change over. Pass it as `sseTransport({ bus })`.
+
+<Callout type="info">
+**One server process? Use `memoryBus()`.** It costs nothing and adds no delay: a write reaches the connections of the same process at once, and there is no other process to hear from. The default is `databaseBus()` only because it is safe everywhere. On several processes `memoryBus()` would fail silently: streams stay up, so clients never fall back to polling, and changes written by another process never arrive.
+
+```ts
+sseTransport({ bus: memoryBus() })
+```
+</Callout>
+
+| Bus | When | Latency across processes | Cost |
+|---|---|---|---|
+| `databaseBus()` (default) | several processes, nothing else to run | up to `intervalMs` (1 s) | one indexed query per second per process with connections |
+| `payloadKVBus()` | `payload.kv` runs on Redis | up to 1 s | one KV read per second; a query only when something changed, plus a full check every 15 s |
+| `redisBus(...)` | you have Redis | milliseconds | no database load |
+| `memoryBus()` | exactly one process | none | none |
+
+**`databaseBus`** writes nothing. The messages already carry `updatedAt`, so each process that holds connections asks once per `intervalMs`: "messages of the keys my connections follow, changed since the last check". Rows are deduplicated over a 5 s overlap, so late commits are not missed. A process without connections asks nothing.
+
+```ts
+sseTransport({ bus: databaseBus({ intervalMs: 1000 }) })
+```
+
+**`payloadKVBus`** puts Payload's KV store in front of the same check. Every write bumps one `payload.kv` entry per instance. Each process reads that entry once per second and queries the messages only when it moved, with a full check every 15 s (`fullCheckMs`) as a safety net. The name says where the flag lives, not what backs it. With a Redis KV adapter the per-second cost is one key read; on Payload's default database KV it only trades one query for another, so use `databaseBus` there.
+
+```ts
+sseTransport({ bus: payloadKVBus() })
+```
+
+**`redisBus`** uses Redis pub/sub on the channel `conversations:<instance>`. A process skips its own messages, because its connections heard them already. There is no client dependency: pass your client through an adapter. A subscribed Redis connection can do nothing else, so it needs a second one.
+
+```ts
+import Redis from 'ioredis'
+import { ioredisPubSub, redisBus, sseTransport } from '@10x-media/conversations'
+
+const redis = new Redis(process.env.REDIS_URL)
+
+sseTransport({ bus: redisBus(ioredisPubSub(redis, redis.duplicate())) })
+// node-redis: redisBus(nodeRedisPubSub(client, client.duplicate()))
+```
+
+Pub/sub keeps nothing, so a process cut off from Redis for a moment would miss messages. A database check therefore still runs underneath, every `fallbackCheckMs` (default 30 s; `false` turns it off).
+
+**Your own bus** implements `ConversationsBus`:
+
+```ts
+type ConversationsBus = {
+  /** After a write in this process: tell the others. */
+  publish?: (args: { instance; payload; signal: { key: string; channel?: string } }) => void | Promise<void>
+  /** While this process holds connections: deliver the others' changes. Returns the stop. */
+  subscribe: (args: {
+    instance
+    payload
+    watched: () => string[]
+    onSignals: (signals: Array<{ key: string; channel?: string }>) => void
+  }) => () => void
 }
 ```
 
-An SSE or websocket adapter subscribes to the watched keys, authorizing with the same tokens, and calls `onChange` when `publish` fires for one of them. On a serverless host, `publish` can call a hosted pub/sub. The plugin ships only polling for now.
+## Pusher-compatible services
+
+For hosts that cannot keep connections open, such as serverless functions. Payload makes one signed HTTP call per change, and the service holds the sockets.
+
+```ts
+import { pusherTransport } from '@10x-media/conversations'
+
+transport: pusherTransport({
+  appId: process.env.PUSHER_APP_ID!,
+  key: process.env.PUSHER_KEY!,
+  secret: process.env.PUSHER_SECRET!,
+  cluster: 'eu',
+})
+
+// Soketi or another Pusher-compatible server
+transport: pusherTransport({ appId, key, secret, host: 'soketi.internal', port: 6001, useTLS: false })
+```
+
+- **No dependency.** The REST call is signed by the plugin, and the browser half speaks the Pusher socket protocol over the native WebSocket, so `pusher-js` is not needed.
+- **Private channels.** Each (instance, key, channel) gets one: `private-cv-<instance>-<key>.<channel>`, base64url-encoded. The browser authorizes a subscription at `POST /api/conversations/<instance>/pusher-auth` with its subscription token, so the check costs no query.
+- **Key length.** Pusher limits channel names to 164 characters, so conversation keys must stay under about 100.
+- **One socket per browser**, shared by all tabs. Pusher bills per concurrent connection, so this matters.
+- **After a reconnect** every watched key counts as changed, because Pusher keeps no history.
+- **A failed trigger** is logged and never fails the write. The next reconnect or poll picks the change up.
+- **Admin.** The admin uses the client half automatically: `pusherTransport` hands it the public options (key, cluster or host). On a website, pass `pusherClientTransport({ key, cluster })` or `pusherClientTransport({ key, wsHost, wsPort, forceTLS })`.
+
+## Writing a transport
+
+The server half:
+
+```ts
+type ConversationsServerTransport = {
+  /** Called after every change a feed shows, with the message's channel. */
+  publish: (args: { instance: string; key: string; channel?: string; req: PayloadRequest }) => void | Promise<void>
+  /** Extra endpoints under /api/conversations/<instance> (a stream, an auth callback). */
+  endpoints?: (args: { base: string; instance }) => Endpoint[]
+  /** What the admin's provider uses: 'polling' | 'sse' | { pusher: PusherClientOptions }. */
+  client?: ClientTransportSpec
+}
+```
+
+The client half is a `ConversationsClientTransport`. `createRelay` from `@10x-media/conversations/react` shares one connection per browser and falls back to polling. A source only opens its connection and reports `changed`, `expired` and `health`.

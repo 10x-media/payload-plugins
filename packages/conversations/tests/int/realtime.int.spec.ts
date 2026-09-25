@@ -1,7 +1,13 @@
 import { type BootedPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { conversations, databaseBus, sseTransport } from '../../src/index'
+import {
+	conversations,
+	databaseBus,
+	getInstance,
+	payloadKVBus,
+	sseTransport,
+} from '../../src/index'
 import { boot, call, instanceOptions, openStream, type Session, signUp } from './fixture'
 
 describeForDb('realtime over SSE', {}, (db) => {
@@ -108,5 +114,69 @@ describeForDb('realtime over SSE', {}, (db) => {
 			expect(ready?.data.expired).toHaveLength(1)
 			await stream.close()
 		})
+	})
+})
+
+describeForDb('realtime over SSE with the Payload KV bus', {}, (db) => {
+	let booted: BootedPayload
+	let staff: Session
+
+	beforeAll(async () => {
+		booted = await boot(
+			db,
+			conversations(
+				instanceOptions({
+					transport: sseTransport({ bus: payloadKVBus({ fullCheckMs: 60_000, intervalMs: 200 }) }),
+				})
+			)
+		)
+		staff = await signUp(booted, 'users', 'Staff')
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted?.stop()
+	})
+
+	it('queries only once the KV flag moved', async () => {
+		const person = await booted.payload.create({ collection: 'persons', data: { name: 'KV' } })
+		const key = `collection:persons:${person.id}`
+		const token = (
+			await call<{ entries: Array<{ token: string }> }>(
+				booted,
+				'POST /conversations/comments/subscribe',
+				{ body: { count: [], keys: [key] }, session: staff }
+			)
+		).json.entries[0]?.token
+		const stream = await openStream(booted, {
+			body: { tokens: [token ?? ''] },
+			instance: 'comments',
+			session: staff,
+		})
+		expect((await stream.next())?.event).toBe('ready')
+		// Let the first full check pass, so only the flag can trigger the next query.
+		await new Promise((resolve) => setTimeout(resolve, 500))
+		const write = () =>
+			booted.payload.db.create({
+				collection: 'comments-messages',
+				data: {
+					authorKey: staff.userKey,
+					channel: 'internal',
+					clientId: crypto.randomUUID(),
+					key,
+					type: 'text',
+				},
+			})
+		// Another process writes without bumping the flag: nobody looks.
+		await write()
+		expect(await stream.next(800)).toBeNull()
+		// Another process writes and bumps it, as its `publish` does.
+		await write()
+		await payloadKVBus().publish?.({
+			instance: getInstance({ payload: booted.payload }, 'comments'),
+			payload: booted.payload,
+			signal: { channel: 'internal', key },
+		})
+		expect(await stream.next()).toMatchObject({ data: { keys: [key] }, event: 'changed' })
+		await stream.close()
 	})
 })
