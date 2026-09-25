@@ -4,18 +4,10 @@ import { useConfig } from '@payloadcms/ui'
 import { type ReactNode, useState } from 'react'
 
 import { ChatProvider } from '../react/provider'
-import { pusherClientTransport } from '../react/pusher'
-import { sseClientTransport } from '../react/sse'
-import { type ConversationsClientTransport, pollingTransport } from '../react/transport'
+import { transportFromSpec } from '../react/transportFromSpec'
 import type { ClientTransportSpec } from '../types'
 import { type ChatComponents, ChatComponentsProvider } from './components'
 import './conversations.css'
-
-const clientTransport = (spec: ClientTransportSpec | undefined): ConversationsClientTransport => {
-	if (spec === 'sse') return sseClientTransport()
-	if (typeof spec === 'object') return pusherClientTransport(spec.pusher)
-	return pollingTransport()
-}
 
 /**
  * The admin's provider for one instance. The plugin registers the server half
@@ -36,7 +28,7 @@ export const ChatAdminProvider = ({
 	transport?: ClientTransportSpec
 }) => {
 	const { config } = useConfig()
-	const [client] = useState(() => clientTransport(transport))
+	const [client] = useState(() => transportFromSpec(transport))
 	return (
 		<ChatProvider
 			apiRoute={config.routes.api}

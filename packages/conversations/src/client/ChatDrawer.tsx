@@ -4,7 +4,7 @@ import { Drawer, useModal, XIcon } from '@payloadcms/ui'
 import type { ReactNode } from 'react'
 
 import { resolveLabel } from '../react/hooks'
-import { useChatPanel } from '../react/useChatPanel'
+import { type UseChatPanelResult, useChatPanel } from '../react/useChatPanel'
 import type { WindowMessage } from '../react/window'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
@@ -60,20 +60,32 @@ const DrawerHeader = ({
 	)
 }
 
-const DrawerBody = ({
+export type ChatPanelProps = {
+	conversationKey: string
+	/** Drawn first, with the panel's state (e.g. the drawer header with its channel slot). */
+	renderHeader?: (panel: UseChatPanelResult) => ReactNode
+	instance: string
+	/** Renders messages whose `type` is not `text`. */
+	renderType?: (message: WindowMessage) => ReactNode
+	/** The Payload modal slug a thread opens under, as a drawer. */
+	threadSlug: string
+}
+
+/**
+ * One conversation's tabs, feed and composer, with threads in a drawer
+ * stacked on top. Fills its parent's column: the drawer, or the inline field.
+ */
+export const ChatPanel = ({
 	conversationKey,
-	drawerSlug,
-	header,
 	instance,
+	renderHeader,
 	renderType,
-	subtitle,
-	title,
-}: ChatDrawerProps) => {
+	threadSlug,
+}: ChatPanelProps) => {
 	const { i18n, t } = useTranslation()
 	const { closeModal, openModal } = useModal()
 	const panel = useChatPanel({ conversationKey })
 	const { channels, conversation, current, other, reads, thread, viewer } = panel
-	const threadSlug = `${drawerSlug}-thread`
 
 	// Opened from the click, not from an effect on `thread`: Escape and a click
 	// outside close the modal without clearing `thread`, and reopening the same
@@ -86,20 +98,8 @@ const DrawerBody = ({
 	const label = current ? resolveLabel(current.label, i18n.language) : ''
 	const cue = current?.cue ?? null
 	return (
-		<div className="conversations-drawer">
-			<DrawerHeader
-				onClose={() => closeModal(drawerSlug)}
-				subtitle={subtitle}
-				title={title ?? t(keys.comments)}
-			>
-				{header}
-				<ChatSlot
-					channel={current?.slug}
-					conversationKey={conversationKey}
-					instance={instance}
-					name="drawerHeader"
-				/>
-			</DrawerHeader>
+		<>
+			{renderHeader?.(panel)}
 			<ChatChannelTabs
 				active={current?.slug ?? ''}
 				channels={channels}
@@ -159,6 +159,44 @@ const DrawerBody = ({
 					</div>
 				</Drawer>
 			) : null}
+		</>
+	)
+}
+
+const DrawerBody = ({
+	conversationKey,
+	drawerSlug,
+	header,
+	instance,
+	renderType,
+	subtitle,
+	title,
+}: ChatDrawerProps) => {
+	const { t } = useTranslation()
+	const { closeModal } = useModal()
+	return (
+		<div className="conversations-drawer">
+			<ChatPanel
+				conversationKey={conversationKey}
+				instance={instance}
+				renderHeader={({ current }) => (
+					<DrawerHeader
+						onClose={() => closeModal(drawerSlug)}
+						subtitle={subtitle}
+						title={title ?? t(keys.comments)}
+					>
+						{header}
+						<ChatSlot
+							channel={current?.slug}
+							conversationKey={conversationKey}
+							instance={instance}
+							name="drawerHeader"
+						/>
+					</DrawerHeader>
+				)}
+				renderType={renderType}
+				threadSlug={`${drawerSlug}-thread`}
+			/>
 		</div>
 	)
 }

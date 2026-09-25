@@ -137,10 +137,11 @@ export const subscribe = async (
 			...(counts ? { unread: counts[entry.key] } : {}),
 		})),
 		channels: Object.fromEntries(
-			[...instance.channels.values()].map((channel) => [
-				channel.slug,
-				{ label: channel.label, ...(channel.cue ? { cue: channel.cue } : {}) },
-			])
+			[...instance.channels.values()].map((channel) => {
+				// Per viewer: a function cue answers for this request.
+				const cue = typeof channel.cue === 'function' ? channel.cue({ req }) : channel.cue
+				return [channel.slug, { label: channel.label, ...(cue ? { cue } : {}) }]
+			})
 		),
 		deleted: instance.deleted,
 		extensionData: Object.fromEntries(

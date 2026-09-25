@@ -27,6 +27,12 @@ import {
 	useState,
 } from 'react'
 
+import {
+	type ComposerClassNames,
+	ComposerClassProvider,
+	type ComposerPart,
+	composerClass,
+} from './classes'
 import { toEditorJSON } from './json'
 import { SlashMenu } from './plugins/SlashMenu'
 import { type ComposerRuntime, ComposerRuntimeContext } from './runtime'
@@ -49,6 +55,12 @@ export type ComposerProps = {
 	/** Focus the editor, caret at the end, when it mounts. */
 	autoFocus?: boolean
 	className?: string
+	/**
+	 * Classes for the composer's parts (toolbar, menus, link field, text), e.g.
+	 * a website's Tailwind classes. Added to the defaults, or alone with
+	 * `unstyled`.
+	 */
+	classNames?: ComposerClassNames
 	/** Receives the Lexical editor, for reading and clearing its state. */
 	editorRef?: MutableRefObject<LexicalEditor | null>
 	features: ComposerFeature[]
@@ -67,23 +79,29 @@ export type ComposerProps = {
 	/** Translates keys features use in their labels. Default: returns the key. */
 	t?: ComposerTranslate
 	toolbar?: ComposerToolbar
+	/**
+	 * Drop the default classes (the admin's look, on Payload's variables) and
+	 * style every part through `classNames` alone.
+	 */
+	unstyled?: boolean
 }
 
 const identity: ComposerTranslate = (key) => key
 
-const theme = {
-	link: 'conversations-editor__link',
-	list: {
-		listitem: 'conversations-editor__listitem',
-		nested: { listitem: 'conversations-editor__listitem--nested' },
-		ol: 'conversations-editor__ol',
-		ul: 'conversations-editor__ul',
-	},
-	paragraph: 'conversations-editor__paragraph',
-	text: {
-		bold: 'conversations-editor__bold',
-		italic: 'conversations-editor__italic',
-	},
+/** Lexical's theme: the classes of text inside the editor. */
+const themeFor = (styling: { classNames?: ComposerClassNames; unstyled?: boolean }) => {
+	const cls = (part: ComposerPart) => composerClass(styling, part)
+	return {
+		link: cls('link'),
+		list: {
+			listitem: cls('listItem'),
+			nested: { listitem: cls('nestedListItem') },
+			ol: cls('ol'),
+			ul: cls('ul'),
+		},
+		paragraph: cls('paragraph'),
+		text: { bold: cls('bold'), italic: cls('italic') },
+	}
 }
 
 /**
@@ -153,7 +171,7 @@ const AutoFocus = () => {
 }
 
 /** Clicking the box around the text puts the caret in it, as a text field would. */
-const FocusOnBoxClick = ({ children, className }: { children: ReactNode; className: string }) => {
+const FocusOnBoxClick = ({ children, className }: { children: ReactNode; className?: string }) => {
 	const [editor] = useLexicalComposerContext()
 	return (
 		// biome-ignore lint/a11y/noStaticElementInteractions: a convenience for the mouse; the editor itself is focusable.
@@ -179,6 +197,7 @@ const FocusOnBoxClick = ({ children, className }: { children: ReactNode; classNa
 export const Composer = ({
 	autoFocus = false,
 	className,
+	classNames,
 	editorRef,
 	features,
 	footer,
@@ -191,6 +210,7 @@ export const Composer = ({
 	submitOn = 'enter',
 	t = identity,
 	toolbar = 'bottom',
+	unstyled,
 }: ComposerProps) => {
 	const placement = typeof toolbar === 'string' ? toolbar : toolbar.placement
 	const toolbarItems = typeof toolbar === 'string' ? undefined : toolbar.items
@@ -223,7 +243,7 @@ export const Composer = ({
 		onError: (error: Error) => {
 			console.error('[@10x-media/conversations] composer', error)
 		},
-		theme,
+		theme: themeFor({ classNames, unstyled }),
 	}))
 	const markdown = useMemo(() => features.flatMap((feature) => feature.markdown ?? []), [features])
 	const latestSubmit = useRef(onSubmit)
@@ -232,39 +252,52 @@ export const Composer = ({
 
 	return (
 		<ComposerRuntimeContext.Provider value={runtime}>
-			<LexicalComposer initialConfig={initialConfig}>
-				<div
-					className={`conversations-editor conversations-editor--toolbar-${placement}${className ? ` ${className}` : ''}`}
-				>
-					{placement === 'top' ? <Toolbar items={toolbarItems} /> : null}
-					<FocusOnBoxClick className="conversations-editor__input">
-						<RichTextPlugin
-							contentEditable={
-								<ContentEditable
-									aria-placeholder={placeholder}
-									className="conversations-editor__content"
-									placeholder={
-										<div className="conversations-editor__placeholder">{placeholder}</div>
-									}
-								/>
-							}
-							ErrorBoundary={LexicalErrorBoundary}
-						/>
-					</FocusOnBoxClick>
-					<FocusOnBoxClick className="conversations-editor__footer">
-						{placement === 'bottom' ? <Toolbar items={toolbarItems} /> : <span />}
-						<div className="conversations-editor__end">{footer}</div>
-					</FocusOnBoxClick>
-				</div>
-				<HistoryPlugin />
-				{markdown.length > 0 ? <MarkdownShortcutPlugin transformers={markdown} /> : null}
-				<SlashMenu />
-				{features.map((feature) => (feature.Plugin ? <feature.Plugin key={feature.key} /> : null))}
-				<SubmitOnEnter isOverlayOpen={isOverlayOpen} onSubmit={submit} submitOn={submitOn} />
-				{autoFocus ? <AutoFocus /> : null}
-				{editorRef ? <EditorRefPlugin editorRef={editorRef} /> : null}
-				{onChange ? <ChangeListener onChange={onChange} /> : null}
-			</LexicalComposer>
+			<ComposerClassProvider classNames={classNames} unstyled={unstyled}>
+				<LexicalComposer initialConfig={initialConfig}>
+					<div
+						className={[
+							composerClass({ classNames, unstyled }, 'root'),
+							unstyled ? null : `conversations-editor--toolbar-${placement}`,
+							className,
+						]
+							.filter(Boolean)
+							.join(' ')}
+						data-toolbar={placement}
+					>
+						{placement === 'top' ? <Toolbar items={toolbarItems} /> : null}
+						<FocusOnBoxClick className={composerClass({ classNames, unstyled }, 'input')}>
+							<RichTextPlugin
+								contentEditable={
+									<ContentEditable
+										aria-placeholder={placeholder}
+										className={composerClass({ classNames, unstyled }, 'content')}
+										placeholder={
+											<div className={composerClass({ classNames, unstyled }, 'placeholder')}>
+												{placeholder}
+											</div>
+										}
+									/>
+								}
+								ErrorBoundary={LexicalErrorBoundary}
+							/>
+						</FocusOnBoxClick>
+						<FocusOnBoxClick className={composerClass({ classNames, unstyled }, 'footer')}>
+							{placement === 'bottom' ? <Toolbar items={toolbarItems} /> : <span />}
+							<div className={composerClass({ classNames, unstyled }, 'footerEnd')}>{footer}</div>
+						</FocusOnBoxClick>
+					</div>
+					<HistoryPlugin />
+					{markdown.length > 0 ? <MarkdownShortcutPlugin transformers={markdown} /> : null}
+					<SlashMenu />
+					{features.map((feature) =>
+						feature.Plugin ? <feature.Plugin key={feature.key} /> : null
+					)}
+					<SubmitOnEnter isOverlayOpen={isOverlayOpen} onSubmit={submit} submitOn={submitOn} />
+					{autoFocus ? <AutoFocus /> : null}
+					{editorRef ? <EditorRefPlugin editorRef={editorRef} /> : null}
+					{onChange ? <ChangeListener onChange={onChange} /> : null}
+				</LexicalComposer>
+			</ComposerClassProvider>
 		</ComposerRuntimeContext.Provider>
 	)
 }

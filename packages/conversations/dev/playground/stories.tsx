@@ -23,6 +23,7 @@ import {
 } from '@10x-media/conversations/react'
 import { Button, PopupList, useModal } from '@payloadcms/ui'
 import { type ReactNode, useState } from 'react'
+import { extraFormatsFeature, textColorFeature } from '../features/textColor'
 import {
 	ANNA,
 	AUTHORS,
@@ -35,7 +36,6 @@ import {
 	mockServer,
 	NOTE_TYPE,
 } from './mockServer'
-import { extraFormatsFeature, textColorFeature } from './textColor'
 
 export type LiveTarget = { key: string; label: string }
 

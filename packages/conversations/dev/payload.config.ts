@@ -5,7 +5,7 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { buildConfig, type CollectionConfig } from 'payload'
+import { buildConfig, type CollectionConfig, type Where } from 'payload'
 import { comments } from '../src/exports/comments'
 import { reactions } from '../src/exports/reactions'
 import {
@@ -82,6 +82,12 @@ const tickets: CollectionConfig = {
 			options: ['open', 'closed'],
 			admin: { description: 'Closed tickets are read only.' },
 		},
+		// The conversation in the form itself: project code composed from the plugin's primitives.
+		{
+			name: 'conversation',
+			type: 'ui',
+			admin: { components: { Field: '/components/TicketConversation#TicketConversation' } },
+		},
 	],
 }
 
@@ -154,7 +160,9 @@ export default buildConfig({
 				{
 					slug: 'shared',
 					label: 'Shared',
-					cue: { label: 'Shared · visible to the customer', tone: 'warning' },
+					// Staff need the warning; the customer is the audience.
+					cue: ({ req }) =>
+						isStaff(req) ? { label: 'Shared · visible to the customer', tone: 'warning' } : null,
 					access: { read: () => true, create: () => true },
 				},
 			],
@@ -232,7 +240,8 @@ export default buildConfig({
 				{
 					slug: 'conversation',
 					label: 'Conversation',
-					cue: { label: 'Visible to the customer', tone: 'warning' },
+					cue: ({ req }) =>
+						isStaff(req) ? { label: 'Visible to the customer', tone: 'warning' } : null,
 					access: { read: () => true, create: () => true },
 				},
 				{
@@ -242,7 +251,14 @@ export default buildConfig({
 					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
 				},
 			],
-			extensions: [comments({ collections: { tickets: true } })],
+			extensions: [reactions({ storage: 'message' })],
+			targets: { collections: { tickets: { channels: ['conversation', 'notes'] } } },
+			// Staff mention staff; customers mention nobody. Enforced by the server (search and
+			// saved mentions), not only by hiding the feature on the website.
+			mentions: {
+				users: ({ collection, req }): Where =>
+					isStaff(req) && collection === 'users' ? {} : { id: { exists: false } },
+			},
 			hooks: { afterMention: autoReply('tickets'), afterMessage: spam('tickets') },
 			transport: pusherTransport({
 				appId: 'app-id',

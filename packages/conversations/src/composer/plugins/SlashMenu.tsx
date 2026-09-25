@@ -9,6 +9,7 @@ import {
 } from '@payloadcms/richtext-lexical/lexical/react/LexicalTypeaheadMenuPlugin'
 import { useEffect, useMemo, useState } from 'react'
 
+import { useComposerClasses } from '../classes'
 import { ComposerMenu } from '../Menu'
 import { mergeSlashGroups } from '../model'
 import { useComposerRuntime } from '../runtime'
@@ -60,6 +61,7 @@ export const rankCommands = <T extends CommandOption>(options: T[], query: strin
 export const SlashMenu = () => {
 	const [editor] = useLexicalComposerContext()
 	const { features, labels, setOverlay, t } = useComposerRuntime()
+	const cx = useComposerClasses()
 	const [query, setQuery] = useState<null | string>(null)
 	const trigger = useBasicTypeaheadTriggerMatch('/', { maxLength: 30, minLength: 0 })
 	const all = useMemo(
@@ -99,10 +101,10 @@ export const SlashMenu = () => {
 							key: option.key,
 							node: (
 								<>
-									<span className="conversations-menu__icon">
+									<span className={cx('menuIcon')}>
 										{option.item.Icon ? <option.item.Icon /> : null}
 									</span>
-									<span className="conversations-menu__label">{option.label}</span>
+									<span className={cx('menuLabel')}>{option.label}</span>
 								</>
 							),
 						}))}

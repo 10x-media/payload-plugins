@@ -1,9 +1,10 @@
 'use client'
 
 import {
+	type ComposerFeature,
 	type ComposerToolbarItemProps,
 	defineComposerFeature,
-} from '@10x-media/conversations/client'
+} from '@10x-media/conversations/composer'
 import {
 	$getSelection,
 	$isRangeSelection,
@@ -14,12 +15,15 @@ import {
 	$getSelectionStyleValueForProperty,
 	$patchStyleText,
 } from '@payloadcms/richtext-lexical/lexical/selection'
+import { type JSXConverters, TextJSXConverter } from '@payloadcms/richtext-lexical/react'
 
 /**
- * A demo of a project's own composer feature: text colour as a toolbar
- * dropdown with a custom palette `Component`, and one `/` command per colour.
- * It stores a `color` style on text nodes; the dev app's `MessageBody` does
- * not render styles, so sent messages show plain text.
+ * A project's own rich text feature, in two halves that travel together:
+ * `textColorFeature` for the composer (a toolbar palette and one `/` command
+ * per colour, storing a `color` style on text nodes) and
+ * `textColorConverters` for showing messages (Payload's text converter plus
+ * the colour). The same file serves the admin (`ChatRichTextProvider`) and
+ * the website (`ConversationUIProvider`).
  */
 
 const COLORS = [
@@ -168,3 +172,27 @@ export const extraFormatsFeature = () =>
 			],
 		},
 	})
+
+/** Only a palette colour survives: the stored `style` is user input. */
+const colorOf = (style: unknown): null | string => {
+	const match = typeof style === 'string' ? /(?:^|;)\s*color:\s*([^;]+)/.exec(style) : null
+	const value = match?.[1]?.trim().toLowerCase()
+	return COLORS.some((color) => color.value === value) ? (value ?? null) : null
+}
+
+/** Shows the colour on sent messages; bold, italic and the rest stay Payload's. */
+export const textColorConverters: JSXConverters = {
+	text: (args) => {
+		// A converter is a function or a ready node.
+		const base = TextJSXConverter.text
+		const rendered = typeof base === 'function' ? base(args as never) : base
+		const color = colorOf((args.node as { style?: unknown }).style)
+		return color ? <span style={{ color }}>{rendered}</span> : rendered
+	},
+}
+
+/** The default features plus text colour: pass as `composerFeatures`. */
+export const withTextColor = ({ defaultFeatures }: { defaultFeatures: ComposerFeature[] }) => [
+	...defaultFeatures,
+	textColorFeature(),
+]

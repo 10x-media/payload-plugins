@@ -42,6 +42,7 @@ const channels: ConversationsChannel[] = [
 	},
 	{
 		access: { create: () => true, read: () => true },
+		cue: ({ req }) => (isStaff(req) ? { label: 'Visible to customers', tone: 'warning' } : null),
 		label: 'Shared',
 		slug: 'shared',
 	},
@@ -153,6 +154,19 @@ describeForDb('conversations access', {}, (db) => {
 	})
 
 	describe('subscribe', () => {
+		it('resolves a cue for the viewer', async () => {
+			const cueFor = async (session: Session) =>
+				(
+					await call<{ channels: Record<string, { cue?: { label: string } }> }>(
+						booted,
+						'POST /conversations/comments/subscribe',
+						{ body: { keys: [] }, session }
+					)
+				).json.channels.shared?.cue
+			expect(await cueFor(staff)).toEqual({ label: 'Visible to customers', tone: 'warning' })
+			expect(await cueFor(stranger)).toBeUndefined()
+		})
+
 		it('counts messages only for the keys asked for', async () => {
 			const [a, b] = [await person('Count A'), await person('Count B')]
 			await call(booted, 'POST /conversations/comments/messages', {

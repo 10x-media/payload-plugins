@@ -13,6 +13,7 @@ import { Avatar } from '../../client/Avatar'
 import { $createMentionNode } from '../../editor/mention/MentionNode'
 import { useMentionSearch } from '../../react/hooks'
 import type { MentionCandidate } from '../../shared/wire'
+import { useComposerClasses } from '../classes'
 import { ComposerMenu } from '../Menu'
 import { useComposerRuntime } from '../runtime'
 
@@ -28,6 +29,7 @@ class UserOption extends MenuOption {
 const Typeahead = ({ channel, conversationKey }: { channel: string; conversationKey: string }) => {
 	const [editor] = useLexicalComposerContext()
 	const { labels, setOverlay } = useComposerRuntime()
+	const cx = useComposerClasses()
 	const [query, setQuery] = useState<null | string>(null)
 	const trigger = useBasicTypeaheadTriggerMatch('@', { maxLength: 40, minLength: 0 })
 	const { loading, users } = useMentionSearch({ channel, key: conversationKey, query })
@@ -51,8 +53,13 @@ const Typeahead = ({ channel, conversationKey }: { channel: string; conversation
 							key: option.key,
 							node: (
 								<>
-									<Avatar author={option.user} size={20} userKey={option.user.userKey} />
-									<span className="conversations-menu__label">{option.user.name}</span>
+									<Avatar
+										author={option.user}
+										className={cx('menuAvatar')}
+										size={20}
+										userKey={option.user.userKey}
+									/>
+									<span className={cx('menuLabel')}>{option.user.name}</span>
 								</>
 							),
 						}))}

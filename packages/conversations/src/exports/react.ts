@@ -56,6 +56,7 @@ export {
 	type TransportConnection,
 	type WatchEntry,
 } from '../react/transport'
+export { transportFromSpec } from '../react/transportFromSpec'
 export { type UseChatPanelResult, useChatPanel } from '../react/useChatPanel'
 export { type UseComposerResult, useComposer } from '../react/useComposer'
 export { useDelayedFlag } from '../react/useDelayedFlag'
@@ -66,3 +67,11 @@ export { dividerBefore, type WindowMessage, type WindowState } from '../react/wi
 export { formatCursor } from '../shared/cursor'
 export { collectionKey, customKey, globalKey, parseKey, userKey } from '../shared/keys'
 export type * from '../shared/wire'
+export type {
+	AuthorProjection,
+	AuthorsMap,
+	ClientTransportSpec,
+	ConversationMessage,
+	LocalizedLabel,
+	PusherClientOptions,
+} from '../types'

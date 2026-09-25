@@ -95,6 +95,9 @@ export type ConversationsAccess = (args: {
 type ChannelArgs = { channel: string; req: PayloadRequest }
 type MessageArgs = { message: ConversationMessage; req: PayloadRequest }
 
+/** A channel's audience hint above the composer. */
+export type ChannelCue = { label: LocalizedLabel; tone: 'neutral' | 'warning' }
+
 export type ConversationsChannel = {
 	access: {
 		create: (args: ChannelArgs) => boolean | Promise<boolean>
@@ -104,8 +107,12 @@ export type ConversationsChannel = {
 		/** Default: the author only. */
 		update?: (args: MessageArgs) => boolean | Promise<boolean>
 	}
-	/** Shown above the composer, e.g. a warning for channels external users can read. */
-	cue?: { label: LocalizedLabel; tone: 'neutral' | 'warning' }
+	/**
+	 * Shown above the composer: who reads what is written here, e.g. a warning
+	 * for channels customers can read. A function answers per viewer (a customer
+	 * needs no "visible to the customer"); null shows none.
+	 */
+	cue?: ChannelCue | ((args: { req: PayloadRequest }) => ChannelCue | null)
 	label: LocalizedLabel
 	slug: string
 }

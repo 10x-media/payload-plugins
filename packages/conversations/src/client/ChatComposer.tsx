@@ -13,6 +13,7 @@ import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { LocalizedLabel } from '../types'
 import { ChatSlot } from './components'
+import { useChatRichText } from './richText'
 import './conversations.css'
 
 export type ChatComposerProps = {
@@ -86,10 +87,12 @@ export const ChatComposer = ({
 		parent,
 	})
 	const { busy, failed, submit } = composer
+	const richText = useChatRichText()
 	// Features are resolved once: the editor registers its nodes on mount.
-	const [resolvedFeatures] = useState(() =>
-		features ? features({ defaultFeatures: defaultComposerFeatures() }) : defaultComposerFeatures()
-	)
+	const [resolvedFeatures] = useState(() => {
+		const pick = features ?? richText.composerFeatures
+		return pick ? pick({ defaultFeatures: defaultComposerFeatures() }) : defaultComposerFeatures()
+	})
 
 	const labels = useMemo<ComposerLabels>(
 		() => ({

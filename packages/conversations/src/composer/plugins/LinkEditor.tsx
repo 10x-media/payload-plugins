@@ -3,6 +3,7 @@
 import {
 	$createTextNode,
 	$getNodeByKey,
+	$getRoot,
 	$getSelection,
 	$isRangeSelection,
 	$setSelection,
@@ -10,6 +11,7 @@ import {
 	COMMAND_PRIORITY_LOW,
 	COMMAND_PRIORITY_NORMAL,
 	KEY_MODIFIER_COMMAND,
+	type RangeSelection,
 } from '@payloadcms/richtext-lexical/lexical'
 import {
 	$createLinkNode,
@@ -23,9 +25,10 @@ import { $findMatchingParent, mergeRegister } from '@payloadcms/richtext-lexical
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
+import { useComposerClasses } from '../classes'
 import { CheckIcon, CrossIcon, PencilIcon } from '../icons'
 import { displayUrl, normalizeUrl } from '../links'
-import { caretRect, useFloatingPlacement } from '../Menu'
+import { caretRect, useFloatingPlacement, usePortalTarget } from '../Menu'
 import { OPEN_LINK_EDITOR_COMMAND, useComposerRuntime } from '../runtime'
 
 /** Every link the composer makes opens in a new tab. */
@@ -47,6 +50,29 @@ const $linkAtSelection = (): LinkNode | null => {
 	return node && $isLinkNode(node) ? node : null
 }
 
+/**
+ * The selection the field was opened at, if its nodes still exist (a `/link`
+ * pick removes its own text, and an empty editor may have none); else the
+ * caret at the end.
+ */
+const $restoreSelection = (saved: BaseSelection | null): null | RangeSelection => {
+	if ($isRangeSelection(saved)) {
+		try {
+			saved.anchor.getNode()
+			saved.focus.getNode()
+			$setSelection(saved.clone())
+		} catch {
+			// Stale: its nodes are gone.
+		}
+	}
+	let selection = $getSelection()
+	if (!$isRangeSelection(selection)) {
+		$getRoot().selectEnd()
+		selection = $getSelection()
+	}
+	return $isRangeSelection(selection) ? selection : null
+}
+
 const Floating = ({
 	children,
 	className,
@@ -57,11 +83,13 @@ const Floating = ({
 	rect: DOMRect | null
 }) => {
 	const { ref, style } = useFloatingPlacement(() => rect)
+	const target = usePortalTarget()
+	if (!target) return null
 	return createPortal(
 		<div className={className} ref={ref} style={style}>
 			{children}
 		</div>,
-		document.body
+		target
 	)
 }
 
@@ -74,6 +102,7 @@ const Floating = ({
 export const LinkEditor = () => {
 	const [editor] = useLexicalComposerContext()
 	const { labels, setOverlay } = useComposerRuntime()
+	const cx = useComposerClasses()
 	const [editing, setEditing] = useState<Editing | null>(null)
 	const [current, setCurrent] = useState<Current | null>(null)
 	const [focused, setFocused] = useState(false)
@@ -206,9 +235,8 @@ export const LinkEditor = () => {
 				if ($isLinkNode(node)) node.setURL(url)
 				return
 			}
-			if (editing.selection) $setSelection(editing.selection.clone())
-			const selection = $getSelection()
-			if (!$isRangeSelection(selection)) return
+			const selection = $restoreSelection(editing.selection)
+			if (!selection) return
 			if (selection.isCollapsed()) {
 				const link = $createLinkNode(url, LINK_ATTRIBUTES)
 				link.append($createTextNode(displayUrl(url)))
@@ -238,12 +266,12 @@ export const LinkEditor = () => {
 
 	if (editing) {
 		return (
-			<Floating className="conversations-link-editor" rect={editing.rect}>
+			<Floating className={cx('linkEditor')} rect={editing.rect}>
 				<div ref={box}>
-					<div className="conversations-link-editor__row">
+					<div className={cx('linkRow')}>
 						<input
 							aria-invalid={invalid}
-							className="conversations-link-editor__input"
+							className={cx('linkInput')}
 							ref={input}
 							onChange={(event) => {
 								setValue(event.target.value)
@@ -263,7 +291,7 @@ export const LinkEditor = () => {
 							value={value}
 						/>
 						<button
-							className="conversations-link-editor__button"
+							className={cx('linkButton')}
 							aria-label={labels.linkApply}
 							title={labels.linkApply}
 							onClick={apply}
@@ -273,7 +301,7 @@ export const LinkEditor = () => {
 						</button>
 						{editing.linkKey ? (
 							<button
-								className="conversations-link-editor__button"
+								className={cx('linkButton')}
 								aria-label={labels.linkRemove}
 								title={labels.linkRemove}
 								onClick={() => remove(editing.linkKey as string)}
@@ -283,9 +311,7 @@ export const LinkEditor = () => {
 							</button>
 						) : null}
 					</div>
-					{invalid ? (
-						<div className="conversations-link-editor__error">{labels.linkInvalid}</div>
-					) : null}
+					{invalid ? <div className={cx('linkError')}>{labels.linkInvalid}</div> : null}
 				</div>
 			</Floating>
 		)
@@ -293,25 +319,14 @@ export const LinkEditor = () => {
 
 	if (current && focused) {
 		return (
-			<Floating
-				className="conversations-link-editor conversations-link-editor--preview"
-				rect={current.rect}
-			>
+			<Floating className={cx('linkEditor', 'linkPreview')} rect={current.rect}>
 				{/* biome-ignore lint/a11y/noStaticElementInteractions: keeps the editor focused while the buttons are pressed. */}
-				<div
-					className="conversations-link-editor__row"
-					onMouseDown={(event) => event.preventDefault()}
-				>
-					<a
-						className="conversations-link-editor__url"
-						href={current.url}
-						rel="noopener noreferrer"
-						target="_blank"
-					>
+				<div className={cx('linkRow')} onMouseDown={(event) => event.preventDefault()}>
+					<a className={cx('linkUrl')} href={current.url} rel="noopener noreferrer" target="_blank">
 						{displayUrl(current.url)}
 					</a>
 					<button
-						className="conversations-link-editor__button"
+						className={cx('linkButton')}
 						aria-label={labels.linkEdit}
 						title={labels.linkEdit}
 						onClick={open}
@@ -320,7 +335,7 @@ export const LinkEditor = () => {
 						<PencilIcon />
 					</button>
 					<button
-						className="conversations-link-editor__button"
+						className={cx('linkButton')}
 						aria-label={labels.linkRemove}
 						title={labels.linkRemove}
 						onClick={() => remove(current.key)}

@@ -1,7 +1,10 @@
 'use client'
 
+import { useLexicalComposerContext } from '@payloadcms/richtext-lexical/lexical/react/LexicalComposerContext'
 import { Fragment, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+
+import { useComposerClasses } from './classes'
 
 /** Space kept between a floating box and the viewport edge. */
 const EDGE = 8
@@ -39,15 +42,27 @@ export const useFloatingPlacement = (anchor: () => DOMRect | null) => {
 		const element = ref.current
 		const rect = anchor()
 		if (!element || !rect) return
-		const { height, width } = element.getBoundingClientRect()
+		const box = element.getBoundingClientRect()
+		const { height, width } = box
+		// `fixed` is relative to the viewport unless an ancestor (a dialog it was
+		// portalled into) has a transform; measure that offset and take it out.
+		const originX = box.left - (Number.parseFloat(element.style.left) || 0)
+		const originY = box.top - (Number.parseFloat(element.style.top) || 0)
 		const below = rect.bottom + 4
-		const top =
-			below + height > window.innerHeight - EDGE && rect.top - height - 4 > EDGE
+		// Whole pixels: measured rects carry sub-pixel noise, and a style that
+		// never settles would re-render forever.
+		const top = Math.round(
+			(below + height > window.innerHeight - EDGE && rect.top - height - 4 > EDGE
 				? rect.top - height - 4
-				: below
-		const left = Math.max(EDGE, Math.min(rect.left, window.innerWidth - width - EDGE))
+				: below) - originY
+		)
+		const left = Math.round(
+			Math.max(EDGE, Math.min(rect.left, window.innerWidth - width - EDGE)) - originX
+		)
 		setStyle((current) =>
-			current.top === top && current.left === left && current.opacity === 1
+			Math.abs(Number(current.top) - top) < 1 &&
+			Math.abs(Number(current.left) - left) < 1 &&
+			current.opacity === 1
 				? current
 				: { left, opacity: 1, position: 'fixed', top }
 		)
@@ -69,6 +84,18 @@ export const caretRect = (anchor?: HTMLElement | null): DOMRect | null => {
 	const rect = anchor.getBoundingClientRect()
 	const lineHeight = rect.height || 16
 	return new DOMRect(rect.left, rect.top - lineHeight - 3, rect.width, lineHeight)
+}
+
+/**
+ * Where floating parts render: the dialog the editor sits in (a modal traps
+ * focus inside itself, so a field outside it could not be typed into), else
+ * `body`. Outside any `overflow`, so nothing clips them.
+ */
+export const usePortalTarget = (): HTMLElement | null => {
+	const [editor] = useLexicalComposerContext()
+	if (typeof document === 'undefined') return null
+	const root = editor.getRootElement()
+	return root?.closest<HTMLElement>('dialog, [role="dialog"]') ?? document.body
 }
 
 /** One row; `group` draws a heading above the first row of each group. */
@@ -99,25 +126,27 @@ export const ComposerMenu = ({
 	setRef?: (index: number, element: HTMLElement | null) => void
 }) => {
 	const { ref, style } = useFloatingPlacement(() => caretRect(anchor))
-	if (typeof document === 'undefined') return null
+	const cx = useComposerClasses()
+	const target = usePortalTarget()
+	if (!target) return null
 	return createPortal(
 		<div
-			className={`conversations-menu${className ? ` ${className}` : ''}`}
+			className={[cx('menu'), className].filter(Boolean).join(' ')}
 			ref={ref}
 			role="listbox"
 			style={style}
 		>
 			{entries.length === 0 ? (
-				<div className="conversations-menu__empty">{empty}</div>
+				<div className={cx('menuEmpty')}>{empty}</div>
 			) : (
 				entries.map((entry, index) => (
 					<Fragment key={entry.key}>
 						{entry.group && entry.groupKey !== entries[index - 1]?.groupKey ? (
-							<div className="conversations-menu__group">{entry.group}</div>
+							<div className={cx('menuGroup')}>{entry.group}</div>
 						) : null}
 						<button
 							aria-selected={selectedIndex === index}
-							className={`conversations-menu__item${selectedIndex === index ? ' conversations-menu__item--selected' : ''}`}
+							className={cx('menuItem', selectedIndex === index && 'menuItemSelected')}
 							onClick={() => onPick(index)}
 							onMouseDown={(event) => event.preventDefault()}
 							onMouseEnter={() => onHover(index)}
@@ -132,6 +161,6 @@ export const ComposerMenu = ({
 				))
 			)}
 		</div>,
-		document.body
+		target
 	)
 }

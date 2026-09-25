@@ -23,18 +23,25 @@ const hue = (value: string) => {
 
 export type AvatarProps = {
 	author?: Pick<AuthorProjection, 'avatar' | 'deleted' | 'name'>
+	/** Replaces the default class; `--conversations-avatar-hue` stays set for colouring. */
+	className?: string
 	size?: number
 	userKey: string
 }
 
 /** The author's picture, or their initials on a colour derived from their key. */
-export const Avatar = ({ author, size = 28, userKey }: AvatarProps) => {
+export const Avatar = ({
+	author,
+	className = 'conversations-avatar',
+	size = 28,
+	userKey,
+}: AvatarProps) => {
 	const name = author?.name ?? ''
 	if (author?.avatar) {
 		return (
 			<img
 				alt=""
-				className="conversations-avatar"
+				className={className}
 				height={size}
 				src={author.avatar}
 				style={{ height: size, width: size }}
@@ -45,7 +52,7 @@ export const Avatar = ({ author, size = 28, userKey }: AvatarProps) => {
 	return (
 		<span
 			aria-hidden="true"
-			className="conversations-avatar"
+			className={className}
 			style={
 				{
 					'--conversations-avatar-hue': author?.deleted ? undefined : hue(userKey),

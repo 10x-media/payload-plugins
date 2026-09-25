@@ -5,7 +5,8 @@ import { useLexicalComposerContext } from '@payloadcms/richtext-lexical/lexical/
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
-import { useFloatingPlacement } from './Menu'
+import { useComposerClasses } from './classes'
+import { useFloatingPlacement, usePortalTarget } from './Menu'
 import { mergeToolbarGroups, pickToolbar } from './model'
 import { useComposerRuntime } from './runtime'
 import { type ComposerToolbarGroup, type ComposerToolbarItem, labelOf } from './types'
@@ -39,6 +40,7 @@ const ItemButton = ({
 	state: ItemState
 }) => {
 	const label = useLabel()(item.label, item.key)
+	const cx = useComposerClasses()
 	if (item.Component) {
 		return (
 			<item.Component
@@ -54,7 +56,7 @@ const ItemButton = ({
 		<button
 			aria-label={label}
 			aria-pressed={state.active}
-			className={`conversations-editor__tool${state.active ? ' conversations-editor__tool--active' : ''}`}
+			className={cx('tool', state.active && 'toolActive')}
 			disabled={!state.enabled}
 			onClick={() => item.onSelect?.({ editor, isActive: state.active })}
 			onMouseDown={(event) => event.preventDefault()}
@@ -76,6 +78,8 @@ const DropdownPanel = ({
 	onClose: () => void
 }) => {
 	const { ref, style } = useFloatingPlacement(() => anchor?.getBoundingClientRect() ?? null)
+	const cx = useComposerClasses()
+	const target = usePortalTarget()
 	useEffect(() => {
 		const onDown = (event: MouseEvent) => {
 			const target = event.target as Node
@@ -91,16 +95,12 @@ const DropdownPanel = ({
 			document.removeEventListener('keydown', onKey)
 		}
 	}, [anchor, onClose, ref])
+	if (!target) return null
 	return createPortal(
-		<div
-			className="conversations-menu conversations-menu--dropdown"
-			ref={ref}
-			role="menu"
-			style={style}
-		>
+		<div className={cx('menu', 'menuDropdown')} ref={ref} role="menu" style={style}>
 			{children}
 		</div>,
-		document.body
+		target
 	)
 }
 
@@ -117,6 +117,7 @@ const MenuRows = ({
 	states: States
 }) => {
 	const label = useLabel()
+	const cx = useComposerClasses()
 	return (
 		<>
 			{items.map((item) => {
@@ -136,7 +137,7 @@ const MenuRows = ({
 				return (
 					<button
 						aria-checked={state.active}
-						className={`conversations-menu__item${state.active ? ' conversations-menu__item--selected' : ''}`}
+						className={cx('menuItem', state.active && 'menuItemSelected')}
 						disabled={!state.enabled}
 						key={item.key}
 						onClick={() => {
@@ -147,10 +148,10 @@ const MenuRows = ({
 						role="menuitemcheckbox"
 						type="button"
 					>
-						<span className="conversations-menu__icon">
+						<span className={cx('menuIcon')}>
 							{item.ChildComponent ? <item.ChildComponent /> : null}
 						</span>
-						<span className="conversations-menu__label">{label(item.label, item.key)}</span>
+						<span className={cx('menuLabel')}>{label(item.label, item.key)}</span>
 					</button>
 				)
 			})}
@@ -168,6 +169,7 @@ const Dropdown = ({
 	states: States
 }) => {
 	const label = useLabel()
+	const cx = useComposerClasses()
 	const [open, setOpen] = useState(false)
 	const button = useRef<HTMLButtonElement>(null)
 	const active = group.items.find((item) => states[item.key]?.active)
@@ -180,7 +182,7 @@ const Dropdown = ({
 				aria-expanded={open}
 				aria-haspopup="menu"
 				aria-label={title}
-				className={`conversations-editor__tool conversations-editor__tool--dropdown${active || open ? ' conversations-editor__tool--active' : ''}`}
+				className={cx('tool', 'toolDropdown', (active || open) && 'toolActive')}
 				onClick={() => setOpen((value) => !value)}
 				onMouseDown={(event) => event.preventDefault()}
 				ref={button}
@@ -246,6 +248,7 @@ const More = ({
 }) => {
 	const { labels } = useComposerRuntime()
 	const label = useLabel()
+	const cx = useComposerClasses()
 	const [open, setOpen] = useState(false)
 	const close = () => setOpen(false)
 	const active = units.some((unit) =>
@@ -259,7 +262,7 @@ const More = ({
 				aria-expanded={open}
 				aria-haspopup="menu"
 				aria-label={labels.more}
-				className={`conversations-editor__tool${active || open ? ' conversations-editor__tool--active' : ''}`}
+				className={cx('tool', (active || open) && 'toolActive')}
 				onClick={() => setOpen((value) => !value)}
 				onMouseDown={(event) => event.preventDefault()}
 				ref={buttonRef}
@@ -281,9 +284,7 @@ const More = ({
 							/>
 						) : (
 							<Fragment key={unit.key}>
-								<div className="conversations-menu__group">
-									{label(unit.group.label, unit.group.key)}
-								</div>
+								<div className={cx('menuGroup')}>{label(unit.group.label, unit.group.key)}</div>
 								<MenuRows close={close} editor={editor} items={unit.group.items} states={states} />
 							</Fragment>
 						)
@@ -306,6 +307,7 @@ const MORE_FALLBACK_PX = 32
 export const Toolbar = ({ items }: { items?: string[] }) => {
 	const [editor] = useLexicalComposerContext()
 	const { features } = useComposerRuntime()
+	const cx = useComposerClasses()
 	// Compared by value: callers pass fresh arrays on every render.
 	const itemsKey = items?.join(',')
 	const groups = useMemo(
@@ -380,11 +382,11 @@ export const Toolbar = ({ items }: { items?: string[] }) => {
 	const shown = units.slice(0, visible)
 	const hidden = units.slice(visible)
 	return (
-		<div className="conversations-editor__toolbar" ref={row} role="toolbar">
+		<div className={cx('toolbar')} ref={row} role="toolbar">
 			{shown.map((unit, index) => (
-				<span className="conversations-editor__unit" data-unit={unit.key} key={unit.key}>
+				<span className={cx('toolbarGroup')} data-unit={unit.key} key={unit.key}>
 					{index > 0 && shown[index - 1]?.groupKey !== unit.groupKey ? (
-						<span aria-hidden="true" className="conversations-editor__divider" />
+						<span aria-hidden="true" className={cx('toolbarDivider')} />
 					) : null}
 					{unit.kind === 'dropdown' ? (
 						<Dropdown editor={editor} group={unit.group} states={states} />
@@ -399,8 +401,8 @@ export const Toolbar = ({ items }: { items?: string[] }) => {
 				</span>
 			))}
 			{hidden.length > 0 ? (
-				<span className="conversations-editor__unit">
-					<span aria-hidden="true" className="conversations-editor__divider" />
+				<span className={cx('toolbarGroup')}>
+					<span aria-hidden="true" className={cx('toolbarDivider')} />
 					<More buttonRef={moreButton} editor={editor} states={states} units={hidden} />
 				</span>
 			) : null}

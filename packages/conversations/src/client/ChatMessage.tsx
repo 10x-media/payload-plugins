@@ -15,6 +15,7 @@ import { Avatar } from './Avatar'
 import { ChatComposer } from './ChatComposer'
 import { ChatSlot, useTypeRenderer } from './components'
 import { MessageMenu } from './MessageMenu'
+import { useChatRichText } from './richText'
 import './conversations.css'
 
 export type ChatMessageProps = {
@@ -65,6 +66,7 @@ export const ChatMessage = ({
 	const deleteSlug = `conversations-delete-${instance}-${String(message.id)}`
 	const author = authors[message.authorKey]
 	const state = useMessage({ message, readOnly, threadReadAt, viewer })
+	const { converters } = useChatRichText()
 	const { deleted, editing, hasNewReplies, own, replies, setEditing } = state
 
 	const threadSummary =
@@ -138,6 +140,7 @@ export const ChatMessage = ({
 					<MessageBody
 						authors={authors}
 						className="conversations-message__body"
+						converters={converters}
 						message={message}
 					/>
 				) : (

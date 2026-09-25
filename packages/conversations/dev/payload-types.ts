@@ -467,6 +467,16 @@ export interface TicketsMessage {
   deletedAt?: string | null;
   replyCount?: number | null;
   lastReplyAt?: string | null;
+  reactions?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  reactionsVersion?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -825,6 +835,8 @@ export interface TicketsMessagesSelect<T extends boolean = true> {
   deletedAt?: T;
   replyCount?: T;
   lastReplyAt?: T;
+  reactions?: T;
+  reactionsVersion?: T;
   updatedAt?: T;
   createdAt?: T;
 }

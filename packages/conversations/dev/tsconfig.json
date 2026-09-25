@@ -4,6 +4,7 @@
 		"baseUrl": ".",
 		"allowJs": true,
 		"paths": {
+			"@/*": ["./*"],
 			"@payload-config": ["./payload.config.ts"]
 		}
 	},

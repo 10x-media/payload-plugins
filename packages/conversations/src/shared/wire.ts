@@ -10,6 +10,7 @@ export type WireMessage = ConversationMessage & { removed?: boolean }
 export type ChannelAccess = { canCreate: boolean; slug: string }
 
 export type ChannelMeta = {
+	/** Resolved for the viewer who subscribed. */
 	cue?: { label: LocalizedLabel; tone: 'neutral' | 'warning' }
 	label: LocalizedLabel
 }
