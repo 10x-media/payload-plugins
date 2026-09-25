@@ -3,7 +3,13 @@ import { getFromImportMap, isReactServerComponentOrFunction } from 'payload/shar
 import type { ComponentType, ReactNode } from 'react'
 
 import { ChatAdminProvider } from '../client/ChatAdminProvider'
-import type { ChatComponents, ChatSlotName, ChatSlotProps } from '../client/components'
+import {
+	type ChatComponents,
+	type ChatSlotEntry,
+	type ChatSlotName,
+	type ChatSlotProps,
+	SERVER_SLOT,
+} from '../client/components'
 import { getInstance } from '../server/service'
 
 const resolve = (payload: Payload, component: PayloadComponent) =>
@@ -31,14 +37,17 @@ export const ChatAdminProviderServer = ({
 	payload: Payload
 }) => {
 	const instance = getInstance({ payload } as never, slug)
-	const components: ChatComponents = { server: { slots: [], types: [] }, slots: {}, types: {} }
-	for (const [name, path] of Object.entries(instance.slots) as Array<
-		[ChatSlotName, PayloadComponent | undefined]
+	const components: ChatComponents = { server: { types: [] }, slots: {}, types: {} }
+	for (const [name, paths] of Object.entries(instance.slots) as Array<
+		[ChatSlotName, PayloadComponent[]]
 	>) {
-		const Component = path ? resolve(payload, path) : undefined
-		if (!Component) continue
-		if (isReactServerComponentOrFunction(Component)) components.server.slots.push(name)
-		else components.slots[name] = Component
+		const entries: ChatSlotEntry[] = []
+		for (const path of paths) {
+			const Component = resolve(payload, path)
+			if (!Component) continue
+			entries.push(isReactServerComponentOrFunction(Component) ? SERVER_SLOT : Component)
+		}
+		if (entries.length > 0) components.slots[name] = entries
 	}
 	for (const type of instance.types.values()) {
 		const Component = type.Component ? resolve(payload, type.Component) : undefined

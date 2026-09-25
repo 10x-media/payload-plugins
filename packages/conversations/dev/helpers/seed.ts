@@ -1,4 +1,4 @@
-import { createLocalReq, type Payload } from 'payload'
+import { createLocalReq, type Payload, type Where } from 'payload'
 
 import { postMessage } from '../../src/index'
 
@@ -46,6 +46,8 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		email: 'customer@example.com',
 		name: 'Czech Canoe',
 	})
+
+	await seedChat(payload, { anna: String(anna.id), me: String(me.id) })
 
 	if ((await payload.count({ collection: 'persons' })).totalDocs > 0) return
 	payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
@@ -146,5 +148,160 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		[`users:${anna.id}`, 'Thanks, it looks good. Please also send a full-page passport scan.'],
 	] as const) {
 		await postMessage(req, { author, channel: 'shared', instance: 'comments', key, text })
+	}
+}
+
+type ChatLine = {
+	/** Minutes before now. */
+	ago: number
+	author: 'anna' | 'marc' | 'me'
+	replies?: Array<Omit<ChatLine, 'replies'>>
+	text: string
+}
+
+/** `readTo`: minutes ago the dev user last read the room; `null` never, absent all read. */
+const ROOMS: Array<{ lines: ChatLine[]; name: string; readTo?: null | number; topic: string }> = [
+	{
+		lines: [
+			{
+				ago: 2 * 1440 + 300,
+				author: 'anna',
+				text: 'Morning all! Heat sheets for the spring cup are in the shared folder.',
+			},
+			{
+				ago: 2 * 1440 + 297,
+				author: 'anna',
+				text: 'Please flag anything that looks off before Thursday.',
+			},
+			{ ago: 2 * 1440 + 240, author: 'marc', text: 'Looking now.' },
+			{
+				ago: 1440 + 420,
+				author: 'me',
+				replies: [
+					{ ago: 1440 + 400, author: 'anna', text: 'Yes, 14:00 in the small room.' },
+					{ ago: 1440 + 390, author: 'marc', text: 'I will join remotely.' },
+				],
+				text: 'Are we still on for the review call tomorrow?',
+			},
+			{
+				ago: 1440 + 120,
+				author: 'marc',
+				text: 'Uploaded the new start lists. The K1 women 500 m had a duplicate entry, removed it.',
+			},
+			{
+				ago: 180,
+				author: 'anna',
+				text: 'Federation confirmed the medical forms are fine this season.',
+			},
+			{ ago: 176, author: 'anna', text: 'So we only need passports from the new athletes.' },
+			{ ago: 40, author: 'me', text: 'Great, I will update the checklist.' },
+			{
+				ago: 6,
+				author: 'marc',
+				text: 'Photographer asked about the finish line position, who knows?',
+			},
+		],
+		name: 'general',
+		readTo: 100,
+		topic: 'Everything about the spring cup',
+	},
+	{
+		lines: [
+			{ ago: 3 * 1440, author: 'anna', text: 'New poster draft is up, feedback welcome.' },
+			{
+				ago: 3 * 1440 - 30,
+				author: 'me',
+				text: 'Love the colours. The date is hard to read on mobile though.',
+			},
+			{ ago: 200, author: 'anna', text: 'Fixed the date size, v3 is up.' },
+		],
+		name: 'design',
+		topic: 'Posters, social tiles, the website',
+	},
+	{
+		lines: [
+			{ ago: 5 * 1440, author: 'marc', text: 'Results page is live on staging.' },
+			{ ago: 90, author: 'marc', text: 'Deploying the timing integration tonight at 22:00.' },
+		],
+		name: 'releases',
+		readTo: null,
+		topic: 'What ships and when',
+	},
+]
+
+/**
+ * Seed the `chat` instance: three staff users and three rooms with a few
+ * days of history and a thread. Dates are moved back after posting, since
+ * messages are stamped when they are created. Idempotent.
+ */
+export const seedChat = async (
+	payload: Payload,
+	{ anna, me }: { anna: string; me: string }
+): Promise<void> => {
+	const marc = await ensureUser(payload, {
+		collection: 'users',
+		email: 'marc@10xmedia.de',
+		name: 'Marc Oliveira',
+	})
+	if ((await payload.count({ collection: 'rooms' })).totalDocs > 0) return
+	const authors = { anna: `users:${anna}`, marc: `users:${marc.id}`, me: `users:${me}` }
+	const req = await createLocalReq({}, payload)
+	const collection = 'chat-messages'
+	const at = (ago: number) => new Date(Date.now() - ago * 60_000).toISOString()
+	const backdate = (id: number | string, data: Record<string, unknown>) =>
+		payload.db.updateOne({ collection, data, id, req, returning: false })
+
+	for (const room of ROOMS) {
+		const doc = await payload.create({
+			collection: 'rooms',
+			data: { name: room.name, topic: room.topic },
+		})
+		const key = `collection:rooms:${doc.id}`
+		for (const line of room.lines) {
+			const root = await postMessage(req, {
+				author: authors[line.author],
+				channel: 'messages',
+				instance: 'chat',
+				key,
+				text: line.text,
+			})
+			for (const reply of line.replies ?? []) {
+				const message = await postMessage(req, {
+					author: authors[reply.author],
+					channel: 'messages',
+					instance: 'chat',
+					key,
+					parent: String(root.id),
+					text: reply.text,
+				})
+				await backdate(message.id, { createdAt: at(reply.ago), updatedAt: at(reply.ago) })
+			}
+			const lastReply = line.replies?.at(-1)
+			await backdate(root.id, {
+				createdAt: at(line.ago),
+				updatedAt: at(lastReply?.ago ?? line.ago),
+				...(lastReply ? { lastReplyAt: at(lastReply.ago) } : {}),
+			})
+		}
+		// Own posts raised the dev user's cursor to now; set it back so some rooms show unread.
+		if (room.readTo !== undefined) {
+			const reads = 'chat-reads'
+			const where: Where = { and: [{ key: { equals: key } }, { userKey: { equals: authors.me } }] }
+			await payload.db.deleteMany({ collection: reads, req, where })
+			if (room.readTo !== null) {
+				await payload.db.create({
+					collection: reads,
+					data: {
+						channel: 'messages',
+						key,
+						lastReadAt: at(room.readTo),
+						thread: '',
+						userKey: authors.me,
+					},
+					req,
+					returning: false,
+				})
+			}
+		}
 	}
 }

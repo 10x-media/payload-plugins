@@ -4,6 +4,7 @@
  * value in every locale (`en.ts`), or it is a type error.
  */
 export const keys = {
+	addReaction: 'conversations:addReaction',
 	bold: 'conversations:bold',
 	bulletList: 'conversations:bulletList',
 	cancel: 'conversations:cancel',
@@ -44,6 +45,9 @@ export const keys = {
 	numberedList: 'conversations:numberedList',
 	oneReply: 'conversations:oneReply',
 	pluginName: 'conversations:pluginName',
+	reactedWith: 'conversations:reactedWith',
+	reactionLimit: 'conversations:reactionLimit',
+	reactionsMore: 'conversations:reactionsMore',
 	readOnlyChannel: 'conversations:readOnlyChannel',
 	replies: 'conversations:replies',
 	reply: 'conversations:reply',

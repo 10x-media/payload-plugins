@@ -17,6 +17,7 @@ const response = (keys: string[]): SubscribeResponse => ({
 			token: `t:${key}`,
 			unread: { internal: 1 },
 		})),
+	extensionData: {},
 	extensions: [],
 	now: '2026-01-01T00:00:00.000Z',
 	reads: true,

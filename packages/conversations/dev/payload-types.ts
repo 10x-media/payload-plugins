@@ -72,8 +72,13 @@ export interface Config {
     customers: Customer;
     persons: Person;
     media: Media;
+    rooms: Room;
     'comments-messages': CommentsMessage;
     'comments-reads': CommentsRead;
+    'comments-reactions': CommentsReaction;
+    'chat-messages': ChatMessage;
+    'chat-reads': ChatRead;
+    'chat-reactions': ChatReaction;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -85,8 +90,13 @@ export interface Config {
     customers: CustomersSelect<false> | CustomersSelect<true>;
     persons: PersonsSelect<false> | PersonsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    rooms: RoomsSelect<false> | RoomsSelect<true>;
     'comments-messages': CommentsMessagesSelect<false> | CommentsMessagesSelect<true>;
     'comments-reads': CommentsReadsSelect<false> | CommentsReadsSelect<true>;
+    'comments-reactions': CommentsReactionsSelect<false> | CommentsReactionsSelect<true>;
+    'chat-messages': ChatMessagesSelect<false> | ChatMessagesSelect<true>;
+    'chat-reads': ChatReadsSelect<false> | ChatReadsSelect<true>;
+    'chat-reactions': ChatReactionsSelect<false> | ChatReactionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -222,6 +232,17 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rooms".
+ */
+export interface Room {
+  id: string;
+  name: string;
+  topic?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "comments-messages".
  */
 export interface CommentsMessage {
@@ -281,6 +302,91 @@ export interface CommentsRead {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "comments-reactions".
+ */
+export interface CommentsReaction {
+  id: string;
+  message: string;
+  key: string;
+  userKey: string;
+  emoji: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "chat-messages".
+ */
+export interface ChatMessage {
+  id: string;
+  key: string;
+  channel: string;
+  parent?: string | null;
+  type: string;
+  body?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  data?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  text?: string | null;
+  mentions?: string[] | null;
+  authorKey: string;
+  clientId?: string | null;
+  editedAt?: string | null;
+  deletedAt?: string | null;
+  replyCount?: number | null;
+  lastReplyAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "chat-reads".
+ */
+export interface ChatRead {
+  id: string;
+  userKey: string;
+  key: string;
+  channel?: string | null;
+  thread?: string | null;
+  lastReadAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "chat-reactions".
+ */
+export interface ChatReaction {
+  id: string;
+  message: string;
+  key: string;
+  userKey: string;
+  emoji: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -320,12 +426,32 @@ export interface PayloadLockedDocument {
         value: string | Media;
       } | null)
     | ({
+        relationTo: 'rooms';
+        value: string | Room;
+      } | null)
+    | ({
         relationTo: 'comments-messages';
         value: string | CommentsMessage;
       } | null)
     | ({
         relationTo: 'comments-reads';
         value: string | CommentsRead;
+      } | null)
+    | ({
+        relationTo: 'comments-reactions';
+        value: string | CommentsReaction;
+      } | null)
+    | ({
+        relationTo: 'chat-messages';
+        value: string | ChatMessage;
+      } | null)
+    | ({
+        relationTo: 'chat-reads';
+        value: string | ChatRead;
+      } | null)
+    | ({
+        relationTo: 'chat-reactions';
+        value: string | ChatReaction;
       } | null);
   globalSlug?: string | null;
   user:
@@ -448,6 +574,16 @@ export interface MediaSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "rooms_select".
+ */
+export interface RoomsSelect<T extends boolean = true> {
+  name?: T;
+  topic?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "comments-messages_select".
  */
 export interface CommentsMessagesSelect<T extends boolean = true> {
@@ -478,6 +614,65 @@ export interface CommentsReadsSelect<T extends boolean = true> {
   channel?: T;
   thread?: T;
   lastReadAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "comments-reactions_select".
+ */
+export interface CommentsReactionsSelect<T extends boolean = true> {
+  message?: T;
+  key?: T;
+  userKey?: T;
+  emoji?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "chat-messages_select".
+ */
+export interface ChatMessagesSelect<T extends boolean = true> {
+  key?: T;
+  channel?: T;
+  parent?: T;
+  type?: T;
+  body?: T;
+  data?: T;
+  text?: T;
+  mentions?: T;
+  authorKey?: T;
+  clientId?: T;
+  editedAt?: T;
+  deletedAt?: T;
+  replyCount?: T;
+  lastReplyAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "chat-reads_select".
+ */
+export interface ChatReadsSelect<T extends boolean = true> {
+  userKey?: T;
+  key?: T;
+  channel?: T;
+  thread?: T;
+  lastReadAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "chat-reactions_select".
+ */
+export interface ChatReactionsSelect<T extends boolean = true> {
+  message?: T;
+  key?: T;
+  userKey?: T;
+  emoji?: T;
   updatedAt?: T;
   createdAt?: T;
 }

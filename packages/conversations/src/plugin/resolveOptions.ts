@@ -1,4 +1,4 @@
-import type { CollectionSlug, Config, PayloadRequest } from 'payload'
+import type { CollectionSlug, Config, PayloadComponent, PayloadRequest } from 'payload'
 
 import { parseKey } from '../shared/keys'
 import type {
@@ -8,7 +8,9 @@ import type {
 	ConversationsTarget,
 	ExtensionMap,
 	MessageTypeDefinition,
+	ResolvedSlots,
 	ResolvedUsersConfig,
+	SlotComponents,
 } from '../types'
 
 /** Who added an entry: the host options, or an extension by name. */
@@ -16,6 +18,9 @@ type Owner = string
 const HOST: Owner = 'the plugin options'
 
 const TARGET_KINDS = ['collections', 'globals', 'custom'] as const
+
+/** Extension endpoints live at `/<instance>/<name>`, next to these. */
+const RESERVED_NAMES = ['mentions', 'messages', 'poll', 'read', 'subscribe']
 
 const fail = (instance: string, message: string): never => {
 	throw new Error(`[@10x-media/conversations] instance "${instance}": ${message}`)
@@ -37,6 +42,9 @@ export const runBeforePhases = (
 	for (const extension of extensions) {
 		if (extensionMap.has(extension.name)) {
 			fail(slug, `extension "${extension.name}" is registered twice`)
+		}
+		if (RESERVED_NAMES.includes(extension.name)) {
+			fail(slug, `extension name "${extension.name}" collides with a core endpoint`)
 		}
 		extensionMap.set(extension.name, { options: extension.options })
 	}
@@ -212,13 +220,31 @@ export const resolveInstance = (
 		messagesSlug: `${slug}-messages` as CollectionSlug,
 		overrides: options.overrides ?? {},
 		readsSlug: options.reads === false ? null : (`${slug}-reads` as CollectionSlug),
-		slots: options.slots ?? {},
+		extensionList: options.extensions ?? [],
+		slots: resolveSlots(options),
 		slug,
 		targets,
 		transport: options.transport,
 		types,
 		users: resolveUsers(config, options),
 	}
+}
+
+const SLOT_NAMES = ['composerAbove', 'drawerHeader', 'messageActions', 'messageFooter'] as const
+
+const asList = (value: SlotComponents | undefined): PayloadComponent[] =>
+	(value === undefined ? [] : Array.isArray(value) ? value : [value]).filter(Boolean)
+
+/** The host's slot components first, then each extension's, in array order. */
+export const resolveSlots = (options: ConversationsPluginOptions): ResolvedSlots => {
+	const slots = {} as ResolvedSlots
+	for (const name of SLOT_NAMES) {
+		slots[name] = [
+			...asList(options.slots?.[name]),
+			...(options.extensions ?? []).flatMap((extension) => asList(extension.slots?.[name])),
+		]
+	}
+	return slots
 }
 
 /** Run each extension's `after` in array order. */

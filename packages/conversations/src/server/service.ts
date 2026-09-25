@@ -10,7 +10,12 @@ import type {
 	SubscribeResponse,
 	WireMessage,
 } from '../shared/wire'
-import type { AuthorsMap, ConversationMessage, ConversationsInstance } from '../types'
+import type {
+	AuthorsMap,
+	ConversationMessage,
+	ConversationsInstance,
+	ExtensionContext,
+} from '../types'
 import { filterReaders } from './audience'
 import { projectAuthors } from './authors'
 import { isLexicalBody, textToBody } from './body'
@@ -124,6 +129,11 @@ export const subscribe = async (
 			])
 		),
 		deleted: instance.deleted,
+		extensionData: Object.fromEntries(
+			instance.extensionList
+				.filter((extension) => extension.client !== undefined)
+				.map((extension) => [extension.name, extension.client])
+		),
 		extensions: [...instance.extensions.keys()],
 		now: new Date().toISOString(),
 		reads: instance.readsSlug !== null,
@@ -214,7 +224,7 @@ export const listMessages = async (
 		...(cursor !== undefined ? { cursor } : {}),
 		hasNewer: feed.hasNewer,
 		hasOlder: feed.hasOlder,
-		messages: feed.messages,
+		messages: await decorateMessages(req, instance, { messages: feed.messages, viewer }),
 		threadReads,
 	}
 }
@@ -271,7 +281,10 @@ export const sendMessage = async (
 			},
 		})) as ConversationMessage | null
 		if (existing) {
-			return { authors: await projectAuthors(req, instance, [existing]), message: existing }
+			return {
+				authors: await projectAuthors(req, instance, [existing]),
+				message: await decorateOne(req, instance, { message: existing, viewer }),
+			}
 		}
 	}
 	const message = await createMessage(req, instance, {
@@ -290,7 +303,10 @@ export const sendMessage = async (
 		thread: message.parent ?? '',
 		userKey: message.authorKey,
 	})
-	return { authors: await projectAuthors(req, instance, [message]), message }
+	return {
+		authors: await projectAuthors(req, instance, [message]),
+		message: await decorateOne(req, instance, { message, viewer }),
+	}
 }
 
 const toBody = (input: { body?: unknown; text?: string }) => {
@@ -361,7 +377,10 @@ export const editMessage = async (
 		id: existing.id,
 		req,
 	})) as unknown as ConversationMessage
-	return { authors: await projectAuthors(req, instance, [message]), message }
+	return {
+		authors: await projectAuthors(req, instance, [message]),
+		message: await decorateOne(req, instance, { message, viewer: viewerKey(req) }),
+	}
 }
 
 /** Soft-delete: content is wiped on the server, the row stays for counters and placeholders. */
@@ -378,7 +397,8 @@ export const deleteMessage = async (
 		id: existing.id,
 		req,
 	})) as unknown as ConversationMessage
-	return { message: isRemoved(instance, message) ? { ...message, removed: true } : message }
+	const decorated = await decorateOne(req, instance, { message, viewer: viewerKey(req) })
+	return { message: isRemoved(instance, message) ? { ...decorated, removed: true } : decorated }
 }
 
 /** Raise the viewer's cursor for channels of a conversation, or for one thread of it. */
@@ -519,6 +539,91 @@ export const searchMentions = async (
 			return { avatar: projected.avatar ?? null, name: projected.name, userKey: entry.userKey }
 		})
 }
+
+/**
+ * Every extension's per-message data (`decorate`), placed at `message.ext[name]`.
+ * One call per extension for the whole batch.
+ */
+export const decorateMessages = async <T extends ConversationMessage>(
+	req: PayloadRequest,
+	instance: ConversationsInstance,
+	{ messages, viewer }: { messages: T[]; viewer: string }
+): Promise<T[]> => {
+	const decorators = instance.extensionList.filter((extension) => extension.decorate)
+	if (decorators.length === 0 || messages.length === 0) {
+		return messages
+	}
+	const results = await Promise.all(
+		decorators.map(
+			async (extension) =>
+				[
+					extension.name,
+					(await extension.decorate?.({ instance, messages, req, viewer })) ?? {},
+				] as const
+		)
+	)
+	return messages.map((message) => {
+		const ext: Record<string, unknown> = { ...message.ext }
+		let changed = false
+		for (const [name, data] of results) {
+			const value = data[String(message.id)]
+			if (value !== undefined) {
+				ext[name] = value
+				changed = true
+			}
+		}
+		return changed ? { ...message, ext } : message
+	})
+}
+
+const decorateOne = async <T extends ConversationMessage>(
+	req: PayloadRequest,
+	instance: ConversationsInstance,
+	{ message, viewer }: { message: T; viewer: string }
+): Promise<T> =>
+	(await decorateMessages(req, instance, { messages: [message], viewer }))[0] ?? message
+
+/** The helpers an extension endpoint gets, bound to one request. */
+export const extensionContext = (
+	req: PayloadRequest,
+	instance: ConversationsInstance
+): ExtensionContext => ({
+	body: async () => {
+		try {
+			const body = (await req.json?.()) as unknown
+			return typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {}
+		} catch {
+			return fail('Invalid JSON body', 400)
+		}
+	},
+	fail,
+	readableMessage: async (id, options = {}) => {
+		const message = await findRoot(req, instance, id)
+		if (!message || (message.deletedAt && !options.deleted)) {
+			return fail('Not found', 404)
+		}
+		const access = await accessFor(req, instance, message.key)
+		if (!access.channels.some((entry) => entry.slug === message.channel)) {
+			return fail('Not found', 404)
+		}
+		return message
+	},
+	respond: async (messages) => {
+		const viewer = viewerKey(req)
+		const [authors, decorated] = await Promise.all([
+			projectAuthors(req, instance, messages),
+			decorateMessages(req, instance, { messages, viewer }),
+		])
+		return {
+			authors,
+			messages: decorated.map((message) =>
+				isRemoved(instance, message) ? { ...message, removed: true } : message
+			),
+		}
+	},
+	touch: (id) => touchMessage(req, { id, instance: instance.slug }),
+	viewer: () => viewerKey(req),
+})
 
 /** Find a registered instance by slug on a booted Payload. */
 export const getInstance = (

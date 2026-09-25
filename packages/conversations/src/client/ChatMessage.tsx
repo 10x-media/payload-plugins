@@ -159,15 +159,14 @@ export const ChatMessage = ({
 					<div className="conversations-message__status">{t(keys.sending)}</div>
 				) : null}
 				{footer}
-				{deleted ? null : (
-					<ChatSlot
-						channel={message.channel}
-						conversationKey={message.key}
-						instance={instance}
-						message={message}
-						name="messageFooter"
-					/>
-				)}
+				{/* Also on a deleted placeholder: what hangs off a message (reactions) outlives its text. */}
+				<ChatSlot
+					channel={message.channel}
+					conversationKey={message.key}
+					instance={instance}
+					message={message}
+					name="messageFooter"
+				/>
 				{threadSummary}
 			</div>
 			{deleted || editing || message.sendStatus ? null : (

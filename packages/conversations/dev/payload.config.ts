@@ -6,7 +6,9 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig, type PayloadRequest, type Where } from 'payload'
 import { comments } from '../src/exports/comments'
+import { reactions } from '../src/exports/reactions'
 import { conversations, defineMessageType, perTarget } from '../src/index'
+import { autoReply } from './helpers/autoReply'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -47,6 +49,16 @@ const media: CollectionConfig = {
 	fields: [{ name: 'title', type: 'text', required: true }],
 }
 
+/** Chat rooms: each room is the target of a conversation in the `chat` instance. */
+const rooms: CollectionConfig = {
+	slug: 'rooms',
+	admin: { group: 'Chat', useAsTitle: 'name' },
+	fields: [
+		{ name: 'name', type: 'text', required: true },
+		{ name: 'topic', type: 'text' },
+	],
+}
+
 const isStaff = (req: PayloadRequest) => req.user?.collection === 'users'
 
 const db =
@@ -69,7 +81,7 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	editor: lexicalEditor(),
-	collections: [users, customers, persons, media],
+	collections: [users, customers, persons, media, rooms],
 	plugins: [
 		conversations({
 			slug: 'comments',
@@ -102,11 +114,8 @@ export default buildConfig({
 					collection === 'customers' && !isStaff(req) ? { id: { exists: false } } : {},
 			},
 			hooks: {
-				afterMention: ({ req, users: mentioned, key }) => {
-					req.payload.logger.info(
-						`[dev] mentioned ${mentioned.map((u) => `${u.collection}:${u.id}`).join(', ')} in ${key}`
-					)
-				},
+				// Whoever you mention answers a few seconds later (dev only).
+				afterMention: autoReply('comments'),
 			},
 			types: [
 				defineMessageType<{ from: string; to: string }>()({
@@ -115,7 +124,35 @@ export default buildConfig({
 					validate: (data) => (data?.from && data.to ? true : 'from and to are required'),
 				}),
 			],
-			extensions: [comments({ collections: { persons: true, media: ['internal'] } })],
+			extensions: [
+				comments({ collections: { persons: true, media: ['internal'] } }),
+				reactions({
+					maxPerUser: 3,
+					hooks: {
+						afterReaction: ({ emoji, message, operation, req, userKey }) => {
+							req.payload.logger.info(
+								`[dev] ${userKey} ${operation === 'add' ? 'reacted' : 'took back'} ${emoji} on a message by ${message.authorKey}`
+							)
+						},
+					},
+				}),
+			],
+		}),
+		// A second instance: a Slack-like chat over `rooms`, one channel per room, staff only.
+		conversations({
+			slug: 'chat',
+			users: ['users'],
+			access: perTarget(({ req }) => isStaff(req)),
+			channels: [
+				{
+					slug: 'messages',
+					label: 'Messages',
+					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
+				},
+			],
+			extensions: [reactions({ emojis: ['👍', '❤️', '😂', '🎉', '🙏', '👀', '🚀', '✅'] })],
+			hooks: { afterMention: autoReply('chat') },
+			targets: { collections: { rooms: { channels: ['messages'] } } },
 		}),
 	],
 	telemetry: false,
@@ -126,8 +163,17 @@ export default buildConfig({
 	admin: {
 		user: 'users',
 		components: {
-			afterNavLinks: ['/playground/PlaygroundNavLink#PlaygroundNavLink'],
+			afterNavLinks: [
+				'/chat/ChatNavLink#ChatNavLink',
+				'/playground/PlaygroundNavLink#PlaygroundNavLink',
+			],
 			views: {
+				chat: {
+					Component: '/chat/ChatView#ChatView',
+					exact: true,
+					meta: { title: 'Chat' },
+					path: '/chat',
+				},
 				playground: {
 					Component: '/playground/PlaygroundView#PlaygroundView',
 					exact: true,

@@ -16,6 +16,8 @@ export {
 	type UseConversationResult,
 	useChannels,
 	useConversation,
+	useExtension,
+	useExtensionApi,
 	useMentionSearch,
 	useMessageActions,
 	useSend,

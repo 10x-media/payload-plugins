@@ -6,6 +6,7 @@ import { keys, type TranslationKey } from './keys'
  * unknown key a type error. `translations/index.ts` nests these for Payload.
  */
 export const en: Record<TranslationKey, string> = {
+	[keys.addReaction]: 'Add reaction',
 	[keys.bold]: 'Bold',
 	[keys.bulletList]: 'Bulleted list',
 	[keys.cancel]: 'Cancel',
@@ -46,6 +47,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.numberedList]: 'Numbered list',
 	[keys.oneReply]: '1 reply',
 	[keys.pluginName]: 'Conversations',
+	[keys.reactedWith]: '{{names}} reacted with {{emoji}}',
+	[keys.reactionLimit]: 'Up to {{count}} reactions per person',
+	[keys.reactionsMore]: 'and {{count}} more',
 	[keys.readOnlyChannel]: 'You can read this channel but not post in it.',
 	[keys.replies]: '{{count}} replies',
 	[keys.reply]: 'Reply',

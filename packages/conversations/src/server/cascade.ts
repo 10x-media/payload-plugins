@@ -32,4 +32,7 @@ export const cascadeHook =
 				where: { key: { equals: key } },
 			})
 		}
+		for (const extension of instance.extensionList) {
+			await extension.onTargetDelete?.({ instance, key, req })
+		}
 	}

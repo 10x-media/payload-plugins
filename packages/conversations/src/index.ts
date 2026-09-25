@@ -61,11 +61,15 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 		]
 		// Paths that live only in plugin options: the import map finds them through here.
 		const dependencies: NonNullable<typeof config.admin.dependencies> = {}
-		for (const [name, component] of Object.entries(instance.slots)) {
-			const path =
-				typeof component === 'string' ? component : component ? component.path : undefined
-			if (path)
-				dependencies[`conversations-${instance.slug}-slot-${name}`] = { path, type: 'component' }
+		for (const [name, components] of Object.entries(instance.slots)) {
+			components.forEach((component, index) => {
+				const path = typeof component === 'string' ? component : component ? component.path : ''
+				if (!path) return
+				dependencies[`conversations-${instance.slug}-slot-${name}-${index}`] = {
+					path,
+					type: 'component',
+				}
+			})
 		}
 		for (const type of instance.types.values()) {
 			const path =
@@ -82,7 +86,7 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 		}
 		config.admin.dependencies = { ...config.admin.dependencies, ...dependencies }
 		const hasComponents =
-			Object.values(instance.slots).some(Boolean) ||
+			Object.values(instance.slots).some((components) => components.length > 0) ||
 			[...instance.types.values()].some((type) => type.Component)
 		const dashboard = config.admin.dashboard
 		const widgetRegistered = dashboard?.widgets?.some((widget) => widget.slug === SLOT_WIDGET_SLUG)
@@ -130,6 +134,7 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 	},
 })
 
+export { projectUsers } from './server/authors'
 export { defineExtension, defineMessageType, type PerTargetCheck, perTarget } from './server/define'
 export {
 	getInstance,

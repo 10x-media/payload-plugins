@@ -48,3 +48,4 @@ export {
 	ConversationsMentionFeatureClient,
 	MentionNode,
 } from '../editor/mention/client'
+export { ReactionPicker, ReactionsBar } from '../reactions/client'

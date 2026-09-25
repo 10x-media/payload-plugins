@@ -29,6 +29,8 @@ export type SubscribeResponse = {
 	channels: Record<string, ChannelMeta>
 	deleted: 'placeholder' | 'placeholderIfReplies'
 	entries: SubscribeEntry[]
+	/** Each extension's public `client` data, by name. */
+	extensionData: Record<string, unknown>
 	/** Names of the instance's extensions. */
 	extensions: string[]
 	/** Server time; the first poll looks back from here. */

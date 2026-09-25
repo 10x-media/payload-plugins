@@ -23,15 +23,22 @@ export type ChatSlotProps = {
 	message?: ConversationMessage
 }
 
+/** Marks a slot entry that is a server component, rendered through `render-widget`. */
+export const SERVER_SLOT = 'server'
+
+/** One component of a slot: a client component, or `SERVER_SLOT`. */
+export type ChatSlotEntry = ComponentType<ChatSlotProps> | typeof SERVER_SLOT
+
 /** Config-level components, resolved on the server from the import map. */
 export type ChatComponents = {
-	/** Slots and types that are server components: rendered through `render-widget`. */
-	server: { slots: ChatSlotName[]; types: string[] }
-	slots: Partial<Record<ChatSlotName, ComponentType<ChatSlotProps>>>
+	/** Message types that are server components: rendered through `render-widget`. */
+	server: { types: string[] }
+	/** Each slot's components in order: the host's, then each extension's. */
+	slots: Partial<Record<ChatSlotName, ChatSlotEntry[]>>
 	types: Record<string, ComponentType<ChatSlotProps>>
 }
 
-const empty: ChatComponents = { server: { slots: [], types: [] }, slots: {}, types: {} }
+const empty: ChatComponents = { server: { types: [] }, slots: {}, types: {} }
 
 const ComponentsContext = createContext<Record<string, ChatComponents>>({})
 
@@ -61,6 +68,7 @@ type WidgetRequest = {
 	instance: string
 	messageId?: number | string
 	slot?: ChatSlotName
+	slotIndex?: number
 	type?: string
 }
 
@@ -103,26 +111,37 @@ const ServerRendered = ({ cacheKey, request }: { cacheKey: string; request: Widg
 }
 
 /**
- * Renders a configured slot, client or server. Nothing when the slot is not
- * configured.
+ * Renders a slot's configured components in order, client or server.
+ * Nothing when the slot has none.
  */
 export const ChatSlot = ({ name, ...props }: ChatSlotProps & { name: ChatSlotName }) => {
-	const components = useChatComponents(props.instance)
-	const Client = components.slots[name]
-	if (Client) return <Client {...props} />
-	if (!components.server.slots.includes(name)) return null
-	const request: WidgetRequest = {
-		channel: props.channel,
-		conversationKey: props.conversationKey,
-		instance: props.instance,
-		messageId: props.message?.id,
-		slot: name,
-	}
+	const entries = useChatComponents(props.instance).slots[name]
+	if (!entries || entries.length === 0) return null
 	return (
-		<ServerRendered
-			cacheKey={`${props.instance}:${name}:${props.conversationKey}:${props.channel ?? ''}:${String(props.message?.id ?? '')}:${props.message?.updatedAt ?? ''}`}
-			request={request}
-		/>
+		<>
+			{entries.map((Entry, index) => {
+				if (Entry !== SERVER_SLOT) {
+					// biome-ignore lint/suspicious/noArrayIndexKey: slot entries are fixed per config and never reorder.
+					return <Entry key={index} {...props} />
+				}
+				const request: WidgetRequest = {
+					channel: props.channel,
+					conversationKey: props.conversationKey,
+					instance: props.instance,
+					messageId: props.message?.id,
+					slot: name,
+					slotIndex: index,
+				}
+				return (
+					<ServerRendered
+						cacheKey={`${props.instance}:${name}:${index}:${props.conversationKey}:${props.channel ?? ''}:${String(props.message?.id ?? '')}:${props.message?.updatedAt ?? ''}`}
+						// biome-ignore lint/suspicious/noArrayIndexKey: as above.
+						key={index}
+						request={request}
+					/>
+				)
+			})}
+		</>
 	)
 }
 

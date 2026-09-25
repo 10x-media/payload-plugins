@@ -429,6 +429,36 @@ export const useMessageActions = () => {
 	return { edit, remove }
 }
 
+/** An extension's public `client` data from the instance config, once subscribed. */
+export const useExtension = <T = unknown>(name: string): T | undefined => {
+	const store = useChatStore()
+	useSyncExternalStore(store.subscribe, store.getVersion, store.getVersion)
+	return store.meta?.extensionData?.[name] as T | undefined
+}
+
+/**
+ * Talk to an extension's endpoints. `merge` puts messages an endpoint returned
+ * into every open window showing them and tells other tabs, as an edit does.
+ */
+export const useExtensionApi = (name: string) => {
+	const store = useChatStore()
+	return useMemo(
+		() => ({
+			merge: (messages: WindowMessage[]) => {
+				const keys = new Set<string>()
+				for (const message of messages) {
+					store.emitLocal(message.key, { message, type: 'confirmed' })
+					keys.add(message.key)
+				}
+				store.touched([...keys])
+			},
+			request: <T>(path: string, init?: { body?: unknown; method?: string }) =>
+				store.api.extension<T>(name, path, init),
+		}),
+		[name, store]
+	)
+}
+
 /** Mention candidates for a query, debounced; stale answers are dropped. */
 export const useMentionSearch = ({
 	channel,

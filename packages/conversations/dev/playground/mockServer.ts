@@ -668,6 +668,7 @@ export class MockServer {
 			channels: CHANNEL_META,
 			deleted: 'placeholderIfReplies',
 			entries,
+			extensionData: {},
 			extensions: ['comments'],
 			now: new Date().toISOString(),
 			reads: true,

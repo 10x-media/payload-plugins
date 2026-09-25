@@ -4,6 +4,7 @@ import { type FeedWindow, parseCursor } from '../server/feed'
 import {
 	deleteMessage,
 	editMessage,
+	extensionContext,
 	listMessages,
 	markRead,
 	poll,
@@ -170,5 +171,15 @@ export const buildEndpoints = (instance: ConversationsInstance): Endpoint[] => {
 			method: 'get',
 			path: `${base}/mentions`,
 		},
+		...instance.extensionList.flatMap((extension) =>
+			(extension.endpoints ?? []).map(
+				(endpoint): Endpoint => ({
+					handler: (req) =>
+						endpoint.handler({ ctx: extensionContext(req, instance), instance, req }),
+					method: endpoint.method,
+					path: `${base}/${extension.name}${endpoint.path}`,
+				})
+			)
+		),
 	]
 }

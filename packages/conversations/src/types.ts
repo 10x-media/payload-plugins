@@ -33,6 +33,8 @@ export type ConversationMessage = {
 	data?: unknown
 	deletedAt?: null | string
 	editedAt?: null | string
+	/** Data extensions attach per message (`decorate`), by extension name. Never stored. */
+	ext?: Record<string, unknown>
 	id: number | string
 	key: string
 	lastReplyAt?: null | string
@@ -112,16 +114,22 @@ export type ConversationsServerTransport = {
 	publish: (args: { instance: string; key: string; req: PayloadRequest }) => Promise<void> | void
 }
 
+/** One component, or several rendered in order. */
+export type SlotComponents = PayloadComponent | PayloadComponent[]
+
 export type ChatSlotConfig = {
 	/** Rendered above the composer. */
-	composerAbove?: PayloadComponent
+	composerAbove?: SlotComponents
 	/** Rendered in the drawer header, after the title. */
-	drawerHeader?: PayloadComponent
+	drawerHeader?: SlotComponents
 	/** Rendered in each message's action row. */
-	messageActions?: PayloadComponent
-	/** Rendered under each message body. */
-	messageFooter?: PayloadComponent
+	messageActions?: SlotComponents
+	/** Rendered under each message body, deleted placeholders included (check `message.deletedAt`). */
+	messageFooter?: SlotComponents
 }
+
+/** Slots after resolution: the host's components, then each extension's, in order. */
+export type ResolvedSlots = { [K in keyof ChatSlotConfig]-?: PayloadComponent[] }
 
 export type CollectionOverride = {
 	access?: CollectionConfig['access']
@@ -199,6 +207,43 @@ export type ConversationsPluginOptions = {
 /** What an extension sees of the others, by name. */
 export type ExtensionMap = ReadonlyMap<string, { options?: unknown }>
 
+/** Helpers an extension endpoint gets, bound to the request and instance. */
+export type ExtensionContext = {
+	/**
+	 * Messages as the endpoints return them: decorated by every extension, with
+	 * the `authors` projection. Hand the result back so windows merge it.
+	 */
+	respond: (messages: ConversationMessage[]) => Promise<{
+		authors: AuthorsMap
+		messages: Array<ConversationMessage & { removed?: boolean }>
+	}>
+	/** The request's JSON body, or `{}`. A malformed body is a 400. */
+	body: () => Promise<Record<string, unknown>>
+	/** A 4xx or 5xx with a message, as the core endpoints answer. */
+	fail: (message: string, status: number) => never
+	/**
+	 * A message the viewer may read (conversation and channel access), or a 404.
+	 * Deleted messages are a 404 too unless `deleted: true`.
+	 */
+	readableMessage: (id: string, options?: { deleted?: boolean }) => Promise<ConversationMessage>
+	/** Move the message's `updatedAt` so every open window picks up the change. */
+	touch: (id: number | string) => Promise<void>
+	/** The signed-in user's key (`<collection>:<id>`), or a 401. */
+	viewer: () => string
+}
+
+/** An endpoint an extension adds under `/api/conversations/<instance>/<extension>`. */
+export type ExtensionEndpoint = {
+	handler: (args: {
+		ctx: ExtensionContext
+		instance: ConversationsInstance
+		req: PayloadRequest
+	}) => Promise<Response> | Response
+	method: 'delete' | 'get' | 'patch' | 'post' | 'put'
+	/** Relative to the extension's base, e.g. `/toggle`. */
+	path: string
+}
+
 export type ConversationsExtension = {
 	/** Runs after the instance is resolved, in array order. May return a new config. */
 	after?: (args: {
@@ -211,9 +256,40 @@ export type ConversationsExtension = {
 		options: ConversationsPluginOptions,
 		ctx: { extensions: ExtensionMap }
 	) => ConversationsPluginOptions
+	/**
+	 * Public, serializable data for the browser, read with `useExtension(name)`:
+	 * the extension's own client settings. Sent with every subscribe.
+	 */
+	client?: unknown
+	/**
+	 * Per-message data for a batch of messages, keyed by message id. The core
+	 * calls it for every response that carries messages (pages, change sync,
+	 * send, edit, delete, extension endpoints) and places each entry at
+	 * `message.ext[name]`. One query for the batch, not one per message.
+	 */
+	decorate?: (args: {
+		instance: ConversationsInstance
+		messages: ConversationMessage[]
+		req: PayloadRequest
+		viewer: string
+	}) => Promise<Record<string, unknown>> | Record<string, unknown>
+	/** Endpoints under `/api/conversations/<instance>/<name>`, with access helpers. */
+	endpoints?: ExtensionEndpoint[]
 	name: string
-	/** Exposed to other extensions through the map, and on the client. */
+	/**
+	 * Remove the extension's own rows for a conversation whose target was
+	 * deleted. Runs in the built-in cascade (`deleteWithTarget: true`); a custom
+	 * cascade function takes this over.
+	 */
+	onTargetDelete?: (args: {
+		instance: ConversationsInstance
+		key: string
+		req: PayloadRequest
+	}) => Promise<void> | void
+	/** Exposed to other extensions through the map. */
 	options?: unknown
+	/** Components added to the instance slots, after the host's own. */
+	slots?: ChatSlotConfig
 }
 
 export type ResolvedUsersConfig = {
@@ -237,6 +313,8 @@ export type ConversationsInstance = {
 		defaultFeatures: ConversationsEditorFeature[]
 	}) => ConversationsEditorFeature[]
 	extensions: ExtensionMap
+	/** The extensions themselves, in order: their decorators, endpoints, cascades. */
+	extensionList: ConversationsExtension[]
 	hooks: ConversationsHooks
 	limits: { bodyLength: number }
 	mentions: {
@@ -247,7 +325,7 @@ export type ConversationsInstance = {
 	messagesSlug: CollectionSlug
 	overrides: NonNullable<ConversationsPluginOptions['overrides']>
 	readsSlug: CollectionSlug | null
-	slots: ChatSlotConfig
+	slots: ResolvedSlots
 	slug: string
 	targets: Required<{ [K in keyof ConversationsTargets]: Record<string, string[]> }>
 	transport?: ConversationsServerTransport

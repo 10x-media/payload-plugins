@@ -156,3 +156,59 @@ test.describe('two users', () => {
 		await expect(anna.locator('.conversations-trigger__dot')).toHaveCount(0)
 	})
 })
+
+test.describe('chat example', () => {
+	test('rooms, unread badges, sending and a thread in the side pane', async ({ page }) => {
+		await login(page, ME)
+		await page.goto('/admin/chat')
+		const rooms = page.locator('.chat-app__room')
+		await expect(rooms).toHaveText([/design/, /general/, /releases/])
+		await expect(rooms.filter({ hasText: 'releases' }).locator('.chat-app__badge')).toHaveText('2')
+		await page.screenshot({ path: 'test-results/chat-general.png' })
+
+		await rooms.filter({ hasText: 'releases' }).click()
+		await expect(page.locator('.chat-app__title')).toContainText('releases')
+		await expect(
+			page.locator('.conversations-message', { hasText: 'timing integration' })
+		).toBeVisible()
+		await expect(rooms.filter({ hasText: 'releases' }).locator('.chat-app__badge')).toHaveCount(0)
+
+		await rooms.filter({ hasText: 'general' }).click()
+		await send(page, `hello general ${Date.now()}`)
+		await page
+			.locator('.conversations-message', { hasText: 'review call' })
+			.locator('.conversations-message__thread')
+			.click()
+		const thread = page.locator('.chat-app__thread')
+		await expect(thread.locator('.conversations-message', { hasText: 'small room' })).toBeVisible()
+		await thread.locator('[contenteditable="true"]').click()
+		await page.keyboard.type('See you there')
+		await page.keyboard.press('Enter')
+		await expect(
+			thread.locator('.conversations-message', { hasText: 'See you there' })
+		).toBeVisible()
+		await page.screenshot({ path: 'test-results/chat-thread.png' })
+	})
+})
+
+test.describe('reactions extension', () => {
+	test('a reaction shows at once and reaches another user', async ({ browser }) => {
+		const me = await asUser(browser, ME)
+		const anna = await asUser(browser, ANNA)
+		for (const page of [me, anna]) await page.goto('/admin/chat')
+		const text = `react here ${Date.now()}`
+		await send(me, text)
+		const mine = me.locator('.conversations-message', { hasText: text }).last()
+		await mine.hover()
+		await mine.getByRole('button', { name: 'Add reaction' }).first().click()
+		await me.locator('.conversations-reaction-picker').getByText('🎉').click()
+		await expect(mine.locator('.conversations-reactions__pill--mine')).toContainText('1')
+
+		const theirs = anna.locator('.conversations-message', { hasText: text }).last()
+		await expect(theirs.locator('.conversations-reactions__pill')).toContainText('🎉', {
+			timeout: 30_000,
+		})
+		await theirs.locator('.conversations-reactions__pill').click()
+		await expect(theirs.locator('.conversations-reactions__pill--mine')).toContainText('2')
+	})
+})

@@ -96,6 +96,14 @@ export const createApi = ({
 				`/messages/${encodeURIComponent(String(id))}`,
 				{ method: 'DELETE' }
 			),
+		/** An extension's endpoint: `<base>/<name><path>`. A `body` makes it a POST by default. */
+		extension: <T>(name: string, path: string, init: { body?: unknown; method?: string } = {}) =>
+			request<T>(
+				`/${name}${path}`,
+				init.body === undefined
+					? { method: init.method ?? 'GET' }
+					: json(init.method ?? 'POST', init.body)
+			),
 		edit: (id: number | string, body: { body?: unknown; text?: string }) =>
 			request<MessageResponse>(`/messages/${encodeURIComponent(String(id))}`, json('PATCH', body)),
 		list: (query: ListQuery) => {

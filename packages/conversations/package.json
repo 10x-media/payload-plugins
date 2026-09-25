@@ -55,6 +55,11 @@
 			"types": "./src/exports/comments.ts",
 			"default": "./dist/exports/comments.js"
 		},
+		"./reactions": {
+			"development": "./src/exports/reactions.ts",
+			"types": "./src/exports/reactions.ts",
+			"default": "./dist/exports/reactions.js"
+		},
 		"./rsc": {
 			"development": "./src/exports/rsc.ts",
 			"types": "./src/exports/rsc.ts",
@@ -75,8 +80,8 @@
 		"test": "vitest run",
 		"test:unit": "vitest run src",
 		"test:int": "vitest run tests/int",
-		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
-		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts",
 		"test:e2e": "bash scripts/e2e.sh",
 		"dev": "pnpm --filter @10x-media/conversations-dev dev",
 		"start": "pnpm --filter @10x-media/conversations-dev start",
@@ -152,6 +157,11 @@
 				"types": "./dist/exports/comments.d.ts",
 				"import": "./dist/exports/comments.js",
 				"default": "./dist/exports/comments.js"
+			},
+			"./reactions": {
+				"types": "./dist/exports/reactions.d.ts",
+				"import": "./dist/exports/reactions.js",
+				"default": "./dist/exports/reactions.js"
 			},
 			"./rsc": {
 				"types": "./dist/exports/rsc.d.ts",

@@ -12,6 +12,8 @@ type SlotRequest = {
 	instance?: string
 	messageId?: number | string
 	slot?: ChatSlotName
+	/** Which of the slot's components, in order. */
+	slotIndex?: number
 	type?: string
 }
 
@@ -65,7 +67,7 @@ export const ConversationsSlotDispatcher = async (props: WidgetServerProps): Pro
 	const path: PayloadComponent | undefined = data.type
 		? instance.types.get(data.type)?.Component
 		: data.slot
-			? instance.slots[data.slot]
+			? instance.slots[data.slot][data.slotIndex ?? 0]
 			: undefined
 	if (!path) return null
 	const Component = getFromImportMap<ComponentType<ChatServerSlotProps>>({
