@@ -32,13 +32,21 @@ export {
 	useChatStore,
 	useOptionalChatStore,
 } from '../react/provider'
-export { sseClientTransport } from '../react/sse'
+export {
+	createPusherSource,
+	pusherClientTransport,
+	pusherSocketUrl,
+	type SocketConstructor,
+} from '../react/pusher'
+export { createRelay, type RealtimeSource, type SourceHandlers } from '../react/relay'
+export { parseEvents, sseClientTransport } from '../react/sse'
 export type { ConversationsStore, InstanceMeta } from '../react/store'
 export {
 	type ConversationsClientTransport,
 	pollingTransport,
 	type TransportConnectArgs,
 	type TransportConnection,
+	type WatchEntry,
 } from '../react/transport'
 export { dividerBefore, type WindowMessage, type WindowState } from '../react/window'
 export { formatCursor } from '../shared/cursor'

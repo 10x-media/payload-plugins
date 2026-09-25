@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { ConversationsRequestError } from './api'
 import type { PollerEnv } from './poller'
-import { createStreamer, parseEvents } from './sse'
+import { parseEvents, sseClientTransport } from './sse'
 import type { TransportConnection } from './transport'
 
 describe('parseEvents', () => {
@@ -70,15 +70,10 @@ const setup = () => {
 	})
 	const onChange = vi.fn()
 	const onExpired = vi.fn()
-	const streamer = createStreamer({
-		env,
-		events,
-		fallback,
-		instance: 'comments',
-		onChange,
-		onExpired,
-		poll: vi.fn(),
-	})
+	const streamer = sseClientTransport({
+		env: () => env,
+		fallback: { connect: () => fallback },
+	}).connect({ events, instance: 'comments', onChange, onExpired, poll: vi.fn(), post: vi.fn() })
 	const runTimers = async () => {
 		const due = [...timers.values()]
 		timers.clear()

@@ -21,7 +21,15 @@ const HOST: Owner = 'the plugin options'
 const TARGET_KINDS = ['collections', 'globals', 'custom'] as const
 
 /** Extension endpoints live at `/<instance>/<name>`, next to these core and transport ones. */
-const RESERVED_NAMES = ['events', 'mentions', 'messages', 'poll', 'read', 'subscribe']
+const RESERVED_NAMES = [
+	'events',
+	'mentions',
+	'messages',
+	'poll',
+	'pusher-auth',
+	'read',
+	'subscribe',
+]
 
 const fail = (instance: string, message: string): never => {
 	throw new Error(`[@10x-media/conversations] instance "${instance}": ${message}`)

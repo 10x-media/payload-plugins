@@ -8,7 +8,13 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig } from 'payload'
 import { comments } from '../src/exports/comments'
 import { reactions } from '../src/exports/reactions'
-import { conversations, defineMessageType, perTarget, sseTransport } from '../src/index'
+import {
+	conversations,
+	defineMessageType,
+	perTarget,
+	pusherTransport,
+	sseTransport,
+} from '../src/index'
 import { autoReply } from './helpers/autoReply'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
@@ -62,6 +68,23 @@ const media: CollectionConfig = {
 	fields: [{ name: 'title', type: 'text', required: true }],
 }
 
+/** Support tickets: each one a conversation in the `tickets` instance, read only once closed. */
+const tickets: CollectionConfig = {
+	slug: 'tickets',
+	admin: { group: 'Support', useAsTitle: 'subject', defaultColumns: ['subject', 'status'] },
+	fields: [
+		{ name: 'subject', type: 'text', required: true },
+		{ name: 'customer', type: 'relationship', relationTo: 'customers' },
+		{
+			name: 'status',
+			type: 'select',
+			defaultValue: 'open',
+			options: ['open', 'closed'],
+			admin: { description: 'Closed tickets are read only.' },
+		},
+	],
+}
+
 /** Chat rooms: each room is the target of a conversation in the `chat` instance. */
 const rooms: CollectionConfig = {
 	slug: 'rooms',
@@ -93,7 +116,7 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	editor: lexicalEditor(),
-	collections: [tenants, users, customers, persons, media, rooms],
+	collections: [tenants, users, customers, persons, media, rooms, tickets],
 	plugins: [
 		// Persons belong to a tenant; staff to one or more (the dev admin to all of them).
 		multiTenantPlugin({
@@ -191,6 +214,44 @@ export default buildConfig({
 			],
 			hooks: { afterMention: autoReply('chat'), afterMessage: spam('chat') },
 			targets: { collections: { rooms: { channels: ['messages'] } } },
+		}),
+		// A third instance: support tickets over Pusher (Soketi in `docker-compose.dev.yml`), the
+		// transport for serverless hosts. Customers see their own tickets; closed ones are read only.
+		conversations({
+			slug: 'tickets',
+			users: ['users', 'customers'],
+			access: perTarget(
+				({ doc, req }) => {
+					const mine = isStaff(req) || String(doc?.customer ?? '') === String(req.user?.id)
+					if (!mine) return false
+					return doc?.status === 'closed' ? { read: true, create: [] } : true
+				},
+				{ load: true }
+			),
+			channels: [
+				{
+					slug: 'conversation',
+					label: 'Conversation',
+					cue: { label: 'Visible to the customer', tone: 'warning' },
+					access: { read: () => true, create: () => true },
+				},
+				{
+					slug: 'notes',
+					label: 'Notes',
+					cue: { label: 'Staff only', tone: 'neutral' },
+					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
+				},
+			],
+			extensions: [comments({ collections: { tickets: true } })],
+			hooks: { afterMention: autoReply('tickets'), afterMessage: spam('tickets') },
+			transport: pusherTransport({
+				appId: 'app-id',
+				host: '127.0.0.1',
+				key: 'app-key',
+				port: 6001,
+				secret: 'app-secret',
+				useTLS: false,
+			}),
 		}),
 	],
 	telemetry: false,

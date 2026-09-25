@@ -87,6 +87,11 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	})
 
 	await seedChat(payload, { anna: String(anna.id), marc: String(marc.id), me: String(me.id) })
+	await seedTickets(payload, {
+		anna: String(anna.id),
+		customer: String(customer.id),
+		me: String(me.id),
+	})
 
 	if ((await payload.count({ collection: 'persons' })).totalDocs > 0) return
 	payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
@@ -355,5 +360,37 @@ export const seedChat = async (
 				})
 			}
 		}
+	}
+}
+
+/**
+ * Seed the `tickets` instance: an open ticket with a short exchange and a
+ * staff note, and a closed one (read only). Idempotent.
+ */
+export const seedTickets = async (
+	payload: Payload,
+	{ anna, customer, me }: { anna: string; customer: string; me: string }
+): Promise<void> => {
+	if ((await payload.count({ collection: 'tickets' })).totalDocs > 0) return
+	const req = await createLocalReq({}, payload)
+	const open = await payload.create({
+		collection: 'tickets',
+		data: { customer, status: 'open', subject: 'Medical form upload fails' },
+	})
+	const closed = await payload.create({
+		collection: 'tickets',
+		data: { customer, status: 'closed', subject: 'Invoice for March' },
+	})
+	const openKey = `collection:tickets:${open.id}`
+	const closedKey = `collection:tickets:${closed.id}`
+	const lines: Array<[key: string, author: string, channel: string, text: string]> = [
+		[openKey, `customers:${customer}`, 'conversation', 'The upload stops at 90 %, twice now.'],
+		[openKey, `users:${anna}`, 'conversation', 'Sorry about that! Which browser are you using?'],
+		[openKey, `users:${anna}`, 'notes', 'Probably the 10 MB limit again, checking the logs.'],
+		[closedKey, `customers:${customer}`, 'conversation', 'Could you resend the March invoice?'],
+		[closedKey, `users:${me}`, 'conversation', 'Sent again, closing this one.'],
+	]
+	for (const [key, author, channel, text] of lines) {
+		await postMessage(req, { author, channel, instance: 'tickets', key, text })
 	}
 }

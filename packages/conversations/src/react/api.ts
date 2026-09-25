@@ -138,6 +138,8 @@ export const createApi = ({
 			}
 			return res
 		},
+		/** A transport's own endpoint, e.g. `/pusher-auth`. */
+		post: <T>(path: string, body: unknown) => request<T>(path, json('POST', body)),
 		poll: (body: { since: string; tokens: string[] }) =>
 			request<PollResponse>('/poll', json('POST', body)),
 		read: (body: { at: string; channels?: string[]; key: string; thread?: string }) =>

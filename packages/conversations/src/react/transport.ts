@@ -1,6 +1,9 @@
 import type { PollResponse } from '../shared/wire'
 import { browserPollerEnv, createPoller, type PollerEnv, type PollerIntervals } from './poller'
 
+/** One watched key: its subscription token and the channels the viewer reads there. */
+export type WatchEntry = { channels?: string[]; key: string; token: string }
+
 /** A live link between one provider and the server's change signals. */
 export type TransportConnection = {
 	destroy: () => void
@@ -9,7 +12,7 @@ export type TransportConnection = {
 	/** A feed of the key is open here (`true`) or closed. */
 	setActive: (key: string, active: boolean) => void
 	/** Replace the watched keys and their subscription tokens. */
-	watch: (entries: Array<{ key: string; token: string }>, since: string) => void
+	watch: (entries: WatchEntry[], since: string) => void
 }
 
 /**
@@ -30,6 +33,8 @@ export type TransportConnectArgs = {
 	onChange: (keys: string[]) => void
 	onExpired: (keys: string[]) => void
 	poll: (body: { since: string; tokens: string[] }) => Promise<PollResponse>
+	/** POSTs to a transport's own endpoint under the instance, e.g. `/pusher-auth`. */
+	post: <T>(path: string, body: unknown) => Promise<T>
 }
 
 /**

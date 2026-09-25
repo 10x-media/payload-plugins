@@ -82,6 +82,7 @@ export class ConversationsStore {
 			onExpired: (keys) => this.request(keys),
 			events: (body, signal) => this.api.events(body, signal),
 			poll: (body) => this.api.poll(body),
+			post: (path, body) => this.api.post(path, body),
 		})
 		this.watch()
 		for (const [key, count] of this.active) {
@@ -238,7 +239,11 @@ export class ConversationsStore {
 	private watch(): void {
 		if (!this.connection || !this.since) return
 		this.connection.watch(
-			[...this.entries.values()].map((entry) => ({ key: entry.key, token: entry.token })),
+			[...this.entries.values()].map((entry) => ({
+				channels: entry.channels.map((channel) => channel.slug),
+				key: entry.key,
+				token: entry.token,
+			})),
 			this.since
 		)
 	}

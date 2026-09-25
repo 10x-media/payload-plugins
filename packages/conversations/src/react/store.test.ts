@@ -61,9 +61,9 @@ describe('conversations store', () => {
 		expect(store.entry('b')?.unread).toEqual({ internal: 1 })
 		expect(connection.watch).toHaveBeenLastCalledWith(
 			[
-				{ key: 'a', token: 't:a' },
-				{ key: 'b', token: 't:b' },
-				{ key: 'c', token: 't:c' },
+				{ channels: ['internal'], key: 'a', token: 't:a' },
+				{ channels: ['internal'], key: 'b', token: 't:b' },
+				{ channels: ['internal'], key: 'c', token: 't:c' },
 			],
 			'2026-01-01T00:00:00.000Z'
 		)

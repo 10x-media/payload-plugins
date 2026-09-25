@@ -142,9 +142,25 @@ export type MessageTypeDefinition<TData = unknown> = {
  * own under `/api/conversations/<instance>` (a stream, an auth callback) and
  * name the client half the admin should use.
  */
+/** What a browser needs to reach a Pusher-compatible service. Public: sent to clients. */
+export type PusherClientOptions = {
+	/** Pusher's cluster, e.g. `eu`; ignored with `wsHost`. */
+	cluster?: string
+	/** Default `true`. */
+	forceTLS?: boolean
+	/** The app key (not the secret). */
+	key: string
+	/** A Pusher-compatible server's socket host (Soketi, a gateway). */
+	wsHost?: string
+	wsPort?: number
+}
+
+/** The client half a server transport asks the admin to use. */
+export type ClientTransportSpec = 'polling' | 'sse' | { pusher: PusherClientOptions }
+
 export type ConversationsServerTransport = {
 	/** Which client transport the admin's provider uses. Default `polling`. */
-	client?: 'polling' | 'sse'
+	client?: ClientTransportSpec
 	endpoints?: (args: { base: string; instance: ConversationsInstance }) => Endpoint[]
 	publish: (args: {
 		channel?: string
