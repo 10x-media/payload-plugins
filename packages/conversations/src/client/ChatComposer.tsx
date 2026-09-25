@@ -1,20 +1,14 @@
 'use client'
 
-import {
-	$createParagraphNode,
-	$getRoot,
-	type LexicalEditor,
-} from '@payloadcms/richtext-lexical/lexical'
 import { Button } from '@payloadcms/ui'
-import { type ReactNode, useCallback, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 
 import { Composer, type ComposerToolbar } from '../composer/Composer'
 import { defaultComposerFeatures } from '../composer/features'
 import { GlobeIcon, LockIcon } from '../composer/icons'
-import { hasContent, toStoredJSON } from '../composer/json'
 import type { ComposerFeature, ComposerLabels, ComposerTranslate } from '../composer/types'
-import { resolveLabel, useSend } from '../react/hooks'
-import { useChatStore } from '../react/provider'
+import { resolveLabel } from '../react/hooks'
+import { useComposer } from '../react/useComposer'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { LocalizedLabel } from '../types'
@@ -57,15 +51,6 @@ export type ChatComposerProps = {
 	toolbar?: ComposerToolbar
 }
 
-const clear = (editor: LexicalEditor) => {
-	editor.update(() => {
-		const root = $getRoot()
-		root.clear()
-		root.append($createParagraphNode())
-		root.selectEnd()
-	})
-}
-
 /**
  * The message editor for the admin: the plugin's own Lexical composer
  * (formatting, `/` commands, `@` mentions, links) under a channel cue, with
@@ -93,25 +78,14 @@ export const ChatComposer = ({
 	toolbar = 'bottom',
 }: ChatComposerProps) => {
 	const { i18n, t } = useTranslation()
-	const { retry, send } = useSend({ channel, key: conversationKey, parent })
-	const store = useChatStore()
-	// Editing starts from the message; a new message from what was left unsent here.
-	const draftKey = onSave ? null : `${conversationKey}|${channel}|${parent ?? ''}`
-	const [startBody] = useState(() =>
-		initialBody !== undefined ? initialBody : draftKey ? store.drafts.get(draftKey) : undefined
-	)
-	const keepDraft = useCallback(
-		(editor: LexicalEditor) => {
-			if (!draftKey) return
-			const body = toStoredJSON(editor.getEditorState().toJSON())
-			if (hasContent(body)) store.drafts.set(draftKey, body)
-			else store.drafts.delete(draftKey)
-		},
-		[draftKey, store]
-	)
-	const [busy, setBusy] = useState(false)
-	const [failed, setFailed] = useState<null | string>(null)
-	const editorRef = useRef<LexicalEditor | null>(null)
+	const composer = useComposer({
+		channel,
+		initialBody,
+		key: conversationKey,
+		onSave,
+		parent,
+	})
+	const { busy, failed, submit } = composer
 	// Features are resolved once: the editor registers its nodes on mount.
 	const [resolvedFeatures] = useState(() =>
 		features ? features({ defaultFeatures: defaultComposerFeatures() }) : defaultComposerFeatures()
@@ -142,42 +116,6 @@ export const ChatComposer = ({
 		() => (key, vars) => (t as (key: string, vars?: Record<string, unknown>) => string)(key, vars),
 		[t]
 	)
-
-	const submit = useCallback(async () => {
-		if (busy) return
-		const editor = editorRef.current
-		if (failed) {
-			setBusy(true)
-			try {
-				await retry(failed)
-				setFailed(null)
-				if (editor) clear(editor)
-			} catch {
-				// Still failed; the banner stays.
-			} finally {
-				setBusy(false)
-			}
-			return
-		}
-		if (!editor) return
-		const body = toStoredJSON(editor.getEditorState().toJSON())
-		if (!hasContent(body)) return
-		setBusy(true)
-		try {
-			if (onSave) {
-				await onSave(body)
-			} else {
-				await send({ body })
-				clear(editor)
-				editor.focus()
-			}
-		} catch (error) {
-			const clientId = (error as { clientId?: string }).clientId
-			setFailed(clientId ?? 'unknown')
-		} finally {
-			setBusy(false)
-		}
-	}, [busy, failed, onSave, retry, send])
 
 	const cueLabel = cue ? resolveLabel(cue.label, i18n.language) : null
 	const tone = cue?.tone ?? 'neutral'
@@ -224,7 +162,7 @@ export const ChatComposer = ({
 			) : (
 				<Composer
 					autoFocus={autoFocus ?? Boolean(onSave)}
-					editorRef={editorRef}
+					editorRef={composer.editorRef}
 					features={resolvedFeatures}
 					footer={
 						<>
@@ -251,10 +189,10 @@ export const ChatComposer = ({
 							</Button>
 						</>
 					}
-					initialBody={startBody}
+					initialBody={composer.initialBody}
 					labels={labels}
 					mentions={{ channel, conversationKey }}
-					onChange={draftKey ? keepDraft : undefined}
+					onChange={composer.onChange}
 					onSubmit={() => void submit()}
 					placeholder={placeholder ?? t(keys.composerPlaceholder)}
 					submitOn={submitOn}

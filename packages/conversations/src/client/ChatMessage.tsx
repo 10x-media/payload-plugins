@@ -1,10 +1,11 @@
 'use client'
 
 import { ConfirmationModal, useModal } from '@payloadcms/ui'
-import { type ReactNode, useState } from 'react'
+import type { ReactNode } from 'react'
 
-import { useMessageActions } from '../react/hooks'
 import { MessageBody } from '../react/MessageBody'
+import { absoluteTime, relativeTime } from '../react/time'
+import { useMessage } from '../react/useMessage'
 import type { WindowMessage } from '../react/window'
 import { TEXT_TYPE } from '../shared/constants'
 import { keys } from '../translations/keys'
@@ -14,7 +15,6 @@ import { Avatar } from './Avatar'
 import { ChatComposer } from './ChatComposer'
 import { ChatSlot, useTypeRenderer } from './components'
 import { MessageMenu } from './MessageMenu'
-import { absoluteTime, relativeTime } from './time'
 import './conversations.css'
 
 export type ChatMessageProps = {
@@ -60,19 +60,12 @@ export const ChatMessage = ({
 	viewer,
 }: ChatMessageProps) => {
 	const { i18n, t } = useTranslation()
-	const { edit, remove } = useMessageActions()
 	const renderConfiguredType = useTypeRenderer(instance)
-	const [editing, setEditing] = useState(false)
 	const { openModal } = useModal()
 	const deleteSlug = `conversations-delete-${instance}-${String(message.id)}`
 	const author = authors[message.authorKey]
-	const own = viewer !== null && message.authorKey === viewer
-	const deleted = Boolean(message.deletedAt)
-	const replies = message.replyCount ?? 0
-	const hasNewReplies =
-		replies > 0 &&
-		Boolean(message.lastReplyAt) &&
-		(!threadReadAt || new Date(message.lastReplyAt as string) > new Date(threadReadAt))
+	const state = useMessage({ message, readOnly, threadReadAt, viewer })
+	const { deleted, editing, hasNewReplies, own, replies, setEditing } = state
 
 	const threadSummary =
 		replies > 0 && onOpenThread ? (
@@ -138,10 +131,7 @@ export const ChatMessage = ({
 						initialBody={message.body}
 						instance={instance}
 						onCancel={() => setEditing(false)}
-						onSave={async (body) => {
-							await edit(message, { body })
-							setEditing(false)
-						}}
+						onSave={state.save}
 						parent={message.parent ?? null}
 					/>
 				) : message.type === TEXT_TYPE ? (
@@ -183,19 +173,17 @@ export const ChatMessage = ({
 						onDelete={() => openModal(deleteSlug)}
 						onEdit={() => setEditing(true)}
 						onOpenThread={onOpenThread}
-						own={own && !readOnly}
+						own={state.canDelete}
 					/>
 				)}
 			</div>
-			{own && !deleted ? (
+			{state.canDelete ? (
 				<ConfirmationModal
 					body={t(keys.deleteConfirm)}
 					confirmLabel={t(keys.delete)}
 					heading={t(keys.deleteHeading)}
 					modalSlug={deleteSlug}
-					onConfirm={async () => {
-						await remove(message)
-					}}
+					onConfirm={state.remove}
 				/>
 			) : null}
 		</div>

@@ -1,27 +1,18 @@
 'use client'
 
 import { Button } from '@payloadcms/ui'
-import {
-	Fragment,
-	type ReactNode,
-	useCallback,
-	useEffect,
-	useLayoutEffect,
-	useRef,
-	useState,
-} from 'react'
+import { Fragment, type ReactNode } from 'react'
 
+import type { FeedDay, FeedItem } from '../react/feed'
 import type { UseConversationResult } from '../react/hooks'
+import { useFeed } from '../react/useFeed'
 import type { WindowMessage } from '../react/window'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { ChatMessage } from './ChatMessage'
-import { dayKey } from './time'
-import { useDelayedFlag } from './useDelayedFlag'
 import './conversations.css'
 
-/** A foreign row shown in the feed at its time, e.g. an audit entry. */
-export type FeedItem = { at: string; id: string; node: ReactNode }
+export type { FeedItem } from '../react/feed'
 
 export type ChatFeedProps = {
 	conversation: UseConversationResult
@@ -43,243 +34,98 @@ export type ChatFeedProps = {
 	renderType?: (message: WindowMessage) => ReactNode
 }
 
-/** Follow-ups within this window from the same author drop their header. */
-const GROUP_MS = 5 * 60 * 1000
-
-/** Close enough to the bottom to count as "at the end". */
-const END_SLACK_PX = 48
-
-const isCompact = (previous: WindowMessage | undefined, message: WindowMessage) =>
-	Boolean(previous) &&
-	previous?.authorKey === message.authorKey &&
-	!previous.deletedAt &&
-	!message.deletedAt &&
-	(previous.replyCount ?? 0) === 0 &&
-	dayKey(previous.createdAt) === dayKey(message.createdAt) &&
-	new Date(message.createdAt).getTime() - new Date(previous.createdAt).getTime() < GROUP_MS
-
 /**
- * A scrolling window over a feed or thread. Opens at the divider or the
- * bottom, keeps its place while older pages load in above, sticks to the
- * bottom while the reader is there, and shows "N new" when they are not.
- * Reaching the end marks the conversation seen.
+ * A scrolling window over a feed or thread, in the admin's look. The
+ * behaviour (opening at the divider, keeping the place, "N new", paging) is
+ * `useFeed`; this draws it.
  */
 export const ChatFeed = ({
 	conversation,
 	empty,
 	instance,
-	items = [],
+	items,
 	onOpenThread,
 	readOnly,
 	renderMessage,
 	renderType,
 }: ChatFeedProps) => {
 	const { i18n, t } = useTranslation()
-	const scroller = useRef<HTMLDivElement>(null)
-	const top = useRef<HTMLDivElement>(null)
-	const bottom = useRef<HTMLDivElement>(null)
-	const atEnd = useRef(true)
-	const opened = useRef(false)
-	const anchor = useRef<null | { height: number; top: number }>(null)
-	const [unseen, setUnseen] = useState(0)
-	/** The newest row the reader has had on screen; only rows after it count as new. */
-	const lastId = useRef<null | string>(null)
-	const { dividerBefore, hasNewer, hasOlder, loadNewer, loadOlder, markSeen, messages, status } =
-		conversation
+	const feed = useFeed({ conversation, items })
 
-	const shown = messages.filter((message) => message.sendStatus !== 'failed')
-
-	const checkEnd = useCallback(() => {
-		const element = scroller.current
-		if (!element) return
-		atEnd.current = element.scrollHeight - element.scrollTop - element.clientHeight < END_SLACK_PX
-		if (atEnd.current && !hasNewer) {
-			setUnseen(0)
-			if (document.visibilityState === 'visible') markSeen()
-		}
-	}, [hasNewer, markSeen])
-
-	// A quick load shows nothing in between; a slow one a skeleton that does not blink.
-	const skeleton = useDelayedFlag(status === 'loading' && shown.length === 0)
-
-	// First paint of a loaded window: the divider if there is one, else the bottom.
-	useLayoutEffect(() => {
-		const element = scroller.current
-		if (!element || status !== 'ready' || skeleton || opened.current) return
-		opened.current = true
-		const divider = dividerBefore
-			? element.querySelector<HTMLElement>('.conversations-feed__divider')
-			: null
-		if (divider) {
-			element.scrollTop = divider.offsetTop - 16
-		} else {
-			element.scrollTop = element.scrollHeight
-		}
-		checkEnd()
-	}, [checkEnd, dividerBefore, skeleton, status])
-
-	// Keep the reader's place when rows are added above; follow the bottom when there.
-	useLayoutEffect(() => {
-		const element = scroller.current
-		if (!element || !opened.current) return
-		if (anchor.current) {
-			element.scrollTop = anchor.current.top + (element.scrollHeight - anchor.current.height)
-			anchor.current = null
-		} else if (atEnd.current && !hasNewer) {
-			element.scrollTop = element.scrollHeight
-		}
-		// Older pages load in above and are not new; count only what arrived below the last row.
-		const ids = shown.map((message) => message.clientId ?? String(message.id))
-		const previous = lastId.current ? ids.lastIndexOf(lastId.current) : -1
-		const added = previous >= 0 ? ids.length - 1 - previous : 0
-		if (added > 0 && !atEnd.current) {
-			setUnseen((count) => count + added)
-		}
-		lastId.current = ids.at(-1) ?? null
-		checkEnd()
-	})
-
-	const older = useCallback(async () => {
-		const element = scroller.current
-		if (!element || !hasOlder) return
-		anchor.current = { height: element.scrollHeight, top: element.scrollTop }
-		await loadOlder()
-	}, [hasOlder, loadOlder])
-
-	useEffect(() => {
-		const element = top.current
-		if (!element || !hasOlder || status !== 'ready') return
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries.some((entry) => entry.isIntersecting)) void older()
-			},
-			{ root: scroller.current, rootMargin: '200px 0px 0px 0px' }
-		)
-		observer.observe(element)
-		return () => observer.disconnect()
-	}, [hasOlder, older, status])
-
-	useEffect(() => {
-		const element = bottom.current
-		if (!element || !hasNewer || status !== 'ready') return
-		const observer = new IntersectionObserver(
-			(entries) => {
-				if (entries.some((entry) => entry.isIntersecting)) void loadNewer()
-			},
-			{ root: scroller.current, rootMargin: '0px 0px 200px 0px' }
-		)
-		observer.observe(element)
-		return () => observer.disconnect()
-	}, [hasNewer, loadNewer, status])
-
-	useEffect(() => {
-		const onVisible = () => checkEnd()
-		document.addEventListener('visibilitychange', onVisible)
-		return () => document.removeEventListener('visibilitychange', onVisible)
-	}, [checkEnd])
-
-	const toBottom = async () => {
-		if (hasNewer) {
-			await conversation.jumpToLatest()
-		}
-		const element = scroller.current
-		if (element) element.scrollTop = element.scrollHeight
-		setUnseen(0)
+	const dayLabel = (day: FeedDay) => {
+		if (day.relative === 'today') return t(keys.today)
+		if (day.relative === 'yesterday') return t(keys.yesterday)
+		return new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(new Date(day.at))
 	}
-
-	type Row = { at: string; item?: FeedItem; message?: WindowMessage }
-	const rows: Row[] = [
-		...shown.map((message) => ({ at: message.createdAt, message })),
-		...items.map((item) => ({ at: item.at, item })),
-	].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
-
-	const dayLabel = (value: string) => {
-		const key = dayKey(value)
-		if (key === dayKey(new Date().toISOString())) return t(keys.today)
-		if (key === dayKey(new Date(Date.now() - 86_400_000).toISOString())) return t(keys.yesterday)
-		return new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium' }).format(new Date(value))
-	}
-
-	let previousMessage: WindowMessage | undefined
-	let previousDay: null | string = null
 
 	return (
-		<div
-			className={`conversations-feed${unseen > 0 || hasNewer ? ' conversations-feed--jump' : ''}`}
-		>
-			<div className="conversations-feed__scroller" onScroll={checkEnd} ref={scroller}>
-				<div ref={top} />
-				{hasOlder ? (
+		<div className={`conversations-feed${feed.showJump ? ' conversations-feed--jump' : ''}`}>
+			<div className="conversations-feed__scroller" onScroll={feed.onScroll} ref={feed.scrollerRef}>
+				<div ref={feed.topRef} />
+				{feed.hasOlder ? (
 					<div className="conversations-feed__older">
-						<Button buttonStyle="subtle" margin={false} onClick={() => void older()} size="small">
+						<Button
+							buttonStyle="subtle"
+							margin={false}
+							onClick={() => void feed.loadOlder()}
+							size="small"
+						>
 							{t(keys.loadEarlier)}
 						</Button>
 					</div>
 				) : null}
-				{skeleton ? <div className="conversations-feed__skeleton" /> : null}
-				{status === 'error' ? (
+				{feed.skeleton ? <div className="conversations-feed__skeleton" /> : null}
+				{feed.status === 'error' ? (
 					<div className="conversations-feed__empty">{t(keys.couldNotLoad)}</div>
 				) : null}
-				{status === 'ready' && !skeleton && rows.length === 0 ? (
+				{feed.status === 'ready' && !feed.skeleton && feed.rows.length === 0 ? (
 					<div className="conversations-feed__empty">{empty}</div>
 				) : null}
-				{(skeleton ? [] : rows).map((row) => {
-					const day = dayKey(row.at)
-					const showDay = day !== previousDay
-					previousDay = day
-					if (row.item) {
-						previousMessage = undefined
-						return (
-							<Fragment key={`item:${row.item.id}`}>
-								{showDay ? <div className="conversations-feed__day">{dayLabel(row.at)}</div> : null}
-								{row.item.node}
-							</Fragment>
-						)
-					}
-					const message = row.message as WindowMessage
-					const compact = !showDay && isCompact(previousMessage, message)
-					previousMessage = message
-					const divider = dividerBefore === String(message.id)
-					return (
-						<Fragment key={message.clientId ?? String(message.id)}>
-							{showDay ? <div className="conversations-feed__day">{dayLabel(row.at)}</div> : null}
-							{divider ? (
-								<div className="conversations-feed__divider">
-									<span>{t(keys.newMessages)}</span>
-								</div>
-							) : null}
-							{renderMessage ? (
-								renderMessage({ compact: compact && !divider, conversation, message })
-							) : (
-								<ChatMessage
-									authors={conversation.authors}
-									compact={compact && !divider}
-									instance={instance}
-									message={message}
-									onOpenThread={onOpenThread}
-									readOnly={readOnly}
-									renderType={renderType}
-									threadReadAt={conversation.threadReads[String(message.id)]}
-									viewer={conversation.viewer}
-								/>
-							)}
-						</Fragment>
-					)
-				})}
+				{feed.rows.map((row) => (
+					<Fragment key={row.key}>
+						{row.day ? <div className="conversations-feed__day">{dayLabel(row.day)}</div> : null}
+						{row.kind === 'item' ? (
+							row.item.node
+						) : (
+							<>
+								{row.divider ? (
+									<div className="conversations-feed__divider" data-feed-divider="">
+										<span>{t(keys.newMessages)}</span>
+									</div>
+								) : null}
+								{renderMessage ? (
+									renderMessage({ compact: row.compact, conversation, message: row.message })
+								) : (
+									<ChatMessage
+										authors={conversation.authors}
+										compact={row.compact}
+										instance={instance}
+										message={row.message}
+										onOpenThread={onOpenThread}
+										readOnly={readOnly}
+										renderType={renderType}
+										threadReadAt={conversation.threadReads[String(row.message.id)]}
+										viewer={conversation.viewer}
+									/>
+								)}
+							</>
+						)}
+					</Fragment>
+				))}
 				{/* Reaching it loads the next page when the window is not at the end yet. */}
-				<div ref={bottom} />
+				<div ref={feed.bottomRef} />
 			</div>
-			{unseen > 0 || hasNewer ? (
+			{feed.showJump ? (
 				<div className="conversations-feed__jump">
 					<Button
 						buttonStyle="pill"
 						icon={['chevron']}
 						iconPosition="right"
 						margin={false}
-						onClick={() => void toBottom()}
+						onClick={() => void feed.toBottom()}
 						size="small"
 					>
-						{hasNewer ? t(keys.jumpToLatest) : t(keys.unseenCount, { count: unseen })}
+						{feed.hasNewer ? t(keys.jumpToLatest) : t(keys.unseenCount, { count: feed.unseen })}
 					</Button>
 				</div>
 			) : null}

@@ -8,6 +8,13 @@ export {
 	type SendBody,
 } from '../react/api'
 export {
+	buildFeedRows,
+	type FeedDay,
+	type FeedItem,
+	type FeedRow,
+	GROUP_MS,
+} from '../react/feed'
+export {
 	type ChannelView,
 	resolveLabel,
 	type SendInput,
@@ -41,6 +48,7 @@ export {
 export { createRelay, type RealtimeSource, type SourceHandlers } from '../react/relay'
 export { parseEvents, sseClientTransport } from '../react/sse'
 export type { ConversationsStore, InstanceMeta } from '../react/store'
+export { absoluteTime, dayKey, relativeTime } from '../react/time'
 export {
 	type ConversationsClientTransport,
 	pollingTransport,
@@ -48,6 +56,12 @@ export {
 	type TransportConnection,
 	type WatchEntry,
 } from '../react/transport'
+export { type UseChatPanelResult, useChatPanel } from '../react/useChatPanel'
+export { type UseComposerResult, useComposer } from '../react/useComposer'
+export { useDelayedFlag } from '../react/useDelayedFlag'
+export { FEED_DIVIDER_ATTRIBUTE, type UseFeedResult, useFeed } from '../react/useFeed'
+export { type UseMessageResult, useMessage } from '../react/useMessage'
+export { useThread } from '../react/useThread'
 export { dividerBefore, type WindowMessage, type WindowState } from '../react/window'
 export { formatCursor } from '../shared/cursor'
 export { collectionKey, customKey, globalKey, parseKey, userKey } from '../shared/keys'

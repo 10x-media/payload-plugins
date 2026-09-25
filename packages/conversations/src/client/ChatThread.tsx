@@ -2,7 +2,8 @@
 
 import type { ReactNode } from 'react'
 
-import { type ChannelView, useConversation } from '../react/hooks'
+import type { ChannelView } from '../react/hooks'
+import { useThread } from '../react/useThread'
 import type { WindowMessage } from '../react/window'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
@@ -30,25 +31,21 @@ export const ChatThread = ({
 	viewer,
 }: ChatThreadProps) => {
 	const { t } = useTranslation()
-	const conversation = useConversation({
-		channel: root.channel,
-		key: root.key,
-		parent: String(root.id),
-	})
-	const merged = { ...authors, ...conversation.authors }
+	const conversation = useThread({ authors, root })
 	return (
 		<div className="conversations-thread">
 			<div className="conversations-thread__root">
 				<ChatMessage
-					authors={merged}
+					authors={conversation.authors}
 					instance={instance}
 					message={root}
+					readOnly={!channel.canCreate}
 					renderType={renderType}
 					viewer={viewer}
 				/>
 			</div>
 			<ChatFeed
-				conversation={{ ...conversation, authors: merged }}
+				conversation={conversation}
 				instance={instance}
 				readOnly={!channel.canCreate}
 				renderType={renderType}

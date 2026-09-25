@@ -50,6 +50,11 @@
 			"types": "./src/exports/react.ts",
 			"default": "./dist/exports/react.js"
 		},
+		"./composer": {
+			"development": "./src/exports/composer.ts",
+			"types": "./src/exports/composer.ts",
+			"default": "./dist/exports/composer.js"
+		},
 		"./comments": {
 			"development": "./src/exports/comments.ts",
 			"types": "./src/exports/comments.ts",
@@ -59,6 +64,11 @@
 			"development": "./src/exports/reactions.ts",
 			"types": "./src/exports/reactions.ts",
 			"default": "./dist/exports/reactions.js"
+		},
+		"./reactions/react": {
+			"development": "./src/exports/reactions-react.ts",
+			"types": "./src/exports/reactions-react.ts",
+			"default": "./dist/exports/reactions-react.js"
 		},
 		"./rsc": {
 			"development": "./src/exports/rsc.ts",

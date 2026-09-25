@@ -1,9 +1,10 @@
 'use client'
 
 import { Drawer, useModal, XIcon } from '@payloadcms/ui'
-import { type ReactNode, useState } from 'react'
+import type { ReactNode } from 'react'
 
-import { resolveLabel, useChannels, useConversation } from '../react/hooks'
+import { resolveLabel } from '../react/hooks'
+import { useChatPanel } from '../react/useChatPanel'
 import type { WindowMessage } from '../react/window'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
@@ -12,7 +13,6 @@ import { ChatComposer } from './ChatComposer'
 import { ChatFeed } from './ChatFeed'
 import { ChatThread } from './ChatThread'
 import { ChatSlot } from './components'
-import { useDelayedFlag } from './useDelayedFlag'
 
 export type ChatDrawerProps = {
 	conversationKey: string
@@ -71,26 +71,20 @@ const DrawerBody = ({
 }: ChatDrawerProps) => {
 	const { i18n, t } = useTranslation()
 	const { closeModal, openModal } = useModal()
-	const { channels, reads, viewer } = useChannels(conversationKey, { count: false })
-	const [active, setActive] = useState<null | string>(null)
-	const [thread, setThread] = useState<null | WindowMessage>(null)
-	const current = channels.find((channel) => channel.slug === active) ?? channels[0]
-	const waiting = useDelayedFlag(!current)
-	const conversation = useConversation({ channel: current?.slug, key: conversationKey })
+	const panel = useChatPanel({ conversationKey })
+	const { channels, conversation, current, other, reads, thread, viewer } = panel
 	const threadSlug = `${drawerSlug}-thread`
 
 	// Opened from the click, not from an effect on `thread`: Escape and a click
 	// outside close the modal without clearing `thread`, and reopening the same
 	// thread would then change nothing an effect could see.
 	const openThread = (message: WindowMessage) => {
-		setThread(message)
+		panel.openThread(message)
 		openModal(threadSlug)
 	}
 
 	const label = current ? resolveLabel(current.label, i18n.language) : ''
 	const cue = current?.cue ?? null
-	// With two channels the cue offers the other one; with more, the tabs do.
-	const other = channels.length === 2 ? channels.find((channel) => channel !== current) : undefined
 	return (
 		<div className="conversations-drawer">
 			<DrawerHeader
@@ -109,7 +103,7 @@ const DrawerBody = ({
 			<ChatChannelTabs
 				active={current?.slug ?? ''}
 				channels={channels}
-				onChange={setActive}
+				onChange={panel.setChannel}
 				reads={reads}
 			/>
 			{current ? (
@@ -131,7 +125,7 @@ const DrawerBody = ({
 							other
 								? {
 										label: t(keys.switchTo, { channel: resolveLabel(other.label, i18n.language) }),
-										onClick: () => setActive(other.slug),
+										onClick: () => panel.setChannel(other.slug),
 									}
 								: null
 						}
@@ -140,7 +134,7 @@ const DrawerBody = ({
 						key={`composer:${current.slug}`}
 					/>
 				</>
-			) : waiting ? (
+			) : panel.loading ? (
 				<div className="conversations-feed__skeleton" />
 			) : null}
 			{thread && current ? (
@@ -149,7 +143,7 @@ const DrawerBody = ({
 						<DrawerHeader
 							onClose={() => {
 								closeModal(threadSlug)
-								setThread(null)
+								panel.closeThread()
 							}}
 							subtitle={label}
 							title={t(keys.thread)}
@@ -159,7 +153,7 @@ const DrawerBody = ({
 							channel={current}
 							instance={instance}
 							renderType={renderType}
-							root={conversation.messages.find((message) => message.id === thread.id) ?? thread}
+							root={thread}
 							viewer={viewer}
 						/>
 					</div>
