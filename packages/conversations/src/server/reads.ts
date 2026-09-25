@@ -25,10 +25,11 @@ const findCursor = async (
  * request transaction on purpose: a lost race on the unique index must not
  * roll back the message that triggered it.
  *
- * On Postgres the conditional update is select-then-update, so two concurrent
- * raises by one user can leave the cursor slightly behind; the next raise
- * heals it. A first-create race loses on the unique index and retries as an
- * update.
+ * The update carries its `lastReadAt < at` condition, so on Mongo it is one
+ * atomic statement. On Postgres the adapter selects then updates, so two
+ * concurrent raises by one user can leave the cursor slightly behind; the
+ * next raise heals it. A first-create race loses on the unique index and
+ * retries as an update.
  */
 export const raiseCursor = async (
 	req: PayloadRequest,
@@ -62,11 +63,12 @@ export const raiseCursor = async (
 		const row = await findCursor(req, collection, where)
 		if (row) {
 			if (new Date(row.lastReadAt).getTime() < new Date(at).getTime()) {
+				// The condition sits in the statement so a concurrent smaller raise cannot win.
 				await req.payload.db.updateOne({
 					collection,
 					data: { lastReadAt: at },
-					id: row.id,
 					returning: false,
+					where: { and: [{ id: { equals: row.id } }, { lastReadAt: { less_than: at } }] },
 				})
 			}
 			return

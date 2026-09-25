@@ -150,7 +150,10 @@ export default buildConfig({
 					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
 				},
 			],
-			extensions: [reactions({ emojis: ['👍', '❤️', '😂', '🎉', '🙏', '👀', '🚀', '✅'] })],
+			// Kept on the message itself; `comments` above uses the default own collection.
+			extensions: [
+				reactions({ emojis: ['👍', '❤️', '😂', '🎉', '🙏', '👀', '🚀', '✅'], storage: 'message' }),
+			],
 			hooks: { afterMention: autoReply('chat') },
 			targets: { collections: { rooms: { channels: ['messages'] } } },
 		}),

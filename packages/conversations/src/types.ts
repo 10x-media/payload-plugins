@@ -174,6 +174,8 @@ export type ConversationsPluginOptions = {
 	extensions?: ConversationsExtension[]
 	hooks?: ConversationsHooks
 	limits?: {
+		/** Maximum bytes of a message's serialized Lexical body. Default 64 KiB. */
+		bodyBytes?: number
 		/** Maximum characters of a message's plain text. Default 10 000. */
 		bodyLength?: number
 	}
@@ -277,6 +279,13 @@ export type ConversationsExtension = {
 	}) => Promise<Record<string, unknown>> | Record<string, unknown>
 	/** Endpoints under `/api/conversations/<instance>/<name>`, with access helpers. */
 	endpoints?: ExtensionEndpoint[]
+	/**
+	 * Fields the extension stores on every message, added to the messages
+	 * collection. They are the extension's own: the core never sends them to
+	 * the browser, so `decorate` reads them and returns what clients see.
+	 * Soft delete leaves them as they are.
+	 */
+	messageFields?: Field[]
 	name: string
 	/**
 	 * Remove the extension's own rows for a conversation whose target was
@@ -318,7 +327,7 @@ export type ConversationsInstance = {
 	/** The extensions themselves, in order: their decorators, endpoints, cascades. */
 	extensionList: ConversationsExtension[]
 	hooks: ConversationsHooks
-	limits: { bodyLength: number }
+	limits: { bodyBytes: number; bodyLength: number }
 	mentions: {
 		max: number
 		users?: NonNullable<ConversationsPluginOptions['mentions']>['users']

@@ -128,6 +128,14 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 				`[@10x-media/conversations] instance "${instance.slug}" targets unknown collections: ${missing.join(', ')}`
 			)
 		}
+		const missingGlobals = Object.keys(instance.targets.globals).filter(
+			(slug) => !config.globals?.some((global) => global.slug === slug)
+		)
+		if (missingGlobals.length > 0) {
+			throw new Error(
+				`[@10x-media/conversations] instance "${instance.slug}" targets unknown globals: ${missingGlobals.join(', ')}`
+			)
+		}
 
 		config = runAfterPhases(config, instance, resolved.extensions ?? [])
 		return config

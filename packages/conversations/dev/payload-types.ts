@@ -78,7 +78,6 @@ export interface Config {
     'comments-reactions': CommentsReaction;
     'chat-messages': ChatMessage;
     'chat-reads': ChatRead;
-    'chat-reactions': ChatReaction;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -96,7 +95,6 @@ export interface Config {
     'comments-reactions': CommentsReactionsSelect<false> | CommentsReactionsSelect<true>;
     'chat-messages': ChatMessagesSelect<false> | ChatMessagesSelect<true>;
     'chat-reads': ChatReadsSelect<false> | ChatReadsSelect<true>;
-    'chat-reactions': ChatReactionsSelect<false> | ChatReactionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -355,6 +353,16 @@ export interface ChatMessage {
   deletedAt?: string | null;
   replyCount?: number | null;
   lastReplyAt?: string | null;
+  reactions?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  reactionsVersion?: number | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -369,19 +377,6 @@ export interface ChatRead {
   channel?: string | null;
   thread?: string | null;
   lastReadAt: string;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "chat-reactions".
- */
-export interface ChatReaction {
-  id: string;
-  message: string;
-  key: string;
-  userKey: string;
-  emoji: string;
   updatedAt: string;
   createdAt: string;
 }
@@ -448,10 +443,6 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'chat-reads';
         value: string | ChatRead;
-      } | null)
-    | ({
-        relationTo: 'chat-reactions';
-        value: string | ChatReaction;
       } | null);
   globalSlug?: string | null;
   user:
@@ -648,6 +639,8 @@ export interface ChatMessagesSelect<T extends boolean = true> {
   deletedAt?: T;
   replyCount?: T;
   lastReplyAt?: T;
+  reactions?: T;
+  reactionsVersion?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -661,18 +654,6 @@ export interface ChatReadsSelect<T extends boolean = true> {
   channel?: T;
   thread?: T;
   lastReadAt?: T;
-  updatedAt?: T;
-  createdAt?: T;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "chat-reactions_select".
- */
-export interface ChatReactionsSelect<T extends boolean = true> {
-  message?: T;
-  key?: T;
-  userKey?: T;
-  emoji?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -36,6 +36,13 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 				slug: 'custom-cascade',
 				targets: { collections: { media: { channels: ['internal'] } } },
 			}),
+			conversations({
+				access: ({ targets }) => targets.map((target) => target.key),
+				channels,
+				deleted: 'placeholder',
+				slug: 'kept',
+				targets: { collections: { persons: { channels: ['internal'] } } },
+			}),
 		])
 		staff = await signUp(booted, 'users', 'Staff')
 	}, 240_000)
@@ -111,6 +118,31 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 		})
 	})
 
+	describe('deleted placeholders', () => {
+		it('keeps counting a deleted reply that still shows', async () => {
+			const person = await booted.payload.create({ collection: 'persons', data: { name: 'K' } })
+			const key = `collection:persons:${person.id}`
+			const root = await call<{ message: ConversationMessage }>(
+				booted,
+				'POST /conversations/kept/messages',
+				{ body: { channel: 'internal', key, text: 'root' }, session: staff }
+			)
+			const reply = await call<{ message: ConversationMessage }>(
+				booted,
+				'POST /conversations/kept/messages',
+				{ body: { key, parent: String(root.json.message.id), text: 'reply' }, session: staff }
+			)
+			await call(booted, `DELETE /conversations/kept/messages/${reply.json.message.id}`, {
+				session: staff,
+			})
+			const stored = (await booted.payload.findByID({
+				collection: 'kept-messages',
+				id: root.json.message.id,
+			})) as unknown as ConversationMessage
+			expect(stored.replyCount).toBe(1)
+		})
+	})
+
 	describe('server helpers', () => {
 		it('posts any type from server code and validates its data', async () => {
 			const person = await booted.payload.create({ collection: 'persons', data: { name: 'T' } })
@@ -126,6 +158,13 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 			})
 			expect(message.type).toBe('ticket.status')
 			expect(message.authorKey).toBe(staff.userKey)
+			const cursor = await booted.payload.find({
+				collection: 'comments-reads',
+				where: { and: [{ userKey: { equals: staff.userKey } }, { key: { equals: key } }] },
+			})
+			expect(cursor.docs.map((doc) => new Date(doc.lastReadAt).toISOString())).toEqual([
+				new Date(message.createdAt).toISOString(),
+			])
 			await expect(
 				postMessage(req, {
 					author: staff.userKey,

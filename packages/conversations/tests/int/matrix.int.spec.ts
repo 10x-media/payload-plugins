@@ -157,6 +157,16 @@ describeForDb('conversations core', {}, (db) => {
 			)
 		})
 
+		it('rejects a body over the byte limit however short its text', async () => {
+			const body = bodyOf(textNode('x'))
+			const [paragraph] = body.root.children
+			for (let i = 0; i < 1500; i++) {
+				if (paragraph) body.root.children.push({ ...paragraph, children: [] })
+			}
+			const res = await send(staff, { body, channel: 'internal', key: personKey })
+			expect(res.status).toBe(400)
+		})
+
 		it('keeps mentions of readers only and reports them once', async () => {
 			const res = await send(staff, {
 				body: bodyOf(
@@ -416,6 +426,23 @@ describeForDb('conversations core', {}, (db) => {
 			const feed = await list(staff, { channel: 'internal', key })
 			// The root had a reply when deleted but its count is now 0, so it is gone too.
 			expect(feed.json.messages.map((m) => m.id)).toEqual([])
+		})
+
+		it('keeps a deleted message empty when the Local API writes a body', async () => {
+			const sent = await send(staff, { channel: 'internal', key: personKey, text: 'gone' })
+			const id = sent.json.message.id
+			await call(booted, `DELETE /conversations/comments/messages/${id}`, { session: staff })
+			await booted.payload.update({
+				collection: 'comments-messages',
+				data: { body: bodyOf(textNode('back')) },
+				id,
+			})
+			const stored = (await booted.payload.findByID({
+				collection: 'comments-messages',
+				id,
+			})) as unknown as ConversationMessage
+			expect(stored.body ?? null).toBeNull()
+			expect(stored.text).toBeNull()
 		})
 
 		it('keeps a deleted root that still has replies', async () => {

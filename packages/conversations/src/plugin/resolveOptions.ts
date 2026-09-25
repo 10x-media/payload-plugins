@@ -215,7 +215,10 @@ export const resolveInstance = (
 		editorFeatures: options.editor ?? (({ defaultFeatures }) => defaultFeatures),
 		extensions: extensionMap,
 		hooks: options.hooks ?? {},
-		limits: { bodyLength: options.limits?.bodyLength ?? 10_000 },
+		limits: {
+			bodyBytes: options.limits?.bodyBytes ?? 64 * 1024,
+			bodyLength: options.limits?.bodyLength ?? 10_000,
+		},
 		mentions: { max: options.mentions?.max ?? 20, users: options.mentions?.users },
 		messagesSlug: `${slug}-messages` as CollectionSlug,
 		overrides: options.overrides ?? {},

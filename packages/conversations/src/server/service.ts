@@ -2,7 +2,7 @@ import { APIError, type CollectionSlug, type PayloadRequest, type Where } from '
 
 import { isRemoved } from '../collections/messages'
 import { AUTHOR_CONTEXT, TEXT_TYPE } from '../shared/constants'
-import { userKey as formatUserKey, type ParsedKey, parseKey } from '../shared/keys'
+import { userKey as formatUserKey, type ParsedKey, parseKey, parseUserKey } from '../shared/keys'
 import type {
 	ChannelAccess,
 	ListResponse,
@@ -19,7 +19,7 @@ import type {
 import { filterReaders } from './audience'
 import { projectAuthors } from './authors'
 import { isLexicalBody, textToBody } from './body'
-import { changedKeys, type FeedWindow, loadFeed, messageCounts } from './feed'
+import { changedKeys, type FeedWindow, loadFeed, MAX_LIMIT, messageCounts } from './feed'
 import { conversationCursors, raiseCursor, threadCursors, unreadCounts } from './reads'
 import { signToken, TOKEN_TTL_MS, verifyToken } from './tokens'
 
@@ -157,6 +157,8 @@ export const listMessages = async (
 	params: ListParams
 ): Promise<ListResponse> => {
 	const viewer = viewerKey(req)
+	// Clamped once here, so the unread check below compares against the page size served.
+	const limit = Math.max(1, Math.min(params.limit, MAX_LIMIT))
 	const access = await accessFor(req, instance, params.key)
 	const readable = new Set(access.channels.map((channel) => channel.slug))
 	const channels = params.channels.filter((channel) => readable.has(channel))
@@ -200,7 +202,7 @@ export const listMessages = async (
 					],
 				},
 			})
-			if (unread.totalDocs > params.limit) {
+			if (unread.totalDocs > limit) {
 				window = { around: cursor, mode: 'around' }
 			}
 		}
@@ -208,7 +210,7 @@ export const listMessages = async (
 	const feed = await loadFeed(req, instance, {
 		channels,
 		key: params.key,
-		limit: params.limit,
+		limit,
 		parent: params.parent,
 		window,
 	})
@@ -574,8 +576,9 @@ export const decorateMessages = async <T extends ConversationMessage>(
 	{ messages, viewer }: { messages: T[]; viewer: string }
 ): Promise<T[]> => {
 	const decorators = instance.extensionList.filter((extension) => extension.decorate)
+	const own = privateFields(instance)
 	if (decorators.length === 0 || messages.length === 0) {
-		return messages
+		return own.length > 0 ? messages.map((message) => withoutFields(message, own)) : messages
 	}
 	const results = await Promise.all(
 		decorators.map(
@@ -596,8 +599,21 @@ export const decorateMessages = async <T extends ConversationMessage>(
 				changed = true
 			}
 		}
-		return changed ? { ...message, ext } : message
+		const visible = own.length > 0 ? withoutFields(message, own) : message
+		return changed ? { ...visible, ext } : visible
 	})
+}
+
+/** Names of the extensions' `messageFields`, which stay on the server. */
+const privateFields = (instance: ConversationsInstance): string[] =>
+	instance.extensionList.flatMap((extension) =>
+		(extension.messageFields ?? []).flatMap((field) => ('name' in field ? [field.name] : []))
+	)
+
+const withoutFields = <T extends ConversationMessage>(message: T, names: string[]): T => {
+	const copy = { ...message } as Record<string, unknown>
+	for (const name of names) delete copy[name]
+	return copy as T
 }
 
 const decorateOne = async <T extends ConversationMessage>(
@@ -693,8 +709,9 @@ export const postMessage = async (
 	if (args.author) {
 		req.context[AUTHOR_CONTEXT] = args.author
 	}
+	let message: ConversationMessage
 	try {
-		return await createMessage(req, instance, {
+		message = await createMessage(req, instance, {
 			body: type === TEXT_TYPE ? toBody(args) : undefined,
 			channel: args.channel,
 			data: args.data,
@@ -705,6 +722,18 @@ export const postMessage = async (
 	} finally {
 		req.context[AUTHOR_CONTEXT] = previous
 	}
+	// As after a send: the author has read up to their own message.
+	const author = parseUserKey(message.authorKey)
+	if (author && instance.users.some((entry) => entry.collection === author.collection)) {
+		await raiseCursor(req, instance, {
+			at: message.createdAt,
+			channel: message.channel,
+			key: message.key,
+			thread: message.parent ?? '',
+			userKey: message.authorKey,
+		})
+	}
+	return message
 }
 
 /**

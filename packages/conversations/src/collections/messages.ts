@@ -111,6 +111,7 @@ export const buildMessagesCollection = (instance: ConversationsInstance): Collec
 				typeof data.clientId === 'string' && data.clientId ? data.clientId : randomUUID()
 			data.replyCount = data.parent ? null : 0
 		}
+		// `data` is the merged document here, so this also keeps an already deleted row empty.
 		if (data.deletedAt) {
 			data.body = null
 			data.text = null
@@ -134,6 +135,10 @@ export const buildMessagesCollection = (instance: ConversationsInstance): Collec
 		}
 		if (!isLexicalBody(data.body)) {
 			return badRequest('A text message needs a body')
+		}
+		// The text limit alone lets empty nodes and formatting grow a row without bound.
+		if (Buffer.byteLength(JSON.stringify(data.body)) > instance.limits.bodyBytes) {
+			badRequest('A message is too large')
 		}
 		if (disallowedLinks(data.body).length > 0) {
 			badRequest('Links must use http, https or mailto')
@@ -160,7 +165,9 @@ export const buildMessagesCollection = (instance: ConversationsInstance): Collec
 		const previous = previousDoc as ConversationMessage | undefined
 		const deletedNow = operation === 'update' && !previous?.deletedAt && Boolean(message.deletedAt)
 
-		if (message.parent && (operation === 'create' || deletedNow)) {
+		// Under `placeholder` a deleted reply still shows, so it still counts.
+		const countsDelete = deletedNow && instance.deleted !== 'placeholder'
+		if (message.parent && (operation === 'create' || countsDelete)) {
 			// One atomic statement on both adapters, so concurrent replies never lose a
 			// count. It joins the request's transaction when there is one; the plugin's
 			// own writes run without one (see `writeOptions`), because on Mongo two
@@ -215,12 +222,25 @@ export const buildMessagesCollection = (instance: ConversationsInstance): Collec
 		{ admin: { readOnly: true }, name: 'text', type: 'textarea' },
 		{ admin: { readOnly: true }, hasMany: true, name: 'mentions', type: 'text' },
 		{ admin: { readOnly: true }, index: true, name: 'authorKey', required: true, type: 'text' },
-		{ admin: { readOnly: true }, name: 'clientId', type: 'text', unique: true },
+		{ admin: { readOnly: true }, name: 'clientId', type: 'text' },
 		{ admin: { readOnly: true }, name: 'editedAt', type: 'date' },
 		{ admin: { readOnly: true }, name: 'deletedAt', type: 'date' },
 		{ admin: { readOnly: true }, name: 'replyCount', type: 'number' },
 		{ admin: { readOnly: true }, name: 'lastReplyAt', type: 'date' },
 	]
+	const taken = new Set(defaultFields.map((field) => ('name' in field ? field.name : '')))
+	for (const extension of instance.extensionList) {
+		for (const field of extension.messageFields ?? []) {
+			const name = 'name' in field ? field.name : ''
+			if (!name || taken.has(name)) {
+				throw new Error(
+					`[@10x-media/conversations] instance "${instance.slug}": extension "${extension.name}" adds message field "${name}", which is ${name ? 'taken' : 'unnamed'}`
+				)
+			}
+			taken.add(name)
+			defaultFields.push(field)
+		}
+	}
 
 	const override = instance.overrides.messages ?? {}
 	return {
@@ -244,6 +264,8 @@ export const buildMessagesCollection = (instance: ConversationsInstance): Collec
 		indexes: [
 			{ fields: ['key', 'channel', 'parent', 'createdAt'] },
 			{ fields: ['key', 'updatedAt'] },
+			// A retry is matched per author, so that is where the id is unique.
+			{ fields: ['authorKey', 'clientId'], unique: true },
 		],
 		slug,
 		timestamps: true,

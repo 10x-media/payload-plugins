@@ -172,14 +172,16 @@ export const buildEndpoints = (instance: ConversationsInstance): Endpoint[] => {
 			path: `${base}/mentions`,
 		},
 		...instance.extensionList.flatMap((extension) =>
-			(extension.endpoints ?? []).map(
-				(endpoint): Endpoint => ({
+			(extension.endpoints ?? []).map((endpoint): Endpoint => {
+				// `add` and `/add` mean the same; an empty path is the extension's root.
+				const sub = endpoint.path.replace(/^\/+/, '')
+				return {
 					handler: (req) =>
 						endpoint.handler({ ctx: extensionContext(req, instance), instance, req }),
 					method: endpoint.method,
-					path: `${base}/${extension.name}${endpoint.path}`,
-				})
-			)
+					path: sub ? `${base}/${extension.name}/${sub}` : `${base}/${extension.name}`,
+				}
+			})
 		),
 	]
 }
