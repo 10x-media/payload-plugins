@@ -82,7 +82,8 @@ export const ChatFeed = ({
 	const opened = useRef(false)
 	const anchor = useRef<null | { height: number; top: number }>(null)
 	const [unseen, setUnseen] = useState(0)
-	const lastCount = useRef(0)
+	/** The newest row the reader has had on screen; only rows after it count as new. */
+	const lastId = useRef<null | string>(null)
 	const { dividerBefore, hasNewer, hasOlder, loadNewer, loadOlder, markSeen, messages, status } =
 		conversation
 
@@ -127,11 +128,14 @@ export const ChatFeed = ({
 		} else if (atEnd.current && !hasNewer) {
 			element.scrollTop = element.scrollHeight
 		}
-		const added = shown.length - lastCount.current
-		if (added > 0 && !atEnd.current && lastCount.current > 0) {
+		// Older pages load in above and are not new; count only what arrived below the last row.
+		const ids = shown.map((message) => message.clientId ?? String(message.id))
+		const previous = lastId.current ? ids.lastIndexOf(lastId.current) : -1
+		const added = previous >= 0 ? ids.length - 1 - previous : 0
+		if (added > 0 && !atEnd.current) {
 			setUnseen((count) => count + added)
 		}
-		lastCount.current = shown.length
+		lastId.current = ids.at(-1) ?? null
 		checkEnd()
 	})
 

@@ -12,6 +12,7 @@ import { conversations, defineMessageType, perTarget } from '../src/index'
 import { autoReply } from './helpers/autoReply'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
+import { spam } from './helpers/spam'
 import {
 	isPlatform,
 	isStaff,
@@ -141,6 +142,8 @@ export default buildConfig({
 			hooks: {
 				// Whoever you mention answers a few seconds later (dev only).
 				afterMention: autoReply('comments'),
+				// Send `spam` or `spam 300`: the other staff flood the channel (dev only).
+				afterMessage: spam('comments'),
 			},
 			types: [
 				defineMessageType<{ from: string; to: string }>()({
@@ -183,7 +186,7 @@ export default buildConfig({
 			extensions: [
 				reactions({ emojis: ['👍', '❤️', '😂', '🎉', '🙏', '👀', '🚀', '✅'], storage: 'message' }),
 			],
-			hooks: { afterMention: autoReply('chat') },
+			hooks: { afterMention: autoReply('chat'), afterMessage: spam('chat') },
 			targets: { collections: { rooms: { channels: ['messages'] } } },
 		}),
 	],
