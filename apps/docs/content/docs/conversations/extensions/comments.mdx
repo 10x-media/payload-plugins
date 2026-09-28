@@ -37,6 +37,8 @@ Channels offered are an upper bound. Who reads and writes which of them is still
 
 ## What it adds
 
+<Screenshot src="/images/conversations/comments-button.webp" width={162} alt="The Comments button in the document controls, with a count" />
+
 - **Targets.** In `before`, each collection and global goes into the instance's `targets` with its channels. If the host or another extension already lists the same target with different channels, startup throws and names both.
 - **The button.** In `after`, `ChatTrigger` is appended to `admin.components.edit.beforeDocumentControls` of each collection and to `admin.components.elements.beforeDocumentControls` of each global, with `clientProps: { instance }`. Existing components there stay.
 

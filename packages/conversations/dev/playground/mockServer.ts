@@ -20,6 +20,8 @@ export const ANNA = 'users:anna'
 export const MARC = 'users:marc'
 export const GONE = 'users:gone'
 export const CUSTOMER = 'customers:czech-canoe'
+/** A system author, as `postMessage({ author: { system: 'import' } })` stores it. */
+export const IMPORT = 'system:import'
 
 const avatar = `data:image/svg+xml;utf8,${encodeURIComponent(
 	'<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#6d8cff"/><stop offset="1" stop-color="#b86dff"/></linearGradient></defs><rect width="64" height="64" fill="url(#g)"/><circle cx="32" cy="26" r="11" fill="#fff" opacity=".85"/><rect x="14" y="41" width="36" height="20" rx="10" fill="#fff" opacity=".85"/></svg>'
@@ -31,6 +33,7 @@ export const AUTHORS: AuthorsMap = {
 	[GONE]: { deleted: true, name: 'Deleted user' },
 	[MARC]: { avatar, name: 'Marc Oliveira' },
 	[ME]: { name: 'Roman Palamar' },
+	[IMPORT]: { avatar: null, name: 'CSV import', system: true },
 }
 
 /** Conversation keys the mock serves. `custom:` keys, so they never collide with real targets. */
@@ -45,6 +48,9 @@ export const MOCK_KEYS = {
 
 /** A client-side message type the mock uses; the real instance does not register it. */
 export const NOTE_TYPE = 'playground.note'
+
+/** A `layout: 'bare'` type: its renderer draws the whole row. */
+export const SYSTEM_TYPE = 'playground.system'
 
 const CHANNEL_META: SubscribeResponse['channels'] = {
 	announcements: { label: 'Announcements' },
@@ -672,7 +678,7 @@ export class MockServer {
 			extensions: ['comments'],
 			now: new Date().toISOString(),
 			reads: true,
-			types: {},
+			types: { [NOTE_TYPE]: { layout: 'message' }, [SYSTEM_TYPE]: { layout: 'bare' } },
 			viewer: ME,
 		}
 		return json(response)

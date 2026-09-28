@@ -266,3 +266,36 @@
 		position: static;
 	}
 }
+
+/* A docs screenshot: the scene crops to it, so it carries its own background and fixed width. */
+.pg .pg-shot {
+	--pg-width: 100%;
+	padding: calc(var(--base) * 0.75);
+	background: var(--theme-bg);
+}
+
+/* Room below a composer for its `/` or `@` menu, inside the cropped area. */
+.pg .pg-shot__menu-room {
+	margin-bottom: 17rem;
+}
+
+.pg-system-note {
+	display: flex;
+	gap: 0.462rem;
+	align-items: baseline;
+	color: var(--theme-elevation-600);
+	font-size: 0.923rem;
+}
+
+.pg-slot-marker {
+	padding: 0.2rem 0.5rem;
+	border: 1px dashed var(--theme-warning-500, #d9a100);
+	border-radius: var(--style-radius-s);
+	color: var(--theme-warning-750, #b58500);
+	font-family: var(--font-mono, monospace);
+	font-size: 0.8rem;
+}
+
+.pg-slot-marker__note {
+	opacity: 0.7;
+}

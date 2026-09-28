@@ -95,6 +95,8 @@ export const StatusChange = ({ message }: ChatServerSlotProps) => {
 
 ### Layout: in the message frame, or the whole row
 
+<Screenshot src="/images/conversations/bare-layout.webp" width={640} alt="A system note from the CSV import drawn as a whole row between chat messages" />
+
 By default (`layout: 'message'`) a type's `Component` stands in for the body only: the avatar, the author's name and the time stay around it, as for a chat message. That suits content someone posted, such as a status change a person made.
 
 `layout: 'bare'` hands the component the whole row. There is no avatar and no name line, the time shows on hover next to the menu, and the row is never grouped with its neighbours, nor does it group the message after it. The menu (reply in thread, extension items), the thread summary and what hangs under a message, such as reactions, stay. Use it for system notes and one-line events ("Anna joined", "Imported from CSV"):

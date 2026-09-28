@@ -70,8 +70,8 @@ catalogs:
       specifier: ^4.12.1
       version: 4.12.1
     clipwright:
-      specifier: ^0.0.4
-      version: 0.0.4
+      specifier: ^0.1.0
+      version: 0.1.0
     dompurify:
       specifier: ^3.2.7
       version: 3.2.7
@@ -264,7 +264,7 @@ importers:
         version: 19.2.3(@types/react@19.2.15)
       clipwright:
         specifier: 'catalog:'
-        version: 0.0.4
+        version: 0.1.0
       next:
         specifier: 'catalog:'
         version: 16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(babel-plugin-macros@3.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
@@ -762,6 +762,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.15)
+      clipwright:
+        specifier: 'catalog:'
+        version: 0.1.0
       ioredis:
         specifier: ^5.4.1
         version: 5.11.1
@@ -5177,8 +5180,8 @@ packages:
   client-only@0.0.1:
     resolution: {integrity: sha512-IV3Ou0jSMzZrd3pZ48nLkT9DA7Ag1pnPzaiQhpW7c3RbcqqzvzzVu+L8gfqMp/8IM2MQtSiqaCxrrcfu8I8rMA==}
 
-  clipwright@0.0.4:
-    resolution: {integrity: sha512-qnogn1jZte6Sxy3+DJOHNnYgA0griopkDG2EaXfOQYkJ8VHcBjFqiGu/UH5MiQRJOssr/wxCjkzzd28jlH5xyg==}
+  clipwright@0.1.0:
+    resolution: {integrity: sha512-p/6YvoMMiQ3iMEpaszXxJBEVQx6t+cGufJZEQH2s7K3mlT902WJXFJPwFZMAyBedCAmSY6143q9A7lZA60fFKg==}
     engines: {node: '>=20'}
     hasBin: true
     peerDependencies:
@@ -12184,7 +12187,7 @@ snapshots:
 
   client-only@0.0.1: {}
 
-  clipwright@0.0.4:
+  clipwright@0.1.0:
     dependencies:
       '@clack/prompts': 1.7.0
       picocolors: 1.1.1

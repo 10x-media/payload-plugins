@@ -9,6 +9,8 @@ Every surface below runs under the provider the plugin already registers in the 
 
 ## A conversation inside a form
 
+<Screenshot src="/images/conversations/ticket-field.webp" width={668} alt="A ticket conversation rendered as a field inside the ticket form" />
+
 A `ui` field whose component renders `ChatPanel` puts the conversation into the edit view, with tabs, feed, composer, and threads in a drawer:
 
 ```ts title="collections/Tickets.ts"
@@ -59,6 +61,8 @@ export const TicketConversation = () => {
 A create view has no id yet, so there is no key: show a hint instead. Wrap the panel in `ChatRichTextProvider` when the instance uses [rich text of its own](/conversations/rich-text). The full ticket setup is in [Support tickets](/conversations/recipes/support-tickets).
 
 ## A full admin view
+
+<Screenshot src="/images/conversations/chat-view.webp" width={720} alt="A chat view with a room list and the selected room" />
 
 For a chat with rooms, register a custom admin view and a nav link:
 

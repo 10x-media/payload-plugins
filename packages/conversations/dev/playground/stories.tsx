@@ -75,7 +75,7 @@ const Case = ({ children, label, note }: { children: ReactNode; label: string; n
 )
 
 /** A box the size of the drawer (width from the toolbar), laid out like the drawer body. */
-const Frame = ({ children, height }: { children: ReactNode; height?: number }) => (
+export const Frame = ({ children, height }: { children: ReactNode; height?: number }) => (
 	<div className="pg-frame conversations-drawer" style={height ? { height } : undefined}>
 		{children}
 	</div>
@@ -92,7 +92,7 @@ const Inspect = ({ title, value }: { title: string; value: unknown }) => (
  * The drawer's parts composed by hand, outside a drawer: what a project would
  * write for a sidebar chat or a support page. Thread opens beside the feed.
  */
-const InlineConversation = ({
+export const InlineConversation = ({
 	conversationKey,
 	inspect = true,
 }: {
@@ -201,7 +201,7 @@ const InlineConversation = ({
 	)
 }
 
-const DrawerButton = ({
+export const DrawerButton = ({
 	conversationKey,
 	header,
 	label,
@@ -235,7 +235,9 @@ const DrawerButton = ({
 }
 
 /** A static window for `ChatFeed`: no requests, every flag set by hand. */
-const staticConversation = (over: Partial<UseConversationResult> = {}): UseConversationResult => ({
+export const staticConversation = (
+	over: Partial<UseConversationResult> = {}
+): UseConversationResult => ({
 	authors: AUTHORS,
 	dividerBefore: null,
 	error: null,
@@ -253,7 +255,7 @@ const staticConversation = (over: Partial<UseConversationResult> = {}): UseConve
 })
 
 let fixtureId = 10_000
-const fixture = (author: string, text: string, minutes: number): WindowMessage => {
+export const fixture = (author: string, text: string, minutes: number): WindowMessage => {
 	const at = new Date(Date.now() - minutes * 60_000).toISOString()
 	return {
 		authorKey: author,
@@ -287,7 +289,7 @@ const feedItems: FeedItem[] = [
 	},
 ]
 
-const channelsFixture = (unread: [number, number], canCreate = true): ChannelView[] => [
+export const channelsFixture = (unread: [number, number], canCreate = true): ChannelView[] => [
 	{ canCreate, label: 'Internal', slug: 'internal', unread: unread[0] },
 	{
 		canCreate,
@@ -411,7 +413,7 @@ const MessageGallery = () => {
 }
 
 /** The thread with new replies from the busy conversation. */
-const ThreadStory = () => {
+export const ThreadStory = () => {
 	const { channels, viewer } = useChannels(MOCK_KEYS.busy)
 	const conversation = useConversation({ channel: 'internal', key: MOCK_KEYS.busy })
 	const seed = mockServer.pick('threadNew')

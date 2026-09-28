@@ -46,6 +46,10 @@ A website that has no editor can send `{ text }` instead of a body. The server w
 
 ## The composer
 
+<Screenshot src="/images/conversations/composer-commands.webp" width={640} alt="The / menu with Insert, Lists and a Color group from a project feature" />
+
+<Screenshot src="/images/conversations/composer-mention.webp" width={640} alt="The @ menu offering people who can read the channel" />
+
 The composer is the plugin's own Lexical editor, not Payload's rich text field. It is built on the Lexical that `@payloadcms/richtext-lexical` re-exports, so a project never ships two copies, and its core (`@10x-media/conversations/composer`) imports nothing from `@payloadcms/ui`, so the same editor runs on a website.
 
 What it does out of the box:

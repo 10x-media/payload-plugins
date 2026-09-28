@@ -5,7 +5,8 @@ import { useTheme } from '@payloadcms/ui'
 import { type ReactNode, useEffect, useMemo, useState } from 'react'
 
 import { mockServer } from './mockServer'
-import { type LiveTarget, stories } from './stories'
+import { shots } from './shots'
+import { stories as baseStories, type LiveTarget } from './stories'
 import './playground.css'
 
 const WIDTHS = [
@@ -16,6 +17,8 @@ const WIDTHS = [
 ]
 
 const LATENCIES = [0, 250, 1500]
+
+const stories = [...baseStories, ...shots]
 
 /** Short intervals, so a mock "Anna posts" shows up within seconds. */
 const mockTransport = pollingTransport({ intervals: { active: 2_000, idle: 4_000 } })

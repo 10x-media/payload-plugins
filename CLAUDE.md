@@ -149,6 +149,8 @@ A plugin may carry `packages/<slug>/videos/*.video.ts`: clipwright scenes drivin
 
 Scenes are linted and typechecked with the rest of the package. Whatever fixtures a scene needs it creates through the REST API in `beforeScene`, which is off camera and free.
 
+A scene with `video: false` renders stills only (clipwright `snapshot()`, no ffmpeg). `conversations` has one (`videos/screenshots.video.ts`) for every docs screenshot: dark admin, cropped to an element, written to `apps/docs/public/images/<slug>/` as PNG, converted by hand to lossless WebP (the command is in the scene's header; a third of the size in git), and placed with `<Screenshot>` (`apps/docs/components/screenshot.tsx`). Its primitives come from the dev playground's "Docs shots" stories on the mock backend (`data-shot` marks each crop), so they are the same on every run.
+
 ## Adding a plugin
 
 1. `pnpm new`: interactive prompt for slug and description.

@@ -5,6 +5,8 @@ description: Ready conversation components in shadcn's look, copied into your pr
 
 For projects on shadcn, the registry installs a complete conversation UI into your codebase: channel tabs, a scrolling feed, messages with a menu, the composer, threads, and reactions. Every component draws state that comes from the package's [headless hooks](/conversations/website/headless), so the behaviour (paging, the "New messages" divider, optimistic sends, drafts, retry, realtime) stays in the package and updates with it. The markup and classes are yours.
 
+<Screenshot src="/images/conversations/registry-panel.webp" width={656} alt="The registry's ConversationPanel on a support page, in shadcn's dark theme" />
+
 ## Install
 
 The registry JSON is built from `packages/conversations/registry/` in the package source; hosting it is a follow-up. Until then, point the CLI at the raw file:
@@ -140,6 +142,8 @@ Optional. Without it the components use English labels and no slots.
 ```
 
 Slots from several extensions merge by spreading, for example `{ ...reactionSlots, messageActions: [PinAction] }`. What each slot receives is typed in `ConversationSlots`.
+
+<Screenshot src="/images/conversations/registry-menu.webp" width={656} alt="A message menu from the registry: the reactions row and Reply in thread" />
 
 ## Changing things
 

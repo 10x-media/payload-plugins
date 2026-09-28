@@ -35,6 +35,8 @@ import { ChatScope } from '@10x-media/conversations/react'
 
 ## The components
 
+<Screenshot src="/images/conversations/panel.webp" width={640} alt="A conversation panel: channel tabs, feed and composer" />
+
 Everything below is exported from `@10x-media/conversations/client`, which is a client entry (`'use client'`).
 
 | Component | Does | Built on |
@@ -55,6 +57,8 @@ Everything below is exported from `@10x-media/conversations/client`, which is a 
 Every `Chat*` component in the first eight rows can be replaced, from the config or in code, and a replacement can render the built-in to wrap it. See [Replacing components](/conversations/admin-ui/replacing-components).
 
 ### ChatTrigger
+
+<Screenshot src="/images/conversations/trigger.webp" width={360} alt="Two triggers: one with a count and the unread dot, one with no messages yet" />
 
 The button `comments()` puts into the document controls. It takes the key from the document being edited (`collection:<slug>:<id>` or `global:<slug>`), or from `conversationKey`.
 
@@ -97,6 +101,8 @@ With exactly two channels, the composer's cue line carries a "Switch to &lt;othe
 
 ### ChatChannelTabs
 
+<Screenshot src="/images/conversations/tabs.webp" width={420} alt="Channel tabs with unread counts" />
+
 | Prop | Type | |
 |---|---|---|
 | `channels` | `ChannelView[]` | From `useChannels` or `useChatPanel` |
@@ -107,6 +113,8 @@ With exactly two channels, the composer's cue line carries a "Switch to &lt;othe
 Payload's own tab buttons. A channel with a cue gets an icon: a lock for `neutral`, a globe for `warning`. Counts cap at "99+". With one channel it renders nothing.
 
 ### ChatFeed
+
+<Screenshot src="/images/conversations/feed.webp" width={640} alt="A feed with a day separator, grouped follow-ups and the New messages divider" />
 
 | Prop | Type | |
 |---|---|---|
@@ -141,6 +149,8 @@ A deleted message that still anchors a thread stays as a "Message deleted" place
 
 ### ChatThread
 
+<Screenshot src="/images/conversations/thread.webp" width={640} alt="A thread: the root, its replies with the New messages divider, and the reply composer" />
+
 | Prop | Type | |
 |---|---|---|
 | `root` | `WindowMessage` | Required |
@@ -153,6 +163,8 @@ A deleted message that still anchors a thread stays as a "Message deleted" place
 The replies are their own window (`parent` set), so they page and stay live independently of the main feed. The reply composer carries a "Replying in thread" cue.
 
 ### ChatComposer
+
+<Screenshot src="/images/conversations/composer.webp" width={640} alt="The composer under a warning cue with a Switch to link" />
 
 | Prop | Type | |
 |---|---|---|

@@ -27,6 +27,8 @@ export default buildConfig({
 })
 ```
 
+<Screenshot src="/images/conversations/comments-drawer.webp" width={520} alt="The comments drawer on a person: channel tabs, the feed with reactions, a system note, and the composer" />
+
 ## The model
 
 - **Instance.** One `conversations()` call, named by `slug`. It registers `<slug>-messages` and `<slug>-reads` and serves its endpoints under `/api/conversations/<slug>`. Call it again for another use case: `comments`, `tickets`, `chat`.
