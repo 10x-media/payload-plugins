@@ -2,17 +2,26 @@
 
 import { useServerFunctions } from '@payloadcms/ui'
 import {
+	type ComponentProps,
 	type ComponentType,
 	createContext,
 	type ReactNode,
 	useContext,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from 'react'
+import { useOptionalChatStore } from '../react/provider'
 import { SLOT_WIDGET_SLUG } from '../shared/constants'
 import type { ChatSlotConfig, ConversationMessage } from '../types'
+import type { ChatChannelTabsProps } from './ChatChannelTabs'
+import type { ChatComposerProps } from './ChatComposer'
+import type { ChatDrawerProps, ChatPanelProps } from './ChatDrawer'
+import type { ChatFeedProps } from './ChatFeed'
 import type { ChatMessageProps } from './ChatMessage'
+import type { ChatThreadProps } from './ChatThread'
+import type { ChatTriggerProps } from './ChatTrigger'
 
 export type ChatSlotName = keyof ChatSlotConfig
 
@@ -30,10 +39,27 @@ export const SERVER_SLOT = 'server'
 /** One component of a slot: a client component, or `SERVER_SLOT`. */
 export type ChatSlotEntry = ComponentType<ChatSlotProps> | typeof SERVER_SLOT
 
+/**
+ * The built-in admin components a project can replace, each with the props of
+ * the one it stands in for (`components` option, `ChatComponentsOverride`).
+ */
+export type ReplaceableComponents = {
+	ChannelTabs: ComponentType<ChatChannelTabsProps>
+	Composer: ComponentType<ChatComposerProps>
+	Drawer: ComponentType<ChatDrawerProps>
+	Feed: ComponentType<ChatFeedProps>
+	Message: ComponentType<ChatMessageProps>
+	Panel: ComponentType<ChatPanelProps>
+	Thread: ComponentType<ChatThreadProps>
+	Trigger: ComponentType<ChatTriggerProps>
+}
+
+export type ReplaceableName = keyof ReplaceableComponents
+
 /** Config-level components, resolved on the server from the import map. */
 export type ChatComponents = {
-	/** Drawn instead of `ChatMessage` (`components.Message`). */
-	Message?: ComponentType<ChatMessageProps>
+	/** Replacements for built-ins (`components` option). */
+	replace: Partial<ReplaceableComponents>
 	/** Message types that are server components: rendered through `render-widget`. */
 	server: { types: string[] }
 	/** Each slot's components in order: the host's, then each extension's. */
@@ -41,7 +67,7 @@ export type ChatComponents = {
 	types: Record<string, ComponentType<ChatSlotProps>>
 }
 
-const empty: ChatComponents = { server: { types: [] }, slots: {}, types: {} }
+const empty: ChatComponents = { replace: {}, server: { types: [] }, slots: {}, types: {} }
 
 const ComponentsContext = createContext<Record<string, ChatComponents>>({})
 
@@ -169,4 +195,58 @@ export const useTypeRenderer = (instance: string) => {
 			/>
 		)
 	}
+}
+
+const OverrideContext = createContext<Partial<ReplaceableComponents>>({})
+
+/** The built-ins currently drawn by their own replacement: inside it, the name means the default. */
+const ReplacingContext = createContext<ReadonlySet<ReplaceableName>>(new Set())
+
+/**
+ * Replaces built-in components for everything below it, over the instance's
+ * `components` option. React components, so it also works where there is no
+ * import map. Nested overrides merge, the nearest winning.
+ */
+export const ChatComponentsOverride = ({
+	children,
+	components,
+}: {
+	children?: ReactNode
+	components?: Partial<ReplaceableComponents>
+}) => {
+	const parent = useContext(OverrideContext)
+	const value = useMemo(() => ({ ...parent, ...components }), [components, parent])
+	return <OverrideContext.Provider value={value}>{children}</OverrideContext.Provider>
+}
+
+/**
+ * A built-in that yields to a replacement: the nearest `ChatComponentsOverride`,
+ * else the instance's `components` option, else `Default`. Inside its own
+ * replacement the built-in draws `Default`, so a replacement can wrap it.
+ */
+export const replaceable = <K extends ReplaceableName>(
+	name: K,
+	Default: ReplaceableComponents[K]
+): ReplaceableComponents[K] => {
+	const Replaceable = (props: ComponentProps<ReplaceableComponents[K]>) => {
+		const replacing = useContext(ReplacingContext)
+		const local = useContext(OverrideContext)[name]
+		const configured = useContext(ComponentsContext)
+		const store = useOptionalChatStore()
+		const instance = (props as { instance?: string }).instance ?? store?.instance
+		const Replacement = replacing.has(name)
+			? undefined
+			: (local ?? (instance ? configured[instance]?.replace[name] : undefined))
+		const inner = useMemo(() => new Set([...replacing, name]), [replacing])
+		// biome-ignore lint/suspicious/noExplicitAny: each name carries its own props.
+		const Component = (Replacement ?? Default) as ComponentType<any>
+		if (!Replacement) return <Component {...props} />
+		return (
+			<ReplacingContext.Provider value={inner}>
+				<Component {...props} />
+			</ReplacingContext.Provider>
+		)
+	}
+	Replaceable.displayName = `Chat${name}`
+	return Replaceable as ReplaceableComponents[K]
 }

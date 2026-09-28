@@ -1,4 +1,4 @@
 {
 	"title": "Admin UI",
-	"pages": ["index", "slots", "replacing-the-message", "custom-views", "styling"]
+	"pages": ["index", "slots", "replacing-components", "custom-views", "styling"]
 }

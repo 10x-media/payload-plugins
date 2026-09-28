@@ -8,7 +8,7 @@ A slot adds to the built-in UI without replacing it. There are two kinds:
 - **Config-level slots**, set in the instance's `slots` option as Payload component paths. They apply everywhere the instance is drawn in the admin, including the drawer `comments()` mounts.
 - **Prop slots** on the components themselves, for UI you compose in code.
 
-To replace a message outright rather than add to it, see [Replacing the message](/conversations/admin-ui/replacing-the-message).
+To replace a component outright rather than add to it, see [Replacing components](/conversations/admin-ui/replacing-components).
 
 ## Config-level slots
 
@@ -137,7 +137,7 @@ When you compose the components yourself, pass React nodes instead:
 />
 ```
 
-`ChatMessage`'s prop slots are what a [replacement message](/conversations/admin-ui/replacing-the-message) uses to wrap the default.
+`ChatMessage`'s prop slots are what a [replacement message](/conversations/admin-ui/replacing-components#the-message) uses to wrap the default.
 
 ## Slots from an extension
 

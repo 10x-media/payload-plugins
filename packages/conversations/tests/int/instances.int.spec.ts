@@ -59,7 +59,9 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 		)
 		expect(slugs).not.toContain('tickets-reads')
 		// A replacement message component lives only in plugin options; the import map finds it here.
-		expect(booted.payload.config.admin.dependencies?.['conversations-kept-message']).toEqual({
+		expect(
+			booted.payload.config.admin.dependencies?.['conversations-kept-component-Message']
+		).toEqual({
 			path: '/components/KeptMessage#KeptMessage',
 			type: 'component',
 		})

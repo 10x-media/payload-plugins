@@ -12,7 +12,7 @@ import { useComposer } from '../react/useComposer'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { LocalizedLabel } from '../types'
-import { ChatSlot } from './components'
+import { ChatSlot, replaceable } from './components'
 import { useChatRichText } from './richText'
 import './conversations.css'
 
@@ -58,7 +58,7 @@ export type ChatComposerProps = {
  * Send in the same box. Enter sends, Shift+Enter breaks the line. A failed
  * send keeps the text and offers Retry under the same `clientId`.
  */
-export const ChatComposer = ({
+const DefaultComposer = ({
 	above,
 	actions,
 	autoFocus,
@@ -206,3 +206,6 @@ export const ChatComposer = ({
 		</div>
 	)
 }
+
+/** The admin composer. Replaceable through `components.Composer`. */
+export const ChatComposer = replaceable('Composer', DefaultComposer)

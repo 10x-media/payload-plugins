@@ -11,20 +11,18 @@ export {
 	type ChatPanelProps,
 } from '../client/ChatDrawer'
 export { ChatFeed, type ChatFeedProps, type FeedItem } from '../client/ChatFeed'
-export {
-	ChatMessage,
-	type ChatMessageProps,
-	MessageView,
-	type RenderMessage,
-} from '../client/ChatMessage'
+export { ChatMessage, type ChatMessageProps } from '../client/ChatMessage'
 export { ChatThread, type ChatThreadProps } from '../client/ChatThread'
 export { ChatTrigger, type ChatTriggerProps } from '../client/ChatTrigger'
 export {
 	type ChatComponents,
+	ChatComponentsOverride,
 	ChatComponentsProvider,
 	ChatSlot,
 	type ChatSlotName,
 	type ChatSlotProps,
+	type ReplaceableComponents,
+	type ReplaceableName,
 	useChatComponents,
 	useTypeRenderer,
 } from '../client/components'

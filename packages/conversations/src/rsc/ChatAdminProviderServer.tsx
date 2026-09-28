@@ -8,6 +8,7 @@ import {
 	type ChatSlotEntry,
 	type ChatSlotName,
 	type ChatSlotProps,
+	type ReplaceableName,
 	SERVER_SLOT,
 } from '../client/components'
 import { getInstance } from '../server/service'
@@ -37,7 +38,7 @@ export const ChatAdminProviderServer = ({
 	payload: Payload
 }) => {
 	const instance = getInstance({ payload } as never, slug)
-	const components: ChatComponents = { server: { types: [] }, slots: {}, types: {} }
+	const components: ChatComponents = { replace: {}, server: { types: [] }, slots: {}, types: {} }
 	for (const [name, paths] of Object.entries(instance.slots) as Array<
 		[ChatSlotName, PayloadComponent[]]
 	>) {
@@ -49,15 +50,18 @@ export const ChatAdminProviderServer = ({
 		}
 		if (entries.length > 0) components.slots[name] = entries
 	}
-	const Message = instance.components.Message
-		? resolve(payload, instance.components.Message)
-		: undefined
-	if (Message && isReactServerComponentOrFunction(Message)) {
-		payload.logger.warn(
-			`[@10x-media/conversations] components.Message of "${slug}" is a server component; it must be a client component ('use client'). Using the default.`
-		)
-	} else if (Message) {
-		components.Message = Message as unknown as ChatComponents['Message']
+	for (const [name, path] of Object.entries(instance.components) as Array<
+		[ReplaceableName, PayloadComponent | undefined]
+	>) {
+		const Component = path ? resolve(payload, path) : undefined
+		if (!Component) continue
+		if (isReactServerComponentOrFunction(Component)) {
+			payload.logger.warn(
+				`[@10x-media/conversations] components.${name} of "${slug}" is a server component; it must be a client component ('use client'). Using the default.`
+			)
+			continue
+		}
+		;(components.replace as Record<string, unknown>)[name] = Component
 	}
 	for (const type of instance.types.values()) {
 		const Component = type.Component ? resolve(payload, type.Component) : undefined

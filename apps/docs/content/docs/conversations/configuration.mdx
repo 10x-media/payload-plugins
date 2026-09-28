@@ -37,7 +37,7 @@ conversations({
 | `reads` | `boolean` | `true` | Per-user read state and unread counts |
 | `transport` | `ConversationsServerTransport` | polling | `sseTransport()`, `pusherTransport()` or your own. See [Transport](/conversations/transport) |
 | `slots` | `ChatSlotConfig` | | Admin components added to the UI. See [Slots](/conversations/admin-ui/slots) |
-| `components.Message` | `PayloadComponent` | `ChatMessage` | A client component drawn for every message in the admin. See [Replacing the message](/conversations/admin-ui/replacing-the-message) |
+| `components` | `{ Trigger?, Drawer?, Panel?, ChannelTabs?, Feed?, Message?, Composer?, Thread? }` | built-ins | Client component paths that replace built-in admin components. See [Replacing components](/conversations/admin-ui/replacing-components) |
 | `overrides.messages`, `overrides.reads` | `{ fields?, hooks?, admin?, access? }` | | Change the collections. `fields` receives `{ defaultFields }`. See [Concepts](/conversations/concepts#changing-the-collections) |
 | `extensions` | `ConversationsExtension[]` | `[]` | `comments()`, `reactions()` and your own. See [Extensions](/conversations/extensions) |
 | `translations` | `TranslationsOption` | | Per-locale string overrides. See [i18n](/conversations/i18n) |

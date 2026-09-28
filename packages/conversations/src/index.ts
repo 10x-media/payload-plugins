@@ -84,13 +84,14 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 					type: 'component',
 				}
 		}
-		const message = instance.components.Message
-		const messagePath = typeof message === 'string' ? message : message ? message.path : undefined
-		if (messagePath)
-			dependencies[`conversations-${instance.slug}-message`] = {
-				path: messagePath,
-				type: 'component',
-			}
+		for (const [name, component] of Object.entries(instance.components)) {
+			const path = typeof component === 'string' ? component : component ? component.path : ''
+			if (path)
+				dependencies[`conversations-${instance.slug}-component-${name}`] = {
+					path,
+					type: 'component',
+				}
+		}
 		config.admin.dependencies = { ...config.admin.dependencies, ...dependencies }
 		const hasComponents =
 			Object.values(instance.slots).some((components) => components.length > 0) ||

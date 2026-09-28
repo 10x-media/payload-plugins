@@ -9,7 +9,8 @@ import { useFeed } from '../react/useFeed'
 import type { WindowMessage } from '../react/window'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
-import { MessageView, type RenderMessage } from './ChatMessage'
+import { ChatMessage } from './ChatMessage'
+import { replaceable } from './components'
 import './conversations.css'
 
 export type { FeedItem } from '../react/feed'
@@ -24,8 +25,6 @@ export type ChatFeedProps = {
 	onOpenThread?: (message: WindowMessage) => void
 	/** The channel takes no writes here, so messages offer no Edit or Delete. */
 	readOnly?: boolean
-	/** Draws each message instead of `components.Message` or `ChatMessage`. */
-	renderMessage?: RenderMessage
 	/** Renders messages whose `type` is not `text`. */
 	renderType?: (message: WindowMessage) => ReactNode
 }
@@ -35,14 +34,13 @@ export type ChatFeedProps = {
  * behaviour (opening at the divider, keeping the place, "N new", paging) is
  * `useFeed`; this draws it.
  */
-export const ChatFeed = ({
+const DefaultFeed = ({
 	conversation,
 	empty,
 	instance,
 	items,
 	onOpenThread,
 	readOnly,
-	renderMessage,
 	renderType,
 }: ChatFeedProps) => {
 	const { i18n, t } = useTranslation()
@@ -89,14 +87,13 @@ export const ChatFeed = ({
 										<span>{t(keys.newMessages)}</span>
 									</div>
 								) : null}
-								<MessageView
+								<ChatMessage
 									authors={conversation.authors}
 									compact={row.compact}
 									instance={instance}
 									message={row.message}
 									onOpenThread={onOpenThread}
 									readOnly={readOnly}
-									render={renderMessage}
 									renderType={renderType}
 									threadReadAt={conversation.threadReads[String(row.message.id)]}
 									viewer={conversation.viewer}
@@ -125,3 +122,6 @@ export const ChatFeed = ({
 		</div>
 	)
 }
+
+/** The message feed. Replaceable through `components.Feed`. */
+export const ChatFeed = replaceable('Feed', DefaultFeed)

@@ -10,25 +10,23 @@ import { useTranslation } from '../translations/useTranslation'
 import type { AuthorsMap } from '../types'
 import { ChatComposer } from './ChatComposer'
 import { ChatFeed } from './ChatFeed'
-import { MessageView, type RenderMessage } from './ChatMessage'
+import { ChatMessage } from './ChatMessage'
+import { replaceable } from './components'
 
 export type ChatThreadProps = {
 	authors: AuthorsMap
 	channel: ChannelView
 	instance: string
-	/** Draws each message, the root included, instead of `components.Message` or `ChatMessage`. */
-	renderMessage?: RenderMessage
 	renderType?: (message: WindowMessage) => ReactNode
 	root: WindowMessage
 	viewer: null | string
 }
 
 /** A root message, its replies as their own window, and a reply composer. */
-export const ChatThread = ({
+const DefaultThread = ({
 	authors,
 	channel,
 	instance,
-	renderMessage,
 	renderType,
 	root,
 	viewer,
@@ -38,12 +36,11 @@ export const ChatThread = ({
 	return (
 		<div className="conversations-thread">
 			<div className="conversations-thread__root">
-				<MessageView
+				<ChatMessage
 					authors={conversation.authors}
 					instance={instance}
 					message={root}
 					readOnly={!channel.canCreate}
-					render={renderMessage}
 					renderType={renderType}
 					viewer={viewer}
 				/>
@@ -52,7 +49,6 @@ export const ChatThread = ({
 				conversation={conversation}
 				instance={instance}
 				readOnly={!channel.canCreate}
-				renderMessage={renderMessage}
 				renderType={renderType}
 			/>
 			<ChatComposer
@@ -67,3 +63,6 @@ export const ChatThread = ({
 		</div>
 	)
 }
+
+/** A thread: root, replies, reply composer. Replaceable through `components.Thread`. */
+export const ChatThread = replaceable('Thread', DefaultThread)

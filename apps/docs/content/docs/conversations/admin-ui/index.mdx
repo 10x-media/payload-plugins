@@ -15,7 +15,7 @@ Every `conversations()` instance adds one provider to `admin.components.provider
 
 It is a server component. On each admin render it:
 
-- resolves the instance's config-level components from the import map: [`slots`](/conversations/admin-ui/slots), the `Component` of each [custom message type](/conversations/messages), and [`components.Message`](/conversations/admin-ui/replacing-the-message). Client components travel to the browser as references; server components are rendered on demand.
+- resolves the instance's config-level components from the import map: [`slots`](/conversations/admin-ui/slots), the `Component` of each [custom message type](/conversations/messages), and the [`components`](/conversations/admin-ui/replacing-components) that replace built-ins. Client components travel to the browser as references; server components are rendered on demand.
 - picks the client transport from the instance's server `transport` (`client: 'polling' | 'sse' | { pusher }`, see [Transport](/conversations/transport)).
 - renders the client `ChatAdminProvider`, which opens a `ChatProvider` for the instance with the admin's `serverURL` and API route.
 
@@ -45,12 +45,14 @@ Everything below is exported from `@10x-media/conversations/client`, which is a 
 | `ChatChannelTabs` | One tab per readable channel, with unread counts | |
 | `ChatFeed` | The scrolling window over a feed or a thread | `useFeed` |
 | `ChatMessage` | One message: avatar, name, time, body, thread summary, menu, inline edit | `useMessage` |
-| `MessageView` | Draws a message through the replacement chain | |
 | `ChatThread` | A root, its replies as their own feed, and a reply composer | `useThread` |
 | `ChatComposer` | The message editor under a channel cue, with Send | `useComposer` |
 | `MessageMenu`, `useMessageMenu` | A message's "⋯" menu, and access to it from slot components | |
 | `Avatar` | A picture, or initials on a colour derived from the user key | |
 | `ChatRichTextProvider` | Composer features and JSX converters for every component below it | |
+| `ChatComponentsOverride` | Replaces built-ins for everything below it | |
+
+Every `Chat*` component in the first eight rows can be replaced, from the config or in code, and a replacement can render the built-in to wrap it. See [Replacing components](/conversations/admin-ui/replacing-components).
 
 ### ChatTrigger
 
@@ -73,7 +75,7 @@ It renders nothing on a create view (no id yet) and nothing when the user can re
 | `title` | `ReactNode` | Default: "Comments" |
 | `subtitle` | `ReactNode` | A line under the title; `ChatTrigger` passes the document's title |
 | `header` | `ReactNode` | Extra content after the title, before the `drawerHeader` slot |
-| `renderMessage` | `RenderMessage` | See [Replacing the message](/conversations/admin-ui/replacing-the-message) |
+| `components` | `Partial<ReplaceableComponents>` | Replacements for everything the drawer draws. See [Replacing components](/conversations/admin-ui/replacing-components) |
 | `renderType` | `(message) => ReactNode` | Draws messages whose `type` is not `text` |
 
 Open it with Payload's `useModal().openModal(drawerSlug)`. A thread opens under `` `${drawerSlug}-thread` ``, stacked on top.
@@ -88,7 +90,7 @@ The drawer's body without the drawer: channel tabs, the current channel's feed, 
 | `instance` | `string` | Required |
 | `threadSlug` | `string` | The Payload modal slug a thread opens under. Required |
 | `renderHeader` | `(panel: UseChatPanelResult) => ReactNode` | Drawn first, with the panel's state |
-| `renderMessage` | `RenderMessage` | |
+| `components` | `Partial<ReplaceableComponents>` | Replacements for everything the panel draws |
 | `renderType` | `(message) => ReactNode` | |
 
 With exactly two channels, the composer's cue line carries a "Switch to &lt;other&gt;" link. A read-only channel shows the reason in place of the editor.
@@ -114,7 +116,6 @@ Payload's own tab buttons. A channel with a cue gets an icon: a lock for `neutra
 | `items` | `FeedItem[]` | Rows from elsewhere (`{ at, id, node }`), interleaved by timestamp |
 | `onOpenThread` | `(message) => void` | Shows thread summaries and "Reply in thread"; omit inside a thread |
 | `readOnly` | `boolean` | No Edit or Delete on any message |
-| `renderMessage` | `RenderMessage` | |
 | `renderType` | `(message) => ReactNode` | |
 
 It opens at the "New messages" divider when there is unread, else at the bottom. It keeps its place while older pages load above, groups consecutive messages by one author into compact rows, puts a separator between days, and loads the next page when you scroll to the edge of the window. New messages below the fold show a "N new" pill; while the window is not at the latest page, the pill reads "Jump to latest".
@@ -138,10 +139,6 @@ It opens at the "New messages" divider when there is unread, else at the bottom.
 
 A deleted message that still anchors a thread stays as a "Message deleted" placeholder, and its `messageFooter` slot still renders. A message being sent is dimmed and reads "Sending…". Edit opens `ChatComposer` in place; Delete asks through Payload's `ConfirmationModal`.
 
-### MessageView and RenderMessage
-
-`MessageView` takes `ChatMessageProps` plus `render?: RenderMessage` and draws the message through the replacement chain: `render`, else the instance's `components.Message`, else `ChatMessage`. `ChatFeed` and `ChatThread` use it for every row. See [Replacing the message](/conversations/admin-ui/replacing-the-message).
-
 ### ChatThread
 
 | Prop | Type | |
@@ -151,7 +148,6 @@ A deleted message that still anchors a thread stays as a "Message deleted" place
 | `authors` | `AuthorsMap` | The authors the root's feed already knows |
 | `instance` | `string` | Required |
 | `viewer` | `string \| null` | |
-| `renderMessage` | `RenderMessage` | Also used for the root |
 | `renderType` | `(message) => ReactNode` | |
 
 The replies are their own window (`parent` set), so they page and stay live independently of the main feed. The reply composer carries a "Replying in thread" cue.

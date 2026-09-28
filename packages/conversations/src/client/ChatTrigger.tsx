@@ -8,6 +8,7 @@ import { collectionKey, globalKey } from '../shared/keys'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { ChatDrawer } from './ChatDrawer'
+import { replaceable } from './components'
 import './conversations.css'
 
 export type ChatTriggerProps = {
@@ -66,7 +67,7 @@ const TriggerButton = ({ conversationKey, instance }: Required<ChatTriggerProps>
  * Renders nothing on a create view (no id yet) or when the user can read no
  * channel of this document.
  */
-export const ChatTrigger = ({ conversationKey, instance }: ChatTriggerProps) => {
+const DefaultTrigger = ({ conversationKey, instance }: ChatTriggerProps) => {
 	const { collectionSlug, globalSlug, id } = useDocumentInfo()
 	const key =
 		conversationKey ??
@@ -82,3 +83,6 @@ export const ChatTrigger = ({ conversationKey, instance }: ChatTriggerProps) => 
 		</ChatScope>
 	)
 }
+
+/** The document-controls button `comments()` adds. Replaceable through `components.Trigger`. */
+export const ChatTrigger = replaceable('Trigger', DefaultTrigger)

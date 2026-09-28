@@ -11,9 +11,13 @@ import { useTranslation } from '../translations/useTranslation'
 import { ChatChannelTabs } from './ChatChannelTabs'
 import { ChatComposer } from './ChatComposer'
 import { ChatFeed } from './ChatFeed'
-import type { RenderMessage } from './ChatMessage'
 import { ChatThread } from './ChatThread'
-import { ChatSlot } from './components'
+import {
+	ChatComponentsOverride,
+	ChatSlot,
+	type ReplaceableComponents,
+	replaceable,
+} from './components'
 
 export type ChatDrawerProps = {
 	conversationKey: string
@@ -22,8 +26,8 @@ export type ChatDrawerProps = {
 	/** Slot: extra content in the header, after the title. */
 	header?: ReactNode
 	instance: string
-	/** Draws each message instead of `components.Message` or `ChatMessage`. */
-	renderMessage?: RenderMessage
+	/** Replacements for the built-ins inside, over the instance's `components` option. */
+	components?: Partial<ReplaceableComponents>
 	/** Renders messages whose `type` is not `text`. */
 	renderType?: (message: WindowMessage) => ReactNode
 	/** A line under the title, e.g. the document's title. */
@@ -68,26 +72,21 @@ export type ChatPanelProps = {
 	/** Drawn first, with the panel's state (e.g. the drawer header with its channel slot). */
 	renderHeader?: (panel: UseChatPanelResult) => ReactNode
 	instance: string
-	/** Draws each message instead of `components.Message` or `ChatMessage`. */
-	renderMessage?: RenderMessage
+	/** Replacements for the built-ins inside, over the instance's `components` option. */
+	components?: Partial<ReplaceableComponents>
 	/** Renders messages whose `type` is not `text`. */
 	renderType?: (message: WindowMessage) => ReactNode
 	/** The Payload modal slug a thread opens under, as a drawer. */
 	threadSlug: string
 }
 
-/**
- * One conversation's tabs, feed and composer, with threads in a drawer
- * stacked on top. Fills its parent's column: the drawer, or the inline field.
- */
-export const ChatPanel = ({
+const PanelBody = ({
 	conversationKey,
 	instance,
 	renderHeader,
-	renderMessage,
 	renderType,
 	threadSlug,
-}: ChatPanelProps) => {
+}: Omit<ChatPanelProps, 'components'>) => {
 	const { i18n, t } = useTranslation()
 	const { closeModal, openModal } = useModal()
 	const panel = useChatPanel({ conversationKey })
@@ -121,7 +120,6 @@ export const ChatPanel = ({
 						key={`feed:${current.slug}`}
 						onOpenThread={openThread}
 						readOnly={!current.canCreate}
-						renderMessage={renderMessage}
 						renderType={renderType}
 					/>
 					<ChatComposer
@@ -159,7 +157,6 @@ export const ChatPanel = ({
 							authors={conversation.authors}
 							channel={current}
 							instance={instance}
-							renderMessage={renderMessage}
 							renderType={renderType}
 							root={thread}
 							viewer={viewer}
@@ -176,11 +173,10 @@ const DrawerBody = ({
 	drawerSlug,
 	header,
 	instance,
-	renderMessage,
 	renderType,
 	subtitle,
 	title,
-}: ChatDrawerProps) => {
+}: Omit<ChatDrawerProps, 'components'>) => {
 	const { t } = useTranslation()
 	const { closeModal } = useModal()
 	return (
@@ -203,7 +199,6 @@ const DrawerBody = ({
 						/>
 					</DrawerHeader>
 				)}
-				renderMessage={renderMessage}
 				renderType={renderType}
 				threadSlug={`${drawerSlug}-thread`}
 			/>
@@ -212,11 +207,26 @@ const DrawerBody = ({
 }
 
 /**
+ * One conversation's tabs, feed and composer, with threads in a drawer
+ * stacked on top. Fills its parent's column: the drawer, or the inline field.
+ * Replaceable through `components.Panel`.
+ */
+export const ChatPanel = replaceable('Panel', ({ components, ...props }: ChatPanelProps) => (
+	<ChatComponentsOverride components={components}>
+		<PanelBody {...props} />
+	</ChatComponentsOverride>
+))
+
+/**
  * The conversation of one target in a Payload drawer: header, channel tabs,
  * feed, composer. A thread opens as a second drawer stacked on top.
+ * Replaceable through `components.Drawer`; a replacement renders the Payload
+ * `Drawer` under `drawerSlug` itself, since that is what the trigger opens.
  */
-export const ChatDrawer = (props: ChatDrawerProps) => (
-	<Drawer className="conversations-drawer-shell" Header={null} slug={props.drawerSlug}>
-		<DrawerBody {...props} />
-	</Drawer>
-)
+export const ChatDrawer = replaceable('Drawer', ({ components, ...props }: ChatDrawerProps) => (
+	<ChatComponentsOverride components={components}>
+		<Drawer className="conversations-drawer-shell" Header={null} slug={props.drawerSlug}>
+			<DrawerBody {...props} />
+		</Drawer>
+	</ChatComponentsOverride>
+))

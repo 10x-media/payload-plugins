@@ -5,6 +5,7 @@ import { Button } from '@payloadcms/ui'
 import { GlobeIcon, LockIcon } from '../composer/icons'
 import { type ChannelView, resolveLabel } from '../react/hooks'
 import { useTranslation } from '../translations/useTranslation'
+import { replaceable } from './components'
 
 export type ChatChannelTabsProps = {
 	active: string
@@ -15,12 +16,7 @@ export type ChatChannelTabsProps = {
 }
 
 /** One tab per readable channel, with its unread count. Renders nothing for a single channel. */
-export const ChatChannelTabs = ({
-	active,
-	channels,
-	onChange,
-	reads = true,
-}: ChatChannelTabsProps) => {
+const DefaultChannelTabs = ({ active, channels, onChange, reads = true }: ChatChannelTabsProps) => {
 	const { i18n } = useTranslation()
 	if (channels.length < 2) return null
 	return (
@@ -53,3 +49,6 @@ export const ChatChannelTabs = ({
 		</div>
 	)
 }
+
+/** The channel tabs. Replaceable through `components.ChannelTabs`. */
+export const ChatChannelTabs = replaceable('ChannelTabs', DefaultChannelTabs)

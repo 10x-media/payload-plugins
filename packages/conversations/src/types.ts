@@ -228,14 +228,29 @@ export type ConversationsHooks = {
 	}) => Promise<void> | void
 }
 
-/** Admin components that replace a built-in one entirely. */
+/**
+ * Admin components that replace a built-in one entirely, as client component
+ * paths. Each gets the props of the built-in it replaces and may render that
+ * built-in itself to wrap the default (inside its own replacement, a built-in
+ * draws the default).
+ */
 export type ChatComponentsConfig = {
-	/**
-	 * A client component drawn for every message in the admin, feeds and
-	 * threads alike, instead of `ChatMessage`. It gets `ChatMessageProps` and
-	 * may render `ChatMessage` itself to wrap the default.
-	 */
+	/** Instead of `ChatChannelTabs`. */
+	ChannelTabs?: PayloadComponent
+	/** Instead of `ChatComposer`: sending, replying and editing. */
+	Composer?: PayloadComponent
+	/** Instead of `ChatDrawer`; renders the Payload `Drawer` under `drawerSlug` itself. */
+	Drawer?: PayloadComponent
+	/** Instead of `ChatFeed`, in the panel and in threads. */
+	Feed?: PayloadComponent
+	/** Instead of `ChatMessage`, for every message, thread roots included. */
 	Message?: PayloadComponent
+	/** Instead of `ChatPanel`: tabs, feed, composer and the thread drawer. */
+	Panel?: PayloadComponent
+	/** Instead of `ChatThread`. */
+	Thread?: PayloadComponent
+	/** Instead of `ChatTrigger`, the button `comments()` adds. */
+	Trigger?: PayloadComponent
 }
 
 export type ConversationsPluginOptions = {

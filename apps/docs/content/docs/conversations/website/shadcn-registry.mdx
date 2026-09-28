@@ -146,7 +146,7 @@ Slots from several extensions merge by spreading, for example `{ ...reactionSlot
 The copied files are a baseline to edit, not an API.
 
 - **Styling.** Everything is Tailwind classes on shadcn's tokens (`bg-muted`, `text-muted-foreground`, `bg-popover`, `ring-foreground/10`, `bg-primary/10`), so your theme applies as is. The composer is skinned through `composerClassNames` at the top of `conversation-composer.tsx`, one class string per named part; the parts are listed on [Headless](/conversations/website/headless#skinning).
-- **Replacing the message.** Edit `conversation-message.tsx`, or write your own and import it in `conversation-feed.tsx` and `conversation-thread.tsx`. Keep `useMessage` for what the viewer may do. The admin has a config option for this ([Replacing the message](/conversations/admin-ui/replacing-the-message)); on a website you own the file, so no option is needed.
+- **Replacing the message.** Edit `conversation-message.tsx`, or write your own and import it in `conversation-feed.tsx` and `conversation-thread.tsx`. Keep `useMessage` for what the viewer may do. The admin replaces components through a config option ([Replacing components](/conversations/admin-ui/replacing-components)); on a website you own the file, so no option is needed.
 - **Delete confirmation.** `conversation-message.tsx` asks through shadcn's `AlertDialog`, with `labels.deleteConfirm` and `labels.deleteDescription`.
 - **Layout.** `conversation-panel.tsx` opens a thread in place of the feed with a back button. For a side pane instead, render `ConversationThread` next to the feed from `useChatPanel()`'s `thread`.
 

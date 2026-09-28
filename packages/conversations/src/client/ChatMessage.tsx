@@ -13,7 +13,7 @@ import { useTranslation } from '../translations/useTranslation'
 import type { AuthorsMap } from '../types'
 import { Avatar } from './Avatar'
 import { ChatComposer } from './ChatComposer'
-import { ChatSlot, useChatComponents, useTypeRenderer } from './components'
+import { ChatSlot, replaceable, useTypeRenderer } from './components'
 import { MessageMenu } from './MessageMenu'
 import { useChatRichText } from './richText'
 import './conversations.css'
@@ -46,7 +46,7 @@ export type ChatMessageProps = {
  * thread summary, and the author's edit and delete. Deleted messages keep
  * their place as a placeholder while they still anchor a thread.
  */
-export const ChatMessage = ({
+const DefaultMessage = ({
 	actions,
 	authors,
 	compact = false,
@@ -193,20 +193,9 @@ export const ChatMessage = ({
 	)
 }
 
-/** Draws one message; `ChatFeed`, `ChatThread` and friends take it as `renderMessage`. */
-export type RenderMessage = (props: ChatMessageProps) => ReactNode
-
 /**
- * One message as the instance draws it: `render` when given, else the
- * config's `components.Message`, else `ChatMessage`. A replacement gets the
- * same props, so it can render `ChatMessage` itself to wrap the default.
+ * One message: avatar, name, time (absolute on hover), body, edited mark,
+ * thread summary, and the author's edit and delete. Replaceable through
+ * `components.Message`; a replacement can render `ChatMessage` to wrap this.
  */
-export const MessageView = ({
-	render,
-	...props
-}: ChatMessageProps & { render?: RenderMessage }) => {
-	const { Message } = useChatComponents(props.instance)
-	if (render) return <>{render(props)}</>
-	if (Message) return <Message {...props} />
-	return <ChatMessage {...props} />
-}
+export const ChatMessage = replaceable('Message', DefaultMessage)
