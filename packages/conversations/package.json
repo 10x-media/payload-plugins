@@ -170,6 +170,11 @@
 				"import": "./dist/exports/react.js",
 				"default": "./dist/exports/react.js"
 			},
+			"./composer": {
+				"types": "./dist/exports/composer.d.ts",
+				"import": "./dist/exports/composer.js",
+				"default": "./dist/exports/composer.js"
+			},
 			"./comments": {
 				"types": "./dist/exports/comments.d.ts",
 				"import": "./dist/exports/comments.js",
@@ -179,6 +184,11 @@
 				"types": "./dist/exports/reactions.d.ts",
 				"import": "./dist/exports/reactions.js",
 				"default": "./dist/exports/reactions.js"
+			},
+			"./reactions/react": {
+				"types": "./dist/exports/reactions-react.d.ts",
+				"import": "./dist/exports/reactions-react.js",
+				"default": "./dist/exports/reactions-react.js"
 			},
 			"./rsc": {
 				"types": "./dist/exports/rsc.d.ts",
