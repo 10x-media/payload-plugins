@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/conversations",
-	"version": "0.0.0",
+	"version": "0.1.0-beta.0",
 	"description": "Conversations for Payload: messages bound to any document, with channels, threads, mentions and read state",
 	"license": "MIT",
 	"repository": {

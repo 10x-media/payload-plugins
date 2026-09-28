@@ -34,7 +34,9 @@
 		"@10x-media/settings-overlay": "0.0.0",
 		"@10x-media/settings-overlay-dev": "0.0.0",
 		"@10x-media/form-variants": "0.0.0",
-		"@10x-media/form-variants-dev": "0.0.0"
+		"@10x-media/form-variants-dev": "0.0.0",
+		"@10x-media/conversations": "0.0.0",
+		"@10x-media/conversations-dev": "0.0.0"
 	},
 	"changesets": [
 		"admin-wiki-block-chips",
@@ -105,6 +107,7 @@
 		"audit-logs-locales",
 		"automations-locales",
 		"color-linked-alpha",
+		"conversations-initial-beta",
 		"dual-session-initial-beta",
 		"dual-session-locales",
 		"dual-session-role-split",
