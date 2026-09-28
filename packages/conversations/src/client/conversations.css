@@ -1,5 +1,15 @@
 /* Conversations admin UI. Built on Payload's theme variables, so light and dark follow the admin. */
 
+/* The slot dispatcher widget added to a dashboard by hand: not for display, and says so. */
+.conversations-widget-notice {
+	margin: 0;
+	padding: var(--base);
+	border: 1px solid var(--theme-error-250);
+	border-radius: var(--style-radius-m);
+	background: var(--theme-error-50);
+	color: var(--theme-error-750);
+}
+
 /* Payload's subtle button; only room for the unread dot on its corner. */
 .conversations-trigger {
 	position: relative;

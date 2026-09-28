@@ -9,3 +9,6 @@ export const TEXT_TYPE = 'text'
 
 /** The widget the plugin registers so server slots can ride Payload's `render-widget`. */
 export const SLOT_WIDGET_SLUG = '@10x-media/conversations:slot'
+
+/** The plugin's own server function for server slots, for hosts that register it (`serverComponents`). */
+export const SLOT_FUNCTION_NAME = 'conversations-render-slot'

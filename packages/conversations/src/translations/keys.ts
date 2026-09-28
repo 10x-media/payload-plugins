@@ -75,6 +75,7 @@ export const keys = {
 	unknownType: 'conversations:unknownType',
 	unreadDot: 'conversations:unreadDot',
 	unseenCount: 'conversations:unseenCount',
+	widgetNotice: 'conversations:widgetNotice',
 	yesterday: 'conversations:yesterday',
 	you: 'conversations:you',
 } as const

@@ -13,7 +13,7 @@ import {
 	useState,
 } from 'react'
 import { useOptionalChatStore } from '../react/provider'
-import { SLOT_WIDGET_SLUG } from '../shared/constants'
+import { SLOT_FUNCTION_NAME, SLOT_WIDGET_SLUG } from '../shared/constants'
 import type { AuthorsMap, ChatSlotConfig, ConversationMessage } from '../types'
 import type { ChatChannelTabsProps } from './ChatChannelTabs'
 import type { ChatComposerProps } from './ChatComposer'
@@ -62,8 +62,12 @@ export type ReplaceableName = keyof ReplaceableComponents
 export type ChatComponents = {
 	/** Replacements for built-ins (`components` option). */
 	replace: Partial<ReplaceableComponents>
-	/** Message types that are server components: rendered through `render-widget`. */
-	server: { types: string[] }
+	/**
+	 * Message types that are server components, and how server components are
+	 * fetched: Payload's `render-widget` (default) or the plugin's own server
+	 * function, which the host registers (`serverComponents: 'server-function'`).
+	 */
+	server: { types: string[]; via?: 'server-function' | 'widget' }
 	/** Each slot's components in order: the host's, then each extension's. */
 	slots: Partial<Record<ChatSlotName, ChatSlotEntry[]>>
 	types: Record<string, ComponentType<ChatSlotProps>>
@@ -107,12 +111,28 @@ type WidgetRequest = {
 const cache = new Map<string, Promise<ReactNode>>()
 
 /**
+ * Payload throws a bare `Unknown Server Function: <name>` when a name is not
+ * registered; say what to do instead.
+ */
+const explainMissingFunction = (error: unknown) => {
+	const message = error instanceof Error ? error.message : String(error)
+	if (message.includes('Unknown Server Function')) {
+		console.error(
+			`[@10x-media/conversations] the "${SLOT_FUNCTION_NAME}" server function is not registered. Either spread \`conversationsServerFunctions\` from @10x-media/conversations/rsc into \`handleServerFunctions\` in app/(payload)/layout.tsx, or drop \`serverComponents: 'server-function'\` to go back to the widget, which needs no wiring.`
+		)
+	}
+	return null
+}
+
+/**
  * A server component slot, fetched after mount through Payload's
- * `render-widget` server function (see `rsc/SlotDispatcher`). Cached by the
- * message's `updatedAt`, so an edit renders afresh and a re-render does not.
+ * `render-widget` server function or the plugin's own (see
+ * `rsc/SlotDispatcher`). Cached by the message's `updatedAt`, so an edit
+ * renders afresh and a re-render does not.
  */
 const ServerRendered = ({ cacheKey, request }: { cacheKey: string; request: WidgetRequest }) => {
 	const { serverFunction } = useServerFunctions()
+	const via = useChatComponents(request.instance).server.via ?? 'widget'
 	const [node, setNode] = useState<ReactNode>(null)
 	// The request is rebuilt every render; the cache key says when it really changed.
 	const latest = useRef(request)
@@ -122,13 +142,17 @@ const ServerRendered = ({ cacheKey, request }: { cacheKey: string; request: Widg
 		let pending = cache.get(cacheKey)
 		if (!pending) {
 			pending = (
-				serverFunction({
-					args: { widgetData: latest.current, widgetSlug: SLOT_WIDGET_SLUG },
-					name: 'render-widget',
-				}) as Promise<{ component?: ReactNode }>
+				serverFunction(
+					via === 'server-function'
+						? { args: latest.current, name: SLOT_FUNCTION_NAME }
+						: {
+								args: { widgetData: latest.current, widgetSlug: SLOT_WIDGET_SLUG },
+								name: 'render-widget',
+							}
+				) as Promise<{ component?: ReactNode }>
 			)
 				.then((result) => result?.component ?? null)
-				.catch(() => null)
+				.catch(explainMissingFunction)
 			cache.set(cacheKey, pending)
 		}
 		void pending.then((value) => {
@@ -137,7 +161,7 @@ const ServerRendered = ({ cacheKey, request }: { cacheKey: string; request: Widg
 		return () => {
 			cancelled = true
 		}
-	}, [cacheKey, serverFunction])
+	}, [cacheKey, serverFunction, via])
 	return <>{node}</>
 }
 

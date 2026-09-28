@@ -105,7 +105,8 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 			[...instance.types.values()].some((type) => type.Component)
 		const dashboard = config.admin.dashboard
 		const widgetRegistered = dashboard?.widgets?.some((widget) => widget.slug === SLOT_WIDGET_SLUG)
-		if (hasComponents && !widgetRegistered) {
+		// One widget serves every instance; none when this one goes through its own server function.
+		if (hasComponents && instance.serverComponents === 'widget' && !widgetRegistered) {
 			config.admin.dashboard = {
 				...dashboard,
 				widgets: [
