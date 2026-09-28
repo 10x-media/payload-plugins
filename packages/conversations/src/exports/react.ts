@@ -63,7 +63,7 @@ export {
 	type TransportConnection,
 	type WatchEntry,
 } from '../react/transport'
-export { transportFromSpec } from '../react/transportFromSpec'
+export { type ClientTransportFactory, transportFromSpec } from '../react/transportFromSpec'
 export { type UseChatPanelResult, useChatPanel } from '../react/useChatPanel'
 export { type UseComposerResult, useComposer } from '../react/useComposer'
 export { useDelayedFlag } from '../react/useDelayedFlag'
@@ -87,6 +87,7 @@ export type {
 	AuthorsMap,
 	ClientTransportSpec,
 	ConversationMessage,
+	CustomClientTransportSpec,
 	LocalizedLabel,
 	PusherClientOptions,
 } from '../types'

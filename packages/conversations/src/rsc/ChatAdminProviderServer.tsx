@@ -11,6 +11,7 @@ import {
 	type ReplaceableName,
 	SERVER_SLOT,
 } from '../client/components'
+import type { ClientTransportFactory } from '../react/transportFromSpec'
 import { getInstance } from '../server/service'
 
 const resolve = (payload: Payload, component: PayloadComponent) =>
@@ -69,11 +70,23 @@ export const ChatAdminProviderServer = ({
 		if (isReactServerComponentOrFunction(Component)) components.server.types.push(type.slug)
 		else components.types[type.slug] = Component
 	}
+	const transport = instance.transport?.client ?? 'polling'
+	// A client reference: a `'use client'` export travels to the browser like a component.
+	const transportFactory =
+		typeof transport === 'object' && 'factory' in transport
+			? getFromImportMap<ClientTransportFactory>({
+					importMap: payload.importMap,
+					PayloadComponent: transport.factory,
+					schemaPath: '',
+					silent: true,
+				})
+			: null
 	return (
 		<ChatAdminProvider
 			components={components}
 			instance={slug}
-			transport={instance.transport?.client ?? 'polling'}
+			transport={transport}
+			transportFactory={transportFactory}
 		>
 			{children}
 		</ChatAdminProvider>

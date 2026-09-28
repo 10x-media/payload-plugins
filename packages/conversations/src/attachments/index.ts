@@ -5,8 +5,8 @@ import type {
 	Config,
 	PayloadRequest,
 } from 'payload'
-import { isValidID } from 'payload'
 
+import { isDocumentId } from '../server/ids'
 import { ADMIN_GROUP } from '../shared/constants'
 import type {
 	CollectionOverride,
@@ -58,7 +58,8 @@ export type AttachmentsOptions = {
 	 * The extension's own collection (without `collection`): slug (default
 	 * `<instance>-attachments`), `upload` settings (default `true`: Payload's
 	 * defaults, any file type) and the usual access, admin, fields and hooks.
-	 * Access defaults to Payload's: any signed-in user, customers included.
+	 * `create` and `read` default to Payload's: any signed-in user, customers
+	 * included. `update` and `delete` are closed unless `access` opens them.
 	 */
 	overrides?: CollectionOverride & { slug?: string; upload?: CollectionConfig['upload'] }
 	/**
@@ -73,6 +74,8 @@ export type AttachmentsOptions = {
 const FIELD = 'attachments'
 
 const DEFAULT_MAX_FILES = 10
+
+const closed = () => false
 
 const stringOr = (value: unknown): null | string => (typeof value === 'string' ? value : null)
 const numberOr = (value: unknown): null | number =>
@@ -129,7 +132,9 @@ export const attachments = (options: AttachmentsOptions = {}): ConversationsExte
 	const ownCollection = (instance: ConversationsInstance): CollectionConfig => {
 		const override = options.overrides ?? {}
 		return {
-			...(override.access ? { access: override.access } : {}),
+			// Files are never changed or removed over REST unless the host opens it; the
+			// extension itself deletes with `overrideAccess` (`deleteWithMessage`).
+			access: { delete: closed, update: closed, ...override.access },
 			admin: { group: ADMIN_GROUP, ...override.admin },
 			fields: override.fields ? override.fields({ defaultFields: [] }) : [],
 			hooks: {
@@ -183,13 +188,6 @@ export const attachments = (options: AttachmentsOptions = {}): ConversationsExte
 		url: stringOr(doc.url),
 		width: numberOr(doc.width),
 	})
-
-	const validId = (req: PayloadRequest, id: string) => {
-		const type =
-			req.payload.collections[slug]?.customIDType ??
-			(req.payload.db.name === 'mongoose' ? 'ObjectID' : req.payload.db.defaultIDType)
-		return isValidID(type === 'number' ? Number(id) : id, type)
-	}
 
 	const deleteFiles = async (req: PayloadRequest, ids: Array<number | string>) => {
 		if (ids.length === 0) return
@@ -262,7 +260,7 @@ export const attachments = (options: AttachmentsOptions = {}): ConversationsExte
 			const ids = [...new Set(input.map(String))]
 			if (ids.length === 0) return undefined
 			// A malformed id would make the database throw rather than find nothing.
-			if (!ids.every((id) => validId(req, id))) {
+			if (!ids.every((id) => isDocumentId(req, slug, id))) {
 				return fail('Unknown file', 400)
 			}
 			if (ids.length > maxFiles) {

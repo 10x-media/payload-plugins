@@ -192,6 +192,12 @@ export const loadFeed = async (
  * The change query behind polling: which of the given keys have a message in
  * a readable channel updated after `since`. One statement.
  */
+/**
+ * How far back a change check looks at most. Tokens live ten minutes, so a
+ * client whose last check is older has resubscribed and reloaded since.
+ */
+export const MAX_CHANGE_WINDOW_MS = 60 * 60 * 1000
+
 export const changedKeys = async (
 	req: PayloadRequest,
 	instance: ConversationsInstance,
@@ -201,6 +207,8 @@ export const changedKeys = async (
 	if (scoped.length === 0) {
 		return []
 	}
+	// The client sends `since`: a date in 1970 would read every row of the keys.
+	const floor = new Date(Date.now() - MAX_CHANGE_WINDOW_MS).toISOString()
 	const result = await req.payload.db.find({
 		collection: instance.messagesSlug,
 		limit: 0,
@@ -208,7 +216,7 @@ export const changedKeys = async (
 		select: { key: true },
 		where: {
 			and: [
-				{ updatedAt: { greater_than: since } },
+				{ updatedAt: { greater_than: since > floor ? since : floor } },
 				{
 					or: scoped.map(
 						(entry): Where => ({

@@ -124,6 +124,26 @@ for (const deleteWithMessage of [false, true])
 			expect((await upload(customer, { composer: false })).status).toBe(400)
 		})
 
+		it('keeps update and delete closed on its own collection over REST', async () => {
+			const file = await upload(customer)
+			const rest = (method: 'DELETE' | 'PATCH') =>
+				handleEndpoints({
+					config: booted.payload.config,
+					payloadInstanceCacheKey: booted.cacheKey,
+					request: new Request(`http://localhost:3000/api/${COLLECTION}/${file.doc?.id}`, {
+						body: method === 'PATCH' ? JSON.stringify({ source: 'changed' }) : undefined,
+						headers: {
+							Authorization: `JWT ${staff.token}`,
+							'Content-Type': 'application/json',
+						},
+						method,
+					}),
+				})
+			expect((await rest('PATCH')).status).toBe(403)
+			expect((await rest('DELETE')).status).toBe(403)
+			expect(await fileExists(file.doc?.id ?? '')).toBe(true)
+		})
+
 		it('stores the ids on the message and shows the files on every response', async () => {
 			const first = await upload(customer, { name: 'a.txt' })
 			const second = await upload(customer, { name: 'b.txt' })

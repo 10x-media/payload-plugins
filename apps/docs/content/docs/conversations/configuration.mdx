@@ -33,6 +33,7 @@ conversations({
 | `systemAuthors` | `Record<string, { name: LocalizedLabel; avatar? }>` | `{}` | Authors that are not people, for `postMessage({ author: { system } })`. See [System authors](/conversations/messages#system-authors) |
 | `limits.bodyLength` | `number` | `10000` | Characters of the plain-text projection |
 | `limits.bodyBytes` | `number` | `65536` | Bytes of the serialized Lexical body |
+| `limits.dataBytes` | `number` | `16384` | Bytes of a custom type's serialized `data` |
 | `deleted` | `'placeholder' \| 'placeholderIfReplies'` | `'placeholderIfReplies'` | What a deleted message leaves behind. See [Messages](/conversations/messages#deleting) |
 | `deleteWithTarget` | `boolean \| ({ req, key, instance }) => void` | `true` | Cascade when a target document is deleted; a function replaces the built-in cascade. See [Production notes](/conversations/production#cascade) |
 | `reads` | `boolean` | `true` | Per-user read state and unread counts |
@@ -113,6 +114,7 @@ type MessageTypeDefinition<TData> = {
   Component?: PayloadComponent // client or server component
   validate?: (data: TData) => true | string | Promise<true | string>
   clientCreatable?: boolean // default false
+  layout?: 'message' | 'bare' // default 'message'; 'bare' draws the Component as the whole row
 }
 ```
 
@@ -124,7 +126,8 @@ Declare one with `defineMessageType<TData>()({ ... })` so `data` is typed.
 type ConversationsServerTransport = {
   publish: (args: { instance: string; key: string; channel?: string; req }) => void | Promise<void>
   endpoints?: (args: { base: string; instance: ConversationsInstance }) => Endpoint[]
-  client?: 'polling' | 'sse' | { pusher: PusherClientOptions } // what the admin uses
+  // what the admin uses; `factory` is the import path of your own client transport
+  client?: 'polling' | 'sse' | { pusher: PusherClientOptions } | { factory: string; options?: unknown }
 }
 ```
 

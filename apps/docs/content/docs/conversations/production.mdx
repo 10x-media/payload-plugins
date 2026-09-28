@@ -11,8 +11,8 @@ The plugin validates targets against the collections and globals in the config i
 
 When a target document is deleted, `deleteWithTarget: true` (the default) removes its conversation:
 
-- one `deleteMany` on the messages and one on the reads for the key;
-- then each extension's `onTargetDelete`, such as the reactions collection.
+- first each extension's `onTargetDelete` (the reactions collection, attachments' files), while the messages are still there to read;
+- then one `deleteMany` on the messages and one on the reads for the key.
 
 The statements run **without per-row hooks**. Your `overrides.messages.hooks` do not see these deletions, and neither does `afterMessage`. A large conversation is removed in the target's `afterDelete`, inside that request.
 

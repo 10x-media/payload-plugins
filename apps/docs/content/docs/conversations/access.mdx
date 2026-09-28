@@ -10,7 +10,7 @@ Access is decided in two places:
 
 Effective access is both together: a channel is readable when the grant includes it and its `read` rule passes, and writable when the grant allows writing there and its `create` rule passes. Writing always implies reading.
 
-A request without a signed-in user gets nothing; the endpoints answer 401.
+A request without a signed-in user gets nothing; the endpoints answer 401. A user of an auth collection not listed in the instance's `users` gets nothing either, before `access` runs: conversations answer 404 and `subscribe` returns none, whatever the grants would say.
 
 ## Conversation access
 
@@ -130,7 +130,7 @@ mentions: {
 }
 ```
 
-- `users` returns a `Where` per users collection. This is the place for target-level visibility of people (same tenant, same team). Without it every user of every users collection is a candidate.
+- `users` returns a `Where` per users collection. This is the place for target-level visibility of people (same tenant, same team). Without it every user of every users collection is a candidate: in a channel customers can read, a customer can list staff and other customers through the typeahead, eight per collection and request, by `useAsTitle` or email. Set it whenever customers or other outside users sign in.
 - Candidates must also pass the channel's `read` rule, evaluated as themselves. A customer is never offered, or notified, in a staff-only channel.
 - `verifyAccess: true` additionally runs conversation access as each candidate, so a mention only reaches someone who can open the conversation. That is one access run per candidate, so it is off by default; `users` is the cheaper place for that rule.
 - On save, mentions that fail these checks stay in the text as a name but are not stored in `mentions` and notify nobody. At most `max` mentions (default 20) are kept per message.

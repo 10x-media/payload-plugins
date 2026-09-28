@@ -40,7 +40,7 @@ An upload that fails does not stop the message: it goes out with the files that 
 
 ### The extension's collection
 
-Without `collection`, the extension adds `<instance>-attachments` with `upload: true` and Payload's default access: **any signed-in user can upload, and read every file**, customers on a website included. Narrow it through `overrides`:
+Without `collection`, the extension adds `<instance>-attachments` with `upload: true`. `create` and `read` keep Payload's default access: **any signed-in user can upload, and read every file**, customers on a website included. `update` and `delete` are closed: nobody changes or removes a file over REST or in the admin until `overrides.access` opens them (the extension's own `deleteWithMessage` works regardless). Narrow or open it through `overrides`:
 
 ```ts
 attachments({

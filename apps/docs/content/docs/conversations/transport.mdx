@@ -166,9 +166,30 @@ type ConversationsServerTransport = {
   publish: (args: { instance: string; key: string; channel?: string; req: PayloadRequest }) => void | Promise<void>
   /** Extra endpoints under /api/conversations/<instance> (a stream, an auth callback). */
   endpoints?: (args: { base: string; instance }) => Endpoint[]
-  /** What the admin's provider uses: 'polling' | 'sse' | { pusher: PusherClientOptions }. */
+  /** What the admin's provider uses: 'polling' | 'sse' | { pusher } | { factory, options }. */
   client?: ClientTransportSpec
 }
 ```
 
 The client half is a `ConversationsClientTransport`. `createRelay` from `@10x-media/conversations/react` shares one connection per browser and falls back to polling. A source only opens its connection and reports `changed`, `expired` and `health`.
+
+To use it in the admin, export a factory from a `'use client'` module and name it in `client`:
+
+```ts title="transport/client.ts"
+'use client'
+import type { ConversationsClientTransport } from '@10x-media/conversations/react'
+
+export const ablyClientTransport = (options: unknown): ConversationsClientTransport => {
+  // ...
+}
+```
+
+```ts title="transport/server.ts"
+export const ablyTransport = (settings: AblySettings): ConversationsServerTransport => ({
+  publish: async ({ instance, key, channel }) => { /* ... */ },
+  // `options` is sent to the browser: public values only.
+  client: { factory: '/transport/client#ablyClientTransport', options: { key: settings.publicKey } },
+})
+```
+
+The plugin registers the path in `admin.dependencies`, so `generate:importmap` picks it up, and the admin calls `ablyClientTransport(options)` once per instance. A factory the import map cannot resolve falls back to polling with a console warning. On a website, import the factory yourself and pass `transportFromSpec(spec, ablyClientTransport)`, or the transport directly, to `ChatProvider`.

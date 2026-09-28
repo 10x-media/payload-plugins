@@ -27,6 +27,7 @@ import { readersAmong } from './audience'
 import { projectAuthors } from './authors'
 import { isLexicalBody, textToBody } from './body'
 import { changedKeys, type FeedWindow, loadFeed, MAX_LIMIT, messageCounts } from './feed'
+import { isDocumentId } from './ids'
 import { conversationCursors, raiseCursor, threadCursors, unreadCounts } from './reads'
 import { signToken, TOKEN_TTL_MS, verifyToken } from './tokens'
 
@@ -55,8 +56,21 @@ export const resolveAccess = async (
 	instance: ConversationsInstance,
 	keys: string[]
 ): Promise<Map<string, KeyAccess>> => {
-	const grants = await instance.grants(req, keys)
 	const out = new Map<string, KeyAccess>()
+	// Only the instance's users collections take part: anyone else would write as an
+	// author the projection cannot name, whatever the host's access says.
+	const collection = req.user?.collection
+	if (collection && !instance.users.some((users) => users.collection === collection)) {
+		return out
+	}
+	// A malformed document id in a key would make loading the target throw.
+	const grants = await instance.grants(
+		req,
+		keys.filter((key) => {
+			const target = parseKey(key)
+			return target?.kind !== 'collection' || isDocumentId(req, target.slug, target.id ?? '')
+		})
+	)
 	await Promise.all(
 		[...grants].map(async ([key, grant]) => {
 			const target = parseKey(key)
@@ -189,6 +203,15 @@ export const listMessages = async (
 	if (channels.length === 0) {
 		fail('Not found', 404)
 	}
+	const at =
+		params.window?.mode === 'before'
+			? params.window.before
+			: params.window?.mode === 'after'
+				? params.window.after
+				: null
+	if (at && !isDocumentId(req, instance.messagesSlug, at.id)) {
+		fail('Invalid cursor', 400)
+	}
 	let cursor: null | string | undefined
 	let window = params.window
 	if (!window) {
@@ -273,10 +296,12 @@ const findRoot = async (
 	instance: ConversationsInstance,
 	id: string
 ): Promise<ConversationMessage | null> =>
-	(await req.payload.db.findOne({
-		collection: instance.messagesSlug,
-		where: { id: { equals: id } },
-	})) as ConversationMessage | null
+	isDocumentId(req, instance.messagesSlug, id)
+		? ((await req.payload.db.findOne({
+				collection: instance.messagesSlug,
+				where: { id: { equals: id } },
+			})) as ConversationMessage | null)
+		: null
 
 /** Create a message as the signed-in user, after conversation and channel access. */
 export const sendMessage = async (

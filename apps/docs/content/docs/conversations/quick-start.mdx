@@ -48,6 +48,11 @@ export default buildConfig({
           access: { read: () => true, create: () => true },
         },
       ],
+      // Who `@` offers and stores: staff mention staff, customers nobody.
+      mentions: {
+        users: ({ req, collection }) =>
+          isStaff({ req }) && collection === 'users' ? {} : { id: { exists: false } },
+      },
       hooks: {
         afterMention: async ({ req, users, message }) => {
           // Notify through your own system, ideally by queueing a job.
@@ -58,6 +63,10 @@ export default buildConfig({
   ],
 })
 ```
+
+<Callout type="warn">
+Keep `mentions.users` when you copy this. Without it, anyone who can read a channel customers read can search every user of every listed users collection through the mention endpoint (`GET /api/conversations/<instance>/mentions?q=`): staff and other customers alike, found by `useAsTitle` or, without one, by email. The channel's `read` rule only narrows candidates to people who can read that channel, and `shared` is readable by everyone. See [Mentions](/conversations/access#mentions).
+</Callout>
 
 List `conversations()` after any plugin that adds your target or users collections: the plugin checks targets against the collections it can see.
 

@@ -221,7 +221,7 @@ For anything else, `overrides.messages.hooks` adds ordinary Payload collection h
 
 ## Endpoints
 
-Every endpoint lives under `/api/conversations/<slug>` and requires a signed-in user of any auth collection. They work from the admin, a website or any client that sends Payload auth (cookie, JWT, API key).
+Every endpoint lives under `/api/conversations/<slug>` and requires a signed-in user of one of the instance's `users` collections; anyone else gets no conversation. They work from the admin, a website or any client that sends Payload auth (cookie, JWT, API key).
 
 | Method and path | Body or query | Returns |
 |---|---|---|

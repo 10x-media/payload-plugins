@@ -121,6 +121,13 @@ export const buildMessagesCollection = (instance: ConversationsInstance): Collec
 		}
 		const merged = { ...(originalDoc ?? {}), ...data } as ConversationMessage
 		if (merged.type !== TEXT_TYPE) {
+			// A client-creatable type takes whatever JSON the browser sends.
+			if (
+				data.data !== undefined &&
+				Buffer.byteLength(JSON.stringify(data.data ?? null)) > instance.limits.dataBytes
+			) {
+				badRequest('Message data is too large')
+			}
 			const definition = instance.types.get(merged.type)
 			if (definition?.validate && (operation === 'create' || 'data' in data)) {
 				const result = await definition.validate(data.data)

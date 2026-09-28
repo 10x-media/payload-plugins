@@ -92,6 +92,13 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 					type: 'component',
 				}
 		}
+		const clientTransport = instance.transport?.client
+		if (typeof clientTransport === 'object' && 'factory' in clientTransport) {
+			dependencies[`conversations-${instance.slug}-transport`] = {
+				path: clientTransport.factory,
+				type: 'function',
+			}
+		}
 		config.admin.dependencies = { ...config.admin.dependencies, ...dependencies }
 		const hasComponents =
 			Object.values(instance.slots).some((components) => components.length > 0) ||

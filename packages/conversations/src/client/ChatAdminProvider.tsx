@@ -4,7 +4,7 @@ import { useConfig } from '@payloadcms/ui'
 import { type ReactNode, useState } from 'react'
 
 import { ChatProvider } from '../react/provider'
-import { transportFromSpec } from '../react/transportFromSpec'
+import { type ClientTransportFactory, transportFromSpec } from '../react/transportFromSpec'
 import type { ClientTransportSpec } from '../types'
 import { type ChatComponents, ChatComponentsProvider } from './components'
 import './conversations.css'
@@ -19,6 +19,7 @@ export const ChatAdminProvider = ({
 	components,
 	instance,
 	transport,
+	transportFactory,
 }: {
 	children?: ReactNode
 	/** Config-level components, resolved by `ChatAdminProviderServer`. */
@@ -26,9 +27,11 @@ export const ChatAdminProvider = ({
 	instance: string
 	/** The client half of the instance's server transport. */
 	transport?: ClientTransportSpec
+	/** A custom spec's factory, resolved from the import map on the server. */
+	transportFactory?: ClientTransportFactory | null
 }) => {
 	const { config } = useConfig()
-	const [client] = useState(() => transportFromSpec(transport))
+	const [client] = useState(() => transportFromSpec(transport, transportFactory))
 	return (
 		<ChatProvider
 			apiRoute={config.routes.api}

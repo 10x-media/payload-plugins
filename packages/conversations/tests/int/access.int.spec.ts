@@ -94,6 +94,15 @@ describeForDb('conversations access', {}, (db) => {
 						slug: 'strict',
 					})
 				),
+				// Everyone passes access, but only staff are its users.
+				conversations(
+					instanceOptions({
+						access: perTarget(() => true),
+						channels,
+						slug: 'staff-only',
+						users: ['users'],
+					})
+				),
 			]
 		)
 		staff = await signUp(booted, 'users', 'Staff')
@@ -112,6 +121,42 @@ describeForDb('conversations access', {}, (db) => {
 			const entries = await subscribe(staff, { keys })
 			expect(entries).toHaveLength(4)
 			expect(ruleCalls).toEqual(['internal'])
+		})
+
+		it('gives users of a collection outside `users` nothing, whatever access says', async () => {
+			const key = await person('Staff room')
+			const as = (session: Session) =>
+				call<{ entries: Entry[] }>(booted, 'POST /conversations/staff-only/subscribe', {
+					body: { keys: [key] },
+					session,
+				})
+			expect((await as(staff)).json.entries).toHaveLength(1)
+			expect((await as(stranger)).json.entries).toEqual([])
+			const sent = await call(booted, 'POST /conversations/staff-only/messages', {
+				body: { channel: 'shared', clientId: crypto.randomUUID(), key, text: 'let me in' },
+				session: stranger,
+			})
+			expect(sent.status).toBe(404)
+		})
+
+		it('answers malformed ids with 404 or 400, never a database error', async () => {
+			const bad = 'collection:persons:not-an-id'
+			expect(await subscribe(staff, { keys: [bad] })).toEqual([])
+			const page = await call(booted, 'GET /conversations/comments/messages', {
+				query: { channel: 'internal', key: bad },
+				session: staff,
+			})
+			expect(page.status).toBe(404)
+			const removed = await call(booted, 'DELETE /conversations/comments/messages/not-an-id', {
+				session: staff,
+			})
+			expect(removed.status).toBe(404)
+			const key = await person('Cursor')
+			const before = await call(booted, 'GET /conversations/comments/messages', {
+				query: { before: `${new Date().toISOString()},not-an-id`, channel: 'internal', key },
+				session: staff,
+			})
+			expect(before.status).toBe(400)
 		})
 
 		it('narrows the channels of one target', async () => {

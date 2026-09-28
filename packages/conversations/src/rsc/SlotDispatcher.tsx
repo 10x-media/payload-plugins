@@ -3,6 +3,7 @@ import { getFromImportMap } from 'payload/shared'
 import type { ComponentType, ReactNode } from 'react'
 
 import type { ChatSlotName } from '../client/components'
+import { isDocumentId } from '../server/ids'
 import { getInstance, resolveAccess } from '../server/service'
 import type { ConversationMessage } from '../types'
 
@@ -50,6 +51,7 @@ export const ConversationsSlotDispatcher = async (props: WidgetServerProps): Pro
 
 	let message: ConversationMessage | undefined
 	if (data.messageId !== undefined) {
+		if (!isDocumentId(req, instance.messagesSlug, data.messageId)) return null
 		const found = (await req.payload.db.findOne({
 			collection: instance.messagesSlug,
 			where: { id: { equals: data.messageId } },

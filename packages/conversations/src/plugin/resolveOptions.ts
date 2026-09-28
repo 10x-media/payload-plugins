@@ -230,6 +230,7 @@ export const resolveInstance = (
 		limits: {
 			bodyBytes: options.limits?.bodyBytes ?? 64 * 1024,
 			bodyLength: options.limits?.bodyLength ?? 10_000,
+			dataBytes: options.limits?.dataBytes ?? 16 * 1024,
 		},
 		mentions: {
 			max: options.mentions?.max ?? 20,

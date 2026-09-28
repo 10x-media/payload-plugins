@@ -175,8 +175,20 @@ export type PusherClientOptions = {
 	wsPort?: number
 }
 
+/**
+ * A client transport of your own for the admin: the import path of a factory
+ * exported from a `'use client'` module (`'/transport/client#myTransport'`),
+ * called in the browser with `options`. The plugin registers the path, so
+ * `generate:importmap` finds it.
+ */
+export type CustomClientTransportSpec = { factory: string; options?: unknown }
+
 /** The client half a server transport asks the admin to use. */
-export type ClientTransportSpec = 'polling' | 'sse' | { pusher: PusherClientOptions }
+export type ClientTransportSpec =
+	| 'polling'
+	| 'sse'
+	| { pusher: PusherClientOptions }
+	| CustomClientTransportSpec
 
 export type ConversationsServerTransport = {
 	/** Which client transport the admin's provider uses. Default `polling`. */
@@ -290,6 +302,8 @@ export type ConversationsPluginOptions = {
 		bodyBytes?: number
 		/** Maximum characters of a message's plain text. Default 10 000. */
 		bodyLength?: number
+		/** Maximum bytes of a custom type's serialized `data`. Default 16 KiB. */
+		dataBytes?: number
 	}
 	mentions?: {
 		/** Mentions kept per message. Default 20. */
@@ -494,7 +508,7 @@ export type ConversationsInstance = {
 	/** The extensions themselves, in order: their decorators, endpoints, cascades. */
 	extensionList: ConversationsExtension[]
 	hooks: ConversationsHooks
-	limits: { bodyBytes: number; bodyLength: number }
+	limits: { bodyBytes: number; bodyLength: number; dataBytes: number }
 	mentions: {
 		max: number
 		users?: NonNullable<ConversationsPluginOptions['mentions']>['users']
