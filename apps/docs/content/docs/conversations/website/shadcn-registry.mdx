@@ -9,17 +9,33 @@ For projects on shadcn, the registry installs a complete conversation UI into yo
 
 ## Install
 
-The registry JSON is built from `packages/conversations/registry/` in the package source; hosting it is a follow-up. Until then, point the CLI at the raw file:
+The registry is served from this site. Add the whole panel by its URL:
 
 ```bash
-npx shadcn@latest add <registry-url>/r/conversation-panel.json
+npx shadcn@latest add https://docs.10xmedia.de/r/conversations/conversation-panel.json
 ```
 
 `conversation-panel` pulls in the items it is built from. Add reactions separately when the instance has the [reactions extension](/conversations/extensions/reactions):
 
 ```bash
-npx shadcn@latest add <registry-url>/r/conversation-reactions.json
+npx shadcn@latest add https://docs.10xmedia.de/r/conversations/conversation-reactions.json
 ```
+
+Files land in `components/conversations/`. Or register the namespace once in `components.json` and add items by name:
+
+```json title="components.json"
+{
+  "registries": {
+    "@10x-conversations": "https://docs.10xmedia.de/r/conversations/{name}.json"
+  }
+}
+```
+
+```bash
+npx shadcn@latest add @10x-conversations/conversation-panel @10x-conversations/conversation-reactions
+```
+
+Every plugin with components is a registry of its own under `/r/<plugin>/`, with an index at [`/r/conversations/registry.json`](https://docs.10xmedia.de/r/conversations/registry.json). The registry follows the repository's main branch, like these docs, so it can be a step ahead of the latest published package.
 
 The components are written for shadcn's `base-nova` style (Base UI primitives, lucide icons) and Tailwind v4. They also need `@10x-media/conversations` and `@payloadcms/richtext-lexical`, which renders message bodies and carries the composer's Lexical.
 

@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'apps/docs/**'
+      # Plugins' built shadcn registries, served from the docs site under /r/<slug>/.
+      - 'packages/*/registry/r/**'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 

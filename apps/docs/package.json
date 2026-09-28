@@ -4,11 +4,11 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"dev": "next dev --turbo",
-		"build": "next build",
+		"dev": "node scripts/collect-registry.ts && next dev --turbo",
+		"build": "node scripts/collect-registry.ts && next build",
 		"start": "next start",
-		"lint": "biome check app content lib components",
-		"lint:fix": "biome check --write app content lib components",
+		"lint": "biome check app content lib components scripts",
+		"lint:fix": "biome check --write app content lib components scripts",
 		"typecheck": "fumadocs-mdx && tsc -p tsconfig.json --noEmit"
 	},
 	"dependencies": {
