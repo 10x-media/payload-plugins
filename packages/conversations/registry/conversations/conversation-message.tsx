@@ -90,22 +90,25 @@ export function ConversationMessage({
 		<div
 			className={cn(
 				'group relative flex gap-3 px-4 hover:bg-muted/40',
-				compact ? 'py-0.5' : 'pt-2 pb-0.5',
+				state.bare ? 'py-1' : compact ? 'py-0.5' : 'pt-2 pb-0.5',
 				message.sendStatus === 'sending' && 'opacity-60'
 			)}
 			data-message-id={String(message.id)}
 		>
-			<div className="w-8 shrink-0">
-				{compact ? null : author?.avatar ? (
-					<img alt="" className="size-8 rounded-full object-cover" src={author.avatar} />
-				) : (
-					<div className="flex size-8 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground text-xs">
-						{initials(author?.name ?? '')}
-					</div>
-				)}
-			</div>
+			{/* A `layout: 'bare'` type draws the whole row: no avatar, no name line. */}
+			{state.bare ? null : (
+				<div className="w-8 shrink-0">
+					{compact ? null : author?.avatar ? (
+						<img alt="" className="size-8 rounded-full object-cover" src={author.avatar} />
+					) : (
+						<div className="flex size-8 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground text-xs">
+							{initials(author?.name ?? '')}
+						</div>
+					)}
+				</div>
+			)}
 			<div className="min-w-0 flex-1">
-				{compact ? null : (
+				{compact || state.bare ? null : (
 					<div className="flex items-baseline gap-2">
 						<span className="font-medium text-sm">{name}</span>
 						<time
@@ -140,7 +143,7 @@ export function ConversationMessage({
 						message={message}
 					/>
 				) : (
-					(renderType?.(message) ?? (
+					(renderType?.(message, authors) ?? (
 						<div className="text-muted-foreground text-sm italic">{labels.unknownType}</div>
 					))
 				)}
@@ -171,6 +174,15 @@ export function ConversationMessage({
 					</button>
 				) : null}
 			</div>
+			{state.bare ? (
+				<time
+					className="shrink-0 pt-0.5 text-muted-foreground text-xs opacity-0 group-hover:opacity-100"
+					dateTime={message.createdAt}
+					title={absoluteTime(message.createdAt, locale)}
+				>
+					{relativeTime(message.createdAt, locale)}
+				</time>
+			) : null}
 			{hasMenu ? (
 				<div
 					className={cn(

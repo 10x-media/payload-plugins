@@ -50,11 +50,14 @@ const relativeDay = (at: string, now: number): FeedDay['relative'] => {
  */
 export const buildFeedRows = ({
 	dividerBefore,
+	isBare,
 	items = [],
 	messages,
 	now = Date.now(),
 }: {
 	dividerBefore?: null | string
+	/** Rows drawn without a frame (`layout: 'bare'` types): never grouped, and they end a group. */
+	isBare?: (message: WindowMessage) => boolean
 	items?: FeedItem[]
 	messages: WindowMessage[]
 	now?: number
@@ -82,8 +85,9 @@ export const buildFeedRows = ({
 		}
 		const message = entry.message as WindowMessage
 		const divider = dividerBefore === String(message.id)
-		const compact = !day && !divider && isCompact(previousMessage, message)
-		previousMessage = message
+		const bare = isBare?.(message) ?? false
+		const compact = !day && !divider && !bare && isCompact(previousMessage, message)
+		previousMessage = bare ? undefined : message
 		rows.push({
 			compact,
 			day,

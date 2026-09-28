@@ -1,9 +1,38 @@
 import type { PayloadRequest } from 'payload'
 
-import type { AuthorsMap, ConversationMessage, ConversationsInstance } from '../types'
+import { parseSystemKey } from '../shared/keys'
+import type {
+	AuthorProjection,
+	AuthorsMap,
+	ConversationMessage,
+	ConversationsInstance,
+	LocalizedLabel,
+} from '../types'
 import { loadUsers } from './audience'
 
 export const DELETED_USER = 'Deleted user'
+
+/** The name of a system author with no `systemAuthors` entry. */
+export const SYSTEM_NAME = 'System'
+
+const localized = (label: LocalizedLabel, locale: string | undefined): string =>
+	typeof label === 'string'
+		? label
+		: ((locale ? label[locale] : undefined) ?? label.en ?? Object.values(label)[0] ?? SYSTEM_NAME)
+
+/** A system author as the UI shows it: its configured name and avatar, or "System". */
+const projectSystem = (
+	req: PayloadRequest,
+	instance: ConversationsInstance,
+	name: string
+): AuthorProjection => {
+	const entry = instance.systemAuthors[name]
+	return {
+		avatar: entry?.avatar ?? null,
+		name: entry ? localized(entry.name, req.i18n?.language) : SYSTEM_NAME,
+		system: true,
+	}
+}
 
 /**
  * Users as the UI shows them, by user key, through each users collection's
@@ -20,6 +49,11 @@ export const projectUsers = async (
 	const displays = new Map(instance.users.map((entry) => [entry.collection, entry.display]))
 	const projected: AuthorsMap = {}
 	for (const key of keys) {
+		const system = parseSystemKey(key)
+		if (system !== null) {
+			projected[key] = projectSystem(req, instance, system)
+			continue
+		}
 		const doc = users.get(key)
 		const display = doc ? displays.get(doc.collection) : undefined
 		if (!doc || !display) {

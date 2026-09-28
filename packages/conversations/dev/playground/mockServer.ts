@@ -672,6 +672,7 @@ export class MockServer {
 			extensions: ['comments'],
 			now: new Date().toISOString(),
 			reads: true,
+			types: {},
 			viewer: ME,
 		}
 		return json(response)

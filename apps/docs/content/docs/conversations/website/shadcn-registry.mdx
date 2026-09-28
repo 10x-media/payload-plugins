@@ -122,7 +122,7 @@ Optional. Without it the components use English labels and no slots.
 | `labels` | Any of the strings the components show (`defaultLabels` in `conversation-ui.tsx`), for your language. `replies`, `switchTo` and `unseen` are functions |
 | `locale` | Picks channel labels and cues from localized config labels, and formats dates. Default `en`. Nothing reads the browser's language: pass your router's locale |
 | `slots` | Extension components as React components (a website has no import map): `composerAbove`, `messageActions`, `messageQuickActions`, `messageFooter`, each a list |
-| `renderType` | Draws messages whose `type` is not `text`; return `null` for types you do not know |
+| `renderType` | `(message, authors) => ReactNode`: draws messages whose `type` is not `text`; return `null` for types you do not know. A `layout: 'bare'` type's result is the whole row |
 | `composerFeatures` | `({ defaultFeatures }) => features` for every composer below |
 | `converters` | JSX converters for message bodies, to show what those features store |
 

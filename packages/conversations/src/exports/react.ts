@@ -65,7 +65,15 @@ export { type UseMessageResult, useMessage } from '../react/useMessage'
 export { useThread } from '../react/useThread'
 export { dividerBefore, type WindowMessage, type WindowState } from '../react/window'
 export { formatCursor } from '../shared/cursor'
-export { collectionKey, customKey, globalKey, parseKey, userKey } from '../shared/keys'
+export {
+	collectionKey,
+	customKey,
+	globalKey,
+	parseKey,
+	parseSystemKey,
+	systemKey,
+	userKey,
+} from '../shared/keys'
 export type * from '../shared/wire'
 export type {
 	AuthorProjection,

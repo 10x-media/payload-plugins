@@ -37,6 +37,8 @@ export type SubscribeResponse = {
 	/** Server time; the first poll looks back from here. */
 	now: string
 	reads: boolean
+	/** Every registered message type's layout, by slug. */
+	types: Record<string, { layout: 'bare' | 'message' }>
 	/** The signed-in user's key. */
 	viewer: string
 }

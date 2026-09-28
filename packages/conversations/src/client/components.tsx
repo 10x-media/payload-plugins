@@ -14,7 +14,7 @@ import {
 } from 'react'
 import { useOptionalChatStore } from '../react/provider'
 import { SLOT_WIDGET_SLUG } from '../shared/constants'
-import type { ChatSlotConfig, ConversationMessage } from '../types'
+import type { AuthorsMap, ChatSlotConfig, ConversationMessage } from '../types'
 import type { ChatChannelTabsProps } from './ChatChannelTabs'
 import type { ChatComposerProps } from './ChatComposer'
 import type { ChatDrawerProps, ChatPanelProps } from './ChatDrawer'
@@ -27,6 +27,8 @@ export type ChatSlotName = keyof ChatSlotConfig
 
 /** Props every configured slot and message type component receives. */
 export type ChatSlotProps = {
+	/** The authors map of the view, for message type components that name people. Client components only. */
+	authors?: AuthorsMap
 	channel?: string
 	conversationKey: string
 	instance: string
@@ -177,10 +179,17 @@ export const ChatSlot = ({ name, ...props }: ChatSlotProps & { name: ChatSlotNam
 /** Renders a custom message type's component, or null when none is registered. */
 export const useTypeRenderer = (instance: string) => {
 	const components = useChatComponents(instance)
-	return (message: ConversationMessage): ReactNode => {
+	return (message: ConversationMessage, authors?: AuthorsMap): ReactNode => {
 		const Client = components.types[message.type]
 		if (Client) {
-			return <Client conversationKey={message.key} instance={instance} message={message} />
+			return (
+				<Client
+					authors={authors}
+					conversationKey={message.key}
+					instance={instance}
+					message={message}
+				/>
+			)
 		}
 		if (!components.server.types.includes(message.type)) return null
 		return (

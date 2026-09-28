@@ -186,7 +186,16 @@ export default buildConfig({
 				// Send `spam` or `spam 300`: the other staff flood the channel (dev only).
 				afterMessage: spam('comments'),
 			},
+			// Authors that are not people, for notes left by server code.
+			systemAuthors: { import: { name: 'CSV import' } },
 			types: [
+				// A whole-row note, no avatar or name line: see `components/SystemNote.tsx`.
+				defineMessageType<{ text: string }>()({
+					slug: 'system.note',
+					Component: '/components/SystemNote#SystemNote',
+					layout: 'bare',
+					validate: (data) => (data?.text ? true : 'text is required'),
+				}),
 				defineMessageType<{ from: string; to: string }>()({
 					slug: 'person.status',
 					Component: '/components/StatusChange#StatusChange',

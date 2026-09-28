@@ -1,7 +1,7 @@
 'use client'
 
 import type { ComposerFeature } from '@10x-media/conversations/composer'
-import type { WindowMessage } from '@10x-media/conversations/react'
+import type { AuthorsMap, WindowMessage } from '@10x-media/conversations/react'
 import type { JSXConverters } from '@payloadcms/richtext-lexical/react'
 import { type ComponentType, createContext, type ReactNode, useContext, useMemo } from 'react'
 
@@ -66,7 +66,8 @@ type ConversationUI = {
 	/** Picks channel names and cues from localized config labels, and formats dates. */
 	locale: string
 	/** Draws message types other than `text`; return null for unknown ones. */
-	renderType?: (message: WindowMessage) => ReactNode
+	/** Draws messages whose `type` is not `text`; `authors` names the people in it. */
+	renderType?: (message: WindowMessage, authors: AuthorsMap) => ReactNode
 	slots: ConversationSlots
 }
 

@@ -12,6 +12,7 @@ import {
 
 import { buildFeedRows, type FeedItem, type FeedRow } from './feed'
 import type { UseConversationResult } from './hooks'
+import { useOptionalChatStore } from './provider'
 import { useDelayedFlag } from './useDelayedFlag'
 
 /** Close enough to the bottom to count as "at the end". */
@@ -73,9 +74,16 @@ export const useFeed = ({
 	const { dividerBefore, hasNewer, hasOlder, loadNewer, loadOlder, markSeen, messages, status } =
 		conversation
 
+	const types = useOptionalChatStore()?.meta?.types
 	const rows = useMemo(
-		() => buildFeedRows({ dividerBefore, items, messages }),
-		[dividerBefore, items, messages]
+		() =>
+			buildFeedRows({
+				dividerBefore,
+				isBare: (message) => types?.[message.type]?.layout === 'bare',
+				items,
+				messages,
+			}),
+		[dividerBefore, items, messages, types]
 	)
 	const shownIds = rows.flatMap((row) => (row.kind === 'message' ? [row.key] : []))
 

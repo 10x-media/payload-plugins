@@ -80,6 +80,7 @@ conversations({ slug: 'tickets', types: [statusChange] /* … */ })
 - `clientCreatable: true` lets browsers send the type through the endpoint, after `validate`. Otherwise only server code can post it, with `postMessage`.
 - A type has no visibility of its own: the message's channel decides who sees it.
 - Only `text` messages can be edited. Any type can be deleted.
+- `layout` decides how much of the row the `Component` owns (below).
 
 `Component` is a Payload component path, resolved through the import map. A client component renders directly with `{ message, conversationKey, instance }`. A server component receives `{ message, conversationKey, instance, channel?, req, locale, permissions }` and renders after mount through Payload's `render-widget` server function, after the plugin checks the viewer can read the message. That path goes through a dashboard widget the plugin registers, so a "Conversations (internal)" entry appears in the dashboard's Add widget drawer. Server components cost one request per message on screen; prefer client components for types that are common.
 
@@ -91,6 +92,35 @@ export const StatusChange = ({ message }: ChatServerSlotProps) => {
   return <div>Status changed from <strong>{data.from}</strong> to <strong>{data.to}</strong></div>
 }
 ```
+
+### Layout: in the message frame, or the whole row
+
+By default (`layout: 'message'`) a type's `Component` stands in for the body only: the avatar, the author's name and the time stay around it, as for a chat message. That suits content someone posted, such as a status change a person made.
+
+`layout: 'bare'` hands the component the whole row. There is no avatar and no name line, the time shows on hover next to the menu, and the row is never grouped with its neighbours, nor does it group the message after it. The menu (reply in thread, extension items), the thread summary and what hangs under a message, such as reactions, stay. Use it for system notes and one-line events ("Anna joined", "Imported from CSV"):
+
+```ts title="src/chat/systemNote.ts"
+export const systemNote = defineMessageType<{ text: string }>()({
+  slug: 'system.note',
+  Component: '/components/SystemNote#SystemNote',
+  layout: 'bare',
+  validate: (data) => (data?.text ? true : 'text is required'),
+})
+```
+
+```tsx title="src/components/SystemNote.tsx"
+'use client'
+import type { ChatSlotProps } from '@10x-media/conversations/client'
+
+export const SystemNote = ({ authors, message }: ChatSlotProps) => (
+  <div className="system-note">
+    <strong>{message && authors?.[message.authorKey]?.name}:</strong>{' '}
+    {(message?.data as { text: string }).text}
+  </div>
+)
+```
+
+A client component gets the view's `authors` map, so a one-line event can name people itself. The layout of every type travels to the browser with `subscribe`, so website components and the headless hooks draw and group bare rows the same way (`useMessage().bare`).
 
 In the admin, a message whose type has no `Component` (and no `renderType` in the view) renders as "This message cannot be shown here". Admin views and website components also take a `renderType` prop to draw types in code; see [Admin UI](/conversations/admin-ui).
 
@@ -119,7 +149,7 @@ await postMessage(req, {
 | `key`, `channel`, `parent?` | Where the message goes; a reply takes its root's channel |
 | `text` or `body` | For `text` messages |
 | `type`, `data` | For custom types |
-| `author` | A user key. Default: the signed-in user of `req`. Without either, the call fails |
+| `author` | A user key, or `{ system: name }` for a [system author](#system-authors). Default: the signed-in user of `req`. Without either, the call fails |
 
 Collection hooks run as for a message from the admin: validation, derived fields, counters, `afterMessage`, `afterMention`, and the transport signal. The author's read cursor moves, as it does after a send. It returns the stored message.
 
@@ -138,6 +168,34 @@ It updates `updatedAt` without running hooks and signals the transport.
 ### `getInstance` and `projectUsers`
 
 `getInstance(req, slug)` returns the resolved instance of a booted Payload: its collection slugs (`messagesSlug`, `readsSlug`), channels, targets, types and access helpers. `projectUsers(req, instance, userKeys)` returns an `authors`-shaped map for any user keys, for extension data that names people.
+
+### System authors
+
+Server code often writes in no person's name: an import, a scheduled job, an integration. Post as a system author instead of borrowing a user:
+
+```ts
+conversations({
+  slug: 'comments',
+  systemAuthors: {
+    import: { name: { en: 'CSV import', de: 'CSV-Import' } },
+    sync: { name: 'CRM sync', avatar: '/icons/crm.svg' },
+  },
+  // ...
+})
+
+await postMessage(req, {
+  instance: 'comments',
+  key: collectionKey('persons', person.id),
+  channel: 'internal',
+  author: { system: 'import' },
+  type: 'system.note',
+  data: { text: 'Birth date inferred from the CSV import (only the year was given).' },
+})
+```
+
+The message stores `authorKey: 'system:import'` (`systemKey('import')`), and the `authors` map shows it as `{ name, avatar, system: true }`, named in the viewer's language. A name missing from `systemAuthors` shows as "System". A system author is not a person: it has no read cursor, cannot be mentioned, and its messages count as unread for everyone. Edit and delete follow the channel's `update` and `delete` rules, whose default (the author only) leaves system messages untouched. No users collection may be named `system`.
+
+Paired with a `layout: 'bare'` type this gives a note that reads as coming from the system, with a thread to discuss it and reactions to acknowledge it.
 
 ## Hooks
 

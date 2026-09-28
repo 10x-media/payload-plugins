@@ -2,7 +2,13 @@ import { APIError, type CollectionSlug, type PayloadRequest, type Where } from '
 
 import { isRemoved } from '../collections/messages'
 import { AUTHOR_CONTEXT, TEXT_TYPE } from '../shared/constants'
-import { userKey as formatUserKey, type ParsedKey, parseKey, parseUserKey } from '../shared/keys'
+import {
+	userKey as formatUserKey,
+	type ParsedKey,
+	parseKey,
+	parseUserKey,
+	systemKey,
+} from '../shared/keys'
 import type {
 	ChannelAccess,
 	ListResponse,
@@ -152,6 +158,9 @@ export const subscribe = async (
 		extensions: [...instance.extensions.keys()],
 		now: new Date().toISOString(),
 		reads: instance.readsSlug !== null,
+		types: Object.fromEntries(
+			[...instance.types.values()].map((type) => [type.slug, { layout: type.layout ?? 'message' }])
+		),
 		viewer,
 	}
 }
@@ -710,8 +719,12 @@ export const getInstance = (
 export type InstanceRegistry = { instances: Record<string, ConversationsInstance> }
 
 export type PostMessageArgs = {
-	/** A user key (`<collection>:<id>`). Default: `req.user`. */
-	author?: string
+	/**
+	 * A user key (`<collection>:<id>`), or `{ system: name }` for a system
+	 * author (`systemAuthors`) when no person wrote it, e.g. an import. Default:
+	 * `req.user`.
+	 */
+	author?: string | { system: string }
 	body?: unknown
 	channel: string
 	data?: unknown
@@ -735,7 +748,8 @@ export const postMessage = async (
 	const type = args.type ?? TEXT_TYPE
 	const previous = req.context[AUTHOR_CONTEXT]
 	if (args.author) {
-		req.context[AUTHOR_CONTEXT] = args.author
+		req.context[AUTHOR_CONTEXT] =
+			typeof args.author === 'string' ? args.author : systemKey(args.author.system)
 	}
 	let message: ConversationMessage
 	try {

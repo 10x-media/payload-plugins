@@ -67,7 +67,7 @@ const DefaultMessage = ({
 	const author = authors[message.authorKey]
 	const state = useMessage({ message, readOnly, threadReadAt, viewer })
 	const { converters } = useChatRichText()
-	const { deleted, editing, hasNewReplies, own, replies, setEditing } = state
+	const { bare, deleted, editing, hasNewReplies, own, replies, setEditing } = state
 
 	const threadSummary =
 		replies > 0 && onOpenThread ? (
@@ -93,6 +93,7 @@ const DefaultMessage = ({
 	const classes = [
 		'conversations-message',
 		compact && 'conversations-message--compact',
+		bare && 'conversations-message--bare',
 		deleted && 'conversations-message--deleted',
 		message.sendStatus && `conversations-message--${message.sendStatus}`,
 	]
@@ -101,11 +102,13 @@ const DefaultMessage = ({
 
 	return (
 		<div className={classes} data-message-id={String(message.id)}>
-			<div className="conversations-message__gutter">
-				{compact ? null : <Avatar author={author} userKey={message.authorKey} />}
-			</div>
+			{bare ? null : (
+				<div className="conversations-message__gutter">
+					{compact ? null : <Avatar author={author} userKey={message.authorKey} />}
+				</div>
+			)}
 			<div className="conversations-message__main">
-				{compact
+				{compact || bare
 					? null
 					: (header ?? (
 							<div className="conversations-message__header">
@@ -145,7 +148,7 @@ const DefaultMessage = ({
 					/>
 				) : (
 					(renderType?.(message) ??
-					renderConfiguredType(message) ?? (
+					renderConfiguredType(message, authors) ?? (
 						<div className="conversations-message__placeholder">{t(keys.unknownType)}</div>
 					))
 				)}
@@ -168,6 +171,15 @@ const DefaultMessage = ({
 			</div>
 			{/* Its own column, so it never covers the text; shown on hover, always on touch. */}
 			<div className="conversations-message__side">
+				{bare ? (
+					<time
+						className="conversations-message__bare-time"
+						dateTime={message.createdAt}
+						title={absoluteTime(message.createdAt, i18n.language)}
+					>
+						{relativeTime(message.createdAt, i18n.language)}
+					</time>
+				) : null}
 				{deleted || editing || message.sendStatus ? null : (
 					<MessageMenu
 						actions={actions}

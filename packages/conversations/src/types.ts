@@ -53,6 +53,8 @@ export type AuthorProjection = {
 	avatar?: null | string
 	deleted?: boolean
 	name: string
+	/** Written by server code as a system author (`systemAuthors`), not by a person. */
+	system?: boolean
 }
 
 export type AuthorsMap = Record<string, AuthorProjection>
@@ -117,6 +119,9 @@ export type ConversationsChannel = {
 	slug: string
 }
 
+/** How a system author looks in the UI. */
+export type SystemAuthor = { avatar?: null | string; name: LocalizedLabel }
+
 export type ConversationsUsersConfig = {
 	collection: string
 	/** Projection for display. Default: the collection's `useAsTitle`, no avatar. */
@@ -138,6 +143,14 @@ export type MessageTypeDefinition<TData = unknown> = {
 	clientCreatable?: boolean
 	/** A PayloadComponent path; client or server component. */
 	Component?: PayloadComponent
+	/**
+	 * `message` (default): the type's `Component` stands in for the body, under
+	 * the usual avatar, name and time. `bare`: the `Component` is the whole row,
+	 * full width with no avatar or name line, never grouped with its
+	 * neighbours; the menu and what hangs under a message (reactions, thread
+	 * summary) stay. For system notes and one-line events ("Anna joined").
+	 */
+	layout?: 'bare' | 'message'
 	slug: string
 	validate?: (data: TData) => Promise<string | true> | string | true
 }
@@ -305,6 +318,13 @@ export type ConversationsPluginOptions = {
 	slots?: ChatSlotConfig
 	/** Names the instance: `<slug>-messages`, `/api/conversations/<slug>`. */
 	slug: string
+	/**
+	 * Authors that are not people, for messages server code posts with
+	 * `postMessage({ author: { system: 'import' } })`: stored as
+	 * `system:import`, shown with this name and avatar. An unlisted name shows
+	 * as "System". Never mentioned, never unread for themselves.
+	 */
+	systemAuthors?: Record<string, SystemAuthor>
 	targets?: ConversationsTargets
 	translations?: TranslationsOption
 	transport?: ConversationsServerTransport
@@ -452,6 +472,7 @@ export type ConversationsInstance = {
 	readsSlug: CollectionSlug | null
 	slots: ResolvedSlots
 	slug: string
+	systemAuthors: Record<string, SystemAuthor>
 	targets: Required<{ [K in keyof ConversationsTargets]: Record<string, string[]> }>
 	transport?: ConversationsServerTransport
 	types: Map<string, MessageTypeDefinition>

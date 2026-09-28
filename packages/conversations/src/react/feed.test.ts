@@ -53,4 +53,23 @@ describe('buildFeedRows', () => {
 			'5:-:',
 		])
 	})
+
+	it('never groups a bare row, and starts a fresh group after one', () => {
+		const rows = buildFeedRows({
+			isBare: (row) => row.type === 'system.note',
+			messages: [
+				message('1', '2026-03-10T10:00:00'),
+				message('2', '2026-03-10T10:01:00', { type: 'system.note' }),
+				message('3', '2026-03-10T10:02:00'),
+				message('4', '2026-03-10T10:03:00'),
+			],
+			now: NOW,
+		})
+		expect(rows.map((row) => (row.kind === 'message' && row.compact ? 'c' : '-'))).toEqual([
+			'-',
+			'-',
+			'-',
+			'c',
+		])
+	})
 })

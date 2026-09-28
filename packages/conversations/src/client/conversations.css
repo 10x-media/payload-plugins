@@ -340,6 +340,32 @@
 	width: 1.846rem;
 }
 
+/* A `layout: 'bare'` type: its component is the row; the time waits for hover beside the menu. */
+.conversations-message--bare {
+	padding-block: 0.308rem;
+}
+
+.conversations-message--bare .conversations-message__side {
+	display: flex;
+	gap: 0.308rem;
+	align-items: flex-start;
+	width: auto;
+}
+
+.conversations-message__bare-time {
+	padding-top: 0.154rem;
+	color: var(--theme-elevation-500);
+	font-size: 0.846rem;
+	white-space: nowrap;
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+
+.conversations-message:hover .conversations-message__bare-time,
+.conversations-message:focus-within .conversations-message__bare-time {
+	opacity: 1;
+}
+
 /* The "⋯" button: on hover or focus, while its menu is open, and always where nothing hovers. */
 .conversations-message__menu {
 	opacity: 0;

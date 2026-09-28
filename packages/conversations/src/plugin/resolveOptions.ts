@@ -1,7 +1,7 @@
 import type { CollectionSlug, Config, PayloadComponent, PayloadRequest } from 'payload'
 
 import { resolveGrants } from '../server/access'
-import { parseKey } from '../shared/keys'
+import { parseKey, SYSTEM_AUTHOR } from '../shared/keys'
 import type {
 	ConversationsExtension,
 	ConversationsInstance,
@@ -126,6 +126,11 @@ const resolveUsers = (
 	const entries = options.users ?? [config.admin?.user ?? 'users']
 	return entries.map((entry) => {
 		const collection = typeof entry === 'string' ? entry : entry.collection
+		if (collection === SYSTEM_AUTHOR) {
+			throw new Error(
+				`[@10x-media/conversations] a users collection cannot be named "${SYSTEM_AUTHOR}": system authors use that prefix`
+			)
+		}
 		const custom = typeof entry === 'string' ? undefined : entry.display
 		const field = labelFieldOf(config, collection)
 		const searchField = field === 'id' ? 'email' : field
@@ -238,6 +243,7 @@ export const resolveInstance = (
 		extensionList: options.extensions ?? [],
 		slots: resolveSlots(options),
 		slug,
+		systemAuthors: options.systemAuthors ?? {},
 		targets,
 		transport: options.transport,
 		types,

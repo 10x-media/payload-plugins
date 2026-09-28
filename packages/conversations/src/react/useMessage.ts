@@ -4,9 +4,12 @@ import { useState } from 'react'
 
 import { TEXT_TYPE } from '../shared/constants'
 import { useMessageActions } from './hooks'
+import { useOptionalChatStore } from './provider'
 import type { WindowMessage } from './window'
 
 export type UseMessageResult = {
+	/** Its type has `layout: 'bare'`: draw the type's component as the whole row, without avatar or name. */
+	bare: boolean
 	/** The viewer may delete it: their own, in a channel that takes writes. */
 	canDelete: boolean
 	/** The viewer may edit it: their own text message, in a channel that takes writes. */
@@ -44,6 +47,7 @@ export const useMessage = ({
 	viewer: null | string
 }): UseMessageResult => {
 	const { edit, remove } = useMessageActions()
+	const layout = useOptionalChatStore()?.meta?.types?.[message.type]?.layout
 	const [editing, setEditing] = useState(false)
 	const own = viewer !== null && message.authorKey === viewer
 	const deleted = Boolean(message.deletedAt)
@@ -54,6 +58,7 @@ export const useMessage = ({
 		(!threadReadAt || new Date(message.lastReplyAt as string) > new Date(threadReadAt))
 	const writable = own && !deleted && !readOnly
 	return {
+		bare: layout === 'bare',
 		canDelete: writable,
 		canEdit: writable && message.type === TEXT_TYPE,
 		deleted,

@@ -7,6 +7,7 @@ import type { ConversationMessage } from '../../src/types'
 import { boot, call, channels, instanceOptions, type Session, signUp } from './fixture'
 
 const statusChange = defineMessageType<{ from: string; to: string }>()({
+	layout: 'bare',
 	slug: 'ticket.status',
 	validate: (data) => (data?.to ? true : 'to is required'),
 })
@@ -18,33 +19,42 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 	let staff: Session
 
 	beforeAll(async () => {
-		booted = await boot(db, conversations(instanceOptions({ types: [statusChange] })), [
-			conversations({
-				access: ({ targets }) => targets.map((target) => target.key),
-				channels,
-				deleteWithTarget: false,
-				reads: false,
-				slug: 'tickets',
-				targets: { collections: { persons: { channels: ['shared'] } } },
-			}),
-			conversations({
-				access: ({ targets }) => targets.map((target) => target.key),
-				channels,
-				deleteWithTarget: ({ key }) => {
-					cascaded.push(key)
-				},
-				slug: 'custom-cascade',
-				targets: { collections: { media: { channels: ['internal'] } } },
-			}),
-			conversations({
-				access: ({ targets }) => targets.map((target) => target.key),
-				channels,
-				components: { Message: '/components/KeptMessage#KeptMessage' },
-				deleted: 'placeholder',
-				slug: 'kept',
-				targets: { collections: { persons: { channels: ['internal'] } } },
-			}),
-		])
+		booted = await boot(
+			db,
+			conversations(
+				instanceOptions({
+					systemAuthors: { import: { name: { de: 'Import', en: 'CSV import' } } },
+					types: [statusChange],
+				})
+			),
+			[
+				conversations({
+					access: ({ targets }) => targets.map((target) => target.key),
+					channels,
+					deleteWithTarget: false,
+					reads: false,
+					slug: 'tickets',
+					targets: { collections: { persons: { channels: ['shared'] } } },
+				}),
+				conversations({
+					access: ({ targets }) => targets.map((target) => target.key),
+					channels,
+					deleteWithTarget: ({ key }) => {
+						cascaded.push(key)
+					},
+					slug: 'custom-cascade',
+					targets: { collections: { media: { channels: ['internal'] } } },
+				}),
+				conversations({
+					access: ({ targets }) => targets.map((target) => target.key),
+					channels,
+					components: { Message: '/components/KeptMessage#KeptMessage' },
+					deleted: 'placeholder',
+					slug: 'kept',
+					targets: { collections: { persons: { channels: ['internal'] } } },
+				}),
+			]
+		)
 		staff = await signUp(booted, 'users', 'Staff')
 	}, 240_000)
 
@@ -148,6 +158,51 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 				id: root.json.message.id,
 			})) as unknown as ConversationMessage
 			expect(stored.replyCount).toBe(1)
+		})
+	})
+
+	describe('system authors', () => {
+		it('posts as a system author and projects its configured name', async () => {
+			const person = await booted.payload.create({ collection: 'persons', data: { name: 'S' } })
+			const key = `collection:persons:${person.id}`
+			// No user on the request: an import job.
+			const req = await createLocalReq({}, booted.payload)
+			const note = await postMessage(req, {
+				author: { system: 'import' },
+				channel: 'internal',
+				instance: 'comments',
+				key,
+				text: 'Birth date inferred from the CSV import.',
+			})
+			const other = await postMessage(req, {
+				author: { system: 'cron' },
+				channel: 'internal',
+				instance: 'comments',
+				key,
+				text: 'Nightly check passed.',
+			})
+			expect(note.authorKey).toBe('system:import')
+			const page = await call<{ authors: Record<string, unknown> }>(
+				booted,
+				'GET /conversations/comments/messages',
+				{ query: { channel: 'internal', key }, session: staff }
+			)
+			expect(page.json.authors[note.authorKey]).toEqual({
+				avatar: null,
+				name: 'CSV import',
+				system: true,
+			})
+			expect(page.json.authors[other.authorKey]).toMatchObject({ name: 'System', system: true })
+			// Unread for people: nobody wrote it.
+			const sub = await call<{
+				entries: Array<{ unread?: Record<string, number> }>
+				types: Record<string, { layout: string }>
+			}>(booted, 'POST /conversations/comments/subscribe', {
+				body: { keys: [key] },
+				session: staff,
+			})
+			expect(sub.json.entries[0]?.unread?.internal).toBe(2)
+			expect(sub.json.types).toEqual({ 'ticket.status': { layout: 'bare' } })
 		})
 	})
 

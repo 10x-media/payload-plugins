@@ -6,7 +6,7 @@ Initial beta of `@10x-media/conversations`: conversations bound to any document,
 
 - **Instances**: one `conversations()` call per use case, each with its own `<slug>-messages` and `<slug>-reads` collections and endpoints under `/api/conversations/<slug>`.
 - **Access**: required batch conversation access answering per target with grants (every channel, some channels, or read only; `perTarget` for simple cases), channel rules per user run once per request, per-message `update` / `delete`, collections closed over REST.
-- **Messages**: channels, one-level threads with atomic reply counts, soft delete with placeholders, idempotent sends, plain-text projection, body size limits, custom message types with typed `data`, server helpers `postMessage` and `touchMessage`.
+- **Messages**: channels, one-level threads with atomic reply counts, soft delete with placeholders, idempotent sends, plain-text projection, body size limits, custom message types with typed `data` drawn in the message frame or as the whole row (`layout: 'bare'`), system authors for server code (`systemAuthors`), server helpers `postMessage` and `touchMessage`.
 - **Mentions**: a typeahead that offers only users who can read the channel, scoped per users collection; `afterMention` fires once per new mention.
 - **Read state**: cursors per user, conversation and channel, and per thread; unread counts in one query and a "New messages" divider.
 - **Transports**: polling by default (one tab per key via Web Locks and BroadcastChannel, signed tokens, nothing while hidden), Server-Sent Events served by Payload with `databaseBus`, `payloadKVBus`, `redisBus` or `memoryBus`, and a dependency-free Pusher-compatible transport; one realtime connection per browser.

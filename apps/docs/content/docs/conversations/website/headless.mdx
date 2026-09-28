@@ -124,7 +124,7 @@ A scrolling feed around a `useConversation` result. Put `scrollerRef` and `onScr
 
 It opens at the divider or the bottom, follows the bottom while the reader is there, counts what arrives below otherwise, loads pages as the top or bottom comes into view, and calls `markSeen` at the end.
 
-`items` interleaves rows from elsewhere by time: `{ id, at, node }`, for example audit entries in a ticket's history. `buildFeedRows({ messages, dividerBefore, items })` is the pure function underneath, for a list that does not scroll.
+`items` interleaves rows from elsewhere by time: `{ id, at, node }`, for example audit entries in a ticket's history. `buildFeedRows({ messages, dividerBefore, items, isBare })` is the pure function underneath, for a list that does not scroll; `useFeed` passes `isBare` from the instance's type layouts, so bare rows are never grouped.
 
 ### useMessage
 
@@ -132,7 +132,7 @@ It opens at the divider or the bottom, follows the bottom while the reader is th
 const state = useMessage({ message, viewer, readOnly, threadReadAt })
 ```
 
-What the viewer may do with one message: `own`, `deleted`, `canEdit` (own text message, writable channel), `canDelete`, `editing` and `setEditing`, `save(body)`, `remove()`, and the thread summary's `replies` and `hasNewReplies`. Pass `readOnly` when the channel's `canCreate` is false.
+What the viewer may do with one message, and how to draw it: `bare` (its type has `layout: 'bare'`: draw the type's component as the whole row, no avatar or name), `own`, `deleted`, `canEdit` (own text message, writable channel), `canDelete`, `editing` and `setEditing`, `save(body)`, `remove()`, and the thread summary's `replies` and `hasNewReplies`. Pass `readOnly` when the channel's `canCreate` is false.
 
 ### useComposer
 

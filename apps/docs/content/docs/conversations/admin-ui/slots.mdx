@@ -103,9 +103,11 @@ Server slots exist only in the admin.
 
 ## Custom message type components
 
-A [custom message type](/conversations/messages) with a `Component` is drawn in the same way as a slot: a client component renders directly with `ChatSlotProps` (`message` set), a server component goes through `render-widget` with `ChatServerSlotProps`. A message of a type with no component shows "This message cannot be shown here".
+A [custom message type](/conversations/messages) with a `Component` is drawn in the same way as a slot: a client component renders directly with `ChatSlotProps` (`message` and the view's `authors` set), a server component goes through `render-widget` with `ChatServerSlotProps`. A message of a type with no component shows "This message cannot be shown here".
 
-`useTypeRenderer(instance)` returns the function the admin uses, `(message) => ReactNode | null`, for your own markup. In a composed view you can also pass `renderType` to `ChatPanel`, `ChatDrawer`, `ChatFeed`, `ChatThread` or `ChatMessage`; it is tried first, and the configured component is the fallback when it returns `null` or `undefined`.
+With `layout: 'bare'` the component is the whole row rather than the body under the author's name; see [Layout](/conversations/messages#layout-in-the-message-frame-or-the-whole-row).
+
+`useTypeRenderer(instance)` returns the function the admin uses, `(message, authors?) => ReactNode | null`, for your own markup. In a composed view you can also pass `renderType` to `ChatPanel`, `ChatDrawer`, `ChatFeed`, `ChatThread` or `ChatMessage`; it is tried first, and the configured component is the fallback when it returns `null` or `undefined`.
 
 ## Prop slots
 

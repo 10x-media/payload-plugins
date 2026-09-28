@@ -191,6 +191,15 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		key,
 		type: 'person.status',
 	})
+	// Written by no person: an import leaves a note behind (`layout: 'bare'`).
+	await postMessage(req, {
+		author: { system: 'import' },
+		channel: 'internal',
+		data: { text: 'Birth date inferred from the club CSV import (only the year was given).' },
+		instance: 'comments',
+		key,
+		type: 'system.note',
+	})
 	for (const [author, text] of [
 		[`customers:${customer.id}`, 'We uploaded the new medical form, can you check?'],
 		[`users:${anna.id}`, 'Thanks, it looks good. Please also send a full-page passport scan.'],

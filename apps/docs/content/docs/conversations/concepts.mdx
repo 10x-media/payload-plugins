@@ -79,7 +79,9 @@ users: [
 ]
 ```
 
-Names are never stored on a message (the plain-text projection aside). Every response that carries messages also carries an `authors` map, `{ [userKey]: { name, avatar?, deleted? } }`, built once per response with one query per users collection. The default projection reads the collection's `useAsTitle`, then `email`, then the id. A user that no longer exists reads as "Deleted user". Mention search matches the `useAsTitle` field, or `email` when there is none.
+Names are never stored on a message (the plain-text projection aside). Every response that carries messages also carries an `authors` map, `{ [userKey]: { name, avatar?, deleted?, system? } }`, built once per response with one query per users collection. The default projection reads the collection's `useAsTitle`, then `email`, then the id. A user that no longer exists reads as "Deleted user". Mention search matches the `useAsTitle` field, or `email` when there is none.
+
+Server code can also write as a system author (`system:<name>`, from `systemAuthors`), for imports and jobs that act in no person's name. See [System authors](/conversations/messages#system-authors).
 
 ## Data model
 

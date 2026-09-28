@@ -25,6 +25,7 @@ import { ConversationsSlotDispatcher as ConversationsSlotDispatcher_7345af0c80d8
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 import { ReactionsBar as ReactionsBar_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
 import { ReactionQuickActions as ReactionQuickActions_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
+import { SystemNote as SystemNote_d6b0c4bea73699147f3f268dc40b6145 } from '../../../components/SystemNote'
 import { StatusChange as StatusChange_31eb553b5a0efb219e39dcd1f84fa727 } from '../../../components/StatusChange'
 import { ReplacedChannelTabs as ReplacedChannelTabs_47f5d179a1f03ef62bdf0539f15601b3 } from '../../../replaced/Replaced'
 import { ReplacedComposer as ReplacedComposer_47f5d179a1f03ef62bdf0539f15601b3 } from '../../../replaced/Replaced'
@@ -64,6 +65,7 @@ export const importMap = {
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
   "@10x-media/conversations/client#ReactionsBar": ReactionsBar_63b29dbabe93a0fc3d3dbd1a91acf947,
   "@10x-media/conversations/client#ReactionQuickActions": ReactionQuickActions_63b29dbabe93a0fc3d3dbd1a91acf947,
+  "/components/SystemNote#SystemNote": SystemNote_d6b0c4bea73699147f3f268dc40b6145,
   "/components/StatusChange#StatusChange": StatusChange_31eb553b5a0efb219e39dcd1f84fa727,
   "/replaced/Replaced#ReplacedChannelTabs": ReplacedChannelTabs_47f5d179a1f03ef62bdf0539f15601b3,
   "/replaced/Replaced#ReplacedComposer": ReplacedComposer_47f5d179a1f03ef62bdf0539f15601b3,

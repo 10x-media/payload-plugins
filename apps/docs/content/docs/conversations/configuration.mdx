@@ -29,7 +29,8 @@ conversations({
 | `hooks.afterMessage` | `({ req, message, operation }) => void` | | After create, edit and delete. See [Messages](/conversations/messages#hooks) |
 | `hooks.afterMention` | `({ req, message, users, key, channel }) => void` | | New mentions only |
 | `editor` | `({ defaultFeatures }) => features` | the defaults | The instance's server editor. See [Rich text](/conversations/rich-text) |
-| `types` | `MessageTypeDefinition[]` | `[]` | Custom message types. See [Messages](/conversations/messages#custom-message-types) |
+| `types` | `MessageTypeDefinition[]` | `[]` | Custom message types, each with `layout: 'message' \| 'bare'`. See [Messages](/conversations/messages#custom-message-types) |
+| `systemAuthors` | `Record<string, { name: LocalizedLabel; avatar? }>` | `{}` | Authors that are not people, for `postMessage({ author: { system } })`. See [System authors](/conversations/messages#system-authors) |
 | `limits.bodyLength` | `number` | `10000` | Characters of the plain-text projection |
 | `limits.bodyBytes` | `number` | `65536` | Bytes of the serialized Lexical body |
 | `deleted` | `'placeholder' \| 'placeholderIfReplies'` | `'placeholderIfReplies'` | What a deleted message leaves behind. See [Messages](/conversations/messages#deleting) |

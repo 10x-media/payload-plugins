@@ -67,6 +67,18 @@ export type UserRef = { collection: string; id: string }
 export const userKey = (collection: string, id: number | string): string =>
 	`${collection}:${String(id)}`
 
+/** The prefix of a system author's key: `system:<name>`. No users collection may take it. */
+export const SYSTEM_AUTHOR = 'system'
+
+/** A system author's key, for messages server code posts in no person's name. */
+export const systemKey = (name: string): string => `${SYSTEM_AUTHOR}:${name}`
+
+/** The name of a system author's key, or null for anyone else. */
+export const parseSystemKey = (value: unknown): null | string =>
+	typeof value === 'string' && value.startsWith(`${SYSTEM_AUTHOR}:`) && value.length > 7
+		? value.slice(SYSTEM_AUTHOR.length + 1)
+		: null
+
 export const parseUserKey = (value: unknown): UserRef | null => {
 	if (typeof value !== 'string') {
 		return null
