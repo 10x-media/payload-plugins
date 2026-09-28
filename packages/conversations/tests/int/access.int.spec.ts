@@ -2,6 +2,7 @@ import { type BootedPayload, describeForDb } from '@10x-media/payload-test-harne
 import { createLocalReq } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { reactions } from '../../src/exports/reactions'
 import { conversations, perTarget, postMessage } from '../../src/index'
 import { UNREAD_CAP } from '../../src/server/reads'
 import type { ConversationMessage, ConversationsChannel } from '../../src/types'
@@ -80,16 +81,21 @@ describeForDb('conversations access', {}, (db) => {
 		`collection:persons:${(await booted.payload.create({ collection: 'persons', data: { name, owner } })).id}`
 
 	beforeAll(async () => {
-		booted = await boot(db, conversations(instanceOptions({ access, channels })), [
-			conversations(
-				instanceOptions({
-					access,
-					channels,
-					mentions: { verifyAccess: true },
-					slug: 'strict',
-				})
-			),
-		])
+		booted = await boot(
+			db,
+			conversations(instanceOptions({ access, channels, extensions: [reactions()] })),
+			[
+				conversations(
+					instanceOptions({
+						access,
+						channels,
+						extensions: [reactions({ allowReadOnly: true })],
+						mentions: { verifyAccess: true },
+						slug: 'strict',
+					})
+				),
+			]
+		)
 		staff = await signUp(booted, 'users', 'Staff')
 		staff2 = await signUp(booted, 'users', 'Staff Two')
 		stranger = await signUp(booted, 'customers', 'Stranger')
@@ -150,6 +156,33 @@ describeForDb('conversations access', {}, (db) => {
 				{ query: { channel: 'internal', key }, session: staff }
 			)
 			expect(list.json.messages.map((message) => message.text)).toEqual(['before closing'])
+		})
+
+		it('freezes reactions in a read-only conversation unless the instance allows them', async () => {
+			const key = await person('Open for reactions')
+			const post = async (instance: string) =>
+				(
+					await call<{ message: ConversationMessage }>(
+						booted,
+						`POST /conversations/${instance}/messages`,
+						{ body: { channel: 'internal', key, text: 'react later' }, session: staff }
+					)
+				).json.message
+			const frozen = await post('comments')
+			const open = await post('strict')
+			await booted.payload.update({
+				collection: 'persons',
+				data: { name: 'Closed' },
+				id: String(key.split(':').at(-1)),
+			})
+			const react = (instance: string, message: ConversationMessage, action: 'add' | 'remove') =>
+				call(booted, `POST /conversations/${instance}/reactions/${action}`, {
+					body: { emoji: '👍', message: message.id },
+					session: staff,
+				})
+			expect((await react('comments', frozen, 'add')).status).toBe(403)
+			expect((await react('comments', frozen, 'remove')).status).toBe(403)
+			expect((await react('strict', open, 'add')).status).toBe(200)
 		})
 	})
 

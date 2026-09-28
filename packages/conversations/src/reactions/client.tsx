@@ -9,7 +9,7 @@ import { ChatScope } from '../react/provider'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { ConversationMessage } from '../types'
-import { blocked, summariesOf, useReact } from './react'
+import { blocked, summariesOf, useReact, useReactions } from './react'
 import { REACTIONS, type ReactionSummary, type ReactionsClientData } from './shared'
 import './reactions.css'
 
@@ -37,8 +37,9 @@ const EmojiRow = ({
 }) => {
 	const { t } = useTranslation()
 	const react = useReact()
+	const { readOnly } = useReactions()
 	const data = useExtension<ReactionsClientData>(REACTIONS)
-	if (!data?.emojis.length) return null
+	if (!data?.emojis.length || readOnly(message)) return null
 	const mine = new Set(
 		summariesOf(message)
 			.filter((entry) => entry.mine)
@@ -111,6 +112,7 @@ const Bar = ({ message }: { message: ConversationMessage }) => {
 	const list = summariesOf(message)
 	// A deleted message keeps its reactions; only your own can still be taken back.
 	const deleted = Boolean(message.deletedAt)
+	const frozen = useReactions().readOnly(message)
 	const limit = useExtension<ReactionsClientData>(REACTIONS)
 	if (list.length === 0) return null
 	return (
@@ -119,7 +121,7 @@ const Bar = ({ message }: { message: ConversationMessage }) => {
 				<button
 					aria-pressed={entry.mine}
 					className={`conversations-reactions__pill${entry.mine ? ' conversations-reactions__pill--mine' : ''}`}
-					disabled={(deleted && !entry.mine) || blocked(message, entry.emoji, limit)}
+					disabled={frozen || (deleted && !entry.mine) || blocked(message, entry.emoji, limit)}
 					key={entry.emoji}
 					onClick={() => void react(message, entry.emoji)}
 					title={tooltip(entry, t, t(keys.you))}
@@ -129,7 +131,7 @@ const Bar = ({ message }: { message: ConversationMessage }) => {
 					<span className="conversations-reactions__count">{entry.count}</span>
 				</button>
 			))}
-			{deleted ? null : <AddReaction message={message} />}
+			{deleted || frozen ? null : <AddReaction message={message} />}
 		</div>
 	)
 }

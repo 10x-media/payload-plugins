@@ -5,6 +5,8 @@ export const REACTIONS = 'reactions'
 
 /** What the browser gets from the config: the emoji people can pick, and the per-person limit. */
 export type ReactionsClientData = {
+	/** Reactions stay open in channels the viewer can read but not post in. */
+	allowReadOnly: boolean
 	emojis: string[]
 	maxPerUser: null | number
 	onLimit: 'reject' | 'replace'

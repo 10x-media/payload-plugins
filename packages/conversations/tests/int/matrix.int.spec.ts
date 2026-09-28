@@ -1,6 +1,7 @@
 import { type BootedPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
+import { comments } from '../../src/comments'
 import { conversations } from '../../src/index'
 import type { AuthorsMap, ConversationMessage } from '../../src/types'
 import {
@@ -25,6 +26,7 @@ type Page = {
 }
 
 const mentions: Array<{ key: string; users: string[] }> = []
+const written: Array<{ id: string; operation: string }> = []
 
 describeForDb('conversations core', {}, (db) => {
 	let booted: BootedPayload
@@ -46,9 +48,13 @@ describeForDb('conversations core', {}, (db) => {
 			db,
 			conversations(
 				instanceOptions({
+					extensions: [comments({ globals: { settings: ['internal'] } })],
 					hooks: {
 						afterMention: ({ key, users }) => {
 							mentions.push({ key, users: users.map((u) => `${u.collection}:${u.id}`) })
+						},
+						afterMessage: ({ message, operation }) => {
+							written.push({ id: String(message.id), operation })
 						},
 					},
 				})
@@ -196,6 +202,34 @@ describeForDb('conversations core', {}, (db) => {
 			expect(edited.status).toBe(200)
 			expect(edited.json.message.editedAt).toBeTruthy()
 			expect(mentions).toHaveLength(count)
+
+			const staff3 = await signUp(booted, 'users', 'Staff Three')
+			await call(booted, `PATCH /conversations/comments/messages/${res.json.message.id}`, {
+				body: {
+					body: bodyOf(
+						textNode('and '),
+						mentionNode(staff2.userKey, 'Staff Two'),
+						mentionNode(staff3.userKey, 'Staff Three')
+					),
+				},
+				session: staff,
+			})
+			expect(mentions.slice(count)).toEqual([{ key: personKey, users: [staff3.userKey] }])
+		})
+
+		it('tells afterMessage whether a message was created, updated or deleted', async () => {
+			const res = await send(staff, { channel: 'internal', key: personKey, text: 'lifecycle' })
+			const id = String(res.json.message.id)
+			await call(booted, `PATCH /conversations/comments/messages/${id}`, {
+				body: { text: 'lifecycle, edited' },
+				session: staff,
+			})
+			await call(booted, `DELETE /conversations/comments/messages/${id}`, { session: staff })
+			expect(written.filter((entry) => entry.id === id).map((entry) => entry.operation)).toEqual([
+				'create',
+				'update',
+				'delete',
+			])
 		})
 
 		it('lets only the author edit by default', async () => {
@@ -271,6 +305,63 @@ describeForDb('conversations core', {}, (db) => {
 				text: 'nested',
 			})
 			expect(nested.status).toBe(400)
+		})
+	})
+
+	describe('thread read state', () => {
+		it('keeps a thread cursor apart from the channel cursor', async () => {
+			const root = await send(staff, { channel: 'internal', key: otherKey, text: 'thread root' })
+			const rootId = String(root.json.message.id)
+			const reply = await send(staff, {
+				channel: 'internal',
+				key: otherKey,
+				parent: rootId,
+				text: 'thread reply',
+			})
+			const at = reply.json.message.createdAt
+			await call(booted, 'POST /conversations/comments/read', {
+				body: { at, key: otherKey, thread: rootId },
+				session: staff2,
+			})
+			const feed = await list(staff2, { channel: 'internal', key: otherKey })
+			expect(feed.json.threadReads?.[rootId]).toBe(at)
+			const thread = await list(staff2, { channel: 'internal', key: otherKey, parent: rootId })
+			expect(thread.json.cursor).toBe(at)
+		})
+	})
+
+	describe('global targets', () => {
+		const key = 'global:settings'
+
+		it('adds the comments button to the global', () => {
+			const settings = booted.payload.config.globals.find((global) => global.slug === 'settings')
+			expect(settings?.admin?.components?.elements?.beforeDocumentControls).toEqual([
+				{
+					clientProps: { instance: 'comments' },
+					path: '@10x-media/conversations/client#ChatTrigger',
+				},
+			])
+		})
+
+		it('subscribes, sends and lists on a global, for those with access only', async () => {
+			const entries = async (session: Session) =>
+				(
+					await call<{ entries: Array<{ channels: Array<{ slug: string }>; key: string }> }>(
+						booted,
+						'POST /conversations/comments/subscribe',
+						{ body: { keys: [key] }, session }
+					)
+				).json.entries
+			expect((await entries(staff))[0]?.channels.map((channel) => channel.slug)).toEqual([
+				'internal',
+			])
+			expect(await entries(customer)).toEqual([])
+
+			const sent = await send(staff, { channel: 'internal', key, text: 'on the global' })
+			expect(sent.status).toBe(201)
+			const page = await list(staff2, { channel: 'internal', key })
+			expect(page.json.messages.map((message) => message.text)).toEqual(['on the global'])
+			expect((await list(customer, { channel: 'internal', key })).status).toBe(404)
 		})
 	})
 

@@ -1,5 +1,7 @@
 'use client'
 
+import { useSyncExternalStore } from 'react'
+
 import { useExtension, useExtensionApi } from '../react/hooks'
 import { useChatStore } from '../react/provider'
 import type { WindowMessage } from '../react/window'
@@ -79,6 +81,11 @@ export type UseReactionsResult = {
 	limit: ReactionsClientData | undefined
 	/** The viewer's reactions on a message. */
 	mine: (message: ConversationMessage) => Set<string>
+	/**
+	 * The message's channel takes no posts from the viewer and the instance
+	 * keeps reactions closed there: show them, offer no changes.
+	 */
+	readOnly: (message: ConversationMessage) => boolean
 	summaries: (message: ConversationMessage) => ReactionSummary[]
 	/** Add or take back the viewer's reaction: shown at once, confirmed by the server. */
 	toggle: (message: ConversationMessage, emoji: string) => Promise<void>
@@ -92,6 +99,8 @@ export type UseReactionsResult = {
 export const useReactions = (): UseReactionsResult => {
 	const limit = useExtension<ReactionsClientData>(REACTIONS)
 	const toggle = useReact()
+	const store = useChatStore()
+	useSyncExternalStore(store.subscribe, store.getVersion, store.getVersion)
 	return {
 		emojis: limit?.emojis ?? [],
 		isBlocked: (message, emoji) => blocked(message, emoji, limit),
@@ -102,6 +111,11 @@ export const useReactions = (): UseReactionsResult => {
 					.filter((entry) => entry.mine)
 					.map((entry) => entry.emoji)
 			),
+		// An unknown key counts as open; the server has the last word.
+		readOnly: (message) =>
+			!limit?.allowReadOnly &&
+			store.entry(message.key)?.channels.find((entry) => entry.slug === message.channel)
+				?.canCreate === false,
 		summaries: summariesOf,
 		toggle,
 	}

@@ -11,6 +11,16 @@ import {
 import { MoreHorizontalIcon } from 'lucide-react'
 import { useState } from 'react'
 
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
 	DropdownMenu,
@@ -62,6 +72,7 @@ export function ConversationMessage({
 	const { converters, labels, locale, renderType, slots } = useConversationUI()
 	const state = useMessage({ message, readOnly, threadReadAt, viewer })
 	const [menuOpen, setMenuOpen] = useState(false)
+	const [confirming, setConfirming] = useState(false)
 	const close = () => setMenuOpen(false)
 	const author = authors[message.authorKey]
 	const name = state.own ? labels.you : (author?.name ?? '')
@@ -191,12 +202,7 @@ export function ConversationMessage({
 								</DropdownMenuItem>
 							) : null}
 							{state.canDelete ? (
-								<DropdownMenuItem
-									onClick={() => {
-										if (window.confirm(labels.deleteConfirm)) void state.remove()
-									}}
-									variant="destructive"
-								>
+								<DropdownMenuItem onClick={() => setConfirming(true)} variant="destructive">
 									{labels.delete}
 								</DropdownMenuItem>
 							) : null}
@@ -207,6 +213,28 @@ export function ConversationMessage({
 						</DropdownMenuContent>
 					</DropdownMenu>
 				</div>
+			) : null}
+			{state.canDelete ? (
+				<AlertDialog onOpenChange={setConfirming} open={confirming}>
+					<AlertDialogContent size="sm">
+						<AlertDialogHeader>
+							<AlertDialogTitle>{labels.deleteConfirm}</AlertDialogTitle>
+							<AlertDialogDescription>{labels.deleteDescription}</AlertDialogDescription>
+						</AlertDialogHeader>
+						<AlertDialogFooter>
+							<AlertDialogCancel>{labels.cancel}</AlertDialogCancel>
+							<AlertDialogAction
+								onClick={() => {
+									setConfirming(false)
+									void state.remove()
+								}}
+								variant="destructive"
+							>
+								{labels.delete}
+							</AlertDialogAction>
+						</AlertDialogFooter>
+					</AlertDialogContent>
+				</AlertDialog>
 			) : null}
 		</div>
 	)

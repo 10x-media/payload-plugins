@@ -13,6 +13,13 @@ import { applyReaction, type ReactionChange, readStored } from './embedded'
 import { REACTIONS, type ReactionRow, type ReactionsClientData, summarize } from './shared'
 
 export type ReactionsOptions = {
+	/**
+	 * Reactions in a channel the viewer can read but not post in. Default
+	 * `false`: a read-only conversation (a closed ticket, an archived room) is
+	 * frozen, reactions included. `true` suits announcement channels, where
+	 * few post and everyone reacts.
+	 */
+	allowReadOnly?: boolean
 	/** The emoji people can pick, in picker order. */
 	emojis?: string[]
 	/** How many different emoji one person may put on one message. Default: no limit. */
@@ -375,7 +382,8 @@ export const reactions = (options: ReactionsOptions = {}): ConversationsExtensio
 	const maxPerUser =
 		options.maxPerUser && options.maxPerUser > 0 ? Math.floor(options.maxPerUser) : null
 	const onLimit = options.onLimit ?? 'reject'
-	const client: ReactionsClientData = { emojis, maxPerUser, onLimit }
+	const allowReadOnly = options.allowReadOnly ?? false
+	const client: ReactionsClientData = { allowReadOnly, emojis, maxPerUser, onLimit }
 	const storage =
 		options.storage === 'message'
 			? messageStorage({ maxPerUser, onLimit })
@@ -387,7 +395,10 @@ export const reactions = (options: ReactionsOptions = {}): ConversationsExtensio
 			const { emoji, message } = await readInput(ctx, emojis)
 			const viewer = ctx.viewer()
 			// A deleted message takes no new reactions, but its own can still go.
-			const target = await ctx.readableMessage(message, { deleted: operation === 'remove' })
+			const target = await ctx.readableMessage(message, {
+				deleted: operation === 'remove',
+				write: !allowReadOnly,
+			})
 			const args: ChangeArgs = { ctx, emoji, instance, operation, req, target, viewer }
 			const { added, removed } = await storage.change(args)
 			if (added || removed.length > 0) {

@@ -133,6 +133,8 @@ export const threadCursors = async (
 			and: [
 				{ userKey: { equals: userKey } },
 				{ key: { equals: key } },
+				// Thread rows carry no channel; naming it lets the unique index serve `thread`.
+				{ channel: { equals: '' } },
 				{ thread: { in: rootIds } },
 			],
 		},

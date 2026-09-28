@@ -306,9 +306,15 @@ export type ExtensionContext = {
 	fail: (message: string, status: number) => never
 	/**
 	 * A message the viewer may read (conversation and channel access), or a 404.
-	 * Deleted messages are a 404 too unless `deleted: true`.
+	 * Deleted messages are a 404 too unless `deleted: true`. With `write: true`
+	 * the viewer must also be able to post in its channel, else a 403: a
+	 * read-only conversation (a closed ticket, an archived room) takes no
+	 * changes. Costs nothing extra, the access check already answers it.
 	 */
-	readableMessage: (id: string, options?: { deleted?: boolean }) => Promise<ConversationMessage>
+	readableMessage: (
+		id: string,
+		options?: { deleted?: boolean; write?: boolean }
+	) => Promise<ConversationMessage>
 	/** Move the message's `updatedAt` so every open window picks up the change. */
 	touch: (id: number | string) => Promise<void>
 	/** The signed-in user's key (`<collection>:<id>`), or a 401. */

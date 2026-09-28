@@ -389,6 +389,11 @@
 	border-bottom: 1px solid var(--theme-elevation-150);
 }
 
+/* A quick action may render nothing, e.g. reactions in a read-only channel. */
+.conversations-message-menu__quick:empty {
+	display: none;
+}
+
 .conversations-sr-only {
 	position: absolute;
 	width: 1px;

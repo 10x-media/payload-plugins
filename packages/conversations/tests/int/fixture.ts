@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, type SupportedDb } from '@10x-media/payload-test-harness'
-import { type CollectionConfig, handleEndpoints, type Plugin } from 'payload'
+import { type CollectionConfig, type GlobalConfig, handleEndpoints, type Plugin } from 'payload'
 
 import { conversations, perTarget } from '../../src/index'
 import { parseEvents } from '../../src/react/sse'
@@ -28,6 +28,11 @@ export const collections: CollectionConfig[] = [
 		slug: 'persons',
 	},
 	{ fields: [{ name: 'title', type: 'text' }], slug: 'media' },
+]
+
+/** A global target; staff pass the fixture's access, customers never (no owner). */
+export const globals: GlobalConfig[] = [
+	{ fields: [{ name: 'motto', type: 'text' }], slug: 'settings' },
 ]
 
 const isStaff = (req: { user?: { collection?: string } | null }) => req.user?.collection === 'users'
@@ -74,7 +79,7 @@ export const boot = (
 	plugin: Plugin = conversations(instanceOptions()),
 	extra: Plugin[] = []
 ): Promise<BootedPayload> =>
-	bootPayload({ collections, configOverrides: { plugins: extra }, db, plugin })
+	bootPayload({ collections, configOverrides: { globals, plugins: extra }, db, plugin })
 
 export type Session = { id: number | string; token: string; userKey: string }
 

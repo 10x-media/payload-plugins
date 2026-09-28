@@ -667,8 +667,12 @@ export const extensionContext = (
 			return fail('Not found', 404)
 		}
 		const access = await accessFor(req, instance, message.key)
-		if (!access.channels.some((entry) => entry.slug === message.channel)) {
+		const channel = access.channels.find((entry) => entry.slug === message.channel)
+		if (!channel) {
 			return fail('Not found', 404)
+		}
+		if (options.write && !channel.canCreate) {
+			return fail('Forbidden', 403)
 		}
 		return message
 	},

@@ -14,6 +14,7 @@ export const defaultLabels = {
 	couldNotSend: 'Could not send.',
 	delete: 'Delete',
 	deleteConfirm: 'Delete this message?',
+	deleteDescription: 'It is removed for everyone. Its replies stay.',
 	edit: 'Edit',
 	edited: 'edited',
 	empty: 'No messages yet.',

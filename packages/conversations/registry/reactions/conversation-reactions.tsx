@@ -24,7 +24,7 @@ export function ReactionRow({
 }) {
 	const reactions = useReactions()
 	const mine = reactions.mine(message)
-	if (reactions.emojis.length === 0) return null
+	if (reactions.emojis.length === 0 || reactions.readOnly(message)) return null
 	return (
 		<div className="flex gap-0.5 p-1">
 			{reactions.emojis.map((emoji) => (
@@ -59,6 +59,7 @@ export function ReactionsBar({ message }: { message: WindowMessage }) {
 	const [open, setOpen] = useState(false)
 	const list = reactions.summaries(message)
 	const deleted = Boolean(message.deletedAt)
+	const frozen = reactions.readOnly(message)
 	if (list.length === 0) return null
 	return (
 		<div className="mt-1 flex flex-wrap items-center gap-1">
@@ -69,7 +70,7 @@ export function ReactionsBar({ message }: { message: WindowMessage }) {
 						'flex h-6 items-center gap-1 rounded-full border px-2 text-xs hover:bg-muted disabled:opacity-50',
 						entry.mine && 'border-primary/40 bg-primary/10'
 					)}
-					disabled={(deleted && !entry.mine) || reactions.isBlocked(message, entry.emoji)}
+					disabled={frozen || (deleted && !entry.mine) || reactions.isBlocked(message, entry.emoji)}
 					key={entry.emoji}
 					onClick={() => void reactions.toggle(message, entry.emoji)}
 					title={tooltip(entry)}
@@ -79,7 +80,7 @@ export function ReactionsBar({ message }: { message: WindowMessage }) {
 					<span className="tabular-nums">{entry.count}</span>
 				</button>
 			))}
-			{deleted ? null : (
+			{deleted || frozen ? null : (
 				<Popover onOpenChange={setOpen} open={open}>
 					<PopoverTrigger
 						render={
@@ -109,6 +110,8 @@ export function ReactionQuickActions({
 	close: () => void
 	message: WindowMessage
 }) {
+	const reactions = useReactions()
+	if (reactions.readOnly(message) || reactions.emojis.length === 0) return null
 	return (
 		<div className="-mx-1 -mt-1 mb-1 border-b">
 			<ReactionRow message={message} onPicked={close} />
