@@ -181,11 +181,11 @@ The replies are their own window (`parent` set), so they page and stay live inde
 | `toolbar` | `'bottom' \| 'top' \| 'none' \| { placement, items }` | See [Styling](/conversations/admin-ui/styling) |
 | `features` | `({ defaultFeatures }) => ComposerFeature[]` | See [Rich text](/conversations/rich-text) |
 | `above` | `ReactNode` | Under the cue, before the `composerAbove` slot |
-| `actions` | `ReactNode` | Buttons next to Send |
+| `actions` | `ReactNode` | Buttons next to Send, after the `composerActions` slot |
 | `autoFocus` | `boolean` | Default: only when editing |
 | `initialBody`, `onSave`, `onCancel` | | Editing mode: the body goes to `onSave` instead of being sent |
 
-Enter sends and Shift+Enter breaks the line. A failed send keeps the text and offers Retry under the same `clientId`, so a retry never posts twice. The editor itself and its features are described in [Rich text](/conversations/rich-text).
+Enter sends and Shift+Enter breaks the line. A failed send keeps the text and offers Retry under the same `clientId`, so a retry never posts twice. When an extension takes files (`attachments()`), the composer also accepts drops and pastes of files; its `composerBelow` and `composerActions` slots render inside it, where [composer addons](/conversations/extensions#adding-to-the-composer) add to the send. The editor itself and its features are described in [Rich text](/conversations/rich-text).
 
 ### MessageMenu and useMessageMenu
 

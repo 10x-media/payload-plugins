@@ -7,6 +7,7 @@ import { Composer, type ComposerToolbar } from '../composer/Composer'
 import { defaultComposerFeatures } from '../composer/features'
 import { GlobeIcon, LockIcon } from '../composer/icons'
 import type { ComposerFeature, ComposerLabels, ComposerTranslate } from '../composer/types'
+import { ComposerAddonsContext } from '../react/composerAddons'
 import { resolveLabel } from '../react/hooks'
 import { useComposer } from '../react/useComposer'
 import { keys } from '../translations/keys'
@@ -122,8 +123,9 @@ const DefaultComposer = ({
 
 	const cueLabel = cue ? resolveLabel(cue.label, i18n.language) : null
 	const tone = cue?.tone ?? 'neutral'
+	const slotProps = { channel, conversationKey, instance }
 
-	return (
+	const box = (
 		<div
 			className={`conversations-composer${tone === 'warning' && cue ? ' conversations-composer--warning' : ''}${failed ? ' conversations-composer--failed' : ''}`}
 		>
@@ -152,19 +154,13 @@ const DefaultComposer = ({
 				</div>
 			) : null}
 			{above}
-			{onSave ? null : (
-				<ChatSlot
-					channel={channel}
-					conversationKey={conversationKey}
-					instance={instance}
-					name="composerAbove"
-				/>
-			)}
+			{onSave ? null : <ChatSlot {...slotProps} name="composerAbove" />}
 			{disabledReason ? (
 				<div className="conversations-composer__disabled">{disabledReason}</div>
 			) : (
 				<Composer
 					autoFocus={autoFocus ?? Boolean(onSave)}
+					below={onSave ? null : <ChatSlot {...slotProps} name="composerBelow" />}
 					editorRef={composer.editorRef}
 					features={resolvedFeatures}
 					footer={
@@ -179,6 +175,7 @@ const DefaultComposer = ({
 									{t(keys.cancel)}
 								</Button>
 							) : null}
+							{onSave ? null : <ChatSlot {...slotProps} name="composerActions" />}
 							{actions}
 							<Button
 								buttonStyle="primary"
@@ -196,6 +193,7 @@ const DefaultComposer = ({
 					labels={labels}
 					mentions={{ channel, conversationKey }}
 					onChange={composer.onChange}
+					onFiles={composer.onFiles}
 					onSubmit={() => void submit()}
 					placeholder={placeholder ?? t(keys.composerPlaceholder)}
 					submitOn={submitOn}
@@ -204,6 +202,11 @@ const DefaultComposer = ({
 				/>
 			)}
 		</div>
+	)
+	return composer.addons ? (
+		<ComposerAddonsContext.Provider value={composer.addons}>{box}</ComposerAddonsContext.Provider>
+	) : (
+		box
 	)
 }
 

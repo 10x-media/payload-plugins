@@ -280,6 +280,31 @@ export function PinItem({ close, message }: { close: () => void; message: Window
 
 The hooks come from `@10x-media/conversations/react` and import nothing from `@payloadcms/ui`, so keep the shared types in a file without admin imports. See [Website UI](/conversations/website).
 
+## Data that comes with a new message
+
+Pins change messages that already exist, so they go through an endpoint. When the data is part of writing a message (a poll's options, files, a priority flag), send it with the message instead of a second request after it:
+
+1. **In the composer**, a component in the `composerBelow` or `composerActions` slot (on a website, anywhere inside the composer) registers an addon with `useComposerAddon('priority', { prepare, reset })`. `prepare` returns the extension's part of the send.
+2. **On the server**, the extension's `send` hook reads that part as `input`, validates it and returns values for its `messageFields`. They are stored in the same write as the message.
+
+```ts
+// server
+send: ({ input, fail }) => {
+  if (input === undefined) return undefined
+  if (input !== 'high' && input !== 'normal') fail('Unknown priority', 400)
+  return { priority: input }
+},
+
+// client, in a composerActions slot
+const [high, setHigh] = useState(false)
+useComposerAddon('priority', {
+  prepare: () => (high ? 'high' : undefined),
+  reset: () => setHigh(false),
+})
+```
+
+The same `send` runs for `postMessage({ ext: { priority: 'high' } })` from server code. [Attachments](/conversations/extensions/attachments) is the full example: its addon uploads files in `prepare`, its `send` checks the ids. See [Part of the send](/conversations/extensions#part-of-the-send) and [Adding to the composer](/conversations/extensions#adding-to-the-composer).
+
 ## 8. Test it
 
 Extensions are tested through the real endpoints, the way the plugin's own suite does it: boot Payload with the instance and your extension, sign users in, and call `/api/conversations/<instance>/pins/pin` through Payload's `handleEndpoints`. Worth covering:
@@ -297,5 +322,6 @@ Extensions are tested through the real endpoints, the way the plugin's own suite
 - `decorate` is one query per batch, and returns only what the viewer may see.
 - Endpoints start with `ctx.readableMessage` (or at least `ctx.viewer()`); pass `write: true` for anything that changes a conversation.
 - Endpoints are idempotent (`add` / `remove`, `pin` / `unpin`), not toggles.
-- Own rows are removed in `onTargetDelete`.
+- Own rows are removed in `onTargetDelete` (and in `onMessageDelete` if they belong to one message).
+- Data that comes with a new message goes through `send` and a composer addon, not a second request.
 - Slot components check `message.deletedAt` where it matters; footers render on placeholders.

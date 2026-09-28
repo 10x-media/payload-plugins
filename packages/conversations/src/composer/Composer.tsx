@@ -6,6 +6,7 @@ import {
 	COMMAND_PRIORITY_HIGH,
 	KEY_ENTER_COMMAND,
 	type LexicalEditor,
+	PASTE_COMMAND,
 } from '@payloadcms/richtext-lexical/lexical'
 import { $isListItemNode } from '@payloadcms/richtext-lexical/lexical/list'
 import { LexicalComposer } from '@payloadcms/richtext-lexical/lexical/react/LexicalComposer'
@@ -18,6 +19,7 @@ import { MarkdownShortcutPlugin } from '@payloadcms/richtext-lexical/lexical/rea
 import { RichTextPlugin } from '@payloadcms/richtext-lexical/lexical/react/LexicalRichTextPlugin'
 import { $findMatchingParent } from '@payloadcms/richtext-lexical/lexical/utils'
 import {
+	type DragEvent,
 	type MutableRefObject,
 	type ReactNode,
 	useCallback,
@@ -54,6 +56,8 @@ export type ComposerToolbar =
 export type ComposerProps = {
 	/** Focus the editor, caret at the end, when it mounts. */
 	autoFocus?: boolean
+	/** Inside the box, between the text and the bottom row: e.g. picked files. */
+	below?: ReactNode
 	className?: string
 	/**
 	 * Classes for the composer's parts (toolbar, menus, link field, text), e.g.
@@ -73,6 +77,12 @@ export type ComposerProps = {
 	mentions?: { channel: string; conversationKey: string } | null
 	/** Every change of the editor's content, e.g. to keep a draft. */
 	onChange?: (editor: LexicalEditor) => void
+	/**
+	 * Files dropped on the composer or pasted into it. Absent, the composer
+	 * takes neither (a pasted image does nothing). While files are dragged over
+	 * it, the root has `data-dragging`.
+	 */
+	onFiles?: (files: File[]) => void
 	onSubmit: () => void
 	placeholder?: string
 	submitOn?: 'enter' | 'mod+enter'
@@ -187,6 +197,65 @@ const FocusOnBoxClick = ({ children, className }: { children: ReactNode; classNa
 	)
 }
 
+const hasFiles = (event: DragEvent) => event.dataTransfer.types.includes('Files')
+
+/** Drag and drop of files onto the composer's box, and whether some are over it now. */
+const useFileDrop = (onFiles?: (files: File[]) => void) => {
+	const [dragging, setDragging] = useState(false)
+	// Entering a child fires enter on it before leave on its parent; count the depth.
+	const depth = useRef(0)
+	if (!onFiles) return { dragging: false, handlers: {} }
+	return {
+		dragging,
+		handlers: {
+			onDragEnter: (event: DragEvent) => {
+				if (!hasFiles(event)) return
+				depth.current += 1
+				setDragging(true)
+			},
+			onDragLeave: (event: DragEvent) => {
+				if (!hasFiles(event)) return
+				depth.current = Math.max(0, depth.current - 1)
+				if (depth.current === 0) setDragging(false)
+			},
+			onDragOver: (event: DragEvent) => {
+				if (hasFiles(event)) event.preventDefault()
+			},
+			onDrop: (event: DragEvent) => {
+				if (!hasFiles(event)) return
+				event.preventDefault()
+				depth.current = 0
+				setDragging(false)
+				onFiles([...event.dataTransfer.files])
+			},
+		},
+	}
+}
+
+/** Files on the clipboard go to `onFiles` instead of into the text. */
+const PasteFiles = ({ onFiles }: { onFiles: (files: File[]) => void }) => {
+	const [editor] = useLexicalComposerContext()
+	const latest = useRef(onFiles)
+	latest.current = onFiles
+	useEffect(
+		() =>
+			editor.registerCommand(
+				PASTE_COMMAND,
+				(event) => {
+					const files =
+						'clipboardData' in event ? [...(event.clipboardData?.files ?? [])] : ([] as File[])
+					if (files.length === 0) return false
+					event.preventDefault()
+					latest.current(files)
+					return true
+				},
+				COMMAND_PRIORITY_HIGH
+			),
+		[editor]
+	)
+	return null
+}
+
 /**
  * The message editor: Lexical with the composer's own features, toolbar,
  * `/` commands, `@` mentions and link field. Headless of Payload's admin UI:
@@ -196,6 +265,7 @@ const FocusOnBoxClick = ({ children, className }: { children: ReactNode; classNa
  */
 export const Composer = ({
 	autoFocus = false,
+	below,
 	className,
 	classNames,
 	editorRef,
@@ -205,6 +275,7 @@ export const Composer = ({
 	labels,
 	mentions,
 	onChange,
+	onFiles,
 	onSubmit,
 	placeholder = '',
 	submitOn = 'enter',
@@ -212,6 +283,7 @@ export const Composer = ({
 	toolbar = 'bottom',
 	unstyled,
 }: ComposerProps) => {
+	const drop = useFileDrop(onFiles)
 	const placement = typeof toolbar === 'string' ? toolbar : toolbar.placement
 	const toolbarItems = typeof toolbar === 'string' ? undefined : toolbar.items
 	const overlays = useRef(new Set<string>())
@@ -262,7 +334,9 @@ export const Composer = ({
 						]
 							.filter(Boolean)
 							.join(' ')}
+						data-dragging={drop.dragging ? '' : undefined}
 						data-toolbar={placement}
+						{...drop.handlers}
 					>
 						{placement === 'top' ? <Toolbar items={toolbarItems} /> : null}
 						<FocusOnBoxClick className={composerClass({ classNames, unstyled }, 'input')}>
@@ -281,6 +355,7 @@ export const Composer = ({
 								ErrorBoundary={LexicalErrorBoundary}
 							/>
 						</FocusOnBoxClick>
+						{below}
 						<FocusOnBoxClick className={composerClass({ classNames, unstyled }, 'footer')}>
 							{placement === 'bottom' ? <Toolbar items={toolbarItems} /> : <span />}
 							<div className={composerClass({ classNames, unstyled }, 'footerEnd')}>{footer}</div>
@@ -296,6 +371,7 @@ export const Composer = ({
 					{autoFocus ? <AutoFocus /> : null}
 					{editorRef ? <EditorRefPlugin editorRef={editorRef} /> : null}
 					{onChange ? <ChangeListener onChange={onChange} /> : null}
+					{onFiles ? <PasteFiles onFiles={onFiles} /> : null}
 				</LexicalComposer>
 			</ComposerClassProvider>
 		</ComposerRuntimeContext.Provider>

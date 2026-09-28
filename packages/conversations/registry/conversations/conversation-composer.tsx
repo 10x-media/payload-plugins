@@ -9,7 +9,7 @@ import {
 	defaultComposerFeatures,
 	englishComposerLabels,
 } from '@10x-media/conversations/composer'
-import { useComposer } from '@10x-media/conversations/react'
+import { ComposerAddonsContext, useComposer } from '@10x-media/conversations/react'
 import { GlobeIcon, LockIcon } from 'lucide-react'
 import { type ReactNode, useState } from 'react'
 
@@ -48,7 +48,7 @@ export type ConversationComposerProps = {
  * here; behaviour stays in the package.
  */
 const composerClassNames: ComposerClassNames = {
-	root: 'flex flex-col [&_.conversations-mention]:rounded [&_.conversations-mention]:bg-primary/10 [&_.conversations-mention]:px-1 [&_.conversations-mention]:font-medium',
+	root: 'flex flex-col rounded-lg data-dragging:bg-muted/60 data-dragging:ring-2 data-dragging:ring-primary/40 [&_.conversations-mention]:rounded [&_.conversations-mention]:bg-primary/10 [&_.conversations-mention]:px-1 [&_.conversations-mention]:font-medium',
 	input: 'relative px-3 pt-2.5 pb-1 text-sm',
 	content: 'max-h-60 min-h-6 overflow-y-auto outline-none',
 	placeholder: 'pointer-events-none absolute top-2.5 left-3 select-none text-muted-foreground',
@@ -119,8 +119,15 @@ export function ConversationComposer({
 		return pick ? pick({ defaultFeatures: defaultComposerFeatures() }) : defaultComposerFeatures()
 	})
 	const warning = cue?.tone === 'warning'
+	const slotsOf = (list: typeof slots.composerAbove) =>
+		onSave
+			? null
+			: list?.map((Slot, index) => (
+					// biome-ignore lint/suspicious/noArrayIndexKey: slots are a fixed list from props.
+					<Slot channel={channel} conversationKey={conversationKey} key={index} />
+				))
 
-	return (
+	const box = (
 		<div
 			className={cn(
 				'rounded-lg border bg-background',
@@ -156,17 +163,13 @@ export function ConversationComposer({
 					) : null}
 				</div>
 			) : null}
-			{onSave
-				? null
-				: slots.composerAbove?.map((Slot, index) => (
-						// biome-ignore lint/suspicious/noArrayIndexKey: slots are a fixed list from props.
-						<Slot channel={channel} conversationKey={conversationKey} key={index} />
-					))}
+			{slotsOf(slots.composerAbove)}
 			{disabledReason ? (
 				<div className="px-3 py-3 text-muted-foreground text-sm">{disabledReason}</div>
 			) : (
 				<Composer
 					autoFocus={Boolean(onSave)}
+					below={slotsOf(slots.composerBelow)}
 					classNames={composerClassNames}
 					editorRef={composer.editorRef}
 					features={resolvedFeatures}
@@ -175,6 +178,7 @@ export function ConversationComposer({
 							<span className="hidden text-muted-foreground text-xs sm:inline">
 								{composer.failed ? labels.textKept : labels.enterToSend}
 							</span>
+							{slotsOf(slots.composerActions)}
 							{onCancel ? (
 								<Button onClick={onCancel} size="sm" variant="outline">
 									{labels.cancel}
@@ -189,6 +193,7 @@ export function ConversationComposer({
 					labels={editorLabels}
 					mentions={{ channel, conversationKey }}
 					onChange={composer.onChange}
+					onFiles={composer.onFiles}
 					onSubmit={() => void composer.submit()}
 					placeholder={placeholder ?? labels.composerPlaceholder}
 					toolbar={toolbar}
@@ -196,5 +201,10 @@ export function ConversationComposer({
 				/>
 			)}
 		</div>
+	)
+	return composer.addons ? (
+		<ComposerAddonsContext.Provider value={composer.addons}>{box}</ComposerAddonsContext.Provider>
+	) : (
+		box
 	)
 }

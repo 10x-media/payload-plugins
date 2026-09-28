@@ -152,6 +152,7 @@ await postMessage(req, {
 | `text` or `body` | For `text` messages |
 | `type`, `data` | For custom types |
 | `author` | A user key, or `{ system: name }` for a [system author](#system-authors). Default: the signed-in user of `req`. Without either, the call fails |
+| `ext` | Data for extensions, by name, e.g. `{ attachments: [fileId] }`. Each extension's [`send` hook](/conversations/extensions#part-of-the-send) reads its part, trusted |
 
 Collection hooks run as for a message from the admin: validation, derived fields, counters, `afterMessage`, `afterMention`, and the transport signal. The author's read cursor moves, as it does after a send. It returns the stored message.
 

@@ -388,7 +388,16 @@ export const useConversation = ({
 	}
 }
 
-export type SendInput = { body: unknown } | { text: string }
+export type SendInput = ({ body: unknown } | { text: string }) & {
+	/** Per extension, by name: what its server `send` hook reads. */
+	ext?: Record<string, unknown>
+	/**
+	 * Runs once the optimistic message shows and before the request, e.g. to
+	 * upload files, and returns more `ext`. Its result is kept: a retry sends it
+	 * again without running this twice.
+	 */
+	prepare?: (args: { clientId: string }) => Promise<Record<string, unknown>>
+}
 
 const newClientId = () =>
 	typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -433,7 +442,12 @@ export const useSend = ({
 				type: 'optimistic',
 			})
 			try {
-				const result = await store.api.send({ channel, clientId, key, parent, ...input })
+				const { prepare, ...ready } = input
+				if (prepare) {
+					ready.ext = { ...input.ext, ...(await prepare({ clientId })) }
+					pending.current.set(clientId, ready)
+				}
+				const result = await store.api.send({ channel, clientId, key, parent, ...ready })
 				pending.current.delete(clientId)
 				store.emitLocal(key, { message: result.message, type: 'confirmed' })
 				if (result.root) {

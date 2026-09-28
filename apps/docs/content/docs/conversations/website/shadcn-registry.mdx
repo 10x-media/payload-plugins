@@ -15,10 +15,11 @@ The registry is served from this site. Add the whole panel by its URL:
 npx shadcn@latest add https://docs.10xmedia.de/r/conversations/conversation-panel.json
 ```
 
-`conversation-panel` pulls in the items it is built from. Add reactions separately when the instance has the [reactions extension](/conversations/extensions/reactions):
+`conversation-panel` pulls in the items it is built from. Add an extension's item separately when the instance has the [reactions](/conversations/extensions/reactions) or [attachments](/conversations/extensions/attachments) extension:
 
 ```bash
 npx shadcn@latest add https://docs.10xmedia.de/r/conversations/conversation-reactions.json
+npx shadcn@latest add https://docs.10xmedia.de/r/conversations/conversation-attachments.json
 ```
 
 Files land in `components/conversations/`. Or register the namespace once in `components.json` and add items by name:
@@ -51,8 +52,9 @@ The components are written for shadcn's `base-nova` style (Base UI primitives, l
 | `conversation-composer` | The Lexical composer skinned with Tailwind: toolbar, `/` and `@` menus, link field, channel cue, Send | `button` |
 | `conversation-thread` | A root message, its replies as their own feed, a reply composer | |
 | `conversation-reactions` | `ReactionsBar`, `ReactionQuickActions` and `reactionSlots` | `popover` |
+| `conversation-attachments` | `AttachButton`, `AttachmentsPicker` (picked files in the composer), `MessageAttachments` with an image and PDF viewer, and `attachmentSlots` | `button`, `dialog` |
 
-The shadcn primitives (`button`, `dropdown-menu`, `alert-dialog`, `popover`) come from your own `@/components/ui`, and `cn` from `@/lib/utils`, as in any shadcn project.
+The shadcn primitives (`button`, `dropdown-menu`, `alert-dialog`, `popover`, `dialog`) come from your own `@/components/ui`, and `cn` from `@/lib/utils`, as in any shadcn project.
 
 ## A page
 
@@ -139,7 +141,7 @@ Optional. Without it the components use English labels and no slots.
 |---|---|
 | `labels` | Any of the strings the components show (`defaultLabels` in `conversation-ui.tsx`), for your language. `replies`, `switchTo` and `unseen` are functions |
 | `locale` | Picks channel labels and cues from localized config labels, and formats dates. Default `en`. Nothing reads the browser's language: pass your router's locale |
-| `slots` | Extension components as React components (a website has no import map): `composerAbove`, `messageActions`, `messageQuickActions`, `messageFooter`, each a list |
+| `slots` | Extension components as React components (a website has no import map): `composerAbove`, `composerBelow`, `composerActions`, `messageActions`, `messageQuickActions`, `messageFooter`, each a list |
 | `renderType` | `(message, authors) => ReactNode`: draws messages whose `type` is not `text`; return `null` for types you do not know. A `layout: 'bare'` type's result is the whole row |
 | `composerFeatures` | `({ defaultFeatures }) => features` for every composer below |
 | `converters` | JSX converters for message bodies, to show what those features store |
@@ -157,7 +159,7 @@ Optional. Without it the components use English labels and no slots.
 >
 ```
 
-Slots from several extensions merge by spreading, for example `{ ...reactionSlots, messageActions: [PinAction] }`. What each slot receives is typed in `ConversationSlots`.
+Slots from several extensions merge by spreading, for example `{ ...reactionSlots, messageActions: [PinAction] }`. Where two fill the same slot, join the lists: `messageFooter: [...attachmentSlots.messageFooter, ...reactionSlots.messageFooter]`. What each slot receives is typed in `ConversationSlots`.
 
 <Screenshot src="/images/conversations/registry-menu.webp" width={656} alt="A message menu from the registry: the reactions row and Reply in thread" />
 

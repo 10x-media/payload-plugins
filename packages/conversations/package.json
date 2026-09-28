@@ -70,6 +70,16 @@
 			"types": "./src/exports/reactions-react.ts",
 			"default": "./dist/exports/reactions-react.js"
 		},
+		"./attachments": {
+			"development": "./src/exports/attachments.ts",
+			"types": "./src/exports/attachments.ts",
+			"default": "./dist/exports/attachments.js"
+		},
+		"./attachments/react": {
+			"development": "./src/exports/attachments-react.ts",
+			"types": "./src/exports/attachments-react.ts",
+			"default": "./dist/exports/attachments-react.js"
+		},
 		"./rsc": {
 			"development": "./src/exports/rsc.ts",
 			"types": "./src/exports/rsc.ts",
@@ -90,8 +100,8 @@
 		"test": "vitest run",
 		"test:unit": "vitest run src",
 		"test:int": "vitest run tests/int",
-		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts tests/int/access.int.spec.ts tests/int/realtime.int.spec.ts tests/int/pusher.int.spec.ts tests/int/redis.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts tests/int/access.int.spec.ts tests/int/realtime.int.spec.ts tests/int/pusher.int.spec.ts tests/int/redis.int.spec.ts",
-		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts tests/int/access.int.spec.ts tests/int/realtime.int.spec.ts tests/int/pusher.int.spec.ts tests/int/redis.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts tests/int/access.int.spec.ts tests/int/realtime.int.spec.ts tests/int/pusher.int.spec.ts tests/int/redis.int.spec.ts",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts tests/int/attachments.int.spec.ts tests/int/access.int.spec.ts tests/int/realtime.int.spec.ts tests/int/pusher.int.spec.ts tests/int/redis.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts tests/int/attachments.int.spec.ts tests/int/access.int.spec.ts tests/int/realtime.int.spec.ts tests/int/pusher.int.spec.ts tests/int/redis.int.spec.ts",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts tests/int/attachments.int.spec.ts tests/int/access.int.spec.ts tests/int/realtime.int.spec.ts tests/int/pusher.int.spec.ts tests/int/redis.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/reactions.int.spec.ts tests/int/attachments.int.spec.ts tests/int/access.int.spec.ts tests/int/realtime.int.spec.ts tests/int/pusher.int.spec.ts tests/int/redis.int.spec.ts",
 		"registry:build": "shadcn build registry.json --cwd registry --output r",
 		"test:e2e": "bash scripts/e2e.sh",
 		"videos": "clipwright videos",
@@ -189,6 +199,16 @@
 				"types": "./dist/exports/reactions-react.d.ts",
 				"import": "./dist/exports/reactions-react.js",
 				"default": "./dist/exports/reactions-react.js"
+			},
+			"./attachments": {
+				"types": "./dist/exports/attachments.d.ts",
+				"import": "./dist/exports/attachments.js",
+				"default": "./dist/exports/attachments.js"
+			},
+			"./attachments/react": {
+				"types": "./dist/exports/attachments-react.d.ts",
+				"import": "./dist/exports/attachments-react.js",
+				"default": "./dist/exports/attachments-react.js"
 			},
 			"./rsc": {
 				"types": "./dist/exports/rsc.d.ts",

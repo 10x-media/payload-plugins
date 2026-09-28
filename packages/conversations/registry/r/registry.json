@@ -155,6 +155,22 @@
 					"target": "components/conversations/conversation-reactions.tsx"
 				}
 			]
+		},
+		{
+			"name": "conversation-attachments",
+			"type": "registry:component",
+			"title": "Conversation attachments",
+			"description": "The attach button, picked files inside the composer (drop and paste too), a message's files with an image and PDF viewer, and attachmentSlots for ConversationUIProvider.",
+			"author": "10x Media GmbH <https://github.com/10x-media>",
+			"dependencies": ["@10x-media/conversations"],
+			"registryDependencies": ["button", "dialog"],
+			"files": [
+				{
+					"path": "attachments/conversation-attachments.tsx",
+					"type": "registry:component",
+					"target": "components/conversations/conversation-attachments.tsx"
+				}
+			]
 		}
 	]
 }

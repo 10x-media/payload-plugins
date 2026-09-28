@@ -2,7 +2,7 @@
 
 # @10x-media/conversations
 
-Conversations for Payload: messages bound to any document, global or custom key, with channels that decide who reads what, one-level threads, mentions and per-user read state. Comments on documents and reactions ship as extensions; support tickets, chat rooms and website chats are built from the same primitives.
+Conversations for Payload: messages bound to any document, global or custom key, with channels that decide who reads what, one-level threads, mentions and per-user read state. Comments on documents, reactions and file attachments ship as extensions; support tickets, chat rooms and website chats are built from the same primitives.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/conversations?style=flat-square)](https://www.npmjs.com/package/@10x-media/conversations)
 
@@ -17,7 +17,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Mentions** with a typeahead that offers only people who can read the channel; `afterMention` fires once per new mention, never again on edits.
 - **Unread state** per user and channel, and per thread.
 - **Transports**: polling by default (one tab per key, nothing while hidden, signed tokens so a tick runs no access code), Server-Sent Events served by Payload itself with database, Payload KV or Redis buses, or a Pusher-compatible service for serverless hosts.
-- **Extensions**: `comments()` adds a Comments button to edit views, `reactions()` adds emoji reactions with per-person limits. Your own extensions get per-message data, endpoints, stored fields, slots and client data.
+- **Extensions**: `comments()` adds a Comments button to edit views, `reactions()` adds emoji reactions with per-person limits, `attachments()` adds files on messages through an upload collection of its own or yours. Your own extensions get per-message data, endpoints, stored fields, their part of a send, slots, composer addons and client data.
 - **Admin UI on Payload's own components**: drawer, panel, feed, message, thread and a Lexical composer with a toolbar, `/` commands, markdown and links. Add to it through slots, or replace any of its components entirely.
 - **Website UI**: headless React hooks and a composer core without `@payloadcms/ui`, plus shadcn registry components to start from.
 - **Several instances**: call `conversations()` once per use case (`comments`, `tickets`, `chat`), each with its own collections, endpoints and transport.
@@ -61,7 +61,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/conversations)
 
 - [Overview](https://docs.10xmedia.de/conversations) and [Quick start](https://docs.10xmedia.de/conversations/quick-start)
 - [Concepts](https://docs.10xmedia.de/conversations/concepts), [Access](https://docs.10xmedia.de/conversations/access), [Messages](https://docs.10xmedia.de/conversations/messages), [Rich text](https://docs.10xmedia.de/conversations/rich-text)
-- [Extensions](https://docs.10xmedia.de/conversations/extensions): comments, reactions, writing your own
+- [Extensions](https://docs.10xmedia.de/conversations/extensions): comments, reactions, attachments, writing your own
 - [Admin UI](https://docs.10xmedia.de/conversations/admin-ui): components, slots, replacing components, custom views, styling
 - [Website UI](https://docs.10xmedia.de/conversations/website): the shadcn registry and the headless hooks
 - [Transport](https://docs.10xmedia.de/conversations/transport): polling, SSE, Pusher

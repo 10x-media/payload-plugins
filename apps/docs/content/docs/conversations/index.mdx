@@ -5,7 +5,7 @@ description: Messages bound to any document, global or key of your own, with cha
 
 `@10x-media/conversations` adds conversations to Payload. A conversation belongs to a target: a document, a global, or a key of your own. Its messages live in channels, and each channel decides who reads and who writes. Threads are one level deep. Mentions go through a Lexical feature and end in a hook. Every user has their own read state, per channel and per thread.
 
-The core has no opinion on what a conversation is for. `comments()` turns it into a Comments button on edit views, and `reactions()` adds emoji reactions. A support ticket system or a chat room is another configuration of the same core, with a view you compose from the admin components or, on a website, from the headless hooks and the shadcn registry.
+The core has no opinion on what a conversation is for. `comments()` turns it into a Comments button on edit views, `reactions()` adds emoji reactions, and `attachments()` files on messages. A support ticket system or a chat room is another configuration of the same core, with a view you compose from the admin components or, on a website, from the headless hooks and the shadcn registry.
 
 ```ts title="payload.config.ts"
 import { conversations, perTarget } from '@10x-media/conversations'
@@ -38,7 +38,7 @@ export default buildConfig({
 - **Thread.** A reply points at its root. Roots count their replies atomically on Mongo and Postgres.
 - **Read state.** A cursor per user, conversation and channel, plus one per opened thread.
 - **Transport.** How browsers learn that something changed: polling by default, Server-Sent Events, or a Pusher-compatible service.
-- **Extensions.** Shape an instance, add per-message data, endpoints, stored fields, UI slots and client data.
+- **Extensions.** Shape an instance, add per-message data, endpoints, stored fields, their part of a send, UI slots, composer addons and client data.
 
 ## Entry points
 
@@ -47,9 +47,11 @@ export default buildConfig({
 | `@10x-media/conversations` | `conversations`, `perTarget`, `defineMessageType`, `defineExtension`, `postMessage`, `touchMessage`, `getInstance`, `projectUsers`, key helpers, transports and buses |
 | `@10x-media/conversations/comments` | `comments()` |
 | `@10x-media/conversations/reactions` | `reactions()` |
+| `@10x-media/conversations/attachments` | `attachments()` |
 | `@10x-media/conversations/client` | admin components on `@payloadcms/ui` |
 | `@10x-media/conversations/react` | headless provider and hooks, no `@payloadcms/ui` |
 | `@10x-media/conversations/reactions/react` | `useReactions` |
+| `@10x-media/conversations/attachments/react` | `useAttachmentsComposer`, `useAttachments` |
 | `@10x-media/conversations/composer` | the Lexical composer core, no `@payloadcms/ui` |
 | `@10x-media/conversations/rsc` | server components the plugin registers |
 | `@10x-media/conversations/i18n` | translation keys |
@@ -62,7 +64,7 @@ export default buildConfig({
 - [Access](/conversations/access): grants per target, channel rules, read-only conversations, mentions, closed REST.
 - [Messages](/conversations/messages): sending, editing, deleting, custom message types, server helpers, hooks and endpoints.
 - [Rich text](/conversations/rich-text): the instance editor and composer features.
-- [Extensions](/conversations/extensions): how they work, [comments](/conversations/extensions/comments), [reactions](/conversations/extensions/reactions), and [writing your own](/conversations/extensions/writing-your-own).
+- [Extensions](/conversations/extensions): how they work, [comments](/conversations/extensions/comments), [reactions](/conversations/extensions/reactions), [attachments](/conversations/extensions/attachments), and [writing your own](/conversations/extensions/writing-your-own).
 - [Admin UI](/conversations/admin-ui): the components, [slots](/conversations/admin-ui/slots), [replacing components](/conversations/admin-ui/replacing-components), [custom views](/conversations/admin-ui/custom-views) and [styling](/conversations/admin-ui/styling).
 - [Website UI](/conversations/website): customer auth and the provider, the [shadcn registry](/conversations/website/shadcn-registry), and the [headless hooks](/conversations/website/headless).
 - [Transport](/conversations/transport): polling, SSE with its buses, and Pusher.

@@ -8,6 +8,7 @@ import {
 } from '@10x-media/conversations/react'
 import { useState } from 'react'
 
+import { attachmentSlots } from '../../../../../registry/attachments/conversation-attachments'
 import { ConversationPanel } from '../../../../../registry/conversations/conversation-panel'
 import { ConversationUIProvider } from '../../../../../registry/conversations/conversation-ui'
 import { reactionSlots } from '../../../../../registry/reactions/conversation-reactions'
@@ -17,6 +18,13 @@ import { textColorConverters, withTextColor } from '../../../../features/textCol
  * A ticket's conversation on the website, from the registry components. The
  * server hands down which transport the instance uses (Pusher here).
  */
+/** Both extensions' slots; `messageFooter` shows the files, then the reactions. */
+const slots = {
+	...attachmentSlots,
+	...reactionSlots,
+	messageFooter: [...attachmentSlots.messageFooter, ...reactionSlots.messageFooter],
+}
+
 export function SupportChat({
 	subject,
 	ticketId,
@@ -32,7 +40,7 @@ export function SupportChat({
 			<ConversationUIProvider
 				composerFeatures={withTextColor}
 				converters={textColorConverters}
-				slots={reactionSlots}
+				slots={slots}
 			>
 				<ConversationPanel
 					className="h-[70vh]"

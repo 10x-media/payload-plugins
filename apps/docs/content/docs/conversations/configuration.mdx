@@ -40,7 +40,7 @@ conversations({
 | `slots` | `ChatSlotConfig` | | Admin components added to the UI. See [Slots](/conversations/admin-ui/slots) |
 | `components` | `{ Trigger?, Drawer?, Panel?, ChannelTabs?, Feed?, Message?, Composer?, Thread? }` | built-ins | Client component paths that replace built-in admin components. See [Replacing components](/conversations/admin-ui/replacing-components) |
 | `overrides.messages`, `overrides.reads` | `{ fields?, hooks?, admin?, access? }` | | Change the collections. `fields` receives `{ defaultFields }`. See [Concepts](/conversations/concepts#changing-the-collections) |
-| `extensions` | `ConversationsExtension[]` | `[]` | `comments()`, `reactions()` and your own. See [Extensions](/conversations/extensions) |
+| `extensions` | `ConversationsExtension[]` | `[]` | `comments()`, `reactions()`, `attachments()` and your own. See [Extensions](/conversations/extensions) |
 | `translations` | `TranslationsOption` | | Per-locale string overrides. See [i18n](/conversations/i18n) |
 | `disabled` | `boolean` | `false` | Returns the config untouched |
 
@@ -49,6 +49,8 @@ conversations({
 | Slot | Where |
 |---|---|
 | `composerAbove` | Above the composer, under the channel cue |
+| `composerBelow` | Inside the composer's box, under the text (not while editing) |
+| `composerActions` | Next to Send (not while editing) |
 | `drawerHeader` | In the drawer header, after the title |
 | `messageQuickActions` | A row at the top of each message's menu, for one-click actions such as reactions |
 | `messageActions` | Items in each message's menu, after Reply in thread, Edit and Delete |

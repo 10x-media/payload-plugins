@@ -49,6 +49,10 @@ export type ConversationLabels = typeof defaultLabels
 export type ConversationSlots = {
 	/** Above the composer's editor. */
 	composerAbove?: ComponentType<{ channel: string; conversationKey: string }>[]
+	/** Next to Send, e.g. an attach button. Not while editing. */
+	composerActions?: ComponentType<{ channel: string; conversationKey: string }>[]
+	/** Inside the composer's box under the text, e.g. picked files. Not while editing. */
+	composerBelow?: ComponentType<{ channel: string; conversationKey: string }>[]
 	/** Items at the end of a message's menu. `close` shuts the menu. */
 	messageActions?: ComponentType<{ close: () => void; message: WindowMessage }>[]
 	/** Under a message's body, also on deleted placeholders (reactions outlive the text). */

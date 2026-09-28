@@ -6,6 +6,7 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig, type Where } from 'payload'
+import { attachments } from '../src/exports/attachments'
 import { comments } from '../src/exports/comments'
 import { reactions } from '../src/exports/reactions'
 import {
@@ -66,6 +67,21 @@ const media: CollectionConfig = {
 	slug: 'media',
 	admin: { useAsTitle: 'title' },
 	fields: [{ name: 'title', type: 'text', required: true }],
+}
+
+/**
+ * Files on tickets: an upload collection of the host's own. Its required
+ * `title` is what the `attachments` extension's `data` hook fills.
+ */
+const files: CollectionConfig = {
+	slug: 'files',
+	admin: { group: 'Support', useAsTitle: 'title' },
+	access: { create: ({ req }) => Boolean(req.user), read: ({ req }) => Boolean(req.user) },
+	fields: [{ name: 'title', type: 'text', required: true }],
+	upload: {
+		mimeTypes: ['image/*', 'application/pdf', 'text/plain'],
+		staticDir: path.resolve(dirname, 'uploads/files'),
+	},
 }
 
 /** Support tickets: each one a conversation in the `tickets` instance, read only once closed. */
@@ -131,7 +147,7 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	editor: lexicalEditor(),
-	collections: [tenants, users, customers, persons, media, rooms, tickets, projects],
+	collections: [tenants, users, customers, persons, media, files, rooms, tickets, projects],
 	plugins: [
 		// Persons belong to a tenant; staff to one or more (the dev admin to all of them).
 		multiTenantPlugin({
@@ -204,6 +220,11 @@ export default buildConfig({
 			],
 			extensions: [
 				comments({ collections: { persons: true, media: ['internal'] } }),
+				// The extension's own `comments-attachments` collection, files removed with their message.
+				attachments({
+					deleteWithMessage: true,
+					overrides: { upload: { staticDir: path.resolve(dirname, 'uploads/comments') } },
+				}),
 				reactions({
 					maxPerUser: 3,
 					hooks: {
@@ -269,7 +290,14 @@ export default buildConfig({
 					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
 				},
 			],
-			extensions: [reactions({ storage: 'message' })],
+			extensions: [
+				reactions({ storage: 'message' }),
+				// Into the host's `files` collection, under its own access.
+				attachments({
+					collection: 'files',
+					data: ({ file }) => ({ title: file?.name ?? 'Attachment' }),
+				}),
+			],
 			targets: { collections: { tickets: { channels: ['conversation', 'notes'] } } },
 			// Staff mention staff; customers mention nobody. Enforced by the server (search and
 			// saved mentions), not only by hiding the feature on the website.

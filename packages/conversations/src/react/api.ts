@@ -34,6 +34,8 @@ export type SendBody = {
 	channel?: string
 	clientId: string
 	data?: unknown
+	/** Per extension, by name: what its server `send` hook reads. */
+	ext?: Record<string, unknown>
 	key: string
 	parent?: null | string
 	text?: string
@@ -124,6 +126,34 @@ export const createApi = ({
 				`/mentions?${new URLSearchParams({ channel: query.channel, key: query.key, q: query.q }).toString()}`,
 				{ signal }
 			),
+		/**
+		 * Uploads a file into an upload collection through Payload's own REST
+		 * endpoint, under that collection's access. `data` becomes the document's
+		 * other fields; `headers` go along, e.g. for a collection hook.
+		 */
+		upload: async <T = Record<string, unknown>>(args: {
+			collection: string
+			data?: Record<string, unknown>
+			file: Blob
+			filename?: string
+			headers?: Record<string, string>
+			signal?: AbortSignal
+		}): Promise<T> => {
+			const form = new FormData()
+			form.append('file', args.file, args.filename ?? (args.file as File).name ?? 'file')
+			if (args.data) form.append('_payload', JSON.stringify(args.data))
+			const res = await fetcher(`${serverURL}${apiRoute}/${args.collection}`, {
+				body: form,
+				credentials: 'include',
+				headers: args.headers ?? {},
+				method: 'POST',
+				signal: args.signal,
+			})
+			if (!res.ok) {
+				throw new ConversationsRequestError(await errorMessage(res), res.status)
+			}
+			return ((await res.json()) as { doc: T }).doc
+		},
 		/** Opens the instance's event stream (a realtime transport's endpoint); the raw response. */
 		events: async (body: { since?: string; tokens: string[] }, signal?: AbortSignal) => {
 			const res = await fetcher(`${base}/events`, {

@@ -12,6 +12,7 @@ A conversation is not tied to the admin. The endpoints under `/api/conversations
 | `@10x-media/conversations/react` | `ChatProvider`, the hooks, `MessageBody`, client transports, key helpers |
 | `@10x-media/conversations/composer` | The Lexical message editor, without `@payloadcms/ui` |
 | `@10x-media/conversations/reactions/react` | `useReactions`, when the instance has [reactions](/conversations/extensions/reactions) |
+| `@10x-media/conversations/attachments/react` | `useAttachmentsComposer`, `useAttachments`, when the instance has [attachments](/conversations/extensions/attachments) |
 
 Never import `@10x-media/conversations/client` on a website. It is the admin's layer, built on `@payloadcms/ui`. The three subpaths above import nothing from it. The composer reaches Lexical through Payload's thin re-exports (`@payloadcms/richtext-lexical/lexical/*`, which are `export * from 'lexical'`), so a website bundles Lexical itself and no admin code.
 

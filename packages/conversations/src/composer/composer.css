@@ -17,6 +17,13 @@
 	border-color: var(--theme-elevation-400);
 }
 
+/* Files dragged over a composer that takes them (`onFiles`). */
+.conversations-editor[data-dragging] {
+	border-style: dashed;
+	border-color: var(--theme-success-500, var(--theme-elevation-500));
+	background: var(--theme-elevation-50);
+}
+
 .conversations-editor__input {
 	position: relative;
 	padding: 0.846rem 1.077rem 0.308rem;

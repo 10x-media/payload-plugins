@@ -20,6 +20,10 @@ export const cascadeHook =
 			await setting({ instance: instance.slug, key, req })
 			return
 		}
+		// First, while the messages are there: an extension may read its fields on them.
+		for (const extension of instance.extensionList) {
+			await extension.onTargetDelete?.({ instance, key, req })
+		}
 		await req.payload.db.deleteMany({
 			collection: instance.messagesSlug,
 			req,
@@ -31,8 +35,5 @@ export const cascadeHook =
 				req,
 				where: { key: { equals: key } },
 			})
-		}
-		for (const extension of instance.extensionList) {
-			await extension.onTargetDelete?.({ instance, key, req })
 		}
 	}

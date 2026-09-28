@@ -8,6 +8,7 @@ import {
 import { type RefObject, useCallback, useRef, useState } from 'react'
 
 import { hasContent, toStoredJSON } from '../composer/json'
+import { type ComposerAddons, useComposerAddonRegistry } from './composerAddons'
 import { useSend } from './hooks'
 import { useChatStore } from './provider'
 
@@ -21,6 +22,12 @@ const clear = (editor: LexicalEditor) => {
 }
 
 export type UseComposerResult = {
+	/**
+	 * What extensions add to this composer (`useComposerAddon`): wrap the
+	 * composer's markup in `ComposerAddonsContext.Provider` with it. Absent
+	 * while editing: an edit changes the text only.
+	 */
+	addons: ComposerAddons | null
 	/** A send or save is under way. */
 	busy: boolean
 	/** Pass to the composer's `editorRef`. */
@@ -31,6 +38,8 @@ export type UseComposerResult = {
 	initialBody: unknown
 	/** Pass to the composer's `onChange`: keeps the draft (absent while editing). */
 	onChange?: (editor: LexicalEditor) => void
+	/** Pass to the composer's `onFiles`: set when an addon takes dropped and pasted files. */
+	onFiles?: (files: File[]) => void
 	/** Send (or save, or retry) what is in the editor. */
 	submit: () => Promise<void>
 }
@@ -76,6 +85,7 @@ export const useComposer = ({
 	const [busy, setBusy] = useState(false)
 	const [failed, setFailed] = useState<null | string>(null)
 	const editorRef = useRef<LexicalEditor | null>(null)
+	const addons = useComposerAddonRegistry()
 
 	const submit = useCallback(async () => {
 		if (busy) return
@@ -86,6 +96,7 @@ export const useComposer = ({
 				await retry(failed)
 				setFailed(null)
 				if (editor) clear(editor)
+				addons.reset()
 			} catch {
 				// Still failed; the banner stays.
 			} finally {
@@ -101,8 +112,9 @@ export const useComposer = ({
 			if (onSave) {
 				await onSave(body)
 			} else {
-				await send({ body })
+				await send({ body, prepare: addons.prepare() ?? undefined })
 				clear(editor)
+				addons.reset()
 				editor.focus()
 			}
 		} catch (error) {
@@ -111,14 +123,16 @@ export const useComposer = ({
 		} finally {
 			setBusy(false)
 		}
-	}, [busy, failed, onSave, retry, send])
+	}, [addons, busy, failed, onSave, retry, send])
 
 	return {
+		addons: onSave ? null : addons.context,
 		busy,
 		editorRef,
 		failed: failed !== null,
 		initialBody: startBody,
 		onChange: draftKey ? keepDraft : undefined,
+		onFiles: !onSave && addons.context.acceptsFiles ? addons.context.addFiles : undefined,
 		submit,
 	}
 }

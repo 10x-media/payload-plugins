@@ -10,6 +10,8 @@ export default definePluginBuild({
 		'exports/comments': 'src/exports/comments.ts',
 		'exports/reactions': 'src/exports/reactions.ts',
 		'exports/reactions-react': 'src/exports/reactions-react.ts',
+		'exports/attachments': 'src/exports/attachments.ts',
+		'exports/attachments-react': 'src/exports/attachments-react.ts',
 		'exports/rsc': 'src/exports/rsc.ts',
 		'exports/i18n': 'src/exports/i18n.ts',
 	},

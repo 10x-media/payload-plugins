@@ -30,13 +30,17 @@ conversations({
 |---|---|---|
 | `drawerHeader` | In the drawer header, after the title and subtitle | no (gets the current `channel`) |
 | `composerAbove` | Above the editor, under the channel cue. Not while editing a message | no (gets `channel`) |
+| `composerBelow` | Inside the composer's box, between the text and the bottom row, e.g. picked files. Not while editing | no (gets `channel`) |
+| `composerActions` | Next to Send, before the composer's `actions`, e.g. an attach button. Not while editing | no (gets `channel`) |
 | `messageQuickActions` | A row at the top of each message's "⋯" menu, for one-click actions | yes |
 | `messageActions` | Items in each message's menu, after Reply in thread, Edit and Delete | yes |
 | `messageFooter` | Under each message body, deleted placeholders included | yes |
 
-Each slot takes one component or an array, rendered in order. The host's components come first, then each extension's in the order of `extensions` (this is how [reactions](/conversations/extensions/reactions) adds its bar and quick row). Paths are registered in `admin.dependencies`, so `payload generate:importmap` finds them.
+Each slot takes one component or an array, rendered in order. The host's components come first, then each extension's in the order of `extensions` (this is how [reactions](/conversations/extensions/reactions) adds its bar and quick row, and [attachments](/conversations/extensions/attachments) its button, picked files and file list). Paths are registered in `admin.dependencies`, so `payload generate:importmap` finds them.
 
 `messageFooter` renders on a deleted placeholder too, because what hangs off a message (reactions, for one) can outlive its text. Check `message.deletedAt` when your component should not.
+
+The composer slots render inside the composer, so a client component there can add to the send with `useComposerAddon` (see [Adding to the composer](/conversations/extensions#adding-to-the-composer)).
 
 ### Client components
 
@@ -126,7 +130,7 @@ When you compose the components yourself, pass React nodes instead:
 | `ChatMessage` | `footer` | Under the body, before `messageFooter` |
 | `ChatMessage` | `actions` | Menu items, before `messageActions` |
 | `ChatComposer` | `above` | Under the cue, before `composerAbove` |
-| `ChatComposer` | `actions` | Buttons next to Send |
+| `ChatComposer` | `actions` | Buttons next to Send, after `composerActions` |
 
 ```tsx
 <ChatFeed

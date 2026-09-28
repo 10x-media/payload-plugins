@@ -253,6 +253,8 @@ export const resolveInstance = (
 
 const SLOT_NAMES = [
 	'composerAbove',
+	'composerActions',
+	'composerBelow',
 	'drawerHeader',
 	'messageActions',
 	'messageFooter',

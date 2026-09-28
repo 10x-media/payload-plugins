@@ -260,6 +260,8 @@ export type SendInput = {
 	channel?: string
 	clientId?: string
 	data?: unknown
+	/** Per extension, by name: what its `send` hook reads. */
+	ext?: unknown
 	key: string
 	parent?: null | string
 	text?: string
@@ -313,8 +315,17 @@ export const sendMessage = async (
 			}
 		}
 	}
+	const body = type === TEXT_TYPE ? toBody(input) : undefined
+	const fields = await extensionFields(req, instance, {
+		channel: channel ?? '',
+		ext: input.ext,
+		key: input.key,
+		parent: input.parent ?? null,
+		source: 'client',
+	})
 	const message = await createMessage(req, instance, {
-		body: type === TEXT_TYPE ? toBody(input) : undefined,
+		...fields,
+		body,
 		channel,
 		clientId: input.clientId,
 		data: type === TEXT_TYPE ? undefined : input.data,
@@ -353,6 +364,49 @@ const rootAfterReply = async (
 	const decorated = await decorateOne(req, instance, { message: root, viewer })
 	return isRemoved(instance, root) ? { ...decorated, removed: true } : decorated
 }
+
+/**
+ * The extensions' `send` hooks for a new message: each reads its part of
+ * `ext` and returns values for its own `messageFields`, nothing else.
+ */
+const extensionFields = async (
+	req: PayloadRequest,
+	instance: ConversationsInstance,
+	args: {
+		channel: string
+		ext: unknown
+		key: string
+		parent: null | string
+		source: 'client' | 'server'
+	}
+): Promise<Record<string, unknown>> => {
+	if (args.ext !== undefined && args.ext !== null && !isRecord(args.ext)) {
+		return fail('Invalid ext', 400)
+	}
+	const ext = (args.ext ?? {}) as Record<string, unknown>
+	const fields: Record<string, unknown> = {}
+	for (const extension of instance.extensionList) {
+		if (!extension.send) continue
+		const values = await extension.send({
+			channel: args.channel,
+			fail,
+			input: ext[extension.name],
+			instance,
+			key: args.key,
+			parent: args.parent,
+			req,
+			source: args.source,
+		})
+		if (!values) continue
+		for (const field of extension.messageFields ?? []) {
+			if ('name' in field && field.name in values) fields[field.name] = values[field.name]
+		}
+	}
+	return fields
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+	typeof value === 'object' && value !== null && !Array.isArray(value)
 
 const toBody = (input: { body?: unknown; text?: string }) => {
 	if (input.body !== undefined && input.body !== null) {
@@ -447,6 +501,9 @@ export const deleteMessage = async (
 		id: existing.id,
 		req,
 	})) as unknown as ConversationMessage
+	for (const extension of instance.extensionList) {
+		await extension.onMessageDelete?.({ instance, message, req })
+	}
 	const viewer = viewerKey(req)
 	const decorated = await decorateOne(req, instance, { message, viewer })
 	const root = await rootAfterReply(req, instance, { message, viewer })
@@ -728,6 +785,8 @@ export type PostMessageArgs = {
 	body?: unknown
 	channel: string
 	data?: unknown
+	/** Per extension, by name: what its `send` hook reads (`source: 'server'`). */
+	ext?: Record<string, unknown>
 	instance: string
 	key: string
 	parent?: null | string
@@ -751,10 +810,19 @@ export const postMessage = async (
 		req.context[AUTHOR_CONTEXT] =
 			typeof args.author === 'string' ? args.author : systemKey(args.author.system)
 	}
+	const body = type === TEXT_TYPE ? toBody(args) : undefined
+	const fields = await extensionFields(req, instance, {
+		channel: args.channel,
+		ext: args.ext,
+		key: args.key,
+		parent: args.parent ?? null,
+		source: 'server',
+	})
 	let message: ConversationMessage
 	try {
 		message = await createMessage(req, instance, {
-			body: type === TEXT_TYPE ? toBody(args) : undefined,
+			...fields,
+			body,
 			channel: args.channel,
 			data: args.data,
 			key: args.key,

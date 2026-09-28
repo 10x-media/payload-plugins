@@ -73,11 +73,13 @@ export interface Config {
     customers: Customer;
     persons: Person;
     media: Media;
+    files: File;
     rooms: Room;
     tickets: Ticket;
     projects: Project;
     'comments-messages': CommentsMessage;
     'comments-reads': CommentsRead;
+    'comments-attachments': CommentsAttachment;
     'comments-reactions': CommentsReaction;
     'chat-messages': ChatMessage;
     'chat-reads': ChatRead;
@@ -98,11 +100,13 @@ export interface Config {
     customers: CustomersSelect<false> | CustomersSelect<true>;
     persons: PersonsSelect<false> | PersonsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    files: FilesSelect<false> | FilesSelect<true>;
     rooms: RoomsSelect<false> | RoomsSelect<true>;
     tickets: TicketsSelect<false> | TicketsSelect<true>;
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
     'comments-messages': CommentsMessagesSelect<false> | CommentsMessagesSelect<true>;
     'comments-reads': CommentsReadsSelect<false> | CommentsReadsSelect<true>;
+    'comments-attachments': CommentsAttachmentsSelect<false> | CommentsAttachmentsSelect<true>;
     'comments-reactions': CommentsReactionsSelect<false> | CommentsReactionsSelect<true>;
     'chat-messages': ChatMessagesSelect<false> | ChatMessagesSelect<true>;
     'chat-reads': ChatReadsSelect<false> | ChatReadsSelect<true>;
@@ -264,6 +268,25 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "files".
+ */
+export interface File {
+  id: string;
+  title: string;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "rooms".
  */
 export interface Room {
@@ -344,6 +367,15 @@ export interface CommentsMessage {
   deletedAt?: string | null;
   replyCount?: number | null;
   lastReplyAt?: string | null;
+  attachments?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -360,6 +392,24 @@ export interface CommentsRead {
   lastReadAt: string;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "comments-attachments".
+ */
+export interface CommentsAttachment {
+  id: string;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -495,6 +545,15 @@ export interface TicketsMessage {
     | boolean
     | null;
   reactionsVersion?: number | null;
+  attachments?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -629,6 +688,10 @@ export interface PayloadLockedDocument {
         value: string | Media;
       } | null)
     | ({
+        relationTo: 'files';
+        value: string | File;
+      } | null)
+    | ({
         relationTo: 'rooms';
         value: string | Room;
       } | null)
@@ -647,6 +710,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'comments-reads';
         value: string | CommentsRead;
+      } | null)
+    | ({
+        relationTo: 'comments-attachments';
+        value: string | CommentsAttachment;
       } | null)
     | ({
         relationTo: 'comments-reactions';
@@ -818,6 +885,24 @@ export interface MediaSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "files_select".
+ */
+export interface FilesSelect<T extends boolean = true> {
+  title?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "rooms_select".
  */
 export interface RoomsSelect<T extends boolean = true> {
@@ -866,6 +951,7 @@ export interface CommentsMessagesSelect<T extends boolean = true> {
   deletedAt?: T;
   replyCount?: T;
   lastReplyAt?: T;
+  attachments?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -881,6 +967,23 @@ export interface CommentsReadsSelect<T extends boolean = true> {
   lastReadAt?: T;
   updatedAt?: T;
   createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "comments-attachments_select".
+ */
+export interface CommentsAttachmentsSelect<T extends boolean = true> {
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -952,6 +1055,7 @@ export interface TicketsMessagesSelect<T extends boolean = true> {
   lastReplyAt?: T;
   reactions?: T;
   reactionsVersion?: T;
+  attachments?: T;
   updatedAt?: T;
   createdAt?: T;
 }

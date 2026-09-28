@@ -2,7 +2,7 @@
 '@10x-media/conversations': minor
 ---
 
-Initial beta of `@10x-media/conversations`: conversations bound to any document, global or custom key, with comments and reactions as the first extensions.
+Initial beta of `@10x-media/conversations`: conversations bound to any document, global or custom key, with comments, reactions and attachments as the first extensions.
 
 - **Instances**: one `conversations()` call per use case, each with its own `<slug>-messages` and `<slug>-reads` collections and endpoints under `/api/conversations/<slug>`.
 - **Access**: required batch conversation access answering per target with grants (every channel, some channels, or read only; `perTarget` for simple cases), channel rules per user run once per request, per-message `update` / `delete`, collections closed over REST.
@@ -10,6 +10,6 @@ Initial beta of `@10x-media/conversations`: conversations bound to any document,
 - **Mentions**: a typeahead that offers only users who can read the channel, scoped per users collection; `afterMention` fires once per new mention.
 - **Read state**: cursors per user, conversation and channel, and per thread; unread counts in one query and a "New messages" divider.
 - **Transports**: polling by default (one tab per key via Web Locks and BroadcastChannel, signed tokens, nothing while hidden), Server-Sent Events served by Payload with `databaseBus`, `payloadKVBus`, `redisBus` or `memoryBus`, and a dependency-free Pusher-compatible transport; one realtime connection per browser.
-- **Extensions**: `before` / `after` config phases plus per-message `decorate`, endpoints, stored `messageFields`, slots, client data and cascade cleanup. `comments()` adds a Comments button and drawer to collections and globals; `reactions()` adds emoji reactions with per-person limits, stored in their own collection or on the message.
-- **Admin UI**: drawer, panel, feed, message, thread and trigger on Payload's own components, a Lexical composer with toolbar, `/` commands, markdown and links, config-level slots (client or server components), and `components` to replace any built-in (trigger, drawer, panel, tabs, feed, message, composer, thread).
-- **Website UI**: headless hooks (`/react`, `/reactions/react`), the composer core without `@payloadcms/ui` (`/composer`) with named, skinnable parts, and shadcn registry sources.
+- **Extensions**: `before` / `after` config phases plus per-message `decorate`, a `send` hook that stores the extension's part of a new message, endpoints, stored `messageFields`, slots, composer addons (`useComposerAddon`: data and files for the send), client data and cleanup per message and per target. `comments()` adds a Comments button and drawer to collections and globals; `reactions()` adds emoji reactions with per-person limits, stored in their own collection or on the message; `attachments()` adds files on messages, uploaded on send into its own upload collection or yours, under that collection's access, with a picker, drop and paste in the composer and an image and PDF viewer.
+- **Admin UI**: drawer, panel, feed, message, thread and trigger on Payload's own components, a Lexical composer with toolbar, `/` commands, markdown and links, config-level slots (client or server components, `composerBelow` and `composerActions` inside the composer), and `components` to replace any built-in (trigger, drawer, panel, tabs, feed, message, composer, thread).
+- **Website UI**: headless hooks (`/react`, `/reactions/react`, `/attachments/react`), the composer core without `@payloadcms/ui` (`/composer`) with named, skinnable parts, and shadcn registry sources.

@@ -106,6 +106,7 @@ export const buildEndpoints = (instance: ConversationsInstance): Endpoint[] => {
 						channel: stringOf(body.channel),
 						clientId: stringOf(body.clientId),
 						data: body.data,
+						ext: body.ext,
 						key: requireString(body.key, 'key'),
 						parent: stringOf(body.parent) ?? null,
 						text: typeof body.text === 'string' ? body.text : undefined,

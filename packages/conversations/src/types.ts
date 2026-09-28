@@ -196,6 +196,10 @@ export type SlotComponents = PayloadComponent | PayloadComponent[]
 export type ChatSlotConfig = {
 	/** Rendered above the composer. */
 	composerAbove?: SlotComponents
+	/** Next to Send, before the host's `actions`: e.g. an attach button. Not while editing. */
+	composerActions?: SlotComponents
+	/** Inside the composer's box under the text: e.g. picked files. Not while editing. */
+	composerBelow?: SlotComponents
 	/** Rendered in the drawer header, after the title. */
 	drawerHeader?: SlotComponents
 	/** Items in each message's menu, after Reply in thread, Edit and Delete. */
@@ -421,16 +425,46 @@ export type ConversationsExtension = {
 	name: string
 	/**
 	 * Remove the extension's own rows for a conversation whose target was
-	 * deleted. Runs in the built-in cascade (`deleteWithTarget: true`); a custom
-	 * cascade function takes this over.
+	 * deleted. Runs in the built-in cascade (`deleteWithTarget: true`) before
+	 * the messages go, so their fields can still be read; a custom cascade
+	 * function takes this over.
 	 */
 	onTargetDelete?: (args: {
 		instance: ConversationsInstance
 		key: string
 		req: PayloadRequest
 	}) => Promise<void> | void
+	/**
+	 * After a message was deleted (soft delete, through the endpoints), e.g. to
+	 * remove what the extension kept for it. Target deletion runs
+	 * `onTargetDelete` instead.
+	 */
+	onMessageDelete?: (args: {
+		instance: ConversationsInstance
+		message: ConversationMessage
+		req: PayloadRequest
+	}) => Promise<void> | void
 	/** Exposed to other extensions through the map. */
 	options?: unknown
+	/**
+	 * Runs before every new message is created, a client send or `postMessage`,
+	 * with this extension's part of the send (`ext[name]`, `undefined` when none
+	 * came). Returns values for the extension's own `messageFields`, stored with
+	 * the message; other keys are ignored. Refuse the send with `fail`. A send
+	 * retried under the same `clientId` returns the stored message without
+	 * running it again.
+	 */
+	send?: (args: {
+		channel: string
+		fail: (message: string, status: number) => never
+		input: unknown
+		instance: ConversationsInstance
+		key: string
+		parent: null | string
+		req: PayloadRequest
+		/** `client`: through the endpoints, as `req.user`. `server`: `postMessage`, trusted. */
+		source: 'client' | 'server'
+	}) => Promise<Record<string, unknown> | undefined> | Record<string, unknown> | undefined
 	/** Components added to the instance slots, after the host's own. */
 	slots?: ChatSlotConfig
 }

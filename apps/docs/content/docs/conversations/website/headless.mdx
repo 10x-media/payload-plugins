@@ -69,6 +69,8 @@ Each send gets a `clientId`, shows up at once as a `sending` message in every wi
 
 `{ text }` needs no editor: the server wraps it into a one-paragraph body. A website that wants a plain `<textarea>` can stop here.
 
+`send` also takes `ext`, data for extensions keyed by name (`{ text, ext: { attachments: [id] } }`), and `prepare({ clientId })`, an async step that runs once the message shows as sending and returns more `ext` (uploads, for one). A retry reuses what `prepare` returned. `useComposer` builds both from its [addons](#composer-addons).
+
 ### useMessageActions
 
 ```ts
@@ -96,7 +98,7 @@ const result = await request<{ message: WindowMessage }>('/add', { body: { messa
 merge([result.message])
 ```
 
-`useExtension(name)` is an extension's public `client` data. `useExtensionApi(name)` calls its endpoints under `/api/conversations/<instance>/<name>` and merges messages they return into every window. Per-message extension data arrives on `message.ext[name]`. See [Writing your own](/conversations/extensions/writing-your-own). Reactions ship a hook of their own, `useReactions`, from `@10x-media/conversations/reactions/react`.
+`useExtension(name)` is an extension's public `client` data. `useExtensionApi(name)` calls its endpoints under `/api/conversations/<instance>/<name>` and merges messages they return into every window. Per-message extension data arrives on `message.ext[name]`. See [Writing your own](/conversations/extensions/writing-your-own). Reactions ship a hook of their own, `useReactions`, from `@10x-media/conversations/reactions/react`; attachments theirs from `/attachments/react`.
 
 ### useChatStore
 
@@ -141,6 +143,8 @@ const composer = useComposer({ key, channel, parent })
 ```
 
 The behaviour around the `Composer` editor: `editorRef`, `onChange` (keeps a draft per conversation, channel and thread while the provider lives), `initialBody` (the draft, or the message being edited), `submit()`, `busy`, and `failed` (the text stays in the editor and `submit` retries it). With `onSave` and `initialBody` it edits a message instead of sending.
+
+`addons` and `onFiles` connect extensions to it; see [Composer addons](#composer-addons). Both are absent while editing.
 
 ### useChatPanel
 
@@ -213,11 +217,39 @@ function MessageInput({ conversationKey, channel }: { conversationKey: string; c
 | `mentions` | `{ channel, conversationKey }` for `@`; `null` turns mentions off |
 | `toolbar` | `'bottom'` (default), `'top'`, `'none'`, or `{ placement, items }` to keep and order groups |
 | `footer` | The right side of the bottom row: your buttons |
-| `editorRef`, `initialBody`, `onChange` | From `useComposer` |
+| `below` | Inside the box, between the text and the bottom row: e.g. picked files |
+| `onFiles` | Files dropped on the composer or pasted into it. Absent, it takes neither. The root has `data-dragging` while files are over it |
+| `editorRef`, `initialBody`, `onChange`, `onFiles` | From `useComposer` |
 | `autoFocus`, `placeholder`, `className`, `t` | |
 | `classNames`, `unstyled` | Skinning, below |
 
 The server validates the body against the instance's editor. A feature that stores new nodes must be registered there too, or the server refuses the message; see [Rich text](/conversations/rich-text).
+
+### Composer addons
+
+Extensions add to a send through addons registered inside the composer ([attachments](/conversations/extensions/attachments) uploads its files this way). Provide `useComposer`'s `addons` around the composer's markup and pass `onFiles` on:
+
+```tsx
+import { ComposerAddonsContext, useComposer } from '@10x-media/conversations/react'
+import { AttachButton, PickedFiles } from './attachments'
+
+const composer = useComposer({ key: conversationKey, channel })
+const editor = (
+  <Composer
+    // ...as above
+    below={<PickedFiles channel={channel} conversationKey={conversationKey} />}
+    footer={<><AttachButton /><button onClick={() => void composer.submit()}>Send</button></>}
+    onFiles={composer.onFiles}
+  />
+)
+return composer.addons ? (
+  <ComposerAddonsContext.Provider value={composer.addons}>{editor}</ComposerAddonsContext.Provider>
+) : (
+  editor
+)
+```
+
+Components inside it call `useComposerAddon(name, { prepare, reset, onFiles })` or `useComposerFiles()`; see [Adding to the composer](/conversations/extensions#adding-to-the-composer). The registry's `ConversationComposer` already does this and renders the `composerBelow` and `composerActions` slots of `ConversationUIProvider`.
 
 ### Skinning
 

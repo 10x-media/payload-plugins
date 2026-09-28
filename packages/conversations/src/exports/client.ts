@@ -1,5 +1,6 @@
 'use client'
 
+export { AttachButton, AttachmentsList, AttachmentsPicker } from '../attachments/client'
 export { Avatar, type AvatarProps } from '../client/Avatar'
 export { ChatAdminProvider } from '../client/ChatAdminProvider'
 export { ChatChannelTabs, type ChatChannelTabsProps } from '../client/ChatChannelTabs'

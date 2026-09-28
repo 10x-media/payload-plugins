@@ -23,6 +23,9 @@ import { ChatView as ChatView_9ff71714c0033d16c2f4e44b53d7abe9 } from '../../../
 import { PlaygroundView as PlaygroundView_794a6abe41de858e73edd23cfa8a8229 } from '../../../playground/PlaygroundView'
 import { ConversationsSlotDispatcher as ConversationsSlotDispatcher_7345af0c80d81d7368c532bb4469972c } from '@10x-media/conversations/rsc'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
+import { AttachButton as AttachButton_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
+import { AttachmentsPicker as AttachmentsPicker_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
+import { AttachmentsList as AttachmentsList_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
 import { ReactionsBar as ReactionsBar_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
 import { ReactionQuickActions as ReactionQuickActions_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
 import { SystemNote as SystemNote_d6b0c4bea73699147f3f268dc40b6145 } from '../../../components/SystemNote'
@@ -63,6 +66,9 @@ export const importMap = {
   "/playground/PlaygroundView#PlaygroundView": PlaygroundView_794a6abe41de858e73edd23cfa8a8229,
   "@10x-media/conversations/rsc#ConversationsSlotDispatcher": ConversationsSlotDispatcher_7345af0c80d81d7368c532bb4469972c,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
+  "@10x-media/conversations/client#AttachButton": AttachButton_63b29dbabe93a0fc3d3dbd1a91acf947,
+  "@10x-media/conversations/client#AttachmentsPicker": AttachmentsPicker_63b29dbabe93a0fc3d3dbd1a91acf947,
+  "@10x-media/conversations/client#AttachmentsList": AttachmentsList_63b29dbabe93a0fc3d3dbd1a91acf947,
   "@10x-media/conversations/client#ReactionsBar": ReactionsBar_63b29dbabe93a0fc3d3dbd1a91acf947,
   "@10x-media/conversations/client#ReactionQuickActions": ReactionQuickActions_63b29dbabe93a0fc3d3dbd1a91acf947,
   "/components/SystemNote#SystemNote": SystemNote_d6b0c4bea73699147f3f268dc40b6145,

@@ -8,6 +8,13 @@ export {
 	type SendBody,
 } from '../react/api'
 export {
+	type ComposerAddon,
+	type ComposerAddons,
+	ComposerAddonsContext,
+	useComposerAddon,
+	useComposerFiles,
+} from '../react/composerAddons'
+export {
 	buildFeedRows,
 	type FeedDay,
 	type FeedItem,
