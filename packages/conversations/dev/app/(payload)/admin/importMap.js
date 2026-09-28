@@ -26,6 +26,14 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 import { ReactionsBar as ReactionsBar_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
 import { ReactionQuickActions as ReactionQuickActions_63b29dbabe93a0fc3d3dbd1a91acf947 } from '@10x-media/conversations/client'
 import { StatusChange as StatusChange_31eb553b5a0efb219e39dcd1f84fa727 } from '../../../components/StatusChange'
+import { ReplacedChannelTabs as ReplacedChannelTabs_47f5d179a1f03ef62bdf0539f15601b3 } from '../../../replaced/Replaced'
+import { ReplacedComposer as ReplacedComposer_47f5d179a1f03ef62bdf0539f15601b3 } from '../../../replaced/Replaced'
+import { ReplacedDrawer as ReplacedDrawer_47f5d179a1f03ef62bdf0539f15601b3 } from '../../../replaced/Replaced'
+import { ReplacedFeed as ReplacedFeed_47f5d179a1f03ef62bdf0539f15601b3 } from '../../../replaced/Replaced'
+import { ReplacedMessage as ReplacedMessage_47f5d179a1f03ef62bdf0539f15601b3 } from '../../../replaced/Replaced'
+import { ReplacedPanel as ReplacedPanel_47f5d179a1f03ef62bdf0539f15601b3 } from '../../../replaced/Replaced'
+import { ReplacedThread as ReplacedThread_47f5d179a1f03ef62bdf0539f15601b3 } from '../../../replaced/Replaced'
+import { ReplacedTrigger as ReplacedTrigger_47f5d179a1f03ef62bdf0539f15601b3 } from '../../../replaced/Replaced'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -56,5 +64,13 @@ export const importMap = {
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
   "@10x-media/conversations/client#ReactionsBar": ReactionsBar_63b29dbabe93a0fc3d3dbd1a91acf947,
   "@10x-media/conversations/client#ReactionQuickActions": ReactionQuickActions_63b29dbabe93a0fc3d3dbd1a91acf947,
-  "/components/StatusChange#StatusChange": StatusChange_31eb553b5a0efb219e39dcd1f84fa727
+  "/components/StatusChange#StatusChange": StatusChange_31eb553b5a0efb219e39dcd1f84fa727,
+  "/replaced/Replaced#ReplacedChannelTabs": ReplacedChannelTabs_47f5d179a1f03ef62bdf0539f15601b3,
+  "/replaced/Replaced#ReplacedComposer": ReplacedComposer_47f5d179a1f03ef62bdf0539f15601b3,
+  "/replaced/Replaced#ReplacedDrawer": ReplacedDrawer_47f5d179a1f03ef62bdf0539f15601b3,
+  "/replaced/Replaced#ReplacedFeed": ReplacedFeed_47f5d179a1f03ef62bdf0539f15601b3,
+  "/replaced/Replaced#ReplacedMessage": ReplacedMessage_47f5d179a1f03ef62bdf0539f15601b3,
+  "/replaced/Replaced#ReplacedPanel": ReplacedPanel_47f5d179a1f03ef62bdf0539f15601b3,
+  "/replaced/Replaced#ReplacedThread": ReplacedThread_47f5d179a1f03ef62bdf0539f15601b3,
+  "/replaced/Replaced#ReplacedTrigger": ReplacedTrigger_47f5d179a1f03ef62bdf0539f15601b3
 }

@@ -75,6 +75,7 @@ export interface Config {
     media: Media;
     rooms: Room;
     tickets: Ticket;
+    projects: Project;
     'comments-messages': CommentsMessage;
     'comments-reads': CommentsRead;
     'comments-reactions': CommentsReaction;
@@ -82,6 +83,9 @@ export interface Config {
     'chat-reads': ChatRead;
     'tickets-messages': TicketsMessage;
     'tickets-reads': TicketsRead;
+    'notes-messages': NotesMessage;
+    'notes-reads': NotesRead;
+    'notes-reactions': NotesReaction;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -96,6 +100,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     rooms: RoomsSelect<false> | RoomsSelect<true>;
     tickets: TicketsSelect<false> | TicketsSelect<true>;
+    projects: ProjectsSelect<false> | ProjectsSelect<true>;
     'comments-messages': CommentsMessagesSelect<false> | CommentsMessagesSelect<true>;
     'comments-reads': CommentsReadsSelect<false> | CommentsReadsSelect<true>;
     'comments-reactions': CommentsReactionsSelect<false> | CommentsReactionsSelect<true>;
@@ -103,6 +108,9 @@ export interface Config {
     'chat-reads': ChatReadsSelect<false> | ChatReadsSelect<true>;
     'tickets-messages': TicketsMessagesSelect<false> | TicketsMessagesSelect<true>;
     'tickets-reads': TicketsReadsSelect<false> | TicketsReadsSelect<true>;
+    'notes-messages': NotesMessagesSelect<false> | NotesMessagesSelect<true>;
+    'notes-reads': NotesReadsSelect<false> | NotesReadsSelect<true>;
+    'notes-reactions': NotesReactionsSelect<false> | NotesReactionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -281,6 +289,16 @@ export interface Ticket {
    * Closed tickets are read only.
    */
   status?: ('open' | 'closed') | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "projects".
+ */
+export interface Project {
+  id: string;
+  name: string;
   updatedAt: string;
   createdAt: string;
 }
@@ -496,6 +514,78 @@ export interface TicketsRead {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notes-messages".
+ */
+export interface NotesMessage {
+  id: string;
+  key: string;
+  channel: string;
+  parent?: string | null;
+  type: string;
+  body?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  data?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  text?: string | null;
+  mentions?: string[] | null;
+  authorKey: string;
+  clientId?: string | null;
+  editedAt?: string | null;
+  deletedAt?: string | null;
+  replyCount?: number | null;
+  lastReplyAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notes-reads".
+ */
+export interface NotesRead {
+  id: string;
+  userKey: string;
+  key: string;
+  channel?: string | null;
+  thread?: string | null;
+  lastReadAt: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notes-reactions".
+ */
+export interface NotesReaction {
+  id: string;
+  message: string;
+  key: string;
+  userKey: string;
+  emoji: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -547,6 +637,10 @@ export interface PayloadLockedDocument {
         value: string | Ticket;
       } | null)
     | ({
+        relationTo: 'projects';
+        value: string | Project;
+      } | null)
+    | ({
         relationTo: 'comments-messages';
         value: string | CommentsMessage;
       } | null)
@@ -573,6 +667,18 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'tickets-reads';
         value: string | TicketsRead;
+      } | null)
+    | ({
+        relationTo: 'notes-messages';
+        value: string | NotesMessage;
+      } | null)
+    | ({
+        relationTo: 'notes-reads';
+        value: string | NotesRead;
+      } | null)
+    | ({
+        relationTo: 'notes-reactions';
+        value: string | NotesReaction;
       } | null);
   globalSlug?: string | null;
   user:
@@ -734,6 +840,15 @@ export interface TicketsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "projects_select".
+ */
+export interface ProjectsSelect<T extends boolean = true> {
+  name?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "comments-messages_select".
  */
 export interface CommentsMessagesSelect<T extends boolean = true> {
@@ -850,6 +965,53 @@ export interface TicketsReadsSelect<T extends boolean = true> {
   channel?: T;
   thread?: T;
   lastReadAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notes-messages_select".
+ */
+export interface NotesMessagesSelect<T extends boolean = true> {
+  key?: T;
+  channel?: T;
+  parent?: T;
+  type?: T;
+  body?: T;
+  data?: T;
+  text?: T;
+  mentions?: T;
+  authorKey?: T;
+  clientId?: T;
+  editedAt?: T;
+  deletedAt?: T;
+  replyCount?: T;
+  lastReplyAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notes-reads_select".
+ */
+export interface NotesReadsSelect<T extends boolean = true> {
+  userKey?: T;
+  key?: T;
+  channel?: T;
+  thread?: T;
+  lastReadAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notes-reactions_select".
+ */
+export interface NotesReactionsSelect<T extends boolean = true> {
+  message?: T;
+  key?: T;
+  userKey?: T;
+  emoji?: T;
   updatedAt?: T;
   createdAt?: T;
 }

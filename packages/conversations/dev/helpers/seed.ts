@@ -92,6 +92,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		customer: String(customer.id),
 		me: String(me.id),
 	})
+	await seedProjects(payload, { anna: String(anna.id), me: String(me.id) })
 
 	if ((await payload.count({ collection: 'persons' })).totalDocs > 0) return
 	payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
@@ -393,4 +394,40 @@ export const seedTickets = async (
 	for (const [key, author, channel, text] of lines) {
 		await postMessage(req, { author, channel, instance: 'tickets', key, text })
 	}
+}
+
+/** Seed the `notes` instance: one project with a short exchange and a thread. Idempotent. */
+export const seedProjects = async (
+	payload: Payload,
+	{ anna, me }: { anna: string; me: string }
+): Promise<void> => {
+	if ((await payload.count({ collection: 'projects' })).totalDocs > 0) return
+	const req = await createLocalReq({}, payload)
+	const project = await payload.create({
+		collection: 'projects',
+		data: { name: 'Website relaunch' },
+	})
+	const key = `collection:projects:${project.id}`
+	const root = await postMessage(req, {
+		author: `users:${anna}`,
+		channel: 'team',
+		instance: 'notes',
+		key,
+		text: 'Kick-off is on Monday, agenda below.',
+	})
+	await postMessage(req, {
+		author: `users:${me}`,
+		channel: 'team',
+		instance: 'notes',
+		key,
+		parent: String(root.id),
+		text: 'I will bring the sitemap draft.',
+	})
+	await postMessage(req, {
+		author: `users:${me}`,
+		channel: 'log',
+		instance: 'notes',
+		key,
+		text: 'Decided: launch without the blog.',
+	})
 }

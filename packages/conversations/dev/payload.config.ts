@@ -102,6 +102,15 @@ const rooms: CollectionConfig = {
 	],
 }
 
+/** Projects: the `notes` instance, where every built-in admin component is replaced. */
+const projects: CollectionConfig = {
+	slug: 'projects',
+	admin: { group: 'Replaced UI', useAsTitle: 'name' },
+	fields: [{ name: 'name', type: 'text', required: true }],
+}
+
+const replaced = (name: string) => `/replaced/Replaced#Replaced${name}`
+
 const db =
 	useDb === 'postgres'
 		? postgresAdapter({
@@ -122,7 +131,7 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	editor: lexicalEditor(),
-	collections: [tenants, users, customers, persons, media, rooms, tickets],
+	collections: [tenants, users, customers, persons, media, rooms, tickets, projects],
 	plugins: [
 		// Persons belong to a tenant; staff to one or more (the dev admin to all of them).
 		multiTenantPlugin({
@@ -268,6 +277,37 @@ export default buildConfig({
 				secret: 'app-secret',
 				useTLS: false,
 			}),
+		}),
+		// A fourth instance on polling: every built-in admin component replaced by a labelled
+		// wrapper (`replaced/Replaced.tsx`), to see replacements reach every corner.
+		conversations({
+			slug: 'notes',
+			users: ['users'],
+			access: perTarget(({ req }) => isStaff(req)),
+			channels: [
+				{
+					slug: 'team',
+					label: 'Team',
+					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
+				},
+				{
+					slug: 'log',
+					label: 'Log',
+					cue: { label: 'Decisions only', tone: 'neutral' },
+					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
+				},
+			],
+			components: {
+				ChannelTabs: replaced('ChannelTabs'),
+				Composer: replaced('Composer'),
+				Drawer: replaced('Drawer'),
+				Feed: replaced('Feed'),
+				Message: replaced('Message'),
+				Panel: replaced('Panel'),
+				Thread: replaced('Thread'),
+				Trigger: replaced('Trigger'),
+			},
+			extensions: [comments({ collections: { projects: true } }), reactions()],
 		}),
 	],
 	telemetry: false,
