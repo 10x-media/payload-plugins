@@ -96,6 +96,16 @@ export const normalizeOptions = (options: EnabledOptions, config: Config): Resol
 		)
 	}
 
+	const deleteAfterDays = options.retention ? options.retention.deleteAfterDays : undefined
+	if (
+		options.retention &&
+		(typeof deleteAfterDays !== 'number' ||
+			!Number.isFinite(deleteAfterDays) ||
+			deleteAfterDays <= 0)
+	) {
+		throw new Error(`${PREFIX} retention.deleteAfterDays must be a positive finite number.`)
+	}
+
 	return {
 		access: {
 			filterTargets: options.access.filterTargets,
@@ -105,6 +115,7 @@ export const normalizeOptions = (options: EnabledOptions, config: Config): Resol
 		},
 		apiPath,
 		collectionSlug,
+		collectionOverrides: options.collection?.overrides,
 		cookies: {
 			clearOnSwitch: options.cookies?.clearOnSwitch ?? defaultClearOnSwitch(cookiePrefix),
 		},

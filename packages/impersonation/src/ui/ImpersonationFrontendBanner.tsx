@@ -4,22 +4,35 @@ import { getImpersonation } from '../getImpersonation'
 import { getRegistry } from '../plugin/registry'
 import { ImpersonationFrontendExit } from '../ui/ImpersonationFrontendExit'
 
+export type ImpersonationFrontendBannerLabels = {
+	/** `{{name}}` is the target email, or the collection and id when there is no email. */
+	actingAs?: string
+	exit?: string
+}
+
 export type ImpersonationFrontendBannerProps = {
+	className?: string
 	headers: Headers
+	labels?: ImpersonationFrontendBannerLabels
 	payload: Payload
 	user?: null | { collection?: string; id?: number | string }
 }
 
+const fillName = (template: string, name: string): string => template.split('{{name}}').join(name)
+
 /**
  * Default frontend banner. Renders nothing when this request is not the
- * impersonated session. Own styles, no Payload admin CSS. Drop it in a layout:
+ * impersonated session. Class names are the styling hook; inline styles are
+ * only the unstyled default.
  *
  * ```tsx
  * <ImpersonationFrontendBanner payload={payload} headers={await headers()} />
  * ```
  */
 export const ImpersonationFrontendBanner = async ({
+	className,
 	headers,
+	labels,
 	payload,
 	user,
 }: ImpersonationFrontendBannerProps) => {
@@ -35,29 +48,45 @@ export const ImpersonationFrontendBanner = async ({
 		return null
 	}
 
-	const name = status.target?.id ?? 'user'
+	const fallback = status.target ? `${status.target.collection}/${status.target.id}` : 'user'
+	const name = status.targetEmail || fallback
+	const actingAs = fillName(labels?.actingAs ?? 'Acting as {{name}}', name)
 	const apiPath = `${payload.config.routes.api}${options.apiPath}`
+	const rootClass = className
+		? `impersonation-frontend-banner ${className}`
+		: 'impersonation-frontend-banner'
 
 	return (
-		<div
-			data-testid="impersonation-frontend-banner"
-			role="status"
-			style={{
-				alignItems: 'center',
-				background: '#3d2a12',
-				color: '#f3e6d2',
-				display: 'flex',
-				fontFamily: 'system-ui, sans-serif',
-				fontSize: 14,
-				gap: 12,
-				justifyContent: 'space-between',
-				padding: '0.6rem 1rem',
-			}}
-		>
-			<span>
-				Impersonation · Acting as {status.target?.collection}/{name}
-			</span>
-			<ImpersonationFrontendExit apiPath={apiPath} label="Exit" />
+		<div className={rootClass} data-testid="impersonation-frontend-banner" role="status">
+			<style>
+				{`
+.impersonation-frontend-banner {
+	align-items: center;
+	background: #f4f1ea;
+	color: #1c1915;
+	display: flex;
+	font: 14px/1.4 system-ui, sans-serif;
+	gap: 12px;
+	justify-content: space-between;
+	padding: 0.6rem 1rem;
+}
+.impersonation-frontend-banner__exit {
+	background: transparent;
+	border: 1px solid currentColor;
+	border-radius: 4px;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	padding: 0.35rem 0.75rem;
+}
+`}
+			</style>
+			<span className="impersonation-frontend-banner__text">{actingAs}</span>
+			<ImpersonationFrontendExit
+				apiPath={apiPath}
+				className="impersonation-frontend-banner__exit"
+				label={labels?.exit ?? 'Exit'}
+			/>
 		</div>
 	)
 }

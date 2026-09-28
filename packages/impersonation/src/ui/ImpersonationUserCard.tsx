@@ -45,27 +45,29 @@ export const ImpersonationUserCard = ({
 		</button>
 		<div className="impersonation-card__actions">
 			<Button
-				aria-label={openDrawerLabel}
 				buttonStyle="icon-label"
-				extraButtonProps={{ 'data-testid': 'impersonation-open-drawer' }}
+				extraButtonProps={{
+					'aria-label': openDrawerLabel,
+					'data-testid': 'impersonation-open-drawer',
+				}}
 				icon={<EditIcon />}
 				iconStyle="none"
 				margin={false}
 				onClick={onOpenDrawer}
 				size="small"
-				tooltip={openDrawerLabel}
 			/>
 			<Button
-				aria-label={openDocumentLabel}
 				buttonStyle="icon-label"
 				el="link"
-				extraButtonProps={{ 'data-testid': 'impersonation-open-document' }}
+				extraButtonProps={{
+					'aria-label': openDocumentLabel,
+					'data-testid': 'impersonation-open-document',
+				}}
 				icon={<ExternalLinkIcon />}
 				iconStyle="none"
 				margin={false}
 				size="small"
 				to={documentHref}
-				tooltip={openDocumentLabel}
 			/>
 		</div>
 	</div>

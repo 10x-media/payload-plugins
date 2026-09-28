@@ -29,7 +29,11 @@ export const resolveTargetFilters = async ({
 		let result: boolean | Where
 		try {
 			result = await options.access.filterTargets({ req, targetCollection: slug })
-		} catch {
+		} catch (error) {
+			req.payload.logger.error({
+				err: error,
+				msg: `@10x-media/impersonation: access.filterTargets threw for "${slug}"`,
+			})
 			continue
 		}
 		if (result === true) {

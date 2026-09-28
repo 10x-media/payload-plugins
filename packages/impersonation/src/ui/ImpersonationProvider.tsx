@@ -1,14 +1,16 @@
+import { headers as nextHeaders } from 'next/headers'
 import type { ServerProps } from 'payload'
 import { createLocalReq } from 'payload'
 import type { ReactNode } from 'react'
 
 import { resolveTargetFilters } from '../access/filterTargets'
+import { statusFromRow } from '../getImpersonation'
 import { IMPERSONATION_SID_PREFIX } from '../plugin/constants'
 import { readHintCookie } from '../plugin/lookup'
 import { getRegistry } from '../plugin/registry'
 import { startableCollectionSlugs } from '../plugin/startable'
 import {
-	findOpenBySid,
+	cachedFindOpenBySid,
 	impersonationSide,
 	isPastAbsoluteExpiry,
 	relationOf,
@@ -23,6 +25,7 @@ export type ImpersonationProviderProps = ServerProps & { children?: ReactNode }
 
 export const ImpersonationProvider = async ({
 	children,
+	i18n,
 	payload,
 	user,
 }: ImpersonationProviderProps) => {
@@ -36,7 +39,8 @@ export const ImpersonationProvider = async ({
 		startable.map((slug) => [slug, true as const])
 	)
 	if (user && options.access.filterTargets) {
-		const req = await createLocalReq({ user }, payload)
+		const headerList = await nextHeaders()
+		const req = await createLocalReq({ req: { headers: headerList, i18n } as never, user }, payload)
 		targets = await resolveTargetFilters({ collections: startable, options, req })
 	}
 
@@ -53,7 +57,7 @@ export const ImpersonationProvider = async ({
 
 	let row = null
 	if (!painted && user && sid && shouldLookup) {
-		row = await findOpenBySid({ options, payload, sid })
+		row = await cachedFindOpenBySid(sid, options, payload)
 		if (row && isPastAbsoluteExpiry(row)) {
 			row = null
 		}
@@ -69,18 +73,10 @@ export const ImpersonationProvider = async ({
 				side: 'target' as const,
 				startedAt: paintedLive.startedAt,
 				target: paintedLive.target,
+				targetEmail: paintedLive.targetEmail ?? null,
 			}
 		: row && sid
-			? {
-					absoluteExpiresAt: row.absoluteExpiresAt ?? null,
-					active: true as const,
-					impersonator: relationOf(row.impersonator),
-					impersonatorLocale: row.impersonatorLocale ?? null,
-					mode: row.mode,
-					side: impersonationSide(row, sid),
-					startedAt: row.startedAt,
-					target: relationOf(row.target),
-				}
+			? statusFromRow(row, sid)
 			: { active: false as const }
 
 	const barSource = paintedLive
@@ -107,23 +103,17 @@ export const ImpersonationProvider = async ({
 				}
 			: null
 
-	const wrapped = (
-		<ImpersonationClientConfig
-			value={{
-				apiPath,
-				cardEmail: options.ui.cardEmail,
-				reasonMode: options.reason,
-				sessionCollection: options.collectionSlug,
-				status,
-				targets,
-			}}
-		>
-			{children}
-		</ImpersonationClientConfig>
-	)
+	const clientValue = {
+		apiPath,
+		cardEmail: options.ui.cardEmail,
+		reasonMode: options.reason,
+		sessionCollection: options.collectionSlug,
+		status,
+		targetFilters: targets,
+	}
 
 	if (!options.ui.bar || !barSource) {
-		return wrapped
+		return <ImpersonationClientConfig value={clientValue}>{children}</ImpersonationClientConfig>
 	}
 
 	const locale = barSource.impersonatorLocale
@@ -138,8 +128,8 @@ export const ImpersonationProvider = async ({
 		: fillTemplate(messageFor(locale, keys.returnTo), '{{name}}', String(impersonatorLabel))
 
 	return (
-		<>
-			{wrapped}
+		<ImpersonationClientConfig value={clientValue}>
+			{children}
 			<ImpersonationBar
 				actingAs={actingAs}
 				adminRoute={payload.config.routes.admin}
@@ -153,7 +143,8 @@ export const ImpersonationProvider = async ({
 				sessionEndsAtTemplate={messageFor(locale, keys.sessionEndsAt)}
 				sessionEndsInTemplate={messageFor(locale, keys.sessionEndsIn)}
 				showFrontendLink={isImpersonatorSide}
+				tone={isImpersonatorSide ? 'quiet' : 'warning'}
 			/>
-		</>
+		</ImpersonationClientConfig>
 	)
 }

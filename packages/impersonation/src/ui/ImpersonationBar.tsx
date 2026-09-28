@@ -1,13 +1,13 @@
 'use client'
 
 import { Button, Pill, toast } from '@payloadcms/ui'
+import { usePathname } from 'next/navigation'
 import {
 	type PointerEvent as ReactPointerEvent,
 	useCallback,
 	useEffect,
 	useRef,
 	useState,
-	useSyncExternalStore,
 } from 'react'
 
 import type { ImpersonationStatus } from '../getImpersonation'
@@ -35,25 +35,6 @@ const SESSION_GONE = new Set([
 	'impersonatorSessionExpired',
 	'notImpersonating',
 ])
-
-const subscribeToPath = (onChange: () => void): (() => void) => {
-	window.addEventListener('popstate', onChange)
-	const push = history.pushState.bind(history)
-	const replace = history.replaceState.bind(history)
-	history.pushState = (...args) => {
-		push(...args)
-		onChange()
-	}
-	history.replaceState = (...args) => {
-		replace(...args)
-		onChange()
-	}
-	return () => {
-		window.removeEventListener('popstate', onChange)
-		history.pushState = push
-		history.replaceState = replace
-	}
-}
 
 const formatCountdown = (expiresAt: string, now: number): string | null => {
 	const remaining = new Date(expiresAt).getTime() - now
@@ -86,6 +67,7 @@ export type ImpersonationBarProps = {
 	sessionEndsAtTemplate: string
 	sessionEndsInTemplate: string
 	showFrontendLink?: boolean
+	tone?: 'quiet' | 'warning'
 }
 
 export const ImpersonationBar = ({
@@ -101,15 +83,12 @@ export const ImpersonationBar = ({
 	sessionEndsAtTemplate,
 	sessionEndsInTemplate,
 	showFrontendLink,
+	tone = 'warning',
 }: ImpersonationBarProps) => {
 	const { setStatus } = useImpersonation()
 	const [mounted, setMounted] = useState(false)
-	const pathname = useSyncExternalStore(
-		subscribeToPath,
-		() => window.location.pathname,
-		() => ''
-	)
-	const onLogin = mounted && pathname === `${adminRoute}/login`
+	const pathname = usePathname() ?? ''
+	const onLogin = pathname === `${adminRoute}/login`
 	const [busy, setBusy] = useState(false)
 	const [visible, setVisible] = useState(true)
 	const [collapsed, setCollapsed] = useState(false)
@@ -435,14 +414,16 @@ export const ImpersonationBar = ({
 	return (
 		<div
 			aria-live="polite"
-			className="impersonation-bar"
+			className={
+				tone === 'quiet' ? 'impersonation-bar impersonation-bar--quiet' : 'impersonation-bar'
+			}
 			data-testid="impersonation-bar"
 			ref={rootRef}
 			role="status"
 		>
 			<div className="impersonation-bar__meta">
 				<div className="impersonation-bar__copy">
-					<Pill pillStyle="warning" size="small">
+					<Pill pillStyle={tone === 'quiet' ? 'success' : 'warning'} size="small">
 						{pluginName}
 					</Pill>
 					<span>{actingAs}</span>
@@ -479,7 +460,7 @@ export const ImpersonationBar = ({
 
 const CollapseIcon = () => (
 	<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
-		<path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" strokeWidth="1.5" />
+		<path d="M3.5 6 8 10.5 12.5 6" stroke="currentColor" strokeWidth="1.5" />
 	</svg>
 )
 

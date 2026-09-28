@@ -5,7 +5,6 @@
  */
 export const keys = {
 	actingAs: 'impersonation:actingAs',
-	cancel: 'impersonation:cancel',
 	collectionPlural: 'impersonation:collectionPlural',
 	collectionSingular: 'impersonation:collectionSingular',
 	confirm: 'impersonation:confirm',

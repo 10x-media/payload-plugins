@@ -14,7 +14,7 @@ export type ImpersonationClientOptions = {
 	sessionCollection: string
 	setStatus: (status: ImpersonationStatus) => void
 	status: ImpersonationStatus
-	targets: TargetFilterMap
+	targetFilters: TargetFilterMap
 }
 
 type ServerClientOptions = Omit<ImpersonationClientOptions, 'setStatus'>

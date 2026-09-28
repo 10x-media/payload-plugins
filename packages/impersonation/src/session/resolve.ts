@@ -1,5 +1,6 @@
 import type { Payload, PayloadRequest, Where } from 'payload'
 import { parseCookies } from 'payload/shared'
+import { cache } from 'react'
 import { idsEqual } from '../ids'
 import type { ImpersonationRecord, ResolvedOptions } from '../types'
 
@@ -85,6 +86,12 @@ export const findOpenBySid = async (args: {
 	req?: PayloadRequest
 	sid: string
 }): Promise<ImpersonationRecord | null> => findOpenWhere({ ...args, where: openBySid(args.sid) })
+
+/** One lookup per sid for the server components of a single admin render. */
+export const cachedFindOpenBySid = cache(
+	(sid: string, options: ResolvedOptions, payload: Payload): Promise<ImpersonationRecord | null> =>
+		findOpenBySid({ options, payload, sid })
+)
 
 export const impersonationSide = (
 	row: ImpersonationRecord,

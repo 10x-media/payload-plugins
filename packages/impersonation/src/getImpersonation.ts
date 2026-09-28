@@ -22,6 +22,7 @@ export type ImpersonationStatus =
 			side: 'impersonator' | 'target'
 			startedAt: string
 			target: { collection: string; id: number | string } | null
+			targetEmail: null | string
 	  }
 	| { active: false }
 
@@ -36,6 +37,7 @@ export const statusFromRow = (row: ImpersonationRecord, sid: string): Impersonat
 	side: impersonationSide(row, sid),
 	startedAt: row.startedAt,
 	target: relationOf(row.target),
+	targetEmail: row.targetEmail ?? null,
 })
 
 /**

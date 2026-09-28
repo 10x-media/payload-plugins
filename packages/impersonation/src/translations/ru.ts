@@ -2,7 +2,6 @@ import { keys, type TranslationKey } from './keys'
 
 export const ru: Record<TranslationKey, string> = {
 	[keys.actingAs]: 'Действует как {{name}}',
-	[keys.cancel]: 'Отмена',
 	[keys.collectionPlural]: 'Сеансы имперсонации',
 	[keys.collectionSingular]: 'Сеанс имперсонации',
 	[keys.confirm]: 'Имперсонировать',

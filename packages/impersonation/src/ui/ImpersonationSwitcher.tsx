@@ -33,9 +33,7 @@ export type SwitcherCollection = {
 
 export type ImpersonationSwitcherProps = {
 	Card?: ComponentType<ImpersonationUserCardProps>
-	apiPath?: string
 	collections: SwitcherCollection[]
-	reasonMode?: 'off' | 'optional' | 'required'
 	viewerId: number | string
 }
 
@@ -76,7 +74,7 @@ export const ImpersonationSwitcher = ({
 	const { config } = useConfig()
 	const { t } = useTranslation()
 	const { closeModal, isModalOpen, openModal } = useModal()
-	const { apiPath, cardEmail, reasonMode, targets } = useImpersonation()
+	const { apiPath, cardEmail, reasonMode, targetFilters } = useImpersonation()
 	const [collection, setCollection] = useState(collections[0]?.slug ?? '')
 	const [search, setSearch] = useState('')
 	const [page, setPage] = useState(1)
@@ -89,8 +87,8 @@ export const ImpersonationSwitcher = ({
 	const [preview, setPreview] = useState<null | { collection: string; id: number | string }>(null)
 
 	const visibleCollections = useMemo(
-		() => collections.filter((entry) => targets[entry.slug] !== undefined),
-		[collections, targets]
+		() => collections.filter((entry) => targetFilters[entry.slug] !== undefined),
+		[collections, targetFilters]
 	)
 
 	useEffect(() => {
@@ -119,10 +117,13 @@ export const ImpersonationSwitcher = ({
 		listAbort.current = controller
 		setLoading(true)
 		try {
-			const filter = targets[collection]
+			const filter = targetFilters[collection]
 			const clauses: Where[] = []
 			if (filter && filter !== true) {
 				clauses.push(filter)
+			}
+			if (collection === config.admin.user && viewerId !== undefined && viewerId !== '') {
+				clauses.push({ id: { not_equals: viewerId } })
 			}
 			const trimmed = search.trim()
 			if (trimmed) {
@@ -172,7 +173,18 @@ export const ImpersonationSwitcher = ({
 				setLoading(false)
 			}
 		}
-	}, [collection, config.routes.api, isModalOpen, page, search, t, targets, useAsTitle])
+	}, [
+		collection,
+		config.admin.user,
+		config.routes.api,
+		isModalOpen,
+		page,
+		search,
+		t,
+		targetFilters,
+		useAsTitle,
+		viewerId,
+	])
 
 	useEffect(() => {
 		void load()
@@ -192,7 +204,7 @@ export const ImpersonationSwitcher = ({
 	return (
 		<>
 			<Button
-				buttonStyle="none"
+				buttonStyle="subtle"
 				margin={false}
 				onClick={() => {
 					setPage(1)
@@ -238,9 +250,6 @@ export const ImpersonationSwitcher = ({
 							<p className="impersonation-switcher__empty">{t(keys.noResults)}</p>
 						) : null}
 						{docs.map((doc) => {
-							if (String(doc.id) === String(viewerId) && collection === config.admin.user) {
-								return null
-							}
 							const title = String(doc[useAsTitle] ?? doc.email ?? doc.id)
 							const email = typeof doc.email === 'string' ? doc.email : undefined
 							const showEmail = cardEmail && email && email !== title

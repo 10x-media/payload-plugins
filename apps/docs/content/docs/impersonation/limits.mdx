@@ -35,9 +35,10 @@ Default mint prefixes the target sid with `imp_` so ordinary traffic does not hi
 
 You cannot start while a session is already open, including the admin side of a parallel session.
 
-## What the plugin will not do
+## Swap mode remote end signs the impersonator out
 
-- Step-up password, notify-the-target emails, or an email kill-switch
-- Preference isolation or BroadcastChannel across tabs
-- Rewrite Payload versions / `lastModifiedBy` to the impersonator
-- GraphQL mutations for start / exit / end
+In swap mode, start replaces `payload-token` with the target session. **End session** on the record (from another browser) and `maxDuration` expiry both revoke that target session. They can only set cookies on the browser that made the request, so the browser that was impersonating is left with a revoked token and the next request is anonymous. That admin has to log in again.
+
+**Return to** is the only action that puts the impersonator back, because it runs in that same browser and restores their session.
+
+Parallel mode is not affected. The impersonator's admin cookie is never replaced.

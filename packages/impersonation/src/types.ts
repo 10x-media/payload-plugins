@@ -1,5 +1,6 @@
 import type {
 	Access,
+	CollectionConfig,
 	CollectionSlug,
 	Payload,
 	PayloadComponent,
@@ -47,9 +48,7 @@ export type ImpersonateAccessArgs = {
  * `undefined`, and a Payload `Where` object all deny. A `Where` is never treated
  * as allow-all.
  */
-export type ImpersonateAccess = (
-	args: ImpersonateAccessArgs
-) => boolean | Promise<boolean | unknown> | unknown
+export type ImpersonateAccess = (args: ImpersonateAccessArgs) => boolean | Promise<boolean>
 
 export type BooleanAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 
@@ -175,6 +174,16 @@ export type EnabledOptions = {
 	}
 	apiPath?: string
 	collectionSlug?: string
+	/**
+	 * Last pass over the built `impersonation-sessions` collection. Whatever
+	 * this returns is registered as-is, including access. Do not rename fields
+	 * the plugin reads (`impersonator`, `target`, `targetSid`, `impersonatorSid`,
+	 * `startedAt`, `endedAt`, `endedBy`, `mode`, `absoluteExpiresAt`) and do not
+	 * change the slug here. Use `collectionSlug` for that.
+	 */
+	collection?: {
+		overrides?: (collection: CollectionConfig) => CollectionConfig
+	}
 	cookies?: { clearOnSwitch?: string[] }
 	decorateRequests?: boolean
 	hintCookieName?: string
@@ -227,6 +236,7 @@ export type ResolvedOptions = {
 	}
 	apiPath: string
 	collectionSlug: CollectionSlug
+	collectionOverrides?: (collection: CollectionConfig) => CollectionConfig
 	cookies: { clearOnSwitch: string[] }
 	decorateRequests: boolean
 	hintCookieName: string

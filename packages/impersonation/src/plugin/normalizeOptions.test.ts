@@ -97,6 +97,18 @@ describe('normalizeOptions', () => {
 		).toBe(true)
 	})
 
+	it('throws when retention.deleteAfterDays is not a positive finite number', () => {
+		expect(() =>
+			normalizeOptions(enabled({ retention: { deleteAfterDays: 0 } }), config())
+		).toThrow(/deleteAfterDays/)
+		expect(() =>
+			normalizeOptions(enabled({ retention: { deleteAfterDays: -1 } }), config())
+		).toThrow(/deleteAfterDays/)
+		expect(() =>
+			normalizeOptions(enabled({ retention: { deleteAfterDays: Number.NaN } }), config())
+		).toThrow(/deleteAfterDays/)
+	})
+
 	it('derives the tenant cookie from cookiePrefix', () => {
 		expect(
 			normalizeOptions(enabled(), config({ cookiePrefix: 'acme' })).cookies.clearOnSwitch

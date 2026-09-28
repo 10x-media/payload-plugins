@@ -28,7 +28,7 @@ export default async function Layout({ children }) {
 }
 ```
 
-Pass `user` if you already called `payload.auth`, so the banner does not authenticate again.
+Pass `user` if you already called `payload.auth`, so the banner does not authenticate again. `className` and `labels` (`actingAs` with `{{name}}`, `exit`) are the styling and copy hooks. The default label uses the target email. Exit reloads only when the request succeeds.
 
 ## Build your own
 

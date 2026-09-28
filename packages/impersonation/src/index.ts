@@ -63,9 +63,7 @@ export const impersonation = definePlugin<ImpersonationPluginOptions>({
 				)
 			}
 
-			if (resolved.decorateRequests) {
-				decorateAuthStrategies(payload, resolved)
-			}
+			decorateAuthStrategies(payload, resolved)
 
 			try {
 				await closeStaleImpersonations(payload)

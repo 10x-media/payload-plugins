@@ -7,7 +7,7 @@ import { IMPERSONATION_SID_PREFIX } from '../plugin/constants'
 import { readHintCookie } from '../plugin/lookup'
 import { getRegistry } from '../plugin/registry'
 import { isStartableAuthCollection } from '../plugin/startable'
-import { findOpenBySid } from '../session/resolve'
+import { cachedFindOpenBySid } from '../session/resolve'
 import { asAuthUser, boundSid } from '../types'
 import { ImpersonationSwitcher } from './ImpersonationSwitcher'
 import type { ImpersonationUserCardProps } from './ImpersonationUserCard'
@@ -35,7 +35,7 @@ export const ImpersonationAction = async ({ payload, user }: ServerProps) => {
 	const shouldLookup =
 		Boolean(options.session.issue) || Boolean(hint) || sid.startsWith(IMPERSONATION_SID_PREFIX)
 	if (shouldLookup) {
-		const active = await findOpenBySid({ options, payload, sid })
+		const active = await cachedFindOpenBySid(sid, options, payload)
 		if (active) {
 			return null
 		}

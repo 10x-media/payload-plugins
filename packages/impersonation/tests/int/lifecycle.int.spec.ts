@@ -398,7 +398,9 @@ describeForDb('impersonation refusals', {}, (db) => {
 			configOverrides: { admin: { user: 'users' } },
 			db,
 			plugin: impersonation({
-				access: { impersonate: () => ({ id: { exists: true } }) },
+				access: {
+					impersonate: (() => ({ id: { exists: true } })) as unknown as () => boolean,
+				},
 			}),
 			seed,
 		})

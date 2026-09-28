@@ -115,8 +115,9 @@ export const registerCollection = (config: Config, options: ResolvedOptions): vo
 	const authSlugs = (config.collections ?? [])
 		.filter((collection) => Boolean(collection.auth))
 		.map(({ slug }) => slug as CollectionSlug)
+	const built = buildRecordsCollection({ authSlugs, options })
 	config.collections = [
 		...(config.collections ?? []),
-		buildRecordsCollection({ authSlugs, options }),
+		options.collectionOverrides ? options.collectionOverrides(built) : built,
 	]
 }

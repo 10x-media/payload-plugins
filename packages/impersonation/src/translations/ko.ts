@@ -2,7 +2,6 @@ import { keys, type TranslationKey } from './keys'
 
 export const ko: Record<TranslationKey, string> = {
 	[keys.actingAs]: '{{name}}(으)로 활동 중',
-	[keys.cancel]: '취소',
 	[keys.collectionPlural]: '가장 세션',
 	[keys.collectionSingular]: '가장 세션',
 	[keys.confirm]: '가장하기',

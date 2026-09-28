@@ -20,6 +20,17 @@ html[data-theme="dark"] .impersonation-bar {
 	color: var(--theme-warning-800);
 }
 
+.impersonation-bar--quiet {
+	background: var(--theme-success-50);
+	border-block-start-color: var(--theme-success-250);
+	color: var(--theme-success-800);
+}
+
+html[data-theme="dark"] .impersonation-bar--quiet {
+	background: var(--theme-success-100);
+	color: var(--theme-success-800);
+}
+
 .impersonation-bar__meta {
 	display: flex;
 	flex-direction: column;
@@ -38,6 +49,10 @@ html[data-theme="dark"] .impersonation-bar {
 	color: var(--theme-warning-800);
 	font-size: 0.875rem;
 	opacity: 0.92;
+}
+
+.impersonation-bar--quiet .impersonation-bar__time {
+	color: var(--theme-success-800);
 }
 
 .impersonation-bar__actions {
@@ -125,6 +140,7 @@ body.impersonation--active {
 
 .impersonation-switcher {
 	display: flex;
+	padding-block-end: var(--base);
 	flex-direction: column;
 	gap: var(--base);
 	min-height: calc(100vh - 10rem);
@@ -203,8 +219,8 @@ body.impersonation--active {
 .impersonation-collection .rs__menu,
 .impersonation-collection .rs__menu-list {
 	background: var(--theme-elevation-0);
-	min-width: 100%;
-	width: 100%;
+	min-width: 12rem;
+	width: max-content;
 }
 
 .impersonation-collection .rs__menu {
@@ -307,8 +323,8 @@ body.impersonation--active {
 }
 
 .impersonation-card__email {
-	color: var(--theme-elevation-800);
-	font-size: 0.8125rem;
+	color: var(--theme-elevation-500);
+	font-size: 1rem;
 }
 
 .impersonation-switcher__empty {

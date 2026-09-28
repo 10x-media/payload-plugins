@@ -23,8 +23,10 @@ export type UseImpersonation = {
 		redirect?: string
 	}) => Promise<{ error?: FailureCode; ok: boolean; redirect?: string; status: number }>
 	status: ImpersonationStatus
-	targets: Record<string, true | Where>
+	targetFilters: Record<string, true | Where>
 }
+
+const noopSetStatus = (_status: ImpersonationStatus): void => {}
 
 /**
  * Headless client API. The provider is always registered, so this works from
@@ -36,10 +38,10 @@ export const useImpersonation = (): UseImpersonation => {
 	const apiPath = plugin?.apiPath ?? `${config.routes.api}/impersonation`
 	const reasonMode = plugin?.reasonMode ?? 'off'
 	const sessionCollection = plugin?.sessionCollection ?? 'impersonation-sessions'
-	const targets = plugin?.targets ?? {}
+	const targetFilters = plugin?.targetFilters ?? {}
 	const cardEmail = plugin?.cardEmail ?? true
 	const status = plugin?.status ?? { active: false }
-	const setStatus = plugin?.setStatus ?? (() => undefined)
+	const setStatus = plugin?.setStatus ?? noopSetStatus
 
 	return {
 		apiPath,
@@ -51,7 +53,7 @@ export const useImpersonation = (): UseImpersonation => {
 		setStatus,
 		start: (args) => postImpersonation(`${apiPath}/start`, args),
 		status,
-		targets,
+		targetFilters,
 	}
 }
 

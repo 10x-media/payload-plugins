@@ -2,7 +2,6 @@ import { keys, type TranslationKey } from './keys'
 
 export const ar: Record<TranslationKey, string> = {
 	[keys.actingAs]: 'يتصرف باسم {{name}}',
-	[keys.cancel]: 'إلغاء',
 	[keys.collectionPlural]: 'جلسات انتحال الهوية',
 	[keys.collectionSingular]: 'جلسة انتحال الهوية',
 	[keys.confirm]: 'انتحال الهوية',

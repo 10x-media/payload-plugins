@@ -2,7 +2,6 @@ import { keys, type TranslationKey } from './keys'
 
 export const zh: Record<TranslationKey, string> = {
 	[keys.actingAs]: '正在以 {{name}} 的身份操作',
-	[keys.cancel]: '取消',
 	[keys.collectionPlural]: '模拟登录会话',
 	[keys.collectionSingular]: '模拟登录会话',
 	[keys.confirm]: '模拟登录',

@@ -69,7 +69,7 @@ const wrapStrategy = ({
 
 		const impersonator = relationOf(row.impersonator)
 		const target = relationOf(row.target)
-		if (impersonator && target && sid === row.targetSid) {
+		if (options.decorateRequests && impersonator && target && sid === row.targetSid) {
 			const actor: ImpersonationActor = {
 				absoluteExpiresAt: row.absoluteExpiresAt ?? null,
 				id: row.id,

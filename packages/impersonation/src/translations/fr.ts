@@ -2,7 +2,6 @@ import { keys, type TranslationKey } from './keys'
 
 export const fr: Record<TranslationKey, string> = {
 	[keys.actingAs]: 'Agit en tant que {{name}}',
-	[keys.cancel]: 'Annuler',
 	[keys.collectionPlural]: "Sessions d'usurpation",
 	[keys.collectionSingular]: "Session d'usurpation",
 	[keys.confirm]: 'Usurper',
