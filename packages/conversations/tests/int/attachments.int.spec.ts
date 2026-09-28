@@ -173,7 +173,8 @@ for (const deleteWithMessage of [false, true])
 			expect(unknown.status).toBe(400)
 			// In turn: concurrent uploads race for the same free filename.
 			const three = []
-			for (const name of ['one.txt', 'two.txt', 'three.txt']) three.push(await upload(staff, { name }))
+			for (const name of ['one.txt', 'two.txt', 'three.txt'])
+				three.push(await upload(staff, { name }))
 			expect(three.every((entry) => entry.status === 201)).toBe(true)
 			const tooMany = await call<{ errors?: Array<{ message: string }> }>(
 				booted,
