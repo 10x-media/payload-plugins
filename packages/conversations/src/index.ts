@@ -1,4 +1,4 @@
-import { type Config, definePlugin } from 'payload'
+import { type Config, definePlugin, type PayloadComponent } from 'payload'
 
 import { buildMessagesCollection } from './collections/messages'
 import { buildReadsCollection } from './collections/reads'
@@ -9,6 +9,9 @@ import { cascadeHook } from './server/cascade'
 import type { InstanceRegistry } from './server/service'
 import { SLOT_WIDGET_SLUG } from './shared/constants'
 import type { ConversationsPluginOptions } from './types'
+
+/** The plugin's own admin components: all client ones, so never a reason for the widget. */
+const OWN_CLIENT_ENTRY = '@10x-media/conversations/client#'
 
 declare module 'payload' {
 	interface RegisteredPlugins {
@@ -100,9 +103,15 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 			}
 		}
 		config.admin.dependencies = { ...config.admin.dependencies, ...dependencies }
+		// Whether a component is a server one shows only in the import map, so every host path
+		// counts; the plugin's own (the reactions and attachments slots) are client components.
+		const mayBeServer = (component: PayloadComponent | undefined) => {
+			const path = typeof component === 'string' ? component : component?.path
+			return Boolean(path) && !path?.startsWith(OWN_CLIENT_ENTRY)
+		}
 		const hasComponents =
-			Object.values(instance.slots).some((components) => components.length > 0) ||
-			[...instance.types.values()].some((type) => type.Component)
+			Object.values(instance.slots).some((components) => components.some(mayBeServer)) ||
+			[...instance.types.values()].some((type) => mayBeServer(type.Component))
 		const dashboard = config.admin.dashboard
 		const widgetRegistered = dashboard?.widgets?.some((widget) => widget.slug === SLOT_WIDGET_SLUG)
 		// One widget serves every instance; none when this one goes through its own server function.

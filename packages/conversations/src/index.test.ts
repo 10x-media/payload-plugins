@@ -60,7 +60,11 @@ describe('server components', () => {
 		expect(widgets({ serverComponents: 'server-function' })).toHaveLength(0)
 	})
 
-	it('registers none without a server-capable component', () => {
+	it('registers none without a component that could be a server one', () => {
 		expect(widgets({ slots: {} })).toHaveLength(0)
+		// The plugin's own slot components (reactions, attachments) are client components.
+		expect(
+			widgets({ slots: { messageFooter: '@10x-media/conversations/client#ReactionsBar' } })
+		).toHaveLength(0)
 	})
 })

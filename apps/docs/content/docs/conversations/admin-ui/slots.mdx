@@ -112,7 +112,7 @@ Rendering a server component after mount takes a Next server action, and Payload
 
 **Nothing is asked of you.** The plugin registers one internal dashboard widget, `Conversations (internal)`, and renders through Payload's built-in `render-widget`.
 
-That widget appears in the dashboard's "Add widget" drawer, which readers see only while editing their dashboard. One widget serves every instance, and it is registered only when some instance on this route has a slot or message type component. Added to a dashboard by hand, it shows a notice that it is not for display and can be removed.
+That widget appears in the dashboard's "Add widget" drawer, which readers see only while editing their dashboard. One widget serves every instance, and it is registered only when some instance on this route has a slot or message type component of yours: whether a component is a server one shows only in the import map, so every path you configure counts, while the plugin's own (the reactions and attachments slots) never do. Added to a dashboard by hand, it shows a notice that it is not for display and can be removed.
 
 #### `serverComponents: 'server-function'`
 
@@ -147,7 +147,7 @@ Payload generates that layout file and marks it "DO NOT MODIFY", so this one is 
 
 #### Choosing
 
-Take the default unless a stray row in the dashboard's widget drawer bothers you more than an edit to a generated file. If no instance has a server slot or message type component, neither is used: nothing is registered and nothing is called.
+Take the default unless a stray row in the dashboard's widget drawer bothers you more than an edit to a generated file. If no instance has a slot or message type component of yours, neither is used: nothing is registered and nothing is called.
 
 ## Custom message type components
 

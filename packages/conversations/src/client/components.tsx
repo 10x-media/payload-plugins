@@ -111,15 +111,18 @@ type WidgetRequest = {
 const cache = new Map<string, Promise<ReactNode>>()
 
 /**
+ * A server component that could not be fetched renders nothing, but says why.
  * Payload throws a bare `Unknown Server Function: <name>` when a name is not
- * registered; say what to do instead.
+ * registered; that one gets the fix spelled out.
  */
-const explainMissingFunction = (error: unknown) => {
+const explainFailure = (error: unknown) => {
 	const message = error instanceof Error ? error.message : String(error)
 	if (message.includes('Unknown Server Function')) {
 		console.error(
 			`[@10x-media/conversations] the "${SLOT_FUNCTION_NAME}" server function is not registered. Either spread \`conversationsServerFunctions\` from @10x-media/conversations/rsc into \`handleServerFunctions\` in app/(payload)/layout.tsx, or drop \`serverComponents: 'server-function'\` to go back to the widget, which needs no wiring.`
 		)
+	} else {
+		console.error('[@10x-media/conversations] a server component failed to render', error)
 	}
 	return null
 }
@@ -152,7 +155,7 @@ const ServerRendered = ({ cacheKey, request }: { cacheKey: string; request: Widg
 				) as Promise<{ component?: ReactNode }>
 			)
 				.then((result) => result?.component ?? null)
-				.catch(explainMissingFunction)
+				.catch(explainFailure)
 			cache.set(cacheKey, pending)
 		}
 		void pending.then((value) => {
