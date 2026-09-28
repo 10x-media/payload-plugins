@@ -170,25 +170,26 @@ export const useAttachmentsComposer = ({
 				status: 'uploading',
 			}))
 			uploads.set(clientId, states)
-			const results = await Promise.all(
-				picked.map(async (entry, index) => {
-					try {
-						const doc = await store.api.upload<{ id: number | string }>({
-							collection: settings.collection,
-							file: entry.file,
-							headers: {
-								[ATTACHMENT_CHANNEL_HEADER]: channel,
-								[ATTACHMENT_HEADER]: store.instance,
-								[ATTACHMENT_KEY_HEADER]: conversationKey,
-							},
-						})
-						return doc.id
-					} catch (error) {
-						states[index] = { error: errorText(error), filename: entry.file.name, status: 'failed' }
-						return null
-					}
-				})
-			)
+			// One after another: Payload picks a free filename before inserting, so two
+			// concurrent uploads of `image.png` race for the same one and one fails.
+			const results: Array<null | number | string> = []
+			for (const [index, entry] of picked.entries()) {
+				try {
+					const doc = await store.api.upload<{ id: number | string }>({
+						collection: settings.collection,
+						file: entry.file,
+						headers: {
+							[ATTACHMENT_CHANNEL_HEADER]: channel,
+							[ATTACHMENT_HEADER]: store.instance,
+							[ATTACHMENT_KEY_HEADER]: conversationKey,
+						},
+					})
+					results.push(doc.id)
+				} catch (error) {
+					states[index] = { error: errorText(error), filename: entry.file.name, status: 'failed' }
+					results.push(null)
+				}
+			}
 			// Only the failures stay: they show under the sent message.
 			uploads.set(
 				clientId,

@@ -171,12 +171,26 @@ for (const deleteWithMessage of [false, true])
 			expect(refused.status).toBe(400)
 			const unknown = await send(staff, { ext: { attachments: ['999999'] }, text: 'x' })
 			expect(unknown.status).toBe(400)
-			const three = await Promise.all([upload(staff), upload(staff), upload(staff)])
-			const tooMany = await send(staff, {
-				ext: { attachments: three.map((entry) => entry.doc?.id) },
-				text: 'x',
-			})
+			// In turn: concurrent uploads race for the same free filename.
+			const three = []
+			for (const name of ['one.txt', 'two.txt', 'three.txt']) three.push(await upload(staff, { name }))
+			expect(three.every((entry) => entry.status === 201)).toBe(true)
+			const tooMany = await call<{ errors?: Array<{ message: string }> }>(
+				booted,
+				'POST /conversations/comments/messages',
+				{
+					body: {
+						channel: 'shared',
+						clientId: crypto.randomUUID(),
+						ext: { attachments: three.map((entry) => entry.doc?.id) },
+						key: personKey,
+						text: 'x',
+					},
+					session: staff,
+				}
+			)
 			expect(tooMany.status).toBe(400)
+			expect(tooMany.json.errors?.[0]?.message).toBe('At most 2 files per message')
 			expect((await send(staff, { ext: { attachments: 'nope' }, text: 'x' })).status).toBe(400)
 			expect((await send(staff, { ext: 'nope', text: 'x' })).status).toBe(400)
 		})

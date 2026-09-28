@@ -21,7 +21,7 @@ The extension only ties an upload collection to messages. Who may upload and who
 ## How it works
 
 1. A person picks files in the composer. Nothing is uploaded yet.
-2. On Send, the message shows at once (sending), and each file goes to the collection's own REST endpoint, `POST /api/<collection>`, as the signed-in user.
+2. On Send, the message shows at once (sending), and the files go to the collection's own REST endpoint, `POST /api/<collection>`, one after another (two concurrent uploads of the same filename would race for the same free name), as the signed-in user.
 3. The send carries the ids of the files that uploaded: `ext: { attachments: [id, ...] }`. The server checks there are at most `maxFiles` and that the sender can read every one of them (the collection's `read` access), then stores them on the message.
 4. Every response that carries the message shows its files at `message.ext.attachments`.
 
