@@ -25,7 +25,7 @@ conversations({
 })
 ```
 
-`@10x-media/conversations/i18n` exports `keys`, the built-in `translations` (English), and the `TranslationKey` (alias `ConversationsTranslationKeys`) and `TranslationsOption` types. A typo'd key fails to compile.
+`@10x-media/conversations/i18n` exports `keys`, the built-in `translations` (Arabic, Chinese, English, French, German, Indonesian, Korean, Portuguese, Russian, Spanish and Ukrainian, like the other plugins), and the `TranslationKey` (alias `ConversationsTranslationKeys`) and `TranslationsOption` types. A typo'd key fails to compile.
 
 The strings are shared by all instances: they are merged into the Payload config's `i18n.translations`, so passing them on one instance is enough. Merge order, extra locales, and app-level overrides work as in every plugin: see [Translations](/concepts/translations). Payload has no per-key fallback, so translate every key you rely on when you add a locale.
 
