@@ -77,6 +77,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.unknownType]: 'This message cannot be shown here',
 	[keys.unreadDot]: 'Unread messages',
 	[keys.unseenCount]: '{{count}} new',
+	[keys.widgetNotice]:
+		'This widget is not intended for display. You can remove it from your dashboard.',
 	[keys.yesterday]: 'Yesterday',
 	[keys.you]: 'You',
 }

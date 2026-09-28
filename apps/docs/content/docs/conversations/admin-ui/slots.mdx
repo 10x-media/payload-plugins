@@ -82,7 +82,7 @@ Slot components sit under the instance's provider, so every hook from `@10x-medi
 
 ### Server components
 
-A server component is rendered after mount through Payload's `render-widget` server function, with a real request:
+A server component is rendered after mount through a server function, with a real request (see [How server components reach the admin](#how-server-components-reach-the-admin)):
 
 ```ts
 type ChatServerSlotProps = ChatSlotProps & { req: PayloadRequest; locale; permissions }
@@ -100,16 +100,58 @@ export const SeenBy = async ({ message, req }: ChatServerSlotProps) => {
 
 Before rendering, the dispatcher runs the instance's access for the conversation and checks the message's channel against it, so a crafted request shows nothing the user could not read through the endpoints.
 
-What it costs:
-
-- **One request per slot and message.** A server `messageFooter` in a feed of 30 messages makes 30 `render-widget` calls. Results are cached per message and `updatedAt` for the life of the page, so an edit renders afresh and a re-render does not. Prefer client components for the per-message slots, and fetch what you need in one request there.
-- **One dashboard entry.** Payload offers no config-level way to add a server function, so the plugin registers a dashboard widget (`Conversations (internal)`) as the dispatcher. It appears once in the dashboard's "Add widget" drawer. Leave it out of your dashboards. It is added only when some instance has a slot or message type component.
+**One request per slot and message.** A server `messageFooter` in a feed of 30 messages makes 30 server function calls. Results are cached per message and `updatedAt` for the life of the page, so an edit renders afresh and a re-render does not. Prefer client components for the per-message slots, and fetch what you need in one request there.
 
 Server slots exist only in the admin.
 
+### How server components reach the admin
+
+Rendering a server component after mount takes a Next server action, and Payload funnels all of its own through one action declared in your generated `app/(payload)/layout.tsx`, with no config-level way to add a name to it. So the plugin offers two routes, per instance, with `serverComponents`.
+
+#### `serverComponents: 'widget'`, the default
+
+**Nothing is asked of you.** The plugin registers one internal dashboard widget, `Conversations (internal)`, and renders through Payload's built-in `render-widget`.
+
+That widget appears in the dashboard's "Add widget" drawer, which readers see only while editing their dashboard. One widget serves every instance, and it is registered only when some instance on this route has a slot or message type component of yours: whether a component is a server one shows only in the import map, so every path you configure counts, while the plugin's own (the reactions and attachments slots) never do. Added to a dashboard by hand, it shows a notice that it is not for display and can be removed.
+
+#### `serverComponents: 'server-function'`
+
+No widget is registered for the instance. In exchange you wire the plugin's own function yourself:
+
+```ts title="app/(payload)/layout.tsx"
+import config from '@payload-config'
+import { conversationsServerFunctions } from '@10x-media/conversations/rsc'
+import { handleServerFunctions, RootLayout } from '@payloadcms/next/layouts'
+import type { ServerFunctionClient } from 'payload'
+
+import { importMap } from './admin/importMap.js'
+
+const serverFunction: ServerFunctionClient = async (args) => {
+  'use server'
+  return handleServerFunctions({
+    ...args,
+    config,
+    importMap,
+    serverFunctions: conversationsServerFunctions,
+  })
+}
+```
+
+```ts title="payload.config.ts"
+conversations({ slug: 'comments', serverComponents: 'server-function', /* ... */ })
+```
+
+With another plugin that registers functions the same way, spread both: `serverFunctions: { ...conversationsServerFunctions, ...settingsOverlayServerFunctions }`.
+
+Payload generates that layout file and marks it "DO NOT MODIFY", so this one is opt in. Forget the wiring and the browser console says so in as many words, naming both the fix and the way back.
+
+#### Choosing
+
+Take the default unless a stray row in the dashboard's widget drawer bothers you more than an edit to a generated file. If no instance has a slot or message type component of yours, neither is used: nothing is registered and nothing is called.
+
 ## Custom message type components
 
-A [custom message type](/conversations/messages) with a `Component` is drawn in the same way as a slot: a client component renders directly with `ChatSlotProps` (`message` and the view's `authors` set), a server component goes through `render-widget` with `ChatServerSlotProps`. A message of a type with no component shows "This message cannot be shown here".
+A [custom message type](/conversations/messages) with a `Component` is drawn in the same way as a slot: a client component renders directly with `ChatSlotProps` (`message` and the view's `authors` set), a server component goes through the [server function](#how-server-components-reach-the-admin) with `ChatServerSlotProps`. A message of a type with no component shows "This message cannot be shown here".
 
 With `layout: 'bare'` the component is the whole row rather than the body under the author's name; see [Layout](/conversations/messages#layout-in-the-message-frame-or-the-whole-row).
 

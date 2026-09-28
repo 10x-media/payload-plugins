@@ -39,7 +39,12 @@ export const ChatAdminProviderServer = ({
 	payload: Payload
 }) => {
 	const instance = getInstance({ payload } as never, slug)
-	const components: ChatComponents = { replace: {}, server: { types: [] }, slots: {}, types: {} }
+	const components: ChatComponents = {
+		replace: {},
+		server: { types: [], via: instance.serverComponents },
+		slots: {},
+		types: {},
+	}
 	for (const [name, paths] of Object.entries(instance.slots) as Array<
 		[ChatSlotName, PayloadComponent[]]
 	>) {

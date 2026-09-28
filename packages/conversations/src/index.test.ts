@@ -31,3 +31,40 @@ describe('targets', () => {
 		).not.toThrow()
 	})
 })
+
+describe('server components', () => {
+	const widgets = (extra: Partial<ConversationsPluginOptions>) =>
+		(
+			conversations({
+				...options({}),
+				slots: { messageFooter: '/components/SeenBy#SeenBy' },
+				...extra,
+			})(config()) as Config
+		).admin?.dashboard?.widgets ?? []
+
+	it('registers the dispatcher widget by default, once for every instance', () => {
+		expect(widgets({})).toHaveLength(1)
+		const both = conversations({
+			...options({}),
+			slots: { messageFooter: '/components/B#B' },
+			slug: 'chat',
+		})(
+			conversations({ ...options({}), slots: { messageFooter: '/components/A#A' } })(
+				config()
+			) as Config
+		) as Config
+		expect(both.admin?.dashboard?.widgets).toHaveLength(1)
+	})
+
+	it('registers no widget when the instance uses its own server function', () => {
+		expect(widgets({ serverComponents: 'server-function' })).toHaveLength(0)
+	})
+
+	it('registers none without a component that could be a server one', () => {
+		expect(widgets({ slots: {} })).toHaveLength(0)
+		// The plugin's own slot components (reactions, attachments) are client components.
+		expect(
+			widgets({ slots: { messageFooter: '@10x-media/conversations/client#ReactionsBar' } })
+		).toHaveLength(0)
+	})
+})

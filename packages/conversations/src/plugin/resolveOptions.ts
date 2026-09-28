@@ -244,6 +244,7 @@ export const resolveInstance = (
 		extensionList: options.extensions ?? [],
 		slots: resolveSlots(options),
 		slug,
+		serverComponents: options.serverComponents ?? 'widget',
 		systemAuthors: options.systemAuthors ?? {},
 		targets,
 		transport: options.transport,

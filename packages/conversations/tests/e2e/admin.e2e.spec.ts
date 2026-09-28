@@ -4,12 +4,16 @@ const PASSWORD = 'password'
 const ME = 'dev@10xmedia.de'
 const ANNA = 'anna@10xmedia.de'
 
+/**
+ * Through the API, as the other plugins' suites do: the session cookie lands in
+ * the page's context, and no test waits on the login form's redirect to the
+ * dashboard, whose first render on a cold server was the flaky part.
+ */
 const login = async (page: Page, email: string) => {
-	await page.goto('/admin/login')
-	await page.fill('#field-email', email)
-	await page.fill('#field-password', PASSWORD)
-	await page.click('button[type=submit]')
-	await page.waitForURL('**/admin')
+	const res = await page.request.post('/api/users/login', {
+		data: { email, password: PASSWORD },
+	})
+	expect(res.ok(), `login as ${email}`).toBeTruthy()
 }
 
 const personId = async (page: Page, name: string): Promise<string> => {

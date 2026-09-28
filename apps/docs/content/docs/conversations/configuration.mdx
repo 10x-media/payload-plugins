@@ -39,6 +39,7 @@ conversations({
 | `reads` | `boolean` | `true` | Per-user read state and unread counts |
 | `transport` | `ConversationsServerTransport` | polling | `sseTransport()`, `pusherTransport()` or your own. See [Transport](/conversations/transport) |
 | `slots` | `ChatSlotConfig` | | Admin components added to the UI. See [Slots](/conversations/admin-ui/slots) |
+| `serverComponents` | `'widget' \| 'server-function'` | `'widget'` | How server slot and message type components reach the admin: an internal dashboard widget, or the plugin's own server function registered in `app/(payload)/layout.tsx`. See [Slots](/conversations/admin-ui/slots#how-server-components-reach-the-admin) |
 | `components` | `{ Trigger?, Drawer?, Panel?, ChannelTabs?, Feed?, Message?, Composer?, Thread? }` | built-ins | Client component paths that replace built-in admin components. See [Replacing components](/conversations/admin-ui/replacing-components) |
 | `overrides.messages`, `overrides.reads` | `{ fields?, hooks?, admin?, access? }` | | Change the collections. `fields` receives `{ defaultFields }`. See [Concepts](/conversations/concepts#changing-the-collections) |
 | `extensions` | `ConversationsExtension[]` | `[]` | `comments()`, `reactions()`, `attachments()` and your own. See [Extensions](/conversations/extensions) |

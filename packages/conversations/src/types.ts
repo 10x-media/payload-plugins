@@ -333,6 +333,15 @@ export type ConversationsPluginOptions = {
 	}
 	/** Per-user read cursors. Default true. */
 	reads?: boolean
+	/**
+	 * How server components in slots and message types reach the admin after
+	 * mount. `widget` (default): through Payload's `render-widget`, which needs
+	 * no wiring but lists one "Conversations (internal)" widget in the
+	 * dashboard's "Add widget" drawer. `server-function`: through the plugin's
+	 * own server function, which you register in `app/(payload)/layout.tsx`
+	 * (`conversationsServerFunctions` from `/rsc`); no widget then.
+	 */
+	serverComponents?: 'server-function' | 'widget'
 	slots?: ChatSlotConfig
 	/** Names the instance: `<slug>-messages`, `/api/conversations/<slug>`. */
 	slug: string
@@ -518,6 +527,7 @@ export type ConversationsInstance = {
 	messagesSlug: CollectionSlug
 	overrides: NonNullable<ConversationsPluginOptions['overrides']>
 	readsSlug: CollectionSlug | null
+	serverComponents: 'server-function' | 'widget'
 	slots: ResolvedSlots
 	slug: string
 	systemAuthors: Record<string, SystemAuthor>
