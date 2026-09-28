@@ -108,6 +108,8 @@
 		"automations-locales",
 		"color-linked-alpha",
 		"conversations-initial-beta",
+		"conversations-locales",
+		"conversations-server-function",
 		"dual-session-initial-beta",
 		"dual-session-locales",
 		"dual-session-role-split",
