@@ -77,6 +77,8 @@ pnpm changeset                          # author a changeset
 # Process hygiene
 pnpm check:processes                    # dry-run stale-process scan
 pnpm clean:processes                    # kill them
+pnpm check:mongo-temp                   # dry-run: list orphaned mongo-mem-* dirs in the OS temp dir
+pnpm clean:mongo-temp                   # delete them (--min-age=<minutes>, default 60)
 ```
 
 `<name>` is a plugin directory under `packages/` (e.g. `automations`) or an app under `apps/` (e.g. `docs`, so `pnpm dev docs` and `pnpm build docs` work). `scripts/run.ts` runs cacheable tasks (`build`/`lint`/`typecheck`/`test*`) through turbo and routes `dev`/`start`/`generate*`/`migrate*` to a plugin's `-dev` package via pnpm; apps have no `-dev` companion and do not support `generate`/`migrate`. Unknown names get a "Did you mean: ..." suggestion.
@@ -146,6 +148,14 @@ A plugin may carry `packages/<slug>/videos/*.video.ts`: clipwright scenes drivin
 `pnpm videos <name>` renders them, and needs `pnpm dev <name>` already serving on `:3000` (override with `WIKI_DEV_URL`). Output goes straight into `apps/docs/public/videos/<slug>/`, one MP4 plus a poster PNG per scene, and those files are committed. Nothing renders them in CI: they are binaries in git, so re-render only when the UI they show actually changed.
 
 Scenes are linted and typechecked with the rest of the package. Whatever fixtures a scene needs it creates through the REST API in `beforeScene`, which is off camera and free.
+
+A scene with `video: false` renders stills only (clipwright `snapshot()`, no ffmpeg). `conversations` has one (`videos/screenshots.video.ts`) for every docs screenshot: dark admin, cropped to an element, written to `apps/docs/public/images/<slug>/` as PNG, converted by hand to lossless WebP (the command is in the scene's header; a third of the size in git), and placed with `<Screenshot>` (`apps/docs/components/screenshot.tsx`). Its primitives come from the dev playground's "Docs shots" stories on the mock backend (`data-shot` marks each crop), so they are the same on every run.
+
+## shadcn registries
+
+A plugin with website components carries a shadcn registry in `packages/<slug>/registry/`: sources, `registry.json`, and the built `registry/r/*.json` from its `registry:build` script, committed. `pnpm check:registry` (`scripts/check-registry.sh`) rebuilds every one and fails on drift; it runs unscoped in CI.
+
+The docs site serves them: `apps/docs/scripts/collect-registry.ts` copies each `registry/r` into `apps/docs/public/r/<slug>/` (gitignored) before `dev` and `build`, so items live at `https://docs.10xmedia.de/r/<slug>/<item>.json` and the folder's `registry.json` is the index. Each plugin is its own registry, so item names only need to be unique within it. Items that depend on another item of the same registry list it by full URL in `registryDependencies`, which works without any `components.json` setup. A change under `packages/*/registry/r` redeploys the docs (`docs.yml` paths, and the docs build's turbo inputs).
 
 ## Adding a plugin
 

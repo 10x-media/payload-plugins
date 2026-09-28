@@ -1,0 +1,57 @@
+---
+title: i18n
+description: Override or localize the conversations UI strings, and give channels labels and cues per locale.
+---
+
+## UI strings
+
+Every string the admin components render (buttons, menus, the composer, placeholders, unread labels) is a typed translation under the `conversations:` namespace. Override any of them, or add a locale, through the `translations` option of an instance:
+
+```ts title="payload.config.ts"
+import { conversations } from '@10x-media/conversations'
+import { keys } from '@10x-media/conversations/i18n'
+
+conversations({
+  slug: 'comments',
+  // …
+  translations: {
+    en: { [keys.comments]: 'Notes', [keys.composerPlaceholder]: 'Add a note… @ to mention' },
+    de: {
+      [keys.comments]: 'Kommentare',
+      [keys.send]: 'Senden',
+      [keys.replyInThread]: 'Im Thread antworten',
+    },
+  },
+})
+```
+
+`@10x-media/conversations/i18n` exports `keys`, the built-in `translations` (English), and the `TranslationKey` (alias `ConversationsTranslationKeys`) and `TranslationsOption` types. A typo'd key fails to compile.
+
+The strings are shared by all instances: they are merged into the Payload config's `i18n.translations`, so passing them on one instance is enough. Merge order, extra locales, and app-level overrides work as in every plugin: see [Translations](/concepts/translations). Payload has no per-key fallback, so translate every key you rely on when you add a locale.
+
+Values may contain Payload's `{{placeholders}}`, such as `{{count}}` in `keys.commentsCount` and `keys.replies`, or `{{channel}}` in `keys.emptyChannel` and `keys.switchTo`. Keep them in your translations.
+
+## Channel labels and cues
+
+Channel labels and cue labels live in your config, not in the translation keys. Each takes a string or one string per locale:
+
+```ts
+channels: [
+  {
+    slug: 'shared',
+    label: { en: 'Shared', de: 'Geteilt' },
+    cue: { label: { en: 'Visible to the customer', de: 'Für den Kunden sichtbar' }, tone: 'warning' },
+    access: { read: () => true, create: () => true },
+  },
+]
+```
+
+The admin picks the entry for the admin language, then `en`, then the first one. On a website, the locale comes from the `locale` prop of the provider; nothing reads the browser's language. A cue that is a function of the viewer returns the same shape.
+
+## Website components
+
+The headless hooks carry no strings of their own. The shadcn registry components take their strings as a `labels` prop on their provider, so a website translates them with whatever i18n it already uses. See [Website UI](/conversations/website).
+
+## Message content
+
+Messages are not localized: a conversation is the same in every locale, and the plain-text projection keeps names as they were written. Dates and relative times ("2h ago", "Yesterday") follow the admin language, or the website provider's `locale`.

@@ -1,0 +1,146 @@
+---
+title: Configuration
+description: Every option of conversations(), with defaults and where each is explained.
+---
+
+```ts
+import { conversations } from '@10x-media/conversations'
+
+conversations({
+  slug: 'comments',
+  access,
+  channels,
+  // everything below is optional
+})
+```
+
+## Options
+
+| Option | Type | Default | |
+|---|---|---|---|
+| `slug` | `string` | required | Names the instance: `<slug>-messages`, `<slug>-reads`, `/api/conversations/<slug>`. Lowercase letters, digits, dashes. See [Concepts](/conversations/concepts#instances) |
+| `access` | `ConversationsAccess` | required | Batch conversation access; fails closed without it. See [Access](/conversations/access#conversation-access) |
+| `channels` | `ConversationsChannel[]` | required | Slug, label, cue, access rules. See [Access](/conversations/access#channel-rules) |
+| `targets` | `{ collections?, globals?, custom? }` | `{}` | Channels per target; extensions add to it. See [Concepts](/conversations/concepts#targets) |
+| `users` | `Array<string \| ConversationsUsersConfig>` | `[admin.user]` | Auth collections whose users take part, with an optional `display` projection |
+| `mentions.users` | `({ req, key, channel, collection }) => Where` | every user | Who can be mentioned, per users collection |
+| `mentions.max` | `number` | `20` | Mentions kept per message |
+| `mentions.verifyAccess` | `boolean` | `false` | Also run conversation access as each candidate |
+| `hooks.afterMessage` | `({ req, message, operation }) => void` | | After create, edit and delete. See [Messages](/conversations/messages#hooks) |
+| `hooks.afterMention` | `({ req, message, users, key, channel }) => void` | | New mentions only |
+| `editor` | `({ defaultFeatures }) => features` | the defaults | The instance's server editor. See [Rich text](/conversations/rich-text) |
+| `types` | `MessageTypeDefinition[]` | `[]` | Custom message types, each with `layout: 'message' \| 'bare'`. See [Messages](/conversations/messages#custom-message-types) |
+| `systemAuthors` | `Record<string, { name: LocalizedLabel; avatar? }>` | `{}` | Authors that are not people, for `postMessage({ author: { system } })`. See [System authors](/conversations/messages#system-authors) |
+| `limits.bodyLength` | `number` | `10000` | Characters of the plain-text projection |
+| `limits.bodyBytes` | `number` | `65536` | Bytes of the serialized Lexical body |
+| `limits.dataBytes` | `number` | `16384` | Bytes of a custom type's serialized `data` |
+| `deleted` | `'placeholder' \| 'placeholderIfReplies'` | `'placeholderIfReplies'` | What a deleted message leaves behind. See [Messages](/conversations/messages#deleting) |
+| `deleteWithTarget` | `boolean \| ({ req, key, instance }) => void` | `true` | Cascade when a target document is deleted; a function replaces the built-in cascade. See [Production notes](/conversations/production#cascade) |
+| `reads` | `boolean` | `true` | Per-user read state and unread counts |
+| `transport` | `ConversationsServerTransport` | polling | `sseTransport()`, `pusherTransport()` or your own. See [Transport](/conversations/transport) |
+| `slots` | `ChatSlotConfig` | | Admin components added to the UI. See [Slots](/conversations/admin-ui/slots) |
+| `components` | `{ Trigger?, Drawer?, Panel?, ChannelTabs?, Feed?, Message?, Composer?, Thread? }` | built-ins | Client component paths that replace built-in admin components. See [Replacing components](/conversations/admin-ui/replacing-components) |
+| `overrides.messages`, `overrides.reads` | `{ fields?, hooks?, admin?, access? }` | | Change the collections. `fields` receives `{ defaultFields }`. See [Concepts](/conversations/concepts#changing-the-collections) |
+| `extensions` | `ConversationsExtension[]` | `[]` | `comments()`, `reactions()`, `attachments()` and your own. See [Extensions](/conversations/extensions) |
+| `translations` | `TranslationsOption` | | Per-locale string overrides. See [i18n](/conversations/i18n) |
+| `disabled` | `boolean` | `false` | Returns the config untouched |
+
+### Slots
+
+| Slot | Where |
+|---|---|
+| `composerAbove` | Above the composer, under the channel cue |
+| `composerBelow` | Inside the composer's box, under the text (not while editing) |
+| `composerActions` | Next to Send (not while editing) |
+| `drawerHeader` | In the drawer header, after the title |
+| `messageQuickActions` | A row at the top of each message's menu, for one-click actions such as reactions |
+| `messageActions` | Items in each message's menu, after Reply in thread, Edit and Delete |
+| `messageFooter` | Under each message body, deleted placeholders included |
+
+Each takes one component path or a list. Extensions append theirs after the host's.
+
+## Types
+
+All exported from `@10x-media/conversations` (and `@10x-media/conversations/types`).
+
+### `ConversationsChannel`
+
+```ts
+type ConversationsChannel = {
+  slug: string
+  label: string | Record<string, string>
+  cue?: ChannelCue | ((args: { req }) => ChannelCue | null)
+  access: {
+    read: (args: { channel: string; req }) => boolean | Promise<boolean>
+    create: (args: { channel: string; req }) => boolean | Promise<boolean>
+    update?: (args: { message; req }) => boolean | Promise<boolean> // default: the author
+    delete?: (args: { message; req }) => boolean | Promise<boolean> // default: the author
+  }
+}
+
+type ChannelCue = { label: string | Record<string, string>; tone: 'neutral' | 'warning' }
+```
+
+### `ConversationsAccess` and `TargetGrant`
+
+```ts
+type ConversationsAccess = (args: {
+  req: PayloadRequest
+  targets: Array<{ key: string; kind: 'collection' | 'global' | 'custom'; slug: string; id?: string }>
+}) => ConversationsAccessResult | Promise<ConversationsAccessResult>
+
+type ConversationsAccessResult = string[] | Record<string, TargetGrant | false | null | undefined>
+
+type TargetGrant = true | string[] | { read: true | string[]; create?: true | string[] }
+```
+
+`perTarget(check, { load? })` builds a `ConversationsAccess` from a per-target check that returns `false` or a `TargetGrant`.
+
+### `ConversationsUsersConfig`
+
+```ts
+type ConversationsUsersConfig = {
+  collection: string
+  /** Default: the collection's useAsTitle, then email, then the id; no avatar. */
+  display?: (doc: Record<string, unknown>) => { name: string; avatar?: string | null }
+}
+```
+
+### `MessageTypeDefinition`
+
+```ts
+type MessageTypeDefinition<TData> = {
+  slug: string
+  Component?: PayloadComponent // client or server component
+  validate?: (data: TData) => true | string | Promise<true | string>
+  clientCreatable?: boolean // default false
+  layout?: 'message' | 'bare' // default 'message'; 'bare' draws the Component as the whole row
+}
+```
+
+Declare one with `defineMessageType<TData>()({ ... })` so `data` is typed.
+
+### `ConversationsServerTransport`
+
+```ts
+type ConversationsServerTransport = {
+  publish: (args: { instance: string; key: string; channel?: string; req }) => void | Promise<void>
+  endpoints?: (args: { base: string; instance: ConversationsInstance }) => Endpoint[]
+  // what the admin uses; `factory` is the import path of your own client transport
+  client?: 'polling' | 'sse' | { pusher: PusherClientOptions } | { factory: string; options?: unknown }
+}
+```
+
+The built-in transports and buses are covered on [Transport](/conversations/transport). The extension type, `ConversationsExtension`, is covered on [Writing your own](/conversations/extensions/writing-your-own).
+
+## Validation at startup
+
+The plugin throws while building the config, naming the instance, when:
+
+- the slug is malformed, or two instances share one;
+- channel slugs repeat, or a target lists an unknown channel;
+- a target collection or global does not exist;
+- a message type is called `text`, or two parties register one type slug;
+- two parties give one target different channel lists;
+- two extensions share a name, or an extension is named like a core or transport endpoint (`subscribe`, `messages`, `read`, `poll`, `mentions`, `events`, `pusher-auth`);
+- two extensions add a message field with one name, or one that the core already has.

@@ -1,0 +1,183 @@
+---
+title: Attachments
+description: Files on messages, uploaded into an upload collection of the extension's or your own, under that collection's access, with UI for the admin and a website.
+---
+
+```ts title="payload.config.ts"
+import { conversations } from '@10x-media/conversations'
+import { attachments } from '@10x-media/conversations/attachments'
+
+conversations({
+  slug: 'comments',
+  // ...
+  extensions: [attachments()],
+})
+```
+
+That adds an upload collection, `comments-attachments`, and in the admin a paperclip next to Send, picked files inside the composer, and the files under each message. Files can also be dropped on the composer or pasted into it. Run `pnpm payload generate:importmap` once, and on Postgres create a migration: the extension adds a collection and one JSON column on the messages table.
+
+The extension only ties an upload collection to messages. Who may upload and who may read a file is that collection's access, as for any other upload in Payload; storage adapters, image sizes and file limits are its `upload` settings.
+
+## How it works
+
+1. A person picks files in the composer. Nothing is uploaded yet.
+2. On Send, the message shows at once (sending), and the files go to the collection's own REST endpoint, `POST /api/<collection>`, one after another (two concurrent uploads of the same filename would race for the same free name), as the signed-in user.
+3. The send carries the ids of the files that uploaded: `ext: { attachments: [id, ...] }`. The server checks there are at most `maxFiles` and that the sender can read every one of them (the collection's `read` access), then stores them on the message.
+4. Every response that carries the message shows its files at `message.ext.attachments`.
+
+An upload that fails does not stop the message: it goes out with the files that made it, and the failed ones show under it in the sender's tab. A message still needs text; files alone do not make one.
+
+## Options
+
+| Option | Type | Default | |
+|---|---|---|---|
+| `collection` | `string` | the extension's own | An upload collection of yours (`'media'`) instead |
+| `overrides` | object | | The extension's own collection: `slug`, `upload`, `access`, `admin`, `fields`, `hooks` |
+| `data` | function | | Fields for a new file uploaded from a composer, e.g. the collection's required ones |
+| `thumbnail` | `(doc) => string \| null` | none | A smaller image for the message, e.g. from `sizes` |
+| `maxFiles` | `number` | `10` | Most files on one message |
+| `deleteWithMessage` | `boolean` | `false` | Delete the files when their message or its target is deleted |
+
+### The extension's collection
+
+Without `collection`, the extension adds `<instance>-attachments` with `upload: true`. `create` and `read` keep Payload's default access: **any signed-in user can upload, and read every file**, customers on a website included. `update` and `delete` are closed: nobody changes or removes a file over REST or in the admin until `overrides.access` opens them (the extension's own `deleteWithMessage` works regardless). Narrow or open it through `overrides`:
+
+```ts
+attachments({
+  overrides: {
+    slug: 'chat-files',
+    upload: {
+      mimeTypes: ['image/*', 'application/pdf'],
+      imageSizes: [{ name: 'thumbnail', width: 400 }],
+    },
+    access: {
+      create: ({ req }) => Boolean(req.user),
+      read: ({ req }) => req.user?.collection === 'users', // staff only
+    },
+    fields: ({ defaultFields }) => [...defaultFields, { name: 'note', type: 'text' }],
+  },
+  thumbnail: (doc) => doc.sizes?.thumbnail?.url,
+})
+```
+
+`upload.mimeTypes` also reaches the browser: the file picker offers only those types, and a dropped file of another type is turned away before any upload.
+
+### Your own collection
+
+```ts
+attachments({
+  collection: 'media',
+  // `media` requires `alt`; a composer upload has none, so fill it.
+  data: ({ file, req }) => ({ alt: file?.name ?? 'Attachment', uploadedBy: req.user?.id }),
+})
+```
+
+The collection must be an upload collection that already exists in the config. Its access applies unchanged: a person who can post in a channel but may not create `media` documents can send text, and their files fail to upload.
+
+`data` runs as a `beforeValidate` hook on the collection, for creates that come from a composer only (they carry an `x-conversations-attachment` header with the instance slug). It gets `{ req, data, file, instance, key, channel }` and returns fields merged into the new document. `key` and `channel` come from the browser: use them to fill fields, never to grant access.
+
+## The data
+
+```ts
+type AttachmentView = {
+  id: number | string
+  filename: string
+  mimeType: string | null
+  filesize: number | null
+  width: number | null
+  height: number | null
+  url: string | null
+  thumbnail: string | null // from the `thumbnail` option
+}
+```
+
+`message.ext.attachments` lists them in the order they were attached. A file deleted from the collection drops out of the list; a deleted message lists none. The ids live on the message in a hidden `attachments` JSON field, which, like every extension field, never reaches the browser.
+
+`url` is the collection's own file URL, served by Payload under the collection's `read` access (or by your storage adapter). The message only points to it.
+
+The instance settings reach the browser as client data (`useExtension('attachments')`): `{ collection, maxFiles, mimeTypes }`.
+
+## Deleting
+
+Files stay in the collection when their message goes, by default: a file in a shared `media` collection may be used elsewhere. With `deleteWithMessage: true` the extension deletes a message's files through the Local API (so the stored files go too):
+
+- when the message is deleted, and
+- when the target document goes, in the built-in cascade (`deleteWithTarget`).
+
+A file attached to two messages goes with the first. If a send fails after its files uploaded, they stay in the collection unattached; the composer does not remove them.
+
+## Server code
+
+`postMessage` takes the same `ext`, and trusts it: server code may attach any file without the read check.
+
+```ts
+import { postMessage } from '@10x-media/conversations'
+
+const file = await req.payload.create({ collection: 'media', data: { alt: 'Import log' }, filePath, req })
+await postMessage(req, {
+  instance: 'comments',
+  key,
+  channel: 'internal',
+  author: { system: 'import' },
+  text: 'Import finished, log attached.',
+  ext: { attachments: [file.id] },
+})
+```
+
+## Admin UI
+
+The extension fills three slots, after any of the host's:
+
+- `composerActions`: `AttachButton`, the paperclip next to Send.
+- `composerBelow`: `AttachmentsPicker`, the picked files inside the composer's box, each with a remove button. It also takes the composer's drops and pastes.
+- `messageFooter`: `AttachmentsList`, a message's files: images as a grid, other files as rows with their size and a download button. Images and PDFs open in a viewer (arrow keys step through them, Escape closes); other files open in a new tab.
+
+All three are exported from `/client`. None of them show while a message is being edited: an edit changes the text only.
+
+## Website UI
+
+`@10x-media/conversations/attachments/react` carries the behaviour, with no `@payloadcms/ui` import:
+
+| Hook | Returns |
+|---|---|
+| `useAttachmentsComposer({ channel, conversationKey })` | `files` (picked, with an image `preview` URL), `add(files)`, `remove(id)`, `rejected` (turned away by the last `add`: wrong type or over the limit), `accept` for a file input, `maxFiles`, `enabled`. It registers with the composer around it, so drops and pastes land here and the files upload on Send |
+| `useAttachments(message)` | `files`, the message's `AttachmentView`s, and `uploads`: in the sending tab, the files still uploading and then the ones that failed |
+
+Render `useAttachmentsComposer` inside a composer (one that provides `ComposerAddonsContext`, as the registry's does) and pick files with `useComposerFiles()` from `/react`, which hands them to it:
+
+```tsx
+'use client'
+import { useAttachmentsComposer } from '@10x-media/conversations/attachments/react'
+import { useComposerFiles } from '@10x-media/conversations/react'
+
+export function PickedFiles({ channel, conversationKey }: { channel: string; conversationKey: string }) {
+  const { files, remove } = useAttachmentsComposer({ channel, conversationKey })
+  return files.map((entry) => (
+    <button key={entry.id} onClick={() => remove(entry.id)} type="button">
+      {entry.file.name} ×
+    </button>
+  ))
+}
+
+export function AttachButton() {
+  const intake = useComposerFiles()
+  if (!intake?.acceptsFiles) return null
+  return <input multiple onChange={(event) => intake.addFiles([...(event.target.files ?? [])])} type="file" />
+}
+```
+
+The shadcn registry has a ready item, `conversation-attachments`: `AttachButton`, `AttachmentsPicker`, `MessageAttachments` with a dialog viewer, and an `attachmentSlots` object. Combine it with other extensions' slots, joining the lists both fill:
+
+```tsx
+const slots = {
+  ...attachmentSlots,
+  ...reactionSlots,
+  messageFooter: [...attachmentSlots.messageFooter, ...reactionSlots.messageFooter],
+}
+
+<ConversationUIProvider slots={slots}>
+  <ConversationPanel conversationKey={key} />
+</ConversationUIProvider>
+```
+
+See [shadcn registry](/conversations/website/shadcn-registry) for installing it.

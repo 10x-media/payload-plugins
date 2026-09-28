@@ -56,3 +56,6 @@ docs/superpowers/
 # misc
 note.md
 *.log
+
+# Collected from packages/*/registry/r by apps/docs/scripts/collect-registry.ts
+apps/docs/public/r/

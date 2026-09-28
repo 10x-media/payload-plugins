@@ -273,7 +273,7 @@ An authenticated `POST /api/forms/:id/close` endpoint backs the identical close 
 
 ## Rendering results
 
-`<FormResults>` is presentational and never fetches; resolve data and pass it in. Labels, counts, and percentages are real text; the bar fill is decorative. Import `./styles.css` for the `fb-results*` styling or style it yourself (a shadcn parity component is in the registry):
+`<FormResults>` is presentational and never fetches; resolve data and pass it in. Labels, counts, and percentages are real text; the bar fill is decorative. Import `./styles.css` for the `fb-results*` styling or style it yourself (a shadcn parity component is in the registry: `npx shadcn@latest add https://docs.10xmedia.de/r/form-builder/form-results.json`):
 
 ```tsx
 import { FormResults } from '@10x-media/form-builder/react'

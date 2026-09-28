@@ -1,0 +1,40 @@
+.replaced {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	padding: calc(var(--base) * 0.25);
+	border: 1px dashed var(--replaced-color);
+	border-radius: var(--style-radius-s);
+}
+
+.replaced__label {
+	align-self: flex-start;
+	padding: 0 calc(var(--base) * 0.25);
+	border-radius: var(--style-radius-s);
+	background: var(--replaced-color);
+	color: #fff;
+	font-size: 0.6875rem;
+	line-height: 1.4;
+}
+
+.replaced__header {
+	display: flex;
+	gap: calc(var(--base) * 0.4);
+	align-items: center;
+	font-weight: 600;
+}
+
+.replaced__badge {
+	padding: 0 calc(var(--base) * 0.25);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-800);
+	font-size: 0.6875rem;
+	font-weight: 400;
+}
+
+.replaced__footer {
+	color: var(--theme-elevation-500);
+	font-size: 0.6875rem;
+}

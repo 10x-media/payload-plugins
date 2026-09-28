@@ -1,0 +1,530 @@
+/* Conversations admin UI. Built on Payload's theme variables, so light and dark follow the admin. */
+
+/* Payload's subtle button; only room for the unread dot on its corner. */
+.conversations-trigger {
+	position: relative;
+	--btn-icon-size: calc(var(--base) * 0.85);
+}
+
+.conversations-trigger .btn__icon svg {
+	width: calc(var(--base) * 0.85);
+	height: calc(var(--base) * 0.85);
+}
+
+.conversations-trigger__count {
+	min-width: 1.538rem;
+	margin-left: calc(var(--base) * 0.3);
+	padding: 0 0.369rem;
+	border-radius: 999px;
+	background: var(--theme-elevation-200);
+	font-size: 0.846rem;
+	text-align: center;
+}
+
+.conversations-trigger__dot {
+	position: absolute;
+	top: -3px;
+	right: -3px;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--theme-error-500, #e5484d);
+}
+
+.conversations-drawer-shell .drawer__content {
+	max-width: min(49.231rem, 100vw);
+}
+
+.conversations-drawer-shell .drawer__content-children {
+	height: 100%;
+	overflow: hidden;
+}
+
+/*
+ * Inside Payload's drawer (its gutter, background and header markup): only
+ * the layout a chat needs, a column whose feed scrolls between the header
+ * and the composer.
+ */
+.conversations-drawer {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	min-height: 0;
+	padding-bottom: var(--base);
+}
+
+.conversations-drawer__header {
+	flex: none;
+	align-items: flex-start;
+}
+
+.conversations-drawer__heading {
+	flex-grow: 1;
+	min-width: 0;
+}
+
+.conversations-drawer__subtitle {
+	margin-top: calc(var(--base) / 4);
+	color: var(--theme-elevation-500);
+}
+
+.conversations-tabs {
+	display: flex;
+	gap: calc(var(--base) * 0.25);
+	padding-bottom: 1.077rem;
+	border-bottom: 1px solid var(--theme-elevation-100);
+}
+
+/* Payload's tab buttons, as channels: a quiet fill when idle, the tab style's own when active. */
+.conversations-tabs__tab {
+	--btn-icon-size: calc(var(--base) * 0.85);
+}
+
+.conversations-tabs__tab .btn__icon svg {
+	width: calc(var(--base) * 0.85);
+	height: calc(var(--base) * 0.85);
+}
+
+.conversations-tabs__tab.btn--style-tab:not(.btn--disabled) {
+	--bg-color: var(--theme-elevation-50);
+	--hover-bg: var(--theme-elevation-100);
+	--color: var(--theme-elevation-650, var(--theme-elevation-600));
+}
+
+.conversations-tabs__tab.btn--style-tab.btn--disabled {
+	--bg-color: var(--theme-elevation-150);
+}
+
+.conversations-tabs__count {
+	margin-left: calc(var(--base) * 0.3);
+	color: var(--theme-elevation-600);
+	font-size: 0.923rem;
+	font-weight: 500;
+}
+
+.conversations-feed {
+	position: relative;
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.conversations-feed__scroller {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: 0.154rem;
+	min-height: 0;
+	padding: 1.231rem 0;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+}
+
+/* Few messages sit at the bottom, next to the composer, as in any chat. */
+.conversations-feed__scroller > :first-child {
+	margin-top: auto;
+}
+
+.conversations-feed__older {
+	display: flex;
+	justify-content: center;
+	padding: 0.615rem 0;
+}
+
+.conversations-feed__empty {
+	margin: auto;
+	padding: 2.462rem 1.231rem;
+	color: var(--theme-elevation-600);
+	font-size: 1.077rem;
+	text-align: center;
+}
+
+.conversations-feed__skeleton {
+	flex: 1;
+	min-height: 9.846rem;
+	margin: 1.231rem 0;
+	border-radius: var(--style-radius-m, 4px);
+	background: linear-gradient(
+		90deg,
+		var(--theme-elevation-50),
+		var(--theme-elevation-100),
+		var(--theme-elevation-50)
+	);
+	background-size: 200% 100%;
+	animation: conversations-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes conversations-shimmer {
+	from {
+		background-position: 200% 0;
+	}
+	to {
+		background-position: -200% 0;
+	}
+}
+
+.conversations-feed__day,
+.conversations-feed__divider {
+	display: flex;
+	align-items: center;
+	gap: 0.923rem;
+	margin: 0.923rem 0 0.308rem;
+	color: var(--theme-elevation-600);
+	font-size: 0.923rem;
+}
+
+.conversations-feed__day::before,
+.conversations-feed__day::after,
+.conversations-feed__divider::before,
+.conversations-feed__divider::after {
+	content: "";
+	flex: 1;
+	height: 1px;
+	background: var(--theme-elevation-100);
+}
+
+.conversations-feed__divider {
+	color: var(--theme-error-500, #e5484d);
+	font-weight: 600;
+}
+
+.conversations-feed__divider::before,
+.conversations-feed__divider::after {
+	background: color-mix(in srgb, var(--theme-error-500, #e5484d) 45%, transparent);
+}
+
+/* Room under the last message for the floating button, so nothing stays hidden behind it. */
+.conversations-feed--jump .conversations-feed__scroller {
+	padding-bottom: calc(var(--base) * 3);
+}
+
+/* Payload's pill button, floating over the bottom of the feed. */
+.conversations-feed__jump {
+	position: absolute;
+	bottom: calc(var(--base) * 0.75);
+	left: 50%;
+	transform: translateX(-50%);
+	border-radius: 999px;
+	box-shadow: 0 2px 12px -2px rgb(0 0 0 / 0.25);
+}
+
+.conversations-avatar {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: hsl(var(--conversations-avatar-hue, 0) 35% 28%);
+	color: hsl(var(--conversations-avatar-hue, 0) 70% 82%);
+	font-weight: 600;
+	object-fit: cover;
+}
+
+.conversations-message {
+	position: relative;
+	display: flex;
+	gap: 0.923rem;
+	padding: 0.615rem 0.615rem 0.462rem;
+	border-radius: var(--style-radius-m, 4px);
+}
+
+.conversations-message--compact {
+	padding-top: 0.154rem;
+}
+
+.conversations-message:hover {
+	background: var(--theme-elevation-100);
+}
+
+.conversations-message__gutter {
+	flex: none;
+	width: 28px;
+}
+
+.conversations-message__main {
+	flex: 1;
+	min-width: 0;
+}
+
+.conversations-message__header {
+	display: flex;
+	align-items: baseline;
+	gap: 0.615rem;
+	margin-bottom: 0.154rem;
+}
+
+.conversations-message__author {
+	font-size: 1.077rem;
+	font-weight: 600;
+}
+
+.conversations-message__time,
+.conversations-message__edited,
+.conversations-message__status {
+	color: var(--theme-elevation-600);
+	font-size: 0.923rem;
+}
+
+.conversations-message__body {
+	font-size: 1.077rem;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+.conversations-message__body p {
+	margin: 0;
+}
+
+.conversations-message__body p + p,
+.conversations-message__body ul,
+.conversations-message__body ol {
+	margin-top: 0.462rem;
+}
+
+.conversations-message__body ul,
+.conversations-message__body ol {
+	margin-bottom: 0;
+	padding-left: 1.538rem;
+}
+
+.conversations-message__body a {
+	color: var(--theme-success-500, #2d7ff9);
+	text-decoration: underline;
+}
+
+.conversations-message__placeholder {
+	color: var(--theme-elevation-600);
+	font-size: 1.077rem;
+	font-style: italic;
+}
+
+.conversations-message--sending {
+	opacity: 0.6;
+}
+
+.conversations-message__thread {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.615rem;
+	margin-top: 0.462rem;
+	padding: 0.308rem 0.769rem;
+	border: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-s, 4px);
+	background: var(--theme-elevation-50);
+	color: var(--theme-elevation-600);
+	font-size: 0.923rem;
+	cursor: pointer;
+}
+
+.conversations-message__thread:hover {
+	border-color: var(--theme-elevation-200);
+}
+
+.conversations-message__thread-count {
+	color: var(--theme-success-500, #2d7ff9);
+	font-weight: 500;
+}
+
+.conversations-message__thread-new {
+	padding: 0 0.462rem;
+	border-radius: 999px;
+	background: var(--theme-error-500, #e5484d);
+	color: #fff;
+	font-size: 0.846rem;
+	font-weight: 600;
+}
+
+.conversations-message__side {
+	flex: none;
+	width: 1.846rem;
+}
+
+/* A `layout: 'bare'` type: its component is the row; the time waits for hover beside the menu. */
+.conversations-message--bare {
+	padding-block: 0.308rem;
+}
+
+.conversations-message--bare .conversations-message__side {
+	display: flex;
+	gap: 0.308rem;
+	align-items: flex-start;
+	width: auto;
+}
+
+.conversations-message__bare-time {
+	padding-top: 0.154rem;
+	color: var(--theme-elevation-500);
+	font-size: 0.846rem;
+	white-space: nowrap;
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+
+.conversations-message:hover .conversations-message__bare-time,
+.conversations-message:focus-within .conversations-message__bare-time {
+	opacity: 1;
+}
+
+/* The "⋯" button: on hover or focus, while its menu is open, and always where nothing hovers. */
+.conversations-message__menu {
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+
+.conversations-message:hover .conversations-message__menu,
+.conversations-message:focus-within .conversations-message__menu,
+.conversations-message__menu--open {
+	opacity: 1;
+}
+
+@media (hover: none) {
+	.conversations-message__menu {
+		opacity: 0.6;
+	}
+}
+
+.conversations-message__menu-button {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.846rem;
+	height: 1.846rem;
+	border-radius: var(--style-radius-s, 4px);
+	color: var(--theme-elevation-600);
+}
+
+.conversations-message__menu-button:hover,
+.conversations-message__menu--open .conversations-message__menu-button {
+	background: var(--theme-elevation-150);
+	color: var(--theme-text);
+}
+
+.conversations-message__menu-button .icon {
+	width: 1.538rem;
+	height: 1.538rem;
+}
+
+/* A row of one-click actions above the menu's list, e.g. reactions. */
+.conversations-message-menu__quick {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.154rem;
+	margin-bottom: calc(var(--base) * 0.25);
+	padding-bottom: calc(var(--base) * 0.25);
+	border-bottom: 1px solid var(--theme-elevation-150);
+}
+
+/* A quick action may render nothing, e.g. reactions in a read-only channel. */
+.conversations-message-menu__quick:empty {
+	display: none;
+}
+
+.conversations-sr-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip: rect(0 0 0 0);
+	white-space: nowrap;
+}
+
+.conversations-thread {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+}
+
+.conversations-thread__root {
+	padding: 0.308rem;
+	border: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-m, 4px);
+	background: var(--theme-elevation-100);
+}
+
+.conversations-composer {
+	display: flex;
+	flex-direction: column;
+	gap: 0.615rem;
+	padding-top: 0.923rem;
+	border-top: 1px solid var(--theme-elevation-100);
+}
+
+.conversations-composer__banner {
+	display: flex;
+	align-items: center;
+	gap: 0.615rem;
+	padding: 0.615rem 0.923rem;
+	border-radius: var(--style-radius-m, 4px);
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-700);
+	font-size: 1rem;
+}
+
+.conversations-composer__banner--warning {
+	background: color-mix(in srgb, var(--theme-warning-500, #f5a623) 16%, transparent);
+	color: var(--theme-warning-600, var(--theme-warning-500, #f5a623));
+}
+
+.conversations-composer__banner--error {
+	justify-content: space-between;
+	background: color-mix(in srgb, var(--theme-error-500, #e5484d) 18%, transparent);
+	color: var(--theme-error-500, #e5484d);
+}
+
+.conversations-composer__cue-icon {
+	display: inline-flex;
+	flex: none;
+	opacity: 0.85;
+}
+
+.conversations-composer__cue-label {
+	flex: 1;
+	min-width: 0;
+}
+
+.conversations-composer__cue-action {
+	flex: none;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.conversations-composer__cue-action:hover {
+	color: var(--theme-text);
+}
+
+.conversations-composer--warning .conversations-editor {
+	border-color: color-mix(in srgb, var(--theme-warning-500, #f5a623) 55%, transparent);
+}
+
+.conversations-composer--failed .conversations-editor {
+	border-color: color-mix(in srgb, var(--theme-error-500, #e5484d) 60%, transparent);
+}
+
+.conversations-composer__disabled {
+	padding: 1.077rem 1.231rem;
+	border: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-m, 4px);
+	color: var(--theme-elevation-600);
+	font-size: 1rem;
+}
+
+.conversations-composer__hint {
+	color: var(--theme-elevation-500);
+	font-size: 0.923rem;
+	white-space: nowrap;
+}
+
+/* A narrow composer drops the hint before the buttons would wrap. */
+@container (max-width: 26rem) {
+	.conversations-composer__hint {
+		display: none;
+	}
+}
