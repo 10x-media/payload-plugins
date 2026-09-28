@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/conversations
 
 Conversations for Payload: messages bound to any document, global or custom key, with channels that decide who reads what, one-level threads, mentions and per-user read state. Comments on documents and reactions ship as extensions; support tickets, chat rooms and website chats are built from the same primitives.
