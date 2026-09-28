@@ -39,6 +39,7 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 			conversations({
 				access: ({ targets }) => targets.map((target) => target.key),
 				channels,
+				components: { Message: '/components/KeptMessage#KeptMessage' },
 				deleted: 'placeholder',
 				slug: 'kept',
 				targets: { collections: { persons: { channels: ['internal'] } } },
@@ -57,6 +58,11 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 			expect.arrayContaining(['comments-messages', 'comments-reads', 'tickets-messages'])
 		)
 		expect(slugs).not.toContain('tickets-reads')
+		// A replacement message component lives only in plugin options; the import map finds it here.
+		expect(booted.payload.config.admin.dependencies?.['conversations-kept-message']).toEqual({
+			path: '/components/KeptMessage#KeptMessage',
+			type: 'component',
+		})
 
 		const person = await booted.payload.create({ collection: 'persons', data: { name: 'P' } })
 		const key = `collection:persons:${person.id}`

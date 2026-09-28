@@ -10,12 +10,14 @@ import { useTranslation } from '../translations/useTranslation'
 import type { AuthorsMap } from '../types'
 import { ChatComposer } from './ChatComposer'
 import { ChatFeed } from './ChatFeed'
-import { ChatMessage } from './ChatMessage'
+import { MessageView, type RenderMessage } from './ChatMessage'
 
 export type ChatThreadProps = {
 	authors: AuthorsMap
 	channel: ChannelView
 	instance: string
+	/** Draws each message, the root included, instead of `components.Message` or `ChatMessage`. */
+	renderMessage?: RenderMessage
 	renderType?: (message: WindowMessage) => ReactNode
 	root: WindowMessage
 	viewer: null | string
@@ -26,6 +28,7 @@ export const ChatThread = ({
 	authors,
 	channel,
 	instance,
+	renderMessage,
 	renderType,
 	root,
 	viewer,
@@ -35,11 +38,12 @@ export const ChatThread = ({
 	return (
 		<div className="conversations-thread">
 			<div className="conversations-thread__root">
-				<ChatMessage
+				<MessageView
 					authors={conversation.authors}
 					instance={instance}
 					message={root}
 					readOnly={!channel.canCreate}
+					render={renderMessage}
 					renderType={renderType}
 					viewer={viewer}
 				/>
@@ -48,6 +52,7 @@ export const ChatThread = ({
 				conversation={conversation}
 				instance={instance}
 				readOnly={!channel.canCreate}
+				renderMessage={renderMessage}
 				renderType={renderType}
 			/>
 			<ChatComposer

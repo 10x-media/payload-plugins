@@ -11,6 +11,7 @@ import { useTranslation } from '../translations/useTranslation'
 import { ChatChannelTabs } from './ChatChannelTabs'
 import { ChatComposer } from './ChatComposer'
 import { ChatFeed } from './ChatFeed'
+import type { RenderMessage } from './ChatMessage'
 import { ChatThread } from './ChatThread'
 import { ChatSlot } from './components'
 
@@ -21,6 +22,8 @@ export type ChatDrawerProps = {
 	/** Slot: extra content in the header, after the title. */
 	header?: ReactNode
 	instance: string
+	/** Draws each message instead of `components.Message` or `ChatMessage`. */
+	renderMessage?: RenderMessage
 	/** Renders messages whose `type` is not `text`. */
 	renderType?: (message: WindowMessage) => ReactNode
 	/** A line under the title, e.g. the document's title. */
@@ -65,6 +68,8 @@ export type ChatPanelProps = {
 	/** Drawn first, with the panel's state (e.g. the drawer header with its channel slot). */
 	renderHeader?: (panel: UseChatPanelResult) => ReactNode
 	instance: string
+	/** Draws each message instead of `components.Message` or `ChatMessage`. */
+	renderMessage?: RenderMessage
 	/** Renders messages whose `type` is not `text`. */
 	renderType?: (message: WindowMessage) => ReactNode
 	/** The Payload modal slug a thread opens under, as a drawer. */
@@ -79,6 +84,7 @@ export const ChatPanel = ({
 	conversationKey,
 	instance,
 	renderHeader,
+	renderMessage,
 	renderType,
 	threadSlug,
 }: ChatPanelProps) => {
@@ -115,6 +121,7 @@ export const ChatPanel = ({
 						key={`feed:${current.slug}`}
 						onOpenThread={openThread}
 						readOnly={!current.canCreate}
+						renderMessage={renderMessage}
 						renderType={renderType}
 					/>
 					<ChatComposer
@@ -152,6 +159,7 @@ export const ChatPanel = ({
 							authors={conversation.authors}
 							channel={current}
 							instance={instance}
+							renderMessage={renderMessage}
 							renderType={renderType}
 							root={thread}
 							viewer={viewer}
@@ -168,6 +176,7 @@ const DrawerBody = ({
 	drawerSlug,
 	header,
 	instance,
+	renderMessage,
 	renderType,
 	subtitle,
 	title,
@@ -194,6 +203,7 @@ const DrawerBody = ({
 						/>
 					</DrawerHeader>
 				)}
+				renderMessage={renderMessage}
 				renderType={renderType}
 				threadSlug={`${drawerSlug}-thread`}
 			/>

@@ -13,7 +13,7 @@ import { useTranslation } from '../translations/useTranslation'
 import type { AuthorsMap } from '../types'
 import { Avatar } from './Avatar'
 import { ChatComposer } from './ChatComposer'
-import { ChatSlot, useTypeRenderer } from './components'
+import { ChatSlot, useChatComponents, useTypeRenderer } from './components'
 import { MessageMenu } from './MessageMenu'
 import { useChatRichText } from './richText'
 import './conversations.css'
@@ -191,4 +191,22 @@ export const ChatMessage = ({
 			) : null}
 		</div>
 	)
+}
+
+/** Draws one message; `ChatFeed`, `ChatThread` and friends take it as `renderMessage`. */
+export type RenderMessage = (props: ChatMessageProps) => ReactNode
+
+/**
+ * One message as the instance draws it: `render` when given, else the
+ * config's `components.Message`, else `ChatMessage`. A replacement gets the
+ * same props, so it can render `ChatMessage` itself to wrap the default.
+ */
+export const MessageView = ({
+	render,
+	...props
+}: ChatMessageProps & { render?: RenderMessage }) => {
+	const { Message } = useChatComponents(props.instance)
+	if (render) return <>{render(props)}</>
+	if (Message) return <Message {...props} />
+	return <ChatMessage {...props} />
 }

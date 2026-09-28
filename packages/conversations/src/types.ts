@@ -228,10 +228,22 @@ export type ConversationsHooks = {
 	}) => Promise<void> | void
 }
 
+/** Admin components that replace a built-in one entirely. */
+export type ChatComponentsConfig = {
+	/**
+	 * A client component drawn for every message in the admin, feeds and
+	 * threads alike, instead of `ChatMessage`. It gets `ChatMessageProps` and
+	 * may render `ChatMessage` itself to wrap the default.
+	 */
+	Message?: PayloadComponent
+}
+
 export type ConversationsPluginOptions = {
 	/** Conversation access. Required: nobody sees anything without it (fail closed). */
 	access: ConversationsAccess
 	channels: ConversationsChannel[]
+	/** Admin components replacing built-in ones. For additions, use `slots`. */
+	components?: ChatComponentsConfig
 	/** Cascade on target delete. Default true; a function replaces the built-in cascade. */
 	deleteWithTarget?: DeleteWithTarget
 	/** Default `'placeholderIfReplies'`. */
@@ -401,6 +413,7 @@ export type ConversationsInstance = {
 	/** Conversation access for `keys`, as grants within each target's offered channels. */
 	grants: (req: PayloadRequest, keys: string[]) => Promise<Map<string, ResolvedGrant>>
 	channels: Map<string, ConversationsChannel>
+	components: ChatComponentsConfig
 	/** Channels a target offers, in instance order; empty when the target is not served. */
 	channelsFor: (target: ParsedKey) => string[]
 	deleted: 'placeholder' | 'placeholderIfReplies'

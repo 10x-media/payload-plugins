@@ -9,7 +9,7 @@ import { useFeed } from '../react/useFeed'
 import type { WindowMessage } from '../react/window'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
-import { ChatMessage } from './ChatMessage'
+import { MessageView, type RenderMessage } from './ChatMessage'
 import './conversations.css'
 
 export type { FeedItem } from '../react/feed'
@@ -24,12 +24,8 @@ export type ChatFeedProps = {
 	onOpenThread?: (message: WindowMessage) => void
 	/** The channel takes no writes here, so messages offer no Edit or Delete. */
 	readOnly?: boolean
-	/** Replaces the default message renderer. */
-	renderMessage?: (args: {
-		compact: boolean
-		message: WindowMessage
-		conversation: UseConversationResult
-	}) => ReactNode
+	/** Draws each message instead of `components.Message` or `ChatMessage`. */
+	renderMessage?: RenderMessage
 	/** Renders messages whose `type` is not `text`. */
 	renderType?: (message: WindowMessage) => ReactNode
 }
@@ -93,21 +89,18 @@ export const ChatFeed = ({
 										<span>{t(keys.newMessages)}</span>
 									</div>
 								) : null}
-								{renderMessage ? (
-									renderMessage({ compact: row.compact, conversation, message: row.message })
-								) : (
-									<ChatMessage
-										authors={conversation.authors}
-										compact={row.compact}
-										instance={instance}
-										message={row.message}
-										onOpenThread={onOpenThread}
-										readOnly={readOnly}
-										renderType={renderType}
-										threadReadAt={conversation.threadReads[String(row.message.id)]}
-										viewer={conversation.viewer}
-									/>
-								)}
+								<MessageView
+									authors={conversation.authors}
+									compact={row.compact}
+									instance={instance}
+									message={row.message}
+									onOpenThread={onOpenThread}
+									readOnly={readOnly}
+									render={renderMessage}
+									renderType={renderType}
+									threadReadAt={conversation.threadReads[String(row.message.id)]}
+									viewer={conversation.viewer}
+								/>
 							</>
 						)}
 					</Fragment>

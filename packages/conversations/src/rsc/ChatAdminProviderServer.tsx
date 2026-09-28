@@ -23,7 +23,7 @@ const resolve = (payload: Payload, component: PayloadComponent) =>
 /**
  * The admin provider of one instance, registered in
  * `admin.components.providers`. Resolves the config-level components (message
- * type `Component`s and `slots`) from the import map on the server: client
+ * type `Component`s, `slots`, `components.Message`) from the import map on the server: client
  * components travel to the browser as references, server components are
  * listed by name and rendered on demand through `render-widget`.
  */
@@ -48,6 +48,16 @@ export const ChatAdminProviderServer = ({
 			entries.push(isReactServerComponentOrFunction(Component) ? SERVER_SLOT : Component)
 		}
 		if (entries.length > 0) components.slots[name] = entries
+	}
+	const Message = instance.components.Message
+		? resolve(payload, instance.components.Message)
+		: undefined
+	if (Message && isReactServerComponentOrFunction(Message)) {
+		payload.logger.warn(
+			`[@10x-media/conversations] components.Message of "${slug}" is a server component; it must be a client component ('use client'). Using the default.`
+		)
+	} else if (Message) {
+		components.Message = Message as unknown as ChatComponents['Message']
 	}
 	for (const type of instance.types.values()) {
 		const Component = type.Component ? resolve(payload, type.Component) : undefined

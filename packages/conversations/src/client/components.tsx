@@ -12,6 +12,7 @@ import {
 } from 'react'
 import { SLOT_WIDGET_SLUG } from '../shared/constants'
 import type { ChatSlotConfig, ConversationMessage } from '../types'
+import type { ChatMessageProps } from './ChatMessage'
 
 export type ChatSlotName = keyof ChatSlotConfig
 
@@ -31,6 +32,8 @@ export type ChatSlotEntry = ComponentType<ChatSlotProps> | typeof SERVER_SLOT
 
 /** Config-level components, resolved on the server from the import map. */
 export type ChatComponents = {
+	/** Drawn instead of `ChatMessage` (`components.Message`). */
+	Message?: ComponentType<ChatMessageProps>
 	/** Message types that are server components: rendered through `render-widget`. */
 	server: { types: string[] }
 	/** Each slot's components in order: the host's, then each extension's. */

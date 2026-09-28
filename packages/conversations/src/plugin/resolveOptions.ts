@@ -231,6 +231,7 @@ export const resolveInstance = (
 			users: options.mentions?.users,
 			verifyAccess: options.mentions?.verifyAccess ?? false,
 		},
+		components: options.components ?? {},
 		messagesSlug: `${slug}-messages` as CollectionSlug,
 		overrides: options.overrides ?? {},
 		readsSlug: options.reads === false ? null : (`${slug}-reads` as CollectionSlug),
