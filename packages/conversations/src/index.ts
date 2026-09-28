@@ -106,7 +106,8 @@ export const conversations = definePlugin<ConversationsPluginOptions>({
 		// Whether a component is a server one shows only in the import map, so every host path
 		// counts; the plugin's own (the reactions and attachments slots) are client components.
 		const mayBeServer = (component: PayloadComponent | undefined) => {
-			const path = typeof component === 'string' ? component : component?.path
+			const path =
+				typeof component === 'string' ? component : component ? component.path : undefined
 			return Boolean(path) && !path?.startsWith(OWN_CLIENT_ENTRY)
 		}
 		const hasComponents =
