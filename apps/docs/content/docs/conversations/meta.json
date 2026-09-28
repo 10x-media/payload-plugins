@@ -3,10 +3,17 @@
 	"pages": [
 		"index",
 		"quick-start",
+		"concepts",
 		"access",
+		"messages",
+		"rich-text",
 		"extensions",
-		"primitives",
+		"admin-ui",
+		"website",
 		"transport",
-		"configuration"
+		"recipes",
+		"configuration",
+		"production",
+		"i18n"
 	]
 }

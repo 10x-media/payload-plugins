@@ -1,0 +1,150 @@
+---
+title: Multi-tenant
+description: Conversations with @payloadcms/plugin-multi-tenant. Tenant checks live in conversation access, mentions stay inside the tenant, channel rules stay per user.
+---
+
+With `@payloadcms/plugin-multi-tenant`, documents belong to a tenant and staff belong to one or more tenants. Conversations follow without a tenant field of their own: a conversation belongs to its target, and the target has the tenant. This recipe is the `comments` instance of the plugin's dev app, on persons of two tenants.
+
+The rules to keep in mind:
+
+- **The tenant check goes in conversation `access`.** It is the only rule that sees the target, and it answers for every target on screen in one batch.
+- **Channel rules stay about the user** (staff or customer), never about the tenant. They run once per request, however many conversations are open.
+- **Mentions are scoped with `mentions.users`**, a `Where` per users collection, so the picker never offers someone from another tenant.
+- **Leave the conversations collections out of the multi-tenant plugin.** They are closed over REST, and every read goes through the instance endpoints, which check the target.
+
+## Tenants and users
+
+```ts title="payload.config.ts"
+import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
+
+plugins: [
+  multiTenantPlugin({
+    collections: { persons: {} }, // not the conversations collections
+    tenantsSlug: 'tenants',
+    userHasAccessToAllTenants: (user) => user?.email === PLATFORM_EMAIL,
+  }),
+  conversations({ /* below */ }),
+]
+```
+
+Staff (`users`) get the plugin's `tenants` array. Website customers belong to one tenant through a `tenant` relationship of their own.
+
+List `conversations()` after the plugins that add your target or users collections, so it can find them.
+
+## Who belongs where
+
+A few helpers read the signed-in person's tenants. `getUserTenantIDs` comes from the multi-tenant plugin:
+
+```ts title="tenancy.ts"
+import { getUserTenantIDs } from '@payloadcms/plugin-multi-tenant/utilities'
+import type { PayloadRequest } from 'payload'
+
+export const PLATFORM_EMAIL = 'ops@example.com'
+
+export const isStaff = (req: PayloadRequest) => req.user?.collection === 'users'
+
+export const isPlatform = (req: PayloadRequest) =>
+  isStaff(req) && req.user?.email === PLATFORM_EMAIL
+
+const idOf = (value: unknown): string =>
+  value && typeof value === 'object' && 'id' in value ? String(value.id) : String(value ?? '')
+
+/** Staff through the plugin's array, a customer through their own `tenant`. */
+export const tenantsOf = (req: PayloadRequest): string[] => {
+  const user = req.user
+  if (!user) return []
+  if (user.collection === 'customers') return user.tenant ? [idOf(user.tenant)] : []
+  return getUserTenantIDs(user).map(String)
+}
+```
+
+## Conversation access
+
+```ts title="payload.config.ts"
+import { conversations, perTarget } from '@10x-media/conversations'
+import { comments } from '@10x-media/conversations/comments'
+
+conversations({
+  slug: 'comments',
+  users: ['users', 'customers'],
+  access: perTarget(
+    ({ doc, req, target }) => {
+      if (isStaff(req)) {
+        // Media has no tenant; the platform admin sees every tenant.
+        if (target.slug !== 'persons' || isPlatform(req)) return true
+        return tenantsOf(req).includes(doc?.tenant ? String(doc.tenant) : '')
+      }
+      // A customer: only the persons they own.
+      return req.user?.collection === 'customers' && String(doc?.owner ?? '') === String(req.user.id)
+    },
+    { load: true }
+  ),
+  channels: [
+    {
+      slug: 'internal',
+      label: 'Internal',
+      access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
+    },
+    {
+      slug: 'shared',
+      label: 'Shared',
+      cue: ({ req }) => (isStaff(req) ? { label: 'Shared · visible to the customer', tone: 'warning' } : null),
+      access: { read: () => true, create: () => true },
+    },
+  ],
+  mentions: { users: mentionableInTenant },
+  extensions: [comments({ collections: { persons: true, media: ['internal'] } })],
+})
+```
+
+`perTarget` with `{ load: true }` loads the targets first, one query per collection at depth 0, and hands each check its `doc`. A list of 25 persons therefore costs one query for all of their tenants, not 25. A target that does not exist is denied.
+
+For a check that is cheaper as a query of its own, write `access` as the batch function it is: receive `targets`, query the allowed ids with `tenant in [...]`, and return their keys. See [Access](/conversations/access).
+
+## Mentions inside the tenant
+
+`mentions.users` returns a `Where` for each users collection, built for the sender's request and the conversation's key. The picker searches with it, and saving a message drops any mention outside it.
+
+```ts title="tenancy.ts"
+import { parseKey } from '@10x-media/conversations'
+import type { PayloadRequest, Where } from 'payload'
+
+/** The person's tenant, or null for targets without one. */
+const targetTenant = async (req: PayloadRequest, key: string): Promise<string | null> => {
+  const target = parseKey(key)
+  if (target?.kind !== 'collection' || target.slug !== 'persons' || !target.id) return null
+  const doc = await req.payload.findByID({
+    collection: 'persons',
+    id: target.id,
+    depth: 0,
+    disableErrors: true,
+    overrideAccess: true,
+    req,
+  })
+  return doc?.tenant ? idOf(doc.tenant) : null
+}
+
+/** People of the target's tenant (and the platform admin); customers only when staff write. */
+export const mentionableInTenant = async ({ collection, key, req }: {
+  collection: string
+  key: string
+  req: PayloadRequest
+}): Promise<Where> => {
+  if (collection === 'customers' && !isStaff(req)) return { id: { exists: false } }
+  const tenant = await targetTenant(req, key)
+  if (!tenant) return {}
+  return collection === 'users'
+    ? { or: [{ 'tenants.tenant': { equals: tenant } }, { email: { equals: PLATFORM_EMAIL } }] }
+    : { tenant: { equals: tenant } }
+}
+```
+
+The channel's `read` rule filters on top: a customer is never offered, or kept, as a mention in Internal, whatever this `Where` says. For the strict guarantee that a mentioned person can open the conversation at all, `mentions.verifyAccess: true` runs conversation access as each candidate, at the cost of one access run per candidate.
+
+## What stays the same
+
+- **Messages carry no tenant.** Moving a person to another tenant moves its conversation with it, since access is read from the target on every request.
+- **Unread counts and realtime** respect the same access: `subscribe` runs it once for every key on screen, and a transport only ever signals keys the viewer's tokens were issued for.
+- **Tokens expire after 10 minutes**, so a user removed from a tenant stops getting change signals for its conversations within that time. Message loads always run full access.
+
+To try it, run the dev app (`pnpm dev conversations`) and log in as `marc@10xmedia.de` (Rowing only), `anna@10xmedia.de` (both tenants) or `dev@10xmedia.de` (platform), password `password`, and compare the persons each can comment on and mention.

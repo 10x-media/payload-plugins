@@ -9,9 +9,11 @@ description: Install the plugin, decide who sees which conversation, and add com
 pnpm add @10x-media/conversations@beta
 ```
 
-The plugin needs `@payloadcms/richtext-lexical`, which the message editor is built on.
+The plugin needs `payload`, `@payloadcms/ui` and `@payloadcms/richtext-lexical` 3.83 or later, and React 19. Messages are Lexical rich text, validated against an editor the plugin builds per instance.
 
 ## Configure an instance
+
+The example gives staff (the `users` collection) an internal channel, and lets customers (a second auth collection) talk to staff about the persons they own.
 
 ```ts title="payload.config.ts"
 import { conversations, perTarget } from '@10x-media/conversations'
@@ -25,27 +27,30 @@ export default buildConfig({
     conversations({
       slug: 'comments',
       users: ['users', 'customers'],
-      // Staff see every person; a customer sees the persons they own.
+      // Staff see every person; a customer only the persons they own.
       access: perTarget(
-        ({ doc, req }) => isStaff({ req }) || doc?.owner === req.user?.id,
+        ({ doc, req }) => isStaff({ req }) || String(doc?.owner) === String(req.user?.id),
         { load: true }
       ),
       channels: [
         {
           slug: 'internal',
           label: 'Internal',
+          cue: { label: 'Internal · staff only', tone: 'neutral' },
           access: { read: isStaff, create: isStaff },
         },
         {
           slug: 'shared',
           label: 'Shared',
-          cue: { label: 'Shared · visible to the customer', tone: 'warning' },
+          // Staff need the warning; the customer is the audience.
+          cue: ({ req }) =>
+            isStaff({ req }) ? { label: 'Shared · visible to the customer', tone: 'warning' } : null,
           access: { read: () => true, create: () => true },
         },
       ],
       hooks: {
         afterMention: async ({ req, users, message }) => {
-          // Notify through your own system.
+          // Notify through your own system, ideally by queueing a job.
         },
       },
       extensions: [comments({ collections: { persons: true } })],
@@ -54,28 +59,45 @@ export default buildConfig({
 })
 ```
 
-Run `payload generate:importmap`. Open a person: the document controls now show a Comments button with a count and an unread dot. It opens a drawer with a tab for each channel you can read, the feed, and a composer. Threads open as a second drawer on top.
+List `conversations()` after any plugin that adds your target or users collections: the plugin checks targets against the collections it can see.
+
+Then regenerate the import map, since the plugin registers admin components:
+
+```bash
+pnpm payload generate:importmap
+```
+
+Open a person. The document controls now show a Comments button with a count and an unread dot. It opens a drawer with a tab per readable channel, the feed, and a composer. A thread opens as a second drawer on top.
 
 ## What you get
 
-- Two hidden collections, `comments-messages` and `comments-reads`, closed over REST.
+- Two hidden collections, `comments-messages` and `comments-reads`, closed over REST and GraphQL.
 - Endpoints under `/api/conversations/comments`.
-- A provider in the admin that polls the conversations on screen, and nothing else.
+- An admin provider that watches the conversations on screen through the instance's transport (polling by default), and nothing else.
+- When a person is deleted, its messages and read cursors go with it.
 
-## Server code
+## Post from server code
 
-Post a message of any type from a hook, a job or a seed:
+A hook, a job or a seed can post a message of any type:
 
 ```ts
-import { postMessage } from '@10x-media/conversations'
+import { collectionKey, postMessage } from '@10x-media/conversations'
 
 await postMessage(req, {
   instance: 'comments',
-  key: `collection:persons:${person.id}`,
+  key: collectionKey('persons', person.id),
   channel: 'internal',
   author: `users:${req.user.id}`,
   text: 'Passport verified.',
 })
 ```
 
-Collection hooks still run, so validation, mentions and `afterMessage` behave as they do for a message sent from the admin.
+Collection hooks still run, so validation, mentions and `afterMessage` behave as they do for a message sent from the admin. See [Messages](/conversations/messages).
+
+## Next steps
+
+- Understand the pieces: [Concepts](/conversations/concepts) and [Access](/conversations/access).
+- Add emoji reactions: [Reactions](/conversations/extensions/reactions).
+- Go realtime: [Transport](/conversations/transport).
+- Build a ticket view or a chat room: [Custom views](/conversations/admin-ui/custom-views) and the [recipes](/conversations/recipes/support-tickets).
+- Put the conversation on your website: [Website UI](/conversations/website).

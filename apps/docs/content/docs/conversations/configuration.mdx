@@ -1,39 +1,140 @@
 ---
 title: Configuration
-description: Every option of conversations(), and the limits to know about.
+description: Every option of conversations(), with defaults and where each is explained.
 ---
+
+```ts
+import { conversations } from '@10x-media/conversations'
+
+conversations({
+  slug: 'comments',
+  access,
+  channels,
+  // everything below is optional
+})
+```
+
+## Options
 
 | Option | Type | Default | |
 |---|---|---|---|
-| `slug` | `string` | required | Names the collections (`<slug>-messages`, `<slug>-reads`) and endpoints |
-| `access` | `ConversationsAccess` | required | Batch conversation access; fails closed without it |
-| `channels` | `ConversationsChannel[]` | required | Slug, label, optional cue, access |
-| `targets` | `{ collections?, globals?, custom? }` | `{}` | Channels per target; extensions add to it |
-| `users` | `Array<string \| { collection, display? }>` | `[admin.user]` | Auth collections that take part |
-| `mentions` | `{ users?, max? }` | `max: 20` | Who can be mentioned, per users collection |
-| `hooks` | `{ afterMessage?, afterMention? }` | | `afterMention` sees only new mentions on edit |
-| `editor` | `({ defaultFeatures }) => features` | | Extend the message editor, e.g. with a glossary feature |
-| `types` | `MessageTypeDefinition[]` | `[]` | Custom message types |
+| `slug` | `string` | required | Names the instance: `<slug>-messages`, `<slug>-reads`, `/api/conversations/<slug>`. Lowercase letters, digits, dashes. See [Concepts](/conversations/concepts#instances) |
+| `access` | `ConversationsAccess` | required | Batch conversation access; fails closed without it. See [Access](/conversations/access#conversation-access) |
+| `channels` | `ConversationsChannel[]` | required | Slug, label, cue, access rules. See [Access](/conversations/access#channel-rules) |
+| `targets` | `{ collections?, globals?, custom? }` | `{}` | Channels per target; extensions add to it. See [Concepts](/conversations/concepts#targets) |
+| `users` | `Array<string \| ConversationsUsersConfig>` | `[admin.user]` | Auth collections whose users take part, with an optional `display` projection |
+| `mentions.users` | `({ req, key, channel, collection }) => Where` | every user | Who can be mentioned, per users collection |
+| `mentions.max` | `number` | `20` | Mentions kept per message |
+| `mentions.verifyAccess` | `boolean` | `false` | Also run conversation access as each candidate |
+| `hooks.afterMessage` | `({ req, message, operation }) => void` | | After create, edit and delete. See [Messages](/conversations/messages#hooks) |
+| `hooks.afterMention` | `({ req, message, users, key, channel }) => void` | | New mentions only |
+| `editor` | `({ defaultFeatures }) => features` | the defaults | The instance's server editor. See [Rich text](/conversations/rich-text) |
+| `types` | `MessageTypeDefinition[]` | `[]` | Custom message types. See [Messages](/conversations/messages#custom-message-types) |
 | `limits.bodyLength` | `number` | `10000` | Characters of the plain-text projection |
-| `deleted` | `'placeholder' \| 'placeholderIfReplies'` | `'placeholderIfReplies'` | What a deleted message leaves behind |
-| `deleteWithTarget` | `boolean \| fn` | `true` | Cascade when a target document is deleted |
+| `limits.bodyBytes` | `number` | `65536` | Bytes of the serialized Lexical body |
+| `deleted` | `'placeholder' \| 'placeholderIfReplies'` | `'placeholderIfReplies'` | What a deleted message leaves behind. See [Messages](/conversations/messages#deleting) |
+| `deleteWithTarget` | `boolean \| ({ req, key, instance }) => void` | `true` | Cascade when a target document is deleted; a function replaces the built-in cascade. See [Production notes](/conversations/production#cascade) |
 | `reads` | `boolean` | `true` | Per-user read state and unread counts |
-| `transport` | `{ publish }` | | Server half of a realtime transport |
-| `slots` | `{ composerAbove?, drawerHeader?, messageActions?, messageFooter? }` | | Payload component paths |
-| `overrides` | `{ messages?, reads? }` | | `fields` (composition seam), `hooks`, `admin`, `access` |
-| `extensions` | `ConversationsExtension[]` | `[]` | `comments()` and your own |
-| `translations` | per-locale overrides | | Keys from `@10x-media/conversations/i18n` |
+| `transport` | `ConversationsServerTransport` | polling | `sseTransport()`, `pusherTransport()` or your own. See [Transport](/conversations/transport) |
+| `slots` | `ChatSlotConfig` | | Admin components added to the UI. See [Slots](/conversations/admin-ui/slots) |
+| `components.Message` | `PayloadComponent` | `ChatMessage` | A client component drawn for every message in the admin. See [Replacing the message](/conversations/admin-ui/replacing-the-message) |
+| `overrides.messages`, `overrides.reads` | `{ fields?, hooks?, admin?, access? }` | | Change the collections. `fields` receives `{ defaultFields }`. See [Concepts](/conversations/concepts#changing-the-collections) |
+| `extensions` | `ConversationsExtension[]` | `[]` | `comments()`, `reactions()` and your own. See [Extensions](/conversations/extensions) |
+| `translations` | `TranslationsOption` | | Per-locale string overrides. See [i18n](/conversations/i18n) |
 | `disabled` | `boolean` | `false` | Returns the config untouched |
 
-## Message fields
+### Slots
 
-`key`, `channel`, `parent` (root id or null), `type`, `body` (rich text), `data` (json, for custom types), `text` (plain-text projection, derived), `mentions` (user keys, derived), `authorKey`, `clientId` (idempotent sends), `editedAt`, `deletedAt`, `replyCount` and `lastReplyAt` (roots). `channel` and `type` are text rather than select, so adding either needs no migration.
+| Slot | Where |
+|---|---|
+| `composerAbove` | Above the composer, under the channel cue |
+| `drawerHeader` | In the drawer header, after the title |
+| `messageQuickActions` | A row at the top of each message's menu, for one-click actions such as reactions |
+| `messageActions` | Items in each message's menu, after Reply in thread, Edit and Delete |
+| `messageFooter` | Under each message body, deleted placeholders included |
 
-## Limits
+Each takes one component path or a list. Extensions append theirs after the host's.
 
-- **Cascade skips hooks.** Deleting a target runs one `deleteMany` per collection with no per-row hooks. Pass a function to `deleteWithTarget` to run your own, for example a batch job.
-- **REST is closed** on both collections. See [Access](/conversations/access).
-- **Deleting wipes content.** Body, text, mentions and data are cleared on the server. The row stays for thread counters and placeholders.
-- **Read cursor races.** On Postgres, raising a cursor is a select then an update. Two concurrent raises by one user can leave it a few seconds behind until the next raise. First creation is guarded by a unique index.
-- **Writes skip transactions.** The plugin writes messages with `disableTransaction`. Concurrent replies to one root would otherwise abort each other on Mongo, and exhaust the pool on Postgres. The reply counter is still one atomic `$inc`.
-- **Audit logs.** If you use `@10x-media/audit-logs`, leave the messages collection out of it, or every message becomes an audit entry.
+## Types
+
+All exported from `@10x-media/conversations` (and `@10x-media/conversations/types`).
+
+### `ConversationsChannel`
+
+```ts
+type ConversationsChannel = {
+  slug: string
+  label: string | Record<string, string>
+  cue?: ChannelCue | ((args: { req }) => ChannelCue | null)
+  access: {
+    read: (args: { channel: string; req }) => boolean | Promise<boolean>
+    create: (args: { channel: string; req }) => boolean | Promise<boolean>
+    update?: (args: { message; req }) => boolean | Promise<boolean> // default: the author
+    delete?: (args: { message; req }) => boolean | Promise<boolean> // default: the author
+  }
+}
+
+type ChannelCue = { label: string | Record<string, string>; tone: 'neutral' | 'warning' }
+```
+
+### `ConversationsAccess` and `TargetGrant`
+
+```ts
+type ConversationsAccess = (args: {
+  req: PayloadRequest
+  targets: Array<{ key: string; kind: 'collection' | 'global' | 'custom'; slug: string; id?: string }>
+}) => ConversationsAccessResult | Promise<ConversationsAccessResult>
+
+type ConversationsAccessResult = string[] | Record<string, TargetGrant | false | null | undefined>
+
+type TargetGrant = true | string[] | { read: true | string[]; create?: true | string[] }
+```
+
+`perTarget(check, { load? })` builds a `ConversationsAccess` from a per-target check that returns `false` or a `TargetGrant`.
+
+### `ConversationsUsersConfig`
+
+```ts
+type ConversationsUsersConfig = {
+  collection: string
+  /** Default: the collection's useAsTitle, then email, then the id; no avatar. */
+  display?: (doc: Record<string, unknown>) => { name: string; avatar?: string | null }
+}
+```
+
+### `MessageTypeDefinition`
+
+```ts
+type MessageTypeDefinition<TData> = {
+  slug: string
+  Component?: PayloadComponent // client or server component
+  validate?: (data: TData) => true | string | Promise<true | string>
+  clientCreatable?: boolean // default false
+}
+```
+
+Declare one with `defineMessageType<TData>()({ ... })` so `data` is typed.
+
+### `ConversationsServerTransport`
+
+```ts
+type ConversationsServerTransport = {
+  publish: (args: { instance: string; key: string; channel?: string; req }) => void | Promise<void>
+  endpoints?: (args: { base: string; instance: ConversationsInstance }) => Endpoint[]
+  client?: 'polling' | 'sse' | { pusher: PusherClientOptions } // what the admin uses
+}
+```
+
+The built-in transports and buses are covered on [Transport](/conversations/transport). The extension type, `ConversationsExtension`, is covered on [Writing your own](/conversations/extensions/writing-your-own).
+
+## Validation at startup
+
+The plugin throws while building the config, naming the instance, when:
+
+- the slug is malformed, or two instances share one;
+- channel slugs repeat, or a target lists an unknown channel;
+- a target collection or global does not exist;
+- a message type is called `text`, or two parties register one type slug;
+- two parties give one target different channel lists;
+- two extensions share a name, or an extension is named like a core or transport endpoint (`subscribe`, `messages`, `read`, `poll`, `mentions`, `events`, `pusher-auth`);
+- two extensions add a message field with one name, or one that the core already has.

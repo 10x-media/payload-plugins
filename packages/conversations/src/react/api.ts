@@ -99,7 +99,7 @@ export const createApi = ({
 		/** An extension's endpoint: `<base>/<name><path>`. A `body` makes it a POST by default. */
 		extension: <T>(name: string, path: string, init: { body?: unknown; method?: string } = {}) =>
 			request<T>(
-				`/${name}${path}`,
+				`/${name}${path && !path.startsWith('/') ? `/${path}` : path}`,
 				init.body === undefined
 					? { method: init.method ?? 'GET' }
 					: json(init.method ?? 'POST', init.body)

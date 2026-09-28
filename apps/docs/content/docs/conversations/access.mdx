@@ -1,13 +1,20 @@
 ---
 title: Access
-description: Conversation access, channel access, mentions, and the closed collections.
+description: Conversation access with grants per target, channel rules per user, read-only conversations, mentions, subscription tokens, and the closed collections.
 ---
 
-Access is checked twice. **Conversation access** decides whether the user sees a conversation at all. **Channel access** then decides which of its channels they can read and write. Effective access is both together.
+Access is decided in two places:
+
+- **Conversation access** answers, for a batch of targets, whether the user sees each one and which of its channels they may read and write. Everything that depends on the target (owner, tenant, a closed ticket, an archived room) lives here.
+- **Channel rules** answer whether the user may read or write a channel at all. They see the user, not the target.
+
+Effective access is both together: a channel is readable when the grant includes it and its `read` rule passes, and writable when the grant allows writing there and its `create` rule passes. Writing always implies reading.
+
+A request without a signed-in user gets nothing; the endpoints answer 401.
 
 ## Conversation access
 
-`access` is required, and the plugin fails closed without it: nobody sees anything. It is a batch function, so a list view with 25 triggers costs one call rather than 25:
+`access` is required. Without it the plugin fails closed and nobody sees anything. It is a batch function: a list view with 25 triggers costs one call rather than 25.
 
 ```ts
 access: async ({ req, targets }) => {
@@ -18,47 +25,134 @@ access: async ({ req, targets }) => {
     where: { and: [{ id: { in: ids } }, { team: { equals: req.user?.team } }] },
     depth: 0,
     pagination: false,
+    overrideAccess: true,
   })
   return allowed.docs.map((doc) => `collection:persons:${doc.id}`)
 }
 ```
 
-For simple cases, `perTarget` wraps a per-target predicate. With `{ load: true }` it loads the targets first, one query per collection at depth 0, and denies a target that does not exist:
+Only targets the instance serves are passed in; a key for a collection that is not in `targets` never reaches your function.
+
+### Grants per target
+
+Returning a list of keys gives each listed key every channel its target offers, to read and write. To answer per key, return a record of grants:
 
 ```ts
-access: perTarget(({ req, doc }) => doc?.owner === req.user?.id, { load: true })
-```
-
-Conversation access is not delegated to the target collection's own `read` access. That access often depends on the whole document or on population, and it would run once per key. Reuse it yourself if it fits.
-
-## Channel access
-
-```ts
-{
-  slug: 'shared',
-  label: { en: 'Shared', de: 'Geteilt' },
-  cue: { label: 'Visible to the customer', tone: 'warning' },
-  access: {
-    read: ({ req, key, target }) => true,
-    create: ({ req, key, target }) => true,
-    update: ({ req, message }) => message.authorKey === `users:${req.user?.id}`, // default: the author
-    delete: ({ req, message }) => req.user?.role === 'admin', // default: the author
-  },
+return {
+  'collection:tickets:1': true,                                // every offered channel
+  'collection:tickets:2': ['conversation'],                    // only these, read and write
+  'collection:tickets:3': { read: true, create: [] },          // read only
+  'collection:tickets:4': { read: ['conversation', 'notes'], create: ['notes'] },
+  'collection:tickets:5': false,                               // denied (as is leaving it out)
 }
 ```
 
-`target` is the parsed key, not a loaded document: channel access is about the user (roles, memberships). Anything that depends on the target belongs in conversation access. When a user can read no channel of a target, its trigger does not render.
+A grant is `true`, a channel list, or `{ read, create }`. `create` defaults to `read` and never reaches beyond it. Channels outside what the target offers are ignored. A key left out, `false` or `null` is denied, and so is a grant with nothing to read.
+
+### `perTarget`
+
+For simple cases, `perTarget` wraps a check per target and builds the record for you:
+
+```ts
+import { perTarget } from '@10x-media/conversations'
+
+access: perTarget(
+  ({ doc, req, target }) => {
+    const mine = isStaff(req) || String(doc?.customer) === String(req.user?.id)
+    if (!mine) return false
+    return doc?.status === 'closed' ? { read: true, create: [] } : true
+  },
+  { load: true }
+)
+```
+
+The check returns `false` or any grant. With `{ load: true }` the targets are loaded first: one `find` per collection at depth 0 with access overridden, and one `findGlobal` per global. A document that does not exist is denied before your check runs. Without `load`, `doc` is undefined and the check sees only the parsed key.
+
+Conversation access is not delegated to the target collection's own `read` access. That access often depends on population or the whole document, and would run once per key. Call it yourself if it fits.
+
+## Channel rules
+
+```ts
+channels: [
+  {
+    slug: 'notes',
+    label: { en: 'Notes', de: 'Notizen' },
+    cue: { label: 'Staff only', tone: 'neutral' },
+    access: {
+      read: ({ req }) => req.user?.collection === 'users',
+      create: ({ req }) => req.user?.collection === 'users',
+      update: ({ req, message }) => message.authorKey === `users:${req.user?.id}`, // default: the author
+      delete: ({ req, message }) => req.user?.roles?.includes('admin'),            // default: the author
+    },
+  },
+]
+```
+
+`read` and `create` receive `{ channel, req }` only. They depend on the user (roles, memberships), so each runs once per request and channel however many conversations the request asks about. Anything target-specific belongs in conversation access.
+
+`update` and `delete` run per message with `{ message, req }`. Without them only the author may edit or delete. Only `text` messages can be edited.
+
+When a user can read no channel of a target, the target is treated as not found, and its trigger does not render.
+
+### Cues
+
+A cue is the line above the composer that says who reads what you write, with a lock icon for `neutral` and an eye for `warning`. It can be a function of the viewer, resolved per request:
+
+```ts
+cue: ({ req }) =>
+  req.user?.collection === 'users' ? { label: 'Visible to the customer', tone: 'warning' } : null,
+```
+
+A customer writing in that channel needs no warning that the customer can read it; `null` shows none.
+
+## Read-only conversations
+
+A grant with `create: []` (or any channel left out of `create`) makes those channels read only for that user on that target: an archived room, a closed ticket.
+
+- Sending, editing and deleting answer 403.
+- Reading, paging and read state keep working.
+- The admin and registry components hide Edit and Delete and disable the composer with a "read only" note.
+- Reactions are frozen too, unless the instance opts in with `reactions({ allowReadOnly: true })`. See [Reactions](/conversations/extensions/reactions).
+
+Extensions check the same right through `ctx.readableMessage(id, { write: true })`, which costs no extra query.
 
 ## Mentions
 
-`mentions.users` narrows who can be mentioned, per users collection, as a `Where`. The search also drops users who cannot read the channel, and saving applies the same rule. A mention of a user who cannot read the channel stays in the text but notifies nobody. So `afterMention` can promise that each user it names can read the message.
+The `@` typeahead and the saved mentions follow the same rules:
+
+```ts
+mentions: {
+  // Per users collection, built for the sender's request: who may be mentioned at all.
+  users: ({ req, key, channel, collection }) =>
+    collection === 'users' ? { tenants: { in: tenantsOf(req) } } : { id: { exists: false } },
+  max: 20,
+  verifyAccess: false,
+}
+```
+
+- `users` returns a `Where` per users collection. This is the place for target-level visibility of people (same tenant, same team). Without it every user of every users collection is a candidate.
+- Candidates must also pass the channel's `read` rule, evaluated as themselves. A customer is never offered, or notified, in a staff-only channel.
+- `verifyAccess: true` additionally runs conversation access as each candidate, so a mention only reaches someone who can open the conversation. That is one access run per candidate, so it is off by default; `users` is the cheaper place for that rule.
+- On save, mentions that fail these checks stay in the text as a name but are not stored in `mentions` and notify nobody. At most `max` mentions (default 20) are kept per message.
+
+`afterMention` can therefore promise that each user it names may read the message.
+
+The picker searches the `useAsTitle` field of each users collection (`email` when there is none), up to 8 people per collection.
+
+## Subscription tokens
+
+When a browser subscribes to a conversation, the response carries a token per key: an HMAC-SHA256 signature, keyed by `payload.secret`, over the instance, the user, the key, the channels the user could read, and an expiry 10 minutes out. The poll, the SSE stream and the Pusher auth callback verify tokens without touching the database or running your access code. Clients renew them before they expire.
+
+Revoked access therefore stops "something changed" signals within 10 minutes. Loading messages always runs full access, so a revoked user never loads anything new.
 
 ## Closed collections
 
-Both collections deny every operation over REST and GraphQL. Payload's collection `read` access gets only `{ req }` on a `find`, which is not enough to check a conversation. Every read and write goes through the instance endpoints, which run instance access and then call the Local API with `overrideAccess`.
+Both collections deny every operation over REST and GraphQL. Payload's collection `read` access gets only `{ req }` on a `find`, which cannot check a conversation. Every read and write goes through the instance endpoints, which run instance access and then call the Local API with `overrideAccess`. Collection hooks still run, so `overrides.messages.hooks` behave normally.
 
-A project that stores what its access needs on the message itself, such as a `tenant` field added through `overrides.messages.fields`, may open REST through `overrides.messages.access`. That becomes the project's responsibility. The endpoints keep checking regardless.
+A project that stores what its access needs on the message itself, such as a `tenant` field added through `overrides.messages.fields`, may open REST through `overrides.messages.access`. That becomes the project's responsibility; the instance endpoints keep checking instance access regardless.
 
-## Authors across auth collections
+The Local API is yours: `payload.find({ collection: 'comments-messages' })` from server code works as with any collection, and the collection hooks keep the invariants (channel and type checks, derived fields, counters, instance hooks).
 
-`users` lists every auth collection whose users take part (default: `admin.user`). Messages store `authorKey` as `<collection>:<id>`. Responses carry an `authors` map, projected once per response through each collection's `display` (default: its `useAsTitle`). A deleted user reads as "Deleted user".
+## Plugin order
+
+Targets and users collections are looked up in the config the plugin receives. List `conversations()` after any plugin that adds a collection you target or whose users take part, or the target check throws and display names fall back to ids.

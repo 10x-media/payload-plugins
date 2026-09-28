@@ -1,0 +1,142 @@
+---
+title: Concepts
+description: Instances, keys, channels, threads, read state, authors, and the data model behind them.
+---
+
+## Instances
+
+Each `conversations()` call is an instance, named by its `slug`. An instance is one use case with its own rules: `comments` on documents, `tickets` for support, `chat` for rooms. Everything it registers carries the slug:
+
+| Thing | Name |
+|---|---|
+| Messages collection | `<slug>-messages` |
+| Reads collection | `<slug>-reads` (absent with `reads: false`) |
+| Endpoints | `/api/conversations/<slug>/*` |
+| Web Lock and BroadcastChannel names | `conversations:<slug>:*` |
+| Component props | `instance: '<slug>'` |
+
+Instances share nothing but the plugin's code. Each has its own access, channels, targets, extensions and transport, so comments can poll while a chat streams over SSE. The slug must be lowercase letters, digits and dashes, and two instances cannot share one.
+
+## Keys
+
+A conversation is identified by a string key derived from its target. The target holds no reference to its conversation.
+
+| Target | Key | Helper |
+|---|---|---|
+| A collection document | `collection:<collectionSlug>:<id>` | `collectionKey('persons', 42)` |
+| A global | `global:<globalSlug>` | `globalKey('settings')` |
+| Anything else | `custom:<prefix>` or `custom:<prefix>:<anything>` | `customKey('room:general')` |
+
+A custom key may contain further `:`. Its prefix, the text up to the first `:` after `custom:`, is how custom targets are declared: `targets.custom` is keyed by it. `parseKey(key)` returns `{ key, kind, slug, id? }` or `null` for anything malformed (keys are capped at 512 characters).
+
+Users are named the same way across auth collections: `userKey('users', 7)` is `users:7`, and `parseUserKey` reads it back. Messages store their author as such a key (`authorKey`), and mentions store user keys too.
+
+All helpers are exported from the main entry. `@10x-media/conversations/react` exports them too, except `parseUserKey`.
+
+## Targets
+
+A target is served by an instance when it is listed in `targets`, with the channels it offers:
+
+```ts
+targets: {
+  collections: { tickets: { channels: ['conversation', 'notes'] } },
+  globals: { settings: { channels: ['internal'] } },
+  custom: { room: { channels: ['messages'] } }, // custom:room:<anything>
+}
+```
+
+Extensions add targets too: `comments({ collections: { persons: true } })` adds `persons` with every channel of the instance. The same target listed with different channel lists by two parties is a config error that names both. A target collection or global that does not exist throws at startup.
+
+## Channels
+
+A channel is an attribute of each message, not a container. Every channel has a slug, a label, optional cue text shown above the composer, and access rules. A target offers only the channels listed for it, and a user sees only those that both conversation access and the channel's rules allow. See [Access](/conversations/access).
+
+`channel` and `type` are stored as text, not `select`, so adding a channel or a message type never needs a Postgres migration.
+
+## Threads
+
+A reply points at its root through `parent`. Threads are one level deep: a reply to a reply is rejected, and a reply always takes its root's channel, whatever the client sends. Roots carry `replyCount` and `lastReplyAt`. The count moves with one atomic `$inc` on both adapters, so concurrent replies never lose one.
+
+## Read state
+
+With `reads` on (the default) each user has cursors in `<slug>-reads`:
+
+- **One per conversation and channel.** It is raised when a feed is visible and scrolled to its end, to the time of the last message actually seen, not on mere open. Sending raises it too, so your own messages are never unread.
+- **One per opened thread.** A thread cursor belongs to its root, so a summary can say "3 replies · 1 new".
+
+Cursors only move forward. Unread counts cover root messages by other people, not deleted, in channels the user can read, capped at 100 per channel. The client keeps the cursor from before the raise to place the "New messages" divider while the feed stays open.
+
+With `reads: false` the reads collection is not registered, the endpoints return no unread data, and the UI hides unread badges and dividers.
+
+## Authors across auth collections
+
+`users` lists every auth collection whose users take part. The default is your `admin.user` collection.
+
+```ts
+users: [
+  'users',
+  { collection: 'customers', display: (doc) => ({ name: `${doc.firstName} ${doc.lastName}`, avatar: doc.avatarUrl }) },
+]
+```
+
+Names are never stored on a message (the plain-text projection aside). Every response that carries messages also carries an `authors` map, `{ [userKey]: { name, avatar?, deleted? } }`, built once per response with one query per users collection. The default projection reads the collection's `useAsTitle`, then `email`, then the id. A user that no longer exists reads as "Deleted user". Mention search matches the `useAsTitle` field, or `email` when there is none.
+
+## Data model
+
+### `<slug>-messages`
+
+| Field | Type | Notes |
+|---|---|---|
+| `key` | text, indexed | The conversation key |
+| `channel` | text | Checked against the channels the target offers |
+| `parent` | text, indexed | Root id for a reply, `null` on roots |
+| `type` | text | `text` or a registered [message type](/conversations/messages#custom-message-types) |
+| `body` | richText | The instance editor; for `text` messages |
+| `data` | json | For custom types, checked by the type's `validate` |
+| `text` | textarea | Plain-text projection, derived on save |
+| `mentions` | text, hasMany | User keys, derived on save |
+| `authorKey` | text, indexed | From the signed-in user, never from the client |
+| `clientId` | text | Client-generated id for idempotent sends |
+| `editedAt` | date | |
+| `deletedAt` | date | Soft delete |
+| `replyCount` | number | Roots only |
+| `lastReplyAt` | date | Roots only |
+
+Plus `createdAt` and `updatedAt`. Compound indexes:
+
+- `(key, channel, parent, createdAt)`: feeds, threads, keyset paging and unread counts.
+- `(key, updatedAt)`: change detection for polling and buses.
+- `(authorKey, clientId)`, unique: a retried send finds its first attempt.
+
+Relationships are deliberately absent. On Postgres a polymorphic relationship lives in a `_rels` table and could not carry these indexes.
+
+### `<slug>-reads`
+
+| Field | Type | Notes |
+|---|---|---|
+| `userKey` | text | |
+| `key` | text, indexed | |
+| `channel` | text | The channel of a conversation cursor; empty on a thread cursor |
+| `thread` | text | Root id of a thread cursor; empty on a conversation cursor |
+| `lastReadAt` | date | |
+
+A unique index on `(userKey, key, channel, thread)` holds one row per cursor.
+
+### Fields from extensions
+
+An extension can store data on every message through `messageFields`, as `reactions({ storage: 'message' })` does. Those fields are added to the messages collection, survive soft delete, and are never sent to the browser as they are: the extension's `decorate` reads them and returns what clients see under `message.ext[name]`. Two extensions adding one field name throw at startup. See [Writing your own](/conversations/extensions/writing-your-own).
+
+### Changing the collections
+
+`overrides.messages` and `overrides.reads` take `fields`, `hooks`, `admin` and `access`. `fields` is a composition seam: it receives the built fields and returns the result.
+
+```ts
+overrides: {
+  messages: {
+    fields: ({ defaultFields }) => [...defaultFields, { name: 'tenant', type: 'text', index: true }],
+    hooks: { afterChange: [emailRequesterOnReply] },
+  },
+}
+```
+
+Your hooks run after the plugin's own, which hold the invariants. Opening access is covered in [Access](/conversations/access#closed-collections).

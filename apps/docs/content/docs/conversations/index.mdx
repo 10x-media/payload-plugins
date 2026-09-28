@@ -1,15 +1,17 @@
 ---
 title: Conversations
-description: Messages bound to any document, with channels, threads, mentions and read state. Comments are the first extension.
+description: Messages bound to any document, global or key of your own, with channels, threads, mentions and read state. Comments and reactions ship as extensions.
 ---
 
-`@10x-media/conversations` adds conversations to Payload. A conversation belongs to a target (a document, a global, or a key of your own), and its messages live in channels that decide who reads what. Threads are one level deep. Mentions go through a Lexical feature and end in a hook. Every user has their own read state.
+`@10x-media/conversations` adds conversations to Payload. A conversation belongs to a target: a document, a global, or a key of your own. Its messages live in channels, and each channel decides who reads and who writes. Threads are one level deep. Mentions go through a Lexical feature and end in a hook. Every user has their own read state, per channel and per thread.
 
-The core has no opinion on what a conversation is for. `comments()` turns it into a Comments button on edit views. A ticket system or a chat room is another configuration of the same core, with a view you build from the primitives.
+The core has no opinion on what a conversation is for. `comments()` turns it into a Comments button on edit views, and `reactions()` adds emoji reactions. A support ticket system or a chat room is another configuration of the same core, with a view you compose from the admin components or, on a website, from the headless hooks and the shadcn registry.
 
 ```ts title="payload.config.ts"
 import { conversations, perTarget } from '@10x-media/conversations'
 import { comments } from '@10x-media/conversations/comments'
+
+const isStaff = ({ req }) => req.user?.collection === 'users'
 
 export default buildConfig({
   plugins: [
@@ -17,11 +19,7 @@ export default buildConfig({
       slug: 'comments',
       access: perTarget(({ req }) => Boolean(req.user)),
       channels: [
-        {
-          slug: 'internal',
-          label: 'Internal',
-          access: { read: ({ req }) => req.user?.collection === 'users', create: ({ req }) => req.user?.collection === 'users' },
-        },
+        { slug: 'internal', label: 'Internal', access: { read: isStaff, create: isStaff } },
       ],
       extensions: [comments({ collections: { posts: true } })],
     }),
@@ -31,17 +29,42 @@ export default buildConfig({
 
 ## The model
 
-- **Instance.** One `conversations()` call, named by `slug`. It registers `<slug>-messages` and `<slug>-reads` and serves the endpoints under `/api/conversations/<slug>`. Call it again for another use case.
+- **Instance.** One `conversations()` call, named by `slug`. It registers `<slug>-messages` and `<slug>-reads` and serves its endpoints under `/api/conversations/<slug>`. Call it again for another use case: `comments`, `tickets`, `chat`.
 - **Key.** A conversation is a string: `collection:<slug>:<id>`, `global:<slug>` or `custom:<anything>`. The target holds no reference to it, so no field is added to your collections.
-- **Channel.** An attribute of each message, with its own `read`, `create`, `update` and `delete` access. A target offers the channels you list for it.
-- **Thread.** A reply points at its root. Roots count their replies atomically on both adapters.
+- **Channel.** An attribute of each message, with its own access. A target offers the channels you list for it.
+- **Access.** Conversation access answers for many targets in one batch, per target (every channel, some channels, or read only). Channel rules see only the user. Both collections are closed over REST; every read and write goes through the instance endpoints.
+- **Thread.** A reply points at its root. Roots count their replies atomically on Mongo and Postgres.
 - **Read state.** A cursor per user, conversation and channel, plus one per opened thread.
+- **Transport.** How browsers learn that something changed: polling by default, Server-Sent Events, or a Pusher-compatible service.
+- **Extensions.** Shape an instance, add per-message data, endpoints, stored fields, UI slots and client data.
+
+## Entry points
+
+| Import | Contents |
+|---|---|
+| `@10x-media/conversations` | `conversations`, `perTarget`, `defineMessageType`, `defineExtension`, `postMessage`, `touchMessage`, `getInstance`, `projectUsers`, key helpers, transports and buses |
+| `@10x-media/conversations/comments` | `comments()` |
+| `@10x-media/conversations/reactions` | `reactions()` |
+| `@10x-media/conversations/client` | admin components on `@payloadcms/ui` |
+| `@10x-media/conversations/react` | headless provider and hooks, no `@payloadcms/ui` |
+| `@10x-media/conversations/reactions/react` | `useReactions` |
+| `@10x-media/conversations/composer` | the Lexical composer core, no `@payloadcms/ui` |
+| `@10x-media/conversations/rsc` | server components the plugin registers |
+| `@10x-media/conversations/i18n` | translation keys |
+| `@10x-media/conversations/types` | public types |
 
 ## Where to go next
 
 - [Quick start](/conversations/quick-start): install, configure access and channels, and add comments.
-- [Access](/conversations/access): conversation access, channel access, mentions, and why REST is closed.
-- [Extensions](/conversations/extensions): `comments()`, writing your own, and custom message types.
-- [UI primitives](/conversations/primitives): the admin components, the headless hooks, and slots.
-- [Transport](/conversations/transport): how polling works and where a realtime adapter plugs in.
-- [Configuration](/conversations/configuration): every option, and the limits to know about.
+- [Concepts](/conversations/concepts): instances, keys, channels, threads, read state and the data model.
+- [Access](/conversations/access): grants per target, channel rules, read-only conversations, mentions, closed REST.
+- [Messages](/conversations/messages): sending, editing, deleting, custom message types, server helpers, hooks and endpoints.
+- [Rich text](/conversations/rich-text): the instance editor and composer features.
+- [Extensions](/conversations/extensions): how they work, [comments](/conversations/extensions/comments), [reactions](/conversations/extensions/reactions), and [writing your own](/conversations/extensions/writing-your-own).
+- [Admin UI](/conversations/admin-ui): the components, [slots](/conversations/admin-ui/slots), [replacing the message](/conversations/admin-ui/replacing-the-message), [custom views](/conversations/admin-ui/custom-views) and [styling](/conversations/admin-ui/styling).
+- [Website UI](/conversations/website): customer auth and the provider, the [shadcn registry](/conversations/website/shadcn-registry), and the [headless hooks](/conversations/website/headless).
+- [Transport](/conversations/transport): polling, SSE with its buses, and Pusher.
+- Recipes: [support tickets](/conversations/recipes/support-tickets), [chat rooms](/conversations/recipes/chat-rooms), [multi-tenant](/conversations/recipes/multi-tenant).
+- [Configuration](/conversations/configuration): every option.
+- [Production notes](/conversations/production): cascade, plugin order, database cost, limits.
+- [i18n](/conversations/i18n): translate the UI and localize channel labels.

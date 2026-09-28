@@ -2,13 +2,14 @@
 '@10x-media/conversations': minor
 ---
 
-Initial beta of `@10x-media/conversations`: conversations bound to any document, global or custom key, with comments as the first extension.
+Initial beta of `@10x-media/conversations`: conversations bound to any document, global or custom key, with comments and reactions as the first extensions.
 
 - **Instances**: one `conversations()` call per use case, each with its own `<slug>-messages` and `<slug>-reads` collections and endpoints under `/api/conversations/<slug>`.
-- **Access**: required batch conversation access (`perTarget` for simple cases), per-channel `read` / `create` / `update` / `delete`, collections closed over REST.
-- **Messages**: channels, one-level threads with atomic reply counts, soft delete with placeholders, idempotent sends, plain-text projection, custom message types with typed `data`.
-- **Mentions**: a Lexical feature with a typeahead that offers only users who can read the channel; `afterMention` fires once per new mention.
-- **Read state**: cursors per user, conversation and channel, and per thread; unread counts and a "New messages" divider.
-- **Polling**: only mounted conversations, one tab per key across the browser via Web Locks and BroadcastChannel, signed subscription tokens, nothing while hidden; a transport interface for realtime adapters.
-- **UI**: headless hooks for websites (`/react`), admin primitives on `@payloadcms/ui` (`/client`), and client or server components for message types and slots.
-- **`comments()`**: a Comments button in the document controls of the listed collections and globals, opening a drawer with channel tabs, feed, composer and stacked threads.
+- **Access**: required batch conversation access answering per target with grants (every channel, some channels, or read only; `perTarget` for simple cases), channel rules per user run once per request, per-message `update` / `delete`, collections closed over REST.
+- **Messages**: channels, one-level threads with atomic reply counts, soft delete with placeholders, idempotent sends, plain-text projection, body size limits, custom message types with typed `data`, server helpers `postMessage` and `touchMessage`.
+- **Mentions**: a typeahead that offers only users who can read the channel, scoped per users collection; `afterMention` fires once per new mention.
+- **Read state**: cursors per user, conversation and channel, and per thread; unread counts in one query and a "New messages" divider.
+- **Transports**: polling by default (one tab per key via Web Locks and BroadcastChannel, signed tokens, nothing while hidden), Server-Sent Events served by Payload with `databaseBus`, `payloadKVBus`, `redisBus` or `memoryBus`, and a dependency-free Pusher-compatible transport; one realtime connection per browser.
+- **Extensions**: `before` / `after` config phases plus per-message `decorate`, endpoints, stored `messageFields`, slots, client data and cascade cleanup. `comments()` adds a Comments button and drawer to collections and globals; `reactions()` adds emoji reactions with per-person limits, stored in their own collection or on the message.
+- **Admin UI**: drawer, panel, feed, message, thread and trigger on Payload's own components, a Lexical composer with toolbar, `/` commands, markdown and links, config-level slots (client or server components), and `components.Message` to replace the message.
+- **Website UI**: headless hooks (`/react`, `/reactions/react`), the composer core without `@payloadcms/ui` (`/composer`) with named, skinnable parts, and shadcn registry sources.

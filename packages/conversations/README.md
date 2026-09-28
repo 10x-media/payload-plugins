@@ -1,6 +1,6 @@
 # @10x-media/conversations
 
-Conversations for Payload: messages bound to any document, global or custom key, with channels that decide who reads what, one-level threads, mentions and per-user read state. Comments on documents are the first extension; tickets and rooms are built from the same primitives.
+Conversations for Payload: messages bound to any document, global or custom key, with channels that decide who reads what, one-level threads, mentions and per-user read state. Comments on documents and reactions ship as extensions; support tickets, chat rooms and website chats are built from the same primitives.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/conversations?style=flat-square)](https://www.npmjs.com/package/@10x-media/conversations)
 
@@ -9,14 +9,16 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Features
 
 - **Bound to targets, not to a conversations table**: a conversation is a key (`collection:persons:42`, `global:settings`, `custom:room:general`). The target document holds no reference to it.
-- **Channels with their own access**: `internal` for staff, `shared` for the customer, each with `read` / `create` / `update` / `delete`. A cue above the composer says who will read what you write.
+- **Channels with their own access**: `internal` for staff, `shared` for the customer. A cue above the composer says who will read what you write, per viewer.
+- **Access in one batch**: conversation access answers for many targets at once, with grants per target (every channel, some channels, or read only). Channel rules see only the user and run once per request. Both collections are closed over REST.
 - **Threads** one level deep, with atomic reply counts on Mongo and Postgres.
-- **Mentions** through a Lexical feature with a typeahead. Only users who can read the channel are offered, and `afterMention` fires once per new mention, never on edits. Delivering notifications is left to your project.
+- **Mentions** with a typeahead that offers only people who can read the channel; `afterMention` fires once per new mention, never again on edits.
 - **Unread state** per user and channel, and per thread.
-- **Polling that stays cheap**: only mounted conversations, one tab per key across the browser, and nothing while the tab is hidden. Tokens are signed, so a poll tick runs no access code. The client transport can be swapped for a realtime one.
-- **Fail-closed access**: batch conversation access is required, and both collections are closed over REST. Everything goes through the instance endpoints.
-- **Primitives, not a page**: headless hooks for a website (`/react`), admin components on `@payloadcms/ui` (`/client`), and slots for your own client or server components.
-- **Several instances**: call `conversations()` once per use case (`comments`, `tickets`), each with its own collections and endpoints.
+- **Transports**: polling by default (one tab per key, nothing while hidden, signed tokens so a tick runs no access code), Server-Sent Events served by Payload itself with database, Payload KV or Redis buses, or a Pusher-compatible service for serverless hosts.
+- **Extensions**: `comments()` adds a Comments button to edit views, `reactions()` adds emoji reactions with per-person limits. Your own extensions get per-message data, endpoints, stored fields, slots and client data.
+- **Admin UI on Payload's own components**: drawer, panel, feed, message, thread and a Lexical composer with a toolbar, `/` commands, markdown and links. Add to it through slots, or replace the message entirely.
+- **Website UI**: headless React hooks and a composer core without `@payloadcms/ui`, plus shadcn registry components to start from.
+- **Several instances**: call `conversations()` once per use case (`comments`, `tickets`, `chat`), each with its own collections, endpoints and transport.
 
 ## Quick start
 
@@ -53,7 +55,16 @@ Then run `payload generate:importmap`. Every edit view of `posts` now has a Comm
 
 ## Documentation
 
-Full documentation, covering access, channels, extensions, the React primitives, custom message types, transports and limits, lives at [the docs site](https://github.com/10x-media/payload-plugins/tree/main/apps/docs).
+Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/conversations):
+
+- [Overview](https://docs.10xmedia.de/conversations) and [Quick start](https://docs.10xmedia.de/conversations/quick-start)
+- [Concepts](https://docs.10xmedia.de/conversations/concepts), [Access](https://docs.10xmedia.de/conversations/access), [Messages](https://docs.10xmedia.de/conversations/messages), [Rich text](https://docs.10xmedia.de/conversations/rich-text)
+- [Extensions](https://docs.10xmedia.de/conversations/extensions): comments, reactions, writing your own
+- [Admin UI](https://docs.10xmedia.de/conversations/admin-ui): components, slots, replacing the message, custom views, styling
+- [Website UI](https://docs.10xmedia.de/conversations/website): the shadcn registry and the headless hooks
+- [Transport](https://docs.10xmedia.de/conversations/transport): polling, SSE, Pusher
+- [Recipes](https://docs.10xmedia.de/conversations/recipes/support-tickets): support tickets, chat rooms, multi-tenant
+- [Configuration](https://docs.10xmedia.de/conversations/configuration) and [Production notes](https://docs.10xmedia.de/conversations/production)
 
 ## Development
 
@@ -63,6 +74,8 @@ pnpm test conversations     # unit + integration (Mongo in memory)
 pnpm test:matrix conversations
 pnpm test:e2e conversations
 ```
+
+The dev app shows every transport: comments on polling, `/admin/chat` on SSE, and tickets on Pusher through Soketi (`docker compose -f packages/conversations/docker-compose.dev.yml up -d`). The website under `/support` uses the registry components with a customer login (`customer@example.com` / `password`, in a private window).
 
 ## License
 

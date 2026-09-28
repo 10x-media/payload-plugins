@@ -1,0 +1,155 @@
+---
+title: shadcn registry
+description: Ready conversation components in shadcn's look, copied into your project and built on the headless hooks.
+---
+
+For projects on shadcn, the registry installs a complete conversation UI into your codebase: channel tabs, a scrolling feed, messages with a menu, the composer, threads, and reactions. Every component draws state that comes from the package's [headless hooks](/conversations/website/headless), so the behaviour (paging, the "New messages" divider, optimistic sends, drafts, retry, realtime) stays in the package and updates with it. The markup and classes are yours.
+
+## Install
+
+The registry JSON is built from `packages/conversations/registry/` in the package source; hosting it is a follow-up. Until then, point the CLI at the raw file:
+
+```bash
+npx shadcn@latest add <registry-url>/r/conversation-panel.json
+```
+
+`conversation-panel` pulls in the items it is built from. Add reactions separately when the instance has the [reactions extension](/conversations/extensions/reactions):
+
+```bash
+npx shadcn@latest add <registry-url>/r/conversation-reactions.json
+```
+
+The components are written for shadcn's `base-nova` style (Base UI primitives, lucide icons) and Tailwind v4. They also need `@10x-media/conversations` and `@payloadcms/richtext-lexical`, which renders message bodies and carries the composer's Lexical.
+
+## The items
+
+| Item | What it is | Uses |
+|---|---|---|
+| `conversation-ui` | `ConversationUIProvider`: labels, locale, extension slots, custom message types, rich text features | |
+| `conversation-panel` | One conversation, complete: header, channel tabs, feed, composer; a thread opens in place with a back button | `button` |
+| `conversation-channel-tabs` | The readable channels as tabs with unread counts; nothing with one channel | |
+| `conversation-feed` | The scrolling window: "Load earlier", day separators, grouping, the divider, the "N new" pill | `button` |
+| `conversation-message` | Avatar, name, time, body, edited mark, thread summary, deleted placeholder, inline edit, a menu with reply, edit and delete | `button`, `dropdown-menu`, `alert-dialog` |
+| `conversation-composer` | The Lexical composer skinned with Tailwind: toolbar, `/` and `@` menus, link field, channel cue, Send | `button` |
+| `conversation-thread` | A root message, its replies as their own feed, a reply composer | |
+| `conversation-reactions` | `ReactionsBar`, `ReactionQuickActions` and `reactionSlots` | `popover` |
+
+The shadcn primitives (`button`, `dropdown-menu`, `alert-dialog`, `popover`) come from your own `@/components/ui`, and `cn` from `@/lib/utils`, as in any shadcn project.
+
+## A page
+
+A ticket's conversation for the customer who owns it. The server component checks the ticket and hands down the instance's transport; the client component sets up the provider and draws the panel.
+
+```tsx title="app/(frontend)/support/[id]/page.tsx"
+import { getInstance } from '@10x-media/conversations'
+import config from '@payload-config'
+import { headers } from 'next/headers'
+import { notFound, redirect } from 'next/navigation'
+import { getPayload } from 'payload'
+
+import { SupportChat } from './support-chat'
+
+export const dynamic = 'force-dynamic'
+
+export default async function TicketPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const payload = await getPayload({ config })
+  const { user } = await payload.auth({ headers: await headers() })
+  if (user?.collection !== 'customers') redirect('/support/login')
+  const ticket = await payload.findByID({ collection: 'tickets', id, depth: 0, disableErrors: true })
+  if (!ticket || String(ticket.customer) !== String(user.id)) notFound()
+  return (
+    <main className="mx-auto max-w-2xl p-6">
+      <SupportChat
+        subject={ticket.subject}
+        ticketId={String(ticket.id)}
+        transport={getInstance({ payload }, 'tickets').transport?.client}
+      />
+    </main>
+  )
+}
+```
+
+```tsx title="app/(frontend)/support/[id]/support-chat.tsx"
+'use client'
+
+import {
+  ChatProvider,
+  type ClientTransportSpec,
+  collectionKey,
+  transportFromSpec,
+} from '@10x-media/conversations/react'
+import { useState } from 'react'
+
+import { ConversationPanel } from '@/components/conversations/conversation-panel'
+import { ConversationUIProvider } from '@/components/conversations/conversation-ui'
+import { reactionSlots } from '@/components/conversations/conversation-reactions'
+
+export function SupportChat({
+  subject,
+  ticketId,
+  transport,
+}: {
+  subject: string
+  ticketId: string
+  transport?: ClientTransportSpec
+}) {
+  const [client] = useState(() => transportFromSpec(transport))
+  return (
+    <ChatProvider instance="tickets" transport={client}>
+      <ConversationUIProvider slots={reactionSlots}>
+        <ConversationPanel
+          className="h-[70vh]"
+          conversationKey={collectionKey('tickets', ticketId)}
+          header={<h2 className="font-medium">{subject}</h2>}
+        />
+      </ConversationUIProvider>
+    </ChatProvider>
+  )
+}
+```
+
+The page's own access check is for the page. The conversation endpoints check again on every request with the instance's access, so a customer who guesses another ticket's id gets nothing from them either.
+
+`ConversationPanel` fills the height you give it and scrolls its feed inside. `ChatProvider` and the auth it relies on are covered on [Website UI](/conversations/website).
+
+## ConversationUIProvider
+
+Optional. Without it the components use English labels and no slots.
+
+| Prop | |
+|---|---|
+| `labels` | Any of the strings the components show (`defaultLabels` in `conversation-ui.tsx`), for your language. `replies`, `switchTo` and `unseen` are functions |
+| `locale` | Picks channel labels and cues from localized config labels, and formats dates. Default `en`. Nothing reads the browser's language: pass your router's locale |
+| `slots` | Extension components as React components (a website has no import map): `composerAbove`, `messageActions`, `messageQuickActions`, `messageFooter`, each a list |
+| `renderType` | Draws messages whose `type` is not `text`; return `null` for types you do not know |
+| `composerFeatures` | `({ defaultFeatures }) => features` for every composer below |
+| `converters` | JSX converters for message bodies, to show what those features store |
+
+`composerFeatures` and `converters` travel as a pair: a feature that stores something needs a converter that shows it. How to write both is on [Rich text](/conversations/rich-text).
+
+```tsx
+<ConversationUIProvider
+  locale="de"
+  labels={{ send: 'Senden', composerPlaceholder: 'Nachricht schreiben…' }}
+  slots={reactionSlots}
+  renderType={(message) =>
+    message.type === 'ticket.status' ? <StatusRow data={message.data} /> : null
+  }
+>
+```
+
+Slots from several extensions merge by spreading, for example `{ ...reactionSlots, messageActions: [PinAction] }`. What each slot receives is typed in `ConversationSlots`.
+
+## Changing things
+
+The copied files are a baseline to edit, not an API.
+
+- **Styling.** Everything is Tailwind classes on shadcn's tokens (`bg-muted`, `text-muted-foreground`, `bg-popover`, `ring-foreground/10`, `bg-primary/10`), so your theme applies as is. The composer is skinned through `composerClassNames` at the top of `conversation-composer.tsx`, one class string per named part; the parts are listed on [Headless](/conversations/website/headless#skinning).
+- **Replacing the message.** Edit `conversation-message.tsx`, or write your own and import it in `conversation-feed.tsx` and `conversation-thread.tsx`. Keep `useMessage` for what the viewer may do. The admin has a config option for this ([Replacing the message](/conversations/admin-ui/replacing-the-message)); on a website you own the file, so no option is needed.
+- **Delete confirmation.** `conversation-message.tsx` asks through shadcn's `AlertDialog`, with `labels.deleteConfirm` and `labels.deleteDescription`.
+- **Layout.** `conversation-panel.tsx` opens a thread in place of the feed with a back button. For a side pane instead, render `ConversationThread` next to the feed from `useChatPanel()`'s `thread`.
+
+## Updating
+
+The components you copied do not change when the package updates; the hooks under them do. Re-run `shadcn add` for an item to see what changed upstream and merge it by hand, as with any shadcn component.
