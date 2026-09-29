@@ -9,8 +9,8 @@ A lock blocks writes from jobs like from anything else, so a job that writes int
 
 - **A lock on everything pauses every queue.** The plugin's worker and `queue-run` endpoint claim no new jobs until it ends. Jobs already queued simply wait.
 - **A partial lock keeps queues running.** Jobs that do not touch the frozen content carry on; one that writes into it is interrupted.
-- **An interrupted job** fails for good by default, with "Interrupted by content-lock" and no retries, since running it again later may act on content that changed meanwhile. A job marked with `deferOnInterrupt` goes back to the queue until the lock ends instead, without spending a retry. See [interruptions](/jobs/interruptions).
-- **Ending or changing a window** releases the jobs it deferred right away, and only those: **End now** on a lock over users does not wake jobs waiting on a separate lock over posts. A window without a known end defers its jobs for a day; ending it releases them sooner. A window that disappears without its hooks running (deleted in the database) releases its jobs the next time the lock state is rebuilt, within about a minute.
+- **An interrupted job** fails for good by default, with "Interrupted by content-lock" and no retries. A job marked with `deferOnInterrupt` goes back to the queue until the lock ends instead, without spending a retry. See [interruptions](/jobs/interruptions).
+- **Ending or changing a window** releases the jobs it deferred right away, and only those: **End now** on a lock over users does not wake jobs waiting on a separate lock over posts. A window without a known end defers its jobs for a day; ending it releases them sooner. A window deleted directly in the database releases its jobs within about a minute.
 
 Only the plugin's worker and `queue-run` honour the pause. Payload's `autoRun` and `/api/payload-jobs/run` keep claiming jobs, which then fail or defer on their writes.
 

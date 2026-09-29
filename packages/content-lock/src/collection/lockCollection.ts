@@ -18,7 +18,7 @@ import { toWindow } from '../state/window'
 import { en } from '../translations/en'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
-import { updateUnlessEnded } from './access'
+import { resolveLockAccess, updateUnlessEnded } from './access'
 import { checkWindowChange } from './rules'
 import { buildScopeFields } from './scopeFields'
 
@@ -139,10 +139,7 @@ export const buildLockCollection = (
 			singular: labelForKey(keys.collectionSingular),
 			plural: labelForKey(keys.collectionPlural),
 		},
-		access: {
-			...collectionOptions?.access,
-			update: updateUnlessEnded(collectionOptions?.access?.update),
-		},
+		access: resolveLockAccess(collectionOptions?.access),
 		admin: {
 			useAsTitle: 'title',
 			defaultColumns: ['title', 'status', 'startsAt', 'endsAt', '_status'],
@@ -292,5 +289,7 @@ export const buildLockCollection = (
 			...scopeFields.sidebar,
 		],
 	}
-	return collectionOptions?.overrides ? collectionOptions.overrides(collection) : collection
+	const final = collectionOptions?.overrides ? collectionOptions.overrides(collection) : collection
+	// Last, so an override that replaces access keeps ended windows read-only too.
+	return { ...final, access: { ...final.access, update: updateUnlessEnded(final.access?.update) } }
 }

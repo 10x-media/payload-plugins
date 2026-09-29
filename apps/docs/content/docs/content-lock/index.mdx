@@ -18,12 +18,12 @@ That adds a **Content locks** collection. Create a window in it (or press **Lock
 
 ## How it works
 
-A lock is a document in the `content-locks` collection: a **window** with a start, an optional end, an optional announcement, and a scope. Many windows can exist at once, scheduled weeks ahead or started on the spot. Each moves through stages derived from the clock (pending, announced, active, ended), so nothing has to run on a timer for a lock to start or end.
+A lock is a document in the `content-locks` collection: a **window** with a start, an optional end, an optional announcement, and a scope. Many windows can exist at once, scheduled weeks ahead or started on the spot. Each moves through its stages (pending, announced, active, ended) on its own as time passes.
 
-When a window is active, the plugin blocks writes in two layers:
+While a window is active:
 
-- **A guard** (`beforeOperation`) on every covered collection and global rejects `create`, `update`, `delete`, autosave and version restores with a `503` and a `Retry-After` header. It runs on REST, GraphQL, the admin, and the Local API, **including `overrideAccess: true`**. This is the layer that guarantees nothing gets written.
-- **Access wrapping** makes `create`, `update` and `delete` access return `false` in scope, so the admin renders documents read-only and hides Save, Create and Delete instead of letting editors run into an error.
+- **Writes are rejected** on every covered collection and global: create, update, delete, autosave and version restores answer `503` with a `Retry-After` header. This holds on REST, GraphQL, the admin, and the Local API, **including `overrideAccess: true`**.
+- **The admin turns read-only** in scope: documents open read-only, and Save, Create and Delete are hidden.
 
 Reads are never affected. The plugin's own collection and Payload's system collections (preferences, locked documents, jobs, kv, migrations) are always writable, so logins, preferences and the lock itself keep working.
 

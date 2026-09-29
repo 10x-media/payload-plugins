@@ -1,4 +1,5 @@
 import type { CollectionConfig, DateField, PayloadRequest } from 'payload'
+import type { LockAccessOption } from './collection/access'
 import type { ContentLockJobsOptions } from './jobs/registerJobs'
 
 import type { ContentLockEditorFeaturesOption } from './lexical/editor'
@@ -52,17 +53,16 @@ export type ContentLockPluginOptions = {
 		/** @default 'content-locks' */
 		slug?: string
 		/**
-		 * Who may read and manage lock windows. Defaults to any authenticated
-		 * user. Ended windows stay read-only whatever `update` says: the plugin
-		 * narrows it to windows that have not ended.
+		 * Who may read and manage lock windows. Per operation, or one function
+		 * for create, update and delete (read then stays with any signed-in
+		 * user). Defaults to any signed-in user. `update` never reaches an ended
+		 * window: the plugin adds that rule on top, after `overrides` too.
 		 */
-		access?: CollectionConfig['access']
+		access?: LockAccessOption
 		/**
-		 * Last-word override of the generated collection config. It can replace
-		 * `access` wholesale, dropping the plugin's read-only rule for ended
-		 * windows; when it does, fold `notEndedWhere(new Date())` (exported from
-		 * the package) into the new `update`. The server still refuses changes to
-		 * an ended window either way.
+		 * Last-word override of the generated collection config. Ended windows
+		 * stay read-only even when it replaces `access`: the plugin applies that
+		 * rule to the result.
 		 */
 		overrides?: (collection: CollectionConfig) => CollectionConfig
 	}

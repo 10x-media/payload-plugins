@@ -25,7 +25,7 @@ contentLock({
   jobs?: false | { queues?: string[] }
   collection?: {
     slug?: string                      // default 'content-locks'
-    access?: CollectionConfig['access']
+    access?: CollectionConfig['access'] | Access // one function: create, update, delete
     overrides?: (collection: CollectionConfig) => CollectionConfig
   }
   translations?: TranslationsOption
@@ -35,7 +35,7 @@ contentLock({
 | Option | Default | |
 |---|---|---|
 | `disabled` | `false` | Return the config untouched, for opting out per environment. |
-| `order` | `1000` | Plugin order. Late, so access wrapping sees other plugins' final access functions. |
+| `order` | `1000` | Plugin order. Keep it after plugins that add or change access on your collections. |
 | `groups` | `[]` | What a window can freeze besides everything. See [scope](/content-lock/scope). |
 | `individualSelection` | `false` | Raw collection and global pickers on the window, optionally gated by `access`. |
 | `exempt` | `[]` | Slugs never frozen, on top of the lock collection and Payload's system collections. |
@@ -45,8 +45,8 @@ contentLock({
 | `editor` | | Extra Lexical features and their converters for [messages](/content-lock/banner#extending-the-editor). |
 | `jobs` | on | [Jobs integration](/content-lock/jobs), when `@10x-media/jobs` is installed. |
 | `collection.slug` | `'content-locks'` | |
-| `collection.access` | signed-in users | Who may read and manage windows. `update` is narrowed to windows that have not ended. |
-| `collection.overrides` | | Last-word override of the generated collection. If it replaces `access.update`, fold in `notEndedWhere`. |
+| `collection.access` | signed-in users | Who may read and manage windows: per operation, or one function for create, update and delete. The plugin always narrows `update` to windows that have not ended. |
+| `collection.overrides` | | Last-word override of the generated collection. Ended windows stay read-only even if it replaces `access`. |
 | `translations` | | Per-key string overrides. See [i18n](/content-lock/i18n). |
 
 ## Exports

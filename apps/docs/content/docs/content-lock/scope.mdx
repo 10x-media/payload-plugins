@@ -18,7 +18,7 @@ contentLock({
 })
 ```
 
-- A window stores the group's `key`, and membership is resolved from the config at runtime: add a collection to a group and every window on that group covers it. Renaming a key orphans old windows.
+- A window stores the group's `key`, so a collection added to a group is covered by every window on it. Renaming a key detaches existing windows from the group.
 - `label` is a string or a map per admin language. It shows in the window form and the banner.
 - The build fails when a group names a collection or global the config does not have, or when two groups share a key.
 

@@ -1,9 +1,9 @@
-import { type Access, getCurrentDate, type Where } from 'payload'
+import { type Access, type CollectionConfig, getCurrentDate, type Where } from 'payload'
 
 /**
  * Lock windows that have not ended at `now`: never ended by hand, and either
- * ending manually or ending later. Use it in a replaced `update` access
- * (`collection.overrides`) to keep ended windows read-only.
+ * ending manually or ending later. The plugin already folds it into the lock
+ * collection's `update`; exported for queries of your own.
  */
 export const notEndedWhere = (now: Date): Where => ({
 	and: [
@@ -33,3 +33,14 @@ export const updateUnlessEnded =
 		const notEnded = notEndedWhere(getCurrentDate())
 		return base === true ? notEnded : { and: [base, notEnded] }
 	}
+
+/** The `collection.access` option: per operation, or one function for every write. */
+export type LockAccessOption = CollectionConfig['access'] | Access
+
+/**
+ * Expand the option into collection access. One function governs create,
+ * update and delete; read stays Payload's default (signed-in users), so the
+ * banner and the list keep working for everyone.
+ */
+export const resolveLockAccess = (option: LockAccessOption): CollectionConfig['access'] =>
+	typeof option === 'function' ? { create: option, delete: option, update: option } : option
