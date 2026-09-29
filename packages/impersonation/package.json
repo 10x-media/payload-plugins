@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/impersonation",
-	"version": "0.0.0",
+	"version": "0.1.0-beta.0",
 	"description": "Let an authorised account sign in as another user without their password, then return. Every session is recorded.",
 	"license": "MIT",
 	"repository": {
@@ -10,7 +10,14 @@
 	},
 	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/impersonation",
 	"bugs": "https://github.com/10x-media/payload-plugins/issues",
-	"keywords": ["payload", "payloadcms", "plugin", "impersonation", "auth", "session"],
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin",
+		"impersonation",
+		"auth",
+		"session"
+	],
 	"author": "10x-media",
 	"engines": {
 		"node": ">=22.18.0"
@@ -44,7 +51,12 @@
 			"default": "./dist/exports/i18n.js"
 		}
 	},
-	"files": ["dist", "README.md", "CHANGELOG.md", "LICENSE"],
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
 	"scripts": {
 		"build": "tsdown",
 		"lint": "biome check src tests dev",

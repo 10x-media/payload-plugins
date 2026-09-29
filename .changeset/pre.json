@@ -36,7 +36,9 @@
 		"@10x-media/form-variants": "0.0.0",
 		"@10x-media/form-variants-dev": "0.0.0",
 		"@10x-media/conversations": "0.0.0",
-		"@10x-media/conversations-dev": "0.0.0"
+		"@10x-media/conversations-dev": "0.0.0",
+		"@10x-media/impersonation": "0.0.0",
+		"@10x-media/impersonation-dev": "0.0.0"
 	},
 	"changesets": [
 		"admin-wiki-block-chips",
@@ -185,6 +187,14 @@
 		"form-variants-nested-component-items",
 		"icon-async-libraries",
 		"icon-manifest-label-annotation",
+		"impersonation-bar-chip",
+		"impersonation-native-admin-ui",
+		"impersonation-review-fixes",
+		"impersonation-review-followups",
+		"impersonation-sessions-nav-expiry",
+		"impersonation-switcher-sessions",
+		"impersonation-tenant-cookie",
+		"impersonation-v1",
 		"jobs-admin-ux",
 		"jobs-boolean-opt-in",
 		"jobs-feedback",
