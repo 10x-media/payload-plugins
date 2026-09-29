@@ -112,7 +112,7 @@ Submission is also guarded against double activation: while a submit is in fligh
 
 ### Transport
 
-By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Override the prefix with `apiRoute`, or replace the transport entirely (see [Submission locale](#submission-locale) for the `locale` it receives):
+By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Override the prefix with `apiRoute`, point it at a [renamed submissions collection](/form-builder/customization#renaming-collections) with `collections`, or replace the transport entirely (see [Submission locale](#submission-locale) for the `locale` it receives):
 
 ```tsx
 <Form
@@ -163,6 +163,7 @@ It receives the form as already read with your config's fallback, at depth 0, so
 | `fieldTypes` | `AnyFormFieldDefinition[]` | none | Extra field-type definitions, for custom types. |
 | `rules` | `AnyValidationRuleDefinition[]` | none | Extra validation rule definitions. |
 | `apiRoute` | `string` | `'/api'` | API prefix for the built-in transport. |
+| `collections` | `FormCollections` | defaults | Renamed plugin collections (`{ forms?, formSubmissions? }`), matching the server's `overrides.*.slug`. |
 | `onSubmit` | `SubmitHandler` | none | Custom transport. |
 | `onSuccess` / `onError` | callbacks | none | Submission outcome hooks. |
 | `events` | `FormEventSink` | none | Lifecycle event sink; see [Actions and events](/form-builder/actions#lifecycle-events). |
