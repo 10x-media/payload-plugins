@@ -1,0 +1,77 @@
+---
+title: Interruptions
+description: Pause queues from another plugin and decide what happens to jobs stopped mid-run.
+---
+
+Another plugin can stop jobs for a while: a maintenance window that freezes content, a feature flag, a quota. The jobs plugin gives it two extension points and gives you one decision per job: when a job is stopped mid-run, does it **fail** or go back to the queue (**defer**)?
+
+## What happens to an interrupted job
+
+A job is interrupted when its handler throws an error a registered classifier recognises, or `JobDeferredError`. What happens next depends on its policy:
+
+| Policy | Result |
+|---|---|
+| `fail` (default) | The job fails for good with `Interrupted by <name>`. Payload's retries are cut off, because a later re-run may act on data that changed meanwhile. Re-queue it by hand if it is still wanted. |
+| `defer` | The job goes back to the queue until the interruption is expected to end. It spends no retry, and its `deferredBy` field names who deferred it. A workflow re-runs from the step it stopped at, skipping the steps it completed. |
+
+Opt a task or workflow into `defer` only when running it again from the start is safe:
+
+```ts title="payload.config.ts"
+import { deferOnInterrupt, jobs } from '@10x-media/jobs'
+
+export default buildConfig({
+  jobs: {
+    tasks: [deferOnInterrupt({ slug: 'reindexSearch', handler: reindexSearch })],
+    workflows: [deferOnInterrupt(importCatalog)],
+  },
+  plugins: [
+    // for tasks another plugin registers, or handlers registered by path:
+    jobs({ interrupt: { defer: ['syncThumbnails'] } }),
+  ],
+})
+```
+
+A workflow's policy covers every task it runs.
+
+## Checkpoints
+
+A long handler can stop cleanly between batches instead of running into the interruption:
+
+```ts
+import { checkpoint } from '@10x-media/jobs'
+
+handler: async ({ job, req }) => {
+  for (const page of pages) {
+    await checkpoint({ job, req }) // throws JobDeferredError when a gate pauses this queue
+    await processPage(page)
+  }
+}
+```
+
+A checkpoint always defers, whatever the job's policy: placing one is your statement that stopping there is safe.
+
+## Where it applies
+
+Run gates are honoured by [`createWorker`](/jobs/workers) and the [`queue-run`](/jobs/queue-control) endpoint. Handlers are wrapped when Payload initialises, so tasks added by any plugin are covered; handlers registered by path are not. If you drive `payload.jobs.run` yourself, call `wrapJobHandlers(payload)` before it and `applyJobInterruptions(payload)` after it.
+
+Payload's own `autoRun` and `/api/payload-jobs/run` do not consult the gates, and nothing applies the policy after them.
+
+## For plugin authors
+
+The registry lives at `config.custom['@10x-media/jobs']`. A plugin ordered after jobs appends to it at config time, with no runtime import of this package:
+
+```ts
+import type { JobsRegistry } from '@10x-media/jobs'
+
+const registry = config.custom?.['@10x-media/jobs'] as JobsRegistry | undefined
+registry?.extensions.runGates.push(async ({ payload }) =>
+  (await isFrozen(payload)) ? { by: 'my-plugin', paused: 'all', until: frozenUntil } : null
+)
+registry?.extensions.interruptOn.push(({ error }) =>
+  error instanceof FrozenError ? { by: 'my-plugin', until: error.until } : null
+)
+```
+
+- A **run gate** returns `null` or `{ paused: 'all' | string[], until?, by? }`. It widens the manual pause for one tick and never writes the pause store. A gate that throws pauses everything for that tick.
+- An **interrupt classifier** returns `null` or `{ until, by }` for an error a handler threw.
+- `registry.api.resumeDeferred(payload, by)` releases the jobs deferred by `by` right away, for when the interruption ends early.

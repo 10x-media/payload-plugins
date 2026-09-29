@@ -1,5 +1,8 @@
 import type { Payload } from 'payload'
 import { getCurrentDate } from 'payload'
+import { evaluateRunGates, withGates } from '../interruption/gates'
+import { applyJobInterruptions } from '../interruption/records'
+import { wrapJobHandlers } from '../interruption/wrap'
 import { createPauseStore, type PauseStore } from '../queueControl/pauseStore'
 import { runTargetsForPause } from '../queueControl/runTargets'
 import { createJobLeaseStore } from '../reliability/jobLeaseStore'
@@ -157,10 +160,14 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 	// get the correct pause behavior without requiring an explicit pauseStore argument.
 	const pauseStore: PauseStore = args.pauseStore ?? createPauseStore(payload)
 
+	// Run gates widen the manual pause for this tick; interruptions a run recorded
+	// are applied as soon as it returns, before the next target can claim the job.
 	const runJobs = async (): Promise<void> => {
-		const state = await pauseStore.getState()
+		wrapJobHandlers(payload)
+		const state = withGates(await pauseStore.getState(), await evaluateRunGates(payload))
 		for (const target of runTargetsForPause(args.queues, state)) {
 			await payload.jobs.run({ ...target, limit: runLimit, silent: true })
+			await applyJobInterruptions(payload)
 		}
 	}
 	const handleSchedules = async (): Promise<void> => {

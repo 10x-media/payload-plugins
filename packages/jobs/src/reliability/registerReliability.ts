@@ -2,7 +2,7 @@ import { type Config, type Payload, ValidationError } from 'payload'
 
 import { enforceConcurrencyControl } from './concurrencyContract'
 import { reliabilityJobFields } from './fields'
-import { registerHeartbeat } from './heartbeat'
+import type { HeartbeatPlan } from './heartbeat'
 import { buildJobsLocksCollection, JOBS_LOCKS_SLUG, LEADER_ROLES } from './locksCollection'
 import { resolveNodeId } from './nodeId'
 import type { ResolvedReliabilityOptions } from './options'
@@ -36,9 +36,13 @@ const ensureLockRows = async (payload: Payload): Promise<void> => {
  * Register the reliability layer on the incoming config: add diagnostic fields to
  * `payload-jobs` through the same `jobsCollectionOverrides` seam the observability
  * layer uses (composing, never clobbering), add the locks collection, and ensure the
- * lock rows at init (preserving any host onInit).
+ * lock rows at init (preserving any host onInit). Returns the heartbeat plan, which
+ * `wrapJobHandlers` applies at init so tasks added by later plugins beat too.
  */
-export const registerReliability = (config: Config, options: ResolvedReliabilityOptions): void => {
+export const registerReliability = (
+	config: Config,
+	options: ResolvedReliabilityOptions
+): HeartbeatPlan => {
 	enforceConcurrencyControl(config, options)
 
 	const existingOverride = config.jobs?.jobsCollectionOverrides
@@ -60,5 +64,5 @@ export const registerReliability = (config: Config, options: ResolvedReliability
 		await ensureLockRows(payload)
 	}
 
-	registerHeartbeat(config, options, resolveNodeId(options.leaderId))
+	return { options, ownerId: resolveNodeId(options.leaderId) }
 }

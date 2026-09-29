@@ -28,6 +28,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.fieldId]: 'ID',
 	[keys.fieldStarted]: 'Розпочато',
 	[keys.fieldLeaseExpires]: 'Оренда спливає',
+	[keys.fieldDeferredBy]: 'Відкладено',
 	[keys.fieldScheduledFor]: 'Заплановано на',
 
 	[keys.outcome]: 'Результат',

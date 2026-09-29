@@ -28,6 +28,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.fieldId]: 'ID',
 	[keys.fieldStarted]: '시작 일시',
 	[keys.fieldLeaseExpires]: '리스 만료 일시',
+	[keys.fieldDeferredBy]: '연기한 주체',
 	[keys.fieldScheduledFor]: '예약 일시',
 
 	[keys.outcome]: '결과',
