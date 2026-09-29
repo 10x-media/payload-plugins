@@ -21,6 +21,7 @@
 	},
 	"dependencies": {
 		"@10x-media/content-lock": "workspace:*",
+		"@10x-media/jobs": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/next": "catalog:",

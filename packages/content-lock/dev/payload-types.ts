@@ -72,8 +72,10 @@ export interface Config {
     posts: Post;
     products: Product;
     categories: Category;
+    'payload-jobs-locks': PayloadJobsLock;
     'content-locks': ContentLock;
     'payload-kv': PayloadKv;
+    'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
@@ -85,8 +87,10 @@ export interface Config {
     posts: PostsSelect<false> | PostsSelect<true>;
     products: ProductsSelect<false> | ProductsSelect<true>;
     categories: CategoriesSelect<false> | CategoriesSelect<true>;
+    'payload-jobs-locks': PayloadJobsLocksSelect<false> | PayloadJobsLocksSelect<true>;
     'content-locks': ContentLocksSelect<false> | ContentLocksSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
+    'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
@@ -107,7 +111,15 @@ export interface Config {
   };
   user: User;
   jobs: {
-    tasks: unknown;
+    tasks: {
+      playgroundWrite: TaskPlaygroundWrite;
+      playgroundWriteDeferred: TaskPlaygroundWriteDeferred;
+      playgroundBatch: TaskPlaygroundBatch;
+      inline: {
+        input: unknown;
+        output: unknown;
+      };
+    };
     workflows: unknown;
   };
 }
@@ -256,6 +268,19 @@ export interface Category {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs-locks".
+ */
+export interface PayloadJobsLock {
+  id: string;
+  role: string;
+  owner?: string | null;
+  leaseExpiresAt?: string | null;
+  fenceToken: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "content-locks".
  */
 export interface ContentLock {
@@ -325,6 +350,105 @@ export interface PayloadKv {
     | number
     | boolean
     | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs".
+ */
+export interface PayloadJob {
+  id: string;
+  jobTitle?: string | null;
+  /**
+   * Input data provided to the job
+   */
+  input?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  taskStatus?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  completedAt?: string | null;
+  totalTried?: number | null;
+  /**
+   * If hasError is true this job will not be retried
+   */
+  hasError?: boolean | null;
+  /**
+   * If hasError is true, this is the error that caused it
+   */
+  error?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  /**
+   * Task execution log
+   */
+  log?:
+    | {
+        executedAt: string;
+        completedAt: string;
+        taskSlug: 'inline' | 'playgroundWrite' | 'playgroundWriteDeferred' | 'playgroundBatch';
+        taskID: string;
+        input?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        output?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        state: 'failed' | 'succeeded';
+        error?:
+          | {
+              [k: string]: unknown;
+            }
+          | unknown[]
+          | string
+          | number
+          | boolean
+          | null;
+        id?: string | null;
+      }[]
+    | null;
+  taskSlug?: ('inline' | 'playgroundWrite' | 'playgroundWriteDeferred' | 'playgroundBatch') | null;
+  queue?: string | null;
+  waitUntil?: string | null;
+  processing?: boolean | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt?: string | null;
+  leaseExpiresAt?: string | null;
+  claimedBy?: string | null;
+  fenceToken?: number | null;
+  recoveryAttempts?: number | null;
+  deferredBy?: string | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -463,6 +587,18 @@ export interface CategoriesSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs-locks_select".
+ */
+export interface PayloadJobsLocksSelect<T extends boolean = true> {
+  role?: T;
+  owner?: T;
+  leaseExpiresAt?: T;
+  fenceToken?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "content-locks_select".
  */
 export interface ContentLocksSelect<T extends boolean = true> {
@@ -494,6 +630,44 @@ export interface ContentLocksSelect<T extends boolean = true> {
 export interface PayloadKvSelect<T extends boolean = true> {
   key?: T;
   data?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-jobs_select".
+ */
+export interface PayloadJobsSelect<T extends boolean = true> {
+  jobTitle?: T;
+  input?: T;
+  taskStatus?: T;
+  completedAt?: T;
+  totalTried?: T;
+  hasError?: T;
+  error?: T;
+  log?:
+    | T
+    | {
+        executedAt?: T;
+        completedAt?: T;
+        taskSlug?: T;
+        taskID?: T;
+        input?: T;
+        output?: T;
+        state?: T;
+        error?: T;
+        id?: T;
+      };
+  taskSlug?: T;
+  queue?: T;
+  waitUntil?: T;
+  processing?: T;
+  createdAt?: T;
+  updatedAt?: T;
+  startedAt?: T;
+  leaseExpiresAt?: T;
+  claimedBy?: T;
+  fenceToken?: T;
+  recoveryAttempts?: T;
+  deferredBy?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -556,6 +730,36 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskPlaygroundWrite".
+ */
+export interface TaskPlaygroundWrite {
+  input: {
+    slug: string;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskPlaygroundWriteDeferred".
+ */
+export interface TaskPlaygroundWriteDeferred {
+  input: {
+    slug: string;
+  };
+  output?: unknown;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "TaskPlaygroundBatch".
+ */
+export interface TaskPlaygroundBatch {
+  input: {
+    slug: string;
+  };
+  output?: unknown;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

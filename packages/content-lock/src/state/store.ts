@@ -1,7 +1,7 @@
 import { type CollectionSlug, getCurrentDate, type Payload, type PayloadRequest } from 'payload'
 
 import { optionsFromConfig } from '../options'
-import { resolveState, statusOf } from './resolve'
+import { isEntityLocked, resolveState, statusOf } from './resolve'
 import type { ContentLockState, LockWindow } from './types'
 import { toWindow } from './window'
 
@@ -82,4 +82,22 @@ export const forgetWindows = (payload: Payload): void => {
 export const getContentLockState = async (payload: Payload): Promise<ContentLockState> => {
 	const { groups } = optionsFromConfig(payload.config)
 	return resolveState(await readWindows(payload), getCurrentDate(), groups)
+}
+
+/**
+ * Whether content is locked right now: any of it, or the given collection or
+ * global. For jobs and other server code that would rather skip or postpone
+ * work than have its writes rejected.
+ */
+export const isContentLocked = async (
+	payload: Payload,
+	target?: { collection: string } | { global: string }
+): Promise<boolean> => {
+	const state = await getContentLockState(payload)
+	if (!target) {
+		return state.locked
+	}
+	return 'collection' in target
+		? isEntityLocked(state, { type: 'collection', slug: target.collection })
+		: isEntityLocked(state, { type: 'global', slug: target.global })
 }

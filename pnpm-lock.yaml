@@ -730,6 +730,9 @@ importers:
         specifier: 8.0.1
         version: 8.0.1
     devDependencies:
+      '@10x-media/jobs':
+        specifier: workspace:*
+        version: link:../jobs
       '@10x-media/payload-test-harness':
         specifier: workspace:*
         version: link:../../tooling/test-harness
@@ -799,6 +802,9 @@ importers:
       '@10x-media/content-lock':
         specifier: workspace:*
         version: link:..
+      '@10x-media/jobs':
+        specifier: workspace:*
+        version: link:../../jobs
       '@payloadcms/db-mongodb':
         specifier: 'catalog:'
         version: 3.85.0(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(socks@2.8.10)

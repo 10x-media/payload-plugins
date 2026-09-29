@@ -1,4 +1,5 @@
 import type { CollectionConfig, DateField, PayloadRequest } from 'payload'
+import type { ContentLockJobsOptions } from './jobs/registerJobs'
 
 import type { ContentLockEditorFeaturesOption } from './lexical/editor'
 import type { LockGroup } from './state/types'
@@ -98,6 +99,15 @@ export type ContentLockPluginOptions = {
 		 */
 		converters?: string
 	}
+	/**
+	 * Integration with `@10x-media/jobs`, on when that plugin is installed. A
+	 * lock on everything pauses every queue; a partial lock keeps them running
+	 * (or pauses the `queues` listed). A job a lock stops mid-run fails cleanly,
+	 * or goes back to the queue until the lock ends when it opted into
+	 * `deferOnInterrupt`. Jobs that should skip locked work up front can check
+	 * `isContentLocked`. `false` turns it off.
+	 */
+	jobs?: false | ContentLockJobsOptions
 	/**
 	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
 	 * translation keys exported from `@10x-media/content-lock/i18n`. Values win

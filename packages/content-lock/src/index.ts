@@ -3,6 +3,7 @@ import { type Config, definePlugin, type Plugin } from 'payload'
 import { buildLockCollection } from './collection/lockCollection'
 import { CONTENT_LOCKED_ERROR_NAME } from './enforcement/ContentLockedError'
 import { registerEnforcement } from './enforcement/register'
+import { registerJobsIntegration } from './jobs/registerJobs'
 import {
 	type ContentLockPluginOptions,
 	CUSTOM_KEY,
@@ -14,6 +15,7 @@ import { registerTranslations } from './plugin/registerTranslations'
 import { rebuildSnapshot } from './state/store'
 
 export { notEndedWhere } from './collection/access'
+export type { ContentLockJobsOptions } from './jobs/registerJobs'
 export type {
 	ContentLockEditorFeature,
 	ContentLockEditorFeaturesOption,
@@ -55,7 +57,7 @@ const assertKnownSlugs = (config: Config, options: ResolvedOptions): void => {
 const definition = definePlugin<ContentLockPluginOptions>({
 	slug: PLUGIN_SLUG,
 	order: DEFAULT_ORDER,
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	plugin: ({ config, plugins, ...options }): Config => {
 		if (options.disabled === true) {
 			return config
 		}
@@ -66,6 +68,7 @@ const definition = definePlugin<ContentLockPluginOptions>({
 
 		const lockCollection = buildLockCollection(config, resolved, options)
 		registerEnforcement(config, resolved)
+		registerJobsIntegration(config, options.jobs, Boolean(plugins['@10x-media/jobs']))
 		config.collections = [...(config.collections ?? []), lockCollection]
 
 		config.admin = {
@@ -126,6 +129,6 @@ export {
 	type ContentLockedErrorData,
 	isContentLockedError,
 } from './enforcement/ContentLockedError'
-export { getContentLockState } from './state/store'
+export { getContentLockState, isContentLocked } from './state/store'
 export type { ContentLockState, LockWindow, ResolvedScope, WindowStatus } from './state/types'
 export type { ContentLockPluginOptions as PluginOptions }

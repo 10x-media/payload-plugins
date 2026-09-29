@@ -29,6 +29,19 @@ import { ContentLockTokenFeatureClient as ContentLockTokenFeatureClient_28db02d6
 import { StageFilterBar as StageFilterBar_5503e853a89fb9ae921fa68d36a2f940 } from '@10x-media/content-lock/rsc'
 import { EndNowButton as EndNowButton_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
 import { LockNowButton as LockNowButton_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
+import { JobStatusCell as JobStatusCell_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
+import { JobStatusHeader as JobStatusHeader_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
+import { JobTitleCell as JobTitleCell_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
+import { JobInputFieldServer as JobInputFieldServer_58547d93a961407e3e8c8637352c625e } from '@10x-media/jobs/rsc'
+import { RelativeTimeCell as RelativeTimeCell_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
+import { AttemptsCell as AttemptsCell_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
+import { JobErrorPanel as JobErrorPanel_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
+import { JobLogTimelineServer as JobLogTimelineServer_58547d93a961407e3e8c8637352c625e } from '@10x-media/jobs/rsc'
+import { QueueSelectField as QueueSelectField_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
+import { WaitUntilField as WaitUntilField_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
+import { ReadOnlyDateField as ReadOnlyDateField_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
+import { JobsHealthBar as JobsHealthBar_58547d93a961407e3e8c8637352c625e } from '@10x-media/jobs/rsc'
+import { JobDocDescription as JobDocDescription_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
 import { ContentLockHeader as ContentLockHeader_5503e853a89fb9ae921fa68d36a2f940 } from '@10x-media/content-lock/rsc'
 import { ContentLockProvider as ContentLockProvider_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
@@ -66,6 +79,19 @@ export const importMap = {
   "@10x-media/content-lock/rsc#StageFilterBar": StageFilterBar_5503e853a89fb9ae921fa68d36a2f940,
   "@10x-media/content-lock/client#EndNowButton": EndNowButton_28db02d614876b75124a07b975a40caa,
   "@10x-media/content-lock/client#LockNowButton": LockNowButton_28db02d614876b75124a07b975a40caa,
+  "@10x-media/jobs/client#JobStatusCell": JobStatusCell_6d572934460331fb7409e85e4294174e,
+  "@10x-media/jobs/client#JobStatusHeader": JobStatusHeader_6d572934460331fb7409e85e4294174e,
+  "@10x-media/jobs/client#JobTitleCell": JobTitleCell_6d572934460331fb7409e85e4294174e,
+  "@10x-media/jobs/rsc#JobInputFieldServer": JobInputFieldServer_58547d93a961407e3e8c8637352c625e,
+  "@10x-media/jobs/client#RelativeTimeCell": RelativeTimeCell_6d572934460331fb7409e85e4294174e,
+  "@10x-media/jobs/client#AttemptsCell": AttemptsCell_6d572934460331fb7409e85e4294174e,
+  "@10x-media/jobs/client#JobErrorPanel": JobErrorPanel_6d572934460331fb7409e85e4294174e,
+  "@10x-media/jobs/rsc#JobLogTimelineServer": JobLogTimelineServer_58547d93a961407e3e8c8637352c625e,
+  "@10x-media/jobs/client#QueueSelectField": QueueSelectField_6d572934460331fb7409e85e4294174e,
+  "@10x-media/jobs/client#WaitUntilField": WaitUntilField_6d572934460331fb7409e85e4294174e,
+  "@10x-media/jobs/client#ReadOnlyDateField": ReadOnlyDateField_6d572934460331fb7409e85e4294174e,
+  "@10x-media/jobs/rsc#JobsHealthBar": JobsHealthBar_58547d93a961407e3e8c8637352c625e,
+  "@10x-media/jobs/client#JobDocDescription": JobDocDescription_6d572934460331fb7409e85e4294174e,
   "@10x-media/content-lock/rsc#ContentLockHeader": ContentLockHeader_5503e853a89fb9ae921fa68d36a2f940,
   "@10x-media/content-lock/client#ContentLockProvider": ContentLockProvider_28db02d614876b75124a07b975a40caa,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1

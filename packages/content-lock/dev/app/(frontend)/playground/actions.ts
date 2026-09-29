@@ -52,3 +52,13 @@ export async function localWrite(input: {
 		}
 	}
 }
+
+export type PlaygroundTask = 'playgroundWrite' | 'playgroundWriteDeferred' | 'playgroundBatch'
+
+/** Queue a playground job that writes into `slug`; the dev worker picks it up. */
+export async function queueJob(input: { task: PlaygroundTask; slug: string }): Promise<void> {
+	const payload = await getPayload({ config })
+	await payload.jobs.queue({ input: { slug: input.slug }, task: input.task } as Parameters<
+		typeof payload.jobs.queue
+	>[0])
+}

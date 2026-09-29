@@ -1,11 +1,13 @@
 // biome-ignore-all lint/plugin/noProcessEnv: dev app env boundary
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { jobs } from '@10x-media/jobs'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig, type GlobalConfig } from 'payload'
 import { contentLock } from '../src/index'
+import { playgroundTasks, startDevWorker } from './helpers/jobs'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 
@@ -66,7 +68,9 @@ export default buildConfig({
 	globals: [header],
 	localization: { locales: ['en', 'de'], defaultLocale: 'en' },
 	i18n: { fallbackLanguage: 'en' },
+	jobs: { deleteJobOnComplete: false, tasks: playgroundTasks },
 	plugins: [
+		jobs({ reliability: true }),
 		contentLock({
 			groups: [
 				{
@@ -87,6 +91,7 @@ export default buildConfig({
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
+		startDevWorker(payload)
 	},
 	typescript: { autoGenerate },
 	admin: {
