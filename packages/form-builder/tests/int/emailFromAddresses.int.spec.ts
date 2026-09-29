@@ -144,7 +144,7 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 
 	describe('with fromSources set', () => {
 		let booted: BootedPayload
-		const resolveCalls: Array<{ formId: unknown }> = []
+		const resolveCalls: Array<{ formId: unknown; fields: unknown }> = []
 
 		beforeAll(async () => {
 			booted = await bootPayload({
@@ -155,7 +155,7 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 								value: 'tenant:default',
 								label: 'Tenant default',
 								resolve: (args) => {
-									resolveCalls.push({ formId: args.form.id })
+									resolveCalls.push({ formId: args.form.id, fields: args.form.fields })
 									return 'Acme <hello@acme.example>'
 								},
 							},
@@ -223,6 +223,10 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 			expect(sends).toHaveLength(1)
 			expect(sends[0]?.from).toBe('Acme <hello@acme.example>')
 			expect(resolveCalls.at(-1)?.formId).toBe(form.id)
+			// The whole loaded form document, so a source reads its own fields without a second read.
+			expect(resolveCalls.at(-1)?.fields).toEqual([
+				expect.objectContaining({ blockType: 'email', name: 'email' }),
+			])
 		})
 	})
 

@@ -1,14 +1,12 @@
 import type { PayloadRequest, RichTextField } from 'payload'
 import { interpolate } from '../../recall/interpolate'
 import type { SubmissionDescriptor, SubmissionValue } from '../../submissions/types'
+import type { SubmissionForm } from '../submissionContext'
 import type { BodyConverter, BodyRender } from './converters'
 import { defaultBodyConverters } from './converters'
 import { escapeHtml } from './escapeHtml'
 import { serializeSlate } from './serializeSlate'
 import { renderAllValues, renderAllValuesTable } from './wildcards'
-
-/** Minimal form identity threaded alongside a rendered body (e.g. per-tenant template lookups). */
-type SerializeBodyForm = { id: number | string; title?: string }
 
 /** Submission data plus optional converter overrides available while serializing a body. */
 export type BodyContext = {
@@ -19,14 +17,15 @@ export type BodyContext = {
 
 /**
  * Args a custom `richText.serialize` replacement receives per rendered body. Always populated by
- * `makeRenderBody` (the action-body pipeline): `form` and `req` enable per-tenant template
- * lookups or handing the body off to a renderer like react-email.
+ * `makeRenderBody` (the action-body pipeline): `form` (the whole document) and `req` enable
+ * per-tenant template lookups or handing the body off to a renderer like react-email.
  */
 export type SerializeBodyArgs = {
 	body: unknown
 	values: SubmissionValue[]
 	descriptors: SubmissionDescriptor[]
-	form: SerializeBodyForm
+	/** The whole form document at depth 0, in the submission's locale; see `SubmissionForm`. */
+	form: SubmissionForm
 	req?: PayloadRequest
 	/**
 	 * The submission's own stored locale, the one the form (and so `body`) was loaded at. Use it for
@@ -41,11 +40,11 @@ export type SerializeBodyArgs = {
  * Customizes how the plugin's rich text is authored and rendered. `converters` spread over the
  * default Lexical node converters; `serialize` replaces the whole action-body pipeline (for
  * non-HTML channels like chat or plain text, or to hand the body plus the submitted `form`/`req`
- * off to a renderer like react-email). Wrapping emails in a layout is `email.render`'s job. `editor` is the default Lexical/richText editor for every
- * plugin-authored richText field: message content, consent statement, the response message, and
- * the action body fields. `bodyEditor` overrides the action body fields specifically (emailTeam
- * and confirmation), and `responseEditor` overrides the success `response` message field; both fall
- * back to `editor` when absent.
+ * off to a renderer like react-email). Wrapping emails in a layout is `email.render`'s job.
+ * `editor` is the default Lexical/richText editor for every plugin-authored richText field: message
+ * content, consent statement, the response message, and the action body fields. `bodyEditor`
+ * overrides the action body fields specifically (emailTeam and confirmation), and `responseEditor`
+ * overrides the success `response` message field; both fall back to `editor` when absent.
  */
 export type RichTextBodyOption = {
 	converters?: Record<string, BodyConverter>
@@ -132,30 +131,14 @@ export const serializeBody = (body: unknown, ctx: BodyContext): string => {
 
 /** Build the `renderBody` passed to actions, honoring a plugin-level `richText` customization. */
 export const makeRenderBody =
-	(args: {
-		values: SubmissionValue[]
-		descriptors: SubmissionDescriptor[]
-		form: SerializeBodyForm
-		req?: PayloadRequest
-		locale: string
-		actionType: string
-		richText?: RichTextBodyOption
-	}) =>
+	({ richText, ...args }: Omit<SerializeBodyArgs, 'body'> & { richText?: RichTextBodyOption }) =>
 	async (body: unknown): Promise<string> => {
-		if (args.richText?.serialize) {
-			return await args.richText.serialize({
-				body,
-				values: args.values,
-				descriptors: args.descriptors,
-				form: args.form,
-				req: args.req,
-				locale: args.locale,
-				actionType: args.actionType,
-			})
+		if (richText?.serialize) {
+			return await richText.serialize({ ...args, body })
 		}
 		return serializeBody(body, {
 			values: args.values,
 			descriptors: args.descriptors,
-			converters: args.richText?.converters,
+			converters: richText?.converters,
 		})
 	}

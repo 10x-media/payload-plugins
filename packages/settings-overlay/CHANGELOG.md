@@ -1,5 +1,11 @@
 # @10x-media/settings-overlay
 
+## 0.1.0-beta.3
+
+### Patch Changes
+
+- Fix `useSettingsOverlay must be used inside the settings overlay provider` crashing the admin after signing in through the login form. The provider now mounts its context on the login screen too, and refreshes the layout when the signed-in user changes, so the rail is computed for the new reader instead of the previous one.
+
 ## 0.1.0-beta.2
 
 ### Patch Changes

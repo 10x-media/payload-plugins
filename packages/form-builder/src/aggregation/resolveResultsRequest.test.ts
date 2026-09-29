@@ -30,7 +30,7 @@ const pollForm = {
 }
 
 const findByID = vi.fn()
-const payload = { findByID } as unknown as Payload
+const payload = { config: {}, findByID } as unknown as Payload
 
 const tallyAggregation = {
 	field: 'color',

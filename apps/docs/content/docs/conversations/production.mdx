@@ -1,0 +1,78 @@
+---
+title: Production notes
+description: Cascade behavior, plugin order, database cost per request, concurrency, and the limits to know before going live.
+---
+
+## Plugin order
+
+The plugin validates targets against the collections and globals in the config it receives, and reads each users collection's `useAsTitle` from there. List `conversations()` after every plugin that adds a collection you target or whose users take part (a multi-tenant plugin, an auth plugin). Otherwise startup throws for an unknown target, or names fall back to ids.
+
+## Cascade
+
+When a target document is deleted, `deleteWithTarget: true` (the default) removes its conversation:
+
+- first each extension's `onTargetDelete` (the reactions collection, attachments' files), while the messages are still there to read;
+- then one `deleteMany` on the messages and one on the reads for the key.
+
+The statements run **without per-row hooks**. Your `overrides.messages.hooks` do not see these deletions, and neither does `afterMessage`. A large conversation is removed in the target's `afterDelete`, inside that request.
+
+Pass a function to take over, for example to enqueue a batch job. The function replaces the whole built-in cascade, extensions' `onTargetDelete` included:
+
+```ts
+deleteWithTarget: async ({ req, key, instance }) => {
+  await req.payload.jobs.queue({ task: 'purgeConversation', input: { key, instance } })
+},
+```
+
+`false` keeps conversations of deleted targets. Only collection targets cascade: globals are never deleted, and `custom:` keys belong to you, so delete their rows yourself (`payload.db.deleteMany` on `<slug>-messages` and `<slug>-reads` with `key` equal to yours).
+
+Soft-deleted messages stay as rows until their target goes, because they anchor thread counters and placeholders. Their content is gone from the moment they are deleted.
+
+## Closed REST
+
+Both collections deny every REST and GraphQL operation; the instance endpoints are the only door. Admin list views of the collections are hidden. See [Access](/conversations/access#closed-collections) for opening them deliberately.
+
+## Hooks run inside the request
+
+`afterMessage`, `afterMention` and reactions' `afterReaction` run after the row is written but before the response. Slow work there (email, push, webhooks) delays every send, and an error fails the request although the message is saved. Queue a job and return.
+
+## Writes and concurrency
+
+- **No transactions for the plugin's own writes.** Sends, edits and deletes run with `disableTransaction`. A message is one row plus an atomic counter on its root; in a transaction, concurrent replies to one root abort each other with write conflicts on Mongo and hold extra pooled connections on Postgres.
+- **Reply counts are atomic.** One `$inc` statement on both adapters; 20 concurrent replies count 20.
+- **Read cursors on Postgres.** Raising a cursor is conditional (`lastReadAt < at`). On Mongo that is one atomic statement; Postgres runs it as a select then an update, so two concurrent raises by the same user can leave the cursor a few seconds behind until the next raise. The first creation of a cursor is guarded by the unique index and retried as an update.
+- **Idempotent sends.** `(authorKey, clientId)` is unique, and a retry with the same `clientId` returns the first message.
+
+## Database cost per request
+
+What each surface costs, before your own access code:
+
+| Request | Queries |
+|---|---|
+| `subscribe` for K keys (a trigger, a list of rooms) | conversation access once for the batch (with `perTarget({ load })`: one `find` per target collection), channel `read` / `create` rules once per channel per request, 1 for cursors, 1 for unread counts, plus 1 count per key whose total is shown |
+| Open a feed page | access for the key, 1 find (plus 1 count when a cursor exists), 1 per users collection for authors, 1 for thread cursors, 1 per extension with `decorate` |
+| Poll tick | 1 change query for every key the tab leads, no access code (tokens) |
+| Send | access, the insert, 1 atomic update on the root for a reply, the cursor raise, mention checks, 1 per users collection for authors |
+| Mention search | access, 1 query per users collection, the channel rule per candidate (plus conversation access per candidate with `verifyAccess`) |
+
+Unread counts are one query for all keys and channels, capped at 100 per channel. When that query hits its limit, the pairs still under the cap are recounted one query each. The admin trigger asks for totals, the drawer and feeds do not, and a list surface built on `useChannels(key, { count: false })` skips them.
+
+Keep channel rules cheap: they should read `req.user` (roles, memberships) and not query. Put target lookups in conversation access, which runs once per batch.
+
+## Indexes
+
+The collections declare their indexes (see [Concepts](/conversations/concepts#data-model)). On Postgres they arrive with your migrations: run `payload migrate:create` after adding the plugin, an instance, an extension that stores a collection or message fields, or `overrides` that add indexed fields. On Mongo, Payload creates them when `ensureIndexes` is on.
+
+Channels and message types are text, so adding either needs no migration.
+
+## Realtime hosting
+
+Polling needs nothing. Server-Sent Events need a long-running Node process and a [bus](/conversations/transport#buses-several-server-processes) when you run more than one. On serverless hosts, use the Pusher-compatible transport. Pusher channel names are limited to 164 characters, which leaves room for conversation keys up to about 100 characters. Details on [Transport](/conversations/transport).
+
+## Audit logs
+
+If you use `@10x-media/audit-logs`, leave `<slug>-messages` and `<slug>-reads` out of it. Every message and every read cursor would otherwise become an audit entry.
+
+## Body size
+
+`limits.bodyLength` caps the plain text (10 000 characters) and `limits.bodyBytes` the serialized body (64 KiB). Next route handlers and Payload's REST layer set no request body limit of their own, so keep `bodyBytes` if you raise `bodyLength`.

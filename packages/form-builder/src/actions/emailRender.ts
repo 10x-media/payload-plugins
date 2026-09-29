@@ -1,4 +1,4 @@
-import type { RecipientResolveArgs } from './recipientSources'
+import type { SubmissionContextArgs } from './submissionContext'
 
 /** The built-in email actions `email.render` runs for. */
 export type EmailActionType = 'emailTeam' | 'confirmation'
@@ -6,11 +6,11 @@ export type EmailActionType = 'emailTeam' | 'confirmation'
 /**
  * What `email.render` receives per outgoing email: the finished body `html` (the default pipeline's
  * output, or `richText.serialize`'s when set), the raw `body` it was rendered from, the interpolated
- * `subject`, the `actionType` sending it, and the same run-time args a recipient source gets:
- * `locale` (the submission's own), `form`, `submissionId`, `values`, `descriptors`, `context`,
- * `payload`, and `req`.
+ * `subject`, the `actionType` sending it, and the submission context: `locale` (the submission's
+ * own), `form` (the whole document, see `SubmissionForm`), `submissionId`, `values`,
+ * `descriptors`, `context`, `payload`, and `req`.
  */
-export type EmailRenderArgs = RecipientResolveArgs & {
+export type EmailRenderArgs = SubmissionContextArgs & {
 	html: string
 	/** The action's stored rich text (or legacy string) body config, before serialization. */
 	body: unknown

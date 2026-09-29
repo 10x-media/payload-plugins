@@ -6,6 +6,8 @@ export type FetchResultsInput = {
 	field?: string
 	/** Payload API route prefix; defaults to `/api`. */
 	apiRoute?: string
+	/** The Payload content locale (a `localization` code) option labels are returned in, sent as `?locale=`. */
+	locale?: string
 	/** Injectable for testing; defaults to global `fetch`. */
 	fetchImpl?: typeof fetch
 }
@@ -20,8 +22,15 @@ export type FetchResultsResult =
  * access by the form's poll opt-in and results visibility. Pure: inject `fetchImpl` in tests.
  */
 export const fetchFormResults = async (input: FetchResultsInput): Promise<FetchResultsResult> => {
-	const { formId, field, apiRoute = '/api', fetchImpl = fetch } = input
-	const query = field ? `?field=${encodeURIComponent(field)}` : ''
+	const { formId, field, apiRoute = '/api', locale, fetchImpl = fetch } = input
+	const params = new URLSearchParams()
+	if (field) {
+		params.set('field', field)
+	}
+	if (locale) {
+		params.set('locale', locale)
+	}
+	const query = params.size > 0 ? `?${params}` : ''
 	let response: Response
 	try {
 		response = await fetchImpl(`${apiRoute}/forms/${formId}/results${query}`, { method: 'GET' })

@@ -28,6 +28,13 @@ import {
 /** The plugin-derived options every built-in email action is built from (was five positional args). */
 export type EmailActionOptions = {
 	localize: boolean
+	/**
+	 * Localize the recipient lists (`to`, `cc`, `bcc`, `replyTo`) too, so each locale routes to its
+	 * own addresses (plugin option `email.localizeRecipients`). Off by default: routing is usually
+	 * the same in every locale, and a list left empty in a locale that does not fall back fails
+	 * `emailTeam` there. Only applies while `localize` is on.
+	 */
+	localizeRecipients?: boolean
 	editor?: RichTextField['editor']
 	fromAddresses?: FromAddressesResolver
 	/** Send-time-resolved senders offered in the from select (plugin option `email.fromSources`). */
@@ -54,6 +61,14 @@ export type EmailActionConfig = {
 type RecipientFieldBuilder = (name: string, labelKey: string) => Field
 
 type Resolver = ReturnType<typeof resolverFor>
+
+/**
+ * Whether serialized body html carries anything beyond markup and whitespace: an empty editor
+ * serializes to bare tags, while a lone image or rule is content even without text.
+ */
+const hasVisibleContent = (html: string): boolean =>
+	/<(img|hr|table|iframe|video|svg)\b/i.test(html) ||
+	html.replace(/<[^>]*>|&nbsp;/g, '').trim() !== ''
 
 /** What `resolveTo` needs to compute the primary target, including server-resolved sources. */
 type ResolveToArgs<TConfig extends EmailActionConfig> = {
@@ -83,11 +98,12 @@ type EmailActionSpec<TConfig extends EmailActionConfig> = {
 /**
  * The shared skeleton of the built-in email actions (`emailTeam`, `confirmation`): an identical
  * config (a first row pairing the action's target with `replyTo`, an optional `from` select, a
- * cc/bcc row, a subject, and a rich text body, content and recipient fields carrying `localized`
- * when `localize`) and an identical send (interpolate the subject, render the body, resolve
- * cc/bcc/replyTo, pass the html through `options.render` when set, and hand a single comma-joined
- * string per list to `payload.sendEmail`). Only the
- * primary `to` target and its missing-value behavior differ, threaded through `spec`.
+ * cc/bcc row, a subject, and a rich text body, content fields carrying `localized` when `localize`
+ * and recipient fields only when `localizeRecipients` too) and an identical send (interpolate the
+ * subject, render the body, fail on an email with neither, resolve cc/bcc/replyTo, pass the html
+ * through `options.render` when set, and hand a single comma-joined string per list to
+ * `payload.sendEmail`). Only the primary `to` target and its missing-value behavior differ,
+ * threaded through `spec`.
  */
 export const buildEmailAction = <TConfig extends EmailActionConfig>(
 	options: EmailActionOptions,
@@ -95,6 +111,7 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 ): ActionDefinition<TConfig> => {
 	const {
 		localize,
+		localizeRecipients,
 		editor,
 		fromAddresses,
 		fromSources,
@@ -106,7 +123,7 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 	const fromSourcesByValue = sourcesByValue(fromSources)
 	const endpoint = departments ? 'departments' : undefined
 	const recip: RecipientFieldBuilder = (name, labelKey) =>
-		buildRecipientField(name, labelKey, localize, {
+		buildRecipientField(name, labelKey, localize && localizeRecipients === true, {
 			endpoint,
 			recipients,
 			width: '50%',
@@ -170,6 +187,10 @@ export const buildEmailAction = <TConfig extends EmailActionConfig>(
 
 			const subject = interpolate(config.subject ?? '', resolve)
 			const serialized = await args.renderBody(config.body)
+			// Checked before `render`, which may wrap an empty body in a frame that has content of its own.
+			if (!subject.trim() && !hasVisibleContent(serialized)) {
+				throw new Error(`${spec.type}: empty subject and body`)
+			}
 			const html = render
 				? await render({
 						...sourceArgs,

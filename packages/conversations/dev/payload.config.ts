@@ -1,0 +1,382 @@
+// biome-ignore-all lint/plugin/noProcessEnv: dev app env boundary
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { postgresAdapter } from '@payloadcms/db-postgres'
+import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { buildConfig, type CollectionConfig, type Where } from 'payload'
+import { attachments } from '../src/exports/attachments'
+import { comments } from '../src/exports/comments'
+import { reactions } from '../src/exports/reactions'
+import {
+	conversations,
+	defineMessageType,
+	perTarget,
+	pusherTransport,
+	sseTransport,
+} from '../src/index'
+import { autoReply } from './helpers/autoReply'
+import { startMemoryMongo } from './helpers/memoryDb'
+import { seedDev } from './helpers/seed'
+import { spam } from './helpers/spam'
+import {
+	isPlatform,
+	isStaff,
+	mentionableInTenant,
+	PLATFORM_EMAIL,
+	tenants,
+	tenantsOf,
+} from './tenancy'
+
+const dirname = path.dirname(fileURLToPath(import.meta.url))
+const migrationDir = path.resolve(dirname, 'migrations')
+const useDb = process.env.DEV_DB === 'postgres' ? 'postgres' : 'mongo'
+const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
+
+const users: CollectionConfig = {
+	slug: 'users',
+	auth: true,
+	admin: { useAsTitle: 'name' },
+	fields: [{ name: 'name', type: 'text' }],
+}
+
+/** Website accounts of one tenant: they read and write the shared channel of their own persons only. */
+const customers: CollectionConfig = {
+	slug: 'customers',
+	auth: true,
+	admin: { useAsTitle: 'name' },
+	fields: [
+		{ name: 'name', type: 'text' },
+		{ name: 'tenant', type: 'relationship', relationTo: 'tenants' },
+	],
+}
+
+const persons: CollectionConfig = {
+	slug: 'persons',
+	admin: { useAsTitle: 'name' },
+	versions: { drafts: true },
+	fields: [
+		{ name: 'name', type: 'text', required: true },
+		{ name: 'owner', type: 'relationship', relationTo: 'customers' },
+		{ name: 'notes', type: 'textarea' },
+	],
+}
+
+const media: CollectionConfig = {
+	slug: 'media',
+	admin: { useAsTitle: 'title' },
+	fields: [{ name: 'title', type: 'text', required: true }],
+}
+
+/**
+ * Files on tickets: an upload collection of the host's own. Its required
+ * `title` is what the `attachments` extension's `data` hook fills.
+ */
+const files: CollectionConfig = {
+	slug: 'files',
+	admin: { group: 'Support', useAsTitle: 'title' },
+	access: { create: ({ req }) => Boolean(req.user), read: ({ req }) => Boolean(req.user) },
+	fields: [{ name: 'title', type: 'text', required: true }],
+	upload: {
+		mimeTypes: ['image/*', 'application/pdf', 'text/plain'],
+		staticDir: path.resolve(dirname, 'uploads/files'),
+	},
+}
+
+/** Support tickets: each one a conversation in the `tickets` instance, read only once closed. */
+const tickets: CollectionConfig = {
+	slug: 'tickets',
+	admin: { group: 'Support', useAsTitle: 'subject', defaultColumns: ['subject', 'status'] },
+	fields: [
+		{ name: 'subject', type: 'text', required: true },
+		{ name: 'customer', type: 'relationship', relationTo: 'customers' },
+		{
+			name: 'status',
+			type: 'select',
+			defaultValue: 'open',
+			options: ['open', 'closed'],
+			admin: { description: 'Closed tickets are read only.' },
+		},
+		// The conversation in the form itself: project code composed from the plugin's primitives.
+		{
+			name: 'conversation',
+			type: 'ui',
+			admin: { components: { Field: '/components/TicketConversation#TicketConversation' } },
+		},
+	],
+}
+
+/** Chat rooms: each room is the target of a conversation in the `chat` instance. */
+const rooms: CollectionConfig = {
+	slug: 'rooms',
+	admin: { group: 'Chat', useAsTitle: 'name' },
+	fields: [
+		{ name: 'name', type: 'text', required: true },
+		{ name: 'topic', type: 'text' },
+		{ name: 'archived', type: 'checkbox', admin: { description: 'Archived rooms are read only.' } },
+	],
+}
+
+/** Projects: the `notes` instance, where every built-in admin component is replaced. */
+const projects: CollectionConfig = {
+	slug: 'projects',
+	admin: { group: 'Replaced UI', useAsTitle: 'name' },
+	fields: [{ name: 'name', type: 'text', required: true }],
+}
+
+const replaced = (name: string) => `/replaced/Replaced#Replaced${name}`
+
+const db =
+	useDb === 'postgres'
+		? postgresAdapter({
+				migrationDir,
+				pool: {
+					connectionString:
+						process.env.DATABASE_URI_POSTGRES ??
+						'postgres://e2e:e2e@localhost:35432/conversations_e2e',
+				},
+			})
+		: mongooseAdapter({
+				ensureIndexes: true,
+				migrationDir,
+				url: process.env.DATABASE_URI_MONGO ?? (await startMemoryMongo()),
+			})
+
+export default buildConfig({
+	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
+	db,
+	editor: lexicalEditor(),
+	collections: [tenants, users, customers, persons, media, files, rooms, tickets, projects],
+	plugins: [
+		// Persons belong to a tenant; staff to one or more (the dev admin to all of them).
+		multiTenantPlugin({
+			collections: { persons: {} },
+			tenantsSlug: 'tenants',
+			userHasAccessToAllTenants: (user) =>
+				(user as { email?: string } | null)?.email === PLATFORM_EMAIL,
+		}),
+		conversations({
+			slug: 'comments',
+			users: ['users', 'customers'],
+			// No `transport`: comments stay on polling, `chat` below shows realtime.
+			// Everything about the target is decided here, in one batch: staff see the persons of
+			// their tenants, a customer only the persons they own. Media has no tenant.
+			access: perTarget(
+				({ doc, req, target }) => {
+					if (isStaff(req)) {
+						if (target.slug !== 'persons' || isPlatform(req)) return true
+						const tenant = doc?.tenant ? String(doc.tenant) : ''
+						return tenantsOf(req).includes(tenant)
+					}
+					return (
+						req.user?.collection === 'customers' && String(doc?.owner ?? '') === String(req.user.id)
+					)
+				},
+				{ load: true }
+			),
+			channels: [
+				{
+					slug: 'internal',
+					label: 'Internal',
+					cue: { label: 'Internal · staff only', tone: 'neutral' },
+					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
+				},
+				{
+					slug: 'shared',
+					label: 'Shared',
+					// Staff need the warning; the customer is the audience.
+					cue: ({ req }) =>
+						isStaff(req) ? { label: 'Shared · visible to the customer', tone: 'warning' } : null,
+					access: { read: () => true, create: () => true },
+				},
+			],
+			mentions: {
+				// Only people of the person's tenant, customers only by staff; the channel rule
+				// filters the rest (a customer is never mentioned in Internal).
+				users: mentionableInTenant,
+			},
+			hooks: {
+				// Whoever you mention answers a few seconds later (dev only).
+				afterMention: autoReply('comments'),
+				// Send `spam` or `spam 300`: the other staff flood the channel (dev only).
+				afterMessage: spam('comments'),
+			},
+			// Authors that are not people, for notes left by server code.
+			systemAuthors: { import: { name: 'CSV import' } },
+			types: [
+				// A whole-row note, no avatar or name line: see `components/SystemNote.tsx`.
+				defineMessageType<{ text: string }>()({
+					slug: 'system.note',
+					Component: '/components/SystemNote#SystemNote',
+					layout: 'bare',
+					validate: (data) => (data?.text ? true : 'text is required'),
+				}),
+				defineMessageType<{ from: string; to: string }>()({
+					slug: 'person.status',
+					Component: '/components/StatusChange#StatusChange',
+					validate: (data) => (data?.from && data.to ? true : 'from and to are required'),
+				}),
+			],
+			extensions: [
+				comments({ collections: { persons: true, media: ['internal'] } }),
+				// The extension's own `comments-attachments` collection, files removed with their message.
+				attachments({
+					deleteWithMessage: true,
+					overrides: { upload: { staticDir: path.resolve(dirname, 'uploads/comments') } },
+				}),
+				reactions({
+					maxPerUser: 3,
+					hooks: {
+						afterReaction: ({ emoji, message, operation, req, userKey }) => {
+							req.payload.logger.info(
+								`[dev] ${userKey} ${operation === 'add' ? 'reacted' : 'took back'} ${emoji} on a message by ${message.authorKey}`
+							)
+						},
+					},
+				}),
+			],
+		}),
+		// A second instance: a Slack-like chat over `rooms`, one channel per room, staff only.
+		conversations({
+			slug: 'chat',
+			users: ['users'],
+			// Realtime: one stream per browser, other processes heard through the database.
+			transport: sseTransport(),
+			// An archived room stays readable but takes no new messages, edits or deletes.
+			access: perTarget(
+				({ doc, req }) => isStaff(req) && (doc?.archived ? { read: true, create: [] } : true),
+				{ load: true }
+			),
+			channels: [
+				{
+					slug: 'messages',
+					label: 'Messages',
+					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
+				},
+			],
+			// Kept on the message itself; `comments` above uses the default own collection.
+			extensions: [
+				reactions({ emojis: ['👍', '❤️', '😂', '🎉', '🙏', '👀', '🚀', '✅'], storage: 'message' }),
+			],
+			hooks: { afterMention: autoReply('chat'), afterMessage: spam('chat') },
+			targets: { collections: { rooms: { channels: ['messages'] } } },
+		}),
+		// A third instance: support tickets over Pusher (Soketi in `docker-compose.dev.yml`), the
+		// transport for serverless hosts. Customers see their own tickets; closed ones are read only.
+		conversations({
+			slug: 'tickets',
+			users: ['users', 'customers'],
+			access: perTarget(
+				({ doc, req }) => {
+					const mine = isStaff(req) || String(doc?.customer ?? '') === String(req.user?.id)
+					if (!mine) return false
+					return doc?.status === 'closed' ? { read: true, create: [] } : true
+				},
+				{ load: true }
+			),
+			channels: [
+				{
+					slug: 'conversation',
+					label: 'Conversation',
+					cue: ({ req }) =>
+						isStaff(req) ? { label: 'Visible to the customer', tone: 'warning' } : null,
+					access: { read: () => true, create: () => true },
+				},
+				{
+					slug: 'notes',
+					label: 'Notes',
+					cue: { label: 'Staff only', tone: 'neutral' },
+					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
+				},
+			],
+			extensions: [
+				reactions({ storage: 'message' }),
+				// Into the host's `files` collection, under its own access.
+				attachments({
+					collection: 'files',
+					data: ({ file }) => ({ title: file?.name ?? 'Attachment' }),
+				}),
+			],
+			targets: { collections: { tickets: { channels: ['conversation', 'notes'] } } },
+			// Staff mention staff; customers mention nobody. Enforced by the server (search and
+			// saved mentions), not only by hiding the feature on the website.
+			mentions: {
+				users: ({ collection, req }): Where =>
+					isStaff(req) && collection === 'users' ? {} : { id: { exists: false } },
+			},
+			hooks: { afterMention: autoReply('tickets'), afterMessage: spam('tickets') },
+			transport: pusherTransport({
+				appId: 'app-id',
+				host: '127.0.0.1',
+				key: 'app-key',
+				port: 6001,
+				secret: 'app-secret',
+				useTLS: false,
+			}),
+		}),
+		// A fourth instance on polling: every built-in admin component replaced by a labelled
+		// wrapper (`replaced/Replaced.tsx`), to see replacements reach every corner.
+		conversations({
+			slug: 'notes',
+			users: ['users'],
+			access: perTarget(({ req }) => isStaff(req)),
+			channels: [
+				{
+					slug: 'team',
+					label: 'Team',
+					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
+				},
+				{
+					slug: 'log',
+					label: 'Log',
+					cue: { label: 'Decisions only', tone: 'neutral' },
+					access: { read: ({ req }) => isStaff(req), create: ({ req }) => isStaff(req) },
+				},
+			],
+			components: {
+				ChannelTabs: replaced('ChannelTabs'),
+				Composer: replaced('Composer'),
+				Drawer: replaced('Drawer'),
+				Feed: replaced('Feed'),
+				Message: replaced('Message'),
+				Panel: replaced('Panel'),
+				Thread: replaced('Thread'),
+				Trigger: replaced('Trigger'),
+			},
+			extensions: [comments({ collections: { projects: true } }), reactions()],
+		}),
+	],
+	telemetry: false,
+	onInit: async (payload) => {
+		await seedDev(payload)
+	},
+	typescript: { autoGenerate },
+	admin: {
+		user: 'users',
+		components: {
+			afterNavLinks: [
+				'/chat/ChatNavLink#ChatNavLink',
+				'/playground/PlaygroundNavLink#PlaygroundNavLink',
+			],
+			views: {
+				chat: {
+					Component: '/chat/ChatView#ChatView',
+					exact: true,
+					meta: { title: 'Chat' },
+					path: '/chat',
+				},
+				playground: {
+					Component: '/playground/PlaygroundView#PlaygroundView',
+					exact: true,
+					meta: { title: 'UI playground' },
+					path: '/playground',
+				},
+			},
+		},
+		importMap: {
+			autoGenerate,
+			baseDir: path.resolve(dirname),
+		},
+	},
+})

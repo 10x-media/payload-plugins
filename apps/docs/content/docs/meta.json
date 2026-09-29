@@ -16,6 +16,7 @@
 		"dual-session",
 		"settings-overlay",
 		"form-variants",
+		"conversations",
 		"impersonation"
 	]
 }

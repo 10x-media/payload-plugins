@@ -36,6 +36,8 @@ The renderer is independent of the admin i18n: `<Form>` takes a `t` translator a
 <Form form={form} locale="de" t={(key) => myMessages[key] ?? key} />
 ```
 
+`locale` stays in the browser. To have the submission stored in the visitor's content locale, and the confirmation and team emails rendered in it, also pass `submissionLocale`, one of your Payload `localization` codes. It is a separate prop because a formatting tag like `en-US` is usually not a content locale code; see [Submission locale](/form-builder/rendering#submission-locale).
+
 ### Falling back to the shipped bundles
 
 `<Form>` and `<Poll>` resolve their own chrome (the submit / next / back labels, the failure banner, poll notices) and the client-side validation messages through `t`. A host that bridges `t` to its own i18n only sees the keys it references directly, so keys it never mirrors (the chrome, when you correctly pass no label props) fall through. With a `?? key`-to-English fallback that leak is silent: a German visitor sees English with no error. Fall back to the plugin's own complete bundle instead, and English cannot leak:

@@ -1,6 +1,6 @@
 'use client'
 
-import { ConfirmationModal, useModal } from '@payloadcms/ui'
+import { ConfirmationModal, useAuth, useModal } from '@payloadcms/ui'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { ListQuery } from 'payload'
@@ -15,6 +15,7 @@ import { InternalBadgeProvider } from './badges'
 import { SettingsOverlayContext, type SettingsOverlayContextValue } from './context'
 import { SettingsPanel } from './Overlay'
 import { createOverlayQueryClient } from './queries'
+import { readerKey } from './readerKey'
 import type { OverlaySlots } from './slots'
 import {
 	CLOSED,
@@ -33,6 +34,8 @@ export type SettingsOverlayClientProps = {
 	lazyTransport: 'server-function' | 'widget'
 	manifests: Record<string, Manifest>
 	overlays: ClientOverlay[]
+	/** `readerKey` of the user the server rendered this for, `null` on the login screen. */
+	reader: null | string
 	/** Server-rendered eager `component` items, keyed by `overlayId/itemSlug`. */
 	rendered: Record<string, React.ReactNode>
 	slots?: Record<string, OverlaySlots>
@@ -55,6 +58,7 @@ export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 	lazyTransport,
 	manifests,
 	overlays,
+	reader,
 	rendered,
 	slots,
 }) => {
@@ -62,6 +66,7 @@ export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 	const pathname = usePathname()
 	const router = useRouter()
 	const { openModal } = useModal()
+	const { user } = useAuth()
 	const { t } = useTranslation()
 	const [queryClient] = useState(createOverlayQueryClient)
 
@@ -132,6 +137,23 @@ export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 		},
 		[addressable, historyModes, pathname]
 	)
+
+	// Signing in and out are client navigations, which leave the root layout, and with it the
+	// server half of this provider, as it was rendered for the previous reader. Refresh once per
+	// reader so the rail is computed for the one now signed in.
+	const currentReader = readerKey(user)
+	const refreshedFor = useRef<null | string | undefined>(undefined)
+	useEffect(() => {
+		if (currentReader === reader) {
+			refreshedFor.current = undefined
+			return
+		}
+		if (refreshedFor.current === currentReader) {
+			return
+		}
+		refreshedFor.current = currentReader
+		router.refresh()
+	}, [currentReader, reader, router])
 
 	// Back and forward: the browser restores a URL and the panel follows it, including to closed.
 	// Read straight from `window.location` so the decision is made before Next has re-rendered

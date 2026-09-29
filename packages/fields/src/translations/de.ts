@@ -53,4 +53,12 @@ export const de: Record<TranslationKey, string> = {
 	[keys.selectUnit]: 'Einheit wählen',
 	[keys.measurementBelowMin]: 'Muss mindestens {{min}} sein',
 	[keys.measurementAboveMax]: 'Darf höchstens {{max}} sein',
+	[keys.selectCountry]: 'Land auswählen',
+	[keys.searchCountries]: 'Länder durchsuchen',
+	[keys.noCountriesFound]: 'Keine Länder gefunden',
+	[keys.phoneRequired]: 'Dieses Feld ist erforderlich.',
+	[keys.invalidPhoneNumber]: 'Bitte eine gültige Telefonnummer eingeben.',
+	[keys.phoneNotMobile]: 'Bitte eine Mobilnummer eingeben.',
+	[keys.clearPhoneNumber]: 'Telefonnummer löschen',
+	[keys.phoneCountryFor]: 'Land: {{country}}',
 }

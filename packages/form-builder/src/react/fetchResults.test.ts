@@ -34,6 +34,17 @@ describe('fetchFormResults', () => {
 		expect(fetchImpl).toHaveBeenCalledWith('/custom/forms/1/results?field=x', expect.anything())
 	})
 
+	it('sends a locale as ?locale= alongside the field', async () => {
+		const fetchImpl = vi.fn().mockResolvedValue(okResponse({ results: [] }))
+		await fetchFormResults({ formId: 1, field: 'x', locale: 'pt-BR', fetchImpl })
+		expect(fetchImpl).toHaveBeenCalledWith(
+			'/api/forms/1/results?field=x&locale=pt-BR',
+			expect.anything()
+		)
+		await fetchFormResults({ formId: 1, locale: 'de', fetchImpl })
+		expect(fetchImpl).toHaveBeenLastCalledWith('/api/forms/1/results?locale=de', expect.anything())
+	})
+
 	it('returns an error result on a non-ok response', async () => {
 		const fetchImpl = vi
 			.fn()

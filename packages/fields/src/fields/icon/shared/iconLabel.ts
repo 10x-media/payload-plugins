@@ -1,6 +1,6 @@
 import type { IconMeta } from '../../../types'
+import { resolveStaticLabel } from '../../../utils/resolveStaticLabel'
 import { formatIconLabel } from './formatIconLabel'
-import { resolveStaticLabel } from './resolveStaticLabel'
 
 /** What an editor sees for one icon: its accessible name, plus the raw name where that adds information. */
 export type IconDisplayLabel = { code?: string; label: string }
