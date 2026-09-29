@@ -2,9 +2,11 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import { createLocalReq, type Endpoint, type PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { defineAction } from '../../src/actions/defineAction'
+import { ACTIONS_TASK_SLUG } from '../../src/actions/task'
 import { resolveFormResultsRequest } from '../../src/aggregation/resolveResultsRequest'
 import { formBuilder } from '../../src/index'
 import { collectionSlugsOf } from '../../src/plugin/collectionSlugs'
+import { POLL_CLOSE_TASK_SLUG } from '../../src/poll/closeJob'
 import { resolvePollCloseRequest } from '../../src/poll/resolvePollCloseRequest'
 import { resolvePollOutcome } from '../../src/poll/resolvePollOutcome'
 import { recountPollVotes } from '../../src/poll/votes/recountPollVotes'
@@ -273,5 +275,124 @@ describeForDb('form-builder with renamed collections and cookie prefix', {}, (db
 		expect((await submit({ form: form.id, values })).status).toBe(201)
 		// Called directly, the handler surfaces the ValidationError the router would map to a 400.
 		await expect(submit({ form: form.id, values })).rejects.toThrow(/email/)
+	})
+})
+
+// Hosts with a job runner take the queued path: the actions task and the poll close job run in a
+// job request, reading the slugs off the config rather than any submit-time state.
+describeForDb('form-builder renamed collections on the queued path', {}, (db) => {
+	let booted: BootedPayload
+	const recorded: string[] = []
+
+	const recorder = defineAction({
+		type: 'recorder',
+		label: 'Recorder',
+		run: ({ submissionId }) => {
+			recorded.push(String(submissionId))
+		},
+	})
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: formBuilder({
+				actions: { recorder },
+				overrides: { forms: { slug: FORMS }, formSubmissions: { slug: SUBMISSIONS } },
+				poll: { votes: { overrides: { slug: TALLIES } } },
+			}),
+			db,
+			// Truthy autoRun marks a runner present; scheduling nothing leaves the queue to the test.
+			configOverrides: { jobs: { autoRun: () => [] } },
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const pendingJobs = async (taskSlug: string): Promise<number> =>
+		(
+			await booted.payload.count({
+				collection: 'payload-jobs',
+				where: { and: [{ taskSlug: { equals: taskSlug } }, { completedAt: { exists: false } }] },
+			})
+		).totalDocs
+
+	it('queues the actions task, then runs and prunes against the renamed collections', async () => {
+		recorded.length = 0
+		const form = await booted.payload.create({
+			collection: FORMS,
+			data: {
+				title: 'Queued signup',
+				persistSubmissions: false,
+				fields: [{ blockType: 'text', name: 'name', label: 'Name' }],
+				actions: [{ blockType: 'recorder' }],
+			},
+		})
+		const submission = await booted.payload.create({
+			collection: SUBMISSIONS,
+			data: { form: form.id, values: [{ field: 'name', value: 'Ada' }] },
+		})
+		expect(recorded).toEqual([])
+		expect(await pendingJobs(ACTIONS_TASK_SLUG)).toBe(1)
+
+		await booted.payload.jobs.run()
+
+		expect(recorded).toEqual([String(submission.id)])
+		const { totalDocs } = await booted.payload.count({
+			collection: SUBMISSIONS,
+			where: { form: { equals: form.id } },
+		})
+		expect(totalDocs).toBe(0)
+	})
+
+	it('runs the queued poll close job against the renamed forms and tallies', async () => {
+		const poll = (closesAt: string) => ({ resultsField: 'vote', type: 'mostVoted', closesAt })
+		const form = await booted.payload.create({
+			collection: FORMS,
+			data: {
+				title: 'Queued close',
+				fields: [
+					{
+						blockType: 'select',
+						name: 'vote',
+						label: 'Vote',
+						options: [
+							{ label: 'A', value: 'a' },
+							{ label: 'B', value: 'b' },
+						],
+					},
+				],
+				pollEnabled: true,
+				poll: poll(new Date(Date.now() + 60_000).toISOString()),
+			},
+		})
+		for (const value of ['b', 'b', 'a']) {
+			await booted.payload.create({
+				collection: SUBMISSIONS,
+				data: { form: form.id, values: [{ field: 'vote', value }] },
+			})
+		}
+		await booted.payload.update({
+			collection: FORMS,
+			id: form.id,
+			data: { poll: poll(new Date(Date.now() - 1_000).toISOString()) },
+			overrideAccess: true,
+		})
+		const winners = async () =>
+			(
+				(await booted.payload.findByID({
+					collection: FORMS,
+					id: form.id,
+					depth: 0,
+					overrideAccess: true,
+				})) as { poll?: { outcome?: Outcome } }
+			).poll?.outcome?.winningValues ?? []
+		expect(await winners()).toEqual([])
+		expect(await pendingJobs(POLL_CLOSE_TASK_SLUG)).toBeGreaterThan(0)
+
+		await booted.payload.jobs.run()
+
+		expect(await winners()).toEqual(['b'])
+		expect(await pendingJobs(POLL_CLOSE_TASK_SLUG)).toBe(0)
 	})
 })
