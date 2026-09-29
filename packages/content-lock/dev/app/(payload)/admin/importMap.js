@@ -23,7 +23,7 @@ import { BoldFeatureClient as BoldFeatureClient_e70f5e05f09f93e00b997edb1ef0c864
 import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { EntitySelect as EntitySelect_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
 import { FixedToolbarFeatureClient as FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
-import { BlocksFeatureClient as BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { ContentLockTokenFeatureClient as ContentLockTokenFeatureClient_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
 import { EndNowButton as EndNowButton_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
 import { LockNowButton as LockNowButton_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
 import { ContentLockHeader as ContentLockHeader_5503e853a89fb9ae921fa68d36a2f940 } from '@10x-media/content-lock/rsc'
@@ -57,7 +57,7 @@ export const importMap = {
   "@payloadcms/richtext-lexical/client#ItalicFeatureClient": ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@10x-media/content-lock/client#EntitySelect": EntitySelect_28db02d614876b75124a07b975a40caa,
   "@payloadcms/richtext-lexical/client#FixedToolbarFeatureClient": FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
-  "@payloadcms/richtext-lexical/client#BlocksFeatureClient": BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@10x-media/content-lock/client#ContentLockTokenFeatureClient": ContentLockTokenFeatureClient_28db02d614876b75124a07b975a40caa,
   "@10x-media/content-lock/client#EndNowButton": EndNowButton_28db02d614876b75124a07b975a40caa,
   "@10x-media/content-lock/client#LockNowButton": LockNowButton_28db02d614876b75124a07b975a40caa,
   "@10x-media/content-lock/rsc#ContentLockHeader": ContentLockHeader_5503e853a89fb9ae921fa68d36a2f940,

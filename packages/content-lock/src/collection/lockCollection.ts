@@ -107,10 +107,19 @@ const liveStatus: FieldHook = async ({ data, req }) => {
 export const buildLockCollection = (
 	config: Config,
 	options: ResolvedOptions,
-	raw: Pick<ContentLockPluginOptions, 'collection' | 'individualSelection'>
+	raw: Pick<ContentLockPluginOptions, 'collection' | 'editor' | 'individualSelection'>
 ): CollectionConfig => {
 	const collectionOptions = raw.collection
 	const scopeFields = buildScopeFields(config, options, raw.individualSelection)
+	const editor = buildMessageEditor({
+		groups: options.groups.map(({ key, label, collections, globals }) => ({
+			key,
+			label,
+			collections,
+			globals,
+		})),
+		features: raw.editor?.features,
+	})
 	const collection: CollectionConfig = {
 		slug: options.slug,
 		labels: {
@@ -207,7 +216,7 @@ export const buildLockCollection = (
 								type: 'richText',
 								localized: Boolean(config.localization),
 								label: labelForKey(keys.fieldMessage),
-								editor: buildMessageEditor(),
+								editor,
 							},
 						],
 					},
@@ -220,7 +229,7 @@ export const buildLockCollection = (
 								type: 'richText',
 								localized: Boolean(config.localization),
 								label: labelForKey(keys.fieldMessage),
-								editor: buildMessageEditor(),
+								editor,
 							},
 						],
 					},

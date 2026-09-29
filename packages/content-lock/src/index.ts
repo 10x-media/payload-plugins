@@ -13,6 +13,11 @@ import {
 import { registerTranslations } from './plugin/registerTranslations'
 import { rebuildSnapshot } from './state/store'
 
+export type {
+	ContentLockEditorFeature,
+	ContentLockEditorFeaturesOption,
+} from './lexical/editor'
+export { ContentLockTokenFeature } from './lexical/token/server'
 export type { ContentLockGroup, ContentLockPluginOptions } from './options'
 
 declare module 'payload' {
@@ -75,6 +80,16 @@ const definition = definePlugin<ContentLockPluginOptions>({
 					`${PLUGIN_SLUG}/client#ContentLockProvider`,
 				],
 			},
+		}
+
+		if (resolved.editorConverters) {
+			config.admin.dependencies = {
+				...config.admin.dependencies,
+				[`content-lock:${resolved.editorConverters}`]: {
+					path: resolved.editorConverters,
+					type: 'function',
+				},
+			}
 		}
 
 		// A lock rejection is expected traffic, not a server fault: log it quietly.

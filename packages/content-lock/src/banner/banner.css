@@ -4,7 +4,9 @@
 	position: relative;
 	z-index: 2;
 	padding: calc(var(--base) * 0.4) var(--gutter-h);
-	border-bottom: 1px solid var(--content-lock-accent);
+	/* An inset line rather than a border, so it adds nothing to the height and
+	   the padding above and below the text stays even. */
+	box-shadow: inset 0 -1px 0 var(--content-lock-accent);
 	background: var(--content-lock-surface);
 	color: var(--theme-text);
 	font-size: calc(var(--base) * 0.65);
@@ -19,7 +21,9 @@
 .content-lock-banner__row {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: baseline;
+	/* Centred, not baseline: the controls are taller than a line of text, and
+	   baseline alignment pinned the text to the top of the row. */
+	align-items: center;
 	gap: calc(var(--base) * 0.25) calc(var(--base) * 0.6);
 }
 
@@ -34,17 +38,11 @@
 	color: var(--theme-elevation-800);
 }
 
-.content-lock-banner__countdown {
-	font-variant-numeric: tabular-nums;
-	font-weight: 600;
-}
-
 .content-lock-banner__controls {
 	display: inline-flex;
 	align-items: center;
 	gap: calc(var(--base) * 0.4);
 	margin-left: auto;
-	align-self: center;
 }
 
 .content-lock-banner__pager {

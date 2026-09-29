@@ -1,29 +1,63 @@
 import {
-	BlocksFeature,
 	BoldFeature,
 	FixedToolbarFeature,
 	ItalicFeature,
+	type LexicalEditorProps,
 	LinkFeature,
 	lexicalEditor,
-	ParagraphFeature,
 } from '@payloadcms/richtext-lexical'
 import type { CollectionSlug } from 'payload'
 
-import { dateBlock } from './dateBlock'
-import { scopeBlock } from './scopeBlock'
+import { ContentLockTokenFeature, type TokenGroup } from './token/server'
 
 /**
- * The lock message editor: short formatted text plus inline dates and scope. It never
- * inherits the project's editor, so a banner cannot grow uploads or blocks.
+ * One lexical feature, exactly as `lexicalEditor` takes them. Derived from its
+ * own props, because the feature type is generic over prop types this plugin
+ * has no business naming.
  */
-export const buildMessageEditor = (): ReturnType<typeof lexicalEditor> =>
+export type ContentLockEditorFeature = Extract<
+	NonNullable<LexicalEditorProps['features']>,
+	readonly unknown[]
+>[number]
+
+/**
+ * Lexical features for the banner message editor. The array form appends to
+ * the plugin's own; the function form gets them as `defaultFeatures` and
+ * returns the whole list, so it can reorder or drop one. Dropping the token
+ * feature takes the lock values with it.
+ */
+export type ContentLockEditorFeaturesOption =
+	| ContentLockEditorFeature[]
+	| ((args: { defaultFeatures: ContentLockEditorFeature[] }) => ContentLockEditorFeature[])
+
+/**
+ * The banner message editor: short formatted text plus lock value tokens. It
+ * never inherits the project's editor, so a banner cannot grow uploads or
+ * blocks unless `features` adds them. Paragraphs are Lexical's own; leaving out
+ * `ParagraphFeature` only drops the text-type dropdown, which would offer
+ * nothing but "Normal text" here.
+ */
+export const buildMessageEditor = ({
+	groups,
+	features,
+}: {
+	groups: TokenGroup[]
+	features?: ContentLockEditorFeaturesOption
+}): ReturnType<typeof lexicalEditor> =>
 	lexicalEditor({
-		features: () => [
-			ParagraphFeature(),
-			BoldFeature(),
-			ItalicFeature(),
-			LinkFeature({ enabledCollections: [] as CollectionSlug[] }),
-			BlocksFeature({ inlineBlocks: [dateBlock, scopeBlock] }),
-			FixedToolbarFeature(),
-		],
+		features: () => {
+			const defaultFeatures: ContentLockEditorFeature[] = [
+				BoldFeature(),
+				ItalicFeature(),
+				LinkFeature({ enabledCollections: [] as CollectionSlug[] }),
+				ContentLockTokenFeature({ groups }),
+				FixedToolbarFeature(),
+			]
+			if (!features) {
+				return defaultFeatures
+			}
+			return typeof features === 'function'
+				? features({ defaultFeatures })
+				: [...defaultFeatures, ...features]
+		},
 	})

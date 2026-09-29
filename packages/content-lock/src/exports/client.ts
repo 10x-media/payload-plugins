@@ -11,3 +11,4 @@ export {
 } from '../banner/ContentLockProvider'
 export { LocalDate } from '../banner/LocalDate'
 export { EntitySelect, type EntitySelectProps } from '../collection/components/EntitySelect'
+export { ContentLockTokenFeatureClient } from '../lexical/token/client'

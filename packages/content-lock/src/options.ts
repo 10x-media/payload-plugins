@@ -1,5 +1,6 @@
 import type { CollectionConfig, PayloadRequest } from 'payload'
 
+import type { ContentLockEditorFeaturesOption } from './lexical/editor'
 import type { LockGroup } from './state/types'
 import type { TranslationsOption } from './translations'
 
@@ -45,12 +46,6 @@ export type ContentLockPluginOptions = {
 	 * @default 3600
 	 */
 	retryAfter?: number | 'untilEnd'
-	/**
-	 * The banner shows a live countdown when the lock ends within this many
-	 * milliseconds, and refreshes the page when it reaches zero.
-	 * @default 10_800_000 (3 hours)
-	 */
-	countdownThresholdMs?: number
 	/** The lock windows collection. */
 	collection?: {
 		/** @default 'content-locks' */
@@ -59,6 +54,28 @@ export type ContentLockPluginOptions = {
 		access?: CollectionConfig['access']
 		/** Last-word override of the generated collection config. */
 		overrides?: (collection: CollectionConfig) => CollectionConfig
+	}
+	/**
+	 * Maps admin UI languages (`i18n.language`) to content locales, for projects
+	 * whose two axes use different keys. A viewer's banner messages load in their
+	 * admin language through this map, the language itself when it is a content
+	 * locale, then the default locale.
+	 */
+	localeMap?: Record<string, string>
+	/** Extensions to the banner message editor and its rendering. */
+	editor?: {
+		/**
+		 * Lexical features beside the plugin's own (paragraph, bold, italic,
+		 * link, lock value tokens). An array appends; a function gets the
+		 * plugin's list as `defaultFeatures` and returns the whole list.
+		 */
+		features?: ContentLockEditorFeaturesOption
+		/**
+		 * Import-map path of a module exporting a `JSXConvertersFunction`, for
+		 * nodes the added features bring. It receives the plugin's converters as
+		 * `defaultConverters`. Rendered on the server, in the admin banner.
+		 */
+		converters?: string
 	}
 	/**
 	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
@@ -80,7 +97,6 @@ export const SYSTEM_EXEMPT = [
 
 export const DEFAULT_SLUG = 'content-locks'
 export const DEFAULT_RETRY_AFTER = 3600
-export const DEFAULT_COUNTDOWN_THRESHOLD_MS = 3 * 60 * 60 * 1000
 export const DEFAULT_ORDER = 1000
 
 /** Options after defaults, in the serializable shape stored on `config.custom`. */
@@ -90,7 +106,9 @@ export type ResolvedOptions = {
 	individualSelection: boolean
 	exempt: string[]
 	retryAfter: number | 'untilEnd'
-	countdownThresholdMs: number
+	/** Import-map path of the project's banner converters, if any. */
+	editorConverters?: string
+	localeMap: Record<string, string>
 }
 
 export const resolveOptions = (options: ContentLockPluginOptions): ResolvedOptions => {
@@ -106,7 +124,8 @@ export const resolveOptions = (options: ContentLockPluginOptions): ResolvedOptio
 		individualSelection: Boolean(options.individualSelection),
 		exempt: [...new Set([slug, ...SYSTEM_EXEMPT, ...(options.exempt ?? [])])],
 		retryAfter: options.retryAfter ?? DEFAULT_RETRY_AFTER,
-		countdownThresholdMs: options.countdownThresholdMs ?? DEFAULT_COUNTDOWN_THRESHOLD_MS,
+		...(options.editor?.converters ? { editorConverters: options.editor.converters } : {}),
+		localeMap: options.localeMap ?? {},
 	}
 }
 

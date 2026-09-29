@@ -5,13 +5,10 @@ const DEV_PASSWORD = 'password'
 
 const HOUR = 60 * 60 * 1000
 
-type Inline =
-	| string
-	| { block: 'contentLockDate'; source: string; format: string }
-	| { block: 'contentLockScope' }
+type Token = { token: 'startsAt' | 'endsAt' | 'announceAt' | 'scope'; format?: string }
 
-/** A one-paragraph Lexical message from text runs and the plugin's inline blocks. */
-const message = (...parts: Inline[]) => ({
+/** A one-paragraph Lexical message from text runs and lock value tokens. */
+const message = (...parts: Array<string | Token>) => ({
 	root: {
 		type: 'root',
 		direction: 'ltr' as const,
@@ -26,7 +23,7 @@ const message = (...parts: Inline[]) => ({
 				indent: 0,
 				version: 1,
 				textFormat: 0,
-				children: parts.map((part, index) =>
+				children: parts.map((part) =>
 					typeof part === 'string'
 						? {
 								type: 'text',
@@ -37,16 +34,7 @@ const message = (...parts: Inline[]) => ({
 								style: '',
 								version: 1,
 							}
-						: {
-								type: 'inlineBlock',
-								version: 1,
-								fields: {
-									id: `seed-${index}`,
-									blockName: '',
-									blockType: part.block,
-									...('source' in part ? { source: part.source, format: part.format } : {}),
-								},
-							}
+						: { type: 'contentLockToken', version: 1, format: 'datetime', ...part }
 				),
 			},
 		],
@@ -55,8 +43,8 @@ const message = (...parts: Inline[]) => ({
 
 /**
  * Seed the dev Payload app: an admin user, some content, and lock windows in
- * every stage: two announced (everything tomorrow, with a message in English
- * and German, and the site group in three days) so the banner pages, one
+ * every stage: two announced (everything tomorrow, with a tokenized message in
+ * English and German, and the site group in three days) so the banner pages, one
  * pending, one active on the catalog group only, so the site collections stay
  * editable, and one unpublished draft that locks nothing. Idempotent.
  */
@@ -93,11 +81,9 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			endsAt: at(30 * HOUR),
 			announcementMessage: message(
 				'We are moving to a new database ',
-				{ block: 'contentLockDate', source: 'startsAt', format: 'relative' },
-				'. ',
-				{ block: 'contentLockScope' },
-				' will be read-only until ',
-				{ block: 'contentLockDate', source: 'endsAt', format: 'time' },
+				{ token: 'startsAt', format: 'relative' },
+				'. Content will be read-only until ',
+				{ token: 'endsAt', format: 'time' },
 				'.'
 			),
 		},
@@ -109,11 +95,9 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		data: {
 			announcementMessage: message(
 				'Wir ziehen auf eine neue Datenbank um, ',
-				{ block: 'contentLockDate', source: 'startsAt', format: 'relative' },
-				'. ',
-				{ block: 'contentLockScope' },
-				' sind bis ',
-				{ block: 'contentLockDate', source: 'endsAt', format: 'time' },
+				{ token: 'startsAt', format: 'relative' },
+				'. Inhalte sind bis ',
+				{ token: 'endsAt', format: 'time' },
 				' schreibgeschützt.'
 			),
 		},
@@ -126,6 +110,13 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			startsAt: at(3 * 24 * HOUR),
 			lockEverything: false,
 			groups: ['site'],
+			announcementMessage: message(
+				'Relaunch on ',
+				{ token: 'startsAt', format: 'date' },
+				': ',
+				{ token: 'scope' },
+				' will be frozen while we move to the new design.'
+			),
 		},
 	})
 	await payload.create({

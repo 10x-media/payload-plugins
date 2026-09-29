@@ -4,11 +4,10 @@ import './banner.css'
 
 import { ChevronIcon, usePreferences } from '@payloadcms/ui'
 import { useRouter } from 'next/navigation'
-import { type ReactNode, useEffect, useRef, useState } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
-import { formatCountdown } from './formatDate'
 import { LocalDate } from './LocalDate'
 
 const PREFERENCE_KEY = 'content-lock-dismissed'
@@ -32,46 +31,49 @@ export type BannerItem = {
 export type ContentLockBannerProps = {
 	/** Active and announced windows, most relevant first. */
 	items: BannerItem[]
-	countdownThresholdMs: number
 }
 
-/** Live `Ends in` counter that refreshes the page once the lock is over. */
-const Countdown = ({ endsAt }: { endsAt: string }) => {
-	const { t } = useTranslation()
+/** `setTimeout` takes a signed 32-bit delay; anything later waits for the next page load. */
+const MAX_TIMEOUT_MS = 2 ** 31 - 1
+
+/**
+ * Refresh the page when any shown window changes stage: an active one reaching
+ * its end, an announced one reaching its start. The server then renders the
+ * next state, whatever the message says.
+ */
+const useRefreshOnTransition = (items: BannerItem[]) => {
 	const router = useRouter()
-	const refreshed = useRef(false)
-	const [left, setLeft] = useState(() => Date.parse(endsAt) - Date.now())
+	const next = items
+		.map((item) => (item.status === 'active' ? item.endsAt : item.startsAt))
+		.filter((iso): iso is string => iso !== null)
+		.map((iso) => Date.parse(iso))
+		.reduce((soonest, at) => Math.min(soonest, at), Number.POSITIVE_INFINITY)
 	useEffect(() => {
-		const timer = setInterval(() => setLeft(Date.parse(endsAt) - Date.now()), 1000)
-		return () => clearInterval(timer)
-	}, [endsAt])
-	useEffect(() => {
-		if (left <= 0 && !refreshed.current) {
-			refreshed.current = true
-			router.refresh()
+		const delay = next - Date.now()
+		if (!Number.isFinite(delay) || delay > MAX_TIMEOUT_MS) {
+			return
 		}
-	}, [left, router])
-	return (
-		<span className={`${baseClass}__countdown`} suppressHydrationWarning>
-			{t(keys.bannerEndsIn, { time: formatCountdown(left) })}
-		</span>
-	)
+		// A beat past the instant, so the server's clock agrees it has passed.
+		const timer = setTimeout(() => router.refresh(), Math.max(0, delay) + 500)
+		return () => clearTimeout(timer)
+	}, [next, router])
 }
 
 /**
  * The admin-wide notice for lock windows. It shows one window at a time and
  * pages through the rest. A window's own message for its stage replaces the
- * built-in text, which stays as the fallback. Announcements can be dismissed per user (stored in
- * preferences, so it follows them across devices), which reveals the next
- * one; an active lock cannot be dismissed.
+ * built-in text, which stays as the fallback. Announcements can be dismissed
+ * per user (stored in preferences, so it follows them across devices), which
+ * reveals the next one; an active lock cannot be dismissed. The page refreshes
+ * itself when a shown window changes stage.
  */
-export const ContentLockBanner = ({ items, countdownThresholdMs }: ContentLockBannerProps) => {
+export const ContentLockBanner = ({ items }: ContentLockBannerProps) => {
 	const { t } = useTranslation()
 	const { getPreference, setPreference } = usePreferences()
 	// Announcements stay hidden until the preference is known, so a dismissed one never flashes.
 	const [dismissed, setDismissed] = useState<Set<string> | null>(null)
 	const [selectedId, setSelectedId] = useState<string | null>(null)
-	const [nearEnd, setNearEnd] = useState(false)
+	useRefreshOnTransition(items)
 
 	useEffect(() => {
 		let cancelled = false
@@ -100,10 +102,6 @@ export const ContentLockBanner = ({ items, countdownThresholdMs }: ContentLockBa
 	const active = current?.status === 'active'
 	const endsAt = current?.endsAt ?? null
 
-	useEffect(() => {
-		setNearEnd(active && endsAt !== null && Date.parse(endsAt) - Date.now() <= countdownThresholdMs)
-	}, [active, endsAt, countdownThresholdMs])
-
 	if (!current) {
 		return null
 	}
@@ -126,8 +124,6 @@ export const ContentLockBanner = ({ items, countdownThresholdMs }: ContentLockBa
 			: t(active ? keys.bannerActivePartial : keys.bannerAnnouncedPartial, {
 					what: current.scopeLabels.join(', '),
 				})
-	const countdown =
-		endsAt !== null && nearEnd ? <Countdown endsAt={endsAt} key={current.id} /> : null
 
 	return (
 		<div
@@ -136,10 +132,7 @@ export const ContentLockBanner = ({ items, countdownThresholdMs }: ContentLockBa
 		>
 			<div className={`${baseClass}__row`}>
 				{current.message ? (
-					<div className={`${baseClass}__message`}>
-						{current.message}
-						{countdown}
-					</div>
+					<div className={`${baseClass}__message`}>{current.message}</div>
 				) : (
 					<>
 						<strong className={`${baseClass}__title`}>{title}</strong>
@@ -150,12 +143,11 @@ export const ContentLockBanner = ({ items, countdownThresholdMs }: ContentLockBa
 									{t(keys.bannerFrom)} <LocalDate iso={current.startsAt} />
 								</span>
 							)}
-							{endsAt !== null && !nearEnd && (
+							{endsAt !== null && (
 								<span>
 									{t(keys.bannerUntil)} <LocalDate iso={endsAt} />
 								</span>
 							)}
-							{countdown}
 						</span>
 					</>
 				)}

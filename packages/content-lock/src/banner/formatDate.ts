@@ -1,9 +1,10 @@
-import type { DateFormat } from '../lexical/dateBlock'
+import type { DateFormat } from '../lexical/token/types'
 
 const UNITS: Array<[Intl.RelativeTimeFormatUnit, number]> = [
 	['day', 86_400_000],
 	['hour', 3_600_000],
 	['minute', 60_000],
+	['second', 1_000],
 ]
 
 /** `in 3 hours`, `2 days ago`, in the viewer's language. */
@@ -15,7 +16,7 @@ export const formatRelative = (iso: string, now: number, language: string): stri
 			return format.format(Math.round(delta / size), unit)
 		}
 	}
-	return format.format(Math.round(delta / 60_000), 'minute')
+	return format.format(0, 'second')
 }
 
 /**
@@ -48,13 +49,3 @@ export const formatInstant = ({
 /** The full instant with its time zone, for a hover title. */
 export const formatInstantFull = (iso: string, language: string): string =>
 	new Intl.DateTimeFormat(language, { dateStyle: 'full', timeStyle: 'long' }).format(new Date(iso))
-
-/** `1:05:09`, `12:30`: the time left until an instant, never negative. */
-export const formatCountdown = (msLeft: number): string => {
-	const total = Math.max(0, Math.ceil(msLeft / 1000))
-	const hours = Math.floor(total / 3600)
-	const minutes = Math.floor((total % 3600) / 60)
-	const seconds = total % 60
-	const pad = (value: number) => String(value).padStart(2, '0')
-	return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`
-}

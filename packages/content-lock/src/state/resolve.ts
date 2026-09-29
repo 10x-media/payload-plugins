@@ -30,6 +30,23 @@ export const statusOf = (window: LockWindow, now: Date): WindowStatus => {
 	return 'pending'
 }
 
+/**
+ * The targets worth naming to a reader: every group, plus the collections and
+ * globals no selected group already covers. Picking "Catalog" and also
+ * "Products" reads as just "Catalog".
+ */
+export const namedTargets = (
+	targets: readonly string[],
+	groups: readonly Pick<LockGroup, 'key' | 'collections' | 'globals'>[]
+): string[] => {
+	const selected = groups.filter((group) => targets.includes(`group:${group.key}`))
+	const covered = new Set([
+		...selected.flatMap((group) => group.collections.map((slug) => `collection:${slug}`)),
+		...selected.flatMap((group) => group.globals.map((slug) => `global:${slug}`)),
+	])
+	return targets.filter((target) => !covered.has(target))
+}
+
 /** Expand a window's scope, resolving `group:<key>` refs against the configured groups. */
 export const scopeOf = (window: LockWindow, groups: readonly LockGroup[]): ResolvedScope => {
 	if (window.scope === 'everything') {

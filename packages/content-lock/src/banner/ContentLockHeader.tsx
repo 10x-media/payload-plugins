@@ -1,17 +1,16 @@
 import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
-import { RichText } from '@payloadcms/richtext-lexical/react'
+import { type JSXConvertersFunction, RichText } from '@payloadcms/richtext-lexical/react'
 import { getTranslation, type I18nClient } from '@payloadcms/translations'
 import type { CollectionSlug, Payload, SelectType, ServerProps, TypedLocale } from 'payload'
 
 import { optionsFromConfig, type ResolvedOptions } from '../options'
-import { orderBanners, scopeOf } from '../state/resolve'
+import { namedTargets, orderBanners, scopeOf } from '../state/resolve'
 import { getContentLockState } from '../state/store'
 import type { LockWindow, ResolvedScope } from '../state/types'
-import { keys } from '../translations/keys'
-import { asTranslate } from '../translations/server'
 import { type BannerItem, ContentLockBanner } from './ContentLockBanner'
 import { ContentLockStateSync } from './ContentLockProvider'
-import { buildMessageConverters } from './messageConverters'
+import { languageForLocale, resolveMessageLocale } from './locale'
+import { buildMessageConverters, composeConverters } from './messageConverters'
 
 type HeaderProps = ServerProps & { collectionSlug?: string; globalSlug?: string }
 
@@ -33,7 +32,7 @@ const scopeLabels = ({
 		return null
 	}
 	const labels: string[] = []
-	for (const target of window.targets) {
+	for (const target of namedTargets(window.targets, options.groups)) {
 		const separator = target.indexOf(':')
 		const kind = target.slice(0, separator)
 		const slug = target.slice(separator + 1)
@@ -51,24 +50,17 @@ const scopeLabels = ({
 	return labels
 }
 
-/** The content locale for a message: the admin language when it is one, else the default. */
-const messageLocale = (payload: Payload, language: string): TypedLocale | undefined => {
-	const localization = payload.config.localization
-	if (!localization) {
-		return undefined
-	}
-	const codes = localization.localeCodes
-	return (codes.includes(language) ? language : localization.defaultLocale) as TypedLocale
-}
-
 const hasContent = (message: SerializedEditorState | null | undefined): boolean => {
 	const root = message?.root
 	return Boolean(root && Array.isArray(root.children) && root.children.length > 0)
 }
 
+/** A message and the content locale it was actually loaded in. */
+type LoadedMessage = { state: SerializedEditorState; locale: string | undefined }
+
 type WindowMessages = {
-	announced?: SerializedEditorState
-	active?: SerializedEditorState
+	announced?: LoadedMessage
+	active?: LoadedMessage
 }
 
 type MessageDoc = {
@@ -77,40 +69,78 @@ type MessageDoc = {
 	activeMessage?: SerializedEditorState | null
 }
 
-/**
- * The published, non-empty messages of the given windows, in one read, by
- * window id. The content locale's own fallback applies, so an untranslated
- * message shows in the default locale.
- */
-const loadMessages = async ({
+const MESSAGE_FIELDS = [
+	['announced', 'announcementMessage'],
+	['active', 'activeMessage'],
+] as const
+
+const readMessages = async ({
 	payload,
 	slug,
 	ids,
-	language,
+	locale,
 }: {
 	payload: Payload
 	slug: string
 	ids: string[]
-	language: string
-}): Promise<Map<string, WindowMessages>> => {
+	locale: string | undefined
+}): Promise<MessageDoc[]> => {
 	const { docs } = await payload.find({
 		collection: slug as CollectionSlug,
 		depth: 0,
+		fallbackLocale: false,
 		limit: 0,
-		locale: messageLocale(payload, language),
+		locale: locale as TypedLocale | undefined,
 		overrideAccess: true,
 		pagination: false,
 		select: { announcementMessage: true, activeMessage: true } as SelectType,
 		where: { id: { in: ids } },
 	})
+	return docs as unknown as MessageDoc[]
+}
+
+/**
+ * The published, non-empty messages of the given windows, by window id, each
+ * with the locale it came in: the viewer's content locale, or the default one
+ * for a message not translated yet. At most two reads.
+ */
+const loadMessages = async ({
+	payload,
+	slug,
+	ids,
+	locale,
+}: {
+	payload: Payload
+	slug: string
+	ids: string[]
+	locale: string | undefined
+}): Promise<Map<string, WindowMessages>> => {
 	const messages = new Map<string, WindowMessages>()
-	for (const doc of docs as unknown as MessageDoc[]) {
-		messages.set(String(doc.id), {
-			announced: hasContent(doc.announcementMessage)
-				? (doc.announcementMessage ?? undefined)
-				: undefined,
-			active: hasContent(doc.activeMessage) ? (doc.activeMessage ?? undefined) : undefined,
-		})
+	const collect = (docs: MessageDoc[], docLocale: string | undefined) => {
+		for (const doc of docs) {
+			const entry = messages.get(String(doc.id)) ?? {}
+			for (const [stage, field] of MESSAGE_FIELDS) {
+				const state = doc[field]
+				if (!entry[stage] && state && hasContent(state)) {
+					entry[stage] = { state, locale: docLocale }
+				}
+			}
+			messages.set(String(doc.id), entry)
+		}
+	}
+	collect(await readMessages({ payload, slug, ids, locale }), locale)
+	const defaultLocale = payload.config.localization
+		? payload.config.localization.defaultLocale
+		: undefined
+	const untranslated = ids.filter((id) => {
+		const entry = messages.get(id)
+		return !entry?.announced || !entry.active
+	})
+	if (locale !== undefined && locale !== defaultLocale && untranslated.length > 0) {
+		collect(
+			await readMessages({ payload, slug, ids: untranslated, locale: defaultLocale }),
+			defaultLocale
+		)
 	}
 	return messages
 }
@@ -151,16 +181,29 @@ export const ContentLockHeader = async ({
 	if (windows.length === 0) {
 		return sync
 	}
+	const localization = payload.config.localization
 	const messages = await loadMessages({
 		payload,
 		slug: options.slug,
 		ids: windows.map((window) => window.id),
-		language: i18n.language,
+		locale: resolveMessageLocale({
+			contentLocales: localization ? localization.localeCodes : [],
+			defaultLocale: localization ? localization.defaultLocale : undefined,
+			language: i18n.language,
+			localeMap: options.localeMap,
+		}),
 	}).catch((error: unknown) => {
 		payload.logger.error({ err: error, msg: '[content-lock] cannot load banner messages' })
 		return new Map<string, WindowMessages>()
 	})
-	const t = asTranslate(i18n.t)
+	const projectConverters = options.editorConverters
+		? (payload.importMap[options.editorConverters] as JSXConvertersFunction | undefined)
+		: undefined
+	if (options.editorConverters && !projectConverters) {
+		payload.logger.warn(
+			`[content-lock] converters "${options.editorConverters}" are not in the import map; banners render with the plugin's own converters`
+		)
+	}
 	const items = windows.map((window): BannerItem => {
 		const status = state.active.includes(window) ? 'active' : 'announced'
 		const labels = scopeLabels({
@@ -172,6 +215,17 @@ export const ContentLockHeader = async ({
 		})
 		const endsAt = window.endMode === 'at' ? window.endsAt : null
 		const message = messages.get(window.id)?.[status]
+		// The scope token reads in the message's language, like its dates.
+		const messageLabels =
+			message?.locale === undefined
+				? labels
+				: scopeLabels({
+						scope: scopeOf(window, options.groups),
+						window,
+						payload,
+						i18n: { ...i18n, language: languageForLocale(message.locale, options.localeMap) },
+						options,
+					})
 		return {
 			id: window.id,
 			status,
@@ -181,15 +235,17 @@ export const ContentLockHeader = async ({
 			scopeLabels: labels,
 			message: message ? (
 				<RichText
-					converters={buildMessageConverters({
-						startsAt: window.startsAt,
-						endsAt,
-						announceAt: window.announceAt,
-						scopeLabels: labels,
-						everythingLabel: t(keys.scopeEverything),
-						openEndLabel: t(keys.dateOpenEnd),
-					})}
-					data={message}
+					converters={composeConverters(
+						buildMessageConverters({
+							startsAt: window.startsAt,
+							endsAt,
+							announceAt: window.announceAt,
+							scopeLabels: messageLabels,
+							locale: message.locale,
+						}),
+						projectConverters
+					)}
+					data={message.state}
 					disableContainer
 				/>
 			) : null,
@@ -198,7 +254,7 @@ export const ContentLockHeader = async ({
 	return (
 		<>
 			{sync}
-			<ContentLockBanner countdownThresholdMs={options.countdownThresholdMs} items={items} />
+			<ContentLockBanner items={items} />
 		</>
 	)
 }
