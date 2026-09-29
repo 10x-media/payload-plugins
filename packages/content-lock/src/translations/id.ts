@@ -7,11 +7,11 @@ export const id: Record<TranslationKey, string> = {
 	[keys.collectionPlural]: 'Kunci konten',
 
 	[keys.fieldTitle]: 'Judul',
+	[keys.fieldAnnounce]: 'Umumkan lebih awal',
 	[keys.fieldAnnounceAt]: 'Umumkan mulai',
-	[keys.fieldAnnounceAtDescription]:
-		'Kapan banner terjadwal mulai ditampilkan. Kosongkan jika tidak perlu diumumkan.',
+	[keys.fieldAnnounceAtDescription]: 'Kapan banner mulai mengumumkan penguncian ini.',
 	[keys.fieldStartsAt]: 'Mulai pada',
-	[keys.fieldStartsAtDescription]: 'Kosongkan untuk langsung mengunci konten.',
+	[keys.fieldStartsAtDescription]: 'Kosongkan untuk mengunci saat diterbitkan.',
 	[keys.fieldEndAtTime]: 'Berakhir pada waktu tertentu',
 	[keys.fieldEndsAt]: 'Berakhir pada',
 	[keys.fieldEndedAt]: 'Diakhiri pada',
@@ -20,6 +20,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.fieldGroups]: 'Grup',
 	[keys.fieldCollections]: 'Koleksi',
 	[keys.fieldGlobals]: 'Global',
+	[keys.fieldAdvanced]: 'Lanjutan',
 	[keys.fieldMessage]: 'Pesan',
 	[keys.fieldAnnouncementMessageDescription]:
 		'Ditampilkan selama penguncian diumumkan. Kosongkan untuk pemberitahuan bawaan.',
@@ -58,6 +59,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.errorAnnounceAfterStart]: 'Pengumuman harus dimulai sebelum penguncian.',
 	[keys.errorEndBeforeStart]: 'Penguncian harus berakhir setelah dimulai.',
 	[keys.errorEndsAtRequired]: 'Tentukan kapan penguncian berakhir.',
+	[keys.errorAnnounceAtRequired]: 'Tentukan kapan pengumuman dimulai.',
 	[keys.errorTargetsRequired]: 'Pilih setidaknya satu item untuk dikunci.',
 	[keys.errorEndedReadOnly]: 'Penguncian yang sudah berakhir tidak dapat diubah lagi.',
 	[keys.errorActiveStartMoved]:

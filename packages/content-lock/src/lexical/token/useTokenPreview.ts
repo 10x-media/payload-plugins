@@ -32,6 +32,7 @@ const asIso = (value: unknown): string | null => {
 export const useWindowForm = () => {
 	const startsAt = useFormFields(([fields]) => fields.startsAt?.value)
 	const endsAt = useFormFields(([fields]) => fields.endsAt?.value)
+	const announce = useFormFields(([fields]) => fields.announce?.value)
 	const announceAt = useFormFields(([fields]) => fields.announceAt?.value)
 	const endAtTime = useFormFields(([fields]) => fields.endAtTime?.value)
 	const lockEverything = useFormFields(([fields]) => fields.lockEverything?.value)
@@ -42,7 +43,7 @@ export const useWindowForm = () => {
 		startsAt: asIso(startsAt),
 		endsAt: asIso(endsAt),
 		announceAt: asIso(announceAt),
-		values: { announceAt, endAtTime, lockEverything } satisfies TokenWindowValues,
+		values: { announce, announceAt, endAtTime, lockEverything } satisfies TokenWindowValues,
 		groups: asStrings(groups),
 		collections: asStrings(collections),
 		globals: asStrings(globals),

@@ -145,6 +145,10 @@ const TokenEditor = ({ anchorElem }: { anchorElem: HTMLElement }) => {
 	}, [])
 
 	const $update = useCallback(() => {
+		if (!editor.isEditable()) {
+			hide()
+			return
+		}
 		const selection = $getSelection()
 		const nodes = $isNodeSelection(selection) ? selection.getNodes() : []
 		const node = nodes.length === 1 ? nodes[0] : null

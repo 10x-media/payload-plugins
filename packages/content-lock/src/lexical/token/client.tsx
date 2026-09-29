@@ -101,13 +101,14 @@ const available = (editor: LexicalEditor, kind: TokenKind): boolean =>
  */
 const TokenPlugin: PluginComponent<ContentLockTokenClientProps> = () => {
 	const [editor] = useLexicalComposerContext()
+	const announce = useFormFields(([fields]) => fields.announce?.value)
 	const announceAt = useFormFields(([fields]) => fields.announceAt?.value)
 	const endAtTime = useFormFields(([fields]) => fields.endAtTime?.value)
 	const lockEverything = useFormFields(([fields]) => fields.lockEverything?.value)
 
 	useEffect(() => {
-		setWindowValues(editor, { announceAt, endAtTime, lockEverything })
-	}, [editor, announceAt, endAtTime, lockEverything])
+		setWindowValues(editor, { announce, announceAt, endAtTime, lockEverything })
+	}, [editor, announce, announceAt, endAtTime, lockEverything])
 
 	useEffect(
 		() =>

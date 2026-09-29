@@ -7,11 +7,11 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.collectionPlural]: 'Verrouillages du contenu',
 
 	[keys.fieldTitle]: 'Titre',
+	[keys.fieldAnnounce]: 'Annoncer à l’avance',
 	[keys.fieldAnnounceAt]: 'Annoncer à partir du',
-	[keys.fieldAnnounceAtDescription]:
-		'Moment où la bannière programmée commence à s’afficher. Laissez vide pour ne rien annoncer.',
+	[keys.fieldAnnounceAtDescription]: 'Quand le bandeau commence à annoncer ce verrouillage.',
 	[keys.fieldStartsAt]: 'Commence le',
-	[keys.fieldStartsAtDescription]: 'Laissez vide pour verrouiller le contenu immédiatement.',
+	[keys.fieldStartsAtDescription]: 'Laisser vide pour verrouiller à la publication.',
 	[keys.fieldEndAtTime]: 'Terminer à une heure définie',
 	[keys.fieldEndsAt]: 'Se termine le',
 	[keys.fieldEndedAt]: 'Terminé le',
@@ -21,6 +21,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.fieldGroups]: 'Groupes',
 	[keys.fieldCollections]: 'Collections',
 	[keys.fieldGlobals]: 'Globals',
+	[keys.fieldAdvanced]: 'Avancé',
 	[keys.fieldMessage]: 'Message',
 	[keys.fieldAnnouncementMessageDescription]:
 		'Affiché tant que le verrouillage est annoncé. Laisser vide pour l’avis par défaut.',
@@ -57,6 +58,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.errorAnnounceAfterStart]: 'L’annonce doit commencer avant le verrouillage.',
 	[keys.errorEndBeforeStart]: 'Le verrouillage doit se terminer après son début.',
 	[keys.errorEndsAtRequired]: 'Indiquez quand le verrouillage se termine.',
+	[keys.errorAnnounceAtRequired]: 'Indiquez quand l’annonce commence.',
 	[keys.errorTargetsRequired]: 'Choisissez au moins un élément à verrouiller.',
 	[keys.errorEndedReadOnly]: 'Un verrouillage terminé ne peut plus être modifié.',
 	[keys.errorActiveStartMoved]:

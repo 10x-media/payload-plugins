@@ -19,7 +19,7 @@ const strings = (value: unknown): string[] => (Array.isArray(value) ? value.map(
 export const toWindow = (doc: Record<string, unknown>): LockWindow => ({
 	id: String(doc.id),
 	title: typeof doc.title === 'string' ? doc.title : '',
-	announceAt: iso(doc.announceAt),
+	announceAt: doc.announce === false ? null : iso(doc.announceAt),
 	startsAt: iso(doc.startsAt) ?? new Date(0).toISOString(),
 	endMode: doc.endAtTime === true ? 'at' : 'manual',
 	endsAt: iso(doc.endsAt),

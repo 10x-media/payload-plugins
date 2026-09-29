@@ -13,6 +13,7 @@ import {
 import { registerTranslations } from './plugin/registerTranslations'
 import { rebuildSnapshot } from './state/store'
 
+export { notEndedWhere } from './collection/access'
 export type {
 	ContentLockEditorFeature,
 	ContentLockEditorFeaturesOption,

@@ -264,27 +264,10 @@ export interface ContentLock {
   status?: ('draft' | 'pending' | 'announced' | 'active' | 'ended') | null;
   announceAt?: string | null;
   startsAt?: string | null;
-  endAtTime?: boolean | null;
   endsAt?: string | null;
-  lockEverything?: boolean | null;
   groups?: ('catalog' | 'site')[] | null;
   collections?: string[] | null;
   globals?: string[] | null;
-  announcementMessage?: {
-    root: {
-      type: string;
-      children: {
-        type: any;
-        version: number;
-        [k: string]: unknown;
-      }[];
-      direction: ('ltr' | 'rtl') | null;
-      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
-      indent: number;
-      version: number;
-    };
-    [k: string]: unknown;
-  } | null;
   activeMessage?: {
     root: {
       type: string;
@@ -300,7 +283,25 @@ export interface ContentLock {
     };
     [k: string]: unknown;
   } | null;
+  announcementMessage?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
   endedAt?: string | null;
+  announce?: boolean | null;
+  endAtTime?: boolean | null;
+  lockEverything?: boolean | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -466,15 +467,16 @@ export interface ContentLocksSelect<T extends boolean = true> {
   status?: T;
   announceAt?: T;
   startsAt?: T;
-  endAtTime?: T;
   endsAt?: T;
-  lockEverything?: T;
   groups?: T;
   collections?: T;
   globals?: T;
-  announcementMessage?: T;
   activeMessage?: T;
+  announcementMessage?: T;
   endedAt?: T;
+  announce?: T;
+  endAtTime?: T;
+  lockEverything?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;

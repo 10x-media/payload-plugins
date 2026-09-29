@@ -7,11 +7,11 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.collectionPlural]: '콘텐츠 잠금',
 
 	[keys.fieldTitle]: '제목',
+	[keys.fieldAnnounce]: '미리 예고',
 	[keys.fieldAnnounceAt]: '공지 시작',
-	[keys.fieldAnnounceAtDescription]:
-		'예약된 배너가 표시되기 시작하는 시점입니다. 공지하지 않으려면 비워 두세요.',
+	[keys.fieldAnnounceAtDescription]: '배너가 이 잠금을 예고하기 시작하는 시각입니다.',
 	[keys.fieldStartsAt]: '시작 시각',
-	[keys.fieldStartsAtDescription]: '비워 두면 콘텐츠가 즉시 잠깁니다.',
+	[keys.fieldStartsAtDescription]: '비워 두면 게시할 때 잠급니다.',
 	[keys.fieldEndAtTime]: '지정된 시각에 종료',
 	[keys.fieldEndsAt]: '종료 시각',
 	[keys.fieldEndedAt]: '종료됨',
@@ -20,6 +20,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.fieldGroups]: '그룹',
 	[keys.fieldCollections]: '컬렉션',
 	[keys.fieldGlobals]: '글로벌',
+	[keys.fieldAdvanced]: '고급',
 	[keys.fieldMessage]: '메시지',
 	[keys.fieldAnnouncementMessageDescription]:
 		'잠금이 예고된 동안 표시됩니다. 기본 안내를 사용하려면 비워 두세요.',
@@ -56,6 +57,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.errorAnnounceAfterStart]: '공지는 잠금보다 먼저 시작해야 합니다.',
 	[keys.errorEndBeforeStart]: '잠금은 시작 이후에 종료되어야 합니다.',
 	[keys.errorEndsAtRequired]: '잠금 종료 시각을 설정하세요.',
+	[keys.errorAnnounceAtRequired]: '예고 시작 시각을 지정하세요.',
 	[keys.errorTargetsRequired]: '잠글 항목을 하나 이상 선택하세요.',
 	[keys.errorEndedReadOnly]: '종료된 잠금은 더 이상 변경할 수 없습니다.',
 	[keys.errorActiveStartMoved]:

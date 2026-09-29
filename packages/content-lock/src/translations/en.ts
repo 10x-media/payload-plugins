@@ -11,11 +11,11 @@ export const en: Record<TranslationKey, string> = {
 	[keys.collectionPlural]: 'Content locks',
 
 	[keys.fieldTitle]: 'Title',
+	[keys.fieldAnnounce]: 'Announce in advance',
 	[keys.fieldAnnounceAt]: 'Announce from',
-	[keys.fieldAnnounceAtDescription]:
-		'When the scheduled banner starts showing. Leave empty for no announcement.',
+	[keys.fieldAnnounceAtDescription]: 'When the banner starts announcing this lock.',
 	[keys.fieldStartsAt]: 'Starts at',
-	[keys.fieldStartsAtDescription]: 'Leave empty to lock content immediately.',
+	[keys.fieldStartsAtDescription]: 'Leave empty to lock when published.',
 	[keys.fieldEndAtTime]: 'End at a set time',
 	[keys.fieldEndsAt]: 'Ends at',
 	[keys.fieldEndedAt]: 'Ended at',
@@ -24,6 +24,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fieldGroups]: 'Groups',
 	[keys.fieldCollections]: 'Collections',
 	[keys.fieldGlobals]: 'Globals',
+	[keys.fieldAdvanced]: 'Advanced',
 	[keys.fieldMessage]: 'Message',
 	[keys.fieldAnnouncementMessageDescription]:
 		'Shown while the lock is announced. Leave empty for the default notice.',
@@ -60,6 +61,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.errorAnnounceAfterStart]: 'The announcement must start before the lock does.',
 	[keys.errorEndBeforeStart]: 'The lock must end after it starts.',
 	[keys.errorEndsAtRequired]: 'Set when the lock ends.',
+	[keys.errorAnnounceAtRequired]: 'Set when the announcement starts.',
 	[keys.errorTargetsRequired]: 'Pick at least one item to lock.',
 	[keys.errorEndedReadOnly]: 'An ended lock can no longer be changed.',
 	[keys.errorActiveStartMoved]:

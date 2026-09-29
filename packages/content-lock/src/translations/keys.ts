@@ -9,6 +9,7 @@ export const keys = {
 	collectionPlural: 'contentLock:collectionPlural',
 
 	fieldTitle: 'contentLock:fieldTitle',
+	fieldAnnounce: 'contentLock:fieldAnnounce',
 	fieldAnnounceAt: 'contentLock:fieldAnnounceAt',
 	fieldAnnounceAtDescription: 'contentLock:fieldAnnounceAtDescription',
 	fieldStartsAt: 'contentLock:fieldStartsAt',
@@ -21,6 +22,7 @@ export const keys = {
 	fieldGroups: 'contentLock:fieldGroups',
 	fieldCollections: 'contentLock:fieldCollections',
 	fieldGlobals: 'contentLock:fieldGlobals',
+	fieldAdvanced: 'contentLock:fieldAdvanced',
 	fieldMessage: 'contentLock:fieldMessage',
 	fieldAnnouncementMessageDescription: 'contentLock:fieldAnnouncementMessageDescription',
 	fieldActiveMessageDescription: 'contentLock:fieldActiveMessageDescription',
@@ -55,6 +57,7 @@ export const keys = {
 	errorAnnounceAfterStart: 'contentLock:errorAnnounceAfterStart',
 	errorEndBeforeStart: 'contentLock:errorEndBeforeStart',
 	errorEndsAtRequired: 'contentLock:errorEndsAtRequired',
+	errorAnnounceAtRequired: 'contentLock:errorAnnounceAtRequired',
 	errorTargetsRequired: 'contentLock:errorTargetsRequired',
 	errorEndedReadOnly: 'contentLock:errorEndedReadOnly',
 	errorActiveStartMoved: 'contentLock:errorActiveStartMoved',

@@ -32,20 +32,23 @@ const entityField = (
 })
 
 /**
- * The scope fields of a lock window. "Lock everything" is on by default;
- * turning it off reveals the groups, and with the escape hatch enabled, the
- * individual collections and globals. With neither, there is nothing to
- * choose: no scope fields, and every window locks everything.
+ * The scope fields of a lock window, split by where they sit. The "Lock
+ * everything" toggle goes to the sidebar, on by default; turning it off
+ * reveals the groups in the main column, and with the escape hatch enabled, the
+ * individual collections and globals under a collapsed "Advanced" (a
+ * presentational collapsible, so the stored shape is unchanged). With neither,
+ * there is nothing to choose: no scope fields, and every window locks
+ * everything.
  */
 export const buildScopeFields = (
 	config: Config,
 	options: ResolvedOptions,
 	individualSelection: ContentLockPluginOptions['individualSelection']
-): Field[] => {
+): { sidebar: Field[]; main: Field[] } => {
 	const exempt = new Set(options.exempt)
-	const fields: Field[] = []
+	const main: Field[] = []
 	if (options.groups.length > 0) {
-		fields.push({
+		main.push({
 			name: 'groups',
 			type: 'select',
 			hasMany: true,
@@ -66,20 +69,32 @@ export const buildScopeFields = (
 		const globals = (config.globals ?? [])
 			.map((global) => global.slug)
 			.filter((slug) => !exempt.has(slug))
-		fields.push(entityField('collections', collections, access))
-		fields.push(entityField('globals', globals, access))
+		main.push({
+			type: 'collapsible',
+			label: labelForKey(keys.fieldAdvanced),
+			admin: { condition: notEverything, initCollapsed: true },
+			fields: [
+				entityField('collections', collections, access),
+				entityField('globals', globals, access),
+			],
+		})
 	}
-	if (fields.length === 0) {
-		return []
+	if (main.length === 0) {
+		return { sidebar: [], main: [] }
 	}
-	return [
-		{
-			name: 'lockEverything',
-			type: 'checkbox',
-			defaultValue: true,
-			label: labelForKey(keys.fieldLockEverything),
-			admin: { description: labelForKey(keys.fieldLockEverythingDescription) },
-		},
-		...fields,
-	]
+	return {
+		sidebar: [
+			{
+				name: 'lockEverything',
+				type: 'checkbox',
+				defaultValue: true,
+				label: labelForKey(keys.fieldLockEverything),
+				admin: {
+					position: 'sidebar',
+					description: labelForKey(keys.fieldLockEverythingDescription),
+				},
+			},
+		],
+		main,
+	}
 }

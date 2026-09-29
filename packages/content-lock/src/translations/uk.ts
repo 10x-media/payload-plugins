@@ -7,11 +7,11 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.collectionPlural]: 'Блокування контенту',
 
 	[keys.fieldTitle]: 'Назва',
+	[keys.fieldAnnounce]: 'Анонсувати заздалегідь',
 	[keys.fieldAnnounceAt]: 'Оголосити з',
-	[keys.fieldAnnounceAtDescription]:
-		'Коли з’являється банер. Залиште порожнім, щоб не оголошувати.',
+	[keys.fieldAnnounceAtDescription]: 'Коли банер почне анонсувати це блокування.',
 	[keys.fieldStartsAt]: 'Початок',
-	[keys.fieldStartsAtDescription]: 'Залиште порожнім, щоб заблокувати контент одразу.',
+	[keys.fieldStartsAtDescription]: 'Залиште порожнім, щоб заблокувати під час публікації.',
 	[keys.fieldEndAtTime]: 'Завершити у визначений час',
 	[keys.fieldEndsAt]: 'Завершення',
 	[keys.fieldEndedAt]: 'Завершено',
@@ -20,6 +20,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.fieldGroups]: 'Групи',
 	[keys.fieldCollections]: 'Колекції',
 	[keys.fieldGlobals]: 'Глобальні налаштування',
+	[keys.fieldAdvanced]: 'Розширені',
 	[keys.fieldMessage]: 'Повідомлення',
 	[keys.fieldAnnouncementMessageDescription]:
 		'Показується, поки блокування анонсоване. Залиште порожнім для стандартного сповіщення.',
@@ -56,6 +57,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.errorAnnounceAfterStart]: 'Оголошення має починатися раніше за блокування.',
 	[keys.errorEndBeforeStart]: 'Блокування має завершуватися після початку.',
 	[keys.errorEndsAtRequired]: 'Вкажіть, коли завершується блокування.',
+	[keys.errorAnnounceAtRequired]: 'Вкажіть, коли почати анонс.',
 	[keys.errorTargetsRequired]: 'Виберіть принаймні один елемент для блокування.',
 	[keys.errorEndedReadOnly]: 'Завершене блокування більше не можна змінити.',
 	[keys.errorActiveStartMoved]:

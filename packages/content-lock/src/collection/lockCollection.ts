@@ -18,6 +18,7 @@ import { toWindow } from '../state/window'
 import { en } from '../translations/en'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
+import { updateUnlessEnded } from './access'
 import { checkWindowChange } from './rules'
 import { buildScopeFields } from './scopeFields'
 
@@ -53,6 +54,9 @@ const stampAndValidate: CollectionBeforeChangeHook = ({ data, operation, origina
 		const requested = Date.parse(String(data.endedAt))
 		data.endedAt = new Date(Math.min(requested, now.getTime())).toISOString()
 	}
+	if (data.announce === false) {
+		data.announceAt = null
+	}
 	if (data.endAtTime === false) {
 		data.endsAt = null
 	}
@@ -64,9 +68,13 @@ const stampAndValidate: CollectionBeforeChangeHook = ({ data, operation, origina
 	if (draft) {
 		return data
 	}
+	const merged = { ...stored, ...data }
 	const before = stored ? toWindow(stored) : null
-	const after = toWindow({ ...stored, ...data })
-	const violation = checkWindowChange(before, after, now)
+	const after = toWindow(merged)
+	const violation =
+		merged.announce === true && !merged.announceAt
+			? keys.errorAnnounceAtRequired
+			: checkWindowChange(before, after, now)
 	if (violation) {
 		const message = typeof req.t === 'function' ? asTranslate(req.t)(violation) : en[violation]
 		throw new APIError(message, 400, null, true)
@@ -126,7 +134,10 @@ export const buildLockCollection = (
 			singular: labelForKey(keys.collectionSingular),
 			plural: labelForKey(keys.collectionPlural),
 		},
-		access: collectionOptions?.access,
+		access: {
+			...collectionOptions?.access,
+			update: updateUnlessEnded(collectionOptions?.access?.update),
+		},
 		admin: {
 			useAsTitle: 'title',
 			defaultColumns: ['title', 'status', 'startsAt', 'endsAt', '_status'],
@@ -175,6 +186,7 @@ export const buildLockCollection = (
 						admin: {
 							date: { pickerAppearance: 'dayAndTime' },
 							description: labelForKey(keys.fieldAnnounceAtDescription),
+							condition: (_data, siblingData) => siblingData?.announce === true,
 						},
 					},
 					{
@@ -186,33 +198,27 @@ export const buildLockCollection = (
 							description: labelForKey(keys.fieldStartsAtDescription),
 						},
 					},
+					{
+						name: 'endsAt',
+						type: 'date',
+						label: labelForKey(keys.fieldEndsAt),
+						admin: {
+							date: { pickerAppearance: 'dayAndTime' },
+							condition: (_data, siblingData) => siblingData?.endAtTime === true,
+						},
+					},
 				],
 			},
-			{
-				name: 'endAtTime',
-				type: 'checkbox',
-				defaultValue: false,
-				label: labelForKey(keys.fieldEndAtTime),
-			},
-			{
-				name: 'endsAt',
-				type: 'date',
-				label: labelForKey(keys.fieldEndsAt),
-				admin: {
-					date: { pickerAppearance: 'dayAndTime' },
-					condition: (_data, siblingData) => siblingData?.endAtTime === true,
-				},
-			},
-			...scopeFields,
+			...scopeFields.main,
 			{
 				type: 'tabs',
 				tabs: [
 					{
-						label: labelForKey(keys.tabAnnouncement),
-						description: labelForKey(keys.fieldAnnouncementMessageDescription),
+						label: labelForKey(keys.tabActive),
+						description: labelForKey(keys.fieldActiveMessageDescription),
 						fields: [
 							{
-								name: 'announcementMessage',
+								name: 'activeMessage',
 								type: 'richText',
 								localized: Boolean(config.localization),
 								label: labelForKey(keys.fieldMessage),
@@ -221,11 +227,13 @@ export const buildLockCollection = (
 						],
 					},
 					{
-						label: labelForKey(keys.tabActive),
-						description: labelForKey(keys.fieldActiveMessageDescription),
+						label: labelForKey(keys.tabAnnouncement),
+						// Only a window that announces itself has an announcement to write.
+						admin: { condition: (data) => data?.announce === true },
+						description: labelForKey(keys.fieldAnnouncementMessageDescription),
 						fields: [
 							{
-								name: 'activeMessage',
+								name: 'announcementMessage',
 								type: 'richText',
 								localized: Boolean(config.localization),
 								label: labelForKey(keys.fieldMessage),
@@ -246,6 +254,29 @@ export const buildLockCollection = (
 					condition: (data) => Boolean(data?.endedAt),
 				},
 			},
+			{
+				// No default: a write setting `announceAt` without it (API, scripts)
+				// still announces; only an explicit `false` drops the date.
+				name: 'announce',
+				type: 'checkbox',
+				hooks: {
+					// A window stored without the toggle announces when it has a date.
+					afterRead: [
+						({ value, siblingData }) =>
+							typeof value === 'boolean' ? value : Boolean(siblingData?.announceAt),
+					],
+				},
+				label: labelForKey(keys.fieldAnnounce),
+				admin: { position: 'sidebar' },
+			},
+			{
+				name: 'endAtTime',
+				type: 'checkbox',
+				defaultValue: false,
+				label: labelForKey(keys.fieldEndAtTime),
+				admin: { position: 'sidebar' },
+			},
+			...scopeFields.sidebar,
 		],
 	}
 	return collectionOptions?.overrides ? collectionOptions.overrides(collection) : collection

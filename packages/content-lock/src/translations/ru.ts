@@ -7,11 +7,11 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.collectionPlural]: 'Блокировки контента',
 
 	[keys.fieldTitle]: 'Название',
+	[keys.fieldAnnounce]: 'Анонсировать заранее',
 	[keys.fieldAnnounceAt]: 'Объявить с',
-	[keys.fieldAnnounceAtDescription]:
-		'Когда начинает показываться баннер. Оставьте пустым, чтобы не объявлять.',
+	[keys.fieldAnnounceAtDescription]: 'Когда баннер начнёт анонсировать эту блокировку.',
 	[keys.fieldStartsAt]: 'Начало',
-	[keys.fieldStartsAtDescription]: 'Оставьте пустым, чтобы заблокировать контент сразу.',
+	[keys.fieldStartsAtDescription]: 'Оставьте пустым, чтобы заблокировать при публикации.',
 	[keys.fieldEndAtTime]: 'Завершить в заданное время',
 	[keys.fieldEndsAt]: 'Окончание',
 	[keys.fieldEndedAt]: 'Завершено',
@@ -20,6 +20,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.fieldGroups]: 'Группы',
 	[keys.fieldCollections]: 'Коллекции',
 	[keys.fieldGlobals]: 'Глобальные настройки',
+	[keys.fieldAdvanced]: 'Расширенные',
 	[keys.fieldMessage]: 'Сообщение',
 	[keys.fieldAnnouncementMessageDescription]:
 		'Показывается, пока блокировка анонсирована. Оставьте пустым для стандартного уведомления.',
@@ -56,6 +57,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.errorAnnounceAfterStart]: 'Объявление должно начинаться раньше блокировки.',
 	[keys.errorEndBeforeStart]: 'Блокировка должна заканчиваться после начала.',
 	[keys.errorEndsAtRequired]: 'Укажите, когда заканчивается блокировка.',
+	[keys.errorAnnounceAtRequired]: 'Укажите, когда начать анонс.',
 	[keys.errorTargetsRequired]: 'Выберите хотя бы один элемент для блокировки.',
 	[keys.errorEndedReadOnly]: 'Завершённую блокировку больше нельзя изменить.',
 	[keys.errorActiveStartMoved]:

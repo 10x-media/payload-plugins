@@ -75,6 +75,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		collection: 'content-locks',
 		data: {
 			title: 'Database upgrade',
+			announce: true,
 			announceAt: at(-HOUR),
 			startsAt: at(26 * HOUR),
 			endAtTime: true,
@@ -106,6 +107,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		collection: 'content-locks',
 		data: {
 			title: 'Website relaunch',
+			announce: true,
 			announceAt: at(-HOUR),
 			startsAt: at(3 * 24 * HOUR),
 			lockEverything: false,
@@ -123,6 +125,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		collection: 'content-locks',
 		data: {
 			title: 'Quarterly cleanup',
+			announce: true,
 			announceAt: at(20 * 24 * HOUR),
 			startsAt: at(21 * 24 * HOUR),
 		},

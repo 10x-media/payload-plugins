@@ -49,6 +49,7 @@ export type SerializedTokenNode = TokenData & { type: typeof TOKEN_NODE_TYPE; ve
 
 /** The window fields a token depends on, as a form or a document holds them. */
 export type TokenWindowValues = {
+	announce?: unknown
 	announceAt?: unknown
 	endAtTime?: unknown
 	lockEverything?: unknown
@@ -84,7 +85,7 @@ export const tokenProblem = (
 		case 'endsAt':
 			return values.endAtTime === true ? null : keys.tokenNoEnd
 		case 'announceAt':
-			return values.announceAt ? null : keys.tokenNoAnnouncement
+			return values.announce === true && values.announceAt ? null : keys.tokenNoAnnouncement
 		case 'scope':
 			return values.lockEverything === false ? null : keys.tokenNoScope
 		case 'date':

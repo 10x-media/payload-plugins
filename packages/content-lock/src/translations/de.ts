@@ -7,11 +7,11 @@ export const de: Record<TranslationKey, string> = {
 	[keys.collectionPlural]: 'Inhaltssperren',
 
 	[keys.fieldTitle]: 'Titel',
+	[keys.fieldAnnounce]: 'Vorab ankündigen',
 	[keys.fieldAnnounceAt]: 'Ankündigen ab',
-	[keys.fieldAnnounceAtDescription]:
-		'Ab wann das Banner angezeigt wird. Leer lassen, um nichts anzukündigen.',
+	[keys.fieldAnnounceAtDescription]: 'Ab wann das Banner diese Sperre ankündigt.',
 	[keys.fieldStartsAt]: 'Beginnt am',
-	[keys.fieldStartsAtDescription]: 'Leer lassen, um Inhalte sofort zu sperren.',
+	[keys.fieldStartsAtDescription]: 'Leer lassen, um bei Veröffentlichung zu sperren.',
 	[keys.fieldEndAtTime]: 'Zu einem festen Zeitpunkt beenden',
 	[keys.fieldEndsAt]: 'Endet am',
 	[keys.fieldEndedAt]: 'Beendet am',
@@ -20,6 +20,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fieldGroups]: 'Gruppen',
 	[keys.fieldCollections]: 'Sammlungen',
 	[keys.fieldGlobals]: 'Globale Dokumente',
+	[keys.fieldAdvanced]: 'Erweitert',
 	[keys.fieldMessage]: 'Nachricht',
 	[keys.fieldAnnouncementMessageDescription]:
 		'Wird angezeigt, solange die Sperre angekündigt ist. Leer lassen für den Standardhinweis.',
@@ -56,6 +57,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.errorAnnounceAfterStart]: 'Die Ankündigung muss vor der Sperre beginnen.',
 	[keys.errorEndBeforeStart]: 'Die Sperre muss nach ihrem Beginn enden.',
 	[keys.errorEndsAtRequired]: 'Lege fest, wann die Sperre endet.',
+	[keys.errorAnnounceAtRequired]: 'Legen Sie fest, wann die Ankündigung beginnt.',
 	[keys.errorTargetsRequired]: 'Wähle mindestens ein Element zum Sperren aus.',
 	[keys.errorEndedReadOnly]: 'Eine beendete Sperre kann nicht mehr geändert werden.',
 	[keys.errorActiveStartMoved]:

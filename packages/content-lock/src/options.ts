@@ -50,9 +50,19 @@ export type ContentLockPluginOptions = {
 	collection?: {
 		/** @default 'content-locks' */
 		slug?: string
-		/** Who may read and manage lock windows. Defaults to any authenticated user. */
+		/**
+		 * Who may read and manage lock windows. Defaults to any authenticated
+		 * user. Ended windows stay read-only whatever `update` says: the plugin
+		 * narrows it to windows that have not ended.
+		 */
 		access?: CollectionConfig['access']
-		/** Last-word override of the generated collection config. */
+		/**
+		 * Last-word override of the generated collection config. It can replace
+		 * `access` wholesale, dropping the plugin's read-only rule for ended
+		 * windows; when it does, fold `notEndedWhere(new Date())` (exported from
+		 * the package) into the new `update`. The server still refuses changes to
+		 * an ended window either way.
+		 */
 		overrides?: (collection: CollectionConfig) => CollectionConfig
 	}
 	/**

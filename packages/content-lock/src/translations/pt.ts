@@ -7,11 +7,11 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.collectionPlural]: 'Bloqueios de conteúdo',
 
 	[keys.fieldTitle]: 'Título',
+	[keys.fieldAnnounce]: 'Anunciar com antecedência',
 	[keys.fieldAnnounceAt]: 'Anunciar a partir de',
-	[keys.fieldAnnounceAtDescription]:
-		'Quando o banner programado começa a ser exibido. Deixe vazio para não anunciar.',
+	[keys.fieldAnnounceAtDescription]: 'Quando o banner começa a anunciar este bloqueio.',
 	[keys.fieldStartsAt]: 'Começa em',
-	[keys.fieldStartsAtDescription]: 'Deixe vazio para bloquear o conteúdo imediatamente.',
+	[keys.fieldStartsAtDescription]: 'Deixe vazio para bloquear ao publicar.',
 	[keys.fieldEndAtTime]: 'Encerrar em um horário definido',
 	[keys.fieldEndsAt]: 'Termina em',
 	[keys.fieldEndedAt]: 'Encerrado em',
@@ -20,6 +20,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.fieldGroups]: 'Grupos',
 	[keys.fieldCollections]: 'Coleções',
 	[keys.fieldGlobals]: 'Globais',
+	[keys.fieldAdvanced]: 'Avançado',
 	[keys.fieldMessage]: 'Mensagem',
 	[keys.fieldAnnouncementMessageDescription]:
 		'Exibido enquanto o bloqueio está anunciado. Deixe vazio para o aviso padrão.',
@@ -56,6 +57,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.errorAnnounceAfterStart]: 'O anúncio deve começar antes do bloqueio.',
 	[keys.errorEndBeforeStart]: 'O bloqueio deve terminar depois de começar.',
 	[keys.errorEndsAtRequired]: 'Defina quando o bloqueio termina.',
+	[keys.errorAnnounceAtRequired]: 'Defina quando o anúncio começa.',
 	[keys.errorTargetsRequired]: 'Escolha pelo menos um item para bloquear.',
 	[keys.errorEndedReadOnly]: 'Um bloqueio encerrado não pode mais ser alterado.',
 	[keys.errorActiveStartMoved]:
