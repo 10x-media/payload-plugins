@@ -8,6 +8,11 @@ import { buildDefaultFieldDefinitions } from './fields/builtin'
 import { resolveFieldTypes, stashFieldTypes } from './fields/registry'
 import { stashFallbackLocale } from './form/findFormAtLocale'
 import type { FormBuilderPluginOptions } from './options'
+import {
+	resolveCollectionSlugs,
+	resolveVotedCookiePrefix,
+	stashCollectionSlugs,
+} from './plugin/collectionSlugs'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
 import { readUploadCollectionMimeTypes } from './plugin/uploadsCollection'
@@ -27,6 +32,10 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		}
 		const localizeContent = options.localizeContent !== false
 		const uploads = options.uploads ?? false
+		// Resolved once, validated at boot: collection builders receive these directly, and every
+		// runtime path (jobs, endpoints, host-called helpers) reads the same object off the config.
+		const slugs = resolveCollectionSlugs(options)
+		const votedCookiePrefix = resolveVotedCookiePrefix(options.poll?.cookiePrefix)
 		const calcSources = options.calc?.sources ?? {}
 		const calcFunctions = options.calc?.functions ?? {}
 		// Fail fast: the evaluator resolves built-ins first, so a colliding custom function could never
@@ -104,6 +113,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		config.custom = stashPollOptionSources(config.custom, pollSourceRegistry)
 		config.custom = stashPollTypes(config.custom, pollTypeRegistry)
 		config.custom = stashFieldTypes(config.custom, registry)
+		config.custom = stashCollectionSlugs(config.custom, slugs, votedCookiePrefix)
 		if (consentSources) {
 			config.custom = stashConsentSources(config.custom, consentSources)
 		}
@@ -143,6 +153,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			fromSources,
 			departments,
 			redirectRelationships: options.redirectRelationships,
+			slugs,
 			overrides: options.overrides,
 		})
 		return config
@@ -333,6 +344,12 @@ export type {
 	FormBuilderPluginOptions,
 	FormBuilderPluginOptions as PluginOptions,
 } from './options'
+export type { FormBuilderCollectionSlugs } from './plugin/collectionSlugs'
+export {
+	collectionSlugsOf,
+	DEFAULT_COLLECTION_SLUGS,
+	DEFAULT_VOTED_COOKIE_PREFIX,
+} from './plugin/collectionSlugs'
 export type { UploadsOption } from './plugin/uploadsCollection'
 export type { PollCloseTaskInput } from './poll/closeJob'
 export {

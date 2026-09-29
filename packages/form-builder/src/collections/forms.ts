@@ -37,6 +37,10 @@ import { END_OF_FORM } from '../flow/types'
 import { pollConfigOf } from '../form/pollState'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
+import {
+	DEFAULT_COLLECTION_SLUGS,
+	type FormBuilderCollectionSlugs,
+} from '../plugin/collectionSlugs'
 import { buildPollOptionSourceFields } from '../poll/buildPollOptionSourceFields'
 import { enqueuePollClose } from '../poll/closeJob'
 import { pollOutcomeBeforeChange } from '../poll/outcomeBeforeChange'
@@ -53,8 +57,6 @@ import { type ButtonsOption, buildDefaultButtonFields } from './buttonFields'
 import { buildFormsEndpoints } from './formsEndpoints'
 import type { ResponseOption } from './redirectFields'
 import { composeSettingsFields, type SettingsOption } from './settingsFields'
-
-export const FORMS_SLUG = 'forms'
 
 /** `req.context` key under which `consentAfterRead` tracks the form ids it is currently resolving, to break re-entrant reads. */
 const CONSENT_AFTER_READ_GUARD = 'formBuilderConsentAfterReadInFlight'
@@ -208,6 +210,8 @@ type BuildFormsCollectionArgs = {
 	 * redirect.
 	 */
 	redirectRelationships?: CollectionSlug[]
+	/** Resolved plugin collection slugs (after host `overrides.*.slug`); defaults when omitted. */
+	slugs?: FormBuilderCollectionSlugs
 	overrides?: CollectionOverrides
 }
 
@@ -239,6 +243,7 @@ const mergeSavedShape = (
 
 export const buildFormsCollection = ({
 	overrides,
+	slugs = DEFAULT_COLLECTION_SLUGS,
 	registry,
 	ruleRegistry,
 	calcAllowed,
@@ -304,7 +309,7 @@ export const buildFormsCollection = ({
 			if (pollOn && persistOff) {
 				throw new ValidationError(
 					{
-						collection: FORMS_SLUG,
+						collection: slugs.forms,
 						errors: [
 							{
 								path: 'persistSubmissions',
@@ -328,7 +333,7 @@ export const buildFormsCollection = ({
 			if (pollOn && persistOff && allowChangeOn) {
 				throw new ValidationError(
 					{
-						collection: FORMS_SLUG,
+						collection: slugs.forms,
 						errors: [
 							{
 								path: 'persistSubmissions',
@@ -376,7 +381,7 @@ export const buildFormsCollection = ({
 			if (providedFlowStepCount(data.flow) > 0 && normalizedFlow === undefined) {
 				throw new ValidationError(
 					{
-						collection: FORMS_SLUG,
+						collection: slugs.forms,
 						errors: [
 							{
 								path: 'flow',
@@ -411,7 +416,7 @@ export const buildFormsCollection = ({
 							eligible.length > 1 ? keys.pollVoteFieldChoose : keys.pollVoteFieldMissing
 						throw new ValidationError(
 							{
-								collection: FORMS_SLUG,
+								collection: slugs.forms,
 								errors: [{ path: 'poll.resultsField', message: asTranslate(req.t)(messageKey) }],
 							},
 							req.t
@@ -453,7 +458,7 @@ export const buildFormsCollection = ({
 			}
 		}
 		if (errors.length > 0) {
-			throw new ValidationError({ collection: FORMS_SLUG, errors }, req.t)
+			throw new ValidationError({ collection: slugs.forms, errors }, req.t)
 		}
 		return data
 	}
@@ -900,7 +905,7 @@ export const buildFormsCollection = ({
 
 	return {
 		...(overrides ?? {}),
-		slug: FORMS_SLUG,
+		slug: slugs.forms,
 		labels: {
 			singular: labelForKey(keys.collectionFormSingular),
 			plural: labelForKey(keys.collectionFormPlural),

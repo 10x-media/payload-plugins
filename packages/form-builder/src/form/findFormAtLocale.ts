@@ -6,7 +6,7 @@ import {
 	type TypedLocale,
 } from 'payload'
 import type { SubmissionForm } from '../actions/submissionContext'
-import { FORMS_SLUG } from '../collections/forms'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import { customStateOf, stashCustomState } from '../plugin/customState'
 
 /**
@@ -107,7 +107,7 @@ export const findFormAtLocale = async ({
 	const { localization } = payload.config
 	const read = (fallbackLocale: string | string[] | false | undefined) =>
 		payload.findByID({
-			collection: FORMS_SLUG,
+			collection: pluginSlugsOf(payload).forms,
 			id,
 			depth: 0,
 			// Cast: a clamped locale is one of the host's own codes, but its concrete `TypedLocale` union

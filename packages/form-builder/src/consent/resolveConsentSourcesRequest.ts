@@ -1,5 +1,5 @@
 import type { Payload, PayloadRequest } from 'payload'
-import { FORMS_SLUG } from '../collections/forms'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import { resolveConsentEntries } from './resolveConsentEntries'
 import type { ConsentSourcesResolver } from './types'
 
@@ -41,7 +41,7 @@ export const resolveConsentSourcesRequest = async (
 	// then refuses a cross-tenant form id (null -> 404), so an authed user can never enumerate another
 	// tenant's consent source labels/ids.
 	const form = await payload
-		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, req })
+		.findByID({ collection: pluginSlugsOf(payload).forms, id: formId, depth: 0, req })
 		.catch(() => null)
 	if (!form) {
 		return { status: 404, body: { errors: [{ message: 'Not found' }] } }

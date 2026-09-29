@@ -8,13 +8,13 @@ import { calcExpressionOf } from '../calc/computeCalcFields'
 import type { CalcResolved } from '../calc/evaluate'
 import type { CalcFunction, CalcSource } from '../calc/registry'
 import { resolveCalcContext } from '../calc/resolveCalcContext'
-import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import type { ConsentSnapshotMode } from '../consent/captureConsent'
 import { resolveConsentEntries } from '../consent/resolveConsentEntries'
 import type { ConsentSourceEntry, ConsentSourcesResolver } from '../consent/types'
 import type { FieldTypeRegistry } from '../fields/registry'
 import { findFormAtLocale } from '../form/findFormAtLocale'
 import { isPollClosed, pollConfigOf } from '../form/pollState'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import { applyPollOptions } from '../poll/applyPollOptions'
 import type { PollOption } from '../poll/definePollOptionSource'
 import { resolveEffectivePollOptions } from '../poll/effectivePollOptions'
@@ -165,7 +165,7 @@ export const validateSubmission =
 				if (isAnswered && !resolved.some((option) => option.value === answer)) {
 					throw new ValidationError(
 						{
-							collection: FORM_SUBMISSIONS_SLUG,
+							collection: pluginSlugsOf(req.payload).formSubmissions,
 							errors: [
 								{ path: resultsField, message: asTranslate(req.i18n.t)(keys.validationSelect) },
 							],
@@ -252,7 +252,7 @@ export const validateSubmission =
 
 			if (result.errors.length > 0) {
 				throw new ValidationError(
-					{ collection: FORM_SUBMISSIONS_SLUG, errors: result.errors },
+					{ collection: pluginSlugsOf(req.payload).formSubmissions, errors: result.errors },
 					req.t
 				)
 			}

@@ -157,7 +157,7 @@ describeForDb(
 			const parsed = votedSubmissionIdFromCookie(
 				asCookieHeader(setCookieOf(req) ?? ''),
 				form.id,
-				booted.payload.secret
+				booted.payload
 			)
 			expect(parsed).toBe(String(doc?.id))
 		})
@@ -199,7 +199,7 @@ describeForDb(
 			const parsed = votedSubmissionIdFromCookie(
 				asCookieHeader(setCookie ?? ''),
 				form.id,
-				booted.payload.secret
+				booted.payload
 			)
 			expect(parsed).toBe(String(doc.id))
 		})

@@ -1,6 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import type { FieldAggregation } from '../../aggregation/types'
-import { POLL_VOTES_SLUG, RESPONDENTS_VALUE } from './votesCollection'
+import { pluginSlugsOf } from '../../plugin/collectionSlugs'
+import { RESPONDENTS_VALUE } from './votesCollection'
 
 type VoteRow = { field?: unknown; value?: unknown; count?: unknown }
 
@@ -22,7 +23,7 @@ export const aggregateFromVotes = async (args: {
 }): Promise<FieldAggregation> => {
 	const { payload, formId, field, meta, options, req } = args
 	const { docs } = await payload.find({
-		collection: POLL_VOTES_SLUG,
+		collection: pluginSlugsOf(payload).pollVotes,
 		where: { and: [{ form: { equals: String(formId) } }, { field: { equals: field } }] },
 		limit: 100_000,
 		pagination: false,

@@ -1,5 +1,5 @@
 import type { Payload, PayloadRequest } from 'payload'
-import { FORMS_SLUG } from '../collections/forms'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import type { PollOption } from './definePollOptionSource'
 import { resolveEffectivePollOptions } from './effectivePollOptions'
 
@@ -37,7 +37,7 @@ export const resolvePollOptionsRequest = async (
 	// then refuses a cross-tenant form id (null -> 404), so an authed user cannot read another tenant's
 	// poll options.
 	const form = await payload
-		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, req })
+		.findByID({ collection: pluginSlugsOf(payload).forms, id: formId, depth: 0, req })
 		.catch(() => null)
 	if (!form) {
 		return { status: 404, body: { errors: [{ message: 'Not found' }] } }
