@@ -115,9 +115,11 @@ const liveStatus: FieldHook = async ({ data, req }) => {
 export const buildLockCollection = (
 	config: Config,
 	options: ResolvedOptions,
-	raw: Pick<ContentLockPluginOptions, 'collection' | 'editor' | 'individualSelection'>
+	raw: Pick<ContentLockPluginOptions, 'collection' | 'editor' | 'individualSelection' | 'timezone'>
 ): CollectionConfig => {
 	const collectionOptions = raw.collection
+	const timezone =
+		raw.timezone === false ? undefined : raw.timezone === undefined ? true : raw.timezone
 	const scopeFields = buildScopeFields(config, options, raw.individualSelection)
 	const editor = buildMessageEditor({
 		groups: options.groups.map(({ key, label, collections, globals }) => ({
@@ -182,6 +184,7 @@ export const buildLockCollection = (
 					{
 						name: 'announceAt',
 						type: 'date',
+						timezone,
 						label: labelForKey(keys.fieldAnnounceAt),
 						admin: {
 							date: { pickerAppearance: 'dayAndTime' },
@@ -192,6 +195,7 @@ export const buildLockCollection = (
 					{
 						name: 'startsAt',
 						type: 'date',
+						timezone,
 						label: labelForKey(keys.fieldStartsAt),
 						admin: {
 							date: { pickerAppearance: 'dayAndTime' },
@@ -201,6 +205,7 @@ export const buildLockCollection = (
 					{
 						name: 'endsAt',
 						type: 'date',
+						timezone,
 						label: labelForKey(keys.fieldEndsAt),
 						admin: {
 							date: { pickerAppearance: 'dayAndTime' },

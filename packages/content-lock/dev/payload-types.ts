@@ -263,8 +263,11 @@ export interface ContentLock {
   title: string;
   status?: ('draft' | 'pending' | 'announced' | 'active' | 'ended') | null;
   announceAt?: string | null;
+  announceAt_tz?: SupportedTimezones;
   startsAt?: string | null;
+  startsAt_tz?: SupportedTimezones;
   endsAt?: string | null;
+  endsAt_tz?: SupportedTimezones;
   groups?: ('catalog' | 'site')[] | null;
   collections?: string[] | null;
   globals?: string[] | null;
@@ -466,8 +469,11 @@ export interface ContentLocksSelect<T extends boolean = true> {
   title?: T;
   status?: T;
   announceAt?: T;
+  announceAt_tz?: T;
   startsAt?: T;
+  startsAt_tz?: T;
   endsAt?: T;
+  endsAt_tz?: T;
   groups?: T;
   collections?: T;
   globals?: T;

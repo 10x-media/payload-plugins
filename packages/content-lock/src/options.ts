@@ -1,4 +1,4 @@
-import type { CollectionConfig, PayloadRequest } from 'payload'
+import type { CollectionConfig, DateField, PayloadRequest } from 'payload'
 
 import type { ContentLockEditorFeaturesOption } from './lexical/editor'
 import type { LockGroup } from './state/types'
@@ -65,6 +65,17 @@ export type ContentLockPluginOptions = {
 		 */
 		overrides?: (collection: CollectionConfig) => CollectionConfig
 	}
+	/**
+	 * Time zone picker next to the window's dates (announce, start, end), so an
+	 * author sets "22:00 Europe/Berlin" explicitly instead of in whatever zone
+	 * their browser is in, and colleagues opening the window see the same
+	 * wall-clock time. Dates are still stored as UTC instants; each date gains a
+	 * sibling `<name>_tz` field. `true` uses the config's `admin.timezones`;
+	 * pass Payload's date timezone config to narrow the zones or require one.
+	 * The banner always shows the viewer's local time.
+	 * @default true
+	 */
+	timezone?: boolean | Exclude<DateField['timezone'], undefined>
 	/**
 	 * Maps admin UI languages (`i18n.language`) to content locales, for projects
 	 * whose two axes use different keys. A viewer's banner messages load in their
