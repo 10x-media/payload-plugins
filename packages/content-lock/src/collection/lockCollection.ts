@@ -23,6 +23,7 @@ import { checkWindowChange } from './rules'
 import { buildScopeFields } from './scopeFields'
 
 const CLIENT = '@10x-media/content-lock/client'
+const RSC = '@10x-media/content-lock/rsc'
 
 /**
  * A write that is not an explicit draft publishes. Payload would otherwise
@@ -144,6 +145,7 @@ export const buildLockCollection = (
 			useAsTitle: 'title',
 			defaultColumns: ['title', 'status', 'startsAt', 'endsAt', '_status'],
 			components: {
+				beforeListTable: [{ path: `${RSC}#StageFilterBar`, serverProps: { slug: options.slug } }],
 				edit: { beforeDocumentControls: [`${CLIENT}#EndNowButton`] },
 				views: {
 					list: {
@@ -175,7 +177,11 @@ export const buildLockCollection = (
 					{ value: 'active', label: labelForKey(keys.statusActive) },
 					{ value: 'ended', label: labelForKey(keys.statusEnded) },
 				],
-				admin: { readOnly: true, position: 'sidebar' },
+				admin: {
+					readOnly: true,
+					position: 'sidebar',
+					components: { Field: `${CLIENT}#StatusField`, Cell: `${CLIENT}#StatusCell` },
+				},
 				hooks: { afterRead: [liveStatus] },
 			},
 			{

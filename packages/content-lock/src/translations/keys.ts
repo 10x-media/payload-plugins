@@ -34,6 +34,7 @@ export const keys = {
 	statusAnnounced: 'contentLock:statusAnnounced',
 	statusActive: 'contentLock:statusActive',
 	statusEnded: 'contentLock:statusEnded',
+	filterAll: 'contentLock:filterAll',
 
 	tokenPickDate: 'contentLock:tokenPickDate',
 	tokenFormat: 'contentLock:tokenFormat',

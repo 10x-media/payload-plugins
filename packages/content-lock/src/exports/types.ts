@@ -1,3 +1,4 @@
+export type { LockStage } from '../collection/stage'
 export type { ContentLockGroup, ContentLockPluginOptions } from '../options'
 export type {
 	ContentLockState,

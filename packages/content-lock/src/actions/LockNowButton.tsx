@@ -30,7 +30,7 @@ export const LockNowButton = ({ collectionSlug }: { collectionSlug: string }) =>
 	return (
 		<>
 			<Button
-				buttonStyle="secondary"
+				buttonStyle="subtle"
 				disabled={busy}
 				margin={false}
 				onClick={() => openModal(MODAL_SLUG)}

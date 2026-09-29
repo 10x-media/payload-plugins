@@ -725,6 +725,10 @@ importers:
         version: 5.9.3
 
   packages/content-lock:
+    dependencies:
+      qs-esm:
+        specifier: 8.0.1
+        version: 8.0.1
     devDependencies:
       '@10x-media/payload-test-harness':
         specifier: workspace:*
