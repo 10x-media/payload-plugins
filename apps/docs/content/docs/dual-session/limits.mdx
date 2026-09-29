@@ -70,7 +70,9 @@ The same happens if you change `cookieName` later. Toggling `disabled` looks the
 **Assume conflict, and check before you install both.** This plugin works by replacing a collection's auth endpoints and by owning where that collection's cookie is written. Another plugin doing either of those things to the same collection will collide, and the collision is usually silent, a cookie written to the wrong name or an endpoint that never runs, rather than an error you can see.
 </Callout>
 
-None of the `@10x-media` plugins touch auth, so this is about third-party ones: OAuth and social login, magic links, passkeys, SSO, 2FA, impersonation, anything advertising "authentication".
+`@10x-media/impersonation` is the other `@10x-media` plugin that touches auth. It mints sessions with `addSessionToUser` / `jwtSign`, and on isolated targets it writes `generateIsolatedAuthCookie`. List **impersonation after dual-session** (and after any plugin that adds auth collections). A host that assigns `auth.strategies` wholesale after both ran still drops this plugin's strategy.
+
+Third-party plugins that also write cookies or shadow `/login` on the same collection still collide, silently. OAuth, magic links, passkeys, SSO, and 2FA are in that class. Plugins that only read `req.user` or append a strategy compose.
 
 ### What survives and what does not
 

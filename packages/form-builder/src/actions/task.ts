@@ -1,8 +1,8 @@
 import type { Config, Payload, PayloadRequest, TaskConfig } from 'payload'
-import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
 import type { FormContextReference } from '../context/formContext'
 import type { Translate } from '../fields/types'
 import { findFormAtLocale, missingFormOnReadError } from '../form/findFormAtLocale'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import { resolveSubmissionLocale } from '../submissions/submissionLocale'
 import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types'
 import { asFieldTranslate } from '../translations/server'
@@ -60,7 +60,7 @@ export const runActionsForSubmission = async (args: {
 	const { input, registry, payload, req, richText } = args
 	const submission = await payload
 		.findByID({
-			collection: FORM_SUBMISSIONS_SLUG,
+			collection: pluginSlugsOf(payload).formSubmissions,
 			id: input.submissionId,
 			depth: 0,
 			overrideAccess: true,
@@ -142,7 +142,12 @@ export const runActionsForSubmission = async (args: {
 	// dispatcher then skips this completion entirely), so pruning belongs to the closing pass alone.
 	if (subset !== 'essential' && form.persistSubmissions === false) {
 		await payload
-			.delete({ collection: FORM_SUBMISSIONS_SLUG, id: submission.id, overrideAccess: true, req })
+			.delete({
+				collection: pluginSlugsOf(payload).formSubmissions,
+				id: submission.id,
+				overrideAccess: true,
+				req,
+			})
 			.catch((error) => {
 				payload.logger?.error(
 					`@10x-media/form-builder: failed to prune submission ${String(submission.id)}: ${

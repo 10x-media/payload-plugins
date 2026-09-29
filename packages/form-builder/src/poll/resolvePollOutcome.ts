@@ -1,8 +1,8 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { aggregateFieldResponses } from '../aggregation/aggregateResponses'
 import type { FieldAggregation } from '../aggregation/types'
-import { FORMS_SLUG } from '../collections/forms'
 import { pollConfigOf } from '../form/pollState'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import type { PollOutcomeStrategyArgs } from './definePollType'
 import { resolveEffectivePollOptions } from './effectivePollOptions'
 import { pollTypesOf } from './pollTypeRegistry'
@@ -55,7 +55,7 @@ const cleanWinners = (value: string[] | undefined): string[] =>
 export const resolvePollOutcome = async (args: ResolvePollOutcomeArgs): Promise<string[]> => {
 	const { payload, formId, pollVotesEnabled, req } = args
 	const form = await payload.findByID({
-		collection: FORMS_SLUG,
+		collection: pluginSlugsOf(payload).forms,
 		id: formId,
 		depth: 0,
 		overrideAccess: true,
@@ -117,7 +117,7 @@ export const resolvePollOutcome = async (args: ResolvePollOutcomeArgs): Promise<
 	}
 
 	await payload.update({
-		collection: FORMS_SLUG,
+		collection: pluginSlugsOf(payload).forms,
 		id: formId,
 		data: { poll: { outcome: { winningValues } } },
 		depth: 0,

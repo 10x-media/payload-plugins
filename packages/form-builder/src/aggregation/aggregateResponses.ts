@@ -1,8 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
-import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
-import { FORMS_SLUG } from '../collections/forms'
 import { isNamedField, type NamedFormFieldInstance } from '../fields/fieldKey'
 import { instanceOptionsOf } from '../fields/instanceOptions'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import type { FormFieldInstance } from '../submissions/types'
 import { aggregateRowsForFields } from './aggregateRows'
 import type { AggregationRow, FieldAggregation, FieldMeta, SubmissionStatusFilter } from './types'
@@ -61,7 +60,13 @@ export const aggregateFormResponses = async (
 		resolvedOptions,
 	} = args
 	const form = await payload
-		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
+		.findByID({
+			collection: pluginSlugsOf(payload).forms,
+			id: formId,
+			depth: 0,
+			overrideAccess: true,
+			req,
+		})
 		.catch(() => null)
 	if (!form || !Array.isArray(form.fields)) {
 		return []
@@ -91,7 +96,7 @@ export const aggregateFormResponses = async (
 	let truncated = false
 	for (;;) {
 		const result = await payload.find({
-			collection: FORM_SUBMISSIONS_SLUG,
+			collection: pluginSlugsOf(payload).formSubmissions,
 			where,
 			limit: pageSize,
 			page,

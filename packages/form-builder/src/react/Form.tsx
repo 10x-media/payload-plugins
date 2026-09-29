@@ -28,6 +28,7 @@ import type {
 	FormPollSettings,
 	FormResponseSettings,
 } from '../form/types'
+import type { FormBuilderCollectionSlugs } from '../plugin/collectionSlugs'
 import {
 	DEFAULT_PRESENTATION_NAME,
 	defaultPresentationDescriptors,
@@ -102,12 +103,21 @@ export type FormSuccessResult = {
 	values?: SubmissionValue[]
 }
 
+/**
+ * The plugin's collection slugs as the browser needs them, for a host that renamed them through
+ * `overrides.forms.slug` / `overrides.formSubmissions.slug`. Pass the same values the server was
+ * given; each omitted key keeps its default.
+ */
+export type FormCollections = Partial<Pick<FormBuilderCollectionSlugs, 'forms' | 'formSubmissions'>>
+
 export type FormProps = {
 	form: FormDocument
 	fieldTypes?: AnyFormFieldDefinition[]
 	rules?: AnyValidationRuleDefinition[]
 	renderers?: RenderersConfig
 	apiRoute?: string
+	/** Renamed plugin collections: submits post to `formSubmissions`, `<Poll>` reads results from `forms`. */
+	collections?: FormCollections
 	onSubmit?: SubmitHandler
 	/**
 	 * Called after a successful submission with the submission id and the resolved success response
@@ -250,6 +260,7 @@ export const Form = ({
 	rules,
 	renderers,
 	apiRoute,
+	collections,
 	onSubmit,
 	onSuccess,
 	onError,
@@ -406,11 +417,15 @@ export const Form = ({
 	// Focus management for step transitions and blocked advances/submits. A pending request is performed
 	// by an effect after the render it triggers, so focus lands on the DOM that reflects the new state.
 	const formRef = useRef<HTMLFormElement>(null)
-	const pendingFocusRef = useRef<'stepStart' | 'firstInvalid' | null>(null)
+	const pendingFocusRef = useRef<{ intent: 'stepStart' | 'firstInvalid'; nonce: number } | null>(
+		null
+	)
+	const focusSeqRef = useRef(0)
 	const [focusNonce, setFocusNonce] = useState(0)
 	const requestFocus = (intent: 'stepStart' | 'firstInvalid') => {
-		pendingFocusRef.current = intent
-		setFocusNonce((nonce) => nonce + 1)
+		focusSeqRef.current += 1
+		pendingFocusRef.current = { intent, nonce: focusSeqRef.current }
+		setFocusNonce(focusSeqRef.current)
 	}
 
 	const dispatch = useCallback((action: FormAction) => {
@@ -645,15 +660,18 @@ export const Form = ({
 
 	// Perform a pending focus request after the render it triggered, so it lands on the DOM that reflects
 	// the new state (a changed step, or freshly revealed errors). Null on mount, so the first render never
-	// steals focus. currentStepId and focusNonce are intentional re-run triggers: a blocked advance keeps
-	// the same step, so the nonce forces a fresh run; the body reads only refs, hence the ignore.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: currentStepId/focusNonce are re-run triggers, not read in the body
+	// steals focus. A blocked advance keeps the same step, so the nonce forces a fresh run and names the
+	// request this render may act on; currentStepId is a re-run trigger only, hence the ignore.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: currentStepId is a re-run trigger, not read in the body
 	useEffect(() => {
-		const intent = pendingFocusRef.current
-		if (!intent) {
+		const pending = pendingFocusRef.current
+		// React can flush a commit's effect late, just before the next render. By then a newer request
+		// may be pending that targets DOM this commit does not have, so only its own render acts on it.
+		if (!pending || pending.nonce !== focusNonce) {
 			return
 		}
 		pendingFocusRef.current = null
+		const { intent } = pending
 		if (intent === 'firstInvalid') {
 			focusFirstIn(formRef.current, '[aria-invalid="true"]')
 			return
@@ -778,6 +796,7 @@ export const Form = ({
 			formId: form.id,
 			values,
 			...(submissionLocale ? { locale: submissionLocale } : {}),
+			...(collections?.formSubmissions ? { collection: collections.formSubmissions } : {}),
 		}
 		const result: SubmitFormResult = onSubmit
 			? await onSubmit(input)
