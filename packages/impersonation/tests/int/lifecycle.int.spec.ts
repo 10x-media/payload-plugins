@@ -956,4 +956,79 @@ describeForDb('impersonation refusals', {}, (db) => {
 			await booted.stop()
 		}
 	})
+
+	it('refuses an API-key caller, who has no session to return to', async () => {
+		const apiKey = 'impersonation-test-api-key'
+		const booted = await bootPayload({
+			collections: [
+				{ slug: 'users', auth: { useAPIKey: true }, fields: [{ name: 'name', type: 'text' }] },
+			],
+			configOverrides: { admin: { user: 'users' } },
+			db,
+			plugin: impersonation({ access: { impersonate: () => true } }),
+			seed: async (payload) => {
+				await payload.create({
+					collection: 'users',
+					data: { ...ADMIN, apiKey, enableAPIKey: true, name: 'Admin' },
+				})
+				await payload.create({ collection: 'users', data: { ...TARGET, name: 'Target' } })
+			},
+		})
+		try {
+			const client = createRestClient(booted)
+			const target = await booted.payload.find({
+				collection: 'users',
+				limit: 1,
+				where: { email: { equals: TARGET.email } },
+			})
+			const start = await client.post('/api/impersonation/start', {
+				body: { collection: 'users', id: target.docs[0]?.id },
+				headers: { Authorization: `users API-Key ${apiKey}` },
+				jar: false,
+			})
+			expect(start.status).toBe(403)
+			expect(start.body).toMatchObject({ error: 'unsupportedAuth' })
+		} finally {
+			await booted.stop()
+		}
+	})
+
+	it('refuses a target collection with useSessions: false', async () => {
+		const booted = await bootPayload({
+			collections: [
+				...collections,
+				{
+					slug: 'members',
+					auth: { useSessions: false },
+					fields: [{ name: 'name', type: 'text' }],
+				},
+			],
+			configOverrides: { admin: { user: 'users' } },
+			db,
+			plugin: impersonation({ access: { impersonate: () => true } }),
+			seed: async (payload) => {
+				await seed(payload)
+				await payload.create({
+					collection: 'members',
+					data: { email: 'member@10xmedia.de', name: 'Member', password: 'password' },
+				})
+			},
+		})
+		try {
+			const client = createRestClient(booted)
+			const member = await booted.payload.find({
+				collection: 'members',
+				limit: 1,
+				where: { email: { equals: 'member@10xmedia.de' } },
+			})
+			await client.post('/api/users/login', { body: ADMIN })
+			const start = await client.post('/api/impersonation/start', {
+				body: { collection: 'members', id: member.docs[0]?.id },
+			})
+			expect(start.status).toBe(400)
+			expect(start.body).toMatchObject({ error: 'unsupportedCollection' })
+		} finally {
+			await booted.stop()
+		}
+	})
 })
