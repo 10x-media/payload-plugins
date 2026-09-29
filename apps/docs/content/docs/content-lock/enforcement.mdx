@@ -43,6 +43,8 @@ In server code, check with `isContentLockedError(error)`.
 
 During a lock, `create`, `update` and `delete` access is denied in scope, so the admin renders documents read-only and hides the buttons that would fail. Outside a lock and out of scope, your access functions apply unchanged. Read access is never touched.
 
+<Screenshot src="/images/content-lock/locked-document.webp" width={720} alt="A product during a lock on the catalog: the banner on top, the fields read-only, no save buttons" />
+
 A page opened before the lock started still shows editable fields until it refreshes; saving it answers with the 503 toast. The banner refreshes the page when a window it shows changes stage.
 
 ## Checking the lock in server code

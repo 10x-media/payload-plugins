@@ -7,6 +7,8 @@ One document in the `content-locks` collection is one window. It locks content f
 
 ## Fields
 
+<Screenshot src="/images/content-lock/window-form.webp" width={720} alt="A window form: announce, start and end dates with time zones, the message tabs, and the sidebar toggles" />
+
 | Field | Meaning |
 |---|---|
 | **Title** | Internal name, shown in the list and the pager. |
@@ -29,7 +31,9 @@ Dates have a time zone picker by default, so a window is set as, say, "22:00 Eur
 | **Active** | From the start until the end. Content in scope is frozen. |
 | **Ended** | Past its end time, or ended with **End now**. |
 
-The stage is a virtual field, not stored in the database, so it always reflects the current time. It shows as a coloured pill in the list and the sidebar, and the list has quick filters per stage.
+The stage is the **Lock status** field: a virtual field, not stored in the database, so it always reflects the current time. It shows as a coloured pill in the list column and the sidebar, and the list has quick filters per stage. It is separate from Payload's own **Status** (draft or published).
+
+<Screenshot src="/images/content-lock/windows-list.webp" width={720} alt="The windows list with quick filters per stage and a coloured pill for each window" />
 
 ## Drafts
 

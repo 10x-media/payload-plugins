@@ -18,6 +18,8 @@ Messages are localized rich text (bold, italic, links), so they can be translate
 
 ### Lock values
 
+<Video alt="Writing an announcement: a lock start token set to relative, a lock end token set to time, then the banner reading the published message" src="/videos/content-lock/message-tokens.mp4" />
+
 The editor's toolbar, `+` menu and slash menu insert **tokens** for the window's own values, which follow the window when it changes:
 
 | Token | Renders |
@@ -29,6 +31,8 @@ The editor's toolbar, `+` menu and slash menu insert **tokens** for the window's
 | Date | A fixed date you pick. |
 
 Dates render in the viewer's time zone and admin language, as a date and time, a date, a time, or relative ("in 2 hours"), which updates live. A token picks up bold and italic like text. The editor previews tokens with the form's current values, and one the window cannot fill (an end on a window without one) is flagged in the editor and renders as nothing.
+
+<Screenshot src="/images/content-lock/token-panel.webp" width={720} alt="A lock start token selected in the editor, rendered as tomorrow, with its panel open on the Relative format" />
 
 ## Message locale
 
