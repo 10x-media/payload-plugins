@@ -21,7 +21,11 @@ describeForDb('contentLock loads', { dbs: ['mongo'] }, (db) => {
 		expect(booted.db).toBe(db)
 	})
 
-	it('plugin does not mutate config in passthrough mode', () => {
-		expect(booted.payload.collections).toBeDefined()
+	it('offers no scope fields without groups or individual selection', () => {
+		const fields = booted.payload.collections['content-locks']?.config.flattenedFields ?? []
+		const names = fields.map((field) => field.name)
+		expect(names).toContain('startsAt')
+		expect(names).not.toContain('lockEverything')
+		expect(names).not.toContain('groups')
 	})
 })

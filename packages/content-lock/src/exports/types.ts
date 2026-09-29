@@ -1,1 +1,8 @@
-export type { ContentLockPluginOptions } from '../index'
+export type { ContentLockGroup, ContentLockPluginOptions } from '../options'
+export type {
+	ContentLockState,
+	EntityRef,
+	LockWindow,
+	ResolvedScope,
+	WindowStatus,
+} from '../state/types'

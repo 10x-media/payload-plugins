@@ -1,0 +1,59 @@
+.content-lock-banner {
+	--content-lock-accent: var(--theme-warning-500);
+	--content-lock-surface: var(--theme-warning-100);
+	position: relative;
+	z-index: 2;
+	padding: calc(var(--base) * 0.4) var(--gutter-h);
+	border-bottom: 1px solid var(--content-lock-accent);
+	background: var(--content-lock-surface);
+	color: var(--theme-text);
+	font-size: calc(var(--base) * 0.65);
+	line-height: 1.4;
+}
+
+.content-lock-banner--active {
+	--content-lock-accent: var(--theme-error-500);
+	--content-lock-surface: var(--theme-error-100);
+}
+
+.content-lock-banner__row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: calc(var(--base) * 0.25) calc(var(--base) * 0.6);
+}
+
+.content-lock-banner__title {
+	font-weight: 600;
+}
+
+.content-lock-banner__times {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) * 0.6);
+	color: var(--theme-elevation-800);
+}
+
+.content-lock-banner__countdown {
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
+.content-lock-banner__dismiss {
+	margin-left: auto;
+	padding: 0 calc(var(--base) * 0.25);
+	border: 0;
+	background: none;
+	color: inherit;
+	font-size: calc(var(--base) * 0.9);
+	line-height: 1;
+	cursor: pointer;
+}
+
+.content-lock-banner__message {
+	margin-top: calc(var(--base) * 0.2);
+}
+
+.content-lock-banner__message p {
+	margin: 0;
+}

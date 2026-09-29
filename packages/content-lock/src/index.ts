@@ -1,22 +1,19 @@
-import { type Config, definePlugin } from 'payload'
+import { type Config, definePlugin, type Plugin } from 'payload'
 
+import { buildLockCollection } from './collection/lockCollection'
+import { CONTENT_LOCKED_ERROR_NAME } from './enforcement/ContentLockedError'
+import { registerEnforcement } from './enforcement/register'
+import {
+	type ContentLockPluginOptions,
+	CUSTOM_KEY,
+	DEFAULT_ORDER,
+	type ResolvedOptions,
+	resolveOptions,
+} from './options'
 import { registerTranslations } from './plugin/registerTranslations'
-import type { TranslationsOption } from './translations'
+import { rebuildSnapshot } from './state/store'
 
-export type ContentLockPluginOptions = {
-	/**
-	 * Disable the plugin entirely (incoming config returned untouched).
-	 * Useful for opting out per environment without removing the plugin call.
-	 */
-	disabled?: boolean
-	/**
-	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
-	 * translation keys exported from `@10x-media/content-lock/i18n`. Values win
-	 * over the built-in locales key-by-key; locales the plugin does not ship are
-	 * added whole. App-level `i18n.translations` still wins over both.
-	 */
-	translations?: TranslationsOption
-}
+export type { ContentLockGroup, ContentLockPluginOptions } from './options'
 
 declare module 'payload' {
 	interface RegisteredPlugins {
@@ -24,20 +21,95 @@ declare module 'payload' {
 	}
 }
 
-/**
- * Content Lock plugin for Payload v3. Currently registers this plugin's
- * translations; future releases will add feature behavior. Authored with
- * `definePlugin` so sibling plugins can detect it by slug.
- */
-export const contentLock = definePlugin<ContentLockPluginOptions>({
-	slug: '@10x-media/content-lock',
+const PLUGIN_SLUG = '@10x-media/content-lock'
+
+/** Fail the build when a group or exemption names an entity the config does not have. */
+const assertKnownSlugs = (config: Config, options: ResolvedOptions): void => {
+	const collections = new Set((config.collections ?? []).map((collection) => collection.slug))
+	const globals = new Set((config.globals ?? []).map((global) => global.slug))
+	const keys = new Set<string>()
+	for (const group of options.groups) {
+		if (keys.has(group.key)) {
+			throw new Error(`[content-lock] duplicate group key "${group.key}"`)
+		}
+		keys.add(group.key)
+		for (const slug of group.collections) {
+			if (!collections.has(slug)) {
+				throw new Error(`[content-lock] group "${group.key}" names unknown collection "${slug}"`)
+			}
+		}
+		for (const slug of group.globals) {
+			if (!globals.has(slug)) {
+				throw new Error(`[content-lock] group "${group.key}" names unknown global "${slug}"`)
+			}
+		}
+	}
+}
+
+const definition = definePlugin<ContentLockPluginOptions>({
+	slug: PLUGIN_SLUG,
+	order: DEFAULT_ORDER,
 	plugin: ({ config, plugins: _plugins, ...options }): Config => {
 		if (options.disabled === true) {
 			return config
 		}
+		const resolved = resolveOptions(options)
+		assertKnownSlugs(config, resolved)
 		registerTranslations(config, options.translations)
+		config.custom = { ...config.custom, [CUSTOM_KEY]: resolved }
+
+		const lockCollection = buildLockCollection(config, resolved, options)
+		registerEnforcement(config, resolved)
+		config.collections = [...(config.collections ?? []), lockCollection]
+
+		config.admin = {
+			...config.admin,
+			components: {
+				...config.admin?.components,
+				header: [
+					`${PLUGIN_SLUG}/rsc#ContentLockHeader`,
+					...(config.admin?.components?.header ?? []),
+				],
+				providers: [
+					...(config.admin?.components?.providers ?? []),
+					`${PLUGIN_SLUG}/client#ContentLockProvider`,
+				],
+			},
+		}
+
+		// A lock rejection is expected traffic, not a server fault: log it quietly.
+		const loggingLevels = { ...config.loggingLevels } as Record<string, unknown>
+		loggingLevels[CONTENT_LOCKED_ERROR_NAME] ??= 'info'
+		config.loggingLevels = loggingLevels as Config['loggingLevels']
+
+		const priorOnInit = config.onInit
+		config.onInit = async (payload) => {
+			await priorOnInit?.(payload)
+			await rebuildSnapshot(payload)
+		}
 		return config
 	},
 })
 
+/**
+ * Content Lock: planned and unplanned maintenance windows that freeze content.
+ * Every write to a frozen collection or global is rejected with 503 on every
+ * channel, the admin turns read-only, and a banner announces the window.
+ */
+export const contentLock = (options: ContentLockPluginOptions): Plugin => {
+	const plugin = definition(options)
+	if (options.order !== undefined) {
+		plugin.order = options.order
+	}
+	return plugin
+}
+
+export {
+	CONTENT_LOCKED_ERROR_NAME,
+	ContentLockedError,
+	type ContentLockedErrorData,
+	isContentLockedError,
+} from './enforcement/ContentLockedError'
+export { getContentLockState } from './state/store'
+export type { ContentLockState, LockWindow, ResolvedScope, WindowStatus } from './state/types'
 export type { ContentLockPluginOptions as PluginOptions }

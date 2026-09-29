@@ -3,7 +3,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { buildConfig, type CollectionConfig } from 'payload'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { buildConfig, type CollectionConfig, type GlobalConfig } from 'payload'
 import { contentLock } from '../src/index'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
@@ -18,6 +19,21 @@ const users: CollectionConfig = {
 	auth: true,
 	admin: { useAsTitle: 'email' },
 	fields: [],
+}
+
+const titled = (slug: string, group: string): CollectionConfig => ({
+	slug,
+	admin: { useAsTitle: 'title', group },
+	fields: [
+		{ name: 'title', type: 'text', required: true },
+		{ name: 'body', type: 'richText' },
+	],
+})
+
+const header: GlobalConfig = {
+	slug: 'header',
+	admin: { group: 'Site' },
+	fields: [{ name: 'tagline', type: 'text' }],
 }
 
 const db =
@@ -39,14 +55,42 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users],
-	plugins: [contentLock({})],
+	editor: lexicalEditor(),
+	collections: [
+		users,
+		titled('pages', 'Site'),
+		titled('posts', 'Site'),
+		titled('products', 'Catalog'),
+		titled('categories', 'Catalog'),
+	],
+	globals: [header],
+	localization: { locales: ['en', 'de'], defaultLocale: 'en' },
+	i18n: { fallbackLanguage: 'en' },
+	plugins: [
+		contentLock({
+			groups: [
+				{
+					key: 'catalog',
+					label: { en: 'Catalog', de: 'Katalog' },
+					collections: ['products', 'categories'],
+				},
+				{
+					key: 'site',
+					label: { en: 'Website', de: 'Website' },
+					collections: ['pages', 'posts'],
+					globals: ['header'],
+				},
+			],
+			individualSelection: true,
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
 	},
 	typescript: { autoGenerate },
 	admin: {
+		user: 'users',
 		importMap: {
 			autoGenerate,
 			baseDir: path.resolve(dirname),

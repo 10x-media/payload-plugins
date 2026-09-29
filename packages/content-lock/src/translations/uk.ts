@@ -1,0 +1,69 @@
+import { keys, type TranslationKey } from './keys'
+
+/** Ukrainian values, keyed by the typed constants in `keys.ts` (see `en.ts`). */
+export const uk: Record<TranslationKey, string> = {
+	[keys.pluginName]: 'Блокування контенту',
+	[keys.collectionSingular]: 'Блокування контенту',
+	[keys.collectionPlural]: 'Блокування контенту',
+
+	[keys.fieldTitle]: 'Назва',
+	[keys.fieldAnnounceAt]: 'Оголосити з',
+	[keys.fieldAnnounceAtDescription]:
+		'Коли з’являється банер. Залиште порожнім, щоб не оголошувати.',
+	[keys.fieldStartsAt]: 'Початок',
+	[keys.fieldStartsAtDescription]: 'Залиште порожнім, щоб заблокувати контент одразу.',
+	[keys.fieldEndAtTime]: 'Завершити у визначений час',
+	[keys.fieldEndsAt]: 'Завершення',
+	[keys.fieldEndedAt]: 'Завершено',
+	[keys.fieldLockEverything]: 'Заблокувати все',
+	[keys.fieldLockEverythingDescription]: 'Вимкніть, щоб заблокувати лише вибраний контент.',
+	[keys.fieldGroups]: 'Групи',
+	[keys.fieldCollections]: 'Колекції',
+	[keys.fieldGlobals]: 'Глобальні налаштування',
+	[keys.fieldMessage]: 'Повідомлення',
+	[keys.fieldMessageDescription]: 'Необов’язковий текст у банері під стандартним сповіщенням.',
+	[keys.fieldStatus]: 'Статус',
+	[keys.statusPending]: 'Очікує',
+	[keys.statusAnnounced]: 'Оголошено',
+	[keys.statusActive]: 'Активне',
+	[keys.statusEnded]: 'Завершено',
+
+	[keys.dateBlockLabel]: 'Дата',
+	[keys.dateBlockDate]: 'Дата й час',
+	[keys.dateBlockFormat]: 'Формат',
+	[keys.formatDatetime]: 'Дата й час',
+	[keys.formatDate]: 'Дата',
+	[keys.formatTime]: 'Час',
+	[keys.formatRelative]: 'Відносно',
+
+	[keys.errorAnnounceAfterStart]: 'Оголошення має починатися раніше за блокування.',
+	[keys.errorEndBeforeStart]: 'Блокування має завершуватися після початку.',
+	[keys.errorEndsAtRequired]: 'Вкажіть, коли завершується блокування.',
+	[keys.errorTargetsRequired]: 'Виберіть принаймні один елемент для блокування.',
+	[keys.errorEndedReadOnly]: 'Завершене блокування більше не можна змінити.',
+	[keys.errorActiveStartMoved]:
+		'Активне блокування не можна перенести в майбутнє. Завершіть його й заплануйте нове.',
+	[keys.errorLocked]: 'Контент заблоковано на час технічних робіт. Спробуйте пізніше.',
+
+	[keys.bannerAnnouncedTitle]: 'Заплановані технічні роботи',
+	[keys.bannerActiveTitle]: 'Тривають технічні роботи',
+	[keys.bannerAnnouncedEverything]: 'Контент буде доступний лише для читання.',
+	[keys.bannerActiveEverything]: 'Контент доступний лише для читання.',
+	[keys.bannerAnnouncedPartial]: 'Буде доступно лише для читання: {{what}}.',
+	[keys.bannerActivePartial]: 'Лише для читання: {{what}}.',
+	[keys.bannerFrom]: 'З',
+	[keys.bannerUntil]: 'До',
+	[keys.bannerEndsIn]: 'Завершиться через {{time}}',
+	[keys.bannerDismiss]: 'Приховати',
+
+	[keys.actionLockNow]: 'Заблокувати зараз',
+	[keys.actionLockNowTitle]: 'Позапланове блокування',
+	[keys.actionEndNow]: 'Завершити зараз',
+	[keys.actionFailed]: 'Не вдалося оновити блокування.',
+	[keys.confirmLockNowHeading]: 'Заблокувати весь контент зараз?',
+	[keys.confirmLockNowBody]:
+		'Усі одразу втрачають доступ на запис, доки хтось не завершить це блокування.',
+	[keys.confirmEndNowHeading]: 'Завершити це блокування зараз?',
+	[keys.confirmEndNowBody]:
+		'Контент під цим блокуванням одразу знову стане доступним для редагування.',
+}
