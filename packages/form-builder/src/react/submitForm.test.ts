@@ -21,6 +21,14 @@ describe('submitForm', () => {
 		})
 	})
 
+	it('POSTs to a renamed submissions collection', async () => {
+		const fetchImpl = vi.fn<typeof fetch>(
+			async () => new Response(JSON.stringify({ doc: { id: '1' } }), { status: 201 })
+		)
+		await submitForm({ formId: 'f1', values, collection: 'responses', fetchImpl })
+		expect(fetchImpl.mock.calls[0]?.[0]).toBe('/api/responses')
+	})
+
 	it('parses the 400 ValidationError into per-field errors', async () => {
 		const body = {
 			errors: [

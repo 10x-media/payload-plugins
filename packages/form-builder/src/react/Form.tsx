@@ -28,6 +28,7 @@ import type {
 	FormPollSettings,
 	FormResponseSettings,
 } from '../form/types'
+import type { FormBuilderCollectionSlugs } from '../plugin/collectionSlugs'
 import {
 	DEFAULT_PRESENTATION_NAME,
 	defaultPresentationDescriptors,
@@ -102,12 +103,21 @@ export type FormSuccessResult = {
 	values?: SubmissionValue[]
 }
 
+/**
+ * The plugin's collection slugs as the browser needs them, for a host that renamed them through
+ * `overrides.forms.slug` / `overrides.formSubmissions.slug`. Pass the same values the server was
+ * given; each omitted key keeps its default.
+ */
+export type FormCollections = Partial<Pick<FormBuilderCollectionSlugs, 'forms' | 'formSubmissions'>>
+
 export type FormProps = {
 	form: FormDocument
 	fieldTypes?: AnyFormFieldDefinition[]
 	rules?: AnyValidationRuleDefinition[]
 	renderers?: RenderersConfig
 	apiRoute?: string
+	/** Renamed plugin collections: submits post to `formSubmissions`, `<Poll>` reads results from `forms`. */
+	collections?: FormCollections
 	onSubmit?: SubmitHandler
 	/**
 	 * Called after a successful submission with the submission id and the resolved success response
@@ -250,6 +260,7 @@ export const Form = ({
 	rules,
 	renderers,
 	apiRoute,
+	collections,
 	onSubmit,
 	onSuccess,
 	onError,
@@ -778,6 +789,7 @@ export const Form = ({
 			formId: form.id,
 			values,
 			...(submissionLocale ? { locale: submissionLocale } : {}),
+			...(collections?.formSubmissions ? { collection: collections.formSubmissions } : {}),
 		}
 		const result: SubmitFormResult = onSubmit
 			? await onSubmit(input)

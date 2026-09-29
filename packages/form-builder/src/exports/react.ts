@@ -43,6 +43,7 @@ export type { FieldRenderer, FieldRendererProps, RendererTranslate } from '../re
 export { defineFieldRenderer } from '../react/contract'
 export type {
 	FormButtonSettings,
+	FormCollections,
 	FormDocument,
 	FormPollSettings,
 	FormProps,
