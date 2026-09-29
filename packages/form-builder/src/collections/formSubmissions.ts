@@ -1,10 +1,4 @@
-import type {
-	CollectionAfterChangeHook,
-	CollectionConfig,
-	CollectionSlug,
-	Field,
-	PayloadRequest,
-} from 'payload'
+import type { CollectionAfterChangeHook, CollectionConfig, Field, PayloadRequest } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
@@ -305,13 +299,7 @@ export const buildSubmissionsCollection = ({
 	overrides,
 }: BuildSubmissionsCollectionArgs): CollectionConfig => {
 	const defaultFields: Field[] = [
-		{
-			name: 'form',
-			type: 'relationship',
-			// A host's generated slug union cannot know a slug resolved at boot.
-			relationTo: slugs.forms as CollectionSlug,
-			required: true,
-		},
+		{ name: 'form', type: 'relationship', relationTo: slugs.forms, required: true },
 		{
 			name: 'status',
 			type: 'select',

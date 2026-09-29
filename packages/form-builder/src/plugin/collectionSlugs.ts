@@ -1,11 +1,15 @@
-import type { Payload } from 'payload'
+import type { CollectionSlug, Payload } from 'payload'
 import { customStateOf, stashCustomState } from './customState'
 
-/** The slugs of the collections the plugin registers, after host overrides. */
+/**
+ * The slugs of the collections the plugin registers, after host overrides. Typed as `CollectionSlug`
+ * because each one is a registered collection, so a host's generated slug union always contains it
+ * and the values pass straight to `payload.find({ collection })`.
+ */
 export type FormBuilderCollectionSlugs = {
-	forms: string
-	formSubmissions: string
-	pollVotes: string
+	forms: CollectionSlug
+	formSubmissions: CollectionSlug
+	pollVotes: CollectionSlug
 }
 
 export const DEFAULT_COLLECTION_SLUGS = Object.freeze({
@@ -30,9 +34,10 @@ const OPTION_PATHS: Record<keyof FormBuilderCollectionSlugs, string> = {
 	pollVotes: 'poll.votes.overrides.slug',
 }
 
-const slugOf = (override: SlugOverride, fallback: string): string => {
+const slugOf = (override: SlugOverride, fallback: string): CollectionSlug => {
 	const slug = override?.slug?.trim()
-	return slug ? slug : fallback
+	// Registered under this very slug at boot, so it is a member of the host's generated union.
+	return (slug ? slug : fallback) as CollectionSlug
 }
 
 /**
