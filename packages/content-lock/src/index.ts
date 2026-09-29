@@ -12,7 +12,7 @@ import {
 	resolveOptions,
 } from './options'
 import { registerTranslations } from './plugin/registerTranslations'
-import { rebuildSnapshot } from './state/store'
+import { healSnapshot, readStoredWindows } from './state/store'
 
 export { notEndedWhere } from './collection/access'
 export type { ContentLockJobsOptions } from './jobs/registerJobs'
@@ -104,7 +104,7 @@ const definition = definePlugin<ContentLockPluginOptions>({
 		const priorOnInit = config.onInit
 		config.onInit = async (payload) => {
 			await priorOnInit?.(payload)
-			await rebuildSnapshot(payload)
+			await healSnapshot(payload, await readStoredWindows(payload))
 		}
 		return config
 	},

@@ -10,6 +10,7 @@ import type { CollectionConfig, TaskConfig } from 'payload'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 
 import { contentLock, isContentLocked } from '../../src/index'
+import { forgetWindows } from '../../src/state/store'
 
 const LOCKS = 'content-locks'
 const START = new Date('2026-01-10T10:00:00.000Z')
@@ -31,6 +32,14 @@ const rewritePost = deferOnInterrupt<TaskConfig<'rewritePost'>>({
 	slug: 'rewritePost',
 	handler: async ({ req }) => {
 		await req.payload.create({ collection: 'posts', data: { title: 'from a job' }, req })
+		return { output: {} }
+	},
+})
+
+const rewriteNote = deferOnInterrupt<TaskConfig<'rewriteNote'>>({
+	slug: 'rewriteNote',
+	handler: async ({ req }) => {
+		await req.payload.create({ collection: 'notes', data: { body: 'from a job' }, req })
 		return { output: {} }
 	},
 })
@@ -80,7 +89,7 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 			db,
 			collections: [posts, notes],
 			configOverrides: {
-				jobs: { deleteJobOnComplete: false, tasks: [writePost, rewritePost] },
+				jobs: { deleteJobOnComplete: false, tasks: [writePost, rewritePost, rewriteNote] },
 				plugins: [jobs({})],
 			},
 			plugin: contentLock({ individualSelection: true }),
@@ -111,20 +120,20 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 		expect((await evaluateRunGates(payload())).global).toBe(false)
 
 		await payload().delete({ collection: LOCKS, id: partial.id, overrideAccess: true })
-		await lock({ lockEverything: true, endAtTime: true, endsAt: ENDS_AT })
+		const everything = await lock({ lockEverything: true, endAtTime: true, endsAt: ENDS_AT })
 		const gates = await evaluateRunGates(payload())
 		expect(gates.global).toBe(true)
-		expect(gates.by).toBe('content-lock')
+		expect(gates.by).toBe(`content-lock:${everything.id}`)
 		expect(gates.until?.toISOString()).toBe(ENDS_AT)
 	})
 
 	it('fails a job the lock interrupts, without retries', async () => {
-		await lock()
+		const window = await lock()
 		const job = await payload().jobs.queue({ input: {}, task: 'writePost' })
 		await runOnce()
 		const row = await read(job.id)
 		expect(row.hasError).toBe(true)
-		expect(row.error?.interruptedBy).toBe('content-lock')
+		expect(row.error?.interruptedBy).toBe(`content-lock:${window.id}`)
 	})
 
 	it('defers an opted-in job to the end, and "End now" releases it', async () => {
@@ -133,7 +142,7 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 		await runOnce()
 		const deferred = await read(job.id)
 		expect(deferred.hasError).toBe(false)
-		expect(deferred.deferredBy).toBe('content-lock')
+		expect(deferred.deferredBy).toBe(`content-lock:${window.id}`)
 		expect(new Date(deferred.waitUntil ?? 0).toISOString()).toBe(ENDS_AT)
 
 		await payload().update({
@@ -148,6 +157,36 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 
 		await runOnce()
 		expect((await read(job.id)).completedAt).toBeTruthy()
+	})
+
+	it('releases only the jobs of the window that ended', async () => {
+		const postsLock = await lock()
+		await lock({ collections: ['notes'] })
+		const postJob = await payload().jobs.queue({ input: {}, task: 'rewritePost' })
+		const noteJob = await payload().jobs.queue({ input: {}, task: 'rewriteNote' })
+		await runOnce()
+
+		await payload().update({
+			collection: LOCKS,
+			data: { endedAt: START.toISOString() },
+			id: postsLock.id,
+			overrideAccess: true,
+		})
+		expect((await read(postJob.id)).deferredBy ?? null).toBeNull()
+		expect((await read(noteJob.id)).deferredBy).toMatch(/^content-lock:/)
+	})
+
+	it('releases the jobs of a window removed behind the hooks', async () => {
+		const window = await lock()
+		const job = await payload().jobs.queue({ input: {}, task: 'rewritePost' })
+		await runOnce()
+		expect((await read(job.id)).deferredBy).toBe(`content-lock:${window.id}`)
+
+		await payload().db.deleteOne({ collection: LOCKS, where: { id: { equals: window.id } } })
+		forgetWindows(payload())
+		clock.set(new Date(START.getTime() + 2 * 60_000))
+		expect(await isContentLocked(payload())).toBe(false)
+		expect((await read(job.id)).deferredBy ?? null).toBeNull()
 	})
 
 	it('tells server code whether content is locked', async () => {

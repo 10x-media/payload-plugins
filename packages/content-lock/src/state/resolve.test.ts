@@ -159,17 +159,14 @@ describe('orderBanners', () => {
 		])
 	})
 
-	it('puts windows touching the current route first', () => {
+	it('keeps only the windows covering the current route, active first', () => {
 		const state = resolveState([announced, activeCatalog, activeSite], now, groups)
 		expect(ids(orderBanners(state, groups, { type: 'collection', slug: 'products' }))).toEqual([
 			'active-catalog',
 			'announced-all',
-			'active-site',
 		])
 		expect(ids(orderBanners(state, groups, { type: 'collection', slug: 'media' }))).toEqual([
 			'announced-all',
-			'active-site',
-			'active-catalog',
 		])
 	})
 

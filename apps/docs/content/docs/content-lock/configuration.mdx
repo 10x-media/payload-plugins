@@ -1,0 +1,60 @@
+---
+title: Configuration
+description: Every content-lock option.
+---
+
+```ts
+contentLock({
+  disabled?: boolean
+  order?: number                       // default 1000
+  groups?: Array<{
+    key: string
+    label: string | Record<string, string>
+    collections?: string[]
+    globals?: string[]
+  }>
+  individualSelection?: boolean | { access?: ({ req }) => boolean } // default false
+  exempt?: string[]
+  retryAfter?: number | 'untilEnd'     // default 3600
+  timezone?: boolean | DateField['timezone'] // default true
+  localeMap?: Record<string, string>
+  editor?: {
+    features?: FeatureProviderServer[] | (({ defaultFeatures }) => FeatureProviderServer[])
+    converters?: string
+  }
+  jobs?: false | { queues?: string[] }
+  collection?: {
+    slug?: string                      // default 'content-locks'
+    access?: CollectionConfig['access']
+    overrides?: (collection: CollectionConfig) => CollectionConfig
+  }
+  translations?: TranslationsOption
+})
+```
+
+| Option | Default | |
+|---|---|---|
+| `disabled` | `false` | Return the config untouched, for opting out per environment. |
+| `order` | `1000` | Plugin order. Late, so access wrapping sees other plugins' final access functions. |
+| `groups` | `[]` | What a window can freeze besides everything. See [scope](/content-lock/scope). |
+| `individualSelection` | `false` | Raw collection and global pickers on the window, optionally gated by `access`. |
+| `exempt` | `[]` | Slugs never frozen, on top of the lock collection and Payload's system collections. |
+| `retryAfter` | `3600` | `Retry-After` seconds, or `'untilEnd'` for the seconds until the known end. |
+| `timezone` | `true` | Time zone picker on the window's dates, from `admin.timezones`. Pass Payload's date `timezone` config to narrow the zones, or `false` to turn it off. The banner always shows the viewer's local time. |
+| `localeMap` | `{}` | Admin language to content locale, for [message locales](/content-lock/banner#message-locale). |
+| `editor` | | Extra Lexical features and their converters for [messages](/content-lock/banner#extending-the-editor). |
+| `jobs` | on | [Jobs integration](/content-lock/jobs), when `@10x-media/jobs` is installed. |
+| `collection.slug` | `'content-locks'` | |
+| `collection.access` | signed-in users | Who may read and manage windows. `update` is narrowed to windows that have not ended. |
+| `collection.overrides` | | Last-word override of the generated collection. If it replaces `access.update`, fold in `notEndedWhere`. |
+| `translations` | | Per-key string overrides. See [i18n](/content-lock/i18n). |
+
+## Exports
+
+| Path | |
+|---|---|
+| `@10x-media/content-lock` | `contentLock`, `getContentLockState`, `isContentLocked`, `ContentLockedError`, `isContentLockedError`, `notEndedWhere`, `ContentLockTokenFeature`, types |
+| `@10x-media/content-lock/client` | `useContentLock`, `LocalDate`, the admin components |
+| `@10x-media/content-lock/rsc` | `ContentLockHeader`, `StageFilterBar` |
+| `@10x-media/content-lock/types` | `ContentLockState`, `LockWindow`, `LockStage`, and friends |
+| `@10x-media/content-lock/i18n` | `keys`, `translations` |

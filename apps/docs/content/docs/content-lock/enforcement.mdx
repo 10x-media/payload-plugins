@@ -1,0 +1,72 @@
+---
+title: Enforcement
+description: What a lock blocks, how clients see it, and how server code can check it.
+---
+
+## What is blocked
+
+On every collection and global in scope, while a window is active:
+
+| Operation | Collections | Globals |
+|---|---|---|
+| create | blocked | |
+| update, including bulk updates | blocked | blocked |
+| delete, including bulk deletes | blocked | |
+| autosave and version restore | blocked | blocked |
+| find, count, read | allowed | allowed |
+
+The guard runs as the first `beforeOperation` hook, before access control, so it applies on every channel: REST, GraphQL, the admin, custom endpoints, and the Local API **with `overrideAccess: true`**. No option, role or user bypasses it. Bulk operations are rejected as a whole.
+
+Logins, token refresh, logout and password resets keep working: they write through the database adapter, and auth collections stay readable.
+
+## What clients receive
+
+A blocked write throws `ContentLockedError`, an `APIError` with status `503`:
+
+```json
+{
+  "errors": [{
+    "message": "Content is locked for maintenance. Please try again later.",
+    "data": { "endsAt": "2026-01-10T13:00:00.000Z", "lockIds": ["..."] }
+  }]
+}
+```
+
+- `endsAt` is the latest known end of the active windows, or `null` when any of them ends manually.
+- The response carries `Retry-After`: 3600 seconds by default, or the seconds until the known end with `retryAfter: 'untilEnd'`. GraphQL errors carry it too, with `extensions.statusCode: 503`.
+- The message is translated to the request's language.
+- The error logs at `info`, not as a server fault.
+
+In server code, check with `isContentLockedError(error)` (it holds across bundled copies) or `instanceof ContentLockedError`.
+
+## The admin
+
+Access to `create`, `update` and `delete` in scope returns `false` during a lock, so the admin renders documents read-only and hides the buttons that would fail. The original access function is called unchanged outside a lock and for entities out of scope, including a `Where` it returns. The plugin runs late (`order: 1000`) so it wraps every other plugin's final access functions; adjust `order` if another plugin must run after it.
+
+A page opened before the lock started still shows editable fields until it refreshes; saving it answers with the 503 toast. The banner refreshes the page when a window it shows changes stage.
+
+## Checking the lock in server code
+
+```ts
+import { getContentLockState, isContentLocked } from '@10x-media/content-lock'
+
+if (await isContentLocked(payload, { collection: 'products' })) {
+  return // skip, or postpone the work
+}
+
+const state = await getContentLockState(payload)
+// { locked, scope, endsAt, active, announced, resolvedAt }
+```
+
+In custom admin components, `useContentLock()` from `@10x-media/content-lock/client` returns `{ state, locked, isLocked(entity), endsAt, activeWindow }`.
+
+## Runtime state
+
+The windows that are not ended live in a snapshot in `payload.kv` (Redis when you configure a kv adapter, otherwise the `payload-kv` collection), rebuilt on every change to the collection and at startup. Each process keeps it in memory for about two seconds, so a lock reaches every node within that. A snapshot older than a minute is rebuilt from the collection, which heals one left stale by a direct database edit.
+
+If the state cannot be read at all, writes fail closed: every entity counts as locked until it can.
+
+## Limits
+
+- Writes through `payload.db.*` or the raw database driver bypass Payload's operations, so the guard never sees them. Code that writes this way must check `isContentLocked` itself.
+- Frontend writes to collections in scope get the same 503. List them in `exempt` if they must keep working.

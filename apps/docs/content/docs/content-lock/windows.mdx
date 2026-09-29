@@ -1,0 +1,73 @@
+---
+title: Windows
+description: The lifecycle of a lock window, from draft to ended.
+---
+
+One document in the `content-locks` collection is one window. Windows never lock by being edited; they lock by the clock.
+
+## Fields
+
+| Field | Meaning |
+|---|---|
+| **Title** | Internal name, shown in the list and the pager. |
+| **Starts at** | When the lock begins. Leave it empty to start on save. |
+| **Announce** / **Announce at** | Warn editors from this moment on. Announce must be before the start. |
+| **End at time** / **Ends at** | When the lock ends by itself. Without it the window runs until someone presses **End now**. |
+| **Lock everything** / scope | Everything, or the groups (and, with `individualSelection`, collections and globals) you pick. See [scope](/content-lock/scope). |
+| **During the lock** / **Announcement** | Banner messages for each stage, localized. See [banner](/content-lock/banner). |
+| **Ended at** | Set by **End now**. Read-only. |
+
+Dates carry a time zone picker by default, so an author sets "22:00 Europe/Berlin" explicitly instead of in whatever zone their browser is in, and colleagues see the same wall-clock time. Dates are stored as UTC instants either way; see the `timezone` option in [configuration](/content-lock/configuration).
+
+## Stages
+
+| Stage | When |
+|---|---|
+| **Draft** | The window is not published. It locks and announces nothing. |
+| **Pending** | Published, before its announcement (or its start, without one). |
+| **Announced** | Between the announcement and the start. The banner warns. |
+| **Active** | From the start until the end. Content in scope is frozen. |
+| **Ended** | Past its end time, or ended with **End now**. |
+
+The stage is derived, never stored: every read compares the window's dates with the current time, so a window starts and ends on time without a cron. It shows as a coloured pill in the list and the sidebar, and the list has quick filters per stage.
+
+## Drafts
+
+The collection has drafts so a window can be prepared, its messages translated into every locale, and then published in one go. Only published windows count. A write without `draft: true` publishes, so **Lock now**, scripts and the Local API never create a window that silently does nothing.
+
+A published window with unpublished changes keeps its live stage; publishing applies the latest draft, including when **End now** publishes the window.
+
+## Editing rules
+
+- An **active** window can be ended, extended, rescoped, and have its messages changed. Its start cannot move into the future: to postpone, end it and create a new one.
+- **Pending** and **announced** windows are fully editable.
+- **Ended** windows are history: they open read-only and can only be deleted.
+- Announce at is never after Starts at, and Ends at is always after it.
+
+The server enforces the rules; the admin mirrors them. Read-only for ended windows comes from the collection's `update` access, so if you replace access through `collection.overrides`, fold `notEndedWhere(new Date())` into your `update`:
+
+```ts
+import { notEndedWhere } from '@10x-media/content-lock'
+
+contentLock({
+  collection: {
+    overrides: (collection) => ({
+      ...collection,
+      access: {
+        ...collection.access,
+        update: ({ req }) =>
+          req.user?.role === 'admin' ? notEndedWhere(new Date()) : false,
+      },
+    }),
+  },
+})
+```
+
+The server still refuses changes to an ended window either way; the access only keeps the admin from offering them.
+
+## Actions
+
+- **Lock now** (list view) creates a window that freezes everything, starts now and ends manually.
+- **End now** (active window) sets **Ended at** to now.
+
+Both are ordinary writes, so they follow the collection's access: to let only some users lock, narrow `collection.access`.

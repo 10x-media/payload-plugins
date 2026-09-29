@@ -1,9 +1,8 @@
 import type { RequestContext } from 'payload'
 
 /**
- * Marks a request whose writes the lock lets through. Internal: it exists for
- * the jobs integration draining in-flight jobs, and is deliberately not an
- * option a person or role can reach.
+ * Marks a request whose writes the lock lets through. Internal and
+ * deliberately not an option: no person, role or setting can reach it.
  */
 export const CONTENT_LOCK_BYPASS = Symbol.for('@10x-media/content-lock:bypass')
 

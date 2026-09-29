@@ -9,7 +9,7 @@ import {
 	type FieldHook,
 	getCurrentDate,
 } from 'payload'
-import { resumeLockDeferredJobs } from '../jobs/registerJobs'
+import { resumeWindowJobs } from '../jobs/deferred'
 import { buildMessageEditor } from '../lexical/editor'
 import type { ContentLockPluginOptions, ResolvedOptions } from '../options'
 import { statusOf } from '../state/resolve'
@@ -85,13 +85,13 @@ const stampAndValidate: CollectionBeforeChangeHook = ({ data, operation, origina
 
 const syncSnapshotAfterChange: CollectionAfterChangeHook = async ({ doc, req }) => {
 	await rebuildSnapshot(req.payload, req)
-	await resumeLockDeferredJobs(req.payload)
+	await resumeWindowJobs(req.payload, doc.id)
 	return doc
 }
 
 const syncSnapshotAfterDelete: CollectionAfterDeleteHook = async ({ doc, req }) => {
 	await rebuildSnapshot(req.payload, req)
-	await resumeLockDeferredJobs(req.payload)
+	await resumeWindowJobs(req.payload, doc.id)
 	return doc
 }
 

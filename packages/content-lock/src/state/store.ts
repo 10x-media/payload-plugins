@@ -1,5 +1,6 @@
 import { type CollectionSlug, getCurrentDate, type Payload, type PayloadRequest } from 'payload'
 
+import { resumeWindowJobs } from '../jobs/deferred'
 import { optionsFromConfig } from '../options'
 import { isEntityLocked, resolveState, statusOf } from './resolve'
 import type { ContentLockState, LockWindow } from './types'
@@ -56,6 +57,12 @@ export const rebuildSnapshot = async (
 	return windows
 }
 
+/** The windows in the stored snapshot, however old; empty when there is none. */
+export const readStoredWindows = async (payload: Payload): Promise<LockWindow[]> => {
+	const stored = await payload.kv.get<Snapshot>(SNAPSHOT_KEY)
+	return isSnapshot(stored) ? stored.windows : []
+}
+
 /** Current windows: process memory, then kv, then the collection. */
 export const readWindows = async (payload: Payload): Promise<LockWindow[]> => {
 	const cached = memory.get(payload)
@@ -70,7 +77,27 @@ export const readWindows = async (payload: Payload): Promise<LockWindow[]> => {
 		memory.set(payload, { readAt: Date.now(), windows: stored.windows })
 		return stored.windows
 	}
-	return rebuildSnapshot(payload)
+	return healSnapshot(payload, isSnapshot(stored) ? stored.windows : [])
+}
+
+/**
+ * Rebuild the snapshot outside a window write (at startup, or when it went
+ * stale). Windows live in `previous` but gone now (ended, deleted, or edited
+ * in the database) release the jobs they deferred, in case the release that
+ * should have followed their change never ran. Costs nothing unless one went.
+ */
+export const healSnapshot = async (
+	payload: Payload,
+	previous: LockWindow[]
+): Promise<LockWindow[]> => {
+	const windows = await rebuildSnapshot(payload)
+	const live = new Set(windows.map((window) => window.id))
+	for (const window of previous) {
+		if (!live.has(window.id)) {
+			await resumeWindowJobs(payload, window.id)
+		}
+	}
+	return windows
 }
 
 /** Drop this process's in-memory copy so the next read goes to kv. */

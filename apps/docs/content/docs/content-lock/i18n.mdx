@@ -1,0 +1,22 @@
+---
+title: i18n
+description: Override or localize the content-lock admin strings.
+---
+
+Every admin-facing string (the banner's fallback text, field labels, the actions, the error message clients receive) is a typed translation under the `contentLock:` namespace. Several locales ship built in; the `translations` export names the current set. Override or extend through the `translations` option:
+
+```ts title="payload.config.ts"
+import { contentLock } from '@10x-media/content-lock'
+import { keys } from '@10x-media/content-lock/i18n'
+
+contentLock({
+  translations: {
+    en: { [keys.bannerActiveTitle]: 'Content freeze' },
+    de: { [keys.errorLocked]: 'Inhalte sind wegen Wartung gesperrt.' },
+  },
+})
+```
+
+The fallback text only shows for windows without their own message. For the text editors see during a specific window, write it in the window's [messages](/content-lock/banner#messages) instead.
+
+For merge order, adding locales, and app-level overrides, see [Translations](/concepts/translations); the pattern is identical in every plugin.
