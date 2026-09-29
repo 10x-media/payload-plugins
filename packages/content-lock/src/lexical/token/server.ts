@@ -9,11 +9,16 @@ export type TokenGroup = {
 	label: string | Record<string, string>
 	collections: string[]
 	globals: string[]
+	custom: string[]
 }
+
+/** A custom target as the scope token names it. */
+export type TokenCustomTarget = { key: string; label: string | Record<string, string> }
 
 /** Props the server feature forwards to its client half. */
 export type ContentLockTokenClientProps = {
 	groups: TokenGroup[]
+	customTargets?: TokenCustomTarget[]
 }
 
 /**
@@ -31,7 +36,7 @@ export const ContentLockTokenFeature = createServerFeature<
 >({
 	feature: ({ props }) => ({
 		ClientFeature: '@10x-media/content-lock/client#ContentLockTokenFeatureClient',
-		clientFeatureProps: { groups: props.groups },
+		clientFeatureProps: { customTargets: props.customTargets ?? [], groups: props.groups },
 		nodes: [createNode({ node: ContentLockTokenServerNode })],
 		sanitizedServerFeatureProps: props,
 	}),

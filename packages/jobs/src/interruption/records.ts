@@ -54,6 +54,12 @@ export const recordInterruption = (
 	record: InterruptionRecord
 ): void => {
 	const store = storeOf(payload)
+	// Runs outside the worker never apply their records; drop the stale ones here.
+	for (const [staleKey, pending] of store) {
+		if (record.recordedAt - pending.record.recordedAt > RECORD_TTL_MS) {
+			store.delete(staleKey)
+		}
+	}
 	const key = String(jobId)
 	if (!store.has(key)) {
 		store.set(key, { id: jobId, record })

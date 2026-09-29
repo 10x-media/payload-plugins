@@ -18,6 +18,9 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.fieldLockEverything]: 'Заблокувати все',
 	[keys.fieldLockEverythingDescription]: 'Вимкніть, щоб заблокувати лише вибраний контент.',
 	[keys.fieldGroups]: 'Групи',
+	[keys.fieldCustomTargets]: 'Інші області',
+	[keys.fieldCustomTargetsDescription]:
+		'Частини проєкту, які теж охоплює блокування. Їх перевіряє код проєкту; плагін не блокує для них запис.',
 	[keys.fieldCollections]: 'Колекції',
 	[keys.fieldGlobals]: 'Глобальні налаштування',
 	[keys.fieldAdvanced]: 'Розширені',

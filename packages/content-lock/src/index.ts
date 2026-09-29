@@ -2,7 +2,7 @@ import { type Config, definePlugin, type Plugin } from 'payload'
 
 import { buildLockCollection } from './collection/lockCollection'
 import { CONTENT_LOCKED_ERROR_NAME } from './enforcement/ContentLockedError'
-import { registerEnforcement } from './enforcement/register'
+import { isMarkedExempt, registerEnforcement } from './enforcement/register'
 import { registerJobsIntegration } from './jobs/registerJobs'
 import {
 	type ContentLockPluginOptions,
@@ -10,6 +10,7 @@ import {
 	DEFAULT_ORDER,
 	type ResolvedOptions,
 	resolveOptions,
+	SYSTEM_EXEMPT,
 } from './options'
 import { registerTranslations } from './plugin/registerTranslations'
 import { healSnapshot, readStoredWindows } from './state/store'
@@ -21,7 +22,12 @@ export type {
 	ContentLockEditorFeaturesOption,
 } from './lexical/editor'
 export { ContentLockTokenFeature } from './lexical/token/server'
-export type { ContentLockGroup, ContentLockPluginOptions } from './options'
+export type {
+	ContentLockCustomTarget,
+	ContentLockCustomTargetPath,
+	ContentLockGroup,
+	ContentLockPluginOptions,
+} from './options'
 
 declare module 'payload' {
 	interface RegisteredPlugins {
@@ -31,10 +37,18 @@ declare module 'payload' {
 
 const PLUGIN_SLUG = '@10x-media/content-lock'
 
-/** Fail the build when a group or exemption names an entity the config does not have. */
+/** Fail the build on a group, custom target or exemption the config does not back. */
 const assertKnownSlugs = (config: Config, options: ResolvedOptions): void => {
 	const collections = new Set((config.collections ?? []).map((collection) => collection.slug))
 	const globals = new Set((config.globals ?? []).map((global) => global.slug))
+	const custom = new Set(options.customTargets.map((target) => target.key))
+	const exempt = new Set(options.exempt)
+	const builtIn = new Set<string>([options.slug, ...SYSTEM_EXEMPT, 'payload-folders'])
+	for (const slug of exempt) {
+		if (!builtIn.has(slug) && !collections.has(slug) && !globals.has(slug)) {
+			throw new Error(`[content-lock] exempt names unknown collection or global "${slug}"`)
+		}
+	}
 	const keys = new Set<string>()
 	for (const group of options.groups) {
 		if (keys.has(group.key)) {
@@ -51,8 +65,28 @@ const assertKnownSlugs = (config: Config, options: ResolvedOptions): void => {
 				throw new Error(`[content-lock] group "${group.key}" names unknown global "${slug}"`)
 			}
 		}
+		for (const slug of [...group.collections, ...group.globals]) {
+			if (exempt.has(slug)) {
+				throw new Error(
+					`[content-lock] group "${group.key}" names exempt "${slug}", which no lock freezes`
+				)
+			}
+		}
+		for (const key of group.custom) {
+			if (!custom.has(key)) {
+				throw new Error(
+					`[content-lock] group "${group.key}" names undeclared custom target "${key}"`
+				)
+			}
+		}
 	}
 }
+
+/** Collections and globals that exempt themselves through `custom.contentLock.exempt`. */
+const markedExempt = (config: Config): string[] =>
+	[...(config.collections ?? []), ...(config.globals ?? [])]
+		.filter((entity) => isMarkedExempt(entity))
+		.map((entity) => entity.slug)
 
 const definition = definePlugin<ContentLockPluginOptions>({
 	slug: PLUGIN_SLUG,
@@ -62,6 +96,7 @@ const definition = definePlugin<ContentLockPluginOptions>({
 			return config
 		}
 		const resolved = resolveOptions(options)
+		resolved.exempt = [...new Set([...resolved.exempt, ...markedExempt(config)])]
 		assertKnownSlugs(config, resolved)
 		registerTranslations(config, options.translations)
 		config.custom = { ...config.custom, [CUSTOM_KEY]: resolved }

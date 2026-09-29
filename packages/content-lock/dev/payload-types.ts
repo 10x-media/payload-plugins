@@ -294,6 +294,7 @@ export interface ContentLock {
   endsAt?: string | null;
   endsAt_tz?: SupportedTimezones;
   groups?: ('catalog' | 'site')[] | null;
+  customTargets?: ('reports' | 'crm-sync')[] | null;
   collections?: string[] | null;
   globals?: string[] | null;
   activeMessage?: {
@@ -611,6 +612,7 @@ export interface ContentLocksSelect<T extends boolean = true> {
   endsAt?: T;
   endsAt_tz?: T;
   groups?: T;
+  customTargets?: T;
   collections?: T;
   globals?: T;
   activeMessage?: T;

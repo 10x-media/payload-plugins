@@ -20,6 +20,8 @@ export const keys = {
 	fieldLockEverything: 'contentLock:fieldLockEverything',
 	fieldLockEverythingDescription: 'contentLock:fieldLockEverythingDescription',
 	fieldGroups: 'contentLock:fieldGroups',
+	fieldCustomTargets: 'contentLock:fieldCustomTargets',
+	fieldCustomTargetsDescription: 'contentLock:fieldCustomTargetsDescription',
 	fieldCollections: 'contentLock:fieldCollections',
 	fieldGlobals: 'contentLock:fieldGlobals',
 	fieldAdvanced: 'contentLock:fieldAdvanced',

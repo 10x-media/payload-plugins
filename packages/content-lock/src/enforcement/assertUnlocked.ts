@@ -29,6 +29,7 @@ export const readStateOrLocked = async (req: PayloadRequest): Promise<ContentLoc
 			active: [],
 			announced: [],
 			resolvedAt: new Date().toISOString(),
+			exempt: [],
 		}
 	}
 }

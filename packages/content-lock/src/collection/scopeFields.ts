@@ -57,6 +57,19 @@ export const buildScopeFields = (
 			admin: { condition: notEverything },
 		})
 	}
+	if (options.customTargets.length > 0) {
+		main.push({
+			name: 'customTargets',
+			type: 'select',
+			hasMany: true,
+			label: labelForKey(keys.fieldCustomTargets),
+			options: options.customTargets.map((target) => ({ value: target.key, label: target.label })),
+			admin: {
+				condition: notEverything,
+				description: labelForKey(keys.fieldCustomTargetsDescription),
+			},
+		})
+	}
 	if (individualSelection) {
 		const gate =
 			typeof individualSelection === 'object' && individualSelection.access

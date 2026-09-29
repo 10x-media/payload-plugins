@@ -8,7 +8,7 @@ import {
 } from '@payloadcms/richtext-lexical'
 import type { CollectionSlug } from 'payload'
 
-import { ContentLockTokenFeature, type TokenGroup } from './token/server'
+import { ContentLockTokenFeature, type TokenCustomTarget, type TokenGroup } from './token/server'
 
 /**
  * One lexical feature, exactly as `lexicalEditor` takes them. Derived from its
@@ -39,9 +39,11 @@ export type ContentLockEditorFeaturesOption =
  */
 export const buildMessageEditor = ({
 	groups,
+	customTargets = [],
 	features,
 }: {
 	groups: TokenGroup[]
+	customTargets?: TokenCustomTarget[]
 	features?: ContentLockEditorFeaturesOption
 }): ReturnType<typeof lexicalEditor> =>
 	lexicalEditor({
@@ -50,7 +52,7 @@ export const buildMessageEditor = ({
 				BoldFeature(),
 				ItalicFeature(),
 				LinkFeature({ enabledCollections: [] as CollectionSlug[] }),
-				ContentLockTokenFeature({ groups }),
+				ContentLockTokenFeature({ customTargets, groups }),
 				FixedToolbarFeature(),
 			]
 			if (!features) {

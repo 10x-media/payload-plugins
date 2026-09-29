@@ -19,8 +19,20 @@ const window = (overrides: Partial<LockWindow> = {}): LockWindow => ({
 })
 
 const groups: LockGroup[] = [
-	{ key: 'catalog', label: 'Catalog', collections: ['products', 'categories'], globals: [] },
-	{ key: 'site', label: 'Site', collections: ['pages', 'posts'], globals: ['header'] },
+	{
+		key: 'catalog',
+		label: 'Catalog',
+		collections: ['products', 'categories'],
+		globals: [],
+		custom: [],
+	},
+	{
+		key: 'site',
+		label: 'Site',
+		collections: ['pages', 'posts'],
+		globals: ['header'],
+		custom: ['reports'],
+	},
 ]
 
 describe('statusOf', () => {
@@ -67,7 +79,36 @@ describe('scopeOf', () => {
 			everything: false,
 			collections: ['products', 'categories', 'pages'],
 			globals: ['footer'],
+			custom: [],
 		})
+	})
+
+	it('expands custom targets, raw and through a group', () => {
+		const scope = scopeOf(
+			window({ scope: 'selected', targets: ['group:site', 'custom:crm-sync'] }),
+			groups
+		)
+		expect(scope).toMatchObject({ custom: ['reports', 'crm-sync'] })
+	})
+})
+
+describe('isEntityLocked', () => {
+	const now = at('2026-01-10T11:00:00.000Z')
+
+	it('never reports an exempt collection as locked', () => {
+		const state = resolveState([window()], now, { exempt: ['form-submissions'], groups })
+		expect(isEntityLocked(state, { type: 'collection', slug: 'posts' })).toBe(true)
+		expect(isEntityLocked(state, { type: 'collection', slug: 'form-submissions' })).toBe(false)
+	})
+
+	it('reports custom targets a lock covers', () => {
+		const everything = resolveState([window()], now, { groups })
+		expect(isEntityLocked(everything, { type: 'custom', slug: 'reports' })).toBe(true)
+		const site = resolveState([window({ scope: 'selected', targets: ['group:site'] })], now, {
+			groups,
+		})
+		expect(isEntityLocked(site, { type: 'custom', slug: 'reports' })).toBe(true)
+		expect(isEntityLocked(site, { type: 'custom', slug: 'crm-sync' })).toBe(false)
 	})
 })
 
@@ -75,7 +116,7 @@ describe('resolveState', () => {
 	const now = at('2026-01-10T11:00:00.000Z')
 
 	it('is unlocked with no active window', () => {
-		const state = resolveState([window({ startsAt: '2026-01-11T00:00:00.000Z' })], now, groups)
+		const state = resolveState([window({ startsAt: '2026-01-11T00:00:00.000Z' })], now, { groups })
 		expect(state.locked).toBe(false)
 		expect(isEntityLocked(state, { type: 'collection', slug: 'pages' })).toBe(false)
 	})
@@ -87,7 +128,7 @@ describe('resolveState', () => {
 				window({ id: 'b', scope: 'selected', targets: ['global:header'] }),
 			],
 			now,
-			groups
+			{ groups }
 		)
 		expect(isEntityLocked(state, { type: 'collection', slug: 'products' })).toBe(true)
 		expect(isEntityLocked(state, { type: 'global', slug: 'header' })).toBe(true)
@@ -98,7 +139,7 @@ describe('resolveState', () => {
 		const state = resolveState(
 			[window({ id: 'a', scope: 'selected', targets: ['group:catalog'] }), window({ id: 'b' })],
 			now,
-			groups
+			{ groups }
 		)
 		expect(state.scope).toEqual({ everything: true })
 	})
@@ -109,11 +150,11 @@ describe('resolveState', () => {
 			resolveState(
 				[timed('a', '2026-01-10T12:00:00.000Z'), timed('b', '2026-01-10T13:00:00.000Z')],
 				now,
-				groups
+				{ groups }
 			).endsAt
 		).toBe('2026-01-10T13:00:00.000Z')
 		expect(
-			resolveState([timed('a', '2026-01-10T12:00:00.000Z'), window({ id: 'b' })], now, groups)
+			resolveState([timed('a', '2026-01-10T12:00:00.000Z'), window({ id: 'b' })], now, { groups })
 				.endsAt
 		).toBeNull()
 	})
@@ -128,7 +169,7 @@ describe('resolveState', () => {
 				}),
 			],
 			now,
-			groups
+			{ groups }
 		)
 		expect(state.locked).toBe(false)
 		expect(state.announced.map((w) => w.id)).toEqual(['soon'])
@@ -151,7 +192,7 @@ describe('orderBanners', () => {
 	const ids = (windows: LockWindow[]) => windows.map((entry) => entry.id)
 
 	it('puts active before announced, active ones by the larger scope', () => {
-		const state = resolveState([announced, activeCatalog, activeSite], now, groups)
+		const state = resolveState([announced, activeCatalog, activeSite], now, { groups })
 		expect(ids(orderBanners(state, groups, null))).toEqual([
 			'active-site',
 			'active-catalog',
@@ -160,7 +201,7 @@ describe('orderBanners', () => {
 	})
 
 	it('keeps only the windows covering the current route, active first', () => {
-		const state = resolveState([announced, activeCatalog, activeSite], now, groups)
+		const state = resolveState([announced, activeCatalog, activeSite], now, { groups })
 		expect(ids(orderBanners(state, groups, { type: 'collection', slug: 'products' }))).toEqual([
 			'active-catalog',
 			'announced-all',
@@ -183,7 +224,7 @@ describe('orderBanners', () => {
 			announceAt: '2026-01-10T00:00:00.000Z',
 			startsAt: '2026-01-11T00:00:00.000Z',
 		})
-		const state = resolveState([announced, soonCatalog, soonAll], now, groups)
+		const state = resolveState([announced, soonCatalog, soonAll], now, { groups })
 		expect(ids(orderBanners(state, groups, null))).toEqual([
 			'soon-all',
 			'soon-catalog',
@@ -192,6 +233,6 @@ describe('orderBanners', () => {
 	})
 
 	it('is empty when nothing is announced or active', () => {
-		expect(orderBanners(resolveState([], now, groups), groups, null)).toEqual([])
+		expect(orderBanners(resolveState([], now, { groups }), groups, null)).toEqual([])
 	})
 })

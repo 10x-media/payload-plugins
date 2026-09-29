@@ -18,6 +18,9 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.fieldLockEverything]: 'Bloquear tudo',
 	[keys.fieldLockEverythingDescription]: 'Desative para bloquear apenas o conteúdo selecionado.',
 	[keys.fieldGroups]: 'Grupos',
+	[keys.fieldCustomTargets]: 'Outras áreas',
+	[keys.fieldCustomTargetsDescription]:
+		'Partes do projeto que o bloqueio também cobre. O código do projeto as verifica; o plugin não bloqueia gravações para elas.',
 	[keys.fieldCollections]: 'Coleções',
 	[keys.fieldGlobals]: 'Globais',
 	[keys.fieldAdvanced]: 'Avançado',

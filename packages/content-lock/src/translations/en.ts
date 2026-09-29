@@ -22,6 +22,9 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fieldLockEverything]: 'Lock everything',
 	[keys.fieldLockEverythingDescription]: 'Turn off to lock only selected content.',
 	[keys.fieldGroups]: 'Groups',
+	[keys.fieldCustomTargets]: 'Custom targets',
+	[keys.fieldCustomTargetsDescription]:
+		'Parts of the project the lock also covers. Project code checks them; the plugin blocks no writes for them.',
 	[keys.fieldCollections]: 'Collections',
 	[keys.fieldGlobals]: 'Globals',
 	[keys.fieldAdvanced]: 'Advanced',

@@ -21,7 +21,8 @@ export const notEndedWhere = (now: Date): Where => ({
 /**
  * `update` access that keeps ended windows read-only on top of `original`
  * (or Payload's default, any signed-in user). An ended window is history: the
- * admin opens it read-only, and deleting it stays allowed.
+ * admin opens it read-only, and deleting it stays allowed. A window never
+ * published locked nothing, so it stays editable whatever its dates say.
  */
 export const updateUnlessEnded =
 	(original: Access | undefined): Access =>
@@ -30,8 +31,10 @@ export const updateUnlessEnded =
 		if (!base) {
 			return false
 		}
-		const notEnded = notEndedWhere(getCurrentDate())
-		return base === true ? notEnded : { and: [base, notEnded] }
+		const editable: Where = {
+			or: [{ _status: { equals: 'draft' } }, notEndedWhere(getCurrentDate())],
+		}
+		return base === true ? editable : { and: [base, editable] }
 	}
 
 /** The `collection.access` option: per operation, or one function for every write. */

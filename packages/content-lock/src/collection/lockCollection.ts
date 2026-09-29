@@ -65,6 +65,7 @@ const stampAndValidate: CollectionBeforeChangeHook = ({ data, operation, origina
 		data.groups = []
 		data.collections = []
 		data.globals = []
+		data.customTargets = []
 	}
 	if (draft) {
 		return data
@@ -125,12 +126,14 @@ export const buildLockCollection = (
 		raw.timezone === false ? undefined : raw.timezone === undefined ? true : raw.timezone
 	const scopeFields = buildScopeFields(config, options, raw.individualSelection)
 	const editor = buildMessageEditor({
-		groups: options.groups.map(({ key, label, collections, globals }) => ({
+		groups: options.groups.map(({ key, label, collections, globals, custom }) => ({
 			key,
 			label,
 			collections,
 			globals,
+			custom,
 		})),
+		customTargets: options.customTargets.map(({ key, label }) => ({ key, label })),
 		features: raw.editor?.features,
 	})
 	const collection: CollectionConfig = {

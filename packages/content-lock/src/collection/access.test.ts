@@ -25,8 +25,10 @@ describe('resolveLockAccess', () => {
 
 describe('updateUnlessEnded', () => {
 	it('narrows a grant to windows that have not ended', async () => {
-		const result = await updateUnlessEnded(isAdmin)(args())
-		expect(JSON.stringify(result)).toContain('endedAt')
+		const result = JSON.stringify(await updateUnlessEnded(isAdmin)(args()))
+		expect(result).toContain('endedAt')
+		// A window never published stays editable.
+		expect(result).toContain('"_status":{"equals":"draft"}')
 	})
 
 	it('keeps a denial', async () => {
@@ -54,7 +56,7 @@ describe('lock collection access', () => {
 			},
 		})
 		const result = await collection.access?.update?.(args())
-		expect(result).toHaveProperty('and')
+		expect(JSON.stringify(result)).toContain('endedAt')
 	})
 
 	it('applies a single access function to every write', async () => {

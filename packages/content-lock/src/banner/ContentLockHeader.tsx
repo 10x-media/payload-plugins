@@ -4,15 +4,22 @@ import { getTranslation, type I18nClient } from '@payloadcms/translations'
 import type { CollectionSlug, Payload, SelectType, ServerProps, TypedLocale } from 'payload'
 
 import { optionsFromConfig, type ResolvedOptions } from '../options'
+import { customTargetsAt } from '../state/customTargets'
 import { namedTargets, orderBanners, scopeOf } from '../state/resolve'
 import { getContentLockState } from '../state/store'
-import type { LockWindow, ResolvedScope } from '../state/types'
+import type { EntityRef, LockWindow, ResolvedScope } from '../state/types'
 import { type BannerItem, ContentLockBanner } from './ContentLockBanner'
 import { ContentLockStateSync } from './ContentLockProvider'
 import { languageForLocale, resolveMessageLocale } from './locale'
 import { buildMessageConverters, composeConverters } from './messageConverters'
 
 type HeaderProps = ServerProps & { collectionSlug?: string; globalSlug?: string }
+
+/** The admin page's path below the admin route, from the catch-all segments. */
+const adminPath = (params: unknown): string => {
+	const segments = (params as { segments?: unknown } | undefined)?.segments
+	return Array.isArray(segments) ? `/${segments.map(String).join('/')}` : '/'
+}
 
 /** Labels of a window's scope for the viewer, or `null` when it freezes everything. */
 const scopeLabels = ({
@@ -45,6 +52,9 @@ const scopeLabels = ({
 		} else if (kind === 'global') {
 			const label = payload.globals.config.find((global) => global.slug === slug)?.label
 			labels.push(label ? getTranslation(label, i18n) : slug)
+		} else if (kind === 'custom') {
+			const target = options.customTargets.find((candidate) => candidate.key === slug)
+			labels.push(target ? getTranslation(target.label, i18n) : slug)
 		}
 	}
 	return labels
@@ -155,6 +165,7 @@ export const ContentLockHeader = async ({
 	collectionSlug,
 	globalSlug,
 	i18n,
+	params,
 	payload,
 }: HeaderProps) => {
 	if (!payload || !i18n) {
@@ -171,12 +182,14 @@ export const ContentLockHeader = async ({
 		})
 		return null
 	}
-	const route = collectionSlug
-		? ({ type: 'collection', slug: collectionSlug } as const)
-		: globalSlug
-			? ({ type: 'global', slug: globalSlug } as const)
-			: null
-	const windows = orderBanners(state, options.groups, route)
+	const route: EntityRef[] = [
+		...(collectionSlug ? [{ type: 'collection', slug: collectionSlug } as const] : []),
+		...(globalSlug ? [{ type: 'global', slug: globalSlug } as const] : []),
+		...customTargetsAt(options.customTargets, adminPath(params)).map(
+			(key) => ({ type: 'custom', slug: key }) as const
+		),
+	]
+	const windows = orderBanners(state, options.groups, route.length > 0 ? route : null)
 	const sync = <ContentLockStateSync state={state} />
 	if (windows.length === 0) {
 		return sync

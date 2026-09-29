@@ -29,5 +29,6 @@ export const toWindow = (doc: Record<string, unknown>): LockWindow => ({
 		...strings(doc.groups).map((key) => `group:${key}`),
 		...strings(doc.collections).map((slug) => `collection:${slug}`),
 		...strings(doc.globals).map((slug) => `global:${slug}`),
+		...strings(doc.customTargets).map((key) => `custom:${key}`),
 	],
 })

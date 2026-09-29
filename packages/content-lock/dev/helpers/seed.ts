@@ -7,8 +7,36 @@ const HOUR = 60 * 60 * 1000
 
 type Token = { token: 'startsAt' | 'endsAt' | 'announceAt' | 'scope'; format?: string }
 
-/** A one-paragraph Lexical message from text runs and lock value tokens. */
-const message = (...parts: Array<string | Token>) => ({
+/** The dev app's `swatch` inline block, added to the editor through `editor.features`. */
+type Swatch = { swatch: 'black' | 'red' | 'amber' | 'green' }
+
+let swatchId = 0
+
+const node = (part: string | Token | Swatch) => {
+	if (typeof part === 'string') {
+		return {
+			type: 'text',
+			text: part,
+			detail: 0,
+			format: 0,
+			mode: 'normal',
+			style: '',
+			version: 1,
+		}
+	}
+	if ('swatch' in part) {
+		swatchId += 1
+		return {
+			type: 'inlineBlock',
+			version: 1,
+			fields: { id: `seed-swatch-${swatchId}`, blockType: 'swatch', color: part.swatch },
+		}
+	}
+	return { type: 'contentLockToken', version: 1, format: 'datetime', ...part }
+}
+
+/** A one-paragraph Lexical message from text runs, lock value tokens and swatches. */
+const message = (...parts: Array<string | Token | Swatch>) => ({
 	root: {
 		type: 'root',
 		direction: 'ltr' as const,
@@ -23,19 +51,7 @@ const message = (...parts: Array<string | Token>) => ({
 				indent: 0,
 				version: 1,
 				textFormat: 0,
-				children: parts.map((part) =>
-					typeof part === 'string'
-						? {
-								type: 'text',
-								text: part,
-								detail: 0,
-								format: 0,
-								mode: 'normal',
-								style: '',
-								version: 1,
-							}
-						: { type: 'contentLockToken', version: 1, format: 'datetime', ...part }
-				),
+				children: parts.map(node),
 			},
 		],
 	},
@@ -81,6 +97,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			endAtTime: true,
 			endsAt: at(30 * HOUR),
 			announcementMessage: message(
+				{ swatch: 'amber' },
 				'We are moving to a new database ',
 				{ token: 'startsAt', format: 'relative' },
 				'. Content will be read-only until ',

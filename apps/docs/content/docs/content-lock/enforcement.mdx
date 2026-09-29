@@ -55,12 +55,13 @@ import { getContentLockState, isContentLocked } from '@10x-media/content-lock'
 if (await isContentLocked(payload, { collection: 'products' })) {
   return // skip, or postpone the work
 }
+// also { global: 'header' }, or { custom: 'crm-sync' } for a custom target
 
 const state = await getContentLockState(payload)
 // { locked, scope, endsAt, active, announced, resolvedAt }
 ```
 
-In custom admin components, `useContentLock()` from `@10x-media/content-lock/client` returns `{ state, locked, isLocked(entity), endsAt, activeWindow }`.
+In custom admin components, `useContentLock()` from `@10x-media/content-lock/client` returns `{ state, locked, isLocked(entity), endsAt, activeWindow }`. Exempt collections and globals never count as locked, in either.
 
 ## Timing
 

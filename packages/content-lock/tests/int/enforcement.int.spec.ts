@@ -7,7 +7,12 @@ import {
 } from '@10x-media/payload-test-harness'
 import { type AccessArgs, type CollectionConfig, type GlobalConfig, handleEndpoints } from 'payload'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
-import { ContentLockedError, contentLock, getContentLockState } from '../../src/index'
+import {
+	ContentLockedError,
+	contentLock,
+	getContentLockState,
+	isContentLocked,
+} from '../../src/index'
 import { forgetWindows, SNAPSHOT_KEY } from '../../src/state/store'
 
 const LOCKS = 'content-locks'
@@ -27,6 +32,12 @@ const submissions: CollectionConfig = {
 	fields: [{ name: 'body', type: 'text' }],
 }
 const header: GlobalConfig = { slug: 'header', fields: [{ name: 'text', type: 'text' }] }
+/** Exempts itself, the way a plugin's log collection would. */
+const logs: CollectionConfig = {
+	slug: 'logs',
+	custom: { contentLock: { exempt: true } },
+	fields: [{ name: 'line', type: 'text' }],
+}
 
 describeForDb('content-lock enforcement', {}, (db) => {
 	let booted: BootedPayload
@@ -56,7 +67,7 @@ describeForDb('content-lock enforcement', {}, (db) => {
 		clock = installTestClock(START)
 		booted = await bootPayload({
 			db,
-			collections: [users, posts, products, submissions],
+			collections: [users, posts, products, submissions, logs],
 			configOverrides: {
 				globals: [header],
 				admin: { user: 'users' },
@@ -72,7 +83,10 @@ describeForDb('content-lock enforcement', {}, (db) => {
 				],
 			},
 			plugin: contentLock({
-				groups: [{ key: 'catalog', label: 'Catalog', collections: ['products'] }],
+				groups: [
+					{ key: 'catalog', label: 'Catalog', collections: ['products'], custom: ['reports'] },
+				],
+				customTargets: [{ key: 'reports', label: 'Reports', path: '/reports' }, 'crm-sync'],
 				exempt: ['submissions'],
 				individualSelection: true,
 			}),
@@ -155,6 +169,58 @@ describeForDb('content-lock enforcement', {}, (db) => {
 			data: { email: 'dev@10xmedia.de', password: 'password' },
 		})
 		expect(result.token).toBeTruthy()
+	})
+
+	it('still lets people ask for a password reset', async () => {
+		await lock()
+		await payload().forgotPassword({
+			collection: 'users',
+			data: { email: 'dev@10xmedia.de' },
+			disableEmail: true,
+		})
+		const stored = (await payload().db.findOne({
+			collection: 'users',
+			where: { email: { equals: 'dev@10xmedia.de' } },
+		})) as { resetPasswordToken?: string } | null
+		expect(stored?.resetPasswordToken).toBeTruthy()
+	})
+
+	it('rejects bulk updates and deletes as a whole', async () => {
+		await payload().create({ collection: 'posts', data: { title: 'mine' }, overrideAccess: true })
+		await lock()
+		await expect(
+			payload().update({
+				collection: 'posts',
+				data: { title: 'bulk' },
+				overrideAccess: true,
+				where: { id: { exists: true } },
+			})
+		).rejects.toBeInstanceOf(ContentLockedError)
+		await expect(
+			payload().delete({
+				collection: 'posts',
+				overrideAccess: true,
+				where: { id: { exists: true } },
+			})
+		).rejects.toBeInstanceOf(ContentLockedError)
+	})
+
+	it('keeps collections that exempt themselves writable, and reports them unlocked', async () => {
+		await lock()
+		await expect(
+			payload().create({ collection: 'logs', data: { line: 'hi' }, overrideAccess: true })
+		).resolves.toBeDefined()
+		expect(await isContentLocked(payload(), { collection: 'logs' })).toBe(false)
+		expect(await isContentLocked(payload(), { collection: 'submissions' })).toBe(false)
+		expect(await isContentLocked(payload(), { collection: 'posts' })).toBe(true)
+	})
+
+	it('reports custom targets, directly and through a group', async () => {
+		await lock({ lockEverything: false, customTargets: ['crm-sync'] })
+		expect(await isContentLocked(payload(), { custom: 'crm-sync' })).toBe(true)
+		expect(await isContentLocked(payload(), { custom: 'reports' })).toBe(false)
+		await lock({ lockEverything: false, groups: ['catalog'] })
+		expect(await isContentLocked(payload(), { custom: 'reports' })).toBe(true)
 	})
 
 	it('freezes only a selected group', async () => {

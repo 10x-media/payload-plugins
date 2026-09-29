@@ -3,10 +3,11 @@ import type { LockAccessOption } from './collection/access'
 import type { ContentLockJobsOptions } from './jobs/registerJobs'
 
 import type { ContentLockEditorFeaturesOption } from './lexical/editor'
+import type { CustomTarget, PathMatch } from './state/customTargets'
 import type { LockGroup } from './state/types'
 import type { TranslationsOption } from './translations'
 
-/** A named set of collections and globals that can be frozen together. */
+/** A named set of collections, globals and custom targets that can be frozen together. */
 export type ContentLockGroup = {
 	/** Stable identifier stored on lock windows as `group:<key>`. Renaming it orphans old windows. */
 	key: string
@@ -14,7 +15,34 @@ export type ContentLockGroup = {
 	label: string | Record<string, string>
 	collections?: string[]
 	globals?: string[]
+	/** Keys of declared `customTargets`. */
+	custom?: string[]
 }
+
+/** Where a custom target lives in the admin: a path below the admin route. */
+export type ContentLockCustomTargetPath = string | { path: string; match?: PathMatch }
+
+/**
+ * Something a window can lock that the config does not describe: a custom
+ * view, an integration, a sync. The plugin blocks no writes for it; project
+ * code checks it with `isContentLocked(payload, { custom: key })` or
+ * `useContentLock().isLocked({ type: 'custom', slug: key })`. The string
+ * shorthand declares a key labelled by itself.
+ */
+export type ContentLockCustomTarget =
+	| string
+	| {
+			key: string
+			/** Shown in the window form and the banner. Defaults to the key. */
+			label?: string | Record<string, string>
+			/**
+			 * Admin pages that stand for this target, so the banner there shows
+			 * only the windows covering it. A path covers itself and everything
+			 * below (`match: 'prefix'`, the default) or only itself
+			 * (`match: 'exact'`); the query string never counts.
+			 */
+			path?: ContentLockCustomTargetPath | ContentLockCustomTargetPath[]
+	  }
 
 export type ContentLockPluginOptions = {
 	/**
@@ -30,6 +58,8 @@ export type ContentLockPluginOptions = {
 	order?: number
 	/** Groups offered by a "selected" window's targets. */
 	groups?: ContentLockGroup[]
+	/** Custom targets a window can lock besides collections and globals. */
+	customTargets?: ContentLockCustomTarget[]
 	/**
 	 * Escape hatch next to the groups: lets a window freeze individual
 	 * collections and globals by slug, in two fields of their own. Pass an
@@ -39,7 +69,8 @@ export type ContentLockPluginOptions = {
 	individualSelection?: boolean | { access?: (args: { req: PayloadRequest }) => boolean }
 	/**
 	 * Collection and global slugs never frozen. The plugin's own collection and
-	 * Payload's system collections are always exempt.
+	 * Payload's system collections are always exempt, and so is any collection
+	 * or global whose config sets `custom: { contentLock: { exempt: true } }`.
 	 */
 	exempt?: string[]
 	/**
@@ -134,6 +165,7 @@ export const DEFAULT_ORDER = 1000
 export type ResolvedOptions = {
 	slug: string
 	groups: LockGroup[]
+	customTargets: CustomTarget[]
 	individualSelection: boolean
 	exempt: string[]
 	retryAfter: number | 'untilEnd'
@@ -151,13 +183,38 @@ export const resolveOptions = (options: ContentLockPluginOptions): ResolvedOptio
 			label: group.label,
 			collections: group.collections ?? [],
 			globals: group.globals ?? [],
+			custom: group.custom ?? [],
 		})),
+		customTargets: resolveCustomTargets(options.customTargets),
 		individualSelection: Boolean(options.individualSelection),
 		exempt: [...new Set([slug, ...SYSTEM_EXEMPT, ...(options.exempt ?? [])])],
 		retryAfter: options.retryAfter ?? DEFAULT_RETRY_AFTER,
 		...(options.editor?.converters ? { editorConverters: options.editor.converters } : {}),
 		localeMap: options.localeMap ?? {},
 	}
+}
+
+const resolveCustomTargets = (targets: ContentLockCustomTarget[] = []): CustomTarget[] => {
+	const resolved: CustomTarget[] = []
+	for (const target of targets) {
+		const entry = typeof target === 'string' ? { key: target } : target
+		const key = entry.key.replace(/^custom:/, '').trim()
+		if (!key || resolved.some((known) => known.key === key)) {
+			continue
+		}
+		const paths =
+			entry.path === undefined ? [] : Array.isArray(entry.path) ? entry.path : [entry.path]
+		resolved.push({
+			key,
+			label: entry.label ?? key,
+			paths: paths.map((path) =>
+				typeof path === 'string'
+					? { path, match: 'prefix' as const }
+					: { path: path.path, match: path.match ?? 'prefix' }
+			),
+		})
+	}
+	return resolved
 }
 
 export const CUSTOM_KEY = '@10x-media/content-lock'

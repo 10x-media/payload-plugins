@@ -107,24 +107,29 @@ export const forgetWindows = (payload: Payload): void => {
 
 /** The effective lock at the current instant (Payload's clock, so tests can move it). */
 export const getContentLockState = async (payload: Payload): Promise<ContentLockState> => {
-	const { groups } = optionsFromConfig(payload.config)
-	return resolveState(await readWindows(payload), getCurrentDate(), groups)
+	const { exempt, groups } = optionsFromConfig(payload.config)
+	return resolveState(await readWindows(payload), getCurrentDate(), { exempt, groups })
 }
 
 /**
- * Whether content is locked right now: any of it, or the given collection or
- * global. For jobs and other server code that would rather skip or postpone
- * work than have its writes rejected.
+ * Whether content is locked right now: any of it, or the given collection,
+ * global or custom target. Exempt collections and globals never are. For jobs
+ * and other server code that would rather skip or postpone work than have its
+ * writes rejected, and for anything a custom target stands for.
  */
 export const isContentLocked = async (
 	payload: Payload,
-	target?: { collection: string } | { global: string }
+	target?: { collection: string } | { global: string } | { custom: string }
 ): Promise<boolean> => {
 	const state = await getContentLockState(payload)
 	if (!target) {
 		return state.locked
 	}
-	return 'collection' in target
-		? isEntityLocked(state, { type: 'collection', slug: target.collection })
-		: isEntityLocked(state, { type: 'global', slug: target.global })
+	if ('collection' in target) {
+		return isEntityLocked(state, { type: 'collection', slug: target.collection })
+	}
+	if ('global' in target) {
+		return isEntityLocked(state, { type: 'global', slug: target.global })
+	}
+	return isEntityLocked(state, { type: 'custom', slug: target.custom })
 }

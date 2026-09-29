@@ -4,9 +4,10 @@ import { fileURLToPath } from 'node:url'
 import { jobs } from '@10x-media/jobs'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
-import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import { BlocksFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type CollectionConfig, type GlobalConfig } from 'payload'
 import { contentLock } from '../src/index'
+import { swatchBlock } from './components/swatchBlock'
 import { playgroundTasks, startDevWorker } from './helpers/jobs'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
@@ -83,9 +84,18 @@ export default buildConfig({
 					label: { en: 'Website', de: 'Website' },
 					collections: ['pages', 'posts'],
 					globals: ['header'],
+					custom: ['reports'],
 				},
 			],
+			customTargets: [
+				{ key: 'reports', label: { en: 'Reports', de: 'Berichte' }, path: '/reports' },
+				{ key: 'crm-sync', label: 'CRM sync' },
+			],
 			individualSelection: true,
+			editor: {
+				features: [BlocksFeature({ inlineBlocks: [swatchBlock] })],
+				converters: '/components/lockConverters#lockConverters',
+			},
 		}),
 	],
 	telemetry: false,
@@ -96,6 +106,11 @@ export default buildConfig({
 	typescript: { autoGenerate },
 	admin: {
 		user: 'users',
+		components: {
+			views: {
+				reports: { Component: './components/ReportsView#ReportsView', path: '/reports' },
+			},
+		},
 		importMap: {
 			autoGenerate,
 			baseDir: path.resolve(dirname),

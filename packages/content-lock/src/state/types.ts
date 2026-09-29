@@ -7,8 +7,11 @@ export type ScopeMode = 'everything' | 'selected'
 /** A window's lifecycle position, derived from its timestamps and `now`. */
 export type WindowStatus = 'pending' | 'announced' | 'active' | 'ended'
 
-/** A collection or global the lock can freeze. */
-export type EntityRef = { type: 'collection' | 'global'; slug: string }
+/**
+ * Something a lock can cover: a collection or global, which the lock freezes,
+ * or a custom target, which it only reports for project code to honour.
+ */
+export type EntityRef = { type: 'collection' | 'global' | 'custom'; slug: string }
 
 /**
  * One lock window as the runtime sees it. Timestamps are ISO strings so the
@@ -27,18 +30,19 @@ export type LockWindow = {
 	targets: string[]
 }
 
-/** A configured group of collections and globals, frozen together under one label. */
+/** A configured group of collections, globals and custom targets, frozen together under one label. */
 export type LockGroup = {
 	key: string
 	label: string | Record<string, string>
 	collections: string[]
 	globals: string[]
+	custom: string[]
 }
 
 /** Entities a scope covers. `everything` short-circuits the lists. */
 export type ResolvedScope =
 	| { everything: true }
-	| { everything: false; collections: string[]; globals: string[] }
+	| { everything: false; collections: string[]; globals: string[]; custom: string[] }
 
 /** The effective lock at one instant, merged over every window. Serializable. */
 export type ContentLockState = {
@@ -54,4 +58,6 @@ export type ContentLockState = {
 	announced: LockWindow[]
 	/** The instant this state was resolved for, ISO. */
 	resolvedAt: string
+	/** Collection and global slugs no lock freezes. */
+	exempt: string[]
 }

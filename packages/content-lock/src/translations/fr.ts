@@ -19,6 +19,9 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.fieldLockEverythingDescription]:
 		'Désactivez pour verrouiller uniquement le contenu sélectionné.',
 	[keys.fieldGroups]: 'Groupes',
+	[keys.fieldCustomTargets]: 'Autres zones',
+	[keys.fieldCustomTargetsDescription]:
+		'Parties du projet que le verrou couvre aussi. Le code du projet les vérifie ; le plugin ne bloque aucune écriture pour elles.',
 	[keys.fieldCollections]: 'Collections',
 	[keys.fieldGlobals]: 'Globals',
 	[keys.fieldAdvanced]: 'Avancé',

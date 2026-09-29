@@ -39,6 +39,7 @@ export const useWindowForm = () => {
 	const groups = useFormFields(([fields]) => fields.groups?.value)
 	const collections = useFormFields(([fields]) => fields.collections?.value)
 	const globals = useFormFields(([fields]) => fields.globals?.value)
+	const customTargets = useFormFields(([fields]) => fields.customTargets?.value)
 	return {
 		startsAt: asIso(startsAt),
 		endsAt: asIso(endsAt),
@@ -47,6 +48,7 @@ export const useWindowForm = () => {
 		groups: asStrings(groups),
 		collections: asStrings(collections),
 		globals: asStrings(globals),
+		customTargets: asStrings(customTargets),
 	}
 }
 
@@ -73,11 +75,10 @@ export const useTokenPreview = (
 	}, [data.format])
 
 	const problem = tokenProblem(data, form.values)
-	const groups = (
-		editorConfig.resolvedFeatureMap.get(TOKEN_FEATURE_KEY)?.sanitizedClientFeatureProps as
-			| ContentLockTokenClientProps
-			| undefined
-	)?.groups
+	const featureProps = editorConfig.resolvedFeatureMap.get(TOKEN_FEATURE_KEY)
+		?.sanitizedClientFeatureProps as ContentLockTokenClientProps | undefined
+	const groups = featureProps?.groups
+	const customLabels = featureProps?.customTargets ?? []
 
 	// Labels in the document's content locale where they have one, like the dates.
 	const labelI18n = locale?.code ? { ...i18n, language: locale.code } : i18n
@@ -87,6 +88,7 @@ export const useTokenPreview = (
 				...form.groups.map((key) => `group:${key}`),
 				...form.collections.map((slug) => `collection:${slug}`),
 				...form.globals.map((slug) => `global:${slug}`),
+				...form.customTargets.map((key) => `custom:${key}`),
 			],
 			groups ?? []
 		)
@@ -98,6 +100,10 @@ export const useTokenPreview = (
 				if (kind === 'group') {
 					const group = groups?.find((candidate) => candidate.key === slug)
 					return group ? getTranslation(group.label, labelI18n) : slug
+				}
+				if (kind === 'custom') {
+					const target = customLabels.find((candidate) => candidate.key === slug)
+					return target ? getTranslation(target.label, labelI18n) : slug
 				}
 				if (kind === 'collection') {
 					const plural = config.collections.find((entry) => entry.slug === slug)?.labels?.plural

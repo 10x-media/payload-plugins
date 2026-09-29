@@ -24,6 +24,7 @@ import { ItalicFeatureClient as ItalicFeatureClient_e70f5e05f09f93e00b997edb1ef0
 import { StatusCell as StatusCell_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
 import { StatusField as StatusField_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
 import { EntitySelect as EntitySelect_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
+import { BlocksFeatureClient as BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { FixedToolbarFeatureClient as FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { ContentLockTokenFeatureClient as ContentLockTokenFeatureClient_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
 import { StageFilterBar as StageFilterBar_5503e853a89fb9ae921fa68d36a2f940 } from '@10x-media/content-lock/rsc'
@@ -44,7 +45,9 @@ import { JobsHealthBar as JobsHealthBar_58547d93a961407e3e8c8637352c625e } from 
 import { JobDocDescription as JobDocDescription_6d572934460331fb7409e85e4294174e } from '@10x-media/jobs/client'
 import { ContentLockHeader as ContentLockHeader_5503e853a89fb9ae921fa68d36a2f940 } from '@10x-media/content-lock/rsc'
 import { ContentLockProvider as ContentLockProvider_28db02d614876b75124a07b975a40caa } from '@10x-media/content-lock/client'
+import { ReportsView as ReportsView_20909e71c988b5f2a21405d748f0d771 } from '../../../components/ReportsView'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
+import { lockConverters as lockConverters_daf77a749566a26487a706533865745b } from '../../../components/lockConverters'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -74,6 +77,7 @@ export const importMap = {
   "@10x-media/content-lock/client#StatusCell": StatusCell_28db02d614876b75124a07b975a40caa,
   "@10x-media/content-lock/client#StatusField": StatusField_28db02d614876b75124a07b975a40caa,
   "@10x-media/content-lock/client#EntitySelect": EntitySelect_28db02d614876b75124a07b975a40caa,
+  "@payloadcms/richtext-lexical/client#BlocksFeatureClient": BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#FixedToolbarFeatureClient": FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@10x-media/content-lock/client#ContentLockTokenFeatureClient": ContentLockTokenFeatureClient_28db02d614876b75124a07b975a40caa,
   "@10x-media/content-lock/rsc#StageFilterBar": StageFilterBar_5503e853a89fb9ae921fa68d36a2f940,
@@ -94,5 +98,7 @@ export const importMap = {
   "@10x-media/jobs/client#JobDocDescription": JobDocDescription_6d572934460331fb7409e85e4294174e,
   "@10x-media/content-lock/rsc#ContentLockHeader": ContentLockHeader_5503e853a89fb9ae921fa68d36a2f940,
   "@10x-media/content-lock/client#ContentLockProvider": ContentLockProvider_28db02d614876b75124a07b975a40caa,
-  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
+  "./components/ReportsView#ReportsView": ReportsView_20909e71c988b5f2a21405d748f0d771,
+  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
+  "/components/lockConverters#lockConverters": lockConverters_daf77a749566a26487a706533865745b
 }

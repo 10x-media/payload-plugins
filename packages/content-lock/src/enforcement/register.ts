@@ -5,6 +5,14 @@ import { collectionGuard, globalGuard } from './guard'
 import { retryAfterHook } from './retryAfter'
 import { wrapAccess } from './wrapAccess'
 
+/**
+ * Whether a collection or global exempts itself from every lock, for plugins
+ * and projects that own collections which must stay writable (logs, queues,
+ * submissions) without every consumer listing them in `exempt`.
+ */
+export const isMarkedExempt = (entity: { custom?: Record<string, unknown> }): boolean =>
+	(entity.custom?.contentLock as { exempt?: unknown } | undefined)?.exempt === true
+
 /** Guard plus access wrapping for one collection. */
 export const lockCollection = (collection: CollectionConfig): CollectionConfig => {
 	const entity = { type: 'collection', slug: collection.slug } as const
@@ -58,7 +66,10 @@ export const registerEnforcement = (config: Config, options: ResolvedOptions): v
 			...config.folders,
 			collectionOverrides: [
 				...(config.folders?.collectionOverrides ?? []),
-				({ collection }) => (exempt.has(collection.slug) ? collection : lockCollection(collection)),
+				({ collection }) =>
+					exempt.has(collection.slug) || isMarkedExempt(collection)
+						? collection
+						: lockCollection(collection),
 			],
 		}
 	}
