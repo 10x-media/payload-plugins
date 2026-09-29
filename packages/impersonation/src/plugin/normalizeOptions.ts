@@ -36,6 +36,7 @@ const resolveUi = (ui: EnabledOptions['ui']): ResolvedUi => {
 			headerAction: false,
 			recordAction: false,
 			sessionsCollection: false,
+			userLabel: 'title',
 		}
 	}
 	return {
@@ -46,6 +47,7 @@ const resolveUi = (ui: EnabledOptions['ui']): ResolvedUi => {
 		headerAction: ui?.headerAction !== false,
 		recordAction: ui?.recordAction !== false,
 		sessionsCollection: ui?.sessionsCollection === true,
+		userLabel: ui?.userLabel === 'email' ? 'email' : 'title',
 	}
 }
 

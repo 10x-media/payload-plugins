@@ -27,6 +27,7 @@ const options = {
 		headerAction: false,
 		recordAction: false,
 		sessionsCollection: false,
+		userLabel: 'title',
 	},
 } satisfies ResolvedOptions
 

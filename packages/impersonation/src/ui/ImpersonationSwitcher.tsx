@@ -2,12 +2,15 @@
 
 import {
 	Button,
+	ChevronIcon,
 	Drawer,
 	Pagination,
+	Pill,
+	Popup,
+	PopupList,
 	RenderCustomComponent,
 	SearchFilter,
 	SearchIcon,
-	SelectInput,
 	toast,
 	useConfig,
 	useDocumentDrawer,
@@ -76,6 +79,7 @@ export const ImpersonationSwitcher = ({
 	const { closeModal, isModalOpen, openModal } = useModal()
 	const { apiPath, cardEmail, reasonMode, targetFilters } = useImpersonation()
 	const [collection, setCollection] = useState(collections[0]?.slug ?? '')
+	const [collectionMenuOpen, setCollectionMenuOpen] = useState(false)
 	const [search, setSearch] = useState('')
 	const [page, setPage] = useState(1)
 	const [docs, setDocs] = useState<ListedUser[]>([])
@@ -107,6 +111,14 @@ export const ImpersonationSwitcher = ({
 	}, [])
 
 	const listAbort = useRef<AbortController | null>(null)
+	const switcherRef = useRef<HTMLDivElement>(null)
+	const resultsRef = useRef<HTMLDivElement>(null)
+
+	const changePage = (next: number) => {
+		setPage(next)
+		switcherRef.current?.closest('.drawer__content-children')?.scrollTo({ top: 0 })
+		resultsRef.current?.scrollTo({ top: 0 })
+	}
 
 	const load = useCallback(async () => {
 		if (!collection || !isModalOpen(drawerSlug)) {
@@ -205,47 +217,64 @@ export const ImpersonationSwitcher = ({
 		<>
 			<Button
 				buttonStyle="subtle"
+				className="impersonation-switcher-button"
 				margin={false}
 				onClick={() => {
 					setPage(1)
 					openModal(drawerSlug)
 				}}
+				size="small"
+				icon={<ImpersonateIcon />}
+				iconPosition="left"
 			>
-				<span className="impersonation-header-action" data-testid="impersonation-switcher">
-					<ImpersonateIcon />
-					{t(keys.switchToUser)}
-				</span>
+				{t(keys.switchToUser)}
 			</Button>
 			<Drawer slug={drawerSlug} title={t(keys.switchToUser)}>
-				<div className="impersonation-switcher">
-					<div className="search-bar impersonation-toolbar">
+				<div className="impersonation-switcher" ref={switcherRef}>
+					<div className="search-bar">
 						<SearchIcon />
 						<SearchFilter handleChange={onSearch} label={t(keys.searchByName)} />
 						{visibleCollections.length > 1 ? (
-							<div className="search-bar__actions impersonation-collection">
-								<SelectInput
-									isClearable={false}
-									name="impersonation-collection"
-									onChange={(incoming) => {
-										const next = Array.isArray(incoming) ? incoming[0] : incoming
-										const value =
-											next && typeof next === 'object' && 'value' in next
-												? String(next.value)
-												: String(next ?? '')
-										setCollection(value)
-										setPage(1)
-									}}
-									options={visibleCollections.map((entry) => ({
-										label: entry.label,
-										value: entry.slug,
-									}))}
-									path="impersonation-collection"
-									value={collection}
+							<div className="search-bar__actions">
+								<Popup
+									button={
+										<Pill
+											className="impersonation-collection"
+											icon={<ChevronIcon direction={collectionMenuOpen ? 'up' : 'down'} />}
+											pillStyle="light"
+											size="small"
+										>
+											{visibleCollections.find((entry) => entry.slug === collection)?.label ??
+												collection}
+										</Pill>
+									}
+									buttonType="custom"
+									caret={false}
+									horizontalAlign="right"
+									onToggleOpen={setCollectionMenuOpen}
+									render={({ close }) => (
+										<PopupList.ButtonGroup>
+											{visibleCollections.map((entry) => (
+												<PopupList.Button
+													active={entry.slug === collection}
+													key={entry.slug}
+													onClick={() => {
+														setCollection(entry.slug)
+														setPage(1)
+														close()
+													}}
+												>
+													{entry.label}
+												</PopupList.Button>
+											))}
+										</PopupList.ButtonGroup>
+									)}
+									size="fit-content"
 								/>
 							</div>
 						) : null}
 					</div>
-					<div className="impersonation-switcher__results">
+					<div className="impersonation-switcher__results" ref={resultsRef}>
 						{docs.length === 0 && !loading ? (
 							<p className="impersonation-switcher__empty">{t(keys.noResults)}</p>
 						) : null}
@@ -279,7 +308,7 @@ export const ImpersonationSwitcher = ({
 								hasNextPage={hasNext}
 								hasPrevPage={hasPrev}
 								nextPage={page + 1}
-								onChange={setPage}
+								onChange={changePage}
 								page={page}
 								prevPage={Math.max(1, page - 1)}
 								totalPages={totalPages}

@@ -38,7 +38,7 @@ export const EndSessionMenuItem = () => {
 	return (
 		<>
 			<Button buttonStyle="subtle" margin={false} onClick={() => openModal(CONFIRM_SLUG)}>
-				<span data-testid="impersonation-end-session">{t(keys.endSession)}</span>
+				{t(keys.endSession)}
 			</Button>
 			<ConfirmationModal
 				body={t(keys.endSessionBody)}

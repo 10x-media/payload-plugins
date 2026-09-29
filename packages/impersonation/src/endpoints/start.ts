@@ -8,7 +8,7 @@ import {
 	readTenantCookie,
 	startTenantCookies,
 } from '../auth/tenantCookie'
-import { asId, collectionBySlug, idsEqual } from '../ids'
+import { asId, collectionBySlug, idsEqual, userTitle } from '../ids'
 import { REASON_MAX_LENGTH } from '../plugin/constants'
 import { isStartableAuthCollection } from '../plugin/startable'
 import { closeRecord } from '../session/close'
@@ -209,6 +209,11 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 				impersonatorEmail: typeof user.email === 'string' ? user.email : undefined,
 				impersonatorLocale: locale,
 				impersonatorSid: sid,
+				impersonatorTitle: userTitle(
+					req.payload,
+					user.collection,
+					user as unknown as Record<string, unknown>
+				),
 				impersonatorTenantCookie: readTenantCookie(req.headers, req.payload.config.cookiePrefix),
 				ip: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? undefined,
 				mode: minted.mode,
@@ -223,6 +228,11 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 							: undefined,
 				targetLocked: Boolean(readable.lockUntil),
 				targetSid: minted.sid,
+				targetTitle: userTitle(
+					req.payload,
+					collection,
+					readable ?? (minted.user as Record<string, unknown>)
+				),
 				userAgent: req.headers.get('user-agent') ?? undefined,
 			} as never,
 			depth: 0,

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 
 import { resolveTargetFilters } from '../access/filterTargets'
 import { statusFromRow } from '../getImpersonation'
+import { labelUser } from '../ids'
 import { IMPERSONATION_SID_PREFIX } from '../plugin/constants'
 import { readHintCookie } from '../plugin/lookup'
 import { getRegistry } from '../plugin/registry'
@@ -74,6 +75,7 @@ export const ImpersonationProvider = async ({
 				startedAt: paintedLive.startedAt,
 				target: paintedLive.target,
 				targetEmail: paintedLive.targetEmail ?? null,
+				targetTitle: paintedLive.targetTitle ?? paintedLive.targetEmail ?? null,
 			}
 		: row && sid
 			? statusFromRow(row, sid)
@@ -84,22 +86,26 @@ export const ImpersonationProvider = async ({
 				absoluteExpiresAt: paintedLive.absoluteExpiresAt,
 				impersonatorEmail: paintedLive.impersonatorEmail,
 				impersonatorId: paintedLive.impersonator.id,
+				impersonatorTitle: paintedLive.impersonatorTitle,
 				impersonatorLocale: paintedLive.impersonatorLocale,
 				mode: paintedLive.mode,
 				side: 'target' as const,
 				targetEmail: paintedLive.targetEmail,
 				targetId: paintedLive.target.id,
+				targetTitle: paintedLive.targetTitle,
 			}
 		: row && sid
 			? {
 					absoluteExpiresAt: row.absoluteExpiresAt,
 					impersonatorEmail: row.impersonatorEmail,
 					impersonatorId: relationOf(row.impersonator)?.id,
+					impersonatorTitle: row.impersonatorTitle,
 					impersonatorLocale: row.impersonatorLocale,
 					mode: row.mode,
 					side: impersonationSide(row, sid),
 					targetEmail: row.targetEmail,
 					targetId: relationOf(row.target)?.id,
+					targetTitle: row.targetTitle,
 				}
 			: null
 
@@ -117,8 +123,16 @@ export const ImpersonationProvider = async ({
 	}
 
 	const locale = barSource.impersonatorLocale
-	const targetName = barSource.targetEmail ?? String(barSource.targetId ?? '')
-	const impersonatorLabel = barSource.impersonatorEmail ?? barSource.impersonatorId ?? ''
+	const targetName =
+		labelUser(options.ui.userLabel, {
+			email: barSource.targetEmail,
+			title: barSource.targetTitle,
+		}) ?? String(barSource.targetId ?? '')
+	const impersonatorLabel =
+		labelUser(options.ui.userLabel, {
+			email: barSource.impersonatorEmail,
+			title: barSource.impersonatorTitle,
+		}) ?? String(barSource.impersonatorId ?? '')
 	const isImpersonatorSide = barSource.side === 'impersonator' && barSource.mode === 'parallel'
 	const actingAs = isImpersonatorSide
 		? fillTemplate(messageFor(locale, keys.sessionActiveOnSite), '{{name}}', String(targetName))
@@ -143,6 +157,7 @@ export const ImpersonationProvider = async ({
 				sessionEndsAtTemplate={messageFor(locale, keys.sessionEndsAt)}
 				sessionEndsInTemplate={messageFor(locale, keys.sessionEndsIn)}
 				showFrontendLink={isImpersonatorSide}
+				targetName={targetName}
 				tone={isImpersonatorSide ? 'quiet' : 'warning'}
 			/>
 		</ImpersonationClientConfig>

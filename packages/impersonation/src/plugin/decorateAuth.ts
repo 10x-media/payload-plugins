@@ -2,7 +2,7 @@ import type { AuthStrategy, Payload } from 'payload'
 
 import { absoluteExpiryCookies } from '../auth/expiryCookies'
 import { closeAndRevoke } from '../session/close'
-import { findOpenBySid, isPastAbsoluteExpiry, relationOf } from '../session/resolve'
+import { cachedFindOpenBySid, isPastAbsoluteExpiry, relationOf } from '../session/resolve'
 import type {
 	ImpersonatedUser,
 	ImpersonationActor,
@@ -50,7 +50,7 @@ const wrapStrategy = ({
 			return result
 		}
 
-		const row = await findOpenBySid({ options, payload, sid })
+		const row = await cachedFindOpenBySid(sid, options, payload)
 		if (!row) {
 			return result
 		}
@@ -76,11 +76,13 @@ const wrapStrategy = ({
 				impersonator,
 				impersonatorEmail: row.impersonatorEmail,
 				impersonatorLocale: row.impersonatorLocale,
+				impersonatorTitle: row.impersonatorTitle,
 				mode: row.mode,
 				reason: row.reason,
 				startedAt: row.startedAt,
 				target,
 				targetEmail: row.targetEmail,
+				targetTitle: row.targetTitle,
 			}
 			user._impersonation = actor
 		}

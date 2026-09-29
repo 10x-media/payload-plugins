@@ -23,10 +23,9 @@ export default async function FrontendPage() {
 		<main>
 			<h1>Impersonation host</h1>
 			<p>
-				<code>req.user</code> is{' '}
-				<strong data-testid="live-user">{describeUser(user as ResolvedUser)}</strong>.
+				<code>req.user</code> is <strong>{describeUser(user as ResolvedUser)}</strong>.
 			</p>
-			<p data-testid="impersonation-status">
+			<p className="dev-impersonation-status">
 				{impersonation.active
 					? `impersonating as ${impersonation.target?.collection}/${impersonation.target?.id}`
 					: 'not impersonating'}
@@ -52,7 +51,7 @@ export default async function FrontendPage() {
 			</div>
 
 			<p>
-				<a data-testid="sso-login" href={`/api/sso-users/sso/callback?email=${DEV_SSO.email}`}>
+				<a href={`/api/sso-users/sso/callback?email=${DEV_SSO.email}`}>
 					Sign in as {DEV_SSO.email} with fake SSO
 				</a>
 			</p>

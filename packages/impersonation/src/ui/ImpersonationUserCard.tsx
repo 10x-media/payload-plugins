@@ -48,7 +48,6 @@ export const ImpersonationUserCard = ({
 				buttonStyle="icon-label"
 				extraButtonProps={{
 					'aria-label': openDrawerLabel,
-					'data-testid': 'impersonation-open-drawer',
 				}}
 				icon={<EditIcon />}
 				iconStyle="none"
@@ -61,7 +60,6 @@ export const ImpersonationUserCard = ({
 				el="link"
 				extraButtonProps={{
 					'aria-label': openDocumentLabel,
-					'data-testid': 'impersonation-open-document',
 				}}
 				icon={<ExternalLinkIcon />}
 				iconStyle="none"

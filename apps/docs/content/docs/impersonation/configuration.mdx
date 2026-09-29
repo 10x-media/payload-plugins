@@ -38,6 +38,7 @@ Each flag is independent. `ui: false` turns all of them off. The provider still 
 | `ui.sessionsCollection` | `false` | Put `impersonation-sessions` in the admin nav. `access.readRecords` still decides who can read a row. |
 | `ui.card` | unset | Replacement for the default switcher row. Same props as `ImpersonationUserCard`: `collectionSlug`, `doc`, `onSelect`, `onOpenDrawer`, `documentHref`, `title`, `email`, `openDocumentLabel`, `openDrawerLabel`. Pass a component path, or `{ path, exportName }` for a named export. Omit to keep the default card. |
 | `ui.cardEmail` | `true` | Show email under `useAsTitle` on default switcher cards. |
+| `ui.userLabel` | `'title'` | How the bar, collapsed chip, and frontend banner name users. `'title'` is the collection's `useAsTitle`, `'email'` is the email. Each falls back to the other. |
 
 Build your own control with `useImpersonation` from `@10x-media/impersonation/client`. It returns `{ status, setStatus, start, exit, end, reasonMode, targetFilters, apiPath, cardEmail, sessionCollection }`. `targetFilters` is the `access.filterTargets` result (`true` or a `Where` per collection). `status` starts from the server render and updates after the bar checks the live session. `StartConfirmModal` is exported too.
 

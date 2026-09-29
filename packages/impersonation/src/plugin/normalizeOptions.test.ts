@@ -40,6 +40,7 @@ describe('normalizeOptions', () => {
 			headerAction: true,
 			recordAction: true,
 			sessionsCollection: false,
+			userLabel: 'title',
 		})
 	})
 

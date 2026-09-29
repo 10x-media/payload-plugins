@@ -87,7 +87,10 @@ export const findOpenBySid = async (args: {
 	sid: string
 }): Promise<ImpersonationRecord | null> => findOpenWhere({ ...args, where: openBySid(args.sid) })
 
-/** One lookup per sid for the server components of a single admin render. */
+/**
+ * One lookup per sid for a single admin render: the auth strategy, the provider,
+ * and the header action share it. Outside a React render `cache` is a pass-through.
+ */
 export const cachedFindOpenBySid = cache(
 	(sid: string, options: ResolvedOptions, payload: Payload): Promise<ImpersonationRecord | null> =>
 		findOpenBySid({ options, payload, sid })

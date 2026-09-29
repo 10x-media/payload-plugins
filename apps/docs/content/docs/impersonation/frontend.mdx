@@ -7,7 +7,7 @@ The admin bar is Payload-only. On the website, drop in the shipped banner or cop
 
 ## Shipped banner
 
-Server component. Renders nothing when this request is not the impersonated session. Own styles, no admin CSS.
+Server component. Renders nothing when this request is not the impersonated session. Minimal default styles, no admin CSS.
 
 ```tsx title="app/(frontend)/layout.tsx"
 import { ImpersonationFrontendBanner } from '@10x-media/impersonation/rsc'
@@ -28,7 +28,7 @@ export default async function Layout({ children }) {
 }
 ```
 
-Pass `user` if you already called `payload.auth`, so the banner does not authenticate again. `className` and `labels` (`actingAs` with `{{name}}`, `exit`) are the styling and copy hooks. The default label uses the target email. Exit reloads only when the request succeeds.
+Pass `user` if you already called `payload.auth`, so the banner does not authenticate again. `className` and `labels` (`actingAs` with `{{name}}`, `exit`) are the styling and copy hooks. The default look has zero specificity, so your own class overrides it without `!important`. Pass `unstyled` to drop it and style the `impersonation-frontend-banner`, `__text`, and `__exit` classes yourself. The name follows `ui.userLabel` (`useAsTitle` by default); pass `userLabel="email"` or `"title"` to override it for the banner. Exit reloads only when the request succeeds.
 
 ## Build your own
 

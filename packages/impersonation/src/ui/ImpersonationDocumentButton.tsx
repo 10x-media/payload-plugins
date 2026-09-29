@@ -94,13 +94,12 @@ export const ImpersonationDocumentButton = () => {
 			<Button
 				buttonStyle="subtle"
 				className="impersonation-document-button"
+				icon={<ImpersonateIcon />}
+				iconPosition="left"
 				margin={false}
 				onClick={() => openModal(CONFIRM_SLUG)}
 			>
-				<span className="impersonation-header-action">
-					<ImpersonateIcon />
-					<span data-testid="impersonation-document-action">{t(keys.switchToUser)}</span>
-				</span>
+				{t(keys.switchToUser)}
 			</Button>
 			<StartConfirmModal
 				apiPath={apiPath}

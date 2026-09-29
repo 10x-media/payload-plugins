@@ -15,8 +15,6 @@ export type BarPlacement = {
 
 export type Point = { x: number; y: number }
 
-export type BarInset = { end: number; start: number }
-
 const STORAGE_KEY = 'impersonation-bar'
 const MARGIN = 12
 
@@ -57,50 +55,29 @@ export const writeBarPlacement = (placement: BarPlacement): void => {
 }
 
 /**
- * How far the docked bar must stay clear of the nav. Uses the content column,
- * so closing the nav lets the bar grow into that space.
+ * Layout viewport without scrollbars. `position: fixed` resolves against it, so
+ * `window.innerWidth` would park a right-edge chip under the scrollbar.
  */
-export const measureNavInset = (): BarInset => {
-	const wrap = document.querySelector('.template-default__wrap')
-	if (wrap instanceof HTMLElement) {
-		const rect = wrap.getBoundingClientRect()
-		return {
-			end: Math.max(0, Math.round(window.innerWidth - rect.right)),
-			start: Math.max(0, Math.round(rect.left)),
-		}
-	}
-	const nav = document.querySelector('aside.nav')
-	if (!(nav instanceof HTMLElement) || !nav.classList.contains('nav--nav-open')) {
-		return { end: 0, start: 0 }
-	}
-	const rect = nav.getBoundingClientRect()
-	if (rect.width < 8) {
-		return { end: 0, start: 0 }
-	}
-	if (rect.left <= 1) {
-		return { end: 0, start: rect.width }
-	}
-	return { end: rect.width, start: 0 }
-}
+export const readViewport = (): { height: number; width: number } => ({
+	height: document.documentElement.clientHeight,
+	width: document.documentElement.clientWidth,
+})
 
 export const anchorsFor = ({
 	header,
-	inset,
 	size,
 	viewport,
 }: {
 	header: number
-	inset: BarInset
 	size: { height: number; width: number }
 	viewport: { height: number; width: number }
 }): Record<BarEdge, Point> => {
-	const left = inset.start + MARGIN
-	const right = Math.max(left, viewport.width - inset.end - size.width - MARGIN)
+	const left = MARGIN
+	const right = Math.max(left, viewport.width - size.width - MARGIN)
 	const top = header + MARGIN
 	const bottom = Math.max(top, viewport.height - size.height - MARGIN)
 	const midY = Math.max(top, (viewport.height - size.height) / 2)
-	const span = viewport.width - inset.start - inset.end - size.width
-	const midX = inset.start + Math.max(MARGIN, span / 2)
+	const midX = Math.max(MARGIN, (viewport.width - size.width) / 2)
 	return {
 		bottom: { x: midX, y: bottom },
 		'bottom-left': { x: left, y: bottom },

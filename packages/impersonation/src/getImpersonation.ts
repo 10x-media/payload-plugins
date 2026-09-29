@@ -23,6 +23,8 @@ export type ImpersonationStatus =
 			startedAt: string
 			target: { collection: string; id: number | string } | null
 			targetEmail: null | string
+			/** `useAsTitle` of the target at start, else its email. */
+			targetTitle: null | string
 	  }
 	| { active: false }
 
@@ -38,6 +40,7 @@ export const statusFromRow = (row: ImpersonationRecord, sid: string): Impersonat
 	startedAt: row.startedAt,
 	target: relationOf(row.target),
 	targetEmail: row.targetEmail ?? null,
+	targetTitle: row.targetTitle ?? row.targetEmail ?? null,
 })
 
 /**

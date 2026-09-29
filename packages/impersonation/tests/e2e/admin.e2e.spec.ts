@@ -15,13 +15,17 @@ const collectionLabel = (slug: string) =>
 	({ customers: 'Customers', partners: 'Partners', users: 'Users' })[slug] ?? slug
 
 const startAs = async (page: Page, name: string, collection?: string) => {
-	await page.getByTestId('impersonation-switcher').click()
+	await page.locator('.impersonation-switcher-button').click()
 	const drawer = page.locator('.drawer--is-open, .drawer')
 	await expect(drawer).toBeVisible()
 	if (collection) {
-		await drawer.locator('.react-select').first().click()
-		await page.getByRole('option', { name: collectionLabel(collection), exact: true }).click()
+		await drawer.locator('.impersonation-collection').click()
+		await page
+			.locator('.popup-button-list')
+			.getByRole('button', { name: collectionLabel(collection), exact: true })
+			.click()
 	}
+	await drawer.locator('.search-filter input').fill(name)
 	await drawer.locator('.impersonation-card__pick').filter({ hasText: name }).click()
 	const confirm = page.locator('.confirmation-modal')
 	await expect(confirm).toBeVisible()
@@ -42,18 +46,18 @@ test('payload health endpoint responds', async ({ request }) => {
 test('staff can switch to a user and return', async ({ page }) => {
 	await loginAdmin(page)
 	await startAs(page, 'Dev Editor')
-	await expect(page.getByTestId('impersonation-bar')).toContainText('Acting as')
+	await expect(page.locator('.impersonation-bar')).toContainText('Acting as')
 	await page.getByRole('button', { name: /Return to/ }).click()
-	await expect(page.getByTestId('impersonation-switcher')).toBeVisible()
+	await expect(page.locator('.impersonation-switcher-button')).toBeVisible()
 })
 
 test('bar stays on /admin/unauthorized for a non-staff target', async ({ page }) => {
 	await loginAdmin(page)
 	await startAs(page, 'Dev User')
 	await expect(page).toHaveURL(/\/admin\/unauthorized/)
-	await expect(page.getByTestId('impersonation-bar')).toContainText('Acting as')
+	await expect(page.locator('.impersonation-bar')).toContainText('Acting as')
 	await page.getByRole('button', { name: /Return to/ }).click()
-	await expect(page.getByTestId('impersonation-switcher')).toBeVisible()
+	await expect(page.locator('.impersonation-switcher-button')).toBeVisible()
 })
 
 test('document action starts impersonation', async ({ page }) => {
@@ -64,30 +68,30 @@ test('document action starts impersonation', async ({ page }) => {
 	expect(listed.ok()).toBeTruthy()
 	const id = (await listed.json()).docs[0].id
 	await page.goto(`/admin/collections/users/${id}`)
-	await page.getByTestId('impersonation-document-action').click()
+	await page.locator('.impersonation-document-button').click()
 	const confirm = page.locator('.confirmation-modal')
 	await expect(confirm).toBeVisible()
 	await confirm.getByRole('button', { name: 'Impersonate', exact: true }).click()
-	await expect(page.getByTestId('impersonation-bar')).toContainText('Acting as')
+	await expect(page.locator('.impersonation-bar')).toContainText('Acting as')
 })
 
 test('logout while impersonating closes the session', async ({ page }) => {
 	await loginAdmin(page)
 	await startAs(page, 'Dev Editor')
-	await expect(page.getByTestId('impersonation-bar')).toContainText('Acting as')
+	await expect(page.locator('.impersonation-bar')).toContainText('Acting as')
 	const status = await page.evaluate(async () => {
 		const response = await fetch('/api/users/logout', { credentials: 'include', method: 'POST' })
 		return response.status
 	})
 	expect(status).toBeLessThan(400)
 	await page.goto('/')
-	await expect(page.getByTestId('impersonation-status')).toHaveText('not impersonating')
+	await expect(page.locator('.dev-impersonation-status')).toHaveText('not impersonating')
 })
 
 test('terminate from the record ends the other session', async ({ browser, page }) => {
 	await loginAdmin(page)
 	await startAs(page, 'Dev Editor')
-	await expect(page.getByTestId('impersonation-bar')).toContainText('Acting as')
+	await expect(page.locator('.impersonation-bar')).toContainText('Acting as')
 
 	const terminator = await browser.newContext()
 	const other = await terminator.newPage()
@@ -110,7 +114,7 @@ test('terminate from the record ends the other session', async ({ browser, page 
 		}, row.id)
 		expect(ended.ok, `terminate ${ended.status}`).toBeTruthy()
 		await page.reload()
-		await expect(page.getByTestId('impersonation-bar')).toHaveCount(0)
+		await expect(page.locator('.impersonation-bar')).toHaveCount(0)
 	} finally {
 		await terminator.close()
 	}
@@ -119,9 +123,9 @@ test('terminate from the record ends the other session', async ({ browser, page 
 test('frontend helper reports a customer impersonation', async ({ page }) => {
 	await loginAdmin(page)
 	await startAs(page, 'Dev Customer', 'customers')
-	await expect(page.getByTestId('impersonation-status')).toContainText(
+	await expect(page.locator('.dev-impersonation-status')).toContainText(
 		'impersonating as customers/'
 	)
-	await page.getByTestId('impersonation-exit').click()
-	await expect(page.getByTestId('impersonation-status')).toHaveText('not impersonating')
+	await page.locator('.impersonation-frontend-banner__exit').click()
+	await expect(page.locator('.dev-impersonation-status')).toHaveText('not impersonating')
 })

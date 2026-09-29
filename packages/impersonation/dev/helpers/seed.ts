@@ -35,6 +35,9 @@ export const DEV_PARTNER = {
 
 export const DEV_SSO = { email: 'sso@10xmedia.de', name: 'Dev SSO' }
 
+/** Enough customers for several switcher pages (`SWITCHER_PAGE_SIZE` is 20). */
+const CUSTOMER_TOTAL = 65
+
 /**
  * Seed every auth collection the plugin will need to exercise: staff who may
  * impersonate, a non-admin target, a second local-auth collection, an isolated
@@ -57,6 +60,22 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	if (customerCount.totalDocs === 0) {
 		await payload.create({ collection: 'customers', data: DEV_CUSTOMER })
 		payload.logger.info(`Seeded customer: ${DEV_CUSTOMER.email} / ${DEV_CUSTOMER.password}`)
+	}
+
+	const customersSoFar = (await payload.count({ collection: 'customers' })).totalDocs
+	if (customersSoFar < CUSTOMER_TOTAL) {
+		for (let n = customersSoFar; n < CUSTOMER_TOTAL; n += 1) {
+			const label = String(n).padStart(2, '0')
+			await payload.create({
+				collection: 'customers',
+				data: {
+					email: `customer-${label}@10xmedia.de`,
+					name: `Customer ${label}`,
+					password: DEV_CUSTOMER.password,
+				},
+			})
+		}
+		payload.logger.info(`Seeded ${CUSTOMER_TOTAL} customers for switcher pagination`)
 	}
 
 	const partnerCount = await payload.count({ collection: 'partners' })

@@ -1,11 +1,14 @@
 import type { Payload } from 'payload'
 
 import { getImpersonation } from '../getImpersonation'
+import { labelUser } from '../ids'
 import { getRegistry } from '../plugin/registry'
+import type { UserLabel } from '../types'
 import { ImpersonationFrontendExit } from '../ui/ImpersonationFrontendExit'
+import './frontendBanner.css'
 
 export type ImpersonationFrontendBannerLabels = {
-	/** `{{name}}` is the target email, or the collection and id when there is no email. */
+	/** `{{name}}` is the target per `userLabel`, else collection and id. */
 	actingAs?: string
 	exit?: string
 }
@@ -15,6 +18,10 @@ export type ImpersonationFrontendBannerProps = {
 	headers: Headers
 	labels?: ImpersonationFrontendBannerLabels
 	payload: Payload
+	/** Skip the default look. Class names stay, so the project styles everything. */
+	unstyled?: boolean
+	/** Name the target by `useAsTitle` or by email. Defaults to the plugin's `ui.userLabel`. */
+	userLabel?: UserLabel
 	user?: null | { collection?: string; id?: number | string }
 }
 
@@ -22,8 +29,9 @@ const fillName = (template: string, name: string): string => template.split('{{n
 
 /**
  * Default frontend banner. Renders nothing when this request is not the
- * impersonated session. Class names are the styling hook; inline styles are
- * only the unstyled default.
+ * impersonated session. Class names are the styling hook. The default look
+ * has zero specificity, so a project class overrides it without `!important`;
+ * `unstyled` drops it.
  *
  * ```tsx
  * <ImpersonationFrontendBanner payload={payload} headers={await headers()} />
@@ -34,7 +42,9 @@ export const ImpersonationFrontendBanner = async ({
 	headers,
 	labels,
 	payload,
+	unstyled,
 	user,
+	userLabel,
 }: ImpersonationFrontendBannerProps) => {
 	const options = getRegistry(payload.config)
 	if (!options) {
@@ -49,38 +59,23 @@ export const ImpersonationFrontendBanner = async ({
 	}
 
 	const fallback = status.target ? `${status.target.collection}/${status.target.id}` : 'user'
-	const name = status.targetEmail || fallback
+	const name =
+		labelUser(userLabel ?? options.ui.userLabel, {
+			email: status.targetEmail,
+			title: status.targetTitle,
+		}) ?? fallback
 	const actingAs = fillName(labels?.actingAs ?? 'Acting as {{name}}', name)
 	const apiPath = `${payload.config.routes.api}${options.apiPath}`
-	const rootClass = className
-		? `impersonation-frontend-banner ${className}`
-		: 'impersonation-frontend-banner'
+	const rootClass = [
+		'impersonation-frontend-banner',
+		unstyled ? null : 'impersonation-frontend-banner--default',
+		className,
+	]
+		.filter(Boolean)
+		.join(' ')
 
 	return (
-		<div className={rootClass} data-testid="impersonation-frontend-banner" role="status">
-			<style>
-				{`
-.impersonation-frontend-banner {
-	align-items: center;
-	background: #f4f1ea;
-	color: #1c1915;
-	display: flex;
-	font: 14px/1.4 system-ui, sans-serif;
-	gap: 12px;
-	justify-content: space-between;
-	padding: 0.6rem 1rem;
-}
-.impersonation-frontend-banner__exit {
-	background: transparent;
-	border: 1px solid currentColor;
-	border-radius: 4px;
-	color: inherit;
-	cursor: pointer;
-	font: inherit;
-	padding: 0.35rem 0.75rem;
-}
-`}
-			</style>
+		<div className={rootClass} role="status">
 			<span className="impersonation-frontend-banner__text">{actingAs}</span>
 			<ImpersonationFrontendExit
 				apiPath={apiPath}

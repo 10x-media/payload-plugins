@@ -28,7 +28,7 @@ export const buildRecordsCollection = ({
 			defaultColumns: ['target', 'impersonator', 'startedAt', 'endedAt', 'endedBy'],
 			group: ADMIN_GROUP,
 			hidden: !options.ui.sessionsCollection,
-			useAsTitle: 'targetEmail',
+			useAsTitle: 'targetTitle',
 			...(options.ui.recordAction
 				? {
 						components: {
@@ -56,6 +56,8 @@ export const buildRecordsCollection = ({
 			},
 			{ name: 'impersonatorEmail', type: 'text', index: true },
 			{ name: 'targetEmail', type: 'text', index: true },
+			{ name: 'impersonatorTitle', type: 'text' },
+			{ name: 'targetTitle', type: 'text' },
 			{
 				name: 'mode',
 				type: 'select',

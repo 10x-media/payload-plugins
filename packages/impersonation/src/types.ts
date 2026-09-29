@@ -30,11 +30,13 @@ export type ImpersonationActor = {
 	impersonator: { collection: string; id: number | string }
 	impersonatorEmail?: null | string
 	impersonatorLocale?: null | string
+	impersonatorTitle?: null | string
 	mode: ImpersonationMode
 	reason?: null | string
 	startedAt: string
 	target: { collection: string; id: number | string }
 	targetEmail?: null | string
+	targetTitle?: null | string
 }
 
 export type ImpersonateAccessArgs = {
@@ -127,6 +129,13 @@ export type UiOptions = {
 	 */
 	documentAction?: boolean
 	/**
+	 * How the bar, the collapsed chip, and the frontend banner name users:
+	 * `'title'` is the collection's `useAsTitle` (falls back to the email),
+	 * `'email'` is the email.
+	 * @default 'title'
+	 */
+	userLabel?: UserLabel
+	/**
 	 * Header control that opens the user switcher drawer.
 	 * @default true
 	 */
@@ -217,6 +226,8 @@ export type ImpersonationPluginOptions =
 	| ({ disabled: true } & Partial<EnabledOptions>)
 	| ({ disabled?: false } & EnabledOptions)
 
+export type UserLabel = 'email' | 'title'
+
 export type ResolvedUi = {
 	bar: boolean
 	card?: PayloadComponent
@@ -225,6 +236,7 @@ export type ResolvedUi = {
 	headerAction: boolean
 	recordAction: boolean
 	sessionsCollection: boolean
+	userLabel: UserLabel
 }
 
 export type ResolvedOptions = {
@@ -281,6 +293,7 @@ export type ImpersonationRecord = {
 	impersonatorLocale?: null | string
 	impersonatorSid: string
 	impersonatorTenantCookie?: null | string
+	impersonatorTitle?: null | string
 	ip?: null | string
 	mode: ImpersonationMode
 	reason?: null | string
@@ -289,5 +302,6 @@ export type ImpersonationRecord = {
 	targetEmail?: null | string
 	targetLocked?: boolean | null
 	targetSid: string
+	targetTitle?: null | string
 	userAgent?: null | string
 }

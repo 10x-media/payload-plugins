@@ -18,12 +18,11 @@ import { errorKey, goAfterSwitch, postImpersonation } from './api'
 import {
 	anchorsFor,
 	type BarEdge,
-	type BarInset,
-	measureNavInset,
 	nearestEdge,
 	type Point,
 	projectThrow,
 	readBarPlacement,
+	readViewport,
 	writeBarPlacement,
 } from './barPlacement'
 import { useImpersonation } from './useImpersonation'
@@ -67,6 +66,8 @@ export type ImpersonationBarProps = {
 	sessionEndsAtTemplate: string
 	sessionEndsInTemplate: string
 	showFrontendLink?: boolean
+	/** Collapsed chip label. */
+	targetName: string
 	tone?: 'quiet' | 'warning'
 }
 
@@ -83,6 +84,7 @@ export const ImpersonationBar = ({
 	sessionEndsAtTemplate,
 	sessionEndsInTemplate,
 	showFrontendLink,
+	targetName,
 	tone = 'warning',
 }: ImpersonationBarProps) => {
 	const { setStatus } = useImpersonation()
@@ -93,10 +95,11 @@ export const ImpersonationBar = ({
 	const [visible, setVisible] = useState(true)
 	const [collapsed, setCollapsed] = useState(false)
 	const [edge, setEdge] = useState<BarEdge>('right')
-	const [inset, setInset] = useState<BarInset>({ end: 0, start: 0 })
+	const [viewport, setViewport] = useState(() =>
+		typeof document === 'undefined' ? { height: 800, width: 1200 } : readViewport()
+	)
 	const [dragPoint, setDragPoint] = useState<null | Point>(null)
 	const [now, setNow] = useState(() => Date.now())
-	const rootRef = useRef<HTMLDivElement>(null)
 	const chipRef = useRef<HTMLDivElement>(null)
 	const expiredProbe = useRef(false)
 	const dragOffset = useRef<null | Point>(null)
@@ -109,7 +112,6 @@ export const ImpersonationBar = ({
 	const onWindowPointerEnd = useRef(() => {
 		endChipDragRef.current()
 	})
-	const docked = visible && !onLogin && !collapsed
 
 	useEffect(() => {
 		const stored = readBarPlacement()
@@ -119,26 +121,14 @@ export const ImpersonationBar = ({
 	}, [])
 
 	useEffect(() => {
-		if (!visible || onLogin) {
+		if (!collapsed) {
 			return
 		}
-		const measure = () => setInset(measureNavInset())
-		measure()
-		const resize = new ResizeObserver(measure)
-		const wrap = document.querySelector('.template-default__wrap')
-		const nav = document.querySelector('aside.nav')
-		if (wrap) {
-			resize.observe(wrap)
-		}
-		if (nav) {
-			resize.observe(nav)
-		}
-		window.addEventListener('resize', measure)
-		return () => {
-			resize.disconnect()
-			window.removeEventListener('resize', measure)
-		}
-	}, [onLogin, visible])
+		const update = () => setViewport(readViewport())
+		update()
+		window.addEventListener('resize', update)
+		return () => window.removeEventListener('resize', update)
+	}, [collapsed])
 
 	const probe = useCallback(async () => {
 		try {
@@ -164,44 +154,6 @@ export const ImpersonationBar = ({
 		}
 		void probe()
 	}, [onLogin, probe])
-
-	useEffect(() => {
-		document.documentElement.style.setProperty('--impersonation-inline-start', `${inset.start}px`)
-		document.documentElement.style.setProperty('--impersonation-inline-end', `${inset.end}px`)
-	}, [inset.end, inset.start])
-
-	useEffect(() => {
-		if (!docked) {
-			document.body.classList.remove('impersonation--active')
-			document.documentElement.style.removeProperty('--impersonation-bar-height')
-			return
-		}
-		document.body.classList.add('impersonation--active')
-		const node = rootRef.current
-		const applyHeight = () => {
-			if (!node) {
-				return
-			}
-			document.documentElement.style.setProperty(
-				'--impersonation-bar-height',
-				`${node.offsetHeight}px`
-			)
-		}
-		applyHeight()
-		if (!node) {
-			return () => {
-				document.body.classList.remove('impersonation--active')
-				document.documentElement.style.removeProperty('--impersonation-bar-height')
-			}
-		}
-		const observer = new ResizeObserver(applyHeight)
-		observer.observe(node)
-		return () => {
-			document.body.classList.remove('impersonation--active')
-			document.documentElement.style.removeProperty('--impersonation-bar-height')
-			observer.disconnect()
-		}
-	}, [docked])
 
 	useEffect(() => {
 		if (!sessionEndsAt || !visible || onLogin) {
@@ -282,9 +234,8 @@ export const ImpersonationBar = ({
 		)
 		const anchors = anchorsFor({
 			header: Number.isFinite(header) ? header : 48,
-			inset: { end: 0, start: 0 },
 			size: { height: rect.height, width: rect.width },
-			viewport: { height: window.innerHeight, width: window.innerWidth },
+			viewport: readViewport(),
 		})
 		const nextEdge = nearestEdge(projectThrow(point, velocity.current), anchors)
 		setEdge(nextEdge)
@@ -357,21 +308,21 @@ export const ImpersonationBar = ({
 			: 48
 		const anchors = anchorsFor({
 			header: Number.isFinite(header) ? header : 48,
-			inset: { end: 0, start: 0 },
 			size: { height: rect?.height ?? 36, width: rect?.width ?? 168 },
-			viewport: {
-				height: mounted ? window.innerHeight : 800,
-				width: mounted ? window.innerWidth : 1200,
-			},
+			viewport,
 		})
 		const point = dragPoint ?? anchors[edge]
 		return (
 			<div
+				aria-label={actingAs}
 				aria-live="polite"
-				className={
-					dragPoint ? 'impersonation-chip impersonation-chip--dragging' : 'impersonation-chip'
-				}
-				data-testid="impersonation-bar-chip"
+				className={[
+					'impersonation-chip',
+					tone === 'quiet' ? 'impersonation-chip--quiet' : null,
+					dragPoint ? 'impersonation-chip--dragging' : null,
+				]
+					.filter(Boolean)
+					.join(' ')}
 				onPointerCancel={endChipDrag}
 				onPointerDown={onChipPointerDown}
 				onPointerMove={onChipPointerMove}
@@ -380,7 +331,7 @@ export const ImpersonationBar = ({
 				role="status"
 				style={{ left: point.x, top: point.y }}
 			>
-				<span>{pluginName}</span>
+				<span className="impersonation-chip__name">{targetName}</span>
 				<button
 					aria-label={messageFor(impersonatorLocale, keys.expandBar)}
 					className="impersonation-bar__icon"
@@ -417,8 +368,6 @@ export const ImpersonationBar = ({
 			className={
 				tone === 'quiet' ? 'impersonation-bar impersonation-bar--quiet' : 'impersonation-bar'
 			}
-			data-testid="impersonation-bar"
-			ref={rootRef}
 			role="status"
 		>
 			<div className="impersonation-bar__meta">

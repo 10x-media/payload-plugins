@@ -10,4 +10,5 @@ export type {
 	ImpersonationPluginOptions as PluginOptions,
 	RetentionOptions,
 	UiOptions,
+	UserLabel,
 } from '../types'

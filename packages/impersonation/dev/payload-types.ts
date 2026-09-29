@@ -268,8 +268,24 @@ export interface Partner {
 export interface Post {
   id: string;
   title: string;
-  author?: (string | null) | User;
+  subtitle?: string | null;
+  excerpt?: string | null;
+  body?: string | null;
+  quote?: string | null;
+  quoteAuthor?: string | null;
+  callToAction?: string | null;
+  notes?: string | null;
   visibility: 'public' | 'partners' | 'staff';
+  author?: (string | null) | User;
+  slug?: string | null;
+  publishedAt?: string | null;
+  featured?: boolean | null;
+  category?: string | null;
+  tags?: string[] | null;
+  readingTime?: number | null;
+  seoTitle?: string | null;
+  seoDescription?: string | null;
+  internalNotes?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -341,6 +357,8 @@ export interface ImpersonationSession {
       };
   impersonatorEmail?: string | null;
   targetEmail?: string | null;
+  impersonatorTitle?: string | null;
+  targetTitle?: string | null;
   mode: 'swap' | 'parallel';
   targetSid: string;
   impersonatorSid: string;
@@ -549,8 +567,24 @@ export interface PartnersSelect<T extends boolean = true> {
  */
 export interface PostsSelect<T extends boolean = true> {
   title?: T;
-  author?: T;
+  subtitle?: T;
+  excerpt?: T;
+  body?: T;
+  quote?: T;
+  quoteAuthor?: T;
+  callToAction?: T;
+  notes?: T;
   visibility?: T;
+  author?: T;
+  slug?: T;
+  publishedAt?: T;
+  featured?: T;
+  category?: T;
+  tags?: T;
+  readingTime?: T;
+  seoTitle?: T;
+  seoDescription?: T;
+  internalNotes?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -586,6 +620,8 @@ export interface ImpersonationSessionsSelect<T extends boolean = true> {
   target?: T;
   impersonatorEmail?: T;
   targetEmail?: T;
+  impersonatorTitle?: T;
+  targetTitle?: T;
   mode?: T;
   targetSid?: T;
   impersonatorSid?: T;
