@@ -228,11 +228,7 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 							: undefined,
 				targetLocked: Boolean(readable.lockUntil),
 				targetSid: minted.sid,
-				targetTitle: userTitle(
-					req.payload,
-					collection,
-					readable ?? (minted.user as Record<string, unknown>)
-				),
+				targetTitle: userTitle(req.payload, collection, readable),
 				userAgent: req.headers.get('user-agent') ?? undefined,
 			} as never,
 			depth: 0,
