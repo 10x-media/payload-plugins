@@ -28,7 +28,7 @@ const submissions: CollectionConfig = {
 }
 const header: GlobalConfig = { slug: 'header', fields: [{ name: 'text', type: 'text' }] }
 
-describeForDb('content-lock enforcement', { dbs: ['mongo'] }, (db) => {
+describeForDb('content-lock enforcement', {}, (db) => {
 	let booted: BootedPayload
 	let clock: TestClock
 	let user: Awaited<ReturnType<BootedPayload['payload']['create']>>

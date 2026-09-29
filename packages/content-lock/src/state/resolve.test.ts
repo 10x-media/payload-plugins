@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isEntityLocked, pickBanner, resolveState, scopeOf, statusOf } from './resolve'
+import { isEntityLocked, orderBanners, resolveState, scopeOf, statusOf } from './resolve'
 import type { LockGroup, LockWindow } from './types'
 
 const at = (iso: string) => new Date(iso)
@@ -135,7 +135,7 @@ describe('resolveState', () => {
 	})
 })
 
-describe('pickBanner', () => {
+describe('orderBanners', () => {
 	const now = at('2026-01-10T11:00:00.000Z')
 	const announced = window({
 		id: 'announced-all',
@@ -148,23 +148,53 @@ describe('pickBanner', () => {
 		targets: ['group:catalog'],
 	})
 	const activeSite = window({ id: 'active-site', scope: 'selected', targets: ['group:site'] })
+	const ids = (windows: LockWindow[]) => windows.map((entry) => entry.id)
 
-	it('prefers active over announced, then the larger scope', () => {
+	it('puts active before announced, active ones by the larger scope', () => {
 		const state = resolveState([announced, activeCatalog, activeSite], now, groups)
-		expect(pickBanner(state, groups, null)?.id).toBe('active-site')
+		expect(ids(orderBanners(state, groups, null))).toEqual([
+			'active-site',
+			'active-catalog',
+			'announced-all',
+		])
 	})
 
-	it('prefers the window touching the current route', () => {
+	it('puts windows touching the current route first', () => {
 		const state = resolveState([announced, activeCatalog, activeSite], now, groups)
-		expect(pickBanner(state, groups, { type: 'collection', slug: 'products' })?.id).toBe(
-			'active-catalog'
-		)
-		expect(pickBanner(state, groups, { type: 'collection', slug: 'media' })?.id).toBe(
-			'announced-all'
-		)
+		expect(ids(orderBanners(state, groups, { type: 'collection', slug: 'products' }))).toEqual([
+			'active-catalog',
+			'announced-all',
+			'active-site',
+		])
+		expect(ids(orderBanners(state, groups, { type: 'collection', slug: 'media' }))).toEqual([
+			'announced-all',
+			'active-site',
+			'active-catalog',
+		])
 	})
 
-	it('returns null when nothing is announced or active', () => {
-		expect(pickBanner(resolveState([], now, groups), groups, null)).toBeNull()
+	it('orders announcements by the nearest start, then the larger scope', () => {
+		const soonCatalog = window({
+			id: 'soon-catalog',
+			announceAt: '2026-01-10T00:00:00.000Z',
+			startsAt: '2026-01-11T00:00:00.000Z',
+			scope: 'selected',
+			targets: ['group:catalog'],
+		})
+		const soonAll = window({
+			id: 'soon-all',
+			announceAt: '2026-01-10T00:00:00.000Z',
+			startsAt: '2026-01-11T00:00:00.000Z',
+		})
+		const state = resolveState([announced, soonCatalog, soonAll], now, groups)
+		expect(ids(orderBanners(state, groups, null))).toEqual([
+			'soon-all',
+			'soon-catalog',
+			'announced-all',
+		])
+	})
+
+	it('is empty when nothing is announced or active', () => {
+		expect(orderBanners(resolveState([], now, groups), groups, null)).toEqual([])
 	})
 })

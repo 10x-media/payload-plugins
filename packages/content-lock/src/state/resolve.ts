@@ -115,31 +115,38 @@ const scopeSize = (scope: ResolvedScope): number =>
 	scope.everything ? Number.POSITIVE_INFINITY : scope.collections.length + scope.globals.length
 
 /**
- * The one window the banner shows. A window touching the entity the viewer is
- * on wins; otherwise the widest blast radius: active before announced, then
- * the larger scope, then the earlier start.
+ * The windows the banner pages through, in order. On a collection or global
+ * view only windows covering that entity count; elsewhere (dashboard, account,
+ * custom views) all do. Active windows come first, ranked by blast radius
+ * (larger scope, then earlier start); announced ones follow, ranked by what
+ * happens first (earlier start, then larger scope).
  */
-export const pickBanner = (
+export const orderBanners = (
 	state: ContentLockState,
 	groups: readonly LockGroup[],
 	route: EntityRef | null
-): LockWindow | null => {
+): LockWindow[] => {
 	const ranked = [
-		...state.active.map((window) => ({ window, rank: 0 })),
-		...state.announced.map((window) => ({ window, rank: 1 })),
+		...state.active.map((window) => ({ window, active: true })),
+		...state.announced.map((window) => ({ window, active: false })),
 	]
-		.map((entry) => ({ ...entry, scope: scopeOf(entry.window, groups) }))
-		.sort(
-			(a, b) =>
-				a.rank - b.rank ||
-				scopeSize(b.scope) - scopeSize(a.scope) ||
-				Date.parse(a.window.startsAt) - Date.parse(b.window.startsAt)
-		)
-	if (route !== null) {
-		const onRoute = ranked.find((entry) => scopeCovers(entry.scope, route))
-		if (onRoute) {
-			return onRoute.window
+		.map((entry) => {
+			const scope = scopeOf(entry.window, groups)
+			return {
+				...entry,
+				relevant: route === null || scopeCovers(scope, route),
+				size: scopeSize(scope),
+				start: Date.parse(entry.window.startsAt),
+			}
+		})
+		.filter((entry) => entry.relevant)
+	ranked.sort((a, b) => {
+		const byStage = Number(b.active) - Number(a.active)
+		if (byStage !== 0) {
+			return byStage
 		}
-	}
-	return ranked[0]?.window ?? null
+		const bySize = b.size === a.size ? 0 : b.size > a.size ? 1 : -1
+		return a.active ? bySize || a.start - b.start : a.start - b.start || bySize
+	})
+	return ranked.map((entry) => entry.window)
 }

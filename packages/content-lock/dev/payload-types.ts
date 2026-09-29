@@ -261,7 +261,7 @@ export interface Category {
 export interface ContentLock {
   id: string;
   title: string;
-  status?: ('pending' | 'announced' | 'active' | 'ended') | null;
+  status?: ('draft' | 'pending' | 'announced' | 'active' | 'ended') | null;
   announceAt?: string | null;
   startsAt?: string | null;
   endAtTime?: boolean | null;
@@ -270,7 +270,22 @@ export interface ContentLock {
   groups?: ('catalog' | 'site')[] | null;
   collections?: string[] | null;
   globals?: string[] | null;
-  message?: {
+  announcementMessage?: {
+    root: {
+      type: string;
+      children: {
+        type: any;
+        version: number;
+        [k: string]: unknown;
+      }[];
+      direction: ('ltr' | 'rtl') | null;
+      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+      indent: number;
+      version: number;
+    };
+    [k: string]: unknown;
+  } | null;
+  activeMessage?: {
     root: {
       type: string;
       children: {
@@ -288,6 +303,7 @@ export interface ContentLock {
   endedAt?: string | null;
   updatedAt: string;
   createdAt: string;
+  _status?: ('draft' | 'published') | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -456,10 +472,12 @@ export interface ContentLocksSelect<T extends boolean = true> {
   groups?: T;
   collections?: T;
   globals?: T;
-  message?: T;
+  announcementMessage?: T;
+  activeMessage?: T;
   endedAt?: T;
   updatedAt?: T;
   createdAt?: T;
+  _status?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

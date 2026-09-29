@@ -2,7 +2,7 @@
 
 import './banner.css'
 
-import { usePreferences } from '@payloadcms/ui'
+import { ChevronIcon, usePreferences } from '@payloadcms/ui'
 import { useRouter } from 'next/navigation'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 
@@ -14,18 +14,25 @@ import { LocalDate } from './LocalDate'
 const PREFERENCE_KEY = 'content-lock-dismissed'
 const baseClass = 'content-lock-banner'
 
-export type ContentLockBannerProps = {
+/** One lock window as the banner shows it. */
+export type BannerItem = {
+	id: string
 	status: 'announced' | 'active'
 	/** Labels of what the window freezes, or `null` for everything. */
 	scopeLabels: string[] | null
 	startsAt: string
 	/** This window's known end, or `null` when it ends manually. */
 	endsAt: string | null
-	countdownThresholdMs: number
 	/** Identity of the announcement; changes when the window is rescheduled. */
 	dismissKey: string
-	/** The window's rendered message, if it has one. */
-	children?: ReactNode
+	/** The window's rendered message for its current stage, if it has one. */
+	message: ReactNode
+}
+
+export type ContentLockBannerProps = {
+	/** Active and announced windows, most relevant first. */
+	items: BannerItem[]
+	countdownThresholdMs: number
 }
 
 /** Live `Ends in` counter that refreshes the page once the lock is over. */
@@ -52,93 +59,150 @@ const Countdown = ({ endsAt }: { endsAt: string }) => {
 }
 
 /**
- * The admin-wide notice for one lock window. Announcements can be dismissed
- * per user (stored in preferences, so it follows them across devices); an
- * active lock cannot.
+ * The admin-wide notice for lock windows. It shows one window at a time and
+ * pages through the rest. A window's own message for its stage replaces the
+ * built-in text, which stays as the fallback. Announcements can be dismissed per user (stored in
+ * preferences, so it follows them across devices), which reveals the next
+ * one; an active lock cannot be dismissed.
  */
-export const ContentLockBanner = ({
-	status,
-	scopeLabels,
-	startsAt,
-	endsAt,
-	countdownThresholdMs,
-	dismissKey,
-	children,
-}: ContentLockBannerProps) => {
+export const ContentLockBanner = ({ items, countdownThresholdMs }: ContentLockBannerProps) => {
 	const { t } = useTranslation()
 	const { getPreference, setPreference } = usePreferences()
-	const active = status === 'active'
 	// Announcements stay hidden until the preference is known, so a dismissed one never flashes.
-	const [dismissed, setDismissed] = useState<boolean | null>(active ? false : null)
+	const [dismissed, setDismissed] = useState<Set<string> | null>(null)
+	const [selectedId, setSelectedId] = useState<string | null>(null)
 	const [nearEnd, setNearEnd] = useState(false)
 
 	useEffect(() => {
-		if (active) {
-			return
-		}
 		let cancelled = false
-		void getPreference<string[]>(PREFERENCE_KEY).then((keysSeen) => {
+		void getPreference<string[]>(PREFERENCE_KEY).then((seen) => {
 			if (!cancelled) {
-				setDismissed(Array.isArray(keysSeen) && keysSeen.includes(dismissKey))
+				setDismissed(new Set(Array.isArray(seen) ? seen : []))
 			}
 		})
 		return () => {
 			cancelled = true
 		}
-	}, [active, dismissKey, getPreference])
+	}, [getPreference])
+
+	// Until the preference is known, show only the leading active windows, so
+	// the first notice never swaps out for another once it arrives.
+	const firstAnnounced = items.findIndex((item) => item.status === 'announced')
+	const visible =
+		dismissed === null
+			? items.slice(0, firstAnnounced === -1 ? items.length : firstAnnounced)
+			: items.filter((item) => item.status === 'active' || !dismissed.has(item.dismissKey))
+	const index = Math.max(
+		0,
+		visible.findIndex((item) => item.id === selectedId)
+	)
+	const current = visible[index]
+	const active = current?.status === 'active'
+	const endsAt = current?.endsAt ?? null
 
 	useEffect(() => {
 		setNearEnd(active && endsAt !== null && Date.parse(endsAt) - Date.now() <= countdownThresholdMs)
 	}, [active, endsAt, countdownThresholdMs])
 
-	if (dismissed !== false) {
+	if (!current) {
 		return null
 	}
 
 	const dismiss = async () => {
-		setDismissed(true)
+		const next = visible[index + 1] ?? visible[index - 1]
+		setSelectedId(next?.id ?? null)
+		setDismissed((prior) => new Set([...(prior ?? []), current.dismissKey]))
 		const seen = (await getPreference<string[]>(PREFERENCE_KEY)) ?? []
-		await setPreference(PREFERENCE_KEY, [...seen.filter((key) => key !== dismissKey), dismissKey])
+		await setPreference(PREFERENCE_KEY, [
+			...seen.filter((key) => key !== current.dismissKey),
+			current.dismissKey,
+		])
 	}
 
 	const title = t(active ? keys.bannerActiveTitle : keys.bannerAnnouncedTitle)
 	const scope =
-		scopeLabels === null
+		current.scopeLabels === null
 			? t(active ? keys.bannerActiveEverything : keys.bannerAnnouncedEverything)
 			: t(active ? keys.bannerActivePartial : keys.bannerAnnouncedPartial, {
-					what: scopeLabels.join(', '),
+					what: current.scopeLabels.join(', '),
 				})
+	const countdown =
+		endsAt !== null && nearEnd ? <Countdown endsAt={endsAt} key={current.id} /> : null
 
 	return (
-		<div className={`${baseClass} ${baseClass}--${status}`} role={active ? 'alert' : 'status'}>
+		<div
+			className={`${baseClass} ${baseClass}--${current.status}`}
+			role={active ? 'alert' : 'status'}
+		>
 			<div className={`${baseClass}__row`}>
-				<strong className={`${baseClass}__title`}>{title}</strong>
-				<span className={`${baseClass}__scope`}>{scope}</span>
-				<span className={`${baseClass}__times`}>
-					{!active && (
-						<span>
-							{t(keys.bannerFrom)} <LocalDate iso={startsAt} />
+				{current.message ? (
+					<div className={`${baseClass}__message`}>
+						{current.message}
+						{countdown}
+					</div>
+				) : (
+					<>
+						<strong className={`${baseClass}__title`}>{title}</strong>
+						<span className={`${baseClass}__scope`}>{scope}</span>
+						<span className={`${baseClass}__times`}>
+							{!active && (
+								<span>
+									{t(keys.bannerFrom)} <LocalDate iso={current.startsAt} />
+								</span>
+							)}
+							{endsAt !== null && !nearEnd && (
+								<span>
+									{t(keys.bannerUntil)} <LocalDate iso={endsAt} />
+								</span>
+							)}
+							{countdown}
 						</span>
-					)}
-					{endsAt !== null && !nearEnd && (
-						<span>
-							{t(keys.bannerUntil)} <LocalDate iso={endsAt} />
-						</span>
-					)}
-					{endsAt !== null && nearEnd && <Countdown endsAt={endsAt} />}
-				</span>
-				{!active && (
-					<button
-						aria-label={t(keys.bannerDismiss)}
-						className={`${baseClass}__dismiss`}
-						onClick={() => void dismiss()}
-						type="button"
-					>
-						×
-					</button>
+					</>
 				)}
+				<span className={`${baseClass}__controls`}>
+					{visible.length > 1 && (
+						<span className={`${baseClass}__pager`}>
+							<button
+								aria-label={t(keys.bannerPrevious)}
+								className={`${baseClass}__button`}
+								disabled={index === 0}
+								onClick={() => setSelectedId(visible[index - 1]?.id ?? null)}
+								type="button"
+							>
+								<ChevronIcon direction="up" />
+							</button>
+							<span
+								title={t(keys.bannerPosition, {
+									current: index + 1,
+									total: visible.length,
+								})}
+								className={`${baseClass}__position`}
+							>
+								{index + 1}/{visible.length}
+							</span>
+							<button
+								aria-label={t(keys.bannerNext)}
+								className={`${baseClass}__button`}
+								disabled={index === visible.length - 1}
+								onClick={() => setSelectedId(visible[index + 1]?.id ?? null)}
+								type="button"
+							>
+								<ChevronIcon direction="down" />
+							</button>
+						</span>
+					)}
+					{!active && (
+						<button
+							aria-label={t(keys.bannerDismiss)}
+							className={`${baseClass}__button ${baseClass}__dismiss`}
+							onClick={() => void dismiss()}
+							type="button"
+						>
+							×
+						</button>
+					)}
+				</span>
 			</div>
-			{children ? <div className={`${baseClass}__message`}>{children}</div> : null}
 		</div>
 	)
 }

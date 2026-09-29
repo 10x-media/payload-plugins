@@ -1,15 +1,17 @@
 import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
 import { RichText } from '@payloadcms/richtext-lexical/react'
 import { getTranslation, type I18nClient } from '@payloadcms/translations'
-import type { CollectionSlug, Payload, ServerProps, TypedLocale } from 'payload'
+import type { CollectionSlug, Payload, SelectType, ServerProps, TypedLocale } from 'payload'
 
 import { optionsFromConfig, type ResolvedOptions } from '../options'
-import { pickBanner, scopeOf } from '../state/resolve'
+import { orderBanners, scopeOf } from '../state/resolve'
 import { getContentLockState } from '../state/store'
 import type { LockWindow, ResolvedScope } from '../state/types'
-import { ContentLockBanner } from './ContentLockBanner'
+import { keys } from '../translations/keys'
+import { asTranslate } from '../translations/server'
+import { type BannerItem, ContentLockBanner } from './ContentLockBanner'
 import { ContentLockStateSync } from './ContentLockProvider'
-import { messageConverters } from './messageConverters'
+import { buildMessageConverters } from './messageConverters'
 
 type HeaderProps = ServerProps & { collectionSlug?: string; globalSlug?: string }
 
@@ -59,34 +61,65 @@ const messageLocale = (payload: Payload, language: string): TypedLocale | undefi
 	return (codes.includes(language) ? language : localization.defaultLocale) as TypedLocale
 }
 
-const loadMessage = async ({
+const hasContent = (message: SerializedEditorState | null | undefined): boolean => {
+	const root = message?.root
+	return Boolean(root && Array.isArray(root.children) && root.children.length > 0)
+}
+
+type WindowMessages = {
+	announced?: SerializedEditorState
+	active?: SerializedEditorState
+}
+
+type MessageDoc = {
+	id: number | string
+	announcementMessage?: SerializedEditorState | null
+	activeMessage?: SerializedEditorState | null
+}
+
+/**
+ * The published, non-empty messages of the given windows, in one read, by
+ * window id. The content locale's own fallback applies, so an untranslated
+ * message shows in the default locale.
+ */
+const loadMessages = async ({
 	payload,
 	slug,
-	id,
+	ids,
 	language,
 }: {
 	payload: Payload
 	slug: string
-	id: string
+	ids: string[]
 	language: string
-}): Promise<SerializedEditorState | null> => {
-	const doc = await payload.findByID({
+}): Promise<Map<string, WindowMessages>> => {
+	const { docs } = await payload.find({
 		collection: slug as CollectionSlug,
-		id,
 		depth: 0,
+		limit: 0,
 		locale: messageLocale(payload, language),
 		overrideAccess: true,
-		select: { message: true },
+		pagination: false,
+		select: { announcementMessage: true, activeMessage: true } as SelectType,
+		where: { id: { in: ids } },
 	})
-	const message = (doc as { message?: SerializedEditorState | null }).message
-	const root = message?.root
-	return root && Array.isArray(root.children) && root.children.length > 0 ? message : null
+	const messages = new Map<string, WindowMessages>()
+	for (const doc of docs as unknown as MessageDoc[]) {
+		messages.set(String(doc.id), {
+			announced: hasContent(doc.announcementMessage)
+				? (doc.announcementMessage ?? undefined)
+				: undefined,
+			active: hasContent(doc.activeMessage) ? (doc.activeMessage ?? undefined) : undefined,
+		})
+	}
+	return messages
 }
 
 /**
- * Admin header slot: the one lock banner that matters for this page, plus the
- * state sync feeding `useContentLock`. Rendered by the default template on
- * every view, so it follows navigation.
+ * Admin header slot: the lock banner, paging through every active and
+ * announced window in the order that matters for this page, plus the state
+ * sync feeding `useContentLock`. Rendered by the default template on every
+ * view, so it follows navigation.
  */
 export const ContentLockHeader = async ({
 	collectionSlug,
@@ -113,39 +146,59 @@ export const ContentLockHeader = async ({
 		: globalSlug
 			? ({ type: 'global', slug: globalSlug } as const)
 			: null
-	const window = pickBanner(state, options.groups, route)
+	const windows = orderBanners(state, options.groups, route)
 	const sync = <ContentLockStateSync state={state} />
-	if (!window) {
+	if (windows.length === 0) {
 		return sync
 	}
-	const status = state.active.includes(window) ? 'active' : 'announced'
-	const message = await loadMessage({
+	const messages = await loadMessages({
 		payload,
 		slug: options.slug,
-		id: window.id,
+		ids: windows.map((window) => window.id),
 		language: i18n.language,
-	}).catch(() => null)
+	}).catch((error: unknown) => {
+		payload.logger.error({ err: error, msg: '[content-lock] cannot load banner messages' })
+		return new Map<string, WindowMessages>()
+	})
+	const t = asTranslate(i18n.t)
+	const items = windows.map((window): BannerItem => {
+		const status = state.active.includes(window) ? 'active' : 'announced'
+		const labels = scopeLabels({
+			scope: scopeOf(window, options.groups),
+			window,
+			payload,
+			i18n,
+			options,
+		})
+		const endsAt = window.endMode === 'at' ? window.endsAt : null
+		const message = messages.get(window.id)?.[status]
+		return {
+			id: window.id,
+			status,
+			dismissKey: `${window.id}:${window.announceAt ?? ''}:${window.startsAt}`,
+			startsAt: window.startsAt,
+			endsAt,
+			scopeLabels: labels,
+			message: message ? (
+				<RichText
+					converters={buildMessageConverters({
+						startsAt: window.startsAt,
+						endsAt,
+						announceAt: window.announceAt,
+						scopeLabels: labels,
+						everythingLabel: t(keys.scopeEverything),
+						openEndLabel: t(keys.dateOpenEnd),
+					})}
+					data={message}
+					disableContainer
+				/>
+			) : null,
+		}
+	})
 	return (
 		<>
 			{sync}
-			<ContentLockBanner
-				countdownThresholdMs={options.countdownThresholdMs}
-				dismissKey={`${window.id}:${window.announceAt ?? ''}:${window.startsAt}`}
-				endsAt={window.endMode === 'at' ? window.endsAt : null}
-				scopeLabels={scopeLabels({
-					scope: scopeOf(window, options.groups),
-					window,
-					payload,
-					i18n,
-					options,
-				})}
-				startsAt={window.startsAt}
-				status={status}
-			>
-				{message ? (
-					<RichText converters={messageConverters} data={message} disableContainer />
-				) : null}
-			</ContentLockBanner>
+			<ContentLockBanner countdownThresholdMs={options.countdownThresholdMs} items={items} />
 		</>
 	)
 }

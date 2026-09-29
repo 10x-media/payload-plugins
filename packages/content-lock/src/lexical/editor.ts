@@ -10,9 +10,10 @@ import {
 import type { CollectionSlug } from 'payload'
 
 import { dateBlock } from './dateBlock'
+import { scopeBlock } from './scopeBlock'
 
 /**
- * The lock message editor: short formatted text plus inline dates. It never
+ * The lock message editor: short formatted text plus inline dates and scope. It never
  * inherits the project's editor, so a banner cannot grow uploads or blocks.
  */
 export const buildMessageEditor = (): ReturnType<typeof lexicalEditor> =>
@@ -22,7 +23,7 @@ export const buildMessageEditor = (): ReturnType<typeof lexicalEditor> =>
 			BoldFeature(),
 			ItalicFeature(),
 			LinkFeature({ enabledCollections: [] as CollectionSlug[] }),
-			BlocksFeature({ inlineBlocks: [dateBlock] }),
+			BlocksFeature({ inlineBlocks: [dateBlock, scopeBlock] }),
 			FixedToolbarFeature(),
 		],
 	})

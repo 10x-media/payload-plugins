@@ -28,22 +28,23 @@ const isSnapshot = (value: unknown): value is Snapshot =>
 	Array.isArray((value as Snapshot).windows)
 
 /**
- * Rebuild the snapshot from the collection and store it in kv. Pass the
- * request of an in-flight write so the read sees that write's transaction.
+ * Rebuild the snapshot from the collection and store it in kv. Only published
+ * windows count: a draft locks and announces nothing. Pass the request of an
+ * in-flight write so the read sees that write's transaction.
  */
 export const rebuildSnapshot = async (
 	payload: Payload,
 	req?: PayloadRequest
 ): Promise<LockWindow[]> => {
 	const { slug } = optionsFromConfig(payload.config)
-	const { docs } = await payload.find({
+	// Straight from the adapter: collection hooks (the live status field reads
+	// this snapshot) must not run while it is being built.
+	const { docs } = await payload.db.find({
 		collection: slug as CollectionSlug,
-		depth: 0,
 		limit: 0,
-		overrideAccess: true,
 		pagination: false,
 		req,
-		where: { endedAt: { exists: false } },
+		where: { and: [{ _status: { equals: 'published' } }, { endedAt: { exists: false } }] },
 	})
 	const now = getCurrentDate()
 	const windows = docs

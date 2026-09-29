@@ -3,15 +3,17 @@ import {
 	type CollectionAfterChangeHook,
 	type CollectionAfterDeleteHook,
 	type CollectionBeforeChangeHook,
+	type CollectionBeforeOperationHook,
 	type CollectionConfig,
 	type Config,
+	type FieldHook,
 	getCurrentDate,
 } from 'payload'
 
 import { buildMessageEditor } from '../lexical/editor'
 import type { ContentLockPluginOptions, ResolvedOptions } from '../options'
 import { statusOf } from '../state/resolve'
-import { rebuildSnapshot } from '../state/store'
+import { readWindows, rebuildSnapshot } from '../state/store'
 import { toWindow } from '../state/window'
 import { en } from '../translations/en'
 import { keys } from '../translations/keys'
@@ -21,10 +23,29 @@ import { buildScopeFields } from './scopeFields'
 
 const CLIENT = '@10x-media/content-lock/client'
 
+/**
+ * A write that is not an explicit draft publishes. Payload would otherwise
+ * default `_status` to draft, and a lock created through the Local API or REST
+ * would silently lock nothing.
+ */
+const publishUnlessDraft: CollectionBeforeOperationHook = ({ args, operation }) => {
+	if ((operation === 'create' || operation === 'update') && !args.draft && args.data) {
+		const data = args.data as { _status?: string }
+		data._status ??= 'published'
+	}
+	return args
+}
+
+/**
+ * Normalizes a window and enforces the editing rules. Drafts skip both the
+ * start stamp and the rules: they lock nothing, so they may be incomplete, and
+ * an empty start means "when published".
+ */
 const stampAndValidate: CollectionBeforeChangeHook = ({ data, operation, originalDoc, req }) => {
 	const now = getCurrentDate()
 	const stored = operation === 'update' ? originalDoc : undefined
-	if (!data.startsAt && !stored?.startsAt) {
+	const draft = data._status === 'draft'
+	if (!draft && !data.startsAt && !stored?.startsAt) {
 		data.startsAt = now.toISOString()
 	}
 	// An end is always stamped by the server clock, never in the future.
@@ -39,6 +60,9 @@ const stampAndValidate: CollectionBeforeChangeHook = ({ data, operation, origina
 		data.groups = []
 		data.collections = []
 		data.globals = []
+	}
+	if (draft) {
+		return data
 	}
 	const before = stored ? toWindow(stored) : null
 	const after = toWindow({ ...stored, ...data })
@@ -60,6 +84,25 @@ const syncSnapshotAfterDelete: CollectionAfterDeleteHook = async ({ doc, req }) 
 	return doc
 }
 
+/**
+ * The live stage of a window. A window the runtime knows is judged by its
+ * published values, so a pending draft of an active lock still reads active;
+ * an unpublished one reads draft.
+ */
+const liveStatus: FieldHook = async ({ data, req }) => {
+	if (!data) {
+		return null
+	}
+	const now = getCurrentDate()
+	const live = (await readWindows(req.payload).catch(() => [])).find(
+		(window) => window.id === String(data.id)
+	)
+	if (live) {
+		return statusOf(live, now)
+	}
+	return data._status === 'draft' ? 'draft' : statusOf(toWindow(data), now)
+}
+
 /** The lock windows collection. One document is one window. */
 export const buildLockCollection = (
 	config: Config,
@@ -77,7 +120,7 @@ export const buildLockCollection = (
 		access: collectionOptions?.access,
 		admin: {
 			useAsTitle: 'title',
-			defaultColumns: ['title', 'status', 'startsAt', 'endsAt'],
+			defaultColumns: ['title', 'status', 'startsAt', 'endsAt', '_status'],
 			components: {
 				edit: { beforeDocumentControls: [`${CLIENT}#EndNowButton`] },
 				views: {
@@ -89,7 +132,9 @@ export const buildLockCollection = (
 				},
 			},
 		},
+		versions: { drafts: true },
 		hooks: {
+			beforeOperation: [publishUnlessDraft],
 			beforeChange: [stampAndValidate],
 			afterChange: [syncSnapshotAfterChange],
 			afterDelete: [syncSnapshotAfterDelete],
@@ -102,15 +147,14 @@ export const buildLockCollection = (
 				virtual: true,
 				label: labelForKey(keys.fieldStatus),
 				options: [
+					{ value: 'draft', label: labelForKey(keys.statusDraft) },
 					{ value: 'pending', label: labelForKey(keys.statusPending) },
 					{ value: 'announced', label: labelForKey(keys.statusAnnounced) },
 					{ value: 'active', label: labelForKey(keys.statusActive) },
 					{ value: 'ended', label: labelForKey(keys.statusEnded) },
 				],
 				admin: { readOnly: true, position: 'sidebar' },
-				hooks: {
-					afterRead: [({ data }) => (data ? statusOf(toWindow(data), getCurrentDate()) : null)],
-				},
+				hooks: { afterRead: [liveStatus] },
 			},
 			{
 				type: 'row',
@@ -152,12 +196,35 @@ export const buildLockCollection = (
 			},
 			...scopeFields,
 			{
-				name: 'message',
-				type: 'richText',
-				localized: Boolean(config.localization),
-				label: labelForKey(keys.fieldMessage),
-				editor: buildMessageEditor(),
-				admin: { description: labelForKey(keys.fieldMessageDescription) },
+				type: 'tabs',
+				tabs: [
+					{
+						label: labelForKey(keys.tabAnnouncement),
+						description: labelForKey(keys.fieldAnnouncementMessageDescription),
+						fields: [
+							{
+								name: 'announcementMessage',
+								type: 'richText',
+								localized: Boolean(config.localization),
+								label: labelForKey(keys.fieldMessage),
+								editor: buildMessageEditor(),
+							},
+						],
+					},
+					{
+						label: labelForKey(keys.tabActive),
+						description: labelForKey(keys.fieldActiveMessageDescription),
+						fields: [
+							{
+								name: 'activeMessage',
+								type: 'richText',
+								localized: Boolean(config.localization),
+								label: labelForKey(keys.fieldMessage),
+								editor: buildMessageEditor(),
+							},
+						],
+					},
+				],
 			},
 			{
 				name: 'endedAt',
