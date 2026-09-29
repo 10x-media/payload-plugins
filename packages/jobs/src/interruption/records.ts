@@ -25,6 +25,7 @@ type LogEntry = { id?: null | string; state?: null | string }
 /** The slice of a `payload-jobs` row the fix-up reads. */
 export type JobRow = {
 	processing?: boolean | null
+	totalTried?: null | number
 	completedAt?: null | string
 	log?: LogEntry[] | null
 }
@@ -102,10 +103,31 @@ export const interruptionUpdate = (
 export type ApplyInterruptionsResult = { deferred: number; failed: number }
 
 /**
- * Apply every recorded interruption whose job Payload has finished writing.
- * The plugin's worker and `queue-run` call it after each run; call it after
- * `payload.jobs.run` in a custom run loop too. A job still processing keeps its
- * record for the next call. Writes go through `payload.db` (no hooks).
+ * What to do with a record, given the row as it is now. Payload bumps
+ * `totalTried` by one when it records the failed attempt, so the record
+ * applies to a settled row one try past the claim. A row still at the claim
+ * and processing has not been written yet (wait). Any other row has moved on:
+ * another node claimed the job again, so that node owns its outcome (drop).
+ */
+export const interruptionStep = (
+	record: InterruptionRecord,
+	row: JobRow | null
+): 'apply' | 'drop' | 'wait' => {
+	if (!row || row.completedAt) {
+		return 'drop'
+	}
+	const tried = row.totalTried ?? 0
+	if (row.processing) {
+		return tried === record.totalTried ? 'wait' : 'drop'
+	}
+	return tried === record.totalTried + 1 ? 'apply' : 'drop'
+}
+
+/**
+ * Apply every recorded interruption whose attempt Payload has finished
+ * writing. The plugin's worker and `queue-run` call it after each run; call it
+ * after `payload.jobs.run` in a custom run loop too. Writes go through
+ * `payload.db` (no hooks).
  */
 export const applyJobInterruptions = async (
 	payload: Payload
@@ -121,17 +143,17 @@ export const applyJobInterruptions = async (
 			collection: JOBS_SLUG,
 			where: { id: { equals: id } },
 		})) as JobRow | null
-		if (!row || row.completedAt) {
-			store.delete(key)
-			continue
-		}
-		if (row.processing) {
+		const step = interruptionStep(record, row)
+		if (step === 'wait') {
 			if (now - record.recordedAt > RECORD_TTL_MS) {
 				store.delete(key)
 			}
 			continue
 		}
 		store.delete(key)
+		if (step === 'drop' || !row) {
+			continue
+		}
 		await payload.db.updateOne({
 			collection: JOBS_SLUG,
 			data: interruptionUpdate(record, row),

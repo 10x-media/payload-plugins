@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { mergeGateResults, withGates } from './gates'
 import { deferOnInterrupt, policyFor, resolveDeferSlugs } from './policy'
-import { type InterruptionRecord, interruptionUpdate } from './records'
+import { type InterruptionRecord, interruptionStep, interruptionUpdate } from './records'
 
 const until = new Date('2030-01-01T00:00:00.000Z')
 const later = new Date('2030-06-01T00:00:00.000Z')
@@ -117,5 +117,35 @@ describe('interruptionUpdate', () => {
 			processing: false,
 			waitUntil: null,
 		})
+	})
+})
+
+describe('interruptionStep', () => {
+	const record: InterruptionRecord = {
+		by: 'lock',
+		logIds: [],
+		outcome: 'defer',
+		reason: 'locked',
+		recordedAt: 0,
+		totalTried: 2,
+		until,
+	}
+
+	it('applies to the settled attempt it recorded', () => {
+		expect(interruptionStep(record, { processing: false, totalTried: 3 })).toBe('apply')
+	})
+
+	it('waits while Payload has not written the attempt yet', () => {
+		expect(interruptionStep(record, { processing: true, totalTried: 2 })).toBe('wait')
+	})
+
+	it('drops when another node claimed the job again', () => {
+		expect(interruptionStep(record, { processing: true, totalTried: 3 })).toBe('drop')
+		expect(interruptionStep(record, { processing: false, totalTried: 4 })).toBe('drop')
+	})
+
+	it('drops a completed or missing job', () => {
+		expect(interruptionStep(record, { completedAt: 'x', totalTried: 3 })).toBe('drop')
+		expect(interruptionStep(record, null)).toBe('drop')
 	})
 })
