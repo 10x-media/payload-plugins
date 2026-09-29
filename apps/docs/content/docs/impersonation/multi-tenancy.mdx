@@ -1,0 +1,47 @@
+---
+title: Multi-tenancy
+description: Collection access already scopes who you can impersonate. The plugin only manages the tenant selector cookie.
+---
+
+This plugin has no `multiTenancy` option. It does not stamp a tenant on `impersonation-sessions`, and it does not filter the switcher. `@payloadcms/plugin-multi-tenant` already does that through collection `access.read`.
+
+Put this plugin **after** `@payloadcms/plugin-multi-tenant` (and after `@10x-media/dual-session`).
+
+## Access
+
+The switcher lists users over the normal collection REST API. Start then loads the target with `overrideAccess: false`. A tenant operator cannot pick or start a user their read access hides. Guessed ids from another tenant return `forbidden`.
+
+`access.impersonate` is still the host gate. Platform admins who can read every user can impersonate every user. A tenant operator stays limited to what the tenant plugin already allows. Example, using the multi-tenant helpers in **your** config, not this plugin:
+
+```ts
+import { getUserTenantIDs } from '@payloadcms/plugin-multi-tenant/utilities'
+
+impersonation({
+  access: {
+    impersonate: ({ req }) =>
+      req.user?.roles?.includes('admin') === true ||
+      getUserTenantIDs(req.user).length > 0,
+  },
+})
+```
+
+Do **not** add `impersonation-sessions` to the multi-tenant `collections` map. The rows are a hidden audit of who acted as whom, including a platform admin switching into a tenant user. Registering that collection would hide those rows from the people who need them.
+
+## Tenant cookie
+
+`@payloadcms/plugin-multi-tenant` stores the nav selection in `` `${cookiePrefix}-tenant` `` (`payload-tenant` by default). That cookie is not a capability. This plugin already listed it in `cookies.clearOnSwitch` so a swap would not keep the impersonator's selected tenant while `req.user` is the target.
+
+What it does now:
+
+| Mode | Start | Exit |
+|---|---|---|
+| Swap | Snapshot the impersonator's cookie onto the row. Set the target's if they have exactly one assigned tenant (`tenants` or `tenant`). Otherwise expire it. | Write the snapshot back. |
+| Parallel | Leave the cookie alone. Admin identity did not change. | Leave it alone. |
+
+Opt out by setting `cookies.clearOnSwitch` to a list that does not include that cookie name. Then the plugin neither snapshots nor writes it.
+
+## What this is not
+
+- A second tenant-scoped admin view (see [audit-logs](/audit-logs/multi-tenancy)).
+- A `scopeResolver` (see [analytics](/analytics/multi-tenancy)).
+- Preference isolation. Payload prefs stay on the user document.

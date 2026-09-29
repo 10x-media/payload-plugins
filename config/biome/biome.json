@@ -20,7 +20,8 @@
 			"!.claude/settings.local.json",
 			"!.changeset/*.md",
 			"!packages/*/dev/app/(payload)/admin/importMap.js",
-			"!packages/*/registry/r/**"
+			"!packages/*/registry/r/**",
+			"!**/dev/migrations/*.json"
 		]
 	},
 	"formatter": {
