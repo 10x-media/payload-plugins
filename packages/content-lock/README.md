@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/content-lock
 
 Planned and unplanned maintenance windows for Payload v3. While a window is active, every write to the frozen collections and globals is rejected with a 503 on every channel, the admin turns read-only, and a banner tells editors why and until when.
