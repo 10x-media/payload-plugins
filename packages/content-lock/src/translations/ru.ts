@@ -19,8 +19,6 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.fieldLockEverythingDescription]: 'Отключите, чтобы заблокировать только выбранный контент.',
 	[keys.fieldGroups]: 'Группы',
 	[keys.fieldCustomTargets]: 'Другие области',
-	[keys.fieldCustomTargetsDescription]:
-		'Части проекта, которые тоже охватывает блокировка. Их проверяет код проекта; плагин не блокирует для них запись.',
 	[keys.fieldCollections]: 'Коллекции',
 	[keys.fieldGlobals]: 'Глобальные настройки',
 	[keys.fieldAdvanced]: 'Расширенные',

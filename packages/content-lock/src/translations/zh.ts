@@ -19,8 +19,6 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.fieldLockEverythingDescription]: '关闭后仅锁定所选内容。',
 	[keys.fieldGroups]: '分组',
 	[keys.fieldCustomTargets]: '其他区域',
-	[keys.fieldCustomTargetsDescription]:
-		'锁定同时覆盖的项目其他部分。由项目代码检查；插件不会为其阻止写入。',
 	[keys.fieldCollections]: '集合',
 	[keys.fieldGlobals]: '全局',
 	[keys.fieldAdvanced]: '高级',

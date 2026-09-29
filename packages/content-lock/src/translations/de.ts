@@ -19,8 +19,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fieldLockEverythingDescription]: 'Deaktivieren, um nur ausgewählte Inhalte zu sperren.',
 	[keys.fieldGroups]: 'Gruppen',
 	[keys.fieldCustomTargets]: 'Weitere Bereiche',
-	[keys.fieldCustomTargetsDescription]:
-		'Weitere Teile des Projekts, die die Sperre abdeckt. Projektcode prüft sie; das Plugin blockiert dafür keine Schreibzugriffe.',
 	[keys.fieldCollections]: 'Sammlungen',
 	[keys.fieldGlobals]: 'Globale Dokumente',
 	[keys.fieldAdvanced]: 'Erweitert',

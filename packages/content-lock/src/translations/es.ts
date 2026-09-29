@@ -20,8 +20,6 @@ export const es: Record<TranslationKey, string> = {
 		'Desactívalo para bloquear solo el contenido seleccionado.',
 	[keys.fieldGroups]: 'Grupos',
 	[keys.fieldCustomTargets]: 'Otras áreas',
-	[keys.fieldCustomTargetsDescription]:
-		'Partes del proyecto que el bloqueo también cubre. Las comprueba el código del proyecto; el plugin no bloquea escrituras para ellas.',
 	[keys.fieldCollections]: 'Colecciones',
 	[keys.fieldGlobals]: 'Globales',
 	[keys.fieldAdvanced]: 'Avanzado',

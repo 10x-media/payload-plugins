@@ -19,8 +19,6 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.fieldLockEverythingDescription]: 'أوقف هذا الخيار لقفل المحتوى المحدد فقط.',
 	[keys.fieldGroups]: 'الأقسام',
 	[keys.fieldCustomTargets]: 'مناطق أخرى',
-	[keys.fieldCustomTargetsDescription]:
-		'أجزاء من المشروع يشملها القفل أيضًا. يتحقق منها كود المشروع؛ ولا تمنع الإضافة الكتابة إليها.',
 	[keys.fieldCollections]: 'المجموعات',
 	[keys.fieldGlobals]: 'الإعدادات العامة',
 	[keys.fieldAdvanced]: 'متقدم',

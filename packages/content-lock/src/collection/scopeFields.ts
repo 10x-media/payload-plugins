@@ -64,10 +64,7 @@ export const buildScopeFields = (
 			hasMany: true,
 			label: labelForKey(keys.fieldCustomTargets),
 			options: options.customTargets.map((target) => ({ value: target.key, label: target.label })),
-			admin: {
-				condition: notEverything,
-				description: labelForKey(keys.fieldCustomTargetsDescription),
-			},
+			admin: { condition: notEverything },
 		})
 	}
 	if (individualSelection) {

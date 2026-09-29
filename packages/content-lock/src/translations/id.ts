@@ -19,8 +19,6 @@ export const id: Record<TranslationKey, string> = {
 	[keys.fieldLockEverythingDescription]: 'Nonaktifkan untuk mengunci konten terpilih saja.',
 	[keys.fieldGroups]: 'Grup',
 	[keys.fieldCustomTargets]: 'Area lain',
-	[keys.fieldCustomTargetsDescription]:
-		'Bagian proyek yang juga dicakup kunci. Kode proyek memeriksanya; plugin tidak memblokir penulisan untuknya.',
 	[keys.fieldCollections]: 'Koleksi',
 	[keys.fieldGlobals]: 'Global',
 	[keys.fieldAdvanced]: 'Lanjutan',

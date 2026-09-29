@@ -19,8 +19,6 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.fieldLockEverythingDescription]: '선택한 콘텐츠만 잠그려면 끄세요.',
 	[keys.fieldGroups]: '그룹',
 	[keys.fieldCustomTargets]: '기타 영역',
-	[keys.fieldCustomTargetsDescription]:
-		'잠금이 함께 적용되는 프로젝트의 다른 부분입니다. 프로젝트 코드가 확인하며, 플러그인은 이에 대한 쓰기를 막지 않습니다.',
 	[keys.fieldCollections]: '컬렉션',
 	[keys.fieldGlobals]: '글로벌',
 	[keys.fieldAdvanced]: '고급',
