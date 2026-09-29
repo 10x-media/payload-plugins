@@ -1278,6 +1278,9 @@ importers:
       '@standard-schema/spec':
         specifier: ^1.0.0
         version: 1.1.0
+      to-snake-case:
+        specifier: 1.0.0
+        version: 1.0.0
     devDependencies:
       '@10x-media/payload-test-harness':
         specifier: workspace:*
@@ -1324,6 +1327,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.15)
+      '@types/to-snake-case':
+        specifier: 1.0.0
+        version: 1.0.0
       axe-core:
         specifier: 'catalog:'
         version: 4.12.1
@@ -4824,6 +4830,9 @@ packages:
 
   '@types/statuses@2.0.6':
     resolution: {integrity: sha512-xMAgYwceFhRA2zY+XbEA7mxYbA093wdiW8Vu6gZPGWy9cmOyU9XesH1tNcEWsKFd5Vzrqx5T3D38PWx1FIIXkA==}
+
+  '@types/to-snake-case@1.0.0':
+    resolution: {integrity: sha512-9YtLP+wuIL2EwOqyUjwTzWK6CGVnsP13vJ3i0U8S7O+SLAxrsi1jwC2TkHkdqVqfGLQWnk5H+Z+sSPT7SJeGYg==}
 
   '@types/tough-cookie@4.0.5':
     resolution: {integrity: sha512-/Ad8+nIOV7Rl++6f1BdKxFSMgmoqEoYbHRpPcx3JEfv8VRsQe9Z4mCXeJBzxs7mbHY/XOZZuXlRNfhpVPbs6ZA==}
@@ -11875,6 +11884,8 @@ snapshots:
       '@types/node': 18.19.130
 
   '@types/statuses@2.0.6': {}
+
+  '@types/to-snake-case@1.0.0': {}
 
   '@types/tough-cookie@4.0.5': {}
 

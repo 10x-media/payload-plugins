@@ -280,6 +280,14 @@ export type FormBuilderPluginOptions = {
 	 */
 	poll?: {
 		votedCookie?: boolean
+		/**
+		 * Name prefix of the httpOnly voted cookie (default `fb-voted-`, so `fb-voted-{formId}`), for
+		 * hosts with cookie naming or consent-classification rules. Applies to both the `votedCookie`
+		 * marker and the signed `allowChange` cookie. Must be a valid cookie-name token; validated at
+		 * boot. Pass `payload` to `hasVotedCookie`/`votedCookieName` so they read the same name.
+		 * Changing it on a live site orphans every cookie already issued.
+		 */
+		cookiePrefix?: string
 		sources?: PollOptionSourcesConfig
 		types?: PollTypesConfig
 		outcomeFields?: OutcomeFieldsOverride
@@ -288,7 +296,7 @@ export type FormBuilderPluginOptions = {
 		 * collection of aggregate rows at submit time, so results reads are O(options), never
 		 * truncate, and survive `persistSubmissions: false`. `false` restores scan-based results
 		 * (and then a persist-off poll is rejected at save). `overrides` opens the tally
-		 * collection (slug stays `form-poll-votes`).
+		 * collection, including its `slug` (default `form-poll-votes`).
 		 */
 		votes?: false | { overrides?: CollectionOverrides }
 	}
@@ -304,6 +312,12 @@ export type FormBuilderPluginOptions = {
 	 * order per key determines who wins), hooks are appended after the plugin's own hooks, and
 	 * `fields` is a function that receives the default fields and returns the final array so
 	 * additions/removals are always intentional.
+	 *
+	 * `slug` renames a collection (defaults `forms` and `form-submissions`); the plugin resolves it
+	 * at boot and uses it everywhere, including relationships, jobs, and the voted cookie. Browser
+	 * components keep posting to the default REST paths until handed the same slugs through
+	 * `<Form collections>`. Read the live slugs server-side with `collectionSlugsOf(payload)`.
+	 * Renaming on a live database is a migration: existing rows stay under the old collection.
 	 */
 	overrides?: {
 		forms?: CollectionOverrides

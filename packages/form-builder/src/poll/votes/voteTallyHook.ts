@@ -1,6 +1,6 @@
 import type { CollectionAfterChangeHook } from 'payload'
-import { FORMS_SLUG } from '../../collections/forms'
 import { pollConfigOf } from '../../form/pollState'
+import { pluginSlugsOf } from '../../plugin/collectionSlugs'
 import { formIdOf } from '../../submissions/formIdOf'
 import { answerValues } from './answerValues'
 import { bumpPollVote } from './bumpPollVote'
@@ -38,7 +38,13 @@ export const makeVoteTallyHook =
 		const formId = formIdOf(doc.form)
 		if (formId == null) return doc
 		const form = await req.payload
-			.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
+			.findByID({
+				collection: pluginSlugsOf(req.payload).forms,
+				id: formId,
+				depth: 0,
+				overrideAccess: true,
+				req,
+			})
 			.catch(() => null)
 		const poll = form?.pollEnabled === true ? pollConfigOf(form.poll) : undefined
 		const resultsField =

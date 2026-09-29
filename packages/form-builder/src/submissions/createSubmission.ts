@@ -1,5 +1,5 @@
 import type { Payload, PayloadRequest } from 'payload'
-import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import type { ConsentProofEntry } from './runSubmission'
 import { SUBMISSION_LOCALE_CONTEXT_KEY } from './submissionLocale'
 import type { SubmissionDescriptor, SubmissionValue } from './types'
@@ -33,7 +33,7 @@ export type CreatedSubmission = {
 
 /**
  * Server-side counterpart to the browser `submitForm` helper: a typed wrapper over `payload.create`
- * for the `form-submissions` collection. Submitting this way runs the exact same pipeline a browser
+ * for the plugin's submissions collection (whatever slug it is registered under). Submitting this way runs the exact same pipeline a browser
  * or raw REST submit does, server-authoritative validation, spam metadata capture when `req` is
  * threaded through, descriptor snapshotting, consent capture, and post-submit action dispatch, since
  * all of it lives in the collection's own hooks rather than in a route handler. Use it from server
@@ -56,7 +56,7 @@ export const createSubmission = (
 		context?: Record<string, unknown>
 	}) => Promise<CreatedSubmission>
 	const created = create({
-		collection: FORM_SUBMISSIONS_SLUG,
+		collection: pluginSlugsOf(payload).formSubmissions,
 		data: { form: args.form, values: args.values },
 		req: args.req,
 		...(args.locale ? { context: { [SUBMISSION_LOCALE_CONTEXT_KEY]: args.locale } } : {}),

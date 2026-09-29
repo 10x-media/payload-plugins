@@ -22,6 +22,12 @@ describe('fetchFormResults', () => {
 		})
 	})
 
+	it('reads results from a renamed forms collection', async () => {
+		const fetchImpl = vi.fn().mockResolvedValue(okResponse({ results: [] }))
+		await fetchFormResults({ formId: 7, collection: 'surveys', fetchImpl })
+		expect(fetchImpl).toHaveBeenCalledWith('/api/surveys/7/results', expect.anything())
+	})
+
 	it('omits the query string when no field is given', async () => {
 		const fetchImpl = vi.fn().mockResolvedValue(okResponse({ results: [] }))
 		await fetchFormResults({ formId: 'abc', fetchImpl })

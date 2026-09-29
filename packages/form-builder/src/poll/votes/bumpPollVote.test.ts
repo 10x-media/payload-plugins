@@ -1,5 +1,7 @@
 import type { Payload } from 'payload'
+import toSnakeCase from 'to-snake-case'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_COLLECTION_SLUGS, stashCollectionSlugs } from '../../plugin/collectionSlugs'
 import { bumpPollVote } from './bumpPollVote'
 import { POLL_VOTES_SLUG, VOTE_SHARDS } from './votesCollection'
 
@@ -60,6 +62,41 @@ const makePgPayload = (args?: {
 	}
 	return { payload: { db } as unknown as Payload, root }
 }
+
+const withTallySlug = (payload: Payload, pollVotes: string): Payload =>
+	({
+		...payload,
+		config: {
+			custom: stashCollectionSlugs(undefined, { ...DEFAULT_COLLECTION_SLUGS, pollVotes }),
+		},
+	}) as unknown as Payload
+
+describe('bumpPollVote with a renamed tally collection', () => {
+	it('writes through the mongoose model registered under the configured slug', async () => {
+		const updateOne = vi.fn().mockResolvedValue({})
+		const db = {
+			name: 'mongoose',
+			collections: { 'survey-tallies': { collection: { updateOne } } },
+		}
+		const payload = withTallySlug({ db } as unknown as Payload, 'survey-tallies')
+		await bumpPollVote(payload, key, 1)
+		expect(updateOne).toHaveBeenCalledOnce()
+	})
+
+	it('resolves the drizzle table the way Payload keys it, by the snake-cased slug', async () => {
+		// A host `dbName` changes the table name but not the key Payload maps it under.
+		const { payload, root } = makePgPayload({
+			tableNameMap: new Map([['survey_tallies', 'custom_table']]),
+			tables: { custom_table: pgTable },
+		})
+		await bumpPollVote(withTallySlug(payload, 'survey-tallies'), key, 1)
+		expect(root.insert).toHaveBeenCalledWith(pgTable)
+	})
+
+	it('keeps the historical default table key for the default slug', () => {
+		expect(toSnakeCase(DEFAULT_COLLECTION_SLUGS.pollVotes)).toBe('form_poll_votes')
+	})
+})
 
 describe('bumpPollVote', () => {
 	beforeEach(() => {

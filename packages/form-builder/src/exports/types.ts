@@ -70,6 +70,7 @@ export type {
 } from '../form/types'
 export type { FormBuilderPluginOptions } from '../index'
 export type { CollectionOverrides, FieldsOverride } from '../plugin/collectionOverrides'
+export type { FormBuilderCollectionSlugs } from '../plugin/collectionSlugs'
 export type { UploadsOption } from '../plugin/uploadsCollection'
 export type {
 	PollOptionSourceOption,

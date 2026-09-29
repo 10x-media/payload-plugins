@@ -89,6 +89,24 @@ describe('Poll', () => {
 		expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ locale: 'de' }))
 	})
 
+	it('reads results from the renamed forms collection', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		render(
+			createElement(Poll, {
+				form,
+				resultsField: 'colour',
+				hasVoted: true,
+				fetchResultsImpl,
+				collections: { forms: 'surveys' },
+			})
+		)
+		await waitFor(() =>
+			expect(fetchResultsImpl).toHaveBeenCalledWith(
+				expect.objectContaining({ collection: 'surveys' })
+			)
+		)
+	})
+
 	it('forwards the resolved success response to a Poll host onSuccess', async () => {
 		const onSuccess = vi.fn()
 		const formWithResponse = {

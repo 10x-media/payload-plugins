@@ -24,4 +24,4 @@ export const stashCustomState = <TState extends Record<string, unknown>>(
 /** The plugin's slice of `payload.config.custom`, or an empty object when the plugin never booted. */
 export const customStateOf = <TState extends Record<string, unknown>>(
 	payload: Payload
-): Partial<TState> => (payload.config.custom?.[CUSTOM_KEY] as Partial<TState> | undefined) ?? {}
+): Partial<TState> => (payload.config?.custom?.[CUSTOM_KEY] as Partial<TState> | undefined) ?? {}
