@@ -1,7 +1,7 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig, KVAdapterResult } from 'payload'
+import { type CollectionConfig, createLocalReq, type KVAdapterResult } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { ContentLockedError, contentLock } from '../../src/index'
+import { assertContentUnlocked, ContentLockedError, contentLock } from '../../src/index'
 
 describeForDb('contentLock loads', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
@@ -68,5 +68,15 @@ describeForDb('contentLock boot with an unavailable kv', { dbs: ['mongo'] }, (db
 		await expect(
 			booted.payload.create({ collection: 'posts', data: { title: 'x' }, overrideAccess: true })
 		).rejects.toBeInstanceOf(ContentLockedError)
+	})
+
+	it('keeps exempt collections unlocked while the lock state cannot be read', async () => {
+		const req = await createLocalReq({}, booted.payload)
+		await expect(
+			assertContentUnlocked(req, { collection: 'content-locks' })
+		).resolves.toBeUndefined()
+		await expect(assertContentUnlocked(req, { collection: 'posts' })).rejects.toBeInstanceOf(
+			ContentLockedError
+		)
 	})
 })

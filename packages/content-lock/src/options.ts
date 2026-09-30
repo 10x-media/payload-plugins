@@ -219,13 +219,18 @@ const resolveCustomTargets = (targets: ContentLockCustomTarget[] = []): CustomTa
 
 export const CUSTOM_KEY = '@10x-media/content-lock'
 
+/** The resolved options on the sanitized config, or `undefined` when the plugin did not run (disabled or not installed). */
+export const storedOptionsOf = (config: {
+	custom?: Record<string, unknown>
+}): ResolvedOptions | undefined => config.custom?.[CUSTOM_KEY] as ResolvedOptions | undefined
+
 /** Read the resolved options the plugin stored on the sanitized config. */
 export const optionsFromConfig = (config: {
 	custom?: Record<string, unknown>
 }): ResolvedOptions => {
-	const stored = config.custom?.[CUSTOM_KEY]
+	const stored = storedOptionsOf(config)
 	if (!stored) {
 		throw new Error('[content-lock] plugin options not found on config.custom')
 	}
-	return stored as ResolvedOptions
+	return stored
 }

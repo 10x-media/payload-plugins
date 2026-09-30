@@ -1,5 +1,5 @@
 import type { PayloadRequest } from 'payload'
-import { optionsFromConfig } from '../options'
+import { optionsFromConfig, storedOptionsOf } from '../options'
 import { entityOf, isEntityLocked, scopeCovers, scopeOf } from '../state/resolve'
 import { getContentLockState } from '../state/store'
 import type { ContentLockState, ContentLockTarget, EntityRef } from '../state/types'
@@ -29,7 +29,7 @@ export const readStateOrLocked = async (req: PayloadRequest): Promise<ContentLoc
 			active: [],
 			announced: [],
 			resolvedAt: new Date().toISOString(),
-			exempt: [],
+			exempt: storedOptionsOf(req.payload.config)?.exempt ?? [],
 		}
 	}
 }

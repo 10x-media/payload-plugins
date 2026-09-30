@@ -20,7 +20,7 @@ jobs({
 ```
 
 <Callout>
-Reliability adds fields to `payload-jobs` and a `payload-jobs-locks` collection. On Postgres, create and run a migration after enabling it. The lease collection exempts itself from `@10x-media/content-lock`, so a content freeze never blocks leader election or the boot that seeds its rows.
+Reliability adds fields to `payload-jobs` and a `payload-jobs-locks` collection. On Postgres, create and run a migration after enabling it. The lease collection exempts itself from `@10x-media/content-lock`, so the rows it seeds at startup are still written while content is frozen.
 </Callout>
 
 ## Job leases and the sweeper

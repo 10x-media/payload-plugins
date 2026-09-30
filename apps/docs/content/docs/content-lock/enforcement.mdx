@@ -72,7 +72,7 @@ const body = await translate(input.body) // only paid for while products is writ
 await req.payload.update({ collection: 'products', id: input.id, data: { body }, req })
 ```
 
-In custom admin components, `useContentLock()` from `@10x-media/content-lock/client` returns `{ state, locked, isLocked(entity), endsAt, activeWindow }`. Exempt collections and globals never count as locked, in either.
+In custom admin components, `useContentLock()` from `@10x-media/content-lock/client` returns `{ state, locked, isLocked(entity), endsAt, activeWindow }`. Exempt collections and globals never count as locked, on the server or in the admin.
 
 ## Timing
 
@@ -96,6 +96,7 @@ await withoutContentLock(async () => {
 
 - Everything the callback runs is covered: nested Local API calls, the hooks they fire and the writes those make, and work it starts and leaves running.
 - Requests handled at the same time stay locked. Only the callback's own async chain is let through.
+- Open it after Payload is initialized, and start no server, worker, cron or interval inside it: anything created inside keeps the lock lifted for as long as it runs. Jobs it queues run later, outside the scope, and meet the lock like any other job.
 - The lock itself stays in place: the banner, `isContentLocked`, `getContentLockState` and paused queues report it as before.
 - Keep it to trusted maintenance code. Never wrap a request handler, a custom endpoint or a job run in it.
 

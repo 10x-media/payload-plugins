@@ -346,6 +346,29 @@ describeForDb('content-lock enforcement', {}, (db) => {
 		).resolves.toBeUndefined()
 	})
 
+	it('runs a user write through the access check inside withoutContentLock', async () => {
+		await lock()
+		const asUser = { ...user, collection: 'users' as const }
+		await expect(
+			payload().create({
+				collection: 'products',
+				data: { name: 'outside' },
+				overrideAccess: false,
+				user: asUser,
+			})
+		).rejects.toBeInstanceOf(ContentLockedError)
+		await expect(
+			withoutContentLock(() =>
+				payload().create({
+					collection: 'products',
+					data: { name: 'inside' },
+					overrideAccess: false,
+					user: asUser,
+				})
+			)
+		).resolves.toMatchObject({ name: 'inside' })
+	})
+
 	it('passes the original access result through inside withoutContentLock', async () => {
 		const update = payload().collections.posts?.config.access.update
 		if (!update) {

@@ -15,7 +15,9 @@ holder[SCOPE] = scope
  * to protect (migrations, imports, restores). Covers every Local API call in `fn`'s async chain,
  * the hooks those calls run and the calls they make, including work `fn` starts and leaves
  * running. Requests handled meanwhile stay locked, and the lock is still reported: the banner,
- * `isContentLocked` and paused queues are unchanged. Never wrap a request handler or a job run.
+ * `isContentLocked` and paused queues are unchanged. Open it after Payload is initialized and
+ * start no server, cron or interval inside it, since whatever is created inside keeps the lock
+ * lifted for as long as it runs. Never wrap a request handler or a job run.
  */
 export const withoutContentLock = <T>(fn: () => T): Promise<Awaited<T>> =>
 	scope.run(true, async (): Promise<Awaited<T>> => await fn())
