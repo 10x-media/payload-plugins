@@ -13,6 +13,9 @@ export type WindowStatus = 'pending' | 'announced' | 'active' | 'ended'
  */
 export type EntityRef = { type: 'collection' | 'global' | 'custom'; slug: string }
 
+/** A collection, global or custom target, as the server helpers name it. */
+export type ContentLockTarget = { collection: string } | { global: string } | { custom: string }
+
 /**
  * One lock window as the runtime sees it. Timestamps are ISO strings so the
  * value survives `payload.kv` and the RSC to client boundary unchanged.

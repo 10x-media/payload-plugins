@@ -54,12 +54,16 @@ For a planned window, create one instead: set **Starts at**, turn on **Announce*
 Everything the admin does is an ordinary write to the collection, so scripts can open and close windows too:
 
 ```ts
+import { withoutContentLock } from '@10x-media/content-lock'
+
 const window = await payload.create({
   collection: 'content-locks',
   data: { title: 'Nightly import', lockEverything: false, groups: ['catalog'] },
 })
 
-// maintenance here: editors, API clients and jobs cannot write to the catalog
+await withoutContentLock(async () => {
+  // the import: its writes go through, while editors, API clients and jobs stay locked out
+})
 
 await payload.update({
   collection: 'content-locks',
@@ -68,4 +72,4 @@ await payload.update({
 })
 ```
 
-Code running under the lock is blocked like everyone else: nothing bypasses it, not even `overrideAccess`. Maintenance that must write goes through the database adapter directly, or into collections the window leaves open.
+Code running under the lock is blocked like everyone else, `overrideAccess` included, unless it runs inside `withoutContentLock`: only the callback's own writes go through. See [Maintenance code](/content-lock/enforcement#maintenance-code) for what that scope covers.

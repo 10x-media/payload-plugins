@@ -29,4 +29,5 @@ contentLock({
 - Mark jobs that are safe to run again from the start with `deferOnInterrupt`. Workflows re-run from the step they stopped at.
 - Long jobs can call `checkpoint({ job, req })` between batches to stop cleanly when their queue is paused.
 - Jobs that would rather skip locked work than fail check `isContentLocked(payload, { collection })` first.
+- Jobs that catch write errors per item, or pay for an external call before they write, call `assertContentUnlocked(req, { collection })` first. A lock caught per item never reaches the jobs plugin; asserted up front, it defers or fails the job before any work is done.
 - Jobs that write through `payload.db` or the raw driver are not stopped by the lock at all; only a paused queue keeps them out, so check `isContentLocked` in them.

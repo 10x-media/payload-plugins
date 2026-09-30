@@ -1,9 +1,9 @@
 import { type CollectionSlug, getCurrentDate, type Payload, type PayloadRequest } from 'payload'
 
 import { resumeWindowJobs } from '../jobs/deferred'
-import { optionsFromConfig } from '../options'
-import { isEntityLocked, resolveState, statusOf } from './resolve'
-import type { ContentLockState, LockWindow } from './types'
+import { optionsFromConfig, storedOptionsOf } from '../options'
+import { entityOf, isEntityLocked, resolveState, statusOf } from './resolve'
+import type { ContentLockState, ContentLockTarget, LockWindow } from './types'
 import { toWindow } from './window'
 
 export const SNAPSHOT_KEY = '@10x-media/content-lock:snapshot'
@@ -107,8 +107,15 @@ export const forgetWindows = (payload: Payload): void => {
 
 /** The effective lock at the current instant (Payload's clock, so tests can move it). */
 export const getContentLockState = async (payload: Payload): Promise<ContentLockState> => {
-	const { exempt, groups } = optionsFromConfig(payload.config)
-	return resolveState(await readWindows(payload), getCurrentDate(), { exempt, groups })
+	const options = storedOptionsOf(payload.config)
+	// Disabled for this environment, or not installed: nothing is locked, so host code can ask anyway.
+	if (!options) {
+		return resolveState([], getCurrentDate(), { groups: [] })
+	}
+	return resolveState(await readWindows(payload), getCurrentDate(), {
+		exempt: options.exempt,
+		groups: options.groups,
+	})
 }
 
 /**
@@ -119,17 +126,8 @@ export const getContentLockState = async (payload: Payload): Promise<ContentLock
  */
 export const isContentLocked = async (
 	payload: Payload,
-	target?: { collection: string } | { global: string } | { custom: string }
+	target?: ContentLockTarget
 ): Promise<boolean> => {
 	const state = await getContentLockState(payload)
-	if (!target) {
-		return state.locked
-	}
-	if ('collection' in target) {
-		return isEntityLocked(state, { type: 'collection', slug: target.collection })
-	}
-	if ('global' in target) {
-		return isEntityLocked(state, { type: 'global', slug: target.global })
-	}
-	return isEntityLocked(state, { type: 'custom', slug: target.custom })
+	return target ? isEntityLocked(state, entityOf(target)) : state.locked
 }

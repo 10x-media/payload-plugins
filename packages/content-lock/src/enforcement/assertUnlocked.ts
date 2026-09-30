@@ -1,12 +1,12 @@
 import type { PayloadRequest } from 'payload'
-import { optionsFromConfig } from '../options'
-import { isEntityLocked, scopeCovers, scopeOf } from '../state/resolve'
+import { optionsFromConfig, storedOptionsOf } from '../options'
+import { entityOf, isEntityLocked, scopeCovers, scopeOf } from '../state/resolve'
 import { getContentLockState } from '../state/store'
-import type { ContentLockState, EntityRef } from '../state/types'
+import type { ContentLockState, ContentLockTarget, EntityRef } from '../state/types'
 import { en } from '../translations/en'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
-import { hasBypass } from './bypass'
+import { isLockLifted } from './bypass'
 import { ContentLockedError } from './ContentLockedError'
 
 /**
@@ -29,14 +29,14 @@ export const readStateOrLocked = async (req: PayloadRequest): Promise<ContentLoc
 			active: [],
 			announced: [],
 			resolvedAt: new Date().toISOString(),
-			exempt: [],
+			exempt: storedOptionsOf(req.payload.config)?.exempt ?? [],
 		}
 	}
 }
 
-/** Throw `ContentLockedError` when `entity` is frozen and the request has no bypass. */
+/** Throw `ContentLockedError` when `entity` is frozen, unless the caller runs inside `withoutContentLock`. */
 export const assertUnlocked = async (req: PayloadRequest, entity: EntityRef): Promise<void> => {
-	if (hasBypass(req.context)) {
+	if (isLockLifted()) {
 		return
 	}
 	const state = await readStateOrLocked(req)
@@ -54,3 +54,15 @@ export const assertUnlocked = async (req: PayloadRequest, entity: EntityRef): Pr
 		lockIds,
 	})
 }
+
+/**
+ * Throw the lock's own `ContentLockedError` when `target` is frozen, for code that must not start
+ * work a lock would stop halfway: a job that catches write errors per item, or one that pays for
+ * an external call before it writes. A job sees it like a blocked write, so it defers or fails per
+ * its interruption policy. Exempt collections and globals never throw, nor does code running
+ * inside `withoutContentLock`.
+ */
+export const assertContentUnlocked = (
+	req: PayloadRequest,
+	target: ContentLockTarget
+): Promise<void> => assertUnlocked(req, entityOf(target))

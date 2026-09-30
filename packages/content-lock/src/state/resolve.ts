@@ -1,5 +1,6 @@
 import type {
 	ContentLockState,
+	ContentLockTarget,
 	EntityRef,
 	LockGroup,
 	LockWindow,
@@ -135,6 +136,14 @@ export const resolveState = (
 		exempt: [...exempt],
 	}
 }
+
+/** The entity a server helper's target names. */
+export const entityOf = (target: ContentLockTarget): EntityRef =>
+	'collection' in target
+		? { type: 'collection', slug: target.collection }
+		: 'global' in target
+			? { type: 'global', slug: target.global }
+			: { type: 'custom', slug: target.custom }
 
 /** Whether a scope covers an entity. */
 export const scopeCovers = (scope: ResolvedScope, entity: EntityRef): boolean => {

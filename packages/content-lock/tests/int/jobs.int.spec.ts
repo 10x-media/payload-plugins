@@ -9,7 +9,12 @@ import {
 import type { CollectionConfig, TaskConfig } from 'payload'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 
-import { contentLock, isContentLocked } from '../../src/index'
+import {
+	assertContentUnlocked,
+	contentLock,
+	getContentLockState,
+	isContentLocked,
+} from '../../src/index'
 import { forgetWindows } from '../../src/state/store'
 
 const LOCKS = 'content-locks'
@@ -40,6 +45,19 @@ const rewriteNote = deferOnInterrupt<TaskConfig<'rewriteNote'>>({
 	slug: 'rewriteNote',
 	handler: async ({ req }) => {
 		await req.payload.create({ collection: 'notes', data: { body: 'from a job' }, req })
+		return { output: {} }
+	},
+})
+
+/** Stands in for work a job pays for before it writes, such as a translation API call. */
+let paidCalls = 0
+
+const translatePost = deferOnInterrupt<TaskConfig<'translatePost'>>({
+	slug: 'translatePost',
+	handler: async ({ req }) => {
+		await assertContentUnlocked(req, { collection: 'posts' })
+		paidCalls += 1
+		await req.payload.create({ collection: 'posts', data: { title: 'translated' }, req })
 		return { output: {} }
 	},
 })
@@ -89,7 +107,10 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 			db,
 			collections: [posts, notes],
 			configOverrides: {
-				jobs: { deleteJobOnComplete: false, tasks: [writePost, rewritePost, rewriteNote] },
+				jobs: {
+					deleteJobOnComplete: false,
+					tasks: [writePost, rewritePost, rewriteNote, translatePost],
+				},
 				plugins: [jobs({})],
 			},
 			plugin: contentLock({ individualSelection: true }),
@@ -159,6 +180,21 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 		expect((await read(job.id)).completedAt).toBeTruthy()
 	})
 
+	it('stops a job before its paid work when it asserts the lock up front', async () => {
+		const window = await lock({ endAtTime: true, endsAt: ENDS_AT })
+		paidCalls = 0
+		const job = await payload().jobs.queue({ input: {}, task: 'translatePost' })
+		await runOnce()
+		expect(paidCalls).toBe(0)
+		expect((await read(job.id)).deferredBy).toBe(`content-lock:${window.id}`)
+		const { totalDocs } = await payload().count({
+			collection: 'posts',
+			overrideAccess: true,
+			where: { title: { equals: 'translated' } },
+		})
+		expect(totalDocs).toBe(0)
+	})
+
 	it('releases only the jobs of the window that ended', async () => {
 		const postsLock = await lock()
 		await lock({ collections: ['notes'] })
@@ -195,5 +231,38 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 		expect(await isContentLocked(payload())).toBe(true)
 		expect(await isContentLocked(payload(), { collection: 'posts' })).toBe(true)
 		expect(await isContentLocked(payload(), { collection: 'notes' })).toBe(false)
+	})
+})
+
+describeForDb('content-lock with @10x-media/jobs reliability', {}, (db) => {
+	let booted: BootedPayload
+
+	const payload = () => booted.payload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			collections: [posts],
+			configOverrides: { plugins: [jobs({ reliability: true })] },
+			plugin: contentLock({}),
+		})
+	})
+
+	afterEach(async () => {
+		await payload().delete({
+			collection: LOCKS,
+			where: { id: { exists: true } },
+			overrideAccess: true,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('keeps the lease rows writable while everything is locked, so init still succeeds', async () => {
+		await payload().create({ collection: LOCKS, data: { title: 'Deploy' }, overrideAccess: true })
+		expect((await getContentLockState(payload())).exempt).toContain('payload-jobs-locks')
+		await expect(payload().config.onInit?.(payload())).resolves.toBeUndefined()
 	})
 })

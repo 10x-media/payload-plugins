@@ -15,7 +15,7 @@ On every collection and global in scope, while a window is active:
 | autosave and version restore | blocked | blocked |
 | find, count, read | allowed | allowed |
 
-This applies on every channel: REST, GraphQL, the admin, custom endpoints, and the Local API **with `overrideAccess: true`**. No option, role or user bypasses it. Bulk operations are rejected as a whole.
+This applies on every channel: REST, GraphQL, the admin, custom endpoints, and the Local API **with `overrideAccess: true`**. No option, role or user bypasses it; only server code running inside `withoutContentLock` does (see [Maintenance code](#maintenance-code)). Bulk operations are rejected as a whole.
 
 Logins, token refresh, logout and password resets keep working.
 
@@ -61,11 +61,44 @@ const state = await getContentLockState(payload)
 // { locked, scope, endsAt, active, announced, resolvedAt }
 ```
 
-In custom admin components, `useContentLock()` from `@10x-media/content-lock/client` returns `{ state, locked, isLocked(entity), endsAt, activeWindow }`. Exempt collections and globals never count as locked, in either.
+Code that must not start work a lock would stop halfway asserts instead: `assertContentUnlocked` throws the lock's own `ContentLockedError`, so a job treats it like a blocked write and defers or fails per its [interruption policy](/content-lock/jobs), before it has paid for anything.
+
+```ts
+import { assertContentUnlocked } from '@10x-media/content-lock'
+
+// inside a task handler
+await assertContentUnlocked(req, { collection: 'products' })
+const body = await translate(input.body) // only paid for while products is writable
+await req.payload.update({ collection: 'products', id: input.id, data: { body }, req })
+```
+
+In custom admin components, `useContentLock()` from `@10x-media/content-lock/client` returns `{ state, locked, isLocked(entity), endsAt, activeWindow }`. Exempt collections and globals never count as locked, on the server or in the admin.
 
 ## Timing
 
 A lock that starts or ends reaches every server within a few seconds. If the lock state cannot be read, writes are rejected until it can.
+
+## Maintenance code
+
+A lock keeps editors, integrations and jobs out while you change the content yourself: a migration, an import, a restore. Run that code inside `withoutContentLock` so its own writes go through:
+
+```ts
+import { withoutContentLock } from '@10x-media/content-lock'
+
+await withoutContentLock(async () => {
+  await payload.update({
+    collection: 'products',
+    where: { legacySku: { exists: true } },
+    data: { legacySku: null },
+  })
+})
+```
+
+- Everything the callback runs is covered: nested Local API calls, the hooks they fire and the writes those make, and work it starts and leaves running.
+- Requests handled at the same time stay locked. Only the callback's own async chain is let through.
+- Open it after Payload is initialized, and start no server, worker, cron or interval inside it: anything created inside keeps the lock lifted for as long as it runs. Jobs it queues run later, outside the scope, and meet the lock like any other job.
+- The lock itself stays in place: the banner, `isContentLocked`, `getContentLockState` and paused queues report it as before.
+- Keep it to trusted maintenance code. Never wrap a request handler, a custom endpoint or a job run in it.
 
 ## Limits
 

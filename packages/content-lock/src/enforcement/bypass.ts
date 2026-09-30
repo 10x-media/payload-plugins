@@ -1,10 +1,26 @@
-import type { RequestContext } from 'payload'
+import { AsyncLocalStorage } from 'node:async_hooks'
+
+const SCOPE = Symbol.for('@10x-media/content-lock:bypassScope')
+
+type ScopeHolder = Record<symbol, AsyncLocalStorage<true> | undefined>
+
+// Held on globalThis because Next.js can evaluate this module in more than one server graph, and
+// a scope opened through one copy has to reach the guard running in another.
+const holder = globalThis as unknown as ScopeHolder
+const scope = holder[SCOPE] ?? new AsyncLocalStorage<true>()
+holder[SCOPE] = scope
 
 /**
- * Marks a request whose writes the lock lets through. Internal and
- * deliberately not an option: no person, role or setting can reach it.
+ * Run `fn` with every content lock lifted for the writes it makes: the maintenance a lock exists
+ * to protect (migrations, imports, restores). Covers every Local API call in `fn`'s async chain,
+ * the hooks those calls run and the calls they make, including work `fn` starts and leaves
+ * running. Requests handled meanwhile stay locked, and the lock is still reported: the banner,
+ * `isContentLocked` and paused queues are unchanged. Open it after Payload is initialized and
+ * start no server, cron or interval inside it, since whatever is created inside keeps the lock
+ * lifted for as long as it runs. Never wrap a request handler or a job run.
  */
-export const CONTENT_LOCK_BYPASS = Symbol.for('@10x-media/content-lock:bypass')
+export const withoutContentLock = <T>(fn: () => T): Promise<Awaited<T>> =>
+	scope.run(true, async (): Promise<Awaited<T>> => await fn())
 
-export const hasBypass = (context: RequestContext | undefined): boolean =>
-	Boolean(context && (context as Record<symbol, unknown>)[CONTENT_LOCK_BYPASS])
+/** Whether the calling code runs inside `withoutContentLock`. */
+export const isLockLifted = (): boolean => scope.getStore() === true

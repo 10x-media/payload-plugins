@@ -12,6 +12,7 @@ import {
 	resolveOptions,
 	SYSTEM_EXEMPT,
 } from './options'
+import { foldersSlugOf } from './plugin/foldersSlug'
 import { registerTranslations } from './plugin/registerTranslations'
 import { healSnapshot, readStoredWindows } from './state/store'
 
@@ -40,6 +41,10 @@ const PLUGIN_SLUG = '@10x-media/content-lock'
 /** Fail the build on a group, custom target or exemption the config does not back. */
 const assertKnownSlugs = (config: Config, options: ResolvedOptions): void => {
 	const collections = new Set((config.collections ?? []).map((collection) => collection.slug))
+	const folders = foldersSlugOf(config)
+	if (folders) {
+		collections.add(folders)
+	}
 	const globals = new Set((config.globals ?? []).map((global) => global.slug))
 	const custom = new Set(options.customTargets.map((target) => target.key))
 	const exempt = new Set(options.exempt)
@@ -139,7 +144,16 @@ const definition = definePlugin<ContentLockPluginOptions>({
 		const priorOnInit = config.onInit
 		config.onInit = async (payload) => {
 			await priorOnInit?.(payload)
-			await healSnapshot(payload, await readStoredWindows(payload))
+			// Readers rebuild a missing or stale snapshot and reject writes until they can, so a kv
+			// error here costs nothing but the log line; throwing would take the whole app down.
+			try {
+				await healSnapshot(payload, await readStoredWindows(payload))
+			} catch (error) {
+				payload.logger.error({
+					err: error,
+					msg: '[content-lock] cannot rebuild the lock snapshot at startup',
+				})
+			}
 		}
 		return config
 	},
@@ -158,6 +172,8 @@ export const contentLock = (options: ContentLockPluginOptions): Plugin => {
 	return plugin
 }
 
+export { assertContentUnlocked } from './enforcement/assertUnlocked'
+export { withoutContentLock } from './enforcement/bypass'
 export {
 	CONTENT_LOCKED_ERROR_NAME,
 	ContentLockedError,
@@ -165,5 +181,11 @@ export {
 	isContentLockedError,
 } from './enforcement/ContentLockedError'
 export { getContentLockState, isContentLocked } from './state/store'
-export type { ContentLockState, LockWindow, ResolvedScope, WindowStatus } from './state/types'
+export type {
+	ContentLockState,
+	ContentLockTarget,
+	LockWindow,
+	ResolvedScope,
+	WindowStatus,
+} from './state/types'
 export type { ContentLockPluginOptions as PluginOptions }
