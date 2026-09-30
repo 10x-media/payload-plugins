@@ -1,8 +1,8 @@
 import type { PayloadRequest } from 'payload'
 import { optionsFromConfig } from '../options'
-import { isEntityLocked, scopeCovers, scopeOf } from '../state/resolve'
+import { entityOf, isEntityLocked, scopeCovers, scopeOf } from '../state/resolve'
 import { getContentLockState } from '../state/store'
-import type { ContentLockState, EntityRef } from '../state/types'
+import type { ContentLockState, ContentLockTarget, EntityRef } from '../state/types'
 import { en } from '../translations/en'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
@@ -54,3 +54,15 @@ export const assertUnlocked = async (req: PayloadRequest, entity: EntityRef): Pr
 		lockIds,
 	})
 }
+
+/**
+ * Throw the lock's own `ContentLockedError` when `target` is frozen, for code that must not start
+ * work a lock would stop halfway: a job that catches write errors per item, or one that pays for
+ * an external call before it writes. A job sees it like a blocked write, so it defers or fails per
+ * its interruption policy. Exempt collections and globals never throw, nor does code running
+ * inside `withoutContentLock`.
+ */
+export const assertContentUnlocked = (
+	req: PayloadRequest,
+	target: ContentLockTarget
+): Promise<void> => assertUnlocked(req, entityOf(target))

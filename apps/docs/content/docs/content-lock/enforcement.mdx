@@ -61,6 +61,17 @@ const state = await getContentLockState(payload)
 // { locked, scope, endsAt, active, announced, resolvedAt }
 ```
 
+Code that must not start work a lock would stop halfway asserts instead: `assertContentUnlocked` throws the lock's own `ContentLockedError`, so a job treats it like a blocked write and defers or fails per its [interruption policy](/content-lock/jobs), before it has paid for anything.
+
+```ts
+import { assertContentUnlocked } from '@10x-media/content-lock'
+
+// inside a task handler
+await assertContentUnlocked(req, { collection: 'products' })
+const body = await translate(input.body) // only paid for while products is writable
+await req.payload.update({ collection: 'products', id: input.id, data: { body }, req })
+```
+
 In custom admin components, `useContentLock()` from `@10x-media/content-lock/client` returns `{ state, locked, isLocked(entity), endsAt, activeWindow }`. Exempt collections and globals never count as locked, in either.
 
 ## Timing

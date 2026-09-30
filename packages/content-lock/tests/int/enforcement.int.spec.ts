@@ -5,9 +5,16 @@ import {
 	installTestClock,
 	type TestClock,
 } from '@10x-media/payload-test-harness'
-import { type AccessArgs, type CollectionConfig, type GlobalConfig, handleEndpoints } from 'payload'
+import {
+	type AccessArgs,
+	type CollectionConfig,
+	createLocalReq,
+	type GlobalConfig,
+	handleEndpoints,
+} from 'payload'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 import {
+	assertContentUnlocked,
 	ContentLockedError,
 	contentLock,
 	getContentLockState,
@@ -324,6 +331,19 @@ describeForDb('content-lock enforcement', {}, (db) => {
 		release()
 		expect(res.status).toBe(503)
 		await expect(migration).resolves.toMatchObject({ title: 'migrated' })
+	})
+
+	it('asserts a target up front the way a blocked write would', async () => {
+		const req = await createLocalReq({}, payload())
+		await expect(assertContentUnlocked(req, { collection: 'posts' })).resolves.toBeUndefined()
+		await lock()
+		const attempt = assertContentUnlocked(req, { collection: 'posts' })
+		await expect(attempt).rejects.toBeInstanceOf(ContentLockedError)
+		await expect(attempt).rejects.toMatchObject({ status: 503 })
+		await expect(assertContentUnlocked(req, { collection: 'submissions' })).resolves.toBeUndefined()
+		await expect(
+			withoutContentLock(() => assertContentUnlocked(req, { collection: 'posts' }))
+		).resolves.toBeUndefined()
 	})
 
 	it('passes the original access result through inside withoutContentLock', async () => {

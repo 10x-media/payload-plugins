@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { isEntityLocked, orderBanners, resolveState, scopeOf, statusOf } from './resolve'
+import { entityOf, isEntityLocked, orderBanners, resolveState, scopeOf, statusOf } from './resolve'
 import type { LockGroup, LockWindow } from './types'
 
 const at = (iso: string) => new Date(iso)
@@ -234,5 +234,13 @@ describe('orderBanners', () => {
 
 	it('is empty when nothing is announced or active', () => {
 		expect(orderBanners(resolveState([], now, { groups }), groups, null)).toEqual([])
+	})
+})
+
+describe('entityOf', () => {
+	it('maps each target kind to its entity', () => {
+		expect(entityOf({ collection: 'posts' })).toEqual({ type: 'collection', slug: 'posts' })
+		expect(entityOf({ global: 'header' })).toEqual({ type: 'global', slug: 'header' })
+		expect(entityOf({ custom: 'crm-sync' })).toEqual({ type: 'custom', slug: 'crm-sync' })
 	})
 })

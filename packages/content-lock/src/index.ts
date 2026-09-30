@@ -172,6 +172,7 @@ export const contentLock = (options: ContentLockPluginOptions): Plugin => {
 	return plugin
 }
 
+export { assertContentUnlocked } from './enforcement/assertUnlocked'
 export { withoutContentLock } from './enforcement/bypass'
 export {
 	CONTENT_LOCKED_ERROR_NAME,
@@ -180,5 +181,11 @@ export {
 	isContentLockedError,
 } from './enforcement/ContentLockedError'
 export { getContentLockState, isContentLocked } from './state/store'
-export type { ContentLockState, LockWindow, ResolvedScope, WindowStatus } from './state/types'
+export type {
+	ContentLockState,
+	ContentLockTarget,
+	LockWindow,
+	ResolvedScope,
+	WindowStatus,
+} from './state/types'
 export type { ContentLockPluginOptions as PluginOptions }
