@@ -9,7 +9,7 @@ import {
 import type { CollectionConfig, TaskConfig } from 'payload'
 import { afterAll, afterEach, beforeAll, beforeEach, expect, it } from 'vitest'
 
-import { contentLock, isContentLocked } from '../../src/index'
+import { contentLock, getContentLockState, isContentLocked } from '../../src/index'
 import { forgetWindows } from '../../src/state/store'
 
 const LOCKS = 'content-locks'
@@ -195,5 +195,38 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 		expect(await isContentLocked(payload())).toBe(true)
 		expect(await isContentLocked(payload(), { collection: 'posts' })).toBe(true)
 		expect(await isContentLocked(payload(), { collection: 'notes' })).toBe(false)
+	})
+})
+
+describeForDb('content-lock with @10x-media/jobs reliability', {}, (db) => {
+	let booted: BootedPayload
+
+	const payload = () => booted.payload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			collections: [posts],
+			configOverrides: { plugins: [jobs({ reliability: true })] },
+			plugin: contentLock({}),
+		})
+	})
+
+	afterEach(async () => {
+		await payload().delete({
+			collection: LOCKS,
+			where: { id: { exists: true } },
+			overrideAccess: true,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('keeps the lease rows writable while everything is locked, so init still succeeds', async () => {
+		await payload().create({ collection: LOCKS, data: { title: 'Deploy' }, overrideAccess: true })
+		expect((await getContentLockState(payload())).exempt).toContain('payload-jobs-locks')
+		await expect(payload().config.onInit?.(payload())).resolves.toBeUndefined()
 	})
 })

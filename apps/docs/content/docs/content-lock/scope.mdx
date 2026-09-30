@@ -67,7 +67,7 @@ Some collections stay writable during every lock:
 - the lock collection itself;
 - Payload's system collections: `payload-preferences`, `payload-locked-documents`, `payload-jobs`, `payload-kv`, `payload-migrations`;
 - everything in `exempt`;
-- any collection or global that exempts itself in its own config.
+- any collection or global that exempts itself in its own config, as `@10x-media/jobs` does for its `payload-jobs-locks` leases.
 
 ```ts
 contentLock({ exempt: ['form-submissions', 'newsletter-signups'] })

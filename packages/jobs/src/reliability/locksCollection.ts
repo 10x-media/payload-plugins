@@ -29,4 +29,7 @@ export const buildJobsLocksCollection = (): CollectionConfig => ({
 		{ name: 'fenceToken', type: 'number', defaultValue: 0, required: true },
 	],
 	lockDocuments: false,
+	// Coordination state, not content: `@10x-media/content-lock` would otherwise reject the row
+	// seeding in onInit during a lock (its guard runs before validation), failing the boot.
+	custom: { contentLock: { exempt: true } },
 })
