@@ -99,7 +99,7 @@ auditLogs({
 | `payloadAPIs` | `(string \| { label, value })[]` | none | Extra `payloadAPI` values to label in the view, on top of `REST`, `GraphQL` and `local`. |
 | `access` | `{ create?, read?, update?, delete? }` | all denied | Access for the collection's own REST and GraphQL endpoints. |
 | `view` | `false \| { path?, defaultLimit?, access?, forceWhere? }` | on | The custom view. See [the admin view](/audit-logs/admin-view). |
-| `override` | `(collection) => CollectionConfig` | none | Modify the generated collection. The slug is always forced back to `audit-logs`. |
+| `override` | `(collection) => CollectionConfig` | none | Modify the generated collection. The slug is always forced back to `audit-logs`, and the [content-lock exemption](#content-locks) is always kept. |
 
 All four access rules default to denying everything. The plugin's own writes never go through them, so the log fills up regardless; the rules only govern the public API. Open `read` if something outside the admin needs to query entries.
 
@@ -134,6 +134,14 @@ hooks: {
 ```
 
 `req.context` lives for one request. Work that crosses a request boundary (a queued job, a webhook callback) starts with a fresh `req`, so set the value again at the start of each one.
+
+### Content locks
+
+With [`@10x-media/content-lock`](/content-lock) installed, the `audit-logs` collection stays writable during every lock. It exempts itself with `custom: { contentLock: { exempt: true } }`, applied after `override`, so an override cannot drop it.
+
+An entry follows a write the lock already let through, such as a login or a write to a collection the lock leaves open, and a rejected entry would fail that write with it. [Custom events](/audit-logs/custom-events) are recorded as usual, and the [retention jobs](/audit-logs/data-retention#during-a-content-lock) can still delete and stamp entries.
+
+No window can freeze an exempt collection: individual selection does not offer `audit-logs`, and a content-lock group that names it fails the build.
 
 ## disabled
 

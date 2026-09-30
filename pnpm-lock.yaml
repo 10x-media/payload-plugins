@@ -499,6 +499,9 @@ importers:
 
   packages/audit-logs:
     devDependencies:
+      '@10x-media/content-lock':
+        specifier: workspace:*
+        version: link:../content-lock
       '@10x-media/payload-test-harness':
         specifier: workspace:*
         version: link:../../tooling/test-harness

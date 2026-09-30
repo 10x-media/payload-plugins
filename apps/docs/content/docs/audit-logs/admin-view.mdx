@@ -108,7 +108,7 @@ With `debug: true` and `retention` configured, the view grows two buttons that q
 
 ## Changing the collection
 
-`logs.override` receives the fully built `audit-logs` collection and returns your version. The slug is forced back afterwards, because the hooks, the view and the jobs all address it by name.
+`logs.override` receives the fully built `audit-logs` collection and returns your version. The slug is forced back afterwards, because the hooks, the view and the jobs all address it by name. So is the [content-lock exemption](/audit-logs/configuration#content-locks) in `custom.contentLock`; the rest of `custom` is yours.
 
 ```ts title="payload.config.ts"
 auditLogs({

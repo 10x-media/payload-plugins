@@ -90,6 +90,29 @@ Configuring `archive` adds an indexed, hidden `archivedAt` date field to the col
 
 That ordering is the safety property worth understanding: if an archive run fails partway through, say the upload errors, the affected entries never get stamped. They are retried on the next run, and the delete job cannot reach them in the meantime.
 
+## During a content lock
+
+With [`@10x-media/content-lock`](/content-lock) installed, the `audit-logs` collection is [exempt from every lock](/audit-logs/configuration#content-locks), so the delete job and the archive job's `archivedAt` stamps go through while content is frozen.
+
+The archive job also uploads into `archive.uploadCollection`, which a lock freezes like any other collection it covers. Left frozen, a run during the lock fails on the upload before anything is stamped, and the first run after the lock ends archives the same entries.
+
+To keep archives landing during a lock, exempt the upload collection. That opens it to every writer, editors included, which is easier to accept for a collection that holds only archives:
+
+```ts title="payload.config.ts"
+plugins: [
+  auditLogs({
+    collections: { posts: true },
+    retention: {
+      deleteCron: '0 3 1 * *',
+      archive: { cron: '0 2 * * 0', uploadCollection: 'audit-archives' },
+    },
+  }),
+  contentLock({ exempt: ['audit-archives'] }),
+],
+```
+
+Whether the jobs run during a lock at all depends on the runner. `autoRun` and `/api/payload-jobs/run` keep claiming them, while the `@10x-media/jobs` worker claims nothing during a lock on everything (see [how locks pause queues](/content-lock/jobs)).
+
 ## The CSV
 
 One file per run, gzipped, named `audit-logs-{date}.csv.gz` unless `generateFilename` says otherwise.
