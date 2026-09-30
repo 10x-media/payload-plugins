@@ -6,7 +6,7 @@ import type { ContentLockState, EntityRef } from '../state/types'
 import { en } from '../translations/en'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
-import { hasBypass } from './bypass'
+import { isLockLifted } from './bypass'
 import { ContentLockedError } from './ContentLockedError'
 
 /**
@@ -34,9 +34,9 @@ export const readStateOrLocked = async (req: PayloadRequest): Promise<ContentLoc
 	}
 }
 
-/** Throw `ContentLockedError` when `entity` is frozen and the request has no bypass. */
+/** Throw `ContentLockedError` when `entity` is frozen, unless the caller runs inside `withoutContentLock`. */
 export const assertUnlocked = async (req: PayloadRequest, entity: EntityRef): Promise<void> => {
-	if (hasBypass(req.context)) {
+	if (isLockLifted()) {
 		return
 	}
 	const state = await readStateOrLocked(req)

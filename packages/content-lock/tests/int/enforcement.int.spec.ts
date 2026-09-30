@@ -12,6 +12,7 @@ import {
 	contentLock,
 	getContentLockState,
 	isContentLocked,
+	withoutContentLock,
 } from '../../src/index'
 import { forgetWindows, SNAPSHOT_KEY } from '../../src/state/store'
 
@@ -291,6 +292,49 @@ describeForDb('content-lock enforcement', {}, (db) => {
 		expect(await update(args)).toEqual({ title: { equals: 'mine' } })
 		await lock()
 		expect(await update(args)).toBe(false)
+	})
+
+	it('lets writes through inside withoutContentLock and keeps reporting the lock', async () => {
+		await lock()
+		const migrated = await withoutContentLock(() =>
+			payload().create({ collection: 'posts', data: { title: 'migrated' }, overrideAccess: true })
+		)
+		expect(migrated.title).toBe('migrated')
+		expect(await isContentLocked(payload(), { collection: 'posts' })).toBe(true)
+		await expect(
+			payload().create({ collection: 'posts', data: { title: 'editor' }, overrideAccess: true })
+		).rejects.toBeInstanceOf(ContentLockedError)
+	})
+
+	it('keeps requests handled meanwhile locked', async () => {
+		await lock()
+		let release: () => void = () => undefined
+		const gate = new Promise<void>((resolve) => {
+			release = resolve
+		})
+		const migration = withoutContentLock(async () => {
+			await gate
+			return payload().create({
+				collection: 'posts',
+				data: { title: 'migrated' },
+				overrideAccess: true,
+			})
+		})
+		const res = await rest('/posts', { method: 'POST', body: JSON.stringify({ title: 'editor' }) })
+		release()
+		expect(res.status).toBe(503)
+		await expect(migration).resolves.toMatchObject({ title: 'migrated' })
+	})
+
+	it('passes the original access result through inside withoutContentLock', async () => {
+		const update = payload().collections.posts?.config.access.update
+		if (!update) {
+			throw new Error('posts collection missing')
+		}
+		const args = { req: { payload: payload(), context: {}, user: null } } as unknown as AccessArgs
+		await lock()
+		expect(await update(args)).toBe(false)
+		expect(await withoutContentLock(() => update(args))).toEqual({ title: { equals: 'mine' } })
 	})
 
 	it('rebuilds a missing snapshot from the collection', async () => {

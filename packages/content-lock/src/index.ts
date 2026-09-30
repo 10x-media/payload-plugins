@@ -158,6 +158,7 @@ export const contentLock = (options: ContentLockPluginOptions): Plugin => {
 	return plugin
 }
 
+export { withoutContentLock } from './enforcement/bypass'
 export {
 	CONTENT_LOCKED_ERROR_NAME,
 	ContentLockedError,

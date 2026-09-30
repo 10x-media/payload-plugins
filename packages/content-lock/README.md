@@ -12,6 +12,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 
 - Lock windows as documents: start now or schedule ahead, announce in advance, end at a time or by hand, with drafts and time zones.
 - Blocks writes on REST, GraphQL, the admin and the Local API, including `overrideAccess: true`, with `Retry-After`.
+- Maintenance code (migrations, imports) writes through a lock with `withoutContentLock`.
 - Freeze everything, configured groups, or individual collections and globals; exempt what the public site writes to.
 - An admin banner that pages through windows, with localized per-window messages and live lock value tokens.
 - Works with `@10x-media/jobs`: full locks pause the queues, interrupted jobs fail cleanly or defer until the lock ends.
