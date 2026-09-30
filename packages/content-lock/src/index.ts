@@ -139,7 +139,16 @@ const definition = definePlugin<ContentLockPluginOptions>({
 		const priorOnInit = config.onInit
 		config.onInit = async (payload) => {
 			await priorOnInit?.(payload)
-			await healSnapshot(payload, await readStoredWindows(payload))
+			// Readers rebuild a missing or stale snapshot and reject writes until they can, so a kv
+			// error here costs nothing but the log line; throwing would take the whole app down.
+			try {
+				await healSnapshot(payload, await readStoredWindows(payload))
+			} catch (error) {
+				payload.logger.error({
+					err: error,
+					msg: '[content-lock] cannot rebuild the lock snapshot at startup',
+				})
+			}
 		}
 		return config
 	},
