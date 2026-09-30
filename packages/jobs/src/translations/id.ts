@@ -28,6 +28,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.fieldId]: 'ID',
 	[keys.fieldStarted]: 'Dimulai',
 	[keys.fieldLeaseExpires]: 'Masa sewa berakhir',
+	[keys.fieldDeferredBy]: 'Ditunda oleh',
 	[keys.fieldScheduledFor]: 'Dijadwalkan untuk',
 
 	[keys.outcome]: 'Hasil',

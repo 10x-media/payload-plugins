@@ -1,0 +1,85 @@
+---
+title: Scope
+description: Freeze everything, a group, individual collections and globals, or custom targets.
+---
+
+A window freezes **everything** unless you turn off **Lock everything** and pick what it covers.
+
+## Groups
+
+Groups are named sets of collections and globals, defined once in the config and picked per window:
+
+```ts
+contentLock({
+  groups: [
+    { key: 'catalog', label: 'Catalog', collections: ['products', 'categories'] },
+    { key: 'site', label: { en: 'Website', de: 'Webseite' }, collections: ['pages', 'posts'], globals: ['header', 'footer'] },
+  ],
+})
+```
+
+- A window stores the group's `key`, so a collection added to a group is covered by every window on it. Renaming a key detaches existing windows from the group.
+- `label` is a string or a map per admin language. It shows in the window form and the banner.
+- `custom` lists [custom targets](#custom-targets) the group covers too.
+- The build fails when a group names a collection or global the config does not have, or when two groups share a key.
+
+## Individual collections and globals
+
+```ts
+contentLock({ individualSelection: true })
+```
+
+adds an **Advanced** section to the window with raw collection and global pickers, for the one-off that no group fits. Pass `{ access: ({ req }) => boolean }` instead of `true` to show those pickers only to some users. Entities already covered by a picked group are not repeated in the banner.
+
+## Custom targets
+
+Some things a lock should cover are not collections: a custom admin view, an integration that syncs data in, a report. Declare them as custom targets and a window can lock them like anything else:
+
+```ts
+contentLock({
+  customTargets: [
+    { key: 'reports', label: 'Reports', path: '/reports' },
+    { key: 'crm-sync', label: { en: 'CRM sync', de: 'CRM-Abgleich' } },
+    'imports', // labelled by its key
+  ],
+  groups: [{ key: 'catalog', label: 'Catalog', collections: ['products'], custom: ['crm-sync'] }],
+})
+```
+
+The window form offers them next to the groups, the banner names them by their label, and a lock on everything covers them too.
+
+The plugin blocks no writes for a custom target: it cannot know what one stands for. Your code asks instead:
+
+```ts
+if (await isContentLocked(payload, { custom: 'crm-sync' })) {
+  return // skip the sync while the lock holds
+}
+```
+
+In admin components, `useContentLock().isLocked({ type: 'custom', slug: 'reports' })` answers the same question.
+
+`path` ties a target to admin pages, so the banner there shows only the windows covering it, as it does on a collection. A path covers itself and every page below it (`/reports` covers `/reports/2026`, not `/reportsx`); pass `{ path, match: 'exact' }` for just that page. Paths are relative to the admin route, the query string never counts, and a target can list several. Without a `path`, a target has no page of its own.
+
+## Always writable
+
+Some collections stay writable during every lock:
+
+- the lock collection itself;
+- Payload's system collections: `payload-preferences`, `payload-locked-documents`, `payload-jobs`, `payload-kv`, `payload-migrations`;
+- everything in `exempt`;
+- any collection or global that exempts itself in its own config.
+
+```ts
+contentLock({ exempt: ['form-submissions', 'newsletter-signups'] })
+
+// or on the collection, which suits plugins that own such collections:
+const auditLog: CollectionConfig = {
+  slug: 'audit-log',
+  custom: { contentLock: { exempt: true } },
+  fields: [/* ... */],
+}
+```
+
+Use them for collections the public site or other plugins write to (submissions, logs, queues), which should keep accepting writes while editors are frozen out. `isContentLocked` never reports an exempt collection as locked. Payload's folders collection is covered like any other.
+
+The build fails when `exempt` names a collection or global the config does not have, or when a group names an exempt one.

@@ -1,5 +1,6 @@
 import { type Config, definePlugin } from 'payload'
 
+import { registerInterruption } from './interruption/register'
 import type { JobsPluginOptions } from './options'
 import { applyCollectionOverride } from './plugin/applyCollectionOverride'
 import { registerJobsEnhancements } from './plugin/registerJobsEnhancements'
@@ -36,9 +37,8 @@ export const jobs = definePlugin<JobsPluginOptions>({
 			...(options.queues ?? []),
 			...(queueControl?.queues ?? []),
 		])
-		if (reliability) {
-			registerReliability(config, reliability)
-		}
+		const heartbeat = reliability ? registerReliability(config, reliability) : null
+		registerInterruption(config, options.interrupt, heartbeat)
 		if (queueControl) {
 			registerQueueControl(config, queueControl, reliability)
 		}
@@ -74,6 +74,32 @@ export {
 } from './execution/autoRunConfig'
 export { type DrainDeps, type DrainOptions, type DrainResult, drainWorker } from './execution/drain'
 export { type CreateWorkerArgs, createWorker, type Worker } from './execution/worker'
+export {
+	isJobDeferredError,
+	JOB_DEFERRED_ERROR_NAME,
+	JobDeferredError,
+} from './interruption/deferredError'
+export {
+	checkpoint,
+	evaluateRunGates,
+	type GatePause,
+} from './interruption/gates'
+export { deferOnInterrupt, type InterruptPolicy } from './interruption/policy'
+export { type ApplyInterruptionsResult, applyJobInterruptions } from './interruption/records'
+export type { InterruptOptions } from './interruption/register'
+export {
+	type InterruptClassifier,
+	type Interruption,
+	JOBS_CUSTOM_KEY,
+	type JobsApi,
+	type JobsExtensions,
+	type JobsRegistry,
+	jobsRegistryOf,
+	type RunGate,
+	type RunGateResult,
+} from './interruption/registry'
+export { resumeDeferred } from './interruption/resume'
+export { wrapJobHandlers } from './interruption/wrap'
 export type { JobStatus, JobStatusInput } from './jobs/deriveJobStatus'
 export { deriveJobStatus } from './jobs/deriveJobStatus'
 export type { JobInputComponentProps, JobInputComponents } from './jobs/inputComponents'

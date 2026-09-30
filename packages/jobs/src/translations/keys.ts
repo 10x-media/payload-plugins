@@ -31,6 +31,7 @@ export const keys = {
 	fieldId: 'jobs:fieldId',
 	fieldStarted: 'jobs:fieldStarted',
 	fieldLeaseExpires: 'jobs:fieldLeaseExpires',
+	fieldDeferredBy: 'jobs:fieldDeferredBy',
 	fieldScheduledFor: 'jobs:fieldScheduledFor',
 
 	outcome: 'jobs:outcome',

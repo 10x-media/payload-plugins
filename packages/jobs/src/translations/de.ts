@@ -28,6 +28,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fieldId]: 'ID',
 	[keys.fieldStarted]: 'Gestartet',
 	[keys.fieldLeaseExpires]: 'Lease läuft ab',
+	[keys.fieldDeferredBy]: 'Zurückgestellt von',
 	[keys.fieldScheduledFor]: 'Geplant für',
 
 	[keys.outcome]: 'Ergebnis',

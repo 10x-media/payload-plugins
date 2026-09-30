@@ -1,0 +1,32 @@
+---
+title: Jobs
+description: How locks pause queues and interrupt jobs with @10x-media/jobs.
+---
+
+A lock blocks writes from jobs like from anything else, so a job that writes into locked content fails on that write, with or without the jobs plugin. With [`@10x-media/jobs`](/jobs) installed, content-lock also behaves well towards them; it detects the plugin and needs no setup.
+
+## What happens
+
+- **A lock on everything pauses every queue.** The plugin's worker and `queue-run` endpoint claim no new jobs until it ends. Jobs already queued simply wait.
+- **A partial lock keeps queues running.** Jobs that do not touch the frozen content carry on; one that writes into it is interrupted.
+- **An interrupted job** fails for good by default, with "Interrupted by content-lock" and no retries. A job marked with `deferOnInterrupt` goes back to the queue until the lock ends instead, without spending a retry. See [interruptions](/jobs/interruptions).
+- **Ending or changing a window** releases the jobs it deferred right away, and only those: **End now** on a lock over users does not wake jobs waiting on a separate lock over posts. A window without a known end defers its jobs for a day; ending it releases them sooner. A window deleted directly in the database releases its jobs within about a minute.
+
+Only the plugin's worker and `queue-run` honour the pause. Payload's `autoRun` and `/api/payload-jobs/run` keep claiming jobs, which then fail or defer on their writes.
+
+## Options
+
+```ts
+contentLock({
+  jobs: { queues: ['catalog-sync'] }, // also pause these queues during partial locks
+})
+```
+
+`jobs: false` turns the integration off.
+
+## Writing lock-friendly jobs
+
+- Mark jobs that are safe to run again from the start with `deferOnInterrupt`. Workflows re-run from the step they stopped at.
+- Long jobs can call `checkpoint({ job, req })` between batches to stop cleanly when their queue is paused.
+- Jobs that would rather skip locked work than fail check `isContentLocked(payload, { collection })` first.
+- Jobs that write through `payload.db` or the raw driver are not stopped by the lock at all; only a paused queue keeps them out, so check `isContentLocked` in them.

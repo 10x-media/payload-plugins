@@ -1,0 +1,71 @@
+---
+title: Quick start
+description: Install content-lock, define groups, and run your first lock.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/content-lock
+```
+
+`@payloadcms/richtext-lexical` is a peer dependency: banner messages are Lexical rich text.
+
+## Configure
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { contentLock } from '@10x-media/content-lock'
+
+export default buildConfig({
+  // ...
+  plugins: [
+    contentLock({
+      groups: [
+        { key: 'catalog', label: 'Catalog', collections: ['products', 'categories'] },
+        { key: 'site', label: { en: 'Website', de: 'Website' }, collections: ['pages'], globals: ['header'] },
+      ],
+      exempt: ['form-submissions'],
+    }),
+  ],
+})
+```
+
+- `groups` are what a window can freeze besides everything. See [scope](/content-lock/scope).
+- `exempt` keeps collections writable during every lock, typically ones the public site writes to.
+
+The plugin adds a collection and admin components, so regenerate the import map, and on Postgres create a migration:
+
+```bash
+pnpm payload generate:importmap
+pnpm payload migrate:create content-lock
+```
+
+By default any signed-in user can create and end windows. To leave that to some users, set `collection.access`; see [who manages windows](/content-lock/windows#who-manages-windows).
+
+## Lock now
+
+Open **Content locks** in the admin and press **Lock now**. The window starts immediately, freezes everything, and ends when someone opens it and presses **End now**.
+
+For a planned window, create one instead: set **Starts at**, turn on **Announce** to warn editors ahead of time, turn on **End at time** if you know when it finishes, and choose the scope.
+
+## From code
+
+Everything the admin does is an ordinary write to the collection, so scripts can open and close windows too:
+
+```ts
+const window = await payload.create({
+  collection: 'content-locks',
+  data: { title: 'Nightly import', lockEverything: false, groups: ['catalog'] },
+})
+
+// maintenance here: editors, API clients and jobs cannot write to the catalog
+
+await payload.update({
+  collection: 'content-locks',
+  id: window.id,
+  data: { endedAt: new Date().toISOString() },
+})
+```
+
+Code running under the lock is blocked like everyone else: nothing bypasses it, not even `overrideAccess`. Maintenance that must write goes through the database adapter directly, or into collections the window leaves open.
