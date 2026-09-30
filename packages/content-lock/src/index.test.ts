@@ -24,4 +24,15 @@ describe('contentLock factory', () => {
 		expect(i18n.de?.contentLock?.pluginName).toBe('Beispiel')
 		expect(i18n.en?.contentLock?.pluginName).toBe('Content Lock')
 	})
+
+	it('lets a group name the folders collection only when a collection uses folders', () => {
+		const plugin = contentLock({
+			groups: [{ key: 'library', label: 'Library', collections: ['payload-folders'] }],
+		})
+		expect(() => plugin(fakeConfig())).toThrow('unknown collection "payload-folders"')
+		const withFolders = {
+			collections: [{ slug: 'documents', fields: [], folders: true }],
+		} as unknown as Config
+		expect(() => plugin(withFolders)).not.toThrow()
+	})
 })

@@ -80,6 +80,6 @@ const auditLog: CollectionConfig = {
 }
 ```
 
-Use them for collections the public site or other plugins write to (submissions, logs, queues), which should keep accepting writes while editors are frozen out. `isContentLocked` never reports an exempt collection as locked. Payload's folders collection is covered like any other.
+Use them for collections the public site or other plugins write to (submissions, logs, queues), which should keep accepting writes while editors are frozen out. `isContentLocked` never reports an exempt collection as locked. Payload's folders collection is frozen like any other, and once a collection uses folders, groups and individual selection can name it too (`payload-folders`, unless `folders.slug` renames it).
 
 The build fails when `exempt` names a collection or global the config does not have, or when a group names an exempt one.

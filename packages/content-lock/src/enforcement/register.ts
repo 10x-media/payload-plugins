@@ -1,6 +1,7 @@
 import type { CollectionConfig, Config, GlobalConfig } from 'payload'
 
 import type { ResolvedOptions } from '../options'
+import { foldersSlugOf } from '../plugin/foldersSlug'
 import { collectionGuard, globalGuard } from './guard'
 import { retryAfterHook } from './retryAfter'
 import { wrapAccess } from './wrapAccess'
@@ -60,8 +61,7 @@ export const registerEnforcement = (config: Config, options: ResolvedOptions): v
 	config.globals = (config.globals ?? []).map((global) =>
 		exempt.has(global.slug) ? global : lockGlobal(global)
 	)
-	const usesFolders = (config.collections ?? []).some((collection) => Boolean(collection.folders))
-	if (config.folders !== false && usesFolders) {
+	if (config.folders !== false && foldersSlugOf(config)) {
 		config.folders = {
 			...config.folders,
 			collectionOverrides: [

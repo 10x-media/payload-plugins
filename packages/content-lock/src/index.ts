@@ -12,6 +12,7 @@ import {
 	resolveOptions,
 	SYSTEM_EXEMPT,
 } from './options'
+import { foldersSlugOf } from './plugin/foldersSlug'
 import { registerTranslations } from './plugin/registerTranslations'
 import { healSnapshot, readStoredWindows } from './state/store'
 
@@ -40,6 +41,10 @@ const PLUGIN_SLUG = '@10x-media/content-lock'
 /** Fail the build on a group, custom target or exemption the config does not back. */
 const assertKnownSlugs = (config: Config, options: ResolvedOptions): void => {
 	const collections = new Set((config.collections ?? []).map((collection) => collection.slug))
+	const folders = foldersSlugOf(config)
+	if (folders) {
+		collections.add(folders)
+	}
 	const globals = new Set((config.globals ?? []).map((global) => global.slug))
 	const custom = new Set(options.customTargets.map((target) => target.key))
 	const exempt = new Set(options.exempt)
