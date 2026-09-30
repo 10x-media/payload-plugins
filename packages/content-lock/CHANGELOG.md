@@ -1,5 +1,21 @@
 # @10x-media/content-lock
 
+## 0.1.0-beta.1
+
+### Minor Changes
+
+- `assertContentUnlocked(req, target)` throws the lock's own `ContentLockedError` when a collection, global or custom target is frozen. Jobs that catch write errors per item, or pay for an external call before they write, call it first: the jobs integration then defers or fails them like a blocked write, before any work is done. It never throws for exempt targets, inside `withoutContentLock`, or with the plugin disabled. `isContentLocked` and the new helper share an exported `ContentLockTarget` type.
+
+- `withoutContentLock(fn)` lets maintenance code write while a lock is active. Every Local API call in the callback's async chain, the hooks it fires included, runs as if nothing were locked; requests handled at the same time stay locked, and the banner, `isContentLocked` and paused queues still report the lock. Use it for the migrations and imports a lock exists to protect, never for request handlers or job runs.
+
+### Patch Changes
+
+- With the plugin disabled, `getContentLockState` and `isContentLocked` report nothing locked instead of throwing, so host code can call them in every environment.
+
+- Groups and individual selection can name Payload's folders collection. Payload adds it after plugins run, so a group naming it failed the build with an unknown-collection error and the picker never offered it; locks on everything already froze it.
+
+- A kv error while rebuilding the lock snapshot at startup is logged instead of failing the boot. Readers already rebuild a missing or stale snapshot and reject writes until they can, so enforcement is unchanged.
+
 ## 0.1.0-beta.0
 
 ### Minor Changes

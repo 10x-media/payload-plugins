@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/content-lock",
-	"version": "0.1.0-beta.0",
+	"version": "0.1.0-beta.1",
 	"description": "Planned and unplanned maintenance windows that freeze Payload content: 503 on every write channel, read-only admin, localized banners.",
 	"license": "MIT",
 	"repository": {
