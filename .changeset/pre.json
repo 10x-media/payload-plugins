@@ -38,7 +38,9 @@
 		"@10x-media/conversations": "0.0.0",
 		"@10x-media/conversations-dev": "0.0.0",
 		"@10x-media/impersonation": "0.0.0",
-		"@10x-media/impersonation-dev": "0.0.0"
+		"@10x-media/impersonation-dev": "0.0.0",
+		"@10x-media/content-lock": "0.0.0",
+		"@10x-media/content-lock-dev": "0.0.0"
 	},
 	"changesets": [
 		"admin-wiki-block-chips",
@@ -109,6 +111,7 @@
 		"audit-logs-locales",
 		"automations-locales",
 		"color-linked-alpha",
+		"content-lock-initial-beta",
 		"conversations-initial-beta",
 		"conversations-locales",
 		"conversations-server-function",
@@ -202,6 +205,7 @@
 		"jobs-feedback",
 		"jobs-initial-beta",
 		"jobs-input-placeholder",
+		"jobs-interruptions",
 		"jobs-locales",
 		"jobs-log-entry-components",
 		"jobs-review-fixes",
