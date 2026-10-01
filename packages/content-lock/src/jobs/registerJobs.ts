@@ -11,7 +11,15 @@ import { deferredByWindow, jobsRegistryOf } from './deferred'
  */
 const UNKNOWN_END_MS = 24 * 60 * 60 * 1000
 
-const unknownEnd = () => new Date(getCurrentDate().getTime() + UNKNOWN_END_MS)
+/**
+ * How long a job waits when the lock that stopped it names no window: the lock
+ * state could not be read and the guard failed closed, so no window change can
+ * release the job. A minute outlasts a kv or database blip; while the state
+ * stays unreadable the run gate throws and the jobs worker claims nothing.
+ */
+const UNREADABLE_STATE_RETRY_MS = 60 * 1000
+
+const fromNow = (ms: number) => new Date(getCurrentDate().getTime() + ms)
 
 /** Integration with `@10x-media/jobs`. */
 export type ContentLockJobsOptions = {
@@ -41,7 +49,7 @@ const lockGate =
 		return {
 			by: deferredByWindow(pausing?.id),
 			paused,
-			until: state.endsAt ? new Date(state.endsAt) : unknownEnd(),
+			until: state.endsAt ? new Date(state.endsAt) : fromNow(UNKNOWN_END_MS),
 		}
 	}
 
@@ -51,10 +59,14 @@ const lockInterruption: InterruptClassifier = ({ error }) => {
 	}
 	// Any covering window will do: resumed early by the wrong one, the job hits
 	// the other lock and is deferred again under its id.
+	const windowId = error.data?.lockIds?.[0]
+	if (!windowId) {
+		return { by: deferredByWindow(undefined), until: fromNow(UNREADABLE_STATE_RETRY_MS) }
+	}
 	const endsAt = error.data?.endsAt
 	return {
-		by: deferredByWindow(error.data?.lockIds?.[0]),
-		until: endsAt ? new Date(endsAt) : unknownEnd(),
+		by: deferredByWindow(windowId),
+		until: endsAt ? new Date(endsAt) : fromNow(UNKNOWN_END_MS),
 	}
 }
 
