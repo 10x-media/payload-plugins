@@ -29,14 +29,10 @@ const isSnapshot = (value: unknown): value is Snapshot =>
 	Array.isArray((value as Snapshot).windows)
 
 /**
- * Rebuild the snapshot from the collection and store it in kv. Only published
- * windows count: a draft locks and announces nothing. Pass the request of an
- * in-flight write so the read sees that write's transaction.
+ * A snapshot of the collection as it is now. Only published windows count: a
+ * draft locks and announces nothing.
  */
-export const rebuildSnapshot = async (
-	payload: Payload,
-	req?: PayloadRequest
-): Promise<LockWindow[]> => {
+const readCollection = async (payload: Payload, req?: PayloadRequest): Promise<Snapshot> => {
 	const { slug } = optionsFromConfig(payload.config)
 	// Straight from the adapter: collection hooks (the live status field reads
 	// this snapshot) must not run while it is being built.
@@ -51,10 +47,23 @@ export const rebuildSnapshot = async (
 	const windows = docs
 		.map((doc) => toWindow(doc as unknown as Record<string, unknown>))
 		.filter((window) => statusOf(window, now) !== 'ended')
-	const snapshot: Snapshot = { version: 1, builtAt: now.toISOString(), windows }
+	return { version: 1, builtAt: now.toISOString(), windows }
+}
+
+/**
+ * Rebuild the snapshot after a window write and store it in kv. Pass the
+ * write's request so the read sees its transaction. A kv error throws and
+ * fails the write: other servers would go on enforcing the old snapshot for up
+ * to `SNAPSHOT_MAX_AGE_MS`, so the write must not report a change they cannot see.
+ */
+export const rebuildSnapshot = async (
+	payload: Payload,
+	req: PayloadRequest
+): Promise<LockWindow[]> => {
+	const snapshot = await readCollection(payload, req)
 	await payload.kv.set(SNAPSHOT_KEY, snapshot)
-	memory.set(payload, { readAt: Date.now(), windows })
-	return windows
+	memory.set(payload, { readAt: Date.now(), windows: snapshot.windows })
+	return snapshot.windows
 }
 
 /** The windows in the stored snapshot, however old; empty when there is none. */
@@ -82,15 +91,27 @@ export const readWindows = async (payload: Payload): Promise<LockWindow[]> => {
 
 /**
  * Rebuild the snapshot outside a window write (at startup, or when it went
- * stale). Windows live in `previous` but gone now (ended, deleted, or edited
- * in the database) release the jobs they deferred, in case the release that
- * should have followed their change never ran. Costs nothing unless one went.
+ * stale). A kv error is only logged: the windows are known, so this process
+ * enforces them and the next rebuild retries the store. Windows in `previous` but
+ * gone now (ended, deleted, or edited in the database) release the jobs they
+ * deferred, in case the release that should have followed their change never
+ * ran. Costs nothing unless one went.
  */
 export const healSnapshot = async (
 	payload: Payload,
 	previous: LockWindow[]
 ): Promise<LockWindow[]> => {
-	const windows = await rebuildSnapshot(payload)
+	const snapshot = await readCollection(payload)
+	try {
+		await payload.kv.set(SNAPSHOT_KEY, snapshot)
+	} catch (error) {
+		payload.logger.error({
+			err: error,
+			msg: '[content-lock] cannot store the lock snapshot, enforcing the windows read from the collection',
+		})
+	}
+	const { windows } = snapshot
+	memory.set(payload, { readAt: Date.now(), windows })
 	const live = new Set(windows.map((window) => window.id))
 	for (const window of previous) {
 		if (!live.has(window.id)) {
