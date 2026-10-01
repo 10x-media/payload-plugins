@@ -117,7 +117,7 @@ Whether the jobs run during a lock at all depends on the runner. `autoRun` and `
 
 One file per run, gzipped, named `audit-logs-{date}.csv.gz` unless `generateFilename` says otherwise.
 
-Columns come out in a fixed order for the built-in fields (`id`, `operation`, `eventType`, `relationTo`, `documentId`, `user`, `locale`, `payloadAPI`, `changedPaths`, `diff`, `snapshot`, `metadata`, `tenant`, `createdAt`, `ipAddress`, `userAgent`), followed by any fields you added through `logs.override`, alphabetically. JSON-valued columns are serialized and escaped.
+Columns come out in a fixed order for the built-in fields (`id`, `operation`, `eventType`, `relationTo`, `documentId`, `user`, `impersonator`, `locale`, `payloadAPI`, `changedPaths`, `diff`, `snapshot`, `metadata`, `tenant`, `createdAt`, `ipAddress`, `userAgent`), followed by any fields you added through `logs.override`, alphabetically. JSON-valued columns are serialized and escaped.
 
 Anything in `excludeFields` is dropped from the header and every row. The default drops `ipAddress` and `userAgent`; pass `[]` to keep everything.
 

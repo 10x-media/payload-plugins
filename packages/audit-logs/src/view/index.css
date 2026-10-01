@@ -447,12 +447,23 @@
 	white-space: nowrap;
 }
 .al-row__user {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
 	font-family: monospace;
 	font-size: 12px;
 	color: var(--theme-elevation-500);
+}
+.al-row__user-name,
+.al-row__via {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+}
+.al-row__via {
+	font-size: 11px;
+	color: var(--theme-elevation-400);
 }
 .al-row__right {
 	display: flex;

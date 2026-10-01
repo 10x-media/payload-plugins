@@ -73,6 +73,7 @@ export const es: Record<TranslationKey, string> = {
 	[keys.metaIp]: 'IP',
 	[keys.metaUa]: 'UA',
 	[keys.metaLocale]: 'Idioma',
+	[keys.viaImpersonator]: 'vía {{name}}',
 	[keys.sectionSnapshot]: 'Instantánea',
 	[keys.sectionAuthEvent]: 'Evento de autenticación',
 	[keys.sectionCustomEvent]: 'Evento personalizado',

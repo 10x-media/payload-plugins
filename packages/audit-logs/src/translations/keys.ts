@@ -62,6 +62,7 @@ export const keys = {
 	metaIp: 'auditLogs:metaIp',
 	metaUa: 'auditLogs:metaUa',
 	metaLocale: 'auditLogs:metaLocale',
+	viaImpersonator: 'auditLogs:viaImpersonator',
 	sectionSnapshot: 'auditLogs:sectionSnapshot',
 	sectionAuthEvent: 'auditLogs:sectionAuthEvent',
 	sectionCustomEvent: 'auditLogs:sectionCustomEvent',

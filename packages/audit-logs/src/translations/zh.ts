@@ -73,6 +73,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.metaIp]: 'IP',
 	[keys.metaUa]: 'UA',
 	[keys.metaLocale]: '语言',
+	[keys.viaImpersonator]: '经由 {{name}}',
 	[keys.sectionSnapshot]: '快照',
 	[keys.sectionAuthEvent]: '认证事件',
 	[keys.sectionCustomEvent]: '自定义事件',

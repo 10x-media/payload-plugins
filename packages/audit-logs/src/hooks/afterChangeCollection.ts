@@ -5,6 +5,7 @@ import { REDACTED } from '../types'
 import { anonymizeDoc } from '../utilities/anonymize'
 import type { FieldMap } from '../utilities/buildFieldMap'
 import { computeDiff, normalizeSnapshot } from '../utilities/diff'
+import { impersonatorRelationship } from '../utilities/impersonator'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { extractTenantId } from '../utilities/tenant'
 import { writeAuditLog } from '../utilities/writeAuditLog'
@@ -77,6 +78,7 @@ export const afterChangeCollectionAuditLog =
 				? { relationTo: req.user.collection, value: req.user.id }
 				: req.user.id
 			: undefined
+		const impersonator = impersonatorRelationship(req.user, options.isUserPolymorphic)
 		const ipAddress = options.collectIpAddress ? getClientIP(req) : undefined
 		const userAgent = options.collectUserAgent ? getUserAgent(req) : undefined
 		const group = options.groupContextKey
@@ -148,6 +150,7 @@ export const afterChangeCollectionAuditLog =
 					relationTo: options.collectionSlug,
 					documentId,
 					...(userValue !== undefined && { user: userValue }),
+					...(impersonator !== undefined && { impersonator }),
 					...(req.locale && { locale: req.locale }),
 					payloadAPI: req.payloadAPI,
 					...(ipAddress && { ipAddress }),
@@ -194,6 +197,7 @@ export const afterChangeCollectionAuditLog =
 				relationTo: options.collectionSlug,
 				documentId,
 				...(userValue !== undefined && { user: userValue }),
+				...(impersonator !== undefined && { impersonator }),
 				...(req.locale && { locale: req.locale }),
 				payloadAPI: req.payloadAPI,
 				...(ipAddress && { ipAddress }),
