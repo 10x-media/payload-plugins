@@ -76,7 +76,11 @@ In custom admin components, `useContentLock()` from `@10x-media/content-lock/cli
 
 ## Timing
 
-A lock that starts or ends reaches every server within a few seconds. If the lock state cannot be read, writes are rejected until it can.
+A lock that starts or ends reaches every server within a few seconds. Servers share the windows through a snapshot in `payload.kv`, and a server rebuilds it from the collection when it is missing or more than a minute old.
+
+- A server that cannot store the snapshot it rebuilt logs the error and enforces the windows it read from the collection.
+- Saving or deleting a window fails while its snapshot cannot be stored, since the other servers would keep the old one for up to a minute.
+- If the lock state cannot be read, because kv does not answer or the collection cannot be read for a rebuild, writes are rejected until it can.
 
 ## Maintenance code
 
