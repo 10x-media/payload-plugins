@@ -7,6 +7,7 @@ import type {
 import { AuthenticationError, LockedAuth, UnverifiedEmail } from 'payload'
 
 import type { FailedLoginOptions, FailedLoginReason } from '../types'
+import { impersonatorRelationship } from '../utilities/impersonator'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { writeAuditLog } from '../utilities/writeAuditLog'
 
@@ -64,6 +65,7 @@ export const afterLoginAuditLog =
 		const userValue = options.isUserPolymorphic
 			? { relationTo: options.collectionSlug, value: user.id }
 			: user.id
+		const impersonator = impersonatorRelationship(user, options.isUserPolymorphic)
 
 		const ipAddress = options.collectIpAddress ? getClientIP(req) : undefined
 		const userAgent = options.collectUserAgent ? getUserAgent(req) : undefined
@@ -80,6 +82,7 @@ export const afterLoginAuditLog =
 				relationTo: options.collectionSlug,
 				documentId: String(user.id),
 				user: userValue,
+				...(impersonator !== undefined && { impersonator }),
 				...(req.locale && { locale: req.locale }),
 				payloadAPI: req.payloadAPI,
 				...(ipAddress && { ipAddress }),

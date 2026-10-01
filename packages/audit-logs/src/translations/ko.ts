@@ -73,6 +73,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.metaIp]: 'IP',
 	[keys.metaUa]: 'UA',
 	[keys.metaLocale]: '언어',
+	[keys.viaImpersonator]: '{{name}} 대행',
 	[keys.sectionSnapshot]: '스냅샷',
 	[keys.sectionAuthEvent]: '인증 이벤트',
 	[keys.sectionCustomEvent]: '사용자 정의 이벤트',

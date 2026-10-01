@@ -39,8 +39,17 @@ export function LogRow({ adminRoute, doc, payloadAPILabels, userTitleFields }: P
 	const isAuthOrCustom = doc.operation === 'auth' || doc.operation === 'custom'
 	const hasMeta = Boolean(doc.ipAddress || doc.userAgent)
 	const hasGroup = Boolean(doc.group)
+	const userLabel = displayUser(doc.user, userTitleFields)
+	const impersonatorLabel = displayUser(doc.impersonator, userTitleFields)
+	const hasImpersonator = Boolean(doc.impersonator) && impersonatorLabel !== '—'
 	const isExpandable =
-		hasDiff || hasSnapshot || hasMetadata || isAuthOrCustom || hasMeta || hasGroup
+		hasDiff ||
+		hasSnapshot ||
+		hasMetadata ||
+		isAuthOrCustom ||
+		hasMeta ||
+		hasGroup ||
+		hasImpersonator
 
 	return (
 		<div className={`al-row${expanded ? ' al-row--expanded' : ''}`}>
@@ -65,8 +74,15 @@ export function LogRow({ adminRoute, doc, payloadAPILabels, userTitleFields }: P
 					{isGlobal ? '—' : doc.documentId ? `#${doc.documentId.slice(-8)}` : '—'}
 				</span>
 
-				<span className="al-row__user" title={displayUser(doc.user, userTitleFields)}>
-					{displayUser(doc.user, userTitleFields).slice(-20)}
+				<span className="al-row__user">
+					<span className="al-row__user-name" title={userLabel}>
+						{userLabel.slice(-20)}
+					</span>
+					{hasImpersonator && (
+						<span className="al-row__via" title={impersonatorLabel}>
+							{t(keys.viaImpersonator, { name: impersonatorLabel })}
+						</span>
+					)}
 				</span>
 
 				<span className="al-row__badges">
@@ -108,6 +124,11 @@ export function LogRow({ adminRoute, doc, payloadAPILabels, userTitleFields }: P
 							{doc.locale && (
 								<span className="al-row__meta-item">
 									<span className="al-row__meta-label">{t(keys.metaLocale)}</span> {doc.locale}
+								</span>
+							)}
+							{hasImpersonator && (
+								<span className="al-row__meta-item">
+									{t(keys.viaImpersonator, { name: impersonatorLabel })}
 								</span>
 							)}
 							{doc.group && groupHref && (

@@ -5,6 +5,7 @@ export type AuditLogDoc = {
 	relationTo: string
 	documentId?: string
 	user?: unknown
+	impersonator?: unknown
 	locale?: string
 	/** Free text: core sets REST, GraphQL or local, a plugin may set anything else. */
 	payloadAPI?: string

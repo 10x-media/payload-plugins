@@ -78,6 +78,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.metaIp]: 'IP',
 	[keys.metaUa]: 'UA',
 	[keys.metaLocale]: 'Локалізація',
+	[keys.viaImpersonator]: 'від {{name}}',
 	[keys.sectionSnapshot]: 'Знімок',
 	[keys.sectionAuthEvent]: 'Подія автентифікації',
 	[keys.sectionCustomEvent]: 'Кастомна подія',

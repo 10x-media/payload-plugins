@@ -73,6 +73,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.metaIp]: 'IP',
 	[keys.metaUa]: 'UA',
 	[keys.metaLocale]: 'Язык',
+	[keys.viaImpersonator]: 'от {{name}}',
 	[keys.sectionSnapshot]: 'Снимок',
 	[keys.sectionAuthEvent]: 'Событие аутентификации',
 	[keys.sectionCustomEvent]: 'Пользовательское событие',

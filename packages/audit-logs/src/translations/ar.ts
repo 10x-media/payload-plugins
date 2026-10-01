@@ -73,6 +73,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.metaIp]: 'IP',
 	[keys.metaUa]: 'UA',
 	[keys.metaLocale]: 'اللغة',
+	[keys.viaImpersonator]: 'عبر {{name}}',
 	[keys.sectionSnapshot]: 'لقطة',
 	[keys.sectionAuthEvent]: 'حدث المصادقة',
 	[keys.sectionCustomEvent]: 'حدث مخصص',
