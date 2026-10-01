@@ -18,7 +18,7 @@ description: Options for access, cookies, duration, UI, and session seams.
 | `reason` | `'off' \| 'optional' \| 'required'` | `'off'` | Note stored on the row. |
 | `maxDuration` | `number` (seconds) | unset | Absolute cap from `startedAt`. Unset means refresh can keep the session alive. |
 | `retention` | `{ deleteAfterDays, cron?, queue? }` | off | Opt-in job: close stale open rows, then delete **closed** rows older than N days. Host must run the queue (`jobs.autoRun`). Open rows are never deleted. |
-| `cookies.clearOnSwitch` | `string[]` | `` [`${cookiePrefix}-tenant`] `` | Extra cookies expired on start and exit. See [Multi-tenancy](/impersonation/multi-tenancy). |
+| `cookies.clearOnSwitch` | `string[]` | `` [`${cookiePrefix}-tenant`] `` | Extra cookies expired on swap start and exit. Parallel leaves them in place. See [Multi-tenancy](/impersonation/multi-tenancy). |
 | `security.trustedOrigins` | `string[]` | `[]` | Extra Origins allowed for cookie POSTs. |
 | `targets` | `string[]` | every local-strategy auth collection | Collections that can be impersonated. |
 | `session.issue` / `revoke` / `binding` | functions | Payload local-auth | Custom auth seams. |

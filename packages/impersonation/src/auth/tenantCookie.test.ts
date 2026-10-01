@@ -3,12 +3,11 @@ import { describe, expect, it } from 'vitest'
 
 import type { ResolvedOptions } from '../types'
 import {
+	clearCookiesOnStart,
 	clearOnSwitchWithoutTenant,
 	exitTenantCookies,
 	readTenantCookie,
-	startTenantCookies,
 	tenantCookieName,
-	uniqueAssignedTenantId,
 } from './tenantCookie'
 
 const authConfig = () =>
@@ -17,7 +16,7 @@ const authConfig = () =>
 		tokenExpiration: 7200,
 	}) as unknown as SanitizedCollectionConfig['auth']
 
-const options = (clearOnSwitch = ['payload-tenant']): ResolvedOptions =>
+const options = (clearOnSwitch = ['payload-tenant', 'side']): ResolvedOptions =>
 	({ cookies: { clearOnSwitch } }) as ResolvedOptions
 
 describe('tenantCookie', () => {
@@ -40,70 +39,33 @@ describe('tenantCookie', () => {
 		expect(readTenantCookie(new Headers({ cookie: 'payload-tenant=' }), 'payload')).toBeUndefined()
 	})
 
-	it('treats a unique tenants or tenant assignment as the selector', () => {
-		expect(uniqueAssignedTenantId({ tenants: ['alpha'] })).toBe('alpha')
-		expect(uniqueAssignedTenantId({ tenant: { relationTo: 'tenants', value: 'alpha' } })).toBe(
-			'alpha'
-		)
-		expect(uniqueAssignedTenantId({ tenants: [{ id: 12 }] })).toBe('12')
-		expect(uniqueAssignedTenantId({ tenants: ['alpha', 'beta'] })).toBeUndefined()
-		expect(uniqueAssignedTenantId({})).toBeUndefined()
-	})
-
-	it('reads the tenant from a membership row and keeps a resolved tenant document id', () => {
-		expect(uniqueAssignedTenantId({ tenants: [{ id: 'row1', tenant: 'tenantABC' }] })).toBe(
-			'tenantABC'
-		)
-		expect(uniqueAssignedTenantId({ tenants: [{ id: 'tenantABC', name: 'Asia' }] })).toBe(
-			'tenantABC'
-		)
-		expect(
-			uniqueAssignedTenantId({
-				tenants: [
-					{ id: 'row1', tenant: 'tenantABC' },
-					{ id: 'row2', tenant: 'tenantXYZ' },
-				],
-			})
-		).toBeUndefined()
-		expect(uniqueAssignedTenantId({ tenant: { relationTo: 'tenants', value: 'tenantABC' } })).toBe(
-			'tenantABC'
-		)
-	})
-
-	it('sets the unique assigned tenant on swap start and expires when there is none', () => {
-		const set = startTenantCookies({
+	it('expires clearOnSwitch on swap start and leaves it alone in parallel', () => {
+		const expired = clearCookiesOnStart({
 			authConfig: authConfig(),
 			cookiePrefix: 'payload',
+			except: ['payload-token'],
 			mode: 'swap',
 			options: options(),
-			target: { tenants: ['alpha'] },
 		})
-		expect(set[0]).toContain('payload-tenant=alpha')
-		expect(set[0]).not.toContain('HttpOnly=true')
+		const tenant = expired.find((cookie) => cookie.startsWith('payload-tenant='))
+		expect(tenant).toBeDefined()
+		expect(tenant).not.toContain('HttpOnly=true')
+		expect(new Date(tenant?.match(/Expires=([^;]+)/)?.[1] ?? '').getTime()).toBeLessThan(Date.now())
+		expect(expired.some((cookie) => cookie.startsWith('side='))).toBe(true)
+		expect(expired.some((cookie) => cookie.startsWith('payload-token='))).toBe(false)
 
-		const expired = startTenantCookies({
-			authConfig: authConfig(),
-			cookiePrefix: 'payload',
-			mode: 'swap',
-			options: options(),
-			target: {},
-		})
-		expect(expired[0]).toContain('payload-tenant=')
-		expect(new Date(expired[0]?.match(/Expires=([^;]+)/)?.[1] ?? '').getTime()).toBeLessThan(
-			Date.now()
-		)
-	})
-
-	it('leaves the tenant cookie alone in parallel', () => {
 		expect(
-			startTenantCookies({
+			clearCookiesOnStart({
 				authConfig: authConfig(),
 				cookiePrefix: 'payload',
+				except: [],
 				mode: 'parallel',
 				options: options(),
-				target: { tenants: ['alpha'] },
 			})
 		).toEqual([])
+	})
+
+	it('leaves the tenant cookie alone in parallel on exit', () => {
 		expect(
 			exitTenantCookies({
 				authConfig: authConfig(),
@@ -128,12 +90,12 @@ describe('tenantCookie', () => {
 
 	it('does nothing when clearOnSwitch does not manage the tenant cookie', () => {
 		expect(
-			startTenantCookies({
+			exitTenantCookies({
 				authConfig: authConfig(),
 				cookiePrefix: 'payload',
 				mode: 'swap',
-				options: options([]),
-				target: { tenants: ['alpha'] },
+				options: options(['side']),
+				snapshot: 'tenant-a',
 			})
 		).toEqual([])
 	})

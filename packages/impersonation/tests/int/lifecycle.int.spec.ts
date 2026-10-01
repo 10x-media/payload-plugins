@@ -904,7 +904,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		}
 	})
 
-	it('sets the unique assigned tenant on swap start', async () => {
+	it('expires the tenant cookie on swap start when the target has one assignment', async () => {
 		const booted = await bootPayload({
 			collections: [
 				{
@@ -943,12 +943,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 				body: { collection: 'users', id: target.docs[0]?.id },
 			})
 			expect(start.status).toBe(200)
-			const admin = await booted.payload.find({
-				collection: 'users',
-				limit: 1,
-				where: { email: { equals: ADMIN.email } },
-			})
-			expect(client.jar.get('payload-tenant')).toBe(String(admin.docs[0]?.id))
+			expect(client.cookieNames()).not.toContain('payload-tenant')
 			const exit = await client.post('/api/impersonation/exit', { body: {} })
 			expect(exit.status).toBe(200)
 			expect(client.jar.get('payload-tenant')).toBe('other-tenant')

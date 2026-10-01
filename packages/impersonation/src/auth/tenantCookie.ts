@@ -3,7 +3,7 @@ import { parseCookies } from 'payload/shared'
 
 import { defaultClearOnSwitch } from '../plugin/constants'
 import type { ImpersonationMode, ResolvedOptions } from '../types'
-import { expireCookie, writeCookie } from './cookies'
+import { expireCookie, expireCookies, writeCookie } from './cookies'
 
 type AuthConfig = SanitizedCollectionConfig['auth']
 
@@ -42,6 +42,7 @@ export const setTenantCookie = ({
 		value,
 	})
 
+/** Client-readable selector. An HttpOnly expiry does not replace it. */
 export const expireTenantCookie = ({
 	authConfig,
 	cookiePrefix,
@@ -55,62 +56,36 @@ export const expireTenantCookie = ({
 		name: tenantCookieName(cookiePrefix),
 	})
 
-const idsFrom = (value: unknown): string[] => {
-	if (value == null) {
-		return []
-	}
-	if (Array.isArray(value)) {
-		return value.flatMap(idsFrom)
-	}
-	if (typeof value === 'string' || typeof value === 'number') {
-		const id = String(value)
-		return TENANT_COOKIE_VALUE.test(id) ? [id] : []
-	}
-	if (typeof value === 'object') {
-		// A multi-tenant membership is { id: rowId, tenant, roles }. The row id is not a tenant.
-		if ('tenant' in value) {
-			return idsFrom((value as { tenant: unknown }).tenant)
-		}
-		if ('id' in value) {
-			return idsFrom((value as { id: unknown }).id)
-		}
-		if ('value' in value) {
-			return idsFrom((value as { value: unknown }).value)
-		}
-	}
-	return []
-}
-
-/**
- * `@payloadcms/plugin-multi-tenant` puts assignments on `tenants` (hasMany) and
- * sometimes a single `tenant`. Only a unique readable id is safe to write as the selector.
- */
-export const uniqueAssignedTenantId = (user: Record<string, unknown>): string | undefined => {
-	const ids = [...new Set([...idsFrom(user.tenants), ...idsFrom(user.tenant)])]
-	return ids.length === 1 ? ids[0] : undefined
-}
-
-export const startTenantCookies = ({
+/** Parallel keeps these. They are origin-wide, and the impersonator session did not change. */
+export const clearCookiesOnStart = ({
 	authConfig,
 	cookiePrefix,
+	except,
 	mode,
 	options,
-	target,
 }: {
 	authConfig: AuthConfig
 	cookiePrefix: string
+	except: string[]
 	mode: ImpersonationMode
 	options: ResolvedOptions
-	target: Record<string, unknown>
 }): string[] => {
-	if (!isManagedTenantCookie(options.cookies.clearOnSwitch, cookiePrefix) || mode === 'parallel') {
+	if (mode === 'parallel') {
 		return []
 	}
-	const assigned = uniqueAssignedTenantId(target)
-	if (assigned) {
-		return [setTenantCookie({ authConfig, cookiePrefix, value: assigned })]
-	}
-	return [expireTenantCookie({ authConfig, cookiePrefix })]
+	const tenant = isManagedTenantCookie(options.cookies.clearOnSwitch, cookiePrefix)
+		? [expireTenantCookie({ authConfig, cookiePrefix })]
+		: []
+	return [
+		...tenant,
+		...expireCookies({
+			authConfig,
+			cookiePrefix,
+			names: clearOnSwitchWithoutTenant(options.cookies.clearOnSwitch, cookiePrefix).filter(
+				(name) => !except.includes(name)
+			),
+		}),
+	]
 }
 
 export const exitTenantCookies = ({

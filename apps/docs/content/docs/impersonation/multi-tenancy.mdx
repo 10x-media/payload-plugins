@@ -35,8 +35,8 @@ What it does now:
 
 | Mode | Start | Exit |
 |---|---|---|
-| Swap | Snapshot the impersonator's cookie onto the row. Set the target's if they have exactly one assigned tenant (`tenants` or `tenant`). Otherwise expire it. | Write the snapshot back. |
-| Parallel | Leave the cookie alone. Admin identity did not change. | Leave it alone. |
+| Swap | Snapshot the impersonator's cookie onto the row, then expire it. The multi-tenant plugin selects the target's tenant. | Write the snapshot back. |
+| Parallel | Leave every `clearOnSwitch` cookie alone. The admin session did not change. | Leave them alone. |
 
 Opt out by setting `cookies.clearOnSwitch` to a list that does not include that cookie name. Then the plugin neither snapshots nor writes it.
 

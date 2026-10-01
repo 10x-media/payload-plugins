@@ -151,11 +151,6 @@ export const exitHandler = async (req: PayloadRequest): Promise<Response> => {
 			cookies: [
 				...(isolatedName ? [expireCookie({ authConfig, name: isolatedName })] : []),
 				expireCookie({ authConfig, name: options.hintCookieName }),
-				...expireCookies({
-					authConfig,
-					cookiePrefix,
-					names: extraClearOnSwitch,
-				}),
 			],
 			req,
 			status: 200,
