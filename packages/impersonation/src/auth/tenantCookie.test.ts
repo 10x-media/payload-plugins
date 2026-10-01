@@ -50,6 +50,26 @@ describe('tenantCookie', () => {
 		expect(uniqueAssignedTenantId({})).toBeUndefined()
 	})
 
+	it('reads the tenant from a membership row and keeps a resolved tenant document id', () => {
+		expect(uniqueAssignedTenantId({ tenants: [{ id: 'row1', tenant: 'tenantABC' }] })).toBe(
+			'tenantABC'
+		)
+		expect(uniqueAssignedTenantId({ tenants: [{ id: 'tenantABC', name: 'Asia' }] })).toBe(
+			'tenantABC'
+		)
+		expect(
+			uniqueAssignedTenantId({
+				tenants: [
+					{ id: 'row1', tenant: 'tenantABC' },
+					{ id: 'row2', tenant: 'tenantXYZ' },
+				],
+			})
+		).toBeUndefined()
+		expect(uniqueAssignedTenantId({ tenant: { relationTo: 'tenants', value: 'tenantABC' } })).toBe(
+			'tenantABC'
+		)
+	})
+
 	it('sets the unique assigned tenant on swap start and expires when there is none', () => {
 		const set = startTenantCookies({
 			authConfig: authConfig(),

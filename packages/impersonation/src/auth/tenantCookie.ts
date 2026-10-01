@@ -67,6 +67,10 @@ const idsFrom = (value: unknown): string[] => {
 		return TENANT_COOKIE_VALUE.test(id) ? [id] : []
 	}
 	if (typeof value === 'object') {
+		// A multi-tenant membership is { id: rowId, tenant, roles }. The row id is not a tenant.
+		if ('tenant' in value) {
+			return idsFrom((value as { tenant: unknown }).tenant)
+		}
 		if ('id' in value) {
 			return idsFrom((value as { id: unknown }).id)
 		}
