@@ -116,6 +116,7 @@
 		"content-lock-disabled-helpers",
 		"content-lock-folders-scope",
 		"content-lock-initial-beta",
+		"content-lock-kv-failure-recovery",
 		"content-lock-startup-heal",
 		"content-lock-without-content-lock",
 		"conversations-initial-beta",
