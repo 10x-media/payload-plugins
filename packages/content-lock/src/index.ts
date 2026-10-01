@@ -144,8 +144,8 @@ const definition = definePlugin<ContentLockPluginOptions>({
 		const priorOnInit = config.onInit
 		config.onInit = async (payload) => {
 			await priorOnInit?.(payload)
-			// Readers rebuild a missing or stale snapshot and reject writes until they can, so a kv
-			// error here costs nothing but the log line; throwing would take the whole app down.
+			// Readers rebuild the snapshot themselves and reject writes only while the lock state is
+			// unreadable, so an error here costs nothing but the log line; throwing would kill the app.
 			try {
 				await healSnapshot(payload, await readStoredWindows(payload))
 			} catch (error) {

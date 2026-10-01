@@ -1,7 +1,13 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { type CollectionConfig, createLocalReq, type KVAdapterResult } from 'payload'
+import {
+	type CollectionConfig,
+	createLocalReq,
+	type KVAdapter,
+	type KVAdapterResult,
+} from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { assertContentUnlocked, ContentLockedError, contentLock } from '../../src/index'
+import { forgetWindows } from '../../src/state/store'
 
 describeForDb('contentLock loads', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
@@ -31,14 +37,25 @@ describeForDb('contentLock loads', { dbs: ['mongo'] }, (db) => {
 	})
 })
 
-const failingKV: KVAdapterResult = {
+/** Answers every read with nothing and rejects every write, like Redis at maxmemory under `volatile-lru`. */
+const rejectingWrites = (): KVAdapter => ({
+	clear: async () => undefined,
+	delete: async () => undefined,
+	get: async () => null,
+	has: async () => false,
+	keys: async () => [],
+	set: async () => {
+		throw new Error('kv rejects writes')
+	},
+})
+
+const writeRejectingKV: KVAdapterResult = { init: rejectingWrites }
+
+/** Fails reads too, like an unreachable Redis. */
+const unavailableKV: KVAdapterResult = {
 	init: () => ({
-		clear: async () => undefined,
-		delete: async () => undefined,
-		get: async () => null,
-		has: async () => false,
-		keys: async () => [],
-		set: async () => {
+		...rejectingWrites(),
+		get: async () => {
 			throw new Error('kv unavailable')
 		},
 	}),
@@ -46,15 +63,15 @@ const failingKV: KVAdapterResult = {
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
-// The kv adapter under test is independent of the database, so one lane covers it.
-describeForDb('contentLock boot with an unavailable kv', { dbs: ['mongo'] }, (db) => {
+// The kv adapters under test are independent of the database, so one lane covers them.
+describeForDb('contentLock with an unavailable kv', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
 		booted = await bootPayload({
 			db,
 			collections: [posts],
-			configOverrides: { kv: failingKV },
+			configOverrides: { kv: unavailableKV },
 			plugin: contentLock({}),
 		})
 	})
@@ -63,7 +80,7 @@ describeForDb('contentLock boot with an unavailable kv', { dbs: ['mongo'] }, (db
 		await booted?.stop()
 	})
 
-	it('boots when the startup snapshot cannot be stored, and rejects writes until it can', async () => {
+	it('boots, and rejects writes until the lock state can be read', async () => {
 		expect(booted.payload).toBeDefined()
 		await expect(
 			booted.payload.create({ collection: 'posts', data: { title: 'x' }, overrideAccess: true })
@@ -78,5 +95,43 @@ describeForDb('contentLock boot with an unavailable kv', { dbs: ['mongo'] }, (db
 		await expect(assertContentUnlocked(req, { collection: 'posts' })).rejects.toBeInstanceOf(
 			ContentLockedError
 		)
+	})
+})
+
+describeForDb('contentLock with a kv that rejects writes', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			collections: [posts],
+			configOverrides: { kv: writeRejectingKV },
+			plugin: contentLock({}),
+		})
+	})
+
+	afterAll(async () => {
+		await booted?.stop()
+	})
+
+	it('boots, and enforces the windows read from the collection', async () => {
+		const { payload } = booted
+		await expect(
+			payload.create({ collection: 'posts', data: { title: 'open' }, overrideAccess: true })
+		).resolves.toMatchObject({ title: 'open' })
+
+		// A window write fails while its snapshot cannot be stored, so this one goes in behind the hooks.
+		await payload.db.create({
+			collection: 'content-locks',
+			data: {
+				_status: 'published',
+				startsAt: new Date(Date.now() - 60_000).toISOString(),
+				title: 'Migration',
+			},
+		})
+		forgetWindows(payload)
+		await expect(
+			payload.create({ collection: 'posts', data: { title: 'locked' }, overrideAccess: true })
+		).rejects.toBeInstanceOf(ContentLockedError)
 	})
 })
