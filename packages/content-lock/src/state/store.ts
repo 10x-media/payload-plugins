@@ -20,7 +20,28 @@ const SNAPSHOT_MAX_AGE_MS = 60_000
 
 type Snapshot = { version: 1; builtAt: string; windows: LockWindow[] }
 
-const memory = new WeakMap<Payload, { readAt: number; windows: LockWindow[] }>()
+/**
+ * What this process holds for one Payload instance. A window write replaces
+ * it, so a read that began before the write settles into the old one and
+ * cannot store its older windows over the write's.
+ */
+type Memory = {
+	/** The windows last read, trusted for `MEMORY_TTL_MS` after `readAt`. */
+	cached?: { readAt: number; windows: LockWindow[] }
+	/** The read in flight, which every caller shares until it settles. */
+	reading?: Promise<LockWindow[]>
+}
+
+const memory = new WeakMap<Payload, Memory>()
+
+const memoryOf = (payload: Payload): Memory => {
+	let held = memory.get(payload)
+	if (!held) {
+		held = {}
+		memory.set(payload, held)
+	}
+	return held
+}
 
 const isSnapshot = (value: unknown): value is Snapshot =>
 	typeof value === 'object' &&
@@ -61,8 +82,12 @@ export const rebuildSnapshot = async (
 	req: PayloadRequest
 ): Promise<LockWindow[]> => {
 	const snapshot = await readCollection(payload, req)
+	// Swapped in just before the kv write, so a read still in flight skips its own kv write and no
+	// older snapshot can follow this one into kv.
+	const held: Memory = {}
+	memory.set(payload, held)
 	await payload.kv.set(SNAPSHOT_KEY, snapshot)
-	memory.set(payload, { readAt: Date.now(), windows: snapshot.windows })
+	held.cached = { readAt: Date.now(), windows: snapshot.windows }
 	return snapshot.windows
 }
 
@@ -72,56 +97,75 @@ export const readStoredWindows = async (payload: Payload): Promise<LockWindow[]>
 	return isSnapshot(stored) ? stored.windows : []
 }
 
-/** Current windows: process memory, then kv, then the collection. */
+/**
+ * Current windows: process memory, then kv, then the collection. Concurrent
+ * callers share one read, so a burst (an admin page resolving the access of
+ * every collection at once) costs one kv read and at most one rebuild. A
+ * failed read rejects the callers that shared it; the next call starts over.
+ */
 export const readWindows = async (payload: Payload): Promise<LockWindow[]> => {
-	const cached = memory.get(payload)
-	if (cached && Date.now() - cached.readAt < MEMORY_TTL_MS) {
-		return cached.windows
+	const held = memoryOf(payload)
+	if (held.cached && Date.now() - held.cached.readAt < MEMORY_TTL_MS) {
+		return held.cached.windows
 	}
+	held.reading ??= loadWindows(payload, held).finally(() => {
+		held.reading = undefined
+	})
+	return held.reading
+}
+
+const loadWindows = async (payload: Payload, held: Memory): Promise<LockWindow[]> => {
 	const stored = await payload.kv.get<Snapshot>(SNAPSHOT_KEY)
 	if (
 		isSnapshot(stored) &&
 		getCurrentDate().getTime() - Date.parse(stored.builtAt) < SNAPSHOT_MAX_AGE_MS
 	) {
-		memory.set(payload, { readAt: Date.now(), windows: stored.windows })
+		held.cached = { readAt: Date.now(), windows: stored.windows }
 		return stored.windows
 	}
-	return healSnapshot(payload, isSnapshot(stored) ? stored.windows : [])
+	return heal(payload, isSnapshot(stored) ? stored.windows : [], held)
 }
 
 /**
- * Rebuild the snapshot outside a window write (at startup, or when it went
- * stale). A kv error is only logged: the windows are known, so this process
- * enforces them and the next rebuild retries the store. Windows in `previous` but
- * gone now (ended, deleted, or edited in the database) release the jobs they
- * deferred, in case the release that should have followed their change never
- * ran. Costs nothing unless one went.
+ * Rebuild the snapshot outside a window write, when it is missing or went
+ * stale. A kv error is only logged: the windows are known, so this process
+ * enforces them and the next rebuild retries the store. Windows in `previous`
+ * but gone now (ended, deleted, or edited in the database) release the jobs
+ * they deferred, in case the release that should have followed their change
+ * never ran. Costs nothing unless one went.
  */
-export const healSnapshot = async (
+const heal = async (
 	payload: Payload,
-	previous: LockWindow[]
+	previous: LockWindow[],
+	held: Memory
 ): Promise<LockWindow[]> => {
 	const snapshot = await readCollection(payload)
-	try {
-		await payload.kv.set(SNAPSHOT_KEY, snapshot)
-	} catch (error) {
-		payload.logger.error({
-			err: error,
-			msg: '[content-lock] cannot store the lock snapshot, enforcing the windows read from the collection',
-		})
+	// A window write since this read began has stored newer windows; storing these would undo it.
+	if (memory.get(payload) === held) {
+		try {
+			await payload.kv.set(SNAPSHOT_KEY, snapshot)
+		} catch (error) {
+			payload.logger.error({
+				err: error,
+				msg: '[content-lock] cannot store the lock snapshot, enforcing the windows read from the collection',
+			})
+		}
+		held.cached = { readAt: Date.now(), windows: snapshot.windows }
 	}
-	const { windows } = snapshot
-	memory.set(payload, { readAt: Date.now(), windows })
-	const live = new Set(windows.map((window) => window.id))
+	const live = new Set(snapshot.windows.map((window) => window.id))
 	for (const window of previous) {
 		if (!live.has(window.id)) {
 			await resumeWindowJobs(payload, window.id)
 		}
 	}
-	return windows
+	return snapshot.windows
 }
 
-/** Drop this process's in-memory copy so the next read goes to kv. */
+/** Rebuild the snapshot at startup, releasing the jobs of windows gone from `previous`. */
+export const healSnapshot = (payload: Payload, previous: LockWindow[]): Promise<LockWindow[]> =>
+	heal(payload, previous, memoryOf(payload))
+
+/** Drop what this process holds, so the next read goes to kv. A read in flight settles unseen. */
 export const forgetWindows = (payload: Payload): void => {
 	memory.delete(payload)
 }
