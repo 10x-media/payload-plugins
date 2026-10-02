@@ -39,6 +39,8 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.filterEventType]: 'Тип події',
 	[keys.filterChangedPath]: 'Змінений шлях',
 	[keys.filterGroup]: 'Група',
+	[keys.filterApi]: 'API',
+	[keys.apiPlaceholder]: 'REST, GraphQL, local…',
 	[keys.groupFilterBtn]: 'Фільтрувати за групою',
 	[keys.filterDate]: 'Дата',
 	[keys.filterDateRange]: 'Діапазон дат',

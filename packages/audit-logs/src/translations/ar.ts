@@ -34,6 +34,8 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.filterEventType]: 'نوع الحدث',
 	[keys.filterChangedPath]: 'المسار المتغير',
 	[keys.filterGroup]: 'التجميع',
+	[keys.filterApi]: 'واجهة API',
+	[keys.apiPlaceholder]: 'REST، GraphQL، local…',
 	[keys.groupFilterBtn]: 'تصفية حسب التجميع',
 	[keys.filterDate]: 'التاريخ',
 	[keys.filterDateRange]: 'النطاق الزمني',

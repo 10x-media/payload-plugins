@@ -34,6 +34,8 @@ export const id: Record<TranslationKey, string> = {
 	[keys.filterEventType]: 'Jenis peristiwa',
 	[keys.filterChangedPath]: 'Jalur yang diubah',
 	[keys.filterGroup]: 'Grup',
+	[keys.filterApi]: 'API',
+	[keys.apiPlaceholder]: 'REST, GraphQL, local…',
 	[keys.groupFilterBtn]: 'Filter menurut grup',
 	[keys.filterDate]: 'Tanggal',
 	[keys.filterDateRange]: 'Rentang tanggal',

@@ -31,6 +31,8 @@ type Props = {
 	renderedEvent?: ReactNode
 	/** Tenant names by id, in the all-tenants view only; the tenant view leaves it out. */
 	tenantLabels?: Record<string, string>
+	/** The tenants collection, so the badge can open the tenant. */
+	tenantsSlug?: string
 	userTitleFields: Record<string, string>
 }
 
@@ -43,6 +45,7 @@ export function LogRow({
 	payloadAPILabels,
 	renderedEvent,
 	tenantLabels,
+	tenantsSlug,
 	userTitleFields,
 }: Props) {
 	const { t } = useTranslation()
@@ -90,7 +93,7 @@ export function LogRow({
 				: doc.documentId
 					? `${adminRoute}/collections/${doc.relationTo}/${encodeURIComponent(doc.documentId)}`
 					: undefined
-	const isExpandable = hasDiff || hasSnapshot || hasEventDetails || hasMeta || hasGroup || locale
+	const isExpandable = hasDiff || hasSnapshot || hasEventDetails || hasMeta || hasGroup
 	const entityName = isGlobal
 		? (globalLabels[doc.documentId ?? ''] ?? doc.documentId)
 		: (collectionLabels[doc.relationTo] ?? doc.relationTo)
@@ -157,16 +160,29 @@ export function LogRow({
 					)}
 					{locale && <span className="al-badge al-badge--locale">{locale}</span>}
 					{tenantHref && tenantId != null && (
-						<a
-							className="al-badge al-badge--tenant"
-							href={tenantHref}
-							title={`${t(keys.filterTenant)}: ${tenantLabels?.[String(tenantId)] ?? String(tenantId)}`}
-						>
-							{/* The badge is a flex box, which ellipsis does not apply to; the text is. */}
-							<span className="al-badge__text">
+						<span className="al-badge al-badge--tenant">
+							{/* The name narrows the list to the tenant; the arrow opens it, like the
+							    collection link. The text carries the ellipsis a flex box cannot. */}
+							<a
+								className="al-badge__text"
+								href={tenantHref}
+								title={`${t(keys.filterTenant)}: ${tenantLabels?.[String(tenantId)] ?? String(tenantId)}`}
+							>
 								{tenantLabels?.[String(tenantId)] ?? String(tenantId)}
-							</span>
-						</a>
+							</a>
+							{tenantsSlug && (
+								<Link
+									aria-label={t(keys.viewDocument)}
+									className="al-badge__open"
+									href={`${adminRoute}/collections/${tenantsSlug}/${encodeURIComponent(String(tenantId))}`}
+									rel="noopener"
+									target="_blank"
+									title={t(keys.viewDocument)}
+								>
+									<ExternalLinkIcon />
+								</Link>
+							)}
+						</span>
 					)}
 				</span>
 

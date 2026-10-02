@@ -27,6 +27,7 @@ export function AuditLogsClient({
 	filters,
 	globalOptions,
 	tenantGlobalOptions,
+	tenantsSlug,
 	collectionLabels,
 	globalLabels,
 	refLabels,
@@ -176,6 +177,7 @@ export function AuditLogsClient({
 				titleFields={titleFields}
 				userCollections={Object.keys(userTitleFields)}
 				onFilter={handleFilter}
+				payloadAPILabels={payloadAPILabels}
 				tenantOptions={lockedTenantId ? undefined : tenantOptions}
 			/>
 
@@ -194,6 +196,7 @@ export function AuditLogsClient({
 							payloadAPILabels={payloadAPILabels}
 							renderedEvent={renderedEvents?.[String(doc.id)]}
 							tenantLabels={tenantLabels}
+							tenantsSlug={tenantsSlug}
 							userTitleFields={userTitleFields}
 						/>
 					))

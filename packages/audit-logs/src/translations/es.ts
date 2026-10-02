@@ -34,6 +34,8 @@ export const es: Record<TranslationKey, string> = {
 	[keys.filterEventType]: 'Tipo de evento',
 	[keys.filterChangedPath]: 'Ruta modificada',
 	[keys.filterGroup]: 'Grupo',
+	[keys.filterApi]: 'API',
+	[keys.apiPlaceholder]: 'REST, GraphQL, local…',
 	[keys.groupFilterBtn]: 'Filtrar por grupo',
 	[keys.filterDate]: 'Fecha',
 	[keys.filterDateRange]: 'Rango de fechas',

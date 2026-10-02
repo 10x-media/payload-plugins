@@ -11,6 +11,7 @@ import { RefPicker, ValuesInput } from './RefPicker'
 import type { EditorProps } from './types'
 
 type Props = EditorProps & {
+	apiOptions: SelectOption[]
 	documentCollections: string[]
 	labels: Record<string, string>
 	onLabel: (ref: string, label: string) => void
@@ -19,6 +20,7 @@ type Props = EditorProps & {
 
 /** The rare filters, all on one screen, each taking several values. */
 export function MoreFilters({
+	apiOptions,
 	documentCollections,
 	labels,
 	onLabel,
@@ -59,7 +61,7 @@ export function MoreFilters({
 		)
 	}, [scopeKey, getEntityConfig, i18n])
 
-	const set = (field: 'changedPaths' | 'documents' | 'groups') => (values?: string[]) =>
+	const set = (field: 'apis' | 'changedPaths' | 'documents' | 'groups') => (values?: string[]) =>
 		setStaged((f): Filters => ({ ...f, [field]: values }))
 
 	return (
@@ -85,6 +87,14 @@ export function MoreFilters({
 				onChange={set('groups')}
 				placeholder={t(keys.groupPlaceholder)}
 				values={staged.groups ?? []}
+			/>
+			{/* Labels from `logs.payloadAPIs`; any other value a plugin sets can be typed. */}
+			<ValuesInput
+				label={t(keys.filterApi)}
+				onChange={set('apis')}
+				options={apiOptions}
+				placeholder={t(keys.apiPlaceholder)}
+				values={staged.apis ?? []}
 			/>
 		</div>
 	)

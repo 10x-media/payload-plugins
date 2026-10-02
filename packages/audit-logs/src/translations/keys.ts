@@ -29,6 +29,8 @@ export const keys = {
 	filterEventType: 'auditLogs:filterEventType',
 	filterChangedPath: 'auditLogs:filterChangedPath',
 	filterGroup: 'auditLogs:filterGroup',
+	filterApi: 'auditLogs:filterApi',
+	apiPlaceholder: 'auditLogs:apiPlaceholder',
 	groupFilterBtn: 'auditLogs:groupFilterBtn',
 	filterDate: 'auditLogs:filterDate',
 	filterDateRange: 'auditLogs:filterDateRange',

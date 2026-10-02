@@ -34,6 +34,7 @@ export const parseFilters = (sp: Params, { useTenant = false } = {}): Filters =>
 		eventTypes: listOrUndefined(all(sp.eventType)),
 		globals: listOrUndefined(all(sp.global)),
 		groups: listOrUndefined(all(sp.group)),
+		apis: listOrUndefined(all(sp.api)),
 		operations: listOrUndefined(all(sp.operation)),
 		tenants: useTenant ? undefined : listOrUndefined(all(sp.tenant)),
 		users: listOrUndefined(all(sp.userId)),
@@ -145,6 +146,7 @@ export const filterConditions = (filters: Filters, ctx: WhereContext): Where[] =
 	else if (filters.tenants?.length) push(inOrEquals('tenant', filters.tenants))
 
 	if (filters.groups?.length) push(inOrEquals('group', filters.groups))
+	if (filters.apis?.length) push(inOrEquals('payloadAPI', filters.apis))
 	if (filters.changedPaths?.length) push({ changedPaths: { in: filters.changedPaths } })
 
 	if (filters.dateFrom) push({ createdAt: { greater_than_equal: filters.dateFrom } })

@@ -34,6 +34,8 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.filterEventType]: '事件类型',
 	[keys.filterChangedPath]: '变更路径',
 	[keys.filterGroup]: '分组',
+	[keys.filterApi]: 'API',
+	[keys.apiPlaceholder]: 'REST、GraphQL、local…',
 	[keys.groupFilterBtn]: '按分组筛选',
 	[keys.filterDate]: '日期',
 	[keys.filterDateRange]: '日期范围',

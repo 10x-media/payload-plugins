@@ -37,6 +37,8 @@ export type Filters = {
 	eventTypes?: string[]
 	globals?: string[]
 	groups?: string[]
+	/** `payloadAPI` values: the built-ins, `logs.payloadAPIs`, or any typed in. */
+	apis?: string[]
 	operations?: string[]
 	tenants?: string[]
 	users?: string[]
@@ -57,6 +59,8 @@ export type AuditLogsClientProps = {
 	globalOptions: SelectOption[]
 	/** Per-tenant singleton collections, offered as globals in the tenant view. */
 	tenantGlobalOptions: SelectOption[]
+	/** The tenants collection, when multi-tenancy is on. */
+	tenantsSlug?: string
 	/** Singular collection labels and global labels by slug, for the rows. */
 	collectionLabels: Record<string, string>
 	globalLabels: Record<string, string>

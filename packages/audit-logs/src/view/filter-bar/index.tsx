@@ -32,6 +32,7 @@ export function FilterBar({
 	filters,
 	globalOptions,
 	onFilter,
+	payloadAPILabels,
 	tenantGlobalOptions,
 	refLabels,
 	tenantOptions,
@@ -91,6 +92,7 @@ export function FilterBar({
 		...(staged.documents?.length ? [t(keys.filterDocument)] : []),
 		...(staged.changedPaths?.length ? [t(keys.filterChangedPath)] : []),
 		...(staged.groups?.length ? [t(keys.filterGroup)] : []),
+		...(staged.apis?.length ? [t(keys.filterApi)] : []),
 	].join(', ')
 
 	const handleApply = useCallback(() => {
@@ -170,6 +172,10 @@ export function FilterBar({
 							? staged.collections
 							: collectionOptions.map((o) => o.value)
 						).filter((slug) => !tenantGlobalOptions.some((o) => o.value === slug))}
+						apiOptions={Object.entries(payloadAPILabels).map(([value, label]) => ({
+							label,
+							value,
+						}))}
 						labels={labels}
 						onLabel={onLabel}
 						titleFields={titleFields}

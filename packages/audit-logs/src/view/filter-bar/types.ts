@@ -14,6 +14,8 @@ export type FilterBarProps = {
 	/** Per-tenant singleton collections, offered as globals in the tenant view. */
 	tenantGlobalOptions: SelectOption[]
 	onFilter: (f: Filters) => void
+	/** `payloadAPI` value to label: the built-ins plus `logs.payloadAPIs`. */
+	payloadAPILabels: Record<string, string>
 	/** Titles of the documents and users the current filters name. */
 	refLabels: Record<string, string>
 	tenantOptions?: SelectOption[]

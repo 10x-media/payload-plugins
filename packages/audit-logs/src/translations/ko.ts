@@ -34,6 +34,8 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.filterEventType]: '이벤트 유형',
 	[keys.filterChangedPath]: '변경된 경로',
 	[keys.filterGroup]: '그룹',
+	[keys.filterApi]: 'API',
+	[keys.apiPlaceholder]: 'REST, GraphQL, local…',
 	[keys.groupFilterBtn]: '그룹으로 필터링',
 	[keys.filterDate]: '날짜',
 	[keys.filterDateRange]: '날짜 범위',

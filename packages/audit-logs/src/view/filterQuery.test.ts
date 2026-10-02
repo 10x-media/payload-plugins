@@ -93,6 +93,12 @@ describe('filterConditions', () => {
 		])
 	})
 
+	it('matches any of the picked APIs', () => {
+		expect(filterConditions({ apis: ['REST', 'MCP'] }, ctx)).toEqual([
+			{ payloadAPI: { in: ['REST', 'MCP'] } },
+		])
+	})
+
 	it('lets a locked tenant override the tenant filter', () => {
 		expect(filterConditions({ tenants: ['a'] }, { ...ctx, lockedTenantId: 'b' })).toEqual([
 			{ tenant: { equals: 'b' } },

@@ -171,6 +171,7 @@ export const buildParams = (filters: Filters, page?: number, limit?: number): st
 	for (const t of filters.tenants ?? []) params.append('tenant', t)
 	for (const ref of filters.users ?? []) params.append('userId', ref)
 	for (const group of filters.groups ?? []) params.append('group', group)
+	for (const api of filters.apis ?? []) params.append('api', api)
 	if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
 	if (filters.dateTo) params.set('dateTo', filters.dateTo)
 	if (page && page > 1) params.set('page', String(page))

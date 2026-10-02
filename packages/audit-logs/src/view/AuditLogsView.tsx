@@ -271,6 +271,7 @@ export async function AuditLogsView({
 					globalOptions={globalOptions}
 					tenantGlobalOptions={tenantGlobalOptions}
 					collectionLabels={collectionLabels}
+					tenantsSlug={multiTenancy ? tenantsSlug : undefined}
 					globalLabels={globalLabels}
 					refLabels={refLabels}
 					titleFields={Object.fromEntries(
