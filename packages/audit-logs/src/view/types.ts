@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 export type AuditLogDoc = {
 	id: string
 	operation: 'auth' | 'create' | 'custom' | 'delete' | 'update'
@@ -36,6 +38,9 @@ export type Filters = {
 
 export type SelectOption = { label: string; value: string }
 
+/** Server-rendered custom event bodies, keyed by entry id. */
+export type RenderedEvents = Record<string, ReactNode>
+
 export type AuditLogsClientProps = {
 	adminRoute: string
 	apiRoute: string
@@ -58,4 +63,5 @@ export type AuditLogsClientProps = {
 	debugMode?: boolean
 	/** Whether the archive job is configured (controls visibility of the Archive button). */
 	hasArchive?: boolean
+	renderedEvents?: RenderedEvents
 }

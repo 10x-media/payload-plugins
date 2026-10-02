@@ -3,6 +3,7 @@ import type {
 	CollectionConfig,
 	CollectionSlug,
 	GlobalSlug,
+	PayloadComponent,
 	PayloadRequest,
 	RelationshipField,
 	Where,
@@ -195,6 +196,29 @@ export type DataRetentionConfig = {
  * Only `req` is available (no collection/id/data context).
  */
 export type ViewAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
+
+/**
+ * Props a custom event renderer receives. A server component additionally gets
+ * `payload` and `req`, so it can look up whatever the metadata points at.
+ */
+export type CustomEventComponentProps = {
+	/** The collection or global slug the event was recorded against. */
+	collection: string
+	/** ISO timestamp of the entry. */
+	createdAt: string
+	documentId?: string
+	/** The whole entry as the view read it, `user` populated. */
+	entry: Record<string, unknown>
+	eventType: string
+	metadata?: Record<string, unknown>
+}
+
+/**
+ * Renderers for the expanded body of custom events, keyed by `eventType`, with
+ * `'*'` as the fallback for every type. An explicit `false` keeps the default
+ * table and JSON block, wildcard included.
+ */
+export type CustomEventComponents = Record<string, PayloadComponent | false>
 
 // ---------- Audit Log types ----------
 
@@ -688,6 +712,23 @@ export type AuditPluginConfig = {
 					 * forceWhere: { relationTo: { equals: 'orders' } }
 					 */
 					forceWhere?: Where
+					/**
+					 * Custom renderers for parts of an expanded entry.
+					 */
+					components?: {
+						/**
+						 * Replaces the event table and metadata JSON of custom events
+						 * (`createAuditEvent`). Keyed by `eventType`, `'*'` matches every type.
+						 *
+						 * @example
+						 * customEvents: {
+						 *   order_refunded: '/components/RefundEvent#RefundEvent',
+						 *   '*': '/components/AnyEvent#AnyEvent',
+						 *   export_downloaded: false,
+						 * }
+						 */
+						customEvents?: CustomEventComponents
+					}
 			  }
 			| false
 	}

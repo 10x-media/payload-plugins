@@ -1,14 +1,17 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
+import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerComponent'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, CollectionSlug, Params, PopulateType, Where } from 'payload'
 import { parseCookies } from 'payload'
 import { payloadAPILabels } from '../plugin/resolveOptions'
 import { keys } from '../translations'
 import { asTranslate } from '../translations/server'
-import type { AuditPluginConfig } from '../types'
+import type { AuditPluginConfig, CustomEventComponentProps } from '../types'
+import { resolveCustomEventComponent } from '../utilities/customEventComponents'
 import { AuditLogsClient } from './AuditLogsClient'
 import { authRedirectUrl } from './authRedirect'
+import type { RenderedEvents } from './types'
 import { GLOBAL_SENTINEL } from './utils'
 
 export async function AuditLogsView({
@@ -217,6 +220,34 @@ export async function AuditLogsView({
 		overrideAccess: true,
 	})
 
+	// Rendered here rather than in the row: a renderer may be a server component, and
+	// only this page can hand it `payload` and `req`.
+	const customEvents = viewConfig?.components?.customEvents
+	const renderedEvents: RenderedEvents = {}
+	for (const doc of result.docs as unknown as Record<string, unknown>[]) {
+		if (doc.operation !== 'custom') continue
+		const eventType = typeof doc.eventType === 'string' ? doc.eventType : undefined
+		const Component = resolveCustomEventComponent(customEvents, eventType)
+		if (!Component || !eventType) continue
+		const props: CustomEventComponentProps = {
+			collection: String(doc.relationTo),
+			createdAt: String(doc.createdAt),
+			...(typeof doc.documentId === 'string' && { documentId: doc.documentId }),
+			entry: doc,
+			eventType,
+			...(doc.metadata && typeof doc.metadata === 'object'
+				? { metadata: doc.metadata as Record<string, unknown> }
+				: {}),
+		}
+		const node = RenderServerComponent({
+			clientProps: props,
+			Component,
+			importMap: req.payload.importMap,
+			serverProps: { payload: req.payload, req },
+		})
+		if (node != null) renderedEvents[String(doc.id)] = node
+	}
+
 	return (
 		<DefaultTemplate
 			i18n={req.i18n}
@@ -260,6 +291,7 @@ export async function AuditLogsView({
 					payloadAPILabels={payloadAPILabels(pluginOptions.logs?.payloadAPIs)}
 					debugMode={pluginOptions.debug === true && Boolean(pluginOptions.retention)}
 					hasArchive={Boolean(pluginOptions.retention?.archive)}
+					renderedEvents={renderedEvents}
 				/>
 			</Gutter>
 		</DefaultTemplate>

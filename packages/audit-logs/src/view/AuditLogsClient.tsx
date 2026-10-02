@@ -31,6 +31,7 @@ export function AuditLogsClient({
 	userTitleFields,
 	payloadAPILabels,
 	debugMode,
+	renderedEvents,
 	hasArchive,
 }: AuditLogsClientProps) {
 	const router = useRouter()
@@ -148,6 +149,7 @@ export function AuditLogsClient({
 							doc={doc as unknown as AuditLogDoc}
 							key={String(doc.id)}
 							payloadAPILabels={payloadAPILabels}
+							renderedEvent={renderedEvents?.[String(doc.id)]}
 							userTitleFields={userTitleFields}
 						/>
 					))

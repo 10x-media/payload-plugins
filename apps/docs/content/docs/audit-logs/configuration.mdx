@@ -98,7 +98,7 @@ auditLogs({
 | `group` | `boolean \| { contextKey?: string }` | off | Add an indexed `group` field, filled from `req.context[contextKey]`. Default key `auditGroup`. |
 | `payloadAPIs` | `(string \| { label, value })[]` | none | Extra `payloadAPI` values to label in the view, on top of `REST`, `GraphQL` and `local`. |
 | `access` | `{ create?, read?, update?, delete? }` | all denied | Access for the collection's own REST and GraphQL endpoints. |
-| `view` | `false \| { path?, defaultLimit?, access?, forceWhere? }` | on | The custom view. See [the admin view](/audit-logs/admin-view). |
+| `view` | `false \| { path?, defaultLimit?, access?, forceWhere?, components? }` | on | The custom view. See [the admin view](/audit-logs/admin-view). `components.customEvents` renders custom events, see [custom events](/audit-logs/custom-events#rendering-them-in-the-view). |
 | `override` | `(collection) => CollectionConfig` | none | Modify the generated collection. The slug is always forced back to `audit-logs`, and the [content-lock exemption](#content-locks) is always kept. |
 
 All four access rules default to denying everything. The plugin's own writes never go through them, so the log fills up regardless; the rules only govern the public API. Open `read` if something outside the admin needs to query entries.

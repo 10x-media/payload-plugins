@@ -3,7 +3,7 @@
 import { ChevronIcon, ExternalLinkIcon, Link } from '@payloadcms/ui'
 
 import { useSearchParams } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { DiffViewer } from './DiffViewer'
@@ -16,10 +16,18 @@ type Props = {
 	adminRoute: string
 	doc: AuditLogDoc
 	payloadAPILabels: Record<string, string>
+	/** Host renderer for a custom event, replacing the default table and JSON. */
+	renderedEvent?: ReactNode
 	userTitleFields: Record<string, string>
 }
 
-export function LogRow({ adminRoute, doc, payloadAPILabels, userTitleFields }: Props) {
+export function LogRow({
+	adminRoute,
+	doc,
+	payloadAPILabels,
+	renderedEvent,
+	userTitleFields,
+}: Props) {
 	const { t } = useTranslation()
 	const [expanded, setExpanded] = useState(false)
 	const searchParams = useSearchParams()
@@ -180,42 +188,46 @@ export function LogRow({ adminRoute, doc, payloadAPILabels, userTitleFields }: P
 								<div className="al-row__section-label">
 									{doc.operation === 'auth' ? t(keys.sectionAuthEvent) : t(keys.sectionCustomEvent)}
 								</div>
-								<table className="al-diff">
-									<tbody>
-										{doc.eventType && (
-											<tr className="al-diff__row">
-												<td className="al-diff__td al-diff__col-path">
-													<code className="al-diff__path">eventType</code>
-												</td>
-												<td className="al-diff__td" colSpan={2}>
-													{doc.eventType}
-												</td>
-											</tr>
+								{renderedEvent ?? (
+									<>
+										<table className="al-diff">
+											<tbody>
+												{doc.eventType && (
+													<tr className="al-diff__row">
+														<td className="al-diff__td al-diff__col-path">
+															<code className="al-diff__path">eventType</code>
+														</td>
+														<td className="al-diff__td" colSpan={2}>
+															{doc.eventType}
+														</td>
+													</tr>
+												)}
+												{doc.relationTo && (
+													<tr className="al-diff__row">
+														<td className="al-diff__td al-diff__col-path">
+															<code className="al-diff__path">collection</code>
+														</td>
+														<td className="al-diff__td" colSpan={2}>
+															{doc.relationTo}
+														</td>
+													</tr>
+												)}
+												{doc.documentId && (
+													<tr className="al-diff__row">
+														<td className="al-diff__td al-diff__col-path">
+															<code className="al-diff__path">documentId</code>
+														</td>
+														<td className="al-diff__td" colSpan={2}>
+															{doc.documentId}
+														</td>
+													</tr>
+												)}
+											</tbody>
+										</table>
+										{hasMetadata && (
+											<pre className="al-json-block">{JSON.stringify(doc.metadata, null, 2)}</pre>
 										)}
-										{doc.relationTo && (
-											<tr className="al-diff__row">
-												<td className="al-diff__td al-diff__col-path">
-													<code className="al-diff__path">collection</code>
-												</td>
-												<td className="al-diff__td" colSpan={2}>
-													{doc.relationTo}
-												</td>
-											</tr>
-										)}
-										{doc.documentId && (
-											<tr className="al-diff__row">
-												<td className="al-diff__td al-diff__col-path">
-													<code className="al-diff__path">documentId</code>
-												</td>
-												<td className="al-diff__td" colSpan={2}>
-													{doc.documentId}
-												</td>
-											</tr>
-										)}
-									</tbody>
-								</table>
-								{hasMetadata && (
-									<pre className="al-json-block">{JSON.stringify(doc.metadata, null, 2)}</pre>
+									</>
 								)}
 							</div>
 						)}

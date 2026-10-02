@@ -28,6 +28,8 @@ export type {
 	AuditPluginConfig,
 	AuthEventsOptions,
 	CollectionAuditLogConfig,
+	CustomEventComponentProps,
+	CustomEventComponents,
 	DataRetentionConfig,
 	DeleteJobHooks,
 	GlobalAuditLogConfig,
