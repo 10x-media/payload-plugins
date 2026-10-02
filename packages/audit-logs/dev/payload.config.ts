@@ -1,6 +1,7 @@
 // biome-ignore-all lint/plugin/noProcessEnv: dev app env boundary
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { impersonation } from '@10x-media/impersonation'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig } from 'payload'
@@ -97,6 +98,9 @@ export default buildConfig({
 				},
 			},
 		}),
+		// Impersonate the seeded editor from the user menu, edit a post, and the entry
+		// shows the editor with a via line naming the dev admin.
+		impersonation({ access: { impersonate: () => true } }),
 	],
 	telemetry: false,
 	onInit: async (payload) => {
@@ -104,6 +108,7 @@ export default buildConfig({
 	},
 	typescript: { autoGenerate },
 	admin: {
+		user: 'users',
 		importMap: {
 			autoGenerate,
 			baseDir: path.resolve(dirname),

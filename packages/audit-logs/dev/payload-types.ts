@@ -76,6 +76,7 @@ export interface Config {
     media: Media;
     users: User;
     'audit-logs': AuditLog;
+    'impersonation-sessions': ImpersonationSession;
     'payload-kv': PayloadKv;
     'payload-jobs': PayloadJob;
     'payload-locked-documents': PayloadLockedDocument;
@@ -93,6 +94,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'audit-logs': AuditLogsSelect<false> | AuditLogsSelect<true>;
+    'impersonation-sessions': ImpersonationSessionsSelect<false> | ImpersonationSessionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-jobs': PayloadJobsSelect<false> | PayloadJobsSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -313,6 +315,7 @@ export interface AuditLog {
   relationTo: string;
   documentId?: string | null;
   user?: (string | null) | User;
+  impersonator?: (string | null) | User;
   locale?: string | null;
   payloadAPI?: string | null;
   ipAddress?: string | null;
@@ -347,6 +350,40 @@ export interface AuditLog {
     | null;
   group?: string | null;
   archivedAt?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "impersonation-sessions".
+ */
+export interface ImpersonationSession {
+  id: string;
+  impersonator: {
+    relationTo: 'users';
+    value: string | User;
+  };
+  target: {
+    relationTo: 'users';
+    value: string | User;
+  };
+  impersonatorEmail?: string | null;
+  targetEmail?: string | null;
+  impersonatorTitle?: string | null;
+  targetTitle?: string | null;
+  mode: 'swap' | 'parallel';
+  targetSid: string;
+  impersonatorSid: string;
+  impersonatorTenantCookie?: string | null;
+  startedAt: string;
+  endedAt?: string | null;
+  endedBy?: ('exit' | 'logout' | 'terminated' | 'expired' | 'impersonatorGone' | 'targetGone' | 'failed') | null;
+  reason?: string | null;
+  ip?: string | null;
+  userAgent?: string | null;
+  impersonatorLocale?: string | null;
+  absoluteExpiresAt?: string | null;
+  targetLocked?: boolean | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -510,6 +547,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'audit-logs';
         value: string | AuditLog;
+      } | null)
+    | ({
+        relationTo: 'impersonation-sessions';
+        value: string | ImpersonationSession;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -705,6 +746,7 @@ export interface AuditLogsSelect<T extends boolean = true> {
   relationTo?: T;
   documentId?: T;
   user?: T;
+  impersonator?: T;
   locale?: T;
   payloadAPI?: T;
   ipAddress?: T;
@@ -715,6 +757,33 @@ export interface AuditLogsSelect<T extends boolean = true> {
   metadata?: T;
   group?: T;
   archivedAt?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "impersonation-sessions_select".
+ */
+export interface ImpersonationSessionsSelect<T extends boolean = true> {
+  impersonator?: T;
+  target?: T;
+  impersonatorEmail?: T;
+  targetEmail?: T;
+  impersonatorTitle?: T;
+  targetTitle?: T;
+  mode?: T;
+  targetSid?: T;
+  impersonatorSid?: T;
+  impersonatorTenantCookie?: T;
+  startedAt?: T;
+  endedAt?: T;
+  endedBy?: T;
+  reason?: T;
+  ip?: T;
+  userAgent?: T;
+  impersonatorLocale?: T;
+  absoluteExpiresAt?: T;
+  targetLocked?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -25,6 +25,13 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	})
 	payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 
+	// Someone to impersonate. Nothing below runs as them, so their entries only
+	// appear once you act as them from the admin.
+	await payload.create({
+		collection: 'users',
+		data: { email: 'editor@10xmedia.de', password: DEV_PASSWORD, name: 'Dev Editor' },
+	})
+
 	// Everything below runs as the seeded admin, so the log shows a real user
 	// rather than an empty `user` column.
 	const req = { user: { ...user, collection: 'users' } } as Parameters<
