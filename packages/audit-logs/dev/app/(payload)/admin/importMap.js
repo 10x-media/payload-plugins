@@ -5,6 +5,7 @@ import { ImpersonationAction as ImpersonationAction_59e9dfcbfaee95b3a2ecff56d5d2
 import { ImpersonationProvider as ImpersonationProvider_59e9dfcbfaee95b3a2ecff56d5d216e8 } from '@10x-media/impersonation/rsc'
 import { AuditLogsView as AuditLogsView_d109efa364f92f646cad8031879d6db3 } from '@10x-media/audit-logs/rsc'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
+import { RefundEvent as RefundEvent_c5043e5dbb4333de30960340700b913f } from '../../../components/RefundEvent'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -14,5 +15,6 @@ export const importMap = {
   "@10x-media/impersonation/rsc#ImpersonationAction": ImpersonationAction_59e9dfcbfaee95b3a2ecff56d5d216e8,
   "@10x-media/impersonation/rsc#ImpersonationProvider": ImpersonationProvider_59e9dfcbfaee95b3a2ecff56d5d216e8,
   "@10x-media/audit-logs/rsc#AuditLogsView": AuditLogsView_d109efa364f92f646cad8031879d6db3,
-  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
+  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
+  "/components/RefundEvent#RefundEvent": RefundEvent_c5043e5dbb4333de30960340700b913f
 }

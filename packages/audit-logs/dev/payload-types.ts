@@ -64,6 +64,7 @@ export type SupportedTimezones =
 export interface Config {
   auth: {
     users: UserAuthOperations;
+    customers: CustomerAuthOperations;
   };
   blocks: {};
   collections: {
@@ -75,6 +76,7 @@ export interface Config {
     tags: Tag;
     media: Media;
     users: User;
+    customers: Customer;
     'audit-logs': AuditLog;
     'impersonation-sessions': ImpersonationSession;
     'payload-kv': PayloadKv;
@@ -93,6 +95,7 @@ export interface Config {
     tags: TagsSelect<false> | TagsSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
+    customers: CustomersSelect<false> | CustomersSelect<true>;
     'audit-logs': AuditLogsSelect<false> | AuditLogsSelect<true>;
     'impersonation-sessions': ImpersonationSessionsSelect<false> | ImpersonationSessionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -117,7 +120,7 @@ export interface Config {
   widgets: {
     collections: CollectionsWidget;
   };
-  user: User;
+  user: User | Customer;
   jobs: {
     tasks: {
       'audit-logs-archive': TaskAuditLogsArchive;
@@ -131,6 +134,24 @@ export interface Config {
   };
 }
 export interface UserAuthOperations {
+  forgotPassword: {
+    email: string;
+    password: string;
+  };
+  login: {
+    email: string;
+    password: string;
+  };
+  registerFirstUser: {
+    email: string;
+    password: string;
+  };
+  unlock: {
+    email: string;
+    password: string;
+  };
+}
+export interface CustomerAuthOperations {
   forgotPassword: {
     email: string;
     password: string;
@@ -180,8 +201,24 @@ export interface Post {
    * Redacted in the log.
    */
   apiKey?: string | null;
-  createdBy?: (string | null) | User;
-  lastModifiedBy?: (string | null) | User;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  lastModifiedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
 }
@@ -224,6 +261,32 @@ export interface User {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customers".
+ */
+export interface Customer {
+  id: string;
+  name?: string | null;
+  updatedAt: string;
+  createdAt: string;
+  email: string;
+  resetPasswordToken?: string | null;
+  resetPasswordExpiration?: string | null;
+  salt?: string | null;
+  hash?: string | null;
+  loginAttempts?: number | null;
+  lockUntil?: string | null;
+  sessions?:
+    | {
+        id: string;
+        createdAt?: string | null;
+        expiresAt: string;
+      }[]
+    | null;
+  password?: string | null;
+  collection: 'customers';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "pages".
  */
 export interface Page {
@@ -231,8 +294,24 @@ export interface Page {
   title: string;
   slug?: string | null;
   body?: string | null;
-  createdBy?: (string | null) | User;
-  lastModifiedBy?: (string | null) | User;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  lastModifiedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -246,8 +325,24 @@ export interface Article {
   title: string;
   slug?: string | null;
   body?: string | null;
-  createdBy?: (string | null) | User;
-  lastModifiedBy?: (string | null) | User;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  lastModifiedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -269,8 +364,24 @@ export interface Order {
     | null;
   total?: number | null;
   lastTouchedBy?: (string | null) | User;
-  createdBy?: (string | null) | User;
-  lastModifiedBy?: (string | null) | User;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  lastModifiedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
 }
@@ -314,8 +425,24 @@ export interface AuditLog {
   eventType?: string | null;
   relationTo: string;
   documentId?: string | null;
-  user?: (string | null) | User;
-  impersonator?: (string | null) | User;
+  user?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  impersonator?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   locale?: string | null;
   payloadAPI?: string | null;
   ipAddress?: string | null;
@@ -359,14 +486,24 @@ export interface AuditLog {
  */
 export interface ImpersonationSession {
   id: string;
-  impersonator: {
-    relationTo: 'users';
-    value: string | User;
-  };
-  target: {
-    relationTo: 'users';
-    value: string | User;
-  };
+  impersonator:
+    | {
+        relationTo: 'users';
+        value: string | User;
+      }
+    | {
+        relationTo: 'customers';
+        value: string | Customer;
+      };
+  target:
+    | {
+        relationTo: 'users';
+        value: string | User;
+      }
+    | {
+        relationTo: 'customers';
+        value: string | Customer;
+      };
   impersonatorEmail?: string | null;
   targetEmail?: string | null;
   impersonatorTitle?: string | null;
@@ -545,6 +682,10 @@ export interface PayloadLockedDocument {
         value: string | User;
       } | null)
     | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null)
+    | ({
         relationTo: 'audit-logs';
         value: string | AuditLog;
       } | null)
@@ -553,10 +694,15 @@ export interface PayloadLockedDocument {
         value: string | ImpersonationSession;
       } | null);
   globalSlug?: string | null;
-  user: {
-    relationTo: 'users';
-    value: string | User;
-  };
+  user:
+    | {
+        relationTo: 'users';
+        value: string | User;
+      }
+    | {
+        relationTo: 'customers';
+        value: string | Customer;
+      };
   updatedAt: string;
   createdAt: string;
 }
@@ -566,10 +712,15 @@ export interface PayloadLockedDocument {
  */
 export interface PayloadPreference {
   id: string;
-  user: {
-    relationTo: 'users';
-    value: string | User;
-  };
+  user:
+    | {
+        relationTo: 'users';
+        value: string | User;
+      }
+    | {
+        relationTo: 'customers';
+        value: string | Customer;
+      };
   key?: string | null;
   value?:
     | {
@@ -738,6 +889,29 @@ export interface UsersSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "customers_select".
+ */
+export interface CustomersSelect<T extends boolean = true> {
+  name?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  email?: T;
+  resetPasswordToken?: T;
+  resetPasswordExpiration?: T;
+  salt?: T;
+  hash?: T;
+  loginAttempts?: T;
+  lockUntil?: T;
+  sessions?:
+    | T
+    | {
+        id?: T;
+        createdAt?: T;
+        expiresAt?: T;
+      };
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "audit-logs_select".
  */
 export interface AuditLogsSelect<T extends boolean = true> {
@@ -878,8 +1052,24 @@ export interface SiteSetting {
         id?: string | null;
       }[]
     | null;
-  createdBy?: (string | null) | User;
-  lastModifiedBy?: (string | null) | User;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  lastModifiedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt?: string | null;
   createdAt?: string | null;
 }

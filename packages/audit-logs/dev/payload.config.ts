@@ -7,6 +7,7 @@ import { postgresAdapter } from '@payloadcms/db-postgres'
 import { buildConfig } from 'payload'
 import { auditLogs } from '../src/index'
 import { articles } from './collections/articles'
+import { customers } from './collections/customers'
 import { media } from './collections/media'
 import { orderEvents, orders } from './collections/orders'
 import { pages } from './collections/pages'
@@ -41,7 +42,7 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [posts, pages, articles, orders, orderEvents, tags, media, users],
+	collections: [posts, pages, articles, orders, orderEvents, tags, media, users, customers],
 	globals: [siteSettings],
 	plugins: [
 		auditLogs({
@@ -71,6 +72,7 @@ export default buildConfig({
 				// Auth events only. Document edits stay out, which is the common shape for
 				// an auth collection: password hashes and login counters would flood the log.
 				users: { auth: { login: true, forgotPassword: true, failedLogin: true } },
+				customers: { auth: { login: true, failedLogin: true } },
 			},
 			globals: {
 				'site-settings': true,
@@ -84,7 +86,13 @@ export default buildConfig({
 				// next to the custom view at /admin/audit-logs.
 				hidden: false,
 				group: true,
-				view: { defaultLimit: 25 },
+				view: {
+					defaultLimit: 25,
+					// The other seeded custom events keep the default table and JSON block.
+					components: {
+						customEvents: { order_refunded: '/components/RefundEvent#RefundEvent' },
+					},
+				},
 			},
 			retention: {
 				// Cron strings are required by the type but nothing runs them: the stand
@@ -100,7 +108,8 @@ export default buildConfig({
 		}),
 		// Impersonate the seeded editor from the user menu, edit a post, and the entry
 		// shows the editor with a via line naming the dev admin.
-		impersonation({ access: { impersonate: () => true } }),
+		// Customers cannot open the admin, so swapping into one would strand the session.
+		impersonation({ access: { impersonate: () => true }, targets: ['users'] }),
 	],
 	telemetry: false,
 	onInit: async (payload) => {

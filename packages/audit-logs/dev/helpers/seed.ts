@@ -1,4 +1,7 @@
 import type { Payload } from 'payload'
+import { createLocalReq } from 'payload'
+
+import { createAuditEvent } from '../../src/index'
 
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
@@ -163,6 +166,68 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		id: tagIds[1] ?? '',
 		data: { color: '#ef4444' },
 		req: groupedReq,
+	})
+
+	// A second auth collection makes `user` polymorphic. The customer places an order,
+	// so their entries sit next to the admin's in the list with their own pill.
+	const customer = await payload.create({
+		collection: 'customers',
+		data: { email: 'customer@10xmedia.de', password: DEV_PASSWORD, name: 'Dev Customer' },
+	})
+	const customerReq = await createLocalReq(
+		{ user: { ...customer, collection: 'customers' } as never },
+		payload
+	)
+	const order = await payload.create({
+		collection: 'orders',
+		data: {
+			reference: 'ord-1001',
+			lines: [
+				{ sku: 'TEE-M', price: 25 },
+				{ sku: 'CAP', price: 15 },
+			],
+		},
+		req: customerReq,
+	})
+	await createAuditEvent(customerReq, {
+		collection: 'orders',
+		documentId: order.id,
+		eventType: 'checkout_started',
+		metadata: { cartItems: 2, channel: 'web' },
+	})
+
+	// The admin takes it from there: marking it paid fires the `order_paid` event
+	// from the orders hook, then a refund is recorded by hand.
+	const adminReq = await createLocalReq(
+		{ user: { ...user, collection: 'users' } as never },
+		payload
+	)
+	await payload.update({
+		collection: 'orders',
+		id: order.id,
+		data: { status: 'paid' },
+		req: adminReq,
+	})
+	await createAuditEvent(adminReq, {
+		collection: 'orders',
+		documentId: order.id,
+		eventType: 'order_refunded',
+		metadata: { amount: 15, reason: 'Item out of stock', sku: 'CAP' },
+	})
+
+	// Collection-level, no document: nothing to link to, the row only names the collection.
+	await createAuditEvent(adminReq, {
+		collection: 'posts',
+		eventType: 'export_downloaded',
+		metadata: { format: 'csv', rows: 2 },
+	})
+
+	// A custom event can join a group like any write.
+	await createAuditEvent(adminReq, {
+		collection: 'tags',
+		eventType: 'bulk_recolor',
+		group: 'seed-import',
+		metadata: { tags: 2 },
 	})
 
 	const logs = await payload.count({ collection: 'audit-logs' })
