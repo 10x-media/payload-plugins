@@ -1,0 +1,86 @@
+---
+title: Searching
+description: How look-alikes are found, scored and queued, findDuplicates and the adapter seam.
+---
+
+## Match fields
+
+Each match field compares by its `compare`:
+
+| `compare` | Matches |
+| --- | --- |
+| `exact` (default) | The same value, ignoring case, accents and extra spaces. |
+| `text` | The same words in any order, also a name written as one word or two. |
+| `phone` | The same last nine digits. |
+| `number` | The same number. With `tolerance`, close numbers too: `toleranceType: 'value'` by size, `'quantity'` by differing digits. |
+| `date` | The same day, or day and month swapped. |
+| `{ keys, similarity }` | Your own: `keys(value)` lists the keys of a value, `similarity(a, b)` returns 0 to 1. |
+
+Only documents that share a key are compared.
+
+## Score
+
+A matching field adds its `weight`, a near match part of it, a differing one `onDiffer` (a quarter of the weight off by default), and `onDiffer: 'veto'` rules the pair out. Pairs from `minScore` up go to the queue, with the fields that match and differ.
+
+## Save check and scan
+
+Every save queues a `dedupe-check` job that compares the document with its look-alikes and opens or refreshes their pairs; a pair that no longer qualifies goes stale. The scan compares a whole collection: run it with "Scan now" in the queue, or schedule it with `scan.cron`.
+
+Both need a job worker for the `dedupe` queue, for example `jobs.autoRun: [{ cron: '* * * * *', queue: 'dedupe' }]`. Without one, set `disableJobsQueue: true` and both run inside the request. Across servers, set `jobs.enableConcurrencyControl`.
+
+A pair marked "Not duplicates" stays marked however often it is found again. Unless `draft` is set, unpublished documents are not searched.
+
+## Finding duplicates from code
+
+`findDuplicates` runs the same search and stores nothing:
+
+```ts
+import { findDuplicates } from '@10x-media/dedupe'
+
+const found = await findDuplicates({
+  req,
+  collection: 'customers',
+  doc: { name: 'Olena Koval', phone: '+380 44 123 4567' },
+})
+// [{ doc, score, signals }], best first
+```
+
+- `doc` may hold unsaved values; with an `id`, that document is left out.
+- `overrideAccess: false` leaves out documents `req.user` may not read.
+- Without a request, make one with `createLocalReq({}, payload)`.
+
+## Adapters
+
+The adapter decides which documents are compared; the score stays the plugin's. Extend the built-in keys adapter:
+
+```ts
+dedupe({
+  adapter: (keys) => ({
+    ...keys,
+    findCandidates: async (args) => [
+      ...(await keys.findCandidates(args)),
+      ...(await fromCrm(args.doc)),
+    ],
+  }),
+})
+```
+
+Or write your own. Only `findCandidates` is required:
+
+```ts
+import type { DedupeAdapter } from '@10x-media/dedupe/types'
+
+const typesense: DedupeAdapter = {
+  findCandidates: async ({ collection, doc, limit }) => [{ id: '...' }],
+  index: async ({ collection, doc }) => { /* upsert into the engine */ },
+  remove: async ({ collection, id }) => { /* delete from the engine */ },
+}
+
+dedupe({ adapter: () => typesense })
+```
+
+- `findCandidates({ req, collection, doc, limit })`: documents to compare with `doc`.
+- `index({ req, collection, doc })`: on a save, a merge and the scan.
+- `remove({ req, collection, id })`: when a document is deleted, trashed, unpublished or merged.
+- `scanBuckets({ req, collection, cursor, limit })`: key buckets for the scan. Without it, the scan calls `findCandidates` per document.
+- `register(config)`: adds collections or endpoints at config time.

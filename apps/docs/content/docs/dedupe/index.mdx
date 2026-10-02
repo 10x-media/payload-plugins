@@ -1,0 +1,48 @@
+---
+title: Dedupe
+description: Find duplicate documents in any collection and merge a group of them into one from the admin.
+---
+
+`@10x-media/dedupe` finds documents that are probably the same thing and merges a group of them into one.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { dedupe } from '@10x-media/dedupe'
+
+export default buildConfig({
+  plugins: [
+    dedupe({
+      collections: {
+        customers: {
+          match: {
+            fields: [
+              { path: 'email', weight: 45 },
+              { path: 'name', weight: 40, compare: 'text' },
+              { path: 'phone', weight: 35, compare: 'phone' },
+            ],
+          },
+        },
+      },
+    }),
+  ],
+})
+```
+
+Run `payload generate:importmap` afterwards.
+
+## Search and merge
+
+**Search** compares documents that share a key and keeps the likely duplicates in a queue. It runs on every save and as a scan.
+
+**Merge** shows a group of documents side by side, lets the reviewer pick the primary and a value per field, and writes the result.
+
+They work independently: `customers: true` gives a collection the merge screen without search.
+
+## Where things are
+
+- `/admin/dedupe`: the queue of look-alike groups.
+- `/admin/dedupe/merge`: the merge screen.
+- `/admin/dedupe/merges`: the merge history.
+- "Merge selected" in the list view menu of a configured collection.
+
+The plugin keeps its data in hidden collections: `dedupe-pairs`, `dedupe-merges` and, with the built-in adapter, `dedupe-keys`.
