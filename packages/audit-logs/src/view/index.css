@@ -76,6 +76,10 @@
 .al-choice--active {
 	background: var(--theme-elevation-200);
 }
+/* The lighter active background would swallow the muted label. */
+.al-choice--active .al-choice__label {
+	color: var(--theme-elevation-650);
+}
 .al-choice--active .al-choice__value {
 	color: var(--theme-text);
 	font-weight: 600;

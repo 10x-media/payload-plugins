@@ -11,6 +11,8 @@ export type FilterBarProps = {
 	eventTypeLabels: Record<string, string>
 	filters: Filters
 	globalOptions: SelectOption[]
+	/** Per-tenant singleton collections, offered as globals in the tenant view. */
+	tenantGlobalOptions: SelectOption[]
 	onFilter: (f: Filters) => void
 	/** Titles of the documents and users the current filters name. */
 	refLabels: Record<string, string>

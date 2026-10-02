@@ -53,6 +53,8 @@ export type AuditLogsClientProps = {
 	docs: Record<string, unknown>[]
 	filters: Filters
 	globalOptions: SelectOption[]
+	/** Per-tenant singleton collections, offered as globals in the tenant view. */
+	tenantGlobalOptions: SelectOption[]
 	/** Titles of the documents and users the current filters name. */
 	refLabels: Record<string, string>
 	/** `useAsTitle` per collection, to name what the filter drawers pick. */

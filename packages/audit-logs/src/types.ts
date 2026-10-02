@@ -540,6 +540,21 @@ export type MultiTenancyConfig = {
 	 */
 	tenantFieldName?: string
 	/**
+	 * The tenant-scoped collections, in the shape `@payloadcms/plugin-multi-tenant`
+	 * takes them, so one object can be passed to both plugins. When set, only these
+	 * collections (and the tenants collection) record a tenant, and
+	 * `excludeCollections` is not consulted. A collection with `isGlobal: true` is
+	 * one document per tenant; the tenant view offers it as a global.
+	 *
+	 * Without it, any collection with a field named `tenantFieldName` records one.
+	 *
+	 * @example
+	 * const collections = { notes: {}, settings: { isGlobal: true } }
+	 * multiTenantPlugin({ collections })
+	 * auditLogs({ multiTenancy: { collections } })
+	 */
+	collections?: Partial<Record<CollectionSlug, { isGlobal?: boolean }>>
+	/**
 	 * Collections to exclude from tenant capture.
 	 * Useful when a collection has a field named after `tenantFieldName` for unrelated reasons -
 	 * e.g. a super-admin-only collection that uses a `tenant` field with different semantics.

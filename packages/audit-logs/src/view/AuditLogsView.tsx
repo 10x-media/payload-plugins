@@ -9,6 +9,7 @@ import { keys } from '../translations'
 import { asTranslate } from '../translations/server'
 import type { AuditPluginConfig, CustomEventComponentProps } from '../types'
 import { resolveCustomEventComponent } from '../utilities/customEventComponents'
+import { isTenantGlobal, isTenantScoped } from '../utilities/tenantScope'
 import { AuditLogsClient } from './AuditLogsClient'
 import { authRedirectUrl } from './authRedirect'
 import { filterConditions, parseFilters, splitRef } from './filterQuery'
@@ -96,11 +97,40 @@ export async function AuditLogsView({
 
 	const { collections: collectionConfigs, globals: globalConfigs = [] } = req.payload.config
 	const byLabel = (a: SelectOption, b: SelectOption) => a.label.localeCompare(b.label)
-	const collectionOptions = collectionConfigs
-		.filter((c) => c.slug !== 'audit-logs' && !PAYLOAD_INTERNAL_COLLECTIONS.includes(c.slug))
-		.map((c) => ({ label: labelOf(c.labels?.plural, req.i18n) ?? c.slug, value: c.slug }))
+	// The tenant view offers only what can carry a tenant: tenant-scoped collections
+	// and the tenants collection, with the per-tenant singletons as its globals. Real
+	// globals never have a tenant, so it has none of those.
+	const tenantFieldName = multiTenancy?.tenantFieldName ?? 'tenant'
+	const tenantsSlug = multiTenancy?.tenantsSlug ?? 'tenants'
+	const inTenantView = (c: (typeof collectionConfigs)[number]) =>
+		c.slug === tenantsSlug ||
+		(multiTenancy !== undefined &&
+			isTenantScoped(
+				c.slug,
+				multiTenancy,
+				c.fields.some((f) => 'name' in f && f.name === tenantFieldName)
+			))
+	const toOption = (c: (typeof collectionConfigs)[number]) => ({
+		label: labelOf(c.labels?.plural, req.i18n) ?? c.slug,
+		value: c.slug,
+	})
+	const offeredCollections = collectionConfigs.filter(
+		(c) =>
+			c.slug !== 'audit-logs' &&
+			!PAYLOAD_INTERNAL_COLLECTIONS.includes(c.slug) &&
+			(!useTenant || inTenantView(c))
+	)
+	const isSingleton = (slug: string) =>
+		Boolean(useTenant && multiTenancy && isTenantGlobal(slug, multiTenancy))
+	const collectionOptions = offeredCollections
+		.filter((c) => !isSingleton(c.slug))
+		.map(toOption)
 		.sort(byLabel)
-	const globalOptions = globalConfigs
+	const tenantGlobalOptions = offeredCollections
+		.filter((c) => isSingleton(c.slug))
+		.map(toOption)
+		.sort(byLabel)
+	const globalOptions = (useTenant ? [] : globalConfigs)
 		.filter((g) => !PAYLOAD_INTERNAL_GLOBALS.includes(g.slug))
 		.map((g) => ({ label: labelOf(g.label, req.i18n) ?? g.slug, value: g.slug }))
 		.sort(byLabel)
@@ -225,6 +255,7 @@ export async function AuditLogsView({
 					docs={result.docs as unknown as Record<string, unknown>[]}
 					filters={filters}
 					globalOptions={globalOptions}
+					tenantGlobalOptions={tenantGlobalOptions}
 					refLabels={refLabels}
 					titleFields={Object.fromEntries(
 						collectionConfigs.map((c) => [c.slug, titleFieldOf(c.slug)])

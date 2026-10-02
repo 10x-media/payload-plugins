@@ -50,6 +50,10 @@ export function RefPicker({
 		value: ref,
 	}))
 
+	// With nothing to list (only per-tenant singletons picked, say) the drawer would
+	// have no collection to open on and throws; a typed id still works.
+	const canPick = collections.length > 0
+
 	return (
 		<div className="al-ref-picker">
 			<div className="al-filterpopover__editor-label">{label}</div>
@@ -73,26 +77,30 @@ export function RefPicker({
 						value={value}
 					/>
 				</div>
-				<button
-					aria-label={t(keys.choose)}
-					className="al-attached__action"
-					onClick={openDrawer}
-					title={t(keys.choose)}
-					type="button"
-				>
-					<ListViewIcon />
-				</button>
+				{canPick && (
+					<button
+						aria-label={t(keys.choose)}
+						className="al-attached__action"
+						onClick={openDrawer}
+						title={t(keys.choose)}
+						type="button"
+					>
+						<ListViewIcon />
+					</button>
+				)}
 			</div>
-			<ListDrawer
-				onSelect={({ collectionSlug, doc }) => {
-					const ref = `${collectionSlug}:${String(doc.id)}`
-					const titleField = titleFields[collectionSlug]
-					const title = titleField ? doc[titleField] : undefined
-					if (title) onLabel(ref, String(title))
-					if (!refs.includes(ref)) onChange([...refs, ref])
-					closeDrawer()
-				}}
-			/>
+			{canPick && (
+				<ListDrawer
+					onSelect={({ collectionSlug, doc }) => {
+						const ref = `${collectionSlug}:${String(doc.id)}`
+						const titleField = titleFields[collectionSlug]
+						const title = titleField ? doc[titleField] : undefined
+						if (title) onLabel(ref, String(title))
+						if (!refs.includes(ref)) onChange([...refs, ref])
+						closeDrawer()
+					}}
+				/>
+			)}
 		</div>
 	)
 }
@@ -111,6 +119,7 @@ export function ValuesInput({ label, onChange, options = [], placeholder, values
 	const flat = (options as (SelectOption | { options: SelectOption[] })[]).flatMap((o) =>
 		'options' in o ? o.options : [o]
 	)
+
 	return (
 		<div className="al-ref-picker">
 			<div className="al-filterpopover__editor-label">{label}</div>

@@ -32,6 +32,7 @@ export function FilterBar({
 	filters,
 	globalOptions,
 	onFilter,
+	tenantGlobalOptions,
 	refLabels,
 	tenantOptions,
 	titleFields,
@@ -77,7 +78,9 @@ export function FilterBar({
 		(refs ?? []).map((ref) => labels[ref] ?? splitRef(ref).id).join(', ')
 
 	const scopeValue = [
-		...(staged.collections ?? []).map((v) => labelOf(collectionOptions, v)),
+		...(staged.collections ?? []).map((v) =>
+			labelOf([...collectionOptions, ...tenantGlobalOptions], v)
+		),
 		...(staged.globals ?? []).map((v) => labelOf(globalOptions, v)),
 	].join(', ')
 	const userValue = refNames(staged.users)
@@ -118,6 +121,7 @@ export function FilterBar({
 						{...shared}
 						collectionOptions={collectionOptions}
 						globalOptions={globalOptions}
+						tenantGlobalOptions={tenantGlobalOptions}
 					/>
 				)
 			case 'user':
@@ -162,11 +166,10 @@ export function FilterBar({
 				return (
 					<MoreFilters
 						{...shared}
-						documentCollections={
-							staged.collections?.length
-								? staged.collections
-								: collectionOptions.map((o) => o.value)
-						}
+						documentCollections={(staged.collections?.length
+							? staged.collections
+							: collectionOptions.map((o) => o.value)
+						).filter((slug) => !tenantGlobalOptions.some((o) => o.value === slug))}
 						labels={labels}
 						onLabel={onLabel}
 						titleFields={titleFields}

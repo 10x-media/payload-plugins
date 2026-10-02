@@ -26,6 +26,7 @@ export function AuditLogsClient({
 	limit,
 	filters,
 	globalOptions,
+	tenantGlobalOptions,
 	refLabels,
 	titleFields,
 	lockedTenantId,
@@ -151,6 +152,7 @@ export function AuditLogsClient({
 				eventTypeLabels={eventTypeLabels}
 				filters={filters}
 				globalOptions={globalOptions}
+				tenantGlobalOptions={tenantGlobalOptions}
 				refLabels={refLabels}
 				titleFields={titleFields}
 				userCollections={Object.keys(userTitleFields)}
