@@ -21,6 +21,18 @@ auditLogs({
 
 Pass `view: false` to skip mounting it.
 
+## Rows
+
+A row reads left to right as what happened, to what, by whom, and through what:
+
+- **The event**: a coloured badge for the operation, or the auth or custom event type under its label from [`logs.eventTypes`](/audit-logs/configuration#eventtypes).
+- **The collection or global**, by its label. It links to the document in a new tab, except for a delete, which leaves nothing to open.
+- **The user**, as a pill linking to them. When the entry was written under [impersonation](/audit-logs#what-gets-recorded), the pill carries an `impersonated` mark that opens who was impersonating. A user who no longer exists shows as deleted.
+- **Context badges**: the API the request came through, the locale (not for auth events and deletes), and in the all-tenants view the tenant. The tenant's name filters the list to it; the arrow beside it opens the tenant.
+- **How many fields changed**, and when, in `admin.dateFormat` and the admin's language, to the second on hover.
+
+Expanding a row shows the request details (IP, user agent, locale, group), the changed paths as links that add them to the Changed field filter, and the diff. A create or delete with a snapshot shows it as the same path and value table, and an auth or custom event its metadata, each with the raw JSON in a collapsible you can copy from. [Custom events](/audit-logs/custom-events#rendering-them-in-the-view) can render their own body instead. A row with none of this does not expand.
+
 ## Filters
 
 The filters sit in one row of pills, each showing its current value. A pill opens its editor in a panel below the row, one at a time, the way the list view opens its columns and filters. Changes are staged and applied together. Filters live in the URL, so any view state is a link you can share or bookmark.

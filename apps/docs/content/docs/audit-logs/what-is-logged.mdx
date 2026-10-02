@@ -12,6 +12,7 @@ description: The shape of an entry, how the diff is built, and everything delibe
   relationTo:   string       // collection slug, or '__global__' for a global
   documentId?:  string       // the document id; for globals, the global slug
   user?:        relationship // req.user at the time of the write
+  impersonator?: relationship // who was impersonating `user`, via @10x-media/impersonation
   locale?:      string       // req.locale; not set for auth events and deletes
   payloadAPI?:  string       // 'REST' | 'GraphQL' | 'local', or whatever a plugin sets
   ipAddress?:   string
@@ -21,6 +22,7 @@ description: The shape of an entry, how the diff is built, and everything delibe
   snapshot?:    Record<string, unknown>
   metadata?:    Record<string, unknown>  // custom events only
   group?:       string
+  tenant?:      relationship // with multiTenancy, the document's tenant
 }
 ```
 
