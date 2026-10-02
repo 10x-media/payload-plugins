@@ -342,9 +342,11 @@
 	outline: var(--accessibility-outline);
 	outline-offset: -2px;
 }
+/* Decoration only; clicks pass through to the stretched toggle beneath. */
 .al-row__toggle {
 	color: var(--theme-elevation-400);
 	display: inline-flex;
+	pointer-events: none;
 }
 .al-row__toggle--hidden {
 	visibility: hidden;
@@ -413,11 +415,17 @@
 	gap: calc(var(--base) * 0.3);
 	overflow: hidden;
 }
+/* Above the stretched toggle, but only the pill takes clicks: the empty rest of
+   the column still expands the row. */
 .al-row__user {
 	position: relative;
 	z-index: 1;
 	display: flex;
 	min-width: 0;
+	pointer-events: none;
+}
+.al-row__user > * {
+	pointer-events: auto;
 }
 .al-row__empty {
 	color: var(--theme-elevation-400);
