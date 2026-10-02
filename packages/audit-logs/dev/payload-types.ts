@@ -77,6 +77,9 @@ export interface Config {
     media: Media;
     users: User;
     customers: Customer;
+    tenants: Tenant;
+    notes: Note;
+    'tenant-settings': TenantSetting;
     'audit-logs': AuditLog;
     'impersonation-sessions': ImpersonationSession;
     'payload-kv': PayloadKv;
@@ -96,6 +99,9 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     customers: CustomersSelect<false> | CustomersSelect<true>;
+    tenants: TenantsSelect<false> | TenantsSelect<true>;
+    notes: NotesSelect<false> | NotesSelect<true>;
+    'tenant-settings': TenantSettingsSelect<false> | TenantSettingsSelect<true>;
     'audit-logs': AuditLogsSelect<false> | AuditLogsSelect<true>;
     'impersonation-sessions': ImpersonationSessionsSelect<false> | ImpersonationSessionsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
@@ -253,6 +259,12 @@ export interface Tag {
 export interface User {
   id: string;
   name?: string | null;
+  tenants?:
+    | {
+        tenant: string | Tenant;
+        id?: string | null;
+      }[]
+    | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -271,6 +283,17 @@ export interface User {
     | null;
   password?: string | null;
   collection: 'users';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tenants".
+ */
+export interface Tenant {
+  id: string;
+  name: string;
+  slug: string;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -430,6 +453,50 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notes".
+ */
+export interface Note {
+  id: string;
+  tenant?: (string | null) | Tenant;
+  title: string;
+  body?: string | null;
+  pinned?: boolean | null;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  lastModifiedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tenant-settings".
+ */
+export interface TenantSetting {
+  id: string;
+  tenant?: (string | null) | Tenant;
+  siteName: string;
+  supportEmail?: string | null;
+  maintenance?: boolean | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "audit-logs".
  */
 export interface AuditLog {
@@ -490,6 +557,7 @@ export interface AuditLog {
     | null;
   group?: string | null;
   archivedAt?: string | null;
+  tenant?: (string | null) | Tenant;
   updatedAt: string;
   createdAt: string;
 }
@@ -699,6 +767,18 @@ export interface PayloadLockedDocument {
         value: string | Customer;
       } | null)
     | ({
+        relationTo: 'tenants';
+        value: string | Tenant;
+      } | null)
+    | ({
+        relationTo: 'notes';
+        value: string | Note;
+      } | null)
+    | ({
+        relationTo: 'tenant-settings';
+        value: string | TenantSetting;
+      } | null)
+    | ({
         relationTo: 'audit-logs';
         value: string | AuditLog;
       } | null)
@@ -902,6 +982,12 @@ export interface MediaSelect<T extends boolean = true> {
  */
 export interface UsersSelect<T extends boolean = true> {
   name?: T;
+  tenants?:
+    | T
+    | {
+        tenant?: T;
+        id?: T;
+      };
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -944,6 +1030,42 @@ export interface CustomersSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tenants_select".
+ */
+export interface TenantsSelect<T extends boolean = true> {
+  name?: T;
+  slug?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "notes_select".
+ */
+export interface NotesSelect<T extends boolean = true> {
+  tenant?: T;
+  title?: T;
+  body?: T;
+  pinned?: T;
+  createdBy?: T;
+  lastModifiedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tenant-settings_select".
+ */
+export interface TenantSettingsSelect<T extends boolean = true> {
+  tenant?: T;
+  siteName?: T;
+  supportEmail?: T;
+  maintenance?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "audit-logs_select".
  */
 export interface AuditLogsSelect<T extends boolean = true> {
@@ -963,6 +1085,7 @@ export interface AuditLogsSelect<T extends boolean = true> {
   metadata?: T;
   group?: T;
   archivedAt?: T;
+  tenant?: T;
   updatedAt?: T;
   createdAt?: T;
 }

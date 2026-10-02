@@ -28,11 +28,24 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	})
 	payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 
-	// Someone to impersonate. Nothing below runs as them, so their entries only
+	// Two tenants. The dev admin reaches both through `userHasAccessToAllTenants`.
+	const alpha = await payload.create({
+		collection: 'tenants',
+		data: { name: 'Alpha', slug: 'alpha' },
+	})
+	const beta = await payload.create({ collection: 'tenants', data: { name: 'Beta', slug: 'beta' } })
+
+	// Someone to impersonate, and a member of Alpha only, so impersonating them also
+	// narrows the tenant picker. Nothing below runs as them, so their entries only
 	// appear once you act as them from the admin.
 	await payload.create({
 		collection: 'users',
-		data: { email: 'editor@10xmedia.de', password: DEV_PASSWORD, name: 'Dev Editor' },
+		data: {
+			email: 'editor@10xmedia.de',
+			password: DEV_PASSWORD,
+			name: 'Dev Editor',
+			tenants: [{ tenant: alpha.id }],
+		},
 	})
 
 	// Everything below runs as the seeded admin, so the log shows a real user
@@ -243,6 +256,24 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		group: 'seed-import',
 		metadata: { tags: 2 },
 	})
+
+	// Tenant-scoped writes: each entry takes its note's tenant, so the tenant view
+	// shows two entries for Alpha and one for Beta.
+	for (const [tenant, title] of [
+		[alpha.id, 'Alpha kickoff'],
+		[alpha.id, 'Alpha retro'],
+		[beta.id, 'Beta kickoff'],
+	] as const) {
+		await payload.create({ collection: 'notes', data: { tenant, title }, req })
+	}
+
+	// The per-tenant singleton: one settings document each.
+	for (const [tenant, siteName] of [
+		[alpha.id, 'Alpha site'],
+		[beta.id, 'Beta site'],
+	] as const) {
+		await payload.create({ collection: 'tenant-settings', data: { siteName, tenant }, req })
+	}
 
 	const logs = await payload.count({ collection: 'audit-logs' })
 	payload.logger.info(`Seeded ${logs.totalDocs} audit log entries`)
