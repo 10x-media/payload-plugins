@@ -117,6 +117,8 @@ export default buildConfig({
 				// next to the custom view at /admin/audit-logs.
 				hidden: false,
 				group: true,
+				// The seed writes a few entries as an MCP server would.
+				payloadAPIs: ['MCP'],
 				view: {
 					defaultLimit: 25,
 					// The other seeded custom events keep the default table and JSON block.

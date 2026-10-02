@@ -36,9 +36,9 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	const beta = await payload.create({ collection: 'tenants', data: { name: 'Beta', slug: 'beta' } })
 
 	// Someone to impersonate, and a member of Alpha only, so impersonating them also
-	// narrows the tenant picker. Nothing below runs as them, so their entries only
-	// appear once you act as them from the admin.
-	await payload.create({
+	// narrows the tenant picker. The seed writes a few entries as them under
+	// impersonation, near the end.
+	const editor = await payload.create({
 		collection: 'users',
 		data: {
 			email: 'editor@10xmedia.de',
@@ -287,6 +287,48 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	] as const) {
 		await payload.create({ collection: 'tenant-settings', data: { siteName, tenant }, req })
 	}
+
+	// Writes through an MCP server: `@payloadcms/plugin-mcp` sets `payloadAPI` to
+	// 'MCP', which `logs.payloadAPIs` labels and the API filter offers.
+	const mcpReq = await createLocalReq({ user: { ...user, collection: 'users' } as never }, payload)
+	;(mcpReq as { payloadAPI: string }).payloadAPI = 'MCP'
+	await payload.update({
+		collection: 'posts',
+		id: post.id,
+		data: { status: 'published' },
+		req: mcpReq,
+	})
+	await payload.create({ collection: 'tags', data: { name: 'agent-added' }, req: mcpReq })
+
+	// Writes under impersonation: the dev admin acting as the editor, the way
+	// `@10x-media/impersonation` stamps `_impersonation` on the request's user.
+	const impersonatedReq = await createLocalReq(
+		{
+			user: {
+				...editor,
+				collection: 'users',
+				_impersonation: { impersonator: { collection: 'users', id: user.id } },
+			} as never,
+		},
+		payload
+	)
+	await payload.update({
+		collection: 'posts',
+		id: post.id,
+		data: { title: 'Audit logs playground (edited as the editor)' },
+		req: impersonatedReq,
+	})
+	await payload.create({
+		collection: 'notes',
+		data: { tenant: alpha.id, title: 'Written while impersonating' },
+		req: impersonatedReq,
+	})
+	await createAuditEvent(impersonatedReq, {
+		collection: 'orders',
+		documentId: order.id,
+		eventType: 'order_refunded',
+		metadata: { amount: 5, reason: 'Goodwill credit', sku: 'TEE-M' },
+	})
 
 	const logs = await payload.count({ collection: 'audit-logs' })
 	payload.logger.info(`Seeded ${logs.totalDocs} audit log entries`)
