@@ -1,0 +1,1215 @@
+/* Everything on these screens is a Payload component or Payload's own markup, so this
+   sheet only lays them out: spacing, column widths and the few states the admin has no
+   class for. Colours and radii come from the theme variables, never from here. */
+
+/* Queue ------------------------------------------------------------------- */
+
+.dedupe-queue__controls,
+.dedupe-merges__controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: calc(var(--base) / 2) var(--base);
+	margin-block: var(--base);
+}
+
+/* Five tabs do not always fit beside the title, depending on the width, the nav and the
+   language: then they go under it and wrap. */
+.dedupe-queue .list-header__content {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	justify-content: space-between;
+	gap: calc(var(--base) / 2) var(--base);
+}
+
+.dedupe-queue .list-header__actions {
+	min-width: 0;
+}
+
+.dedupe-queue .default-list-view-tabs {
+	flex-wrap: wrap;
+}
+
+.dedupe-queue__about {
+	margin: 0;
+	color: var(--theme-elevation-500);
+}
+
+/* The admin gives every cell room for text; a percentage needs none of it. */
+.dedupe-queue__table .cell-score {
+	width: 1%;
+	white-space: nowrap;
+}
+
+.dedupe-queue__score {
+	font-variant-numeric: tabular-nums;
+}
+
+.dedupe-signals__apart {
+	color: var(--theme-elevation-500);
+}
+
+/* Merge history ----------------------------------------------------------- */
+
+.dedupe-merges__table .cell-createdAt,
+.dedupe-merges__table .cell-status {
+	white-space: nowrap;
+}
+
+.dedupe-merges__docs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) / 4) calc(var(--base) / 2);
+}
+
+.dedupe-merges__doc {
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--base) / 4);
+}
+
+/* A section opens the gutter it sits in, where the admin drops a group field's top padding. */
+.dedupe-record__block {
+	padding-top: var(--base);
+}
+
+/* Every document of the merge as it was, on the grid "Compare versions" lays out two on,
+   sized as the merge screen sizes its columns: two share the page; from three on a column is
+   40% of it and the rest scroll sideways, heads and fields together, stopping on a column's
+   edge, the field names held at the left edge. A phone shows one column and the edge of the
+   next. */
+.dedupe-record__compare {
+	container: dedupe-record / inline-size;
+	padding-bottom: calc(var(--base) / 2);
+	overflow-x: auto;
+	scroll-snap-type: x mandatory;
+	scroll-padding-left: calc(var(--gutter-h) + 10px);
+}
+
+.dedupe-record__cell {
+	scroll-snap-align: start;
+}
+
+.dedupe-record__compare :is(.dedupe-record__heads, .field-diff-content, .dedupe-record__rails) {
+	grid-template-columns: repeat(var(--dedupe-cols), minmax(0, 1fr));
+}
+
+.dedupe-record__compare--scroll
+	:is(.dedupe-record__heads, .field-diff-content, .dedupe-record__rails) {
+	grid-template-columns: repeat(var(--dedupe-cols), 40cqi);
+}
+
+.dedupe-record__compare .field-diff-label {
+	position: sticky;
+	left: var(--gutter-h);
+	width: fit-content;
+}
+
+/* The version view's line between its two columns, one per boundary here. Payload draws its
+   single line as `::after` at half the width of each block; the same declarations sit on a
+   layer of empty columns laid over the heads and over the fields. The heads take the fields'
+   padding and gap so their columns line up. */
+.dedupe-record :is(.view-version-controls-bottom, .view-version__diff-wrap)::after {
+	content: none;
+}
+
+.dedupe-record__heads {
+	padding-inline: 10px;
+	column-gap: 20px;
+}
+
+.dedupe-record__head h2 {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: calc(var(--base) / 4);
+}
+
+.dedupe-record__rails {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: var(--gutter-h);
+	right: var(--gutter-h);
+	display: grid;
+	padding-inline: 10px;
+	column-gap: 20px;
+	pointer-events: none;
+}
+
+.dedupe-record__rails > * {
+	position: relative;
+}
+
+/* Scrolled columns pass under the page's side margin instead of showing in it, as the merge
+   screen keeps its columns inside the margin: the first rail stays put and paints the margin
+   in the page's colour over them. */
+.dedupe-record__rails > :first-child {
+	position: sticky;
+	left: calc(var(--gutter-h) + 10px);
+	z-index: 3;
+}
+
+.dedupe-record__rails > :first-child::after {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: calc(-10px - var(--gutter-h));
+	width: var(--gutter-h);
+	background-color: var(--theme-bg);
+}
+
+.dedupe-record__rails > * + *::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: -10px;
+	width: 1px;
+	background-color: var(--theme-elevation-100);
+	transform: translate(-50%);
+	z-index: 2;
+}
+
+.dedupe-record__compare--scroll > *,
+.dedupe-record__compare--scroll .render-field-diffs {
+	width: max-content;
+	min-width: 100%;
+}
+
+.dedupe-record__compare--scroll .dedupe-record__rails {
+	right: auto;
+	width: max-content;
+}
+
+@media (max-width: 768px) {
+	.dedupe-record__compare :is(.dedupe-record__heads, .field-diff-content, .dedupe-record__rails) {
+		grid-template-columns: repeat(var(--dedupe-cols), 90cqi);
+	}
+
+	.dedupe-record__compare > *,
+	.dedupe-record__compare .render-field-diffs {
+		width: max-content;
+		min-width: 100%;
+	}
+
+	.dedupe-record__compare .dedupe-record__rails {
+		right: auto;
+		width: max-content;
+	}
+}
+
+/* One fill per value: the version view's band over the line or the cell, without its second,
+   darker fill on the text itself. Rich text is marked as one block, which takes the band's fill. */
+.dedupe-record .html-diff [data-match-type="create"] {
+	background-color: transparent;
+}
+
+.dedupe-record .html-diff div[data-match-type="create"] {
+	background-color: var(--diff-create-parent-bg);
+}
+
+/* A list the result took whole fills its cell, as a single value does, in place of a band
+   per item. */
+.dedupe-record__cell--taken {
+	position: relative;
+	z-index: 0;
+}
+
+/* Short of the line on its right by a pixel, so two filled neighbours stay apart. */
+.dedupe-record__cell--taken::before {
+	content: "";
+	position: absolute;
+	inset: -10px -9px -10px -10px;
+	z-index: -1;
+	background-color: var(--diff-create-parent-bg);
+}
+
+.dedupe-record__cell--taken li::before {
+	content: none;
+}
+
+/* A list item's band starts at the cell's edge, as a single value's does, with its marker
+   inside it: past the item's own 10px and the list's 20px indent. */
+.dedupe-record .html-diff ul {
+	padding-inline-start: 20px;
+}
+
+.dedupe-record .html-diff > ul > li:has([data-match-type="create"])::before {
+	left: -30px;
+}
+
+/* The name that opens the document in a drawer, drawn as the link it stands in for. */
+.dedupe-record__head-name {
+	padding: 0;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: start;
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+/* Duplicate warnings on a document form ----------------------------------- */
+
+/* Only a click catcher: the admin's own button lays out as if nothing wrapped it. */
+.dedupe-confirm-create {
+	display: contents;
+}
+
+.dedupe-duplicates__list {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 2);
+	margin: calc(var(--base) / 2) 0 0;
+	padding: 0;
+	list-style: none;
+}
+
+.dedupe-duplicates__item {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: calc(var(--base) / 4);
+	padding-bottom: calc(var(--base) / 2);
+	border-bottom: 1px solid var(--theme-elevation-100);
+}
+
+.dedupe-duplicates__head {
+	display: flex;
+	align-self: stretch;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: calc(var(--base) / 3);
+}
+
+.dedupe-duplicates__head > a {
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+.dedupe-duplicates__actions {
+	display: flex;
+	margin-inline-start: auto;
+}
+
+/* Merge ------------------------------------------------------------------- */
+
+.dedupe-merge {
+	display: flex;
+	flex-direction: column;
+	gap: var(--base);
+	padding-bottom: calc(var(--base) * 2);
+}
+
+.dedupe-merge__header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--base);
+}
+
+/* Cut short like the title of Payload's edit view. */
+.dedupe-merge__header h1 {
+	margin: 0;
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.dedupe-merge__toggles {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--base);
+}
+
+/* The merge table, laid out as Payload's "Compare versions": each field's label on a line of
+   its own and its values side by side, a column per document. Two documents share the width.
+   From three on a column is 40% of it, so two are in view and the edge of the third shows
+   there is more; the rows scroll sideways a column at a time, the heads stuck to the top of
+   the page and the labels to the left edge. A phone shows one column and the edge of the next. */
+.dedupe-merge__matrix {
+	container: dedupe-matrix / inline-size;
+}
+
+/* The heads and the rows are two grids on the same columns. */
+.dedupe-merge__heads,
+.dedupe-merge__grid {
+	display: grid;
+	grid-template-columns: repeat(var(--dedupe-docs), minmax(0, 1fr));
+	column-gap: var(--base);
+	align-items: stretch;
+}
+
+.dedupe-merge__matrix--scroll :is(.dedupe-merge__heads, .dedupe-merge__grid) {
+	grid-template-columns: repeat(var(--dedupe-docs), 40cqi);
+}
+
+@media (max-width: 768px) {
+	.dedupe-merge__matrix :is(.dedupe-merge__heads, .dedupe-merge__grid) {
+		grid-template-columns: repeat(var(--dedupe-docs), 90cqi);
+	}
+}
+
+/* The heads stay at the top of the page while the rows pass, as the document controls do. */
+.dedupe-merge__heads {
+	position: sticky;
+	top: 0;
+	z-index: 3;
+	overflow-x: hidden;
+	border-bottom: 1px solid var(--theme-elevation-100);
+	background: var(--theme-bg);
+}
+
+.dedupe-merge__grid {
+	padding-bottom: calc(var(--base) / 2);
+	overflow-x: auto;
+	scroll-snap-type: x mandatory;
+}
+
+/* Scrolling stops on a column's edge. The admin's radios and checkboxes stack parts of
+   themselves; isolated, they pass under the labels too. */
+.dedupe-merge__cell {
+	isolation: isolate;
+	scroll-snap-align: start;
+}
+
+.dedupe-merge__label {
+	grid-column: 1 / -1;
+	position: sticky;
+	left: 0;
+	max-width: 100cqi;
+}
+
+.dedupe-merge__head {
+	container: dedupe-head / inline-size;
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 4);
+	min-width: 0;
+	padding: calc(var(--base) * 0.75) calc(var(--base) / 2) calc(var(--base) / 2);
+}
+
+.dedupe-merge__head-title {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--base) / 4);
+	min-width: 0;
+}
+
+.dedupe-merge__head-name {
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	font: inherit;
+	/* The admin's h4. */
+	font-size: calc(var(--base) * 0.8);
+	font-weight: 600;
+	line-height: var(--base);
+	text-align: start;
+	text-decoration: underline;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Both dates on one line; a narrow column puts the second under the first, never cut short. */
+.dedupe-merge__head-meta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0 var(--base);
+	margin: 0;
+	font-size: 0.85em;
+}
+
+.dedupe-merge__head-meta > div {
+	display: flex;
+	gap: calc(var(--base) / 4);
+	white-space: nowrap;
+}
+
+.dedupe-merge__head-meta dt {
+	color: var(--theme-elevation-500);
+}
+
+.dedupe-merge__head-meta dd {
+	margin: 0;
+}
+
+/* A field's label, as the version view heads a field's two sides. */
+.dedupe-merge__label {
+	z-index: 1;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: calc(var(--base) / 4) calc(var(--base) / 2);
+	min-width: 0;
+	padding: calc(var(--base) * 1.25) 0 calc(var(--base) / 2);
+	background: var(--theme-bg);
+}
+
+.dedupe-merge__label-group {
+	color: var(--theme-elevation-500);
+	font-size: 0.85em;
+}
+
+.dedupe-merge__label-name {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--base) / 4);
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+/* A cell is one document's value. */
+.dedupe-merge__cell {
+	position: relative;
+	display: flex;
+	min-width: 0;
+	overflow-wrap: anywhere;
+}
+
+/* A value is drawn as the admin draws an input: its radio or check, a separator, the value.
+   The value the merge keeps is outlined; colour marks only what differs from the primary. */
+.dedupe-merge__field {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	min-width: 0;
+	min-height: 40px;
+	margin: 0;
+	padding: 0 calc(var(--base) * 0.75);
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
+	box-shadow: 0 2px 2px -1px rgb(0 0 0 / 0.1);
+	cursor: pointer;
+}
+
+.dedupe-merge__field > .radio-input {
+	flex: 1 1 auto;
+	align-self: stretch;
+	align-items: center;
+	min-width: 0;
+	margin: 0;
+}
+
+:is(.dedupe-merge__field, .dedupe-merge__line) :is(.radio-input__label, label.field-label) {
+	flex: 1 1 auto;
+	align-self: stretch;
+	display: flex;
+	align-items: center;
+	min-width: 0;
+	margin: 0;
+	margin-inline-start: calc(var(--base) * 0.75);
+	padding: calc(var(--base) * 0.4) 0;
+	padding-inline-start: calc(var(--base) * 0.75);
+	border-inline-start: 1px solid var(--theme-elevation-150);
+	overflow-wrap: anywhere;
+}
+
+label.dedupe-merge__field:hover {
+	border-color: var(--theme-elevation-250);
+}
+
+.dedupe-merge__field.dedupe-merge__cell--picked,
+.dedupe-merge__list:has(.checkbox-input--checked:not(.checkbox-input--read-only)) {
+	border-color: var(--theme-elevation-700);
+}
+
+/* A value that cannot be picked here, as the admin draws a read-only input. */
+.dedupe-merge__field--read-only {
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-400);
+	box-shadow: none;
+	cursor: default;
+}
+
+:is(.dedupe-merge__cell, .dedupe-merge__head)
+	:is(.radio-input__styled-radio, .checkbox-input__input) {
+	flex-shrink: 0;
+}
+
+.dedupe-merge__cell .html-diff {
+	font-size: inherit;
+}
+
+.dedupe-merge__cell .html-diff :is(p, ul) {
+	margin: 0;
+}
+
+.dedupe-merge__cell .html-diff ul {
+	padding-inline-start: 1.2em;
+}
+
+.dedupe-merge__cell .html-diff pre {
+	max-height: 12rem;
+	margin: 0;
+	overflow: auto;
+	white-space: pre-wrap;
+}
+
+.dedupe-merge__cell .html-diff :is(p, li, pre)::before {
+	display: none;
+}
+
+/* A `hasMany` list is one input per document and its values are the input's lines, each with a check. */
+.dedupe-merge__list {
+	flex-direction: column;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s);
+	background: var(--theme-input-bg);
+	box-shadow: 0 2px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+div.dedupe-merge__list {
+	padding: calc(var(--base) * 0.4) calc(var(--base) * 0.75);
+}
+
+/* No rows: as tall as one closed row (two 24px lines, the header's 8px padding, a border), not
+   as tall as the longest list beside it. */
+div.dedupe-merge__list--rows {
+	align-self: start;
+	min-height: calc(2 * 24px + 2 * 8px + 2px);
+}
+
+.dedupe-merge__item {
+	display: flex;
+	align-items: flex-start;
+	min-width: 0;
+}
+
+.dedupe-merge__item + .dedupe-merge__item {
+	border-top: 1px solid var(--theme-elevation-150);
+}
+
+.dedupe-merge__line {
+	display: flex;
+	flex: 1 1 auto;
+	align-items: center;
+	min-width: 0;
+	min-height: 40px;
+	margin: 0;
+	padding: 0 calc(var(--base) * 0.75);
+}
+
+/* Rows of an array or blocks as the document's own form draws them, read-only. The field's own
+   header repeats the label on the left, and sorting and adding do nothing here, so they are left out. */
+.dedupe-merge__rows {
+	flex-direction: column;
+}
+
+.dedupe-merge__rows > .form > .render-fields > :is(.array-field, .blocks-field) {
+	margin: 0;
+}
+
+.dedupe-merge__rows
+	> .form
+	> .render-fields
+	> .field-type
+	> :is(.array-field__header, .blocks-field__header),
+.dedupe-merge__rows :is(.collapsible__drag, .blocks-field__drawer-toggler) {
+	display: none;
+}
+
+.dedupe-merge__rows
+	> .form
+	> .render-fields
+	> .field-type
+	> :is(.array-field__draggable-rows, .blocks-field__rows) {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 2);
+}
+
+/* A nested list's header in a narrow column: its buttons go under the title rather than breaking it. */
+.dedupe-merge__rows :is(.array-field__header-wrap, .blocks-field__header-wrap) {
+	flex-wrap: wrap;
+	row-gap: calc(var(--base) / 4);
+}
+
+.dedupe-merge__rows :is(.array-field__header-content, .blocks-field__heading-with-error) h3,
+.dedupe-merge__rows :is(.array-field__header-action, .blocks-field__header-action) {
+	white-space: nowrap;
+}
+
+.dedupe-merge__rows :is(.array-field__header-actions, .blocks-field__header-actions) {
+	flex-wrap: wrap;
+}
+
+.dedupe-merge__rows .collapsible__header-wrap--has-drag-handle {
+	left: 0;
+}
+
+.dedupe-merge__rows .collapsible:has(> .collapsible__toggle-wrap .checkbox-input--checked) {
+	border-color: var(--theme-elevation-700);
+}
+
+/* The header lets a click through to the toggle under it; the check takes its own. */
+.dedupe-merge__row-pick {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.5);
+	min-width: 0;
+}
+
+.dedupe-merge__row-pick > .checkbox-input {
+	flex: 0 0 auto;
+	margin: 0;
+	pointer-events: auto;
+}
+
+/* A row's name and its first text on a line each, cut short; the open row shows them whole. */
+.dedupe-merge__row-title {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+}
+
+.dedupe-merge__row-title > * {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.dedupe-merge__row-name {
+	display: flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.375);
+}
+
+.dedupe-merge__row-summary {
+	color: var(--theme-elevation-500);
+}
+
+/* A value another document holds, drawn as the admin draws what cannot be changed. */
+.dedupe-merge__line.checkbox-input--read-only {
+	color: var(--theme-elevation-400);
+}
+
+.dedupe-merge__value--empty {
+	color: var(--theme-elevation-400);
+	font-style: italic;
+}
+
+.dedupe-merge__releases {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 2);
+}
+
+/* The matrix, the documents that move and what the merged-in documents give up. */
+.dedupe-merge__body {
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 2);
+}
+
+/* Answers for the survivor or documents the reviewer has just changed are on their way. */
+.dedupe-merge__body--loading {
+	opacity: 0.6;
+	transition: opacity 0.2s;
+}
+
+.dedupe-merge__dismissed {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: space-between;
+	gap: calc(var(--base) / 2);
+}
+
+/* Related documents, one join-field table per field. */
+.dedupe-related__header {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: calc(var(--base) / 2);
+}
+
+.dedupe-related__heading {
+	margin: 0;
+}
+
+.dedupe-related .relationship-table__header {
+	flex-wrap: wrap;
+	gap: calc(var(--base) / 2);
+}
+
+.dedupe-related .relationship-table__actions {
+	min-width: 0;
+}
+
+.dedupe-related td {
+	overflow-wrap: anywhere;
+}
+
+.dedupe-related .relationship-table__actions :is(.pill, .pill__label) {
+	flex-shrink: 1;
+	overflow: visible;
+	white-space: normal;
+	overflow-wrap: anywhere;
+}
+
+.dedupe-related .collapsible {
+	margin-bottom: var(--base);
+}
+
+.dedupe-related__table + .dedupe-related__table {
+	margin-top: var(--base);
+}
+
+.dedupe-related__more {
+	margin: calc(var(--base) / 2) 0 0;
+	color: var(--theme-elevation-500);
+}
+
+/* Stays in reach at the end of a long screen; above the sticky headers of any card. */
+.dedupe-merge__footer {
+	position: sticky;
+	bottom: 0;
+	z-index: 2;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	justify-content: flex-end;
+	gap: calc(var(--base) / 2);
+	padding-block: calc(var(--base) / 2);
+	background: var(--theme-bg);
+	border-top: 1px solid var(--theme-elevation-100);
+}
+
+.dedupe-merge__footer .btn {
+	margin: 0;
+	/* Payload's input height, `base(2)`, compiled to px: the button's padding follows
+	   `--base`, which shrinks on small screens while the input does not. */
+	height: 40px;
+}
+
+/* The counts on the left, the buttons on the right, on one line while both fit. */
+.dedupe-merge__stats {
+	flex: 1 1 20rem;
+	min-width: 0;
+	margin: 0;
+	color: var(--theme-elevation-500);
+	overflow-wrap: anywhere;
+}
+
+/* A narrow column puts the name on a line of its own under the buttons. */
+@container dedupe-head (width < 14rem) {
+	.dedupe-merge__head-title {
+		flex-wrap: wrap;
+	}
+
+	.dedupe-merge__head-name {
+		display: -webkit-box;
+		order: 1;
+		flex-basis: 100%;
+		white-space: normal;
+		overflow-wrap: anywhere;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 2;
+	}
+
+	.dedupe-merge__linked {
+		margin-inline-start: auto;
+	}
+}
+
+@media (max-width: 768px) {
+	.dedupe-merge__stats,
+	.dedupe-merge__footer .btn {
+		flex: 1 1 100%;
+	}
+}
+
+/* Rich text as the version view draws it: Payload's own Lexical diff styles, which load only on
+   that view, scoped to a rich text cell. */
+/* biome-ignore-start lint/style/noDescendingSpecificity: Payload's rules, in Payload's order */
+.dedupe-merge__rich-text .html-diff {
+	font-family: var(--font-serif);
+	font-size: 16px;
+	letter-spacing: 0.02em;
+}
+
+.dedupe-merge__rich-text .html-diff blockquote {
+	font-size: 16px;
+	margin-block: 16px;
+	margin-inline: 0;
+	padding-inline-start: 12px;
+	padding-block: 4px;
+	position: relative;
+}
+
+.dedupe-merge__rich-text .html-diff blockquote:after {
+	content: "";
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	inset-inline-start: 0;
+	width: 4px;
+	background-color: var(--theme-elevation-150);
+}
+
+.dedupe-merge__rich-text .html-diff blockquote:has([data-match-type="create"]):after {
+	background-color: var(--theme-success-150);
+}
+
+.dedupe-merge__rich-text .html-diff blockquote:has([data-match-type="delete"]):after {
+	background-color: var(--theme-error-150);
+}
+
+.dedupe-merge__rich-text .html-diff a {
+	border-bottom: 1px dotted;
+	text-decoration: none;
+}
+
+.dedupe-merge__rich-text .html-diff h1 {
+	padding: 14px 0 11px;
+	line-height: 30px;
+	font-weight: 600;
+	font-size: 28px;
+	font-family: var(--font-body);
+}
+
+.dedupe-merge__rich-text .html-diff h2 {
+	padding: 14px 0 10px;
+	line-height: 28px;
+	font-weight: 600;
+	font-size: 25px;
+	font-family: var(--font-body);
+}
+
+.dedupe-merge__rich-text .html-diff h3 {
+	padding: 12px 0 9px;
+	line-height: 28px;
+	font-weight: 600;
+	font-size: 22px;
+	font-family: var(--font-body);
+}
+
+.dedupe-merge__rich-text .html-diff h4 {
+	padding: 8px 0 7px;
+	line-height: 30px;
+	font-weight: 600;
+	font-size: 21px;
+	font-family: var(--font-body);
+}
+
+.dedupe-merge__rich-text .html-diff h5 {
+	padding: 6px 0;
+	line-height: 28px;
+	font-weight: 600;
+	font-size: 18px;
+	font-family: var(--font-body);
+}
+
+.dedupe-merge__rich-text .html-diff h6 {
+	padding: 11px 0 5px;
+	line-height: 10px;
+	font-weight: 600;
+	font-size: 15px;
+	font-family: var(--font-body);
+}
+
+.dedupe-merge__rich-text .html-diff p {
+	padding: 8px 0;
+}
+
+.dedupe-merge__rich-text .html-diff p:first-child {
+	padding: 0 0 8px;
+}
+
+.dedupe-merge__rich-text .html-diff ul,
+.dedupe-merge__rich-text .html-diff ol {
+	padding-top: 8px;
+	padding-bottom: 8px;
+}
+
+.dedupe-merge__rich-text .html-diff ul.list-check {
+	padding-left: 0;
+}
+
+.dedupe-merge__rich-text .checkboxItem {
+	list-style-type: none;
+}
+
+.dedupe-merge__rich-text .checkboxItem__wrapper {
+	display: flex;
+	align-items: center;
+}
+
+.dedupe-merge__rich-text .checkboxItem__icon {
+	width: 16px;
+	height: 16px;
+	margin-right: 8px;
+	border: 1px solid var(--theme-text);
+	border-radius: 3px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	pointer-events: none;
+}
+
+.dedupe-merge__rich-text .checkboxItem__icon .icon--check {
+	height: 11px;
+}
+
+.dedupe-merge__rich-text .checkboxItem__icon[data-match-type="create"] {
+	border-color: var(--diff-create-pill-color);
+}
+
+.dedupe-merge__rich-text .checkboxItem__icon[data-match-type="delete"] {
+	border-color: var(--diff-delete-pill-color);
+}
+
+.dedupe-merge__rich-text .checkboxItem--nested {
+	margin-left: 1.5rem;
+}
+
+.dedupe-merge__rich-text .lexical-relationship-diff {
+	font-size: 13px;
+	line-height: 20px;
+	font-weight: 400;
+	box-shadow: 0 2px 2px -1px #0000001a;
+	min-width: calc(var(--base) * 8);
+	max-width: fit-content;
+	display: flex;
+	align-items: center;
+	background-color: var(--theme-input-bg);
+	border-radius: 3px;
+	border: 1px solid var(--theme-elevation-100);
+	position: relative;
+	font-family: var(--font-body);
+	margin-block: 10px;
+	max-height: calc(var(--base) * 4);
+	padding: 12px;
+}
+
+.dedupe-merge__rich-text .lexical-relationship-diff[data-match-type="create"] {
+	border-color: var(--diff-create-pill-border);
+	color: var(--diff-create-parent-color);
+}
+
+.dedupe-merge__rich-text
+	.lexical-relationship-diff[data-match-type="create"]
+	.lexical-relationship-diff__collectionLabel {
+	color: var(--diff-create-link-color);
+}
+
+.dedupe-merge__rich-text
+	.lexical-relationship-diff[data-match-type="create"]
+	.lexical-relationship-diff__title
+	* {
+	color: var(--diff-create-parent-color);
+}
+
+.dedupe-merge__rich-text .lexical-relationship-diff[data-match-type="delete"] {
+	border-color: var(--diff-delete-pill-border);
+	color: var(--diff-delete-parent-color);
+	text-decoration-line: none;
+	background-color: var(--diff-delete-pill-bg);
+}
+
+.dedupe-merge__rich-text
+	.lexical-relationship-diff[data-match-type="delete"]
+	.lexical-relationship-diff__collectionLabel {
+	color: var(--diff-delete-link-color);
+}
+
+.dedupe-merge__rich-text .lexical-relationship-diff[data-match-type="delete"] * {
+	text-decoration-line: none;
+	color: var(--diff-delete-parent-color);
+}
+
+.dedupe-merge__rich-text .lexical-relationship-diff__card {
+	width: 100%;
+	flex-grow: 1;
+	display: flex;
+	align-items: flex-start;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.dedupe-merge__rich-text .lexical-relationship-diff__title {
+	display: flex;
+	flex-direction: row;
+	font-weight: 600;
+}
+
+.dedupe-merge__rich-text .lexical-relationship-diff__collectionLabel {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.dedupe-merge__rich-text .lexical-unknown-diff {
+	font-size: 13px;
+	line-height: 20px;
+	font-weight: 400;
+	box-shadow: 0 2px 2px -1px #0000001a;
+	max-width: fit-content;
+	display: flex;
+	align-items: center;
+	background: var(--theme-input-bg);
+	border-radius: 3px;
+	border: 1px solid var(--theme-elevation-100);
+	position: relative;
+	font-family: var(--font-body);
+	margin-block: 10px;
+	max-height: calc(var(--base) * 4);
+	padding: 5px;
+}
+
+.dedupe-merge__rich-text .lexical-unknown-diff__specifier {
+	font-family:
+		SF Mono,
+		Menlo,
+		Consolas,
+		Monaco,
+		monospace;
+}
+
+.dedupe-merge__rich-text .lexical-unknown-diff[data-match-type="create"] {
+	border-color: var(--diff-create-pill-border);
+	color: var(--diff-create-parent-color);
+}
+
+.dedupe-merge__rich-text .lexical-unknown-diff[data-match-type="delete"] {
+	border-color: var(--diff-delete-pill-border);
+	color: var(--diff-delete-parent-color);
+	text-decoration-line: none;
+	background-color: var(--diff-delete-pill-bg);
+}
+
+.dedupe-merge__rich-text .lexical-unknown-diff[data-match-type="delete"] * {
+	text-decoration-line: none;
+	color: var(--diff-delete-parent-color);
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff {
+	font-size: 13px;
+	line-height: 20px;
+	font-weight: 400;
+	box-shadow: 0 2px 2px -1px #0000001a;
+	min-width: calc(var(--base) * 10);
+	max-width: fit-content;
+	display: flex;
+	align-items: center;
+	background-color: var(--theme-input-bg);
+	border-radius: 3px;
+	border: 1px solid var(--theme-elevation-100);
+	position: relative;
+	font-family: var(--font-body);
+	margin-block: 10px;
+	max-height: calc(var(--base) * 3);
+	padding: 12px;
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="create"] {
+	border-color: var(--diff-create-pill-border);
+	color: var(--diff-create-parent-color);
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="create"] * {
+	color: var(--diff-create-parent-color);
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="create"] .lexical-upload-diff__meta,
+.dedupe-merge__rich-text
+	.lexical-upload-diff[data-match-type="create"]
+	.lexical-upload-diff__meta
+	* {
+	color: var(--diff-create-link-color);
+}
+
+.dedupe-merge__rich-text
+	.lexical-upload-diff[data-match-type="create"]
+	.lexical-upload-diff__thumbnail {
+	border-radius: 0;
+	border-color: var(--diff-create-pill-border);
+	background-color: none;
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="delete"] {
+	border-color: var(--diff-delete-pill-border);
+	text-decoration-line: none;
+	color: var(--diff-delete-parent-color);
+	background-color: var(--diff-delete-pill-bg);
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="delete"] .lexical-upload-diff__meta,
+.dedupe-merge__rich-text
+	.lexical-upload-diff[data-match-type="delete"]
+	.lexical-upload-diff__meta
+	* {
+	color: var(--diff-delete-link-color);
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="delete"] * {
+	text-decoration-line: none;
+	color: var(--diff-delete-parent-color);
+}
+
+.dedupe-merge__rich-text
+	.lexical-upload-diff[data-match-type="delete"]
+	.lexical-upload-diff__thumbnail {
+	border-radius: 0;
+	border-color: var(--diff-delete-pill-border);
+	background-color: none;
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff__card {
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	width: 100%;
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff__thumbnail {
+	width: calc(var(--base) * 3 - 24px);
+	height: calc(var(--base) * 3 - 24px);
+	position: relative;
+	overflow: hidden;
+	flex-shrink: 0;
+	border-radius: 0;
+	border: 1px solid var(--theme-elevation-100);
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff__thumbnail img,
+.dedupe-merge__rich-text .lexical-upload-diff__thumbnail svg {
+	position: absolute;
+	object-fit: cover;
+	width: 100%;
+	height: 100%;
+	border-radius: 0;
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff__info {
+	flex-grow: 1;
+	display: flex;
+	align-items: flex-start;
+	flex-direction: column;
+	padding: calc(var(--base) * 0.25) calc(var(--base) * 0.75);
+	justify-content: space-between;
+	font-weight: 400;
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff__info strong {
+	font-weight: 600;
+}
+
+.dedupe-merge__rich-text .lexical-upload-diff__meta {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* biome-ignore-end lint/style/noDescendingSpecificity: Payload's rules, in Payload's order */

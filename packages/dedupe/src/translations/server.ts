@@ -1,5 +1,3 @@
-import type { LabelFunction } from 'payload'
-
 import type { TranslationKey } from './keys'
 
 /** A `t`-like function narrowed to this plugin's typed keys. */
@@ -11,9 +9,3 @@ type Translate = (key: TranslationKey) => string
  * cast only widens the compile-time key domain.
  */
 export const asTranslate = (t: unknown): Translate => t as Translate
-
-/** A field `label`/`description` backed by a typed key, resolved per request. */
-export const labelForKey =
-	(key: TranslationKey): LabelFunction =>
-	({ t }) =>
-		asTranslate(t)(key)

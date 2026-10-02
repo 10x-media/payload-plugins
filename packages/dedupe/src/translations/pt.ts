@@ -1,0 +1,112 @@
+import { keys, type TranslationKey } from './keys'
+
+export const pt: Record<TranslationKey, string> = {
+	[keys.pluginName]: 'Duplicados',
+	[keys.queueTitle]: 'Duplicados',
+	[keys.collection]: 'Coleção',
+	[keys.status]: 'Status',
+	[keys.statusOpen]: 'Abertos',
+	[keys.statusDismissed]: 'Não são duplicados',
+	[keys.statusMerged]: 'Mesclados',
+	[keys.statusSuperseded]: 'Substituídos',
+	[keys.statusStale]: 'Desatualizados',
+	[keys.noPairs]: 'Nada para revisar.',
+	[keys.noCollections]: 'Nenhuma coleção está configurada para busca de duplicados.',
+	[keys.dismiss]: 'Não são duplicados',
+	[keys.reopen]: 'Reabrir',
+	[keys.merge]: 'Mesclar',
+	[keys.mergeInto]: 'Mesclar em {{title}}',
+	[keys.runScan]: 'Verificar agora',
+	[keys.scanQueued]: 'Verificação enfileirada.',
+	[keys.scanDone]: 'Verificação concluída: {{pairs}} pares abertos de {{compared}} comparações.',
+	[keys.needsChoice]: 'Precisa de uma escolha',
+	[keys.applied]: 'Mesclado no documento principal.',
+	[keys.empty]: 'vazio',
+	[keys.backToQueue]: 'Voltar aos duplicados',
+	[keys.selectTwo]: 'Selecione de 2 a {{max}} documentos para mesclar.',
+	[keys.mergeSelected]: 'Mesclar selecionados',
+	[keys.noTransactions]:
+		'Este banco de dados não abre transações. Se a mesclagem falhar no meio, os passos já feitos ficam: marcadores nos documentos mesclados, referências movidas, alguns idiomas do principal. O registro fica como falho e lista o que foi movido.',
+	[keys.transactionsRequired]:
+		'Mesclar está desativado: este banco de dados não abre transações e o plugin exige uma.',
+	[keys.takenFrom]: 'Obtido de {{title}}',
+	[keys.error]: 'Algo deu errado.',
+	[keys.missingParams]:
+		'A tela de mesclagem precisa de uma coleção e de dois identificadores de documento.',
+	[keys.confirmHeading]: 'Aplicar esta mesclagem?',
+	[keys.confirmBody]:
+		'{{absorbed}} será mesclado em {{survivor}} e sairá da coleção. A mesclagem fica registrada com uma cópia de cada documento.',
+	[keys.primary]: 'Principal · mantém o ID',
+	[keys.makePrimary]: 'Tornar principal',
+	[keys.created]: 'Criado',
+	[keys.updated]: 'Atualizado',
+	[keys.linkedFrom]: 'Vinculado de',
+	[keys.linkedFromTitle]: 'Documentos que apontam para {{title}}',
+	[keys.onlyDifferences]: 'Somente diferenças',
+	[keys.showDiff]: 'Destacar diferenças',
+	[keys.referencesMove]: '{{count}} referências passam para {{title}}',
+	[keys.mergeCount]: 'Mesclar {{count}} documentos',
+	[keys.releaseMarked]:
+		'{{title}} vai para a lixeira com um marcador em {{fields}}, porque {{survivor}} fica com esses valores e só um documento pode tê-los. O registro da mesclagem guarda os originais.',
+	[keys.releaseEmptied]:
+		'{{title}} vai para a lixeira com {{fields}} vazio, porque {{survivor}} fica com esses valores e só um documento pode tê-los. O registro da mesclagem guarda os originais.',
+	[keys.pointersCleared]:
+		'Os vínculos a documentos desta mesclagem são retirados de {{fields}}: após a mesclagem apontariam para um documento excluído ou para o próprio {{survivor}}.',
+	[keys.survivorDraft]:
+		'{{title}} tem alterações não publicadas que a mesclagem publicaria. Publique ou descarte-as primeiro.',
+	[keys.mayNotApply]: 'Suas permissões não permitem aplicar esta mesclagem.',
+	[keys.releaseDeletes]:
+		'{{title}} será excluído em vez de ir para a lixeira, porque {{survivor}} fica com seu {{fields}} e só um documento pode ter esses valores. O registro da mesclagem guarda uma cópia completa.',
+	[keys.openDrawer]: 'Inspecionar',
+	[keys.signals]: 'Por que combinam',
+	[keys.takeAll]: 'Manter todos os valores',
+	[keys.possibleDuplicates]: 'Possíveis duplicados',
+	[keys.confirmCreateHeading]: 'Isto pode já existir',
+	[keys.confirmCreateBody]: 'Documentos salvos se parecem com o que você está criando:',
+	[keys.createAnyway]: 'Criar mesmo assim',
+	[keys.relatedDocuments]: 'Documentos relacionados',
+	[keys.movesTo]: '{{count}} passarão para {{title}}',
+	[keys.moreDocs]: '+{{count}} mais',
+	[keys.referenceConflict]: 'Um por {{fields}}: estes dois colidiriam',
+	[keys.pendingDraft]: 'Tem alterações não publicadas. Publique ou descarte-as primeiro.',
+	[keys.tooManyReferences]:
+		'{{count}} documentos apontam para um mesclado, mais do que uma mesclagem move.',
+	[keys.blocksMerge]: '{{count}} bloqueiam a mesclagem',
+	[keys.historyTitle]: 'Histórico de mesclagens',
+	[keys.noMerges]: 'Nenhuma mesclagem ainda.',
+	[keys.mergedInto]: 'Mesclado em {{title}}',
+	[keys.mergedIn]: 'Mesclados',
+	[keys.mergeApplying]: 'Em andamento',
+	[keys.mergeApplied]: 'Aplicada',
+	[keys.mergeFailed]: 'Falhou',
+	[keys.similarity]: 'Semelhança',
+	[keys.whySame]: 'Igual: {{fields}}',
+	[keys.whySimilar]: 'Semelhante: {{fields}}',
+	[keys.whyDiffer]: 'Diferente: {{fields}}',
+	[keys.whyVeto]: 'Descartado por {{fields}}',
+	[keys.markedBy]: 'Marcado por',
+	[keys.aboutOpen]:
+		'Documentos parecidos, uma linha por grupo, aguardando revisão. Abra uma para mesclá-la ou marcá-la como não duplicados.',
+	[keys.aboutDismissed]:
+		'Documentos marcados como não duplicados, uma linha por grupo. Varreduras posteriores os mantêm aqui; abra uma para reabri-la.',
+	[keys.aboutMerged]:
+		'Documentos mesclados em um só, uma linha por mesclagem. Abra uma para ver a mesclagem.',
+	[keys.aboutSuperseded]:
+		'Semelhanças que não se aplicam mais: um documento foi mesclado em outro ou removido.',
+	[keys.aboutStale]:
+		'Documentos que deixaram de ser parecidos após uma edição ou mudança de regras.',
+	[keys.markedNotDuplicates]: 'Marcados como não duplicados.',
+	[keys.dismissedNote]: 'Marcados como não duplicados por {{user}} em {{date}}.',
+	[keys.markedApart]:
+		'{{a}} e {{b}} foram marcados como não duplicados por {{user}} em {{date}}. Mesclá-los desfaz essa marcação.',
+	[keys.removeFromMerge]: 'Remover desta mesclagem',
+	[keys.removeHeading]: 'Remover {{title}} desta mesclagem?',
+	[keys.removeBody]:
+		'O documento em si não muda. Os valores escolhidos dele nesta tela são descartados.',
+	[keys.andMore]: '{{title}} e mais {{count}}',
+	[keys.pointsAt]: 'Aponta para',
+	[keys.pointedAt]: 'Apontava para',
+	[keys.mergingInto]: 'Mesclando em {{title}}',
+	[keys.mergeFailedInto]: 'A mesclagem em {{title}} falhou',
+	[keys.primaryRole]: 'Principal',
+}

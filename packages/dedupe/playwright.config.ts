@@ -24,7 +24,14 @@ export default defineConfig({
 		trace: 'on-first-retry',
 		actionTimeout: 15_000,
 	},
-	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+	projects: [
+		{
+			name: 'chromium',
+			// The viewport goes after the device preset, which carries one of its own: at the
+			// preset's 1280px the admin content sits on top of the nav and swallows its clicks.
+			use: { ...devices['Desktop Chrome'], viewport: { width: 1600, height: 900 } },
+		},
+	],
 	webServer: {
 		command: 'pnpm --filter @10x-media/dedupe-dev start',
 		cwd: path.resolve(dirname, '..', '..'),
