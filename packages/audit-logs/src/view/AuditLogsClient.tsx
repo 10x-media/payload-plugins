@@ -27,6 +27,8 @@ export function AuditLogsClient({
 	filters,
 	globalOptions,
 	tenantGlobalOptions,
+	collectionLabels,
+	globalLabels,
 	refLabels,
 	titleFields,
 	lockedTenantId,
@@ -120,10 +122,18 @@ export function AuditLogsClient({
 
 	return (
 		<div className="al-view">
-			<div className="al-view__header">
-				<h1 className="al-view__title">{t(keys.title)}</h1>
-				<span className="al-view__count">{t(keys.entries, { count: totalDocs })}</span>
-			</div>
+			{/* Payload's list header markup: its exported ListHeader is the collection one,
+			    which needs a collection config this view does not have. */}
+			<header className="list-header al-view__header">
+				<div className="list-header__content">
+					<div className="list-header__title-and-actions">
+						<h1 className="list-header__title">{t(keys.title)}</h1>
+						<div className="list-header__title-actions al-view__count">
+							{t(keys.entries, { count: totalDocs })}
+						</div>
+					</div>
+				</div>
+			</header>
 
 			{debugMode && (
 				<div className="al-debug-bar">
@@ -176,7 +186,9 @@ export function AuditLogsClient({
 					docs.map((doc) => (
 						<LogRow
 							adminRoute={adminRoute}
+							collectionLabels={collectionLabels}
 							doc={doc as unknown as AuditLogDoc}
+							globalLabels={globalLabels}
 							key={String(doc.id)}
 							eventTypeLabels={eventTypeLabels}
 							payloadAPILabels={payloadAPILabels}

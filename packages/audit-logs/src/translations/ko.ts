@@ -105,6 +105,8 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.diffPath]: '경로',
 	[keys.diffBefore]: '이전',
 	[keys.diffAfter]: '이후',
+	[keys.diffValue]: '값',
+	[keys.rawJson]: '원본 JSON',
 
 	// Auth events
 	[keys.authEventLogin]: '로그인',

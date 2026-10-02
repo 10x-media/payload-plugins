@@ -93,6 +93,8 @@ export const keys = {
 	diffPath: 'auditLogs:diffPath',
 	diffBefore: 'auditLogs:diffBefore',
 	diffAfter: 'auditLogs:diffAfter',
+	diffValue: 'auditLogs:diffValue',
+	rawJson: 'auditLogs:rawJson',
 
 	authEventLogin: 'auditLogs:authEventLogin',
 	authEventForgotPassword: 'auditLogs:authEventForgotPassword',

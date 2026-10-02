@@ -105,6 +105,8 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.diffPath]: '路径',
 	[keys.diffBefore]: '变更前',
 	[keys.diffAfter]: '变更后',
+	[keys.diffValue]: '值',
+	[keys.rawJson]: '原始 JSON',
 
 	// Auth events
 	[keys.authEventLogin]: '登录',

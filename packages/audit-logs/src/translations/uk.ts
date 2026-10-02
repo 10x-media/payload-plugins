@@ -110,6 +110,8 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.diffPath]: 'Шлях',
 	[keys.diffBefore]: 'До',
 	[keys.diffAfter]: 'Після',
+	[keys.diffValue]: 'Значення',
+	[keys.rawJson]: 'Сирий JSON',
 
 	// Auth events
 	[keys.authEventLogin]: 'Вхід',

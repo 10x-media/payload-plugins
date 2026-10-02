@@ -105,6 +105,8 @@ export const id: Record<TranslationKey, string> = {
 	[keys.diffPath]: 'Jalur',
 	[keys.diffBefore]: 'Sebelum',
 	[keys.diffAfter]: 'Sesudah',
+	[keys.diffValue]: 'Nilai',
+	[keys.rawJson]: 'JSON mentah',
 
 	// Auth events
 	[keys.authEventLogin]: 'Masuk',

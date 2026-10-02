@@ -130,6 +130,13 @@ export async function AuditLogsView({
 		.filter((c) => isSingleton(c.slug))
 		.map(toOption)
 		.sort(byLabel)
+	// What a row calls its collection or global. Singular, since a row is one document.
+	const collectionLabels = Object.fromEntries(
+		collectionConfigs.map((c) => [c.slug, labelOf(c.labels?.singular, req.i18n) ?? c.slug])
+	)
+	const globalLabels = Object.fromEntries(
+		globalConfigs.map((g) => [g.slug, labelOf(g.label, req.i18n) ?? g.slug])
+	)
 	const globalOptions = (useTenant ? [] : globalConfigs)
 		.filter((g) => !PAYLOAD_INTERNAL_GLOBALS.includes(g.slug))
 		.map((g) => ({ label: labelOf(g.label, req.i18n) ?? g.slug, value: g.slug }))
@@ -263,6 +270,8 @@ export async function AuditLogsView({
 					filters={filters}
 					globalOptions={globalOptions}
 					tenantGlobalOptions={tenantGlobalOptions}
+					collectionLabels={collectionLabels}
+					globalLabels={globalLabels}
 					refLabels={refLabels}
 					titleFields={Object.fromEntries(
 						collectionConfigs.map((c) => [c.slug, titleFieldOf(c.slug)])

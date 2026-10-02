@@ -110,6 +110,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.diffPath]: 'Path',
 	[keys.diffBefore]: 'Before',
 	[keys.diffAfter]: 'After',
+	[keys.diffValue]: 'Value',
+	[keys.rawJson]: 'Raw JSON',
 
 	// Auth events
 	[keys.authEventLogin]: 'Login',

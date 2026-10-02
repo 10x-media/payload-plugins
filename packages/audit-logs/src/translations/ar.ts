@@ -105,6 +105,8 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.diffPath]: 'المسار',
 	[keys.diffBefore]: 'قبل',
 	[keys.diffAfter]: 'بعد',
+	[keys.diffValue]: 'القيمة',
+	[keys.rawJson]: 'JSON الخام',
 
 	// Auth events
 	[keys.authEventLogin]: 'تسجيل الدخول',

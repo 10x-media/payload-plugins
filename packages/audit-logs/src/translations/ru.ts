@@ -105,6 +105,8 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.diffPath]: 'Путь',
 	[keys.diffBefore]: 'До',
 	[keys.diffAfter]: 'После',
+	[keys.diffValue]: 'Значение',
+	[keys.rawJson]: 'Сырой JSON',
 
 	// Auth events
 	[keys.authEventLogin]: 'Вход',
