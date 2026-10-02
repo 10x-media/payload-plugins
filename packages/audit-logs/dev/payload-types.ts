@@ -201,6 +201,19 @@ export interface Post {
    * Redacted in the log.
    */
   apiKey?: string | null;
+  layoutWidth?: ('narrow' | 'wide') | null;
+  showToc?: boolean | null;
+  distribution?: {
+    channel?: ('web' | 'newsletter' | 'social') | null;
+    social?: {
+      headline?: string | null;
+      image?: {
+        alt?: string | null;
+        credit?: string | null;
+      };
+    };
+    publishAt?: string | null;
+  };
   createdBy?:
     | ({
         relationTo: 'users';
@@ -772,6 +785,25 @@ export interface PostsSelect<T extends boolean = true> {
       };
   internalNotes?: T;
   apiKey?: T;
+  layoutWidth?: T;
+  showToc?: T;
+  distribution?:
+    | T
+    | {
+        channel?: T;
+        social?:
+          | T
+          | {
+              headline?: T;
+              image?:
+                | T
+                | {
+                    alt?: T;
+                    credit?: T;
+                  };
+            };
+        publishAt?: T;
+      };
   createdBy?: T;
   lastModifiedBy?: T;
   updatedAt?: T;

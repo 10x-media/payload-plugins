@@ -14,6 +14,7 @@ import { authRedirectUrl } from './authRedirect'
 import { filterConditions, parseFilters, splitRef } from './filterQuery'
 import { PAYLOAD_INTERNAL_COLLECTIONS, PAYLOAD_INTERNAL_GLOBALS } from './internalEntities'
 import type { RenderedEvents, SelectOption } from './types'
+import { labelOf } from './utils'
 
 export async function AuditLogsView({
 	initPageResult,
@@ -247,19 +248,6 @@ export async function AuditLogsView({
 			</Gutter>
 		</DefaultTemplate>
 	)
-}
-
-type Label = Record<string, string> | string | ((args: { i18n: unknown; t: unknown }) => string)
-
-/** A collection or global label as configured: plain, per language, or a function. */
-const labelOf = (label: unknown, i18n: { language: string; t: unknown }): string | undefined => {
-	const value = label as Label | undefined
-	if (typeof value === 'string') return value
-	if (typeof value === 'function') return value({ i18n, t: i18n.t })
-	if (value && typeof value === 'object') {
-		return value[i18n.language] ?? value.en ?? Object.values(value)[0]
-	}
-	return undefined
 }
 
 /**

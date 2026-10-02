@@ -99,13 +99,18 @@ export function RefPicker({
 
 type ValuesProps = {
 	label: string
+	/** Suggestions, optionally grouped; anything else can still be typed in. */
+	options?: SelectOption[] | { label: string; options: SelectOption[] }[]
 	onChange: (values: string[] | undefined) => void
 	placeholder: string
 	values: string[]
 }
 
 /** Free values as pills inside the input, the way a `hasMany` text field takes them. */
-export function ValuesInput({ label, onChange, placeholder, values }: ValuesProps) {
+export function ValuesInput({ label, onChange, options = [], placeholder, values }: ValuesProps) {
+	const flat = (options as (SelectOption | { options: SelectOption[] })[]).flatMap((o) =>
+		'options' in o ? o.options : [o]
+	)
 	return (
 		<div className="al-ref-picker">
 			<div className="al-filterpopover__editor-label">{label}</div>
@@ -120,9 +125,9 @@ export function ValuesInput({ label, onChange, placeholder, values }: ValuesProp
 					)
 					onChange(next.length ? next : undefined)
 				}}
-				options={[]}
+				options={options}
 				placeholder={placeholder}
-				value={values.map((v) => ({ label: v, value: v }))}
+				value={values.map((v) => flat.find((o) => o.value === v) ?? { label: v, value: v })}
 			/>
 		</div>
 	)

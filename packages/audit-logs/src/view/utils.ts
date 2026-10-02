@@ -2,6 +2,22 @@ import type { Filters } from './types'
 
 export const GLOBAL_SENTINEL = '__global__'
 
+type Label = Record<string, string> | string | ((args: { i18n: unknown; t: unknown }) => string)
+
+/** A configured label as text: plain, per language, or a function. `false` and unset give nothing. */
+export const labelOf = (
+	label: unknown,
+	i18n: { language: string; t: unknown }
+): string | undefined => {
+	const value = label as Label | undefined
+	if (typeof value === 'string') return value
+	if (typeof value === 'function') return value({ i18n, t: i18n.t })
+	if (value && typeof value === 'object') {
+		return value[i18n.language] ?? value.en ?? Object.values(value)[0]
+	}
+	return undefined
+}
+
 /** Date presets the Date filter offers; each fills `dateFrom` relative to now. */
 export const DATE_RANGES = ['24h', '7d', '30d'] as const
 export type DateRange = (typeof DATE_RANGES)[number]

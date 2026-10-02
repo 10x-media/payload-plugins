@@ -99,6 +99,12 @@
 	background: none;
 }
 
+/* A select keeps the 40px of a plain input once it holds pills; with height auto
+   the multi-value padding would otherwise shrink it. */
+.al-filterbar__panel .react-select .rs__control {
+	min-height: 40px;
+}
+
 /* Fields side by side, wrapping to one column when the view is narrow. */
 .al-panel-grid {
 	display: grid;

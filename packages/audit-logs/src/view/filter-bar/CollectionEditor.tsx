@@ -27,12 +27,7 @@ export function CollectionEditor({ collectionOptions, globalOptions, setStaged, 
 						const values = (Array.isArray(selected) ? selected : selected ? [selected] : []).map(
 							(o) => String(o.value)
 						)
-						setStaged((f): Filters => {
-							const next: Filters = { ...f, [name]: values.length ? values : undefined }
-							// The view reads a global's slug from documentId, so the two cannot coexist.
-							if (name === 'globals' && values.length) delete next.documents
-							return next
-						})
+						setStaged((f): Filters => ({ ...f, [name]: values.length ? values : undefined }))
 					}}
 					options={options}
 					value={options.filter((o) => current.includes(o.value))}

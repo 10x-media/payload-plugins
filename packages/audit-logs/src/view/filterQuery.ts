@@ -25,16 +25,14 @@ export const splitRef = (ref: string): { id: string; slug?: string } => {
 
 /** The URL as `Filters`. Every list filter repeats its key, one value each. */
 export const parseFilters = (sp: Params, { useTenant = false } = {}): Filters => {
-	const globals = all(sp.global)
 	return {
 		changedPaths: listOrUndefined(all(sp.changedPath)),
 		collections: listOrUndefined(all(sp.collection)),
 		dateFrom: one(sp.dateFrom),
 		dateTo: one(sp.dateTo),
-		// A global's slug is stored as its documentId, so a globals filter owns that column.
-		documents: globals.length ? undefined : listOrUndefined(all(sp.documentId)),
+		documents: listOrUndefined(all(sp.documentId)),
 		eventTypes: listOrUndefined(all(sp.eventType)),
-		globals: listOrUndefined(globals),
+		globals: listOrUndefined(all(sp.global)),
 		groups: listOrUndefined(all(sp.group)),
 		operations: listOrUndefined(all(sp.operation)),
 		tenants: useTenant ? undefined : listOrUndefined(all(sp.tenant)),
@@ -42,8 +40,29 @@ export const parseFilters = (sp: Params, { useTenant = false } = {}): Filters =>
 	}
 }
 
+const hasSlug = (ref: { id: string; slug?: string }): ref is { id: string; slug: string } =>
+	Boolean(ref.slug)
+
 const inOrEquals = (path: string, values: string[]): Where =>
 	values.length === 1 ? { [path]: { equals: values[0] } } : { [path]: { in: values } }
+
+const allOf = (parts: Where[]): Where => (parts.length === 1 ? (parts[0] as Where) : { and: parts })
+
+/** A picked document matches in its own collection; a typed id matches in any. */
+const documentCondition = (documents: string[]): Where => {
+	const refs = documents.map(splitRef)
+	const bare = refs.filter((r) => !r.slug).map((r) => r.id)
+	return (
+		anyOf([
+			...refs.filter(hasSlug).map(
+				(r): Where => ({
+					and: [{ relationTo: { equals: r.slug } }, { documentId: { equals: r.id } }],
+				})
+			),
+			...(bare.length ? [inOrEquals('documentId', bare)] : []),
+		]) ?? {}
+	)
+}
 
 const anyOf = (parts: Where[]): Where | undefined => {
 	if (parts.length === 0) return undefined
@@ -67,21 +86,28 @@ export const filterConditions = (filters: Filters, ctx: WhereContext): Where[] =
 		if (where) conditions.push(where)
 	}
 
-	push(
-		anyOf([
-			...(filters.collections?.length ? [inOrEquals('relationTo', filters.collections)] : []),
-			...(filters.globals?.length
-				? [
-						{
-							and: [
-								{ relationTo: { equals: GLOBAL_SENTINEL } },
-								inOrEquals('documentId', filters.globals),
-							],
-						},
-					]
-				: []),
-		])
-	)
+	// Where the entries come from. A global's slug is stored as its documentId, so
+	// a document filter narrows the collection side only: "these documents, or these
+	// globals", never a document id that would also have to be a global slug.
+	const collectionSide = [
+		...(filters.collections?.length ? [inOrEquals('relationTo', filters.collections)] : []),
+		...(filters.documents?.length ? [documentCondition(filters.documents)] : []),
+	]
+	if (filters.globals?.length) {
+		push(
+			anyOf([
+				...(collectionSide.length ? [allOf(collectionSide)] : []),
+				{
+					and: [
+						{ relationTo: { equals: GLOBAL_SENTINEL } },
+						inOrEquals('documentId', filters.globals),
+					],
+				},
+			])
+		)
+	} else {
+		for (const condition of collectionSide) push(condition)
+	}
 
 	// "Any of the picked events": an operation picked whole, or a single event type.
 	push(
@@ -91,32 +117,17 @@ export const filterConditions = (filters: Filters, ctx: WhereContext): Where[] =
 		])
 	)
 
-	if (filters.documents?.length) {
-		const refs = filters.documents.map(splitRef)
-		const bare = refs.filter((r) => !r.slug).map((r) => r.id)
-		push(
-			anyOf([
-				...refs
-					.filter((r) => r.slug)
-					.map((r) => ({
-						and: [{ relationTo: { equals: r.slug } }, { documentId: { equals: r.id } }],
-					})),
-				...(bare.length ? [inOrEquals('documentId', bare)] : []),
-			])
-		)
-	}
-
 	if (filters.users?.length) {
 		const refs = filters.users.map(splitRef)
 		if (ctx.userCollections.length > 1) {
 			const bare = refs.filter((r) => !r.slug).map((r) => r.id)
 			push(
 				anyOf([
-					...refs
-						.filter((r) => r.slug)
-						.map((r) => ({
+					...refs.filter(hasSlug).map(
+						(r): Where => ({
 							and: [{ 'user.relationTo': { equals: r.slug } }, { 'user.value': { equals: r.id } }],
-						})),
+						})
+					),
 					...(bare.length ? [inOrEquals('user.value', bare)] : []),
 				])
 			)

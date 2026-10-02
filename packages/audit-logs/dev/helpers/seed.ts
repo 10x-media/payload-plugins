@@ -92,6 +92,20 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		req,
 	})
 
+	// update: fields nested in a named tab and two groups, so the paths run four
+	// segments deep (`distribution.social.image.alt`) next to a two-segment one.
+	await payload.update({
+		collection: 'posts',
+		id: post.id,
+		data: {
+			distribution: {
+				channel: 'social',
+				social: { headline: 'Read the playground', image: { alt: 'Screenshot of the log' } },
+			},
+		},
+		req,
+	})
+
 	// update: array rows swapped, which produces a `sections.__order__` entry
 	// rather than a diff of every field in every row.
 	const seeded = await payload.findByID({ collection: 'posts', id: post.id })

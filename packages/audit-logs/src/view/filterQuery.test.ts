@@ -22,8 +22,8 @@ describe('parseFilters', () => {
 		})
 	})
 
-	it('lets a globals filter own documentId', () => {
-		expect(parseFilters({ documentId: '1', global: 'site-settings' }).documents).toBeUndefined()
+	it('keeps documents alongside globals', () => {
+		expect(parseFilters({ documentId: '1', global: 'site-settings' }).documents).toEqual(['1'])
 	})
 
 	it('drops the tenant filter in the tenant view', () => {
@@ -64,6 +64,32 @@ describe('filterConditions', () => {
 		expect(filterConditions({ dateFrom: '2026-09-01', dateTo: '2026-09-30' }, ctx)).toEqual([
 			{ createdAt: { greater_than_equal: '2026-09-01' } },
 			{ createdAt: { less_than_equal: '2026-09-30' } },
+		])
+	})
+
+	it('narrows the collection side with documents and keeps globals beside it', () => {
+		expect(
+			filterConditions(
+				{ collections: ['posts'], documents: ['posts:42'], globals: ['site-settings'] },
+				ctx
+			)
+		).toEqual([
+			{
+				or: [
+					{
+						and: [
+							{ relationTo: { equals: 'posts' } },
+							{ and: [{ relationTo: { equals: 'posts' } }, { documentId: { equals: '42' } }] },
+						],
+					},
+					{
+						and: [
+							{ relationTo: { equals: '__global__' } },
+							{ documentId: { equals: 'site-settings' } },
+						],
+					},
+				],
+			},
 		])
 	})
 

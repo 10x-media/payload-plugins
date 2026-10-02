@@ -10,6 +10,10 @@ import type { CollectionConfig } from 'payload'
  * - `seo` is a group, so paths arrive dot-notated (`seo.title`)
  * - `internalNotes` is excluded per collection, so edits to it never reach the log
  * - `apiKey` is anonymized, so its path is recorded but its value is redacted
+ * - the tabs nest paths the way a real schema does: the unnamed tab and its row add
+ *   nothing (`layoutWidth`), the named tab and the groups inside it add a segment
+ *   each (`distribution.social.image.alt`), the collapsible adds none
+ *   (`distribution.publishAt`)
  */
 export const posts: CollectionConfig = {
 	slug: 'posts',
@@ -40,5 +44,49 @@ export const posts: CollectionConfig = {
 		},
 		{ name: 'internalNotes', type: 'textarea', admin: { description: 'Excluded from the log.' } },
 		{ name: 'apiKey', type: 'text', admin: { description: 'Redacted in the log.' } },
+		{
+			type: 'tabs',
+			tabs: [
+				{
+					label: 'Layout',
+					fields: [
+						{
+							type: 'row',
+							fields: [
+								{ name: 'layoutWidth', type: 'select', options: ['narrow', 'wide'] },
+								{ name: 'showToc', type: 'checkbox' },
+							],
+						},
+					],
+				},
+				{
+					name: 'distribution',
+					label: 'Distribution',
+					fields: [
+						{ name: 'channel', type: 'select', options: ['web', 'newsletter', 'social'] },
+						{
+							name: 'social',
+							type: 'group',
+							fields: [
+								{ name: 'headline', type: 'text' },
+								{
+									name: 'image',
+									type: 'group',
+									fields: [
+										{ name: 'alt', type: 'text' },
+										{ name: 'credit', type: 'text' },
+									],
+								},
+							],
+						},
+						{
+							type: 'collapsible',
+							label: 'Scheduling',
+							fields: [{ name: 'publishAt', type: 'date' }],
+						},
+					],
+				},
+			],
+		},
 	],
 }
