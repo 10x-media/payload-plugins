@@ -1,4 +1,4 @@
-import type { Config, TaskConfig } from 'payload'
+import type { Config, PayloadRequest, TaskConfig } from 'payload'
 
 import { closeStaleImpersonations } from '../session/closeStale'
 import type { ResolvedOptions } from '../types'
@@ -20,7 +20,7 @@ export const registerRetention = (config: Config, options: ResolvedOptions): voi
 	const task = {
 		slug: 'impersonationRetention',
 		schedule: [{ cron: retention.cron ?? DEFAULT_CRON, queue: retention.queue ?? DEFAULT_QUEUE }],
-		handler: async ({ req }) => {
+		handler: async ({ req }: { req: PayloadRequest }) => {
 			const closed = await closeStaleImpersonations(req.payload)
 			const cutoff = new Date(Date.now() - retention.deleteAfterDays * 86_400_000).toISOString()
 			let deleted = 0
@@ -52,7 +52,9 @@ export const registerRetention = (config: Config, options: ResolvedOptions): voi
 			}
 			return { output: { closed, deleted } }
 		},
-	} as TaskConfig
+		// Through unknown: a host app compiling this source types its tasks from its own
+		// generated TaskType, which does not know this slug unless retention is on there.
+	} as unknown as TaskConfig
 
 	config.jobs = {
 		...config.jobs,

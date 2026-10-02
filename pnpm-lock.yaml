@@ -571,6 +571,9 @@ importers:
       '@10x-media/audit-logs':
         specifier: workspace:*
         version: link:..
+      '@10x-media/impersonation':
+        specifier: workspace:*
+        version: link:../../impersonation
       '@payloadcms/db-mongodb':
         specifier: 'catalog:'
         version: 3.85.0(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(socks@2.8.10)
@@ -580,6 +583,9 @@ importers:
       '@payloadcms/next':
         specifier: 'catalog:'
         version: 3.85.0(@types/react@19.2.15)(graphql@16.14.0)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)
+      '@payloadcms/plugin-multi-tenant':
+        specifier: 'catalog:'
+        version: 3.85.0(@payloadcms/ui@3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@playwright/test@1.60.0)(babel-plugin-macros@3.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))
       '@payloadcms/ui':
         specifier: 'catalog:'
         version: 3.85.0(@types/react@19.2.15)(monaco-editor@0.55.1)(next@16.2.6(@babel/core@7.29.7)(@playwright/test@1.60.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4))(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(typescript@5.9.3)

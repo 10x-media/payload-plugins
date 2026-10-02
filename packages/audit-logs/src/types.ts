@@ -3,6 +3,7 @@ import type {
 	CollectionConfig,
 	CollectionSlug,
 	GlobalSlug,
+	PayloadComponent,
 	PayloadRequest,
 	RelationshipField,
 	Where,
@@ -195,6 +196,29 @@ export type DataRetentionConfig = {
  * Only `req` is available (no collection/id/data context).
  */
 export type ViewAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
+
+/**
+ * Props a custom event renderer receives. A server component additionally gets
+ * `payload` and `req`, so it can look up whatever the metadata points at.
+ */
+export type CustomEventComponentProps = {
+	/** The collection or global slug the event was recorded against. */
+	collection: string
+	/** ISO timestamp of the entry. */
+	createdAt: string
+	documentId?: string
+	/** The whole entry as the view read it, `user` populated. */
+	entry: Record<string, unknown>
+	eventType: string
+	metadata?: Record<string, unknown>
+}
+
+/**
+ * Renderers for the expanded body of custom events, keyed by `eventType`, with
+ * `'*'` as the fallback for every type. An explicit `false` keeps the default
+ * table and JSON block, wildcard included.
+ */
+export type CustomEventComponents = Record<string, PayloadComponent | false>
 
 // ---------- Audit Log types ----------
 
@@ -500,6 +524,9 @@ export type PayloadAPIOptionObject = { label: string; value: string }
 /** A `logs.payloadAPIs` entry. A bare string is used as both value and label. */
 export type PayloadAPIOption = PayloadAPIOptionObject | string
 
+/** A `logs.eventTypes` entry. A bare string is used as both value and label. */
+export type EventTypeOption = { label: string; value: string } | string
+
 export type MultiTenancyConfig = {
 	/**
 	 * The slug of the tenants collection. Matches `tenantsSlug` in the multi-tenant plugin.
@@ -512,6 +539,21 @@ export type MultiTenancyConfig = {
 	 * @default 'tenant'
 	 */
 	tenantFieldName?: string
+	/**
+	 * The tenant-scoped collections, in the shape `@payloadcms/plugin-multi-tenant`
+	 * takes them, so one object can be passed to both plugins. When set, only these
+	 * collections (and the tenants collection) record a tenant, and
+	 * `excludeCollections` is not consulted. A collection with `isGlobal: true` is
+	 * one document per tenant; the tenant view offers it as a global.
+	 *
+	 * Without it, any collection with a field named `tenantFieldName` records one.
+	 *
+	 * @example
+	 * const collections = { notes: {}, settings: { isGlobal: true } }
+	 * multiTenantPlugin({ collections })
+	 * auditLogs({ multiTenancy: { collections } })
+	 */
+	collections?: Partial<Record<CollectionSlug, { isGlobal?: boolean }>>
 	/**
 	 * Collections to exclude from tenant capture.
 	 * Useful when a collection has a field named after `tenantFieldName` for unrelated reasons -
@@ -608,6 +650,18 @@ export type AuditPluginConfig = {
 		 */
 		payloadAPIs?: PayloadAPIOption[]
 		/**
+		 * Custom event types (`createAuditEvent`) the view offers in its Event filter,
+		 * and the label each shows with in the filter and on the row badge. Types with a
+		 * renderer in `view.components.customEvents` are offered without being listed.
+		 * Anything else is still reachable through the filter's free text entry.
+		 *
+		 * A bare string is its own label.
+		 *
+		 * @example
+		 * eventTypes: ['order_paid', { label: 'Refund', value: 'order_refunded' }]
+		 */
+		eventTypes?: EventTypeOption[]
+		/**
 		 * Whether to collect the requester's IP address and store it on each audit log entry.
 		 * Set to `false` if you do not want IP addresses stored (e.g. for GDPR compliance).
 		 * @default true
@@ -688,6 +742,23 @@ export type AuditPluginConfig = {
 					 * forceWhere: { relationTo: { equals: 'orders' } }
 					 */
 					forceWhere?: Where
+					/**
+					 * Custom renderers for parts of an expanded entry.
+					 */
+					components?: {
+						/**
+						 * Replaces the event table and metadata JSON of custom events
+						 * (`createAuditEvent`). Keyed by `eventType`, `'*'` matches every type.
+						 *
+						 * @example
+						 * customEvents: {
+						 *   order_refunded: '/components/RefundEvent#RefundEvent',
+						 *   '*': '/components/AnyEvent#AnyEvent',
+						 *   export_downloaded: false,
+						 * }
+						 */
+						customEvents?: CustomEventComponents
+					}
 			  }
 			| false
 	}

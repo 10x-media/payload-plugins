@@ -89,6 +89,20 @@ export const buildAuditLogsCollection = (
 				index: true,
 			} as RelationshipField,
 			{
+				/**
+				 * Set when the acting user was reached through impersonation.
+				 * Copied from `req.user._impersonation` at write time.
+				 */
+				name: 'impersonator',
+				type: 'relationship',
+				relationTo: userRelationTo,
+				hasMany: false,
+				admin: {
+					position: 'sidebar',
+				},
+				index: true,
+			} as RelationshipField,
+			{
 				name: 'locale',
 				type: 'text',
 				admin: {

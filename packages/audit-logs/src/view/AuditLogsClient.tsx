@@ -1,8 +1,9 @@
 'use client'
 
-import { Pagination, PerPage, useStepNav } from '@payloadcms/ui'
+import { Button, Pagination, PerPage, Pill, useStepNav } from '@payloadcms/ui'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { formatAdminURL } from 'payload/shared'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import './index.css'
 
@@ -18,19 +19,27 @@ const LIMIT_OPTIONS = [10, 25, 50, 100]
 export function AuditLogsClient({
 	adminRoute,
 	apiRoute,
-	collectionSlugs,
+	collectionOptions,
 	docs,
 	totalDocs,
 	totalPages,
 	page,
 	limit,
 	filters,
-	globalSlugs,
+	globalOptions,
+	tenantGlobalOptions,
+	tenantsSlug,
+	collectionLabels,
+	globalLabels,
+	refLabels,
+	titleFields,
 	lockedTenantId,
 	tenantOptions,
 	userTitleFields,
 	payloadAPILabels,
 	debugMode,
+	renderedEvents,
+	customEventTypes,
 	hasArchive,
 }: AuditLogsClientProps) {
 	const router = useRouter()
@@ -52,7 +61,10 @@ export function AuditLogsClient({
 			setRunningTask(task)
 			setLastResult(null)
 			try {
-				const res = await fetch(`${apiRoute}/audit-retention/run?task=${task}`, { method: 'POST' })
+				const res = await fetch(
+					`${formatAdminURL({ apiRoute, path: '/audit-retention/run' })}?task=${task}`,
+					{ method: 'POST' }
+				)
 				const json = await res.json()
 				if (res.ok) {
 					setLastResult(`Queued: ${task}`)
@@ -66,6 +78,27 @@ export function AuditLogsClient({
 			}
 		},
 		[apiRoute]
+	)
+
+	// Auth types are the plugin's own; custom ones come from `logs.eventTypes` and the
+	// renderer keys. Used by the Event filter and the row badge alike.
+	const eventTypeLabels = useMemo(
+		() => ({
+			login: t(keys.authEventLogin),
+			failed_login: t(keys.authEventFailedLogin),
+			forgot_password: t(keys.authEventForgotPassword),
+			...Object.fromEntries(customEventTypes.map(({ label, value }) => [value, label])),
+		}),
+		[customEventTypes, t]
+	)
+
+	// Rows name their tenant in the all-tenants view only; the tenant view has one.
+	const tenantLabels = useMemo(
+		() =>
+			lockedTenantId || !tenantOptions?.length
+				? undefined
+				: Object.fromEntries(tenantOptions.map(({ label, value }) => [value, label])),
+		[lockedTenantId, tenantOptions]
 	)
 
 	const handleFilter = useCallback(
@@ -94,43 +127,62 @@ export function AuditLogsClient({
 
 	return (
 		<div className="al-view">
-			<div className="al-view__header">
-				<h1 className="al-view__title">{t(keys.title)}</h1>
-				<span className="al-view__count">{t(keys.entries, { count: totalDocs })}</span>
-			</div>
+			{/* Payload's list header markup: its exported ListHeader is the collection one,
+			    which needs a collection config this view does not have. */}
+			<header className="list-header al-view__header">
+				<div className="list-header__content">
+					<div className="list-header__title-and-actions">
+						<h1 className="list-header__title">{t(keys.title)}</h1>
+						<div className="list-header__title-actions al-view__count">
+							{t(keys.entries, { count: totalDocs })}
+						</div>
+					</div>
+				</div>
+			</header>
 
 			{debugMode && (
 				<div className="al-debug-bar">
-					<span className="al-debug-bar__label">{t(keys.debug)}</span>
+					<Pill pillStyle="warning" size="small">
+						{t(keys.debug)}
+					</Pill>
 					{hasArchive && (
-						<button
-							className="al-debug-bar__btn"
+						<Button
+							buttonStyle="subtle"
 							disabled={runningTask !== null}
+							margin={false}
 							onClick={() => triggerJob('audit-logs-archive')}
-							type="button"
+							size="small"
 						>
 							{runningTask === 'audit-logs-archive' ? t(keys.queuing) : t(keys.runArchive)}
-						</button>
+						</Button>
 					)}
-					<button
-						className="al-debug-bar__btn al-debug-bar__btn--danger"
+					<Button
+						buttonStyle="subtle"
+						className="al-debug-bar__danger"
 						disabled={runningTask !== null}
+						margin={false}
 						onClick={() => triggerJob('audit-logs-delete')}
-						type="button"
+						size="small"
 					>
 						{runningTask === 'audit-logs-delete' ? t(keys.queuing) : t(keys.runDelete)}
-					</button>
+					</Button>
 					{lastResult && <span className="al-debug-bar__result">{lastResult}</span>}
 				</div>
 			)}
 
 			<FilterBar
-				collectionSlugs={collectionSlugs}
+				collectionOptions={collectionOptions}
+				customEventTypes={customEventTypes}
+				eventTypeLabels={eventTypeLabels}
 				filters={filters}
-				globalSlugs={globalSlugs}
+				globalOptions={globalOptions}
+				tenantGlobalOptions={tenantGlobalOptions}
+				refLabels={refLabels}
+				titleFields={titleFields}
+				userCollections={Object.keys(userTitleFields)}
 				onFilter={handleFilter}
+				payloadAPILabels={payloadAPILabels}
 				tenantOptions={lockedTenantId ? undefined : tenantOptions}
-				userTitleFields={userTitleFields}
 			/>
 
 			<div className="al-list">
@@ -140,9 +192,15 @@ export function AuditLogsClient({
 					docs.map((doc) => (
 						<LogRow
 							adminRoute={adminRoute}
+							collectionLabels={collectionLabels}
 							doc={doc as unknown as AuditLogDoc}
+							globalLabels={globalLabels}
 							key={String(doc.id)}
+							eventTypeLabels={eventTypeLabels}
 							payloadAPILabels={payloadAPILabels}
+							renderedEvent={renderedEvents?.[String(doc.id)]}
+							tenantLabels={tenantLabels}
+							tenantsSlug={tenantsSlug}
 							userTitleFields={userTitleFields}
 						/>
 					))

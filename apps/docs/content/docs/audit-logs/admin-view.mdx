@@ -21,22 +21,33 @@ auditLogs({
 
 Pass `view: false` to skip mounting it.
 
+## Rows
+
+A row reads left to right as what happened, to what, by whom, and through what:
+
+- **The event**: a coloured badge for the operation, or the auth or custom event type under its label from [`logs.eventTypes`](/audit-logs/configuration#eventtypes).
+- **The collection or global**, by its label. It links to the document in a new tab, except for a delete, which leaves nothing to open.
+- **The user**, as a pill linking to them. When the entry was written under [impersonation](/audit-logs#what-gets-recorded), the pill carries an `impersonated` mark that opens who was impersonating. A user who no longer exists shows as deleted.
+- **Context badges**: the API the request came through, the locale (not for auth events and deletes), and in the all-tenants view the tenant. The tenant's name filters the list to it; the arrow beside it opens the tenant.
+- **How many fields changed**, and when, in `admin.dateFormat` and the admin's language, to the second on hover.
+
+Expanding a row shows the request details (IP, user agent, locale, group), the changed paths as links that add them to the Changed field filter, and the diff. A create or delete with a snapshot shows it as the same path and value table, and an auth or custom event its metadata, each with the raw JSON in a collapsible you can copy from. [Custom events](/audit-logs/custom-events#rendering-them-in-the-view) can render their own body instead. A row with none of this does not expand.
+
 ## Filters
 
-Filters live in the URL, so any view state is a link you can share or bookmark.
+The filters sit in one row of pills, each showing its current value. A pill opens its editor in a panel below the row, one at a time, the way the list view opens its columns and filters. Changes are staged and applied together. Filters live in the URL, so any view state is a link you can share or bookmark.
+
+Values inside one filter match any of them; the filters combine with AND.
 
 | Filter | Notes |
 |---|---|
-| Operation | Multi-select: create, update, delete, auth, custom. |
-| Collection | Multi-select over your collection slugs. |
-| Global | Multi-select over your global slugs. |
-| User | Search existing users, or paste an id, which is how you find the work of a deleted account. |
-| Event type | Auth sub-types (`login`, `forgot_password`) and your custom event identifiers. |
-| Changed path | Entries where one specific field changed. Backed by the index on `changedPaths`. |
-| Group | Present when `logs.group` is enabled. |
-| Date range | From and to. |
+| Event | Create, update and delete, then auth and custom events, each either as a whole ("All custom events") or by type. Custom types come from [`logs.eventTypes`](/audit-logs/configuration#eventtypes) and the keys of `view.components.customEvents`; any other can be typed in. |
+| Collection | Collections and globals, labelled from their config. Payload's own bookkeeping collections (`payload-preferences`, `payload-locked-documents`, `payload-kv` and the like) are not offered. |
+| User | Pick users from the list drawer, as a relationship field does, or type an id, which is how you find the work of a deleted account. |
+| Date | Presets for the last 24 hours, 7 days and 30 days fill the From date; From and To can also be set directly. |
+| More filters | Documents (picked from the drawer, or typed as an id for a deleted one), changed fields, groups, and the API an entry came through. Group is present when `logs.group` is enabled. API offers `REST`, `GraphQL`, `local` and your [`logs.payloadAPIs`](/audit-logs/configuration#payloadapis); any other value can be typed. |
 
-An expanded row also links to the document the entry is about, and, when the entry has a group, to every other entry sharing it.
+The collection name on a row links to the document the entry is about, and, when the entry has a group, the expanded row links to every other entry sharing it.
 
 ## Two kinds of access
 

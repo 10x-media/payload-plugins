@@ -32,16 +32,14 @@ export function DiffViewer({ diff }: Props) {
 							{isLongValue(before) ? (
 								<pre className="al-diff__json">{formatValue(before)}</pre>
 							) : (
-								<span className="al-diff__scalar al-diff__scalar--before">
-									{formatValue(before)}
-								</span>
+								formatValue(before)
 							)}
 						</td>
 						<td className="al-diff__td al-diff__col-after">
 							{isLongValue(after) ? (
 								<pre className="al-diff__json">{formatValue(after)}</pre>
 							) : (
-								<span className="al-diff__scalar al-diff__scalar--after">{formatValue(after)}</span>
+								formatValue(after)
 							)}
 						</td>
 					</tr>

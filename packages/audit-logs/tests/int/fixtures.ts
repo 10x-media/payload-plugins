@@ -85,6 +85,7 @@ export type AuditLogDoc = {
 	relationTo: string
 	documentId?: string
 	user?: unknown
+	impersonator?: unknown
 	changedPaths?: string[]
 	diff?: Record<string, { after: unknown; before: unknown }>
 	snapshot?: Record<string, unknown>

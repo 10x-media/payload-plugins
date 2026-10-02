@@ -1,5 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
+import { impersonatorRelationship } from './impersonator'
 import { writeAuditLog } from './writeAuditLog'
 
 export type CreateAuditEventOptions = {
@@ -39,7 +40,7 @@ export type CreateAuditEventOptions = {
  * Creates a custom audit log entry. Use this for business-specific events that fall outside
  * of automatic create/update/delete tracking.
  *
- * `user` and `locale` are auto-populated from `req`. The log `createdAt` reflects
+ * `user`, `impersonator` and `locale` are auto-populated from `req`. The log `createdAt` reflects
  * when this function is called, use `metadata` to record any domain-specific timestamps
  * that differ (e.g. the date an infraction actually occurred).
  *
@@ -65,6 +66,7 @@ export const createAuditEvent = async (
 		userField && 'relationTo' in userField ? userField.relationTo : undefined
 	)
 	const hasGroupField = auditLogsCollection?.fields.some((f) => 'name' in f && f.name === 'group')
+	const impersonator = impersonatorRelationship(req.user, isPolymorphic)
 
 	// Group: explicit option wins; fall back to req.context.auditGroup if group field is enabled
 	const group =
@@ -86,6 +88,7 @@ export const createAuditEvent = async (
 			...(req.user && {
 				user: isPolymorphic ? { relationTo: req.user.collection, value: req.user.id } : req.user.id,
 			}),
+			...(impersonator !== undefined && { impersonator }),
 			...(req.locale && { locale: req.locale }),
 			payloadAPI: req.payloadAPI,
 			...(options.metadata && { metadata: options.metadata }),
