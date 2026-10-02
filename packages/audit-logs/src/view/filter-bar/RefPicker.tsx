@@ -1,6 +1,7 @@
 'use client'
 
 import { ListViewIcon, ReactSelect, useListDrawer } from '@payloadcms/ui'
+import type { CollectionSlug } from 'payload'
 import { useEffect } from 'react'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
@@ -36,13 +37,13 @@ export function RefPicker({
 }: Props) {
 	const { t } = useTranslation()
 	const [ListDrawer, , { closeDrawer, openDrawer, setCollectionSlugs }] = useListDrawer({
-		collectionSlugs: collections,
+		collectionSlugs: collections as CollectionSlug[],
 	})
 
 	const collectionsKey = collections.join(',')
 	// biome-ignore lint/correctness/useExhaustiveDependencies: the joined key is the dependency; the array is rebuilt every render
 	useEffect(() => {
-		setCollectionSlugs(collections)
+		setCollectionSlugs(collections as CollectionSlug[])
 	}, [collectionsKey, setCollectionSlugs])
 
 	const value: SelectOption[] = refs.map((ref) => ({

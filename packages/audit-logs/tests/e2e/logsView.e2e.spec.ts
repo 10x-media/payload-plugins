@@ -45,8 +45,12 @@ test.describe('signed in', () => {
 		await gotoLogs(page, '?collection=posts')
 
 		await expect(filterPills(page).first()).toBeVisible()
-		const collections = await rows(page).locator('.al-row__collection').allTextContents()
-		expect(new Set(collections)).toEqual(new Set(['posts']))
+		// Rows name the collection by label; the slug is on the link's title.
+		const titles = await rows(page)
+			.locator('.al-row__collection')
+			.evaluateAll((els) => els.map((el) => el.getAttribute('title') ?? ''))
+		expect(titles.length).toBeGreaterThan(0)
+		expect(titles.every((title) => title.endsWith('posts'))).toBe(true)
 	})
 
 	test('an operation filter keeps only that operation', async ({ page }) => {
@@ -117,12 +121,14 @@ test.describe('signed in', () => {
 		await expect(row).not.toContainText('wrong-password')
 	})
 
-	test('a global entry is labelled by its slug', async ({ page }) => {
+	test('a global entry is named by its label, with the slug on hover', async ({ page }) => {
 		await gotoLogs(page, '?global=site-settings')
 
-		const collections = await rows(page).locator('.al-row__collection').allTextContents()
-		expect(collections.length).toBeGreaterThan(0)
-		expect(new Set(collections)).toEqual(new Set(['site-settings']))
+		const titles = await rows(page)
+			.locator('.al-row__collection')
+			.evaluateAll((els) => els.map((el) => el.getAttribute('title') ?? ''))
+		expect(titles.length).toBeGreaterThan(0)
+		expect(titles.every((title) => title.endsWith('site-settings'))).toBe(true)
 	})
 })
 

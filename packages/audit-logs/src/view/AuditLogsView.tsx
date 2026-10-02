@@ -329,7 +329,7 @@ const resolveRefLabels = async (
 					select: { [titleField]: true },
 					where: { id: { in: entries.map((e) => e.id) } },
 				})
-				for (const doc of found.docs as Record<string, unknown>[]) {
+				for (const doc of found.docs as unknown as Record<string, unknown>[]) {
 					const title = doc[titleField]
 					for (const entry of entries) {
 						if (String(doc.id) === entry.id && title) labels[entry.ref] = String(title)
