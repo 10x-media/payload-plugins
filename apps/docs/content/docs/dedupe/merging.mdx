@@ -1,0 +1,98 @@
+---
+title: Merging
+description: "How a group of documents becomes one: the spec, the screen, the apply, unique values, references and the history."
+---
+
+The document a merge keeps is the **primary** (`survivor` in the API); the others are merged in.
+
+## The merge spec
+
+The plugin derives from the schema which fields are merged and how. Named groups and tabs become paths (`profile.bio`); arrays, blocks and `hasMany` fields are lists. System, auth, upload, join and virtual fields are not merged, nor fields hidden from the API.
+
+| Policy | Result |
+| --- | --- |
+| `nonEmpty` | The primary's value, or the newest non-empty one when it is empty. Default. |
+| `union` | For a list: every document's items, the primary's first. |
+| `manual` | Like `nonEmpty`, but a conflict has to be decided before merging. |
+| `survivor` | Always the primary's value. Default for fields hidden in the admin. |
+| `skip` | Not merged. |
+
+Set a policy on the field:
+
+```ts
+import { dedupeCustom } from '@10x-media/dedupe'
+
+{ name: 'notes', type: 'textarea', admin: { custom: dedupeCustom({ policy: 'union' }) } }
+```
+
+Or in the plugin config:
+
+```ts title="payload.config.ts"
+customers: {
+  fields: (derived) =>
+    derived.map((spec) => (spec.path === 'taxId' ? { ...spec, policy: 'manual' } : spec)),
+}
+```
+
+A path that is not in the schema fails at startup.
+
+## The screen
+
+Documents are columns and fields are rows. Pick the primary in a column head and a value per field; a list is picked item by item. "Only differences" hides the fields all documents agree on, and each document opens in a drawer. Under the table are the references that move and what blocks them.
+
+"Not duplicates" marks the group so the queue leaves it alone; a marked group can be reopened.
+
+## Localized fields
+
+A localized field is decided per locale. Payload checks every required value of a locale the merge writes: one the primary lacks there comes from the most similar document of the group that has it, and where none has it the merge is refused, naming the field and the locale. Drafts merged with `draft: true` are not checked.
+
+## Applying
+
+1. The merge is recorded, with a copy of every document.
+2. The merged-in documents give up the unique values the primary takes.
+3. The primary is written.
+4. References to the merged-in documents move to the primary.
+5. The merged-in documents are trashed, or deleted with `absorbed: 'delete'`.
+6. The pairs of the group close, and the primary is checked for new look-alikes.
+
+Without a transaction (MongoDB without a replica set), a failure leaves the steps already done and marks the record failed. `requireTransactions: true` refuses such merges.
+
+The merge is refused when:
+
+- a document changed since the screen opened;
+- the collection's access denies the reviewer `read` on a document, `update` on the primary or `delete` on a merged-in one;
+- a `manual` conflict is open;
+- unless `draft` is set, the primary has an unpublished draft or a document was never published;
+- another editor has a document of the group, or one whose reference moves, open;
+- a moved reference would collide on a unique value, or its document has unpublished changes.
+
+A field the reviewer may not update keeps the primary's value. A field they may not read is not shown and is merged by its policy. A merge never brings into view a value that a field's `read` access hides.
+
+## Unique values
+
+When the primary takes a unique value, the merged-in document gives it up first:
+
+| Field | The merged-in document holds |
+| --- | --- |
+| `text`, `textarea`, `code`, `email` | A placeholder with the value it held: `merged-<id> Anna Kowalska`, or for an email `merged-<id>.anna@mail.com.invalid`. Where the field's validation refuses that, `merged-<id>` (`merged-<id>@dedupe.invalid`). |
+| Any other type, not `required`, on SQL | An empty value. |
+| Any other type on MongoDB or `required`, or a value inside rows or a localized group | Nothing: the merged-in document is deleted instead of trashed. |
+
+The screen shows this before the merge. On Postgres, a merged-in document deleted for good cannot leave while another merged-in document points at it in a `required` field.
+
+## References
+
+Every `relationship` and `upload` field pointing at the collection, in any collection or global, moves to the primary. A pointer at a document of the same merge is removed from the primary's optional fields.
+
+Adjust the list with `references`; `policy: 'keep'` leaves a field alone:
+
+```ts
+references: (derived) =>
+  derived.map((ref) => (ref.collection === 'audit-trail' ? { ...ref, policy: 'keep' } : ref)),
+```
+
+References inside rich text and JSON are not moved; handle them on the `merge.applied` event.
+
+## Merge history
+
+`/admin/dedupe/merges` lists every merge. A record shows the documents as they were before the merge, with what the merge took marked; it opens for readers of the documents.

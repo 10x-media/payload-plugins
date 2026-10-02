@@ -1,0 +1,112 @@
+import { keys, type TranslationKey } from './keys'
+
+export const fr: Record<TranslationKey, string> = {
+	[keys.pluginName]: 'Doublons',
+	[keys.queueTitle]: 'Doublons',
+	[keys.collection]: 'Collection',
+	[keys.status]: 'Statut',
+	[keys.statusOpen]: 'Ouverts',
+	[keys.statusDismissed]: 'Pas des doublons',
+	[keys.statusMerged]: 'Fusionnés',
+	[keys.statusSuperseded]: 'Remplacés',
+	[keys.statusStale]: 'Périmés',
+	[keys.noPairs]: 'Rien à vérifier.',
+	[keys.noCollections]: "Aucune collection n'est configurée pour la recherche de doublons.",
+	[keys.dismiss]: 'Pas des doublons',
+	[keys.reopen]: 'Rouvrir',
+	[keys.merge]: 'Fusionner',
+	[keys.mergeInto]: 'Fusionner dans {{title}}',
+	[keys.runScan]: 'Analyser maintenant',
+	[keys.scanQueued]: "Analyse mise en file d'attente.",
+	[keys.scanDone]: 'Analyse terminée : {{pairs}} paires ouvertes sur {{compared}} comparaisons.',
+	[keys.needsChoice]: 'Décision requise',
+	[keys.applied]: 'Fusionné dans le document principal.',
+	[keys.empty]: 'vide',
+	[keys.backToQueue]: 'Retour aux doublons',
+	[keys.selectTwo]: 'Sélectionnez de 2 à {{max}} documents à fusionner.',
+	[keys.mergeSelected]: 'Fusionner la sélection',
+	[keys.noTransactions]:
+		"Cette base de données n'ouvre pas de transactions. Si la fusion échoue en cours de route, les étapes déjà faites restent : valeurs provisoires dans les documents fusionnés, références déplacées, certaines langues du document principal. L'enregistrement est marqué comme échoué et liste ce qui a été déplacé.",
+	[keys.transactionsRequired]:
+		"La fusion est désactivée : cette base de données n'ouvre pas de transactions et le plugin en exige une.",
+	[keys.takenFrom]: 'Repris de {{title}}',
+	[keys.error]: "Quelque chose s'est mal passé.",
+	[keys.missingParams]:
+		"L'écran de fusion a besoin d'une collection et de deux identifiants de document.",
+	[keys.confirmHeading]: 'Appliquer cette fusion ?',
+	[keys.confirmBody]:
+		'{{absorbed}} sera fusionné dans {{survivor}} et quittera la collection. La fusion est enregistrée avec une copie de chaque document.',
+	[keys.primary]: 'Principal · garde son ID',
+	[keys.makePrimary]: 'Rendre principal',
+	[keys.created]: 'Créé',
+	[keys.updated]: 'Modifié',
+	[keys.linkedFrom]: 'Lié depuis',
+	[keys.linkedFromTitle]: 'Documents qui renvoient à {{title}}',
+	[keys.onlyDifferences]: 'Différences uniquement',
+	[keys.showDiff]: 'Surligner les différences',
+	[keys.referencesMove]: '{{count}} références passent à {{title}}',
+	[keys.mergeCount]: 'Fusionner {{count}} documents',
+	[keys.releaseMarked]:
+		"{{title}} ira à la corbeille avec un marqueur dans {{fields}}, car {{survivor}} reprend ces valeurs et un seul document peut les porter. L'enregistrement de la fusion garde les originaux.",
+	[keys.releaseEmptied]:
+		"{{title}} ira à la corbeille avec {{fields}} vide, car {{survivor}} reprend ces valeurs et un seul document peut les porter. L'enregistrement de la fusion garde les originaux.",
+	[keys.pointersCleared]:
+		'Les liens vers des documents de cette fusion sont retirés de {{fields}} : après la fusion, ils pointeraient vers un document supprimé ou vers {{survivor}} lui-même.',
+	[keys.survivorDraft]:
+		'{{title}} a des modifications non publiées, que la fusion publierait. Publiez-les ou annulez-les d’abord.',
+	[keys.mayNotApply]: 'Vos droits ne vous permettent pas d’appliquer cette fusion.',
+	[keys.releaseDeletes]:
+		"{{title}} sera supprimé au lieu d'aller à la corbeille, car {{survivor}} reprend son {{fields}} et un seul document peut porter ces valeurs. L'enregistrement de la fusion garde une copie complète.",
+	[keys.openDrawer]: 'Inspecter',
+	[keys.signals]: 'Pourquoi ils correspondent',
+	[keys.takeAll]: 'Garder toutes les valeurs',
+	[keys.possibleDuplicates]: 'Doublons possibles',
+	[keys.confirmCreateHeading]: 'Cela existe peut-être déjà',
+	[keys.confirmCreateBody]: 'Des documents enregistrés ressemblent à celui que vous créez :',
+	[keys.createAnyway]: 'Créer quand même',
+	[keys.relatedDocuments]: 'Documents liés',
+	[keys.movesTo]: '{{count}} passeront à {{title}}',
+	[keys.moreDocs]: '+{{count}} de plus',
+	[keys.referenceConflict]: 'Un par {{fields}} : ces deux entreraient en conflit',
+	[keys.pendingDraft]: 'A des modifications non publiées. Publiez-les ou abandonnez-les d’abord.',
+	[keys.tooManyReferences]:
+		'{{count}} documents pointent vers un document fusionné, plus qu’une fusion n’en déplace.',
+	[keys.blocksMerge]: '{{count}} bloquent la fusion',
+	[keys.historyTitle]: 'Historique des fusions',
+	[keys.noMerges]: 'Aucune fusion pour le moment.',
+	[keys.mergedInto]: 'Fusionné dans {{title}}',
+	[keys.mergedIn]: 'Fusionnés',
+	[keys.mergeApplying]: 'En cours',
+	[keys.mergeApplied]: 'Appliquée',
+	[keys.mergeFailed]: 'Échouée',
+	[keys.similarity]: 'Similarité',
+	[keys.whySame]: 'Identique : {{fields}}',
+	[keys.whySimilar]: 'Similaire : {{fields}}',
+	[keys.whyDiffer]: 'Différent : {{fields}}',
+	[keys.whyVeto]: 'Exclu par {{fields}}',
+	[keys.markedBy]: 'Marqué par',
+	[keys.aboutOpen]:
+		'Documents qui se ressemblent, une ligne par groupe, en attente de revue. Ouvrez-en une pour la fusionner ou la marquer comme non doublons.',
+	[keys.aboutDismissed]:
+		'Documents marqués comme non doublons, une ligne par groupe. Les analyses suivantes les gardent ici ; ouvrez-en une pour la rouvrir.',
+	[keys.aboutMerged]:
+		'Documents fusionnés en un seul, une ligne par fusion. Ouvrez-en une pour voir sa fusion.',
+	[keys.aboutSuperseded]:
+		'Ressemblances qui ne s’appliquent plus : un document a été fusionné dans un autre ou supprimé.',
+	[keys.aboutStale]:
+		'Documents qui ne se ressemblent plus après une modification ou un changement de règles.',
+	[keys.markedNotDuplicates]: 'Marqués comme non doublons.',
+	[keys.dismissedNote]: 'Marqués comme non doublons par {{user}} le {{date}}.',
+	[keys.markedApart]:
+		'{{a}} et {{b}} ont été marqués comme non doublons par {{user}} le {{date}}. Les fusionner annule ce choix.',
+	[keys.removeFromMerge]: 'Retirer de cette fusion',
+	[keys.removeHeading]: 'Retirer {{title}} de cette fusion ?',
+	[keys.removeBody]:
+		'Le document lui-même reste inchangé. Les valeurs choisies depuis lui sur cet écran sont abandonnées.',
+	[keys.andMore]: '{{title}} et {{count}} autres',
+	[keys.pointsAt]: 'Pointe vers',
+	[keys.pointedAt]: 'Pointait vers',
+	[keys.mergingInto]: 'Fusion en cours dans {{title}}',
+	[keys.mergeFailedInto]: 'La fusion dans {{title}} a échoué',
+	[keys.primaryRole]: 'Principal',
+}
