@@ -69,6 +69,7 @@
 		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int && TEST_DB=container DB_MATRIX=postgres vitest run tests/int",
 		"test:e2e": "bash scripts/e2e.sh",
 		"dev": "pnpm --filter @10x-media/dedupe-dev dev",
+		"dev:typesense": "docker compose -f docker-compose.typesense.yml up -d --force-recreate && until curl -sf http://localhost:${TYPESENSE_PORT:-8108}/health | grep -q true; do sleep 1; done && DEDUPE_ADAPTER=typesense pnpm --filter @10x-media/dedupe-dev dev",
 		"start": "pnpm --filter @10x-media/dedupe-dev start",
 		"generate": "pnpm --filter @10x-media/dedupe-dev generate",
 		"generate:types": "pnpm --filter @10x-media/dedupe-dev generate:types",
