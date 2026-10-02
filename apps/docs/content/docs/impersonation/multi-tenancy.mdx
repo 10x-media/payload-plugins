@@ -29,16 +29,16 @@ Do **not** add `impersonation-sessions` to the multi-tenant `collections` map. T
 
 ## Tenant cookie
 
-`@payloadcms/plugin-multi-tenant` stores the nav selection in `` `${cookiePrefix}-tenant` `` (`payload-tenant` by default). That cookie is not a capability. This plugin already listed it in `cookies.clearOnSwitch` so a swap would not keep the impersonator's selected tenant while `req.user` is the target.
+`@payloadcms/plugin-multi-tenant` stores the nav selection in `payload-tenant`. It hardcodes that name and ignores `cookiePrefix`, so the default here does too. The cookie is not a capability, but a swap must not keep the impersonator's selected tenant while `req.user` is the target.
 
-What it does now:
+So `payload-tenant` is the default entry in `cookies.clearOnSwitch`, and the plugin treats it like any other entry:
 
 | Mode | Start | Exit |
 |---|---|---|
-| Swap | Snapshot the impersonator's cookie onto the row, then expire it. The multi-tenant plugin selects the target's tenant. | Write the snapshot back. |
-| Parallel | Leave every `clearOnSwitch` cookie alone. The admin session did not change. | Leave them alone. |
+| Swap | Expire it. The multi-tenant plugin then selects the target's tenant when they have exactly one, and none otherwise. | Expire it. The multi-tenant plugin picks the impersonator's tenant the same way. |
+| Parallel | Leave it alone. The admin session did not change. | Leave it alone. |
 
-Opt out by setting `cookies.clearOnSwitch` to a list that does not include that cookie name. Then the plugin neither snapshots nor writes it.
+Opt out by setting `cookies.clearOnSwitch` to a list that does not include `payload-tenant`.
 
 ## What this is not
 

@@ -1,9 +1,8 @@
 import type { CollectionSlug, Endpoint, PayloadRequest } from 'payload'
 import { resolveTargetFilters, targetMatchesFilter } from '../access/filterTargets'
-import { generateHintCookie } from '../auth/cookies'
+import { clearOnSwitchOnStart, generateHintCookie } from '../auth/cookies'
 import { issueSession } from '../auth/issue'
 import { revokeSession } from '../auth/revoke'
-import { clearCookiesOnStart, readTenantCookie } from '../auth/tenantCookie'
 import { asId, collectionBySlug, idsEqual, userTitle } from '../ids'
 import { REASON_MAX_LENGTH } from '../plugin/constants'
 import { isStartableAuthCollection } from '../plugin/startable'
@@ -210,7 +209,6 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 					user.collection,
 					user as unknown as Record<string, unknown>
 				),
-				impersonatorTenantCookie: readTenantCookie(req.headers, req.payload.config.cookiePrefix),
 				ip: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? undefined,
 				mode: minted.mode,
 				reason: options.reason === 'off' ? undefined : reason,
@@ -269,12 +267,12 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 				name: options.hintCookieName,
 				value: String(row.id),
 			}),
-			...clearCookiesOnStart({
+			...clearOnSwitchOnStart({
 				authConfig,
 				cookiePrefix,
 				except: [minted.cookieName],
 				mode: minted.mode,
-				options,
+				names: options.cookies.clearOnSwitch,
 			}),
 		]
 

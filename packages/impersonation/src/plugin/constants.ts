@@ -8,7 +8,11 @@ export const DEFAULT_COLLECTION_SLUG = 'impersonation-sessions'
 export const DEFAULT_API_PATH = '/impersonation'
 export const DEFAULT_HINT_COOKIE = 'impersonation-hint'
 export const DEFAULT_COOKIE_PREFIX = 'payload'
-export const defaultClearOnSwitch = (cookiePrefix: string) => [`${cookiePrefix}-tenant`]
+/**
+ * `@payloadcms/plugin-multi-tenant` hardcodes `payload-tenant` and ignores
+ * `cookiePrefix`, so the default does not follow the prefix either.
+ */
+export const DEFAULT_CLEAR_ON_SWITCH = ['payload-tenant']
 export const REASON_MAX_LENGTH = 500
 /** Client POSTs that busy-gate a control abort after this. */
 export const CLIENT_FETCH_TIMEOUT_MS = 15_000

@@ -362,7 +362,6 @@ export interface ImpersonationSession {
   mode: 'swap' | 'parallel';
   targetSid: string;
   impersonatorSid: string;
-  impersonatorTenantCookie?: string | null;
   startedAt: string;
   endedAt?: string | null;
   endedBy?: ('exit' | 'logout' | 'terminated' | 'expired' | 'impersonatorGone' | 'targetGone' | 'failed') | null;
@@ -625,7 +624,6 @@ export interface ImpersonationSessionsSelect<T extends boolean = true> {
   mode?: T;
   targetSid?: T;
   impersonatorSid?: T;
-  impersonatorTenantCookie?: T;
   startedAt?: T;
   endedAt?: T;
   endedBy?: T;
