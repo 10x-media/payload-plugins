@@ -8,6 +8,8 @@ export type AuditLogDoc = {
 	documentId?: string
 	user?: unknown
 	impersonator?: unknown
+	/** A tenant id, or the tenant itself when the read populated it. */
+	tenant?: unknown
 	locale?: string
 	/** Free text: core sets REST, GraphQL or local, a plugin may set anything else. */
 	payloadAPI?: string

@@ -85,6 +85,15 @@ export function AuditLogsClient({
 		[customEventTypes, t]
 	)
 
+	// Rows name their tenant in the all-tenants view only; the tenant view has one.
+	const tenantLabels = useMemo(
+		() =>
+			lockedTenantId || !tenantOptions?.length
+				? undefined
+				: Object.fromEntries(tenantOptions.map(({ label, value }) => [value, label])),
+		[lockedTenantId, tenantOptions]
+	)
+
 	const handleFilter = useCallback(
 		(newFilters: typeof filters) => {
 			router.push(`?${buildParams(newFilters, undefined, limit)}`)
@@ -172,6 +181,7 @@ export function AuditLogsClient({
 							eventTypeLabels={eventTypeLabels}
 							payloadAPILabels={payloadAPILabels}
 							renderedEvent={renderedEvents?.[String(doc.id)]}
+							tenantLabels={tenantLabels}
 							userTitleFields={userTitleFields}
 						/>
 					))

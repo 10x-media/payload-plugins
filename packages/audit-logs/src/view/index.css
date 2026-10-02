@@ -289,6 +289,30 @@
 	background: #500724;
 	color: #f9a8d4;
 }
+/* Context like the locale and filled the same way, but a link: it narrows the
+   list to that tenant. Above the row's stretched toggle so the click lands. */
+.al-badge--tenant {
+	position: relative;
+	z-index: 1;
+	max-width: 160px;
+	min-width: 0;
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-600);
+	text-decoration: none;
+	text-transform: none;
+	letter-spacing: normal;
+}
+.al-badge--tenant:hover {
+	color: var(--theme-text);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+.al-badge__text {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
 .al-badge--locale {
 	background: var(--theme-elevation-100);
 	color: var(--theme-elevation-500);
@@ -455,6 +479,7 @@
 
 .al-user {
 	max-width: 100%;
+	min-width: 0;
 	flex-shrink: 1;
 }
 .al-user .pill__label {
@@ -464,7 +489,9 @@
 	gap: calc(var(--base) * 0.4);
 	min-width: 0;
 }
+/* A flex item, which only shrinks enough to ellipsize with min-width: 0. */
 .al-user__name {
+	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;

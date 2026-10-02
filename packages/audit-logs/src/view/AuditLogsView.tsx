@@ -151,11 +151,15 @@ export async function AuditLogsView({
 		const tenantCol = req.payload.config.collections.find((c) => c.slug === tenantsSlug)
 		const useAsTitle =
 			typeof tenantCol?.admin?.useAsTitle === 'string' ? tenantCol.admin.useAsTitle : 'id'
+		// Every tenant, but only its title: the list feeds the filter and names the
+		// tenant on each row, so a cap would drop both for the tenants past it.
 		const tenantResult = await req.payload.find({
 			collection: tenantsSlug,
-			limit: 500,
 			depth: 0,
 			overrideAccess: true,
+			pagination: false,
+			select: useAsTitle === 'id' ? {} : { [useAsTitle]: true },
+			sort: useAsTitle,
 		})
 		tenantOptions = tenantResult.docs.map((d) => ({
 			label: String((d as unknown as Record<string, unknown>)[useAsTitle] ?? d.id),
@@ -173,9 +177,12 @@ export async function AuditLogsView({
 
 	// `depth: 1` alone returns every field of the related user, hashed password and
 	// sessions included, to render one label. Narrow it to the field actually shown.
-	const populate = Object.fromEntries(
-		Object.entries(userTitleFields).map(([slug, titleField]) => [slug, { [titleField]: true }])
-	) as PopulateType
+	// The tenant column populates too; the row only needs its id, the name comes from
+	// the tenant options already loaded for the filter.
+	const populate = Object.fromEntries([
+		...Object.entries(userTitleFields).map(([slug, titleField]) => [slug, { [titleField]: true }]),
+		...(multiTenancy ? [[tenantsSlug, { id: true }]] : []),
+	]) as PopulateType
 
 	// Names for the documents and users the filters name, so their pills read as
 	// names rather than ids. Bounded by what is selected, not by the log.

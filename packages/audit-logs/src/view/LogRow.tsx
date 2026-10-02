@@ -20,6 +20,8 @@ type Props = {
 	payloadAPILabels: Record<string, string>
 	/** Host renderer for a custom event, replacing the default table and JSON. */
 	renderedEvent?: ReactNode
+	/** Tenant names by id, in the all-tenants view only; the tenant view leaves it out. */
+	tenantLabels?: Record<string, string>
 	userTitleFields: Record<string, string>
 }
 
@@ -29,6 +31,7 @@ export function LogRow({
 	eventTypeLabels,
 	payloadAPILabels,
 	renderedEvent,
+	tenantLabels,
 	userTitleFields,
 }: Props) {
 	const { t } = useTranslation()
@@ -42,6 +45,21 @@ export function LogRow({
 		return `?${params.toString()}`
 	}, [searchParams, doc.group])
 	const isGlobal = doc.relationTo === GLOBAL_SENTINEL
+	// A login has no document and a delete removes every locale, so the request's
+	// locale says nothing there. Entries written before it was dropped still carry it.
+	const locale = doc.operation === 'auth' || doc.operation === 'delete' ? undefined : doc.locale
+
+	const tenantId =
+		doc.tenant && typeof doc.tenant === 'object'
+			? (doc.tenant as { id?: unknown }).id
+			: (doc.tenant as number | string | undefined)
+	const tenantHref = useMemo(() => {
+		if (tenantId == null || !tenantLabels) return undefined
+		const params = new URLSearchParams(searchParams?.toString() ?? '')
+		params.set('tenant', String(tenantId))
+		params.delete('page')
+		return `?${params.toString()}`
+	}, [searchParams, tenantId, tenantLabels])
 
 	const pathCount = doc.changedPaths?.length ?? 0
 	const diff = doc.diff && Object.keys(doc.diff).length > 0 ? doc.diff : undefined
@@ -124,7 +142,19 @@ export function LogRow({
 							{apiLabel(doc.payloadAPI, payloadAPILabels)}
 						</span>
 					)}
-					{doc.locale && <span className="al-badge al-badge--locale">{doc.locale}</span>}
+					{locale && <span className="al-badge al-badge--locale">{locale}</span>}
+					{tenantHref && tenantId != null && (
+						<a
+							className="al-badge al-badge--tenant"
+							href={tenantHref}
+							title={`${t(keys.filterTenant)}: ${tenantLabels?.[String(tenantId)] ?? String(tenantId)}`}
+						>
+							{/* The badge is a flex box, which ellipsis does not apply to; the text is. */}
+							<span className="al-badge__text">
+								{tenantLabels?.[String(tenantId)] ?? String(tenantId)}
+							</span>
+						</a>
+					)}
 				</span>
 
 				<span className="al-row__right">
@@ -154,9 +184,9 @@ export function LogRow({
 									<span className="al-row__ua">{doc.userAgent}</span>
 								</span>
 							)}
-							{doc.locale && (
+							{locale && (
 								<span className="al-row__meta-item">
-									<span className="al-row__meta-label">{t(keys.metaLocale)}</span> {doc.locale}
+									<span className="al-row__meta-label">{t(keys.metaLocale)}</span> {locale}
 								</span>
 							)}
 							{doc.group && groupHref && (

@@ -80,7 +80,6 @@ export const afterDeleteCollectionAuditLog =
 				documentId,
 				...(userValue !== undefined && { user: userValue }),
 				...(impersonator !== undefined && { impersonator }),
-				...(req.locale && { locale: req.locale }),
 				payloadAPI: req.payloadAPI,
 				...(ipAddress && { ipAddress }),
 				...(userAgent && { userAgent }),
