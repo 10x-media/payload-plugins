@@ -13,7 +13,10 @@
 	"keywords": [
 		"payload",
 		"payloadcms",
-		"plugin"
+		"plugin",
+		"dedupe",
+		"duplicates",
+		"merge"
 	],
 	"author": "10x-media",
 	"engines": {
@@ -37,6 +40,11 @@
 			"types": "./src/exports/client.ts",
 			"default": "./dist/exports/client.js"
 		},
+		"./rsc": {
+			"development": "./src/exports/rsc.ts",
+			"types": "./src/exports/rsc.ts",
+			"default": "./dist/exports/rsc.js"
+		},
 		"./i18n": {
 			"development": "./src/exports/i18n.ts",
 			"types": "./src/exports/i18n.ts",
@@ -57,8 +65,8 @@
 		"test": "vitest run",
 		"test:unit": "vitest run src",
 		"test:int": "vitest run tests/int",
-		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
-		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int && DB_MATRIX=postgres vitest run tests/int",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int && TEST_DB=container DB_MATRIX=postgres vitest run tests/int",
 		"test:e2e": "bash scripts/e2e.sh",
 		"dev": "pnpm --filter @10x-media/dedupe-dev dev",
 		"start": "pnpm --filter @10x-media/dedupe-dev start",
@@ -75,10 +83,19 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
+		"@payloadcms/next": "^3.83.0",
+		"@payloadcms/richtext-lexical": "^3.83.0",
+		"@payloadcms/translations": "^3.83.0",
 		"@payloadcms/ui": "^3.83.0",
+		"next": "^15.2.9 || ^16.2.6",
 		"payload": "^3.83.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
+	},
+	"peerDependenciesMeta": {
+		"@payloadcms/richtext-lexical": {
+			"optional": true
+		}
 	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",
@@ -87,11 +104,15 @@
 		"@10x-media/vitest-config": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/next": "catalog:",
+		"@payloadcms/richtext-lexical": "catalog:",
+		"@payloadcms/translations": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
+		"next": "catalog:",
 		"payload": "catalog:",
 		"playwright": "catalog:",
 		"react": "catalog:",
@@ -117,6 +138,11 @@
 				"types": "./dist/exports/client.d.ts",
 				"import": "./dist/exports/client.js",
 				"default": "./dist/exports/client.js"
+			},
+			"./rsc": {
+				"types": "./dist/exports/rsc.d.ts",
+				"import": "./dist/exports/rsc.js",
+				"default": "./dist/exports/rsc.js"
 			},
 			"./i18n": {
 				"types": "./dist/exports/i18n.d.ts",
