@@ -2,8 +2,9 @@
 
 import { Link, NavGroup, useConfig } from '@payloadcms/ui'
 import { usePathname } from 'next/navigation'
+import { formatAdminURL } from 'payload/shared'
 
-const VIEWS = [
+const VIEWS: { label: string; path: `/${string}` }[] = [
 	{ label: 'All entries', path: '/audit-logs' },
 	{ label: 'Current tenant', path: '/audit-logs-tenant' },
 ]
@@ -23,7 +24,7 @@ export function AuditLogsNav() {
 	return (
 		<NavGroup label="Audit log views">
 			{VIEWS.map(({ label, path }) => {
-				const href = `${admin}${path}`
+				const href = formatAdminURL({ adminRoute: admin, path })
 				const active = pathname === href
 				return (
 					<Link className="nav__link" href={href} id={`nav-${path.slice(1)}`} key={path}>

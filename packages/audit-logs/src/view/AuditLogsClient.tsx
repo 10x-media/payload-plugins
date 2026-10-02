@@ -2,6 +2,7 @@
 
 import { Button, Pagination, PerPage, Pill, useStepNav } from '@payloadcms/ui'
 import { useRouter } from 'next/navigation'
+import { formatAdminURL } from 'payload/shared'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import './index.css'
@@ -60,7 +61,10 @@ export function AuditLogsClient({
 			setRunningTask(task)
 			setLastResult(null)
 			try {
-				const res = await fetch(`${apiRoute}/audit-retention/run?task=${task}`, { method: 'POST' })
+				const res = await fetch(
+					`${formatAdminURL({ apiRoute, path: '/audit-retention/run' })}?task=${task}`,
+					{ method: 'POST' }
+				)
 				const json = await res.json()
 				if (res.ok) {
 					setLastResult(`Queued: ${task}`)

@@ -1,8 +1,8 @@
 'use client'
 
 import { ChevronIcon, ExternalLinkIcon, Link } from '@payloadcms/ui'
-
 import { useSearchParams } from 'next/navigation'
+import { formatAdminURL } from 'payload/shared'
 import { type ReactNode, useState } from 'react'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
@@ -89,9 +89,12 @@ export function LogRow({
 		doc.operation === 'delete'
 			? undefined
 			: isGlobal
-				? `${adminRoute}/globals/${doc.documentId}`
+				? formatAdminURL({ adminRoute, path: `/globals/${doc.documentId}` })
 				: doc.documentId
-					? `${adminRoute}/collections/${doc.relationTo}/${encodeURIComponent(doc.documentId)}`
+					? formatAdminURL({
+							adminRoute,
+							path: `/collections/${doc.relationTo}/${encodeURIComponent(doc.documentId)}`,
+						})
 					: undefined
 	const isExpandable = hasDiff || hasSnapshot || hasEventDetails || hasMeta || hasGroup
 	const entityName = isGlobal
@@ -174,7 +177,10 @@ export function LogRow({
 								<Link
 									aria-label={t(keys.viewDocument)}
 									className="al-badge__open"
-									href={`${adminRoute}/collections/${tenantsSlug}/${encodeURIComponent(String(tenantId))}`}
+									href={formatAdminURL({
+										adminRoute,
+										path: `/collections/${tenantsSlug}/${encodeURIComponent(String(tenantId))}`,
+									})}
 									rel="noopener"
 									target="_blank"
 									title={t(keys.viewDocument)}

@@ -1,6 +1,7 @@
 'use client'
 
 import { Link, Pill, Popup } from '@payloadcms/ui'
+import { formatAdminURL } from 'payload/shared'
 
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
@@ -16,7 +17,10 @@ type Props = {
 const userHref = (adminRoute: string, user: ResolvedUser): string | undefined =>
 	user.deleted || !user.slug
 		? undefined
-		: `${adminRoute}/collections/${user.slug}/${encodeURIComponent(user.id)}`
+		: formatAdminURL({
+				adminRoute,
+				path: `/collections/${user.slug}/${encodeURIComponent(user.id)}`,
+			})
 
 const UserName = ({ adminRoute, user }: { adminRoute: string; user: ResolvedUser }) => {
 	const { t } = useTranslation()
