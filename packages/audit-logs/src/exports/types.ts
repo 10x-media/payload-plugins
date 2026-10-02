@@ -32,6 +32,7 @@ export type {
 	CustomEventComponents,
 	DataRetentionConfig,
 	DeleteJobHooks,
+	EventTypeOption,
 	GlobalAuditLogConfig,
 	GlobalAuditOptions,
 	MultiTenancyConfig,

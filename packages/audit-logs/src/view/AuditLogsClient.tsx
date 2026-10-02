@@ -2,7 +2,7 @@
 
 import { Button, Pagination, PerPage, Pill, useStepNav } from '@payloadcms/ui'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import './index.css'
 
@@ -18,20 +18,23 @@ const LIMIT_OPTIONS = [10, 25, 50, 100]
 export function AuditLogsClient({
 	adminRoute,
 	apiRoute,
-	collectionSlugs,
+	collectionOptions,
 	docs,
 	totalDocs,
 	totalPages,
 	page,
 	limit,
 	filters,
-	globalSlugs,
+	globalOptions,
+	refLabels,
+	titleFields,
 	lockedTenantId,
 	tenantOptions,
 	userTitleFields,
 	payloadAPILabels,
 	debugMode,
 	renderedEvents,
+	customEventTypes,
 	hasArchive,
 }: AuditLogsClientProps) {
 	const router = useRouter()
@@ -67,6 +70,18 @@ export function AuditLogsClient({
 			}
 		},
 		[apiRoute]
+	)
+
+	// Auth types are the plugin's own; custom ones come from `logs.eventTypes` and the
+	// renderer keys. Used by the Event filter and the row badge alike.
+	const eventTypeLabels = useMemo(
+		() => ({
+			login: t(keys.authEventLogin),
+			failed_login: t(keys.authEventFailedLogin),
+			forgot_password: t(keys.authEventForgotPassword),
+			...Object.fromEntries(customEventTypes.map(({ label, value }) => [value, label])),
+		}),
+		[customEventTypes, t]
 	)
 
 	const handleFilter = useCallback(
@@ -131,12 +146,16 @@ export function AuditLogsClient({
 			)}
 
 			<FilterBar
-				collectionSlugs={collectionSlugs}
+				collectionOptions={collectionOptions}
+				customEventTypes={customEventTypes}
+				eventTypeLabels={eventTypeLabels}
 				filters={filters}
-				globalSlugs={globalSlugs}
+				globalOptions={globalOptions}
+				refLabels={refLabels}
+				titleFields={titleFields}
+				userCollections={Object.keys(userTitleFields)}
 				onFilter={handleFilter}
 				tenantOptions={lockedTenantId ? undefined : tenantOptions}
-				userTitleFields={userTitleFields}
 			/>
 
 			<div className="al-list">
@@ -148,6 +167,7 @@ export function AuditLogsClient({
 							adminRoute={adminRoute}
 							doc={doc as unknown as AuditLogDoc}
 							key={String(doc.id)}
+							eventTypeLabels={eventTypeLabels}
 							payloadAPILabels={payloadAPILabels}
 							renderedEvent={renderedEvents?.[String(doc.id)]}
 							userTitleFields={userTitleFields}

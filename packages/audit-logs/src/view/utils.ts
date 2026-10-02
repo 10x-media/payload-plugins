@@ -2,6 +2,37 @@ import type { Filters } from './types'
 
 export const GLOBAL_SENTINEL = '__global__'
 
+/** Date presets the Date filter offers; each fills `dateFrom` relative to now. */
+export const DATE_RANGES = ['24h', '7d', '30d'] as const
+export type DateRange = (typeof DATE_RANGES)[number]
+
+const RANGE_MS: Record<DateRange, number> = {
+	'24h': 24 * 60 * 60 * 1000,
+	'7d': 7 * 24 * 60 * 60 * 1000,
+	'30d': 30 * 24 * 60 * 60 * 1000,
+}
+
+/** Start of a preset window as an ISO string, relative to `now`. */
+export const rangeStart = (range: DateRange, now: number = Date.now()): string =>
+	new Date(now - RANGE_MS[range]).toISOString()
+
+/**
+ * The preset a `dateFrom` was set from, while it still matches within 1% of the
+ * preset's window, so the Date pill keeps reading "Last 7 days" until it clearly
+ * no longer is.
+ */
+export const matchingRange = (
+	dateFrom: string | undefined,
+	dateTo: string | undefined,
+	now: number = Date.now()
+): DateRange | undefined => {
+	if (!dateFrom || dateTo) return undefined
+	const from = Date.parse(dateFrom)
+	return DATE_RANGES.find(
+		(range) => Math.abs(from - (now - RANGE_MS[range])) <= RANGE_MS[range] * 0.01
+	)
+}
+
 export const OPERATION_LABELS: Record<string, string> = {
 	auth: 'Auth',
 	create: 'Create',
@@ -118,13 +149,12 @@ export const buildParams = (filters: Filters, page?: number, limit?: number): st
 	for (const c of filters.collections ?? []) params.append('collection', c)
 	for (const g of filters.globals ?? []) params.append('global', g)
 	for (const op of filters.operations ?? []) params.append('operation', op)
-	if (filters.documentId) params.set('documentId', filters.documentId)
-	if (filters.eventType) params.set('eventType', filters.eventType)
+	for (const type of filters.eventTypes ?? []) params.append('eventType', type)
+	for (const ref of filters.documents ?? []) params.append('documentId', ref)
 	for (const path of filters.changedPaths ?? []) params.append('changedPath', path)
 	for (const t of filters.tenants ?? []) params.append('tenant', t)
-	for (const id of filters.userIds ?? []) params.append('userId', id)
-	if (filters.userCollection) params.set('userCollection', filters.userCollection)
-	if (filters.group) params.set('group', filters.group)
+	for (const ref of filters.users ?? []) params.append('userId', ref)
+	for (const group of filters.groups ?? []) params.append('group', group)
 	if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
 	if (filters.dateTo) params.set('dateTo', filters.dateTo)
 	if (page && page > 1) params.set('page', String(page))

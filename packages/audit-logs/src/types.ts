@@ -524,6 +524,9 @@ export type PayloadAPIOptionObject = { label: string; value: string }
 /** A `logs.payloadAPIs` entry. A bare string is used as both value and label. */
 export type PayloadAPIOption = PayloadAPIOptionObject | string
 
+/** A `logs.eventTypes` entry. A bare string is used as both value and label. */
+export type EventTypeOption = { label: string; value: string } | string
+
 export type MultiTenancyConfig = {
 	/**
 	 * The slug of the tenants collection. Matches `tenantsSlug` in the multi-tenant plugin.
@@ -631,6 +634,18 @@ export type AuditPluginConfig = {
 		 * payloadAPIs: ['MCP', { label: 'Server-side', value: 'local' }]
 		 */
 		payloadAPIs?: PayloadAPIOption[]
+		/**
+		 * Custom event types (`createAuditEvent`) the view offers in its Event filter,
+		 * and the label each shows with in the filter and on the row badge. Types with a
+		 * renderer in `view.components.customEvents` are offered without being listed.
+		 * Anything else is still reachable through the filter's free text entry.
+		 *
+		 * A bare string is its own label.
+		 *
+		 * @example
+		 * eventTypes: ['order_paid', { label: 'Refund', value: 'order_refunded' }]
+		 */
+		eventTypes?: EventTypeOption[]
 		/**
 		 * Whether to collect the requester's IP address and store it on each audit log entry.
 		 * Set to `false` if you do not want IP addresses stored (e.g. for GDPR compliance).

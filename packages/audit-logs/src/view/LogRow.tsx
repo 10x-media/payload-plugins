@@ -15,6 +15,8 @@ import { apiBadgeClass, apiLabel, GLOBAL_SENTINEL, OPERATION_LABELS, resolveUser
 type Props = {
 	adminRoute: string
 	doc: AuditLogDoc
+	/** Label per auth or custom event type, for the badge. */
+	eventTypeLabels: Record<string, string>
 	payloadAPILabels: Record<string, string>
 	/** Host renderer for a custom event, replacing the default table and JSON. */
 	renderedEvent?: ReactNode
@@ -24,6 +26,7 @@ type Props = {
 export function LogRow({
 	adminRoute,
 	doc,
+	eventTypeLabels,
 	payloadAPILabels,
 	renderedEvent,
 	userTitleFields,
@@ -85,7 +88,9 @@ export function LogRow({
 
 				<span className="al-row__op-col">
 					<span className={`al-badge al-badge--op al-badge--${doc.operation}`}>
-						{doc.eventType ?? OPERATION_LABELS[doc.operation] ?? doc.operation}
+						{doc.eventType
+							? (eventTypeLabels[doc.eventType] ?? doc.eventType)
+							: (OPERATION_LABELS[doc.operation] ?? doc.operation)}
 					</span>
 					{docHref ? (
 						<Link

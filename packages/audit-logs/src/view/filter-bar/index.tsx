@@ -1,364 +1,274 @@
 'use client'
 
-import { Button, Popup } from '@payloadcms/ui'
+import { AnimateHeight, Button, ReactSelect } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
+import { splitRef } from '../filterQuery'
 import type { Filters } from '../types'
-import { OPERATION_LABELS } from '../utils'
-import { AddFilterPopup } from './AddFilterPopup'
-import type { AvailableFilter, FilterBarProps } from './types'
-import { formatDatePill } from './utils'
-import { ValueEditor } from './ValueEditor'
+import { CollectionEditor } from './CollectionEditor'
+import { DateEditor, dateFilterValue } from './DateEditor'
+import { EventEditor, eventFilterValue } from './EventEditor'
+import { FilterChoice } from './FilterChoice'
+import { MoreFilters } from './MoreFilters'
+import { RefPicker } from './RefPicker'
+import type { FilterBarProps } from './types'
 
+const PANEL_ID = 'al-filterbar-panel'
+
+type PillArgs = { id: string; label: string; value: string }
+
+/**
+ * One row: a fixed pill per common filter, each always showing its value, then
+ * "More filters" for the rare ones. A pill opens its editor in a panel below the
+ * bar, one at a time, the way the list view opens columns and filters. Changes
+ * are staged and applied together, since every apply is a full server render.
+ */
 export function FilterBar({
-	collectionSlugs,
+	collectionOptions,
+	customEventTypes,
+	eventTypeLabels,
 	filters,
-	globalSlugs,
+	globalOptions,
 	onFilter,
+	refLabels,
 	tenantOptions,
-	userTitleFields,
+	titleFields,
+	userCollections,
 }: FilterBarProps) {
 	const { t } = useTranslation()
 	const [staged, setStaged] = useState<Filters>(filters)
+	const [panel, setPanel] = useState<string>()
+	// The panel that is collapsing keeps its content until the animation ends. Every
+	// other panel is unmounted, so an editor's draft state starts fresh on reopen.
+	const [closing, setClosing] = useState<string>()
+	// Server-resolved titles, plus whatever the drawers pick before the next apply.
+	const [labels, setLabels] = useState(refLabels)
 
 	useEffect(() => {
 		setStaged(filters)
 	}, [filters])
+	useEffect(() => {
+		setLabels((current) => ({ ...current, ...refLabels }))
+	}, [refLabels])
+
+	const toggle = (id: string) => {
+		setClosing(panel)
+		setPanel(panel === id ? undefined : id)
+	}
+	const close = useCallback(() => {
+		setClosing(panel)
+		setPanel(undefined)
+	}, [panel])
+	const onLabel = useCallback(
+		(ref: string, label: string) => setLabels((current) => ({ ...current, [ref]: label })),
+		[]
+	)
 
 	const isDirty = JSON.stringify(staged) !== JSON.stringify(filters)
+	const hasActiveFilters = Object.values(staged).some((value) =>
+		Array.isArray(value) ? value.length > 0 : Boolean(value)
+	)
 
-	const hasActiveFilters =
-		(staged.collections?.length ?? 0) > 0 ||
-		(staged.globals?.length ?? 0) > 0 ||
-		(staged.operations?.length ?? 0) > 0 ||
-		(staged.tenants?.length ?? 0) > 0 ||
-		(staged.userIds?.length ?? 0) > 0 ||
-		!!staged.documentId ||
-		!!staged.eventType ||
-		!!staged.group ||
-		(staged.changedPaths?.length ?? 0) > 0 ||
-		!!staged.dateFrom ||
-		!!staged.dateTo
+	const labelOf = (options: { label: string; value: string }[], value: string) =>
+		options.find((o) => o.value === value)?.label ?? value
+	const refNames = (refs?: string[]) =>
+		(refs ?? []).map((ref) => labels[ref] ?? splitRef(ref).id).join(', ')
 
-	const hasOperations = (staged.operations?.length ?? 0) > 0
-	const hasAuthOp = staged.operations?.includes('auth')
-	const hasCustomOp = staged.operations?.includes('custom')
-	const hasGlobals = (staged.globals?.length ?? 0) > 0
+	const scopeValue = [
+		...(staged.collections ?? []).map((v) => labelOf(collectionOptions, v)),
+		...(staged.globals ?? []).map((v) => labelOf(globalOptions, v)),
+	].join(', ')
+	const userValue = refNames(staged.users)
+	const tenantValue = (staged.tenants ?? []).map((v) => labelOf(tenantOptions ?? [], v)).join(', ')
 
-	const availableToAdd: AvailableFilter[] = [
-		...((staged.collections?.length ?? 0) === 0
-			? [{ key: 'collections' as const, label: t(keys.filterCollection) }]
-			: []),
-		...(globalSlugs.length > 0 && (staged.globals?.length ?? 0) === 0
-			? [{ key: 'globals' as const, label: t(keys.filterGlobal) }]
-			: []),
-		...((staged.operations?.length ?? 0) === 0
-			? [{ key: 'operations' as const, label: t(keys.filterOperation) }]
-			: []),
-		...(tenantOptions && tenantOptions.length > 0 && (staged.tenants?.length ?? 0) === 0
-			? [{ key: 'tenant' as const, label: t(keys.filterTenant) }]
-			: []),
-		...(Object.keys(userTitleFields).length > 0 && (staged.userIds?.length ?? 0) === 0
-			? [{ key: 'userId' as const, label: t(keys.filterUser) }]
-			: []),
-		// documentId not available when globals filter is active (globals use documentId internally)
-		...(!staged.documentId && !hasGlobals
-			? [{ key: 'documentId' as const, label: t(keys.filterDocument) }]
-			: []),
-		...(!staged.eventType && hasOperations && (hasAuthOp || hasCustomOp)
-			? [{ key: 'eventType' as const, label: t(keys.filterEventType) }]
-			: []),
-		{ key: 'changedPath' as const, label: t(keys.filterChangedPath) },
-		...(!staged.group ? [{ key: 'group' as const, label: t(keys.filterGroup) }] : []),
-		...(!staged.dateFrom && !staged.dateTo
-			? [{ key: 'dateRange' as const, label: t(keys.filterDateRange) }]
-			: []),
-	]
+	// The rare filters share one pill, which names the ones in use.
+	const moreValue = [
+		...(staged.documents?.length ? [t(keys.filterDocument)] : []),
+		...(staged.changedPaths?.length ? [t(keys.filterChangedPath)] : []),
+		...(staged.groups?.length ? [t(keys.filterGroup)] : []),
+	].join(', ')
 
-	const getMultiPillValue = (
-		field: 'collections' | 'globals' | 'operations' | 'tenants' | 'userIds'
-	): string => {
-		const values = staged[field] ?? []
-		if (field === 'operations') return values.map((v) => OPERATION_LABELS[v] ?? v).join(', ')
-		if (field === 'userIds') return values.map((id) => `#${id.slice(-8)}`).join(', ')
-		if (field === 'tenants')
-			return values.map((id) => tenantOptions?.find((o) => o.value === id)?.label ?? id).join(', ')
-		return values.join(', ')
-	}
-
-	const removeMulti =
-		(field: 'collections' | 'globals' | 'operations' | 'tenants' | 'userIds') =>
-		(e: React.MouseEvent) => {
-			e.stopPropagation()
-			setStaged((f) => {
-				const next = { ...f, [field]: undefined }
-				if (field === 'operations') delete next.eventType
-				if (field === 'userIds') delete next.userCollection
-				return next
-			})
-		}
-
-	const removeScalar = (field: 'documentId' | 'eventType' | 'group') => (e: React.MouseEvent) => {
-		e.stopPropagation()
-		setStaged((f) => {
-			const next = { ...f }
-			delete next[field]
-			return next
-		})
-	}
-
-	const removeDateRange = (e: React.MouseEvent) => {
-		e.stopPropagation()
-		setStaged((f) => {
-			const next = { ...f }
-			delete next.dateFrom
-			delete next.dateTo
-			return next
-		})
-	}
-
-	const removeChangedPath = (index: number) => (e: React.MouseEvent) => {
-		e.stopPropagation()
-		setStaged((f) => {
-			const paths = [...(f.changedPaths ?? [])]
-			paths.splice(index, 1)
-			return { ...f, changedPaths: paths.length ? paths : undefined }
-		})
-	}
-
-	const handleApply = useCallback(() => onFilter(staged), [onFilter, staged])
+	const handleApply = useCallback(() => {
+		close()
+		onFilter(staged)
+	}, [close, onFilter, staged])
 
 	const handleClear = useCallback(() => {
+		close()
 		setStaged({})
 		onFilter({})
-	}, [onFilter])
+	}, [close, onFilter])
 
-	const datePillValue = (() => {
-		if (staged.dateFrom && staged.dateTo)
-			return `${formatDatePill(staged.dateFrom)} – ${formatDatePill(staged.dateTo)}`
-		if (staged.dateFrom) return `from ${formatDatePill(staged.dateFrom)}`
-		if (staged.dateTo) return `until ${formatDatePill(staged.dateTo)}`
-		return ''
-	})()
+	const editorFor = (id: string): React.ReactNode => {
+		const shared = { setStaged, staged }
+		switch (id) {
+			case 'event':
+				return (
+					<EventEditor
+						{...shared}
+						customEventTypes={customEventTypes}
+						eventTypeLabels={eventTypeLabels}
+					/>
+				)
+			case 'scope':
+				return (
+					<CollectionEditor
+						{...shared}
+						collectionOptions={collectionOptions}
+						globalOptions={globalOptions}
+					/>
+				)
+			case 'user':
+				return (
+					<div className="al-panel-grid">
+						<RefPicker
+							collections={userCollections}
+							label={t(keys.filterUser)}
+							labels={labels}
+							onChange={(users) => setStaged((f): Filters => ({ ...f, users }))}
+							onLabel={onLabel}
+							refs={staged.users ?? []}
+							titleFields={titleFields}
+						/>
+					</div>
+				)
+			case 'date':
+				return <DateEditor {...shared} />
+			case 'tenant':
+				return (
+					<div className="al-panel-grid">
+						<div className="al-ref-picker">
+							<div className="al-filterpopover__editor-label">{t(keys.filterTenant)}</div>
+							<ReactSelect
+								isClearable
+								isMulti
+								onChange={(selected) => {
+									const tenants = (
+										Array.isArray(selected) ? selected : selected ? [selected] : []
+									).map((o) => String(o.value))
+									setStaged(
+										(f): Filters => ({ ...f, tenants: tenants.length ? tenants : undefined })
+									)
+								}}
+								options={tenantOptions ?? []}
+								value={(tenantOptions ?? []).filter((o) => staged.tenants?.includes(o.value))}
+							/>
+						</div>
+					</div>
+				)
+			case 'more':
+				return (
+					<MoreFilters
+						{...shared}
+						documentCollections={
+							staged.collections?.length
+								? staged.collections
+								: collectionOptions.map((o) => o.value)
+						}
+						labels={labels}
+						onLabel={onLabel}
+						titleFields={titleFields}
+					/>
+				)
+			default:
+				return null
+		}
+	}
+
+	const panelIds = [
+		'event',
+		'scope',
+		...(userCollections.length > 0 ? ['user'] : []),
+		'date',
+		...(tenantOptions && tenantOptions.length > 0 ? ['tenant'] : []),
+		'more',
+	]
+
+	const choice = ({ active, id, label, value }: PillArgs & { active: boolean }) => (
+		<FilterChoice
+			active={active}
+			controls={`${PANEL_ID}-${id}`}
+			label={label}
+			onToggle={() => toggle(id)}
+			open={panel === id}
+			value={value}
+		/>
+	)
 
 	return (
 		<div className="al-filterbar">
 			<div className="al-filterbar__row">
-				{/* Multi-select pills (collections, globals, operations, tenants, userIds) */}
-				{(['collections', 'globals', 'operations', 'tenants', 'userIds'] as const).map((field) => {
-					const values = staged[field] ?? []
-					if (!values.length) return null
-					const label =
-						field === 'collections'
-							? t(keys.filterCollection)
-							: field === 'globals'
-								? t(keys.filterGlobal)
-								: field === 'operations'
-									? t(keys.filterOperation)
-									: field === 'tenants'
-										? t(keys.filterTenant)
-										: t(keys.filterUser)
-					return (
-						<Popup
-							key={field}
-							button={
-								<button className="al-filterpill" type="button">
-									<span className="al-filterpill__label">{label}</span>
-									<span className="al-filterpill__sep">:</span>
-									<span className="al-filterpill__value">{getMultiPillValue(field)}</span>
-									{/* biome-ignore lint/a11y/useKeyWithClickEvents: the remove control sits inside the Popup trigger button, so it cannot itself be a button; keyboard users remove the filter from inside the popup */}
-									{/* biome-ignore lint/a11y/useSemanticElements: same nested-trigger constraint as the sibling suppression */}
-									<span
-										className="al-filterpill__remove"
-										onClick={removeMulti(field)}
-										role="button"
-										tabIndex={-1}
-									>
-										×
-									</span>
-								</button>
-							}
-							buttonType="custom"
-							caret={false}
-							horizontalAlign="left"
-							portalClassName="al-filter-popup"
-							render={({ close }) => (
-								<ValueEditor
-									collectionSlugs={collectionSlugs}
-									field={field === 'userIds' ? 'userId' : field === 'tenants' ? 'tenant' : field}
-									globalSlugs={globalSlugs}
-									onClose={close}
-									setStaged={setStaged}
-									staged={staged}
-									tenantOptions={tenantOptions}
-									userTitleFields={userTitleFields}
-								/>
-							)}
-							size="fit-content"
-						/>
-					)
+				{choice({
+					active: Boolean(staged.operations?.length || staged.eventTypes?.length),
+					id: 'event',
+					label: t(keys.filterEvent),
+					value: eventFilterValue(staged, eventTypeLabels, t),
 				})}
-
-				{/* Single value pills (documentId, eventType, group) */}
-				{(['documentId', 'eventType', 'group'] as const).map((field) => {
-					const val = staged[field]
-					if (!val) return null
-					const label =
-						field === 'documentId'
-							? t(keys.filterDocument)
-							: field === 'eventType'
-								? t(keys.filterEventType)
-								: t(keys.filterGroup)
-					const displayVal = field === 'documentId' ? `#${val.slice(-8)}` : val
-					return (
-						<Popup
-							key={field}
-							button={
-								<button className="al-filterpill" type="button">
-									<span className="al-filterpill__label">{label}</span>
-									<span className="al-filterpill__sep">:</span>
-									<span className="al-filterpill__value">{displayVal}</span>
-									{/* biome-ignore lint/a11y/useKeyWithClickEvents: the remove control sits inside the Popup trigger button, so it cannot itself be a button; keyboard users remove the filter from inside the popup */}
-									{/* biome-ignore lint/a11y/useSemanticElements: same nested-trigger constraint as the sibling suppression */}
-									<span
-										className="al-filterpill__remove"
-										onClick={removeScalar(field)}
-										role="button"
-										tabIndex={-1}
-									>
-										×
-									</span>
-								</button>
-							}
-							buttonType="custom"
-							caret={false}
-							horizontalAlign="left"
-							portalClassName="al-filter-popup"
-							render={({ close }) => (
-								<ValueEditor
-									collectionSlugs={collectionSlugs}
-									field={field}
-									globalSlugs={globalSlugs}
-									onClose={close}
-									setStaged={setStaged}
-									staged={staged}
-									userTitleFields={userTitleFields}
-								/>
-							)}
-							size="fit-content"
-						/>
-					)
+				{choice({
+					active: Boolean(scopeValue),
+					id: 'scope',
+					label: t(keys.filterCollection),
+					value: scopeValue || t(keys.filterAll),
 				})}
+				{userCollections.length > 0 &&
+					choice({
+						active: Boolean(userValue),
+						id: 'user',
+						label: t(keys.filterUser),
+						value: userValue || t(keys.filterAll),
+					})}
+				{choice({
+					active: Boolean(staged.dateFrom || staged.dateTo),
+					id: 'date',
+					label: t(keys.filterDate),
+					value: dateFilterValue(staged, t),
+				})}
+				{tenantOptions &&
+					tenantOptions.length > 0 &&
+					choice({
+						active: Boolean(tenantValue),
+						id: 'tenant',
+						label: t(keys.filterTenant),
+						value: tenantValue || t(keys.filterAll),
+					})}
 
-				{/* Changed path pills */}
-				{(staged.changedPaths ?? []).map((path, i) => (
-					<Popup
-						// biome-ignore lint/suspicious/noArrayIndexKey: the same changed path can be staged twice, so the value is not a stable key
-						key={`cp-${i}`}
-						button={
-							<button className="al-filterpill" type="button">
-								<span className="al-filterpill__label">{t(keys.filterChangedPath)}</span>
-								<span className="al-filterpill__sep">:</span>
-								<span className="al-filterpill__value">{path}</span>
-								{/* biome-ignore lint/a11y/useKeyWithClickEvents: the remove control sits inside the Popup trigger button, so it cannot itself be a button; keyboard users remove the filter from inside the popup */}
-								{/* biome-ignore lint/a11y/useSemanticElements: same nested-trigger constraint as the sibling suppression */}
-								<span
-									className="al-filterpill__remove"
-									onClick={removeChangedPath(i)}
-									role="button"
-									tabIndex={-1}
-								>
-									×
-								</span>
-							</button>
-						}
-						buttonType="custom"
-						caret={false}
-						horizontalAlign="left"
-						portalClassName="al-filter-popup"
-						render={({ close }) => (
-							<ValueEditor
-								collectionSlugs={collectionSlugs}
-								field="changedPath"
-								globalSlugs={globalSlugs}
-								index={i}
-								onClose={close}
-								setStaged={setStaged}
-								staged={staged}
-								userTitleFields={userTitleFields}
-							/>
-						)}
-						size="fit-content"
-					/>
-				))}
-
-				{/* Date range pill */}
-				{(staged.dateFrom || staged.dateTo) && (
-					<Popup
-						button={
-							<button className="al-filterpill" type="button">
-								<span className="al-filterpill__label">{t(keys.filterDate)}</span>
-								<span className="al-filterpill__sep">:</span>
-								<span className="al-filterpill__value">{datePillValue}</span>
-								{/* biome-ignore lint/a11y/useKeyWithClickEvents: the remove control sits inside the Popup trigger button, so it cannot itself be a button; keyboard users remove the filter from inside the popup */}
-								{/* biome-ignore lint/a11y/useSemanticElements: same nested-trigger constraint as the sibling suppression */}
-								<span
-									className="al-filterpill__remove"
-									onClick={removeDateRange}
-									role="button"
-									tabIndex={-1}
-								>
-									×
-								</span>
-							</button>
-						}
-						buttonType="custom"
-						caret={false}
-						horizontalAlign="left"
-						portalClassName="al-filter-popup"
-						render={({ close }) => (
-							<ValueEditor
-								collectionSlugs={collectionSlugs}
-								field="dateRange"
-								globalSlugs={globalSlugs}
-								onClose={close}
-								setStaged={setStaged}
-								staged={staged}
-								userTitleFields={userTitleFields}
-							/>
-						)}
-						size="fit-content"
-					/>
-				)}
-
-				{/* Add filter button */}
-				{availableToAdd.length > 0 && (
-					<AddFilterPopup
-						availableToAdd={availableToAdd}
-						collectionSlugs={collectionSlugs}
-						globalSlugs={globalSlugs}
-						setStaged={setStaged}
-						staged={staged}
-						tenantOptions={tenantOptions}
-						userTitleFields={userTitleFields}
-					/>
-				)}
+				{choice({
+					active: Boolean(moreValue),
+					id: 'more',
+					label: t(keys.moreFilters),
+					value: moreValue,
+				})}
 
 				<span className="al-filterbar__spacer" />
 
 				{isDirty && (
-					<Button onClick={handleApply} margin={false} buttonStyle="primary" size={'small'}>
+					<Button onClick={handleApply} margin={false} buttonStyle="primary" size="small">
 						{t(keys.apply)}
 					</Button>
 				)}
 				{hasActiveFilters && (
-					<Button onClick={handleClear} margin={false} buttonStyle="pill" size={'small'}>
+					<Button onClick={handleClear} margin={false} buttonStyle="subtle" size="small">
 						{t(keys.clearAll)}
 					</Button>
 				)}
 			</div>
+
+			{/* One per pill, like the list view: the open one expands while the previous
+			    one collapses. */}
+			{panelIds.map((id) => (
+				<AnimateHeight
+					className="al-filterbar__panel"
+					height={panel === id ? 'auto' : 0}
+					id={`${PANEL_ID}-${id}`}
+					key={id}
+				>
+					<div className="al-filterbar__panel-inner">
+						{(panel === id || closing === id) && editorFor(id)}
+					</div>
+				</AnimateHeight>
+			))}
 		</div>
 	)
 }

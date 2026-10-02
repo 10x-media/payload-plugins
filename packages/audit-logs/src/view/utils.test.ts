@@ -6,6 +6,8 @@ import {
 	buildParams,
 	formatValue,
 	isLongValue,
+	matchingRange,
+	rangeStart,
 	resolveUser,
 } from './utils'
 
@@ -112,10 +114,10 @@ describe('buildParams', () => {
 		)
 	})
 
-	it('sets single-value filters once', () => {
-		expect(buildParams({ documentId: '42', group: 'import-7' })).toBe(
-			'documentId=42&group=import-7'
-		)
+	it('repeats documents, users and groups too', () => {
+		expect(
+			buildParams({ documents: ['posts:42', '7'], users: ['users:1'], groups: ['import-7'] })
+		).toBe('documentId=posts%3A42&documentId=7&userId=users%3A1&group=import-7')
 	})
 
 	it('leaves page one out of the URL', () => {
@@ -165,5 +167,28 @@ describe('apiLabel', () => {
 	it('does not reach an inherited property', () => {
 		expect(apiLabel('constructor', {})).toBe('constructor')
 		expect(apiLabel('toString', {})).toBe('toString')
+	})
+})
+
+describe('rangeStart', () => {
+	it('subtracts the preset window from now', () => {
+		const now = Date.parse('2026-10-02T12:00:00.000Z')
+		expect(rangeStart('24h', now)).toBe('2026-10-01T12:00:00.000Z')
+		expect(rangeStart('7d', now)).toBe('2026-09-25T12:00:00.000Z')
+		expect(rangeStart('30d', now)).toBe('2026-09-02T12:00:00.000Z')
+	})
+})
+
+describe('matchingRange', () => {
+	const now = Date.parse('2026-10-02T12:00:00.000Z')
+
+	it('recognises a preset start, with a little slack', () => {
+		expect(matchingRange('2026-09-25T12:00:00.000Z', undefined, now)).toBe('7d')
+		expect(matchingRange('2026-09-25T12:30:00.000Z', undefined, now)).toBe('7d')
+	})
+
+	it('is nothing for an end date or a start far from any preset', () => {
+		expect(matchingRange('2026-09-25T12:00:00.000Z', '2026-09-30', now)).toBeUndefined()
+		expect(matchingRange('2026-09-20T12:00:00.000Z', undefined, now)).toBeUndefined()
 	})
 })

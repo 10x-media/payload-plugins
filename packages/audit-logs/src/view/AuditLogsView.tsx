@@ -4,15 +4,16 @@ import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerCompo
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, CollectionSlug, Params, PopulateType, Where } from 'payload'
 import { parseCookies } from 'payload'
-import { payloadAPILabels } from '../plugin/resolveOptions'
+import { customEventTypeOptions, payloadAPILabels } from '../plugin/resolveOptions'
 import { keys } from '../translations'
 import { asTranslate } from '../translations/server'
 import type { AuditPluginConfig, CustomEventComponentProps } from '../types'
 import { resolveCustomEventComponent } from '../utilities/customEventComponents'
 import { AuditLogsClient } from './AuditLogsClient'
 import { authRedirectUrl } from './authRedirect'
-import type { RenderedEvents } from './types'
-import { GLOBAL_SENTINEL } from './utils'
+import { filterConditions, parseFilters, splitRef } from './filterQuery'
+import { PAYLOAD_INTERNAL_COLLECTIONS, PAYLOAD_INTERNAL_GLOBALS } from './internalEntities'
+import type { RenderedEvents, SelectOption } from './types'
 
 export async function AuditLogsView({
 	initPageResult,
@@ -88,29 +89,20 @@ export async function AuditLogsView({
 	const getString = (v: string | string[] | undefined): string | undefined =>
 		Array.isArray(v) ? v[0] : v
 
-	const getArray = (v: string | string[] | undefined): string[] =>
-		Array.isArray(v) ? v : v ? [v] : []
-
 	const page = Number(getString(sp.page)) || 1
 	const limit = Number(getString(sp.limit)) || configDefaultLimit
-	const changedPaths = getArray(sp.changedPath)
-	const collections = getArray(sp.collection)
-	const globals = getArray(sp.global)
-	const operations = getArray(sp.operation)
-	const tenants = useTenant ? [] : getArray(sp.tenant)
-	const userIds = getArray(sp.userId)
-	const userCollection = getString(sp.userCollection)
-	const dateFrom = getString(sp.dateFrom)
-	const dateTo = getString(sp.dateTo)
-	const group = getString(sp.group)
+	const filters = parseFilters(sp, { useTenant })
 
-	// Collect collection and global slugs from config
-	const collectionSlugs = req.payload.config.collections
-		.map((c) => c.slug)
-		.filter((slug) => slug !== 'audit-logs')
-		.sort()
-
-	const globalSlugs = (req.payload.config.globals ?? []).map((g) => g.slug).sort()
+	const { collections: collectionConfigs, globals: globalConfigs = [] } = req.payload.config
+	const byLabel = (a: SelectOption, b: SelectOption) => a.label.localeCompare(b.label)
+	const collectionOptions = collectionConfigs
+		.filter((c) => c.slug !== 'audit-logs' && !PAYLOAD_INTERNAL_COLLECTIONS.includes(c.slug))
+		.map((c) => ({ label: labelOf(c.labels?.plural, req.i18n) ?? c.slug, value: c.slug }))
+		.sort(byLabel)
+	const globalOptions = globalConfigs
+		.filter((g) => !PAYLOAD_INTERNAL_GLOBALS.includes(g.slug))
+		.map((g) => ({ label: labelOf(g.label, req.i18n) ?? g.slug, value: g.slug }))
+		.sort(byLabel)
 
 	// Build useAsTitle map for auth collections
 	const userTitleFields: Record<string, string> = {}
@@ -140,65 +132,10 @@ export async function AuditLogsView({
 		}))
 	}
 
-	const whereConditions: Where[] = []
-
-	// Collection / global filter, OR if both are active
-	if (collections.length > 0 || globals.length > 0) {
-		const parts: Where[] = []
-
-		if (collections.length === 1) parts.push({ relationTo: { equals: collections[0] } })
-		else if (collections.length > 1) parts.push({ relationTo: { in: collections } })
-
-		if (globals.length === 1) {
-			parts.push({
-				and: [{ relationTo: { equals: GLOBAL_SENTINEL } }, { documentId: { equals: globals[0] } }],
-			})
-		} else if (globals.length > 1) {
-			parts.push({
-				and: [{ relationTo: { equals: GLOBAL_SENTINEL } }, { documentId: { in: globals } }],
-			})
-		}
-
-		const [onlyPart] = parts
-		whereConditions.push(parts.length === 1 && onlyPart ? onlyPart : { or: parts })
-	}
-
-	if (operations.length === 1) whereConditions.push({ operation: { equals: operations[0] } })
-	else if (operations.length > 1) whereConditions.push({ operation: { in: operations } })
-
-	// documentId filter only applies when no globals filter is active
-	if (getString(sp.documentId) && !globals.length) {
-		whereConditions.push({ documentId: { equals: getString(sp.documentId) } })
-	}
-	if (getString(sp.eventType))
-		whereConditions.push({ eventType: { equals: getString(sp.eventType) } })
-	for (const path of changedPaths) whereConditions.push({ changedPaths: { contains: path } })
-
-	if (userIds.length) {
-		const isPolymorphic = Object.keys(userTitleFields).length > 1
-		if (isPolymorphic) {
-			if (userIds.length === 1) whereConditions.push({ 'user.value': { equals: userIds[0] } })
-			else whereConditions.push({ 'user.value': { in: userIds } })
-			if (userCollection) whereConditions.push({ 'user.relationTo': { equals: userCollection } })
-		} else {
-			if (userIds.length === 1) whereConditions.push({ user: { equals: userIds[0] } })
-			else whereConditions.push({ user: { in: userIds } })
-		}
-	}
-
-	// Tenant filter, locked to cookie in tenant view, URL param in super-admin view
-	if (lockedTenantId) {
-		whereConditions.push({ tenant: { equals: lockedTenantId } })
-	} else if (tenants.length === 1) {
-		whereConditions.push({ tenant: { equals: tenants[0] } })
-	} else if (tenants.length > 1) {
-		whereConditions.push({ tenant: { in: tenants } })
-	}
-
-	if (group) whereConditions.push({ group: { equals: group } })
-	if (dateFrom) whereConditions.push({ createdAt: { greater_than_equal: dateFrom } })
-	if (dateTo) whereConditions.push({ createdAt: { less_than_equal: dateTo } })
-
+	const whereConditions = filterConditions(filters, {
+		lockedTenantId,
+		userCollections: Object.keys(userTitleFields),
+	})
 	if (forceWhere) whereConditions.push(forceWhere)
 
 	const where: Where = whereConditions.length > 0 ? { and: whereConditions } : {}
@@ -208,6 +145,25 @@ export async function AuditLogsView({
 	const populate = Object.fromEntries(
 		Object.entries(userTitleFields).map(([slug, titleField]) => [slug, { [titleField]: true }])
 	) as PopulateType
+
+	// Names for the documents and users the filters name, so their pills read as
+	// names rather than ids. Bounded by what is selected, not by the log.
+	const titleFieldOf = (slug: string): string => {
+		const config = collectionConfigs.find((c) => c.slug === slug)
+		return typeof config?.admin?.useAsTitle === 'string' ? config.admin.useAsTitle : 'id'
+	}
+	const authSlugs = Object.keys(userTitleFields)
+	const refLabels = await resolveRefLabels(
+		req,
+		[
+			...(filters.documents ?? []).map((ref) => ({ ref })),
+			...(filters.users ?? []).map((ref) => ({
+				fallbackSlug: authSlugs.length === 1 ? authSlugs[0] : undefined,
+				ref,
+			})),
+		],
+		titleFieldOf
+	)
 
 	const result = await req.payload.find({
 		collection: 'audit-logs',
@@ -264,23 +220,14 @@ export async function AuditLogsView({
 				<AuditLogsClient
 					adminRoute={req.payload.config.routes?.admin ?? '/admin'}
 					apiRoute={req.payload.config.routes?.api ?? '/api'}
-					collectionSlugs={collectionSlugs}
+					collectionOptions={collectionOptions}
 					docs={result.docs as unknown as Record<string, unknown>[]}
-					filters={{
-						changedPaths: changedPaths.length ? changedPaths : undefined,
-						collections: collections.length ? collections : undefined,
-						dateFrom: dateFrom || undefined,
-						dateTo: dateTo || undefined,
-						documentId: globals.length ? undefined : getString(sp.documentId),
-						eventType: getString(sp.eventType),
-						globals: globals.length ? globals : undefined,
-						group: group || undefined,
-						operations: operations.length ? operations : undefined,
-						tenants: tenants.length ? tenants : undefined,
-						userCollection: userIds.length ? userCollection : undefined,
-						userIds: userIds.length ? userIds : undefined,
-					}}
-					globalSlugs={globalSlugs}
+					filters={filters}
+					globalOptions={globalOptions}
+					refLabels={refLabels}
+					titleFields={Object.fromEntries(
+						collectionConfigs.map((c) => [c.slug, titleFieldOf(c.slug)])
+					)}
 					limit={limit}
 					lockedTenantId={lockedTenantId}
 					page={page}
@@ -292,8 +239,70 @@ export async function AuditLogsView({
 					debugMode={pluginOptions.debug === true && Boolean(pluginOptions.retention)}
 					hasArchive={Boolean(pluginOptions.retention?.archive)}
 					renderedEvents={renderedEvents}
+					customEventTypes={customEventTypeOptions(
+						pluginOptions.logs?.eventTypes,
+						viewConfig?.components?.customEvents
+					)}
 				/>
 			</Gutter>
 		</DefaultTemplate>
 	)
+}
+
+type Label = Record<string, string> | string | ((args: { i18n: unknown; t: unknown }) => string)
+
+/** A collection or global label as configured: plain, per language, or a function. */
+const labelOf = (label: unknown, i18n: { language: string; t: unknown }): string | undefined => {
+	const value = label as Label | undefined
+	if (typeof value === 'string') return value
+	if (typeof value === 'function') return value({ i18n, t: i18n.t })
+	if (value && typeof value === 'object') {
+		return value[i18n.language] ?? value.en ?? Object.values(value)[0]
+	}
+	return undefined
+}
+
+/**
+ * Titles for `slug:id` references, one query per collection. A bare id without a
+ * known collection, or one that no longer resolves, keeps the id as its label.
+ */
+const resolveRefLabels = async (
+	req: AdminViewServerProps['initPageResult']['req'],
+	refs: { fallbackSlug?: string; ref: string }[],
+	titleFieldOf: (slug: string) => string
+): Promise<Record<string, string>> => {
+	const labels: Record<string, string> = {}
+	const bySlug = new Map<string, { id: string; ref: string }[]>()
+	for (const { fallbackSlug, ref } of refs) {
+		const { id, slug = fallbackSlug } = splitRef(ref)
+		labels[ref] = id
+		if (!slug) continue
+		bySlug.set(slug, [...(bySlug.get(slug) ?? []), { id, ref }])
+	}
+	await Promise.all(
+		[...bySlug].map(async ([slug, entries]) => {
+			const titleField = titleFieldOf(slug)
+			if (titleField === 'id') return
+			try {
+				const found = await req.payload.find({
+					collection: slug as CollectionSlug,
+					depth: 0,
+					limit: entries.length,
+					overrideAccess: true,
+					pagination: false,
+					select: { [titleField]: true },
+					where: { id: { in: entries.map((e) => e.id) } },
+				})
+				for (const doc of found.docs as Record<string, unknown>[]) {
+					const title = doc[titleField]
+					for (const entry of entries) {
+						if (String(doc.id) === entry.id && title) labels[entry.ref] = String(title)
+					}
+				}
+			} catch {
+				// An id of the wrong shape for this database; the id stays its own label.
+			}
+		})
+	)
+	return labels
 }

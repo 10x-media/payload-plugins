@@ -68,7 +68,7 @@ test.describe('signed in', () => {
 		await gotoLogs(page)
 
 		// The stand sets `debug: true` with retention configured, so both buttons render.
-		await expect(page.locator('.al-debug-bar__btn')).toHaveCount(2)
+		await expect(page.locator('.al-debug-bar .btn')).toHaveCount(2)
 	})
 
 	test('an excluded field never reaches the log', async ({ page }) => {
@@ -109,7 +109,7 @@ test.describe('signed in', () => {
 		await gotoLogs(page, '?eventType=failed_login')
 
 		const row = rows(page).first()
-		await expect(row.locator('.al-badge--op')).toHaveText('failed_login')
+		await expect(row.locator('.al-badge--op')).toHaveText('Failed login')
 		await expect(row.locator('.al-row__user')).toHaveText('—')
 
 		await rowSummary(row).click()
