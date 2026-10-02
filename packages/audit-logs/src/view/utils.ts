@@ -26,29 +26,66 @@ export const apiBadgeClass = (payloadAPI: string): string =>
 export const apiLabel = (payloadAPI: string, labels: Record<string, string>): string =>
 	(Object.hasOwn(labels, payloadAPI) ? labels[payloadAPI] : undefined) ?? payloadAPI
 
-export const displayUser = (user: unknown, userTitleFields: Record<string, string>): string => {
-	if (!user) return '—'
-	if (typeof user === 'string' || typeof user === 'number') return String(user)
-	if (typeof user === 'object' && user !== null) {
-		const u = user as Record<string, unknown>
-		// Polymorphic populated: { relationTo: 'users', value: { id, email, ... } }
-		if (typeof u.relationTo === 'string' && u.value && typeof u.value === 'object') {
-			const doc = u.value as Record<string, unknown>
-			const titleField = userTitleFields[u.relationTo] ?? 'id'
-			return String(doc[titleField] ?? doc.id ?? '—')
+/**
+ * A `user` or `impersonator` value as the row shows it. `slug` is missing only when
+ * a bare id cannot be tied to a collection, which happens with several auth
+ * collections and a value stored before the field went polymorphic.
+ */
+export type ResolvedUser = {
+	deleted: boolean
+	id: string
+	label: string
+	slug?: string
+}
+
+const onlySlug = (userTitleFields: Record<string, string>): string | undefined => {
+	const slugs = Object.keys(userTitleFields)
+	return slugs.length === 1 ? slugs[0] : undefined
+}
+
+const isId = (value: unknown): value is number | string =>
+	(typeof value === 'string' && value.length > 0) || typeof value === 'number'
+
+const fromDoc = (
+	doc: Record<string, unknown>,
+	slug: string | undefined,
+	userTitleFields: Record<string, string>
+): ResolvedUser | undefined => {
+	if (!isId(doc.id)) return undefined
+	const id = String(doc.id)
+	const titleField = slug ? userTitleFields[slug] : undefined
+	const title = titleField ? doc[titleField] : undefined
+	return { deleted: false, id, label: isId(title) ? String(title) : id, slug }
+}
+
+/**
+ * The view reads with `overrideAccess`, so a relationship that comes back as a bare
+ * id instead of a document points at a user that no longer exists.
+ */
+export const resolveUser = (
+	value: unknown,
+	userTitleFields: Record<string, string>
+): ResolvedUser | undefined => {
+	if (isId(value)) {
+		return {
+			deleted: true,
+			id: String(value),
+			label: String(value),
+			slug: onlySlug(userTitleFields),
 		}
-		// Non-polymorphic populated: direct doc, single auth collection
-		// Read out rather than indexed: a length check does not tell the compiler the element
-		// exists. The single entry condition is unchanged.
-		const entries = Object.entries(userTitleFields)
-		const [onlyEntry] = entries
-		if (entries.length === 1 && onlyEntry) {
-			const titleField = onlyEntry[1]
-			if (titleField !== 'id' && u[titleField]) return String(u[titleField])
-		}
-		if (u.id) return String(u.id)
 	}
-	return String(user)
+	if (!value || typeof value !== 'object') return undefined
+	const record = value as Record<string, unknown>
+	if (typeof record.relationTo === 'string') {
+		const slug = record.relationTo
+		if (isId(record.value)) {
+			return { deleted: true, id: String(record.value), label: String(record.value), slug }
+		}
+		return record.value && typeof record.value === 'object'
+			? fromDoc(record.value as Record<string, unknown>, slug, userTitleFields)
+			: undefined
+	}
+	return fromDoc(record, onlySlug(userTitleFields), userTitleFields)
 }
 
 export const formatDate = (iso: string): string => {

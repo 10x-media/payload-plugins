@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronIcon, Link } from '@payloadcms/ui'
+import { ChevronIcon, ExternalLinkIcon, Link } from '@payloadcms/ui'
 
 import { useSearchParams } from 'next/navigation'
 import { useMemo, useState } from 'react'
@@ -9,7 +9,8 @@ import { useTranslation } from '../translations/useTranslation'
 import { DiffViewer } from './DiffViewer'
 import { FormattedDate } from './FormattedDate'
 import type { AuditLogDoc } from './types'
-import { apiBadgeClass, apiLabel, displayUser, GLOBAL_SENTINEL, OPERATION_LABELS } from './utils'
+import { UserPill } from './UserPill'
+import { apiBadgeClass, apiLabel, GLOBAL_SENTINEL, OPERATION_LABELS, resolveUser } from './utils'
 
 type Props = {
 	adminRoute: string
@@ -39,27 +40,38 @@ export function LogRow({ adminRoute, doc, payloadAPILabels, userTitleFields }: P
 	const isAuthOrCustom = doc.operation === 'auth' || doc.operation === 'custom'
 	const hasMeta = Boolean(doc.ipAddress || doc.userAgent)
 	const hasGroup = Boolean(doc.group)
-	const userLabel = displayUser(doc.user, userTitleFields)
-	const impersonatorLabel = displayUser(doc.impersonator, userTitleFields)
-	const hasImpersonator = Boolean(doc.impersonator) && impersonatorLabel !== '—'
+	const user = resolveUser(doc.user, userTitleFields)
+	const impersonator = resolveUser(doc.impersonator, userTitleFields)
+	// A delete leaves nothing to open, so its collection name stays plain text.
+	const docHref =
+		doc.operation === 'delete'
+			? undefined
+			: isGlobal
+				? `${adminRoute}/globals/${doc.documentId}`
+				: doc.documentId
+					? `${adminRoute}/collections/${doc.relationTo}/${encodeURIComponent(doc.documentId)}`
+					: undefined
 	const isExpandable =
-		hasDiff ||
-		hasSnapshot ||
-		hasMetadata ||
-		isAuthOrCustom ||
-		hasMeta ||
-		hasGroup ||
-		hasImpersonator
+		hasDiff || hasSnapshot || hasMetadata || isAuthOrCustom || hasMeta || hasGroup
 
 	return (
 		<div className={`al-row${expanded ? ' al-row--expanded' : ''}`}>
-			<button
-				type="button"
-				className="al-row__summary"
-				aria-expanded={isExpandable ? expanded : undefined}
-				onClick={() => isExpandable && setExpanded((v) => !v)}
-			>
-				<span className={`al-row__toggle${!isExpandable ? ' al-row__toggle--hidden' : ''}`}>
+			{/* A div, not a button: the user pill holds a link and a popup trigger, which a
+			    button may not contain. The toggle is stretched over the row underneath them. */}
+			<div className={`al-row__summary${isExpandable ? ' al-row__summary--expandable' : ''}`}>
+				{isExpandable && (
+					<button
+						type="button"
+						className="al-row__hit"
+						aria-expanded={expanded}
+						aria-label={t(keys.toggleDetails)}
+						onClick={() => setExpanded((v) => !v)}
+					/>
+				)}
+				<span
+					aria-hidden
+					className={`al-row__toggle${!isExpandable ? ' al-row__toggle--hidden' : ''}`}
+				>
 					<ChevronIcon direction={expanded ? 'down' : 'right'} className="al-row__toggle-icon" />
 				</span>
 
@@ -67,21 +79,29 @@ export function LogRow({ adminRoute, doc, payloadAPILabels, userTitleFields }: P
 					<span className={`al-badge al-badge--op al-badge--${doc.operation}`}>
 						{doc.eventType ?? OPERATION_LABELS[doc.operation] ?? doc.operation}
 					</span>
-					<span className="al-row__collection">{isGlobal ? doc.documentId : doc.relationTo}</span>
-				</span>
-
-				<span className="al-row__docid" title={isGlobal ? undefined : doc.documentId}>
-					{isGlobal ? '—' : doc.documentId ? `#${doc.documentId.slice(-8)}` : '—'}
+					{docHref ? (
+						<Link
+							className="al-row__collection al-row__collection--link"
+							href={docHref}
+							rel="noopener"
+							target="_blank"
+							title={isGlobal ? t(keys.viewGlobal) : t(keys.viewDocument)}
+						>
+							<span className="al-row__collection-name">
+								{isGlobal ? doc.documentId : doc.relationTo}
+							</span>
+							<ExternalLinkIcon />
+						</Link>
+					) : (
+						<span className="al-row__collection">{isGlobal ? doc.documentId : doc.relationTo}</span>
+					)}
 				</span>
 
 				<span className="al-row__user">
-					<span className="al-row__user-name" title={userLabel}>
-						{userLabel.slice(-20)}
-					</span>
-					{hasImpersonator && (
-						<span className="al-row__via" title={impersonatorLabel}>
-							{t(keys.viaImpersonator, { name: impersonatorLabel })}
-						</span>
+					{user ? (
+						<UserPill adminRoute={adminRoute} impersonator={impersonator} user={user} />
+					) : (
+						<span className="al-row__empty">—</span>
 					)}
 				</span>
 
@@ -104,7 +124,7 @@ export function LogRow({ adminRoute, doc, payloadAPILabels, userTitleFields }: P
 					)}
 					<FormattedDate iso={doc.createdAt} />
 				</span>
-			</button>
+			</div>
 
 			<div className="al-row__body">
 				<div className="al-row__detail">
@@ -124,11 +144,6 @@ export function LogRow({ adminRoute, doc, payloadAPILabels, userTitleFields }: P
 							{doc.locale && (
 								<span className="al-row__meta-item">
 									<span className="al-row__meta-label">{t(keys.metaLocale)}</span> {doc.locale}
-								</span>
-							)}
-							{hasImpersonator && (
-								<span className="al-row__meta-item">
-									{t(keys.viaImpersonator, { name: impersonatorLabel })}
 								</span>
 							)}
 							{doc.group && groupHref && (
@@ -202,21 +217,6 @@ export function LogRow({ adminRoute, doc, payloadAPILabels, userTitleFields }: P
 								{hasMetadata && (
 									<pre className="al-json-block">{JSON.stringify(doc.metadata, null, 2)}</pre>
 								)}
-							</div>
-						)}
-
-						{(isGlobal || doc.documentId) && (
-							<div className="al-row__actions">
-								<Link
-									className="al-row__doc-link"
-									href={
-										isGlobal
-											? `${adminRoute}/globals/${doc.documentId}`
-											: `${adminRoute}/collections/${doc.relationTo}/${doc.documentId}`
-									}
-								>
-									{isGlobal ? t(keys.viewGlobal) : t(keys.viewDocument)}
-								</Link>
 							</div>
 						)}
 					</div>

@@ -19,75 +19,30 @@
 
 .al-debug-bar {
 	display: flex;
+	flex-wrap: wrap;
 	align-items: center;
-	gap: 8px;
-	padding: 8px 12px;
-	margin-bottom: 16px;
-	background: #fefce8;
-	border: 1px solid #fde047;
-	border-radius: 6px;
-	font-size: 12px;
+	gap: calc(var(--base) * 0.4);
+	padding: calc(var(--base) * 0.4) calc(var(--base) * 0.6);
+	margin-bottom: var(--base);
+	background: var(--theme-warning-50);
+	border: 1px solid var(--theme-warning-200);
+	border-radius: var(--style-radius-m);
+	font-size: 1rem;
 }
-[data-theme="dark"] .al-debug-bar {
-	background: #422006;
-	border-color: #92400e;
+/* Payload's Button has no error style that renders, so the subtle one is
+   recoloured through its own variables. */
+.al-debug-bar__danger {
+	--color: var(--theme-error-750);
+	--bg-color: var(--theme-error-50);
+	--hover-bg: var(--theme-error-100);
+	--btn-border: 1px solid var(--theme-error-200);
+	--hover-btn-border: 1px solid var(--theme-error-300);
 }
-.al-debug-bar__label {
-	font-weight: 700;
-	font-size: 11px;
-	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	color: #92400e;
-	padding: 2px 6px;
-	background: #fde047;
-	border-radius: 3px;
-	flex-shrink: 0;
-}
-[data-theme="dark"] .al-debug-bar__label {
-	color: #fde68a;
-	background: #78350f;
-}
-.al-debug-bar__btn {
-	padding: 4px 12px;
-	border-radius: 4px;
-	border: 1px solid var(--theme-elevation-300);
-	background: var(--theme-elevation-0);
-	color: var(--theme-text);
-	font-size: 12px;
-	font-weight: 500;
-	cursor: pointer;
-	transition:
-		background 150ms,
-		border-color 150ms;
-}
-.al-debug-bar__btn:hover:not(:disabled) {
-	background: var(--theme-elevation-100);
-	border-color: var(--theme-elevation-500);
-}
-.al-debug-bar__btn:disabled {
+.al-debug-bar__danger.btn--disabled {
 	opacity: 0.5;
-	cursor: not-allowed;
-}
-.al-debug-bar__btn--danger {
-	border-color: #fca5a5;
-	color: #991b1b;
-}
-.al-debug-bar__btn--danger:hover:not(:disabled) {
-	background: #fee2e2;
-	border-color: #f87171;
-}
-[data-theme="dark"] .al-debug-bar__btn--danger {
-	border-color: #7f1d1d;
-	color: #fca5a5;
-}
-[data-theme="dark"] .al-debug-bar__btn--danger:hover:not(:disabled) {
-	background: #450a0a;
-	border-color: #ef4444;
 }
 .al-debug-bar__result {
-	margin-left: 4px;
 	color: var(--theme-elevation-600);
-	font-style: italic;
 }
 
 .al-filter-popup .popup__scroll-container {
@@ -275,9 +230,9 @@
 .al-badge {
 	display: inline-flex;
 	align-items: center;
-	padding: 2px 8px;
-	border-radius: 3px;
-	font-size: 11px;
+	padding: calc(var(--base) * 0.1) calc(var(--base) * 0.4);
+	border-radius: var(--style-radius-s);
+	font-size: 0.85rem;
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
@@ -348,7 +303,7 @@
 .al-badge--locale {
 	background: var(--theme-elevation-100);
 	color: var(--theme-elevation-500);
-	font-size: 10px;
+	font-size: 0.77rem;
 }
 
 .al-list {
@@ -366,41 +321,51 @@
 
 .al-row {
 	border: 1px solid var(--theme-elevation-150);
-	border-radius: 6px;
+	border-radius: var(--style-radius-m);
 	overflow: hidden;
 	background: var(--theme-elevation-0);
 	transition: border-color 220ms ease;
 }
 .al-row + .al-row {
-	margin-top: 4px;
+	margin-top: calc(var(--base) * 0.2);
 }
 .al-row--expanded {
 	border-color: var(--theme-elevation-300);
 }
 .al-row__summary {
+	position: relative;
 	display: grid;
-	grid-template-columns: 20px 220px 100px 160px 1fr auto;
+	grid-template-columns: calc(var(--base) * 0.8) 220px minmax(0, 220px) 1fr auto;
 	align-items: center;
-	gap: 10px;
-	padding: 10px 14px;
-	cursor: pointer;
+	gap: calc(var(--base) / 2);
+	padding: calc(var(--base) / 2) calc(var(--base) * 0.7);
+	font-size: 1rem;
 	user-select: none;
-	width: 100%;
-	border: 0;
-	background: none;
-	font: inherit;
-	color: inherit;
-	text-align: left;
 }
-.al-row__summary:hover {
+.al-row__summary--expandable {
+	cursor: pointer;
+}
+.al-row__summary--expandable:hover {
 	background: var(--theme-elevation-50);
 }
+/* Covers the whole summary, so a click anywhere toggles. Positioned cells
+   (the user pill) sit above it and keep their own clicks. */
+.al-row__hit {
+	position: absolute;
+	inset: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	cursor: pointer;
+}
+.al-row__hit:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: -2px;
+}
 .al-row__toggle {
-	font-size: 10px;
 	color: var(--theme-elevation-400);
-	width: 20px;
-	flex-shrink: 0;
-	display: inline-block;
+	display: inline-flex;
 }
 .al-row__toggle--hidden {
 	visibility: hidden;
@@ -419,11 +384,10 @@
 .al-row__op-col {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: calc(var(--base) * 0.4);
 	overflow: hidden;
 }
 .al-row__collection {
-	font-size: 13px;
 	font-weight: 600;
 	color: var(--theme-text);
 }
@@ -432,54 +396,123 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
+/* Above the stretched toggle, so the name opens the document while the rest of
+   the cell still expands the row. */
+.al-row__collection--link {
+	position: relative;
+	z-index: 1;
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.2);
+	min-width: 0;
+	text-decoration: none;
+}
+.al-row__collection-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.al-row__collection--link .icon {
+	flex-shrink: 0;
+	width: calc(var(--base) * 0.7);
+	height: calc(var(--base) * 0.7);
+	color: var(--theme-elevation-400);
+	transition: color 150ms;
+}
+.al-row__collection--link .icon .stroke {
+	stroke: currentColor;
+}
+.al-row__collection--link:hover .al-row__collection-name {
+	text-decoration: underline;
+}
+.al-row__collection--link:hover .icon {
+	color: var(--theme-text);
+}
 .al-row__badges {
 	display: flex;
 	align-items: center;
-	gap: 6px;
+	gap: calc(var(--base) * 0.3);
 	overflow: hidden;
-}
-.al-row__docid {
-	font-family: monospace;
-	font-size: 12px;
-	color: var(--theme-elevation-500);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 .al-row__user {
+	position: relative;
+	z-index: 1;
 	display: flex;
-	flex-direction: column;
-	gap: 2px;
 	min-width: 0;
-	font-family: monospace;
-	font-size: 12px;
-	color: var(--theme-elevation-500);
 }
-.al-row__user-name,
-.al-row__via {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
-.al-row__via {
-	font-size: 11px;
+.al-row__empty {
 	color: var(--theme-elevation-400);
 }
 .al-row__right {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: calc(var(--base) * 0.4);
 	margin-left: auto;
 	flex-shrink: 0;
 }
-.al-row__paths-count {
-	font-size: 12px;
-	color: var(--theme-elevation-400);
-}
+.al-row__paths-count,
 .al-row__time {
-	font-size: 12px;
-	color: var(--theme-elevation-400);
+	color: var(--theme-elevation-500);
 	white-space: nowrap;
+}
+
+.al-user {
+	max-width: 100%;
+	flex-shrink: 1;
+}
+.al-user .pill__label {
+	display: inline-flex;
+	align-items: center;
+	align-self: stretch;
+	gap: calc(var(--base) * 0.4);
+	min-width: 0;
+}
+.al-user__name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: inherit;
+	text-decoration: none;
+}
+a.al-user__name:hover {
+	text-decoration: underline;
+}
+.al-user__name--deleted {
+	font-style: italic;
+	color: var(--theme-elevation-500);
+}
+/* The mark is the pill's second segment rather than a chip inside it: flush to
+   the right edge, full height, split from the name by a hairline. */
+.al-user--impersonated {
+	--pill-padding-inline-end: 0;
+}
+.al-user__popup,
+.al-user__trigger {
+	display: flex;
+	align-self: stretch;
+	flex-shrink: 0;
+}
+.al-user__impersonated {
+	display: flex;
+	align-items: center;
+	padding: 0 calc(var(--base) * 0.4);
+	border-left: 1px solid var(--theme-elevation-250);
+	background: var(--theme-warning-100);
+	color: var(--theme-warning-800);
+}
+.al-user__trigger:hover .al-user__impersonated,
+.al-user__trigger:focus-visible .al-user__impersonated {
+	background: var(--theme-warning-150);
+}
+.al-user__popover {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: calc(var(--base) * 0.25);
+	font-size: 1rem;
+}
+.al-user__popover-label {
+	color: var(--theme-elevation-500);
 }
 
 .al-row__detail {
@@ -487,23 +520,23 @@
 	overflow: hidden;
 }
 .al-row__detail-inner {
-	padding: 12px 14px 16px;
+	padding: calc(var(--base) * 0.6) calc(var(--base) * 0.7) calc(var(--base) * 0.8);
 	border-top: 1px solid var(--theme-elevation-150);
-	background: var(--theme-elevation-50);
+	background: var(--theme-elevation-0);
 	display: flex;
 	flex-direction: column;
-	gap: 12px;
+	gap: calc(var(--base) * 0.6);
 }
 .al-row__meta {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 16px;
-	font-size: 12px;
+	gap: calc(var(--base) * 0.8);
+	font-size: 1rem;
 	color: var(--theme-elevation-500);
 }
 .al-row__meta-item {
 	display: inline-flex;
-	gap: 4px;
+	gap: calc(var(--base) * 0.2);
 }
 .al-row__meta-label {
 	font-weight: 600;
@@ -520,33 +553,19 @@
 .al-row__changed-paths {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: calc(var(--base) * 0.3);
 }
 .al-row__section {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: calc(var(--base) * 0.3);
 }
 .al-row__section-label {
-	font-size: 11px;
+	font-size: 0.85rem;
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.05em;
 	color: var(--theme-elevation-400);
-}
-.al-row__actions {
-	display: flex;
-	justify-content: flex-end;
-	padding-top: 4px;
-}
-.al-row__doc-link {
-	font-size: 12px;
-	font-weight: 500;
-	color: var(--theme-elevation-500);
-	text-decoration: none;
-}
-.al-row__doc-link:hover {
-	color: var(--theme-text);
 }
 
 .al-path-tag {
@@ -574,7 +593,7 @@
 	border-bottom: 1px solid var(--theme-elevation-150);
 }
 .al-diff__row:hover {
-	background: var(--theme-elevation-0);
+	background: var(--theme-elevation-50);
 }
 .al-diff__td {
 	padding: 6px 10px;
@@ -594,11 +613,15 @@
 	font-size: 12px;
 	color: var(--theme-elevation-700);
 }
-.al-diff__scalar--before {
-	color: #991b1b;
+/* Theme tokens rather than fixed hex: they invert in dark mode, so the tint stays
+   faint and the text stays readable on either background. */
+.al-diff__td.al-diff__col-before {
+	background: var(--theme-error-50);
+	color: var(--theme-error-750);
 }
-.al-diff__scalar--after {
-	color: #166534;
+.al-diff__td.al-diff__col-after {
+	background: var(--theme-success-50);
+	color: var(--theme-success-750);
 }
 .al-diff__json {
 	margin: 0;

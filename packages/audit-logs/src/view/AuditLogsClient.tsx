@@ -1,6 +1,6 @@
 'use client'
 
-import { Pagination, PerPage, useStepNav } from '@payloadcms/ui'
+import { Button, Pagination, PerPage, Pill, useStepNav } from '@payloadcms/ui'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -101,25 +101,30 @@ export function AuditLogsClient({
 
 			{debugMode && (
 				<div className="al-debug-bar">
-					<span className="al-debug-bar__label">{t(keys.debug)}</span>
+					<Pill pillStyle="warning" size="small">
+						{t(keys.debug)}
+					</Pill>
 					{hasArchive && (
-						<button
-							className="al-debug-bar__btn"
+						<Button
+							buttonStyle="subtle"
 							disabled={runningTask !== null}
+							margin={false}
 							onClick={() => triggerJob('audit-logs-archive')}
-							type="button"
+							size="small"
 						>
 							{runningTask === 'audit-logs-archive' ? t(keys.queuing) : t(keys.runArchive)}
-						</button>
+						</Button>
 					)}
-					<button
-						className="al-debug-bar__btn al-debug-bar__btn--danger"
+					<Button
+						buttonStyle="subtle"
+						className="al-debug-bar__danger"
 						disabled={runningTask !== null}
+						margin={false}
 						onClick={() => triggerJob('audit-logs-delete')}
-						type="button"
+						size="small"
 					>
 						{runningTask === 'audit-logs-delete' ? t(keys.queuing) : t(keys.runDelete)}
-					</button>
+					</Button>
 					{lastResult && <span className="al-debug-bar__result">{lastResult}</span>}
 				</div>
 			)}
