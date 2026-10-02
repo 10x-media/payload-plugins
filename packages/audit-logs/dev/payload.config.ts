@@ -142,6 +142,16 @@ export default buildConfig({
 		// Customers cannot open the admin, so swapping into one would strand the session.
 		impersonation({ access: { impersonate: () => true }, targets: ['users'] }),
 	],
+	// Two locales, so entries carry a locale badge and the localized fields in posts
+	// diff per locale.
+	localization: {
+		defaultLocale: 'en',
+		fallback: true,
+		locales: [
+			{ code: 'en', label: 'English' },
+			{ code: 'de', label: 'Deutsch' },
+		],
+	},
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

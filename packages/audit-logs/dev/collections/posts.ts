@@ -10,6 +10,8 @@ import type { CollectionConfig } from 'payload'
  * - `seo` is a group, so paths arrive dot-notated (`seo.title`)
  * - `internalNotes` is excluded per collection, so edits to it never reach the log
  * - `apiKey` is anonymized, so its path is recorded but its value is redacted
+ * - `summary` and `seo.description` are localized, so an edit in German is its own
+ *   entry with a `de` locale badge
  * - the tabs nest paths the way a real schema does: the unnamed tab and its row add
  *   nothing (`layoutWidth`), the named tab and the groups inside it add a segment
  *   each (`distribution.social.image.alt`), the collapsible adds none
@@ -20,7 +22,7 @@ export const posts: CollectionConfig = {
 	admin: { useAsTitle: 'title', group: 'Audit logs' },
 	fields: [
 		{ name: 'title', type: 'text', required: true },
-		{ name: 'summary', type: 'textarea' },
+		{ name: 'summary', type: 'textarea', localized: true },
 		{ name: 'views', type: 'number' },
 		{ name: 'published', type: 'checkbox' },
 		{ name: 'status', type: 'select', options: ['draft', 'review', 'published'] },
@@ -31,7 +33,7 @@ export const posts: CollectionConfig = {
 			type: 'group',
 			fields: [
 				{ name: 'title', type: 'text' },
-				{ name: 'description', type: 'textarea' },
+				{ name: 'description', type: 'textarea', localized: true },
 			],
 		},
 		{

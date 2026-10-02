@@ -113,7 +113,7 @@ export interface Config {
   db: {
     defaultIDType: string;
   };
-  fallbackLocale: null;
+  fallbackLocale: ('false' | 'none' | 'null') | false | null | ('en' | 'de') | ('en' | 'de')[];
   globals: {
     'site-settings': SiteSetting;
     'payload-jobs-stats': PayloadJobsStat;
@@ -122,7 +122,7 @@ export interface Config {
     'site-settings': SiteSettingsSelect<false> | SiteSettingsSelect<true>;
     'payload-jobs-stats': PayloadJobsStatsSelect<false> | PayloadJobsStatsSelect<true>;
   };
-  locale: null;
+  locale: 'en' | 'de';
   widgets: {
     collections: CollectionsWidget;
   };

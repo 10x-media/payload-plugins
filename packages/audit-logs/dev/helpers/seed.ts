@@ -105,6 +105,19 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		req,
 	})
 
+	// update: localized fields edited in German. The entry carries `locale: 'de'`, and
+	// only the German values are in its diff.
+	await payload.update({
+		collection: 'posts',
+		id: post.id,
+		data: {
+			summary: 'Bearbeite dieses Dokument und sieh zu, wie Einträge erscheinen.',
+			seo: { description: 'Beispielbeitrag' },
+		},
+		locale: 'de',
+		req,
+	})
+
 	// update: fields nested in a named tab and two groups, so the paths run four
 	// segments deep (`distribution.social.image.alt`) next to a two-segment one.
 	await payload.update({
