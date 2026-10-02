@@ -1,6 +1,8 @@
 import type { SanitizedCollectionConfig } from 'payload'
 import { generateCookie, generateExpiredPayloadCookie, getCookieExpiration } from 'payload/shared'
 
+import type { ImpersonationMode } from '../types'
+
 type AuthConfig = SanitizedCollectionConfig['auth']
 
 const resolveSameSite = (sameSite: AuthConfig['cookies']['sameSite']) => {
@@ -73,6 +75,31 @@ export const expirePayloadCookie = ({
 	authConfig: AuthConfig
 	cookiePrefix: string
 }) => generateExpiredPayloadCookie({ collectionAuthConfig: authConfig, cookiePrefix })
+
+/**
+ * Expires `cookies.clearOnSwitch` when a swap starts. Parallel keeps them: they
+ * are origin-wide, and the impersonator's session did not change.
+ */
+export const clearOnSwitchOnStart = ({
+	authConfig,
+	cookiePrefix,
+	except,
+	mode,
+	names,
+}: {
+	authConfig: AuthConfig
+	cookiePrefix: string
+	except: string[]
+	mode: ImpersonationMode
+	names: string[]
+}): string[] =>
+	mode === 'parallel'
+		? []
+		: expireCookies({
+				authConfig,
+				cookiePrefix,
+				names: names.filter((name) => !except.includes(name)),
+			})
 
 export const expireCookies = ({
 	authConfig,

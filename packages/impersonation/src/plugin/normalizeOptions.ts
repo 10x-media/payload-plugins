@@ -3,10 +3,10 @@ import type { CollectionConfig, CollectionSlug, Config } from 'payload'
 import type { EnabledOptions, ResolvedOptions, ResolvedUi } from '../types'
 import {
 	DEFAULT_API_PATH,
+	DEFAULT_CLEAR_ON_SWITCH,
 	DEFAULT_COLLECTION_SLUG,
 	DEFAULT_COOKIE_PREFIX,
 	DEFAULT_HINT_COOKIE,
-	defaultClearOnSwitch,
 	RESERVED_API_SEGMENTS,
 } from './constants'
 
@@ -119,7 +119,7 @@ export const normalizeOptions = (options: EnabledOptions, config: Config): Resol
 		collectionSlug,
 		collectionOverrides: options.collection?.overrides,
 		cookies: {
-			clearOnSwitch: options.cookies?.clearOnSwitch ?? defaultClearOnSwitch(cookiePrefix),
+			clearOnSwitch: options.cookies?.clearOnSwitch ?? [...DEFAULT_CLEAR_ON_SWITCH],
 		},
 		decorateRequests: options.decorateRequests !== false,
 		hintCookieName,
