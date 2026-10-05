@@ -40,7 +40,9 @@
 		"@10x-media/impersonation": "0.0.0",
 		"@10x-media/impersonation-dev": "0.0.0",
 		"@10x-media/content-lock": "0.0.0",
-		"@10x-media/content-lock-dev": "0.0.0"
+		"@10x-media/content-lock-dev": "0.0.0",
+		"@10x-media/document-preview": "0.0.0",
+		"@10x-media/document-preview-dev": "0.0.0"
 	},
 	"changesets": [
 		"admin-wiki-block-chips",
@@ -129,6 +131,7 @@
 		"conversations-initial-beta",
 		"conversations-locales",
 		"conversations-server-function",
+		"document-preview-initial-beta",
 		"dual-session-initial-beta",
 		"dual-session-locales",
 		"dual-session-role-split",
