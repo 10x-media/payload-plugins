@@ -1,14 +1,14 @@
 import type { Config, Endpoint, Field, FieldHook } from 'payload'
 import { isImage } from 'payload/shared'
-import { FILE_ICONS_VERSION, fileIconSvg } from '../shared/fileIcons'
-import { fileKind, isFileKind } from '../shared/fileKind'
+
+import type { FileIconSet } from '../shared/fileIcons'
 import { resolveMimeType } from '../shared/mime'
 
 const ENDPOINT_PATH = '/document-preview/file-icon'
 
-/** The URL a non-image upload's thumbnail points at, versioned so a redesign busts the cache. */
-export const fileIconUrl = (apiRoute: string, kind: string): string =>
-	`${apiRoute}${ENDPOINT_PATH}/${kind}?v=${FILE_ICONS_VERSION}`
+/** The URL an icon is served at, versioned so changed artwork busts the cache. */
+export const fileIconUrl = (apiRoute: string, key: string, version: string): string =>
+	`${apiRoute}${ENDPOINT_PATH}/${key}?v=${version}`
 
 /**
  * Fills `thumbnailURL` with a file-type icon when nothing else did. Runs after
@@ -17,7 +17,7 @@ export const fileIconUrl = (apiRoute: string, kind: string): string =>
  * empty value on a non-image file is replaced.
  */
 const fillIcon =
-	(apiRoute: string): FieldHook =>
+	(icons: FileIconSet, apiRoute: string): FieldHook =>
 	({ siblingData, value }) => {
 		if (value) {
 			return value
@@ -32,7 +32,7 @@ const fillIcon =
 		if (isImage(mimeType)) {
 			return value
 		}
-		return fileIconUrl(apiRoute, fileKind(mimeType, filename))
+		return fileIconUrl(apiRoute, icons.keyFor(mimeType, filename), icons.version)
 	}
 
 /**
@@ -41,8 +41,12 @@ const fillIcon =
  * them. A collection that declares `thumbnailURL` itself keeps its settings and
  * gains the hook after its own.
  */
-export const withFileIconThumbnail = (fields: Field[], apiRoute: string): Field[] => {
-	const hook = fillIcon(apiRoute)
+export const withFileIconThumbnail = (
+	fields: Field[],
+	icons: FileIconSet,
+	apiRoute: string
+): Field[] => {
+	const hook = fillIcon(icons, apiRoute)
 	const index = fields.findIndex((field) => 'name' in field && field.name === 'thumbnailURL')
 	const existing = (index === -1 ? undefined : fields[index]) as
 		| (Field & { hooks?: { afterRead?: FieldHook[] } })
@@ -60,27 +64,31 @@ export const withFileIconThumbnail = (fields: Field[], apiRoute: string): Field[
 /**
  * Serves the icons, to signed-in users only: they exist for the admin, and an
  * open endpoint would be a small public CDN on the host's bill. Cached privately
- * for a year; the version in the URL changes with the artwork.
+ * for a year; the version in the URL changes with the artwork. A host SVG is
+ * served as an image under a script-free CSP, so it cannot run anything even
+ * when opened directly.
  */
-export const fileIconEndpoint: Endpoint = {
+export const fileIconEndpoint = (icons: FileIconSet): Endpoint => ({
 	handler: (req) => {
 		if (!req.user) {
 			return Response.json({ error: 'Unauthorized' }, { status: 401 })
 		}
-		const kind = req.routeParams?.kind
-		if (typeof kind !== 'string' || !isFileKind(kind)) {
+		const key = req.routeParams?.key
+		const svg = typeof key === 'string' ? icons.svgFor(key) : undefined
+		if (!svg) {
 			return Response.json({ error: 'Not found' }, { status: 404 })
 		}
-		return new Response(fileIconSvg(kind), {
+		return new Response(svg, {
 			headers: {
 				'Cache-Control': 'private, max-age=31536000, immutable',
+				'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
 				'Content-Type': 'image/svg+xml; charset=utf-8',
 			},
 		})
 	},
 	method: 'get',
-	path: `${ENDPOINT_PATH}/:kind`,
-}
+	path: `${ENDPOINT_PATH}/:key`,
+})
 
 /** The configured REST route prefix, as Payload resolves it. */
 export const apiRouteOf = (config: Config): string => config.routes?.api ?? '/api'

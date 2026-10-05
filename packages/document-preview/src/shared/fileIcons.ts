@@ -1,4 +1,5 @@
-import { FILE_KINDS, type FileKind } from './fileKind'
+import { FILE_KINDS, type FileKind, fileKind } from './fileKind'
+import { matchViewer, type ViewerMap } from './resolveViewer'
 
 /**
  * Payload's fallback `File` graphic, path for path: a #333 square with a white
@@ -16,6 +17,19 @@ const PAGE_SCALE = 2
 /** Text-like rules at the top of the page, kept clear of the folded corner. */
 const RULES =
 	'<path d="M59.5 57.5h19M59.5 62.5h19M59.5 67.5h31M59.5 72.5h24" stroke="#D6D6D6" stroke-linecap="round" stroke-width="2"/>'
+
+/**
+ * A file-type icon a host adds: either a badge on the plugin's page (a short
+ * `label`, up to about four characters, on a `color`), or a complete `svg`
+ * document of its own, best square.
+ */
+export type FileIconDefinition = { color: string; label: string } | { svg: string }
+
+/** Host icons keyed by mime pattern, an exact mime or a `type/*` wildcard. */
+export type FileIconTypes = { [mimePattern: string]: FileIconDefinition }
+
+/** A host icon resolved to its final markup; plain data, so it crosses to the client. */
+export type CustomFileIcon = { pattern: string; svg: string }
 
 type Badge = { color: string; label?: string; symbol?: string }
 
@@ -45,37 +59,82 @@ const BADGES: Record<Exclude<FileKind, 'file'>, Badge> = {
 	word: { color: '#2B6CD4', label: 'DOC' },
 }
 
-const escapeXml = (text: string) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+/** Escapes text for SVG content and attribute values alike. */
+const escapeXml = (text: string) =>
+	text
+		.replaceAll('&', '&amp;')
+		.replaceAll('<', '&lt;')
+		.replaceAll('>', '&gt;')
+		.replaceAll('"', '&quot;')
+		.replaceAll("'", '&#39;')
+
+/** Labels past three characters shrink to stay inside the badge. */
+const labelSize = (label: string) => Math.max(5, Math.min(8.5, 25.5 / Math.max(1, label.length)))
 
 const badge = ({ color, label, symbol }: Badge) => {
 	const content = label
-		? `<text x="75" y="86.4" fill="#fff" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif" font-size="8.5" font-weight="700" letter-spacing=".3" text-anchor="middle" dominant-baseline="middle">${escapeXml(label)}</text>`
+		? `<text x="75" y="86.4" fill="#fff" font-family="system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif" font-size="${labelSize(label)}" font-weight="700" letter-spacing=".3" text-anchor="middle" dominant-baseline="middle">${escapeXml(label)}</text>`
 		: (symbol ?? '')
-	return `<rect x="58.5" y="78" width="33" height="16.5" rx="2" fill="${color}"/>${content}`
+	return `<rect x="58.5" y="78" width="33" height="16.5" rx="2" fill="${escapeXml(color)}"/>${content}`
 }
 
-/**
- * The icon for a file family as a standalone SVG document: usable as an `<img>`
- * source or a thumbnail URL, not only inside React.
- */
-export const fileIconSvg = (kind: FileKind): string => {
-	const decoration = kind === 'file' ? '' : `${RULES}${badge(BADGES[kind])}`
+/** The page, with an optional decoration, as a standalone 150 x 150 SVG document. */
+const pageSvg = (decoration: string) => {
 	const page = `<path d="${PAGE}" fill="#fff"/><path d="${FOLD}" fill="#9A9A9A"/>${decoration}`
 	return `<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150"><rect width="150" height="150" fill="${BACKGROUND}"/><g transform="translate(75 75.5) scale(${PAGE_SCALE}) translate(-75 -75.5)">${page}</g></svg>`
 }
 
-/** `fileIconSvg` as a data URI. */
-export const fileIconDataUri = (kind: FileKind): string =>
-	`data:image/svg+xml;charset=utf-8,${encodeURIComponent(fileIconSvg(kind))}`
+/** The built-in icon for a file family. */
+export const fileIconSvg = (kind: FileKind): string =>
+	pageSvg(kind === 'file' ? '' : `${RULES}${badge(BADGES[kind])}`)
+
+/** A host definition as SVG markup: its own document, or a badge on the plugin's page. */
+export const definitionSvg = (definition: FileIconDefinition): string =>
+	'svg' in definition ? definition.svg.trim() : pageSvg(`${RULES}${badge(definition)}`)
+
+export const svgDataUri = (svg: string): string =>
+	`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+
+/** One icon in a set: the key it is served under, a label for galleries, its markup. */
+export type FileIconEntry = { key: string; label: string; svg: string }
 
 /**
- * A short hash of every icon's markup, for the icon URLs: browsers cache the
- * icons for a year, so changed artwork must change the URL.
+ * The icons in play: the built-in families plus the host's. Host icons are
+ * matched first (exact mime, then `type/*`) and served under `custom-<n>` keys;
+ * everything else falls back to its family.
  */
-export const FILE_ICONS_VERSION = (() => {
-	let hash = 5381
-	for (const char of FILE_KINDS.map(fileIconSvg).join('')) {
-		hash = ((hash << 5) + hash + char.charCodeAt(0)) | 0
+export type FileIconSet = {
+	entries: readonly FileIconEntry[]
+	/** The key of the icon for a file: a host key or a family. */
+	keyFor: (mimeType: string, filename: string) => string
+	svgFor: (key: string) => string | undefined
+	/** A short hash of every icon's markup: changed artwork changes the icon URLs. */
+	version: string
+}
+
+const hash = (text: string) => {
+	let value = 5381
+	for (let index = 0; index < text.length; index += 1) {
+		value = ((value << 5) + value + text.charCodeAt(index)) | 0
 	}
-	return (hash >>> 0).toString(36)
-})()
+	return (value >>> 0).toString(36)
+}
+
+export const createFileIconSet = (custom: readonly CustomFileIcon[] = []): FileIconSet => {
+	const entries: FileIconEntry[] = [
+		...FILE_KINDS.map((kind) => ({ key: kind, label: kind, svg: fileIconSvg(kind) })),
+		...custom.map(({ pattern, svg }, index) => ({ key: `custom-${index}`, label: pattern, svg })),
+	]
+	const byKey = new Map(entries.map((entry) => [entry.key, entry.svg]))
+	const byPattern: ViewerMap<string> = {}
+	custom.forEach(({ pattern }, index) => {
+		byPattern[pattern] = `custom-${index}`
+	})
+	return {
+		entries,
+		keyFor: (mimeType, filename) =>
+			matchViewer(byPattern, mimeType) ?? fileKind(mimeType, filename),
+		svgFor: (key) => byKey.get(key),
+		version: hash(entries.map((entry) => entry.svg).join('')),
+	}
+}

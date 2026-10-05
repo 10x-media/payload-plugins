@@ -1,12 +1,16 @@
 import { type Config, definePlugin } from 'payload'
 
 import type { DocumentPreviewPluginOptions } from './options'
+
+export type { FileIconDefinition, FileIconTypes } from './shared/fileIcons'
+
 import { fileIconEndpoint } from './plugin/fileIcons'
 import { injectCollections } from './plugin/injectCollections'
 import { normalizeOptions } from './plugin/normalizeOptions'
 import { registerTranslations } from './plugin/registerTranslations'
 import type { DocumentPreviewRegistry } from './plugin/registry'
 import { setRegistry } from './plugin/registry'
+import { createFileIconSet } from './shared/fileIcons'
 
 declare module 'payload' {
 	interface RegisteredPlugins {
@@ -49,7 +53,10 @@ export const documentPreview = definePlugin<DocumentPreviewPluginOptions>({
 		injectCollections(config, registry)
 		registerViewerDependencies(config, registry)
 		if (Object.values(registry.collections).some((preview) => preview.fileIcons)) {
-			config.endpoints = [...(config.endpoints ?? []), fileIconEndpoint]
+			config.endpoints = [
+				...(config.endpoints ?? []),
+				fileIconEndpoint(createFileIconSet(registry.fileIcons)),
+			]
 		}
 		config.admin ??= {}
 		config.admin.components ??= {}
@@ -65,6 +72,7 @@ export type {
 	CollectionPreviewOptions,
 	DocumentPreviewPluginOptions,
 	DocumentPreviewPluginOptions as PluginOptions,
+	FileIconsOptions,
 	PreviewDisplay,
 	ViewerOverrides,
 } from './options'

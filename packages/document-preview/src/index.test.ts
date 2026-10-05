@@ -164,6 +164,7 @@ describe('viewer overrides', () => {
 			viewers: { 'application/pdf': '/viewers#Pdf' },
 		})
 		expect(getRegistry(out)).toEqual({
+			fileIcons: [],
 			collections: {
 				media: {
 					display: 'drawer',
@@ -226,6 +227,18 @@ describe('validation', () => {
 		expect(() => run({ collections: { media: { viewers: { 'Video/MP4': '/x#Y' } } } })).toThrow(
 			/collections\.media\.viewers/
 		)
+	})
+
+	it('rejects malformed file icon types', () => {
+		expect(() =>
+			run({ collections: {}, fileIcons: { types: { model: { color: '#000', label: '3D' } } } })
+		).toThrow(/invalid mime pattern/)
+		expect(() =>
+			run({ collections: {}, fileIcons: { types: { 'model/*': { svg: '<div/>' } } } })
+		).toThrow(/must be an SVG document/)
+		expect(() =>
+			run({ collections: {}, fileIcons: { types: { 'model/*': { color: '', label: '3D' } } } })
+		).toThrow(/needs a label and a color/)
 	})
 
 	it('rejects a field name the preview needs', () => {

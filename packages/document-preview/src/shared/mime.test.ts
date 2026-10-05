@@ -17,6 +17,7 @@ describe('resolveMimeType', () => {
 		)
 		expect(resolveMimeType('application/octet-stream', 'data.json')).toBe('application/json')
 		expect(resolveMimeType(undefined, 'legacy.xls')).toBe('application/vnd.ms-excel')
+		expect(resolveMimeType('application/octet-stream', 'part.stl')).toBe('model/stl')
 	})
 
 	it('lets the extension win for CSV, which Windows reports as an Excel mime', () => {

@@ -1,5 +1,6 @@
 import type { CollectionSlug } from 'payload'
 
+import type { FileIconTypes } from './shared/fileIcons'
 import type { TranslationsOption } from './translations'
 
 /**
@@ -40,6 +41,11 @@ export type CollectionPreviewOptions = {
 	viewers?: ViewerOverrides
 }
 
+export type FileIconsOptions = {
+	/** Host icons by mime pattern (`model/gltf-binary`, `model/*`), checked before the built-ins. */
+	types?: FileIconTypes
+}
+
 export type DocumentPreviewPluginOptions = {
 	/**
 	 * Upload collections that get previews. `true` takes the defaults, an object
@@ -53,10 +59,21 @@ export type DocumentPreviewPluginOptions = {
 	 */
 	disabled?: boolean
 	/**
-	 * Default for every collection's `fileIcons`: `false` keeps Payload's own
-	 * blank-page thumbnail everywhere unless a collection turns icons back on.
+	 * Default for every collection's `fileIcons`. `false` keeps Payload's own
+	 * blank-page thumbnail everywhere unless a collection turns icons back on;
+	 * an object turns them on and adds icons of the host's own, matched by mime
+	 * before the built-in families:
+	 *
+	 * ```ts
+	 * fileIcons: {
+	 *   types: {
+	 *     'model/*': { color: '#0EA5E9', label: '3D' },
+	 *     'application/x-sketch': { svg: '<svg xmlns="http://www.w3.org/2000/svg" ...>' },
+	 *   },
+	 * }
+	 * ```
 	 */
-	fileIcons?: boolean
+	fileIcons?: boolean | FileIconsOptions
 	/**
 	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
 	 * translation keys exported from `@10x-media/document-preview/i18n`. Values win

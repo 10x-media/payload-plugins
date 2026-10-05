@@ -57,7 +57,14 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	collections: [users, media, posts],
-	plugins: [documentPreview({ collections: { media: { display: 'both', listView: true } } })],
+	plugins: [
+		documentPreview({
+			collections: { media: { display: 'both', listView: true } },
+			// A host viewer and a host icon, the two ways the plugin extends, both for 3D models.
+			fileIcons: { types: { 'model/*': { color: '#0EA5E9', label: '3D' } } },
+			viewers: { 'model/*': '/viewers/ModelViewer#ModelViewer' },
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

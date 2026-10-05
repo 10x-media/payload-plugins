@@ -2,8 +2,8 @@ import { DefaultTemplate } from '@payloadcms/next/templates'
 import { File, Gutter } from '@payloadcms/ui'
 import type { AdminViewServerProps } from 'payload'
 
-import { fileIconDataUri } from '../src/shared/fileIcons'
-import { FILE_KINDS } from '../src/shared/fileKind'
+import { getRegistry } from '../src/plugin/registry'
+import { createFileIconSet, svgDataUri } from '../src/shared/fileIcons'
 import './file-icons.css'
 
 /** Payload renders thumbnails at these sizes: the edit-view upload area, then list and field rows. */
@@ -21,6 +21,7 @@ export const FileIconsView = ({
 	searchParams,
 }: AdminViewServerProps) => {
 	const { permissions, req, visibleEntities } = initPageResult
+	const icons = createFileIconSet(getRegistry(payload.config)?.fileIcons)
 	return (
 		<DefaultTemplate
 			i18n={i18n}
@@ -57,20 +58,14 @@ export const FileIconsView = ({
 						</div>
 						<figcaption>Payload File</figcaption>
 					</figure>
-					{FILE_KINDS.map((kind) => (
-						<figure className="file-icons__item" key={kind}>
+					{icons.entries.map(({ key, label, svg }) => (
+						<figure className="file-icons__item" key={key}>
 							<div className="file-icons__sizes">
 								{SIZES.map((size) => (
-									<img
-										alt={kind}
-										height={size}
-										key={size}
-										src={fileIconDataUri(kind)}
-										width={size}
-									/>
+									<img alt={label} height={size} key={size} src={svgDataUri(svg)} width={size} />
 								))}
 							</div>
-							<figcaption>{kind}</figcaption>
+							<figcaption>{label}</figcaption>
 						</figure>
 					))}
 				</div>

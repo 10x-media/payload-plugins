@@ -30,6 +30,7 @@ describeForDb('documentPreview loads', { dbs: ['mongo'] }, (db) => {
 
 	it('keeps the registry on the sanitized config for the admin provider', () => {
 		expect(getRegistry(booted.payload.config)).toEqual({
+			fileIcons: [],
 			collections: {
 				media: {
 					display: 'both',

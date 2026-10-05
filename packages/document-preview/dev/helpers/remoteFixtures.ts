@@ -5,7 +5,8 @@ import type { Payload } from 'payload'
 
 /**
  * Real-world files too large or not ours to commit: office documents from
- * extend's docs, and CC0 video and audio from MDN's examples.
+ * extend's docs, CC0 video and audio from MDN's examples, a CC0 glTF model from
+ * Khronos' samples and an MIT STL from three.js' examples.
  */
 const REMOTE_FIXTURES = [
 	'https://www.extend.ai/ui/samples/demo.docx',
@@ -14,6 +15,8 @@ const REMOTE_FIXTURES = [
 	'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4',
 	'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.webm',
 	'https://interactive-examples.mdn.mozilla.net/media/cc0-audio/t-rex-roar.mp3',
+	'https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/Avocado/glTF-Binary/Avocado.glb',
+	'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/stl/binary/colored.stl',
 ]
 
 const cacheDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.seed-cache')

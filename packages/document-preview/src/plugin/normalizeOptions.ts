@@ -6,6 +6,7 @@ import type {
 	ResolvedCollectionPreview,
 	ViewerOverrides,
 } from '../options'
+import { type CustomFileIcon, definitionSvg } from '../shared/fileIcons'
 import { isMimePattern } from '../shared/resolveViewer'
 import type { DocumentPreviewRegistry } from './registry'
 
@@ -20,6 +21,34 @@ const checkViewers = (viewers: undefined | ViewerOverrides, where: string): View
 		}
 	}
 	return { ...viewers }
+}
+
+/** Validate host file icons and resolve each to its final markup. */
+const checkFileIcons = (fileIcons: DocumentPreviewPluginOptions['fileIcons']): CustomFileIcon[] => {
+	if (typeof fileIcons !== 'object') {
+		return []
+	}
+	return Object.entries(fileIcons.types ?? {}).map(([pattern, definition]) => {
+		const where = `fileIcons.types["${pattern}"]`
+		if (!isMimePattern(pattern)) {
+			throw new Error(
+				`[document-preview] invalid mime pattern in ${where} (expected a lowercase mime like "model/gltf-binary" or "model/*")`
+			)
+		}
+		if ('svg' in definition) {
+			if (typeof definition.svg !== 'string' || !definition.svg.trim().startsWith('<svg')) {
+				throw new Error(`[document-preview] ${where}.svg must be an SVG document`)
+			}
+		} else if (
+			typeof definition.label !== 'string' ||
+			!definition.label.trim() ||
+			typeof definition.color !== 'string' ||
+			!definition.color.trim()
+		) {
+			throw new Error(`[document-preview] ${where} needs a label and a color, or an svg`)
+		}
+		return { pattern, svg: definitionSvg(definition) }
+	})
 }
 
 /**
@@ -58,5 +87,9 @@ export const normalizeOptions = (
 			viewers: checkViewers(custom.viewers, `collections.${slug}.viewers`),
 		}
 	}
-	return { collections, viewers: checkViewers(options.viewers, 'viewers') }
+	return {
+		collections,
+		fileIcons: checkFileIcons(options.fileIcons),
+		viewers: checkViewers(options.viewers, 'viewers'),
+	}
 }

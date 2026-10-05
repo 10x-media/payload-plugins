@@ -2,15 +2,17 @@
 
 import { createContext, type ReactNode, useContext, useMemo } from 'react'
 
+import { type CustomFileIcon, createFileIconSet, type FileIconSet } from '../../shared/fileIcons'
 import type { ViewerMap } from '../../shared/resolveViewer'
 import type { DocumentPreviewViewer } from '../../shared/types'
 
 type ViewerOverridesContext = {
 	collections: Record<string, ViewerMap<DocumentPreviewViewer>>
+	icons: FileIconSet
 	viewers: ViewerMap<DocumentPreviewViewer>
 }
 
-const EMPTY: ViewerOverridesContext = { collections: {}, viewers: {} }
+const EMPTY: ViewerOverridesContext = { collections: {}, icons: createFileIconSet(), viewers: {} }
 
 const Context = createContext<ViewerOverridesContext>(EMPTY)
 
@@ -18,6 +20,8 @@ export type DocumentPreviewProviderProps = {
 	children?: ReactNode
 	/** Host viewers per collection slug. */
 	collections?: Record<string, ViewerMap<DocumentPreviewViewer>>
+	/** Host file icons, as the plugin resolved them. */
+	fileIcons?: CustomFileIcon[]
 	/** Host viewers for every collection. */
 	viewers?: ViewerMap<DocumentPreviewViewer>
 }
@@ -30,11 +34,16 @@ export type DocumentPreviewProviderProps = {
 export const DocumentPreviewProvider = ({
 	children,
 	collections,
+	fileIcons,
 	viewers,
 }: DocumentPreviewProviderProps) => {
 	const value = useMemo(
-		() => ({ collections: collections ?? {}, viewers: viewers ?? {} }),
-		[collections, viewers]
+		() => ({
+			collections: collections ?? {},
+			icons: createFileIconSet(fileIcons),
+			viewers: viewers ?? {},
+		}),
+		[collections, fileIcons, viewers]
 	)
 	return <Context value={value}>{children}</Context>
 }
@@ -49,3 +58,6 @@ export const useViewerOverrides = (
 		[collection, collections, viewers]
 	)
 }
+
+/** The file icons in play, the host's included. */
+export const useFileIcons = (): FileIconSet => useContext(Context).icons

@@ -59,6 +59,7 @@ export const DocumentPreviewProviderServer = ({
 	return (
 		<DocumentPreviewProvider
 			collections={collections}
+			fileIcons={registry.fileIcons}
 			viewers={resolveViewers(payload, registry.viewers)}
 		>
 			{children}

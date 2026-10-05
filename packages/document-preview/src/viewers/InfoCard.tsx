@@ -3,8 +3,8 @@
 import { formatFilesize } from 'payload/shared'
 import { type ReactNode, useMemo } from 'react'
 
-import { fileIconDataUri } from '../shared/fileIcons'
-import { fileKind } from '../shared/fileKind'
+import { useFileIcons } from '../components/Provider/DocumentPreviewProvider'
+import { svgDataUri } from '../shared/fileIcons'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 
@@ -36,7 +36,11 @@ export const InfoCard = ({
 	reason = 'unsupported',
 }: InfoCardProps) => {
 	const { t } = useTranslation()
-	const icon = useMemo(() => fileIconDataUri(fileKind(mimeType, filename)), [filename, mimeType])
+	const icons = useFileIcons()
+	const icon = useMemo(
+		() => svgDataUri(icons.svgFor(icons.keyFor(mimeType, filename)) ?? ''),
+		[filename, icons, mimeType]
+	)
 	const size = filesize === undefined ? undefined : formatFilesize(filesize)
 	const reasonMessage =
 		reason === 'tooLarge'
