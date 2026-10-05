@@ -1,7 +1,7 @@
 import type { SanitizedCollectionConfig } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { expireCookie, generateHintCookie, sharedCookieName } from './cookies'
+import { clearOnSwitchOnStart, expireCookie, generateHintCookie, sharedCookieName } from './cookies'
 
 const authConfig = (overrides: Record<string, unknown> = {}) =>
 	({
@@ -32,5 +32,28 @@ describe('cookies', () => {
 		const expires = cookie.match(/Expires=([^;]+)/)?.[1]
 		expect(cookie).toContain('payload-tenant=')
 		expect(new Date(expires ?? '').getTime()).toBeLessThan(Date.now())
+	})
+
+	it('expires clearOnSwitch on swap start except the minted cookie', () => {
+		const expired = clearOnSwitchOnStart({
+			authConfig: authConfig(),
+			cookiePrefix: 'payload',
+			except: ['payload-token'],
+			mode: 'swap',
+			names: ['payload-tenant', 'side', 'payload-token'],
+		})
+		expect(expired.map((cookie) => cookie.split('=')[0])).toEqual(['payload-tenant', 'side'])
+	})
+
+	it('leaves clearOnSwitch alone on parallel start', () => {
+		expect(
+			clearOnSwitchOnStart({
+				authConfig: authConfig(),
+				cookiePrefix: 'payload',
+				except: [],
+				mode: 'parallel',
+				names: ['payload-tenant', 'side'],
+			})
+		).toEqual([])
 	})
 })

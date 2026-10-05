@@ -511,7 +511,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		}
 	})
 
-	it('expires the prefix-derived tenant cookie on start', async () => {
+	it('expires payload-tenant under a custom cookiePrefix', async () => {
 		const booted = await bootPayload({
 			collections,
 			configOverrides: { admin: { user: 'users' }, cookiePrefix: 'acme' },
@@ -527,15 +527,15 @@ describeForDb('impersonation refusals', {}, (db) => {
 				where: { email: { equals: TARGET.email } },
 			})
 			await client.post('/api/users/login', { body: ADMIN })
-			client.setCookie('acme-tenant', 'tenant-a')
+			client.setCookie('payload-tenant', 'tenant-a')
 			const start = await client.post('/api/impersonation/start', {
 				body: { collection: 'users', id: target.docs[0]?.id },
 			})
 			expect(start.status).toBe(200)
-			expect(client.cookieNames()).not.toContain('acme-tenant')
+			expect(client.cookieNames()).not.toContain('payload-tenant')
 			const exit = await client.post('/api/impersonation/exit', { body: {} })
 			expect(exit.status).toBe(200)
-			expect(client.jar.get('acme-tenant')).toBe('tenant-a')
+			expect(client.cookieNames()).not.toContain('payload-tenant')
 		} finally {
 			await booted.stop()
 		}
@@ -904,30 +904,21 @@ describeForDb('impersonation refusals', {}, (db) => {
 		}
 	})
 
-	it('sets the unique assigned tenant on swap start', async () => {
+	it('expires the tenant cookie on swap start and does not restore it on exit', async () => {
 		const booted = await bootPayload({
 			collections: [
 				{
 					slug: 'users',
 					auth: true,
-					fields: [
-						{ name: 'name', type: 'text' },
-						{ hasMany: true, name: 'tenants', relationTo: 'users', type: 'relationship' },
-					],
+					fields: [{ name: 'name', type: 'text' }],
 				},
 			],
 			configOverrides: { admin: { user: 'users' } },
 			db,
 			plugin: impersonation({ access: { impersonate: () => true } }),
 			seed: async (payload) => {
-				const admin = await payload.create({
-					collection: 'users',
-					data: { ...ADMIN, name: 'Admin' },
-				})
-				await payload.create({
-					collection: 'users',
-					data: { ...TARGET, name: 'Target', tenants: [admin.id] },
-				})
+				await payload.create({ collection: 'users', data: { ...ADMIN, name: 'Admin' } })
+				await payload.create({ collection: 'users', data: { ...TARGET, name: 'Target' } })
 			},
 		})
 		try {
@@ -943,15 +934,10 @@ describeForDb('impersonation refusals', {}, (db) => {
 				body: { collection: 'users', id: target.docs[0]?.id },
 			})
 			expect(start.status).toBe(200)
-			const admin = await booted.payload.find({
-				collection: 'users',
-				limit: 1,
-				where: { email: { equals: ADMIN.email } },
-			})
-			expect(client.jar.get('payload-tenant')).toBe(String(admin.docs[0]?.id))
+			expect(client.cookieNames()).not.toContain('payload-tenant')
 			const exit = await client.post('/api/impersonation/exit', { body: {} })
 			expect(exit.status).toBe(200)
-			expect(client.jar.get('payload-tenant')).toBe('other-tenant')
+			expect(client.cookieNames()).not.toContain('payload-tenant')
 		} finally {
 			await booted.stop()
 		}

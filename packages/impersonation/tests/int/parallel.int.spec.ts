@@ -51,7 +51,12 @@ describeForDb('impersonation parallel', {}, (db) => {
 			collections: isolatedCollections,
 			configOverrides: {
 				admin: { user: 'users' },
-				plugins: [impersonation({ access: { impersonate: () => true } })],
+				plugins: [
+					impersonation({
+						access: { impersonate: () => true },
+						cookies: { clearOnSwitch: ['payload-tenant', 'side-cookie'] },
+					}),
+				],
 			},
 			db,
 			plugin: dualSession({ collections: ['partners'] }),
@@ -112,18 +117,21 @@ describeForDb('impersonation parallel', {}, (db) => {
 		await client.post('/api/impersonation/exit', { body: {} })
 	})
 
-	it('keeps the tenant cookie in parallel', async () => {
+	it('keeps clearOnSwitch cookies in parallel', async () => {
 		const client = createRestClient(booted)
 		await client.post('/api/users/login', { body: ADMIN })
 		client.setCookie('payload-tenant', 'tenant-a')
+		client.setCookie('side-cookie', 'keep')
 		const start = await client.post('/api/impersonation/start', {
 			body: { collection: 'partners', id: partnerId },
 		})
 		expect(start.status).toBe(200)
 		expect(client.jar.get('payload-tenant')).toBe('tenant-a')
+		expect(client.jar.get('side-cookie')).toBe('keep')
 		const exit = await client.post('/api/impersonation/exit', { body: {} })
 		expect(exit.status).toBe(200)
 		expect(client.jar.get('payload-tenant')).toBe('tenant-a')
+		expect(client.jar.get('side-cookie')).toBe('keep')
 	})
 })
 

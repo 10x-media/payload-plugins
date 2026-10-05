@@ -110,9 +110,9 @@ describe('normalizeOptions', () => {
 		).toThrow(/deleteAfterDays/)
 	})
 
-	it('derives the tenant cookie from cookiePrefix', () => {
+	it('keeps payload-tenant whatever cookiePrefix is, as the multi-tenant plugin does', () => {
 		expect(
 			normalizeOptions(enabled(), config({ cookiePrefix: 'acme' })).cookies.clearOnSwitch
-		).toEqual(['acme-tenant'])
+		).toEqual(['payload-tenant'])
 	})
 })
