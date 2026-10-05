@@ -20,6 +20,13 @@ const users: CollectionConfig = {
 	fields: [],
 }
 
+const media: CollectionConfig = {
+	slug: 'media',
+	admin: { defaultColumns: ['filename', 'mimeType', 'filesize'], useAsTitle: 'filename' },
+	fields: [{ name: 'alt', type: 'text' }],
+	upload: { staticDir: path.resolve(dirname, 'uploads') },
+}
+
 const db =
 	useDb === 'postgres'
 		? postgresAdapter({
@@ -39,8 +46,8 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users],
-	plugins: [documentPreview({})],
+	collections: [users, media],
+	plugins: [documentPreview({ collections: { media: { display: 'both', listView: true } } })],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)

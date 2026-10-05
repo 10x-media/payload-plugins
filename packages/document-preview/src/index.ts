@@ -1,22 +1,11 @@
 import { type Config, definePlugin } from 'payload'
 
+import type { DocumentPreviewPluginOptions } from './options'
+import { injectCollections } from './plugin/injectCollections'
+import { normalizeOptions } from './plugin/normalizeOptions'
 import { registerTranslations } from './plugin/registerTranslations'
-import type { TranslationsOption } from './translations'
-
-export type DocumentPreviewPluginOptions = {
-	/**
-	 * Disable the plugin entirely (incoming config returned untouched).
-	 * Useful for opting out per environment without removing the plugin call.
-	 */
-	disabled?: boolean
-	/**
-	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
-	 * translation keys exported from `@10x-media/document-preview/i18n`. Values win
-	 * over the built-in locales key-by-key; locales the plugin does not ship are
-	 * added whole. App-level `i18n.translations` still wins over both.
-	 */
-	translations?: TranslationsOption
-}
+import type { DocumentPreviewRegistry } from './plugin/registry'
+import { setRegistry } from './plugin/registry'
 
 declare module 'payload' {
 	interface RegisteredPlugins {
@@ -24,10 +13,28 @@ declare module 'payload' {
 	}
 }
 
+/** Every host viewer path, so `generate:importmap` (which only scans known slots) picks them up. */
+const registerViewerDependencies = (config: Config, registry: DocumentPreviewRegistry): void => {
+	const paths = new Set([
+		...Object.values(registry.viewers),
+		...Object.values(registry.collections).flatMap((preview) => Object.values(preview.viewers)),
+	])
+	if (paths.size === 0) {
+		return
+	}
+	config.admin ??= {}
+	config.admin.dependencies ??= {}
+	for (const path of paths) {
+		config.admin.dependencies[`document-preview:${path}`] = { path, type: 'component' }
+	}
+}
+
 /**
- * Document Preview plugin for Payload v3. Currently registers this plugin's
- * translations; future releases will add feature behavior. Authored with
- * `definePlugin` so sibling plugins can detect it by slug.
+ * Document Preview plugin for Payload v3: read-only previews of upload
+ * documents (images, video, audio, PDF, CSV, text, DOCX, XLSX, PPTX) in the
+ * admin, opened from a drawer, inline above the fields, or a list column. Every
+ * viewer loads lazily on first open. Authored with `definePlugin` so sibling
+ * plugins can detect it by slug.
  */
 export const documentPreview = definePlugin<DocumentPreviewPluginOptions>({
 	slug: '@10x-media/document-preview',
@@ -36,8 +43,24 @@ export const documentPreview = definePlugin<DocumentPreviewPluginOptions>({
 			return config
 		}
 		registerTranslations(config, options.translations)
+		const registry = normalizeOptions(config, options)
+		setRegistry(config, registry)
+		injectCollections(config, registry)
+		registerViewerDependencies(config, registry)
+		config.admin ??= {}
+		config.admin.components ??= {}
+		config.admin.components.providers = [
+			...(config.admin.components.providers ?? []),
+			'@10x-media/document-preview/rsc#DocumentPreviewProviderServer',
+		]
 		return config
 	},
 })
 
-export type { DocumentPreviewPluginOptions as PluginOptions }
+export type {
+	CollectionPreviewOptions,
+	DocumentPreviewPluginOptions,
+	DocumentPreviewPluginOptions as PluginOptions,
+	PreviewDisplay,
+	ViewerOverrides,
+} from './options'
