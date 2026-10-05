@@ -1,5 +1,13 @@
 # @10x-media/audit-logs-dev
 
+## 0.0.1-beta.4
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/audit-logs@0.1.0-beta.4
+  - @10x-media/impersonation@0.1.0-beta.1
+
 ## 0.0.1-beta.3
 
 ### Patch Changes
