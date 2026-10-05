@@ -4,19 +4,19 @@ Previews open in a **drawer** beside the document controls, or *inline* above th
 
 ## Viewers
 
-| Format | Viewer | Loaded |
+| Format | Viewer | Loaded on open |
 | --- | --- | ---: |
-| PDF | Browser iframe | 0 KB |
-| CSV / TSV | Virtualized table | ~7 KB |
-| DOCX | extend | ~580 KB |
+| PDF | Browser iframe | 1 KB |
+| CSV / TSV | Virtualized table | 15 KB |
+| DOCX | extend | ~750 KB |
 | XLSX | extend | ~2.3 MB |
-| PPTX | extend | ~425 KB |
+| PPTX | extend | ~430 KB |
 
 ## Checklist
 
 - [x] Lazy-load every viewer
 - [x] Keep documents light in the dark admin
-- [ ] Icons per file type in thumbnails
+- [x] Icons per file type in thumbnails
 
 > Every viewer loads on first open; a page without a preview loads none of them.
 

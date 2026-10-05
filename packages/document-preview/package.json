@@ -1,7 +1,7 @@
 {
 	"name": "@10x-media/document-preview",
 	"version": "0.0.0",
-	"description": "Read-only previews of upload documents in the Payload admin: images, video, audio, PDF, CSV, text, DOCX, XLSX and PPTX.",
+	"description": "Read-only previews of upload documents in the Payload admin: images, video, audio, PDF, CSV, text and code, Markdown, Word, Excel and PowerPoint, lazy-loaded per format.",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -15,11 +15,13 @@
 		"payloadcms",
 		"plugin",
 		"preview",
+		"upload",
 		"docx",
 		"xlsx",
 		"pptx",
 		"pdf",
-		"csv"
+		"csv",
+		"markdown"
 	],
 	"author": "10x-media",
 	"engines": {
@@ -62,8 +64,8 @@
 	],
 	"scripts": {
 		"build": "tsdown",
-		"lint": "biome check src tests dev",
-		"lint:fix": "biome check --write src tests dev",
+		"lint": "biome check src tests dev videos",
+		"lint:fix": "biome check --write src tests dev videos",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "vitest run",
 		"test:unit": "vitest run src",
@@ -71,6 +73,7 @@
 		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
 		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts",
 		"test:e2e": "bash scripts/e2e.sh",
+		"videos": "clipwright videos",
 		"dev": "pnpm --filter @10x-media/document-preview-dev dev",
 		"start": "pnpm --filter @10x-media/document-preview-dev start",
 		"generate": "pnpm --filter @10x-media/document-preview-dev generate",
@@ -104,6 +107,7 @@
 		"@types/papaparse": "5.5.2",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
+		"clipwright": "catalog:",
 		"payload": "catalog:",
 		"playwright": "catalog:",
 		"react": "catalog:",

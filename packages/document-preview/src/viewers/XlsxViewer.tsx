@@ -93,7 +93,7 @@ const SheetBar = ({ controller }: { controller: XlsxViewerController }) => {
 					title={t(keys.actualSize)}
 					type="button"
 				>
-					{Math.round(controller.zoomScale * 100)}%
+					{Math.round(controller.zoomScale)}%
 				</button>
 				<button
 					aria-label={t(keys.zoomIn)}

@@ -1084,6 +1084,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.15)
+      clipwright:
+        specifier: 'catalog:'
+        version: 0.1.0
       payload:
         specifier: 'catalog:'
         version: 3.85.0(graphql@16.14.0)(typescript@5.9.3)

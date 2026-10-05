@@ -6,7 +6,6 @@ import {
 	parseDocxForViewer,
 	useDocxEditor,
 	useDocxPageLayout,
-	useDocxPagination,
 	type ViewerZoomLevel,
 } from '@extend-ai/react-docx'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -37,12 +36,17 @@ const PAGE_JUMP_OFFSET = 16
  * or a trackpad pinch zooms, which extend leaves to the host. Pages stay light
  * in a dark admin: extend's dark mode inverts the document and leaves body text
  * barely readable, and a page reads as paper either way.
+ *
+ * The page count comes from `onPageCountChange` and the current page from the
+ * scroll position, as in extend's own viewer: the editor's pagination state can
+ * stay at one page while the viewer lays out all of them.
  */
 const DocxPages = ({ document }: { document: ParsedDocxDocument }) => {
 	const { t } = useTranslation()
 	const editor = useDocxEditor({ document, initialDocumentTheme: 'light' })
-	const { pagination } = useDocxPagination(editor)
 	const { layout } = useDocxPageLayout(editor)
+	const [pageCount, setPageCount] = useState(1)
+	const [activePage, setActivePage] = useState(1)
 	const scrollRef = useRef<HTMLDivElement>(null)
 	const [scroller, setScroller] = useState<HTMLDivElement | null>(null)
 	const [showPages, setShowPages] = useState(false)
@@ -72,6 +76,45 @@ const DocxPages = ({ document }: { document: ParsedDocxDocument }) => {
 		scrollRef.current = element
 		setScroller(element)
 	}, [])
+
+	// The page whose middle is nearest the viewport's middle, recomputed once per frame while scrolling.
+	useEffect(() => {
+		if (!scroller) {
+			return
+		}
+		let frameId = 0
+		const update = () => {
+			const viewport = scroller.getBoundingClientRect()
+			const middle = viewport.top + viewport.height / 2
+			let closest = { distance: Number.POSITIVE_INFINITY, page: 1 }
+			for (const page of scroller.querySelectorAll<HTMLElement>(
+				'[data-docx-page-wrapper="true"][data-index]'
+			)) {
+				const rect = page.getBoundingClientRect()
+				const distance = Math.abs(rect.top + rect.height / 2 - middle)
+				if (distance < closest.distance) {
+					closest = { distance, page: Number(page.dataset.index) + 1 }
+				}
+			}
+			setActivePage(closest.page)
+		}
+		const onScroll = () => {
+			cancelAnimationFrame(frameId)
+			frameId = requestAnimationFrame(update)
+		}
+		frameId = requestAnimationFrame(update)
+		scroller.addEventListener('scroll', onScroll, { passive: true })
+		return () => {
+			cancelAnimationFrame(frameId)
+			scroller.removeEventListener('scroll', onScroll)
+		}
+	}, [scroller])
+
+	// The rail sizes its list from `totalPages`, so it gets the count the viewer reported.
+	const railEditor = useMemo(
+		() => ({ ...editor, totalPages: Math.max(editor.totalPages, pageCount) }),
+		[editor, pageCount]
+	)
 
 	// Virtualize against this container explicitly, as extend's own viewer does, rather than a guessed ancestor.
 	const pageVirtualization = useMemo(
@@ -109,17 +152,14 @@ const DocxPages = ({ document }: { document: ParsedDocxDocument }) => {
 		<div className="document-preview-docx">
 			<div className="document-preview-docx__body">
 				{showPages ? (
-					<DocxThumbnails
-						activePage={pagination.currentPage}
-						editor={editor}
-						onSelectPage={scrollToPage}
-					/>
+					<DocxThumbnails activePage={activePage} editor={railEditor} onSelectPage={scrollToPage} />
 				) : null}
 				<div className="document-preview-docx__scroll" ref={setScrollRef}>
 					<DocxEditorViewer
 						className="document-preview-docx__viewer"
 						editor={editor}
 						mode="read-only"
+						onPageCountChange={(count) => setPageCount(Math.max(1, Math.round(count || 1)))}
 						onZoomChange={(state) => setResolved(state.resolvedZoom)}
 						pageGapBackgroundColor="transparent"
 						pageVirtualization={pageVirtualization}
@@ -140,9 +180,7 @@ const DocxPages = ({ document }: { document: ParsedDocxDocument }) => {
 						<RailIcon />
 					</button>
 					<span className="document-preview-toolbar__value">
-						{pagination.totalPages > 0
-							? t(keys.pageOf, { current: pagination.currentPage, total: pagination.totalPages })
-							: null}
+						{t(keys.pageOf, { current: activePage, total: pageCount })}
 					</span>
 				</div>
 				<div className="document-preview-office__zoom">

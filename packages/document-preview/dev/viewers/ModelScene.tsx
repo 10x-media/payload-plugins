@@ -69,14 +69,21 @@ const load = async (format: Format, url: string): Promise<Object3D> => {
 	return group
 }
 
-/** Frames the whole model from a three-quarter angle and makes it the orbit target. */
+/**
+ * Frames the whole model from a three-quarter angle and makes it the orbit
+ * target: far enough that its bounding sphere fits the narrower field of view,
+ * with a margin.
+ */
 const frame = (model: Object3D, camera: PerspectiveCamera, controls: OrbitControls) => {
 	const box = new Box3().setFromObject(model)
 	const size = box.getSize(new Vector3()).length() || 1
 	const center = box.getCenter(new Vector3())
+	const vertical = (camera.fov * Math.PI) / 180
+	const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * camera.aspect)
+	const distance = (size / 2 / Math.sin(Math.min(vertical, horizontal) / 2)) * 1.15
 	camera.near = size / 100
 	camera.far = size * 100
-	camera.position.copy(center).add(new Vector3(0.6, 0.45, 0.8).multiplyScalar(size))
+	camera.position.copy(center).add(new Vector3(0.6, 0.45, 0.8).normalize().multiplyScalar(distance))
 	camera.updateProjectionMatrix()
 	controls.target.copy(center)
 	controls.update()
