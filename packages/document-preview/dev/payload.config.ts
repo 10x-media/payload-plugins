@@ -27,6 +27,16 @@ const media: CollectionConfig = {
 	upload: { staticDir: path.resolve(dirname, 'uploads') },
 }
 
+const posts: CollectionConfig = {
+	slug: 'posts',
+	admin: { defaultColumns: ['title', 'cover', 'attachments'], useAsTitle: 'title' },
+	fields: [
+		{ name: 'title', type: 'text', required: true },
+		{ name: 'cover', type: 'upload', relationTo: 'media' },
+		{ name: 'attachments', type: 'upload', hasMany: true, relationTo: 'media' },
+	],
+}
+
 const db =
 	useDb === 'postgres'
 		? postgresAdapter({
@@ -46,7 +56,7 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [users, media],
+	collections: [users, media, posts],
 	plugins: [documentPreview({ collections: { media: { display: 'both', listView: true } } })],
 	telemetry: false,
 	onInit: async (payload) => {
@@ -54,6 +64,12 @@ export default buildConfig({
 	},
 	typescript: { autoGenerate },
 	admin: {
+		components: {
+			afterNavLinks: ['/FileIconsNavLink#FileIconsNavLink'],
+			views: {
+				fileIcons: { Component: '/FileIconsView#FileIconsView', path: '/file-icons' },
+			},
+		},
 		importMap: {
 			autoGenerate,
 			baseDir: path.resolve(dirname),

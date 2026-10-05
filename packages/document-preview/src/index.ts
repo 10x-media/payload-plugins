@@ -1,6 +1,7 @@
 import { type Config, definePlugin } from 'payload'
 
 import type { DocumentPreviewPluginOptions } from './options'
+import { fileIconEndpoint } from './plugin/fileIcons'
 import { injectCollections } from './plugin/injectCollections'
 import { normalizeOptions } from './plugin/normalizeOptions'
 import { registerTranslations } from './plugin/registerTranslations'
@@ -47,6 +48,9 @@ export const documentPreview = definePlugin<DocumentPreviewPluginOptions>({
 		setRegistry(config, registry)
 		injectCollections(config, registry)
 		registerViewerDependencies(config, registry)
+		if (Object.values(registry.collections).some((preview) => preview.fileIcons)) {
+			config.endpoints = [...(config.endpoints ?? []), fileIconEndpoint]
+		}
 		config.admin ??= {}
 		config.admin.components ??= {}
 		config.admin.components.providers = [

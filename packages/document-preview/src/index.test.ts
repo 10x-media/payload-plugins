@@ -53,10 +53,10 @@ describe('documentPreview factory', () => {
 })
 
 describe('collection wiring', () => {
-	it('defaults to a drawer button and only adds the filesize cell', () => {
+	it('defaults to a drawer button, the filesize cell and file icons', () => {
 		const out = run({ collections: { media: true } })
 		expect(controls(out)).toEqual(['@10x-media/document-preview/client#DocumentPreviewButton'])
-		expect(fieldNames(out)).toEqual(['alt', 'filesize'])
+		expect(fieldNames(out)).toEqual(['alt', 'filesize', 'thumbnailURL'])
 	})
 
 	it('keeps controls the host already declared', () => {
@@ -75,7 +75,7 @@ describe('collection wiring', () => {
 	it('puts the inline preview first, without a list column', () => {
 		const out = run({ collections: { media: { display: 'inline' } } })
 		expect(controls(out)).toEqual([])
-		expect(fieldNames(out)).toEqual([INLINE_FIELD_NAME, 'alt', 'filesize'])
+		expect(fieldNames(out)).toEqual([INLINE_FIELD_NAME, 'alt', 'filesize', 'thumbnailURL'])
 		const field = collection(out).fields[0] as UIField
 		expect(field.admin?.components?.Field).toBe(
 			'@10x-media/document-preview/client#DocumentPreviewInlineField'
@@ -121,7 +121,7 @@ describe('collection wiring', () => {
 
 	it('adds the cell to a filesize field the collection declares, keeping its settings', () => {
 		const out = run(
-			{ collections: { media: true } },
+			{ collections: { media: { fileIcons: false } } },
 			fakeConfig([
 				media({ fields: [{ name: 'filesize', type: 'number', admin: { description: 'Bytes' } }] }),
 			])
@@ -142,10 +142,12 @@ describe('collection wiring', () => {
 		const own = media({
 			fields: [{ name: 'filesize', type: 'number', admin: { components: { Cell: '/own#Cell' } } }],
 		})
-		expect(collection(run({ collections: { media: true } }, fakeConfig([own]))).fields).toEqual(
-			own.fields
-		)
-		expect(fieldNames(run({ collections: { media: { filesizeCell: false } } }))).toEqual(['alt'])
+		expect(
+			collection(run({ collections: { media: { fileIcons: false } } }, fakeConfig([own]))).fields
+		).toEqual(own.fields)
+		expect(
+			fieldNames(run({ collections: { media: { fileIcons: false, filesizeCell: false } } }))
+		).toEqual(['alt'])
 	})
 
 	it('leaves collections that are not listed untouched', () => {
@@ -165,6 +167,7 @@ describe('viewer overrides', () => {
 			collections: {
 				media: {
 					display: 'drawer',
+					fileIcons: true,
 					filesizeCell: true,
 					listView: false,
 					viewers: { 'video/*': '/viewers#Bunny' },
@@ -176,6 +179,20 @@ describe('viewer overrides', () => {
 			'document-preview:/viewers#Bunny': { path: '/viewers#Bunny', type: 'component' },
 			'document-preview:/viewers#Pdf': { path: '/viewers#Pdf', type: 'component' },
 		})
+	})
+
+	it('lets a global fileIcons default be overridden per collection', () => {
+		const media2 = media({ slug: 'media2' })
+		const out = run(
+			{ collections: { media: true, media2: { fileIcons: true } }, fileIcons: false },
+			fakeConfig([media(), media2])
+		)
+		expect(fieldNames(out)).not.toContain('thumbnailURL')
+		expect(
+			collection(out, 'media2').fields.map((field) => ('name' in field ? field.name : undefined))
+		).toContain('thumbnailURL')
+		expect(out.endpoints).toHaveLength(1)
+		expect(run({ collections: { media: true }, fileIcons: false }).endpoints).toBeUndefined()
 	})
 
 	it('adds no dependencies without overrides', () => {

@@ -1,6 +1,7 @@
 import type { CollectionConfig, Config, Field } from 'payload'
 
 import { keys } from '../translations/keys'
+import { apiRouteOf, withFileIconThumbnail } from './fileIcons'
 import type { DocumentPreviewRegistry } from './registry'
 
 /** Name of the ui field carrying the inline preview. */
@@ -66,7 +67,7 @@ const columnLabel = (config: Config): Record<string, string> => {
 const withPreview = (
 	collection: CollectionConfig,
 	preview: DocumentPreviewRegistry['collections'][string],
-	label: Record<string, string>
+	{ apiRoute, label }: { apiRoute: string; label: Record<string, string> }
 ): CollectionConfig => {
 	const admin = { ...collection.admin }
 	let fields: Field[] = collection.fields
@@ -110,14 +111,17 @@ const withPreview = (
 	if (preview.filesizeCell) {
 		fields = withFilesizeCell(fields)
 	}
+	if (preview.fileIcons) {
+		fields = withFileIconThumbnail(fields, apiRoute)
+	}
 	return { ...collection, admin, fields }
 }
 
 /** Wire every enabled upload collection's edit view (and list view, when asked) to the preview. */
 export const injectCollections = (config: Config, registry: DocumentPreviewRegistry): void => {
-	const label = columnLabel(config)
+	const context = { apiRoute: apiRouteOf(config), label: columnLabel(config) }
 	config.collections = (config.collections ?? []).map((collection) => {
 		const preview = registry.collections[collection.slug]
-		return preview ? withPreview(collection, preview, label) : collection
+		return preview ? withPreview(collection, preview, context) : collection
 	})
 }

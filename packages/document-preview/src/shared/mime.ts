@@ -1,10 +1,12 @@
 /** Mime types for the extensions this plugin can preview, used when an upload carries no usable mime. */
 const EXTENSION_MIME: Record<string, string> = {
+	'7z': 'application/x-7z-compressed',
 	avif: 'image/avif',
 	bmp: 'image/bmp',
 	csv: 'text/csv',
 	docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 	gif: 'image/gif',
+	gz: 'application/gzip',
 	ico: 'image/x-icon',
 	jpeg: 'image/jpeg',
 	jpg: 'image/jpeg',
@@ -20,7 +22,9 @@ const EXTENSION_MIME: Record<string, string> = {
 	png: 'image/png',
 	ppt: 'application/vnd.ms-powerpoint',
 	pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+	rar: 'application/vnd.rar',
 	svg: 'image/svg+xml',
+	tar: 'application/x-tar',
 	tsv: 'text/tab-separated-values',
 	txt: 'text/plain',
 	wav: 'audio/wav',
@@ -32,6 +36,7 @@ const EXTENSION_MIME: Record<string, string> = {
 	xml: 'application/xml',
 	yaml: 'application/yaml',
 	yml: 'application/yaml',
+	zip: 'application/zip',
 }
 
 /**

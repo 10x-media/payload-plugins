@@ -74,4 +74,35 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		})
 	}
 	payload.logger.info('Seeded dev media fixtures')
+
+	const media = await payload.find({ collection: 'media', depth: 0, limit: 100, pagination: false })
+	const idOf = (name: string) => media.docs.find((doc) => doc.filename === name)?.id
+	const ids = (names: string[]) =>
+		names.map(idOf).filter((id): id is NonNullable<typeof id> => id !== undefined)
+	await payload.create({
+		collection: 'posts',
+		data: {
+			attachments: ids([
+				'sample.pdf',
+				'demo.docx',
+				'crazy-chart-zoo.xlsx',
+				'demo.pptx',
+				'tiny.csv',
+				'notes.md',
+				'sample.json',
+				'config.yaml',
+				't-rex-roar.mp3',
+				'flower.mp4',
+				'archive.zip',
+				'sample.png',
+			]),
+			cover: idOf('sample.pdf'),
+			title: 'Every file type',
+		},
+	})
+	await payload.create({
+		collection: 'posts',
+		data: { cover: idOf('sample.png'), title: 'Image cover' },
+	})
+	payload.logger.info('Seeded dev posts')
 }

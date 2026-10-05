@@ -22,6 +22,14 @@ export type CollectionPreviewOptions = {
 	/** Defaults to `'drawer'`. */
 	display?: PreviewDisplay
 	/**
+	 * Give non-image files a file-type icon as their admin thumbnail (list
+	 * column, upload fields, edit view) instead of Payload's blank page. On by
+	 * default. Only fills an empty `thumbnailURL`, so image sizes, storage
+	 * adapters and `upload.adminThumbnail` keep precedence. The icons are served
+	 * to signed-in users only.
+	 */
+	fileIcons?: boolean
+	/**
 	 * Show `filesize` in the list view as `1.2 MB` rather than raw bytes. On by
 	 * default; a `Cell` the collection already sets on `filesize` is kept.
 	 */
@@ -45,6 +53,11 @@ export type DocumentPreviewPluginOptions = {
 	 */
 	disabled?: boolean
 	/**
+	 * Default for every collection's `fileIcons`: `false` keeps Payload's own
+	 * blank-page thumbnail everywhere unless a collection turns icons back on.
+	 */
+	fileIcons?: boolean
+	/**
 	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
 	 * translation keys exported from `@10x-media/document-preview/i18n`. Values win
 	 * over the built-in locales key-by-key; locales the plugin does not ship are
@@ -58,6 +71,7 @@ export type DocumentPreviewPluginOptions = {
 /** A collection's options with defaults applied. */
 export type ResolvedCollectionPreview = {
 	display: PreviewDisplay
+	fileIcons: boolean
 	filesizeCell: boolean
 	listView: boolean
 	viewers: ViewerOverrides

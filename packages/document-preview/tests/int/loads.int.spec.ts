@@ -30,7 +30,15 @@ describeForDb('documentPreview loads', { dbs: ['mongo'] }, (db) => {
 
 	it('keeps the registry on the sanitized config for the admin provider', () => {
 		expect(getRegistry(booted.payload.config)).toEqual({
-			collections: { media: { display: 'both', filesizeCell: true, listView: true, viewers: {} } },
+			collections: {
+				media: {
+					display: 'both',
+					fileIcons: true,
+					filesizeCell: true,
+					listView: true,
+					viewers: {},
+				},
+			},
 			viewers: { 'video/*': '/viewers#Player' },
 		})
 	})
@@ -51,6 +59,26 @@ describeForDb('documentPreview loads', { dbs: ['mongo'] }, (db) => {
 		expect(typeof doc.url).toBe('string')
 		expect(doc).not.toHaveProperty('documentPreview')
 		expect(doc.filesize).toBe(8)
+	})
+
+	it('gives non-image uploads an icon thumbnail and leaves images to Payload', async () => {
+		const pdf = await booted.payload.create({
+			collection: 'media',
+			data: {},
+			file: { data: Buffer.from('%PDF-1.4'), mimetype: 'application/pdf', name: 'a.pdf', size: 8 },
+		})
+		expect(pdf.thumbnailURL).toMatch(/^\/api\/document-preview\/file-icon\/pdf\?v=\w+$/)
+		const svg = await booted.payload.create({
+			collection: 'media',
+			data: {},
+			file: {
+				data: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="4" height="4"/>'),
+				mimetype: 'image/svg+xml',
+				name: 'a.svg',
+				size: 60,
+			},
+		})
+		expect(svg.thumbnailURL ?? null).toBeNull()
 	})
 
 	it('merges the filesize cell into the upload field instead of adding a second one', () => {

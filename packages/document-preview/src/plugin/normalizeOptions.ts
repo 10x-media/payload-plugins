@@ -52,6 +52,7 @@ export const normalizeOptions = (
 		}
 		collections[slug] = {
 			display,
+			fileIcons: custom.fileIcons ?? options.fileIcons !== false,
 			filesizeCell: custom.filesizeCell !== false,
 			listView: custom.listView === true,
 			viewers: checkViewers(custom.viewers, `collections.${slug}.viewers`),
