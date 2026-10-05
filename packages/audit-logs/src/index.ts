@@ -36,8 +36,8 @@ declare module 'payload' {
  */
 export const auditLogs = definePlugin<AuditLogsPluginOptions>({
 	slug: '@10x-media/audit-logs',
-	plugin: ({ config, plugins: _plugins, ...pluginOptions }): Config => {
-		const ctx = buildPluginContext(config, pluginOptions)
+	plugin: ({ config, plugins, ...pluginOptions }): Config => {
+		const ctx = buildPluginContext(config, pluginOptions, plugins)
 
 		registerTranslations(config, pluginOptions.translations)
 		// Settles ctx.fastWrite, so it has to run before anything that writes entries.

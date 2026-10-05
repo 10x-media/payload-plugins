@@ -42,7 +42,11 @@ Three consequences are worth knowing before you enable it.
 
 ## What gets recorded
 
-Beyond the diff, each entry carries the acting user, the locale, which API the write came through (`REST`, `GraphQL` or `local`), and by default the IP address and user agent. Both of those can be switched off for GDPR reasons, as can any field value through [anonymization](/audit-logs/anonymization).
+Beyond the diff, each entry carries the acting user, the locale, which API the write came through (`REST`, `GraphQL` or `local`), and by default the IP address and user agent. IP address and user agent can be switched off for GDPR reasons, as can any field value through [anonymization](/audit-logs/anonymization).
+
+When the acting user was reached through `@10x-media/impersonation`, the entry also stores `impersonator`, copied from `req.user` at write time. The list still names the acting user; their pill carries an `impersonated` mark that opens who was impersonating.
+
+The `impersonator` field exists only when the impersonation plugin is installed, so a project without it carries no extra column or index. Turn it off with [`impersonation: false`](/audit-logs/configuration). With the impersonation plugin's `decorateRequests: false`, `req.user._impersonation` is never set, so the field exists but stays empty.
 
 Deletes and creates can additionally store a full document [snapshot](/audit-logs/what-is-logged#snapshots), which is what makes partial recovery possible.
 

@@ -14,6 +14,7 @@ description: The full option surface, from per-collection opt-in to the audit-lo
 | `drafts` | `'ignore' \| 'log'` | `'ignore'` | Default draft handling for versioned entities. |
 | `normalizeRelationships` | `boolean` | `true` | Reduce relationship values to plain ids in diffs and snapshots. |
 | `multiTenancy` | `true \| MultiTenancyConfig` | off | See [multi-tenancy](/audit-logs/multi-tenancy). |
+| `impersonation` | `boolean` | detected | Add the `impersonator` field. On when `@10x-media/impersonation` is in `config.plugins`, in any order. `false` keeps the field out even then; `true` adds it without the plugin, for code that sets `req.user._impersonation` itself. |
 | `retention` | `DataRetentionConfig` | off | See [data retention](/audit-logs/data-retention). |
 | `logs` | `object` | see below | The `audit-logs` collection and its view. |
 | `debug` | `boolean` | `false` | With `retention` set, adds buttons to the view that queue the retention jobs. Development only. |
@@ -97,8 +98,9 @@ auditLogs({
 | `userAgent` | `boolean` | `true` | Store the requester's user agent. |
 | `group` | `boolean \| { contextKey?: string }` | off | Add an indexed `group` field, filled from `req.context[contextKey]`. Default key `auditGroup`. |
 | `payloadAPIs` | `(string \| { label, value })[]` | none | Extra `payloadAPI` values to label in the view, on top of `REST`, `GraphQL` and `local`. |
+| `eventTypes` | `(string \| { label, value })[]` | none | Custom event types to offer in the view's Event filter, and how to label them there and on the row badge. See [eventTypes](#eventtypes). |
 | `access` | `{ create?, read?, update?, delete? }` | all denied | Access for the collection's own REST and GraphQL endpoints. |
-| `view` | `false \| { path?, defaultLimit?, access?, forceWhere? }` | on | The custom view. See [the admin view](/audit-logs/admin-view). |
+| `view` | `false \| { path?, defaultLimit?, access?, forceWhere?, components? }` | on | The custom view. See [the admin view](/audit-logs/admin-view). `components.customEvents` renders custom events, see [custom events](/audit-logs/custom-events#rendering-them-in-the-view). |
 | `override` | `(collection) => CollectionConfig` | none | Modify the generated collection. The slug is always forced back to `audit-logs`, and the [content-lock exemption](#content-locks) is always kept. |
 
 All four access rules default to denying everything. The plugin's own writes never go through them, so the log fills up regardless; the rules only govern the public API. Open `read` if something outside the admin needs to query entries.
@@ -118,6 +120,18 @@ logs: {
 
 A bare string is used as its own label. An entry naming a built-in value relabels it in
 place rather than adding a duplicate.
+
+### eventTypes
+
+The plugin cannot know which `eventType` values your [custom events](/audit-logs/custom-events) use, so the view's Event filter offers the ones you list here, plus every type that has a renderer in `view.components.customEvents`. Any other type can still be typed into the filter.
+
+```ts
+logs: {
+  eventTypes: ['order_paid', { label: 'Refund', value: 'order_refunded' }],
+}
+```
+
+A bare string is used as its own label. The label also replaces the raw identifier on the row badge.
 
 ### group
 

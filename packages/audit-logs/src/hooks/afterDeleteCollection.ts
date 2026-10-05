@@ -4,6 +4,7 @@ import type { AnonymizeFunction, ShouldLogFunction } from '../types'
 import { anonymizeDoc } from '../utilities/anonymize'
 import type { FieldMap } from '../utilities/buildFieldMap'
 import { normalizeSnapshot } from '../utilities/diff'
+import { impersonatorRelationship } from '../utilities/impersonator'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { extractTenantId } from '../utilities/tenant'
 import { writeAuditLog } from '../utilities/writeAuditLog'
@@ -17,6 +18,8 @@ export type AuditLogAfterDeleteOptions = {
 	fieldMap?: FieldMap
 	groupContextKey?: string
 	isUserPolymorphic: boolean
+	/** False when the log collection has no `impersonator` field. */
+	recordImpersonator: boolean
 	isSelfTenant?: boolean
 	shouldLog?: ShouldLogFunction
 	snapshotOnDelete: boolean
@@ -31,6 +34,9 @@ export const afterDeleteCollectionAuditLog =
 			? options.isUserPolymorphic
 				? { relationTo: req.user.collection, value: req.user.id }
 				: req.user.id
+			: undefined
+		const impersonator = options.recordImpersonator
+			? impersonatorRelationship(req.user, options.isUserPolymorphic)
 			: undefined
 		const ipAddress = options.collectIpAddress ? getClientIP(req) : undefined
 		const userAgent = options.collectUserAgent ? getUserAgent(req) : undefined
@@ -77,7 +83,7 @@ export const afterDeleteCollectionAuditLog =
 				relationTo: options.collectionSlug,
 				documentId,
 				...(userValue !== undefined && { user: userValue }),
-				...(req.locale && { locale: req.locale }),
+				...(impersonator !== undefined && { impersonator }),
 				payloadAPI: req.payloadAPI,
 				...(ipAddress && { ipAddress }),
 				...(userAgent && { userAgent }),

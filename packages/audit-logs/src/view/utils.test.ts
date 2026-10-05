@@ -4,38 +4,70 @@ import {
 	apiBadgeClass,
 	apiLabel,
 	buildParams,
-	displayUser,
 	formatValue,
 	isLongValue,
+	matchingRange,
+	rangeStart,
+	resolveUser,
 } from './utils'
 
-describe('displayUser', () => {
-	it('shows a dash when nobody is recorded', () => {
-		expect(displayUser(null, {})).toBe('—')
-		expect(displayUser(undefined, {})).toBe('—')
+describe('resolveUser', () => {
+	const single = { users: 'email' }
+	const several = { admins: 'email', users: 'name' }
+
+	it('returns nothing when nobody is recorded', () => {
+		expect(resolveUser(null, single)).toBeUndefined()
+		expect(resolveUser(undefined, single)).toBeUndefined()
 	})
 
-	it('shows the raw id when the relationship was not populated', () => {
-		expect(displayUser('abc123', { users: 'email' })).toBe('abc123')
-		expect(displayUser(7, { users: 'email' })).toBe('7')
+	it('reads the title field of a populated single-collection user', () => {
+		expect(resolveUser({ id: 1, email: 'a@b.c' }, single)).toEqual({
+			deleted: false,
+			id: '1',
+			label: 'a@b.c',
+			slug: 'users',
+		})
 	})
 
 	it('reads the title field of a populated polymorphic user', () => {
 		const user = { relationTo: 'admins', value: { id: 1, email: 'a@b.c' } }
-		expect(displayUser(user, { admins: 'email', users: 'name' })).toBe('a@b.c')
+		expect(resolveUser(user, several)).toEqual({
+			deleted: false,
+			id: '1',
+			label: 'a@b.c',
+			slug: 'admins',
+		})
 	})
 
-	it('falls back to the id when the title field is missing', () => {
-		const user = { relationTo: 'admins', value: { id: 1 } }
-		expect(displayUser(user, { admins: 'email' })).toBe('1')
+	it('falls back to the id when the title field is empty', () => {
+		expect(resolveUser({ relationTo: 'admins', value: { id: 1 } }, several)?.label).toBe('1')
 	})
 
-	it('reads the title field of a populated single-collection user', () => {
-		expect(displayUser({ id: 1, email: 'a@b.c' }, { users: 'email' })).toBe('a@b.c')
+	it('marks an unpopulated id as a deleted user', () => {
+		expect(resolveUser('abc123', single)).toEqual({
+			deleted: true,
+			id: 'abc123',
+			label: 'abc123',
+			slug: 'users',
+		})
 	})
 
-	it('shows the id when several collections make the shape ambiguous', () => {
-		expect(displayUser({ id: 1, email: 'a@b.c' }, { users: 'email', admins: 'name' })).toBe('1')
+	it('marks an unpopulated polymorphic value as deleted instead of printing the object', () => {
+		expect(resolveUser({ relationTo: 'admins', value: 7 }, several)).toEqual({
+			deleted: true,
+			id: '7',
+			label: '7',
+			slug: 'admins',
+		})
+	})
+
+	it('leaves the slug out when several collections make a bare value ambiguous', () => {
+		expect(resolveUser({ id: 1, email: 'a@b.c' }, several)).toEqual({
+			deleted: false,
+			id: '1',
+			label: '1',
+			slug: undefined,
+		})
 	})
 })
 
@@ -82,10 +114,10 @@ describe('buildParams', () => {
 		)
 	})
 
-	it('sets single-value filters once', () => {
-		expect(buildParams({ documentId: '42', group: 'import-7' })).toBe(
-			'documentId=42&group=import-7'
-		)
+	it('repeats documents, users and groups too', () => {
+		expect(
+			buildParams({ documents: ['posts:42', '7'], users: ['users:1'], groups: ['import-7'] })
+		).toBe('documentId=posts%3A42&documentId=7&userId=users%3A1&group=import-7')
 	})
 
 	it('leaves page one out of the URL', () => {
@@ -135,5 +167,28 @@ describe('apiLabel', () => {
 	it('does not reach an inherited property', () => {
 		expect(apiLabel('constructor', {})).toBe('constructor')
 		expect(apiLabel('toString', {})).toBe('toString')
+	})
+})
+
+describe('rangeStart', () => {
+	it('subtracts the preset window from now', () => {
+		const now = Date.parse('2026-10-02T12:00:00.000Z')
+		expect(rangeStart('24h', now)).toBe('2026-10-01T12:00:00.000Z')
+		expect(rangeStart('7d', now)).toBe('2026-09-25T12:00:00.000Z')
+		expect(rangeStart('30d', now)).toBe('2026-09-02T12:00:00.000Z')
+	})
+})
+
+describe('matchingRange', () => {
+	const now = Date.parse('2026-10-02T12:00:00.000Z')
+
+	it('recognises a preset start, with a little slack', () => {
+		expect(matchingRange('2026-09-25T12:00:00.000Z', undefined, now)).toBe('7d')
+		expect(matchingRange('2026-09-25T12:30:00.000Z', undefined, now)).toBe('7d')
+	})
+
+	it('is nothing for an end date or a start far from any preset', () => {
+		expect(matchingRange('2026-09-25T12:00:00.000Z', '2026-09-30', now)).toBeUndefined()
+		expect(matchingRange('2026-09-20T12:00:00.000Z', undefined, now)).toBeUndefined()
 	})
 })
