@@ -27,7 +27,8 @@ export const registerLogsCollection = (
 		pluginOptions.logs?.access,
 		ctx.tenantsSlug,
 		Boolean(ctx.retention?.archive),
-		ctx.groupEnabled
+		ctx.groupEnabled,
+		ctx.recordImpersonator
 	)
 
 	const overridden = pluginOptions.logs?.override ? pluginOptions.logs.override(built) : built

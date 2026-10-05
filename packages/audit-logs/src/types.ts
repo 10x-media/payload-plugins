@@ -798,6 +798,18 @@ export type AuditPluginConfig = {
 	 */
 	multiTenancy?: true | MultiTenancyConfig
 	/**
+	 * Records who was impersonating on each entry written under `@10x-media/impersonation`,
+	 * in an `impersonator` field beside `user`.
+	 *
+	 * - omitted, on when `@10x-media/impersonation` is in `config.plugins`, in any order
+	 * - `false`, never add the field, even with the plugin installed
+	 * - `true`, add it without the plugin, for code that sets `req.user._impersonation` itself
+	 *
+	 * The value is read off `req.user._impersonation`, so with the impersonation plugin's
+	 * `decorateRequests: false` the field exists but stays empty.
+	 */
+	impersonation?: boolean
+	/**
 	 * Set to `true` to disable all plugin behaviour while keeping fields and the audit-logs
 	 * collection in the schema (useful for maintaining consistent DB migrations).
 	 */

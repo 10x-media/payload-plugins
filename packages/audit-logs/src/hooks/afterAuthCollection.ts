@@ -18,6 +18,8 @@ export type AuthAuditOptions = {
 	collectUserAgent: boolean
 	groupContextKey?: string
 	isUserPolymorphic: boolean
+	/** False when the log collection has no `impersonator` field. */
+	recordImpersonator: boolean
 }
 
 /** Nothing an anonymous caller submits reaches a row at full length. */
@@ -65,7 +67,9 @@ export const afterLoginAuditLog =
 		const userValue = options.isUserPolymorphic
 			? { relationTo: options.collectionSlug, value: user.id }
 			: user.id
-		const impersonator = impersonatorRelationship(user, options.isUserPolymorphic)
+		const impersonator = options.recordImpersonator
+			? impersonatorRelationship(user, options.isUserPolymorphic)
+			: undefined
 
 		const ipAddress = options.collectIpAddress ? getClientIP(req) : undefined
 		const userAgent = options.collectUserAgent ? getUserAgent(req) : undefined

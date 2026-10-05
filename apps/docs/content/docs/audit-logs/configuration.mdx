@@ -14,6 +14,7 @@ description: The full option surface, from per-collection opt-in to the audit-lo
 | `drafts` | `'ignore' \| 'log'` | `'ignore'` | Default draft handling for versioned entities. |
 | `normalizeRelationships` | `boolean` | `true` | Reduce relationship values to plain ids in diffs and snapshots. |
 | `multiTenancy` | `true \| MultiTenancyConfig` | off | See [multi-tenancy](/audit-logs/multi-tenancy). |
+| `impersonation` | `boolean` | detected | Add the `impersonator` field. On when `@10x-media/impersonation` is in `config.plugins`, in any order. `false` keeps the field out even then; `true` adds it without the plugin, for code that sets `req.user._impersonation` itself. |
 | `retention` | `DataRetentionConfig` | off | See [data retention](/audit-logs/data-retention). |
 | `logs` | `object` | see below | The `audit-logs` collection and its view. |
 | `debug` | `boolean` | `false` | With `retention` set, adds buttons to the view that queue the retention jobs. Development only. |

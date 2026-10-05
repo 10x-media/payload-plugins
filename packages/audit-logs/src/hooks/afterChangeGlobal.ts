@@ -20,6 +20,8 @@ export type AuditLogGlobalAfterChangeOptions = {
 	globalSlug: GlobalSlug
 	groupContextKey?: string
 	isUserPolymorphic: boolean
+	/** False when the log collection has no `impersonator` field. */
+	recordImpersonator: boolean
 	shouldLog?: ShouldLogFunction
 	tenantFieldName?: string
 }
@@ -86,7 +88,9 @@ export const afterChangeGlobalAuditLog =
 				? { relationTo: req.user.collection, value: req.user.id }
 				: req.user.id
 			: undefined
-		const impersonator = impersonatorRelationship(req.user, options.isUserPolymorphic)
+		const impersonator = options.recordImpersonator
+			? impersonatorRelationship(req.user, options.isUserPolymorphic)
+			: undefined
 		const ipAddress = options.collectIpAddress ? getClientIP(req) : undefined
 		const userAgent = options.collectUserAgent ? getUserAgent(req) : undefined
 		const group = options.groupContextKey

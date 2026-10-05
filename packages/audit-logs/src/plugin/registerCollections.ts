@@ -39,6 +39,7 @@ const withAuthHooks = ({
 		collectUserAgent: ctx.collectUserAgent,
 		groupContextKey: ctx.groupContextKey,
 		isUserPolymorphic: ctx.isUserPolymorphic,
+		recordImpersonator: ctx.recordImpersonator,
 	}
 
 	const next: CollectionHooks = { ...hooks }
@@ -127,6 +128,7 @@ const registerCollection = (
 				fieldMap,
 				groupContextKey: ctx.groupContextKey,
 				isUserPolymorphic: ctx.isUserPolymorphic,
+				recordImpersonator: ctx.recordImpersonator,
 				isSelfTenant,
 				operations: auditLogConfig.operations,
 				shouldLog: auditLogConfig.shouldLog,
@@ -149,6 +151,7 @@ const registerCollection = (
 					fieldMap,
 					groupContextKey: ctx.groupContextKey,
 					isUserPolymorphic: ctx.isUserPolymorphic,
+					recordImpersonator: ctx.recordImpersonator,
 					isSelfTenant,
 					shouldLog: auditLogConfig.shouldLog,
 					snapshotOnDelete: auditLogConfig.snapshotOnDelete,

@@ -66,7 +66,12 @@ export const createAuditEvent = async (
 		userField && 'relationTo' in userField ? userField.relationTo : undefined
 	)
 	const hasGroupField = auditLogsCollection?.fields.some((f) => 'name' in f && f.name === 'group')
-	const impersonator = impersonatorRelationship(req.user, isPolymorphic)
+	const hasImpersonatorField = auditLogsCollection?.fields.some(
+		(f) => 'name' in f && f.name === 'impersonator'
+	)
+	const impersonator = hasImpersonatorField
+		? impersonatorRelationship(req.user, isPolymorphic)
+		: undefined
 
 	// Group: explicit option wins; fall back to req.context.auditGroup if group field is enabled
 	const group =
