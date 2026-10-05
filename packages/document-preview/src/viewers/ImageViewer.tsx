@@ -11,9 +11,14 @@ type View = { scale: number; x: number; y: number }
 
 type Size = { height: number; width: number }
 
-const MIN_SCALE = 0.05
 const MAX_SCALE = 16
 const STEP = 1.25
+
+/**
+ * How far below the fit scale zooming out may go: a little room around the
+ * image, not shrinking it to a speck.
+ */
+const MIN_FIT_RATIO = 0.8
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
 
@@ -31,9 +36,15 @@ const fitView = (stage: Size, image: Size, upscale: boolean): View => {
 	}
 }
 
-/** `view` rescaled to `scale` around the stage point (`px`, `py`), which stays put on screen. */
-const zoomAround = (view: View, scale: number, [px, py]: [number, number]): View => {
-	const next = clamp(scale, MIN_SCALE, MAX_SCALE)
+/**
+ * `view` rescaled to `scale` (clamped between `min` and `MAX_SCALE`) around the
+ * stage `point`, which stays put on screen.
+ */
+const zoomAround = (
+	view: View,
+	{ min, point: [px, py], scale }: { min: number; point: [number, number]; scale: number }
+): View => {
+	const next = clamp(scale, min, MAX_SCALE)
 	const ratio = next / view.scale
 	return { scale: next, x: px - (px - view.x) * ratio, y: py - (py - view.y) * ratio }
 }
@@ -82,18 +93,40 @@ export const ImageViewer = ({ filename, filesize, mimeType, url }: DocumentPrevi
 	}, [fit, fitted])
 
 	/** Zoom to `scale(current)` around a stage point, defaulting to the stage center. */
-	const zoomTo = useCallback((scale: (current: number) => number, px?: number, py?: number) => {
+	const zoomTo = useCallback(
+		(scale: (current: number) => number, px?: number, py?: number) => {
+			const rect = stageRef.current?.getBoundingClientRect()
+			if (!rect || !natural) {
+				return
+			}
+			const min = fitView(rect, natural, isVector).scale * MIN_FIT_RATIO
+			setView((current) =>
+				current
+					? zoomAround(current, {
+							min,
+							point: [px ?? rect.width / 2, py ?? rect.height / 2],
+							scale: scale(current.scale),
+						})
+					: current
+			)
+			setFitted(false)
+		},
+		[isVector, natural]
+	)
+
+	/** 100%, with the image centered in the stage rather than zoomed around a point. */
+	const actualSize = () => {
 		const rect = stageRef.current?.getBoundingClientRect()
-		if (!rect) {
+		if (!rect || !natural) {
 			return
 		}
-		setView((current) =>
-			current
-				? zoomAround(current, scale(current.scale), [px ?? rect.width / 2, py ?? rect.height / 2])
-				: current
-		)
+		setView({
+			scale: 1,
+			x: (rect.width - natural.width) / 2,
+			y: (rect.height - natural.height) / 2,
+		})
 		setFitted(false)
-	}, [])
+	}
 
 	// React registers wheel listeners as passive, and the zoom must stop the drawer from scrolling.
 	useEffect(() => {
@@ -220,7 +253,7 @@ export const ImageViewer = ({ filename, filesize, mimeType, url }: DocumentPrevi
 				</button>
 				<button
 					className="document-preview-toolbar__button document-preview-toolbar__button--text"
-					onClick={() => zoomTo(() => 1)}
+					onClick={actualSize}
 					type="button"
 				>
 					{t(keys.actualSize)}

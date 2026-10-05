@@ -102,7 +102,7 @@ describe('collection wiring', () => {
 		expect(field.admin?.components?.Cell).toBe(
 			'@10x-media/document-preview/client#DocumentPreviewCell'
 		)
-		expect(field.label).toEqual({ en: 'Preview' })
+		expect(field.label).toMatchObject({ de: 'Vorschau', en: 'Preview', uk: 'Перегляд' })
 	})
 
 	it('declares only a Cell on filesize, for Payload to merge into its upload field', () => {
