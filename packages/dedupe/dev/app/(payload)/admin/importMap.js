@@ -42,7 +42,23 @@ import { DedupeMergeRecordView as DedupeMergeRecordView_70ef83bda0633d1fe4fba91d
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 
 /** @type import('payload').ImportMap */
+import { ColorField as ColorField_befe53322146a11bcfa01ada2679535d } from '../../../components/Showcase'
+import { RatingField as RatingField_befe53322146a11bcfa01ada2679535d } from '../../../components/Showcase'
+import { PhoneField as PhoneField_befe53322146a11bcfa01ada2679535d } from '../../../components/Showcase'
+import { MoneyField as MoneyField_befe53322146a11bcfa01ada2679535d } from '../../../components/Showcase'
+import { WebsiteDescription as WebsiteDescription_befe53322146a11bcfa01ada2679535d } from '../../../components/Showcase'
+import { ContactRowLabel as ContactRowLabel_befe53322146a11bcfa01ada2679535d } from '../../../components/Showcase'
+import { SectionRowLabel as SectionRowLabel_befe53322146a11bcfa01ada2679535d } from '../../../components/Showcase'
+import { ChipsArrayField as ChipsArrayField_befe53322146a11bcfa01ada2679535d } from '../../../components/Showcase'
 export const importMap = {
+  "/components/Showcase#ColorField": ColorField_befe53322146a11bcfa01ada2679535d,
+  "/components/Showcase#RatingField": RatingField_befe53322146a11bcfa01ada2679535d,
+  "/components/Showcase#PhoneField": PhoneField_befe53322146a11bcfa01ada2679535d,
+  "/components/Showcase#MoneyField": MoneyField_befe53322146a11bcfa01ada2679535d,
+  "/components/Showcase#WebsiteDescription": WebsiteDescription_befe53322146a11bcfa01ada2679535d,
+  "/components/Showcase#ContactRowLabel": ContactRowLabel_befe53322146a11bcfa01ada2679535d,
+  "/components/Showcase#SectionRowLabel": SectionRowLabel_befe53322146a11bcfa01ada2679535d,
+  "/components/Showcase#ChipsArrayField": ChipsArrayField_befe53322146a11bcfa01ada2679535d,
   "@payloadcms/plugin-multi-tenant/client#WatchTenantCollection": WatchTenantCollection_1d0591e3cf4f332c83a86da13a0de59a,
   "@payloadcms/plugin-multi-tenant/client#TenantField": TenantField_1d0591e3cf4f332c83a86da13a0de59a,
   "@payloadcms/plugin-multi-tenant/client#AssignTenantFieldTrigger": AssignTenantFieldTrigger_1d0591e3cf4f332c83a86da13a0de59a,

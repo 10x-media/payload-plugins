@@ -22,7 +22,9 @@ import { collections, globals } from './collections'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { recentAdapter } from './helpers/recentAdapter'
 import { DEV_EMAIL, seedDev } from './helpers/seed'
+import { seedShowcase } from './helpers/seedShowcase'
 import { typesenseAdapter } from './helpers/typesenseAdapter'
+import { showcases } from './showcase'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
@@ -47,7 +49,7 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections,
+	collections: [...collections, showcases],
 	globals,
 	editor: lexicalEditor(),
 	// Every language the plugin is translated into, to switch between on the account page.
@@ -67,6 +69,7 @@ export default buildConfig({
 				notes: {},
 				specimens: {},
 				products: {},
+				showcases: {},
 			},
 			tenantsSlug: 'tenants',
 			userHasAccessToAllTenants: () => true,
@@ -113,6 +116,14 @@ export default buildConfig({
 						],
 					},
 				},
+				showcases: {
+					match: {
+						fields: [
+							{ path: 'email', weight: 45 },
+							{ path: 'name', weight: 45, compare: 'text' },
+						],
+					},
+				},
 				articles: {
 					match: {
 						fields: [
@@ -144,6 +155,7 @@ export default buildConfig({
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
+		await seedShowcase(payload)
 	},
 	typescript: { autoGenerate },
 	admin: {
