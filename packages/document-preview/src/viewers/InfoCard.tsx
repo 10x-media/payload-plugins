@@ -1,8 +1,10 @@
 'use client'
 
 import { formatFilesize } from 'payload/shared'
-import type { ReactNode } from 'react'
+import { type ReactNode, useMemo } from 'react'
 
+import { fileIconDataUri } from '../shared/fileIcons'
+import { fileKind } from '../shared/fileKind'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 
@@ -19,21 +21,11 @@ export type InfoCardProps = {
 	reason?: InfoCardReason
 }
 
-const FileIcon = () => (
-	<svg aria-hidden="true" fill="none" height="40" viewBox="0 0 24 24" width="40">
-		<path
-			d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"
-			stroke="currentColor"
-			strokeLinejoin="round"
-			strokeWidth="1.5"
-		/>
-		<path d="M14 3v5h5" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.5" />
-	</svg>
-)
-
 /**
  * The fallback for every file a viewer cannot show: what the file is, and why
- * there is no preview. Also the error boundary's fallback.
+ * there is no preview. Also the error boundary's fallback. Shows the file-type
+ * icon inlined as a data URI, so it needs no request and appears whether or not
+ * the collection serves icons as thumbnails.
  */
 export const InfoCard = ({
 	children,
@@ -44,6 +36,7 @@ export const InfoCard = ({
 	reason = 'unsupported',
 }: InfoCardProps) => {
 	const { t } = useTranslation()
+	const icon = useMemo(() => fileIconDataUri(fileKind(mimeType, filename)), [filename, mimeType])
 	const size = filesize === undefined ? undefined : formatFilesize(filesize)
 	const reasonMessage =
 		reason === 'tooLarge'
@@ -53,9 +46,7 @@ export const InfoCard = ({
 				: t(keys.unsupported)
 	return (
 		<div className="document-preview-card">
-			<span className="document-preview-card__icon">
-				<FileIcon />
-			</span>
+			<img alt="" className="document-preview-card__icon" height={96} src={icon} width={96} />
 			<p className="document-preview-card__name">{filename}</p>
 			<p className="document-preview-card__meta">{[size, mimeType].filter(Boolean).join(' · ')}</p>
 			<p className="document-preview-card__message">{message ?? reasonMessage}</p>
