@@ -58,7 +58,7 @@ dedupe({
 
 The sidebar lists saved look-alikes as the user types; `confirmCreate` asks before a new document that resembles one is saved. Both search as the current user and never block a save when the search fails. `confirmCreate` is skipped on collections with draft autosave.
 
-To place them yourself, import `DuplicatesField`, `ConfirmSaveButton` or `ConfirmCreate` from `@10x-media/dedupe/client` with `collection` and `paths` (the match field paths), or call `useDuplicateCheck({ collection, paths })`.
+To place them yourself, import `DuplicatesField`, `ConfirmSaveButton` or `ConfirmCreate` from `@10x-media/dedupe/client` with `collection` and `paths` (the match field paths), or call `useDuplicateCheck({ collection, paths, minScore })`, where `minScore` is optional and replaces the collection's for the check.
 
 ## Multi-tenancy
 

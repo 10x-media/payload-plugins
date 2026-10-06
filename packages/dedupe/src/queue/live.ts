@@ -4,6 +4,7 @@ import { PAIRS_SLUG } from '../collections/slugs'
 import { pairKeyFor } from '../match/keys'
 import { type MatchResult, type MatchSignal, scorePair } from '../match/score'
 import { isLive, type LoadedDoc, loadDocs } from '../merge/load'
+import { isScore } from '../options'
 import {
 	type CollectionContext,
 	getCollectionContext,
@@ -55,16 +56,18 @@ const scoreCandidates = async (args: {
 export type Duplicate = { doc: LoadedDoc; score: number; signals: MatchSignal[] }
 
 /**
- * Saved documents that look like `doc`, best first, from the collection's `minScore` up.
- * The search a save runs, with nothing stored: no key is indexed and no pair written.
- * `doc` may hold unsaved values; with an `id`, that document is left out of the answer.
- * `overrideAccess: false` leaves out what `req.user` may not read.
+ * Saved documents that look like `doc`, best first, from `minScore` up, the collection's own
+ * by default. The search a save runs, with nothing stored: no key is indexed and no pair
+ * written. `doc` may hold unsaved values; with an `id`, that document is left out of the
+ * answer. `overrideAccess: false` leaves out what `req.user` may not read. A `minScore` only
+ * filters the candidates the adapter offers: a lower one finds no document the adapter missed.
  */
 export const findDuplicates = async (args: {
 	req: PayloadRequest
 	collection: string
 	doc: AdapterDoc
 	overrideAccess?: boolean
+	minScore?: number
 }): Promise<Duplicate[]> => {
 	const { req, collection, doc, overrideAccess } = args
 	const col = getCollectionContext(req.payload, collection)
@@ -72,6 +75,10 @@ export const findDuplicates = async (args: {
 	if (!match) {
 		throw new APIError(`Collection "${collection}" has no match config`, 400, undefined, true)
 	}
+	if (args.minScore !== undefined && !isScore(args.minScore)) {
+		throw new APIError('minScore must be a number from 0 to 1', 400, undefined, true)
+	}
+	const minScore = args.minScore ?? match.minScore
 	const scored = await scoreCandidates({
 		req,
 		ctx: getContext(req.payload),
@@ -80,7 +87,7 @@ export const findDuplicates = async (args: {
 		...(overrideAccess === undefined ? {} : { overrideAccess }),
 	})
 	return scored
-		.filter(({ result }) => result.score >= match.minScore)
+		.filter(({ result }) => result.score >= minScore)
 		.sort((a, b) => b.result.score - a.result.score)
 		.map(({ candidate, result }) => ({
 			doc: candidate,

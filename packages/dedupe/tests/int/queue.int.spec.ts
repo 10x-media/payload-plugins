@@ -128,6 +128,23 @@ describeForDb('dedupe queue', {}, (db) => {
 			expect(await fixture.booted.payload.db.count({ collection: PAIRS_SLUG })).toEqual(before)
 		})
 
+		it('takes a threshold of its own for this check', async () => {
+			// The name alone scores under the collection's threshold.
+			const data = { name: 'Queue Person' }
+			expect((await check({ data })).candidates).toEqual([])
+			const lower = await check({ data, minScore: 0.2 })
+			expect(lower.candidates[0]?.title).toBe('Queue Person')
+			const endpoint = (fixture.booted.payload.config.endpoints as Endpoint[]).find(
+				(entry) => entry.path === '/dedupe/check'
+			) as Endpoint
+			const refused = await endpoint.handler(
+				Object.assign(Object.create(fixture.req), {
+					data: { collection: 'customers', data, minScore: 'low' },
+				}) as PayloadRequest
+			)
+			expect(refused.status).toBe(400)
+		})
+
 		it('returns nothing for values that resemble no one', async () => {
 			const result = await check({ data: { name: 'Nobody Here', phone: '000' } })
 			expect(result.candidates).toEqual([])

@@ -148,6 +148,38 @@ describeForDb('dedupe search', {}, (db) => {
 		expect(await pairs()).toBe(before)
 	})
 
+	it("takes a threshold of its own, above or below the collection's", async () => {
+		n++
+		const name = `Threshold Person${n}`
+		const phone = `04466${n}3344`
+		const saved = await fixture.customer({
+			email: `ms.${n}@search.test`,
+			name,
+			phone,
+			tenant: 'north',
+		})
+		const ids = async (doc: Record<string, unknown>, minScore?: number) =>
+			(
+				await findDuplicates({
+					req: fixture.req,
+					collection: CUSTOMERS,
+					doc: { ...doc, tenant: 'north' },
+					...(minScore === undefined ? {} : { minScore }),
+				})
+			).map((found) => found.doc.id)
+		// The name alone scores 40 of 145, under the collection's 0.35; with the phone, 75 of 145.
+		expect(await ids({ name })).not.toContain(saved.id)
+		expect(await ids({ name }, 0.2)).toContain(saved.id)
+		expect(await ids({ name, phone })).toContain(saved.id)
+		expect(await ids({ name, phone }, 0.6)).not.toContain(saved.id)
+	})
+
+	it('refuses a threshold outside 0 to 1', async () => {
+		await expect(
+			findDuplicates({ req: fixture.req, collection: CUSTOMERS, doc: { name: 'x' }, minScore: 2 })
+		).rejects.toMatchObject({ status: 400 })
+	})
+
 	it('leaves out a candidate of another tenant, whatever the adapter answers', async () => {
 		n++
 		const north = await fixture.customer({

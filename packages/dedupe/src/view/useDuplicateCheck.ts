@@ -22,6 +22,8 @@ export type UseDuplicateCheckArgs = {
 	delay?: number
 	/** `false` asks only through `check`, not as the form changes. */
 	follow?: boolean
+	/** Replaces the collection's `match.minScore` for this check. */
+	minScore?: number
 }
 
 /**
@@ -33,6 +35,7 @@ export const useDuplicateCheck = ({
 	paths,
 	delay = 500,
 	follow = true,
+	minScore,
 }: UseDuplicateCheckArgs) => {
 	const { id } = useDocumentInfo()
 	const { getData } = useForm()
@@ -52,16 +55,19 @@ export const useDuplicateCheck = ({
 
 	const check = useCallback(
 		(): Promise<DuplicateCandidate[]> =>
-			remember(`${collection}|${id ?? ''}|${locale ?? ''}|${watched}`, async () => {
-				const response = await callApi<CheckResponse>({
-					apiRoute,
-					path: `/dedupe/check${locale ? `?locale=${locale}` : ''}`,
-					method: 'POST',
-					body: { collection, id: id ?? null, data: getData() },
-				})
-				return response.candidates
-			}),
-		[apiRoute, collection, getData, id, locale, watched]
+			remember(
+				`${collection}|${id ?? ''}|${locale ?? ''}|${minScore ?? ''}|${watched}`,
+				async () => {
+					const response = await callApi<CheckResponse>({
+						apiRoute,
+						path: `/dedupe/check${locale ? `?locale=${locale}` : ''}`,
+						method: 'POST',
+						body: { collection, id: id ?? null, data: getData(), minScore },
+					})
+					return response.candidates
+				}
+			),
+		[apiRoute, collection, getData, id, locale, minScore, watched]
 	)
 
 	useEffect(() => {

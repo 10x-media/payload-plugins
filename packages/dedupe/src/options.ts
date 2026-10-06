@@ -242,6 +242,10 @@ const DEFAULT_MAX_GROUP_SIZE = 5
 export const DEFAULT_MAX_BUCKET = 2000
 const DEFAULT_CANDIDATE_LIMIT = 200
 
+/** A score threshold: a number from 0 to 1. */
+export const isScore = (value: unknown): value is number =>
+	typeof value === 'number' && value >= 0 && value <= 1
+
 const isPositiveNumber = (value: unknown): value is number =>
 	typeof value === 'number' && Number.isFinite(value) && value > 0
 
@@ -290,7 +294,7 @@ const resolveMatch = (match: MatchConfig | undefined): Required<MatchConfig> | n
 		)
 	}
 	const { minScore, maxBucket, candidateLimit } = match
-	if (minScore !== undefined && !(typeof minScore === 'number' && minScore >= 0 && minScore <= 1)) {
+	if (minScore !== undefined && !isScore(minScore)) {
 		throw new Error('dedupe: `match.minScore` must be a number from 0 to 1')
 	}
 	if (maxBucket !== undefined && !(Number.isInteger(maxBucket) && maxBucket >= 2)) {

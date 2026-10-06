@@ -264,6 +264,7 @@ const checkEndpoint = (options: ResolvedOptions): Endpoint => ({
 				collection: slug,
 				doc: { ...(data as Record<string, unknown>), ...(id ? { id } : {}) },
 				overrideAccess: false,
+				...(body.minScore === undefined ? {} : { minScore: body.minScore as number }),
 			})
 			const candidates = found.map(({ doc, score, signals }) => ({
 				id: String(doc.id),
