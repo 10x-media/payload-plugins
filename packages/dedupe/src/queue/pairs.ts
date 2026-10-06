@@ -231,7 +231,14 @@ export const decideGroup = async (args: {
 				const [docA, docB] = sortedPair(a.id, b.id)
 				pair = (await req.payload.db.create({
 					collection: PAIRS_SLUG,
-					data: { target: col.slug, pairKey, docA, docB, tenant: tenantOf(ctx, a), score: 0 },
+					data: {
+						target: col.slug,
+						pairKey,
+						docA,
+						docB,
+						tenant: tenantOf(req.payload, a),
+						score: 0,
+					},
 					req,
 				})) as PairRow
 			}

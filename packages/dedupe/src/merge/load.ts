@@ -202,7 +202,7 @@ export const loadMergeGroup = async (args: {
 	survivorId: number | string
 	absorbedIds: (number | string)[]
 }): Promise<MergeGroupDocs> => {
-	const { req, ctx, col, survivorId, absorbedIds } = args
+	const { req, col, survivorId, absorbedIds } = args
 	const ids = [survivorId, ...absorbedIds].map(String)
 	const docs = await Promise.all(ids.map((id) => loadDoc({ ...args, id })))
 	for (const [index, doc] of docs.entries()) {
@@ -227,7 +227,11 @@ export const loadMergeGroup = async (args: {
 		}
 	}
 	const [survivor, ...absorbed] = docs as LoadedDoc[]
-	if (absorbed.some((doc) => tenantOf(ctx, doc) !== tenantOf(ctx, survivor as LoadedDoc))) {
+	if (
+		absorbed.some(
+			(doc) => tenantOf(req.payload, doc) !== tenantOf(req.payload, survivor as LoadedDoc)
+		)
+	) {
 		throw badRequest('The documents belong to different tenants.')
 	}
 	return { survivor: survivor as LoadedDoc, absorbed }

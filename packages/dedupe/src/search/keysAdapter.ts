@@ -4,7 +4,7 @@ import { buildKeysCollection } from '../collections/build'
 import { KEYS_SLUG } from '../collections/slugs'
 import { blockingKeys } from '../match/keys'
 import type { CollectionOverride } from '../options'
-import { getCollectionContext, getContext, tenantOf } from '../plugin/context'
+import { getCollectionContext, tenantOf } from '../plugin/context'
 import { addCollection } from '../plugin/registerCollections'
 import type { AdapterDoc, DedupeAdapter, KeyBucket, ScanPage } from './contract'
 
@@ -14,7 +14,7 @@ type KeyRow = { doc: string; key: string }
 const keysOf = (req: PayloadRequest, collection: string, doc: AdapterDoc) => {
 	const col = getCollectionContext(req.payload, collection)
 	return {
-		keys: blockingKeys(doc, col.matchFields, tenantOf(getContext(req.payload), doc)),
+		keys: blockingKeys(doc, col.matchFields, tenantOf(req.payload, doc)),
 		configHash: col.configHash,
 	}
 }

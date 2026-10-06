@@ -160,7 +160,7 @@ const scan = async (
 				const a = docs[i] as LoadedDoc
 				const b = docs[j] as LoadedDoc
 				// The plugin keeps tenants apart whatever an adapter's buckets hold, as the check on save does.
-				if (tenantOf(ctx, a) !== tenantOf(ctx, b)) continue
+				if (tenantOf(req.payload, a) !== tenantOf(req.payload, b)) continue
 				const pairKey = pairKeyFor(col.slug, a.id, b.id)
 				if (seen.has(pairKey)) continue
 				seen.add(pairKey)
@@ -177,7 +177,7 @@ const scan = async (
 					b: b.id,
 					result,
 					seenAt,
-					tenant: tenantOf(ctx, a),
+					tenant: tenantOf(req.payload, a),
 				})
 				if (row && row.status === 'open') summary.pairs++
 			}

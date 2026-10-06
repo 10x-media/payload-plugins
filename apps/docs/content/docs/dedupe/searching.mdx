@@ -51,7 +51,7 @@ const found = await findDuplicates({
 
 ## Adapters
 
-The adapter decides which documents are compared; the score stays the plugin's. Extend the built-in keys adapter:
+The adapter decides which documents are compared; the score stays the plugin's. The plugin ships one, the keys adapter, which compares documents that share a blocking key. Extend it:
 
 ```ts
 dedupe({
@@ -65,22 +65,105 @@ dedupe({
 })
 ```
 
-Or write your own. Only `findCandidates` is required:
+Or replace it with your own: `adapter: () => myAdapter`.
 
-```ts
-import type { DedupeAdapter } from '@10x-media/dedupe/types'
+## Writing an adapter
 
-const typesense: DedupeAdapter = {
-  findCandidates: async ({ collection, doc, limit }) => [{ id: '...' }],
-  index: async ({ collection, doc }) => { /* upsert into the engine */ },
-  remove: async ({ collection, id }) => { /* delete from the engine */ },
-}
+Implement `DedupeAdapter` from `@10x-media/dedupe/types`. Only `findCandidates` is required:
 
-dedupe({ adapter: () => typesense })
-```
-
-- `findCandidates({ req, collection, doc, limit })`: documents to compare with `doc`.
+- `findCandidates({ req, collection, doc, limit })`: up to `limit` documents to compare with `doc`, as `{ id }`. `doc` has no `id` when its values are not saved yet.
 - `index({ req, collection, doc })`: on a save, a merge and the scan.
 - `remove({ req, collection, id })`: when a document is deleted, trashed, unpublished or merged.
 - `scanBuckets({ req, collection, cursor, limit })`: key buckets for the scan. Without it, the scan calls `findCandidates` per document.
 - `register(config)`: adds collections or endpoints at config time.
+
+Over an index the project already keeps current, such as its site search, `findCandidates` is enough. An adapter with an index of its own also writes it in `index` and `remove`.
+
+Only documents in the index are ever found. An index that leaves some out, such as a public search index without blocked users, never finds their duplicates.
+
+`@10x-media/dedupe` exports what an adapter reads:
+
+| Export | Returns |
+| --- | --- |
+| `matchFields(payload, collection)` | The collection's match fields, as its `match` config lists them. |
+| `tenantOf(payload, doc)` | The document's tenant id, or `null` without `multiTenancy`. |
+| `readPath(doc, path)` | The value at a dot path, such as `profile.name`. |
+
+### Example: Typesense
+
+An adapter with its own Typesense index. Each Payload collection has a Typesense collection of the same name, with a `string[]` field per match field and a `tenant` field; one search per value tolerates typos.
+
+```ts
+import { matchFields, readPath, tenantOf } from '@10x-media/dedupe'
+import type { DedupeAdapter } from '@10x-media/dedupe/types'
+
+// Typesense reads a dot in a field name as a nested object.
+const fieldName = (path: string) => `f_${path.replaceAll('.', '__')}`
+
+// Every locale and every item of a list.
+const texts = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.flatMap(texts)
+    : value !== null && typeof value === 'object'
+      ? Object.values(value).flatMap(texts)
+      : value === null || value === undefined || value === ''
+        ? []
+        : [String(value).toLowerCase()]
+
+export const typesenseAdapter = (url: string, apiKey: string): DedupeAdapter => {
+  const call = (path: string, init: RequestInit = {}) =>
+    fetch(`${url}${path}`, {
+      ...init,
+      headers: { 'X-TYPESENSE-API-KEY': apiKey, 'Content-Type': 'application/json' },
+    })
+
+  return {
+    index: async ({ req, collection, doc }) => {
+      const tenant = tenantOf(req.payload, doc)
+      const fields = matchFields(req.payload, collection).map(({ path }) => [
+        fieldName(path),
+        texts(readPath(doc, path)),
+      ])
+      await call(`/collections/${collection}/documents?action=upsert`, {
+        method: 'POST',
+        body: JSON.stringify({
+          id: String(doc.id),
+          ...Object.fromEntries(fields),
+          ...(tenant ? { tenant } : {}),
+        }),
+      })
+    },
+
+    remove: async ({ collection, id }) => {
+      await call(`/collections/${collection}/documents/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+    },
+
+    findCandidates: async ({ req, collection, doc, limit }) => {
+      const tenant = tenantOf(req.payload, doc)
+      const searches = matchFields(req.payload, collection).flatMap(({ path }) =>
+        texts(readPath(doc, path)).map((q) => ({
+          collection,
+          q,
+          query_by: fieldName(path),
+          num_typos: 2,
+          per_page: Math.min(limit, 250),
+          ...(tenant ? { filter_by: `tenant:=${tenant}` } : {}),
+        }))
+      )
+      if (searches.length === 0) return []
+      const response = await call('/multi_search', {
+        method: 'POST',
+        body: JSON.stringify({ searches }),
+      })
+      const { results } = (await response.json()) as {
+        results: { hits?: { document: { id: string } }[] }[]
+      }
+      return results.flatMap((result) => result.hits ?? []).map((hit) => ({ id: hit.document.id }))
+    },
+  }
+}
+```
+
+The plugin drops the document itself, repeated ids and anything past `limit`. The full adapter, which also creates the Typesense collection and compares phone numbers by their digits, is in the dev app: `packages/dedupe/dev/helpers/typesenseAdapter.ts`.

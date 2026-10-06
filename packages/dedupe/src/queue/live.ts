@@ -46,9 +46,9 @@ const scoreCandidates = async (args: {
 		ids: ids.slice(0, match.candidateLimit),
 		...(overrideAccess === undefined ? {} : { overrideAccess }),
 	})
-	const tenant = tenantOf(ctx, doc)
+	const tenant = tenantOf(req.payload, doc)
 	return candidates
-		.filter((candidate) => isLive(col, candidate) && tenantOf(ctx, candidate) === tenant)
+		.filter((candidate) => isLive(col, candidate) && tenantOf(req.payload, candidate) === tenant)
 		.map((candidate) => ({ candidate, result: scorePair(doc, candidate, col.matchFields) }))
 }
 
@@ -130,7 +130,7 @@ export const checkDocument = async (args: {
 			b: candidate.id,
 			result,
 			seenAt,
-			tenant: tenantOf(ctx, doc),
+			tenant: tenantOf(req.payload, doc),
 			known: known.get(pairKeyFor(col.slug, doc.id, candidate.id)) ?? null,
 		})
 		// A pair the reviewer already decided keeps its status; only the open ones count as found.
@@ -148,7 +148,7 @@ export const checkDocument = async (args: {
 		const other = others.find((entry) => String(entry.id) === otherOf(row))
 		if (!other || !isLive(col, other)) continue
 		const result = scorePair(doc, other, col.matchFields)
-		const apart = tenantOf(ctx, other) !== tenantOf(ctx, doc)
+		const apart = tenantOf(req.payload, other) !== tenantOf(req.payload, doc)
 		const kept = await upsertPair({
 			req,
 			ctx,
@@ -157,7 +157,7 @@ export const checkDocument = async (args: {
 			b: other.id,
 			result: apart ? { ...result, score: 0 } : result,
 			seenAt,
-			tenant: tenantOf(ctx, doc),
+			tenant: tenantOf(req.payload, doc),
 			known: row,
 		})
 		keys.push(row.pairKey)

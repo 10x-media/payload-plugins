@@ -1,4 +1,4 @@
-import type { DedupeAdapter } from '../../src/search/contract'
+import type { DedupeAdapter } from '@10x-media/dedupe/types'
 
 /**
  * A candidate source with no index of its own, switched on with `DEDUPE_ADAPTER=custom`: the

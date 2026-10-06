@@ -1,8 +1,6 @@
+import { matchFields, readPath, tenantOf } from '@10x-media/dedupe'
+import type { AdapterDoc, DedupeAdapter } from '@10x-media/dedupe/types'
 import type { PayloadRequest } from 'payload'
-
-import { readPath } from '../../src/merge/compare'
-import { getCollectionContext, getContext, tenantOf } from '../../src/plugin/context'
-import type { AdapterDoc, DedupeAdapter } from '../../src/search/contract'
 
 type Connection = { url: string; apiKey: string }
 
@@ -12,7 +10,7 @@ const fieldName = (path: string) => `f_${path.replaceAll('.', '__')}`
 type Field = { path: string; name: string; phone: boolean }
 
 const fieldsOf = (req: PayloadRequest, collection: string): Field[] =>
-	(getCollectionContext(req.payload, collection).options.match?.fields ?? []).map((field) => ({
+	matchFields(req.payload, collection).map((field) => ({
 		path: field.path,
 		name: fieldName(field.path),
 		phone: field.compare === 'phone',
@@ -92,7 +90,7 @@ export const typesenseAdapter = ({ url, apiKey }: Connection): DedupeAdapter => 
 	return {
 		index: async ({ req, collection, doc }) => {
 			await ensure(req, collection)
-			const tenant = tenantOf(getContext(req.payload), doc)
+			const tenant = tenantOf(req.payload, doc)
 			const body = Object.fromEntries([
 				['id', String(doc.id)],
 				...fieldsOf(req, collection).map((field) => [field.name, textsOf(doc, field)]),
@@ -114,7 +112,7 @@ export const typesenseAdapter = ({ url, apiKey }: Connection): DedupeAdapter => 
 
 		findCandidates: async ({ req, collection, doc, limit }) => {
 			await ensure(req, collection)
-			const tenant = tenantOf(getContext(req.payload), doc)
+			const tenant = tenantOf(req.payload, doc)
 			// One search per value of each match field, typos tolerated.
 			const searches = fieldsOf(req, collection).flatMap((field) =>
 				textsOf(doc, field).map((q) => ({

@@ -2,7 +2,7 @@ import type { Payload } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import type { MatchFieldConfig } from '../options'
-import { getCollectionContext, hashMatch } from './context'
+import { getCollectionContext, hashMatch, matchFields, tenantOf } from './context'
 
 const base: MatchFieldConfig[] = [
 	{ path: 'email', weight: 45 },
@@ -55,5 +55,44 @@ describe('getCollectionContext', () => {
 		expect(() => getCollectionContext(payload, 'ghosts')).toThrow(
 			expect.objectContaining({ status: 400 })
 		)
+	})
+})
+
+// Only what the adapter helpers read: the same shape buildContext writes.
+const withContext = (context: Record<string, unknown>) =>
+	({ [Symbol.for('@10x-media/dedupe/context')]: context }) as unknown as Payload
+
+describe('matchFields', () => {
+	it('lists the match fields as the config gave them, presets by name', () => {
+		const payload = withContext({
+			collections: new Map([['customers', { options: { match: { fields: base } } }]]),
+		})
+		expect(matchFields(payload, 'customers')).toEqual(base)
+	})
+
+	it('is empty for a collection merged by hand only', () => {
+		const payload = withContext({
+			collections: new Map([['leads', { options: { match: null } }]]),
+		})
+		expect(matchFields(payload, 'leads')).toEqual([])
+	})
+})
+
+describe('tenantOf', () => {
+	const tenanted = withContext({ tenantFieldName: 'tenant' })
+
+	it('reads the tenant id whatever shape the relationship arrived in', () => {
+		expect(tenantOf(tenanted, { tenant: 'kyiv' })).toBe('kyiv')
+		expect(tenantOf(tenanted, { tenant: 7 })).toBe('7')
+		expect(tenantOf(tenanted, { tenant: { id: 7, name: 'Kyiv' } })).toBe('7')
+	})
+
+	it('is null for a document without a tenant', () => {
+		expect(tenantOf(tenanted, {})).toBeNull()
+		expect(tenantOf(tenanted, { tenant: null })).toBeNull()
+	})
+
+	it('is null with multiTenancy off, even on a document with a tenant field', () => {
+		expect(tenantOf(withContext({ tenantFieldName: null }), { tenant: 'kyiv' })).toBeNull()
 	})
 })

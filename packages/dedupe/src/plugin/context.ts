@@ -289,10 +289,21 @@ export const tenantScope = (ctx: PluginContext, req: PayloadRequest): Where[] =>
 	]
 }
 
-/** The tenant a document belongs to, as an id, whatever shape the relationship arrived in. */
-export const tenantOf = (ctx: PluginContext, doc: Record<string, unknown>): string | null => {
-	if (!ctx.tenantFieldName) return null
-	const value = doc[ctx.tenantFieldName]
+/**
+ * The match fields of a configured collection, as its `match` config lists them; empty
+ * without one.
+ */
+export const matchFields = (payload: Payload, collection: string): MatchFieldConfig[] =>
+	getCollectionContext(payload, collection).options.match?.fields ?? []
+
+/**
+ * The tenant a document belongs to, as an id, whatever shape the relationship arrived in.
+ * Null with `multiTenancy` off.
+ */
+export const tenantOf = (payload: Payload, doc: Record<string, unknown>): string | null => {
+	const { tenantFieldName } = getContext(payload)
+	if (!tenantFieldName) return null
+	const value = doc[tenantFieldName]
 	if (value === null || value === undefined) return null
 	if (typeof value === 'string' || typeof value === 'number') return String(value)
 	if (typeof value === 'object' && 'id' in (value as object)) {
