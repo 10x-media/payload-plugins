@@ -36,7 +36,7 @@ description: Every option of the plugin and its default.
 | `fields` | derived | `(derived) => spec`, see [Merging](./merging). |
 | `absorbed` | `trash`, or `delete` without a trash | What happens to the merged-in documents: `trash` or `delete`. `trash` needs `trash: true` on the collection. |
 | `draft` | `false` | On a collection with drafts, merge the latest drafts and save the result as a draft. By default the published documents are merged and the result is published. |
-| `checkOnSave` | `true` with a match | Index and check the document on every save. |
+| `checkOnSave` | `true` with a match | Look for duplicates of the document on every save and queue the pairs. The document is indexed on every save either way, so `findDuplicates` finds it before the next scan. |
 | `form.sidebar` | `false` | Saved look-alikes of the typed values in the document sidebar. Needs `match`. |
 | `form.confirmCreate` | `false` | Ask before creating a document that resembles a saved one. Needs `match`. |
 | `references` | every field pointing here | `(derived) => references`, see [Merging](./merging#references). |

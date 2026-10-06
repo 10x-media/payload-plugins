@@ -16,8 +16,9 @@ const isDedupeWrite = (context: Record<string, unknown> | undefined): boolean =>
 
 /**
  * File a saved document as a save files it: indexed inside the write's transaction through
- * `req`, and checked by a job queued there, which exists only once the write commits, so a
- * failure in the check leaves the write alone. Checked right away under `disableJobsQueue`.
+ * `req`, and, with `checkOnSave`, checked by a job queued there, which exists only once the
+ * write commits, so a failure in the check leaves the write alone. Checked right away under
+ * `disableJobsQueue`.
  */
 export const fileDocument = async (args: {
 	req: PayloadRequest
@@ -27,6 +28,7 @@ export const fileDocument = async (args: {
 }): Promise<void> => {
 	const { req, ctx, col, doc } = args
 	await col.adapter.index?.({ req, collection: col.slug, doc })
+	if (!col.options.checkOnSave) return
 	if (ctx.options.disableJobsQueue) {
 		await checkDocument({ req, ctx, col, doc })
 		return
@@ -40,9 +42,10 @@ export const fileDocument = async (args: {
 }
 
 /**
- * Keeps the index and the queue current on every save. The index is written inside the
- * save's transaction through `req`, and the check is queued there as a job, or run there
- * under `disableJobsQueue`. A save the plugin makes itself is skipped by context.
+ * Keeps the index current on every save, and with `checkOnSave` the queue too. The index is
+ * written inside the save's transaction through `req`, and the check is queued there as a
+ * job, or run there under `disableJobsQueue`. A save the plugin makes itself is skipped by
+ * context.
  */
 const afterChange: CollectionAfterChangeHook = async ({ collection, doc, req }) => {
 	if (isDedupeWrite(req.context)) return doc
@@ -65,7 +68,7 @@ const afterChange: CollectionAfterChangeHook = async ({ collection, doc, req }) 
 		})
 		return doc
 	}
-	if (!col.options.match || !col.options.checkOnSave) return doc
+	if (!col.options.match) return doc
 	// A draft saved over a published document leaves that one as it was. Taken off publication,
 	// a document leaves the index, so it pairs with nothing until published again.
 	if (col.hasDrafts && !col.options.draft && saved._status === 'draft') {

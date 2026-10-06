@@ -24,7 +24,7 @@ A matching field adds its `weight`, a near match part of it, a differing one `on
 
 ## Save check and scan
 
-Every save queues a `dedupe-check` job that compares the document with its look-alikes and opens or refreshes their pairs; a pair that no longer qualifies goes stale. The scan compares a whole collection: run it with "Scan now" in the queue, or schedule it with `scan.cron`.
+Every save indexes the document and, unless `checkOnSave: false`, queues a `dedupe-check` job that compares it with its look-alikes and opens or refreshes their pairs; a pair that no longer qualifies goes stale. The scan compares a whole collection: run it with "Scan now" in the queue, or schedule it with `scan.cron`.
 
 Both need a job worker for the `dedupe` queue, for example `jobs.autoRun: [{ cron: '* * * * *', queue: 'dedupe' }]`. Without one, set `disableJobsQueue: true` and both run inside the request. Across servers, set `jobs.enableConcurrencyControl`.
 

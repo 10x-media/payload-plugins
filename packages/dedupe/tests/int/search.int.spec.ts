@@ -8,7 +8,7 @@ import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
 import { runScan } from '../../src/queue/scan'
-import { bootDedupe, CUSTOMERS, type Doc, POSTS, TEAMS } from './fixtures'
+import { bootDedupe, CUSTOMERS, type Doc, POSTS, pluginOptions, TEAMS } from './fixtures'
 
 /** What the search finds and what it costs: the live check, the scan, the key index. */
 describeForDb('dedupe search', {}, (db) => {
@@ -425,5 +425,57 @@ describeForDb('dedupe search', {}, (db) => {
 			depth: 0,
 		})) as unknown as { boards: { seats: { label: string }[] }[] }
 		expect(merged.boards.map((board) => board.seats[0]?.label)).toEqual(['front', 'back'])
+	})
+})
+
+/** `checkOnSave: false` turns off the pairs a save writes, not the index the search reads. */
+describeForDb('dedupe search without the check on save', {}, (db) => {
+	let fixture: Awaited<ReturnType<typeof bootDedupe>>
+
+	const post = (title: string) =>
+		fixture.booted.payload.create({
+			collection: POSTS,
+			data: { title, _status: 'published' } as never,
+		}) as Promise<Doc>
+
+	beforeAll(async () => {
+		fixture = await bootDedupe(db, {
+			collections: {
+				...pluginOptions.collections,
+				posts: { match: { fields: [{ path: 'title', weight: 1 }] }, checkOnSave: false },
+			},
+		})
+	})
+
+	afterAll(async () => {
+		await fixture.booted.stop()
+	})
+
+	it('indexes a saved document, so the search finds it before any scan, and stores no pair', async () => {
+		const first = await post('Quiet Twin')
+		const second = await post('Quiet Twin')
+		expect(await fixture.keysFor(first.id, POSTS)).not.toEqual([])
+		const found = await findDuplicates({
+			req: fixture.req,
+			collection: POSTS,
+			doc: { title: 'Quiet Twin' },
+		})
+		expect(found.map(({ doc }) => doc.id)).toEqual(expect.arrayContaining([first.id, second.id]))
+		const pairs = await fixture.booted.payload.db.count({
+			collection: PAIRS_SLUG,
+			where: { target: { equals: POSTS } },
+		})
+		expect(pairs.totalDocs).toBe(0)
+	})
+
+	it('drops a document taken off publication from the index', async () => {
+		const doc = await post('Quiet Unpublished')
+		expect(await fixture.keysFor(doc.id, POSTS)).not.toEqual([])
+		await fixture.booted.payload.update({
+			collection: POSTS,
+			id: doc.id,
+			data: { _status: 'draft' } as never,
+		})
+		expect(await fixture.keysFor(doc.id, POSTS)).toEqual([])
 	})
 })

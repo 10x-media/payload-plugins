@@ -78,7 +78,10 @@ export type CollectionDedupeOptions = {
 	 * it, extend it by spreading, or return an adapter of your own, used whole. Needs `match`.
 	 */
 	adapter?: DedupeAdapterFactory
-	/** Index and check for duplicates on every save. Default `true` when `match` is set. */
+	/**
+	 * Look for duplicates of a document on every save and queue the pairs found. The document
+	 * is indexed on every save either way. Default `true` when `match` is set.
+	 */
 	checkOnSave?: boolean
 	/**
 	 * Duplicate warnings on this collection's document form. Both need `match`.
