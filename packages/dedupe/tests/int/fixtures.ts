@@ -551,12 +551,6 @@ const fragile: CollectionConfig = {
 	],
 }
 
-/** Points at `fragile`, so the broken merge has a reference to move. */
-const fragileRefs: CollectionConfig = {
-	slug: 'fragile-refs',
-	fields: [{ name: 'target', type: 'relationship', relationTo: 'fragile' }],
-}
-
 /** Rows inside rows: on Postgres every row, nested ones too, is keyed by its own id. */
 const teams: CollectionConfig = {
 	slug: 'teams',
@@ -734,7 +728,6 @@ export const collectionsFor = (db: SupportedDb) => [
 	vaults,
 	agents,
 	fragile,
-	fragileRefs,
 	teams,
 	posts,
 	pages,

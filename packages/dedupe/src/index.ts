@@ -7,7 +7,7 @@ import { registerEndpoints } from './plugin/registerEndpoints'
 import { registerHooks } from './plugin/registerHooks'
 import { registerJobs } from './plugin/registerJobs'
 import { registerTranslations } from './plugin/registerTranslations'
-import { registerFormWarnings, registerViews } from './plugin/registerViews'
+import { registerViews } from './plugin/registerViews'
 import type { DedupeAdapter } from './search/contract'
 import { keysAdapter } from './search/keysAdapter'
 
@@ -79,14 +79,12 @@ export const dedupe = definePlugin<DedupePluginOptions>({
 		registerEndpoints(config, resolved)
 		registerJobs(config, resolved)
 		registerViews(config, resolved)
-		const warnings = registerFormWarnings(config, resolved)
 
 		// The merge spec needs the sanitized schema, which only exists once Payload has
 		// booted, so every configured path is validated here rather than at config time.
 		const previousOnInit = config.onInit
 		config.onInit = async (payload) => {
 			buildContext(payload, resolved, adapters)
-			for (const warning of warnings) payload.logger.warn(warning)
 			if (previousOnInit) await previousOnInit(payload)
 		}
 		return config

@@ -99,30 +99,3 @@ export type MergePlan = {
 	/** Keys of decisions whose required value came from the most similar document. */
 	filled: string[]
 }
-
-/**
- * A field in some collection that points at documents of the merged one. A merge moves
- * what points at the absorbed document to the survivor, unless the policy says `keep`.
- */
-export type ReferenceSpec = {
-	/** The collection holding the reference, or the global when `global` is set. */
-	collection: string
-	/** The reference sits in a global: one document, read and written by its slug. */
-	global?: boolean
-	/** Dot path to the field, through groups, named tabs, array rows and blocks. */
-	path: string
-	/**
-	 * The ways to the field through blocks: on each, the block type at every blocks field of
-	 * the path, keyed by that field's path. Absent when no blocks field is on the way.
-	 */
-	blocks?: Record<string, string>[]
-	/** `relationTo` lists several collections; the value carries which one. */
-	polymorphic: boolean
-	localized: boolean
-	/**
-	 * Other fields that, together with this one, may hold one document per combination.
-	 * `[]` is a field unique on its own. Read from the schema's unique fields and indexes.
-	 */
-	uniquePer: string[][]
-	policy: 'keep' | 'repoint'
-}

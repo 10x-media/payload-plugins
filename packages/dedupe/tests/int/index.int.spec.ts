@@ -33,7 +33,7 @@ describeForDb('dedupe index', {}, (db) => {
 		}
 	})
 
-	it('lets a pair go stale once an edit makes its documents unlike, without waiting for a scan', async () => {
+	it('drops a pair once an edit makes its documents unlike, without waiting for a scan', async () => {
 		const { booted, customer, pairsFor } = fixture
 		const first = await customer({
 			name: 'Edit Twin',
@@ -51,10 +51,10 @@ describeForDb('dedupe index', {}, (db) => {
 			id: second.id,
 			data: { name: 'Quite Someone Else', phone: '0991112233' } as never,
 		})
-		expect((await pairsFor(first.id)).map((pair) => pair.status)).toEqual(['stale'])
+		expect(await pairsFor(first.id)).toEqual([])
 	})
 
-	it('lets a pair go stale once one of its documents moves to another tenant', async () => {
+	it('drops a pair once one of its documents moves to another tenant', async () => {
 		const { booted, customer, pairsFor } = fixture
 		const first = await customer({
 			name: 'Tenant Twin',
@@ -74,10 +74,10 @@ describeForDb('dedupe index', {}, (db) => {
 			id: second.id,
 			data: { tenant: 'south' } as never,
 		})
-		expect((await pairsFor(first.id)).map((pair) => pair.status)).toEqual(['stale'])
+		expect(await pairsFor(first.id)).toEqual([])
 	})
 
-	it('announces a pair that opens again as found', async () => {
+	it('announces a pair found again once its documents meet again', async () => {
 		const { booted, customer, pairsFor } = fixture
 		const first = await customer({
 			name: 'Back Twin',
@@ -96,14 +96,15 @@ describeForDb('dedupe index', {}, (db) => {
 			id: second.id,
 			data: { tenant: 'south' } as never,
 		})
-		const [pair] = await pairsFor(first.id)
-		expect(pair?.status).toBe('stale')
+		expect(await pairsFor(first.id)).toEqual([])
 		const before = emitted.length
 		await booted.payload.update({
 			collection: CUSTOMERS,
 			id: second.id,
 			data: { tenant: 'north' } as never,
 		})
+		const [pair] = await pairsFor(first.id)
+		expect(pair?.status).toBe('open')
 		expect(emitted.slice(before)).toContainEqual(
 			expect.objectContaining({ type: 'pair.found', pairId: String(pair?.id) })
 		)
@@ -336,7 +337,7 @@ describeForDb('dedupe index', {}, (db) => {
 			).rejects.toMatchObject({ status: 400 })
 		})
 
-		it('removes keys and supersedes pairs when a document is trashed', async () => {
+		it('removes keys and pairs when a document is trashed', async () => {
 			const { booted, customer, keysFor, pairsFor } = fixture
 			const extra = await customer({
 				name: 'Ivan Petrenko',
@@ -353,7 +354,7 @@ describeForDb('dedupe index', {}, (db) => {
 				overrideAccess: true,
 			})
 			expect(await keysFor(extra.id)).toHaveLength(0)
-			for (const pair of await pairsFor(extra.id)) expect(pair.status).toBe('superseded')
+			expect(await pairsFor(extra.id)).toEqual([])
 		})
 	})
 })

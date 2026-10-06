@@ -64,7 +64,6 @@ export async function DedupeQueueView({
 					<QueueClient
 						collection={collection}
 						data={data}
-						historyPath={formatAdminURL({ adminRoute, path: `${basePath}/merges` })}
 						limit={limit}
 						maxGroupSize={ctx.options.maxGroupSize}
 						mergePath={formatAdminURL({ adminRoute, path: `${basePath}/merge` })}

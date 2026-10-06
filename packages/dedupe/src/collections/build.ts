@@ -42,7 +42,6 @@ export const buildCollections = (read: Access): CollectionConfig[] => [
 			{ name: 'lastSeenAt', type: 'date', index: true },
 			{ name: 'decidedAt', type: 'date' },
 			{ name: 'decidedBy', type: 'text' },
-			{ name: 'merge', type: 'text', index: true },
 		],
 	},
 	{
@@ -65,7 +64,6 @@ export const buildCollections = (read: Access): CollectionConfig[] => [
 			},
 			{ name: 'decisions', type: 'json' },
 			{ name: 'absorbedSnapshots', type: 'json' },
-			{ name: 'repointed', type: 'json' },
 			{ name: 'released', type: 'json' },
 			{ name: 'appliedBy', type: 'text' },
 			{ name: 'error', type: 'textarea' },

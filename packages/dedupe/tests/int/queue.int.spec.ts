@@ -398,7 +398,7 @@ describeForDb('dedupe queue', {}, (db) => {
 			expect(await status()).toBe('dismissed')
 
 			await payload.delete({ collection: 'customers' as never, id: a.id })
-			expect(await status()).toBe('superseded')
+			expect(await status()).toBeUndefined()
 		})
 
 		it('brings a merged-in document restored from the trash back to the queue beside the primary', async () => {
@@ -423,7 +423,7 @@ describeForDb('dedupe queue', {}, (db) => {
 			})
 			const status = async () =>
 				(await findPairByKey(fixture.req, pairKeyFor('customers', keep.id, gone.id)))?.status
-			expect(await status()).toBe('merged')
+			expect(await status()).toBeUndefined()
 			await payload.update({
 				collection: 'customers' as never,
 				id: gone.id,
@@ -467,7 +467,7 @@ describeForDb('dedupe queue', {}, (db) => {
 			const docs = [a, b].map((doc) => String(doc.id))
 			expect((await raw('/dedupe/dismiss', { collection: 'leads', docs })).status).toBe(200)
 			await fixture.booted.payload.delete({ collection: LEADS, id: a.id })
-			expect(await statusOf(a, b)).toBe('superseded')
+			expect(await statusOf(a, b)).toBeUndefined()
 		})
 	})
 
@@ -483,70 +483,6 @@ describeForDb('dedupe queue', {}, (db) => {
 		})
 		const lead = result.docs.find((row) => row.collection === 'leads')
 		expect(lead?.docs[0]?.title).toBe(lead?.docs[0]?.id)
-	})
-
-	it('names both documents of a merged pair, the absorbed one from the trash, and links the merge', async () => {
-		const { customer, req } = fixture
-		const keep = await customer({
-			name: 'Merged Queue',
-			email: 'mq@mail.com',
-			phone: '0170 111 2222',
-		})
-		const drop = await customer({
-			name: 'Merged Queue',
-			email: 'mq.2@mail.com',
-			phone: '+49 170 111 2222',
-		})
-		const ctx = getContext(fixture.booted.payload)
-		const col = getCollectionContext(fixture.booted.payload, 'customers')
-		const { mergeId } = await applyMerge({
-			req,
-			ctx,
-			col,
-			survivorId: keep.id,
-			absorbedIds: [drop.id],
-			choices: {},
-		})
-		const merged = await readQueue({
-			req,
-			ctx,
-			collection: 'customers',
-			status: 'merged',
-			page: 1,
-			limit: 25,
-		})
-		const [pair] = rowsWith(merged, drop)
-		const absorbed = pair?.docs.find((doc) => doc.id === String(drop.id))
-		expect(absorbed?.title).toBe('Merged Queue')
-		expect(pair?.merge).toBe(mergeId)
-	})
-
-	it('names the document a merge deleted from the copy its record keeps', async () => {
-		const { booted, req } = fixture
-		const lead = (email: string) =>
-			booted.payload.create({ collection: LEADS, data: { email } as never }) as Promise<Doc>
-		const [keep, drop] = [await lead('kept@leads.test'), await lead('deleted@leads.test')]
-		await pairRow('leads', [keep, drop])
-		const ctx = getContext(booted.payload)
-		await applyMerge({
-			req,
-			ctx,
-			col: getCollectionContext(booted.payload, 'leads'),
-			survivorId: keep.id,
-			absorbedIds: [drop.id],
-			choices: {},
-		})
-		const merged = await readQueue({
-			req,
-			ctx,
-			collection: 'leads',
-			status: 'merged',
-			page: 1,
-			limit: 25,
-		})
-		const [pair] = rowsWith(merged, drop)
-		const absorbed = pair?.docs.find((doc) => doc.id === String(drop.id))
-		expect(absorbed?.title).toBe('deleted@leads.test')
 	})
 
 	it('names a related document in the plan only to a reader who may read it', async () => {
@@ -594,38 +530,6 @@ describeForDb('dedupe queue', {}, (db) => {
 			expect(docs[2]).toBe(String(c.id))
 			expect(rows[0]?.score).toBe(0.9)
 			expect(result.counts.open).toBe(result.totalDocs)
-		})
-
-		it('shows the documents of one merge as one row under merged', async () => {
-			const [keep, x, y] = [
-				await lead('merge-a@group.test'),
-				await lead('merge-b@group.test'),
-				await lead('merge-c@group.test'),
-			]
-			await pairRow('leads', [keep, x])
-			await pairRow('leads', [keep, y])
-			await pairRow('leads', [x, y])
-			const ctx = getContext(fixture.booted.payload)
-			const { mergeId } = await applyMerge({
-				req: fixture.req,
-				ctx,
-				col: getCollectionContext(fixture.booted.payload, 'leads'),
-				survivorId: keep.id,
-				absorbedIds: [x.id, y.id],
-				choices: {},
-			})
-			const merged = await readQueue({
-				req: fixture.req,
-				ctx,
-				collection: 'leads',
-				status: 'merged',
-				page: 1,
-				limit: 25,
-			})
-			const rows = rowsWith(merged, keep)
-			expect(rows).toHaveLength(1)
-			expect(rows[0]?.merge).toBe(mergeId)
-			expect(rows[0]?.docs.map((doc) => doc.id).sort()).toEqual(ids([keep, x, y]))
 		})
 
 		it('keeps a group whole past one page of pairs', async () => {

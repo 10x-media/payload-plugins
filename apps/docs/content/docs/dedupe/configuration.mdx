@@ -10,7 +10,7 @@ description: Every option of the plugin and its default.
 | `disabled` | `false` | Turns the plugin off. Its collections stay in the schema. |
 | `translations` | unset | Overrides for the plugin's strings, per locale. |
 | `collections` | `{}` | Per collection: `true` for the merge screen alone, the object below, or `false`. |
-| `access.review` | logged in | Who opens the queue, the merge screen and the history. The collection's `read` access on the documents applies too: the queue lists no group with a document the reader may not read. |
+| `access.review` | logged in | Who opens the queue and the merge screen. The collection's `read` access on the documents applies too: the queue lists no group with a document the reader may not read. |
 | `access.merge` | logged in | Who applies a merge. The collection's `read`, `update` and `delete` access apply too. |
 | `requireTransactions` | `false` | Refuse to merge without a database transaction. |
 | `maxGroupSize` | `5` | Most documents in one merge, 2 or more. |
@@ -18,7 +18,7 @@ description: Every option of the plugin and its default.
 | `disableJobsQueue` | `false` | Run the save check and the scan inside the request, for a deployment without a job worker. |
 | `queue` | `dedupe` | Jobs queue of the `dedupe-check` and `dedupe-scan` tasks. |
 | `scan.cron` | unset | Scan every matched collection on a schedule. Needs a job runner. |
-| `view` | `{ path: '/dedupe' }` | Admin path; `false` removes the views. `navLabel` renames the sidebar entry, `history: true` (or `{ navLabel }`) adds one for the merge history. |
+| `view` | `{ path: '/dedupe' }` | Admin path of the queue and the merge screen; `false` removes the views. The plugin adds no sidebar link to them. |
 | `overrides` | `{}` | `keys`, `pairs`, `merges`: a function over the plugin's collection. Hooks are refused. |
 | `collectionAccess.read` | nobody | REST and GraphQL read access on the plugin's collections. A merge record holds whole copies of the merged-in documents, of every tenant, hidden fields included. |
 | `multiTenancy` | off | `true` or `{ tenantFieldName, collections }`, see below. |
@@ -37,28 +37,8 @@ description: Every option of the plugin and its default.
 | `absorbed` | `trash`, or `delete` without a trash | What happens to the merged-in documents: `trash` or `delete`. `trash` needs `trash: true` on the collection. |
 | `draft` | `false` | On a collection with drafts, merge the latest drafts and save the result as a draft. By default the published documents are merged and the result is published. |
 | `checkOnSave` | `true` with a match | Look for duplicates of the document on every save and queue the pairs. The document is indexed on every save either way, so `findDuplicates` finds it before the next scan. |
-| `form.sidebar` | `false` | Saved look-alikes of the typed values in the document sidebar. Needs `match`. |
-| `form.confirmCreate` | `false` | Ask before creating a document that resembles a saved one. Needs `match`. |
-| `references` | every field pointing here | `(derived) => references`, see [Merging](./merging#references). |
 
 An invalid match config stops the app at startup with an error naming the field.
-
-## Duplicate warnings on the form
-
-```ts
-dedupe({
-  collections: {
-    customers: {
-      match: { fields: [/* ... */] },
-      form: { sidebar: true, confirmCreate: true },
-    },
-  },
-})
-```
-
-The sidebar lists saved look-alikes as the user types; `confirmCreate` asks before a new document that resembles one is saved. Both search as the current user and never block a save when the search fails. `confirmCreate` is skipped on collections with draft autosave.
-
-To place them yourself, import `DuplicatesField`, `ConfirmSaveButton` or `ConfirmCreate` from `@10x-media/dedupe/client` with `collection` and `paths` (the match field paths), or call `useDuplicateCheck({ collection, paths, minScore })`, where `minScore` is optional and replaces the collection's for the check.
 
 ## Multi-tenancy
 
@@ -69,7 +49,7 @@ dedupe({
 })
 ```
 
-Documents of different tenants are never compared or merged together, and the queue and the history show the selected tenant only. A collection that is not scoped shows under every tenant. Set `tenantFieldName` when yours differs from `@payloadcms/plugin-multi-tenant`'s.
+Documents of different tenants are never compared or merged together, and the queue shows the selected tenant only. A collection that is not scoped shows under every tenant. Set `tenantFieldName` when yours differs from `@payloadcms/plugin-multi-tenant`'s.
 
 Without `collections`, every collection with the tenant field is scoped. Pass the multi-tenant plugin's own `collections` to scope only those, so a `tenant` field that means something else stays ordinary data:
 

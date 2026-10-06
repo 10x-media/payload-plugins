@@ -17,20 +17,8 @@ describe('resolveOptions', () => {
 				absorbed: undefined,
 				draft: false,
 				checkOnSave: false,
-				form: { sidebar: false, confirmCreate: false },
 			},
 		])
-	})
-
-	it('turns the form warnings on per collection and refuses them without a match', () => {
-		const match = { fields: [{ path: 'email', weight: 1 }] }
-		const resolved = resolveOptions({
-			collections: { customers: { match, form: { sidebar: true, confirmCreate: true } } },
-		})
-		expect(resolved.collections[0]?.form).toEqual({ sidebar: true, confirmCreate: true })
-		expect(() => resolveOptions({ collections: { leads: { form: { sidebar: true } } } })).toThrow(
-			/form.*match/
-		)
 	})
 
 	it('refuses a collection the multi-tenant plugin keeps one document of per tenant', () => {
@@ -158,11 +146,8 @@ describe('resolveOptions', () => {
 	})
 
 	it('defaults the view path and validates a custom one', () => {
-		expect(resolveOptions({}).view).toEqual({ path: '/dedupe', history: false })
-		expect(resolveOptions({ view: { history: true } }).view).toEqual({
-			path: '/dedupe',
-			history: {},
-		})
+		expect(resolveOptions({}).view).toEqual({ path: '/dedupe' })
+		expect(resolveOptions({ view: { path: '/duplicates' } }).view).toEqual({ path: '/duplicates' })
 		expect(resolveOptions({ view: false }).view).toBe(false)
 		expect(() => resolveOptions({ view: { path: 'dedupe' as `/${string}` } })).toThrow(/slash/)
 	})

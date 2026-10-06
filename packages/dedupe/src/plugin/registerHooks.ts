@@ -20,7 +20,7 @@ const isDedupeWrite = (context: Record<string, unknown> | undefined): boolean =>
  * write commits, so a failure in the check leaves the write alone. Checked right away under
  * `disableJobsQueue`.
  */
-export const fileDocument = async (args: {
+const fileDocument = async (args: {
 	req: PayloadRequest
 	ctx: PluginContext
 	col: CollectionContext
@@ -58,14 +58,7 @@ const afterChange: CollectionAfterChangeHook = async ({ collection, doc, req }) 
 		if (col.options.match) {
 			await col.adapter.remove?.({ req, collection: col.slug, id: String(saved.id) })
 		}
-		await closePairsFor({
-			req,
-			col,
-			docIds: [saved.id],
-			group: null,
-			mergeId: null,
-			keepDismissed: true,
-		})
+		await closePairsFor({ req, col, docIds: [saved.id], keepDismissed: true })
 		return doc
 	}
 	if (!col.options.match) return doc
@@ -100,7 +93,7 @@ const afterDelete: CollectionAfterDeleteHook = async ({ collection, id, req }) =
 	const col = ctx.collections.get(collection.slug)
 	if (!col) return
 	if (col.options.match) await col.adapter.remove?.({ req, collection: col.slug, id: String(id) })
-	await closePairsFor({ req, col, docIds: [id], group: null, mergeId: null })
+	await closePairsFor({ req, col, docIds: [id] })
 }
 
 export const registerHooks = (config: Config, options: ResolvedOptions): void => {

@@ -14,7 +14,7 @@ import { useEffect, useRef } from 'react'
 
 /**
  * Dev stand only: build a look-alike of a customer and open the create form with it
- * typed in, so the sidebar panel and the save confirmation have something to catch.
+ * typed in, so the check on save has something to catch.
  */
 
 const STORAGE_KEY = 'dedupe-dev-near-duplicate'

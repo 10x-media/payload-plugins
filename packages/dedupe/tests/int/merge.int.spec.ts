@@ -286,8 +286,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			const snapshots = merges[0]?.absorbedSnapshots as Record<string, Doc>
 			expect(snapshots[String(absorbed.id)]?.email).toBe('anna.schmidt@mail.com')
 
-			const pairs = await pairsFor(absorbed.id)
-			for (const pair of pairs) expect(['merged', 'superseded']).toContain(pair.status)
+			expect(await pairsFor(absorbed.id)).toEqual([])
 		})
 
 		it('rejects a merge with a trashed document', async () => {
@@ -896,6 +895,27 @@ describeForDb('dedupe merge', {}, (db) => {
 			['A', 'a-1'],
 			['B', 'b-1'],
 		])
+	})
+
+	it('keeps in the merge record a copy of the merged-in document with its fields hidden from the API', async () => {
+		const { booted, req } = fixture
+		const create = (data: Record<string, unknown>) =>
+			booted.payload.create({ collection: TICKETS, data: data as never }) as Promise<Doc>
+		const keep = await create({ title: 'Hidden copy' })
+		const gone = await create({ title: 'Hidden copy', externalRef: 'crm-42' })
+		const { mergeId } = await applyMerge({
+			req,
+			ctx: getContext(booted.payload),
+			col: getCollectionContext(booted.payload, TICKETS),
+			survivorId: keep.id,
+			absorbedIds: [gone.id],
+			choices: {},
+		})
+		const record = (await booted.payload.db.findOne({
+			collection: MERGES_SLUG,
+			where: { id: { equals: mergeId } },
+		})) as unknown as { absorbedSnapshots: Record<string, Record<string, unknown>> }
+		expect(record.absorbedSnapshots[String(gone.id)]?.externalRef).toBe('crm-42')
 	})
 
 	it('keeps a field hidden from the API in a group of a row it takes from a merged-in document', async () => {

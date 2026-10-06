@@ -33,17 +33,12 @@ const baseClass = 'dedupe-queue'
 const STATUS: Record<PairStatus, { label: TranslationKey; about: TranslationKey }> = {
 	open: { label: keys.statusOpen, about: keys.aboutOpen },
 	dismissed: { label: keys.statusDismissed, about: keys.aboutDismissed },
-	merged: { label: keys.statusMerged, about: keys.aboutMerged },
-	superseded: { label: keys.statusSuperseded, about: keys.aboutSuperseded },
-	stale: { label: keys.statusStale, about: keys.aboutStale },
 }
 
 type QueueClientProps = {
 	/** Empty for every collection. */
 	collection: string
 	data: QueueResponse
-	/** The merge history; a merged group opens its record there. */
-	historyPath: string
 	limit: number
 	/** The most documents the merge screen takes: a larger group opens with its most alike. */
 	maxGroupSize: number
@@ -61,7 +56,6 @@ type QueueClientProps = {
 export function QueueClient({
 	collection,
 	data,
-	historyPath,
 	limit,
 	maxGroupSize,
 	mergePath,
@@ -130,11 +124,9 @@ export function QueueClient({
 	const columns = useMemo<Column[]>(() => {
 		const rows = data.docs
 		const labels = new Map(collections.map((entry) => [entry.slug, entry.label]))
-		// A superseded group names a document merged or removed since, and one in the trash cannot
-		// be merged: nothing to open.
+		// A document in the trash cannot be merged: nothing to open.
 		const hrefOf = (group: QueueGroup): string | null => {
-			if (group.status === 'merged') return group.merge ? `${historyPath}/${group.merge}` : null
-			if (group.status === 'superseded' || group.docs.some((doc) => doc.trashed)) return null
+			if (group.docs.some((doc) => doc.trashed)) return null
 			return mergeUrl({
 				mergePath,
 				collection: group.collection,
@@ -211,18 +203,7 @@ export function QueueClient({
 					]
 				: []),
 		]
-	}, [
-		data.docs,
-		collection,
-		collections,
-		historyPath,
-		i18n,
-		maxGroupSize,
-		mergePath,
-		payloadT,
-		status,
-		t,
-	])
+	}, [data.docs, collection, collections, i18n, maxGroupSize, mergePath, payloadT, status, t])
 
 	return (
 		<div className={baseClass}>

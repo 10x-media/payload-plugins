@@ -10,9 +10,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **A queue** of look-alike groups that says why they match; "Not duplicates" sticks.
 - **A merge screen**: pick the primary and a value per field for up to `maxGroupSize` documents.
 - **A merge spec from the schema**, adjustable per field with `dedupeCustom` or per collection with `fields`.
-- **References move** to the primary, and unique values are freed on the merged-in documents.
-- **A merge history** comparing each merge with the documents it merged.
-- **Form warnings**: look-alikes in the sidebar and a question before creating one.
+- **Unique values** are freed on the merged-in documents, so the primary can take them.
 - **Multi-tenancy, drafts, locales and access** respected.
 - **A pluggable candidate source**: swap the built-in keys for a search engine.
 

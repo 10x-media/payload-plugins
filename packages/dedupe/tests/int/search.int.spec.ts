@@ -100,7 +100,7 @@ describeForDb('dedupe search', {}, (db) => {
 		expect(pairFinds).toBeLessThanOrEqual(stored.totalDocs)
 	})
 
-	it('counts the pairs a scan marks stale', async () => {
+	it('deletes and counts the pairs a scan no longer finds', async () => {
 		n++
 		const a = await fixture.customer({
 			email: `s6.${n}@search.test`,
@@ -121,7 +121,8 @@ describeForDb('dedupe search', {}, (db) => {
 			context: { dedupe: { operation: 'import' } },
 		})
 		const summary = await runScan({ req: fixture.req, ctx: ctx(), col: col(CUSTOMERS) })
-		expect(summary.stale).toBeGreaterThanOrEqual(1)
+		expect(summary.removed).toBeGreaterThanOrEqual(1)
+		expect((await pairsOf(a.id)).some((pair) => pair.status === 'open')).toBe(false)
 	})
 
 	it('finds look-alikes of unsaved values from code, best first, and stores nothing', async () => {

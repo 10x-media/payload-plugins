@@ -2,13 +2,10 @@ import { describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionSlug, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
-import { MERGES_SLUG, PAIRS_SLUG } from '../../src/collections/slugs'
-import { pairKeyFor } from '../../src/match/keys'
+import { MERGES_SLUG } from '../../src/collections/slugs'
 import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
-import { readMergeRecord } from '../../src/merge/record'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
-import { readQueue } from '../../src/queue/pairs'
 import type { MergeChoice } from '../../src/schema/types'
 import {
 	AGENTS,
@@ -52,7 +49,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		await fixture.booted.stop()
 	})
 
-	it('sends no values of a field the reader may not read, on the plan and in the history', async () => {
+	it('sends no values of a field the reader may not read, on the plan', async () => {
 		const pair = [
 			await create(STAFF, { name: 'Salaried', salary: 1000 }),
 			await create(STAFF, { name: 'Salaried', salary: 2000 }),
@@ -66,18 +63,6 @@ describeForDb('dedupe merge guards', {}, (db) => {
 			)
 		)
 		expect(valuesOf(plan.decisions, 'salary')).toEqual([undefined, undefined])
-
-		const { mergeId } = await applyMerge({
-			...group(
-				fixture.req,
-				STAFF,
-				pair.map((doc) => doc.id)
-			),
-			choices: { salary: { doc: String(pair[1]?.id) } },
-		})
-		const record = await readMergeRecord({ req: limited, ctx: ctx(), id: mergeId })
-		expect(valuesOf(record.decisions, 'salary')).toEqual([undefined, undefined])
-		expect(record.decisions.find((entry) => entry.key === 'salary')?.proposed).toBeUndefined()
 	})
 
 	it('keeps the primary value of a field that hides the value on the document it would come from', async () => {
@@ -364,40 +349,6 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		}
 	})
 
-	it('waits for a document whose reference the merge moves while another editor has it open', async () => {
-		const pair = [
-			await create(STAFF, { name: 'Moved buddy' }),
-			await create(STAFF, { name: 'Moved buddy' }),
-		] as [Doc, Doc]
-		const friend = await create(STAFF, { name: 'Friend', buddy: pair[1].id })
-		const editor = await fixture.booted.payload.create({
-			collection: 'users' as CollectionSlug,
-			data: { email: 'editor-ref@example.com', password: 'password' } as never,
-		})
-		const lock = await fixture.booted.payload.db.create({
-			collection: 'payload-locked-documents' as CollectionSlug,
-			data: {
-				document: { relationTo: STAFF, value: friend.id },
-				user: { relationTo: 'users', value: editor.id },
-			},
-		})
-		try {
-			const args = group(
-				fixture.req,
-				STAFF,
-				pair.map((doc) => doc.id)
-			)
-			const plan = await buildPlanResponse(args)
-			expect(plan.blocked).toMatch(/open for editing by editor-ref@example\.com/)
-			await expect(applyMerge(args)).rejects.toMatchObject({ status: 409 })
-		} finally {
-			await fixture.booted.payload.db.deleteOne({
-				collection: 'payload-locked-documents' as CollectionSlug,
-				where: { id: { equals: lock.id } },
-			})
-		}
-	})
-
 	it('names no field the reviewer may not read on the primary among the pointers it clears', async () => {
 		const gone = await create(STAFF, { name: 'Sealed buddy' })
 		const keep = await create(STAFF, { name: 'Sealed buddy', sealed: true, buddy: gone.id })
@@ -406,7 +357,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		expect(plan.cleared).not.toContain('buddy')
 	})
 
-	it('sends no values of a field inside rows the reader may not read, on the plan and in the history', async () => {
+	it('sends no values of a field inside rows the reader may not read, on the plan', async () => {
 		const pair = [
 			await create(STAFF, { name: 'Bonused', bonuses: [{ label: 'spring', amount: 4711 }] }),
 			await create(STAFF, { name: 'Bonused', bonuses: [{ label: 'autumn', amount: 4712 }] }),
@@ -418,16 +369,6 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		expect(planned).toContain('autumn')
 		expect(planned).not.toContain('4711')
 		expect(planned).not.toContain('4712')
-
-		const { mergeId } = await applyMerge({
-			...group(fixture.req, STAFF, ids),
-			choices: { bonuses: { items: [{ doc: String(pair[1]?.id), index: 0 }] } },
-		})
-		const record = await readMergeRecord({ req: limited, ctx: ctx(), id: mergeId })
-		const recorded = JSON.stringify(record.decisions.find((entry) => entry.key === 'bonuses'))
-		expect(recorded).toContain('autumn')
-		expect(recorded).not.toContain('4711')
-		expect(recorded).not.toContain('4712')
 	})
 
 	it('keeps the survivor rows when the reviewer may not change a field inside them', async () => {
@@ -544,64 +485,6 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		expect(proposed.map((row) => row.label)).toEqual(['ours'])
 	})
 
-	it('opens the record of a merge whose primary is gone to a reader of some documents, without its values', async () => {
-		const pair = [
-			await create(VAULTS, {
-				name: 'Kept vault',
-				owner: 'owner-gone@example.com',
-				secret: 'one',
-				memo: {
-					root: {
-						type: 'root',
-						direction: 'ltr',
-						format: '',
-						indent: 0,
-						version: 1,
-						children: [
-							{
-								type: 'paragraph',
-								direction: 'ltr',
-								format: '',
-								indent: 0,
-								version: 1,
-								textFormat: 0,
-								children: [
-									{
-										type: 'text',
-										text: 'kept-memo',
-										format: 0,
-										style: '',
-										mode: 'normal',
-										detail: 0,
-										version: 1,
-									},
-								],
-							},
-						],
-					},
-				},
-			}),
-			await create(VAULTS, { name: 'Kept vault', owner: 'owner-gone@example.com', secret: 'two' }),
-		]
-		const { mergeId } = await applyMerge({
-			...group(
-				fixture.req,
-				VAULTS,
-				pair.map((doc) => doc.id)
-			),
-			choices: { secret: { doc: String(pair[1]?.id) } },
-		})
-		await fixture.booted.payload.delete({ collection: VAULTS, id: pair[0]?.id as string })
-		const owner = await reqFor(fixture.booted, 'owner-gone@example.com')
-		const record = await readMergeRecord({ req: owner, ctx: ctx(), id: mergeId })
-		expect(record.survivor.state).toBe('deleted')
-		const memo = record.decisions.find((entry) => entry.key === 'memo')
-		expect(JSON.stringify(memo?.html ?? {})).not.toContain('kept-memo')
-		const secret = record.decisions.find((entry) => entry.key === 'secret')
-		expect(secret?.values[0]?.value).toBeUndefined()
-		expect(secret?.proposed).toBeUndefined()
-	})
-
 	it('lets a reviewer who may only move documents to the trash merge into the trash', async () => {
 		const keep = await create(STAFF, { name: 'Trash Only' })
 		const gone = await create(STAFF, { name: 'Trash Only' })
@@ -645,12 +528,6 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		expect(
 			(await buildPlanResponse(group(fixture.req, AGENTS, ids))).docs.map((doc) => doc.title)
 		).toEqual(['Falcon', 'Falcon'])
-
-		const { mergeId } = await applyMerge(group(fixture.req, AGENTS, ids))
-		const record = await readMergeRecord({ req: limited, ctx: ctx(), id: mergeId })
-		expect([record.survivor.title, ...record.absorbed.map((doc) => doc.title)]).toEqual(
-			ids.map(String)
-		)
 	})
 
 	it('keeps the survivor value of a field the reviewer may not change, whatever they pick', async () => {
@@ -668,76 +545,6 @@ describeForDb('dedupe merge guards', {}, (db) => {
 			choices: { grade: { doc: String(pair[1]?.id) } },
 		})
 		expect(plan.decisions.find((entry) => entry.key === 'grade')?.proposed).toBe('junior')
-	})
-
-	it('names a merged-in document that is gone, and shows its values, only to a reader of the whole collection', async () => {
-		const pair = [
-			await create(VAULTS, { name: 'Vault', owner: 'owner-a@example.com', secret: 'alpha' }),
-			await create(VAULTS, { name: 'Other vault', owner: 'owner-b@example.com', secret: 'beta' }),
-		]
-		await fixture.booted.payload.db.create({
-			collection: PAIRS_SLUG,
-			data: {
-				target: 'vaults',
-				pairKey: pairKeyFor('vaults', pair[0]?.id as string, pair[1]?.id as string),
-				docA: String(pair[0]?.id),
-				docB: String(pair[1]?.id),
-				score: 0.5,
-				status: 'open',
-			},
-		})
-		const { mergeId } = await applyMerge(
-			group(
-				fixture.req,
-				VAULTS,
-				pair.map((doc) => doc.id)
-			)
-		)
-		const owner = await reqFor(fixture.booted, 'owner-a@example.com')
-
-		const record = await readMergeRecord({ req: owner, ctx: ctx(), id: mergeId })
-		expect(record.absorbed).toEqual([
-			{ id: String(pair[1]?.id), title: String(pair[1]?.id), state: 'deleted' },
-		])
-		expect(valuesOf(record.decisions, 'secret')).toEqual(['alpha', undefined])
-
-		const merged = await readQueue({
-			req: owner,
-			ctx: ctx(),
-			collection: 'vaults',
-			status: 'merged',
-			page: 1,
-			limit: 25,
-		})
-		const row = merged.docs.find((entry) =>
-			entry.docs.some((doc) => doc.id === String(pair[1]?.id))
-		)
-		expect(row?.merge, 'no link to a record the reader cannot open').toBeNull()
-		const gone = row?.docs.find((doc) => doc.id === String(pair[1]?.id))
-		expect(gone?.title).toBe(String(pair[1]?.id))
-	})
-
-	it('keeps a merge record readable when its survivor goes to the trash later', async () => {
-		const pair = [
-			await create(VAULTS, { name: 'Trashed', owner: 'owner-c@example.com' }),
-			await create(VAULTS, { name: 'Trashed too', owner: 'owner-c@example.com' }),
-		]
-		const { mergeId } = await applyMerge(
-			group(
-				fixture.req,
-				VAULTS,
-				pair.map((doc) => doc.id)
-			)
-		)
-		await fixture.booted.payload.update({
-			collection: VAULTS,
-			id: pair[0]?.id as string,
-			data: { deletedAt: new Date().toISOString() } as never,
-			overrideAccess: true,
-		})
-		const owner = await reqFor(fixture.booted, 'owner-c@example.com')
-		const record = await readMergeRecord({ req: owner, ctx: ctx(), id: mergeId })
-		expect(record.survivor).toMatchObject({ id: String(pair[0]?.id), state: 'trash' })
 	})
 
 	it('refuses a group of two tenants already at the plan', async () => {
@@ -764,10 +571,9 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		})
 	})
 
-	it('records the references it moved when it fails halfway without a transaction', async () => {
+	it('marks the merge record failed when the merge fails halfway without a transaction', async () => {
 		const survivor = await create(FRAGILE, { title: 'keeps', seat: 1 })
 		const absorbed = await create(FRAGILE, { title: 'boom', seat: 2 })
-		const ref = await create('fragile-refs' as CollectionSlug, { target: absorbed.id })
 		const database = fixture.booted.payload.db as { beginTransaction?: unknown }
 		const begin = database.beginTransaction
 		database.beginTransaction = async () => null
@@ -786,9 +592,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 			where: { survivor: { equals: String(survivor.id) } },
 			limit: 1,
 		})
-		const record = docs[0] as unknown as { status: string; repointed: { ids: string[] }[] | null }
-		expect(record.status).toBe('failed')
-		expect(record.repointed?.flatMap((entry) => entry.ids)).toEqual([String(ref.id)])
+		expect((docs[0] as unknown as { status: string }).status).toBe('failed')
 	})
 
 	it('says at the plan that the merge cannot apply when transactions are required and missing', async () => {

@@ -7,9 +7,7 @@ import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
 import type { MergeChoice } from '../../src/schema/types'
-import { ACCOUNTS, bootDedupe, COMPANIES, CUSTOMERS, type Doc, emitted } from './fixtures'
-
-const MEMBERSHIPS = 'memberships' as CollectionSlug
+import { ACCOUNTS, bootDedupe, CUSTOMERS, type Doc, emitted } from './fixtures'
 
 /** A group of more than two documents merged at once. */
 describeForDb('dedupe group merge', {}, (db) => {
@@ -105,50 +103,6 @@ describeForDb('dedupe group merge', {}, (db) => {
 		})
 	})
 
-	it('refuses while two absorbed documents would give the survivor one club twice, then moves both', async () => {
-		const group = await trio()
-		const [survivor, middle, newest] = group as [Doc, Doc, Doc]
-		const club = await create(COMPANIES, { name: `Club ${n}` })
-		const first = await create(MEMBERSHIPS, { title: 'M', customer: middle.id, club: club.id })
-		const second = await create(MEMBERSHIPS, { title: 'N', customer: newest.id, club: club.id })
-		const elsewhere = await create(COMPANIES, { name: `Other club ${n}` })
-		const free = await create(MEMBERSHIPS, { title: 'F', customer: middle.id, club: elsewhere.id })
-
-		const plan = await buildPlanResponse(args(CUSTOMERS, group))
-		expect(plan.readyToApply).toBe(false)
-		expect(plan.references.conflicts).toEqual([
-			expect.objectContaining({
-				collection: 'memberships',
-				docs: expect.arrayContaining([
-					expect.objectContaining({
-						owner: String(middle.id),
-						doc: expect.objectContaining({ id: String(first.id) }),
-					}),
-					expect.objectContaining({
-						owner: String(newest.id),
-						doc: expect.objectContaining({ id: String(second.id) }),
-					}),
-				]),
-			}),
-		])
-		// A colliding document is listed in its conflict only, not again among those that move.
-		const moving = (entries: typeof plan.references.entries) =>
-			entries
-				.filter((entry) => entry.collection === 'memberships')
-				.flatMap((entry) => entry.docs.map((doc) => doc.id))
-		expect(moving(plan.references.entries)).toEqual([String(free.id)])
-		await expect(applyMerge(args(CUSTOMERS, group))).rejects.toMatchObject({ status: 409 })
-
-		await fixture.booted.payload.delete({ collection: MEMBERSHIPS, id: second.id })
-		const resolved = await buildPlanResponse(args(CUSTOMERS, group))
-		expect(moving(resolved.references.entries).sort()).toEqual(
-			[String(first.id), String(free.id)].sort()
-		)
-		await applyMerge(args(CUSTOMERS, group))
-		const moved = (await find(MEMBERSHIPS, first.id)) as Doc
-		expect(String(moved.customer)).toBe(String(survivor.id))
-	})
-
 	it('builds a list from the values the reviewer checked only', async () => {
 		const group = await trio([{ tags: ['a'] }, { tags: ['b', 'a'] }, { tags: ['c'] }])
 		const [survivor, middle, newest] = group as [Doc, Doc, Doc]
@@ -203,7 +157,7 @@ describeForDb('dedupe group merge', {}, (db) => {
 		)
 	})
 
-	it('closes every pair inside the group as merged and supersedes the others', async () => {
+	it('deletes every pair of a merged-in document, inside the group and out', async () => {
 		const group = await trio([{ phone: '555 1234' }, { phone: '555 1234' }, { phone: '555 1234' }])
 		const outsider = await fixture.customer({
 			name: `Group ${n}`,
@@ -226,14 +180,11 @@ describeForDb('dedupe group merge', {}, (db) => {
 		const inGroup = (pair: { docA: string; docB: string }) =>
 			[pair.docA, pair.docB].every((id) => group.some((doc) => String(doc.id) === id))
 		const after = await pairs()
-		expect(after.filter(inGroup).map((pair) => pair.status)).toEqual(['merged', 'merged', 'merged'])
+		expect(after.filter(inGroup)).toEqual([])
 		const absorbed = group.slice(1).map((doc) => String(doc.id))
-		const outside = after.filter((pair) => !inGroup(pair))
 		expect(
-			outside
-				.filter((pair) => absorbed.includes(pair.docA) || absorbed.includes(pair.docB))
-				.map((pair) => pair.status)
-		).toEqual(['superseded', 'superseded'])
+			after.filter((pair) => absorbed.includes(pair.docA) || absorbed.includes(pair.docB))
+		).toEqual([])
 	})
 
 	it('refuses a group over the limit, a document twice, or the survivor among the absorbed', async () => {

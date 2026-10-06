@@ -2,16 +2,10 @@ import { getTranslation } from '@payloadcms/translations'
 import type { CollectionSlug, PayloadRequest, Where } from 'payload'
 import { toWords } from 'payload/shared'
 
-import {
-	MERGES_SLUG,
-	PAIR_STATUSES,
-	PAIRS_SLUG,
-	type PairStatus,
-	pageSize,
-} from '../collections/slugs'
+import { PAIR_STATUSES, PAIRS_SLUG, type PairStatus, pageSize } from '../collections/slugs'
 import { pairKeyFor, sortedPair } from '../match/keys'
 import type { MatchResult, MatchSignal } from '../match/score'
-import { describeUsers, docTitle, type LoadedDoc, loadDocs, readableTitle } from '../merge/load'
+import { describeUsers, docTitle, type LoadedDoc, loadDocs } from '../merge/load'
 import {
 	type CollectionContext,
 	getCollectionContext,
@@ -36,7 +30,6 @@ export type PairRow = {
 	lastSeenAt: string | null
 	decidedAt: string | null
 	decidedBy: string | null
-	merge: string | null
 	createdAt: string
 	updatedAt: string
 }
@@ -77,9 +70,9 @@ export const findPairByKey = async (
 /**
  * Record what the scorer found for two documents.
  *
- * The reviewer's decision outlives the run that produced the row: a dismissed or merged
- * pair only gets its score refreshed, never its status. A pair that dropped below the
- * threshold goes stale rather than away, so the queue can show it was there.
+ * The reviewer's decision outlives the run that produced the row: a dismissed pair only gets
+ * its score refreshed, never its status. An open pair that dropped below the threshold is
+ * deleted.
  */
 export const upsertPair = async (args: {
 	req: PayloadRequest
@@ -143,39 +136,16 @@ export const upsertPair = async (args: {
 		return row
 	}
 
-	// A merged pair met again has a merged-in document back from the trash: it is open again.
-	let status: PairStatus = existing.status
-	if (existing.status !== 'dismissed') {
-		status = qualifies ? 'open' : 'stale'
+	if (existing.status === 'open' && !qualifies) {
+		await db.deleteOne({ collection: PAIRS_SLUG, where: { id: { equals: existing.id } }, req })
+		return null
 	}
-	const updated = (await db.updateOne({
+	return (await db.updateOne({
 		collection: PAIRS_SLUG,
 		id: existing.id,
-		data: {
-			tenant,
-			score: result.score,
-			signals: result.signals,
-			status,
-			lastSeenAt: seenAt,
-		},
+		data: { tenant, score: result.score, signals: result.signals, lastSeenAt: seenAt },
 		req,
 	})) as unknown as PairRow
-	// Open again, it is found as a new pair is.
-	if (status === 'open' && existing.status !== 'open') {
-		await emitEvent(
-			ctx.options.events,
-			{
-				type: 'pair.found',
-				collection: col.slug,
-				pairId: String(updated.id),
-				docA,
-				docB,
-				score: result.score,
-			},
-			req
-		)
-	}
-	return updated
 }
 
 export const decidePair = async (args: {
@@ -221,7 +191,7 @@ export const decideGroup = async (args: {
 	status: 'dismissed' | 'open'
 }): Promise<void> => {
 	const { req, ctx, col, docs, status } = args
-	const from: PairStatus[] = status === 'dismissed' ? ['open', 'stale'] : ['dismissed']
+	const from: PairStatus = status === 'dismissed' ? 'open' : 'dismissed'
 	for (const [index, a] of docs.entries()) {
 		for (const b of docs.slice(index + 1)) {
 			const pairKey = pairKeyFor(col.slug, a.id, b.id)
@@ -242,49 +212,35 @@ export const decideGroup = async (args: {
 					req,
 				})) as PairRow
 			}
-			if (from.includes(pair.status)) await decidePair({ req, ctx, pair, status })
+			if (pair.status === from) await decidePair({ req, ctx, pair, status })
 		}
 	}
 }
 
 /**
- * Every pair naming one of `docIds`: a pair whose two documents were merged together
- * closes as merged, the rest are superseded. Without a `group` (a document trashed or
- * deleted by hand) every pair is superseded. `keepDismissed` leaves "Not duplicates" in
- * place, for a document in the trash that may come back.
+ * Deletes every pair naming one of `docIds`: a document merged into another, deleted or moved
+ * to the trash. `keepDismissed` leaves "Not duplicates" in place, for a document in the trash
+ * that may come back.
  */
 export const closePairsFor = async (args: {
 	req: PayloadRequest
 	col: CollectionContext
 	docIds: (number | string)[]
-	group: string[] | null
-	mergeId: string | null
 	keepDismissed?: boolean
 }): Promise<void> => {
-	const { req, col, group, mergeId, keepDismissed = false } = args
+	const { req, col, keepDismissed = false } = args
 	const ids = args.docIds.map(String)
-	const result = await req.payload.db.find({
+	await req.payload.db.deleteMany({
 		collection: PAIRS_SLUG,
 		where: {
 			and: [
 				{ target: { equals: col.slug } },
 				{ or: [{ docA: { in: ids } }, { docB: { in: ids } }] },
-				{ status: { in: keepDismissed ? ['open', 'stale'] : ['open', 'stale', 'dismissed'] } },
+				...(keepDismissed ? [{ status: { equals: 'open' } }] : []),
 			],
 		},
-		limit: 0,
-		pagination: false,
 		req,
 	})
-	for (const row of result.docs as PairRow[]) {
-		const merged = Boolean(group?.includes(row.docA) && group.includes(row.docB))
-		await req.payload.db.updateOne({
-			collection: PAIRS_SLUG,
-			id: row.id,
-			data: merged ? { status: 'merged', merge: mergeId } : { status: 'superseded' },
-			req,
-		})
-	}
 }
 
 export type QueueGroup = {
@@ -300,8 +256,6 @@ export type QueueGroup = {
 	/** When and by whom the group was last marked not duplicates. */
 	decidedAt: string | null
 	decidedBy: string | null
-	/** The merge that closed the group, when the reader may see every document of it. */
-	merge: string | null
 }
 
 export type QueueResponse = {
@@ -313,15 +267,11 @@ export type QueueResponse = {
 	counts: Record<PairStatus, number>
 }
 
-type Link = Pick<
-	PairRow,
-	'id' | 'target' | 'docA' | 'docB' | 'score' | 'status' | 'merge' | 'decidedAt'
->
+type Link = Pick<PairRow, 'id' | 'target' | 'docA' | 'docB' | 'score' | 'status' | 'decidedAt'>
 
 /**
- * Pairs of one status as groups: the documents linked by pairs in a chain (A like B, B like C),
- * or on the merged ones the documents of one merge. The strongest group first, and in each
- * group its pairs strongest first.
+ * Pairs of one status as groups: the documents linked by pairs in a chain (A like B, B like C).
+ * The strongest group first, and in each group its pairs strongest first.
  */
 const groupPairs = (links: Link[]): Link[][] => {
 	const parent = new Map<string, string>()
@@ -340,9 +290,7 @@ const groupPairs = (links: Link[]): Link[][] => {
 	}
 	const groups = new Map<string, Link[]>()
 	for (const link of [...links].sort((x, y) => y.score - x.score)) {
-		// A pair reopened after a merge still names it; only a merged pair is grouped by it.
-		const key =
-			link.status === 'merged' && link.merge ? `merge:${link.merge}` : root(node(link, link.docA))
+		const key = root(node(link, link.docA))
 		groups.set(key, [...(groups.get(key) ?? []), link])
 	}
 	return [...groups.values()].sort((x, y) => (y[0] as Link).score - (x[0] as Link).score)
@@ -427,7 +375,6 @@ export const readQueue = async (args: {
 				docB: true,
 				score: true,
 				status: true,
-				merge: true,
 				decidedAt: true,
 			},
 			limit: 0,
@@ -498,55 +445,6 @@ export const readQueue = async (args: {
 			if (doc.deletedAt) trashed.add(`${target}:${doc.id}`)
 		}
 	}
-	// A document the merge deleted is named from the copy its record keeps, to a reader of the
-	// whole collection, as the merge history does.
-	const unnamed = shown.flatMap((group) => {
-		const { target, merge } = group[0] as Link
-		return merge
-			? docsOf(group)
-					.filter((id) => !titles.has(`${target}:${id}`))
-					.map((id) => ({ target, merge, id }))
-			: []
-	})
-	if (unnamed.length > 0) {
-		const existing = new Set<string>()
-		const whole = new Set<string>()
-		for (const target of new Set(unnamed.map((entry) => entry.target))) {
-			const owner = getCollectionContext(req.payload, target)
-			if ((await owner.config.access.read({ req })) === true) whole.add(target)
-			const ids = unnamed.filter((entry) => entry.target === target).map((entry) => entry.id)
-			for (const doc of await loadDocs({ req, ctx, col: owner, ids, trash: true })) {
-				existing.add(`${target}:${doc.id}`)
-			}
-		}
-		const gone = unnamed.filter(
-			(entry) => whole.has(entry.target) && !existing.has(`${entry.target}:${entry.id}`)
-		)
-		const merges = await req.payload.db.find<{
-			id: number | string
-			absorbedSnapshots: Record<string, Record<string, unknown>> | null
-		}>({
-			collection: MERGES_SLUG,
-			where: { id: { in: [...new Set(gone.map((entry) => entry.merge))] } },
-			limit: gone.length,
-			pagination: false,
-			req,
-		})
-		const snapshots = new Map(
-			merges.docs.map((merge) => [String(merge.id), merge.absorbedSnapshots ?? {}])
-		)
-		for (const { target, merge, id } of gone) {
-			const snapshot = snapshots.get(String(merge))?.[id]
-			const owner = ctx.collections.get(target)
-			if (snapshot && owner) {
-				titles.set(
-					`${target}:${id}`,
-					await readableTitle(req, owner, { ...snapshot, id } as LoadedDoc)
-				)
-			}
-		}
-	}
-
 	const decided = shown.flatMap((group) => {
 		const by = full.get(String(latest(group)?.id))?.decidedBy
 		return by ? [by] : []
@@ -557,7 +455,6 @@ export const readQueue = async (args: {
 		const { target } = strongest
 		const last = full.get(String(latest(group)?.id))
 		const ids = docsOf(group)
-		const named = ids.every((id) => titles.has(`${target}:${id}`))
 		return {
 			id: String(strongest.id),
 			collection: target,
@@ -575,8 +472,6 @@ export const readQueue = async (args: {
 			status: strongest.status,
 			decidedAt: last?.decidedAt ?? null,
 			decidedBy: last?.decidedBy ? (users.get(last.decidedBy) ?? last.decidedBy) : null,
-			merge:
-				strongest.status === 'merged' && strongest.merge && named ? String(strongest.merge) : null,
 		}
 	})
 	return {
@@ -589,10 +484,4 @@ export const readQueue = async (args: {
 	}
 }
 
-const emptyCounts = (): Record<PairStatus, number> => ({
-	open: 0,
-	dismissed: 0,
-	merged: 0,
-	superseded: 0,
-	stale: 0,
-})
+const emptyCounts = (): Record<PairStatus, number> => ({ open: 0, dismissed: 0 })

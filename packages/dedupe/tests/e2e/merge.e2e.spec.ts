@@ -1,7 +1,6 @@
 import { expect, type Page, test } from '@playwright/test'
 
 import {
-	ADMIN_ROUTE,
 	type Customer,
 	type CustomerInput,
 	cell,
@@ -16,7 +15,6 @@ import {
 	openMerge,
 	patchCustomer,
 	pick,
-	QUEUE_PATH,
 	readCustomer,
 } from './helpers'
 
@@ -161,7 +159,6 @@ test('a conflict keeps the primary value and marks only what differs', async ({
 	await expect(cell(page, 'note', b.id)).toContainText('from B')
 	// With "Highlight differences" on, another document's cell marks what differs from the primary.
 	await expect(cell(page, 'note', b.id).locator('[data-match-type]').first()).toBeVisible()
-	await expect(page.locator('.dedupe-merge__stats')).not.toContainText(/conflicts|filled in/)
 })
 
 test('a list keeps the primary items and takes the ones checked in other documents', async ({
@@ -255,7 +252,6 @@ test('array rows are the admin rows, read-only, and the same row in two document
 	const row = (doc: Customer, index: number) =>
 		page.locator(`.array-field__row:has([id="dedupe-addresses-${doc.id}-${index}"])`)
 
-	await expect(row(second, 1).locator('.array-field__row-header')).toContainText('Lviv')
 	await row(second, 1).locator('.collapsible__toggle').click()
 	const city = row(second, 1).locator('#field-addresses__1__city')
 	await expect(city).toHaveValue('Lviv')
@@ -366,33 +362,6 @@ test('what a merged-in document gives up is said in red, only for a document tha
 	await expect(releases).toHaveCount(1)
 	await expect(releases).toContainText(`${MARK} release Kowalski goes to the trash`)
 	await expect(releases.locator('.banner')).toHaveClass(/banner--type-error/)
-})
-
-test('a document pointing at two merged-in documents is one row that names both', async ({
-	page,
-	context,
-}) => {
-	const [a, b, c] = (await seedGroup(context.request, 'friends')) as [Customer, Customer, Customer]
-	const response = await context.request.post('/api/specimens', {
-		data: { title: `${MARK} friends of both`, friends: [b.id, c.id] },
-	})
-	expect(response.ok(), `create failed: ${response.status()}`).toBe(true)
-	const specimen = ((await response.json()) as { doc: { id: string } }).doc.id
-	const errors: string[] = []
-	page.on('console', (message) => {
-		if (message.type() === 'error') errors.push(message.text())
-	})
-	try {
-		await openMerge(page, { docs: ids([a, b, c]) })
-		const table = page.locator('.dedupe-related__table', { hasText: 'Specimens · Friends' })
-		const rows = table.locator('tbody tr', { hasText: `${MARK} friends of both` })
-		await expect(rows).toHaveCount(1)
-		await expect(rows).toContainText(String(b.name))
-		await expect(rows).toContainText(String(c.name))
-		expect(errors.filter((text) => text.includes('same key'))).toEqual([])
-	} finally {
-		await context.request.delete(`/api/specimens/${specimen}?trash=false`)
-	}
 })
 
 test('a relationship shows the related title rather than its id', async ({ page, context }) => {
@@ -603,91 +572,6 @@ test("a document's name opens it in a drawer, and the drawer links to the docume
 	await expect(page).toHaveURL(new RegExp(`survivor=${group[0]?.id}`))
 })
 
-test('"Linked from" counts the documents that link to one and lists them', async ({
-	page,
-	context,
-}) => {
-	const group = await seedGroup(context.request, 'linked', 2)
-	const response = await context.request.post('/api/trips', {
-		data: { title: `${MARK} linked trip`, participants: [group[1]?.id] },
-	})
-	expect(response.ok()).toBe(true)
-	const trip = ((await response.json()) as { doc: { id: string } }).doc
-	try {
-		await openMerge(page, { docs: ids(group) })
-		const heads = page.locator('.dedupe-merge__head')
-		await expect(heads.first().locator('.dedupe-merge__linked')).toBeDisabled()
-		await heads.nth(1).locator('.dedupe-merge__linked').click()
-		const drawer = page.locator('.drawer--is-open')
-		await expect(drawer).toContainText('Trips · Participants')
-		await expect(drawer.getByRole('link', { name: `${MARK} linked trip` })).toBeVisible()
-	} finally {
-		await context.request.delete(`/api/trips/${trip.id}`)
-	}
-})
-
-test('a document with unpublished changes is listed with that reason, not under "Points at"', async ({
-	page,
-	context,
-}) => {
-	const [a, b] = (await seedGroup(context.request, 'pending', 2)) as [Customer, Customer]
-	const created = await context.request.post('/api/notes', {
-		data: {
-			text: `${MARK} pending note`,
-			about: { relationTo: 'customers', value: b.id },
-			_status: 'published',
-		},
-	})
-	expect(created.ok()).toBe(true)
-	const note = ((await created.json()) as { doc: { id: string } }).doc.id
-	const drafted = await context.request.patch(`/api/notes/${note}?draft=true`, {
-		data: { text: `${MARK} pending note (draft)` },
-	})
-	expect(drafted.ok()).toBe(true)
-	try {
-		await openMerge(page, { docs: ids([a, b]) })
-		const blocker = page.locator('.dedupe-related__table', { hasText: 'Has unpublished changes' })
-		await expect(blocker).toHaveCount(1)
-		await expect(blocker).toContainText(`${MARK} pending note`)
-		await expect(blocker.locator('th', { hasText: 'Points at' })).toHaveCount(0)
-	} finally {
-		await context.request.delete(`/api/notes/${note}`)
-	}
-})
-
-test('a listed document opens in its drawer again after the drawer was closed', async ({
-	page,
-	context,
-}) => {
-	const [a, b] = (await seedGroup(context.request, 'reopen', 2)) as [Customer, Customer]
-	const created = await context.request.post('/api/notes', {
-		data: {
-			text: `${MARK} reopened note`,
-			about: { relationTo: 'customers', value: b.id },
-			_status: 'published',
-		},
-	})
-	expect(created.ok()).toBe(true)
-	const note = ((await created.json()) as { doc: { id: string } }).doc.id
-	try {
-		await openMerge(page, { docs: ids([a, b]) })
-		const toggler = page
-			.locator('.dedupe-related__table', { hasText: `${MARK} reopened note` })
-			.locator('.drawer-link__doc-drawer-toggler')
-			.first()
-		const drawer = page.locator('.drawer--is-open')
-		await toggler.click()
-		await expect(drawer).toBeVisible()
-		await page.keyboard.press('Escape')
-		await expect(drawer).toHaveCount(0)
-
-		await toggler.click()
-		await expect(drawer, 'opens the second time too').toBeVisible()
-	} finally {
-		await context.request.delete(`/api/notes/${note}`)
-	}
-})
-
 test('warns that two documents of the group were marked not duplicates', async ({
 	page,
 	context,
@@ -740,62 +624,7 @@ test('says which fields lose their pointers at documents of the merge', async ({
 	).toContainText('Pointers at documents of this merge are left out of Referred By')
 })
 
-test('a global that points at a merged-in document is listed and opens on its own page', async ({
-	page,
-	context,
-}) => {
-	const group = await seedGroup(context.request, 'global', 2)
-	const before = await context.request.get('/api/globals/site?depth=0')
-	const featured =
-		((await before.json()) as { featuredCustomer?: string | null }).featuredCustomer ?? null
-	const feature = (id: string | null | undefined) =>
-		context.request.post('/api/globals/site', { data: { featuredCustomer: id } })
-	expect((await feature(group[1]?.id)).ok()).toBe(true)
-	try {
-		await openMerge(page, { docs: ids(group) })
-		const table = page.locator('.dedupe-related__table', { hasText: 'Site · Featured Customer' })
-		await expect(table.getByRole('link', { name: 'Site' })).toHaveAttribute(
-			'href',
-			/\/admin\/globals\/site$/
-		)
-		await expect(table.locator('.drawer-link__doc-drawer-toggler')).toHaveCount(0)
-	} finally {
-		await feature(featured)
-	}
-})
-
-test('the sidebar of a document opened on the merge screen leaves out the merge, and its Merge opens another', async ({
-	page,
-	context,
-}) => {
-	const [a, b, c] = (await seedGroup(context.request, 'drawermerge')) as [
-		Customer,
-		Customer,
-		Customer,
-	]
-	await openMerge(page, { docs: ids([a, b]) })
-	await page.locator('.dedupe-merge__head').nth(1).locator('.dedupe-merge__head-name').click()
-	const drawer = page.locator('.drawer--is-open')
-	await expect(drawer.locator('.dedupe-duplicates__item', { hasText: 'Kowalsky' })).toBeVisible()
-	await expect(
-		drawer.locator('.dedupe-duplicates__item', { hasText: 'Kowalska' }),
-		'already in this merge'
-	).toHaveCount(0)
-	await drawer
-		.locator('.dedupe-duplicates__item', { hasText: `${MARK} drawermerge Kowalsky` })
-		.getByRole('link', { name: 'Merge', exact: true })
-		.click()
-
-	await expect(page).toHaveURL(new RegExp(`docs=${b.id}%2C${c.id}`))
-	await expect(page.locator('.drawer--is-open')).toHaveCount(0)
-	await expect(page.locator('.dedupe-merge__head')).toHaveCount(2)
-	await expect(page.locator('.dedupe-merge__head', { hasText: 'Kowalsky' })).toBeVisible()
-})
-
-test('applying merges the whole group, closes its pairs and lands in the history', async ({
-	page,
-	context,
-}) => {
+test('applying merges the whole group and deletes its pairs', async ({ page, context }) => {
 	const [a, b, c] = (await seedGroup(context.request, 'apply')) as [Customer, Customer, Customer]
 	const pairs = (
 		await Promise.all([
@@ -835,248 +664,9 @@ test('applying merges the whole group, closes its pairs and lands in the history
 		expect((await readCustomer(context.request, doc.id, '&trash=true')).doc?.deletedAt).toBeTruthy()
 	}
 	for (const pair of pairs) {
-		const merged = await context.request.get(`/api/dedupe-pairs/${pair}?depth=0`)
-		expect(((await merged.json()) as { status: string }).status).toBe('merged')
+		const gone = await context.request.get(`/api/dedupe-pairs/${pair}?depth=0`)
+		expect(gone.status(), 'the pairs of a merged group are deleted').toBe(404)
 	}
-
-	await page.goto(`${QUEUE_PATH}/merges`)
-	const row = page.locator('.dedupe-merges table tbody tr', { hasText: `${MARK} apply Kowalska` })
-	await expect(row).toContainText('dev@10xmedia.de')
-	await row.locator('a').first().click()
-	await expect(page.locator('.dedupe-record h1')).toHaveText(`Merged into ${MARK} apply Kowalska`)
-
-	// Every document as it was before the merge, the primary first; no column of the result.
-	const heads = page.locator('.dedupe-record__head')
-	await expect(heads).toHaveCount(3)
-	await expect(heads.first()).toContainText('Primary')
-	await expect(heads.first()).toContainText(`${MARK} apply Kowalska`)
-	const cells = (path: string) =>
-		page.locator(`.render-field-diffs__field[data-field-path="${path}"] .dedupe-record__cell`)
-	await expect(cells('note')).toHaveCount(3)
-	// Only what went into the result is marked, in the column it came from; nothing is red.
-	await expect(page.locator('.dedupe-record [data-match-type="delete"]')).toHaveCount(0)
-	await expect(cells('note').nth(0).locator('[data-match-type="create"]')).toHaveText('from A')
-	await expect(cells('note').nth(1).locator('[data-match-type]')).toHaveCount(0)
-	await expect(cells('profile.score').nth(1).locator('[data-match-type="create"]')).toHaveText('9')
-	await expect(cells('profile.score').nth(0).locator('[data-match-type]')).toHaveCount(0)
-	await expect(cells('email').nth(2).locator('[data-match-type="create"]')).toHaveText(
-		'apply.c@e2e.test'
-	)
-	await expect(cells('email').nth(1).locator('[data-match-type]')).toHaveCount(0)
-	// One fill per value: the band over the line or cell, with no second fill on the text.
-	expect(
-		await cells('note')
-			.nth(0)
-			.locator('[data-match-type="create"]')
-			.evaluate((element) => getComputedStyle(element).backgroundColor)
-	).toBe('rgba(0, 0, 0, 0)')
-	// A list the result took whole fills its cell, as a single value does; a list it took part
-	// of marks those items only.
-	await expect(cells('addresses').nth(0)).toHaveClass(/dedupe-record__cell--taken/)
-	await expect(cells('tags').nth(0)).toHaveClass(/dedupe-record__cell--taken/)
-	await expect(cells('tags').nth(1)).not.toHaveClass(/dedupe-record__cell--taken/)
-	// A row of an array is marked line by line, as text is, not as one filled block.
-	await expect(cells('addresses').nth(0).locator('span[data-match-type="create"]')).not.toHaveCount(
-		0
-	)
-	await expect(cells('addresses').nth(0).locator('div[data-match-type]')).toHaveCount(0)
-	// The primary's ID is the one the merge kept.
-	await expect(cells('id')).toHaveCount(3)
-	await expect(cells('id').nth(0).locator('[data-match-type="create"]')).toHaveText(String(a.id))
-
-	// With more than two columns they scroll as on the merge screen.
-	expect(
-		await page
-			.locator('.dedupe-record__compare')
-			.evaluate((element) => element.scrollWidth > element.clientWidth)
-	).toBe(true)
-
-	// The crumbs lead back to the history and name the primary, as a document's page does.
-	const crumbs = page.locator('.step-nav')
-	await expect(crumbs).toContainText('Merge history')
-	await expect(crumbs).toContainText(`${MARK} apply Kowalska`)
-	await expect(crumbs).not.toContainText('Duplicates')
-
-	// Scrolled sideways on a phone, a field's name keeps the page's side margin.
-	await page.setViewportSize({ width: 390, height: 900 })
-	await page.reload()
-	const label = page.locator('.render-field-diffs__field[data-field-path="note"] .field-diff-label')
-	await expect(label).toBeVisible()
-	const before = (await label.boundingBox())?.x ?? 0
-	expect(before, 'the label starts at the side margin').toBeGreaterThan(0)
-	const compare = page.locator('.dedupe-record__compare')
-	await compare.evaluate((element) => {
-		element.scrollLeft = element.scrollWidth
-	})
-	expect(await compare.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0)
-	await expect.poll(async () => (await label.boundingBox())?.x).toBeCloseTo(before, 0)
-	// The sideways scrollbar sits clear of the last field, as on the merge screen.
-	const gap = await compare.evaluate((element) => {
-		const fields = element.querySelectorAll('.render-field-diffs__field')
-		const last = fields[fields.length - 1] as Element
-		return element.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom
-	})
-	expect(gap).toBeGreaterThanOrEqual(8)
-
-	// The primary opens in a drawer, as a document's name does on the merge screen.
-	await page.setViewportSize({ width: 1280, height: 900 })
-	await page.reload()
-	const opener = heads.first().getByRole('button')
-	await expect(opener).toHaveText(`${MARK} apply Kowalska`)
-	await opener.click()
-	await expect(page.locator('.drawer--is-open')).toBeVisible()
-	await page.keyboard.press('Escape')
-	await expect(page.locator('.drawer--is-open')).toHaveCount(0)
-
-	// A merged-in document in the trash opens in a drawer too, read-only, as it is now.
-	await heads
-		.nth(1)
-		.getByRole('button', { name: `${MARK} apply Kowalski` })
-		.click()
-	const drawer = page.locator('.drawer--is-open')
-	await expect(drawer).toBeVisible()
-	await expect(drawer.locator('#field-note')).toHaveValue('from B')
-	await expect(drawer.locator('#field-note')).toBeDisabled()
-})
-
-test('a merged-in document in the trash shows a reader only the fields they may read', async ({
-	browser,
-	context,
-}) => {
-	const [a, b] = (await seedGroup(context.request, 'fieldread', 2)) as [Customer, Customer]
-	await patchCustomer(context.request, b.id, { creditLimit: 5000 })
-	const applied = await context.request.post('/api/dedupe/apply', {
-		data: {
-			collection: 'customers',
-			survivor: a.id,
-			absorbed: [b.id],
-			choices: { 'profile.score': { doc: a.id } },
-		},
-	})
-	expect(applied.status()).toBe(200)
-	const { mergeId } = (await applied.json()) as { mergeId: string }
-	const reader = { email: `limited-${Date.now()}@e2e.test`, password: 'password' }
-	const created = await context.request.post('/api/users', { data: reader })
-	expect(created.ok(), `user failed: ${created.status()}`).toBe(true)
-	const { doc: user } = (await created.json()) as { doc: { id: string } }
-
-	const limited = await browser.newContext()
-	try {
-		const signedIn = await limited.request.post('/api/users/login', { data: reader })
-		expect(signedIn.ok()).toBe(true)
-		const page = await limited.newPage()
-		await page.goto(`${ADMIN_ROUTE}/dedupe/merges/${mergeId}`)
-		const heads = page.locator('.dedupe-record__head')
-		await heads
-			.nth(1)
-			.getByRole('button', { name: `${MARK} fieldread Kowalski` })
-			.click()
-		const drawer = page.locator('.drawer--is-open')
-		await expect(drawer.locator('#field-note')).toHaveValue('from B')
-		await expect(drawer.locator('#field-creditLimit')).toHaveCount(0)
-	} finally {
-		await limited.close()
-		await context.request.delete(`/api/users/${user.id}`)
-	}
-})
-
-test('the record lists a document that pointed at two merged-in documents once', async ({
-	page,
-	context,
-}) => {
-	const [a, b, c] = (await seedGroup(context.request, 'recfriends')) as [
-		Customer,
-		Customer,
-		Customer,
-	]
-	const created = await context.request.post('/api/specimens', {
-		data: { title: `${MARK} record friends`, friends: [b.id, c.id] },
-	})
-	expect(created.ok()).toBe(true)
-	const specimen = ((await created.json()) as { doc: { id: string } }).doc.id
-	try {
-		const applied = await context.request.post('/api/dedupe/apply', {
-			data: {
-				collection: 'customers',
-				survivor: a.id,
-				absorbed: [b.id, c.id],
-				choices: { 'profile.score': { doc: a.id } },
-			},
-		})
-		expect(applied.status()).toBe(200)
-		const { mergeId } = (await applied.json()) as { mergeId: string }
-
-		await page.goto(`${ADMIN_ROUTE}/dedupe/merges/${mergeId}`)
-		const rows = page
-			.locator('.dedupe-related__table', { hasText: 'Specimens · Friends' })
-			.locator('tbody tr', { hasText: `${MARK} record friends` })
-		await expect(rows).toHaveCount(1)
-		await expect(rows).toContainText(String(b.name))
-		await expect(rows).toContainText(String(c.name))
-	} finally {
-		await context.request.delete(`/api/specimens/${specimen}?trash=false`)
-	}
-})
-
-test('a row two documents share is marked in the one it was taken from', async ({
-	page,
-	context,
-}) => {
-	const [a, b] = (await seedGroup(context.request, 'samerow', 2)) as [Customer, Customer]
-	const row = { city: 'Odesa', street: 'Deribasivska 1' }
-	await patchCustomer(context.request, a.id, { addresses: [row] })
-	await patchCustomer(context.request, b.id, { addresses: [row] })
-	const applied = await context.request.post('/api/dedupe/apply', {
-		data: {
-			collection: 'customers',
-			survivor: a.id,
-			absorbed: [b.id],
-			choices: {
-				'profile.score': { doc: a.id },
-				addresses: { items: [{ doc: b.id, index: 0 }] },
-			},
-		},
-	})
-	expect(applied.status()).toBe(200)
-	const { mergeId } = (await applied.json()) as { mergeId: string }
-
-	await page.goto(`${ADMIN_ROUTE}/dedupe/merges/${mergeId}`)
-	await page.locator('#modifiedOnly').uncheck()
-	const cells = page.locator(
-		'.render-field-diffs__field[data-field-path="addresses"] .dedupe-record__cell'
-	)
-	await expect(cells).toHaveCount(2)
-	await expect(cells.nth(1).locator('[data-match-type="create"]')).not.toHaveCount(0)
-	await expect(cells.nth(0).locator('[data-match-type]')).toHaveCount(0)
-})
-
-test('a merged-in document in the trash opens in the language the admin shows', async ({
-	page,
-	context,
-}) => {
-	const [a, b] = (await seedGroup(context.request, 'language', 2)) as [Customer, Customer]
-	await patchCustomer(context.request, b.id, { name: `${MARK} language Kowalski DE`, locale: 'de' })
-	await patchCustomer(context.request, b.id, { profile: { bio: 'English only', score: 9 } })
-	const applied = await context.request.post('/api/dedupe/apply', {
-		data: {
-			collection: 'customers',
-			survivor: a.id,
-			absorbed: [b.id],
-			choices: { 'profile.score': { doc: a.id } },
-		},
-	})
-	expect(applied.status()).toBe(200)
-	const { mergeId } = (await applied.json()) as { mergeId: string }
-
-	await page.goto(`${ADMIN_ROUTE}/dedupe/merges/${mergeId}?locale=de`)
-	await page.locator('.dedupe-record__head').nth(1).locator('.dedupe-record__head-name').click()
-	const drawer = page.locator('.drawer--is-open')
-	await expect(drawer.locator('#field-name')).toHaveValue(`${MARK} language Kowalski DE`)
-	// A field with no German value is empty in German, as on the document's own page. A group
-	// draws its fields once it is in view.
-	await drawer.locator('#field-profile').scrollIntoViewIfNeeded()
-	await expect(drawer.locator('#field-profile__score')).toHaveValue('9')
-	await expect(drawer.locator('#field-profile__bio')).toHaveValue('')
 })
 
 test('a document edited after the plan was built refuses to merge', async ({ page, context }) => {

@@ -6,8 +6,8 @@ import type React from 'react'
 
 /**
  * Copies of admin markup for pieces `@payloadcms/ui` keeps internal: the list header and
- * tabs, the empty-list notice, a table column, a single radio, and a merge icon drawn to the
- * admin icons' conventions; and the page controls wired to the plugin's own navigation. The
+ * tabs, the empty-list notice, a table column and a single radio; and the page controls wired
+ * to the plugin's own navigation. The
  * admin loads that package's whole stylesheet, so the class names alone reproduce the
  * appearance; only the behaviour is the plugin's own. The same approach as folder-picker's
  * `native.tsx`.
@@ -165,21 +165,4 @@ export const Radio = ({ checked, children, className, id, label, name, onChange 
 			<div className="radio-input__label">{children}</div>
 		</div>
 	</label>
-)
-
-/** Two lines joining into one, drawn like the admin's own icons: 20px box, square stroke. */
-export const MergeIcon = () => (
-	<svg
-		aria-hidden="true"
-		className="icon icon--merge"
-		viewBox="0 0 20 20"
-		xmlns="http://www.w3.org/2000/svg"
-	>
-		<path
-			className="stroke"
-			d="M6 4V7.5C6 9.5 10 10 10 12.5M14 4V7.5C14 9.5 10 10 10 12.5M10 12.5V16M7.5 13.5L10 16L12.5 13.5"
-			fill="none"
-			strokeLinecap="square"
-		/>
-	</svg>
 )

@@ -1,7 +1,7 @@
 import type { Access, CollectionConfig, CollectionSlug, PayloadRequest } from 'payload'
 
 import type { DedupeEventSink } from './plugin/events'
-import type { MergeFieldSpec, ReferenceSpec } from './schema/types'
+import type { MergeFieldSpec } from './schema/types'
 import type { DedupeAdapterFactory } from './search/contract'
 import type { TranslationsOption } from './translations'
 
@@ -83,27 +83,12 @@ export type CollectionDedupeOptions = {
 	 * is indexed on every save either way. Default `true` when `match` is set.
 	 */
 	checkOnSave?: boolean
-	/**
-	 * Duplicate warnings on this collection's document form. Both need `match`.
-	 * `sidebar` adds a panel listing saved look-alikes of the values being typed;
-	 * `confirmCreate` asks before creating a document that resembles a saved one.
-	 */
-	form?: { sidebar?: boolean; confirmCreate?: boolean }
-	/**
-	 * Composition seam for the references a merge moves: receives every field in the app
-	 * that points at this collection and returns the list to use. Set `policy: 'keep'` to
-	 * leave one alone, or add `uniquePer` for a rule the schema does not enforce.
-	 */
-	references?: (derived: ReferenceSpec[]) => ReferenceSpec[]
 }
 
 export type DedupeAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 
 /** Receives one of the plugin's collections and returns the collection to register. */
 export type CollectionOverride = (collection: CollectionConfig) => CollectionConfig
-
-/** A sidebar entry's text: a plain string, or a map keyed by admin language. */
-type NavLabel = Record<string, string> | string
 
 export type MultiTenancyOptions = {
 	/**
@@ -183,17 +168,10 @@ export type DedupePluginOptions = {
 	 */
 	scan?: { cron?: string }
 	/**
-	 * Admin view. `false` removes it; the path defaults to `/dedupe`. `navLabel` replaces
-	 * the sidebar entry's text, as a string or a map keyed by admin language. `history`
-	 * adds a sidebar entry for the merge history under the queue's; off by default.
+	 * Admin views of the queue and the merge screen. `false` removes them; the path defaults
+	 * to `/dedupe`. The plugin adds no link to them: place one where the admin needs it.
 	 */
-	view?:
-		| {
-				path?: `/${string}`
-				navLabel?: NavLabel
-				history?: boolean | { navLabel?: NavLabel }
-		  }
-		| false
+	view?: { path?: `/${string}` } | false
 	/**
 	 * Adjust the plugin's own collections (labels, admin, access, extra fields). Hooks
 	 * are refused: the plugin writes these collections through the database layer.
@@ -226,8 +204,6 @@ export type ResolvedCollectionOptions = {
 	absorbed?: 'delete' | 'trash'
 	draft: boolean
 	checkOnSave: boolean
-	form: { sidebar: boolean; confirmCreate: boolean }
-	references?: CollectionDedupeOptions['references']
 }
 
 export type ResolvedOptions = {
@@ -239,9 +215,7 @@ export type ResolvedOptions = {
 	disableJobsQueue: boolean
 	queue: string
 	scanCron: string | null
-	view:
-		| { path: `/${string}`; navLabel?: NavLabel; history: { navLabel?: NavLabel } | false }
-		| false
+	view: { path: `/${string}` } | false
 	overrides: NonNullable<DedupePluginOptions['overrides']>
 	collectionAccess: { read: Access }
 	tenantFieldName: string | null
@@ -342,13 +316,6 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 		if (value === undefined || value === false) continue
 		const opts: CollectionDedupeOptions = value === true ? {} : value
 		const match = resolveMatch(opts.match)
-		const form = {
-			sidebar: opts.form?.sidebar ?? false,
-			confirmCreate: opts.form?.confirmCreate ?? false,
-		}
-		if ((form.sidebar || form.confirmCreate) && !match) {
-			throw new Error(`dedupe: \`form\` on "${slug}" needs a \`match\` config to search with`)
-		}
 		if (opts.adapter && !match) {
 			throw new Error(`dedupe: \`adapter\` on "${slug}" needs a \`match\` config to search with`)
 		}
@@ -360,8 +327,6 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 			absorbed: opts.absorbed,
 			draft: opts.draft ?? false,
 			checkOnSave: opts.checkOnSave ?? match !== null,
-			form,
-			references: opts.references,
 		})
 	}
 	const multiTenancy = options.multiTenancy === true ? {} : options.multiTenancy
@@ -388,14 +353,7 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 		disableJobsQueue: options.disableJobsQueue ?? false,
 		queue: options.queue ?? 'dedupe',
 		scanCron: options.scan?.cron ?? null,
-		view:
-			options.view === false
-				? false
-				: {
-						path: viewPath(options.view?.path),
-						...(options.view?.navLabel !== undefined ? { navLabel: options.view.navLabel } : {}),
-						history: options.view?.history === true ? {} : options.view?.history || false,
-					},
+		view: options.view === false ? false : { path: viewPath(options.view?.path) },
 		overrides: options.overrides ?? {},
 		collectionAccess: { read: options.collectionAccess?.read ?? (() => false) },
 		tenantFieldName: multiTenancy ? (multiTenancy.tenantFieldName ?? 'tenant') : null,

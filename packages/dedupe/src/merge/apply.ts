@@ -20,7 +20,6 @@ import {
 	userRef,
 } from '../plugin/context'
 import { emitEvent } from '../plugin/events'
-import { fileDocument } from '../plugin/registerHooks'
 import { checkDocument } from '../queue/live'
 import { closePairsFor } from '../queue/pairs'
 import { AUTH_FIELDS } from '../schema/deriveSpec'
@@ -44,7 +43,6 @@ import {
 	checkGroup,
 	describeUsers,
 	docAllowed,
-	isLive,
 	type LoadedDoc,
 	loadDoc,
 	loadDocs,
@@ -56,14 +54,6 @@ import {
 	validatesWrite,
 } from './load'
 import { planMerge } from './plan'
-import {
-	applyRepoint,
-	collectionLabel,
-	previewRepoint,
-	type Repointed,
-	type RepointFound,
-	repointRefusal,
-} from './repoint'
 import { releaseUnique } from './unique'
 
 type ApplyMergeArgs = {
@@ -168,37 +158,27 @@ const heldLock = async (
 }
 
 /**
- * Why the merge waits for another editor, or null: one has a document of the group open, or a
- * document whose reference the merge moves. Payload's save would drop their lock, and their
- * next save would bring the old values back.
+ * Why the merge waits for another editor, or null: one has a document of the group open.
+ * Payload's save would drop their lock, and their next save would bring the old values back.
  */
 export const lockRefusal = async (args: {
 	req: PayloadRequest
 	col: CollectionContext
 	docs: LoadedDoc[]
-	references: RepointFound
 }): Promise<string | null> => {
-	const { req, col, docs, references } = args
-	const named = async (by: string | null) =>
-		by ? ((await describeUsers(req, [by])).get(by) ?? by) : 'another user'
-	const own = await heldLock(
+	const { req, col, docs } = args
+	const lock = await heldLock(
 		req,
 		col.slug,
 		docs.map((doc) => doc.id)
 	)
-	if (own) {
-		const doc = docs.find((one) => String(one.id) === own.id)
-		const title = doc ? await readableTitle(req, col, doc) : own.id
-		return `"${title}" is open for editing by ${await named(own.by)}. Merge once they close it.`
-	}
-	for (const { ref, ids } of references) {
-		if (ref.global) continue
-		const lock = await heldLock(req, ref.collection, ids)
-		if (lock) {
-			return `${collectionLabel(req, ref)} ${lock.id}, which points at a document of this merge, is open for editing by ${await named(lock.by)}. Merge once they close it.`
-		}
-	}
-	return null
+	if (!lock) return null
+	const doc = docs.find((one) => String(one.id) === lock.id)
+	const title = doc ? await readableTitle(req, col, doc) : lock.id
+	const by = lock.by
+		? ((await describeUsers(req, [lock.by])).get(lock.by) ?? lock.by)
+		: 'another user'
+	return `"${title}" is open for editing by ${by}. Merge once they close it.`
 }
 
 /** Why the merge may not write a language, by what it would leave empty there; or null. */
@@ -289,8 +269,7 @@ export const removalRefusal = async (args: {
  * and only then do the absorbed documents leave. Any prefix of that sequence leaves every
  * document in place and the record explaining what was attempted. The exception is an
  * absorbed document that can hold neither a placeholder nor an empty value for a unique
- * value the survivor takes: it leaves, references moved first, before the survivor is
- * written.
+ * value the survivor takes: it leaves before the survivor is written.
  */
 export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult> => {
 	const { req, ctx, col, survivorId, absorbedIds, choices, expected } = args
@@ -359,21 +338,7 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		)
 	}
 
-	const repoint = await previewRepoint({
-		req,
-		ctx,
-		col,
-		survivorId: survivor.id,
-		absorbedIds: absorbed.map((doc) => doc.id),
-	})
-	const refusal = repointRefusal(repoint.preview)
-	if (refusal) throw refusal
-	const locked = await lockRefusal({
-		req,
-		col,
-		docs: [survivor, ...absorbed],
-		references: repoint.found,
-	})
+	const locked = await lockRefusal({ req, col, docs: [survivor, ...absorbed] })
 	if (locked) throw new APIError(locked, 409, undefined, true)
 
 	// The fields hidden from the API, which the documents as loaded lack: the rows the survivor
@@ -434,20 +399,6 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 
 	const draft = col.hasDrafts && col.options.draft
 	let mergeId: number | string | null = null
-	// Outside the `try`, so a merge that fails without a transaction still records what moved.
-	let repointed: Repointed = []
-
-	// Before an absorbed document goes: on Postgres a delete takes its relationship rows
-	// with it, and the references would be lost rather than moved.
-	const moveReferences = (from: string[]) =>
-		applyRepoint({
-			req,
-			ctx,
-			col,
-			found: repoint.found.filter((entry) => from.includes(entry.from)),
-			published: repoint.published,
-			survivorId: survivor.id,
-		})
 	const remove = (id: string) =>
 		payload.delete({
 			collection: col.slug,
@@ -477,7 +428,6 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		})
 		mergeId = (merge as { id: number | string }).id
 
-		repointed = await moveReferences(early)
 		for (const id of early) await remove(id)
 		for (const id of late) {
 			// Through the database layer, so the host's hooks never see the placeholder as an
@@ -593,7 +543,6 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 			})
 		}
 
-		repointed.push(...(await moveReferences(late)))
 		for (const id of late) {
 			if (col.options.absorbed === 'trash') {
 				await payload.update({
@@ -621,30 +570,12 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 				await checkDocument({ req, ctx, col, doc: merged })
 			}
 		}
-		// So do the documents moved to it in collections the plugin compares, whose writes
-		// skipped the plugin's hooks: they are filed as a save files them.
-		const moved = new Map<string, [CollectionContext, string]>()
-		for (const { collection, global, ids: written } of repointed) {
-			const other = global ? undefined : ctx.collections.get(collection)
-			if (!other?.options.match || !other.options.checkOnSave) continue
-			for (const id of written) moved.set(`${collection}|${id}`, [other, id])
-		}
-		for (const [other, id] of moved.values()) {
-			const doc = await loadDoc({ req, ctx, col: other, id })
-			if (doc && isLive(other, doc)) await fileDocument({ req, ctx, col: other, doc })
-		}
-		await closePairsFor({
-			req,
-			col,
-			docIds: ids,
-			group: [String(survivor.id), ...ids],
-			mergeId: String(mergeId),
-		})
+		await closePairsFor({ req, col, docIds: ids })
 
 		await payload.db.updateOne({
 			collection: MERGES_SLUG,
 			id: mergeId,
-			data: { status: 'applied', repointed },
+			data: { status: 'applied' },
 			req,
 		})
 
@@ -673,7 +604,6 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 					data: {
 						status: 'failed',
 						error: error instanceof Error ? error.message : String(error),
-						repointed,
 					},
 				})
 				.catch(() => undefined)

@@ -1,7 +1,6 @@
 export type { MatchSignal, SignalKind } from '../match/score'
 export type { ApplyMergeResult } from '../merge/apply'
 export type { DecisionView, DocRef, PlanResponse } from '../merge/planResponse'
-export type { RepointDocRef, Repointed, RepointPreview } from '../merge/repoint'
 export type { UniqueRelease } from '../merge/unique'
 export type {
 	CollectionDedupeOptions,
@@ -26,7 +25,6 @@ export type {
 	MergeDecision,
 	MergeFieldSpec,
 	MergePolicy,
-	ReferenceSpec,
 } from '../schema/types'
 export type {
 	AdapterDoc,

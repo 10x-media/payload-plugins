@@ -15,8 +15,7 @@ import { resolveCompare } from '../match/presets'
 import type { ResolvedMatchField } from '../match/score'
 import type { MatchFieldConfig, ResolvedCollectionOptions, ResolvedOptions } from '../options'
 import { deriveSpec, resolveSpec } from '../schema/deriveSpec'
-import { deriveReferences, resolveReferences } from '../schema/references'
-import type { MergeFieldSpec, ReferenceSpec } from '../schema/types'
+import type { MergeFieldSpec } from '../schema/types'
 import type { DedupeAdapter } from '../search/contract'
 
 export type CollectionContext = {
@@ -35,8 +34,6 @@ export type CollectionContext = {
 	 * tenant field. One that is not is shared by every tenant.
 	 */
 	tenanted: boolean
-	/** Fields elsewhere that point at this collection, moved to the survivor on a merge. */
-	references: ReferenceSpec[]
 	/** Where candidates come from: the collection's own adapter, or the plugin's. */
 	adapter: DedupeAdapter
 }
@@ -197,11 +194,6 @@ const buildCollectionContext = (
 		configHash: hashMatch(options.match?.fields ?? []),
 		hasDrafts: Boolean(config.versions?.drafts),
 		tenanted,
-		references: resolveReferences(
-			deriveReferences(payload.config, options.slug),
-			options.references,
-			options.slug
-		),
 		adapter,
 	}
 }

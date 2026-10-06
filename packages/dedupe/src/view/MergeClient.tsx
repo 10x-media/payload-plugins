@@ -29,7 +29,6 @@ import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { callApi, mergeUrl } from './api'
 import { Matrix } from './Matrix'
-import { movingCount, RelatedDocuments } from './RelatedDocuments'
 import { fieldList, SHORT_DATE } from './Value'
 
 const baseClass = 'dedupe-merge'
@@ -294,9 +293,6 @@ export function MergeClient({
 				: [],
 		[plan, docs]
 	)
-	const blocking =
-		(plan?.references.conflicts.length ?? 0) + (plan?.references.blockers.length ?? 0)
-	const moving = movingCount(plan?.references.entries ?? [])
 	// A document that gives nothing up has nothing to say, and no empty block under the table.
 	const releases = Object.entries(answer?.release ?? {}).filter(
 		([, release]) => release.deletes.length + release.marked.length + release.emptied.length > 0
@@ -429,16 +425,8 @@ export function MergeClient({
 					onSaved={() => void load()}
 					onTakeAll={takeAll}
 					onlyDifferences={onlyDifferences}
-					linked={plan.references.linked}
 					showDiff={showDiff}
 					survivor={survivor}
-				/>
-
-				<RelatedDocuments
-					onChanged={() => void load()}
-					references={plan.references}
-					survivor={survivor}
-					titleOf={titleOf}
 				/>
 
 				{(answer ?? plan).refusal ? (
@@ -498,13 +486,6 @@ export function MergeClient({
 			</div>
 
 			<div className={`${baseClass}__footer`}>
-				<p className={`${baseClass}__stats`}>
-					{[
-						// The table that says what to resolve can be far above the button it disables.
-						...(blocking > 0 ? [t(keys.blocksMerge, { count: String(blocking) })] : []),
-						t(keys.referencesMove, { count: String(moving), title: titleOf(survivor) }),
-					].join(' · ')}
-				</p>
 				{plan.dismissed ? null : (
 					<Button
 						buttonStyle="secondary"

@@ -105,7 +105,7 @@ export type PairView = {
 	signals: { path: string; kind: string }[] | null
 }
 
-const STATUSES = ['open', 'dismissed', 'merged', 'superseded', 'stale']
+const STATUSES = ['open', 'dismissed']
 
 /** The Kyiv office `login` selects, which the queue on screen is filtered by. */
 const kyivId = async (request: APIRequestContext): Promise<string> => {

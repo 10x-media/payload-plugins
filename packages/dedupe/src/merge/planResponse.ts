@@ -39,7 +39,6 @@ import {
 	validatesWrite,
 } from './load'
 import { planMerge } from './plan'
-import { previewRepoint, type RepointPreview } from './repoint'
 import { richTextHTML } from './richText'
 import { releaseUnique, type UniqueRelease } from './unique'
 
@@ -76,8 +75,6 @@ export type PlanResponse = {
 	dismissed: { at: string | null; by: string | null } | null
 	/** Pairs of the group marked not duplicates while the group as a whole is not. */
 	markedApart: { docs: [string, string]; at: string | null; by: string | null }[]
-	/** Documents elsewhere that point at the absorbed ones, and what stops them moving. */
-	references: RepointPreview
 	/**
 	 * What each absorbed document gives up on its way to the trash, by id; empty when the
 	 * collection deletes them anyway.
@@ -228,7 +225,7 @@ const resolveRelationLabels = async (
  * titles of related documents, no values the reader may not read, and, unless `showHidden`,
  * no values of a field the admin hides.
  */
-export const describeDecisions = async (args: {
+const describeDecisions = async (args: {
 	req: PayloadRequest
 	col: CollectionContext
 	decisions: MergeDecision[]
@@ -352,13 +349,6 @@ export const buildPlanResponse = async (args: {
 		similar,
 		validates: validatesWrite(col),
 	})
-	const { preview: references, found } = await previewRepoint({
-		req,
-		ctx,
-		col,
-		survivorId: survivor.id,
-		absorbedIds: absorbed.map((doc) => doc.id),
-	})
 
 	const decisions = await describeDecisions({
 		req,
@@ -426,7 +416,7 @@ export const buildPlanResponse = async (args: {
 	// Not the reviewer's access: an editor holds a document open, or a language would be left
 	// without a value Payload requires there.
 	const blocked =
-		(await lockRefusal({ req, col, docs: [survivor, ...absorbed], references: found })) ??
+		(await lockRefusal({ req, col, docs: [survivor, ...absorbed] })) ??
 		missingRefusal(req, col, plan.missing)
 
 	const ids = [survivor, ...absorbed].map((doc) => doc.id)
@@ -469,8 +459,6 @@ export const buildPlanResponse = async (args: {
 			!survivorDraft &&
 			refusal === null &&
 			blocked === null &&
-			references.conflicts.length === 0 &&
-			references.blockers.length === 0 &&
 			transactions !== 'refused',
 		transactions,
 		dismissed: decided ? { at: decided.decidedAt, by: decider(decided.decidedBy) } : null,
@@ -481,7 +469,6 @@ export const buildPlanResponse = async (args: {
 					at: pair.decidedAt,
 					by: decider(pair.decidedBy),
 				})),
-		references,
 		release,
 		cleared: plan.cleared,
 		survivorDraft,

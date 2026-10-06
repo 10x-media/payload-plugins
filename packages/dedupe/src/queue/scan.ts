@@ -17,7 +17,8 @@ export type ScanSummary = {
 	skippedBuckets: number
 	compared: number
 	pairs: number
-	stale: number
+	/** Open pairs the run did not find again, deleted. */
+	removed: number
 	startedAt: string
 	finishedAt: string
 }
@@ -90,7 +91,7 @@ const createCache = (args: { req: PayloadRequest; ctx: PluginContext; col: Colle
 /**
  * The whole-collection scan. Re-indexes every live document first, so an import that
  * bypassed the hooks and a changed match config are both healed by the run, then walks
- * the buckets and scores each pair once. Pairs the run did not see go stale.
+ * the buckets and scores each pair once. Open pairs the run did not find again are deleted.
  */
 export const runScan = async (args: {
 	req: PayloadRequest
@@ -129,7 +130,7 @@ const scan = async (
 		skippedBuckets: 0,
 		compared: 0,
 		pairs: 0,
-		stale: 0,
+		removed: 0,
 		startedAt,
 		finishedAt: startedAt,
 	}
@@ -167,7 +168,7 @@ const scan = async (
 				summary.compared++
 				const result = scorePair(a, b, col.matchFields)
 				// Most pairs in a bucket are strangers; only a match is worth a look-up. A stored
-				// pair that no longer matches goes stale at the end, as one not seen at all.
+				// pair that no longer matches is deleted at the end, as one not seen at all.
 				if (result.score < match.minScore) continue
 				const row = await upsertPair({
 					req,
@@ -219,17 +220,10 @@ const scan = async (
 			{ or: [{ lastSeenAt: { less_than: seenAt } }, { lastSeenAt: { exists: false } }] },
 		],
 	}
-	// Counted first: Mongo reads the updated rows back with the same filter, which none match any more.
-	summary.stale = (
+	summary.removed = (
 		await req.payload.db.count({ collection: PAIRS_SLUG, where: unseen, req })
 	).totalDocs
-	await req.payload.db.updateMany({
-		collection: PAIRS_SLUG,
-		where: unseen,
-		data: { status: 'stale' },
-		req,
-		returning: false,
-	})
+	await req.payload.db.deleteMany({ collection: PAIRS_SLUG, where: unseen, req })
 	summary.finishedAt = new Date().toISOString()
 	await emitEvent(ctx.options.events, { type: 'scan.finished', collection: col.slug, summary }, req)
 	return summary

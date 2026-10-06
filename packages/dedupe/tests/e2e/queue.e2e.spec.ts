@@ -13,9 +13,6 @@ import {
 	queueTab,
 } from './helpers'
 
-/** The dashboard's cards keep shifting under the nav, so the click starts from a list view. */
-const ADMIN_HOME = '/admin/collections/customers'
-
 test.beforeEach(async ({ context }) => {
 	await login(context)
 	await cleanup(context.request)
@@ -26,48 +23,6 @@ test.afterAll(async ({ browser }) => {
 	await login(context)
 	await cleanup(context.request)
 	await context.close()
-})
-
-test('the sidebar carries the queue and opens it', async ({ page }) => {
-	await page.goto(ADMIN_HOME)
-	await expect(page.locator('.nav--nav-hydrated')).toBeVisible()
-	const link = page.locator('#nav-dedupe')
-	await expect(link).toBeVisible()
-	await expect(link).toHaveText('Duplicates')
-
-	// The main content slides off the nav as it opens and swallows the click until it has,
-	// so wait until the link is the topmost element at its own centre.
-	await expect
-		.poll(
-			() =>
-				page.evaluate(() => {
-					const target = document.querySelector('#nav-dedupe')
-					if (!target) return false
-					const box = target.getBoundingClientRect()
-					const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)
-					return Boolean(top?.closest('#nav-dedupe'))
-				}),
-			{ timeout: 15_000 }
-		)
-		.toBe(true)
-	await link.click()
-	await expect(page).toHaveURL(new RegExp(`${QUEUE_PATH}$`))
-	await expect(page.locator('.dedupe-queue')).toBeVisible()
-})
-
-test('the merge history has its own nav entry, not a button in the queue header', async ({
-	page,
-}) => {
-	await page.goto(QUEUE_PATH)
-	await expect(page.locator('.dedupe-queue')).toBeVisible()
-	await expect(page.locator('.dedupe-queue a', { hasText: 'Merge history' })).toHaveCount(0)
-	const history = page.locator('#nav-dedupe-history')
-	await expect(history).toHaveText('Merge history')
-	await expect(history).toHaveAttribute('href', `${QUEUE_PATH}/merges`)
-
-	await page.goto(`${QUEUE_PATH}/merges`)
-	await expect(page.locator('#nav-dedupe-history .nav__link-indicator')).toBeVisible()
-	await expect(page.locator('#nav-dedupe .nav__link-indicator')).toHaveCount(0)
 })
 
 test('a saved duplicate reaches the queue with its score and signals', async ({
@@ -186,13 +141,10 @@ test('each status tab counts the rows it lists, one per group', async ({ page, c
 	await createCustomer(context.request, b)
 
 	await openQueue(page)
-	await expect(page.locator('.default-list-view-tabs__button')).toHaveCount(5)
+	await expect(page.locator('.default-list-view-tabs__button')).toHaveCount(2)
 	for (const [label, status] of [
 		['Open', 'open'],
 		['Not duplicates', 'dismissed'],
-		['Merged', 'merged'],
-		['Superseded', 'superseded'],
-		['Stale', 'stale'],
 	] as const) {
 		// One page of the largest size holds every row the dev seed and this suite make.
 		await page.goto(`${QUEUE_PATH}?collection=customers&status=${status}&limit=100`)
@@ -221,7 +173,7 @@ test('documents alike in a chain are one row, and it opens them all', async ({ p
 })
 
 test('an empty status says so instead of showing an empty table', async ({ page }) => {
-	await openQueue(page, 'merged')
+	await openQueue(page, 'dismissed')
 	const table = page.locator('.dedupe-queue__table')
 	const message = page.locator('.dedupe-queue__message')
 	if ((await table.count()) === 0) {

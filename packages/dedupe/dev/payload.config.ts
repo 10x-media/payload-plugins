@@ -126,7 +126,6 @@ export default buildConfig({
 						derived.map((spec) =>
 							spec.path === 'profile.score' ? { ...spec, policy: 'manual' } : spec
 						),
-					form: { sidebar: true, confirmCreate: true },
 				},
 				leads: { absorbed: 'delete' },
 				specimens: {
@@ -178,11 +177,9 @@ export default buildConfig({
 							{ path: 'summary', weight: 40, compare: 'text' },
 						],
 					},
-					form: { sidebar: true, confirmCreate: true },
 				},
 			},
 			multiTenancy: { collections: tenantCollections },
-			view: { history: true },
 			...(process.env.DEDUPE_ADAPTER === 'custom' ? { adapter: () => recentAdapter } : {}),
 			...(process.env.DEDUPE_ADAPTER === 'typesense'
 				? {
@@ -207,6 +204,8 @@ export default buildConfig({
 	},
 	typescript: { autoGenerate },
 	admin: {
+		// The plugin adds no link to its views; the host places one, as here.
+		components: { afterNavLinks: ['/components/DedupeNav#DedupeNav'] },
 		// Any browser opens the admin signed in as the seeded admin. Payload applies it to every
 		// request without a token, the API included, so it stays off unless asked for: the e2e
 		// build checks that anonymous requests are refused.

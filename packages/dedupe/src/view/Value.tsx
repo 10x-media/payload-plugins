@@ -51,7 +51,7 @@ export const fieldList = (decisions: DecisionView[], keyList: string[]): string 
 		.join(', ')
 
 /** A value as HTML for the version view's diff, and whether it compares letter by letter. */
-export type Markup = { html: string; byCharacter: boolean }
+type Markup = { html: string; byCharacter: boolean }
 
 /** How the version view marks a value: added, or removed. */
 export type Mark = 'create' | undefined
@@ -80,10 +80,9 @@ const richTextParagraphs = (value: unknown): string[] | null => {
 	return root.children.map(text).filter((line) => line !== '')
 }
 
-/** One entry of a list as the merge screen labels it: a row's label and first text, or a value. */
+/** One entry of a list as the merge screen labels it: a row's label, or a value. */
 export type Entry = {
 	title: string
-	summary: string | null
 	/** A block row's number and type, drawn apart as the blocks field draws them. */
 	block: { number: string; label: string } | null
 }
@@ -250,17 +249,7 @@ export const useFormat = (collection: string) => {
 			field.type === 'blocks'
 				? `${number} · ${blockLabel}`
 				: `${singular ? getTranslation(singular as string, i18n) : label(field)} ${number}`
-		const first = rowFields(field, row).find(
-			(entry) =>
-				['text', 'textarea', 'email'].includes(entry.type) &&
-				typeof row[(entry as Fielded).name] === 'string' &&
-				row[(entry as Fielded).name] !== ''
-		)
-		return {
-			title,
-			summary: first ? String(row[(first as Fielded).name]) : null,
-			block: field.type === 'blocks' ? { number, label: blockLabel } : null,
-		}
+		return { title, block: field.type === 'blocks' ? { number, label: blockLabel } : null }
 	}
 
 	const item = (
@@ -306,7 +295,7 @@ export const useFormat = (collection: string) => {
 		if (field && value !== null && typeof value === 'object') {
 			return entryOf({ field, row: value as Record<string, unknown>, index })
 		}
-		return { title: plainText(item(decision, value, { index })), summary: null, block: null }
+		return { title: plainText(item(decision, value, { index })), block: null }
 	}
 
 	/**

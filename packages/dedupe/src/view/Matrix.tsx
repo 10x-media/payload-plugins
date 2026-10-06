@@ -6,7 +6,6 @@ import { type CSSProperties, memo, useRef } from 'react'
 import { isEmpty, listOf, normalize } from '../merge/compare'
 import { choosable, pickedItems, withChoice } from '../merge/plan'
 import type { DecisionView, DocRef } from '../merge/planResponse'
-import type { LinkedFrom } from '../merge/repoint'
 import type { MergeChoice } from '../schema/types'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
@@ -237,7 +236,6 @@ export const Matrix = ({
 	collection,
 	decisions,
 	docs,
-	linked,
 	onChoose,
 	onMakeSurvivor,
 	onRemove,
@@ -251,8 +249,6 @@ export const Matrix = ({
 	collection: string
 	decisions: DecisionView[]
 	docs: DocRef[]
-	/** The documents that link to each document of the group, by its id. */
-	linked: Record<string, LinkedFrom[]>
 	onChoose: (key: string, choice: MergeChoice | undefined) => void
 	onMakeSurvivor: (doc: string) => void
 	/** Takes a document out of this merge; absent when only two are left. */
@@ -292,7 +288,6 @@ export const Matrix = ({
 						onRemove={onRemove ? () => onRemove(doc.id) : undefined}
 						onSaved={onSaved}
 						onTakeAll={() => onTakeAll(doc.id)}
-						linked={linked[doc.id] ?? []}
 						survivor={doc.id === survivor}
 					/>
 				))}

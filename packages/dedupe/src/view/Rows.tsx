@@ -149,11 +149,6 @@ const RowPick = ({ own }: { own?: ReactNode }) => {
 							entry.title
 						))}
 				</span>
-				{!own && entry.summary ? (
-					<span className={`${baseClass}__row-summary`} title={entry.summary}>
-						{entry.summary}
-					</span>
-				) : null}
 			</span>
 		</span>
 	)
