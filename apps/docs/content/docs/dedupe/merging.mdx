@@ -49,10 +49,11 @@ A localized field is decided per locale. Payload checks every required value of 
 ## Applying
 
 1. The merge is recorded, with a copy of every document.
-2. The merged-in documents give up the unique values the primary takes.
-3. The primary is written.
-4. The merged-in documents are trashed, or deleted with `absorbed: 'delete'`.
-5. The pairs of the merged-in documents are deleted, and the primary is checked for new look-alikes.
+2. `hooks.beforeRemove` runs.
+3. The merged-in documents give up the unique values the primary takes.
+4. The primary is written.
+5. The merged-in documents are trashed, or deleted with `absorbed: 'delete'`.
+6. The pairs of the merged-in documents are deleted, and the primary is checked for new look-alikes.
 
 Without a transaction (MongoDB without a replica set), a failure leaves the steps already done and marks the record failed. `requireTransactions: true` refuses such merges.
 
@@ -86,3 +87,41 @@ The merge does not move references to the merged-in documents. Documents elsewhe
 - with `absorbed: 'delete'`, on MongoDB at a document that no longer exists, and on Postgres nowhere: the delete removes the reference.
 
 A pointer at a document of the same merge is removed from the primary's optional fields, so the primary never points at itself or at a merged-in document.
+
+To move references, use `hooks.beforeRemove`. It runs once per merge, while the merged-in documents still exist, with the merge's `req`: writes through it are part of the merge's transaction, and throwing rolls the merge back where the database opens one. On Postgres it must run before the delete, since the delete removes the references it would move.
+
+```ts title="payload.config.ts"
+dedupe({
+  hooks: {
+    beforeRemove: async ({ req, collection, survivorId, absorbedIds }) => {
+      if (collection !== 'customers') return
+      // One relationship.
+      await req.payload.update({
+        collection: 'orders',
+        where: { customer: { in: absorbedIds } },
+        data: { customer: survivorId },
+        req,
+      })
+      // A `hasMany` list: the merged-in customers give way to the primary, named once.
+      const gone = new Set(absorbedIds.map(String))
+      const { docs } = await req.payload.find({
+        collection: 'trips',
+        where: { participants: { in: absorbedIds } },
+        depth: 0,
+        pagination: false,
+        req,
+      })
+      for (const trip of docs) {
+        const participants = []
+        for (const id of trip.participants ?? []) {
+          const next = gone.has(String(id)) ? survivorId : id
+          if (!participants.some((kept) => String(kept) === String(next))) participants.push(next)
+        }
+        await req.payload.update({ collection: 'trips', id: trip.id, data: { participants }, req })
+      }
+    },
+  },
+})
+```
+
+Move every other field that points at the collection the same way, rich text and JSON included. The dev app runs this example: `packages/dedupe/dev/helpers/repointCustomers.ts`.

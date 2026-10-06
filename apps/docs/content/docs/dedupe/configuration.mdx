@@ -23,6 +23,7 @@ description: Every option of the plugin and its default.
 | `collectionAccess.read` | nobody | REST and GraphQL read access on the plugin's collections. A merge record holds whole copies of the merged-in documents, of every tenant, hidden fields included. |
 | `multiTenancy` | off | `true` or `{ tenantFieldName, collections }`, see below. |
 | `events` | unset | `{ emit(event, req) }`, see below. |
+| `hooks.beforeRemove` | unset | Runs in every merge before the merged-in documents leave, see [References](./merging#references). |
 
 ## Per collection
 

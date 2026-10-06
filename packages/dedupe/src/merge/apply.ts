@@ -428,6 +428,12 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		})
 		mergeId = (merge as { id: number | string }).id
 
+		await ctx.options.hooks.beforeRemove?.({
+			req,
+			collection: col.slug,
+			survivorId: survivor.id,
+			absorbedIds: absorbed.map((doc) => doc.id),
+		})
 		for (const id of early) await remove(id)
 		for (const id of late) {
 			// Through the database layer, so the host's hooks never see the placeholder as an

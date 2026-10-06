@@ -3,11 +3,13 @@ export type { ApplyMergeResult } from '../merge/apply'
 export type { DecisionView, DocRef, PlanResponse } from '../merge/planResponse'
 export type { UniqueRelease } from '../merge/unique'
 export type {
+	BeforeRemoveArgs,
 	CollectionDedupeOptions,
 	CollectionOverride,
 	CompareFn,
 	ComparePreset,
 	DedupeAccess,
+	DedupeHooks,
 	DedupePluginOptions,
 	MatchConfig,
 	MatchFieldConfig,

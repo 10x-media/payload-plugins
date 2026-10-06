@@ -87,6 +87,26 @@ export type CollectionDedupeOptions = {
 
 export type DedupeAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 
+/** What `hooks.beforeRemove` receives. */
+export type BeforeRemoveArgs = {
+	/** The merge's request: writes through it are part of the merge's transaction. */
+	req: PayloadRequest
+	collection: CollectionSlug
+	/** The primary, which the other documents merge into. */
+	survivorId: number | string
+	/** The merged-in documents, all still in the database. */
+	absorbedIds: (number | string)[]
+}
+
+export type DedupeHooks = {
+	/**
+	 * Runs once per merge, before the first merged-in document is trashed or deleted: the place
+	 * to move references to them, which the plugin does not move. Throwing fails the merge, and
+	 * rolls it back where the database opens a transaction.
+	 */
+	beforeRemove?: (args: BeforeRemoveArgs) => Promise<void> | void
+}
+
 /** Receives one of the plugin's collections and returns the collection to register. */
 export type CollectionOverride = (collection: CollectionConfig) => CollectionConfig
 
@@ -193,6 +213,7 @@ export type DedupePluginOptions = {
 	multiTenancy?: MultiTenancyOptions | true
 	/** Receives an event for every pair found or decided, merge applied or failed, and scan finished. */
 	events?: DedupeEventSink
+	hooks?: DedupeHooks
 }
 
 export type ResolvedCollectionOptions = {
@@ -222,6 +243,7 @@ export type ResolvedOptions = {
 	/** The tenant-scoped collections; null to scope every collection with the tenant field. */
 	tenantCollections: string[] | null
 	events: DedupeEventSink | null
+	hooks: DedupeHooks
 	translations?: TranslationsOption
 }
 
@@ -359,6 +381,7 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 		tenantFieldName: multiTenancy ? (multiTenancy.tenantFieldName ?? 'tenant') : null,
 		tenantCollections: multiTenancy?.collections ? Object.keys(multiTenancy.collections) : null,
 		events: options.events ?? null,
+		hooks: options.hooks ?? {},
 		translations: options.translations,
 	}
 }

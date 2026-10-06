@@ -38,6 +38,7 @@ import {
 import { site } from './globals/site'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { recentAdapter } from './helpers/recentAdapter'
+import { repointCustomers } from './helpers/repointCustomers'
 import { DEV_EMAIL, seedDev } from './helpers/seed'
 import { seedShowcase } from './helpers/seedShowcase'
 import { seedStaff } from './helpers/seedStaff'
@@ -190,6 +191,12 @@ export default buildConfig({
 							}),
 					}
 				: {}),
+			// The plugin moves no reference to a merged-in document; the host does, as here.
+			hooks: {
+				beforeRemove: async (args) => {
+					if (args.collection === 'customers') await repointCustomers(args)
+				},
+			},
 			// The dev app runs no job worker, so the check on save and "Scan now" run in the request.
 			disableJobsQueue: true,
 			// The e2e suite reads the pairs back through the REST API.
