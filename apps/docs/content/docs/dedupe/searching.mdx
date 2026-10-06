@@ -67,6 +67,19 @@ dedupe({
 
 Or replace it with your own: `adapter: () => myAdapter`.
 
+A collection can have an adapter of its own. Its factory receives the plugin's adapter, and the adapter it returns is used whole for that collection: a method it lacks is not taken from the plugin's.
+
+```ts
+dedupe({
+  collections: {
+    customers: { match, adapter: () => typesense },
+    products: { match }, // the plugin's adapter, here the keys adapter
+  },
+})
+```
+
+To change one method of the plugin's adapter for a collection, spread it: `adapter: (base) => ({ ...base, findCandidates })`. Keep the methods that read and write one index together, or `findCandidates` searches an index nobody writes.
+
 ## Writing an adapter
 
 Implement `DedupeAdapter` from `@10x-media/dedupe/types`. Only `findCandidates` is required:

@@ -160,11 +160,12 @@ describeForDb('dedupe index', {}, (db) => {
 		const key = Symbol.for('@10x-media/dedupe/context')
 		const host = payload as unknown as Record<symbol, unknown>
 		const before = host[key]
+		const adapters = { plugin: getCollectionContext(payload, 'customers').adapter, own: new Map() }
 		try {
 			const built = buildContext(
 				payload,
 				resolveOptions({ collections: { tickets: true, customers: true } }),
-				getContext(payload).adapter
+				adapters
 			)
 			expect(built.collections.get('tickets')?.options.absorbed).toBe('delete')
 			expect(built.collections.get('customers')?.options.absorbed).toBe('trash')
@@ -172,7 +173,7 @@ describeForDb('dedupe index', {}, (db) => {
 				buildContext(
 					payload,
 					resolveOptions({ collections: { tickets: { absorbed: 'trash' } } }),
-					getContext(payload).adapter
+					adapters
 				)
 			).toThrow(/"tickets" has no trash/)
 		} finally {
@@ -185,10 +186,11 @@ describeForDb('dedupe index', {}, (db) => {
 		const key = Symbol.for('@10x-media/dedupe/context')
 		const host = payload as unknown as Record<symbol, unknown>
 		const before = host[key]
+		const adapters = { plugin: getCollectionContext(payload, 'customers').adapter, own: new Map() }
 		const withMatch = (slug: string, path: string) =>
 			resolveOptions({ collections: { [slug]: { match: { fields: [{ path, weight: 1 }] } } } })
 		const build = (slug: string, path: string) => () =>
-			buildContext(payload, withMatch(slug, path), getContext(payload).adapter)
+			buildContext(payload, withMatch(slug, path), adapters)
 		try {
 			expect(build('accounts', 'phones')).toThrow(/"phones".*rows/)
 			// Rich text is compared by the settings of its nodes, the same in any two documents.

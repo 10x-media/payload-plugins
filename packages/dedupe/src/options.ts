@@ -73,6 +73,11 @@ export type CollectionDedupeOptions = {
 	 * By default the published documents are merged and the result is published.
 	 */
 	draft?: boolean
+	/**
+	 * How candidates are looked for in this collection. Receives the plugin's adapter: return
+	 * it, extend it by spreading, or return an adapter of your own, used whole. Needs `match`.
+	 */
+	adapter?: DedupeAdapterFactory
 	/** Index and check for duplicates on every save. Default `true` when `match` is set. */
 	checkOnSave?: boolean
 	/**
@@ -143,8 +148,9 @@ export type DedupePluginOptions = {
 	/** The most documents one merge takes, the survivor included. Default 5, at least 2. */
 	maxGroupSize?: number
 	/**
-	 * How candidates are looked for. Receives the built-in keys adapter: return it, extend it
-	 * by spreading, or return an adapter of your own. Default: the keys adapter.
+	 * How candidates are looked for, in every collection without an `adapter` of its own.
+	 * Receives the built-in keys adapter: return it, extend it by spreading, or return an
+	 * adapter of your own. Default: the keys adapter.
 	 */
 	adapter?: DedupeAdapterFactory
 	/**
@@ -199,6 +205,7 @@ export type DedupePluginOptions = {
 export type ResolvedCollectionOptions = {
 	slug: CollectionSlug
 	match: Required<MatchConfig> | null
+	adapter?: DedupeAdapterFactory
 	fields?: CollectionDedupeOptions['fields']
 	/** Unset: decided by whether the collection has a trash. */
 	absorbed?: 'delete' | 'trash'
@@ -321,9 +328,13 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 		if ((form.sidebar || form.confirmCreate) && !match) {
 			throw new Error(`dedupe: \`form\` on "${slug}" needs a \`match\` config to search with`)
 		}
+		if (opts.adapter && !match) {
+			throw new Error(`dedupe: \`adapter\` on "${slug}" needs a \`match\` config to search with`)
+		}
 		collections.push({
 			slug: slug as CollectionSlug,
 			match,
+			adapter: opts.adapter,
 			fields: opts.fields,
 			absorbed: opts.absorbed,
 			draft: opts.draft ?? false,

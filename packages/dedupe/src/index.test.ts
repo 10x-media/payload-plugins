@@ -29,6 +29,29 @@ describe('dedupe factory', () => {
 		expect(out.i18n).toBeUndefined()
 	})
 
+	it('registers the keys collection once when the plugin and a collection both extend it', () => {
+		const out = dedupe({
+			adapter: (keys) => ({ ...keys }),
+			collections: {
+				customers: {
+					match: { fields: [{ path: 'email', weight: 1 }] },
+					adapter: (base) => ({ ...base }),
+				},
+			},
+		})(fakeConfig()) as Config
+		expect(out.collections?.filter((collection) => collection.slug === KEYS_SLUG)).toHaveLength(1)
+	})
+
+	it('refuses an adapter without findCandidates, the one method the search calls', () => {
+		const match = { fields: [{ path: 'email', weight: 1 }] }
+		expect(() =>
+			dedupe({ adapter: () => ({}) as never, collections: { customers: { match } } })(fakeConfig())
+		).toThrow(/findCandidates/)
+		expect(() =>
+			dedupe({ collections: { customers: { match, adapter: () => ({}) as never } } })(fakeConfig())
+		).toThrow(/"customers".*findCandidates/)
+	})
+
 	it('applies the translations option', () => {
 		const out = dedupe({ translations: { de: { [keys.pluginName]: 'Beispiel' } } })(
 			fakeConfig()

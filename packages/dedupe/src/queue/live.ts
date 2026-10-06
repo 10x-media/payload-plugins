@@ -32,7 +32,7 @@ const scoreCandidates = async (args: {
 	const match = col.options.match
 	if (!match) return []
 	const self = doc.id === undefined ? null : String(doc.id)
-	const hits = await ctx.adapter.findCandidates({
+	const hits = await col.adapter.findCandidates({
 		req,
 		collection: col.slug,
 		doc,

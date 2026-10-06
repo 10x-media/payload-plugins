@@ -611,13 +611,13 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 			}
 		}
 
-		for (const id of ids) await ctx.adapter.remove?.({ req, collection: col.slug, id })
+		for (const id of ids) await col.adapter.remove?.({ req, collection: col.slug, id })
 		// The survivor now carries values it did not have; indexed again, the next look-alike
 		// is found by them.
 		if (col.options.match) {
 			const merged = await loadDoc({ req, ctx, col, id: survivor.id })
 			if (merged) {
-				await ctx.adapter.index?.({ req, collection: col.slug, doc: merged })
+				await col.adapter.index?.({ req, collection: col.slug, doc: merged })
 				await checkDocument({ req, ctx, col, doc: merged })
 			}
 		}

@@ -134,7 +134,7 @@ const scan = async (
 		finishedAt: startedAt,
 	}
 
-	const { adapter } = ctx
+	const { adapter } = col
 	if (adapter.index) {
 		summary.indexed = await eachDocument(args, async (doc) => {
 			await adapter.index?.({ req, collection: col.slug, doc })

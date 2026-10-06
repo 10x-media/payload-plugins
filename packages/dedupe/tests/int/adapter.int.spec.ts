@@ -3,12 +3,13 @@ import type { CollectionSlug } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { KEYS_SLUG, PAIRS_SLUG } from '../../src/collections/slugs'
+import type { CollectionDedupeOptions } from '../../src/options'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
 import { checkDocument } from '../../src/queue/live'
 import { decidePair, type PairRow } from '../../src/queue/pairs'
 import { runScan } from '../../src/queue/scan'
 import type { DedupeAdapter } from '../../src/search/contract'
-import { bootDedupe, CUSTOMERS } from './fixtures'
+import { bootDedupe, CUSTOMERS, POSTS, pluginOptions } from './fixtures'
 
 /** The adapter seam: an adapter of one method, and the built-in one handed over to extend. */
 describeForDb('dedupe adapter', {}, (db) => {
@@ -167,6 +168,86 @@ describeForDb('dedupe adapter', {}, (db) => {
 			expect(asked).toContain(String(second.id))
 			expect(await fixture.pairsFor(second.id)).toHaveLength(1)
 			expect(await fixture.keysFor(second.id)).not.toHaveLength(0)
+		})
+	})
+
+	describe('an adapter on one collection', () => {
+		let fixture: Awaited<ReturnType<typeof bootDedupe>>
+		let pluginLevel: DedupeAdapter | undefined
+		let handed: DedupeAdapter | undefined
+		const everyone: DedupeAdapter = {
+			findCandidates: async ({ req, collection, doc }) =>
+				(
+					await req.payload.find({
+						collection: collection as CollectionSlug,
+						depth: 0,
+						pagination: false,
+						req,
+					})
+				).docs
+					.filter((other) => String(other.id) !== String(doc.id))
+					.map((other) => ({ id: String(other.id) })),
+		}
+		// Ids repeat across tables in SQL, so a pair is looked up within its collection.
+		const pairsIn = async (target: string, id: number | string) =>
+			(
+				await fixture.booted.payload.db.find({
+					collection: PAIRS_SLUG,
+					where: {
+						and: [
+							{ target: { equals: target } },
+							{ or: [{ docA: { equals: String(id) } }, { docB: { equals: String(id) } }] },
+						],
+					},
+					pagination: false,
+				})
+			).docs
+
+		beforeAll(async () => {
+			fixture = await bootDedupe(db, {
+				adapter: (keys) => {
+					pluginLevel = { ...keys }
+					return pluginLevel
+				},
+				collections: {
+					...pluginOptions.collections,
+					customers: {
+						...(pluginOptions.collections?.customers as CollectionDedupeOptions),
+						adapter: (base) => {
+							handed = base
+							return everyone
+						},
+					},
+				},
+			})
+		})
+
+		afterAll(async () => {
+			await fixture.booted.stop()
+		})
+
+		it("is handed the plugin's adapter to extend", () => {
+			expect(handed).toBe(pluginLevel)
+		})
+
+		it('finds the duplicates of its collection and stores no key for it', async () => {
+			const [a, b] = twins('own')
+			await fixture.customer(a as Record<string, unknown>)
+			const second = await fixture.customer(b as Record<string, unknown>)
+			expect(await pairsIn(CUSTOMERS, second.id)).toHaveLength(1)
+			expect(await fixture.keysFor(second.id, CUSTOMERS)).toEqual([])
+		})
+
+		it("leaves the other collections on the plugin's adapter", async () => {
+			const create = (title: string) =>
+				fixture.booted.payload.create({
+					collection: POSTS,
+					data: { title, _status: 'published' } as never,
+				}) as Promise<{ id: number | string }>
+			const first = await create('Shared Adapter Twin')
+			const second = await create('Shared Adapter Twin')
+			expect(await fixture.keysFor(first.id, POSTS)).not.toEqual([])
+			expect(await pairsIn(POSTS, second.id)).toHaveLength(1)
 		})
 	})
 })

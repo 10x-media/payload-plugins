@@ -64,5 +64,9 @@ export type DedupeAdapter = {
 	register?(config: Config): void
 }
 
-/** Receives the built-in keys adapter: return it, extend it by spreading, or replace it. */
-export type DedupeAdapterFactory = (keys: DedupeAdapter) => DedupeAdapter
+/**
+ * Receives the adapter the level above uses (the built-in keys adapter for the plugin's
+ * `adapter`, the plugin's adapter for a collection's): return it, extend it by spreading, or
+ * replace it.
+ */
+export type DedupeAdapterFactory = (base: DedupeAdapter) => DedupeAdapter

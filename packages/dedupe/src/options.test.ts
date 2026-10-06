@@ -33,6 +33,12 @@ describe('resolveOptions', () => {
 		)
 	})
 
+	it('refuses an adapter on a collection without a match, which never searches', () => {
+		expect(() => resolveOptions({ collections: { leads: { adapter: (base) => base } } })).toThrow(
+			/adapter.*match/
+		)
+	})
+
 	it('fills match defaults and turns the save hook on', () => {
 		const resolved = resolveOptions({
 			collections: { customers: { match: { fields: [{ path: 'email', weight: 1 }] } } },

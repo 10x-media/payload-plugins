@@ -34,11 +34,12 @@ export type CollectionContext = {
 	tenanted: boolean
 	/** Fields elsewhere that point at this collection, moved to the survivor on a merge. */
 	references: ReferenceSpec[]
+	/** Where candidates come from: the collection's own adapter, or the plugin's. */
+	adapter: DedupeAdapter
 }
 
 export type PluginContext = {
 	options: ResolvedOptions
-	adapter: DedupeAdapter
 	collections: Map<string, CollectionContext>
 	/** Host locale codes, or null without localization. */
 	localeCodes: string[] | null
@@ -88,7 +89,7 @@ export const hashMatch = (fields: MatchFieldConfig[]): string => {
 const buildCollectionContext = (
 	payload: Payload,
 	options: ResolvedCollectionOptions,
-	tenantFieldName: string | null
+	{ tenantFieldName, adapter }: { tenantFieldName: string | null; adapter: DedupeAdapter }
 ): CollectionContext => {
 	const collection = payload.collections[options.slug]
 	if (!collection) {
@@ -191,6 +192,7 @@ const buildCollectionContext = (
 			options.references,
 			options.slug
 		),
+		adapter,
 	}
 }
 
@@ -201,7 +203,10 @@ const buildCollectionContext = (
  */
 export const CONTEXT_SOURCE = '@10x-media/dedupe'
 
-type ContextSource = { options: ResolvedOptions; adapter: DedupeAdapter }
+/** The plugin's adapter, and the collections' own by slug. */
+export type Adapters = { plugin: DedupeAdapter; own: ReadonlyMap<string, DedupeAdapter> }
+
+type ContextSource = { options: ResolvedOptions; adapters: Adapters }
 
 /**
  * Runs from `onInit`, after the config is sanitized, so every path is validated at boot; or on
@@ -210,12 +215,11 @@ type ContextSource = { options: ResolvedOptions; adapter: DedupeAdapter }
 export const buildContext = (
 	payload: Payload,
 	options: ResolvedOptions,
-	adapter: DedupeAdapter
+	adapters: Adapters
 ): PluginContext => {
 	const localization = payload.config.localization
 	const context: PluginContext = {
 		options,
-		adapter,
 		collections: new Map(),
 		localeCodes: localization ? localization.localeCodes : null,
 		defaultLocale: localization ? localization.defaultLocale : null,
@@ -225,7 +229,10 @@ export const buildContext = (
 	for (const entry of options.collections) {
 		context.collections.set(
 			entry.slug,
-			buildCollectionContext(payload, entry, options.tenantFieldName)
+			buildCollectionContext(payload, entry, {
+				tenantFieldName: options.tenantFieldName,
+				adapter: adapters.own.get(entry.slug) ?? adapters.plugin,
+			})
 		)
 	}
 	;(payload as unknown as ContextHost)[CONTEXT_KEY] = context
@@ -238,7 +245,7 @@ export const getContext = (payload: Payload): PluginContext => {
 	const source = payload.config.custom?.[CONTEXT_SOURCE] as ContextSource | null | undefined
 	if (source === null) throw new Error('dedupe: the plugin is disabled (`disabled: true`)')
 	if (!source) throw new Error('dedupe: plugin context missing; is the plugin in the config?')
-	return buildContext(payload, source.options, source.adapter)
+	return buildContext(payload, source.options, source.adapters)
 }
 
 /** The configured collections as the queue lists them. */

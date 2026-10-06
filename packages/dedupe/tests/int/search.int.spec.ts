@@ -156,7 +156,7 @@ describeForDb('dedupe search', {}, (db) => {
 			phone: `04411${n}5566`,
 			tenant: 'north',
 		})
-		const adapter = ctx().adapter
+		const adapter = col(CUSTOMERS).adapter
 		const findCandidates = adapter.findCandidates
 		adapter.findCandidates = async () => [{ id: String(north.id) }]
 		try {

@@ -26,7 +26,7 @@ export const fileDocument = async (args: {
 	doc: LoadedDoc
 }): Promise<void> => {
 	const { req, ctx, col, doc } = args
-	await ctx.adapter.index?.({ req, collection: col.slug, doc })
+	await col.adapter.index?.({ req, collection: col.slug, doc })
 	if (ctx.options.disableJobsQueue) {
 		await checkDocument({ req, ctx, col, doc })
 		return
@@ -53,7 +53,7 @@ const afterChange: CollectionAfterChangeHook = async ({ collection, doc, req }) 
 	const saved = doc as LoadedDoc
 	if (saved.deletedAt) {
 		if (col.options.match) {
-			await ctx.adapter.remove?.({ req, collection: col.slug, id: String(saved.id) })
+			await col.adapter.remove?.({ req, collection: col.slug, id: String(saved.id) })
 		}
 		await closePairsFor({
 			req,
@@ -79,7 +79,7 @@ const afterChange: CollectionAfterChangeHook = async ({ collection, doc, req }) 
 			req: localRequest(req),
 		})) as LoadedDoc | null
 		if (!published || !isLive(col, published)) {
-			await ctx.adapter.remove?.({ req, collection: col.slug, id: String(saved.id) })
+			await col.adapter.remove?.({ req, collection: col.slug, id: String(saved.id) })
 		}
 		return doc
 	}
@@ -96,7 +96,7 @@ const afterDelete: CollectionAfterDeleteHook = async ({ collection, id, req }) =
 	const ctx = getContext(req.payload)
 	const col = ctx.collections.get(collection.slug)
 	if (!col) return
-	if (col.options.match) await ctx.adapter.remove?.({ req, collection: col.slug, id: String(id) })
+	if (col.options.match) await col.adapter.remove?.({ req, collection: col.slug, id: String(id) })
 	await closePairsFor({ req, col, docIds: [id], group: null, mergeId: null })
 }
 
