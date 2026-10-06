@@ -18,14 +18,30 @@ import { ru } from '@payloadcms/translations/languages/ru'
 import { uk } from '@payloadcms/translations/languages/uk'
 import { zh } from '@payloadcms/translations/languages/zh'
 import { buildConfig } from 'payload'
-import { collections, globals } from './collections'
+import {
+	articles,
+	companies,
+	customers,
+	leads,
+	media,
+	memberships,
+	notes,
+	orders,
+	products,
+	showcases,
+	specimens,
+	staff,
+	tenants,
+	trips,
+	users,
+} from './collections'
+import { site } from './globals/site'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { recentAdapter } from './helpers/recentAdapter'
 import { DEV_EMAIL, seedDev } from './helpers/seed'
 import { seedShowcase } from './helpers/seedShowcase'
 import { seedStaff } from './helpers/seedStaff'
 import { typesenseAdapter } from './helpers/typesenseAdapter'
-import { showcases } from './showcase'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
@@ -66,8 +82,24 @@ const db =
 export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
-	collections: [...collections, showcases],
-	globals,
+	collections: [
+		users,
+		tenants,
+		companies,
+		customers,
+		leads,
+		articles,
+		orders,
+		memberships,
+		trips,
+		notes,
+		media,
+		specimens,
+		products,
+		staff,
+		showcases,
+	],
+	globals: [site],
 	editor: lexicalEditor(),
 	// Every language the plugin is translated into, to switch between on the account page.
 	i18n: { supportedLanguages: { ar, de, en, es, fr, id, ko, pt, ru, uk, zh } },
