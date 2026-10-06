@@ -1,4 +1,13 @@
-import type { CollectionConfig, Field, TextareaField, TextField } from 'payload'
+import type {
+	CollectionConfig,
+	Field,
+	TextareaField,
+	TextField,
+	TextFieldSingleValidation,
+} from 'payload'
+import { validateMeasurementId } from '../adapters/ga4/measurementId'
+import { validateCurrency } from '../goals/currency'
+import { docScope, type ScopeChange } from '../plugin/scopeChange'
 import { keys, type TranslationKey } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ProviderAccessArgs } from './access'
@@ -15,8 +24,11 @@ export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 	slug: string
 	access?: Partial<CollectionConfig['access']>
 	overrides?: (collection: CollectionConfig) => CollectionConfig
-	/** Called after any change or delete so the per-scope registry cache drops stale adapters. */
-	onChange: () => void
+	/**
+	 * Called after any change or delete with the scopes the write touched, so the per-scope
+	 * registry cache drops stale adapters and the scope's cached reads are retired.
+	 */
+	onChange: (change: ScopeChange) => void | Promise<void>
 	buildSecret: BuildSecretField
 }
 
@@ -37,6 +49,45 @@ const secretField = (
 		label: labelForKey(opts.label),
 		...(opts.width ? { admin: { width: opts.width } } : {}),
 	})
+
+/**
+ * Public capture config: plain text, never a sealed secret, because the tracker config
+ * serves it to the browser. An adapter declares `capture` only when its public field is
+ * filled, so these are what let a provider document fill a capture slot.
+ */
+const captureField = (
+	name: string,
+	label: TranslationKey,
+	opts: { width?: string; validate?: TextFieldSingleValidation } = {}
+): Field => ({
+	name,
+	type: 'text',
+	label: labelForKey(label),
+	...(opts.validate ? { validate: opts.validate } : {}),
+	admin: {
+		description: labelForKey(keys.providerFieldCaptureHelp),
+		...(opts.width ? { width: opts.width } : {}),
+	},
+})
+
+/**
+ * The plugin's own scope field, and only when `scopeField` still names it: a host-owned
+ * field (a tenant plugin's relationship) is the host's to register, and shadowing it with a
+ * hidden text field of another name would store the scope twice.
+ */
+const scopeField = (args: BuildProvidersCollectionArgs): Field[] =>
+	args.scopeField === 'scope'
+		? [
+				{
+					// Written by scoped setups; hidden because single-site installs never touch it.
+					name: 'scope',
+					type: 'text',
+					index: true,
+					label: labelForKey(keys.providerFieldScope),
+					admin: { hidden: true },
+				},
+			]
+		: []
 
 const hostField = (): Field => ({
 	name: 'host',
@@ -66,6 +117,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			singular: labelForKey(keys.providersCollectionSingular),
 			plural: labelForKey(keys.providersCollectionPlural),
 		},
+		disableDuplicate: true,
 		admin: {
 			useAsTitle: 'name',
 			defaultColumns: ['name', 'provider', 'enabled'],
@@ -81,14 +133,19 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 		hooks: {
 			beforeChange: [stampScope(args)],
 			afterChange: [
-				({ doc }) => {
-					args.onChange()
+				async ({ doc, operation, previousDoc }) => {
+					await args.onChange({
+						scope: docScope(doc, args.scopeField),
+						...(operation === 'update'
+							? { previousScope: docScope(previousDoc, args.scopeField) }
+							: {}),
+					})
 					return doc
 				},
 			],
 			afterDelete: [
-				({ doc }) => {
-					args.onChange()
+				async ({ doc }) => {
+					await args.onChange({ scope: docScope(doc, args.scopeField) })
 					return doc
 				},
 			],
@@ -125,15 +182,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 					},
 				],
 			},
-			{
-				// Written by scoped setups (or a tenant plugin's own field via `scopeField`);
-				// hidden because single-site installs never touch it.
-				name: 'scope',
-				type: 'text',
-				index: true,
-				label: labelForKey(keys.providerFieldScope),
-				admin: { hidden: true },
-			},
+			...scopeField(args),
 			providerGroup('plausible', keys.providerNamePlausible, [
 				{
 					type: 'row',
@@ -141,6 +190,19 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 						textField('siteId', keys.providerFieldSiteId, '50%'),
 						...secretField(args, { name: 'apiKey', label: keys.providerFieldApiKey, width: '50%' }),
 					],
+				},
+				{
+					type: 'row',
+					fields: [
+						captureField('domain', keys.providerFieldDomain, { width: '50%' }),
+						captureField('scriptId', keys.providerFieldScriptId, { width: '50%' }),
+					],
+				},
+				{
+					name: 'revenueCurrency',
+					type: 'text',
+					label: labelForKey(keys.providerFieldRevenueCurrency),
+					validate: validateCurrency,
 				},
 				hostField(),
 			]),
@@ -164,6 +226,9 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 					],
 				},
 				textField('clientEmail', keys.providerFieldClientEmail),
+				captureField('measurementId', keys.providerFieldMeasurementId, {
+					validate: validateMeasurementId,
+				}),
 				...args.buildSecret({
 					name: 'privateKey',
 					type: 'textarea',
@@ -176,6 +241,22 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 					fields: [
 						textField('projectId', keys.providerFieldProjectId, '50%'),
 						...secretField(args, { name: 'apiKey', label: keys.providerFieldApiKey, width: '50%' }),
+					],
+				},
+				{
+					type: 'row',
+					fields: [
+						captureField('projectToken', keys.providerFieldProjectToken, { width: '50%' }),
+						{
+							name: 'region',
+							type: 'select',
+							label: labelForKey(keys.providerFieldRegion),
+							options: [
+								{ label: 'US', value: 'us' },
+								{ label: 'EU', value: 'eu' },
+							],
+							admin: { width: '50%' },
+						},
 					],
 				},
 				hostField(),

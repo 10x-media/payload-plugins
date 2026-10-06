@@ -1,12 +1,16 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
+import type { Endpoint } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
+import { REALTIME_PATH } from '../../src/plugin/realtimeEndpoint'
+import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
 interface InspectedField {
 	name?: string
 	type?: string
 	options?: Array<{ value?: string }>
+	admin?: { components?: { Field?: { path?: string } } }
 }
 
 interface RegisteredWidget {
@@ -23,7 +27,7 @@ const registeredWidgets = (booted: BootedPayload): RegisteredWidget[] => {
 	return config.admin?.dashboard?.widgets ?? []
 }
 
-describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics dashboard widgets', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -112,4 +116,67 @@ describeForDb('analytics dashboard widgets', { dbs: ['mongo'] }, (db) => {
 		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
 		expect(fieldNames).toEqual(expect.arrayContaining(['title', 'metric', 'windowMinutes']))
 	})
+
+	it('renders the metric field through MetricSelectField', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
+		const metricField = (widget?.fields ?? []).find((f) => f.name === 'metric')
+		expect(metricField?.admin?.components?.Field?.path).toBe(
+			'@10x-media/analytics/client#MetricSelectField'
+		)
+	})
 })
+
+describeForDb('analytics dashboard widgets, one adapter with providers.collection', {}, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native()], providers: { collection: true } }),
+			db,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('registers the dataSource field even with a single static adapter, because providers.collection makes runtime providers selectable', () => {
+		const widget = registeredWidgets(booted).find((w) => w.slug === 'analytics-metric')
+		const fieldNames = (widget?.fields ?? []).map((f) => f.name).filter(Boolean)
+		expect(fieldNames).toContain('dataSource')
+	})
+})
+
+describeForDb(
+	'analytics dashboard widgets, open-world gating with providers.collection',
+	{},
+	(db) => {
+		let booted: BootedPayload
+
+		beforeAll(async () => {
+			// memoryAdapter has no realtime() method (despite capabilities.realtime: true),
+			// so the endpoint registers here only because providers.collection makes the
+			// gate open-world, not because the config adapter itself qualifies.
+			booted = await bootPayload({
+				plugin: analytics({ adapters: [memoryAdapter()], providers: { collection: true } }),
+				db,
+			})
+		})
+
+		afterAll(async () => {
+			await booted.stop()
+		})
+
+		it('registers the realtime endpoint even though the only config adapter has no realtime handler', () => {
+			const endpoint = (booted.payload.config.endpoints ?? []).find(
+				(e): e is Endpoint => typeof e === 'object' && e.path === REALTIME_PATH
+			)
+			expect(endpoint).toBeDefined()
+		})
+
+		it('registers the realtime widget even though the only config adapter has no realtime handler', () => {
+			const slugs = registeredWidgets(booted).map((w) => w.slug)
+			expect(slugs).toContain('analytics-realtime')
+		})
+	}
+)

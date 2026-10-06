@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { TrendChart } from '../charts/TrendChart'
 import type { RealtimePoint } from './readForWidgetRealtime'
-import { buildPollPath, toRealtimePoints } from './realtimePoll'
+import { buildPollPath, isPollRefusalFinal, toRealtimePoints } from './realtimePoll'
 
 export interface RealtimeCounterProps {
 	endpoint: string
@@ -13,25 +13,46 @@ export interface RealtimeCounterProps {
 	dataSource?: string
 	initialActiveNow: number
 	initialSeries: RealtimePoint[]
+	/** Whether the reading it mounts with hit the source's event scan cap. */
+	initialSampled?: boolean
 	locale: string
 	caption: string
 	pausedLabel: string
+	/** Notice for a sampled reading; without it the counter renders none. */
+	sampledLabel?: string
 }
 
 export function RealtimeCounter(props: RealtimeCounterProps) {
-	const { endpoint, intervalMs, metric, windowMinutes, dataSource, locale, caption, pausedLabel } =
-		props
+	const {
+		endpoint,
+		intervalMs,
+		metric,
+		windowMinutes,
+		dataSource,
+		locale,
+		caption,
+		pausedLabel,
+		sampledLabel,
+	} = props
 	const [activeNow, setActiveNow] = useState(props.initialActiveNow)
 	const [series, setSeries] = useState(props.initialSeries)
+	const [sampled, setSampled] = useState(props.initialSampled === true)
 	const [paused, setPaused] = useState(false)
 
 	useEffect(() => {
 		let cancelled = false
+		let timer: ReturnType<typeof setInterval> | undefined
+		const stop = () => {
+			if (timer !== undefined) clearInterval(timer)
+		}
 		const path = buildPollPath(endpoint, { metric, windowMinutes, dataSource })
 		const tick = async () => {
 			try {
 				const res = await fetch(path, { credentials: 'same-origin' })
 				if (!res.ok) {
+					// A refusal aimed at this reader never becomes an allowance, so repeating it
+					// every few seconds only burns requests; the counter pauses on it either way.
+					if (await isPollRefusalFinal(res)) stop()
 					if (!cancelled) setPaused(true)
 					return
 				}
@@ -39,19 +60,21 @@ export function RealtimeCounter(props: RealtimeCounterProps) {
 					status: string
 					activeNow: number
 					series: RealtimePoint[]
+					sampled?: boolean
 				}
 				if (cancelled || data.status !== 'ok') return
 				setActiveNow(data.activeNow)
 				setSeries(data.series)
+				setSampled(data.sampled === true)
 				setPaused(false)
 			} catch {
 				if (!cancelled) setPaused(true)
 			}
 		}
-		const id = setInterval(tick, intervalMs)
+		timer = setInterval(tick, intervalMs)
 		return () => {
 			cancelled = true
-			clearInterval(id)
+			stop()
 		}
 	}, [endpoint, intervalMs, metric, windowMinutes, dataSource])
 
@@ -72,6 +95,11 @@ export function RealtimeCounter(props: RealtimeCounterProps) {
 			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>
 				{paused ? pausedLabel : caption}
 			</span>
+			{sampled && sampledLabel ? (
+				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
+					{sampledLabel}
+				</span>
+			) : null}
 			<TrendChart buckets={points} ariaLabel={caption} minHeight={120} />
 		</>
 	)

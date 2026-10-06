@@ -1,6 +1,45 @@
 'use client'
 
 export { BarList, type BarListProps } from '../charts/BarList'
-export { TrendChart, type TrendChartProps } from '../charts/TrendChart'
+export { TrendChart, type TrendChartProps, type TrendPoint } from '../charts/TrendChart'
+export {
+	FilterDimensionSelectField,
+	type FilterDimensionSelectFieldProps,
+} from '../fields/config/FilterDimensionSelectField'
+export {
+	FilterOperatorSelectField,
+	type FilterOperatorSelectFieldProps,
+} from '../fields/config/FilterOperatorSelectField'
+export type { WireSource } from '../fields/config/fetchSources'
+export { MetricSelectField, type MetricSelectFieldProps } from '../fields/config/MetricSelectField'
+export { SourceSelectField } from '../fields/config/SourceSelectField'
+export {
+	type AnalyticsSources,
+	useAnalyticsSources,
+} from '../fields/config/useAnalyticsSources'
+export {
+	type FilterCapabilities,
+	useFilterCapabilities,
+} from '../fields/config/useFilterCapabilities'
 export { DateRangeField } from '../fields/dateRange/ui'
+export type { GoalsResponse, WireGoal } from '../goals/fetchGoals'
+export { GoalSelectField } from '../goals/GoalSelectField'
+export { useAnalyticsGoals } from '../goals/useAnalyticsGoals'
+export {
+	type AnalyticsError,
+	type AnalyticsErrorCode,
+	readErrorCode,
+	readResponseError,
+} from '../plugin/errors'
+export {
+	buildQueryUrl,
+	fetchQuery,
+	QueryFetchError,
+	type QueryRequest,
+	type RefreshRequest,
+	type RefreshResponse,
+	refreshCache,
+} from '../query/fetchQuery'
+export { AnalyticsNavLink, type AnalyticsNavLinkProps } from '../view/AnalyticsNavLink'
+export { AnalyticsViewClient } from '../view/AnalyticsViewClient'
 export { RealtimeCounter } from '../widgets/RealtimeCounter'

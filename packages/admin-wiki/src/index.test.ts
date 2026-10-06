@@ -84,6 +84,23 @@ describe('adminWiki factory', () => {
 		})
 	})
 
+	it('registers block, inline block and converter modules as import map dependencies', () => {
+		const out = adminWiki({
+			editor: {
+				blocks: [{ block: { slug: 'tip', fields: [] }, component: '/components/Tip#Tip' }],
+				converters: '/wiki/converters#wikiConverters',
+				inlineBlocks: [{ block: { slug: 'chip', fields: [] }, component: '/components/Chip#Chip' }],
+			},
+		})(fakeConfig()) as Config
+		// Converters register as Payload's `function` kind, not `component`: the
+		// generator emits the same import, but they are never rendered.
+		expect(Object.values(out.admin?.dependencies ?? {})).toEqual([
+			{ path: '/components/Tip#Tip', type: 'component' },
+			{ path: '/components/Chip#Chip', type: 'component' },
+			{ path: '/wiki/converters#wikiConverters', type: 'function' },
+		])
+	})
+
 	it('offers only covered entities in the collection and global target pickers', () => {
 		const cfg = {
 			collections: [

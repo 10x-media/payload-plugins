@@ -1,0 +1,116 @@
+---
+title: Quick start
+description: Install the plugin, audit your first collection, and find the entries it writes.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/audit-logs
+```
+
+## Configure
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { auditLogs } from '@10x-media/audit-logs'
+
+export default buildConfig({
+  // ...
+  plugins: [
+    auditLogs({
+      collections: {
+        posts: true,
+      },
+    }),
+  ],
+})
+```
+
+`true` turns on both features with defaults: `createdBy` and `lastModifiedBy` fields, plus a log entry for every create, update and delete. Use an object to enable only one of them.
+
+Then regenerate the import map, which is how Payload resolves the plugin's admin components:
+
+```bash
+payload generate:importmap
+```
+
+## Verify
+
+Open a `posts` document. Two read-only relationship fields appear, `Created By` and `Last Modified By`, both stamped with your user.
+
+Change the title and save. Open `/admin/audit-logs`: one row for the create, one for the update. Expand the update and the diff shows `title` with its before and after value, and nothing else.
+
+## Scope it
+
+Auditing is opt-in per collection, and each collection picks which half it wants:
+
+```ts title="payload.config.ts"
+auditLogs({
+  collections: {
+    // Both features, defaults for each.
+    posts: true,
+
+    // Log only. No extra columns on the document.
+    orders: { auditLog: true },
+
+    // Fields only. No log entries.
+    pages: { auditFields: true },
+
+    // Log, narrowed.
+    products: {
+      auditLog: {
+        operations: ['update', 'delete'],
+        excludeFields: ['searchIndex', 'lastSyncedAt'],
+        snapshotOnDelete: true,
+      },
+    },
+  },
+  globals: {
+    'site-settings': true,
+  },
+})
+```
+
+A collection you never list is not audited at all, auth collections included. Logins and password resets are opted into on the collection itself:
+
+```ts title="payload.config.ts"
+auditLogs({
+  collections: {
+    admins: { auth: true },                            // both events
+    editors: { auth: { login: true } },                // logins only
+    customers: { auditLog: true },                     // no auth events
+  },
+})
+```
+
+## Keep it from growing forever
+
+Every write to an audited collection writes a row. Before enabling this on anything busy, decide what happens to old entries:
+
+```ts title="payload.config.ts"
+auditLogs({
+  collections: { posts: true },
+  retention: {
+    deleteCron: '0 3 1 * *',
+    archive: {
+      cron: '0 2 * * 0',
+      uploadCollection: 'media',
+    },
+  },
+})
+```
+
+The plugin registers the two tasks but does not run them. You still need a job runner on the same queue. See [data retention](/audit-logs/data-retention).
+
+## If nothing is logged
+
+Four things account for almost every case.
+
+**The collection is not listed.** `collections` is opt-in, unlike most plugins in this collection.
+
+**Nothing actually changed.** An update whose diff is empty writes no entry, which includes a save where the only changed fields are in `excludeFields`.
+
+**`operations` excludes it.** `operations: ['update']` means creates and deletes are not logged.
+
+**The import map is stale.** That does not stop entries being written, but it does leave `/admin/audit-logs` blank. Run `payload generate:importmap`.

@@ -4,6 +4,7 @@ import type { CalcResolved } from '../calc/evaluate'
 import { evaluateCondition } from '../conditions/evaluate'
 import type { ConsentProof, ConsentSnapshotMode } from '../consent/captureConsent'
 import { captureConsent } from '../consent/captureConsent'
+import { consentDisplayOf } from '../consent/effectiveStatement'
 import type { ConsentSourceEntry } from '../consent/types'
 import { isNamedField } from '../fields/fieldKey'
 import type { FieldTypeRegistry } from '../fields/registry'
@@ -191,12 +192,19 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		const raw = incoming.get(instance.name)
 		// A consent field's "not agreed" state is semantically meaningful: treat a missing value as
 		// `false` so the intrinsic validate can enforce required-agreement (not optional = must be true).
+		// A notice-display consent is instead `true` no matter what came in, because submitting is the
+		// agreement; the client seeds the same (`seedFieldValues`), so conditions and calc evaluate it
+		// identically on both engines even for a raw REST client that omitted the field.
 		// A repeater with no rows is coerced to [] so validate() can check minRows. The empty-guard
 		// below must not skip repeaters: isEmpty([]) is true, but [] still needs to reach validate()
 		// so a minRows > 0 constraint correctly rejects a zero-row submission.
 		const effectiveRaw =
-			instance.blockType === 'consent' && isEmpty(raw)
-				? false
+			instance.blockType === 'consent'
+				? consentDisplayOf(instance) === 'notice'
+					? true
+					: isEmpty(raw)
+						? false
+						: raw
 				: instance.blockType === 'repeater' && isEmpty(raw)
 					? []
 					: raw
@@ -316,7 +324,9 @@ export const runSubmission = async (input: RunSubmissionInput): Promise<RunSubmi
 		if (instance.blockType === 'consent' && payload) {
 			const proof = await captureConsent({
 				field: instance,
-				agreed: value === true,
+				// A notice display has no control: submitting is the consent, so the server records
+				// agreement regardless of what the client sent.
+				agreed: consentDisplayOf(instance) === 'notice' ? true : value === true,
 				entries: consentEntries ?? [],
 				payload,
 				req,

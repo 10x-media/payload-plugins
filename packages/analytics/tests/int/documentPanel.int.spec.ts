@@ -5,6 +5,7 @@ import { readForField } from '../../src/fields/readForDocument'
 import { analytics } from '../../src/index'
 import { flushBatch } from '../../src/native/ingest/flushBatch'
 import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
+import { CHANNEL_TAXONOMY_VERSION } from '../../src/native/ingest/source'
 import { native } from '../../src/native/nativeAdapter'
 import { DOCUMENT_PATH } from '../../src/plugin/paths'
 
@@ -22,9 +23,11 @@ const pageview = (daysAgo: number, visitor: string): StoredEvent => ({
 	visitorHash: visitor,
 	sessionId: `${visitor}-s`,
 	durationMs: 30_000,
+	channel: 'direct',
+	channelVersion: CHANNEL_TAXONOMY_VERSION,
 })
 
-describeForDb('document analytics endpoint', { dbs: ['mongo'] }, (db) => {
+describeForDb('document analytics endpoint', {}, (db) => {
 	let booted: BootedPayload
 	let pageId: string
 	const fakeUser = { id: 'test-user', collection: 'users' } as unknown as TypedUser
@@ -80,6 +83,16 @@ describeForDb('document analytics endpoint', { dbs: ['mongo'] }, (db) => {
 	it(`rejects anonymous requests on ${db}`, async () => {
 		const res = await call(`collection=pages&id=${pageId}`)
 		expect(res.status).toBe(401)
+	})
+
+	// The numbers are the caller's own document's, so no shared cache may hold them.
+	it(`never lets a shared cache hold a reading on ${db}`, async () => {
+		const res = await call(
+			`collection=pages&id=${pageId}&timeframe=last7days&metrics=pageviews`,
+			fakeUser
+		)
+		expect(res.status).toBe(200)
+		expect(res.headers.get('cache-control')).toBe('private, no-store')
 	})
 
 	it(`returns 404 for an unbound collection on ${db}`, async () => {

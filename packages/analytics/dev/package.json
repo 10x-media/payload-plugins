@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/analytics-dev",
-	"version": "0.0.1-beta.3",
+	"version": "0.0.1-beta.11",
 	"private": true,
 	"type": "module",
 	"scripts": {
@@ -33,6 +33,7 @@
 	"devDependencies": {
 		"@10x-media/fields": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
+		"@payloadcms/plugin-multi-tenant": "3.85.0",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",

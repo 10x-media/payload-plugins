@@ -1,0 +1,268 @@
+'use client'
+
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { MetricKey } from '../core/contract'
+import { refreshCache } from '../query/fetchQuery'
+import { MAX_QUERY_FILTERS } from '../query/limits'
+import { keys } from '../translations/keys'
+import { useTranslation } from '../translations/useTranslation'
+import { dayRangeCaption } from './dayRange'
+import { autoGranularity, gate, resolveSource } from './gating'
+import { Breakdowns } from './sections/Breakdowns'
+import { NoSources } from './sections/EmptyStates'
+import { GoalsPanel } from './sections/GoalsPanel'
+import { OverviewCards } from './sections/OverviewCards'
+import { RealtimeStrip } from './sections/RealtimeStrip'
+import { ViewStyles } from './sections/styles'
+import { Toolbar } from './sections/Toolbar'
+import { Trend } from './sections/Trend'
+import { coerceState, parseViewState, rangeFor, serializeViewState, type ViewState } from './state'
+import { useViewQueries } from './useViewQueries'
+import type { AnalyticsViewClientProps } from './viewProps'
+
+/** A day input fires on every keystroke; only the pause between them is worth a history entry. */
+const COMMIT_DELAY_MS = 400
+
+/**
+ * The analytics dashboard. Its whole state is the URL, so a link is a view: the query
+ * string is parsed on every render, coerced to what the selected source serves, and
+ * written back through `router.push` as the reader works (a debounced day edit uses
+ * `replace`, so Back skips the typing). A coerced value is applied to
+ * the reads but deliberately not written back, so a link built for a richer source still
+ * opens as intended once that source is selected again.
+ */
+export function AnalyticsViewClient(props: AnalyticsViewClientProps) {
+	const { t } = useTranslation()
+	const router = useRouter()
+	const pathname = usePathname()
+	const searchParams = useSearchParams()
+	const search = searchParams.toString()
+
+	const parsed = useMemo(
+		() => parseViewState(new URLSearchParams(search), props.defaults),
+		[search, props.defaults]
+	)
+	const source = resolveSource(props.sources, parsed.source)
+	const served = useMemo(() => (source ? gate(source.capabilities) : null), [source])
+	const state = served ? coerceState(parsed, served) : parsed
+	const queries = useViewQueries(props, state)
+
+	const query = useCallback(
+		(next: ViewState) => serializeViewState(next, props.defaults).toString(),
+		[props.defaults]
+	)
+
+	const href = useCallback(
+		(next: ViewState) => {
+			const search = query(next)
+			return search === '' ? pathname : `${pathname}?${search}`
+		},
+		[pathname, query]
+	)
+
+	const pending = useRef<ReturnType<typeof setTimeout> | null>(null)
+	const refreshing = useRef<AbortController | null>(null)
+	const [refreshPending, setRefreshPending] = useState(false)
+	const [refreshFailed, setRefreshFailed] = useState(false)
+
+	/**
+	 * Retires this scope's cached reads, then reissues every section against the new epoch.
+	 * The realtime strip is left alone: it polls its own short-lived window and never reads
+	 * through the aggregate cache the epoch keys. Starting an attempt clears the previous
+	 * failure notice, so the notice always describes the attempt that is in flight.
+	 */
+	const refreshCards = queries.cards.refetch
+	const refreshTrend = queries.trend.refetch
+	const refreshBreakdown = queries.breakdown.refetch
+	const refreshGoals = queries.goals?.refetch
+	const refresh = useCallback((): void => {
+		if (refreshPending) {
+			return
+		}
+		const controller = new AbortController()
+		refreshing.current = controller
+		setRefreshPending(true)
+		setRefreshFailed(false)
+		refreshCache(props.apiRoute, { signal: controller.signal }).then(
+			() => {
+				if (controller.signal.aborted) return
+				setRefreshPending(false)
+				refreshCards()
+				refreshTrend()
+				refreshBreakdown()
+				refreshGoals?.()
+			},
+			() => {
+				if (controller.signal.aborted) return
+				setRefreshPending(false)
+				setRefreshFailed(true)
+			}
+		)
+	}, [props.apiRoute, refreshPending, refreshCards, refreshTrend, refreshBreakdown, refreshGoals])
+
+	/**
+	 * A click is a step the reader took, so Back undoes it rather than leaving the view. It
+	 * also drops any day edit still waiting out its debounce, whose later `replace` would
+	 * otherwise overwrite the click with the state as it stood before it.
+	 */
+	const write = useCallback(
+		(next: ViewState) => {
+			if (pending.current !== null) {
+				clearTimeout(pending.current)
+				pending.current = null
+			}
+			router.push(href(next), { scroll: false })
+		},
+		[router, href]
+	)
+
+	/**
+	 * Typing in a day input is one edit, not a history of them: the committed value replaces
+	 * the entry the picker already wrote rather than stacking one per keystroke pause.
+	 */
+	const writeLater = useCallback(
+		(next: ViewState) => {
+			if (pending.current !== null) {
+				clearTimeout(pending.current)
+			}
+			pending.current = setTimeout(() => {
+				pending.current = null
+				router.replace(href(next), { scroll: false })
+			}, COMMIT_DELAY_MS)
+		},
+		[router, href]
+	)
+	useEffect(
+		() => () => {
+			if (pending.current !== null) {
+				clearTimeout(pending.current)
+			}
+			refreshing.current?.abort()
+		},
+		[]
+	)
+
+	if (!source || !served) {
+		return (
+			<div className="analytics-view">
+				<ViewStyles />
+				<h1 className="analytics-view__title">{t(keys.viewTitle)}</h1>
+				<NoSources />
+			</div>
+		)
+	}
+
+	const now = new Date()
+	const range = rangeFor(state, props.timezone, now)
+	const sections = [
+		queries.cards,
+		queries.trend,
+		queries.breakdown,
+		...(queries.goals ? [queries.goals] : []),
+	]
+	// Whichever section has answered names the source that answered it; every section reads
+	// through the same one.
+	const provider = sections.find((section) => section.data)?.data?.result.meta.provider ?? ''
+	const dimensions = served.dimensionsFor(state.tab)
+	const dimension = state.dim ?? dimensions[0] ?? null
+	const canFilter = dimension !== null && served.canFilter(dimension)
+
+	const addFilter = (value: string): void => {
+		if (dimension === null || state.filters.length >= MAX_QUERY_FILTERS) {
+			return
+		}
+		const already = state.filters.some(
+			(filter) =>
+				filter.dimension === dimension && filter.operator === 'eq' && filter.value === value
+		)
+		if (already) {
+			return
+		}
+		write({
+			...state,
+			filters: [...state.filters, { dimension, operator: 'eq', value }],
+		})
+	}
+
+	return (
+		<div className="analytics-view">
+			<ViewStyles />
+			<h1 className="analytics-view__title">{t(keys.viewTitle)}</h1>
+			<Toolbar
+				clamped={sections.some((section) => section.data?.result.meta.clamped === true)}
+				filtersUnapplied={sections.some(
+					(section) => (section.data?.result.meta.unappliedFilters?.length ?? 0) > 0
+				)}
+				gate={served}
+				locale={props.locale}
+				now={now}
+				onChange={write}
+				onChangeDeferred={writeLater}
+				onRefresh={refresh}
+				provider={provider}
+				range={range}
+				refreshFailed={refreshFailed}
+				refreshing={refreshPending}
+				sampled={sections.some((section) => section.data?.result.meta.sampled === true)}
+				sourceId={source.id}
+				sources={props.sources.sources}
+				stale={sections.some((section) => section.data?.result.meta.stale === true)}
+				state={state}
+				stateKey={query(state)}
+				timezone={props.timezone}
+			/>
+			<OverviewCards
+				compare={state.compare}
+				locale={props.locale}
+				metrics={served.metrics}
+				onSelect={(metric: MetricKey) => write({ ...state, metric })}
+				query={queries.cards}
+				selected={state.metric}
+			/>
+			<Trend
+				compare={state.compare}
+				granularity={state.granularity ?? autoGranularity(range, source.capabilities)}
+				locale={props.locale}
+				metric={state.metric}
+				query={queries.trend}
+				rangeCaption={dayRangeCaption(range, props.locale, props.timezone)}
+				timezone={props.timezone}
+			/>
+			<Breakdowns
+				canFilter={canFilter}
+				dimension={dimension}
+				dimensions={dimensions}
+				limit={state.limit}
+				locale={props.locale}
+				metric={state.metric}
+				// The tab's default is its absence, so picking it back writes a link without `dim`.
+				onDimensionChange={(dim) =>
+					write({ ...state, dim: dim === dimensions[0] ? undefined : dim })
+				}
+				onLimitChange={(limit) => write({ ...state, limit })}
+				onRowSelect={addFilter}
+				onSortChange={(order) => write({ ...state, order })}
+				// A grouping belongs to the tab that offered it, so a new tab starts on its own default.
+				onTabChange={(tab) => write({ ...state, tab, dim: undefined })}
+				{...(state.order === undefined ? {} : { order: state.order })}
+				query={queries.breakdown}
+				tab={state.tab}
+				tabs={served.tabs}
+			/>
+			{served.goals && queries.goals ? (
+				<GoalsPanel
+					goals={props.goals}
+					locale={props.locale}
+					query={queries.goals}
+					{...(queries.cards.data?.result.totals?.visitors === undefined
+						? {}
+						: { siteVisitors: queries.cards.data.result.totals.visitors })}
+				/>
+			) : null}
+			{served.realtime ? (
+				<RealtimeStrip apiRoute={props.apiRoute} locale={props.locale} sourceId={source.id} />
+			) : null}
+		</div>
+	)
+}

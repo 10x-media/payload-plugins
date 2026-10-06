@@ -1,3 +1,4 @@
+import type { DimensionKey } from '../../core/contract'
 import { startOfDayInTz } from '../../timeframe/tz'
 import type { StoredEvent } from '../ingest/normalizeEvent'
 
@@ -7,6 +8,8 @@ export interface RollupKey {
 	path: string
 	dimension: string
 	dimvalue: string
+	/** '' is the hostname-less bucket family; a real hostname is its own family. */
+	hostname: string
 	/** Present only in scoped installs, where it is part of the unique bucket. */
 	scope?: string
 }
@@ -18,42 +21,132 @@ export type RollupMetric =
 	| 'samples'
 	| 'visitors'
 	| 'sessions'
+	| 'conversions'
+	| 'revenue'
+	| 'scrollDepthSum'
+	| 'scrollSamples'
+
+/**
+ * `samples` counts every event in the bucket, so it cannot be the scroll-depth denominator:
+ * `scrollSamples` counts only the pageviews that actually reported a depth, which is what
+ * keeps the `scrollDepth` average honest when the tracker never got to send one.
+ */
+export type RollupInc = {
+	pageviews: number
+	events: number
+	durationMs: number
+	samples: number
+	conversions: number
+	revenue: number
+	scrollDepthSum: number
+	scrollSamples: number
+}
 
 export interface RollupDelta {
 	key: RollupKey
-	inc: { pageviews: number; events: number; durationMs: number; samples: number }
+	inc: RollupInc
 }
 
+/**
+ * Every dimension whose bucket value is a stored string field, and the field it reads. A
+ * dimension the event carries no value for emits no bucket at all, so an unattributed hit
+ * never lands in an "unknown" row. `referrer` reads the host derived at ingest, the same
+ * field the raw-event read path groups and filters on.
+ */
+const DIMENSION_FIELDS: ReadonlyArray<
+	readonly [dimension: DimensionKey, field: keyof StoredEvent]
+> = [
+	['country', 'country'],
+	['region', 'region'],
+	['city', 'city'],
+	['device', 'device'],
+	['browser', 'browser'],
+	['os', 'os'],
+	['language', 'language'],
+	['source', 'source'],
+	['channel', 'channel'],
+	['referrer', 'referrerHost'],
+	['utmSource', 'utmSource'],
+	['utmMedium', 'utmMedium'],
+	['utmCampaign', 'utmCampaign'],
+	['utmContent', 'utmContent'],
+	['utmTerm', 'utmTerm'],
+]
+
+/**
+ * Distinct metrics (visitors, sessions) are exact per bucket and must never be summed
+ * across buckets, so an unfiltered read has to hit its own exact family rather than
+ * derive from a hostname-scoped one (or vice versa). Every bucket is therefore emitted
+ * twice when a hostname is present: once in the hostname-less ('') family that unfiltered
+ * reads use, and once more in the exact-hostname family that a hostname-scoped read uses.
+ * Both families stay per-bucket exact at the cost of one extra bucket set per distinct
+ * hostname a site sees.
+ *
+ * Goal completions add one `('', 'goal', slug)` bucket each, carrying that goal's own single
+ * conversion, while every other bucket carries the event's whole conversion count, so a
+ * site-wide or per-page total never has to scan the goal buckets.
+ */
 export function computeRollupDeltas(event: StoredEvent): RollupDelta[] {
 	// Bucket into the event's reporting-timezone day (UTC when unset), fixing the day
 	// boundary at ingest. Existing rollups are not re-bucketed if the timezone changes.
 	const period = startOfDayInTz(event.timestamp, event.timezone)
-	const inc = {
+	const completions = event.goals ?? []
+	const reportedDepth = event.scrollDepth !== undefined
+	const inc: RollupInc = {
 		pageviews: event.type === 'pageview' ? 1 : 0,
-		events: event.type === 'event' ? 1 : 0,
+		// A `goal` event is a non-pageview hit like a custom event; it stays out of the
+		// `event` dimension breakdown, which reports named custom events only.
+		events: event.type === 'pageview' ? 0 : 1,
 		durationMs: event.durationMs ?? 0,
 		samples: 1,
+		conversions: completions.length,
+		revenue: completions.reduce((sum, goal) => sum + goal.value, 0),
+		scrollDepthSum: reportedDepth ? (event.scrollDepth ?? 0) : 0,
+		scrollSamples: reportedDepth ? 1 : 0,
 	}
-	const make = (path: string, dimension: string, dimvalue: string): RollupDelta => ({
+	const make = (
+		bucket: [path: string, dimension: string, dimvalue: string],
+		hostname: string,
+		over?: Partial<RollupInc>
+	): RollupDelta => ({
 		key: {
 			granularity: 'day',
 			period,
-			path,
-			dimension,
-			dimvalue,
+			path: bucket[0],
+			dimension: bucket[1],
+			dimvalue: bucket[2],
+			hostname,
 			...(event.scope !== undefined ? { scope: event.scope } : {}),
 		},
-		inc: { ...inc },
+		inc: { ...inc, ...over },
 	})
-	const deltas: RollupDelta[] = [make(event.path, '', ''), make('', '', '')]
-	if (event.country) {
-		deltas.push(make('', 'country', event.country))
+	const buckets: Array<[path: string, dimension: string, dimvalue: string]> = [
+		[event.path, '', ''],
+		['', '', ''],
+	]
+	if (event.type === 'event' && event.name) {
+		buckets.push(['', 'event', event.name])
 	}
-	if (event.device) {
-		deltas.push(make('', 'device', event.device))
+	for (const [dimension, field] of DIMENSION_FIELDS) {
+		const value = event[field]
+		if (typeof value === 'string' && value) {
+			buckets.push(['', dimension, value])
+		}
 	}
-	if (event.source) {
-		deltas.push(make('', 'source', event.source))
+	const families = event.hostname ? ['', event.hostname] : ['']
+	const deltas: RollupDelta[] = []
+	for (const hostname of families) {
+		deltas.push(...buckets.map((bucket) => make(bucket, hostname)))
+	}
+	for (const hostname of families) {
+		for (const completion of completions) {
+			deltas.push(
+				make(['', 'goal', completion.slug], hostname, {
+					conversions: 1,
+					revenue: completion.value,
+				})
+			)
+		}
 	}
 	return deltas
 }

@@ -24,7 +24,7 @@ export default buildConfig({
 
 `@10x-media/folder-picker/i18n` exports `keys`, the built-in `translations`, and the `TranslationKey` / `TranslationsOption` types. Misspell a key and the build fails.
 
-The plugin ships English, German and Ukrainian. A locale the host serves without a matching bundle falls back to English, so add it through `translations` above rather than waiting for the plugin to grow one.
+The plugin ships several locales. For a locale it does not ship, Payload renders the raw keys rather than English, so add it through `translations` above rather than waiting for the plugin to grow one.
 
 ## Everything else is Payload's
 

@@ -1,0 +1,9 @@
+.document-preview-icon {
+	height: calc(var(--base) * 0.9);
+	width: calc(var(--base) * 0.9);
+}
+
+.document-preview-inline {
+	height: min(70vh, 56rem);
+	margin-bottom: var(--base);
+}

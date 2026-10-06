@@ -186,6 +186,49 @@ describe('captureConsent', () => {
 			expect(proof.statementText).toBe('I agree')
 		})
 
+		it('snapshots the notice wording, and records the display, for a notice field', async () => {
+			const noticeEntry: ConsentSourceEntry = {
+				...withStatement,
+				noticeStatement: {
+					root: { children: [{ children: [{ text: 'By subscribing you agree' }] }] },
+				},
+			}
+			const noticeField = {
+				...field('privacy'),
+				display: 'notice',
+			} as unknown as FormFieldInstance
+			const proof = await captureConsent({
+				field: noticeField,
+				agreed: true,
+				entries: [noticeEntry],
+				payload: makePayload({ pages: { drafts: false } }),
+				now: NOW,
+			})
+			expect(proof.statementText).toBe('By subscribing you agree')
+			expect(proof.display).toBe('notice')
+		})
+
+		it('snapshots the checkbox statement for a notice field whose source has no notice wording', async () => {
+			const noticeField = {
+				...field('privacy'),
+				display: 'notice',
+			} as unknown as FormFieldInstance
+			const proof = await captureConsent({
+				field: noticeField,
+				agreed: true,
+				entries: [withStatement],
+				payload: makePayload({ pages: { drafts: false } }),
+				now: NOW,
+			})
+			expect(proof.statementText).toBe('I agree')
+			expect(proof.display).toBe('notice')
+		})
+
+		it('records no display member for a checkbox field, keeping the existing proof shape', async () => {
+			const proof = await capture()
+			expect('display' in proof).toBe(false)
+		})
+
 		it('hash mode omits the text; text mode omits the hash; false omits both', async () => {
 			const hash = await capture('hash')
 			expect(hash.statementHash).toBeDefined()

@@ -45,10 +45,15 @@ const linkOf = (raw: unknown): ConsentLink | undefined => {
  * The `statement` and `link` this reads are server-resolved from the field's consent source and
  * injected by `toFormDocument(doc, { consentStatements })`; the form document itself carries only
  * the source key, so a form rendered without that step shows no statement rather than a stale one.
+ * The wording arrives already selected for the field's display (a notice source's
+ * `noticeStatement` lands here as `statement`), so this renderer never picks between phrasings.
+ * A `display: 'notice'` field renders the statement and link as passive prose with no checkbox and
+ * no required marker: submitting the form is the consent, and the server records the agreement.
  */
 export const consentRenderer = defineFieldRenderer<boolean>(
 	({ field, id, name, value, onChange, onBlur, errors, required, disabled }) => {
 		const describedById = `${id}-desc`
+		const isNotice = field.display === 'notice'
 
 		// The checkbox's accessible name is always plain text, regardless of the statement's shape,
 		// so it stays a single unambiguous string even though the visible statement can carry
@@ -62,7 +67,7 @@ export const consentRenderer = defineFieldRenderer<boolean>(
 			<FieldShell
 				id={id}
 				description={typeof field.description === 'string' ? field.description : undefined}
-				required={required}
+				required={isNotice ? false : required}
 				errors={errors}
 				describedById={describedById}
 			>
@@ -78,23 +83,25 @@ export const consentRenderer = defineFieldRenderer<boolean>(
 				) : plainStatement ? (
 					<span className="fb-consent__statement">{plainStatement}</span>
 				) : null}
-				{required && (html || plainStatement) ? (
+				{!isNotice && required && (html || plainStatement) ? (
 					<span className="fb-field__required" aria-hidden="true">
 						{' *'}
 					</span>
 				) : null}
-				<Checkbox
-					id={id}
-					name={name}
-					checked={value ?? false}
-					onChange={onChange}
-					onBlur={onBlur}
-					required={required}
-					disabled={disabled}
-					invalid={errors.length > 0}
-					describedById={describedById}
-					ariaLabel={plainStatement ?? name}
-				/>
+				{isNotice ? null : (
+					<Checkbox
+						id={id}
+						name={name}
+						checked={value ?? false}
+						onChange={onChange}
+						onBlur={onBlur}
+						required={required}
+						disabled={disabled}
+						invalid={errors.length > 0}
+						describedById={describedById}
+						ariaLabel={plainStatement ?? name}
+					/>
+				)}
 				{link ? (
 					<span className="fb-consent__links">
 						<a

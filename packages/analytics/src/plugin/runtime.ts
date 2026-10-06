@@ -1,7 +1,13 @@
 import type { Payload, PayloadRequest } from 'payload'
 import type { ResolvedBinding } from '../binding/types'
+import { PLATFORM_SCOPE } from '../core/contract'
+import type { CaptureSlotOption, ConsentPolicy, ResolvedAutoCapture } from '../core/options'
 import type { AdapterRegistry, RegistryResolver, ResolveRegistryArgs } from '../core/registry'
+import type { ServerTrack } from '../core/serverEvent'
+import type { GoalsResolver, ResolvedGoal } from '../goals/resolver'
+import type { Goal } from '../goals/types'
 import type { Engine } from '../surfacing/engine'
+import { type EpochStore, INITIAL_EPOCH } from '../surfacing/epoch'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 
 export interface AnalyticsRuntime {
@@ -14,10 +20,68 @@ export interface AnalyticsRuntime {
 	resolveTimezone?: (req: PayloadRequest, scope?: string | null) => Promise<string>
 	/** Id of the config adapter shared by every scope, when one is designated. */
 	platformAdapterId?: string
+	/** `capture.slots` overrides naming the adapter that fills each capture slot. */
+	captureSlots?: { global?: CaptureSlotOption; tenant?: CaptureSlotOption }
+	/**
+	 * `capture.paths` overrides for a slot's mount. Unset, the tracker config derives the
+	 * runtime proxy mount; set when the slot is served through Next rewrites instead.
+	 */
+	capturePaths?: { global?: string; tenant?: string }
+	/**
+	 * Whether a slot's tracker waits for consent, evaluated per request-resolved adapter.
+	 * Absent runtimes fall back to the default: no gate for native, one for a vendor.
+	 */
+	consentFor?: ConsentPolicy
+	/** Browser auto-capture toggles handed to the tracker; absent runtimes default all on. */
+	autoCapture?: ResolvedAutoCapture
+	/** Config goals, and the fallback wherever the merged resolution is unavailable. */
+	goals?: Goal[]
+	/**
+	 * Config goals merged with the goals collection for a request's scope. Absent runtimes
+	 * fall back to `goals`.
+	 */
+	resolveGoals?: GoalsResolver['resolve']
+	/** The same merge, each goal tagged with where it came from. */
+	resolveGoalsDetailed?: GoalsResolver['resolveDetailed']
+	/** Slug of the goals collection when the install enabled it; the picker links to it. */
+	goalsCollectionSlug?: string
+	/**
+	 * Records an event from server code, through whichever registered adapter accepts
+	 * server events. Rejects with an `AnalyticsTrackError` when none does.
+	 */
+	track?: ServerTrack
+	/**
+	 * Where the ingest endpoint listens, relative to `routes.api`, lifted at init from the
+	 * adapter that registered one. Absent runtimes fall back to the default mount.
+	 */
+	ingestPath?: string
+	/**
+	 * `capture.proxy` limits for the runtime capture proxy. Deliberately separate from
+	 * `cache.timeoutMs`: that is a per-read provider deadline for authenticated dashboard
+	 * queries, this is a public request path with entirely different traffic.
+	 */
+	captureProxy?: { timeoutMs: number; maxBodyBytes: number }
+	/** The plugin's `trustedProxyHops`, read wherever a request's client address is. */
+	trustedProxyHops?: number
+	/** True when the app configured a scopeResolver (scoped install); mirrors `resolved.scoped`. */
+	scoped?: boolean
+	/**
+	 * Ids of the config-time adapters shared by every scope (the ones passed to
+	 * `adapters` in plugin options). Runtime provider adapters (resolved per scope
+	 * from the providers collection or `providers.resolve`) are never in it.
+	 */
+	configAdapterIds: ReadonlySet<string>
 	/** Gate for cross-scope reads; absent runtimes require an authenticated user. */
 	platformRead?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>
+	/** Gate for the query endpoint; absent runtimes require an authenticated user. */
+	readAccess?: (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 	bindings: Record<string, ResolvedBinding>
 	engine: Engine
+	/**
+	 * The per-scope cache epoch the engine keys on, shared with the reads that build their
+	 * own keys. Absent runtimes key on the initial token throughout.
+	 */
+	epoch?: EpochStore
 	/** Explicit TTL overrides; when a value is unset the adapter's recommendedTtl applies. */
 	ttl: { aggregate?: number; realtime?: number }
 	/** Widget period-over-period comparison; false skips the previous-window read. */
@@ -53,13 +117,71 @@ export const resolveTimezoneFor = (
 	scope?: string | null
 ): Promise<string> => runtime.resolveTimezone?.(req, scope) ?? Promise.resolve(DEFAULT_TIMEZONE)
 
+/**
+ * The reporting timezone of a request, resolving its scope first and falling back to UTC
+ * when the plugin is not booted or resolution throws. Callers that must interpret a
+ * client-supplied or stored calendar day before the read begins use this; a read path
+ * already holding a resolved scope calls {@link resolveTimezoneFor} directly.
+ */
+export const requestTimezone = async (req: PayloadRequest): Promise<string> => {
+	const runtime = getRuntime(req.payload)
+	if (!runtime) {
+		return DEFAULT_TIMEZONE
+	}
+	try {
+		// The cross-scope marker is not a scope a reporting timezone can be resolved for;
+		// `resolveReadContext` narrows it to null the same way.
+		const scope = await resolveScopeFor(runtime, req)
+		return await resolveTimezoneFor(runtime, req, scope === PLATFORM_SCOPE ? null : scope)
+	} catch {
+		return DEFAULT_TIMEZONE
+	}
+}
+
+/** The scope's cache epoch token, the initial one wherever the runtime carries no store. */
+export const cacheEpochFor = (runtime: AnalyticsRuntime, scope?: string | null): Promise<string> =>
+	runtime.epoch?.get(scope) ?? Promise.resolve(INITIAL_EPOCH)
+
 export const resolveRegistryFor = (
 	runtime: AnalyticsRuntime,
 	args: ResolveRegistryArgs
 ): Promise<AdapterRegistry> => runtime.resolveRegistry?.(args) ?? Promise.resolve(runtime.registry)
+
+export const resolveGoalsFor = (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest,
+	scope?: string | null
+): Promise<Goal[]> => runtime.resolveGoals?.(req, scope) ?? Promise.resolve(runtime.goals ?? [])
+
+export const resolveGoalsDetailedFor = (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest,
+	scope?: string | null
+): Promise<ResolvedGoal[]> =>
+	runtime.resolveGoalsDetailed?.(req, scope) ??
+	Promise.resolve((runtime.goals ?? []).map((goal) => ({ goal, source: 'config' as const })))
+
+export const readAccessFor = async (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest
+): Promise<boolean> => (runtime.readAccess ? await runtime.readAccess({ req }) : Boolean(req.user))
 
 export const platformReadFor = async (
 	runtime: AnalyticsRuntime,
 	req: PayloadRequest
 ): Promise<boolean> =>
 	runtime.platformRead ? await runtime.platformRead({ req }) : Boolean(req.user)
+
+/** A `platformRead` decision evaluated at most once, however many gates consult it. */
+export type PlatformReadGate = () => Promise<boolean>
+
+export const platformReadGate = (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest
+): PlatformReadGate => {
+	let pending: Promise<boolean> | undefined
+	return () => {
+		pending ??= platformReadFor(runtime, req)
+		return pending
+	}
+}

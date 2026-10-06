@@ -71,6 +71,9 @@ test.describe('icon field', () => {
 		await expect(page.locator(`${drawer} .tenx-icon-drawer__grid`)).toBeVisible()
 		await expect(page.locator(`${drawer} .tenx-icon-drawer__switcher`)).toBeVisible()
 
+		// The bulk node-data loads lazily; counting before the first option paints
+		// reads an empty grid under machine load and the search assertions collapse
+		await expect(page.locator(options).first()).toBeVisible()
 		const total = await page.locator(options).count()
 		await page.locator(searchInput).fill(FIXTURES.searchTerm)
 		await expect(page.locator(`${drawer} .tenx-icon-drawer__footer`)).not.toHaveText('0 icons')
@@ -129,6 +132,9 @@ test.describe('icon field', () => {
 		await openDoc(page, FIXTURES.multiDocTitle, FIXTURES.multi)
 		await openDrawer(page, FIXTURES.multi)
 		await expect(page.locator(drawer)).toBeVisible()
+		// Scanning a half-loaded drawer computes contrast against unpainted
+		// surfaces; wait for the grid to settle like the search test does
+		await expect(page.locator(options).first()).toBeVisible()
 		const results = await new AxeBuilder({ page }).include(drawer).analyze()
 		const blocking = results.violations.filter(
 			(v) => v.impact === 'serious' || v.impact === 'critical'

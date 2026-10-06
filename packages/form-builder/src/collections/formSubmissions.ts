@@ -1,4 +1,4 @@
-import type { CollectionAfterChangeHook, CollectionConfig, Field } from 'payload'
+import type { CollectionAfterChangeHook, CollectionConfig, Field, PayloadRequest } from 'payload'
 import type { RichTextBodyOption } from '../actions/body/serializeBody'
 import { dispatchActions } from '../actions/dispatch'
 import type { ActionRegistry } from '../actions/registry'
@@ -12,6 +12,11 @@ import type { FieldTypeRegistry } from '../fields/registry'
 import { pollConfigOf } from '../form/pollState'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
+import {
+	DEFAULT_COLLECTION_SLUGS,
+	type FormBuilderCollectionSlugs,
+	pluginSlugsOf,
+} from '../plugin/collectionSlugs'
 import type { PollOptionSourceRegistry } from '../poll/registry'
 import { makeVoteTallyHook } from '../poll/votes/voteTallyHook'
 import { buildSpamGuard } from '../spam/spamGuard'
@@ -31,9 +36,6 @@ import {
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
-import { FORMS_SLUG } from './forms'
-
-export const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 
 type BuildSubmissionsCollectionArgs = {
 	registry: FieldTypeRegistry
@@ -50,6 +52,8 @@ type BuildSubmissionsCollectionArgs = {
 	events?: FormEventSink
 	/** Whether a job runner is likely present; gates the queued vs bounded-inline dispatch path. */
 	hasRunner?: boolean
+	/** Host override for the inline dispatch deadline (plugin option `dispatch.deadlineMs`). */
+	dispatchDeadlineMs?: number
 	/** Body serialization customization forwarded to the inline action dispatch path. */
 	richText?: RichTextBodyOption
 	/** The plugin-configured uploads collection slug; absent when uploads are disabled. */
@@ -71,6 +75,8 @@ type BuildSubmissionsCollectionArgs = {
 	 * represents them fully (locale and meta are folded into its Submission-details section).
 	 */
 	showRawFields?: boolean
+	/** Resolved plugin collection slugs (after host `overrides.*.slug`); defaults when omitted. */
+	slugs?: FormBuilderCollectionSlugs
 	overrides?: CollectionOverrides
 }
 
@@ -88,6 +94,7 @@ const makeAfterChange =
 		events?: FormEventSink
 		hasRunner: boolean
 		richText?: RichTextBodyOption
+		dispatchDeadlineMs?: number
 	}): CollectionAfterChangeHook =>
 	async ({ doc, operation, req }) => {
 		if (operation !== 'create' || (doc.status != null && doc.status !== 'complete')) {
@@ -100,10 +107,58 @@ const makeAfterChange =
 				return doc
 			}
 			const form = await payload
-				.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
+				.findByID({
+					collection: pluginSlugsOf(req.payload).forms,
+					id: formId,
+					depth: 0,
+					overrideAccess: true,
+					req,
+				})
 				.catch(() => null)
 
-			await dispatchActions({
+			// Field access blocks every API writer, so this slug-agnostic override write is the only
+			// path that can set the outcome stamps. `withReq` only while the create transaction is
+			// still open; a late-settlement write happens after the response and passes none.
+			const stamp = async (
+				data: { actionFailed?: boolean; actionUncertain?: boolean },
+				withReq?: PayloadRequest
+			) => {
+				const update = payload.update.bind(payload) as unknown as (options: {
+					collection: string
+					id: number | string
+					data: { actionFailed?: boolean; actionUncertain?: boolean }
+					depth?: number
+					overrideAccess?: boolean
+					req?: PayloadRequest
+				}) => Promise<unknown>
+				await update({
+					collection: pluginSlugsOf(req.payload).formSubmissions,
+					id: doc.id as number | string,
+					data,
+					depth: 0,
+					overrideAccess: true,
+					...(withReq ? { req: withReq } : {}),
+				})
+			}
+
+			const emitCreated = async () => {
+				try {
+					await resolveEventSink(args.events).emit({
+						type: 'submission.created',
+						formId: String(formId),
+						submissionId: String(doc.id),
+						at: new Date().toISOString(),
+					})
+				} catch (error) {
+					payload.logger?.error(
+						`@10x-media/form-builder: submission.created sink threw: ${
+							error instanceof Error ? error.message : String(error)
+						}`
+					)
+				}
+			}
+
+			const { essentialFailed } = await dispatchActions({
 				actions: (form?.actions ?? null) as ActionInstance[] | null,
 				formId,
 				submissionId: doc.id as number | string,
@@ -113,22 +168,34 @@ const makeAfterChange =
 				hasRunner: args.hasRunner,
 				persistSubmissions: form?.persistSubmissions as boolean | undefined,
 				richText: args.richText,
+				deadlineMs: args.dispatchDeadlineMs,
+				// A definite refusal stamps `actionFailed` (the operator's replay filter); a deadline
+				// breach stamps `actionUncertain` instead, because the work may still land and a
+				// premature failure stamp would invite a duplicate replay.
+				onEssentialFailed: ({ timedOut }) =>
+					stamp(timedOut ? { actionUncertain: true } : { actionFailed: true }, req),
+				// The real outcome of a breached pass, recorded durably once the work settles. The
+				// dispatcher invokes this AFTER the late closing pass on success, so the stamp only
+				// clears once the skipped work (rest actions, prune) is done and the created event
+				// follows it, mirroring the on-time order; a `persistSubmissions: false` prune has
+				// already deleted the row by then, so the clear tolerates a missing target. A late
+				// failure converges to the definite-failure stamp.
+				onEssentialSettled: async ({ ok }) => {
+					if (ok) {
+						await stamp({ actionUncertain: false }).catch(() => {})
+						await emitCreated()
+					} else {
+						await stamp({ actionFailed: true, actionUncertain: false })
+					}
+				},
 			})
-
-			try {
-				await resolveEventSink(args.events).emit({
-					type: 'submission.created',
-					formId: String(formId),
-					submissionId: String(doc.id),
-					at: new Date().toISOString(),
-				})
-			} catch (error) {
-				payload.logger?.error(
-					`@10x-media/form-builder: submission.created sink threw: ${
-						error instanceof Error ? error.message : String(error)
-					}`
-				)
+			// A failed-essential submission is kept for recovery but is not a completed signup: no
+			// created event, so a sink-driven automation never treats it as one.
+			if (essentialFailed) {
+				return doc
 			}
+
+			await emitCreated()
 		} catch (error) {
 			payload.logger?.error(
 				`@10x-media/form-builder: afterChange dispatch failed for submission ${String(doc.id)}: ${
@@ -170,7 +237,13 @@ const makeVotedCookieHook = (args: { votedCookie: boolean }): CollectionAfterCha
 		let state = isPollContextState(stashed) ? stashed : undefined
 		if (state === undefined) {
 			const form = await req.payload
-				.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
+				.findByID({
+					collection: pluginSlugsOf(req.payload).forms,
+					id: formId,
+					depth: 0,
+					overrideAccess: true,
+					req,
+				})
 				.catch(() => null)
 			state = {
 				pollEnabled: form?.pollEnabled === true,
@@ -198,7 +271,7 @@ const makeVotedCookieHook = (args: { votedCookie: boolean }): CollectionAfterCha
 		req.responseHeaders ??= new Headers()
 		req.responseHeaders.append(
 			'Set-Cookie',
-			`${votedCookieName(formId)}=${value}; Path=/; Max-Age=${VOTED_COOKIE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax${secure}`
+			`${votedCookieName(formId, req.payload)}=${value}; Path=/; Max-Age=${VOTED_COOKIE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax${secure}`
 		)
 		return doc
 	}
@@ -214,6 +287,7 @@ export const buildSubmissionsCollection = ({
 	actionRegistry = new Map(),
 	events,
 	hasRunner = false,
+	dispatchDeadlineMs,
 	richText,
 	uploadSlug,
 	spam,
@@ -221,10 +295,11 @@ export const buildSubmissionsCollection = ({
 	pollSourceRegistry,
 	pollVotes = false,
 	showRawFields = false,
+	slugs = DEFAULT_COLLECTION_SLUGS,
 	overrides,
 }: BuildSubmissionsCollectionArgs): CollectionConfig => {
 	const defaultFields: Field[] = [
-		{ name: 'form', type: 'relationship', relationTo: FORMS_SLUG, required: true },
+		{ name: 'form', type: 'relationship', relationTo: slugs.forms, required: true },
 		{
 			name: 'status',
 			type: 'select',
@@ -239,6 +314,28 @@ export const buildSubmissionsCollection = ({
 			// Defense-in-depth at the REST layer: anonymous clients cannot set status via the API.
 			// The validateSubmission hook also forces 'complete' server-side, so this covers both paths.
 			access: { create: isLoggedIn, update: isLoggedIn },
+		},
+		// Stamped by the dispatcher when an essential action failed and the row was kept: the flag is
+		// what lets an operator filter these ownerless rows and clear them once the provider has been
+		// fixed and the addresses replayed. Hidden while unset; never client-writable.
+		{
+			name: 'actionFailed',
+			type: 'checkbox',
+			index: true,
+			label: labelForKey(keys.submissionActionFailedFlag),
+			access: { create: () => false, update: () => false },
+			admin: { readOnly: true, condition: (data) => data?.actionFailed === true },
+		},
+		// Stamped instead of `actionFailed` when the essential pass outlived its deadline: the work
+		// may still complete. Cleared once the breached work settles successfully (the row leaves
+		// both filters), or upgraded to `actionFailed` when it settles as a definite failure.
+		{
+			name: 'actionUncertain',
+			type: 'checkbox',
+			index: true,
+			label: labelForKey(keys.submissionActionUncertainFlag),
+			access: { create: () => false, update: () => false },
+			admin: { readOnly: true, condition: (data) => data?.actionUncertain === true },
 		},
 		// answers UI appears first so it is the dominant view when opening a submission document.
 		{
@@ -272,7 +369,7 @@ export const buildSubmissionsCollection = ({
 
 	return {
 		...(overrides ?? {}),
-		slug: FORM_SUBMISSIONS_SLUG,
+		slug: slugs.formSubmissions,
 		labels: {
 			singular: labelForKey(keys.collectionSubmissionSingular),
 			plural: labelForKey(keys.collectionSubmissionPlural),
@@ -317,7 +414,7 @@ export const buildSubmissionsCollection = ({
 				// Payload rolls the submission create/update back inside the operation transaction,
 				// rather than being absorbed by the dispatch hook's swallow-all error boundary below.
 				...(pollVotes !== false ? [makeVoteTallyHook()] : []),
-				makeAfterChange({ actionRegistry, events, hasRunner, richText }),
+				makeAfterChange({ actionRegistry, events, hasRunner, richText, dispatchDeadlineMs }),
 				// Always registered: it self-gates on the option and on the form's allowChange flag.
 				makeVotedCookieHook({ votedCookie }),
 				...(overrides?.hooks?.afterChange ?? []),

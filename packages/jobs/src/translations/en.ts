@@ -33,6 +33,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fieldId]: 'ID',
 	[keys.fieldStarted]: 'Started',
 	[keys.fieldLeaseExpires]: 'Lease expires',
+	[keys.fieldDeferredBy]: 'Deferred by',
 	[keys.fieldScheduledFor]: 'Scheduled for',
 
 	[keys.outcome]: 'Outcome',

@@ -1,4 +1,5 @@
 import type { Config, Payload } from 'payload'
+import type { CaptureSupport } from '../core/capture'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -9,16 +10,28 @@ import type {
 	DimensionKey,
 	MetricKey,
 } from '../core/contract'
+import type { IngestHostnameResolver } from '../core/serverEvent'
+import { INGEST_PATH } from '../plugin/paths'
 import { EVENTS_SLUG, eventsCollection } from './collections/events'
 import { ROLLUPS_SLUG, rollupsCollection } from './collections/rollups'
 import { seenCollection } from './collections/seen'
+import { EVENT_SCAN_LIMIT, eventScanMeta } from './eventScan'
 import { composeGeoResolvers } from './geo/composeGeoResolvers'
 import { type GeoResolver, platformHeaderResolver } from './geo/geoResolver'
 import { maxmindResolver } from './geo/maxmindResolver'
-import { makeIngestHandler } from './ingest/endpoint'
+import { type BotFilter, resolveBotFilter } from './ingest/bots'
+import { type IngestAttribution, type IngestResolvers, makeIngestHandler } from './ingest/endpoint'
 import { flushBatch } from './ingest/flushBatch'
 import type { StoredEvent } from './ingest/normalizeEvent'
+import {
+	type HostnameOption,
+	hostnameSet,
+	resolveEventHostname,
+	resolveHostnameOption,
+} from './ingest/resolveHostname'
+import { makeServerTrack } from './ingest/serverTrack'
 import { createWriteBuffer, type WriteBuffer } from './ingest/writeBuffer'
+import { aggregateEvents, type EventLike, filtersToWhere } from './query/eventAgg'
 import { buildRealtime, type RealtimeEvent } from './realtime/buildRealtime'
 import { pruneEventsTask } from './retention/pruneTask'
 import {
@@ -30,13 +43,49 @@ import {
 	seriesFromRollups,
 } from './rollupAcc'
 
+export type { EventHostnameResolver, HostnameOption } from './ingest/resolveHostname'
+
 export interface NativeOptions {
 	geoResolver?: GeoResolver
 	geoDbPath?: string
 	ingestPath?: string
+	/**
+	 * Events and seen-ledger rows older than this many days are deleted by the nightly task.
+	 * Zero or less means keep everything; anything else must be a whole number of days, so a
+	 * window the sweep could not turn into a cutoff fails the boot.
+	 */
 	retentionDays?: number
+	/**
+	 * Rollup rows older than this many days are deleted by the nightly task. Off by default,
+	 * since rollups are the long-term store. It requires `retentionDays` and cannot be shorter
+	 * than it: a window reaching past raw-event retention is answered from rollups, so a shorter
+	 * rollup window would make a long window report less than a short one.
+	 */
+	rollupRetentionDays?: number
 	/** Opt-in in-process write batching. `true` uses defaults (maxSize 50, maxAgeMs 2000). */
 	buffer?: boolean | { maxSize?: number; maxAgeMs?: number }
+	/**
+	 * Where an event's hostname comes from. `'request'` (the default) stores the host the
+	 * request carried and ignores the body's claim, so a scripted client cannot mint hostname
+	 * buckets. A list stores the request host only when it is one of those, for an install
+	 * behind no host validation at all. A resolver decides per event, and returning null drops
+	 * it. A dropped event is answered exactly like an accepted one.
+	 */
+	hostname?: HostnameOption
+	/**
+	 * Hostnames that keep ingesting on a scoped install even when the request resolves no
+	 * scope: the platform's own domains, which are infrastructure rather than tenants. Their
+	 * events are stored under the null scope. Tenant domains need no entry here, since the
+	 * install's own `scopeResolver` already answers for them.
+	 */
+	platformHostnames?: string[]
+	/**
+	 * Whether crawlers, monitors and headless clients are dropped at ingest, by their user
+	 * agent. On by default. A function decides for itself and receives the raw agent; `false`
+	 * counts every beacon. A dropped bot is answered exactly like an accepted event, and
+	 * `trackServerEvent` is trusted host code that is never filtered.
+	 */
+	filterBots?: boolean | BotFilter
 }
 
 export type NativeAdapter = AnalyticsAdapter & { flush: () => Promise<void> }
@@ -47,26 +96,177 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 	'sessions',
 	'events',
 	'avgDuration',
+	'conversions',
+	'revenue',
+	'scrollDepth',
 ])
-const dimensions: ReadonlySet<DimensionKey> = new Set(['page', 'country', 'source', 'device'])
-
-const REALTIME_EVENT_LIMIT = 50_000
+/**
+ * Everything the tracker can know about a hit. `source` is the visit's named origin (its
+ * `utm_source`, else the referrer host, else `direct`), `channel` the acquisition channel that
+ * origin classifies into (`organic-search`, `paid-social`, ...) and `referrer` the host it came
+ * from, so a report can ask how much of the month was paid search without reading a list of
+ * hostnames.
+ */
+const dimensions: ReadonlySet<DimensionKey> = new Set([
+	'page',
+	'referrer',
+	'source',
+	'channel',
+	'utmSource',
+	'utmMedium',
+	'utmCampaign',
+	'utmContent',
+	'utmTerm',
+	'device',
+	'browser',
+	'os',
+	'country',
+	'region',
+	'city',
+	'language',
+	'event',
+	'goal',
+])
 
 const baseCapabilities: AnalyticsCapabilities = {
 	perPageQuery: true,
 	realtime: true,
 	realtimeWindowMinutes: 60,
-	comparison: true,
-	minGranularity: 'day',
+	minGranularity: 'hour',
 	maxLookbackDays: null,
 	metrics,
 	dimensions,
+	// Every dimension except `goal`, whose completions live in a json column rather than a
+	// field a `where` can compare.
+	filters: new Set([...dimensions].filter((dimension) => dimension !== 'goal')),
+	// No `matches`: every regex flavor the providers offer differs, and the two database
+	// adapters have no portable one to match them with.
+	filterOperators: new Set(['eq', 'contains']),
 	batchPageReport: true,
 	rateLimit: null,
 	recommendedTtl: { realtime: 10, aggregate: 300 },
 }
 
+const DAY_MS = 86_400_000
+
+// The tracker itself is the client (an RSC renders TrackerBoot), so there is nothing to
+// proxy or inject; the ingest path is carried by the tracker config resolver instead.
+const nativeCapture: CaptureSupport = {
+	proxy: { routes: [] },
+	snippet: () => ({ scripts: [] }),
+	client: { kind: 'native' },
+}
+
+interface QueryEventsContext {
+	retentionDays?: number
+	scopeWhere: (q: AnalyticsQuery) => Record<string, unknown>
+}
+
+/**
+ * Filtered/hour-granularity reads bypass the day-bucketed rollups and aggregate raw
+ * events directly, under the same hard cap as `realtime()`. `retentionDays` clamps how
+ * far back the read can reach when it would otherwise ask for events the prune task has
+ * already deleted (or will delete before they're queryable).
+ */
+async function queryEvents(
+	payload: Payload,
+	q: AnalyticsQuery,
+	ctx: QueryEventsContext
+): Promise<AnalyticsResult> {
+	const fetchedAt = q.dateRange.end.toISOString()
+	let start = q.dateRange.start
+	let clamped = false
+	if (ctx.retentionDays && ctx.retentionDays > 0) {
+		const floor = new Date(Date.now() - ctx.retentionDays * DAY_MS)
+		if (start < floor) {
+			start = floor
+			clamped = true
+		}
+	}
+	const baseWhere: Record<string, unknown> = {
+		timestamp: {
+			greater_than_equal: start.toISOString(),
+			less_than_equal: q.dateRange.end.toISOString(),
+		},
+		...(q.hostname ? { hostname: { equals: q.hostname } } : {}),
+		...(q.path ? { path: { equals: q.path } } : {}),
+		...ctx.scopeWhere(q),
+	}
+	// filtersToWhere can also key off 'path' (a page filter); AND rather than spread so
+	// q.path and a page filter both constrain the query instead of one overwriting the other.
+	const filterWhere = filtersToWhere(q.filters ?? [])
+	const where: Record<string, unknown> =
+		Object.keys(filterWhere).length > 0 ? { and: [baseWhere, filterWhere] } : baseWhere
+	const { docs } = await payload.find({
+		collection: EVENTS_SLUG as never,
+		where: where as never,
+		// Newest-first under a hard cap, same tradeoff as realtime(): a very busy site
+		// with more events than the cap in range keeps its most recent activity.
+		limit: EVENT_SCAN_LIMIT,
+		pagination: false,
+		depth: 0,
+		sort: '-timestamp',
+	})
+	// The events collection is registered at runtime, so `payload.find` hands back
+	// `JsonObject & TypeWithID`: a field-by-field mapping would read `any` per column and
+	// duplicate the ingest schema without adding a check. This is the one typed boundary.
+	const events = docs as unknown as EventLike[]
+	const dim = q.dimensions?.find((d) => dimensions.has(d))
+	const granularity =
+		q.granularity === 'hour' || q.granularity === 'day' ? q.granularity : undefined
+	const { rows, totals } = aggregateEvents(events, {
+		metrics: q.metrics,
+		dimension: dim,
+		granularity,
+		timezone: q.timezone,
+		order: q.order,
+		limit: q.limit,
+	})
+	return { rows, totals, meta: eventScanMeta({ fetchedAt, eventCount: events.length, clamped }) }
+}
+
+/** Config-time window validation, so a nonsense window fails the boot rather than the sweep. */
+const retentionWindow = (value: number | undefined, option: string): number | undefined => {
+	if (value === undefined) {
+		return undefined
+	}
+	if (!Number.isInteger(value) || value <= 0) {
+		throw new Error(
+			`analytics: ${option} must be a whole number of days above zero, got ${String(value)}`
+		)
+	}
+	return value
+}
+
 export function native(options: NativeOptions = {}): NativeAdapter {
+	// Validated here so a bad list fails the boot rather than dropping every event at runtime.
+	const hostname = resolveHostnameOption(options.hostname)
+	const filterBots = resolveBotFilter(options.filterBots)
+	const rollupRetentionDays = retentionWindow(options.rollupRetentionDays, 'rollupRetentionDays')
+	// Zero and below have always meant "keep everything", so they stay a no-op rather than a throw.
+	// Anything above zero goes through the same check as the rollup window, so a window the sweep
+	// could not build a cutoff from fails the boot instead of the first nightly run.
+	const retentionDays = retentionWindow(
+		options.retentionDays !== undefined && options.retentionDays <= 0
+			? undefined
+			: options.retentionDays,
+		'retentionDays'
+	)
+	if (rollupRetentionDays !== undefined && retentionDays === undefined) {
+		throw new Error(
+			'analytics: rollupRetentionDays requires retentionDays, since pruning rollups while keeping raw events forever would make an unfiltered long window answer less than the same window filtered'
+		)
+	}
+	if (
+		rollupRetentionDays !== undefined &&
+		retentionDays !== undefined &&
+		rollupRetentionDays < retentionDays
+	) {
+		throw new Error(
+			`analytics: rollupRetentionDays (${rollupRetentionDays}) must not be shorter than retentionDays (${retentionDays}), since windows beyond retentionDays are answered from rollups`
+		)
+	}
+	const platformHostnames = hostnameSet(options.platformHostnames, 'platformHostnames')
 	const geoResolver =
 		options.geoResolver ??
 		(options.geoDbPath
@@ -94,10 +294,38 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 		return docs as unknown as RollupDoc[]
 	}
 
+	// The plugin's resolvers arrive in register(); server tracking reads them late so it
+	// resolves the same scope, timezone and goals the endpoint does.
+	let resolvers: IngestResolvers = {}
+	let attribution: IngestAttribution = {}
+
+	const ingest = {
+		path: options.ingestPath ?? INGEST_PATH,
+		track: makeServerTrack({
+			getPayload: () => payloadRef,
+			geoResolver,
+			getBuffer: () => buffer,
+			getResolvers: () => resolvers,
+			getAttribution: () => attribution,
+		}),
+		// The endpoint's own hostname policy, minus the scoped-install drop rule: a caller on
+		// this seam already knows the boundary its event belongs to.
+		hostname: (args: Parameters<IngestHostnameResolver>[0]) =>
+			resolveEventHostname({
+				option: hostname,
+				claimed: args.claimed,
+				req: args.req,
+				scope: args.scope ?? null,
+				trustedProxyHops: attribution.trustedProxyHops,
+			}),
+	}
+
 	return {
 		id: 'native',
 		label: 'Native (Payload)',
 		capabilities,
+		capture: nativeCapture,
+		ingest,
 		isConfigured: () => true,
 		flush: () => buffer?.flush() ?? Promise.resolve(),
 		register(config: Config, context) {
@@ -111,21 +339,40 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				rollupsCollection(scoped),
 				seenCollection(),
 			]
+			resolvers = {
+				scope: scoped ? context?.resolveScope : undefined,
+				timezone: context?.resolveTimezone,
+				goals: context?.resolveGoals,
+			}
+			attribution = {
+				trustedProxyHops: context?.trustedProxyHops,
+				hostname,
+				platformHostnames,
+			}
 			config.endpoints = [
 				...(config.endpoints ?? []),
 				{
 					method: 'post',
-					path: options.ingestPath ?? '/analytics/ingest',
-					handler: makeIngestHandler(geoResolver, () => buffer, {
-						scope: scoped ? context?.resolveScope : undefined,
-						timezone: context?.resolveTimezone,
+					path: ingest.path,
+					handler: makeIngestHandler({
+						geoResolver,
+						getBuffer: () => buffer,
+						resolvers,
+						attribution,
+						filterBots,
 					}),
 				},
 			]
-			if (options.retentionDays && options.retentionDays > 0) {
+			// Only with a window: payload derives jobs.enabled from the task count, so registering
+			// unconditionally would add the jobs collection and stats global (a migration on
+			// migrate-mode Postgres) to installs that asked for neither jobs nor retention.
+			if (retentionDays !== undefined || rollupRetentionDays !== undefined) {
 				config.jobs = {
 					...config.jobs,
-					tasks: [...(config.jobs?.tasks ?? []), pruneEventsTask(options.retentionDays)],
+					tasks: [
+						...(config.jobs?.tasks ?? []),
+						pruneEventsTask({ retentionDays, rollupRetentionDays }),
+					],
 				}
 			}
 			const prevOnInit = config.onInit
@@ -151,6 +398,9 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 			if (!payloadRef) {
 				throw new Error('analytics: native adapter queried before init')
 			}
+			if ((q.filters && q.filters.length > 0) || q.granularity === 'hour') {
+				return queryEvents(payloadRef, q, { retentionDays, scopeWhere })
+			}
 			const fetchedAt = q.dateRange.end.toISOString()
 			const periodWhere = {
 				greater_than_equal: q.dateRange.start.toISOString(),
@@ -166,6 +416,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 				granularity: { equals: 'day' },
 				dimension: { equals: '' },
 				path: { equals: totalsPath },
+				hostname: { equals: q.hostname ?? '' },
 				period: periodWhere,
 				...scopeWhere(q),
 			})
@@ -192,6 +443,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 							granularity: { equals: 'day' },
 							dimension: { equals: '' },
 							path: { not_equals: '' },
+							hostname: { equals: q.hostname ?? '' },
 							period: periodWhere,
 							...scopeWhere(q),
 						}
@@ -199,6 +451,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 							granularity: { equals: 'day' },
 							dimension: { equals: dim },
 							path: { equals: '' },
+							hostname: { equals: q.hostname ?? '' },
 							period: periodWhere,
 							...scopeWhere(q),
 						}
@@ -236,19 +489,21 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 						greater_than_equal: q.dateRange.start.toISOString(),
 						less_than_equal: q.dateRange.end.toISOString(),
 					},
+					...(q.hostname ? { hostname: { equals: q.hostname } } : {}),
+					...(q.path ? { path: { equals: q.path } } : {}),
 					...scopeWhere(q),
 				} as never,
 				// Newest-first under a hard cap: if a very busy site has more events than the
 				// cap in the window, keep the most recent activity rather than the oldest.
 				// Unbounded accuracy via DB-side aggregation is deferred to the hardening spec.
-				limit: REALTIME_EVENT_LIMIT,
+				limit: EVENT_SCAN_LIMIT,
 				pagination: false,
 				depth: 0,
 				sort: '-timestamp',
 			})
 			const events = docs as unknown as RealtimeEvent[]
 			const { rows, totals } = buildRealtime(events, q.dateRange, q.metrics)
-			return { rows, totals, meta: { provider: 'native', fetchedAt } }
+			return { rows, totals, meta: eventScanMeta({ fetchedAt, eventCount: events.length }) }
 		},
 	}
 }

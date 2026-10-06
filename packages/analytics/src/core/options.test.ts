@@ -1,5 +1,8 @@
+import type { CollectionConfig } from 'payload'
 import { describe, expect, it } from 'vitest'
+import type { Goal } from '../goals/types'
 import { memoryAdapter } from '../testing/memoryAdapter'
+import type { AnalyticsPluginOptions } from './options'
 import { resolveOptions } from './options'
 
 describe('resolveOptions widgets.register', () => {
@@ -49,6 +52,41 @@ describe('resolveOptions', () => {
 	})
 	it('throws when no adapters are supplied', () => {
 		expect(() => resolveOptions({ adapters: [] })).toThrow(/at least one adapter/i)
+	})
+	it('defaults cache.timeoutMs to 15000', () => {
+		expect(resolveOptions({ adapters: [memoryAdapter()] }).cache.timeoutMs).toBe(15_000)
+	})
+	it('keeps an explicit cache.timeoutMs override', () => {
+		const r = resolveOptions({ adapters: [memoryAdapter()], cache: { timeoutMs: 5_000 } })
+		expect(r.cache.timeoutMs).toBe(5_000)
+	})
+	it('leaves trustedProxyHops unset so the leftmost forwarded-for entry keeps applying', () => {
+		expect(resolveOptions({ adapters: [memoryAdapter()] }).trustedProxyHops).toBeUndefined()
+	})
+	it('keeps an explicit trustedProxyHops count', () => {
+		expect(
+			resolveOptions({ adapters: [memoryAdapter()], trustedProxyHops: 2 }).trustedProxyHops
+		).toBe(2)
+	})
+	it('throws on a trustedProxyHops that is not a non-negative integer', () => {
+		for (const hops of [-1, 1.5, Number.NaN]) {
+			expect(() => resolveOptions({ adapters: [memoryAdapter()], trustedProxyHops: hops })).toThrow(
+				/trustedProxyHops must be a non-negative integer/i
+			)
+		}
+	})
+})
+
+describe('resolveOptions scopes', () => {
+	const adapters = [memoryAdapter()]
+
+	it('leaves scopes undefined when the option is not set', () => {
+		expect(resolveOptions({ adapters }).scopes).toBeUndefined()
+	})
+
+	it('carries the scopes resolver through unchanged', () => {
+		const scopes = () => ['t1', 't2']
+		expect(resolveOptions({ adapters, scopes }).scopes).toBe(scopes)
 	})
 })
 
@@ -133,10 +171,28 @@ describe('resolveOptions platformAdapter and access', () => {
 		)
 	})
 
-	it('defaults platformRead to any authenticated user', async () => {
+	it('defaults platformRead to any authenticated user for unscoped installs', async () => {
 		const { platformRead } = resolveOptions({ adapters }).access
 		expect(await platformRead({ req: { user: { id: 1 } } as never })).toBe(true)
 		expect(await platformRead({ req: { user: null } as never })).toBe(false)
+	})
+
+	it('defaults platformRead to deny for scoped installs', async () => {
+		const { platformRead } = resolveOptions({
+			adapters,
+			scopeResolver: () => 'tenant-a',
+		}).access
+		expect(await platformRead({ req: { user: { id: 1 } } as never })).toBe(false)
+	})
+
+	it('lets an explicit platformRead win for a scoped install', async () => {
+		const platformRead = () => true
+		const resolved = resolveOptions({
+			adapters,
+			scopeResolver: () => 'tenant-a',
+			access: { platformRead },
+		})
+		expect(resolved.access.platformRead).toBe(platformRead)
 	})
 
 	it('carries a custom platformRead through', async () => {
@@ -144,6 +200,34 @@ describe('resolveOptions platformAdapter and access', () => {
 		expect(resolveOptions({ adapters, access: { platformRead } }).access.platformRead).toBe(
 			platformRead
 		)
+	})
+})
+
+describe('resolveOptions providers.collection.scopeField', () => {
+	const adapters = [memoryAdapter()]
+
+	it('throws when scopeField contains a dot', () => {
+		expect(() =>
+			resolveOptions({ adapters, providers: { collection: { scopeField: 'tenant.id' } } })
+		).toThrow(/scopeField must be a top-level field name/i)
+	})
+
+	it('throws when scopeField is an empty string', () => {
+		expect(() =>
+			resolveOptions({ adapters, providers: { collection: { scopeField: '' } } })
+		).toThrow(/scopeField must be a non-empty field name/i)
+	})
+
+	it('throws when scopeField is only whitespace', () => {
+		expect(() =>
+			resolveOptions({ adapters, providers: { collection: { scopeField: '  ' } } })
+		).toThrow(/scopeField must be a non-empty field name/i)
+	})
+
+	it('accepts a flat scopeField', () => {
+		expect(() =>
+			resolveOptions({ adapters, providers: { collection: { scopeField: 'tenant' } } })
+		).not.toThrow()
 	})
 })
 
@@ -249,5 +333,288 @@ describe('resolveOptions bindings', () => {
 		expect(() => resolveOptions({ adapters: [adapter], collections: { pages: {} } })).toThrow(
 			/pages.*path.*pathField/i
 		)
+	})
+})
+
+describe('resolveOptions capture.paths', () => {
+	const adapters = [memoryAdapter()]
+	it('leaves both slot paths unset so the resolver derives the proxy mount', () => {
+		expect(resolveOptions({ adapters }).capture.paths).toEqual({})
+	})
+	it('carries per-slot path overrides through', () => {
+		const r = resolveOptions({ adapters, capture: { paths: { tenant: '/ph' } } })
+		expect(r.capture.paths).toEqual({ tenant: '/ph' })
+	})
+})
+
+describe('resolveOptions capture.consent', () => {
+	const adapters = [memoryAdapter()]
+	it('defaults native to none and every vendor kind to required', () => {
+		const consent = resolveOptions({ adapters }).capture.consent
+		expect(consent('global', 'native', 'native')).toBe('none')
+		expect(consent('tenant', 'ph', 'posthog')).toBe('required')
+		expect(consent('tenant', 'pl', 'plausible')).toBe('required')
+		expect(consent('tenant', 'um', 'umami')).toBe('required')
+		expect(consent('tenant', 'ga', 'ga4')).toBe('required')
+	})
+	it('lets a bare mode force every slot, native included', () => {
+		const consent = resolveOptions({ adapters, capture: { consent: 'required' } }).capture.consent
+		expect(consent('global', 'native', 'native')).toBe('required')
+	})
+	it('passes the slot and adapter id to a resolver form', () => {
+		const consent = resolveOptions({
+			adapters,
+			capture: {
+				consent: ({ slot, adapterId }) =>
+					slot === 'tenant' && adapterId === 'ph' ? 'none' : 'required',
+			},
+		}).capture.consent
+		expect(consent('tenant', 'ph', 'posthog')).toBe('none')
+		expect(consent('global', 'ph', 'posthog')).toBe('required')
+	})
+	it('resolves an adapter entry over a slot entry over the kind default', () => {
+		const consent = resolveOptions({
+			adapters,
+			capture: { consent: { slots: { tenant: 'none' }, adapters: { memory: 'required' } } },
+		}).capture.consent
+		expect(consent('tenant', 'memory', 'posthog')).toBe('required')
+		expect(consent('tenant', 'other', 'posthog')).toBe('none')
+		expect(consent('global', 'other', 'posthog')).toBe('required')
+		expect(consent('global', 'other', 'native')).toBe('none')
+	})
+	it('throws when a consent entry names an adapter the config does not carry', () => {
+		expect(() =>
+			resolveOptions({ adapters, capture: { consent: { adapters: { nope: 'none' } } } })
+		).toThrow(/unknown consent adapter "nope"/i)
+	})
+	it('accepts a runtime provider instance id, which config time cannot know', () => {
+		const consent = resolveOptions({
+			adapters,
+			capture: { consent: { adapters: { 'posthog:abc123': 'none' } } },
+		}).capture.consent
+		expect(consent('tenant', 'posthog:abc123', 'posthog')).toBe('none')
+		expect(consent('tenant', 'posthog:other', 'posthog')).toBe('required')
+	})
+})
+
+describe('resolveOptions capture.slots', () => {
+	const adapters = [memoryAdapter()]
+	it('throws when the global slot names an adapter the config does not carry', () => {
+		expect(() => resolveOptions({ adapters, capture: { slots: { global: 'nope' } } })).toThrow(
+			/unknown global capture slot adapter "nope"/i
+		)
+	})
+	it('accepts an unknown tenant slot id, resolved per request against the scope registry', () => {
+		const slots = resolveOptions({ adapters, capture: { slots: { tenant: 'posthog:abc123' } } })
+			.capture.slots
+		expect(slots.tenant).toBe('posthog:abc123')
+	})
+	it('carries false through as an explicit disable rather than an adapter id', () => {
+		const slots = resolveOptions({
+			adapters,
+			capture: { slots: { global: false, tenant: false } },
+		}).capture.slots
+		expect(slots).toEqual({ global: false, tenant: false })
+	})
+	it('rejects a slot value that is neither an adapter id nor false', () => {
+		expect(() =>
+			resolveOptions({
+				adapters,
+				capture: { slots: { tenant: true as unknown as string } },
+			})
+		).toThrow(/capture slot "tenant"/i)
+	})
+})
+
+describe('resolveOptions capture.autoCapture', () => {
+	const adapters = [memoryAdapter()]
+	it('turns every auto-capture listener on by default, except scroll depth', () => {
+		expect(resolveOptions({ adapters }).capture.autoCapture).toEqual({
+			scrollDepth: false,
+			outboundLinks: true,
+			fileDownloads: true,
+			goalAttribute: true,
+			query: true,
+		})
+	})
+	it('overrides one toggle without disturbing the rest', () => {
+		const auto = resolveOptions({
+			adapters,
+			capture: { autoCapture: { scrollDepth: true, fileDownloads: false } },
+		}).capture.autoCapture
+		expect(auto).toEqual({
+			scrollDepth: true,
+			outboundLinks: true,
+			fileDownloads: false,
+			goalAttribute: true,
+			query: true,
+		})
+	})
+	it('turns the query string off without disturbing the rest', () => {
+		const auto = resolveOptions({
+			adapters,
+			capture: { autoCapture: { query: false } },
+		}).capture.autoCapture
+		expect(auto).toEqual({
+			scrollDepth: false,
+			outboundLinks: true,
+			fileDownloads: true,
+			goalAttribute: true,
+			query: false,
+		})
+	})
+})
+
+describe('resolveOptions goals', () => {
+	const adapters = [memoryAdapter()]
+	const signup: Goal = { slug: 'signup', name: 'Signup', match: { kind: 'goal' } }
+	const purchase: Goal = {
+		slug: 'purchase',
+		name: 'Purchase',
+		match: { kind: 'event', name: 'purchase' },
+		value: { prop: 'total' },
+		currency: 'EUR',
+	}
+	it('defaults to no goals', () => {
+		expect(resolveOptions({ adapters }).goals).toEqual([])
+	})
+	it('accepts the array form', () => {
+		expect(resolveOptions({ adapters, goals: [signup, purchase] }).goals).toEqual([
+			signup,
+			purchase,
+		])
+	})
+	it('accepts the object form alongside the collection source', () => {
+		expect(resolveOptions({ adapters, goals: { defaults: [signup] } }).goals).toEqual([signup])
+	})
+	it('throws on a duplicate slug', () => {
+		expect(() =>
+			resolveOptions({ adapters, goals: [signup, { ...signup, name: 'Other' }] })
+		).toThrow(/duplicate goal slug "signup"/i)
+	})
+	it('throws on a slug that is not kebab-case', () => {
+		for (const slug of ['Sign Up', 'sign_up', '-signup', 'signup-']) {
+			expect(() => resolveOptions({ adapters, goals: [{ ...signup, slug }] })).toThrow(
+				/kebab-case/i
+			)
+		}
+	})
+	it('throws on a fixed value that is negative or not finite', () => {
+		for (const fixed of [-1, Number.NaN, Number.POSITIVE_INFINITY]) {
+			expect(() => resolveOptions({ adapters, goals: [{ ...signup, value: { fixed } }] })).toThrow(
+				/goal "signup" value.fixed/i
+			)
+		}
+	})
+	it('accepts a fixed value of zero', () => {
+		expect(
+			resolveOptions({ adapters, goals: [{ ...signup, value: { fixed: 0 } }] }).goals[0]?.value
+		).toEqual({ fixed: 0 })
+	})
+})
+
+describe('resolveOptions goals collection', () => {
+	const adapters = [memoryAdapter()]
+	const collectionOf = (goals: AnalyticsPluginOptions['goals']) =>
+		resolveOptions({ adapters, goals }).goalsCollection
+
+	it('is off unless asked for, in every goals form', () => {
+		expect(collectionOf(undefined).enabled).toBe(false)
+		expect(collectionOf([]).enabled).toBe(false)
+		expect(collectionOf({ defaults: [] }).enabled).toBe(false)
+		expect(collectionOf({ collection: false }).enabled).toBe(false)
+		expect(collectionOf({ collection: { enabled: false, slug: 'custom' } })).toEqual({
+			enabled: false,
+			slug: 'analytics-goals',
+			scopeField: 'scope',
+		})
+	})
+
+	it('defaults the slug and the scope field when enabled', () => {
+		expect(collectionOf({ collection: true })).toEqual({
+			enabled: true,
+			slug: 'analytics-goals',
+			scopeField: 'scope',
+		})
+	})
+
+	it('carries the slug, scope field, access and overrides through', () => {
+		const overrides = (c: CollectionConfig) => c
+		const access = { read: () => true }
+		expect(
+			collectionOf({ collection: { slug: 'conversions', scopeField: 'tenant', access, overrides } })
+		).toEqual({ enabled: true, slug: 'conversions', scopeField: 'tenant', access, overrides })
+	})
+
+	it('stores the slug trimmed', () => {
+		expect(collectionOf({ collection: { slug: '  conversions  ' } }).slug).toBe('conversions')
+	})
+
+	it('throws on an empty slug or an unusable scope field', () => {
+		expect(() => collectionOf({ collection: { slug: '  ' } })).toThrow(/non-empty collection slug/i)
+		expect(() => collectionOf({ collection: { scopeField: '' } })).toThrow(/non-empty field name/i)
+		expect(() => collectionOf({ collection: { scopeField: 'tenant.id' } })).toThrow(/no dots/i)
+	})
+})
+
+describe('resolveOptions view', () => {
+	const adapters = [memoryAdapter()]
+
+	it('fills the defaults when the option is absent', () => {
+		expect(resolveOptions({ adapters }).view).toEqual({
+			path: '/analytics',
+			defaultRange: 'last30days',
+			defaultMetric: 'pageviews',
+		})
+	})
+
+	it('keeps false so nothing is registered', () => {
+		expect(resolveOptions({ adapters, view: false }).view).toBe(false)
+	})
+
+	it('carries path, range, metric and navLabel through', () => {
+		expect(
+			resolveOptions({
+				adapters,
+				view: {
+					path: '/insights',
+					defaultRange: 'last7days',
+					defaultMetric: 'visitors',
+					navLabel: 'Traffic',
+				},
+			}).view
+		).toEqual({
+			path: '/insights',
+			defaultRange: 'last7days',
+			defaultMetric: 'visitors',
+			navLabel: 'Traffic',
+		})
+	})
+
+	it('rejects a path that is not rooted', () => {
+		expect(() => resolveOptions({ adapters, view: { path: 'insights' as `/${string}` } })).toThrow(
+			/view\.path/i
+		)
+	})
+
+	it('rejects an unknown timeframe preset or metric', () => {
+		expect(() =>
+			resolveOptions({ adapters, view: { defaultRange: '30d' as 'last30days' } })
+		).toThrow(/view\.defaultRange/i)
+		expect(() =>
+			resolveOptions({ adapters, view: { defaultMetric: 'clicks' as 'pageviews' } })
+		).toThrow(/view\.defaultMetric/i)
+	})
+
+	it('defaults access.view to the resolved read gate', () => {
+		const resolved = resolveOptions({ adapters })
+		expect(resolved.access.view).toBe(resolved.access.read)
+	})
+
+	it('keeps an explicit access.view separate from access.read', () => {
+		const view = () => false
+		const resolved = resolveOptions({ adapters, access: { view } })
+		expect(resolved.access.view).toBe(view)
+		expect(resolved.access.read).not.toBe(view)
 	})
 })

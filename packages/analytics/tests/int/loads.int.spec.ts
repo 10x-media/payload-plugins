@@ -3,7 +3,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
-describeForDb('analytics loads', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics loads', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {

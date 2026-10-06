@@ -1,0 +1,11 @@
+.settings-overlay-appearance {
+	display: flex;
+	flex-direction: column;
+	gap: var(--base, 20px);
+	padding: var(--base, 20px);
+}
+
+.settings-overlay-appearance__field {
+	margin-bottom: 0;
+	max-width: 32rem;
+}

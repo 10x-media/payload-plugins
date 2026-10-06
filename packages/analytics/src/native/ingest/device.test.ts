@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyDevice } from './device'
+import { classifyDevice, SERVER_USER_AGENT } from './device'
 
 describe('classifyDevice', () => {
 	it('classifies an iPhone user-agent as mobile', () => {
@@ -32,5 +32,9 @@ describe('classifyDevice', () => {
 
 	it('defaults an empty user-agent to desktop', () => {
 		expect(classifyDevice('')).toBe('desktop')
+	})
+
+	it('classifies the synthetic server user-agent as no device at all', () => {
+		expect(classifyDevice(SERVER_USER_AGENT)).toBeUndefined()
 	})
 })

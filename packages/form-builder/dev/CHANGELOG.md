@@ -1,5 +1,68 @@
 # @10x-media/form-builder-dev
 
+## 0.0.1-beta.27
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-builder@0.1.0-beta.27
+
+## 0.0.1-beta.26
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-builder@0.1.0-beta.26
+
+## 0.0.1-beta.25
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-builder@0.1.0-beta.25
+
+## 0.0.1-beta.24
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-builder@0.1.0-beta.24
+
+## 0.0.1-beta.23
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-builder@0.1.0-beta.23
+
+## 0.0.1-beta.22
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-builder@0.1.0-beta.22
+
+## 0.0.1-beta.21
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-builder@0.1.0-beta.21
+
+## 0.0.1-beta.20
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-builder@0.1.0-beta.20
+
+## 0.0.1-beta.19
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-builder@0.1.0-beta.19
+
 ## 0.0.1-beta.18
 
 ### Patch Changes

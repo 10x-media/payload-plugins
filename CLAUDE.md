@@ -77,6 +77,8 @@ pnpm changeset                          # author a changeset
 # Process hygiene
 pnpm check:processes                    # dry-run stale-process scan
 pnpm clean:processes                    # kill them
+pnpm check:mongo-temp                   # dry-run: list orphaned mongo-mem-* dirs in the OS temp dir
+pnpm clean:mongo-temp                   # delete them (--min-age=<minutes>, default 60)
 ```
 
 `<name>` is a plugin directory under `packages/` (e.g. `automations`) or an app under `apps/` (e.g. `docs`, so `pnpm dev docs` and `pnpm build docs` work). `scripts/run.ts` runs cacheable tasks (`build`/`lint`/`typecheck`/`test*`) through turbo and routes `dev`/`start`/`generate*`/`migrate*` to a plugin's `-dev` package via pnpm; apps have no `-dev` companion and do not support `generate`/`migrate`. Unknown names get a "Did you mean: ..." suggestion.
@@ -113,6 +115,32 @@ Unbounded that peaked at 67 node processes and more than 16 GB on a 4-vCPU CI ru
 
 Unfiltered `pnpm build` has the same eleven-way fan-out. The short commands forward extra args to the task rather than to turbo, so cap it with the env var instead: `TURBO_CONCURRENCY=3 pnpm build`.
 
+## Affected scoping in CI
+
+`ci.yml` does not run the whole workspace on every push. Each of `lint`, `typecheck`, `build`, `test`, and `test-matrix` starts with a `scope` step (`scripts/ci-affected.sh`) that resolves the git range into `TURBO_SCM_BASE`/`TURBO_SCM_HEAD` and emits `steps.scope.outputs.flag`, which is either `--affected` or empty. The turbo invocation interpolates that flag, so an empty one means the job runs everything.
+
+The base comes from the workflow-level `AFFECTED_BASE_SHA`: a pull request's base sha, a push's `before` sha, empty otherwise. Every job needs `fetch-depth: 0`; a shallow checkout has no base commit and takes the fallback.
+
+Scoping is by **package graph**, never by directory. A change to `jobs` also selects `automations`, because `automations` depends on it. `--filter` and `--affected` intersect rather than union, so `build` stays `--filter='./packages/*'` and simply narrows within it.
+
+`e2e` reuses the same scope step in its own `e2e-scope` job, which turns `turbo ls` into a matrix with one `pnpm test:e2e <plugin>` leg per plugin. A plugin is picked when it *or its dev app* is affected, because the dev app is what Playwright drives and it can import other plugins: a `fields` change selects `admin-wiki-dev` rather than `admin-wiki`, and still runs admin-wiki's e2e. It runs on pull requests and `workflow_dispatch`, not on pushes to `main`, and the `no_e2e` label opts a pull request out. Labels are read from the triggering event, so adding one takes effect on the next push, the same as `no-release`.
+
+**What forces the whole workspace**, and this is the part to keep intact when editing any of it:
+
+- A path in `globalDependencies` (`config/**`, `tsconfig.json`, `biome.json`, `.npmrc`, the root `package.json`, `pnpm-workspace.yaml`). Turbo fans those out to all 29 packages. The root manifest and the catalog are in that list *specifically* for this: without them a Payload bump in `pnpm-workspace.yaml`'s `catalog:` selects no packages at all and CI passes having tested nothing.
+- A change under `.github/` or `scripts/`, which `ci-affected.sh` special-cases. Those are not a build input of any package, so turbo cannot see them, and a pull request that rewrites CI would otherwise go green having run nothing.
+- `workflow_dispatch`, a first push to a branch, or a base commit that force-push removed.
+
+Verify a scoping change with `turbo ls`, which applies the filter without hashing (`--dry=json` also works but re-hashes the workspace, which is slow on Windows when a global dependency changed):
+
+```bash
+pnpm exec turbo ls --filter='...[<base>...<head>]'
+```
+
+`check:dist` runs as `--only-built`, skipping packages an affected build deliberately left without a `dist/`. `check:template` and `check:registry` stay unscoped: template drift is exactly the class of bug that hides in the packages a scoped run skips.
+
+Two consequences worth knowing. `main` keeps `cancel-in-progress: true`, so if a push cancels an in-flight run, the next run only covers its own commits rather than re-testing the backlog; the cancelled changes were still covered by their own pull request. And the `test` job's Mongo pre-cache step runs even when nothing is affected, so a docs-only pull request still pays for that download.
+
 ## Docs showcase clips
 
 A plugin may carry `packages/<slug>/videos/*.video.ts`: clipwright scenes driving that plugin's own dev app, rendered to MP4 for the docs site. They are showcases rather than tutorials, so they carry no captions and no audio, and the docs play them muted and looping through `<Video>` (`apps/docs/components/video.tsx`).
@@ -120,6 +148,14 @@ A plugin may carry `packages/<slug>/videos/*.video.ts`: clipwright scenes drivin
 `pnpm videos <name>` renders them, and needs `pnpm dev <name>` already serving on `:3000` (override with `WIKI_DEV_URL`). Output goes straight into `apps/docs/public/videos/<slug>/`, one MP4 plus a poster PNG per scene, and those files are committed. Nothing renders them in CI: they are binaries in git, so re-render only when the UI they show actually changed.
 
 Scenes are linted and typechecked with the rest of the package. Whatever fixtures a scene needs it creates through the REST API in `beforeScene`, which is off camera and free.
+
+A scene with `video: false` renders stills only (clipwright `snapshot()`, no ffmpeg). `conversations` has one (`videos/screenshots.video.ts`) for every docs screenshot: dark admin, cropped to an element, written to `apps/docs/public/images/<slug>/` as PNG, converted by hand to lossless WebP (the command is in the scene's header; a third of the size in git), and placed with `<Screenshot>` (`apps/docs/components/screenshot.tsx`). Its primitives come from the dev playground's "Docs shots" stories on the mock backend (`data-shot` marks each crop), so they are the same on every run.
+
+## shadcn registries
+
+A plugin with website components carries a shadcn registry in `packages/<slug>/registry/`: sources, `registry.json`, and the built `registry/r/*.json` from its `registry:build` script, committed. `pnpm check:registry` (`scripts/check-registry.sh`) rebuilds every one and fails on drift; it runs unscoped in CI.
+
+The docs site serves them: `apps/docs/scripts/collect-registry.ts` copies each `registry/r` into `apps/docs/public/r/<slug>/` (gitignored) before `dev` and `build`, so items live at `https://docs.10xmedia.de/r/<slug>/<item>.json` and the folder's `registry.json` is the index. Each plugin is its own registry, so item names only need to be unique within it. Items that depend on another item of the same registry list it by full URL in `registryDependencies`, which works without any `components.json` setup. A change under `packages/*/registry/r` redeploys the docs (`docs.yml` paths, and the docs build's turbo inputs).
 
 ## Adding a plugin
 

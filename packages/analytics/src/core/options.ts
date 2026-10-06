@@ -1,16 +1,24 @@
 import type { KeysConfig } from '@10x-media/fields/encrypted'
 import type { CollectionConfig, CollectionSlug, Payload, PayloadRequest } from 'payload'
 import type { AnalyticsBinding, ResolvedBinding } from '../binding/types'
+import { DEFAULT_PROXY_MAX_BODY_BYTES, DEFAULT_PROXY_TIMEOUT_MS } from '../capture/proxyEndpoint'
+import type { CaptureSlot } from '../capture/slots'
+import { GOALS_SLUG } from '../goals/collection'
+import { GOAL_SLUG_PATTERN, type Goal } from '../goals/types'
 import { PROVIDERS_SLUG } from '../providers/collection'
+import { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 import type { TranslationsOption } from '../translations'
+import { METRIC_KEYS } from '../translations/metricKeys'
 import type { CustomWidgetDef } from '../widgets/customWidget'
-import type { AnalyticsAdapter } from './contract'
+import type { CaptureClientKind } from './capture'
+import type { AnalyticsAdapter, MetricKey } from './contract'
 
 const DEFAULT_WARM_CRON = '*/30 * * * *'
 const DEFAULT_SYNC_CRON = '0 */6 * * *'
 const DEFAULT_SYNC_COLLECTION = 'analytics-daily'
 const DEFAULT_SYNC_LOOKBACK = 3
 const DEFAULT_SCOPE_FIELD = 'scope'
+const DEFAULT_TIMEOUT_MS = 15_000
 
 /**
  * Maps a request to its analytics boundary (tenant id, site key). Null means the
@@ -31,6 +39,12 @@ export type TimezoneResolver = (args: {
 	req: PayloadRequest
 	scope: string | null
 }) => string | null | Promise<string | null>
+
+/**
+ * Enumerates the tenant scopes the cron tiers (cache warming, sync) fan out over.
+ * Absent, each tier runs once for the install-wide scope.
+ */
+export type ScopesResolver = (args: { payload: Payload }) => string[] | Promise<string[]>
 
 /**
  * Escape hatch replacing the provider-collection lookup: return the runtime
@@ -72,13 +86,160 @@ export type ProvidersOptions = {
 /** Access checker for cross-scope (platform) analytics reads. */
 export type PlatformReadAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 
+/** Access checker for authenticated analytics reads. */
+export type AnalyticsReadAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
+
+/** Access checker for the analytics admin view. */
+export type AnalyticsViewAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
+
 export type AnalyticsAccessOptions = {
 	/**
+	 * Gates every authenticated read endpoint: query, document panel, realtime, sources
+	 * and goals. Defaults to any authenticated user; narrow it to a role check to keep
+	 * analytics away from admins who should not see them. Scope gating is separate and
+	 * always applies: granting `read` never widens which scope a user reads.
+	 */
+	read?: AnalyticsReadAccess
+	/**
 	 * Gates cross-scope reads: explicit `scope: '*'` reads, and scoped reads through
-	 * a platform adapter that cannot filter by scope. Defaults to any authenticated
-	 * admin-panel user.
+	 * a shared config adapter that cannot filter by scope. Scoped installs
+	 * (`scopeResolver` configured) default to deny; configure it, for example a role
+	 * check, so platform admins can read cross-scope and manage every tenant's
+	 * providers. Unscoped installs default to any authenticated admin-panel user.
 	 */
 	platformRead?: PlatformReadAccess
+	/**
+	 * Gates the analytics admin view. Defaults to `read`, so one gate covers the view and
+	 * the endpoints behind it. A reader this denies still sees the nav link (it is a client
+	 * component with no access context) and lands on the view's no-access message.
+	 */
+	view?: AnalyticsViewAccess
+}
+
+export type ConsentMode = 'none' | 'required'
+
+/** Per-slot consent decision, evaluated against the slot's resolved adapter. */
+export type ConsentResolver = (args: { slot: CaptureSlot; adapterId: string }) => ConsentMode
+
+/** An adapter id to fill a capture slot with, or `false` to leave it deliberately empty. */
+export type CaptureSlotOption = string | false
+
+/**
+ * A bare mode applies to every slot; a resolver decides per request-resolved adapter; the
+ * object form maps ids and slots, with an adapter entry winning over a slot entry. Every
+ * form overrides the default, which is `none` for the cookieless native tracker and
+ * `required` for a vendor's.
+ */
+export type CaptureConsentOption =
+	| ConsentMode
+	| ConsentResolver
+	| {
+			slots?: Partial<Record<CaptureSlot, ConsentMode>>
+			/**
+			 * Keyed by adapter id. A bare id must name a config adapter; a runtime provider
+			 * instance id (`<provider>:<instance>`) is taken on trust, since the providers it
+			 * comes from are only resolved per request.
+			 */
+			adapters?: Record<string, ConsentMode>
+	  }
+
+/** The normalized policy the runtime evaluates; `kind` carries the adapter's tracker family. */
+export type ConsentPolicy = (
+	slot: CaptureSlot,
+	adapterId: string,
+	kind: CaptureClientKind
+) => ConsentMode
+
+export type AutoCaptureOptions = {
+	scrollDepth?: boolean
+	outboundLinks?: boolean
+	fileDownloads?: boolean
+	goalAttribute?: boolean
+	/**
+	 * Send each pageview's query string so ingest can extract its utm keys. The raw query is
+	 * never stored, only the five campaign values; set false to stop sending it at all.
+	 */
+	query?: boolean
+}
+
+export type ResolvedAutoCapture = Required<AutoCaptureOptions>
+
+export type AnalyticsGoalsCollectionOptions = {
+	/** Set false to keep the object form's other settings while leaving the collection off. */
+	enabled?: boolean
+	slug?: string
+	/**
+	 * Field matched against the resolved scope when looking up a scope's goals. Point it at
+	 * a tenant plugin's field (e.g. 'tenant') when that plugin manages scoping.
+	 */
+	scopeField?: string
+	overrides?: (collection: CollectionConfig) => CollectionConfig
+	access?: Partial<CollectionConfig['access']>
+}
+
+/** Goals as config, plus the opt-in collection editors manage their own goals through. */
+export type AnalyticsGoalsOptions = {
+	defaults?: Goal[]
+	/** Opt-in admin collection whose goals merge over `defaults`, by slug, per scope. */
+	collection?: boolean | AnalyticsGoalsCollectionOptions
+}
+
+export type AnalyticsCaptureOptions = {
+	/**
+	 * Which adapter fills each capture slot, overriding the defaults: `global` is the
+	 * designated `platformAdapter`, or the single config adapter when only one is
+	 * configured; `tenant` is the resolved scope's default adapter. A `global` id must
+	 * name a config adapter; a `tenant` id may also name a runtime provider instance,
+	 * so it is resolved per request rather than validated at config time.
+	 *
+	 * `false` disables a slot outright: it fills with nothing, its proxy mount 404s, and
+	 * the tracker config omits it. Use it to keep a default from filling a slot at all.
+	 */
+	slots?: { global?: CaptureSlotOption; tenant?: CaptureSlotOption }
+	/**
+	 * Mount each slot's snippet points at. Defaults to the runtime proxy endpoint
+	 * (`<routes.api>/analytics/p/<slot>`); set it when the slot is served through Next
+	 * rewrites instead, passing the same path `captureRewrites` was mounted at.
+	 */
+	paths?: { global?: string; tenant?: string }
+	/** Whether a slot's tracker waits for consent. Native defaults to no gate, vendors to one. */
+	consent?: CaptureConsentOption
+	/** Browser auto-capture listeners, all on by default except `scrollDepth`. */
+	autoCapture?: AutoCaptureOptions
+	/** Limits for the public runtime capture proxy, separate from the read-path `cache`. */
+	proxy?: {
+		/**
+		 * Deadline for the upstream response headers, in ms. Default 10000. The body
+		 * download is not on the clock, so a large tracker bundle streams to completion.
+		 */
+		timeoutMs?: number
+		/**
+		 * Largest proxied request body, in bytes. Default 1 MiB, which clears a PostHog
+		 * batch carrying session-replay data. Anything larger is refused with 413.
+		 */
+		maxBodyBytes?: number
+	}
+}
+
+export type AnalyticsViewOptions = {
+	/** Admin path the view mounts at, under `routes.admin`. Default `/analytics`. */
+	path?: `/${string}`
+	/** Timeframe the view opens on before the URL says otherwise. Default `last30days`. */
+	defaultRange?: TimeframePreset
+	/** Metric the cards and the trend open on. Default `pageviews`. */
+	defaultMetric?: MetricKey
+	/**
+	 * Nav link label. A string is used as-is; a map is keyed by admin language code and
+	 * falls back to `en`. Unset, the plugin's own translated label applies.
+	 */
+	navLabel?: string | Record<string, string>
+}
+
+export interface ResolvedView {
+	path: `/${string}`
+	defaultRange: TimeframePreset
+	defaultMetric: MetricKey
+	navLabel?: string | Record<string, string>
 }
 
 export type AnalyticsPluginOptions = {
@@ -93,6 +254,12 @@ export type AnalyticsPluginOptions = {
 	adapters?: AnalyticsAdapter[]
 	defaultAdapter?: string
 	scopeResolver?: ScopeResolver
+	/**
+	 * Enumerates the tenant scopes the cache-warming and sync cron tiers fan out
+	 * over, in addition to the install-wide (null) scope every tier already runs.
+	 * Unset, those tiers run once for the whole install, same as before.
+	 */
+	scopes?: ScopesResolver
 	/**
 	 * IANA reporting timezone that day boundaries (timeframe windows, series axes,
 	 * native rollup buckets) align to. Defaults to UTC. A string forces one timezone
@@ -110,13 +277,37 @@ export type AnalyticsPluginOptions = {
 	 * require `access.platformRead`.
 	 */
 	platformAdapter?: string
+	/**
+	 * How many proxies in front of the app are trusted, counted from the right of
+	 * `x-forwarded-for`, when the plugin reads a request's client address (the native visitor
+	 * hash, geo, and the address the capture proxy forwards upstream). It also lets the native
+	 * ingest read `x-forwarded-host` for the event's hostname. Unset keeps the leftmost
+	 * forwarded entry, which the client controls.
+	 */
+	trustedProxyHops?: number
 	access?: AnalyticsAccessOptions
+	/**
+	 * The analytics admin view and its nav link, on by default. `false` registers neither;
+	 * the read endpoints stay mounted either way, so a custom surface keeps working.
+	 */
+	view?: false | AnalyticsViewOptions
+	capture?: AnalyticsCaptureOptions
+	/**
+	 * Conversion goals the tracker and the native ingest match events against. Slugs must
+	 * be unique and kebab-case; only the slug and its match reach the browser.
+	 */
+	goals?: Goal[] | AnalyticsGoalsOptions
 	/**
 	 * Per-collection bindings, keyed by collection slug. With generated types
 	 * augmented, each slug's resolvers receive that collection's typed document.
 	 */
 	collections?: { [TSlug in CollectionSlug]?: AnalyticsBinding<TSlug> }
-	cache?: { ttl?: { aggregate?: number; realtime?: number }; warm?: boolean | { cron?: string } }
+	cache?: {
+		ttl?: { aggregate?: number; realtime?: number }
+		warm?: boolean | { cron?: string }
+		/** Per-read provider timeout in ms, spanning retries and limiter waits. Default 15000. */
+		timeoutMs?: number
+	}
 	widgets?:
 		| boolean
 		| {
@@ -130,8 +321,9 @@ export type AnalyticsPluginOptions = {
 				localizeText?: boolean
 				/**
 				 * Period-over-period comparison on the metric and trend widgets. On by
-				 * default for adapters that declare `capabilities.comparison`; set false
-				 * to skip the second (previous-window) read entirely.
+				 * default for every source except one whose adapter sets
+				 * `capabilities.comparison` false; set false to skip the second
+				 * (previous-window) read entirely.
 				 */
 				comparison?: boolean
 		  }
@@ -153,16 +345,44 @@ export type AnalyticsPluginOptions = {
 		  }
 }
 
+export interface ResolvedCapture {
+	slots: { global?: CaptureSlotOption; tenant?: CaptureSlotOption }
+	paths: { global?: string; tenant?: string }
+	consent: ConsentPolicy
+	autoCapture: ResolvedAutoCapture
+	proxy: { timeoutMs: number; maxBodyBytes: number }
+}
+
 export interface ResolvedOptions {
 	adapters: AnalyticsAdapter[]
 	defaultAdapter?: string
 	scopeResolver: ScopeResolver
 	/** True when the app configured a scopeResolver (scoped install). */
 	scoped: boolean
+	/** Raw scopes option; undefined runs the cron tiers install-wide only. */
+	scopes?: ScopesResolver
 	/** Raw reportingTimezone option; normalized into a resolver at init. */
 	reportingTimezone?: string | TimezoneResolver
 	platformAdapter?: string
-	access: { platformRead: PlatformReadAccess }
+	/** Raw trustedProxyHops option; undefined keeps the leftmost forwarded-for entry. */
+	trustedProxyHops?: number
+	access: {
+		platformRead: PlatformReadAccess
+		read: AnalyticsReadAccess
+		view: AnalyticsViewAccess
+	}
+	/** The admin view, filled with its defaults, or false when the app turned it off. */
+	view: false | ResolvedView
+	capture: ResolvedCapture
+	/** Config goals, validated; the goals collection layers its own on top of these. */
+	goals: Goal[]
+	goalsCollection: {
+		enabled: boolean
+		slug: string
+		scopeField: string
+		overrides?: (collection: CollectionConfig) => CollectionConfig
+		access?: Partial<CollectionConfig['access']>
+	}
 	providers: {
 		collection: {
 			enabled: boolean
@@ -179,6 +399,7 @@ export interface ResolvedOptions {
 		/** Undefined when unset: adapter recommendedTtl is the fallback, an explicit value wins. */
 		ttl: { aggregate?: number; realtime?: number }
 		warm: { enabled: boolean; cron: string }
+		timeoutMs: number
 	}
 	widgets: {
 		enabled: boolean
@@ -195,6 +416,136 @@ export interface ResolvedOptions {
 		adapters?: string[]
 		/** True hides the analytics-daily collection from the admin nav (default). */
 		hidden: boolean
+	}
+}
+
+/** Scroll depth is the one listener off by default: it fires on every page, for every visitor. */
+export const DEFAULT_AUTO_CAPTURE: ResolvedAutoCapture = {
+	scrollDepth: false,
+	outboundLinks: true,
+	fileDownloads: true,
+	goalAttribute: true,
+	query: true,
+}
+
+const resolveAutoCapture = (option: AutoCaptureOptions | undefined): ResolvedAutoCapture => ({
+	scrollDepth: option?.scrollDepth ?? DEFAULT_AUTO_CAPTURE.scrollDepth,
+	outboundLinks: option?.outboundLinks ?? DEFAULT_AUTO_CAPTURE.outboundLinks,
+	fileDownloads: option?.fileDownloads ?? DEFAULT_AUTO_CAPTURE.fileDownloads,
+	goalAttribute: option?.goalAttribute ?? DEFAULT_AUTO_CAPTURE.goalAttribute,
+	query: option?.query ?? DEFAULT_AUTO_CAPTURE.query,
+})
+
+/** Cookieless native capture needs no consent gate; a vendor's tracker does. */
+export const defaultConsentFor = (kind: CaptureClientKind): ConsentMode =>
+	kind === 'native' ? 'none' : 'required'
+
+const resolveConsent = (
+	option: CaptureConsentOption | undefined,
+	adapters: AnalyticsAdapter[]
+): ConsentPolicy => {
+	if (option === 'none' || option === 'required') {
+		return () => option
+	}
+	if (typeof option === 'function') {
+		return (slot, adapterId) => option({ slot, adapterId })
+	}
+	for (const id of Object.keys(option?.adapters ?? {})) {
+		// A runtime provider instance id is `<provider>:<instance>` and only exists once a
+		// scope resolves, so it cannot be checked here; a bare id must name a config adapter.
+		if (!id.includes(':') && !adapters.some((a) => a.id === id)) {
+			throw new Error(`analytics: unknown consent adapter "${id}"`)
+		}
+	}
+	return (slot, adapterId, kind) =>
+		option?.adapters?.[adapterId] ?? option?.slots?.[slot] ?? defaultConsentFor(kind)
+}
+
+const resolveGoals = (option: AnalyticsPluginOptions['goals']): Goal[] => {
+	const goals = Array.isArray(option) ? option : (option?.defaults ?? [])
+	const seen = new Set<string>()
+	for (const goal of goals) {
+		if (!GOAL_SLUG_PATTERN.test(goal.slug)) {
+			throw new Error(`analytics: goal slug "${goal.slug}" must be kebab-case`)
+		}
+		if (seen.has(goal.slug)) {
+			throw new Error(`analytics: duplicate goal slug "${goal.slug}"`)
+		}
+		const fixed = goal.value?.fixed
+		// Revenue is money: a negative or non-finite fixed value would be silently ignored at
+		// ingest, so it fails the boot instead.
+		if (fixed !== undefined && (!Number.isFinite(fixed) || fixed < 0)) {
+			throw new Error(
+				`analytics: goal "${goal.slug}" value.fixed must be a finite number >= 0, got ${String(fixed)}`
+			)
+		}
+		seen.add(goal.slug)
+	}
+	return goals
+}
+
+const resolveGoalsCollection = (
+	option: AnalyticsPluginOptions['goals']
+): ResolvedOptions['goalsCollection'] => {
+	const off = { enabled: false, slug: GOALS_SLUG, scopeField: DEFAULT_SCOPE_FIELD }
+	const collection = Array.isArray(option) ? undefined : option?.collection
+	if (!collection) {
+		return off
+	}
+	const resolved =
+		collection === true
+			? { ...off, enabled: true }
+			: {
+					enabled: collection.enabled ?? true,
+					slug: collection.slug ?? GOALS_SLUG,
+					scopeField: collection.scopeField ?? DEFAULT_SCOPE_FIELD,
+					overrides: collection.overrides,
+					access: collection.access,
+				}
+	if (!resolved.enabled) {
+		return off
+	}
+	if (typeof resolved.slug !== 'string' || resolved.slug.trim() === '') {
+		throw new Error('analytics: goals.collection.slug must be a non-empty collection slug')
+	}
+	if (resolved.scopeField.trim() === '') {
+		throw new Error('analytics: goals.collection.scopeField must be a non-empty field name')
+	}
+	if (resolved.scopeField.includes('.')) {
+		throw new Error(
+			'analytics: goals.collection.scopeField must be a top-level field name (no dots); the scope stamp writes it as a flat key'
+		)
+	}
+	return { ...resolved, slug: resolved.slug.trim() }
+}
+
+export const DEFAULT_VIEW: ResolvedView = {
+	path: '/analytics',
+	defaultRange: 'last30days',
+	defaultMetric: 'pageviews',
+}
+
+const resolveView = (option: AnalyticsPluginOptions['view']): false | ResolvedView => {
+	if (option === false) {
+		return false
+	}
+	const path = option?.path ?? DEFAULT_VIEW.path
+	if (typeof path !== 'string' || !path.startsWith('/')) {
+		throw new Error(`analytics: view.path must start with "/", got "${String(path)}"`)
+	}
+	const defaultRange = option?.defaultRange ?? DEFAULT_VIEW.defaultRange
+	if (!TIMEFRAME_PRESETS.includes(defaultRange)) {
+		throw new Error(`analytics: unknown view.defaultRange "${String(defaultRange)}"`)
+	}
+	const defaultMetric = option?.defaultMetric ?? DEFAULT_VIEW.defaultMetric
+	if (!(defaultMetric in METRIC_KEYS)) {
+		throw new Error(`analytics: unknown view.defaultMetric "${String(defaultMetric)}"`)
+	}
+	return {
+		path,
+		defaultRange,
+		defaultMetric,
+		...(option?.navLabel !== undefined ? { navLabel: option.navLabel } : {}),
 	}
 }
 
@@ -223,6 +574,25 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 		!options.adapters.some((a) => a.id === options.platformAdapter)
 	) {
 		throw new Error(`analytics: unknown platform adapter "${options.platformAdapter}"`)
+	}
+	for (const [slot, value] of Object.entries(options.capture?.slots ?? {})) {
+		if (value !== false && typeof value !== 'string' && value !== undefined) {
+			throw new Error(
+				`analytics: capture slot "${slot}" must be an adapter id or false, got ${typeof value}`
+			)
+		}
+	}
+	const hops = options.trustedProxyHops
+	if (hops !== undefined && (!Number.isInteger(hops) || hops < 0)) {
+		throw new Error(
+			`analytics: trustedProxyHops must be a non-negative integer, got ${String(hops)}`
+		)
+	}
+	const globalSlot = options.capture?.slots?.global
+	// A tenant id may name a runtime provider instance, which only exists once a scope
+	// resolves; a global one can only come from the config registry, so it is checked here.
+	if (typeof globalSlot === 'string' && !options.adapters.some((a) => a.id === globalSlot)) {
+		throw new Error(`analytics: unknown global capture slot adapter "${globalSlot}"`)
 	}
 	const widgets =
 		options.widgets === false
@@ -272,6 +642,16 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 					: { enabled: false, slug: PROVIDERS_SLUG, scopeField: DEFAULT_SCOPE_FIELD },
 		resolve: options.providers?.resolve,
 	}
+	if (providers.collection.enabled) {
+		if (providers.collection.scopeField.trim() === '') {
+			throw new Error('analytics: providers.collection.scopeField must be a non-empty field name')
+		}
+		if (providers.collection.scopeField.includes('.')) {
+			throw new Error(
+				'analytics: providers.collection.scopeField must be a top-level field name (no dots); the scope stamp writes it as a flat key'
+			)
+		}
+	}
 	const syncOpt = options.sync
 	const sync =
 		syncOpt === true
@@ -298,14 +678,43 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 						lookbackDays: DEFAULT_SYNC_LOOKBACK,
 						hidden: true,
 					}
+	const scoped = options.scopeResolver !== undefined
+	// The view gate defaults to this exact function, so one `access.read` covers both.
+	const read: AnalyticsReadAccess = options.access?.read ?? (({ req }) => Boolean(req.user))
 	return {
 		adapters: options.adapters,
 		defaultAdapter: options.defaultAdapter,
 		scopeResolver: options.scopeResolver ?? (() => null),
-		scoped: options.scopeResolver !== undefined,
+		scoped,
+		scopes: options.scopes,
 		reportingTimezone: options.reportingTimezone,
 		platformAdapter: options.platformAdapter,
-		access: { platformRead: options.access?.platformRead ?? (({ req }) => Boolean(req.user)) },
+		trustedProxyHops: hops,
+		access: {
+			platformRead:
+				options.access?.platformRead ?? (scoped ? () => false : ({ req }) => Boolean(req.user)),
+			read,
+			view: options.access?.view ?? read,
+		},
+		view: resolveView(options.view),
+		capture: {
+			slots: {
+				global: options.capture?.slots?.global,
+				tenant: options.capture?.slots?.tenant,
+			},
+			paths: {
+				global: options.capture?.paths?.global,
+				tenant: options.capture?.paths?.tenant,
+			},
+			consent: resolveConsent(options.capture?.consent, options.adapters),
+			autoCapture: resolveAutoCapture(options.capture?.autoCapture),
+			proxy: {
+				timeoutMs: options.capture?.proxy?.timeoutMs ?? DEFAULT_PROXY_TIMEOUT_MS,
+				maxBodyBytes: options.capture?.proxy?.maxBodyBytes ?? DEFAULT_PROXY_MAX_BODY_BYTES,
+			},
+		},
+		goals: resolveGoals(options.goals),
+		goalsCollection: resolveGoalsCollection(options.goals),
 		providers,
 		bindings: resolveBindings(options.collections),
 		cache: {
@@ -316,6 +725,7 @@ export function resolveOptions(options: AnalyticsPluginOptions): ResolvedOptions
 				realtime: options.cache?.ttl?.realtime,
 			},
 			warm,
+			timeoutMs: options.cache?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
 		},
 		widgets,
 		sync,

@@ -70,6 +70,8 @@ export interface Config {
     colors: Color;
     encrypted: Encrypted;
     icons: Icon;
+    measurements: Measurement;
+    'phone-numbers': PhoneNumber;
     'write-only-stories': WriteOnlyStory;
     tenants: Tenant;
     users: User;
@@ -83,6 +85,8 @@ export interface Config {
     colors: ColorsSelect<false> | ColorsSelect<true>;
     encrypted: EncryptedSelect<false> | EncryptedSelect<true>;
     icons: IconsSelect<false> | IconsSelect<true>;
+    measurements: MeasurementsSelect<false> | MeasurementsSelect<true>;
+    'phone-numbers': PhoneNumbersSelect<false> | PhoneNumbersSelect<true>;
     'write-only-stories': WriteOnlyStoriesSelect<false> | WriteOnlyStoriesSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
@@ -300,6 +304,325 @@ export interface Tenant {
   createdAt: string;
 }
 /**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "measurements".
+ */
+export interface Measurement {
+  id: string;
+  title: string;
+  nativeNumber?: number | null;
+  weight?: number | null;
+  /**
+   * Compound ft+in entry when toggled imperial
+   */
+  height?: number | null;
+  distance?: number | null;
+  load?: number | null;
+  wingspan?: number | null;
+  volume?: number | null;
+  temperature?: number | null;
+  speed?: number | null;
+  poundsFirst?: number | null;
+  kgOnly?: number | null;
+  boundedWeight: number;
+  readOnlyWeight?: number | null;
+  localizedDistance?: number | null;
+  /**
+   * Free-form: inches only, stored in millimetres, its own preference bucket
+   */
+  cutout?: number | null;
+  /**
+   * Free-form with a custom unit (nmi, 1 nmi = 1852 m). No Intl unit for nmi, so it formats as a plain decimal plus shortLabel
+   */
+  sailing?: number | null;
+  /**
+   * Exact mode: free entry (no quantize), faithful drafts, cells read back at full storage precision
+   */
+  labSample?: number | null;
+  /**
+   * Readable mode with storage rounded to whole grams: the granularity contract runs on every write, regardless of what produced the number
+   */
+  shippingWeight?: number | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "phone-numbers".
+ */
+export interface PhoneNumber {
+  id: string;
+  title: string;
+  nativeText?: string | null;
+  phone?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * Native text field outside a row: the phone rows below must share its height, border, radius and margin-bottom
+   */
+  nativeStacked?: string | null;
+  /**
+   * storage e164: one indexed text column holding the raw E.164 string. Also carries admin.placeholder, className, style, and custom Error/beforeInput/afterInput components
+   */
+  e164Phone?: string | null;
+  /**
+   * validation possible: length alone decides
+   */
+  possibleValidation?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * validation valid: the number must match a real range
+   */
+  strictValidation?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * validation mobile: a landline is rejected, which needs metadata max or mobile
+   */
+  mobileOnly?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * flags svg: artwork served by the plugin endpoint
+   */
+  svgFlags?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * flags emoji: regional indicator pairs, no artwork
+   */
+  emojiFlags?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * flags none: the trigger shows the ISO code instead
+   */
+  noFlags?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * countries allowlist of six, defaulting to CH, seeded with a JP number the allowlist does not offer: an allowlist scopes the picker, not what a pasted number may commit
+   */
+  allowlisted?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * The seed is sibling-scoped, so a row must read its own value
+   */
+  contacts?:
+    | {
+        role?: string | null;
+        phone?: {
+          number?: string | null;
+          country?: string | null;
+          national?: string | null;
+          international?: string | null;
+          callingCode?: string | null;
+          uri?: string | null;
+          type?: string | null;
+        };
+        id?: string | null;
+      }[]
+    | null;
+  /**
+   * priorityCountries overriding the plugin-wide DE/AT/CH, headed by priorityCountriesLabel ("Popular")
+   */
+  priorityFirst?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * priorityCountries with no priorityCountriesLabel: the group still leads the list, split from the rest only by the divider, no heading text
+   */
+  priorityFirstNoLabel?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * defaultCountry US: opening the picker has to scroll far down the list to reach it
+   */
+  usDefault?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * cellFormat national: check the list view column
+   */
+  nationalCell?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * cellFormat e164: check the list view column
+   */
+  e164Cell?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * required: no clear control, and empty fails to save
+   */
+  requiredPhone: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  nativeReadOnly?: string | null;
+  /**
+   * admin.readOnly, which reaches a custom Field component only via clientField
+   */
+  readOnlyPhone?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * localized: one number per admin locale
+   */
+  localizedPhone?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * isClearable false: emptying the input and committing reverts to the last valid value
+   */
+  notClearable?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * A localized static label, not the humanized name
+   */
+  labelled?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  customComponents?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  /**
+   * Toggles the conditional phone field below
+   */
+  showConditional?: boolean | null;
+  /**
+   * admin.condition, driven by the checkbox above
+   */
+  conditionalPhone?: {
+    number?: string | null;
+    country?: string | null;
+    national?: string | null;
+    international?: string | null;
+    callingCode?: string | null;
+    uri?: string | null;
+    type?: string | null;
+  };
+  updatedAt: string;
+  createdAt: string;
+}
+/**
  * One field per write-only user story. The input is always editable: a stored value is only a placeholder (hint or dots), typing stages a replacement, emptying the input keeps the stored value, and every action lives inside the input row.
  *
  * This interface was referenced by `Config`'s JSON-Schema
@@ -322,6 +645,16 @@ export interface WriteOnlyStory {
   rotationSecret: string;
   rotationSecret_set?: boolean | null;
   rotationSecret_hint?: string | null;
+  stripeLiveKey?: string;
+  stripeLiveKey_set?: boolean | null;
+  stripeLiveKey_hint?: string | null;
+  /**
+   * Native neighbour at the same width, for comparison: both inputs must be the same height and the same width, and the encrypted one must not push this one out of the row.
+   */
+  rowNeighbour?: string | null;
+  longLivedToken?: string;
+  longLivedToken_set?: boolean | null;
+  longLivedToken_hint?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -385,6 +718,14 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'icons';
         value: string | Icon;
+      } | null)
+    | ({
+        relationTo: 'measurements';
+        value: string | Measurement;
+      } | null)
+    | ({
+        relationTo: 'phone-numbers';
+        value: string | PhoneNumber;
       } | null)
     | ({
         relationTo: 'write-only-stories';
@@ -518,6 +859,284 @@ export interface IconsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "measurements_select".
+ */
+export interface MeasurementsSelect<T extends boolean = true> {
+  title?: T;
+  nativeNumber?: T;
+  weight?: T;
+  height?: T;
+  distance?: T;
+  load?: T;
+  wingspan?: T;
+  volume?: T;
+  temperature?: T;
+  speed?: T;
+  poundsFirst?: T;
+  kgOnly?: T;
+  boundedWeight?: T;
+  readOnlyWeight?: T;
+  localizedDistance?: T;
+  cutout?: T;
+  sailing?: T;
+  labSample?: T;
+  shippingWeight?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "phone-numbers_select".
+ */
+export interface PhoneNumbersSelect<T extends boolean = true> {
+  title?: T;
+  nativeText?: T;
+  phone?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  nativeStacked?: T;
+  e164Phone?: T;
+  possibleValidation?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  strictValidation?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  mobileOnly?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  svgFlags?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  emojiFlags?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  noFlags?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  allowlisted?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  contacts?:
+    | T
+    | {
+        role?: T;
+        phone?:
+          | T
+          | {
+              number?: T;
+              country?: T;
+              national?: T;
+              international?: T;
+              callingCode?: T;
+              uri?: T;
+              type?: T;
+            };
+        id?: T;
+      };
+  priorityFirst?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  priorityFirstNoLabel?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  usDefault?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  nationalCell?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  e164Cell?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  requiredPhone?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  nativeReadOnly?: T;
+  readOnlyPhone?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  localizedPhone?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  notClearable?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  labelled?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  customComponents?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  showConditional?: T;
+  conditionalPhone?:
+    | T
+    | {
+        number?: T;
+        country?: T;
+        national?: T;
+        international?: T;
+        callingCode?: T;
+        uri?: T;
+        type?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "write-only-stories_select".
  */
 export interface WriteOnlyStoriesSelect<T extends boolean = true> {
@@ -536,6 +1155,13 @@ export interface WriteOnlyStoriesSelect<T extends boolean = true> {
   rotationSecret?: T;
   rotationSecret_set?: T;
   rotationSecret_hint?: T;
+  stripeLiveKey?: T;
+  stripeLiveKey_set?: T;
+  stripeLiveKey_hint?: T;
+  rowNeighbour?: T;
+  longLivedToken?: T;
+  longLivedToken_set?: T;
+  longLivedToken_hint?: T;
   updatedAt?: T;
   createdAt?: T;
 }

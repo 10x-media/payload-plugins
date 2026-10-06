@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
+import { FallbackLocaleError, stashFallbackLocale } from '../form/findFormAtLocale'
 import type { AnyActionDefinition } from './defineAction'
 import type { ActionRegistry } from './registry'
 import { runActionsForSubmission } from './task'
@@ -19,7 +20,7 @@ describe('runActionsForSubmission', () => {
 			.fn()
 			.mockResolvedValueOnce({ id: 's1', values: [], descriptors: [], locale: 'en' })
 			.mockResolvedValueOnce({ id: 'f1', title: 'F', actions: [{ blockType: 'boom' }] })
-		const payload = { findByID, logger } as unknown as Payload
+		const payload = { config: {}, findByID, logger } as unknown as Payload
 
 		const results = await runActionsForSubmission({
 			input: { formId: 'f1', submissionId: 's1' },
@@ -31,10 +32,59 @@ describe('runActionsForSubmission', () => {
 		expect(logger.error).toHaveBeenCalledTimes(1)
 	})
 
+	it('hands actions the whole loaded form document, not just its identity', async () => {
+		const run = vi.fn()
+		const registry: ActionRegistry = new Map([['spy', { type: 'spy', label: 'Spy', run }]])
+		const form = { id: 'f1', title: 'F', tenant: 't1', actions: [{ blockType: 'spy' }] }
+		const findByID = vi
+			.fn()
+			.mockResolvedValueOnce({ id: 's1', values: [], descriptors: [], locale: 'en' })
+			.mockResolvedValueOnce(form)
+		const payload = { config: {}, findByID, logger: { error: vi.fn() } } as unknown as Payload
+
+		await runActionsForSubmission({
+			input: { formId: 'f1', submissionId: 's1' },
+			registry,
+			payload,
+		})
+
+		expect(run).toHaveBeenCalledWith(expect.objectContaining({ form }))
+		expect(findByID).toHaveBeenCalledTimes(2)
+	})
+
+	it('fails the run instead of dropping it when the fallbackLocale resolver throws', async () => {
+		const run = vi.fn()
+		const registry: ActionRegistry = new Map([['spy', { type: 'spy', label: 'Spy', run }]])
+		const findByID = vi
+			.fn()
+			.mockResolvedValueOnce({ id: 's1', values: [], descriptors: [], locale: 'de' })
+			.mockResolvedValueOnce({ id: 'f1', actions: [{ blockType: 'spy' }] })
+		const payload = {
+			config: {
+				localization: {
+					defaultLocale: 'en',
+					localeCodes: ['en', 'de'],
+					locales: [{ code: 'en' }, { code: 'de' }],
+					fallback: true,
+				},
+				custom: stashFallbackLocale(undefined, () => {
+					throw new Error('tenant lookup down')
+				}),
+			},
+			findByID,
+			logger: { error: vi.fn() },
+		} as unknown as Payload
+
+		await expect(
+			runActionsForSubmission({ input: { formId: 'f1', submissionId: 's1' }, registry, payload })
+		).rejects.toBeInstanceOf(FallbackLocaleError)
+		expect(run).not.toHaveBeenCalled()
+	})
+
 	it('returns an empty list and logs nothing when the submission is missing', async () => {
 		const logger = { error: vi.fn(), warn: vi.fn(), info: vi.fn() }
 		const findByID = vi.fn().mockResolvedValue(null)
-		const payload = { findByID, logger } as unknown as Payload
+		const payload = { config: {}, findByID, logger } as unknown as Payload
 
 		const results = await runActionsForSubmission({
 			input: { formId: 'f1', submissionId: 's1' },
@@ -55,6 +105,7 @@ describe('runActionsForSubmission', () => {
 	it('prunes the submission after the pass when the form opts out of persistence', async () => {
 		const del = vi.fn().mockResolvedValue(undefined)
 		const payload = {
+			config: {},
 			findByID: submissionThenForm({ actions: [], persistSubmissions: false }),
 			delete: del,
 			logger: { error: vi.fn() },
@@ -72,6 +123,7 @@ describe('runActionsForSubmission', () => {
 	it('keeps the submission when the form persists (the default)', async () => {
 		const del = vi.fn()
 		const payload = {
+			config: {},
 			findByID: submissionThenForm({ actions: [] }),
 			delete: del,
 			logger: { error: vi.fn() },
@@ -94,6 +146,7 @@ describe('runActionsForSubmission', () => {
 		}
 		const del = vi.fn().mockResolvedValue(undefined)
 		const payload = {
+			config: {},
 			findByID: submissionThenForm({ actions: [{ blockType: 'boom' }], persistSubmissions: false }),
 			delete: del,
 			logger: { error: vi.fn() },

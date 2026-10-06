@@ -14,3 +14,16 @@ export const dayIso = (value: string): string | null => {
 	const t = Date.parse(`${date}T00:00:00.000Z`)
 	return Number.isNaN(t) ? null : new Date(t).toISOString()
 }
+
+/**
+ * Normalize a provider's hour label to a UTC ISO string. Takes a datetime like
+ * `2026-06-23 14:00:00` (space- or T-separated). Returns null for an unparseable or
+ * truncated value so the caller can skip that one row rather than emit a broken timestamp.
+ */
+export const hourIso = (value: string): string | null => {
+	if (value.length < 19) {
+		return null
+	}
+	const t = Date.parse(`${value.slice(0, 10)}T${value.slice(11, 19)}.000Z`)
+	return Number.isNaN(t) ? null : new Date(t).toISOString()
+}

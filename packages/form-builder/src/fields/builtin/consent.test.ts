@@ -13,9 +13,10 @@ describe('consentField', () => {
 		expect(consentField.value).toBe('boolean')
 	})
 
-	it('is configured by a source reference alone', () => {
+	it('is configured by a source reference and a display, nothing else', () => {
 		expect((consentField.config ?? []).map((f) => ('name' in f ? f.name : f.type))).toEqual([
 			'source',
+			'display',
 		])
 	})
 
@@ -52,6 +53,31 @@ describe('consentField', () => {
 
 	it('validates: required + value true -> valid', () => {
 		expect(consentField.validate?.({ ...base, value: true, config: { required: true } })).toBe(true)
+	})
+
+	it('validates: a notice display always passes, since the submit itself is the consent', () => {
+		expect(
+			consentField.validate?.({
+				...base,
+				value: undefined,
+				config: { required: true, display: 'notice' },
+			})
+		).toBe(true)
+		expect(
+			consentField.validate?.({
+				...base,
+				value: false,
+				config: { required: true, display: 'notice' },
+			})
+		).toBe(true)
+	})
+
+	it('offers a display select defaulting to checkbox', () => {
+		const display = consentField.config?.find(
+			(entry) => 'name' in entry && entry.name === 'display'
+		) as { type?: string; defaultValue?: unknown } | undefined
+		expect(display?.type).toBe('select')
+		expect(display?.defaultValue).toBe('checkbox')
 	})
 
 	it('validates: not required + value false -> valid (marketing-style opt-in)', () => {

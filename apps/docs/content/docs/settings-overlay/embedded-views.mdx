@@ -1,0 +1,158 @@
+---
+title: Embedded views
+description: Putting a registered admin view in the panel, and the one case that needs a bundler alias.
+---
+
+A `view` item mounts a view already registered in `admin.components.views`, with the page props it was written for. It works unchanged, with one exception: a view that wraps itself in `DefaultTemplate` brings the admin sidebar and header with it, and draws them inside the panel.
+
+Which fix you need depends on who owns the view.
+
+## How a lazy item reaches the server
+
+A `view` item, and a `component` item marked `lazy`, are rendered when the row is opened rather
+than with the page. Two channels can carry that render. They produce the same result and differ
+only in what installation costs.
+
+### `lazyTransport: 'widget'`, the default
+
+**Nothing is asked of you.** The plugin registers one internal dashboard widget and renders
+through it.
+
+That widget's slug appears in the dashboard's "Add widget" drawer, which readers see only while
+editing their dashboard. It is registered only when your config holds a lazy item, so an overlay
+of collections and globals never triggers it.
+
+### `lazyTransport: 'server-function'`
+
+No widget is registered at all. In exchange you wire the plugin's own function yourself:
+
+```ts title="app/(payload)/layout.tsx"
+import config from '@payload-config'
+import { handleServerFunctions, RootLayout } from '@payloadcms/next/layouts'
+import { settingsOverlayServerFunctions } from '@10x-media/settings-overlay/rsc'
+import type { ServerFunctionClient } from 'payload'
+
+import { importMap } from './admin/importMap.js'
+
+const serverFunction: ServerFunctionClient = async (args) => {
+  'use server'
+  return handleServerFunctions({
+    ...args,
+    config,
+    importMap,
+    serverFunctions: settingsOverlayServerFunctions,
+  })
+}
+```
+
+```ts title="payload.config.ts"
+settingsOverlay({ lazyTransport: 'server-function', overlays: [...] })
+```
+
+Payload generates that layout file and marks it "DO NOT MODIFY", so this one is opt in.
+
+Forget the wiring and the panel says so in as many words, naming both the fix and the way back.
+
+### Choosing
+
+Take the default unless a stray row in the dashboard's widget drawer bothers you more than an
+edit to a generated file. If no overlay holds a lazy item, neither is used: nothing is registered
+and nothing is called.
+
+## Your own view
+
+Read the `settingsOverlayEmbed` prop and skip the template:
+
+```tsx title="views/AuditView.tsx"
+import { DefaultTemplate } from '@payloadcms/next/templates'
+import { Gutter } from '@payloadcms/ui'
+import type { SettingsOverlayEmbedServer } from '@10x-media/settings-overlay/types'
+import type { AdminViewServerProps } from 'payload'
+
+type Props = AdminViewServerProps & {
+  settingsOverlayEmbed?: SettingsOverlayEmbedServer
+}
+
+export const AuditView = ({ initPageResult, params, searchParams, settingsOverlayEmbed }: Props) => {
+  const body = <AuditTable />
+
+  if (settingsOverlayEmbed) {
+    return <div className="audit-view--embedded">{body}</div>
+  }
+
+  return (
+    <DefaultTemplate
+      i18n={initPageResult.req.i18n}
+      locale={initPageResult.locale}
+      params={params}
+      payload={initPageResult.req.payload}
+      permissions={initPageResult.permissions}
+      searchParams={searchParams}
+      user={initPageResult.req.user ?? undefined}
+      visibleEntities={initPageResult.visibleEntities}
+    >
+      <Gutter>{body}</Gutter>
+    </DefaultTemplate>
+  )
+}
+```
+
+The prop is present only inside a panel. A hook would not do here: the view is a server component, and it needs the answer before it renders.
+
+This is the recommended path, and it needs nothing from your bundler.
+
+## Somebody else's view
+
+A view from another plugin cannot be asked to read a prop. For that case, and only that case, the package ships a template shim on a separate subpath.
+
+**Symptoms it is what you need:** the panel opens with a second sidebar inside it, or a second admin header above the content.
+
+The plugin cannot detect this and will not warn about it.
+
+### Setup
+
+Alias `@payloadcms/next/templates` to the shim, and give the real module a name of its own so the shim can reach past the export map:
+
+```ts title="next.config.ts"
+import { withPayload } from '@payloadcms/next/withPayload'
+import path from 'node:path'
+import { createRequire } from 'node:module'
+
+const require = createRequire(import.meta.url)
+const realTemplates = path.dirname(require.resolve('@payloadcms/next/package.json')) // adjust to your resolution
+
+const config = {
+  turbopack: {
+    resolveAlias: {
+      '@payloadcms/next/templates': '@10x-media/settings-overlay/embed',
+      'payload-next-templates-real': path.join(realTemplates, 'dist/templates/index.js'),
+    },
+  },
+  webpack: (webpackConfig) => {
+    webpackConfig.resolve.alias = {
+      ...webpackConfig.resolve.alias,
+      '@payloadcms/next/templates': '@10x-media/settings-overlay/embed',
+      'payload-next-templates-real': path.join(realTemplates, 'dist/templates/index.js'),
+    }
+    return webpackConfig
+  },
+}
+
+export default withPayload(config)
+```
+
+```ts title="types/payload-next-templates-real.d.ts"
+declare module 'payload-next-templates-real' {
+  export * from '@payloadcms/next/templates'
+}
+```
+
+### What the shim does
+
+It is Payload's `DefaultTemplate`, aware of where it is rendering. On a page request it is the real template. When the request carries a `next-action` header, which Next sends on every server-function call and never on a page load, it renders only its children.
+
+Payload's own drawers render the edit and list views from server functions, not this template, so there is nothing else to collide with.
+
+### Cost
+
+Nothing, if you do not enable it: the shim lives on its own subpath and nothing else in the package imports it. Collections, globals and `component` items never touch the template at all.

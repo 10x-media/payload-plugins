@@ -1,5 +1,52 @@
 # @10x-media/jobs
 
+## 0.1.0-beta.12
+
+### Patch Changes
+
+- The `payload-jobs-locks` lease collection exempts itself from `@10x-media/content-lock`. With reliability on, the app seeds its lease rows through the Local API at startup, and an active lock on everything rejected that write before the duplicate-row check, so the app failed to start in `onInit`.
+
+## 0.1.0-beta.11
+
+### Minor Changes
+
+- Interruptions: other plugins can pause queues through run gates and mark handler errors as interruptions, via a registry at `config.custom['@10x-media/jobs']`. An interrupted job fails for good by default (retries cut off) or, when opted in with `deferOnInterrupt` or `jobs({ interrupt: { defer } })`, goes back to the queue until the interruption ends without spending a retry. New exports: `checkpoint`, `JobDeferredError`, `resumeDeferred`, `applyJobInterruptions`, `wrapJobHandlers`, `evaluateRunGates`, and the registry types. Adds a `deferredBy` field to `payload-jobs`, so Postgres projects run one `migrate:create`.
+
+  The heartbeat now wraps handlers at init instead of at config time, so tasks and workflows added by plugins ordered after jobs heartbeat too.
+
+## 0.1.0-beta.10
+
+### Patch Changes
+
+- A task running inside a workflow no longer re-stamps the workflow's job lease.
+
+  - Fixed: the task's stamp moved the job's fence token, so the workflow's first heartbeat renew missed, logged `lost lease for job <id> (reclaimed)` one heartbeat interval into every workflow run, and stopped renewing for the rest of the run. Nothing had been reclaimed. The workflow's heartbeat now holds the lease for the whole run, including its tasks.
+  - Single-task jobs, and tasks inside workflows whose handler is a path rather than a function (which are not wrapped), still heartbeat themselves as before.
+
+## 0.1.0-beta.9
+
+### Minor Changes
+
+- More built-in locales for the `jobs:` strings.
+
+  - Added: `de`, `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`, `ko`. Every key is covered in each.
+
+## 0.1.0-beta.8
+
+### Minor Changes
+
+- The create form pre-fills `input` from the selected task's or workflow's `inputSchema`: a field with a static `defaultValue` contributes that, otherwise scalars get an empty value of their kind, a `hasMany` field, an array or blocks one sample element, a relationship the name of the collection it expects an id from, and groups nest. Each task and workflow keeps its own draft while the form is open, so switching parks and restores what was typed; clearing the selection resets the field to `{}`; existing jobs are not touched. `input.examples` merges hand-written top-level values over the derived placeholder of a slug. The field renders through `JobInputField`, exported from `@10x-media/jobs/client`; new type `JobInputExamples`.
+
+  `input.components` swaps that JSON editor for a component of yours per task or workflow slug, with `'*'` for every slug and `false` to keep JSON. The editor receives `JobInputComponentProps` (`path`, `slug`, `kind`, `placeholder`, `readOnly`) and reads and writes the field through `useField`, so the pre-filled placeholder reaches it and the selection switches editors live. `JobInputFieldServer` (exported from `@10x-media/jobs/rsc`) wraps `JobInputField` and resolves the paths against the import map; they are registered with `admin.dependencies`, so adopters re-run `payload generate:importmap` after changing one. New types: `JobInputComponents` and `JobInputComponentProps`.
+
+## 0.1.0-beta.7
+
+### Minor Changes
+
+- Custom components for job log blocks: `log.entryComponents` registers your own renderer for an attempt's `input`, `output`, or `error`, keyed by task slug with `'*'` as the fallback for every task and `false` opting one slot back out to the default JSON. The component replaces only the JSON body; the label, the frame, and the show rules stay the plugin's. It also renders for an empty value (an attempt that returned `{}`), and never for a value the attempt does not carry, so a succeeded attempt gets no error block under a wildcard `error`.
+
+  The `log` field now renders through `JobLogTimelineServer` (exported from `@10x-media/jobs/rsc`), so a renderer may be a server or a client component; `JobLogTimeline` stays exported from `@10x-media/jobs/client` and still falls back to JSON when mounted directly. Configured paths are registered with `admin.dependencies`, so adopters re-run `payload generate:importmap` after adding or changing one. New types: `JobLogEntry`, `JobLogEntryComponents`, `JobLogSlot`, `JobLogSlotComponents`, and `JobLogSlotProps`.
+
 ## 0.1.0-beta.6
 
 ### Patch Changes

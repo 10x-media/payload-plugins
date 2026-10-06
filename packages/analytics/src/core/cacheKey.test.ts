@@ -66,9 +66,78 @@ describe('buildCacheKey', () => {
 		})
 		expect(a).not.toBe(b)
 	})
-	it('keeps the unscoped key format unchanged', () => {
+	it('keys a closed window on its exact bounds', () => {
+		const key = buildCacheKey('native', {
+			metrics: ['pageviews'],
+			timezone: 'Europe/Berlin',
+			dateRange: {
+				start: new Date('2026-05-31T22:00:00.000Z'),
+				end: new Date('2026-06-23T21:59:59.999Z'),
+			},
+		})
+		expect(key).toContain('2026-05-31T22:00:00.000Z_2026-06-23T21:59:59.999Z')
+	})
+	it('separates a closed window from the narrower one that snapped to the same day', () => {
+		// The picker's raw local-midnight instants and the inclusive window they now resolve
+		// to both end on Jun 23 in Berlin; a day-snapped key served the narrow answer for both.
+		const stored = buildCacheKey('native', {
+			metrics: ['pageviews'],
+			timezone: 'Europe/Berlin',
+			dateRange: {
+				start: new Date('2026-05-31T22:00:00.000Z'),
+				end: new Date('2026-06-22T22:00:00.000Z'),
+			},
+		})
+		const inclusive = buildCacheKey('native', {
+			metrics: ['pageviews'],
+			timezone: 'Europe/Berlin',
+			dateRange: {
+				start: new Date('2026-05-31T22:00:00.000Z'),
+				end: new Date('2026-06-23T21:59:59.999Z'),
+			},
+		})
+		expect(inclusive).not.toBe(stored)
+	})
+	it('reads "closed" in the query timezone, not in UTC', () => {
+		const range = {
+			start: new Date('2026-05-31T22:00:00.000Z'),
+			end: new Date('2026-06-23T21:59:59.999Z'),
+		}
+		// The same instant ends a Berlin day but falls mid-day in UTC, which still snaps.
+		expect(buildCacheKey('native', { metrics: ['pageviews'], dateRange: range })).toContain(
+			'2026-06-24T00:00:00.000Z'
+		)
+	})
+	it('writes the unscoped key in its documented segment order', () => {
 		expect(buildCacheKey('ga4', base)).toBe(
-			'analytics|ga4|_|/pricing|pageviews,visitors||2026-01-01T00:00:00.000Z_2026-02-01T00:00:00.000Z|_||_|_'
+			'analytics|e0|ga4|_|/pricing|pageviews,visitors||2026-01-01T00:00:00.000Z_2026-02-01T00:00:00.000Z|_||_|_'
+		)
+	})
+
+	it('writes the epoch segment right after the namespace', () => {
+		expect(
+			buildCacheKey('ga4', base, { epoch: 'mfa1-9c2b' }).startsWith('analytics|emfa1-9c2b|ga4|')
+		).toBe(true)
+	})
+
+	it("reads an absent epoch as '0', so one key format covers every caller", () => {
+		expect(buildCacheKey('ga4', base)).toBe(buildCacheKey('ga4', base, { epoch: '0' }))
+	})
+
+	it('never lets two epochs share an entry', () => {
+		const keys = new Set(
+			['0', 'mfa1-aaaa', 'mfa1-bbbb', 'mfa2-aaaa'].map((e) =>
+				buildCacheKey('ga4', base, { epoch: e })
+			)
+		)
+		expect(keys.size).toBe(4)
+	})
+
+	// The segment sits at a fixed position, so an adapter whose id reads like an epoch
+	// still keys apart from the epoch of that token.
+	it('cannot confuse an epoch with a provider id', () => {
+		expect(buildCacheKey('e5', base, { epoch: '0' })).not.toBe(
+			buildCacheKey('e0', base, { epoch: '5' })
 		)
 	})
 	it('partitions the key by scope', () => {
@@ -94,5 +163,42 @@ describe('buildCacheKey', () => {
 	it('orders the timezone segment before the scope segment', () => {
 		const key = buildCacheKey('ga4', { ...base, timezone: 'Europe/Berlin', scope: 'tenant-a' })
 		expect(key.endsWith('|Europe/Berlin|tenant-a')).toBe(true)
+	})
+	it('partitions the key by the goal hint, which decides what rows a provider returns', () => {
+		const none = buildCacheKey('plausible', base)
+		const one = buildCacheKey('plausible', { ...base, goalSlugs: ['signup'] })
+		const two = buildCacheKey('plausible', { ...base, goalSlugs: ['signup', 'purchase'] })
+		expect(one).not.toBe(none)
+		expect(one).not.toBe(two)
+		expect(two).toBe(buildCacheKey('plausible', { ...base, goalSlugs: ['purchase', 'signup'] }))
+	})
+
+	it('keeps the key unchanged for a scope with no goals, which asks for the same rows', () => {
+		expect(buildCacheKey('plausible', { ...base, goalSlugs: [] })).toBe(
+			buildCacheKey('plausible', base)
+		)
+	})
+
+	// A failed resolver answers no goal rows; sharing the healthy key would serve that
+	// degraded answer to every later read until it expired.
+	it('keys a failed goal resolver apart from every healthy hint', () => {
+		const unresolved = buildCacheKey('plausible', { ...base, goalSlugs: 'unresolved' })
+		expect(unresolved).not.toBe(buildCacheKey('plausible', { ...base, goalSlugs: [] }))
+		expect(unresolved).not.toBe(buildCacheKey('plausible', base))
+		expect(unresolved).not.toBe(buildCacheKey('plausible', { ...base, goalSlugs: ['signup'] }))
+		expect(unresolved.endsWith('|goals:!unresolved')).toBe(true)
+	})
+
+	// `unresolved` is a legal goal slug, so a sentinel spelled like one would hand a scope
+	// that configured that goal the degraded answer of a scope whose resolver failed.
+	it('keys a goal named "unresolved" apart from the failed-resolver sentinel', () => {
+		expect(buildCacheKey('plausible', { ...base, goalSlugs: ['unresolved'] })).not.toBe(
+			buildCacheKey('plausible', { ...base, goalSlugs: 'unresolved' })
+		)
+	})
+
+	it('two instance ids of one provider type produce distinct keys', () => {
+		const q = base
+		expect(buildCacheKey('posthog:a', q)).not.toBe(buildCacheKey('posthog:b', q))
 	})
 })

@@ -1,5 +1,13 @@
 # @10x-media/folder-picker
 
+## 0.1.0-beta.1
+
+### Minor Changes
+
+- More built-in locales for the `folderPicker:` strings.
+
+  - Added: `es`, `fr`, `id`, `pt`, `ru`, `zh`, `ar`, `ko`. Every key is covered in each.
+
 ## 0.1.0-beta.0
 
 ### Minor Changes

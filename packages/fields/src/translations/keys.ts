@@ -1,7 +1,7 @@
 /**
  * Typed translation keys. Lookups must go through these constants, not string
  * literals (enforced by requireI18nKeysTyped.grit). Every key here must have a
- * value in every locale (`en.ts`, `de.ts`), or it is a type error.
+ * value in every locale file, or it is a type error.
  */
 export const keys = {
 	pluginName: 'fields:pluginName',
@@ -47,6 +47,17 @@ export const keys = {
 	generateValue: 'fields:generateValue',
 	writeOnlyValue: 'fields:writeOnlyValue',
 	secretNotSet: 'fields:secretNotSet',
+	selectUnit: 'fields:selectUnit',
+	measurementBelowMin: 'fields:measurementBelowMin',
+	measurementAboveMax: 'fields:measurementAboveMax',
+	selectCountry: 'fields:selectCountry',
+	searchCountries: 'fields:searchCountries',
+	noCountriesFound: 'fields:noCountriesFound',
+	phoneRequired: 'fields:phoneRequired',
+	invalidPhoneNumber: 'fields:invalidPhoneNumber',
+	phoneNotMobile: 'fields:phoneNotMobile',
+	clearPhoneNumber: 'fields:clearPhoneNumber',
+	phoneCountryFor: 'fields:phoneCountryFor',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

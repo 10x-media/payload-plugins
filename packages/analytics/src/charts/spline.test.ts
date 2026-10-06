@@ -19,6 +19,16 @@ describe('monotoneAreaPath', () => {
 	it('renders a single point as a flat midline', () => {
 		expect(monotoneAreaPath([7], { width: 100, height: 40 }).line).toBe('M0,20 L100,20')
 	})
+	it('honours an explicit domain, so two series share one y-scale', () => {
+		const { line } = monotoneAreaPath([0, 10], {
+			width: 100,
+			height: 40,
+			padding: 0,
+			domain: { min: 0, max: 20 },
+		})
+		// 10 of a 0-20 domain lands on the midline instead of the top.
+		expect(line.endsWith('100,20')).toBe(true)
+	})
 	it('returns empty paths for no data', () => {
 		expect(monotoneAreaPath([], { width: 100, height: 40 })).toEqual({ line: '', area: '' })
 	})

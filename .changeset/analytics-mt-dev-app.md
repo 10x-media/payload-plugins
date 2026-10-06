@@ -1,0 +1,5 @@
+---
+"@10x-media/analytics": minor
+---
+
+Multi-tenancy completes. A new `scopes` option enumerates tenant scopes so the cache-warm and sync cron tiers fan out per tenant (each scope resolves its own runtime providers and sync rows carry that scope); without it both tiers keep running install-wide only. Installs with runtime providers (`providers.collection` or `providers.resolve`) no longer treat the config-adapter capability union as a ceiling: every built-in widget registers, the metric pickers offer every metric, and the realtime endpoint is always available, with the per-request sources endpoint and pickers narrowing to what each tenant's sources actually serve. The dev app gains a `TENANCY=on` mode wired through `@payloadcms/plugin-multi-tenant` with two seeded tenants, and the e2e suite runs in both tenancy shapes. The sync task no longer derives a scope from the job request (it fans out over `scopes` and otherwise runs install-wide), and reads on a scoped install that resolve no scope now fail closed unless `access.platformRead` grants.

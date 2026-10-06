@@ -1,5 +1,8 @@
 import type { CollectionConfig, Field, PayloadComponent } from 'payload'
-
+import type { InterruptOptions } from './interruption/register'
+import type { JobInputComponents } from './jobs/inputComponents'
+import type { JobInputExamples } from './jobs/inputPlaceholders'
+import type { JobLogEntryComponents } from './jobs/logSlotComponents'
 import type { Override } from './plugin/resolve'
 import type { QueueControlOptions } from './queueControl/options'
 import type { ReliabilityOptions } from './reliability/options'
@@ -36,6 +39,27 @@ export type JobsOptions = {
 	cells?: Record<string, PayloadComponent | false>
 	/** The derived Status column. `false` removes it; a component replaces our status cell. */
 	status?: PayloadComponent | false
+	/**
+	 * Custom renderers for the JSON blocks inside an expanded log-attempt row.
+	 * `entryComponents` is keyed by task slug (`'*'` for every task, `inline` for
+	 * Payload's reserved inline steps) and then by block; unset blocks keep the
+	 * default JSON dump. A registered block also renders for an empty value (an
+	 * attempt that returned `{}`), but never for a value the attempt does not
+	 * carry at all, so a succeeded attempt gets no error block. Paths are
+	 * registered with `admin.dependencies`, so adopters re-run
+	 * `payload generate:importmap` after changing them.
+	 */
+	log?: { entryComponents?: JobLogEntryComponents }
+	/**
+	 * The job's `input` on the create form. `examples` merges hand-written values
+	 * over the placeholder derived from a slug's `inputSchema`, for values the
+	 * derivation cannot invent. `components` swaps the JSON editor for a custom
+	 * one per task or workflow slug (`'*'` for every slug, `false` to keep JSON);
+	 * the placeholder still applies, and the editor reads and writes the field
+	 * through `useField`. Paths are registered with `admin.dependencies`, so
+	 * adopters re-run `payload generate:importmap` after changing them.
+	 */
+	input?: { components?: JobInputComponents; examples?: JobInputExamples }
 	/**
 	 * Components rendered between the search bar and the table. `false` removes our
 	 * queue-health bar; an array replaces it.
@@ -80,6 +104,13 @@ export type JobsPluginOptions = JobsOptions & {
 	 * Off by default; pass `true` for defaults or an object to tune it.
 	 */
 	queueControl?: boolean | QueueControlOptions
+	/**
+	 * How running jobs react when another plugin interrupts them (a run gate
+	 * pauses their queue, or a handler throws an error a registered classifier
+	 * recognises). Interrupted jobs fail for good unless listed in `defer` or
+	 * wrapped in `deferOnInterrupt`.
+	 */
+	interrupt?: InterruptOptions
 	/**
 	 * Collection-level override for the enhanced `payload-jobs` collection,
 	 * applied as the outermost layer (after reliability fields). `fields`

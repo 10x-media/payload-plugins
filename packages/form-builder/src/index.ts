@@ -6,7 +6,13 @@ import { assertNoCalcFunctionCollision, assertValidCalcSourceKeys } from './calc
 import { stashConsentSources } from './consent/resolveConsentEntries'
 import { buildDefaultFieldDefinitions } from './fields/builtin'
 import { resolveFieldTypes, stashFieldTypes } from './fields/registry'
+import { stashFallbackLocale } from './form/findFormAtLocale'
 import type { FormBuilderPluginOptions } from './options'
+import {
+	resolveCollectionSlugs,
+	resolveVotedCookiePrefix,
+	stashCollectionSlugs,
+} from './plugin/collectionSlugs'
 import { registerCollections } from './plugin/registerCollections'
 import { registerTranslations } from './plugin/registerTranslations'
 import { readUploadCollectionMimeTypes } from './plugin/uploadsCollection'
@@ -26,6 +32,10 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		}
 		const localizeContent = options.localizeContent !== false
 		const uploads = options.uploads ?? false
+		// Resolved once, validated at boot: collection builders receive these directly, and every
+		// runtime path (jobs, endpoints, host-called helpers) reads the same object off the config.
+		const slugs = resolveCollectionSlugs(options)
+		const votedCookiePrefix = resolveVotedCookiePrefix(options.poll?.cookiePrefix)
 		const calcSources = options.calc?.sources ?? {}
 		const calcFunctions = options.calc?.functions ?? {}
 		// Fail fast: the evaluator resolves built-ins first, so a colliding custom function could never
@@ -82,8 +92,10 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 				fromAddresses,
 				fromSources,
 				departments,
+				localizeRecipients: options.email?.localizeRecipients,
 				recipients: options.email?.recipients,
 				recipientSources: options.email?.recipientSources,
+				render: options.email?.render,
 			}),
 			options.actions
 		)
@@ -101,8 +113,12 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		config.custom = stashPollOptionSources(config.custom, pollSourceRegistry)
 		config.custom = stashPollTypes(config.custom, pollTypeRegistry)
 		config.custom = stashFieldTypes(config.custom, registry)
+		config.custom = stashCollectionSlugs(config.custom, slugs, votedCookiePrefix)
 		if (consentSources) {
 			config.custom = stashConsentSources(config.custom, consentSources)
+		}
+		if (options.fallbackLocale) {
+			config.custom = stashFallbackLocale(config.custom, options.fallbackLocale)
 		}
 		registerTranslations(config, options.translations)
 		registerCollections({
@@ -118,6 +134,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			actionRegistry,
 			richText: options.richText,
 			hasJobsPlugin: Boolean(plugins['@10x-media/jobs']),
+			dispatchDeadlineMs: options.dispatch?.deadlineMs,
 			events: options.events,
 			uploads,
 			spam,
@@ -136,6 +153,7 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 			fromSources,
 			departments,
 			redirectRelationships: options.redirectRelationships,
+			slugs,
 			overrides: options.overrides,
 		})
 		return config
@@ -158,8 +176,15 @@ export { serializeBody } from './actions/body/serializeBody'
 export { textOfBody } from './actions/body/textOfBody'
 export { renderAllValues, renderAllValuesTable } from './actions/body/wildcards'
 export { buildDefaultActionDefinitions, defaultActionDefinitions } from './actions/builtin'
-export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from './actions/defineAction'
-export { defineAction } from './actions/defineAction'
+export type {
+	ActionDefinition,
+	ActionRunArgs,
+	ActionValidateArgs,
+	AnyActionDefinition,
+} from './actions/defineAction'
+export { ActionError, defineAction } from './actions/defineAction'
+export { INLINE_DISPATCH_DEADLINE_MS } from './actions/dispatch'
+export type { EmailActionType, EmailRender, EmailRenderArgs } from './actions/emailRender'
 export type {
 	FromAddressesResolver,
 	FromAddressOption,
@@ -175,6 +200,7 @@ export type { ActionOption, ActionRegistry, ActionsConfig } from './actions/regi
 export { resolveActions } from './actions/registry'
 export type { ActionResult } from './actions/runActions'
 export { SIGNATURE_HEADER, signPayload } from './actions/sign'
+export type { SubmissionContextArgs, SubmissionForm } from './actions/submissionContext'
 export type {
 	AggregateFieldResponsesArgs,
 	AggregateFormResponsesArgs,
@@ -300,6 +326,11 @@ export type {
 	OmittableSharedField,
 	ResolveFieldOptionsArgs,
 } from './fields/types'
+export type {
+	FormFallbackLocale,
+	FormFallbackLocaleArgs,
+	FormFallbackLocaleResult,
+} from './form/findFormAtLocale'
 export { isPollClosed } from './form/pollState'
 export type { ToFormDocumentOptions } from './form/toFormDocument'
 export { toFormDocument } from './form/toFormDocument'
@@ -313,6 +344,12 @@ export type {
 	FormBuilderPluginOptions,
 	FormBuilderPluginOptions as PluginOptions,
 } from './options'
+export type { FormBuilderCollectionSlugs } from './plugin/collectionSlugs'
+export {
+	collectionSlugsOf,
+	DEFAULT_COLLECTION_SLUGS,
+	DEFAULT_VOTED_COOKIE_PREFIX,
+} from './plugin/collectionSlugs'
 export type { UploadsOption } from './plugin/uploadsCollection'
 export type { PollCloseTaskInput } from './poll/closeJob'
 export {

@@ -1,0 +1,17 @@
+{
+	"title": "Audit Logs",
+	"pages": [
+		"index",
+		"quick-start",
+		"configuration",
+		"what-is-logged",
+		"audit-fields",
+		"admin-view",
+		"querying",
+		"anonymization",
+		"custom-events",
+		"data-retention",
+		"multi-tenancy",
+		"i18n"
+	]
+}

@@ -1,8 +1,8 @@
-import { voteChangeTargetOf } from '../../submissions/votedCookie'
+import { pluginSlugsOf } from '../../plugin/collectionSlugs'
+import { voteChangeTargetOf } from '../../submissions/voteChange'
 import { keys } from '../../translations/keys'
 import { defineValidationRule } from '../defineValidationRule'
 
-const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 const SCAN_LIMIT = 500
 
 /**
@@ -24,7 +24,7 @@ export const notAlreadySubmittedRule = defineValidationRule<Record<string, never
 		// without the exclusion a re-vote keeping the same value would always collide with itself.
 		const changeTarget = req ? voteChangeTargetOf(req) : undefined
 		const result = await payload.find({
-			collection: FORM_SUBMISSIONS_SLUG,
+			collection: pluginSlugsOf(payload).formSubmissions,
 			where:
 				changeTarget !== undefined
 					? { and: [{ form: { equals: formId } }, { id: { not_equals: changeTarget } }] }

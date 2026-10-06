@@ -11,7 +11,14 @@
 		"folder-picker",
 		"admin-wiki",
 		"undo-redo",
+		"audit-logs",
 		"automations",
-		"dual-session"
+		"dual-session",
+		"settings-overlay",
+		"form-variants",
+		"content-lock",
+		"conversations",
+		"impersonation",
+		"document-preview"
 	]
 }

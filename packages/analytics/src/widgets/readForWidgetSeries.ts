@@ -1,13 +1,17 @@
 import type { PayloadRequest } from 'payload'
-import { satisfiesCapabilities } from '../core/capabilities'
-import type { AnalyticsAdapter, AnalyticsRow, DateRange, MetricKey } from '../core/contract'
-import { supportsGranularity } from '../core/granularity'
-import { resolveReadContext } from '../core/scopedRead'
-import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
-import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
+import { comparisonOf } from '../core/capabilities'
+import type {
+	AnalyticsFilter,
+	AnalyticsResult,
+	AnalyticsRow,
+	DateRange,
+	MetricKey,
+} from '../core/contract'
+import type { TimeframePreset } from '../timeframe/presets'
 import { addDaysInTz, DEFAULT_TIMEZONE, startOfDayInTz, zonedDayIso } from '../timeframe/tz'
-import { previousWindow } from './comparison'
-import type { WidgetReadStatus } from './readForWidget'
+import { previousWindow, withinLookback } from './comparison'
+import { prepareWidgetRead, type WidgetReadStatus } from './prepareWidgetRead'
+import { readMeta } from './readMeta'
 
 export interface SeriesPoint {
 	date: string
@@ -22,11 +26,27 @@ export interface WidgetSeriesResult {
 	timezone: string
 	points: SeriesPoint[]
 	total: number
+	/** The source that answered, absent on a read that never reached one. */
+	provider?: string
 	clamped?: boolean
+	/** True when the engine served a stale cache entry after a failed provider read. */
+	stale?: boolean
+	/** True when the source answered without one of the filters the read carried. */
+	filtersUnapplied?: boolean
+	/** True when the read hit the source's event scan cap, so the numbers are a floor. */
+	sampled?: boolean
+	/** True when the source could not read the scope's goals, so a conversions series means nothing. */
+	goalsUnresolved?: boolean
 	/** Previous-window headline total, present only when the adapter supports comparison. */
 	previousTotal?: number
 	/** The previous comparable window, present only when comparison ran. */
 	comparisonRange?: DateRange
+	/**
+	 * The previous window's daily series, present only when `compare` was asked for and the
+	 * adapter supports comparison. Zero-filled to the same length as `points`, so the
+	 * previous window's day i overlays `points[i]`.
+	 */
+	comparisonPoints?: SeriesPoint[]
 }
 
 export interface ReadForWidgetSeriesArgs {
@@ -38,6 +58,14 @@ export interface ReadForWidgetSeriesArgs {
 	range?: DateRange
 	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
 	scope?: string | null
+	/**
+	 * Reporting timezone the caller already resolved, reused rather than resolved again so
+	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+	 */
+	timezone?: string
+	filters?: AnalyticsFilter[]
+	/** Also return the previous window's series, for the chart's comparison overlay. */
+	compare?: boolean
 }
 
 const MAX_SERIES_DAYS = 366
@@ -79,6 +107,17 @@ export const fillDailySeries = (args: {
 }
 
 /**
+ * Project a comparison series onto the primary axis: day i of the previous window overlays
+ * day i of the current one. Both windows span the same day count by construction, so this
+ * only guards a DST-shifted or clamped edge, silently truncating or zero-filling; a filled
+ * bucket borrows the axis day so every point still carries a real date.
+ */
+const alignSeries = (points: SeriesPoint[], axis: SeriesPoint[]): SeriesPoint[] =>
+	points.length === axis.length
+		? points
+		: axis.map((day, i) => points[i] ?? { date: day.date, value: 0 })
+
+/**
  * Site-wide time-series read for a trend widget: resolve the timeframe, pick the
  * adapter, gate on the metric and day-granularity support, read through the engine,
  * then return a zero-filled daily series plus the headline total. Mirrors
@@ -87,68 +126,86 @@ export const fillDailySeries = (args: {
 export const readForWidgetSeries = async (
 	args: ReadForWidgetSeriesArgs
 ): Promise<WidgetSeriesResult> => {
-	const { req, metric, timeframe, adapterId, now, range } = args
-	const fallback = (status: WidgetReadStatus, id: string): WidgetSeriesResult => ({
-		status,
-		adapterId: id,
-		dateRange: range ?? resolveTimeframe(timeframe, now),
-		timezone: DEFAULT_TIMEZONE,
-		points: [],
-		total: 0,
-	})
+	const { req, metric, timeframe, adapterId, now, range, filters, compare } = args
 
-	const runtime = getRuntime(req.payload)
-	if (!runtime) {
-		return fallback('unavailable', adapterId ?? '')
+	const prepared = await prepareWidgetRead({
+		req,
+		now,
+		timeframe,
+		adapterId,
+		scope: args.scope,
+		timezone: args.timezone,
+		range,
+		filters,
+		requires: { metrics: [metric] },
+		granularity: 'day',
+		goalRead: () => ({ metrics: [metric] }),
+	})
+	if (!prepared.ok) {
+		return {
+			status: prepared.status,
+			adapterId: prepared.adapterId,
+			dateRange: prepared.dateRange,
+			timezone: prepared.tz,
+			points: [],
+			total: 0,
+		}
 	}
-	const ctx = await resolveReadContext({ runtime, req, adapterId, scope: args.scope })
-	if (!ctx.ok) {
-		return fallback('unavailable', adapterId ?? '')
-	}
-	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
-	const dateRange = range ?? resolveTimeframe(timeframe, now, tz)
+	const { runtime, adapter, tz, dateRange, goalSlugs } = prepared
 	const base = { dateRange, timezone: tz, points: [] as SeriesPoint[], total: 0 }
-	const adapter: AnalyticsAdapter = ctx.adapter
-	if (!adapter.isConfigured()) {
-		return { status: 'not-configured', adapterId: adapter.id, ...base }
+	const previousRange =
+		runtime.comparison && comparisonOf(adapter.capabilities) ? previousWindow(dateRange, tz) : null
+	const comparisonRange =
+		previousRange &&
+		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
+			? previousRange
+			: undefined
+	const readBase = {
+		metrics: [metric],
+		filters,
+		timezone: tz,
+		scope: prepared.queryScope,
+		...(goalSlugs === undefined ? {} : { goalSlugs }),
 	}
-	if (
-		!satisfiesCapabilities(adapter.capabilities, { metrics: [metric] }) ||
-		!supportsGranularity(adapter.capabilities, 'day')
-	) {
+	let result: AnalyticsResult
+	let previous: AnalyticsResult | undefined
+	try {
+		;[result, previous] = await Promise.all([
+			runtime.engine.read(adapter, { ...readBase, dateRange, granularity: 'day' }),
+			comparisonRange
+				? runtime.engine.read(adapter, {
+						...readBase,
+						dateRange: comparisonRange,
+						// The overlay needs the previous window bucketed like the primary; the delta
+						// alone only needs its total, so the read stays as it was without `compare`.
+						...(compare ? { granularity: 'day' as const } : {}),
+					})
+				: undefined,
+		])
+	} catch {
+		// No cache entry (fresh or stale) survived the failed read; degrade like an
+		// unsupported capability instead of throwing through the widget render tree.
 		return { status: 'unavailable', adapterId: adapter.id, ...base }
 	}
-	const comparisonRange =
-		runtime.comparison && adapter.capabilities.comparison
-			? (previousWindow(dateRange, tz) ?? undefined)
-			: undefined
-	const [result, previous] = await Promise.all([
-		runtime.engine.read(adapter, {
-			metrics: [metric],
-			dateRange,
-			granularity: 'day',
-			timezone: tz,
-			scope: ctx.queryScope,
-		}),
-		comparisonRange
-			? runtime.engine.read(adapter, {
-					metrics: [metric],
-					dateRange: comparisonRange,
-					timezone: tz,
-					scope: ctx.queryScope,
-				})
-			: undefined,
-	])
 	const previousTotal = previous ? previous.totals?.[metric] : undefined
+	const points = fillDailySeries({ rows: result.rows, dateRange, metric, tz })
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
 		dateRange,
 		timezone: tz,
-		points: fillDailySeries({ rows: result.rows, dateRange, metric, tz }),
+		points,
 		total: result.totals?.[metric] ?? 0,
-		clamped: result.meta.clamped ?? false,
+		...readMeta(result),
 		previousTotal,
 		comparisonRange,
+		...(compare && previous && comparisonRange
+			? {
+					comparisonPoints: alignSeries(
+						fillDailySeries({ rows: previous.rows, dateRange: comparisonRange, metric, tz }),
+						points
+					),
+				}
+			: {}),
 	}
 }

@@ -1,0 +1,13 @@
+{
+	"title": "Settings Overlay",
+	"pages": [
+		"index",
+		"quick-start",
+		"items",
+		"access",
+		"customization",
+		"embedded-views",
+		"configuration",
+		"i18n"
+	]
+}

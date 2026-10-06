@@ -15,7 +15,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Zero-footprint injection**: field help arrives as a `Description` component, block and document help as UI fields. No data, no database columns, nothing in your generated types, and an undocumented admin looks exactly as it did before.
 - **One request per session**: a compact targets map resolves hundreds of field surfaces with a synchronous lookup. Guide content loads lazily and caches per guide and locale.
 - **Write in place**: "write this guide" opens a create drawer with the target prefilled, behind a per-browser edit mode so the affordances stay out of the way until wanted.
-- **A self-contained editor**: callouts, guide-to-guide links, scoped uploads, optional YouTube/Vimeo embeds, and your own blocks. It never inherits the project's rich text configuration.
+- **A self-contained editor**: callouts, guide-to-guide links, scoped uploads, optional YouTube/Vimeo embeds, and your own blocks, inline blocks and converters. It never inherits the project's rich text configuration.
 - **A reading view** at `/admin/wiki`: featured cards, search, filtering by surface, and a table of contents on longer guides.
 - **Markdown seeding**: `seedWiki()` writes guides idempotently by slug, converting GitHub alerts to callouts and resolving media and cross-guide references.
 - **Orphan detection**: a banner lists every guide whose targets no longer resolve against the running config.

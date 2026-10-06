@@ -5,7 +5,11 @@ import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import { buildConfig, type Config, getPayload, type Payload, type Plugin } from 'payload'
 import { type MongoTestDb, startMongo } from './db/mongo'
 import { type MongoContainerDb, startMongoContainer } from './db/mongo-container'
-import { type PostgresContainerDb, startPostgresContainer } from './db/postgres-container'
+import {
+	type PostgresContainerDb,
+	SHARED_POSTGRES_SERVER_ENV,
+	startPostgresContainer,
+} from './db/postgres-container'
 
 export type SupportedDb = 'mongo' | 'postgres'
 
@@ -53,10 +57,24 @@ export interface BootedPayload {
 type AnyDbHandle = MongoTestDb | MongoContainerDb | PostgresContainerDb
 
 /**
- * node-postgres `Pool`'s error-event surface. Drizzle's destroy() leaves the pool open and the
- * container is SIGKILLed right after, so we handle the idle-connection errors (57P01) it emits.
+ * The slice of node-postgres' `Pool` teardown needs. Payload types `payload.db` as the base
+ * adapter, so the drizzle adapter's pool is only reachable by structural check.
  */
-type TeardownPool = { on: (event: 'error', listener: (err: unknown) => void) => void }
+type TeardownPool = {
+	on: (event: 'error', listener: (err: unknown) => void) => void
+	end: () => Promise<void>
+}
+
+const isTeardownPool = (value: unknown): value is TeardownPool =>
+	typeof value === 'object' &&
+	value !== null &&
+	'on' in value &&
+	typeof value.on === 'function' &&
+	'end' in value &&
+	typeof value.end === 'function'
+
+const teardownPoolOf = (db: Payload['db']): TeardownPool | undefined =>
+	'pool' in db && isTeardownPool(db.pool) ? db.pool : undefined
 
 const resolveMode = (explicit?: TestDbMode): TestDbMode => {
 	if (explicit) return explicit
@@ -179,13 +197,15 @@ export const bootPayload = async (options: BootPayloadOptions): Promise<BootedPa
 		stop: async () => {
 			// When attached, only this Payload is destroyed; the owning boot stops the DB.
 			await payload.destroy()
-			// Drizzle's destroy() does not close the pg pool, and a Postgres container is
-			// SIGKILLed right after, terminating the pool's idle connections (57P01). Handle
-			// that expected teardown error so it is not surfaced as an unhandled rejection.
-			// Draining the pool here instead (pool.end) would hang on tests that hold a
-			// checked-out client at teardown.
-			const pool = (payload.db as unknown as { pool?: TeardownPool }).pool
+			// Drizzle's destroy() leaves the pg pool open. A per-boot container is SIGKILLed
+			// right after, terminating its idle connections (57P01), so there the handler is
+			// enough; on a shared server nothing is killed between boots, so end the pool,
+			// unawaited because a test still holding a checked-out client would hang the await.
+			const pool = teardownPoolOf(payload.db)
 			pool?.on('error', () => undefined)
+			if (process.env[SHARED_POSTGRES_SERVER_ENV]) {
+				void pool?.end().catch(() => undefined)
+			}
 			await stopDb()
 		},
 	}

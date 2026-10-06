@@ -1,0 +1,116 @@
+---
+title: Anonymization
+description: Record that a sensitive field changed without recording what it changed to.
+---
+
+An audit log is a copy of your data with a longer retention period than the data itself, which makes it the wrong place for an IBAN. `anonymize` lets you keep the fact of a change while dropping the value.
+
+```ts title="payload.config.ts"
+import { auditLogs } from '@10x-media/audit-logs'
+
+auditLogs({
+  collections: { users: { auditLog: true } },
+  anonymize: {
+    users: ({ path, redacted, value }) => {
+      if (path === 'phone' || path === 'bankAccount.iban') return redacted
+      return value
+    },
+  },
+})
+```
+
+The result keeps the path and loses the value:
+
+```json
+{
+  "changedPaths": ["bankAccount.iban"],
+  "diff": {
+    "bankAccount.iban": { "before": "__REDACTED__", "after": "__REDACTED__" }
+  }
+}
+```
+
+You still know the account number was changed, by whom and when, which is usually the point of the audit. You just cannot read it out of the log.
+
+## The function
+
+```ts
+type AnonymizeFunction = (args: {
+  path: string                  // dot notation: 'address.street', 'items.0.price'
+  value: unknown                // the value at that path
+  collection: string            // collection or global slug
+  documentId: string | number   // empty string for globals
+  operation: 'create' | 'delete' | 'update'
+  redacted: typeof REDACTED     // the sentinel, so you rarely need the import
+}) => unknown
+```
+
+Return `redacted` to drop the value, or return anything else to store that instead. Returning `value` keeps it as is.
+
+`REDACTED` is the string `'__REDACTED__'`, exported from the package for when you read logs back:
+
+```ts
+import { REDACTED } from '@10x-media/audit-logs'
+
+if (entry.diff?.['bankAccount.iban']?.after === REDACTED) {
+  // ...
+}
+```
+
+Redaction is not the only use. Returning a derived value works too, and is often more useful than nothing at all:
+
+```ts
+anonymize: {
+  users: ({ path, value }) => {
+    if (path === 'email' && typeof value === 'string') {
+      return `${value[0]}***@${value.split('@')[1]}`
+    }
+    return value
+  },
+}
+```
+
+## Nesting
+
+The function is called for every node, depth first, with the full path:
+
+```
+address
+address.street
+address.city
+items.0.price
+```
+
+Redacting a parent skips its whole subtree. `return redacted` for `address` means `address.street` is never visited, and one entry replaces the branch. That is the cheap way to drop a whole group.
+
+## Globals
+
+Global slugs are valid keys, alongside collection slugs, in the same map:
+
+```ts
+anonymize: {
+  'site-settings': ({ path, redacted, value }) => (path === 'apiSecret' ? redacted : value),
+}
+```
+
+## Snapshots
+
+The same function runs over snapshots, with the same paths and the same subtree behaviour, so `snapshotOnDelete` cannot smuggle out a value your diff redacts.
+
+<Callout type="warn">
+Anonymization runs before relationship normalization, on the raw hook payload. On a delete, Payload populates relationships, so your function may receive `{ id: 'abc', email: '...' }` where a create would hand you `'abc'`. What gets stored is normalized either way; the difference only matters if your function inspects the value.
+</Callout>
+
+If you do need the id inside the function, Payload's own helper handles both shapes:
+
+```ts
+import { extractID } from 'payload/shared'
+
+anonymize: {
+  posts: ({ path, value }) => (path === 'author' ? extractID(value) : value),
+}
+```
+
+## Retention archives
+
+The archive job takes its own `anonymize` map, falling back to this one when it has none. A CSV that leaves the system can therefore be redacted more aggressively than the live log. It also drops `ipAddress` and `userAgent` by default. See [data retention](/audit-logs/data-retention).

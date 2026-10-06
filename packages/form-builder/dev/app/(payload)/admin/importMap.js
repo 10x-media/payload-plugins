@@ -1,3 +1,4 @@
+import { ConsentRetentionNotice as ConsentRetentionNotice_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { RuleDescription as RuleDescription_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { FieldNameSelect as FieldNameSelect_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { FormConditionField as FormConditionField_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
@@ -41,6 +42,7 @@ import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } f
 
 /** @type import('payload').ImportMap */
 export const importMap = {
+  "@10x-media/form-builder/client#ConsentRetentionNotice": ConsentRetentionNotice_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#RuleDescription": RuleDescription_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#FieldNameSelect": FieldNameSelect_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#FormConditionField": FormConditionField_bf8585411c882b493b730d03575f3f2f,

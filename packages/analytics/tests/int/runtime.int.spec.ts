@@ -4,7 +4,7 @@ import { analytics } from '../../src/index'
 import { getRuntime } from '../../src/plugin/runtime'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
-describeForDb('analytics runtime stash', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics runtime stash', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {

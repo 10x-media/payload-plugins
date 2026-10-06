@@ -1,6 +1,7 @@
 import type { CollectionSlug } from 'payload'
 import type { RichTextBodyOption } from './actions/body/serializeBody'
 import type { RecipientsConfig } from './actions/emailRecipients'
+import type { EmailRender } from './actions/emailRender'
 import type { FromAddressesResolver, FromAddressSourceRegistry } from './actions/fromAddresses'
 import type { RecipientSourceRegistry } from './actions/recipientSources'
 import type { ActionsConfig } from './actions/registry'
@@ -14,6 +15,7 @@ import type { ConsentSourcesResolver } from './consent/types'
 import type { DepartmentEmailsResolver } from './email/departments'
 import type { FormEventSink } from './events/types'
 import type { FieldTypesConfig } from './fields/registry'
+import type { FormFallbackLocale } from './form/findFormAtLocale'
 import type { CollectionOverrides } from './plugin/collectionOverrides'
 import type { UploadsOption } from './plugin/uploadsCollection'
 import type { OutcomeFieldsOverride } from './poll/outcomeFields'
@@ -46,12 +48,33 @@ export type FormBuilderPluginOptions = {
 	 * `consentSourcesField()`, which carries its own `localized` option.
 	 */
 	localizeContent?: boolean
+	/**
+	 * Chooses the fallback locale per form for the plugin's server-side reads of it (validating a
+	 * submission, running its actions, serving poll results), for hosts where the right fallback
+	 * depends on the form's owner rather than on the config, e.g. a tenant whose default locale is not
+	 * the config-wide one, or to force one on a host with `localization.fallback: false`. It receives
+	 * the form as read with the config's own fallback (depth 0, so a
+	 * non-localized owner relationship such as `form.tenant` is on it) and returns a locale code, an
+	 * ordered list of codes, `false` for no fallback, or `undefined` to keep the default. The form is
+	 * read again only when the result differs from the fallback already applied. Absent, a form falls
+	 * back like any Payload read. Render the form on your page with the same fallback so what the
+	 * visitor sees matches what the server validates and sends. See {@link FormFallbackLocale}.
+	 */
+	fallbackLocale?: FormFallbackLocale
 	/** Add, override, or remove field types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	fields?: FieldTypesConfig
 	/** Add, override, or remove validation rule types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	rules?: ValidationRulesConfig
 	/** Add, override, or remove post-submit action types. `false` removes a built-in, `true` keeps it, an object adds or replaces one. */
 	actions?: ActionsConfig
+	/**
+	 * How post-submit action work is dispatched. `deadlineMs` bounds every inline action pass: the
+	 * essential pass that runs before the submit response, and the inline fallback used when no job
+	 * runner is present. Defaults to 5000 (exported as `INLINE_DISPATCH_DEADLINE_MS`). An
+	 * `essential` action making outbound calls should size its own timeouts under this bound, and a
+	 * host that cannot fit its provider under the default raises it here instead of guessing.
+	 */
+	dispatch?: { deadlineMs?: number }
 	/**
 	 * Calculation extensions. `sources` registers named value resolvers the calculation field can
 	 * reference: `resolve` supplies one number per render/submission (a tax rate, a member
@@ -74,8 +97,9 @@ export type FormBuilderPluginOptions = {
 	 * back to `editor`. `converters` spread over the default
 	 * Lexical node converters; `serialize` replaces the whole action-body pipeline (e.g. to
 	 * target chat or plain-text channels instead of email HTML). A custom `serialize` receives
-	 * the submitted `form` (id/title) and `req`, enabling per-tenant lookups or handing the raw
-	 * body off to a renderer like react-email.
+	 * the submitted `form` (id/title), `req`, the submission `locale`, and the rendering
+	 * `actionType`, enabling per-tenant lookups or handing the raw body off to a renderer like
+	 * react-email. To only wrap emails in a layout, use `email.render` instead.
 	 */
 	richText?: RichTextBodyOption
 	/**
@@ -117,11 +141,28 @@ export type FormBuilderPluginOptions = {
 		/** Narrows the recipient fields' behavior (free-typed emails, field tokens). See {@link RecipientsConfig}. */
 		recipients?: RecipientsConfig
 		/**
+		 * Localize the email actions' recipient lists (`to`, `cc`, `bcc`, `replyTo`), so each locale
+		 * stores and routes to its own addresses or departments. Off by default: routing is usually the
+		 * same in every locale, and with per-locale lists a locale the editor never filled in has no
+		 * recipients unless it falls back (mind `localization.fallback: false`; see `fallbackLocale`).
+		 * Ignored with `localizeContent: false`. Switching it on or off changes how existing
+		 * forms store these fields, so it needs a data migration.
+		 */
+		localizeRecipients?: boolean
+		/**
 		 * Server-resolved recipients, offered in every recipient field as their own option group and
 		 * resolved to addresses at send time. Each source's `value` is a namespaced string (so it cannot
 		 * collide with an address); its `resolve` receives the verified form context. See {@link RecipientSource}.
 		 */
 		recipientSources?: RecipientSourceRegistry
+		/**
+		 * Produces the final `html` of every `emailTeam` and `confirmation` email from the already
+		 * serialized body, e.g. to wrap it in a branded layout localized by the submission's `locale`
+		 * and varied by `actionType`. Runs after `richText.serialize` (when set), so the two compose:
+		 * `serialize` replaces how an action body is rendered for any channel, `render` only wraps
+		 * email. Absent, the serialized body is sent as is. See {@link EmailRender}.
+		 */
+		render?: EmailRender
 	}
 	/**
 	 * Where the consent statements a form can reference come from. Absent (the default): no sources,
@@ -239,6 +280,14 @@ export type FormBuilderPluginOptions = {
 	 */
 	poll?: {
 		votedCookie?: boolean
+		/**
+		 * Name prefix of the httpOnly voted cookie (default `fb-voted-`, so `fb-voted-{formId}`), for
+		 * hosts with cookie naming or consent-classification rules. Applies to both the `votedCookie`
+		 * marker and the signed `allowChange` cookie. Must be a valid cookie-name token; validated at
+		 * boot. Pass `payload` to `hasVotedCookie`/`votedCookieName` so they read the same name.
+		 * Changing it on a live site orphans every cookie already issued.
+		 */
+		cookiePrefix?: string
 		sources?: PollOptionSourcesConfig
 		types?: PollTypesConfig
 		outcomeFields?: OutcomeFieldsOverride
@@ -247,7 +296,7 @@ export type FormBuilderPluginOptions = {
 		 * collection of aggregate rows at submit time, so results reads are O(options), never
 		 * truncate, and survive `persistSubmissions: false`. `false` restores scan-based results
 		 * (and then a persist-off poll is rejected at save). `overrides` opens the tally
-		 * collection (slug stays `form-poll-votes`).
+		 * collection, including its `slug` (default `form-poll-votes`).
 		 */
 		votes?: false | { overrides?: CollectionOverrides }
 	}
@@ -263,6 +312,12 @@ export type FormBuilderPluginOptions = {
 	 * order per key determines who wins), hooks are appended after the plugin's own hooks, and
 	 * `fields` is a function that receives the default fields and returns the final array so
 	 * additions/removals are always intentional.
+	 *
+	 * `slug` renames a collection (defaults `forms` and `form-submissions`); the plugin resolves it
+	 * at boot and uses it everywhere, including relationships, jobs, and the voted cookie. Browser
+	 * components keep posting to the default REST paths until handed the same slugs through
+	 * `<Form collections>`. Read the live slugs server-side with `collectionSlugsOf(payload)`.
+	 * Renaming on a live database is a migration: existing rows stay under the old collection.
 	 */
 	overrides?: {
 		forms?: CollectionOverrides

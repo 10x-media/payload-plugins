@@ -10,6 +10,8 @@ const caps = (over: Partial<AnalyticsCapabilities> = {}): AnalyticsCapabilities 
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews']),
 	dimensions: new Set(['source']),
+	filters: new Set(),
+	filterOperators: new Set(['eq']),
 	batchPageReport: true,
 	rateLimit: null,
 	recommendedTtl: { realtime: 10, aggregate: 300 },

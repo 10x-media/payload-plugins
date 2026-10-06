@@ -30,7 +30,7 @@ The merge is key-by-key:
 
 - A value you provide wins over the plugin's built-in value for that key and locale.
 - Keys you do not touch keep their built-in values.
-- A locale the plugin does not ship (the plugins ship `en`) is added whole.
+- A locale the plugin does not ship is added whole.
 - App-level `i18n.translations` in your Payload config still wins over everything, so a project can override any plugin string without touching the plugin call.
 
 A typo'd key is a compile error: `translations` is typed as `Partial<Record<TranslationKey, string>>` per locale, where `TranslationKey` is that plugin's exact key union.
@@ -54,7 +54,7 @@ Each plugin also aliases its key union under a plugin-specific name (`JobsTransl
 
 ## Adding a locale
 
-To ship a locale a plugin does not include, translate the keys you care about and pass them for that locale. Untranslated keys fall back to Payload's `fallbackLanguage` (default `en`):
+To ship a locale a plugin does not include, translate the keys you care about and pass them for that locale. Payload's `t` has no per-key fallback: a key with no value in the active admin language renders as the key itself, so translate every key you rely on:
 
 ```ts
 import { analytics } from '@10x-media/analytics'
@@ -63,9 +63,9 @@ import { keys } from '@10x-media/analytics/i18n'
 analytics({
   adapters: [/* ... */],
   translations: {
-    fr: {
-      [keys.pluginName]: 'Statistiques',
-      [keys.metricPageviews]: 'Pages vues',
+    ja: {
+      [keys.pluginName]: 'アナリティクス',
+      [keys.metricPageviews]: 'ページビュー',
     },
   },
 })

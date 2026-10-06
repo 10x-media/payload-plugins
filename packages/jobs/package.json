@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/jobs",
-	"version": "0.1.0-beta.6",
+	"version": "0.1.0-beta.12",
 	"description": "Jobs ops dashboard, execution helpers, and reliability tooling for Payload",
 	"license": "MIT",
 	"repository": {
@@ -62,8 +62,8 @@
 		"test": "vitest run",
 		"test:unit": "vitest run src",
 		"test:int": "vitest run tests/int",
-		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/reliability-lease.int.spec.ts tests/int/heartbeat-sweeper.int.spec.ts tests/int/execution.int.spec.ts tests/int/queue-control.int.spec.ts tests/int/multi-instance.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/reliability-lease.int.spec.ts tests/int/heartbeat-sweeper.int.spec.ts tests/int/execution.int.spec.ts tests/int/queue-control.int.spec.ts tests/int/multi-instance.int.spec.ts",
-		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/reliability-lease.int.spec.ts tests/int/heartbeat-sweeper.int.spec.ts tests/int/execution.int.spec.ts tests/int/queue-control.int.spec.ts tests/int/multi-instance.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/reliability-lease.int.spec.ts tests/int/heartbeat-sweeper.int.spec.ts tests/int/execution.int.spec.ts tests/int/queue-control.int.spec.ts tests/int/multi-instance.int.spec.ts",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/reliability-lease.int.spec.ts tests/int/heartbeat-sweeper.int.spec.ts tests/int/execution.int.spec.ts tests/int/queue-control.int.spec.ts tests/int/multi-instance.int.spec.ts tests/int/interruption.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/reliability-lease.int.spec.ts tests/int/heartbeat-sweeper.int.spec.ts tests/int/execution.int.spec.ts tests/int/queue-control.int.spec.ts tests/int/multi-instance.int.spec.ts tests/int/interruption.int.spec.ts",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/reliability-lease.int.spec.ts tests/int/heartbeat-sweeper.int.spec.ts tests/int/execution.int.spec.ts tests/int/queue-control.int.spec.ts tests/int/multi-instance.int.spec.ts tests/int/interruption.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/reliability-lease.int.spec.ts tests/int/heartbeat-sweeper.int.spec.ts tests/int/execution.int.spec.ts tests/int/queue-control.int.spec.ts tests/int/multi-instance.int.spec.ts tests/int/interruption.int.spec.ts",
 		"test:e2e": "bash scripts/e2e.sh",
 		"dev": "pnpm --filter @10x-media/jobs-dev dev",
 		"start": "pnpm --filter @10x-media/jobs-dev start",

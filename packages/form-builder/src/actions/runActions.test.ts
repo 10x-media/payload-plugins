@@ -63,6 +63,50 @@ describe('runActions', () => {
 		expect(succeedRun).toHaveBeenCalledOnce()
 	})
 
+	it('carries structured detail from an ActionError onto the failed result', async () => {
+		const { ActionError } = await import('./defineAction')
+		const registry: ActionRegistry = new Map([
+			[
+				'provider',
+				{
+					type: 'provider',
+					label: 'Provider',
+					run: () => {
+						throw new ActionError('provider rejected', { status: 502, body: 'quota exceeded' })
+					},
+				},
+			],
+		])
+		const results = await runActions({
+			...makeMockCtx(),
+			actions: [{ blockType: 'provider' }],
+			registry,
+		})
+		expect(results).toEqual([
+			{
+				type: 'provider',
+				ok: false,
+				error: 'provider rejected',
+				detail: { status: 502, body: 'quota exceeded' },
+			},
+		])
+	})
+
+	it('carries duck-typed detail from any thrown error that has one', async () => {
+		const error = Object.assign(new Error('rejected'), { detail: { code: 'E42' } })
+		const registry: ActionRegistry = new Map([
+			['plain', { type: 'plain', label: 'Plain', run: vi.fn().mockRejectedValue(error) }],
+		])
+		const results = await runActions({
+			...makeMockCtx(),
+			actions: [{ blockType: 'plain' }],
+			registry,
+		})
+		expect(results).toEqual([
+			{ type: 'plain', ok: false, error: 'rejected', detail: { code: 'E42' } },
+		])
+	})
+
 	it('captures non-Error throws as string', async () => {
 		const registry: ActionRegistry = new Map([
 			['bad', { type: 'bad', label: 'Bad', run: vi.fn().mockRejectedValue('raw string error') }],
@@ -88,5 +132,26 @@ describe('runActions', () => {
 		expect(run).toHaveBeenCalledWith(
 			expect.objectContaining({ config: { blockType: 'withConfig', to: 'team@x.com' } })
 		)
+	})
+
+	it('renders each action body with the submission locale and that action type', async () => {
+		const seen: string[] = []
+		const serialize = ({ locale, actionType }: { locale: string; actionType: string }) =>
+			`${locale}:${actionType}`
+		const render = vi.fn(async (args: { renderBody: (body: unknown) => Promise<string> }) => {
+			seen.push(await args.renderBody(''))
+		})
+		const registry: ActionRegistry = new Map([
+			['first', { type: 'first', label: 'First', run: render }],
+			['second', { type: 'second', label: 'Second', run: render }],
+		])
+		await runActions({
+			...makeMockCtx(),
+			locale: 'de',
+			actions: [{ blockType: 'first' }, { blockType: 'second' }],
+			registry,
+			richText: { serialize },
+		})
+		expect(seen).toEqual(['de:first', 'de:second'])
 	})
 })

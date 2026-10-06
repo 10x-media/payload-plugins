@@ -1,11 +1,29 @@
+import { ar } from './ar'
 import { de } from './de'
 import { en } from './en'
+import { es } from './es'
+import { fr } from './fr'
+import { id } from './id'
 import type { TranslationKey } from './keys'
+import { ko } from './ko'
+import { pt } from './pt'
+import { ru } from './ru'
+import { uk } from './uk'
+import { zh } from './zh'
 
+export { ar } from './ar'
 export { de } from './de'
 export { en } from './en'
+export { es } from './es'
+export { fr } from './fr'
+export { id } from './id'
 export type { TranslationKey } from './keys'
 export { keys } from './keys'
+export { ko } from './ko'
+export { pt } from './pt'
+export { ru } from './ru'
+export { uk } from './uk'
+export { zh } from './zh'
 
 /** A complete flat map of every typed key to its string, for one locale. */
 export type TranslationBundle = Record<TranslationKey, string>
@@ -16,7 +34,19 @@ export type TranslationBundle = Record<TranslationKey, string>
  * locale here once and it flows to both. A host bridging its own translator can fall back through a
  * complete bundle (`makeTranslate(locale)`), so a visitor's locale never silently resolves to English.
  */
-export const bundles: Record<string, TranslationBundle> = { en, de }
+export const bundles: Record<string, TranslationBundle> = {
+	ar,
+	de,
+	en,
+	es,
+	fr,
+	id,
+	ko,
+	pt,
+	ru,
+	uk,
+	zh,
+}
 
 /** Per-locale string overrides keyed by this plugin's typed translation keys. */
 export type TranslationsOption = {

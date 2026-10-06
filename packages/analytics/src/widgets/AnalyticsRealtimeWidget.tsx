@@ -1,12 +1,15 @@
 import type { WidgetServerProps } from 'payload'
 import type { MetricKey } from '../core/contract'
-import { REALTIME_PATH } from '../plugin/realtimeEndpoint'
+import { DEFAULT_TIMEZONE } from '../timeframe/tz'
 import { keys, type TranslationKey } from '../translations/keys'
 import { METRIC_KEYS } from '../translations/metricKeys'
 import { asTranslate } from '../translations/server'
 import { cardStyle, labelStyle } from './cardChrome'
 import { RealtimeCounter } from './RealtimeCounter'
 import { readForWidgetRealtime, type WidgetRealtimeStatus } from './readForWidgetRealtime'
+import { buildRealtimeEndpoint } from './realtimePoll'
+import { type WidgetViewProps, widgetViewHref } from './viewLink'
+import { WidgetViewLink } from './WidgetViewLink'
 
 const STATE_KEY: Record<Exclude<WidgetRealtimeStatus, 'ok'>, TranslationKey> = {
 	'not-configured': keys.stateNotConfigured,
@@ -22,14 +25,13 @@ interface RealtimeWidgetData {
 
 const POLL_INTERVAL_MS = 15_000
 
-export default async function AnalyticsRealtimeWidget(props: WidgetServerProps) {
+export default async function AnalyticsRealtimeWidget(props: WidgetServerProps & WidgetViewProps) {
 	const data = (props.widgetData ?? {}) as RealtimeWidgetData
 	const metric: MetricKey = data.metric ?? 'visitors'
 	const windowMinutes = Number(data.windowMinutes) || 30
 	const t = asTranslate(props.req.i18n.t)
 	const locale = props.req.i18n.language ?? 'en-US'
 	const title = data.title?.trim() || t(keys.widgetRealtimeLabel)
-
 	const result = await readForWidgetRealtime({
 		req: props.req,
 		metric,
@@ -37,12 +39,19 @@ export default async function AnalyticsRealtimeWidget(props: WidgetServerProps) 
 		adapterId: data.dataSource,
 		now: new Date(),
 	})
+	// No timeframe: a rolling few minutes is no window the view can hold, so the link opens
+	// it on its configured range, naming the adapter that actually answered.
+	const href = widgetViewHref(props.view, props.req, {
+		timezone: DEFAULT_TIMEZONE,
+		...(result.adapterId ? { source: result.adapterId } : {}),
+	})
 
 	if (result.status !== 'ok') {
 		return (
 			<div className="analytics-realtime-widget" style={cardStyle}>
 				<span style={labelStyle}>{title}</span>
 				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
+				<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
 			</div>
 		)
 	}
@@ -52,17 +61,23 @@ export default async function AnalyticsRealtimeWidget(props: WidgetServerProps) 
 		<div className="analytics-realtime-widget" style={cardStyle}>
 			<span style={labelStyle}>{title}</span>
 			<RealtimeCounter
-				endpoint={`/api${REALTIME_PATH}`}
+				endpoint={buildRealtimeEndpoint(
+					props.req.payload.config.serverURL,
+					props.req.payload.config.routes.api
+				)}
 				intervalMs={POLL_INTERVAL_MS}
 				metric={metric}
 				windowMinutes={windowMinutes}
 				dataSource={data.dataSource}
 				initialActiveNow={result.activeNow}
 				initialSeries={result.series}
+				initialSampled={result.sampled}
 				locale={locale}
 				caption={caption}
 				pausedLabel={t(keys.widgetRealtimePaused)}
+				sampledLabel={t(keys.stateSampled)}
 			/>
+			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
 		</div>
 	)
 }

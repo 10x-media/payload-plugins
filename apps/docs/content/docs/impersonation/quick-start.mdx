@@ -1,0 +1,29 @@
+---
+title: Quick start
+description: Register the plugin with a mandatory access.impersonate function.
+---
+
+```bash
+pnpm add @10x-media/impersonation
+```
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { impersonation } from '@10x-media/impersonation'
+
+export default buildConfig({
+  plugins: [
+    impersonation({
+      access: {
+        impersonate: ({ req }) => req.user?.roles?.includes('admin') === true,
+      },
+    }),
+  ],
+})
+```
+
+`access.impersonate` must be a function. `() => true` is the explicit allow-all.
+
+Put this plugin **after** `@10x-media/dual-session`, after `@payloadcms/plugin-multi-tenant` if you use it, and after any plugin that adds auth collections.
+
+The admin header gets **Impersonate**, which opens a drawer of users. Confirm, and you are that user until you exit. The bar on every admin route (including `/admin/unauthorized`) shows **Acting as** and **Return to**. In parallel mode the admin bar instead says the website session is active.

@@ -1,0 +1,346 @@
+---
+title: Goals
+description: Mark conversions from a data attribute, a block field, a form action, or server code, and let editors manage goals from the admin.
+---
+
+A goal is a named conversion. Declare the goals an install cares about, hook up whatever completes them, and `conversions` and `revenue` become readable metrics alongside pageviews.
+
+## Declare the goals
+
+```ts title="payload.config.ts"
+analytics({
+  adapters: [native()],
+  goals: [
+    { slug: 'book-demo', name: 'Book a demo', match: { kind: 'goal' }, value: { fixed: 500 }, currency: 'EUR' },
+    { slug: 'signup', name: 'Signup', match: { kind: 'event', name: 'signup' } },
+    { slug: 'thank-you', name: 'Thank-you page', match: { kind: 'path', pattern: '/thank-you' } },
+    { slug: 'purchase', name: 'Purchase', match: { kind: 'goal' }, value: { prop: 'total' }, currency: 'USD' },
+  ],
+})
+```
+
+`goals` also accepts the object form `{ defaults: [...], collection: true }`, where `collection` is the admin surface [editors manage their own goals through](#5-let-editors-manage-goals). Slugs must be unique and kebab-case, so a slug is safe in a URL, a data attribute, and a rollup bucket key; a duplicate or a non-kebab slug throws at config time, as does a negative or non-finite `value.fixed`. `name` is admin-facing and never reaches the browser.
+
+### Match kinds
+
+| Kind | Completes on |
+|---|---|
+| `{ kind: 'goal' }` | An explicit `trackGoal('<slug>')`, which is what the attribute hookup emits. |
+| `{ kind: 'event', name }` | A `track(name, props)` custom event with that exact name. |
+| `{ kind: 'path', pattern }` | A pageview whose path matches the glob. |
+
+The kinds never cross: a custom event named `signup` does not complete a `{ kind: 'goal' }` goal whose slug is `signup`, and a `trackGoal('signup')` does not complete a `{ kind: 'event', name: 'signup' }` goal.
+
+### Path globs
+
+Anchored and case-sensitive. `*` is exactly one non-empty segment, `**` is one or more segments at any depth. A trailing slash is insignificant on both sides, a query string and a hash are cut off both the path and the pattern, and every other regex metacharacter is matched literally.
+
+| Pattern | Matches | Does not match |
+|---|---|---|
+| `/thank-you` | `/thank-you`, `/thank-you/`, `/thank-you?ref=x` | `/thank-you/deep` |
+| `/docs/**` | `/docs/intro`, `/docs/a/b/c` | `/docs` |
+| `/checkout/*/done` | `/checkout/abc/done` | `/checkout/done`, `/checkout/a/b/done` |
+
+### Value precedence
+
+The event's own `value` wins (an explicit `0` included), then the goal's `value.fixed`, then `Number(props[value.prop])`, else `0`. A value that is not a finite number `>= 0` falls through to the next source, so a negative amount can never subtract from a bucket's revenue.
+
+One event can complete several goals, and each completion carries its own value.
+
+## Five hookups
+
+| Surface | Reach for it when |
+|---|---|
+| [Data attribute](#1-tag-the-element) | The thing a visitor clicks or submits is markup you control. |
+| [`goalField()`](#2-pick-a-goal-in-a-block) | Editors decide per document which goal a CTA completes. |
+| [Form-builder action](#3-track-a-form-submission) | A `@10x-media/form-builder` submission is the conversion. |
+| [`trackServerEvent()`](#4-track-from-server-code) | The conversion happens on the server: a webhook, a job, a server action. |
+| [Goals collection](#5-let-editors-manage-goals) | Marketers add and edit the goals themselves, without a deploy. |
+
+## 1. Tag the element
+
+The simplest hookup is an attribute. The tracker's `goalAttribute` auto-capture (on by default) fires on click for any element and on submit for any form:
+
+```html
+<button data-analytics-goal="book-demo">Book a demo</button>
+
+<form data-analytics-goal="newsletter-signup">
+  <input name="email" type="email" />
+  <button type="submit">Subscribe</button>
+</form>
+```
+
+Add revenue on the element itself when the amount is per-instance:
+
+```html
+<button
+  data-analytics-goal="purchase"
+  data-analytics-value="49.00"
+  data-analytics-currency="EUR"
+>
+  Buy
+</button>
+```
+
+The attribute is read from the nearest ancestor carrying it, so wrapping a whole card works. A blank or non-numeric `data-analytics-value` is treated as absent rather than zero, so an unfilled template slot never books a zero-revenue conversion.
+
+### Track it by hand
+
+```ts
+import { useAnalytics } from '@10x-media/analytics/react'
+
+const { trackGoal } = useAnalytics()
+trackGoal('book-demo')
+trackGoal('purchase', { value: 49, currency: 'EUR' })
+```
+
+`trackGoal` is on the tracker itself too (`@10x-media/analytics/tracker`), for hosts that boot it without React. Passing no `value` falls back to the goal's own fixed value and currency, which is what lets a vendor sink book revenue; the tracker reads those from its config, a server-rendered snapshot of the request scope's goals with the [collection](#5-let-editors-manage-goals) already merged in. A slug that snapshot does not know is still sent, because the server may know goals it predates.
+
+## 2. Pick a goal in a block
+
+`goalField()` is a field factory for your own collections, globals, and blocks. It stores the goal slug as text and renders a picker listing the goals the requesting scope can see:
+
+```ts title="blocks/cta.ts"
+import { goalField } from '@10x-media/analytics'
+import type { Block } from 'payload'
+
+export const ctaBlock: Block = {
+  slug: 'cta',
+  fields: [
+    { name: 'heading', type: 'text' },
+    { name: 'label', type: 'text', required: true, defaultValue: 'Book a demo' },
+    goalField({ name: 'goal', required: true }),
+  ],
+}
+```
+
+Read it back with `goalSlug()` and hand the slug to whichever hookup fires the completion, usually the [data attribute](#1-tag-the-element):
+
+```tsx title="components/cta.tsx"
+import { goalSlug } from '@10x-media/analytics'
+
+export const Cta = ({ block }: { block: { label: string; goal?: string | null } }) => (
+  <button type="button" data-analytics-goal={goalSlug(block.goal) ?? undefined}>
+    {block.label}
+  </button>
+)
+```
+
+`goalSlug` accepts the stored string and returns `null` for an unset field, so a block whose goal was cleared renders no attribute at all rather than an empty one. It comes from the root entry, which pulls Payload in with it, so call it where the document is read and hand a client component the resolved slug as a prop.
+
+| Option | Default | What it does |
+|---|---|---|
+| `name` | `'goal'` | Field name, and the property the slug is stored under. |
+| `label` | the translated "Goal" | Any Payload label. |
+| `required` | `false` | An empty value then fails with Payload's own `validation:required`. A non-empty one always has to be a kebab-case slug. |
+| `admin` | | Merged under the factory's own admin config. Every slot but `Field` passes through. |
+| `overrides` | | `({ field }) => TextField`, applied last. Spread the field, never deep-merge it. |
+
+The picker is a client component, so regenerate the import map (`payload generate:importmap`) after adding the field. It behaves like a native select: `admin.condition`, `admin.readOnly`, `admin.description`, `admin.placeholder` and `admin.width` all apply, and it resolves its own path through Payload's field context, so it works inside blocks and array rows whose index moves.
+
+Options come from `GET /api/analytics/goals`, an authenticated endpoint listing the config goals merged with the [goals collection](#5-let-editors-manage-goals) for the request's scope:
+
+```jsonc
+{
+  "goals": [
+    { "slug": "book-demo", "name": "Book a demo", "source": "config" },
+    { "slug": "newsletter", "name": "Newsletter signup", "source": "collection" }
+  ],
+  "collection": { "slug": "analytics-goals" }  // null when the collection is off
+}
+```
+
+The endpoint is registered whether or not the collection is enabled, so the picker works on a config-only install. It takes no scope parameter, so a tenant can only ever enumerate their own goals.
+
+A scope with no goals at all still renders the select, with a notice under the input (and a link to the collection when the install has one). A slug stored before the goals changed renders as its own option and stays editable, clearable on an optional field; a `required: true` field keeps the stored value until a goal exists, because the picker itself makes a required goal field non-clearable (Payload's native select stays clearable regardless of `required`, and `admin.isClearable` is not read here).
+
+The endpoint refuses an anonymous request with `401 unauthorized` and a denied one with `403 forbidden`, both in the plugin-wide [error envelope](/analytics/data-sources#errors), and it has no other refusal: a resolution that throws answers `200` with the config goals on an unscoped install and an empty list on a scoped one, rather than a 5xx the picker would have to render. Every answer carries `Cache-Control: private, no-store`, successful listings included, because which goals a caller sees depends on that caller's own scope.
+
+Anything outside the admin reads the field by hand. The value is a plain slug string, and `goalSlug()` is the only normalization it needs.
+
+## 3. Track a form submission
+
+`trackGoalAction()` is a post-submit action for [`@10x-media/form-builder`](/form-builder). Analytics never imports form-builder, and form-builder never imports analytics: the action is registered by the host.
+
+```ts title="payload.config.ts"
+import { GOAL_ACTION_TYPE, trackGoalAction } from '@10x-media/analytics'
+import { formBuilder } from '@10x-media/form-builder'
+
+formBuilder({
+  actions: { [GOAL_ACTION_TYPE]: trackGoalAction({ hostname: 'example.com' }) },
+})
+```
+
+Each form then gets a **Track analytics goal** block under its Actions tab:
+
+| Field | What it does |
+|---|---|
+| Goal | The goal this submission completes, through the same picker as `goalField()`. |
+| Value | Revenue for one completion, overriding the goal's own fixed value. |
+| Value from field | A submission field whose numeric answer becomes the value, used when Value is empty. |
+| Currency | ISO 4217 code the value is denominated in. |
+
+The completion is recorded against `/forms/<form id>` and carries `formId`, `formTitle` and `submissionId` as event props. Pass `path` to attribute it to the page the form lives on instead. Both `hostname` and `path` also take a function of the run arguments, for one Payload serving several sites: `hostname: ({ req }) => req?.headers.get('x-site') ?? 'example.com'`.
+
+### Where the action's hostname comes from
+
+A form submission is a public request whose `Host` the visitor chose, so the action does not store it as given. In order:
+
+1. The `hostname` option, normalized to [what counts as a hostname](/analytics/native#what-counts-as-a-hostname). An option that is not one is skipped rather than stored.
+2. The submitting request's host, judged by the native adapter's own [`hostname` policy](/analytics/native#where-the-hostname-comes-from): `'request'` stores it, a list stores it only when the list holds it, and a resolver decides. A forged host that the endpoint would have refused is refused here too, so a conversion cannot mint a hostname a beacon could not.
+3. The host of the install's `serverURL`.
+
+The scoped-install drop rule does not apply: a submission's scope comes from the form document, not from its host. There is no fourth rung: an install with no `serverURL` whose submitting request carries no usable host has nothing to attribute the completion to, so the action records nothing, writes one `warn` line for the life of the process, and returns. The submission itself is unaffected either way, since the action is not essential.
+
+<Callout type="warn">
+Set `hostname` on any install with a jobs runner. Form-builder queues every non-essential action, and a queued run carries the runner's request rather than the submitter's, so the fall-through lands on `serverURL` and every site's conversions pile up under the CMS host.
+
+On a scoped install, pass `scope` for the same reason: the submitter's tenant cannot be recovered from the runner's request, so an unset scope resolves install-wide. It takes a literal, `null` for install-wide, or a function of the run arguments.
+</Callout>
+
+The action is deliberately not `essential`: a goal is a measurement, so a failed write is logged by form-builder and the submission still succeeds. It records through `trackServerEvent`, so it needs the native adapter.
+
+## 4. Track from server code
+
+`trackServerEvent()` records an event from anywhere on the server, through the native engine's own ingest pipeline: same sanitizers, same goal matching, same write path, no HTTP round trip.
+
+```ts title="app/api/checkout/route.ts"
+import { trackServerEvent } from '@10x-media/analytics'
+import config from '@payload-config'
+import { getPayload } from 'payload'
+import { verifiedWebhookBody } from './verify' // your own signature check
+
+export const POST = async (request: Request) => {
+  const order = await verifiedWebhookBody(request)
+  const payload = await getPayload({ config })
+
+  await trackServerEvent(payload, {
+    type: 'goal',
+    name: 'purchase',
+    path: `/orders/${order.id}`,
+    hostname: 'shop.example.com',
+    value: order.total,
+    currency: 'EUR',
+    props: { plan: order.plan },
+  })
+
+  return new Response(null, { status: 204 })
+}
+```
+
+`type`, `path` and `hostname` are required, and so is `name` on everything but a pageview. An event that fails one of them rejects with an `AnalyticsTrackError` naming the field, and nothing is written. `hostname` is required **here** and optional over the [ingest endpoint](/analytics/native#the-ingest-endpoint), which stores the host the request carried instead: this is trusted server code, and there is no request to attribute a server event to, so the caller owns the value and it is stored as given. A missing `type`, `path` or `name` answers `400` over that endpoint the same way it throws here. Every optional field is sanitized exactly as it is on the wire.
+
+| Option | What it does |
+|---|---|
+| `opts.req` | The request behind the event. Attribution, scope and reporting timezone all follow it. |
+| `opts.flush` | Awaits the write on an install with a [write buffer](/analytics/native#write-batching-opt-in). Without it the call resolves as soon as the event is queued, and a failed flush only reaches the logger. |
+| `event.ip`, `event.userAgent` | Overlaid on the request's own headers, for a proxy that knows better than the request it holds. |
+| `event.scope` | Boundary to stamp, `null` for install-wide. See below. |
+| `event.timezone`, `event.now` | Override the resolved reporting timezone and the event time. |
+
+**Pass `opts.req` whenever there is a request.** The event then inherits that request's whole header set, so the platform geo headers reach the [geo resolver](/analytics/geo), the device classifies from the real user agent, and the visitor hashes to the same person the browser events did. Without a request and without an explicit `userAgent`, the event is attributed to a synthetic server visitor, stable for one day per hostname, and reports no device at all rather than padding the desktop bucket.
+
+On a scoped install the scope comes from `opts.req` unless `event.scope` says otherwise, and goals resolve under the scope the event is stamped with, so a tenant's server event can only complete that tenant's goals. An explicit scope is never validated against the scopes that exist, and an unscoped install ignores it outright, exactly as the ingest endpoint ignores a scope on the wire.
+
+`trackServerEvent` needs the native adapter. Provider slots have no server-side ingestion seam yet, so an install without `native()` throws rather than dropping the event.
+
+## 5. Let editors manage goals
+
+`goals.collection` adds an `analytics-goals` collection to the admin, so goals can be added and edited without a deploy:
+
+```ts title="payload.config.ts"
+analytics({
+  adapters: [native()],
+  goals: {
+    defaults: [{ slug: 'book-demo', name: 'Book a demo', match: { kind: 'goal' } }],
+    collection: true,
+  },
+})
+```
+
+`true` takes the defaults; the object form reshapes them:
+
+| Option | Default | What it does |
+|---|---|---|
+| `enabled` | `true` | Set `false` to keep the rest of the object while leaving the collection off. |
+| `slug` | `'analytics-goals'` | Collection slug. |
+| `scopeField` | `'scope'` | Field matched against the resolved scope. Left at the default, the plugin registers its own hidden text field; name another (a tenant plugin's, say) and it registers none, and the boot fails with a named error when nothing else registered that field. |
+| `access` | scope-aware defaults | Overrides individual operations. |
+| `overrides` | | `(collection) => CollectionConfig`, applied last. |
+
+Each document carries the same shape config goals do: `name`, `slug`, `enabled`, a `match` group (kind `goal`, `event` or `path`, with the event name or the path pattern beside it), a `value` group (`fixed` and `prop`), and a `currency`. The slug validates as kebab-case and is unique per scope. Disabling a document is the soft delete: it stops matching immediately and leaves the history it already stamped alone.
+
+**Collection goals win over config goals by slug.** A document whose slug matches a config goal replaces it in place, keeping config's order so reports built on it do not reorder; the collection's own extras follow. That is what makes the collection an editor's handle on what config declared, rather than a second, competing list.
+
+Resolution is cached for 30 seconds per scope and dropped whenever a goal document changes or is deleted, so native ingest, which resolves goals on every single event, does not query the collection per request. One read serves at most 500 enabled goals per scope, which is a ceiling on how many an install can have in play rather than a page size: a scope holding more gets an arbitrary 500 of them. A read that fails falls back to the config goals rather than taking ingest down with it.
+
+Access is scope-aware out of the box, the same rules the provider collection follows: a tenant reads, updates and deletes only their own goals, every create is stamped with the request's resolved scope server-side (a forged one is refused, not silently rewritten), and `access.platformRead` lifts both restrictions for platform admins. See [Multi-tenancy](/analytics/multi-tenancy#goals-per-tenant).
+
+<Callout type="info">
+Collection goals reach the browser too. The [tracker config](/analytics/capture#plain-html-and-other-frameworks) carries the merged set for the request's own scope, trimmed to what a browser may see (`slug`, `match`, `value`, `currency`, never the admin-facing `name`), so `trackGoal('purchase')` attaches an editor-set fixed value and currency to the event a vendor sink receives, exactly as it does for a config goal.
+
+An edit therefore reaches browsers on a delay: up to the resolver's 30 second per-scope cache, plus the tracker endpoint's own `Cache-Control: private, max-age=60`. Native is never on that delay, since it matches at ingest against the freshly resolved set.
+</Callout>
+
+On Postgres the collection is a new table, so an existing install needs a migration before the option ships: `payload migrate:create` in the app generates the DDL from the collection config, the same way the [native engine's upgrades](/analytics/native#upgrading-an-existing-install) do.
+
+## How native reports them
+
+Goals are matched at ingest, against the same sanitized fields that get stored, and the completions are stamped onto the event. Editing a goal later never rewrites history.
+
+The [native engine](/analytics/native) then serves three metrics and one dimension:
+
+| Key | What it is |
+|---|---|
+| `conversions` | Completions in the bucket. Every bucket carries them, so a breakdown by country or device can report conversions too. |
+| `revenue` | Summed completion values. See the currency note below. |
+| `scrollDepth` | Average deepest scroll, over the pageviews that actually reported one. |
+| `goal` (dimension) | Groups by goal slug. Groupable, not filterable. |
+
+All three metrics appear in the widget metric, trend, and breakdown pickers, and the built-in `analytics-breakdown-goals` widget lists completions per goal (defaulting its metric to `conversions`). For the fuller table, the [goals widget](/analytics/widgets#the-goals-widget) reports conversions, revenue and a conversion rate per goal, under each goal's own name rather than its slug. See [Dashboard widgets](/analytics/widgets).
+
+A `goal` event counts under the `events` metric, not `pageviews`, and is deliberately kept out of the `event` dimension breakdown: its name is a goal slug and belongs to the `goal` dimension instead.
+
+<Callout type="warn">
+Revenue is stored and summed as a plain number in the event's own currency. There is no FX conversion and no `currency` dimension, so a bucket spanning currencies sums figures that are not comparable. Widgets and stat fields render the result as a bare number too, with no currency symbol and nothing marking which currencies went into it. Keep one currency per install, or read revenue per goal.
+</Callout>
+
+Existing native installs need the goal-counter migration before any of this reads correctly. See [Upgrading for goal metrics](/analytics/native#upgrading-for-goal-metrics).
+
+## How providers report them
+
+A goal travels to a vendor as an ordinary event named by its slug, so it shows up wherever that vendor lists event names. The plugin does not create the vendor's own goal or conversion definitions for you.
+
+| Adapter | Call | Revenue |
+|---|---|---|
+| PostHog | `posthog.capture(slug, { ...props, value, currency })` | As the `value` and `currency` properties, which PostHog's revenue analytics reads. |
+| Plausible | `plausible(slug, { props, revenue: { amount, currency } })` | Plausible's documented ecommerce shape. |
+| Umami | `umami.track(slug, { ...props, value, currency })` | Umami has no revenue field; both ride along as event data. |
+| GA4 | `gtag('event', name, { ...props, value, currency })` | As the `value` and `currency` params, which GA4's ecommerce reports read. |
+
+The name GA4 receives is the slug normalized to an event name GA4 accepts, since it takes no hyphens: see [reading them back](#reading-them-back-on-a-provider).
+
+### Reading them back on a provider
+
+Every provider serves `conversions` and the `goal` dimension. GA4 serves `revenue` too, and Plausible does where `revenueCurrency` names the currency of a revenue goal:
+
+| Adapter | Goal rows from | Conversions | Revenue |
+|---|---|---|---|
+| Plausible | `event:goal` | the `events` metric on goal rows (the dashboard's Total Conversions) | `total_revenue`, only with `revenueCurrency` set |
+| GA4 | `eventName` | `keyEvents` | `totalRevenue` |
+| PostHog | `event` | `count()` over the goal events | none |
+| Umami | `/metrics?type=event` | event occurrences | none |
+
+A provider does not know which of its events are this install's goals, so a read that asks about goals carries the scope's goal slugs with it, set by the query endpoint, the widgets and the display fields, and partitioning the cache. **The slug has to be the provider's own name for the goal**: the goal's display name in Plausible's own goal list, the captured event's name on PostHog and Umami, and on GA4 the slug normalized to a valid GA4 event name (hyphens become underscores, anything outside letters, digits and underscores is dropped, a name not starting with a letter gains an `e_` prefix, 40 characters at most), which is exactly what the GA4 sink sends.
+
+<Callout type="info">
+**`conversions` on a provider means this install's goals.** It counts completions of the goals declared here, as it does on native, rather than whatever the vendor counts install-wide. An install with no goals configured therefore reads no conversions from a provider at all: the read answers an empty goal table rather than `meta.goalsUnresolved`, which is reserved for goals that could not be resolved. GA4's `keyEvents` narrows twice: it counts only the goals here **and** only the events the property itself marks as key events.
+</Callout>
+
+Three more things worth knowing before you build on it:
+
+- **A rejected goal request costs the goals, not the read.** When a provider refuses the goal half, the site numbers are served without conversions (and without Plausible's revenue) and the answer carries `meta.goalsUnresolved`. Emptying a pageviews card because goals could not resolve would be worse than the missing column.
+- **Conversions can cost a second request.** A read that asks for site metrics and conversions together cannot goal-filter the whole request without zeroing the site numbers, so Plausible and GA4 issue a second, goal-filtered request and merge it row by row. It runs after the first, inside the same rate-limit permit.
+- **Umami serves conversions as goal rows and a range total only.** There is no per-day source for them, so a conversions trend on Umami charts nothing rather than a flat zero line.
+
+`revenue` is still native, GA4 and Plausible only. That is what the [capability gate](/analytics/adapters#the-capabilities-model) enforces, so a widget whose active source cannot answer degrades rather than reporting a wrong number.

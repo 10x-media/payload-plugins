@@ -1,4 +1,13 @@
 import type { Payload, PayloadRequest, StaticLabel } from 'payload'
+import type { MeasurementPrecision, PrecisionMode } from './fields/measurement/engine/precision'
+import type { MeasurementUnitId } from './fields/measurement/engine/units'
+import type { MetadataSet } from './fields/phoneNumber/engine/metadata'
+import type {
+	CountryCode,
+	PhoneFormat,
+	PhoneValidationMode,
+} from './fields/phoneNumber/engine/phone'
+import type { PhoneFlagMode } from './fields/phoneNumber/options'
 
 /** Args passed to async per-document resolvers (color presets, icon availability). */
 export type FieldsResolverArgs = {
@@ -223,9 +232,52 @@ export type EncryptedGlobalConfig = {
 	onDecryptFailure?: DecryptFailurePolicy
 }
 
+/** Per-request policy for registry defaults; list cells call it with `req` undefined (Cell components carry no request). */
+export type MeasurementDefaultUnitsResolver = (args: {
+	req: PayloadRequest | undefined
+	preferenceKey: string
+}) => MeasurementUnitId | undefined
+
+/** Plugin-level defaults for measurementField(). Per-field options always win. */
+export type MeasurementGlobalConfig = {
+	/**
+	 * Keyed by each field's `preferenceKey`, which defaults to its dimension. Or a
+	 * resolver function for per-request (tenant-aware) policy; a throwing resolver
+	 * degrades to no default rather than breaking the render.
+	 */
+	defaultUnits?: Partial<Record<string, MeasurementUnitId>> | MeasurementDefaultUnitsResolver
+	/** Session-only preference mode for kiosks and shared accounts: skips both reads and writes. Defaults to true. */
+	persistPreferences?: boolean
+	/** Precision default for every measurementField(), ahead of the engine's own default. A field's own `precision` always wins. */
+	precision?: MeasurementPrecision | PrecisionMode
+}
+
+/** Plugin-level defaults for phoneNumberField(). Per-field options always win. */
+export type PhoneNumberGlobalConfig = {
+	/** Default for every phoneNumberField(); a field's own option always wins. */
+	defaultCountry?: CountryCode
+	countries?: readonly CountryCode[]
+	priorityCountries?: readonly CountryCode[]
+	/** Heading over `priorityCountries` in the picker. No label renders no heading, only the group separator. */
+	priorityCountriesLabel?: StaticLabel
+	validation?: PhoneValidationMode
+	flags?: PhoneFlagMode
+	cellFormat?: PhoneFormat
+	/**
+	 * Install-wide, with no per-field form. A cost decision, not a technical one: a second
+	 * set is another 80-145 kB loaded for marginal gain, and two fields on one document
+	 * could then reach different verdicts about the same number.
+	 */
+	metadata?: MetadataSet
+	/** Mount the flag SVG route. Defaults to true. */
+	serveFlags?: boolean
+}
+
 /** Normalized plugin options written to `config.custom['@10x-media/fields']`. */
 export type FieldsPluginRegistry = {
 	color?: ColorGlobalConfig
 	icon?: IconGlobalConfig
 	encrypted?: EncryptedGlobalConfig
+	measurement?: MeasurementGlobalConfig
+	phoneNumber?: PhoneNumberGlobalConfig
 }

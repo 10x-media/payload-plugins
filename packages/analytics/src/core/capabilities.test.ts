@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { satisfiesCapabilities } from './capabilities'
+import { comparisonOf, satisfiesCapabilities, serializeCapabilities } from './capabilities'
 import type { AnalyticsCapabilities } from './contract'
 
 const caps: AnalyticsCapabilities = {
@@ -10,6 +10,8 @@ const caps: AnalyticsCapabilities = {
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews', 'visitors']),
 	dimensions: new Set(['page', 'referrer']),
+	filters: new Set(['page']),
+	filterOperators: new Set(['eq']),
 	batchPageReport: true,
 	rateLimit: null,
 	recommendedTtl: { realtime: 300, aggregate: 3600 },
@@ -27,5 +29,136 @@ describe('satisfiesCapabilities', () => {
 	})
 	it('passes with empty requirements', () => {
 		expect(satisfiesCapabilities(caps, {})).toBe(true)
+	})
+	it('passes when every required filter dimension is in caps.filters', () => {
+		expect(satisfiesCapabilities(caps, { filters: ['page'] })).toBe(true)
+	})
+	it('fails when a required filter dimension is missing from caps.filters', () => {
+		expect(satisfiesCapabilities(caps, { filters: ['referrer'] })).toBe(false)
+	})
+	it('passes when every required filter operator is in caps.filterOperators', () => {
+		expect(satisfiesCapabilities(caps, { filters: ['page'], filterOperators: ['eq'] })).toBe(true)
+	})
+	it('fails when a required filter operator is missing from caps.filterOperators', () => {
+		expect(satisfiesCapabilities(caps, { filters: ['page'], filterOperators: ['matches'] })).toBe(
+			false
+		)
+	})
+})
+
+/** A provider adapter that never mentions comparison: the engine reads the previous window for it. */
+const undeclaredComparison: AnalyticsCapabilities = {
+	perPageQuery: false,
+	realtime: false,
+	minGranularity: 'day',
+	maxLookbackDays: 90,
+	metrics: new Set(['pageviews']),
+	dimensions: new Set(['page']),
+	filters: new Set(),
+	filterOperators: new Set(),
+	batchPageReport: false,
+	rateLimit: null,
+	recommendedTtl: { realtime: 300, aggregate: 3600 },
+}
+
+describe('comparisonOf', () => {
+	it('defaults to true when the adapter never declared the capability', () => {
+		expect(comparisonOf(undeclaredComparison)).toBe(true)
+	})
+
+	it('keeps an explicit true', () => {
+		expect(comparisonOf(caps)).toBe(true)
+	})
+
+	it('honors an explicit opt-out', () => {
+		expect(comparisonOf({ ...caps, comparison: false })).toBe(false)
+	})
+})
+
+describe('serializeCapabilities', () => {
+	it('sends the default to the wire when the adapter omits the key', () => {
+		expect(serializeCapabilities(undeclaredComparison).comparison).toBe(true)
+	})
+
+	it('turns the metric and dimension sets into arrays and keeps the wire fields', () => {
+		const caps: AnalyticsCapabilities = {
+			perPageQuery: true,
+			realtime: true,
+			realtimeWindowMinutes: 60,
+			comparison: true,
+			minGranularity: 'day',
+			maxLookbackDays: null,
+			metrics: new Set(['pageviews', 'visitors']),
+			dimensions: new Set(['page']),
+			filters: new Set(['page']),
+			filterOperators: new Set(['eq', 'contains']),
+			batchPageReport: true,
+			rateLimit: null,
+			recommendedTtl: { realtime: 10, aggregate: 300 },
+		}
+		const wire = serializeCapabilities(caps)
+		expect(wire.metrics).toEqual(['pageviews', 'visitors'])
+		expect(wire.dimensions).toEqual(['page'])
+		expect(wire.filters).toEqual(['page'])
+		expect(wire.filterOperators).toEqual(['eq', 'contains'])
+		expect(wire.realtime).toBe(true)
+		expect(wire.realtimeWindowMinutes).toBe(60)
+		expect(JSON.parse(JSON.stringify(wire))).toEqual(wire)
+	})
+
+	it('serializes to exactly the allowlisted keys, dropping adapter-internal fields', () => {
+		const caps: AnalyticsCapabilities = {
+			perPageQuery: false,
+			realtime: false,
+			comparison: false,
+			minGranularity: 'day',
+			maxLookbackDays: 30,
+			metrics: new Set(),
+			dimensions: new Set(),
+			filters: new Set(),
+			filterOperators: new Set(['eq']),
+			batchPageReport: false,
+			rateLimit: { requestsPerHour: 600 },
+			recommendedTtl: { realtime: 300, aggregate: 3600 },
+			scopedQueries: true,
+		}
+		const wire = serializeCapabilities(caps)
+		expect(Object.keys(wire).sort()).toEqual(
+			[
+				'comparison',
+				'dimensions',
+				'filters',
+				'filterOperators',
+				'maxLookbackDays',
+				'metrics',
+				'minGranularity',
+				'perPageQuery',
+				'realtime',
+			].sort()
+		)
+		expect(wire.metrics).toEqual([])
+		expect(wire.filters).toEqual([])
+		expect((wire as Record<string, unknown>).rateLimit).toBeUndefined()
+		expect((wire as Record<string, unknown>).recommendedTtl).toBeUndefined()
+		expect((wire as Record<string, unknown>).batchPageReport).toBeUndefined()
+		expect((wire as Record<string, unknown>).scopedQueries).toBeUndefined()
+	})
+
+	it('omits realtimeWindowMinutes from the wire object when unset', () => {
+		const caps: AnalyticsCapabilities = {
+			perPageQuery: true,
+			realtime: false,
+			comparison: true,
+			minGranularity: 'day',
+			maxLookbackDays: null,
+			metrics: new Set(),
+			dimensions: new Set(),
+			filters: new Set(),
+			filterOperators: new Set(['eq']),
+			batchPageReport: true,
+			rateLimit: null,
+			recommendedTtl: { realtime: 300, aggregate: 3600 },
+		}
+		expect('realtimeWindowMinutes' in serializeCapabilities(caps)).toBe(false)
 	})
 })

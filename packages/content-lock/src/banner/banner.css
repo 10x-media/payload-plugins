@@ -1,0 +1,105 @@
+.content-lock-banner {
+	--content-lock-accent: var(--theme-warning-500);
+	--content-lock-surface: var(--theme-warning-100);
+	position: relative;
+	z-index: 2;
+	padding: calc(var(--base) * 0.4) var(--gutter-h);
+	/* An inset line rather than a border, so it adds nothing to the height and
+	   the padding above and below the text stays even. */
+	box-shadow: inset 0 -1px 0 var(--content-lock-accent);
+	background: var(--content-lock-surface);
+	color: var(--theme-text);
+	font-size: calc(var(--base) * 0.65);
+	line-height: 1.4;
+}
+
+.content-lock-banner--active {
+	--content-lock-accent: var(--theme-error-500);
+	--content-lock-surface: var(--theme-error-100);
+}
+
+.content-lock-banner__row {
+	display: flex;
+	flex-wrap: wrap;
+	/* Centred, not baseline: the controls are taller than a line of text, and
+	   baseline alignment pinned the text to the top of the row. */
+	align-items: center;
+	gap: calc(var(--base) * 0.25) calc(var(--base) * 0.6);
+}
+
+.content-lock-banner__title {
+	font-weight: 600;
+}
+
+.content-lock-banner__times {
+	display: inline-flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) * 0.6);
+	color: var(--theme-elevation-800);
+}
+
+.content-lock-banner__controls {
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.4);
+	margin-left: auto;
+}
+
+.content-lock-banner__pager {
+	display: inline-flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.1);
+}
+
+.content-lock-banner__position {
+	min-width: calc(var(--base) * 1.6);
+	text-align: center;
+	font-variant-numeric: tabular-nums;
+	color: var(--theme-elevation-800);
+}
+
+.content-lock-banner__button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: calc(var(--base) * 1.1);
+	height: calc(var(--base) * 1.1);
+	padding: 0;
+	border: 0;
+	border-radius: var(--style-radius-s);
+	background: none;
+	color: inherit;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.content-lock-banner__button:hover:not(:disabled) {
+	background: color-mix(in srgb, var(--content-lock-accent) 20%, transparent);
+}
+
+.content-lock-banner__button:disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+
+.content-lock-banner__button svg {
+	width: calc(var(--base) * 0.7);
+	height: calc(var(--base) * 0.7);
+}
+
+.content-lock-banner__dismiss {
+	font-size: calc(var(--base) * 0.9);
+}
+
+.content-lock-banner__message {
+	display: flex;
+	flex: 1 1 auto;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: calc(var(--base) * 0.25) calc(var(--base) * 0.6);
+	min-width: 0;
+}
+
+.content-lock-banner__message p {
+	margin: 0;
+}

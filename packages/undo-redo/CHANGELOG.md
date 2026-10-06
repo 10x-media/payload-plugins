@@ -1,5 +1,13 @@
 # @10x-media/undo-redo
 
+## 0.1.0-beta.2
+
+### Minor Changes
+
+- More built-in locales for the `undoRedo:` strings.
+
+  - Added: `es`, `fr`, `id`, `pt`, `ru`, `zh`, `uk`, `ar`, `ko`. Every key is covered in each.
+
 ## 0.1.0-beta.1
 
 ### Patch Changes

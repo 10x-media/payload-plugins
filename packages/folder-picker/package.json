@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/folder-picker",
-	"version": "0.1.0-beta.0",
+	"version": "0.1.0-beta.1",
 	"description": "Browse and select files through your folder hierarchy directly inside Payload CMS upload fields",
 	"license": "MIT",
 	"repository": {

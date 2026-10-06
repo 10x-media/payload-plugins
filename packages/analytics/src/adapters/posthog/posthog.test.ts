@@ -49,8 +49,8 @@ describe('posthog adapter', () => {
 		expect(body.query?.kind).toBe('HogQLQuery')
 		const sql = body.query?.query ?? ''
 		expect(sql).toContain("event = '$pageview'")
-		expect(sql).toContain("timestamp >= toDateTime('2026-01-01 00:00:00')")
-		expect(sql).toContain("timestamp <= toDateTime('2026-01-31 00:00:00')")
+		expect(sql).toContain("timestamp >= toDateTime('2026-01-01 00:00:00', 'UTC')")
+		expect(sql).toContain("timestamp <= toDateTime('2026-01-31 00:00:00', 'UTC')")
 		expect(sql).toContain("properties.$pathname = '/pricing'")
 		expect(sql).toContain('count(DISTINCT person_id)')
 		expect(result.totals).toEqual({ pageviews: 42891, visitors: 3102, sessions: 8774 })
@@ -100,6 +100,84 @@ describe('posthog adapter', () => {
 			{ dimensions: { page: '/pricing' }, metrics: { pageviews: 7412 } },
 		])
 		expect(result.totals).toBeUndefined()
+	})
+
+	describe('channel', () => {
+		it('breaks down by the session channel type, staying pageview-scoped', async () => {
+			let body: { query?: { query?: string } } = {}
+			server.use(
+				http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+					body = (await request.json()) as typeof body
+					return HttpResponse.json({
+						columns: ['dim', 'm0'],
+						types: ['String', 'UInt64'],
+						results: [
+							['Organic Search', 310],
+							['Direct', 88],
+						],
+					})
+				})
+			)
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['visitors'], dimensions: ['channel'] }),
+				{}
+			)
+			const sql = body.query?.query ?? ''
+			expect(sql).toContain('session.$channel_type AS dim')
+			expect(sql).toContain('GROUP BY dim')
+			expect(sql).toContain("event = '$pageview'")
+			expect(result.rows).toEqual([
+				{ dimensions: { channel: 'Organic Search' }, metrics: { visitors: 310 } },
+				{ dimensions: { channel: 'Direct' }, metrics: { visitors: 88 } },
+			])
+			expect(result.totals).toBeUndefined()
+		})
+
+		it.each([
+			['eq' as const, "session.$channel_type = 'Paid Search'"],
+			['contains' as const, "session.$channel_type ILIKE '%Paid%'"],
+			['matches' as const, "match(session.$channel_type, 'Paid .*')"],
+		])('sends a %s channel filter as %s', async (operator, clause) => {
+			let body: { query?: { query?: string } } = {}
+			server.use(
+				http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+					body = (await request.json()) as typeof body
+					return HttpResponse.json({ columns: ['m0'], types: ['UInt64'], results: [[5]] })
+				})
+			)
+			const value = { eq: 'Paid Search', contains: 'Paid', matches: 'Paid .*' }[operator]
+			const caps = posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities
+			expect(caps.dimensions.has('channel')).toBe(true)
+			expect(caps.filters.has('channel')).toBe(true)
+			await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['pageviews'], filters: [{ dimension: 'channel', operator, value }] }),
+				{}
+			)
+			expect(body.query?.query ?? '').toContain(clause)
+		})
+
+		it('keeps the pageview scope in the WHERE of a channel-filtered read', async () => {
+			let body: { query?: { query?: string } } = {}
+			server.use(
+				http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+					body = (await request.json()) as typeof body
+					return HttpResponse.json({ columns: ['m0'], types: ['UInt64'], results: [[5]] })
+				})
+			)
+			await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({
+					metrics: ['pageviews'],
+					filters: [{ dimension: 'channel', operator: 'eq', value: 'Paid Search' }],
+				}),
+				{}
+			)
+			const sql = body.query?.query ?? ''
+			// `channel` reads a session property rather than the event name, so it must not
+			// widen the scan the way an `event` or `goal` read does.
+			expect(sql).toContain("WHERE event = '$pageview'")
+			expect(sql).toContain("session.$channel_type = 'Paid Search'")
+			expect(sql).toContain('count() AS m0')
+		})
 	})
 
 	it('supports the events metric with all-event conditional aggregation', async () => {
@@ -170,6 +248,157 @@ describe('posthog adapter', () => {
 			{ dimensions: { event: 'signup' }, metrics: { events: 42 } },
 			{ dimensions: { event: 'purchase' }, metrics: { events: 11 } },
 		])
+	})
+
+	describe('goals and conversions', () => {
+		/** Every SQL statement the adapter sent, in call order. */
+		const capture = (respond: (sql: string) => unknown[][]): string[] => {
+			const sent: string[] = []
+			server.use(
+				http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+					const body = (await request.json()) as { query?: { query?: string } }
+					const sql = body.query?.query ?? ''
+					sent.push(sql)
+					return HttpResponse.json({ columns: [], types: [], results: respond(sql) })
+				})
+			)
+			return sent
+		}
+
+		it('declares the goal dimension and conversions, and does not offer goal as a filter', () => {
+			const caps = posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities
+			expect(caps.dimensions.has('goal')).toBe(true)
+			expect(caps.metrics.has('conversions')).toBe(true)
+			expect(caps.filters.has('goal')).toBe(false)
+		})
+
+		it('groups by event, restricted to the hint, counting occurrences as conversions', async () => {
+			const sent = capture(() => [
+				['signup', 42],
+				['purchase', 11],
+			])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({
+					metrics: ['conversions'],
+					dimensions: ['goal'],
+					goalSlugs: ['signup', 'purchase'],
+				}),
+				{}
+			)
+			const sql = sent[0] ?? ''
+			expect(sql).toContain('event AS dim')
+			expect(sql).toContain("event IN ('signup', 'purchase')")
+			// A goal read scans every event: a $pageview clause would zero every count.
+			expect(sql).not.toContain("event = '$pageview'")
+			expect(result.rows).toEqual([
+				{ dimensions: { goal: 'signup' }, metrics: { conversions: 42 } },
+				{ dimensions: { goal: 'purchase' }, metrics: { conversions: 11 } },
+			])
+		})
+
+		it('serves no goal rows and says so when the read carries no hint', async () => {
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'] }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		it('says so when the goal resolver failed', async () => {
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: 'unresolved' }),
+				{}
+			)
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		// A project with no goals configured has an empty goal table, not a broken one.
+		it('serves an empty goal breakdown unflagged when the scope configures no goals', async () => {
+			const sent = capture(() => [])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: [] }),
+				{}
+			)
+			expect(sent).toEqual([])
+			expect(result.rows).toEqual([])
+			expect(result.meta.goalsUnresolved).toBeUndefined()
+		})
+
+		it('counts conversions with a conditional aggregate, leaving the site metrics site-wide', async () => {
+			const sent = capture(() => [[500, 11]])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['pageviews', 'conversions'], goalSlugs: ['signup'] }),
+				{}
+			)
+			expect(sent).toHaveLength(1)
+			const sql = sent[0] ?? ''
+			expect(sql).toContain("countIf(event = '$pageview')")
+			expect(sql).toContain("countIf(event IN ('signup'))")
+			expect(sql).not.toContain('WHERE event IN')
+			expect(result.totals).toEqual({ pageviews: 500, conversions: 11 })
+		})
+
+		it('keeps the site metrics and drops conversions when the read carries no hint', async () => {
+			const sent = capture(() => [[500]])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['pageviews', 'conversions'] }),
+				{}
+			)
+			expect(sent[0]).not.toContain('countIf(event IN')
+			expect(result.totals).toEqual({ pageviews: 500 })
+			expect(result.meta.goalsUnresolved).toBe(true)
+		})
+
+		it('drops conversions unflagged when the scope configures no goals', async () => {
+			const sent = capture(() => [[500]])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['pageviews', 'conversions'], goalSlugs: [] }),
+				{}
+			)
+			expect(sent[0]).not.toContain('countIf(event IN')
+			expect(result.totals).toEqual({ pageviews: 500 })
+			expect(result.meta.goalsUnresolved).toBeUndefined()
+		})
+
+		it('counts a goal breakdown with plain aggregates, not the pageview-conditional ones', async () => {
+			const sent = capture(() => [['signup', 42, 30]])
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({
+					metrics: ['conversions', 'visitors'],
+					dimensions: ['goal'],
+					goalSlugs: ['signup'],
+				}),
+				{}
+			)
+			const sql = sent[0] ?? ''
+			// The scan is already restricted to the goal events, so a $pageview-conditional
+			// visitors count would be 0 on every row and every conversion rate 0%.
+			expect(sql).toContain('count(DISTINCT person_id)')
+			expect(sql).not.toContain("count(DISTINCT if(event = '$pageview', person_id, NULL))")
+			expect(result.rows).toEqual([
+				{ dimensions: { goal: 'signup' }, metrics: { conversions: 42, visitors: 30 } },
+			])
+		})
+
+		it('keeps the conditional aggregates on an event breakdown, which scans every event', async () => {
+			const sent = capture(() => [['signup', 1]])
+			await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['visitors'], dimensions: ['event'] }),
+				{}
+			)
+			expect(sent[0]).toContain("count(DISTINCT if(event = '$pageview', person_id, NULL))")
+		})
+
+		it('escapes a quote in a goal slug (no HogQL injection)', async () => {
+			const sent = capture(() => [['x', 1]])
+			await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['conversions'], dimensions: ['goal'], goalSlugs: ["it's"] }),
+				{}
+			)
+			expect(sent[0]).toContain("event IN ('it\\'s')")
+		})
 	})
 
 	it('filters by hostname via properties.$host', async () => {
@@ -285,6 +514,174 @@ describe('posthog adapter', () => {
 		expect(seriesSql).toContain("toStartOfDay(timestamp, 'UTC') AS day")
 	})
 
+	it('declares filters as the DIMENSION_SQL key set and hour as minGranularity', () => {
+		const caps = posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities
+		expect(caps.filters).toEqual(new Set(['page', 'channel', 'event']))
+		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
+		expect(caps.minGranularity).toBe('hour')
+	})
+
+	it('applies an eq filter as an equality expression', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'page', operator: 'eq', value: '/pricing' }],
+			}),
+			{}
+		)
+		expect(body.query?.query).toContain("properties.$pathname = '/pricing'")
+	})
+
+	it('applies a contains filter as an escaped ILIKE pattern', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'page', operator: 'contains', value: '50%_off' }],
+			}),
+			{}
+		)
+		expect(body.query?.query).toContain("properties.$pathname ILIKE '%50\\\\%\\\\_off%'")
+	})
+
+	it('applies a matches filter via the HogQL match() function', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'event', operator: 'matches', value: '^signup' }],
+			}),
+			{}
+		)
+		expect(body.query?.query).toContain("match(event, '^signup')")
+	})
+
+	it('forces the all-events scan when filtering on the event dimension, so pageviews stays meaningful', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'event', operator: 'eq', value: 'signup' }],
+			}),
+			{}
+		)
+		const sql = body.query?.query ?? ''
+		// An event filter must drop the pageview-scoped WHERE or every metric zeros out.
+		expect(sql).not.toContain("WHERE event = '$pageview'")
+		expect(sql).toContain("countIf(event = '$pageview') AS m0")
+		expect(sql).toContain("event = 'signup'")
+	})
+
+	it('escapes a literal backslash in a contains filter value before the wildcard escapes', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'page', operator: 'contains', value: 'a\\b' }],
+			}),
+			{}
+		)
+		// escapeLikeValue doubles the backslash, then sqlString doubles each again for the literal.
+		expect(body.query?.query).toContain("properties.$pathname ILIKE '%a\\\\\\\\b%'")
+	})
+
+	it('drops a filter for a dimension it cannot serve instead of throwing', async () => {
+		let body: { query?: { query?: string } } = {}
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				body = (await request.json()) as typeof body
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({
+				metrics: ['pageviews'],
+				filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }],
+			}),
+			{}
+		)
+		expect(body.query?.query).not.toContain('DE')
+	})
+
+	it('returns a per-hour series plus range totals when granularity is hour', async () => {
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const body = (await request.json()) as { query?: { query?: string } }
+				const sql = body.query?.query ?? ''
+				if (sql.includes('GROUP BY hour')) {
+					return HttpResponse.json({
+						columns: ['hour', 'm0'],
+						types: [],
+						results: [
+							['2026-01-01 00:00:00', 10],
+							['2026-01-01 01:00:00', 25],
+						],
+					})
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[35]] })
+			})
+		)
+		const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'hour' }),
+			{}
+		)
+		expect(result.rows).toEqual([
+			{ timestamp: '2026-01-01T00:00:00.000Z', metrics: { pageviews: 10 } },
+			{ timestamp: '2026-01-01T01:00:00.000Z', metrics: { pageviews: 25 } },
+		])
+		expect(result.totals).toEqual({ pageviews: 35 })
+	})
+
+	it('buckets the hour series in the query timezone when set', async () => {
+		let seriesSql = ''
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const sql = ((await request.json()) as { query?: { query?: string } }).query?.query ?? ''
+				if (sql.includes('GROUP BY hour')) {
+					seriesSql = sql
+					return HttpResponse.json({ columns: ['hour', 'm0'], types: [], results: [] })
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[0]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'hour', timezone: 'Europe/Berlin' }),
+			{}
+		)
+		expect(seriesSql).toContain("toStartOfHour(timestamp, 'Europe/Berlin')")
+	})
+
 	it('targets the configured host (EU / self-host)', async () => {
 		server.use(
 			http.post('https://eu.posthog.com/api/projects/9/query/', () =>
@@ -354,5 +751,96 @@ describe('posthog scopeProperty', () => {
 			{}
 		)
 		expect(noProperty.get()).not.toContain('acme')
+	})
+})
+
+describe('posthog capture', () => {
+	it('derives region us from the default host and builds the three proxy routes', () => {
+		const capture = posthog({ projectId: '123', apiKey: 'phx_k', projectToken: 'phc_abc' }).capture
+		expect(capture?.proxy.trailingSlashes).toBe(true)
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/static/:p*', upstream: 'https://us-assets.i.posthog.com/static/:p*' },
+			{ source: '/array/:p*', upstream: 'https://us-assets.i.posthog.com/array/:p*' },
+			{ source: '/:p*', upstream: 'https://us.i.posthog.com/:p*' },
+		])
+	})
+
+	it('derives region eu from an eu.posthog.com host', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			host: 'https://eu.posthog.com',
+			projectToken: 'phc_abc',
+		}).capture
+		expect(capture?.proxy.routes).toEqual([
+			{ source: '/static/:p*', upstream: 'https://eu-assets.i.posthog.com/static/:p*' },
+			{ source: '/array/:p*', upstream: 'https://eu-assets.i.posthog.com/array/:p*' },
+			{ source: '/:p*', upstream: 'https://eu.i.posthog.com/:p*' },
+		])
+	})
+
+	it('honors an explicit region over the host-derived one', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			region: 'eu',
+			projectToken: 'phc_abc',
+		}).capture
+		expect(capture?.proxy.routes[0]?.upstream).toBe('https://eu-assets.i.posthog.com/static/:p*')
+	})
+
+	it('renders one self-sequencing inline snippet: the stub, then init', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			projectToken: 'phc_abc',
+		}).capture
+		const scripts = capture?.snippet({ path: '/ph' }).scripts ?? []
+		expect(scripts).toHaveLength(1)
+		expect(scripts[0]?.src).toBeUndefined()
+		const inline = scripts[0]?.inline ?? ''
+		// The official stub publishes the queueing globals and injects array.js itself,
+		// deriving the URL from api_host, so nothing depends on tag order.
+		expect(inline).toContain('e.__SV')
+		expect(inline).toContain(
+			'p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js"'
+		)
+		expect(inline).toContain('"init capture register')
+		// The injected tag inherits the inline's nonce, or a nonce CSP blocks the bundle.
+		expect(inline).toContain(
+			'(c=t.currentScript&&(t.currentScript.nonce||t.currentScript.getAttribute("nonce")))&&(p.nonce=c,p.setAttribute("nonce",c))'
+		)
+		expect(
+			inline.endsWith('posthog.init("phc_abc",{api_host:"/ph",ui_host:"https://us.posthog.com"})')
+		).toBe(true)
+	})
+
+	it('renders the eu ui_host in the init snippet', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			region: 'eu',
+			projectToken: 'phc_abc',
+		}).capture
+		const snippet = capture?.snippet({ path: '/ph' })
+		expect(snippet?.scripts[0]?.inline).toContain('ui_host:"https://eu.posthog.com"')
+	})
+
+	// Capture is public config: a dashboard-only install (projectId + apiKey) must not get a
+	// public forward proxy, nor a snippet initialised with an empty token.
+	it('declares no capture at all when projectToken is absent', () => {
+		expect(posthog({ projectId: '123', apiKey: 'phx_k' }).capture).toBeUndefined()
+	})
+
+	it('client carries only the public project token, never the private apiKey', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_super_secret',
+			projectToken: 'phc_public',
+		}).capture
+		expect(capture?.client).toEqual({ kind: 'posthog', token: 'phc_public' })
+		const roundTripped = JSON.parse(JSON.stringify(capture?.client))
+		expect(roundTripped).toEqual({ kind: 'posthog', token: 'phc_public' })
+		expect(JSON.stringify(capture?.client)).not.toContain('phx_super_secret')
 	})
 })

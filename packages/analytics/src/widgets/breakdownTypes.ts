@@ -1,7 +1,7 @@
 import type { DimensionKey, MetricKey } from '../core/contract'
 import type { TimeframePreset } from '../timeframe/presets'
 import { keys, type TranslationKey } from '../translations/keys'
-import type { WidgetRange } from './types'
+import type { WidgetFilter, WidgetRange } from './types'
 
 export interface BreakdownWidgetData {
 	title?: string
@@ -10,22 +10,60 @@ export interface BreakdownWidgetData {
 	range?: WidgetRange
 	limit?: number
 	dataSource?: string
+	filter?: WidgetFilter
 }
 
 export interface BreakdownSpec {
 	slug: string
 	dimension: DimensionKey
 	label: TranslationKey
+	preferredDefault?: MetricKey
 }
 
 export const BREAKDOWN_SPECS: BreakdownSpec[] = [
 	{ slug: 'analytics-breakdown-pages', dimension: 'page', label: keys.widgetBreakdownPages },
 	{ slug: 'analytics-breakdown-sources', dimension: 'source', label: keys.widgetBreakdownSources },
+	{
+		slug: 'analytics-breakdown-channels',
+		dimension: 'channel',
+		label: keys.widgetBreakdownChannels,
+		// Channels are an acquisition mix, which is a question about people rather than pages.
+		preferredDefault: 'visitors',
+	},
 	{ slug: 'analytics-breakdown-devices', dimension: 'device', label: keys.widgetBreakdownDevices },
 	{
 		slug: 'analytics-breakdown-countries',
 		dimension: 'country',
 		label: keys.widgetBreakdownCountries,
+	},
+	{
+		slug: 'analytics-breakdown-goals',
+		dimension: 'goal',
+		label: keys.widgetBreakdownGoals,
+		// A goals breakdown is a conversion table: pageviews per goal is a stranger default.
+		preferredDefault: 'conversions',
+	},
+	{
+		slug: 'analytics-breakdown-referrers',
+		dimension: 'referrer',
+		label: keys.widgetBreakdownReferrers,
+	},
+	{
+		slug: 'analytics-breakdown-browsers',
+		dimension: 'browser',
+		label: keys.widgetBreakdownBrowsers,
+	},
+	{ slug: 'analytics-breakdown-os', dimension: 'os', label: keys.widgetBreakdownOs },
+	{
+		slug: 'analytics-breakdown-campaigns',
+		dimension: 'utmCampaign',
+		label: keys.widgetBreakdownCampaigns,
+	},
+	{
+		slug: 'analytics-breakdown-events',
+		dimension: 'event',
+		label: keys.widgetBreakdownEvents,
+		preferredDefault: 'events',
 	},
 ]
 

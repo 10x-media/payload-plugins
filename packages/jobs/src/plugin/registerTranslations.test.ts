@@ -13,6 +13,8 @@ describe('registerTranslations', () => {
 		const config = {} as Config
 		registerTranslations(config)
 		expect(translationsOf(config).en?.jobs?.pluginName).toBe('Jobs')
+		expect(translationsOf(config).de?.jobs?.statusQueued).toBe('In Warteschlange')
+		expect(translationsOf(config).uk?.jobs?.statusQueued).toBe('У черзі')
 	})
 
 	it('lets an override win over a built-in key', () => {
@@ -32,13 +34,20 @@ describe('registerTranslations', () => {
 	it('passes a locale the plugin does not ship through whole', () => {
 		const config = {} as Config
 		registerTranslations(config, {
-			de: { [keys.pluginName]: 'Aufgaben', [keys.statusQueued]: 'Wartend' },
+			ja: { [keys.pluginName]: 'ジョブ', [keys.statusQueued]: '待機中' },
 		})
-		expect(translationsOf(config).de?.jobs).toEqual({
-			pluginName: 'Aufgaben',
-			statusQueued: 'Wartend',
+		expect(translationsOf(config).ja?.jobs).toEqual({
+			pluginName: 'ジョブ',
+			statusQueued: '待機中',
 		})
 		expect(translationsOf(config).en?.jobs?.pluginName).toBe('Jobs')
+	})
+
+	it('lets an override win over a built-in locale key by key', () => {
+		const config = {} as Config
+		registerTranslations(config, { de: { [keys.pluginName]: 'Aufgaben' } })
+		expect(translationsOf(config).de?.jobs?.pluginName).toBe('Aufgaben')
+		expect(translationsOf(config).de?.jobs?.statusQueued).toBe('In Warteschlange')
 	})
 
 	it('lets a pre-registered host value win over an override', () => {

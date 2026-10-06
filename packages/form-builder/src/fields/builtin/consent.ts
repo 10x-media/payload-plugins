@@ -1,8 +1,9 @@
+import type { ConsentDisplay } from '../../consent/effectiveStatement'
 import { keys } from '../../translations/keys'
 import { labelForKey } from '../../translations/server'
 import { defineFormField } from '../defineFormField'
 
-type ConsentConfig = { source?: string; required?: boolean }
+type ConsentConfig = { source?: string; required?: boolean; display?: ConsentDisplay }
 
 const SOURCE_FIELD_REF = '@10x-media/form-builder/client#EndpointOptionsSelect'
 
@@ -19,6 +20,10 @@ const SOURCE_FIELD_REF = '@10x-media/form-builder/client#EndpointOptionsSelect'
  * The intrinsic validator owns `required`: the engine's shared required guard only fires on an
  * empty value, and `false` (the coerced state of both an unchecked box and an absent answer) is a
  * present one, so without this a required consent would accept an explicit refusal.
+ *
+ * `display: 'notice'` renders the statement as prose with no control: the submit itself is the
+ * consent, so there is no value for `required` to gate and validation always passes; the server
+ * records `agreed: true` on the proof regardless of what the client sent.
  */
 export const consentField = defineFormField<'boolean', ConsentConfig>({
 	type: 'consent',
@@ -44,8 +49,21 @@ export const consentField = defineFormField<'boolean', ConsentConfig>({
 				},
 			},
 		},
+		{
+			name: 'display',
+			type: 'select',
+			defaultValue: 'checkbox',
+			label: labelForKey(keys.consentConfigDisplay),
+			admin: { isClearable: false, description: labelForKey(keys.consentConfigDisplayDescription) },
+			options: [
+				{ label: labelForKey(keys.consentDisplayCheckbox), value: 'checkbox' },
+				{ label: labelForKey(keys.consentDisplayNotice), value: 'notice' },
+			],
+		},
 	],
 	validate: ({ value, config, t }) =>
-		config.required === true && value !== true ? t(keys.validationRequired) : true,
+		config.display !== 'notice' && config.required === true && value !== true
+			? t(keys.validationRequired)
+			: true,
 	format: ({ value, t }) => t(value === true ? keys.formatYes : keys.formatNo),
 })

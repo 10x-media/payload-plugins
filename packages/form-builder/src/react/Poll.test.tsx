@@ -69,6 +69,44 @@ describe('Poll', () => {
 		expect(window.localStorage.getItem('fb-poll-1')).not.toBeNull()
 	})
 
+	it('reads results in the submissionLocale', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '5' })
+		const { container } = render(
+			createElement(Poll, {
+				form,
+				resultsField: 'colour',
+				onSubmit,
+				fetchResultsImpl,
+				submissionLocale: 'de',
+			})
+		)
+		fireEvent.change(within(container).getByRole('combobox'), { target: { value: 'red' } })
+		fireEvent.click(within(container).getByRole('button', { name: /submit|vote/i }))
+		await waitFor(() =>
+			expect(fetchResultsImpl).toHaveBeenCalledWith(expect.objectContaining({ locale: 'de' }))
+		)
+		expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ locale: 'de' }))
+	})
+
+	it('reads results from the renamed forms collection', async () => {
+		const fetchResultsImpl = vi.fn().mockResolvedValue(resultsOk())
+		render(
+			createElement(Poll, {
+				form,
+				resultsField: 'colour',
+				hasVoted: true,
+				fetchResultsImpl,
+				collections: { forms: 'surveys' },
+			})
+		)
+		await waitFor(() =>
+			expect(fetchResultsImpl).toHaveBeenCalledWith(
+				expect.objectContaining({ collection: 'surveys' })
+			)
+		)
+	})
+
 	it('forwards the resolved success response to a Poll host onSuccess', async () => {
 		const onSuccess = vi.fn()
 		const formWithResponse = {

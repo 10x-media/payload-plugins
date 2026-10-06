@@ -1,0 +1,272 @@
+import type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
+import { MAX_QUERY_LENGTH } from '../query/limits'
+import { type AutoCapture, createAutoCapture } from './autoCapture'
+import { createConsentQueue, readConsent, writeConsent } from './consent'
+import {
+	DEFAULT_EXCLUSION_PARAM,
+	readExclusion,
+	readExclusionParam,
+	writeExclusion,
+} from './exclusion'
+import { createScriptLoader } from './loadScript'
+import { createPageTracking } from './pageTracking'
+import { createGa4Sink } from './sinks/ga4'
+import { createNativeSink } from './sinks/native'
+import { createPlausibleSink } from './sinks/plausible'
+import { createPosthogSink } from './sinks/posthog'
+import { createUmamiSink } from './sinks/umami'
+import type {
+	ConsentState,
+	LoadScript,
+	Sink,
+	Tracker,
+	TrackerEvent,
+	TrackerOptions,
+	TrackerWindow,
+} from './types'
+
+/** Stand-in for a host with no DOM (server rendering, a worker). Every call is a no-op. */
+export const createNoopTracker = (): Tracker => ({
+	page: () => undefined,
+	track: () => undefined,
+	trackGoal: () => undefined,
+	consent: () => undefined,
+	excluded: false,
+	exclude: () => undefined,
+	flush: () => undefined,
+	destroy: () => undefined,
+})
+
+const buildSink = (args: {
+	slot: TrackerSlotConfig
+	win: TrackerWindow
+	loadScript: LoadScript
+	ingestPath: string
+	scrollDepth: () => number | undefined
+}): Sink => {
+	const { slot, win, loadScript, ingestPath, scrollDepth } = args
+	const vendor = { slot: slot.slot, win, scripts: slot.snippet.scripts, loadScript }
+	switch (slot.kind) {
+		case 'native':
+			return createNativeSink({ slot: slot.slot, win, url: ingestPath, scrollDepth })
+		case 'posthog':
+			return createPosthogSink(vendor)
+		case 'plausible':
+			return createPlausibleSink(vendor)
+		case 'umami':
+			return createUmamiSink(vendor)
+		case 'ga4': {
+			const { measurementId } = slot.client
+			return createGa4Sink({
+				...vendor,
+				...(typeof measurementId === 'string' ? { measurementId } : {}),
+			})
+		}
+	}
+}
+
+/**
+ * The browser tracker: one sink per capture slot, a consent gate in front of the slots the
+ * server marked as gated, SPA page tracking, and the auto-capture listeners.
+ *
+ * Every event fans out to every slot; there is no dual-write of one slot's events into
+ * another. The config is a server-rendered snapshot, so an unknown goal slug is still sent:
+ * the server may know goals the snapshot predates.
+ */
+export const createTracker = (config: TrackerConfig, options: TrackerOptions = {}): Tracker => {
+	const win = options.window ?? (globalThis as { window?: TrackerWindow }).window
+	if (!win) {
+		return createNoopTracker()
+	}
+	const persist = options.persistConsent !== false
+	const exclusionParam = options.exclusionParam ?? DEFAULT_EXCLUSION_PARAM
+	const loadScript = options.loadScript ?? createScriptLoader(win, options.nonce)
+	const queue = createConsentQueue<{ sink: Sink; event: TrackerEvent }>()
+	let auto: AutoCapture | null = null
+	let state: ConsentState | null = persist ? readConsent(win) : null
+	let excluded = readExclusion(win)
+
+	const entries = config.slots.map((slot) => ({
+		requiresConsent: slot.requiresConsent,
+		sink: buildSink({
+			slot,
+			win,
+			loadScript,
+			ingestPath: config.ingestPath,
+			scrollDepth: () => auto?.scrollDepth(),
+		}),
+	}))
+
+	const load = (sink: Sink) => {
+		if (excluded) {
+			return
+		}
+		void sink.ready().catch(() => undefined)
+	}
+
+	/**
+	 * Slots are isolated from each other and from the caller: a vendor global that throws,
+	 * or an event that cannot be serialized, must not skip the remaining slots or escape
+	 * into the host's click handler.
+	 */
+	const guard = (run: () => void) => {
+		try {
+			run()
+		} catch {
+			// Dropped, like every other delivery failure.
+		}
+	}
+
+	const deliver = (sink: Sink, event: TrackerEvent) => {
+		guard(() => sink.send(event))
+	}
+
+	const dispatch = (event: TrackerEvent) => {
+		if (excluded) {
+			return
+		}
+		for (const entry of entries) {
+			if (!entry.requiresConsent || state === 'granted') {
+				deliver(entry.sink, event)
+			} else if (state !== 'denied') {
+				queue.push({ sink: entry.sink, event })
+			}
+		}
+	}
+
+	const context = (): Pick<TrackerEvent, 'path' | 'hostname' | 'referrer'> => ({
+		path: win.location.pathname,
+		hostname: win.location.hostname,
+		...(win.document.referrer ? { referrer: win.document.referrer } : {}),
+	})
+
+	/**
+	 * Pageviews only: it exists so ingest can extract the campaign keys, and an event fired
+	 * later in the page's life would attribute the same visit twice.
+	 */
+	const query = (): Pick<TrackerEvent, 'query'> => {
+		// Absent means on: a tracker config snapshot rendered before the toggle existed must
+		// keep the documented default rather than silently losing campaign attribution.
+		if (config.autoCapture.query === false) {
+			return {}
+		}
+		const search = win.location.search.replace(/^\?/, '').slice(0, MAX_QUERY_LENGTH)
+		return search ? { query: search } : {}
+	}
+
+	const page = () => {
+		dispatch({ type: 'pageview', ...context(), ...query() })
+		auto?.resetPage()
+	}
+
+	const track = (name: string, props?: Record<string, unknown>) => {
+		dispatch({ type: 'event', name, ...context(), ...(props ? { props } : {}) })
+	}
+
+	const trackGoal = (slug: string, opts?: { value?: number; currency?: string }) => {
+		const goal = config.goals.find((candidate) => candidate.slug === slug)
+		const value = opts?.value ?? goal?.value?.fixed
+		const currency = opts?.currency ?? goal?.currency
+		dispatch({
+			type: 'goal',
+			name: slug,
+			...context(),
+			...(value === undefined ? {} : { value }),
+			...(currency === undefined ? {} : { currency }),
+		})
+	}
+
+	const flush = () => {
+		for (const entry of entries) {
+			guard(() => entry.sink.flush?.())
+		}
+	}
+
+	/**
+	 * Mirrors the flag into each vendor's own opt-out. The tracker's gate covers what it
+	 * delivers and the scripts it injects; a snippet the server rendered for an ungated slot
+	 * is already running and only the vendor's own switch reaches it.
+	 */
+	const syncVendors = (next: boolean) => {
+		for (const entry of entries) {
+			guard(() => entry.sink.exclude?.(next))
+		}
+	}
+
+	auto = createAutoCapture({
+		win,
+		options: config.autoCapture,
+		handlers: { track, trackGoal },
+	})
+	const pageTracking = createPageTracking(win, page)
+	win.addEventListener('pagehide', flush)
+
+	const requested =
+		exclusionParam === false ? null : readExclusionParam(win.location.search, exclusionParam)
+	if (requested !== null) {
+		excluded = requested
+		writeExclusion(win, requested)
+	}
+	// Only an explicit request clears a vendor switch: one a staff member set through the
+	// vendor's own instructions has to survive a visit that says nothing about exclusion.
+	if (excluded || requested === false) {
+		syncVendors(excluded)
+	}
+
+	for (const entry of entries) {
+		if (!entry.requiresConsent || state === 'granted') {
+			load(entry.sink)
+		}
+	}
+	page()
+
+	return {
+		page,
+		track,
+		trackGoal,
+		flush,
+		consent(next) {
+			state = next
+			if (persist) {
+				writeConsent(win, next)
+			}
+			if (next === 'denied') {
+				queue.clear()
+				return
+			}
+			for (const entry of entries) {
+				if (entry.requiresConsent) {
+					load(entry.sink)
+				}
+			}
+			for (const queued of queue.drain()) {
+				deliver(queued.sink, queued.event)
+			}
+		},
+		get excluded() {
+			return excluded
+		},
+		exclude(next) {
+			excluded = next
+			writeExclusion(win, next)
+			syncVendors(next)
+			if (next) {
+				queue.clear()
+				return
+			}
+			for (const entry of entries) {
+				if (!entry.requiresConsent || state === 'granted') {
+					load(entry.sink)
+				}
+			}
+		},
+		destroy() {
+			flush()
+			pageTracking.destroy()
+			auto?.destroy()
+			auto = null
+			win.removeEventListener('pagehide', flush)
+			queue.clear()
+		},
+	}
+}

@@ -7,6 +7,28 @@ import { jobs } from '../../src/index'
 const fieldByName = (fields: Field[], name: string): Field | undefined =>
 	fields.find((f) => 'name' in f && f.name === name)
 
+/** Core nests several job fields inside tabs, so lookups have to descend. */
+const deepFieldByName = (fields: Field[], name: string): Field | undefined => {
+	for (const field of fields) {
+		if ('name' in field && field.name === name) {
+			return field
+		}
+		const nested =
+			'tabs' in field
+				? deepFieldByName(
+						field.tabs.flatMap((tab) => tab.fields),
+						name
+					)
+				: 'fields' in field
+					? deepFieldByName(field.fields, name)
+					: undefined
+		if (nested) {
+			return nested
+		}
+	}
+	return undefined
+}
+
 const sendEmailTask: TaskConfig<'sendEmail'> = {
 	slug: 'sendEmail',
 	handler: () => ({ output: {} }),
@@ -208,6 +230,138 @@ describeForDb('jobs run-access default', { dbs: ['mongo'] }, (db) => {
 		})
 		try {
 			expect(await booted.payload.config.jobs.access?.run?.({ req: {} as never })).toBe(true)
+		} finally {
+			await booted.stop()
+		}
+	})
+})
+
+describeForDb('jobs log slot components', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: jobs({
+				log: {
+					entryComponents: {
+						'*': { error: '/components/PrettyError#PrettyError' },
+						sendEmail: { output: { exportName: 'Out', path: '/components/Out' } },
+					},
+				},
+			}),
+			db,
+			configOverrides: { jobs: { tasks: [sendEmailTask, syncCrmTask] } },
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('renders the log field through the server timeline, carrying the component map', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		const log = cfg && deepFieldByName(cfg.fields, 'log')
+		const component = log?.admin?.components?.Field
+		expect(component).toMatchObject({ path: '@10x-media/jobs/rsc#JobLogTimelineServer' })
+		expect((component as { serverProps?: { entryComponents?: unknown } })?.serverProps).toEqual({
+			entryComponents: {
+				'*': { error: '/components/PrettyError#PrettyError' },
+				sendEmail: { output: { exportName: 'Out', path: '/components/Out' } },
+			},
+		})
+	})
+
+	it('registers every configured renderer as an admin dependency', () => {
+		expect(booted.payload.config.admin.dependencies).toMatchObject({
+			'@10x-media/jobs:log:*:error': {
+				path: '/components/PrettyError#PrettyError',
+				type: 'component',
+			},
+			'@10x-media/jobs:log:sendEmail:output': { path: '/components/Out#Out', type: 'component' },
+		})
+	})
+})
+
+describeForDb('jobs input editors', { dbs: ['mongo'] }, (db) => {
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: jobs({
+				input: {
+					components: {
+						sendEmail: '/components/SendEmailInput#SendEmailInput',
+						syncCrm: false,
+					},
+					examples: { sendEmail: { to: 'ops@example.com' } },
+				},
+			}),
+			db,
+			configOverrides: {
+				jobs: {
+					tasks: [{ ...sendEmailTask, inputSchema: [{ name: 'to', type: 'text' }] }, syncCrmTask],
+					workflows: [onboardingWorkflow],
+				},
+			},
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('renders the input field through the server component, carrying editors and placeholders', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		const input = cfg && deepFieldByName(cfg.fields, 'input')
+		const component = input?.admin?.components?.Field
+		expect(component).toMatchObject({
+			path: '@10x-media/jobs/rsc#JobInputFieldServer',
+			clientProps: {
+				placeholders: {
+					tasks: { sendEmail: { to: 'ops@example.com' }, syncCrm: {} },
+					workflows: { onboarding: {} },
+				},
+			},
+			serverProps: {
+				components: { sendEmail: '/components/SendEmailInput#SendEmailInput', syncCrm: false },
+			},
+		})
+	})
+
+	it('registers the editors as admin dependencies without any log renderer configured', () => {
+		expect(booted.payload.config.admin.dependencies).toEqual({
+			'@10x-media/jobs:input:sendEmail': {
+				path: '/components/SendEmailInput#SendEmailInput',
+				type: 'component',
+			},
+		})
+	})
+
+	it('leaves the log row fields of the same name alone, timeline territory', () => {
+		const cfg = booted.payload.collections['payload-jobs']?.config
+		const log = cfg && deepFieldByName(cfg.fields, 'log')
+		const rowFields = log && 'fields' in log ? log.fields : []
+		expect(rowFields.length).toBeGreaterThan(0)
+		for (const name of ['input', 'error']) {
+			const field = fieldByName(rowFields, name)
+			expect(field).toBeDefined()
+			expect(field?.admin?.components?.Field).toBeUndefined()
+		}
+	})
+})
+
+describeForDb('jobs log slot components off', { dbs: ['mongo'] }, (db) => {
+	it('adds no admin dependencies when no renderers are configured', async () => {
+		const booted = await bootPayload({
+			plugin: jobs({}),
+			db,
+			configOverrides: { jobs: { tasks: [syncCrmTask] } },
+		})
+		try {
+			const dependencies = booted.payload.config.admin.dependencies ?? {}
+			expect(Object.keys(dependencies).filter((key) => key.startsWith('@10x-media/jobs:'))).toEqual(
+				[]
+			)
 		} finally {
 			await booted.stop()
 		}

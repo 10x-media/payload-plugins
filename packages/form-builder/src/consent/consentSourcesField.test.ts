@@ -21,10 +21,24 @@ describe('consentSourcesField', () => {
 		expect(field.label).toBe('Policies')
 	})
 
-	it('rows are name and statement, identified by their own auto-assigned id', () => {
+	it('rows carry a noticeStatement rich text beside the statement, localized alike', () => {
+		const field = consentSourcesField()
+		const notice = field.fields.find(
+			(entry) => 'name' in entry && entry.name === 'noticeStatement'
+		) as { type?: string; localized?: boolean } | undefined
+		expect(notice?.type).toBe('richText')
+		expect(notice?.localized).toBe(true)
+		const optedOut = consentSourcesField({ localized: false }).fields.find(
+			(entry) => 'name' in entry && entry.name === 'noticeStatement'
+		) as { localized?: boolean } | undefined
+		expect(optedOut?.localized).toBeUndefined()
+	})
+
+	it('rows are name and the two statements, identified by their own auto-assigned id', () => {
 		expect(consentSourcesField().fields.map((f) => ('name' in f ? f.name : f.type))).toEqual([
 			'name',
 			'statement',
+			'noticeStatement',
 		])
 	})
 

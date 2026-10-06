@@ -63,11 +63,27 @@ describe('buildProvidersCollection', () => {
 		}
 	})
 
+	it('disables duplicate (a duplicate could never carry the write-only credentials)', () => {
+		expect(collection.disableDuplicate).toBe(true)
+	})
+
 	it('keeps the scope field hidden, indexed text', () => {
 		const scope = named(collection.fields, 'scope') as TextField | undefined
 		expect(scope?.type).toBe('text')
 		expect(scope?.index).toBe(true)
 		expect(scope?.admin?.hidden).toBe(true)
+	})
+
+	it('leaves the scope field to the host when scopeField names one of its own', () => {
+		const hostOwned = buildProvidersCollection({
+			slug: 'analytics-providers',
+			onChange: () => {},
+			...unscopedArgs,
+			scoped: true,
+			scopeField: 'tenant',
+		})
+		expect(named(hostOwned.fields, 'scope')).toBeUndefined()
+		expect(named(hostOwned.fields, 'tenant')).toBeUndefined()
 	})
 
 	it('delegates secret fields to buildSecret with the right source shape', () => {
@@ -87,6 +103,76 @@ describe('buildProvidersCollection', () => {
 		expect((privateKey as { custom?: Record<string, unknown> } | undefined)?.custom).toEqual({
 			fake: 'textarea',
 		})
+	})
+
+	// Public capture config, not credentials: they reach the browser in the snippet, so they
+	// must stay plain text (a sealed field would be unreadable to the tracker config).
+	it('carries the public capture fields as plain text on posthog, plausible and ga4', () => {
+		const inGroup = (provider: string, name: string): Field | undefined => {
+			const group = named(collection.fields, provider)
+			const fields = group && 'fields' in group ? group.fields : []
+			const direct = named(fields, name)
+			if (direct) {
+				return direct
+			}
+			for (const field of fields) {
+				const nested = 'fields' in field ? named(field.fields, name) : undefined
+				if (nested) {
+					return nested
+				}
+			}
+			return undefined
+		}
+
+		const projectToken = inGroup('posthog', 'projectToken')
+		expect(projectToken?.type).toBe('text')
+		expect((projectToken as TaggedField | undefined)?.custom?.fake).toBeUndefined()
+
+		const region = inGroup('posthog', 'region')
+		expect(region?.type).toBe('select')
+		expect((region as { options?: Array<{ value: string }> } | undefined)?.options).toEqual([
+			{ label: 'US', value: 'us' },
+			{ label: 'EU', value: 'eu' },
+		])
+
+		for (const name of ['domain', 'scriptId']) {
+			const field = inGroup('plausible', name)
+			expect(field?.type).toBe('text')
+			expect((field as TaggedField | undefined)?.custom?.fake).toBeUndefined()
+		}
+
+		const measurementId = inGroup('ga4', 'measurementId')
+		expect(measurementId?.type).toBe('text')
+		expect((measurementId as TaggedField | undefined)?.custom?.fake).toBeUndefined()
+	})
+
+	it('validates the plausible revenue currency as an ISO 4217 code', () => {
+		const group = named(collection.fields, 'plausible')
+		const fields = group && 'fields' in group ? group.fields : []
+		const currency = named(fields, 'revenueCurrency') as TextField | undefined
+		expect(currency?.type).toBe('text')
+		const validate = currency?.validate as
+			| ((value: unknown, options: unknown) => true | string)
+			| undefined
+		const req = { req: { t: (key: string) => key } } as never
+		expect(validate?.('EUR', req)).toBe(true)
+		expect(validate?.('', req)).toBe(true)
+		expect(validate?.('eur', req)).toBe('analytics:goalErrorCurrency')
+		expect(validate?.('EURO', req)).toBe('analytics:goalErrorCurrency')
+	})
+
+	it('validates the ga4 measurement id as a bare token', () => {
+		const group = named(collection.fields, 'ga4')
+		const fields = group && 'fields' in group ? group.fields : []
+		const measurementId = named(fields, 'measurementId') as TextField | undefined
+		const validate = measurementId?.validate as
+			| ((value: unknown, options: unknown) => true | string)
+			| undefined
+		const req = { req: { t: (key: string) => key } } as never
+		expect(validate?.('G-AB12CD34', req)).toBe(true)
+		expect(validate?.('', req)).toBe(true)
+		expect(validate?.('G-AB12</script>', req)).toBe('analytics:providerErrorMeasurementId')
+		expect(validate?.('G AB12', req)).toBe('analytics:providerErrorMeasurementId')
 	})
 
 	it('keeps SECRET_PATHS in parity with the collection secret fields', () => {

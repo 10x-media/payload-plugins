@@ -1,5 +1,61 @@
 # @10x-media/analytics-dev
 
+## 0.0.1-beta.11
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/analytics@1.0.0-beta.11
+
+## 0.0.1-beta.10
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/analytics@1.0.0-beta.10
+
+## 0.0.1-beta.9
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/analytics@1.0.0-beta.9
+
+## 0.0.1-beta.8
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/analytics@1.0.0-beta.8
+
+## 0.0.1-beta.7
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/analytics@1.0.0-beta.7
+
+## 0.0.1-beta.6
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/analytics@1.0.0-beta.6
+
+## 0.0.1-beta.5
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/analytics@0.1.0-beta.5
+
+## 0.0.1-beta.4
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/analytics@0.1.0-beta.4
+
 ## 0.0.1-beta.3
 
 ### Patch Changes

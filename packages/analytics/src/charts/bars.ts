@@ -2,6 +2,10 @@ export interface BarDatum {
 	label: string
 	value: number
 	display?: string
+	/** A second, unbarred column (the view's `visitors` beside the charted metric). */
+	secondary?: string
+	/** `false` keeps this one row inert in a list that is otherwise selectable. */
+	selectable?: boolean
 }
 
 export interface BarRow {
@@ -9,6 +13,8 @@ export interface BarRow {
 	value: number
 	fraction: number
 	display?: string
+	secondary?: string
+	selectable?: boolean
 }
 
 /**
@@ -23,5 +29,7 @@ export const toBarRows = (data: BarDatum[]): BarRow[] => {
 		value: d.value,
 		fraction: max > 0 ? d.value / max : 0,
 		display: d.display,
+		secondary: d.secondary,
+		selectable: d.selectable,
 	}))
 }

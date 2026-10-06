@@ -106,23 +106,53 @@ The same shape covers TanStack Router (`navigate({ to: url, replace })`) and Rea
 
 ### Progressive validation
 
-Validation runs on blur, re-validates on change once a field is touched, then validates all visible fields on submit. Hidden fields ([`visibleWhen`](/form-builder/conditions)) are excluded from validation and from the submitted values. Server-returned field errors map back to the correct fields.
+Validation reveals on blur only once a field is dirty (its value changed since mount or the last reset), re-validates on change once revealed, then validates all visible fields on submit. Focusing a field and leaving it untouched says nothing, and a `successBehavior: 'reset'` makes every field pristine again, so clicking around a just-submitted form never scolds. Hidden fields ([`visibleWhen`](/form-builder/conditions)) are excluded from validation and from the submitted values. Server-returned field errors map back to the correct fields.
 
 Submission is also guarded against double activation: while a submit is in flight, a second click or an Enter-plus-click cannot reach the transport and POST twice. The disabled button is feedback on top of that guard, not the guard itself.
 
 ### Transport
 
-By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Override the prefix with `apiRoute`, or replace the transport entirely:
+By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Override the prefix with `apiRoute`, point it at a [renamed submissions collection](/form-builder/customization#renaming-collections) with `collections`, or replace the transport entirely (see [Submission locale](#submission-locale) for the `locale` it receives):
 
 ```tsx
 <Form
   form={form}
-  onSubmit={async ({ formId, values }) => {
-    const res = await myClient.submitForm(formId, values)
+  submissionLocale={contentLocale}
+  onSubmit={async ({ formId, values, locale }) => {
+    const res = await myClient.submitForm(formId, values, { locale })
     return res.ok ? { ok: true } : { ok: false, message: res.error }
   }}
 />
 ```
+
+### Submission locale
+
+`submissionLocale` is the Payload content locale the visitor submits under, one of your `localization` locale codes (`en`, `de`). The request carries it as `?locale=`, so the server stores it on the submission and the post-submit actions (the confirmation email included) load their subject, body, and recipients in it. A custom `onSubmit` receives it as `locale`. Without the prop the submission takes your default locale.
+
+It is separate from `locale` on purpose. `locale` is a formatting tag handed to renderers and to each field type's `format` (often a full tag such as `en-US` for `Intl`), and it is never sent. A formatting tag is usually not a content locale code, so a site that renders `en-US` but stores content under `en` passes both:
+
+```tsx
+<Form form={form} locale="en-US" submissionLocale="en" t={t} />
+```
+
+The server clamps what it receives: on a host with `localization` only a configured locale code is kept (`all`, `*`, and any other code become the default locale); without `localization` any valid language tag such as `uk` or `pt-BR` is kept in its canonical form (`zh_Hant` is stored as `zh-Hant`) and anything else becomes `en`.
+
+The server reads the form in that locale exactly like any other Payload read, so content the author never filled in for it follows your `localization.fallback`: with fallback on (Payload's default) it comes from the default locale, or from that locale's own `fallbackLocale`; with fallback off it stays empty, the same as on your page. An email left with neither subject nor body then fails its action rather than being sent blank (see [Email layout](/form-builder/actions#email-layout)).
+
+When the right fallback depends on the form rather than the config, for example a multi-tenant app whose tenants each have their own default locale, or a host that turned fallback off but still wants its emails to fall back, choose it per form with the `fallbackLocale` option. It applies wherever the server acts on a form: validating a submission, running its actions, serving poll results.
+
+```ts title="payload.config.ts"
+formBuilder({
+  fallbackLocale: async ({ form, payload }) => {
+    const tenant = await payload.findByID({
+      collection: 'tenants', id: form.tenant as string, depth: 0, overrideAccess: true,
+    })
+    return tenant?.defaultLocale
+  },
+})
+```
+
+It receives the form as already read with your config's fallback, at depth 0, so a non-localized owner relationship is on it without a read of your own, plus the `locale` it is being read at, `payload`, and `req`. Decide from non-localized fields: a localized one (the title, a label) may be empty at that locale, which is the case the resolver exists for. Return a locale code, an ordered list of codes, `false` for no fallback, or `undefined` to keep the default. The form is read a second time only when the result differs from the fallback already applied, so a tenant writing in its own default locale costs nothing extra. To force the default locale everywhere on a host with fallback off, return it unconditionally (`fallbackLocale: () => 'en'`). The resolver runs on every server-side read of a form, so cache what it looks up if that is expensive. A throw is never swallowed: it rejects the submission, fails the action run (retried on the queued path), or fails the results read. Render the form on your page with the same fallback, so what the visitor sees is what the server validates and sends.
 
 ### Props
 
@@ -133,10 +163,12 @@ By default `<Form>` POSTs to `{apiRoute}/form-submissions` (default `/api`). Ove
 | `fieldTypes` | `AnyFormFieldDefinition[]` | none | Extra field-type definitions, for custom types. |
 | `rules` | `AnyValidationRuleDefinition[]` | none | Extra validation rule definitions. |
 | `apiRoute` | `string` | `'/api'` | API prefix for the built-in transport. |
+| `collections` | `FormCollections` | defaults | Renamed plugin collections (`{ forms?, formSubmissions? }`), matching the server's `overrides.*.slug`. |
 | `onSubmit` | `SubmitHandler` | none | Custom transport. |
 | `onSuccess` / `onError` | callbacks | none | Submission outcome hooks. |
 | `events` | `FormEventSink` | none | Lifecycle event sink; see [Actions and events](/form-builder/actions#lifecycle-events). |
 | `t` / `locale` | translator / `string` | identity / `'en'` | Localization for renderer strings and formatting. |
+| `submissionLocale` | `string` | none | Content locale the submission is stored and its emails are rendered in; see [Submission locale](#submission-locale). |
 | `layout` | `boolean` | `true` | Disable the grid wrapper with `false`. |
 | `className` | `string` | none | Extra CSS classes on the root `<form>` element (and the post-submit success node). |
 | `submitLabel`, `nextLabel`, `prevLabel`, `closeLabel` | `string` | built-ins | Button labels. Submit, next, and prev each resolve prop, then the form's `buttons` value, then the translated default. |
@@ -192,7 +224,7 @@ The render prop types (`SubmitButtonRenderProps`, `NextButtonRenderProps`, `Back
 
 ## Submit contract
 
-A submission is `POST {apiRoute}/form-submissions` with a JSON body of `{ form, values }`, where `values` is an array of `{ field, value }` pairs (`SubmissionValue`, exported from `/types`). `<Form>`'s built-in transport above is one way to reach that endpoint, not the only one: every rule this page and [Validation](/form-builder/validation) describe (server-authoritative validation, spam checks, descriptor snapshotting, consent capture, post-submit action dispatch) runs in the `form-submissions` collection's own hooks, not in a route handler `<Form>` calls into. Three front doors reach the identical pipeline:
+A submission is `POST {apiRoute}/form-submissions` (optionally `?locale=`, stored as the submission's locale) with a JSON body of `{ form, values }`, where `values` is an array of `{ field, value }` pairs (`SubmissionValue`, exported from `/types`). `<Form>`'s built-in transport above is one way to reach that endpoint, not the only one: every rule this page and [Validation](/form-builder/validation) describe (server-authoritative validation, spam checks, descriptor snapshotting, consent capture, post-submit action dispatch) runs in the `form-submissions` collection's own hooks, not in a route handler `<Form>` calls into. Three front doors reach the identical pipeline:
 
 - The browser `submitForm(input)` helper (`@10x-media/form-builder/react`), which `<Form>` calls internally.
 - A raw `fetch`/REST `POST` to `{apiRoute}/form-submissions` from any HTTP client.
@@ -205,10 +237,11 @@ const submission = await createSubmission(payload, {
   form: formId,
   values: [{ field: 'email', value: 'ada@example.com' }],
   req, // thread the incoming req when there is one
+  locale: 'de', // optional: the submission locale, as `submissionLocale` sets it in the browser
 })
 ```
 
-`createSubmission` exists for parity, not new behavior: a script, a queued job, or another collection's hook gets a documented, typed entry point instead of hand-rolling the collection slug and body shape. Pass the incoming `req` when you have one so [spam metadata](/form-builder/spam) (client IP, user agent) and per-identity rate limiting see the real request; without one the submission still runs the full pipeline, just with no request to read those signals from.
+`createSubmission` exists for parity, not new behavior: a script, a queued job, or another collection's hook gets a documented, typed entry point instead of hand-rolling the collection slug and body shape. Pass the incoming `req` when you have one so [spam metadata](/form-builder/spam) (client IP, user agent) and per-identity rate limiting see the real request; without one the submission still runs the full pipeline, just with no request to read those signals from. `locale` is clamped exactly like a browser's `?locale=`; absent, the submission takes `req.locale` (or your default locale). The `req` you pass comes back with its own `locale` unchanged.
 
 `form-submissions` access is `create: () => true` (anonymous submissions are the point of a public form), `read` is logged-in users only, and `update` is disabled entirely, so nothing about a submission is readable or editable through the API by the visitor who sent it. This mirrors Payload's own `@payloadcms/plugin-form-builder`: an open create endpoint backed entirely by collection hooks, not a custom controller in front of it.
 

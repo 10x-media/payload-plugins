@@ -1,6 +1,6 @@
 import type { Payload, PayloadRequest } from 'payload'
-import { FORMS_SLUG } from '../collections/forms'
 import { isPollClosed, type PollConfigLike, pollConfigOf } from '../form/pollState'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { resolvePollOutcome } from './resolvePollOutcome'
@@ -80,7 +80,13 @@ export const resolvePollCloseRequest = async (
 		return { status: 400, body: { errors: [{ message: 'Missing form id' }] } }
 	}
 	const form = await payload
-		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
+		.findByID({
+			collection: pluginSlugsOf(payload).forms,
+			id: formId,
+			depth: 0,
+			overrideAccess: true,
+			req,
+		})
 		.catch(() => null)
 	if (!form) {
 		return { status: 404, body: { errors: [{ message: 'Not found' }] } }
@@ -100,7 +106,7 @@ export const resolvePollCloseRequest = async (
 
 	const closesAt = new Date().toISOString()
 	await payload.update({
-		collection: FORMS_SLUG,
+		collection: pluginSlugsOf(payload).forms,
 		id: formId,
 		data: { poll: { closesAt } },
 		depth: 0,

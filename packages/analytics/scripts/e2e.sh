@@ -21,11 +21,16 @@ trap cleanup EXIT
 echo "Starting e2e DBs (mongo:8 replSet + postgres:16)..."
 docker compose -f docker-compose.test.yml up -d --wait
 
-echo "Building plugin..."
-pnpm --filter @10x-media/analytics build
+# Everything the dev app imports from the workspace, not just this plugin: a fresh
+# checkout has no dist/ for any of it.
+echo "Building the dev app's workspace dependencies..."
+pnpm --filter '@10x-media/analytics-dev^...' build
 
 echo "Building dev app..."
 pnpm --filter @10x-media/analytics-dev build
 
-echo "Running Playwright e2e..."
-pnpm --filter @10x-media/analytics exec playwright test "$@"
+echo "Running Playwright e2e (TENANCY=off)..."
+TENANCY=off E2E_REUSE_SERVER=0 pnpm --filter @10x-media/analytics exec playwright test --grep-invert @tenancy "$@"
+
+echo "Running Playwright e2e (TENANCY=on)..."
+TENANCY=on E2E_REUSE_SERVER=0 pnpm --filter @10x-media/analytics exec playwright test --grep @tenancy "$@"

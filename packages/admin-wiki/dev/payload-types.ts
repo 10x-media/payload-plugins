@@ -617,6 +617,16 @@ export interface CollectionsWidget {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "WikiVideoEmbedBlock".
+ */
+export interface WikiVideoEmbedBlock {
+  url: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'wikiVideoEmbed';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "WikiCalloutBlock".
  */
 export interface WikiCalloutBlock {
@@ -639,16 +649,6 @@ export interface WikiCalloutBlock {
   id?: string | null;
   blockName?: string | null;
   blockType: 'wikiCallout';
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "WikiVideoEmbedBlock".
- */
-export interface WikiVideoEmbedBlock {
-  url: string;
-  id?: string | null;
-  blockName?: string | null;
-  blockType: 'wikiVideoEmbed';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

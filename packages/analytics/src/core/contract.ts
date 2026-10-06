@@ -1,4 +1,7 @@
 import type { Config, PayloadRequest } from 'payload'
+import type { Goal } from '../goals/types'
+import type { CaptureSupport } from './capture'
+import type { IngestHostnameResolver, ServerTrack } from './serverEvent'
 
 /**
  * Explicit cross-scope read marker: pass as a read's `scope` to aggregate over every
@@ -18,25 +21,31 @@ export type MetricKey =
 	| 'conversions'
 	| 'revenue'
 
-export type DimensionKey =
-	| 'page'
-	| 'referrer'
-	| 'source'
-	| 'medium'
-	| 'campaign'
-	| 'utmSource'
-	| 'utmMedium'
-	| 'utmCampaign'
-	| 'utmContent'
-	| 'utmTerm'
-	| 'device'
-	| 'browser'
-	| 'os'
-	| 'country'
-	| 'region'
-	| 'city'
-	| 'language'
-	| 'event'
+/** Every breakdown key the contract defines; the registry request parsers validate against. */
+export const DIMENSION_KEYS = [
+	'page',
+	'referrer',
+	'source',
+	'channel',
+	'medium',
+	'campaign',
+	'utmSource',
+	'utmMedium',
+	'utmCampaign',
+	'utmContent',
+	'utmTerm',
+	'device',
+	'browser',
+	'os',
+	'country',
+	'region',
+	'city',
+	'language',
+	'event',
+	'goal',
+] as const
+
+export type DimensionKey = (typeof DIMENSION_KEYS)[number]
 
 export type Granularity = 'minute' | 'hour' | 'day' | 'week' | 'month'
 
@@ -45,9 +54,14 @@ export interface DateRange {
 	end: Date
 }
 
+/** Every filter operator the contract defines; the registry request parsers validate against. */
+export const FILTER_OPERATORS = ['eq', 'contains', 'matches'] as const
+
+export type FilterOperator = (typeof FILTER_OPERATORS)[number]
+
 export interface AnalyticsFilter {
 	dimension: DimensionKey
-	operator: 'eq' | 'contains' | 'matches'
+	operator: FilterOperator
 	value: string
 }
 
@@ -74,6 +88,16 @@ export interface AnalyticsQuery {
 	 * others report in their own account timezone. Part of the cache key when set.
 	 */
 	timezone?: string
+	/**
+	 * The scope's goal slugs, set by callers that ask for the `goal` dimension or the
+	 * `conversions` metric, and possibly empty when the scope configures no goals. Provider
+	 * adapters restrict goal rows to it, since nothing in a provider marks which of its
+	 * events are this install's goals; the native engine ignores it and matches completions
+	 * itself. `'unresolved'` is the sentinel for a goal resolver that failed: the read keeps
+	 * its site numbers, reports `goalsUnresolved`, and never shares a healthy cache key.
+	 * Part of the surfacing cache key when set.
+	 */
+	goalSlugs?: string[] | 'unresolved'
 }
 
 export interface AnalyticsRow {
@@ -85,14 +109,42 @@ export interface AnalyticsRow {
 export interface AnalyticsResult {
 	rows: AnalyticsRow[]
 	totals?: Partial<Record<MetricKey, number>>
-	meta: { provider: string; sampled?: boolean; clamped?: boolean; fetchedAt: string }
+	meta: {
+		provider: string
+		sampled?: boolean
+		clamped?: boolean
+		fetchedAt: string
+		/** Served from an expired cache entry because the live refresh failed. */
+		stale?: boolean
+		/**
+		 * Filters the source could not carry, so the rows are wider than the query asked for.
+		 * A provider whose API takes one value per dimension reports the ones it dropped here.
+		 */
+		unappliedFilters?: AnalyticsFilter[]
+		/**
+		 * The read's goal numbers are absent because resolving them failed: it ran without
+		 * `AnalyticsQuery.goalSlugs`, or with `'unresolved'`, or the provider rejected the goal
+		 * request and the rest of the read was served without it. A scope that configured no
+		 * goals is an empty result instead, not this flag.
+		 */
+		goalsUnresolved?: true
+	}
 }
 
+/**
+ * A read carrying conversions costs a provider up to twice the requests: the goal numbers
+ * come from a second, goal-filtered request the adapter issues after the plain one.
+ */
 export interface RateLimitDescriptor {
 	requestsPerMinute?: number
 	requestsPerHour?: number
 	maxConcurrent?: number
+	/**
+	 * Describes the provider's quota model for documentation; the limiter always
+	 * throttles by request count regardless of this value.
+	 */
 	quotaModel?: 'requests' | 'tokens'
+	/** Documents whether reads consume the provider's write/ingest quota too. */
 	readsCountAsUsage?: boolean
 }
 
@@ -100,11 +152,19 @@ export interface AnalyticsCapabilities {
 	perPageQuery: boolean
 	realtime: boolean
 	realtimeWindowMinutes?: number
-	comparison: boolean
+	/**
+	 * Period-over-period comparison, which the engine serves for every source by reading the
+	 * previous window itself. Adapters omit this; set it false only to opt a source out.
+	 */
+	comparison?: boolean
 	minGranularity: Granularity
 	maxLookbackDays: number | null
 	metrics: ReadonlySet<MetricKey>
 	dimensions: ReadonlySet<DimensionKey>
+	/** Dimensions the adapter can apply AnalyticsQuery.filters on; empty = filters unsupported. */
+	filters: ReadonlySet<DimensionKey>
+	/** Operators the adapter honors in filters; adapters ignore filters whose operator they lack. */
+	filterOperators: ReadonlySet<FilterOperator>
 	batchPageReport: boolean
 	rateLimit: RateLimitDescriptor | null
 	recommendedTtl: { realtime: number; aggregate: number }
@@ -132,12 +192,29 @@ export interface AdapterRegisterContext {
 	 * rollups at ingest). Resolves to `'UTC'` when no reportingTimezone is set.
 	 */
 	resolveTimezone: (req: PayloadRequest, scope?: string | null) => Promise<string>
+	/**
+	 * The install's goals for a request's scope, for adapters that match completions
+	 * themselves (the native engine, at ingest). Config goals, with the goals collection
+	 * merged over them per scope once the install enables it.
+	 */
+	resolveGoals: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>
+	/** The plugin's `trustedProxyHops`, for adapters that read a request's client address. */
+	trustedProxyHops?: number
 }
 
 export interface AnalyticsAdapter {
 	readonly id: string
 	readonly label: string
 	readonly capabilities: AnalyticsCapabilities
+	/** Browser-tracker proxying/boot descriptor. Absent when no public capture field is set. */
+	readonly capture?: CaptureSupport
+	/**
+	 * Where this adapter's own ingest endpoint listens, relative to `routes.api`, for the
+	 * adapters that register one (the native engine), and how server code reaches the same
+	 * pipeline without an HTTP round trip. Server-side only: the tracker learns the path
+	 * from `TrackerConfig.ingestPath`, and this object is never serialized.
+	 */
+	readonly ingest?: { path: string; track?: ServerTrack; hostname?: IngestHostnameResolver }
 	isConfigured(): boolean
 	query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
 	realtime?(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>

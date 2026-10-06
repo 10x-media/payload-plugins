@@ -14,7 +14,10 @@
  * 4. Every package.json `exports` target must exist on disk.
  * 5. publint must report no errors.
  *
- * Run standalone via `pnpm check:dist` (after a build) or in CI.
+ * Run standalone via `pnpm check:dist` (after a build) or in CI. Pass `--only-built` to
+ * skip packages that have no `dist/` at all, which is what an affected-scoped CI build
+ * leaves behind: the packages outside the run's scope were never built, and reporting
+ * them as failures would defeat the scoping.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
@@ -113,10 +116,15 @@ const verifyPackage = async (pkgDir: string): Promise<string[]> => {
 }
 
 const main = async (): Promise<void> => {
+	const onlyBuilt = process.argv.slice(2).includes('--only-built')
 	let failed = false
 	for (const name of readdirSync(PACKAGES_DIR).sort()) {
 		const pkgDir = join(PACKAGES_DIR, name)
 		if (!existsSync(join(pkgDir, 'package.json'))) continue
+		if (onlyBuilt && !existsSync(join(pkgDir, 'dist'))) {
+			console.log(`  skip ${name} (no dist, outside this run's affected scope)`)
+			continue
+		}
 		const errors = await verifyPackage(pkgDir)
 		if (errors.length === 0) {
 			console.log(`  ok   ${name}`)

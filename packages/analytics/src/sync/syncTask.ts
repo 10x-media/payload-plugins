@@ -1,14 +1,16 @@
 import type { PayloadRequest, TaskConfig } from 'payload'
 import type { AnalyticsResult, AnalyticsRow } from '../core/contract'
 import { supportsGranularity } from '../core/granularity'
-import { getRuntime, resolveRegistryFor, resolveScopeFor } from '../plugin/runtime'
+import type { ScopesResolver } from '../core/options'
+import { resolveScopeList } from '../core/scopeList'
+import { getRuntime, resolveRegistryFor } from '../plugin/runtime'
 import { METRIC_FIELDS, type SyncMetric } from './collection'
 
 export const SYNC_TASK_SLUG = 'analytics-sync'
 
 const DAY_MS = 86_400_000
 
-export type SyncRow = { source: string; date: Date; syncedAt: Date } & Partial<
+export type SyncRow = { source: string; date: Date; syncedAt: Date; scope: string } & Partial<
 	Record<SyncMetric, number>
 >
 
@@ -16,7 +18,10 @@ export interface SyncTaskOptions {
 	cron: string
 	lookbackDays: number
 	collectionSlug: string
+	/** Entries match a config adapter id exactly, and a runtime provider instance (`<provider>:<docId>`) by its provider type. */
 	adapterIds?: string[]
+	/** Tenant scopes to fan out over, in addition to the install-wide scope every run already covers. */
+	scopes?: ScopesResolver
 }
 
 /**
@@ -24,7 +29,11 @@ export interface SyncTaskOptions {
  * `date`, each present numeric metric is copied, absent metrics are omitted (stored null).
  * Returns null when the row has no usable timestamp, so a malformed row is skipped not written.
  */
-export const toSyncRow = (source: string, row: AnalyticsRow, syncedAt: Date): SyncRow | null => {
+export const toSyncRow = (
+	source: string,
+	row: AnalyticsRow,
+	opts: { syncedAt: Date; scope?: string }
+): SyncRow | null => {
 	if (!row.timestamp) {
 		return null
 	}
@@ -32,7 +41,7 @@ export const toSyncRow = (source: string, row: AnalyticsRow, syncedAt: Date): Sy
 	if (Number.isNaN(date.getTime())) {
 		return null
 	}
-	const doc: SyncRow = { source, date, syncedAt }
+	const doc: SyncRow = { source, date, syncedAt: opts.syncedAt, scope: opts.scope ?? '' }
 	for (const metric of METRIC_FIELDS) {
 		const value = row.metrics[metric]
 		if (typeof value === 'number') {
@@ -40,6 +49,23 @@ export const toSyncRow = (source: string, row: AnalyticsRow, syncedAt: Date): Sy
 		}
 	}
 	return doc
+}
+
+/**
+ * True when `adapterIds` is unset, or `adapterId` is listed exactly, or (for a
+ * runtime instance id shaped `<provider>:<docId>`) its provider type is listed.
+ */
+export const matchesAdapterFilter = (
+	adapterIds: string[] | undefined,
+	adapterId: string
+): boolean => {
+	if (!adapterIds) {
+		return true
+	}
+	if (adapterIds.includes(adapterId)) {
+		return true
+	}
+	return adapterIds.includes(adapterId.split(':')[0] ?? adapterId)
 }
 
 const startOfUtcDay = (d: Date): Date =>
@@ -53,7 +79,11 @@ const upsertDailyRow = async (
 	const existing = await req.payload.find({
 		collection: collectionSlug as never,
 		where: {
-			and: [{ source: { equals: row.source } }, { date: { equals: row.date.toISOString() } }],
+			and: [
+				{ source: { equals: row.source } },
+				{ date: { equals: row.date.toISOString() } },
+				{ scope: { equals: row.scope } },
+			],
 		},
 		limit: 1,
 		depth: 0,
@@ -78,10 +108,12 @@ const upsertDailyRow = async (
 
 /**
  * Opt-in Payload task that ETLs each configured provider adapter's last `lookbackDays` of
- * daily metrics into the sync collection (one upserted row per source + day), reading
- * through the surfacing engine so the pull rides its queue / backoff / cache. Native is
- * excluded (its data already lives in the rollups collection); each provider runs in its
- * own try/catch so one failure does not abort the rest.
+ * daily metrics into the sync collection (one upserted row per scope + source + day),
+ * reading through the surfacing engine so the pull rides its queue / backoff / cache.
+ * Native is excluded (its data already lives in the rollups collection); each provider
+ * runs in its own try/catch so one failure does not abort the rest. With `scopes`
+ * configured, the whole per-adapter pull runs once per tenant scope (plus the
+ * install-wide scope) so a multi-tenant install syncs every tenant, not just the null one.
  */
 export const syncTask = (
 	opts: SyncTaskOptions
@@ -99,52 +131,78 @@ export const syncTask = (
 		}
 		let synced = 0
 		let failed = 0
-		// A job req may lack the request shape an app's scopeResolver expects;
-		// degrade to the install scope rather than failing the whole run.
-		const scope = await resolveScopeFor(runtime, req).catch(() => null)
-		const registry = await resolveRegistryFor(runtime, { payload: req.payload, req, scope })
-		for (const adapter of registry.all()) {
-			if (adapter.id === 'native') {
-				continue
-			}
-			if (opts.adapterIds && !opts.adapterIds.includes(adapter.id)) {
-				continue
-			}
-			if (!adapter.isConfigured() || !supportsGranularity(adapter.capabilities, 'day')) {
-				continue
-			}
-			const metrics = METRIC_FIELDS.filter((m) => adapter.capabilities.metrics.has(m))
-			if (metrics.length === 0) {
-				continue
-			}
-			let result: AnalyticsResult
+		const scopeList = await resolveScopeList(opts.scopes, req.payload)
+		for (const scope of scopeList) {
+			let registry: Awaited<ReturnType<typeof resolveRegistryFor>>
 			try {
-				result = await runtime.engine.read(adapter, {
-					metrics,
-					dateRange,
-					granularity: 'day',
-					scope: scope ?? undefined,
-				})
+				registry = await resolveRegistryFor(runtime, { payload: req.payload, req, scope })
 			} catch (err) {
 				failed++
 				req.payload.logger.warn(
-					`analytics sync: adapter "${adapter.id}" read failed: ${String(err)}`
+					`analytics sync: registry resolution failed for scope "${scope ?? 'install-wide'}": ${String(err)}`
 				)
 				continue
 			}
-			for (const row of result.rows) {
-				const doc = toSyncRow(adapter.id, row, now)
-				if (!doc) {
+			for (const adapter of registry.all()) {
+				if (adapter.id === 'native') {
 					continue
 				}
+				if (!matchesAdapterFilter(opts.adapterIds, adapter.id)) {
+					continue
+				}
+				// A shared config adapter that cannot narrow its query to one tenant would
+				// otherwise return install-wide totals here, which then get stamped as this
+				// scope's row; skip it for every tenant pass, same as the read path's gate.
+				if (
+					scope !== null &&
+					runtime.configAdapterIds.has(adapter.id) &&
+					!adapter.capabilities.scopedQueries
+				) {
+					continue
+				}
+				if (!adapter.isConfigured() || !supportsGranularity(adapter.capabilities, 'day')) {
+					continue
+				}
+				const metrics = METRIC_FIELDS.filter((m) => adapter.capabilities.metrics.has(m))
+				if (metrics.length === 0) {
+					continue
+				}
+				let result: AnalyticsResult
 				try {
-					await upsertDailyRow(req, opts.collectionSlug, doc)
-					synced++
+					result = await runtime.engine.read(adapter, {
+						metrics,
+						dateRange,
+						granularity: 'day',
+						scope: scope ?? undefined,
+					})
 				} catch (err) {
 					failed++
 					req.payload.logger.warn(
-						`analytics sync: upsert for "${adapter.id}" on ${doc.date.toISOString()} failed: ${String(err)}`
+						`analytics sync: adapter "${adapter.id}" read failed (scope "${scope ?? ''}"): ${String(err)}`
 					)
+					continue
+				}
+				if (result.meta.stale) {
+					failed++
+					req.payload.logger.warn(
+						`analytics sync: adapter "${adapter.id}" read was stale-served, skipping sync (scope "${scope ?? ''}")`
+					)
+					continue
+				}
+				for (const row of result.rows) {
+					const doc = toSyncRow(adapter.id, row, { syncedAt: now, scope: scope ?? '' })
+					if (!doc) {
+						continue
+					}
+					try {
+						await upsertDailyRow(req, opts.collectionSlug, doc)
+						synced++
+					} catch (err) {
+						failed++
+						req.payload.logger.warn(
+							`analytics sync: upsert for "${adapter.id}" on ${doc.date.toISOString()} failed: ${String(err)}`
+						)
+					}
 				}
 			}
 		}

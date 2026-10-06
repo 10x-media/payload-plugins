@@ -6,6 +6,7 @@ import {
 	startOfMonthInTz,
 	startOfWeekInTz,
 	startOfYearInTz,
+	zonedCalendarDay,
 	zonedDayIso,
 } from './tz'
 
@@ -105,5 +106,23 @@ describe('isValidTimeZone', () => {
 		expect(isValidTimeZone('Europe/Berlin')).toBe(true)
 		expect(isValidTimeZone('UTC')).toBe(true)
 		expect(isValidTimeZone('Not/AZone')).toBe(false)
+	})
+})
+
+describe('zonedCalendarDay', () => {
+	it('names the local calendar date, not the UTC one', () => {
+		const berlinDayStart = new Date('2026-08-31T22:00:00.000Z')
+		expect(zonedCalendarDay(berlinDayStart, 'Europe/Berlin')).toBe('2026-09-01')
+		expect(zonedCalendarDay(berlinDayStart, 'UTC')).toBe('2026-08-31')
+	})
+
+	it('names the local calendar date for the last instant of a day west of UTC', () => {
+		const nyDayEnd = new Date('2026-09-08T03:59:59.999Z')
+		expect(zonedCalendarDay(nyDayEnd, 'America/New_York')).toBe('2026-09-07')
+		expect(zonedCalendarDay(nyDayEnd, 'UTC')).toBe('2026-09-08')
+	})
+
+	it('zero-pads single-digit months and days', () => {
+		expect(zonedCalendarDay(new Date('2026-01-05T12:00:00.000Z'), 'UTC')).toBe('2026-01-05')
 	})
 })

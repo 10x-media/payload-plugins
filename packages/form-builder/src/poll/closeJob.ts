@@ -1,6 +1,6 @@
 import type { Config, Payload, PayloadRequest, TaskConfig } from 'payload'
-import { FORMS_SLUG } from '../collections/forms'
 import { isPollClosed, type PollConfigLike, pollConfigOf } from '../form/pollState'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import { resolvePollOutcome } from './resolvePollOutcome'
 
 export const POLL_CLOSE_TASK_SLUG = 'form-builder-poll-close'
@@ -55,7 +55,13 @@ export const runPollClose = async (args: {
 }): Promise<void> => {
 	const { payload, input, pollVotesEnabled, req } = args
 	const form = await payload
-		.findByID({ collection: FORMS_SLUG, id: input.formId, depth: 0, overrideAccess: true, req })
+		.findByID({
+			collection: pluginSlugsOf(payload).forms,
+			id: input.formId,
+			depth: 0,
+			overrideAccess: true,
+			req,
+		})
 		.catch(() => null)
 	if (!form || !shouldAutoResolvePoll(form as PollFormLike)) {
 		return

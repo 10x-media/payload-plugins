@@ -11,6 +11,21 @@ const nextPort = process.env.E2E_NEXT_PORT ?? '3100'
 
 const baseURL = `http://localhost:${nextPort}`
 
+const tenancy = process.env.TENANCY === 'on' ? 'on' : 'off'
+// One mongod/postgres serves both e2e.sh runs, so the two modes get their own database
+// name to keep the off-mode and on-mode seeds from colliding.
+const dbName = `analytics_e2e_${tenancy}`
+
+// e2e.sh runs both tenancy modes back to back against different webServer env, so it
+// forces this off; unset, a local one-off `playwright test` still reuses a running dev
+// server the way the original config did.
+const reuseExistingServer =
+	process.env.E2E_REUSE_SERVER === '0'
+		? false
+		: process.env.E2E_REUSE_SERVER === '1'
+			? true
+			: !process.env.CI
+
 export default defineConfig({
 	testDir: './tests/e2e',
 	testMatch: '**/*.e2e.spec.ts',
@@ -29,14 +44,18 @@ export default defineConfig({
 		command: 'pnpm --filter @10x-media/analytics-dev start',
 		cwd: path.resolve(dirname, '..', '..'),
 		url: `${baseURL}/admin`,
-		reuseExistingServer: !process.env.CI,
+		reuseExistingServer,
 		timeout: 120_000,
 		env: {
 			PORT: nextPort,
 			DEV_DB: process.env.DEV_DB ?? 'mongo',
-			DATABASE_URI_MONGO: `mongodb://localhost:${mongoPort}/analytics_e2e?replicaSet=rs0&directConnection=true`,
-			DATABASE_URI_POSTGRES: `postgres://e2e:e2e@localhost:${pgPort}/analytics_e2e`,
-			PAYLOAD_SECRET: 'e2e-secret',
+			DATABASE_URI_MONGO: `mongodb://localhost:${mongoPort}/${dbName}?replicaSet=rs0&directConnection=true`,
+			DATABASE_URI_POSTGRES: `postgres://e2e:e2e@localhost:${pgPort}/${dbName}`,
+			// The providers collection's secret fields derive encryption keys from this when
+			// no explicit `fields()` keys config is present (single-tenant mode); the fields
+			// plugin requires at least 16 bytes of key material (32+ recommended).
+			PAYLOAD_SECRET: 'e2e-secret-material-32-bytes-minimum!!',
+			TENANCY: process.env.TENANCY ?? '',
 		},
 	},
 })

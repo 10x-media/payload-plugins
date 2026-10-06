@@ -101,6 +101,14 @@ export const bucketSeries = (
 		tz,
 	})
 
+/**
+ * Re-date a comparison series onto the primary axis it is already index-aligned to, so both
+ * series bucket on identical boundaries: bucketed on its own dates, a previous window can
+ * split into a different number of weeks or months than the window it overlays.
+ */
+export const onPrimaryAxis = (comparison: SeriesPoint[], axis: SeriesPoint[]): SeriesPoint[] =>
+	comparison.map((point, i) => ({ date: axis[i]?.date ?? point.date, value: point.value }))
+
 const DAY = 86_400_000
 
 const unitForSpan = (spanDays: number): Unit =>

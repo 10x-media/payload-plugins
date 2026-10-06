@@ -14,6 +14,8 @@ specs=(
 	tests/int/encrypted-query.int.spec.ts
 	tests/int/encrypted-write-only.int.spec.ts
 	tests/int/encrypted-aad-scope.int.spec.ts
+	tests/int/measurement.int.spec.ts
+	tests/int/phone.int.spec.ts
 )
 
 DB_MATRIX=mongo vitest run "${specs[@]}"

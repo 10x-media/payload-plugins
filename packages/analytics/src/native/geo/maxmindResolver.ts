@@ -1,13 +1,9 @@
 import type { CityResponse, Reader } from 'maxmind'
-import type { Geo, GeoResolver } from './geoResolver'
+import { clientIpFromHeaders } from '../ingest/clientIp'
+import type { Geo, GeoResolver, GeoResolverOptions } from './geoResolver'
 
 export interface MaxmindOptions {
 	dbPath: string
-}
-
-const clientIp = (headers: Headers): string | null => {
-	const fwd = headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-	return fwd || headers.get('x-real-ip') || null
 }
 
 /**
@@ -41,8 +37,8 @@ export function maxmindResolver(options: MaxmindOptions): GeoResolver {
 		return readerPromise
 	}
 
-	return async (headers: Headers): Promise<Geo> => {
-		const ip = clientIp(headers)
+	return async (headers: Headers, opts?: GeoResolverOptions): Promise<Geo> => {
+		const ip = clientIpFromHeaders(headers, { trustedProxyHops: opts?.trustedProxyHops })
 		if (!ip) {
 			return {}
 		}

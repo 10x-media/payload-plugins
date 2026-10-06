@@ -30,6 +30,8 @@ pnpm add maxmind   # optional peer dependency, loaded lazily
 
 and a downloaded `.mmdb` file (GeoLite2 is free with a MaxMind account). If the library is missing, the file is unreadable, or a lookup fails, resolution degrades to empty fields with a single logged warning.
 
+The address it looks up is the one `x-forwarded-for` reports, and which entry of that chain counts is the plugin's [`trustedProxyHops`](/analytics/proxy#trusted-proxies). Unset, it is the leftmost entry, which a client can write: a visitor who sets the header geo-locates wherever they please. Set to the number of proxies actually in front of the app, it is the address the outermost trusted one saw, and a chain shorter than that count resolves no geo at all rather than trusting `x-real-ip`. An install that geo-locates from MaxMind and sits behind its own proxy should set it.
+
 ## Custom pipelines
 
 The `@10x-media/analytics/geo` subpath exports the building blocks:
@@ -45,7 +47,7 @@ import {
 } from '@10x-media/analytics/geo'
 ```
 
-A `GeoResolver` is `(headers: Headers) => Geo | Promise<Geo>` where `Geo` is `{ country?, region?, city? }`. Compose resolvers left to right; the first one that produces a country wins:
+A `GeoResolver` is `(headers: Headers, opts?: { trustedProxyHops?: number }) => Geo | Promise<Geo>` where `Geo` is `{ country?, region?, city? }`. Compose resolvers left to right; the first one that produces a country wins:
 
 ```ts
 native({
@@ -56,6 +58,8 @@ native({
   ),
 })
 ```
+
+The second argument carries the install's `trustedProxyHops`, and is passed to every resolver in the chain. Resolvers that read only platform headers ignore it; one that does its own IP lookup should apply the same rule `maxmindResolver` does, reading the entry that many hops from the right of `x-forwarded-for`. The example above reads `x-real-ip` directly and is unaffected either way. The parameter is optional, so a one-argument resolver written before this option existed still type-checks and still runs.
 
 Use `noopResolver` to disable geo entirely (`geoResolver: noopResolver`).
 

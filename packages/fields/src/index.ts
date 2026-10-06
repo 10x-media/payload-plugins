@@ -6,6 +6,10 @@ import {
 	withEncryptedResponseStrip,
 } from './fields/encrypted/queryRewrite'
 import { registerIcon } from './fields/icon/plugin'
+import { resolvePrecision } from './fields/measurement/engine/precision'
+import { isKnownCountry } from './fields/phoneNumber/engine/countries'
+import { isMetadataSet } from './fields/phoneNumber/engine/metadata'
+import { FLAGS_ENDPOINT_PATH, makeFlagsHandler } from './fields/phoneNumber/server/flagsEndpoint'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setFieldsRegistry } from './plugin/registry'
 import type { TranslationsOption } from './translations'
@@ -14,6 +18,8 @@ import type {
 	EncryptedGlobalConfig,
 	FieldsPluginRegistry,
 	IconGlobalConfig,
+	MeasurementGlobalConfig,
+	PhoneNumberGlobalConfig,
 } from './types'
 
 export type FieldsPluginOptions = {
@@ -35,6 +41,10 @@ export type FieldsPluginOptions = {
 	icon?: IconGlobalConfig
 	/** Global defaults for encryptedField(). Per-field options always win. */
 	encrypted?: EncryptedGlobalConfig
+	/** Global defaults for measurementField(). Per-field options always win. */
+	measurement?: MeasurementGlobalConfig
+	/** Global defaults for phoneNumberField(). Per-field options always win. */
+	phoneNumber?: PhoneNumberGlobalConfig
 }
 
 declare module 'payload' {
@@ -52,6 +62,51 @@ const normalizeRegistry = (options: FieldsPluginOptions): FieldsPluginRegistry =
 	// slugs and the default library before writing the normalized slice.
 	if (options.encrypted) {
 		registry.encrypted = options.encrypted
+	}
+	if (options.measurement) {
+		// Fails fast at plugin build, before any field's beforeValidate hook can run
+		// against it, instead of throwing on every write once the app is live.
+		if (options.measurement.precision !== undefined) {
+			try {
+				resolvePrecision([options.measurement.precision])
+			} catch (error) {
+				throw new Error(
+					`fields plugin: measurement.precision is invalid: ${(error as Error).message}`
+				)
+			}
+		}
+		registry.measurement = options.measurement
+	}
+	if (options.phoneNumber) {
+		const { countries, defaultCountry, metadata, validation } = options.phoneNumber
+		for (const code of countries ?? []) {
+			if (!isKnownCountry(code)) {
+				throw new Error(
+					`fields plugin: phoneNumber.countries entry "${code}" is not a supported country.`
+				)
+			}
+		}
+		if (defaultCountry !== undefined && !isKnownCountry(defaultCountry)) {
+			throw new Error(
+				`fields plugin: phoneNumber.defaultCountry "${defaultCountry}" is not a supported country.`
+			)
+		}
+		if (metadata !== undefined && !isMetadataSet(metadata)) {
+			throw new Error(
+				`fields plugin: phoneNumber.metadata "${metadata}" must be "max", "min", or "mobile".`
+			)
+		}
+		if (validation === 'mobile' && metadata === 'min') {
+			throw new Error(
+				"fields plugin: phoneNumber.validation 'mobile' needs metadata 'max' or 'mobile'; 'min' carries no number types."
+			)
+		}
+		if (defaultCountry && countries && !countries.includes(defaultCountry)) {
+			throw new Error(
+				`fields plugin: phoneNumber.defaultCountry "${defaultCountry}" is not in phoneNumber.countries.`
+			)
+		}
+		registry.phoneNumber = options.phoneNumber
 	}
 	return registry
 }
@@ -76,6 +131,21 @@ export const fields = definePlugin<FieldsPluginOptions>({
 		// registers their client components in admin.dependencies. A no-op when no
 		// adapters are configured, leaving registry.icon unset.
 		registerIcon(config, options.icon)
+		config.admin = config.admin ?? {}
+		config.admin.components = config.admin.components ?? {}
+		config.admin.components.providers = config.admin.components.providers ?? []
+		config.admin.components.providers.push({
+			clientProps: { persist: options.measurement?.persistPreferences !== false },
+			path: '@10x-media/fields/client#MeasurementUnitsProvider',
+		})
+		// Gated on serveFlags, not the resolved `flags` value: flags is per-field and
+		// unknown until fields exist, so a field overriding to 'svg' would break under a gated install.
+		if (options.phoneNumber?.serveFlags !== false) {
+			config.endpoints = [
+				...(config.endpoints ?? []),
+				{ handler: makeFlagsHandler(), method: 'get', path: FLAGS_ENDPOINT_PATH },
+			]
+		}
 		// Transparently rewrite equals/in on queryable encrypted fields to their
 		// blind-index siblings; a no-op for collections that have none. Globals
 		// take no where, so they get the response strip alone.
@@ -111,5 +181,8 @@ export type {
 	IconMeta,
 	IconRenderStrategy,
 	KeysConfig,
+	MeasurementDefaultUnitsResolver,
+	MeasurementGlobalConfig,
+	PhoneNumberGlobalConfig,
 } from './types'
 export type { FieldsPluginOptions as PluginOptions }

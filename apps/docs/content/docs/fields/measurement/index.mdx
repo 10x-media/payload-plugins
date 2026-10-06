@@ -1,0 +1,207 @@
+---
+title: Measurement field
+description: A number field that stores one canonical unit and lets every viewer edit and read in their own.
+---
+
+```ts
+import { measurementField, presets } from '@10x-media/fields/measurement'
+
+measurementField({
+  ...presets.bodyWeight,          // storageUnit, units, preferenceKey, name, localeDefaults for this preset
+  fallbackUnit: 'lb',             // display fallback with no saved viewer preference, ahead of locale detection
+  units: ['kg', 'lb'],            // narrow the preset's offered units; still dimension-constrained
+  precision: { display: { lb: 1 } }, // per-unit display fraction digits; see Precision below for every knob
+  min: 20,                        // bounds in the storage unit, enforced by Payload's native number validation
+  max: 300,
+  label: 'Body weight',
+  required: true,
+  localized: false,
+  index: false,
+  overrides: ({ field }) => field,
+})
+```
+
+The field stores one number in a canonical unit and lets each viewer edit and read it in their own. Eight presets cover the common cases: `bodyWeight` (kg, lb, st-lb), `personHeight` (cm, m, in, ft-in), `distance` (m, km, mi), `mass` (g, kg, oz, lb), `length` (mm, cm, m, km, in, ft, yd, mi), `volume` (ml, l, fl-oz, gal), `temperature` (c, f), `speed` (km/h, mph, m/s). Spread one into `measurementField()` and override whatever the field needs; every option after the spread narrows to the preset's dimension, so TypeScript rejects a unit from the wrong family.
+
+## Free-form fields
+
+A field isn't limited to the eight presets. Any field can declare `storageUnit` and `units` directly, with units constrained only by dimension, not by a fixed catalog.
+
+```ts
+measurementField({
+  storageUnit: 'mm',
+  units: ['in', 'ft-in'],
+  preferenceKey: 'cutout',
+})
+```
+
+`storageUnit` still has to be a scalar unit; `units` still has to share its dimension. Everything else is inferred: `name` defaults to `preferenceKey`, and `units` defaults to every built-in unit of the storage unit's dimension when omitted.
+
+## Preference buckets
+
+The display unit a viewer picks is stored under a bucket key (`preferenceKey`), not per field: every field sharing a key flips together. Three ways a field lands in a bucket:
+
+- Spreading a shipped preset carries its `preferenceKey` (`bodyWeight`, `personHeight`, `distance`, `mass`, `length`, `volume`, `temperature`, `speed`), the same eight keys v1 used, so saved preferences keep resolving.
+- A free-form field with no `preferenceKey` defaults to its storage unit's dimension name (`mass`, `length`, `volume`, `temperature`, `speed`). This deliberately shares a bucket with the generic `mass`/`length` presets, which use the same default.
+- Passing `preferenceKey` explicitly overrides either default, for a field that should share a bucket with something else or stay isolated from one.
+
+## Display unit resolution
+
+Display unit resolves in this order, skipping any candidate the field doesn't offer in `units`:
+
+1. The viewer's saved preference for the field's `preferenceKey`.
+2. The field's own `fallbackUnit`.
+3. The plugin's `fields({ measurement: { defaultUnits } })` for that `preferenceKey`.
+4. The field's `localeDefaults[system]`, where `system` is `'metric'`, `'us'`, or `'uk'`, derived from the browser's language (US and Liberia get US, Great Britain and Myanmar get UK, everyone else metric).
+5. The per-dimension `DIMENSION_LOCALE_DEFAULTS[dimension][system]` table, covering the five built-in dimensions. A custom dimension has no entry here.
+6. The field's first configured unit, as the final floor.
+
+Setting `fallbackUnit` (or `defaultUnits` for a bucket in the plugin) is an explicit choice that outranks locale detection. Leave both unset on most fields so a UK visitor sees stone and pounds without any config; the shipped presets already carry the right `localeDefaults` for that (step 4 wins before the generic dimension table in step 5).
+
+`defaultUnits` also accepts a resolver function instead of a plain map, for per-request (tenant-aware) policy:
+
+```ts
+fields({
+  measurement: {
+    defaultUnits: ({ req, preferenceKey }) => tenantUnitFor(req?.user, preferenceKey),
+  },
+})
+```
+
+The edit view calls it with the request that rendered the page; list cells call it with `req` undefined, since Payload's cell components carry no request at all. A resolver that throws degrades to no default rather than breaking the render, logging the error through `payload.logger`. Reciprocal unit kinds and a client-supplied conversion function (see [Custom units and dimensions](#custom-units-and-dimensions)) remain future work; this resolver only changes which default unit is chosen, not how units convert.
+
+Preference persistence and the same-bucket flip are wired by the `fields()` plugin, which registers the unit preference provider. Standalone `measurementField()` still works, but a unit picked without the plugin lasts only for that field until the page reloads, and its list cells skip locale detection entirely: they fall back through the field's `fallbackUnit` (step 2), then straight to its first configured unit (step 6), never reaching steps 4 or 5.
+
+Passing `fields({ measurement: { persistPreferences: false } })` makes the provider session-only: it skips both the read on mount and every write, so a kiosk or shared-account admin session never touches `payload-preferences` for measurement units. The bucket flip described above still applies each session; it doesn't outlive the tab.
+
+## What's stored
+
+The field is a plain `number` column holding a canonical value in `storageUnit`, so it sorts, filters, and groups like any other number and needs no custom query logic. To adopt on an existing numeric column, set `storageUnit` to whatever unit that column already holds: no migration, no data rewrite. Storage is rounded to a configurable fraction-digit count (`precision.storage`, default 6) regardless of display precision, on every write path including the REST and Local API; non-numeric or NaN writes are rejected server-side on every database adapter. The field stores a single number; `hasMany` is not supported. See [Precision](#precision) below for the full set of knobs.
+
+The factory also stamps its resolved config onto `field.custom['@10x-media/fields']`, so tooling and a second app reading the same collection can discover `storageUnit`, `units`, and `preferenceKey` without re-declaring the field. Two apps sharing a database must still declare the same `storageUnit` themselves: the field only round-trips whatever is on disk, it does not reconcile a mismatch between apps. `custom['@10x-media/fields'].precision` carries the field's own unresolved precision layer only; the plugin-merged, per-request result is what the edit view and cells actually use.
+
+## Precision
+
+Two modes decide how a value round-trips between storage and the edit view: `'readable'` (the default) and `'exact'`. Pass either as a bare string, or a `MeasurementPrecision` object to override individual knobs on top of a mode's defaults:
+
+```ts
+precision: 'exact'
+// or, overriding individual knobs on top of a mode's defaults:
+precision: {
+  mode: 'readable',       // 'readable' | 'exact'
+  storage: 6,              // fraction digits kept in the storage unit, applied to every write
+  entry: 'quantize',        // 'quantize' | 'free', entry-unit typing behavior
+  draft: 'display',         // 'display' | 'faithful', draft-repaint policy after a save or refresh
+  display: { cm: 1 },       // per-unit display fraction digits; keys a compound id for its minor part
+}
+```
+
+Four independent knobs, each of which can also be set once for every field via `fields({ measurement: { precision } })`:
+
+| Knob | Values | What it controls |
+|---|---|---|
+| `storage` | integer 0-12, default 6 | Fraction digits kept in the storage unit. Applies to every write path, including the REST and Local API, not only the field's own input. |
+| `entry` | `'quantize'` \| `'free'` | Whether a typed value is rounded at its own display digits, in the unit it was typed in, before converting to storage. |
+| `draft` | `'display'` \| `'faithful'` | Whether the input repaints straight at display digits after a save or refresh, or escalates digits until the draft round-trips the stored value exactly. |
+| `display` | `Partial<Record<UnitId, number>>` | Per-unit display fraction digits, the same map the old top-level `precision` option used to be, now nested here. For compound units (`ft-in`, `st-lb`), key the compound id to set the minor part's digits. |
+
+`mode` only sets defaults for `entry` and `draft`. `storage` is not part of either preset and always defaults to 6 regardless of mode:
+
+| Mode | `entry` | `draft` | Cells and bound messages read at |
+|---|---|---|---|
+| `readable` (default) | `quantize` | `display` | display digits |
+| `exact` | `free` | `faithful` | storage digits, unless `display` explicitly names the shown unit |
+
+### Resolution order
+
+A field's own `precision` wins over `fields({ measurement: { precision } })`, which wins over the engine's built-in default (`readable`, `storage: 6`). Merging is per knob, not per layer: a plugin-wide `precision: 'exact'` and a field's own `precision: { storage: 0 }` combine into exact mode's `entry`/`draft` with `storage: 0`, rather than either layer replacing the other outright. `display` merges per unit key across every layer.
+
+```ts
+fields({ measurement: { precision: 'exact' } })
+
+measurementField({ ...presets.bodyWeight, precision: { storage: 0 } })
+// resolves to { mode: 'exact', entry: 'free', draft: 'faithful', storage: 0 }
+```
+
+### Readable mode: what you type is what's stored
+
+Readable mode's contract is that a saved value never differs from what the viewer typed. `entry: 'quantize'` rounds the typed value at display digits, in the unit it was typed in, before converting: typing `71.437` into a field displaying inches at 1 digit quantizes to `71.4` in first, then converts to storage (`181.356` cm exactly), never the raw `71.437` in's conversion.
+
+The dirty guard extends the same contract to inputs the viewer never touched. Only a part actually typed into commits its displayed value; every other part (the other half of a compound value, or the whole field after a display-unit switch) commits the exact value already on disk, never a rounded preview of it. Switching a display unit never calls into the commit path at all, so the stored number stays untouched until the next real edit. Concretely: a `personHeight` stored at `180.34` cm, viewed in cm at 1 display digit, paints `180.3` in the input; saving an unrelated field on the same document still writes back `180.34`, not the truncated `180.3`, because the height input itself was never dirtied.
+
+### Exact mode: faithful round-trip
+
+`entry: 'free'` keeps a typed value exact, with no rounding before conversion. `draft: 'faithful'` repaints the input at the shortest fraction-digit count that round-trips back to the exact stored value: starting from display digits, escalating one digit at a time up to `storage` digits, so a value is never silently truncated on redisplay. Cells and bound (`min`/`max`) messages read back at full storage-digit precision by default, matching what the edit view can commit, rather than the usually coarser display digits readable mode uses for the same unit.
+
+### The storage knob: universal granularity
+
+`storage` is the one knob every write path shares, including data written through the REST or Local API directly, never through the field's own input. It runs independently of `entry`, `display`, and `draft`, so it can deliberately break readable mode's own promise that what you typed is what's stored: a `bodyWeight` field set to `precision: { storage: 0 }` rounds a write of `249.6` down to `250` even though nothing about display or entry changed. The same mechanism heals import noise: a script writing `500.123456789` through the API against a field left at the default `storage: 6` stores `500.123457`.
+
+### Notes on the edges
+
+- **Oversized minor entries carry into the major.** Typing a minor part that rounds up to the unit ratio is allowed to carry rather than clamp: quantizing `11.96` in against a major of `5` (ft) commits `182.88` cm (6 ft 0 in), not a clamped `182.87746`. The clamp only bounds the raw typed magnitude before quantization, so a literal like `24` in can't reach storage as typed; it never runs again after a legitimate carry.
+- **An untouched compound part can differ from a stale draft in the last storage digit.** The dirty guard always derives an untouched part from decomposing the stored value at full storage precision, the mathematically exact split. A faithful-mode draft, by contrast, is the shortest string that happens to round-trip; in principle the two computations can disagree in the very last storage digit, since round-tripping doesn't require matching the storage-precision decomposition digit for digit. No scenario in this package's test suite has triggered a visible divergence; treat it as a documented theoretical edge rather than an active defect.
+- **An explicit display digit still wins in exact mode.** Exact mode's storage-digit readback for cells and bound messages is a default, not a replacement: `precision: { mode: 'exact', display: { kg: 1 } }` still shows `kg` at 1 digit everywhere that unit is displayed, while every other unit on that field reads back at full storage precision.
+
+## Row and unit menu
+
+The field row is a constant 40px: value and unit sit together on the left as one phrase, and a vertical three-dot menu button sits at the row's right edge. With more than one unit in `units`, that button opens the unit menu (checkmark on the current unit); picking one converts the displayed value in place and calls the same bucket-wide preference update described above, while the stored number stays unaffected until the next edit. The unit text itself is a passive muted suffix, never a control. With only one unit configured, or when the field is read-only, the menu button disappears entirely. Clicking empty space inside the row focuses whichever input is nearest, the way a native control would.
+
+## Compound entry
+
+`personHeight` and `bodyWeight` include a compound display unit, `ft-in` and `st-lb`: two inputs, major and minor, each hugging its own unit suffix, with the row's single menu button switching the whole pair. Compound units are display-only. Storage is always a single scalar number in `storageUnit`; picking `ft-in` never changes what's on disk, only how the value is split for editing.
+
+## Custom units and dimensions
+
+A field can declare units and dimensions the engine doesn't ship, as plain serializable data:
+
+```ts
+measurementField({
+  storageUnit: 'km',
+  units: ['km', 'mi', 'nmi'],
+  preferenceKey: 'sailing',
+  custom: {
+    units: {
+      nmi: { dimension: 'length', factor: 1852, intlUnit: null, shortLabel: 'nmi' },
+    },
+  },
+})
+```
+
+`CustomUnitDef` is `{ dimension, factor, offset?, intlUnit, shortLabel, longLabel?, precision? }`: linear (or affine, with `offset`) against the dimension's canonical unit, same as the built-ins. `CustomDimensionDef` is `{ canonicalUnit }`, naming one of `custom.units` with `factor: 1` and no `offset` as that dimension's canonical. Both travel with the field's `clientProps` as plain data, so the client rebuilds the same engine without a bundle of conversion code shipping separately. Custom unit and dimension ids can't collide with a built-in one; the factory throws at config time if they do.
+
+`intlUnit: null` means the unit has no ECMA-402 identifier for `Intl.NumberFormat`'s `style: 'unit'`. Formatting falls back to a plain localized decimal plus `shortLabel` (`"1.5 nmi"` rather than an `Intl`-rendered unit string), and the unit menu's long label falls back to `longLabel`, then `shortLabel`.
+
+`shortLabel` and `longLabel` each accept either a plain string, used for every locale, or a `LocalizedLabel` map keyed by locale (`{ en: 'nmi', de: 'sm' }`). Resolution tries the exact admin locale, then its language prefix (`de` for `de-AT`), then the map's `en` entry, then whichever value comes first, so a partial map never renders blank. Built-in units with an `intlUnit` never consult this map: their short and long labels are always derived from `Intl.NumberFormat` per locale.
+
+Compound units (`ft-in`, `st-lb`) are always built-in: custom units are scalar-only. A field can still store in a custom unit and display a compound one, or the reverse; the engine bridges through the compound's built-in major unit, converting your custom storage value into it before splitting into major/minor. The nautical-mile example above works the same way if you add `'ft-in'` to `units`.
+
+This is new: pairing errors (a `dimension` referencing nothing built-in or declared, an id colliding with a built-in) throw immediately at field-definition time with the field's name in the message, rather than failing silently at runtime. Reciprocal unit kinds and a client-supplied conversion function are not supported yet; both are documented future work.
+
+## Options
+
+| Option | Default | Notes |
+|---|---|---|
+| `storageUnit` | required (or from a spread preset) | Unit the number is stored in. Must be a scalar unit. Match existing data to adopt with zero migration. |
+| `units` | every built-in unit of the storage unit's dimension | Offered in the unit menu; narrows to the dimension when `storageUnit` is a literal. The first entry is the final display fallback when nothing else resolves. |
+| `preferenceKey` | shipped presets carry their own; free-form defaults to the dimension name | Preference bucket shared with every field using the same key. |
+| `name` | `preferenceKey` (presets also carry their own) | |
+| `fallbackUnit` | none | Field-level display fallback, ahead of the plugin and locale defaults. Must be in `units`. |
+| `localeDefaults` | none | `Partial<Record<'metric' \| 'us' \| 'uk', UnitId>>`, ahead of the per-dimension table. |
+| `precision` | `'readable'` (the mode default; `storage` defaults to 6 regardless of mode) | A bare `'readable' \| 'exact'`, or `{ mode?, storage?, entry?, draft?, display? }`. `display` digits are integers 0 to 100 and `storage` is an integer 0 to 12; the factory throws otherwise. See [Precision](#precision). |
+| `custom` | none | `{ units?, dimensions? }`, serializable custom unit/dimension definitions; see above. |
+| `min` / `max` | none | Bounds in the storage unit, enforced by Payload's native number validation. The edit view converts the message to the display unit. |
+| `overrides` | none | `({ field }) => field` escape hatch with explicit spreads. |
+
+## Limitations
+
+- The list view's filter input operates in storage units. Payload passes custom `Filter` components no props at all, so there is no viewer, locale, or preference to convert against; filtering "under 150" on a `personHeight` field filters on centimeters even for a viewer displaying feet and inches.
+- The list view's cell is a server component, so `fields({ measurement: { defaultUnits } })` reaches it too, not only the edit view. It still can't read the viewer's saved preference server-side though: Payload's cell components carry no request or user, only `payload` and `i18n`, so that step of the resolution chain is left to the client provider once it mounts.
+- The field stores a single number, as covered above; `hasMany` is not supported.
+- Reciprocal conversions (value inverts rather than scales, e.g. frequency/period) and a client-supplied conversion function are not supported by `custom`. Both are future work; today's custom units are linear or affine only.
+- Precision only controls fraction-digit counts. Significant-figure display (dropping or keeping trailing zeros contextually) and arbitrary entry steps (snapping to an increment other than a decimal digit count) are not supported; both are designed-for future work on the `display`/`entry` knobs.
+- The field is a plain `number` column: it has no way to carry per-value significant-figure metadata, so a future sig-fig mode needs a different column shape or a companion field, not just another digit option on `precision`.
+
+## Frontend use
+
+The stored value is a plain number in `storageUnit`; convert and format it for your frontend with [`/measurement/utils`](/fields/measurement/utils), the same engine the field runs.

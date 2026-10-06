@@ -57,6 +57,29 @@ const props = (overrides: Partial<FieldRendererProps<boolean>>): FieldRendererPr
 })
 
 describe('consent renderer', () => {
+	it('renders a notice display as prose with the link and no checkbox or asterisk', () => {
+		const { container } = render(
+			createElement(
+				consentRenderer,
+				props({
+					field: {
+						blockType: 'consent',
+						name: 'terms',
+						display: 'notice',
+						statement: 'By subscribing, you agree to our privacy policy',
+						link: { label: 'Privacy Policy', url: 'https://example.com/privacy' },
+					},
+				})
+			)
+		)
+		expect(within(container).queryByRole('checkbox')).toBeNull()
+		expect(container.textContent).toContain('By subscribing, you agree to our privacy policy')
+		expect(
+			within(container).getByRole('link', { name: 'Privacy Policy' }).getAttribute('href')
+		).toBe('https://example.com/privacy')
+		expect(container.textContent).not.toContain('*')
+	})
+
 	it('renders unchecked by default when value is undefined', () => {
 		const { container } = render(createElement(consentRenderer, props({})))
 		const checkbox = within(container).getByRole('checkbox')

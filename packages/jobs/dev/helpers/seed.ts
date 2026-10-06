@@ -26,6 +26,18 @@ const succeededLog = (taskID: string) => ({
 	state: 'succeeded',
 })
 
+const sleepLog = (state: 'failed' | 'succeeded', ms: number) => ({
+	executedAt: minutesAgo(4),
+	completedAt: minutesAgo(4),
+	taskSlug: 'sleep',
+	taskID: 'sleep-1',
+	input: { ms },
+	...(state === 'succeeded'
+		? { output: { sleptMs: ms } }
+		: { error: { message: 'Timed out waiting for the sleep to finish' } }),
+	state,
+})
+
 /** One sample job per derived status, so every default cell renders in the admin. */
 const sampleJobs: Record<string, unknown>[] = [
 	{
@@ -84,6 +96,16 @@ const sampleJobs: Record<string, unknown>[] = [
 		hasError: true,
 		error: { cancelled: true },
 		input: { automationId: 'cleanup-temp' },
+	},
+	// Exercises the log-slot components wired up in payload.config.ts: two `sleep`
+	// attempts with custom blocks, one `inline` attempt left on the default JSON.
+	{
+		taskSlug: 'sleep',
+		queue: 'default',
+		totalTried: 2,
+		completedAt: minutesAgo(4),
+		input: { ms: 1500 },
+		log: [sleepLog('failed', 1500), sleepLog('succeeded', 1500), succeededLog('wrap-up')],
 	},
 ]
 

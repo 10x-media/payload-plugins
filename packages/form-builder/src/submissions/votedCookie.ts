@@ -1,5 +1,10 @@
 import type { Payload } from 'payload'
 import { signFormContext, verifyFormContext } from '../context/formContext'
+import {
+	DEFAULT_VOTED_COOKIE_PREFIX,
+	pluginSlugsOf,
+	votedCookiePrefixOf,
+} from '../plugin/collectionSlugs'
 
 /**
  * `req.context` key under which `validateSubmission` stashes the loaded form's poll state
@@ -11,56 +16,40 @@ export const POLL_CONTEXT_KEY = 'formBuilderPollConfig'
 /** The poll state `validateSubmission` stashes under {@link POLL_CONTEXT_KEY}. */
 export type PollContextState = { pollEnabled: boolean; allowChange: boolean }
 
-/**
- * `req.context` key the vote-submit endpoint sets to the id of the submission a cookie-identified
- * re-vote is updating. Its presence is what opts the update operation into the create-grade
- * pipeline: the spam guard, full validation in `validateSubmission`, the dedup rule's
- * self-exclusion, and the voted-cookie refresh all key off it, so an unflagged update (host
- * server code, admin tooling) keeps today's behavior exactly.
- */
-export const VOTE_CHANGE_CONTEXT_KEY = 'formBuilderVoteChange'
-
-/** The change-target submission id a flagged request carries, or undefined. */
-export const voteChangeTargetOf = (req: {
-	context?: Record<string, unknown>
-}): number | string | undefined => {
-	const target = req.context?.[VOTE_CHANGE_CONTEXT_KEY]
-	return typeof target === 'string' || typeof target === 'number' ? target : undefined
-}
-
-/** Redeclared to avoid a cycle: `collections/formSubmissions` imports from this module. */
-const FORM_SUBMISSIONS_SLUG = 'form-submissions'
+export { VOTE_CHANGE_CONTEXT_KEY, voteChangeTargetOf } from './voteChange'
 
 /** One year, matching the voted cookie's `Max-Age` so the token never outlives the cookie by less. */
 export const VOTED_COOKIE_MAX_AGE_SECONDS = 31_536_000
 
-/** Name of the httpOnly voted cookie for a form: `fb-voted-{formId}`. */
-export const votedCookieName = (formId: number | string): string => `fb-voted-${formId}`
+/**
+ * Name of the httpOnly voted cookie for a form: `fb-voted-{formId}` by default. Pass `payload`
+ * when the plugin's `poll.cookiePrefix` is set, so the configured prefix is applied.
+ */
+export const votedCookieName = (formId: number | string, payload?: Payload): string =>
+	`${payload ? votedCookiePrefixOf(payload) : DEFAULT_VOTED_COOKIE_PREFIX}${formId}`
 
 /**
  * Whether a request's `Cookie` header carries the voted marker for a form. For SSR hosts: read
  * the header (e.g. Next's `(await headers()).get('cookie')`) and pass the result to `<Poll hasVoted>`.
  * The cookie is httpOnly (set server-side when the plugin's `poll.votedCookie` option is on), so
- * this server read is the only way to consume it.
+ * this server read is the only way to consume it. Pass `payload` when `poll.cookiePrefix` is set;
+ * without it the default `fb-voted-` name is read.
  */
 export const hasVotedCookie = (
 	cookieHeader: string | null | undefined,
-	formId: number | string
+	formId: number | string,
+	payload?: Payload
 ): boolean => {
 	if (!cookieHeader) {
 		return false
 	}
-	return votedCookieValue(cookieHeader, formId) != null
+	return votedCookieValue(cookieHeader, votedCookieName(formId, payload)) != null
 }
 
-const votedCookieValue = (
-	cookieHeader: string | null | undefined,
-	formId: number | string
-): string | null => {
+const votedCookieValue = (cookieHeader: string | null | undefined, name: string): string | null => {
 	if (!cookieHeader) {
 		return null
 	}
-	const name = votedCookieName(formId)
 	for (const pair of cookieHeader.split(';')) {
 		const eq = pair.indexOf('=')
 		if (eq !== -1 && pair.slice(0, eq).trim() === name) {
@@ -79,7 +68,7 @@ const votedCookieValue = (
 export const signVotedCookieValue = (payload: Payload, submissionId: number | string): string =>
 	signFormContext({
 		payload,
-		relationTo: FORM_SUBMISSIONS_SLUG,
+		relationTo: pluginSlugsOf(payload).formSubmissions,
 		value: submissionId,
 		expiresIn: VOTED_COOKIE_MAX_AGE_SECONDS,
 	})
@@ -87,19 +76,20 @@ export const signVotedCookieValue = (payload: Payload, submissionId: number | st
 /**
  * The submission id carried by a form's voted cookie, or null when the header has no cookie for
  * the form, the value is the legacy boolean marker (`1`), or the token fails verification
- * (tampered, wrong secret, expired). Null means "treat the caller as a new voter".
+ * (tampered, wrong secret, expired, or issued for a different submissions collection). Null means
+ * "treat the caller as a new voter".
  */
 export const votedSubmissionIdFromCookie = (
 	cookieHeader: string | null | undefined,
 	formId: number | string,
-	secret: string
+	payload: Payload
 ): string | null => {
-	const value = votedCookieValue(cookieHeader, formId)
+	const value = votedCookieValue(cookieHeader, votedCookieName(formId, payload))
 	if (value == null || value.length === 0) {
 		return null
 	}
-	const reference = verifyFormContext(value, secret)
-	if (reference == null || reference.relationTo !== FORM_SUBMISSIONS_SLUG) {
+	const reference = verifyFormContext(value, payload.secret)
+	if (reference == null || reference.relationTo !== pluginSlugsOf(payload).formSubmissions) {
 		return null
 	}
 	return String(reference.value)

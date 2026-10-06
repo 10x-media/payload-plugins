@@ -25,7 +25,7 @@ export type PollProps = FormProps & {
 	/**
 	 * Server-known voted state, ORed with the localStorage guard: `true` marks the visitor as voted;
 	 * `false`/omitted falls back to localStorage. SSR hosts using the plugin's `poll.votedCookie`
-	 * option pass `hasVotedCookie(cookieHeader, form.id)` here.
+	 * option pass `hasVotedCookie(cookieHeader, form.id, payload)` here.
 	 */
 	hasVoted?: boolean
 	/**
@@ -128,11 +128,14 @@ export const Poll = ({
 		[configuredVoteStorage]
 	)
 
+	const formsCollection = formProps.collections?.forms
 	const loadResults = useCallback(async () => {
 		const result: FetchResultsResult = await fetchResultsImpl({
 			formId: formProps.form.id,
 			field: resultsField,
 			apiRoute,
+			...(formsCollection ? { collection: formsCollection } : {}),
+			locale: formProps.submissionLocale,
 		})
 		// A failed load surfaces as an error, not an empty result set: `[]` would read as "no votes yet".
 		if (result.ok) {
@@ -141,7 +144,14 @@ export const Poll = ({
 		} else {
 			setLoadFailed(true)
 		}
-	}, [fetchResultsImpl, formProps.form.id, resultsField, apiRoute])
+	}, [
+		fetchResultsImpl,
+		formProps.form.id,
+		resultsField,
+		apiRoute,
+		formsCollection,
+		formProps.submissionLocale,
+	])
 
 	const resultsError = (
 		<p className="fb-poll__error" role="alert">

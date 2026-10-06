@@ -9,7 +9,7 @@ describe('makeTranslate', () => {
 	})
 
 	it('falls back to English for an unknown locale (never the raw key)', () => {
-		const t = makeTranslate('fr')
+		const t = makeTranslate('xx')
 		expect(t(keys.formSubmit)).toBe('Submit')
 	})
 

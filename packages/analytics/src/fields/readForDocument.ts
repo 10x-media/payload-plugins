@@ -1,14 +1,15 @@
 import type { PayloadRequest } from 'payload'
 import { resolveHostname, resolvePathCached } from '../binding/resolvePath'
 import type { BindingDoc } from '../binding/types'
-import { satisfiesCapabilities } from '../core/capabilities'
+import { comparisonOf, satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, DateRange, MetricKey } from '../core/contract'
 import { supportsGranularity } from '../core/granularity'
 import { resolveReadContext } from '../core/scopedRead'
+import { goalSlugsFor } from '../plugin/goalHint'
 import { getRuntime, resolveTimezoneFor } from '../plugin/runtime'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
-import { previousWindow } from '../widgets/comparison'
+import { previousWindow, withinLookback } from '../widgets/comparison'
 import { fillDailySeries, type SeriesPoint } from '../widgets/readForWidgetSeries'
 
 export type FieldReadStatus = 'ok' | 'no-path' | 'not-bound' | 'not-configured' | 'unavailable'
@@ -44,6 +45,11 @@ export interface ReadForFieldArgs {
 	now: Date
 	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
 	scope?: string | null
+	/**
+	 * Reporting timezone the caller already resolved, reused rather than resolved again so
+	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+	 */
+	timezone?: string
 	/** Also read the previous comparable window when the adapter supports comparison. */
 	compare?: boolean
 	/** Also read a daily series for the first supported metric when the adapter can. */
@@ -70,7 +76,7 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 			status: 'not-bound',
 			adapterId: adapterId ?? '',
 			dateRange,
-			timezone: DEFAULT_TIMEZONE,
+			timezone: args.timezone ?? DEFAULT_TIMEZONE,
 			...empty,
 		}
 	}
@@ -80,7 +86,7 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 			status: 'not-bound',
 			adapterId: adapterId ?? '',
 			dateRange,
-			timezone: DEFAULT_TIMEZONE,
+			timezone: args.timezone ?? DEFAULT_TIMEZONE,
 			...empty,
 		}
 	}
@@ -90,11 +96,11 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 			status: 'unavailable',
 			adapterId: adapterId ?? '',
 			dateRange,
-			timezone: DEFAULT_TIMEZONE,
+			timezone: args.timezone ?? DEFAULT_TIMEZONE,
 			...empty,
 		}
 	}
-	const tz = await resolveTimezoneFor(runtime, req, ctx.scope)
+	const tz = args.timezone ?? (await resolveTimezoneFor(runtime, req, ctx.scope))
 	dateRange = range ?? resolveTimeframe(timeframe, now, tz)
 	const adapter: AnalyticsAdapter = ctx.adapter
 	const bindingCtx = { req, locale: req.locale ?? undefined }
@@ -132,10 +138,27 @@ export const readForField = async (args: ReadForFieldArgs): Promise<FieldReadRes
 		}
 	}
 	const hostname = await resolveHostname(binding, data, bindingCtx)
-	const base = { path, hostname, timezone: tz, scope: ctx.queryScope }
+	const goalSlugs = await goalSlugsFor({
+		runtime,
+		req,
+		scope: ctx.scope,
+		metrics: supportedMetrics,
+	})
+	const base = {
+		path,
+		hostname,
+		timezone: tz,
+		scope: ctx.queryScope,
+		...(goalSlugs === undefined ? {} : { goalSlugs }),
+	}
+	const previousRange =
+		args.compare && runtime.comparison && comparisonOf(adapter.capabilities)
+			? previousWindow(dateRange, tz)
+			: null
 	const comparisonRange =
-		args.compare && runtime.comparison && adapter.capabilities.comparison
-			? (previousWindow(dateRange, tz) ?? undefined)
+		previousRange &&
+		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
+			? previousRange
 			: undefined
 	const wantsSeries = args.series && supportsGranularity(adapter.capabilities, 'day')
 	const [result, previous, seriesResult] = await Promise.all([

@@ -14,7 +14,14 @@ export type ProviderDoc = {
 	provider?: string | null
 	enabled?: boolean | null
 	scope?: string | null
-	plausible?: { siteId?: string | null; apiKey?: string | null; host?: string | null } | null
+	plausible?: {
+		siteId?: string | null
+		apiKey?: string | null
+		host?: string | null
+		domain?: string | null
+		scriptId?: string | null
+		revenueCurrency?: string | null
+	} | null
 	umami?: {
 		websiteId?: string | null
 		apiKey?: string | null
@@ -26,11 +33,22 @@ export type ProviderDoc = {
 		clientEmail?: string | null
 		privateKey?: string | null
 		projectId?: string | null
+		measurementId?: string | null
 	} | null
-	posthog?: { projectId?: string | null; apiKey?: string | null; host?: string | null } | null
+	posthog?: {
+		projectId?: string | null
+		apiKey?: string | null
+		host?: string | null
+		projectToken?: string | null
+		region?: string | null
+	} | null
 }
 
 const orUndefined = (value: string | null | undefined): string | undefined => value || undefined
+
+/** An unset or unrecognized stored region falls back to host-derived detection. */
+const posthogRegion = (value: string | null | undefined): 'us' | 'eu' | undefined =>
+	value === 'us' || value === 'eu' ? value : undefined
 
 /**
  * Keys pasted from a service-account JSON often carry escaped newlines; the gRPC
@@ -38,13 +56,21 @@ const orUndefined = (value: string | null | undefined): string | undefined => va
  */
 export const normalizePrivateKey = (key: string): string => key.replace(/\\n/g, '\n')
 
-/**
- * Build an adapter instance from a provider-settings document using the same
- * constructors as config-time adapters. Missing credentials are passed through as
- * empty strings so the adapter reports `isConfigured() === false` instead of the
- * factory throwing; an unknown provider value returns null and is skipped.
- */
-export const adapterFromProviderDoc = (doc: ProviderDoc): AnalyticsAdapter | null => {
+const shortId = (id: number | string): string => String(id).slice(-6)
+
+/** Runtime adapters carry a per-document instance id so two projects of one provider type never collide in a registry; config adapters keep their plain ids. */
+const withInstanceIdentity = (adapter: AnalyticsAdapter, doc: ProviderDoc): AnalyticsAdapter => {
+	if (doc.id === undefined || doc.id === null || doc.id === '') {
+		return adapter
+	}
+	return {
+		...adapter,
+		id: `${doc.provider}:${doc.id}`,
+		label: doc.name || `${adapter.label} ${shortId(doc.id)}`,
+	}
+}
+
+const buildBaseAdapter = (doc: ProviderDoc): AnalyticsAdapter | null => {
 	switch (doc.provider) {
 		case 'plausible': {
 			const cfg = doc.plausible ?? {}
@@ -52,6 +78,9 @@ export const adapterFromProviderDoc = (doc: ProviderDoc): AnalyticsAdapter | nul
 				siteId: cfg.siteId ?? '',
 				apiKey: cfg.apiKey ?? '',
 				host: orUndefined(cfg.host),
+				domain: orUndefined(cfg.domain),
+				scriptId: orUndefined(cfg.scriptId),
+				revenueCurrency: orUndefined(cfg.revenueCurrency),
 			})
 		}
 		case 'umami': {
@@ -72,6 +101,7 @@ export const adapterFromProviderDoc = (doc: ProviderDoc): AnalyticsAdapter | nul
 					private_key: normalizePrivateKey(cfg.privateKey ?? ''),
 				},
 				projectId: orUndefined(cfg.projectId),
+				measurementId: orUndefined(cfg.measurementId),
 			})
 		}
 		case 'posthog': {
@@ -80,9 +110,22 @@ export const adapterFromProviderDoc = (doc: ProviderDoc): AnalyticsAdapter | nul
 				projectId: cfg.projectId ?? '',
 				apiKey: cfg.apiKey ?? '',
 				host: orUndefined(cfg.host),
+				projectToken: orUndefined(cfg.projectToken),
+				region: posthogRegion(cfg.region),
 			})
 		}
 		default:
 			return null
 	}
+}
+
+/**
+ * Build an adapter instance from a provider-settings document using the same
+ * constructors as config-time adapters. Missing credentials are passed through as
+ * empty strings so the adapter reports `isConfigured() === false` instead of the
+ * factory throwing; an unknown provider value returns null and is skipped.
+ */
+export const adapterFromProviderDoc = (doc: ProviderDoc): AnalyticsAdapter | null => {
+	const base = buildBaseAdapter(doc)
+	return base ? withInstanceIdentity(base, doc) : null
 }

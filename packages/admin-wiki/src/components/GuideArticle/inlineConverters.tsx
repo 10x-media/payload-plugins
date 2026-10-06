@@ -7,10 +7,9 @@ import { WIKI_GUIDE_LINK_NODE_TYPE } from '../../editor/constants'
 import { GuideLink } from './GuideLink'
 
 /**
- * The converters every rendered wiki editor state needs, nested ones included:
- * guide links and plain links. Guide content adds blocks, headings and video on
- * top of these; a callout body, whose editor is inline-only, needs exactly this
- * much and no more.
+ * The converters every rendered wiki editor state needs: guide links and plain
+ * links. Guide content adds blocks, headings and video on top of these, and a
+ * `Callout` rendered on its own falls back to them.
  */
 export const inlineConverters: JSXConvertersFunction = ({ defaultConverters }) => ({
 	...defaultConverters,

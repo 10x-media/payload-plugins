@@ -21,6 +21,14 @@ describe('submitForm', () => {
 		})
 	})
 
+	it('POSTs to a renamed submissions collection', async () => {
+		const fetchImpl = vi.fn<typeof fetch>(
+			async () => new Response(JSON.stringify({ doc: { id: '1' } }), { status: 201 })
+		)
+		await submitForm({ formId: 'f1', values, collection: 'responses', fetchImpl })
+		expect(fetchImpl.mock.calls[0]?.[0]).toBe('/api/responses')
+	})
+
 	it('parses the 400 ValidationError into per-field errors', async () => {
 		const body = {
 			errors: [
@@ -48,11 +56,42 @@ describe('submitForm', () => {
 		}
 	})
 
+	it('surfaces the server-sent message on a non-400 failure (an essential action rejection)', async () => {
+		const fetchImpl = vi.fn(
+			async () =>
+				new Response(
+					JSON.stringify({ errors: [{ message: 'Your submission could not be processed.' }] }),
+					{ status: 502, headers: { 'Content-Type': 'application/json' } }
+				)
+		)
+		const result = await submitForm({ formId: 'f1', values, apiRoute: '/api', fetchImpl })
+		expect(result.ok).toBe(false)
+		if (!result.ok) {
+			expect(result.message).toBe('Your submission could not be processed.')
+		}
+	})
+
 	it('defaults apiRoute to /api', async () => {
 		const fetchImpl = vi.fn<typeof fetch>(
 			async () => new Response(JSON.stringify({ doc: { id: '2' } }), { status: 201 })
 		)
 		await submitForm({ formId: 'f1', values, fetchImpl })
 		expect(fetchImpl.mock.calls[0]?.[0]).toBe('/api/form-submissions')
+	})
+
+	it('sends an explicit locale as an encoded ?locale= query and keeps the body unchanged', async () => {
+		const fetchImpl = vi.fn<typeof fetch>(
+			async () => new Response(JSON.stringify({ doc: { id: '1' } }), { status: 201 })
+		)
+		await submitForm({ formId: 'f1', values, locale: 'pt-BR', fetchImpl })
+		const call = fetchImpl.mock.calls[0]
+		expect(call?.[0]).toBe('/api/form-submissions?locale=pt-BR')
+		expect(JSON.parse(String((call?.[1] as RequestInit | undefined)?.body))).toEqual({
+			form: 'f1',
+			values,
+		})
+
+		await submitForm({ formId: 'f1', values, locale: 'a&b', fetchImpl })
+		expect(fetchImpl.mock.calls[1]?.[0]).toBe('/api/form-submissions?locale=a%26b')
 	})
 })

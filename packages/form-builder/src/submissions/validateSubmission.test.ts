@@ -5,7 +5,7 @@ import { validateSubmission } from './validateSubmission'
 
 const makeReq = (form: Record<string, unknown>): PayloadRequest =>
 	({
-		payload: { findByID: async () => form },
+		payload: { findByID: async () => form, config: { localization: false } },
 		context: {},
 		locale: 'en',
 		i18n: { t: (key: string) => key },

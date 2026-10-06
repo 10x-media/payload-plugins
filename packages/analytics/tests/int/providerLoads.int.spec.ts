@@ -8,7 +8,7 @@ import { analytics } from '../../src/index'
 import { kvCacheStore } from '../../src/surfacing/cacheStore'
 import { createEngine } from '../../src/surfacing/engine'
 
-describeForDb('analytics provider adapters load', { dbs: ['mongo'] }, (db) => {
+describeForDb('analytics provider adapters load', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -41,6 +41,7 @@ describeForDb('analytics provider adapters load', { dbs: ['mongo'] }, (db) => {
 			store: kvCacheStore(booted.payload.kv),
 			queue: { concurrency: 2 },
 			ttl: { aggregate: 60, realtime: 5 },
+			timeoutMs: 15_000,
 		})
 		const result = await engine.read(plausible({ siteId: '', apiKey: '' }), {
 			path: '/x',
@@ -56,6 +57,7 @@ describeForDb('analytics provider adapters load', { dbs: ['mongo'] }, (db) => {
 			store: kvCacheStore(booted.payload.kv),
 			queue: { concurrency: 2 },
 			ttl: { aggregate: 60, realtime: 5 },
+			timeoutMs: 15_000,
 		})
 		const result = await engine.read(posthog({ projectId: '', apiKey: '' }), {
 			path: '/x',

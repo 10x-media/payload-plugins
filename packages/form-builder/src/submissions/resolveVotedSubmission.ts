@@ -1,11 +1,9 @@
 import type { Payload } from 'payload'
 import { pollConfigOf } from '../form/pollState'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import { answerValues } from '../poll/votes/answerValues'
 import { formIdOf } from './formIdOf'
 import { votedSubmissionIdFromCookie } from './votedCookie'
-
-const FORM_SUBMISSIONS_SLUG = 'form-submissions'
-const FORMS_SLUG = 'forms'
 
 /** The voter's current vote for a poll, resolved server-side from the httpOnly voted cookie. */
 export type VotedSubmission = {
@@ -32,13 +30,14 @@ export const resolveVotedSubmission = async (args: {
 	formId: number | string
 }): Promise<VotedSubmission | null> => {
 	const { payload, cookieHeader, formId } = args
-	const submissionId = votedSubmissionIdFromCookie(cookieHeader, formId, payload.secret)
+	const submissionId = votedSubmissionIdFromCookie(cookieHeader, formId, payload)
 	if (submissionId == null) {
 		return null
 	}
+	const slugs = pluginSlugsOf(payload)
 	const submission = await payload
 		.findByID({
-			collection: FORM_SUBMISSIONS_SLUG,
+			collection: slugs.formSubmissions,
 			id: submissionId,
 			depth: 0,
 			overrideAccess: true,
@@ -55,7 +54,7 @@ export const resolveVotedSubmission = async (args: {
 		return null
 	}
 	const form = await payload
-		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true })
+		.findByID({ collection: slugs.forms, id: formId, depth: 0, overrideAccess: true })
 		.catch(() => null)
 	const poll = form?.pollEnabled === true ? pollConfigOf(form.poll) : undefined
 	const resultsField =

@@ -1,7 +1,18 @@
 {
 	"$schema": "https://turbo.build/schema.json",
 	"ui": "tui",
-	"globalDependencies": ["tsconfig.json", "biome.json", "config/**", ".npmrc"],
+	// Files outside every package that still change what a build or test does. This list
+	// is also what CI's affected scoping falls back on: turbo fans a globalDependencies
+	// change out to all packages, so a catalog bump in pnpm-workspace.yaml or a root
+	// devDependency bump re-runs the whole workspace instead of selecting nothing.
+	"globalDependencies": [
+		"tsconfig.json",
+		"biome.json",
+		"config/**",
+		".npmrc",
+		"package.json",
+		"pnpm-workspace.yaml"
+	],
 	"tasks": {
 		"build": {
 			"dependsOn": ["^build"],

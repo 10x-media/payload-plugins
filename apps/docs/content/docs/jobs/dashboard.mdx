@@ -53,6 +53,105 @@ The select's options come from automatic queue discovery, so you rarely need to 
 jobs({ queues: ['emails', 'exports'] })
 ```
 
+## Create form: input placeholder
+
+Picking a task or workflow on the create form fills `input` with a placeholder derived from that entry's `inputSchema`. An entry with no schema fills `{}`.
+
+Every task and workflow keeps its own draft while the form is open: switching away parks what you typed, switching back restores it, and a slug you pick for the first time opens on its placeholder. A draft that is not valid JSON, or an empty object, is not kept: the slug reopens on its placeholder. Clearing the selection resets the field to `{}`. Existing jobs are not touched: their inputs are read-only.
+
+The placeholder is a real value: what you leave in the editor is what the job receives, `"<users id>"` included.
+
+A field with a static `defaultValue` contributes that. Otherwise:
+
+| Field | Placeholder |
+|---|---|
+| `text`, `textarea`, `email`, `code`, `date` | `""` |
+| `number` | `0` |
+| `checkbox` | `false` |
+| `select`, `radio` | the first option |
+| `relationship`, `upload` | `"<collection id>"`, naming `relationTo` |
+| polymorphic `relationship`, `upload` | `{ relationTo: "<first collection>", value: "<its id>" }` |
+| `json`, `richText` | `{}` |
+| `point` | `[0, 0]` |
+| any `hasMany` field | one element of the above, e.g. `["<people id>"]` |
+| `group` | a nested object; `array` one row of one |
+| `blocks` | one row of the first block, with its `blockType` |
+| `row`, `collapsible`, unnamed `tabs` and groups | their fields, flattened into the parent |
+
+The derivation cannot invent meaningful values, only shapes. For a slug whose placeholder should carry real ones, write them yourself; they are merged over the derived object, so top-level keys you omit keep their derived value:
+
+```ts title="payload.config.ts"
+jobs({
+  input: {
+    examples: {
+      atosSync: { phases: ['persons'], limit: 100 },
+    },
+  },
+})
+```
+
+## Custom input editors
+
+`input.components` swaps the JSON editor for a component of yours, keyed by task or workflow slug. The placeholder above still applies, and the editor is swapped as the selection changes.
+
+```ts title="payload.config.ts"
+jobs({
+  input: {
+    components: {
+      importAthletes: '/components/ImportAthletesInput#ImportAthletesInput',
+      '*': '/components/GenericInput#GenericInput',
+      noop: false,
+    },
+  },
+})
+```
+
+Keys are task and workflow slugs, plus `'*'` for every slug. An exact slug wins over the wildcard, and an explicit `false` sends a slug back to the JSON field, wildcard included. A task and a workflow that share a slug share the editor.
+
+Your component receives `JobInputComponentProps`, exported from `@10x-media/jobs/types`:
+
+| Prop | Type | Description |
+|---|---|---|
+| `path` | `string` | The `input` field's form path. Read and write the value through `useField({ path })`. |
+| `slug` | `string` | The selected task or workflow slug. |
+| `kind` | `'task' \| 'workflow'` | Which of the two the slug names. |
+| `placeholder` | `Record<string, unknown> \| undefined` | What the create form would have pre-filled for this slug: the derived object, with its `input.examples` entry merged over it. |
+| `readOnly` | `boolean \| undefined` | Set on an existing job, whose inputs are locked. |
+
+The editor must be a client module. Every control reads the job's `input` through `useField` and writes a patched object back, which is also how the pre-filled placeholder reaches it:
+
+```tsx title="components/ImportAthletesInput.tsx"
+'use client'
+
+import type { JobInputComponentProps } from '@10x-media/jobs/types'
+import { CheckboxInput, TextInput, useField } from '@payloadcms/ui'
+
+export const ImportAthletesInput = ({ path, readOnly }: JobInputComponentProps) => {
+  const { setValue, value } = useField<{ limit?: number; dryRun?: boolean } | null>({ path })
+  const input = value ?? {}
+  const patch = (part: typeof input) => setValue({ ...input, ...part })
+  return (
+    <>
+      <TextInput
+        label="Limit"
+        onChange={(e) => patch({ limit: e.target.value === '' ? undefined : Number(e.target.value) })}
+        path={`${path}.limit`}
+        readOnly={readOnly}
+        value={String(input.limit ?? '')}
+      />
+      <CheckboxInput
+        checked={Boolean(input.dryRun)}
+        label="Dry run"
+        onToggle={() => patch({ dryRun: !input.dryRun })}
+        readOnly={readOnly}
+      />
+    </>
+  )
+}
+```
+
+Paths resolve through the import map, registered under `admin.dependencies` as for [custom log blocks](#custom-log-blocks): re-run `payload generate:importmap` after adding or changing one. A path it cannot resolve falls back to the JSON field.
+
 ## Options
 
 All dashboard options live at the top level of the plugin options:
@@ -64,6 +163,9 @@ All dashboard options live at the top level of the plugin options:
 | `readOnlyRecord` | `boolean` | `true` | Lock execution state and inputs after Create. |
 | `cells` | `Record<string, PayloadComponent \| false>` | built-ins | Per-field list-cell overrides, keyed by job field name. `false` keeps Payload's default cell. |
 | `status` | `PayloadComponent \| false` | built-in | Replace or remove the derived Status column. |
+| `log.entryComponents` | `Record<string, Partial<Record<JobLogSlot, PayloadComponent \| false>>>` | `{}` | Custom renderers for the blocks inside an expanded log-attempt row, keyed by task slug (`'*'` for every task). See [Custom log blocks](#custom-log-blocks). |
+| `input.examples` | `Record<string, Record<string, unknown>>` | `{}` | Hand-written create-form placeholder values for `input`, keyed by task or workflow slug, merged over the ones derived from `inputSchema`. See [Create form: input placeholder](#create-form-input-placeholder). |
+| `input.components` | `Record<string, PayloadComponent \| false>` | `{}` | Custom editors for `input` on the create form, keyed by task or workflow slug (`'*'` for every slug). See [Custom input editors](#custom-input-editors). |
 | `beforeListTable` | `PayloadComponent[] \| false` | health bar | Replace or remove the components above the list. |
 | `healthBarCap` | `number \| false` | `100` | Per-status count cap; `false` shows exact counts. |
 | `queues` | `string[]` | `[]` | Extra queue names for the admin queue select, on top of the sources auto-discovered from config. |
@@ -108,9 +210,58 @@ Payload's own `TaskConfig`/`WorkflowConfig` accept a `label`, and the dashboard 
 
 The one place a label can't apply is an inline step: a workflow handler that calls `runTask('inline', ...)` instead of running a registered task. Payload's own runner writes that log entry with the reserved `taskSlug: 'inline'`, not a real task config, so there is no label to look up. Those rows render as `inline: <taskID>` instead of bare `inline`, so at least the identifying ID is visible. A registered task or workflow slug always gets its full label treatment.
 
+## Custom log blocks
+
+Each row of the log timeline expands to show that attempt's `input`, `output`, and `error` as JSON dumps. `log.entryComponents` replaces the body of any of those three blocks with a component of yours, keyed by task slug and then by block:
+
+```ts title="payload.config.ts"
+jobs({
+  log: {
+    entryComponents: {
+      sendEmail: {
+        input: '/components/EmailInput#EmailInput',
+        output: '/components/EmailOutput#EmailOutput',
+      },
+      '*': { error: '/components/PrettyError#PrettyError' },
+    },
+  },
+})
+```
+
+Keys are task slugs, plus `'*'` for every task and `inline` for Payload's reserved inline steps. An exact slug wins over the wildcard slot by slot, so `sendEmail` above customizes its own `input` and `output` while still inheriting the wildcard `error`. An explicit `false` opts one slot back out to the default JSON block, wildcard included:
+
+```ts title="payload.config.ts"
+jobs({
+  log: {
+    entryComponents: {
+      '*': { error: '/components/PrettyError#PrettyError' },
+      importCsv: { error: false },
+    },
+  },
+})
+```
+
+Only the JSON body is yours. The block's label, its frame, and the rules for when it appears stay the plugin's. The scope is the three blocks inside an expanded attempt row; the job's top-level `input` field and the error panel are not affected.
+
+Your component receives `JobLogSlotProps`, exported from `@10x-media/jobs/types`:
+
+| Prop | Type | Description |
+|---|---|---|
+| `value` | `unknown` | The block's raw value: the attempt's `input`, `output`, or `error`. `undefined` when the attempt does not carry it. |
+| `slot` | `'input' \| 'output' \| 'error'` | Which block is being rendered. |
+| `entry` | `JobLogEntry` | The whole log attempt (`taskSlug`, `taskID`, `state`, `executedAt`, `completedAt`, and the rest). |
+| `index` | `number` | Zero-based position of the attempt in the `log` array. |
+| `jobID` | `string \| number \| undefined` | The job document's ID. |
+
+Both server and client components work. The `log` field renders through an RSC wrapper, so a server component may await the Local API; a client component needs its own `'use client'`.
+
+The `input` block always renders, as it did before the option existed; an attempt carrying no input at all still gets one, and your component receives `undefined` where the default block shows `{}`. The `output` and `error` blocks follow their value. A registered renderer runs for an empty one, so an attempt that returned `{}` still gets a readable block, but never for a value the attempt does not carry at all, so a succeeded attempt gets no error block even under a wildcard `error`.
+
+Paths resolve through the import map. They live in plugin options rather than in a field slot the generator walks, so the plugin registers them under `admin.dependencies` for you, and you re-run `payload generate:importmap` after adding or changing one. A path the import map cannot resolve falls back to the default JSON block, and Payload logs a console error naming the missing key.
+
 ## Components
 
-The pieces are exported for reuse in your own admin customizations: `JobStatusCell`, `JobStatusHeader`, `JobTitleCell`, `JobErrorPanel`, `JobLogTimeline`, `JobDocDescription`, `RelativeTimeCell`, `ReadOnlyDateField`, `WaitUntilField`, `QueueSelectField`, `AttemptsCell`, and `JobsTotalChip` from `@10x-media/jobs/client`, and the server-rendered `JobsHealthBar` from `@10x-media/jobs/rsc`.
+The pieces are exported for reuse in your own admin customizations: `JobStatusCell`, `JobStatusHeader`, `JobTitleCell`, `JobErrorPanel`, `JobLogTimeline`, `JobDocDescription`, `RelativeTimeCell`, `ReadOnlyDateField`, `WaitUntilField`, `QueueSelectField`, `AttemptsCell`, `JobInputField`, and `JobsTotalChip` from `@10x-media/jobs/client`, and the server-rendered `JobsHealthBar`, `JobLogTimelineServer`, and `JobInputFieldServer` from `@10x-media/jobs/rsc`.
 
 ## Counting caveat
 

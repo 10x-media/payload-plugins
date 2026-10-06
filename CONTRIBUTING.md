@@ -67,7 +67,8 @@ Everything is safe to run in parallel across multiple git worktrees, with no per
 Integration tests use the `@10x-media/payload-test-harness` helpers:
 
 - `bootPayload({ plugin, db, seed?, collections?, configOverrides? })`: boots a real Payload instance on the given DB (`'mongo'` or `'postgres'`) and returns `{ payload, db, stop }`. Always call `stop()` in `afterAll`.
-- `describeForDb(name, { dbs? }, (db) => { ... })`: runs the block once per DB. Omit `dbs` to honor the `DB_MATRIX` env (defaults to Mongo); the `test:matrix` and `test:container` scripts set it to `mongo,postgres`.
+- `describeForDb(name, { dbs? }, (db) => { ... })`: runs the block once per DB. Omit `dbs` to honor the `DB_MATRIX` env (defaults to Mongo). Two separate things decide what a cross-DB run covers: the package's own `test:matrix` (or `test:container`) script decides **which spec files** run in each lane, and each block's `dbs` option decides **which lanes that block joins**. Most plugins' scripts still name individual spec files, so a spec left out of that list is silently excluded from Postgres however it is written; `@10x-media/analytics` is currently the only plugin whose script runs its whole `tests/int` directory on both lanes. A `dbs` pin also overrides the env, so a block pinned to `['mongo']` never runs on Postgres: pin only what is genuinely single-DB, say why in a comment, and add new specs to the script's file list when the script uses one.
+- A suite that boots Payload many times can share one Postgres server across the whole run instead of starting a container per boot: start `startSharedPostgresServer()` from a vitest `globalSetup` and publish its URL on `PAYLOAD_TEST_POSTGRES_SERVER` (see `packages/analytics/tests/setup/sharedPostgres.ts`). Each boot then takes its own database on it. Cap that lane's workers as well (`@10x-media/analytics` sets `maxWorkers: 4` on its int project whenever `DB_MATRIX` names postgres): a many-core machine otherwise boots enough Payloads at once to push the one shared server into recovery mode, which fails specs that changed nothing.
 - `expectForDb(db, { mongo, postgres })` and `skipForDb(...)`: assert or skip per adapter when behavior legitimately differs (for example, Mongo lacks native cascade deletes).
 
 ## Adding a plugin
@@ -140,7 +141,13 @@ Examples: `feat(jobs): add stuck-job sweeper`, `fix(harness): close the pg pool 
 1. Fork or branch from `main`.
 2. Make changes, run `pnpm lint <name>` and `pnpm typecheck <name>`, run the relevant test tier.
 3. Add a changeset (`pnpm changeset`) or apply the `no-release` label.
-4. Open a pull request. CI runs lint, typecheck, and tests; all must pass.
+4. Open a pull request. CI runs lint, typecheck, tests, and e2e; all must pass. It scopes each of
+   those to the packages your change reaches through the dependency graph, so a pull request touching
+   one plugin does not run the other ten. E2E runs for each plugin whose package or dev app your
+   change reaches; apply the `no_e2e` label to skip it (it takes effect on the next push). Changes to
+   shared config, the root manifest, the `pnpm-workspace.yaml` catalog, `.github/`, or `scripts/`
+   fall back to the whole workspace, and so does a manual `workflow_dispatch` run when you want the
+   full suite on demand.
 5. PRs land on `main` as a **squash merge**: one commit per PR keeps `main` linear and maps each commit to one Changeset entry. Write the squash commit subject to follow the commit convention above (GitHub defaults the squash subject to the PR title, so title PRs the same way).
 
 For questions, open a [GitHub Discussion](https://github.com/10x-media/payload-plugins/discussions) rather than an issue.

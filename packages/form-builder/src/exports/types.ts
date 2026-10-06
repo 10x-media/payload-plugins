@@ -1,5 +1,10 @@
 export type { RichTextBodyOption } from '../actions/body/serializeBody'
-export type { ActionDefinition, ActionRunArgs, AnyActionDefinition } from '../actions/defineAction'
+export type {
+	ActionDefinition,
+	ActionRunArgs,
+	ActionValidateArgs,
+	AnyActionDefinition,
+} from '../actions/defineAction'
 export type { FromAddressesResolver, FromAddressOption } from '../actions/fromAddresses'
 export type { ActionOption, ActionRegistry, ActionsConfig } from '../actions/registry'
 export type { ActionResult } from '../actions/runActions'
@@ -65,6 +70,7 @@ export type {
 } from '../form/types'
 export type { FormBuilderPluginOptions } from '../index'
 export type { CollectionOverrides, FieldsOverride } from '../plugin/collectionOverrides'
+export type { FormBuilderCollectionSlugs } from '../plugin/collectionSlugs'
 export type { UploadsOption } from '../plugin/uploadsCollection'
 export type {
 	PollOptionSourceOption,

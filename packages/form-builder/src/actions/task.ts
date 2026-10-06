@@ -1,19 +1,26 @@
-import type { Config, Payload, PayloadRequest, TaskConfig, TypedLocale } from 'payload'
-import { FORM_SUBMISSIONS_SLUG } from '../collections/formSubmissions'
-import { FORMS_SLUG } from '../collections/forms'
+import type { Config, Payload, PayloadRequest, TaskConfig } from 'payload'
 import type { FormContextReference } from '../context/formContext'
 import type { Translate } from '../fields/types'
+import { findFormAtLocale, missingFormOnReadError } from '../form/findFormAtLocale'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
+import { resolveSubmissionLocale } from '../submissions/submissionLocale'
 import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types'
 import { asFieldTranslate } from '../translations/server'
 import type { RichTextBodyOption } from './body/serializeBody'
-import type { ActionRegistry } from './registry'
+import { type ActionRegistry, isEssentialAction } from './registry'
 import type { ActionInstance, ActionResult } from './runActions'
 import { runActions } from './runActions'
+import type { SubmissionForm } from './submissionContext'
 
 export const ACTIONS_TASK_SLUG = 'form-builder-actions'
 
 /** Input the dispatch path enqueues; the handler re-loads everything else from the DB. */
-export type ActionsTaskInput = { formId: number | string; submissionId: number | string }
+/** `subset` filters by the action definitions' `essential` flag; absent runs everything ('all'). */
+export type ActionsTaskInput = {
+	formId: number | string
+	submissionId: number | string
+	subset?: 'essential' | 'rest'
+}
 
 const asActions = (value: unknown): ActionInstance[] =>
 	Array.isArray(value) ? (value as ActionInstance[]) : []
@@ -53,7 +60,7 @@ export const runActionsForSubmission = async (args: {
 	const { input, registry, payload, req, richText } = args
 	const submission = await payload
 		.findByID({
-			collection: FORM_SUBMISSIONS_SLUG,
+			collection: pluginSlugsOf(payload).formSubmissions,
 			id: input.submissionId,
 			depth: 0,
 			overrideAccess: true,
@@ -67,33 +74,43 @@ export const runActionsForSubmission = async (args: {
 	// The submission's own stored locale (set from req.locale at submit) is authoritative, so the form
 	// is loaded at it. A localized action config, notably the emailTeam `to`, then resolves to the
 	// submission's locale even on the queued path, where the job runner's req may carry a different
-	// (or no) locale than the visitor who submitted.
-	const locale = typeof submission.locale === 'string' ? submission.locale : (req?.locale ?? 'en')
+	// (or no) locale than the visitor who submitted. Re-clamped, since a host may have dropped that
+	// locale since the submission was stored.
+	const locale = resolveSubmissionLocale(
+		typeof submission.locale === 'string' ? submission.locale : req?.locale,
+		payload.config.localization
+	)
 
-	const form = await payload
-		.findByID({
-			collection: FORMS_SLUG,
-			id: input.formId,
-			depth: 0,
-			overrideAccess: true,
-			// Cast: the stored locale is a plain string; a host's concrete locale union is unknowable from
-			// the plugin, and an unrecognized code just falls back on read, so this narrows (zero runtime
-			// delta) to satisfy a host whose `findByID` locale is a real union.
-			locale: locale as TypedLocale,
-			req,
-		})
-		.catch(() => null)
+	const form = await findFormAtLocale({
+		payload,
+		id: input.formId,
+		locale,
+		req,
+		overrideAccess: true,
+	}).catch(missingFormOnReadError)
 	if (!form) {
 		return []
 	}
 
 	const t: Translate = asFieldTranslate(req?.i18n?.t ?? ((key: string) => key))
 
+	const subset = input.subset ?? 'all'
+	const selected = asActions(form.actions).filter((instance) => {
+		if (subset === 'all') {
+			return true
+		}
+		const isEssential = isEssentialAction(registry, instance)
+		return subset === 'essential' ? isEssential : !isEssential
+	})
+
 	const results = await runActions({
-		actions: asActions(form.actions),
+		actions: selected,
 		registry,
 		richText,
-		form: { id: form.id, title: typeof form.title === 'string' ? form.title : undefined },
+		// The whole document, not just its identity, so a send-time hook reads a field off it (a
+		// multi-tenant host's `tenant`) instead of loading the same form again. Double cast: a host's
+		// generated Form interface has no index signature.
+		form: form as unknown as SubmissionForm,
 		submissionId: submission.id,
 		values: asValues(submission.values),
 		descriptors: asDescriptors(submission.descriptors),
@@ -107,18 +124,30 @@ export const runActionsForSubmission = async (args: {
 	// so a silently undelivered email/webhook is visible instead of the submission looking successful.
 	for (const result of results) {
 		if (!result.ok) {
-			payload.logger?.error(
-				`@10x-media/form-builder: action "${result.type}" failed for submission ${String(submission.id)}: ${result.error ?? 'unknown error'}`
-			)
+			const message = `@10x-media/form-builder: action "${result.type}" failed for submission ${String(submission.id)}: ${result.error ?? 'unknown error'}`
+			// Pino's (mergeObject, message) form: an ActionError's structured detail lands as a
+			// queryable log field instead of being concatenated into the message.
+			if (result.detail !== undefined) {
+				payload.logger?.error({ detail: result.detail }, message)
+			} else {
+				payload.logger?.error(message)
+			}
 		}
 	}
 	// A form can opt out of storing submissions (a pure signup that only POSTs to a provider): prune the
 	// row after the whole action pass, regardless of individual action success (every action already got
 	// the values). Best-effort: a delete failure is logged, never thrown. Uploads referenced in the values
 	// are host-owned and not cascaded (documented).
-	if (form.persistSubmissions === false) {
+	// Never on the essential pass: essential actions run first and their failure keeps the row (the
+	// dispatcher then skips this completion entirely), so pruning belongs to the closing pass alone.
+	if (subset !== 'essential' && form.persistSubmissions === false) {
 		await payload
-			.delete({ collection: FORM_SUBMISSIONS_SLUG, id: submission.id, overrideAccess: true, req })
+			.delete({
+				collection: pluginSlugsOf(payload).formSubmissions,
+				id: submission.id,
+				overrideAccess: true,
+				req,
+			})
 			.catch((error) => {
 				payload.logger?.error(
 					`@10x-media/form-builder: failed to prune submission ${String(submission.id)}: ${

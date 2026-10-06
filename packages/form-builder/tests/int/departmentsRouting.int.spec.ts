@@ -40,7 +40,7 @@ describeForDb('form-builder email.departments routing', { dbs: ['mongo'] }, (db)
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: formBuilder({ email: { departments } }),
+			plugin: formBuilder({ email: { departments, localizeRecipients: true } }),
 			db,
 			configOverrides: { globals: [makeSettings()], localization },
 		})

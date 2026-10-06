@@ -1,0 +1,149 @@
+.content-lock-token-host {
+	display: inline;
+}
+
+/* Reads as text with a soft highlight, so it flows with the sentence and takes
+   bold and italic like the words beside it. */
+.content-lock-token {
+	padding: 0 2px;
+	border-radius: 2px;
+	background: var(--theme-elevation-100);
+	box-shadow: inset 0 -1px 0 var(--theme-elevation-400);
+}
+
+.content-lock-token--editable {
+	cursor: pointer;
+}
+
+.content-lock-token--editable:hover {
+	background: var(--theme-elevation-150);
+}
+
+.content-lock-token--selected {
+	background: var(--theme-success-100);
+	box-shadow: inset 0 -1px 0 var(--theme-success-500);
+}
+
+.content-lock-token--bold {
+	font-weight: 600;
+}
+
+.content-lock-token--italic {
+	font-style: italic;
+}
+
+.content-lock-token--underline {
+	text-decoration: underline;
+}
+
+.content-lock-token--strikethrough {
+	text-decoration: line-through;
+}
+
+.content-lock-token--underline.content-lock-token--strikethrough {
+	text-decoration: underline line-through;
+}
+
+.content-lock-token--problem {
+	background: var(--theme-error-100);
+	box-shadow: inset 0 -1px 0 var(--theme-error-500);
+	color: var(--theme-error-750);
+}
+
+/* Positioned by `setFloatingElemPositionForLinkEditor`, which writes
+   `transform` and `opacity`, so both start neutralized. It sits inside the
+   editor, so it resets the font to the admin's own, and above the sticky
+   toolbar (z-index 2), so the date picker's calendar is not cut off by it. */
+.content-lock-token-editor {
+	position: absolute;
+	top: 0;
+	left: 0;
+	z-index: 3;
+	padding: 4px;
+	border-radius: 4px;
+	background: var(--theme-input-bg);
+	box-shadow:
+		0 1px 2px 1px rgb(0 0 0 / 10%),
+		0 4px 16px 0 rgb(0 0 0 / 10%);
+	opacity: 0;
+	font-family: var(--font-body);
+	transition: opacity 0.2s;
+}
+
+.content-lock-token-editor__content {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 2px;
+	font-size: 13px;
+}
+
+.content-lock-token-editor__kind {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 0 8px 0 4px;
+	color: var(--theme-elevation-600);
+	white-space: nowrap;
+}
+
+.content-lock-token-editor__kind svg {
+	width: 18px;
+	height: 18px;
+}
+
+.content-lock-token-editor__trigger {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+	height: 30px;
+	padding: 0 4px 0 8px;
+	border-radius: 4px;
+	color: var(--theme-elevation-800);
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.content-lock-token-editor__trigger:hover {
+	background-color: var(--theme-elevation-100);
+}
+
+.content-lock-token-editor__trigger svg {
+	width: 16px;
+	height: 16px;
+}
+
+.content-lock-token-editor__date {
+	width: calc(var(--base) * 12);
+}
+
+/* A token always needs a date, so the picker's clear button has nothing to do. */
+.content-lock-token-editor__date .date-time-picker__clear-button {
+	display: none;
+}
+
+.content-lock-token-editor__remove {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: none;
+	color: var(--theme-elevation-600);
+	cursor: pointer;
+}
+
+.content-lock-token-editor__remove:hover {
+	background-color: var(--theme-elevation-100);
+	color: var(--theme-elevation-800);
+}
+
+.content-lock-token-editor__problem {
+	flex-basis: 100%;
+	margin: 0;
+	padding: 4px 8px;
+	color: var(--theme-error-750);
+}
