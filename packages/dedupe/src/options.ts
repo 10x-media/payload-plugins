@@ -1,7 +1,7 @@
 import type { Access, CollectionConfig, CollectionSlug, PayloadRequest } from 'payload'
 
 import type { DedupeEventSink } from './plugin/events'
-import type { MergeFieldSpec } from './schema/types'
+import type { MergeDecision, MergeFieldSpec } from './schema/types'
 import type { DedupeAdapterFactory } from './search/contract'
 import type { TranslationsOption } from './translations'
 
@@ -96,6 +96,13 @@ export type BeforeRemoveArgs = {
 	survivorId: number | string
 	/** The merged-in documents, all still in the database. */
 	absorbedIds: (number | string)[]
+	/**
+	 * Each merged-in document as it was before the merge, by id: fields hidden from the API
+	 * included, an auth collection's credentials left out.
+	 */
+	snapshots: Record<string, Record<string, unknown>>
+	/** What the merge writes, field by field, with every document's value. */
+	decisions: MergeDecision[]
 }
 
 export type DedupeHooks = {
@@ -201,7 +208,6 @@ export type DedupePluginOptions = {
 	overrides?: {
 		keys?: CollectionOverride
 		pairs?: CollectionOverride
-		merges?: CollectionOverride
 	}
 	/** Read access on the plugin's own collections through the REST and GraphQL APIs. Default: nobody. */
 	collectionAccess?: { read?: Access }

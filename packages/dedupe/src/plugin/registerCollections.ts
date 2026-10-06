@@ -1,7 +1,7 @@
 import type { CollectionConfig, Config } from 'payload'
 
 import { buildCollections } from '../collections/build'
-import { MERGES_SLUG, PAIRS_SLUG } from '../collections/slugs'
+import { PAIRS_SLUG } from '../collections/slugs'
 import type { CollectionOverride, ResolvedOptions } from '../options'
 
 const hasHooks = (collection: CollectionConfig): boolean =>
@@ -25,11 +25,10 @@ export const addCollection = (
 	config.collections = [...(config.collections ?? []), collection]
 }
 
-/** Pairs and merges. Registered even when disabled, so a later migration does not drop them. */
+/** The pairs. Registered even when disabled, so a later migration does not drop them. */
 export const registerCollections = (config: Config, options: ResolvedOptions): void => {
 	const overrideFor: Record<string, CollectionOverride | undefined> = {
 		[PAIRS_SLUG]: options.overrides.pairs,
-		[MERGES_SLUG]: options.overrides.merges,
 	}
 	for (const built of buildCollections(options.collectionAccess.read)) {
 		addCollection(config, built, overrideFor[built.slug])

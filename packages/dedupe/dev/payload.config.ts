@@ -1,6 +1,7 @@
 // biome-ignore-all lint/plugin/noProcessEnv: dev app env boundary
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { auditLogs } from '@10x-media/audit-logs'
 import { dedupe } from '@10x-media/dedupe'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
@@ -36,6 +37,7 @@ import {
 	users,
 } from './collections'
 import { site } from './globals/site'
+import { auditMerge } from './helpers/auditMerge'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { recentAdapter } from './helpers/recentAdapter'
 import { repointCustomers } from './helpers/repointCustomers'
@@ -111,6 +113,12 @@ export default buildConfig({
 			collections: tenantCollections,
 			tenantsSlug: 'tenants',
 			userHasAccessToAllTenants: () => true,
+		}),
+		// Changes to customers, and the entry each merge writes through `auditMerge`.
+		auditLogs({
+			collections: { customers: true },
+			// The stand reads the entries back through the REST API, as the e2e suite does the pairs.
+			logs: { access: { read: ({ req }) => Boolean(req.user) } },
 		}),
 		dedupe({
 			collections: {
@@ -191,10 +199,12 @@ export default buildConfig({
 							}),
 					}
 				: {}),
-			// The plugin moves no reference to a merged-in document; the host does, as here.
+			// The plugin moves no reference to a merged-in document and keeps no record of a
+			// merge; the host does both, as here.
 			hooks: {
 				beforeRemove: async (args) => {
 					if (args.collection === 'customers') await repointCustomers(args)
+					await auditMerge(args)
 				},
 			},
 			// The dev app runs no job worker, so the check on save and "Scan now" run in the request.

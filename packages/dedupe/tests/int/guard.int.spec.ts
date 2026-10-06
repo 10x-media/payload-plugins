@@ -2,7 +2,6 @@ import { describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionSlug, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
-import { MERGES_SLUG } from '../../src/collections/slugs'
 import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
@@ -12,6 +11,7 @@ import {
 	bootDedupe,
 	CUSTOMERS,
 	type Doc,
+	emitted,
 	FRAGILE,
 	KITS,
 	reqFor,
@@ -571,7 +571,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		})
 	})
 
-	it('marks the merge record failed when the merge fails halfway without a transaction', async () => {
+	it('reports a merge that fails halfway without a transaction', async () => {
 		const survivor = await create(FRAGILE, { title: 'keeps', seat: 1 })
 		const absorbed = await create(FRAGILE, { title: 'boom', seat: 2 })
 		const database = fixture.booted.payload.db as { beginTransaction?: unknown }
@@ -587,12 +587,9 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		} finally {
 			database.beginTransaction = begin
 		}
-		const { docs } = await fixture.booted.payload.db.find({
-			collection: MERGES_SLUG,
-			where: { survivor: { equals: String(survivor.id) } },
-			limit: 1,
-		})
-		expect((docs[0] as unknown as { status: string }).status).toBe('failed')
+		expect(emitted).toContainEqual(
+			expect.objectContaining({ type: 'merge.failed', survivorId: String(survivor.id) })
+		)
 	})
 
 	it('says at the plan that the merge cannot apply when transactions are required and missing', async () => {

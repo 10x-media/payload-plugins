@@ -16,14 +16,12 @@ export type DedupeEvent =
 	| {
 			type: 'merge.applied'
 			collection: string
-			mergeId: string
 			survivorId: string
 			absorbedIds: string[]
 	  }
 	| {
 			type: 'merge.failed'
 			collection: string
-			mergeId: string | null
 			survivorId: string
 			absorbedIds: string[]
 			error: string

@@ -2,7 +2,7 @@ import { describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionSlug } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
-import { MERGES_SLUG, PAIRS_SLUG } from '../../src/collections/slugs'
+import { PAIRS_SLUG } from '../../src/collections/slugs'
 import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
@@ -81,21 +81,13 @@ describeForDb('dedupe group merge', {}, (db) => {
 			conflict: true,
 		})
 
-		const result = await applyMerge(args(CUSTOMERS, group, choices))
+		await applyMerge(args(CUSTOMERS, group, choices))
 		const kept = (await find(CUSTOMERS, survivor?.id as string)) as Doc
 		expect([kept.phone, kept.note]).toEqual(['333', 'from the middle'])
 		for (const doc of [middle, newest]) {
 			expect((await find(CUSTOMERS, doc?.id as string))?.deletedAt).toBeTruthy()
 		}
 
-		const record = (await fixture.booted.payload.db.findOne({
-			collection: MERGES_SLUG,
-			where: { id: { equals: result.mergeId } },
-		})) as unknown as { absorbed: string[]; absorbedSnapshots: Record<string, Doc> }
-		expect(record.absorbed).toEqual([String(middle?.id), String(newest?.id)])
-		expect(Object.keys(record.absorbedSnapshots).sort()).toEqual(
-			[String(middle?.id), String(newest?.id)].sort()
-		)
 		expect(emitted.at(-1)).toMatchObject({
 			type: 'merge.applied',
 			survivorId: String(survivor?.id),

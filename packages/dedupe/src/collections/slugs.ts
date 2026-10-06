@@ -2,7 +2,6 @@ import type { CollectionSlug } from 'payload'
 
 export const KEYS_SLUG = 'dedupe-keys' as CollectionSlug
 export const PAIRS_SLUG = 'dedupe-pairs' as CollectionSlug
-export const MERGES_SLUG = 'dedupe-merges' as CollectionSlug
 
 /** Rows a page of the queue or the history holds when the address names no other number. */
 export const PAGE_SIZE = 25
@@ -16,5 +15,3 @@ export type PairStatus = (typeof PAIR_STATUSES)[number]
 
 export const isStatus = (value: string | null | undefined): value is PairStatus =>
 	PAIR_STATUSES.includes(value as PairStatus)
-
-export const MERGE_STATUSES = ['applying', 'applied', 'failed'] as const

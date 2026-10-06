@@ -19,8 +19,8 @@ description: Every option of the plugin and its default.
 | `queue` | `dedupe` | Jobs queue of the `dedupe-check` and `dedupe-scan` tasks. |
 | `scan.cron` | unset | Scan every matched collection on a schedule. Needs a job runner. |
 | `view` | `{ path: '/dedupe' }` | Admin path of the queue and the merge screen; `false` removes the views. The plugin adds no sidebar link to them. |
-| `overrides` | `{}` | `keys`, `pairs`, `merges`: a function over the plugin's collection. Hooks are refused. |
-| `collectionAccess.read` | nobody | REST and GraphQL read access on the plugin's collections. A merge record holds whole copies of the merged-in documents, of every tenant, hidden fields included. |
+| `overrides` | `{}` | `keys`, `pairs`: a function over the plugin's collection. Hooks are refused. |
+| `collectionAccess.read` | nobody | REST and GraphQL read access on the plugin's collections. |
 | `multiTenancy` | off | `true` or `{ tenantFieldName, collections }`, see below. |
 | `events` | unset | `{ emit(event, req) }`, see below. |
 | `hooks.beforeRemove` | unset | Runs in every merge before the merged-in documents leave, see [References](./merging#references). |

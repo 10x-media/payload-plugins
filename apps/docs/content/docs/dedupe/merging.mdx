@@ -48,14 +48,13 @@ A localized field is decided per locale. Payload checks every required value of 
 
 ## Applying
 
-1. The merge is recorded, with a copy of every document.
-2. `hooks.beforeRemove` runs.
-3. The merged-in documents give up the unique values the primary takes.
-4. The primary is written.
-5. The merged-in documents are trashed, or deleted with `absorbed: 'delete'`.
-6. The pairs of the merged-in documents are deleted, and the primary is checked for new look-alikes.
+1. `hooks.beforeRemove` runs.
+2. The merged-in documents give up the unique values the primary takes.
+3. The primary is written.
+4. The merged-in documents are trashed, or deleted with `absorbed: 'delete'`.
+5. The pairs of the merged-in documents are deleted, and the primary is checked for new look-alikes.
 
-Without a transaction (MongoDB without a replica set), a failure leaves the steps already done and marks the record failed. `requireTransactions: true` refuses such merges.
+A failure is logged and sent as `merge.failed`. Without a transaction (MongoDB without a replica set), the steps already done stay done. `requireTransactions: true` refuses such merges.
 
 The merge is refused when:
 
@@ -125,3 +124,35 @@ dedupe({
 ```
 
 Move every other field that points at the collection the same way, rich text and JSON included. The dev app runs this example: `packages/dedupe/dev/helpers/repointCustomers.ts`.
+
+## Recording a merge
+
+The plugin keeps no record of a merge and no copy of the merged-in documents: once they are deleted, or emptied from the trash, only what you kept brings them back. `hooks.beforeRemove` also receives:
+
+- `snapshots`: each merged-in document by id, as it was before the merge gave up its unique values, fields hidden from the API included and an auth collection's credentials left out;
+- `decisions`: what the merge writes, field by field, with every document's value.
+
+With `@10x-media/audit-logs`, one entry per merge on the primary:
+
+```ts title="payload.config.ts"
+import { createAuditEvent } from '@10x-media/audit-logs'
+
+dedupe({
+  hooks: {
+    beforeRemove: async ({ req, collection, survivorId, absorbedIds, snapshots, decisions }) => {
+      await createAuditEvent(req, {
+        collection,
+        documentId: survivorId,
+        eventType: 'dedupe.merge',
+        metadata: {
+          absorbedIds,
+          snapshots,
+          decisions: decisions.filter((decision) => decision.changed),
+        },
+      })
+    },
+  },
+})
+```
+
+The entry is written through the merge's `req`, so it rolls back with a merge that fails. The dev app runs this example: `packages/dedupe/dev/helpers/auditMerge.ts`.

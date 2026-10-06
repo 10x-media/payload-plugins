@@ -11,12 +11,10 @@ import {
 } from 'payload'
 import { toWords } from 'payload/shared'
 
-import { MERGES_SLUG } from '../collections/slugs'
 import {
 	type CollectionContext,
 	dedupeContext,
 	type PluginContext,
-	tenantOf,
 	userRef,
 } from '../plugin/context'
 import { emitEvent } from '../plugin/events'
@@ -71,7 +69,6 @@ type ApplyMergeArgs = {
 }
 
 export type ApplyMergeResult = {
-	mergeId: string
 	survivorId: string
 }
 
@@ -263,13 +260,13 @@ export const removalRefusal = async (args: {
  * Apply a reviewed merge of a group of documents into one.
  *
  * The write order is what makes this safe on a database without transactions (MongoDB
- * on a single node opens none, and Payload does not complain): the merge record goes
- * first with everything needed to redo or undo it, then the absorbed documents let go of
- * the unique values the survivor takes, then the survivor is written one locale at a time,
- * and only then do the absorbed documents leave. Any prefix of that sequence leaves every
- * document in place and the record explaining what was attempted. The exception is an
- * absorbed document that can hold neither a placeholder nor an empty value for a unique
- * value the survivor takes: it leaves before the survivor is written.
+ * on a single node opens none, and Payload does not complain): `hooks.beforeRemove` gets
+ * the absorbed documents as they are, then they let go of the unique values the survivor
+ * takes, then the survivor is written one locale at a time, and only then do the absorbed
+ * documents leave. Any prefix of that sequence leaves every document in place, and a failure
+ * is logged and sent as `merge.failed`. The exception is an absorbed document that can hold
+ * neither a placeholder nor an empty value for a unique value the survivor takes: it leaves
+ * before the survivor is written.
  */
 export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult> => {
 	const { req, ctx, col, survivorId, absorbedIds, choices, expected } = args
@@ -398,7 +395,6 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 	}
 
 	const draft = col.hasDrafts && col.options.draft
-	let mergeId: number | string | null = null
 	const remove = (id: string) =>
 		payload.delete({
 			collection: col.slug,
@@ -411,28 +407,19 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		})
 
 	try {
-		const merge = await payload.db.create({
-			collection: MERGES_SLUG,
-			data: {
-				target: col.slug,
-				survivor: String(survivor.id),
-				absorbed: ids,
-				tenant: tenantOf(req.payload, col.slug, survivor),
-				status: 'applying',
-				decisions: plan.decisions,
-				absorbedSnapshots: Object.fromEntries(snapshots.map((doc) => [String(doc.id), doc])),
-				released: Object.fromEntries([...releases].map(([id, { release }]) => [id, release])),
-				appliedBy: userRef(req),
-			},
-			req,
-		})
-		mergeId = (merge as { id: number | string }).id
-
+		// MongoDB starts a transaction on its first command, and a command sent beside it, as a
+		// paginated find sends its count, finds none. The hook may begin with one, so the
+		// transaction starts here, on a single command.
+		if (transactional) {
+			await payload.db.count({ collection: col.slug, where: { id: { equals: survivor.id } }, req })
+		}
 		await ctx.options.hooks.beforeRemove?.({
 			req,
 			collection: col.slug,
 			survivorId: survivor.id,
 			absorbedIds: absorbed.map((doc) => doc.id),
+			snapshots: Object.fromEntries(snapshots.map((doc) => [String(doc.id), doc])),
+			decisions: plan.decisions,
 		})
 		for (const id of early) await remove(id)
 		for (const id of late) {
@@ -578,42 +565,30 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		}
 		await closePairsFor({ req, col, docIds: ids })
 
-		await payload.db.updateOne({
-			collection: MERGES_SLUG,
-			id: mergeId,
-			data: { status: 'applied' },
-			req,
-		})
-
 		if (transactional) await commitTransaction(req)
 	} catch (error) {
 		await killTransaction(req)
-		// Inside a transaction the merge record rolled back with everything else.
-		if (transactional) mergeId = null
+		payload.logger.error(
+			{
+				err: error,
+				collection: col.slug,
+				survivorId: survivor.id,
+				absorbedIds: ids,
+				transactional,
+			},
+			'[dedupe] merge failed'
+		)
 		await emitEvent(
 			ctx.options.events,
 			{
 				type: 'merge.failed',
 				collection: col.slug,
-				mergeId: mergeId === null ? null : String(mergeId),
 				survivorId: String(survivor.id),
 				absorbedIds: ids,
 				error: error instanceof Error ? error.message : String(error),
 			},
 			req
 		)
-		if (mergeId !== null) {
-			await payload.db
-				.updateOne({
-					collection: MERGES_SLUG,
-					id: mergeId,
-					data: {
-						status: 'failed',
-						error: error instanceof Error ? error.message : String(error),
-					},
-				})
-				.catch(() => undefined)
-		}
 		throw error
 	}
 
@@ -622,12 +597,11 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		{
 			type: 'merge.applied',
 			collection: col.slug,
-			mergeId: String(mergeId),
 			survivorId: String(survivor.id),
 			absorbedIds: ids,
 		},
 		req
 	)
 
-	return { mergeId: String(mergeId), survivorId: String(survivor.id) }
+	return { survivorId: String(survivor.id) }
 }

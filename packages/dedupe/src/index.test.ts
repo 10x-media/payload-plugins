@@ -1,7 +1,7 @@
 import type { CollectionConfig, Config } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { KEYS_SLUG, MERGES_SLUG, PAIRS_SLUG } from './collections/slugs'
+import { KEYS_SLUG, PAIRS_SLUG } from './collections/slugs'
 import { dedupe } from './index'
 import { keys } from './translations'
 
@@ -19,7 +19,6 @@ describe('dedupe factory', () => {
 		expect(out.collections?.map((collection) => collection.slug)).toEqual([
 			'customers',
 			PAIRS_SLUG,
-			MERGES_SLUG,
 			KEYS_SLUG,
 		])
 		expect(out.collections?.[0]?.hooks).toBeUndefined()

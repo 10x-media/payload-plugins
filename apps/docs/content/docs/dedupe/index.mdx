@@ -46,4 +46,4 @@ They work independently: `customers: true` gives a collection the merge screen w
 
 The plugin adds no link to its views to the admin's sidebar: place one where your editors need it, with `admin.components.afterNavLinks`.
 
-The plugin keeps its data in hidden collections: `dedupe-pairs`, `dedupe-merges` (a record of every merge, with a copy of each merged-in document) and, with the built-in adapter, `dedupe-keys`.
+The plugin keeps its data in hidden collections: `dedupe-pairs` and, with the built-in adapter, `dedupe-keys`. It keeps no record of a merge: to keep one, write it on `hooks.beforeRemove`.

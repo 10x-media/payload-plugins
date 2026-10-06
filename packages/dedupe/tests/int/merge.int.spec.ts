@@ -7,7 +7,6 @@ import {
 	createPayloadRequest,
 } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { MERGES_SLUG } from '../../src/collections/slugs'
 import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
@@ -24,7 +23,6 @@ import {
 	LEADS,
 	MANUALS,
 	PAGES,
-	pluginOptions,
 	reqFor,
 	STAFF,
 	TICKETS,
@@ -223,7 +221,7 @@ describeForDb('dedupe merge', {}, (db) => {
 				},
 			})
 			expect(result.survivorId).toBe(String(survivor.id))
-			expect(emitted.at(-1)).toMatchObject({ type: 'merge.applied', mergeId: result.mergeId })
+			expect(emitted.at(-1)).toMatchObject({ type: 'merge.applied', survivorId: result.survivorId })
 
 			const merged = (await booted.payload.findByID({
 				collection: CUSTOMERS,
@@ -270,21 +268,6 @@ describeForDb('dedupe merge', {}, (db) => {
 			expect(hidden).toBeNull()
 
 			expect(await keysFor(absorbed.id)).toHaveLength(0)
-
-			const merges = (
-				await booted.payload.db.find({
-					collection: MERGES_SLUG,
-					where: { survivor: { equals: String(survivor.id) } },
-					pagination: false,
-				})
-			).docs as unknown as Record<string, unknown>[]
-			expect(merges).toHaveLength(1)
-			expect(merges[0]).toMatchObject({
-				status: 'applied',
-				appliedBy: `users:${String(req.user?.id)}`,
-			})
-			const snapshots = merges[0]?.absorbedSnapshots as Record<string, Doc>
-			expect(snapshots[String(absorbed.id)]?.email).toBe('anna.schmidt@mail.com')
 
 			expect(await pairsFor(absorbed.id)).toEqual([])
 		})
@@ -897,27 +880,6 @@ describeForDb('dedupe merge', {}, (db) => {
 		])
 	})
 
-	it('keeps in the merge record a copy of the merged-in document with its fields hidden from the API', async () => {
-		const { booted, req } = fixture
-		const create = (data: Record<string, unknown>) =>
-			booted.payload.create({ collection: TICKETS, data: data as never }) as Promise<Doc>
-		const keep = await create({ title: 'Hidden copy' })
-		const gone = await create({ title: 'Hidden copy', externalRef: 'crm-42' })
-		const { mergeId } = await applyMerge({
-			req,
-			ctx: getContext(booted.payload),
-			col: getCollectionContext(booted.payload, TICKETS),
-			survivorId: keep.id,
-			absorbedIds: [gone.id],
-			choices: {},
-		})
-		const record = (await booted.payload.db.findOne({
-			collection: MERGES_SLUG,
-			where: { id: { equals: mergeId } },
-		})) as unknown as { absorbedSnapshots: Record<string, Record<string, unknown>> }
-		expect(record.absorbedSnapshots[String(gone.id)]?.externalRef).toBe('crm-42')
-	})
-
 	it('keeps a field hidden from the API in a group of a row it takes from a merged-in document', async () => {
 		const { booted, req } = fixture
 		const create = (data: Record<string, unknown>) =>
@@ -1220,53 +1182,5 @@ describeForDb('dedupe merge', {}, (db) => {
 			})) as Doc
 			expect(gone.email).toBe(`drop-${round}@row.test`)
 		}
-	})
-})
-
-/** An auth collection merged: the record keeps no credentials of the merged-in user. */
-describeForDb('dedupe merge of users', {}, (db) => {
-	let fixture: Awaited<ReturnType<typeof bootDedupe>>
-
-	beforeAll(async () => {
-		fixture = await bootDedupe(db, {
-			collections: { ...pluginOptions.collections, users: { absorbed: 'delete' } },
-		})
-	})
-
-	afterAll(async () => {
-		await fixture.booted.stop()
-	})
-
-	it('keeps the sessions and keys of a merged-in user out of its record', async () => {
-		const { payload } = fixture.booted
-		const USERS = 'users' as CollectionSlug
-		const create = (email: string) =>
-			payload.create({
-				collection: USERS,
-				data: { email, password: 'password' } as never,
-			}) as Promise<Doc>
-		const keep = await create('keep-user@merge.test')
-		const gone = await create('gone-user@merge.test')
-		await payload.login({
-			collection: USERS,
-			data: { email: 'gone-user@merge.test', password: 'password' },
-		})
-		const { mergeId } = await applyMerge({
-			req: fixture.req,
-			ctx: getContext(payload),
-			col: getCollectionContext(payload, 'users'),
-			survivorId: keep.id,
-			absorbedIds: [gone.id],
-			choices: {},
-		})
-		const record = (await payload.db.findOne({
-			collection: MERGES_SLUG,
-			where: { id: { equals: mergeId } },
-		})) as unknown as { absorbedSnapshots: Record<string, Record<string, unknown>> }
-		const snapshot = record.absorbedSnapshots[String(gone.id)] ?? {}
-		expect(snapshot.email).toBe('gone-user@merge.test')
-		expect(
-			Object.keys(snapshot).filter((key) => ['sessions', 'apiKey', 'hash', 'salt'].includes(key))
-		).toEqual([])
 	})
 })

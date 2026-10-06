@@ -1089,6 +1089,9 @@ importers:
 
   packages/dedupe/dev:
     dependencies:
+      '@10x-media/audit-logs':
+        specifier: workspace:*
+        version: link:../../audit-logs
       '@10x-media/dedupe':
         specifier: workspace:*
         version: link:..

@@ -2,7 +2,6 @@ import { describeForDb, expectForDb, skipForDb } from '@10x-media/payload-test-h
 import type { CollectionSlug } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
-import { MERGES_SLUG } from '../../src/collections/slugs'
 import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
@@ -91,7 +90,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 				deletes: [],
 			})
 
-			const { mergeId } = await applyMerge(args(ACCOUNTS, [survivor, absorbed], taken))
+			await applyMerge(args(ACCOUNTS, [survivor, absorbed], taken))
 			const kept = (await find(ACCOUNTS, survivor.id)) as Doc
 			const gone = (await find(ACCOUNTS, absorbed.id)) as Doc
 			const marker = `merged-${absorbed.id}`
@@ -106,12 +105,6 @@ describeForDb('dedupe unique values', {}, (db) => {
 			expect(kept.handle).toBe(`handle-${n}`)
 			expect(kept.slug).toEqual({ en: `slug-${n}`, de: `slug-de-${n - 1}` })
 			expect(kept.externalId).toBe(`ext-${n}`)
-
-			const record = (await fixture.booted.payload.db.findOne({
-				collection: MERGES_SLUG,
-				where: { id: { equals: mergeId } },
-			})) as unknown as { absorbedSnapshots: Record<string, Doc> }
-			expect(record.absorbedSnapshots[String(absorbed.id)]?.email).toBe(`a${n}@unique.test`)
 		}
 	})
 

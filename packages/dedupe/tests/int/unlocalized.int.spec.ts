@@ -129,6 +129,6 @@ describeForDb('dedupe without localization', {}, (db) => {
 				absorbedIds: [String(b?.id)],
 				choices: {},
 			})
-		).resolves.toMatchObject({ mergeId: expect.anything() })
+		).resolves.toMatchObject({ survivorId: expect.anything() })
 	})
 })
