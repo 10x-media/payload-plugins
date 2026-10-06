@@ -30,7 +30,10 @@ export type CollectionContext = {
 	/** Identifies the match config the stored keys and pairs were computed with. */
 	configHash: string
 	hasDrafts: boolean
-	/** The collection has the tenant field; one without it is shared by every tenant. */
+	/**
+	 * Scoped by tenant: listed in `multiTenancy.collections`, or without that list, has the
+	 * tenant field. One that is not is shared by every tenant.
+	 */
 	tenanted: boolean
 	/** Fields elsewhere that point at this collection, moved to the survivor on a merge. */
 	references: ReferenceSpec[]
@@ -89,8 +92,11 @@ export const hashMatch = (fields: MatchFieldConfig[]): string => {
 const buildCollectionContext = (
 	payload: Payload,
 	options: ResolvedCollectionOptions,
-	{ tenantFieldName, adapter }: { tenantFieldName: string | null; adapter: DedupeAdapter }
+	plugin: Pick<ResolvedOptions, 'tenantCollections' | 'tenantFieldName'> & {
+		adapter: DedupeAdapter
+	}
 ): CollectionContext => {
+	const { tenantFieldName, tenantCollections, adapter } = plugin
 	const collection = payload.collections[options.slug]
 	if (!collection) {
 		throw new Error(`dedupe: collection "${options.slug}" is not registered`)
@@ -99,6 +105,12 @@ const buildCollectionContext = (
 	if (config.upload) {
 		throw new Error(`dedupe: upload collection "${options.slug}" is not supported`)
 	}
+
+	const tenanted =
+		tenantFieldName !== null &&
+		(tenantCollections
+			? tenantCollections.includes(options.slug)
+			: config.flattenedFields.some((field) => field.name === tenantFieldName))
 
 	// Every document of a merge shares the tenant, and nothing may move the survivor to another.
 	const spec = resolveSpec(
@@ -110,7 +122,7 @@ const buildCollectionContext = (
 		options.fields,
 		options.slug
 	).map((entry) =>
-		entry.path === tenantFieldName ? { ...entry, policy: 'survivor' as const } : entry
+		tenanted && entry.path === tenantFieldName ? { ...entry, policy: 'survivor' as const } : entry
 	)
 	const specByPath = new Map(spec.map((entry) => [entry.path, entry]))
 
@@ -184,9 +196,7 @@ const buildCollectionContext = (
 		matchFields,
 		configHash: hashMatch(options.match?.fields ?? []),
 		hasDrafts: Boolean(config.versions?.drafts),
-		tenanted:
-			tenantFieldName !== null &&
-			config.flattenedFields.some((field) => field.name === tenantFieldName),
+		tenanted,
 		references: resolveReferences(
 			deriveReferences(payload.config, options.slug),
 			options.references,
@@ -231,6 +241,7 @@ export const buildContext = (
 			entry.slug,
 			buildCollectionContext(payload, entry, {
 				tenantFieldName: options.tenantFieldName,
+				tenantCollections: options.tenantCollections,
 				adapter: adapters.own.get(entry.slug) ?? adapters.plugin,
 			})
 		)
@@ -304,12 +315,16 @@ export const matchFields = (payload: Payload, collection: string): MatchFieldCon
 	getCollectionContext(payload, collection).options.match?.fields ?? []
 
 /**
- * The tenant a document belongs to, as an id, whatever shape the relationship arrived in.
- * Null with `multiTenancy` off.
+ * The tenant a document of a configured collection belongs to, as an id, whatever shape the
+ * relationship arrived in. Null with `multiTenancy` off and in a collection it does not scope.
  */
-export const tenantOf = (payload: Payload, doc: Record<string, unknown>): string | null => {
+export const tenantOf = (
+	payload: Payload,
+	collection: string,
+	doc: Record<string, unknown>
+): string | null => {
 	const { tenantFieldName } = getContext(payload)
-	if (!tenantFieldName) return null
+	if (!tenantFieldName || !getCollectionContext(payload, collection).tenanted) return null
 	const value = doc[tenantFieldName]
 	if (value === null || value === undefined) return null
 	if (typeof value === 'string' || typeof value === 'number') return String(value)

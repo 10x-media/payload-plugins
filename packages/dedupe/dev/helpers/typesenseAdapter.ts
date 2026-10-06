@@ -90,7 +90,7 @@ export const typesenseAdapter = ({ url, apiKey }: Connection): DedupeAdapter => 
 	return {
 		index: async ({ req, collection, doc }) => {
 			await ensure(req, collection)
-			const tenant = tenantOf(req.payload, doc)
+			const tenant = tenantOf(req.payload, collection, doc)
 			const body = Object.fromEntries([
 				['id', String(doc.id)],
 				...fieldsOf(req, collection).map((field) => [field.name, textsOf(doc, field)]),
@@ -112,7 +112,7 @@ export const typesenseAdapter = ({ url, apiKey }: Connection): DedupeAdapter => 
 
 		findCandidates: async ({ req, collection, doc, limit }) => {
 			await ensure(req, collection)
-			const tenant = tenantOf(req.payload, doc)
+			const tenant = tenantOf(req.payload, collection, doc)
 			// One search per value of each match field, typos tolerated.
 			const searches = fieldsOf(req, collection).flatMap((field) =>
 				textsOf(doc, field).map((q) => ({

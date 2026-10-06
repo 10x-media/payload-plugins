@@ -229,7 +229,9 @@ export const loadMergeGroup = async (args: {
 	const [survivor, ...absorbed] = docs as LoadedDoc[]
 	if (
 		absorbed.some(
-			(doc) => tenantOf(req.payload, doc) !== tenantOf(req.payload, survivor as LoadedDoc)
+			(doc) =>
+				tenantOf(req.payload, col.slug, doc) !==
+				tenantOf(req.payload, col.slug, survivor as LoadedDoc)
 		)
 	) {
 		throw badRequest('The documents belong to different tenants.')

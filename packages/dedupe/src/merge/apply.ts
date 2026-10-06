@@ -466,7 +466,7 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 				target: col.slug,
 				survivor: String(survivor.id),
 				absorbed: ids,
-				tenant: tenantOf(req.payload, survivor),
+				tenant: tenantOf(req.payload, col.slug, survivor),
 				status: 'applying',
 				decisions: plan.decisions,
 				absorbedSnapshots: Object.fromEntries(snapshots.map((doc) => [String(doc.id), doc])),

@@ -33,6 +33,16 @@ describe('resolveOptions', () => {
 		)
 	})
 
+	it('refuses a collection the multi-tenant plugin keeps one document of per tenant', () => {
+		const multiTenancy = { collections: { settings: { isGlobal: true }, customers: {} } }
+		expect(() => resolveOptions({ multiTenancy, collections: { settings: true } })).toThrow(
+			/"settings".*isGlobal/
+		)
+		expect(
+			resolveOptions({ multiTenancy, collections: { customers: true } }).tenantCollections
+		).toEqual(['settings', 'customers'])
+	})
+
 	it('refuses an adapter on a collection without a match, which never searches', () => {
 		expect(() => resolveOptions({ collections: { leads: { adapter: (base) => base } } })).toThrow(
 			/adapter.*match/

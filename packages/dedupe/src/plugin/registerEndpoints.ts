@@ -113,9 +113,11 @@ const decideEndpoint = (options: ResolvedOptions, status: 'dismissed' | 'open'):
 			if (
 				docs.length !== ids.length ||
 				docs.some(
-					(doc) => tenantOf(req.payload, doc) !== tenantOf(req.payload, docs[0] as LoadedDoc)
+					(doc) =>
+						tenantOf(req.payload, col.slug, doc) !==
+						tenantOf(req.payload, col.slug, docs[0] as LoadedDoc)
 				) ||
-				(tenant && col.tenanted && tenantOf(req.payload, docs[0] as LoadedDoc) !== tenant)
+				(tenant && col.tenanted && tenantOf(req.payload, col.slug, docs[0] as LoadedDoc) !== tenant)
 			) {
 				return json({ message: 'Documents not found' }, 404)
 			}

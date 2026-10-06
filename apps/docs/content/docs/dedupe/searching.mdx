@@ -100,7 +100,7 @@ Only documents in the index are ever found. An index that leaves some out, such 
 | Export | Returns |
 | --- | --- |
 | `matchFields(payload, collection)` | The collection's match fields, as its `match` config lists them. |
-| `tenantOf(payload, doc)` | The document's tenant id, or `null` without `multiTenancy`. |
+| `tenantOf(payload, collection, doc)` | The document's tenant id, or `null` without `multiTenancy` and in a collection it does not scope. |
 | `readPath(doc, path)` | The value at a dot path, such as `profile.name`. |
 
 ### Example: Typesense
@@ -133,7 +133,7 @@ export const typesenseAdapter = (url: string, apiKey: string): DedupeAdapter => 
 
   return {
     index: async ({ req, collection, doc }) => {
-      const tenant = tenantOf(req.payload, doc)
+      const tenant = tenantOf(req.payload, collection, doc)
       const fields = matchFields(req.payload, collection).map(({ path }) => [
         fieldName(path),
         texts(readPath(doc, path)),
@@ -155,7 +155,7 @@ export const typesenseAdapter = (url: string, apiKey: string): DedupeAdapter => 
     },
 
     findCandidates: async ({ req, collection, doc, limit }) => {
-      const tenant = tenantOf(req.payload, doc)
+      const tenant = tenantOf(req.payload, collection, doc)
       const searches = matchFields(req.payload, collection).flatMap(({ path }) =>
         texts(readPath(doc, path)).map((q) => ({
           collection,

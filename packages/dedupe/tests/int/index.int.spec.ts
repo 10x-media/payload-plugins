@@ -357,3 +357,41 @@ describeForDb('dedupe index', {}, (db) => {
 		})
 	})
 })
+
+/**
+ * With the multi-tenant plugin's own `collections`, only those collections are scoped: a
+ * `tenant` field elsewhere is data like any other.
+ */
+describeForDb('dedupe tenancy by the listed collections', {}, (db) => {
+	let fixture: Awaited<ReturnType<typeof bootDedupe>>
+
+	beforeAll(async () => {
+		fixture = await bootDedupe(db, { multiTenancy: { collections: { posts: {} } } })
+	})
+
+	afterAll(async () => {
+		await fixture.booted.stop()
+	})
+
+	it('scopes the listed collections only, whatever fields the others have', () => {
+		const { payload } = fixture.booted
+		expect(getCollectionContext(payload, 'posts').tenanted).toBe(true)
+		expect(getCollectionContext(payload, CUSTOMERS).tenanted).toBe(false)
+	})
+
+	it('pairs, keys and merges a collection left out as one with no tenant', async () => {
+		const { booted, req, customer, keysFor, pairsFor } = fixture
+		const left = await customer({ name: 'Petro Unscoped', phone: '0671114455', tenant: 'a' })
+		const right = await customer({ name: 'Petro Unscoped', phone: '0671114455', tenant: 'b' })
+		expect(await pairsFor(right.id)).toHaveLength(1)
+		expect((await keysFor(left.id, CUSTOMERS)).some((row) => row.key.startsWith('t:'))).toBe(false)
+		expect(getCollectionContext(booted.payload, CUSTOMERS).specByPath.get('tenant')?.policy).toBe(
+			'nonEmpty'
+		)
+		const ctx = getContext(booted.payload)
+		const col = getCollectionContext(booted.payload, CUSTOMERS)
+		await expect(
+			applyMerge({ req, ctx, col, survivorId: left.id, absorbedIds: [right.id], choices: {} })
+		).resolves.toMatchObject({ survivorId: String(left.id) })
+	})
+})

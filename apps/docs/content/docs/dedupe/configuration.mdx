@@ -21,7 +21,7 @@ description: Every option of the plugin and its default.
 | `view` | `{ path: '/dedupe' }` | Admin path; `false` removes the views. `navLabel` renames the sidebar entry, `history: true` (or `{ navLabel }`) adds one for the merge history. |
 | `overrides` | `{}` | `keys`, `pairs`, `merges`: a function over the plugin's collection. Hooks are refused. |
 | `collectionAccess.read` | nobody | REST and GraphQL read access on the plugin's collections. A merge record holds whole copies of the merged-in documents, of every tenant, hidden fields included. |
-| `multiTenancy` | off | `true` or `{ tenantFieldName }`, see below. |
+| `multiTenancy` | off | `true` or `{ tenantFieldName, collections }`, see below. |
 | `events` | unset | `{ emit(event, req) }`, see below. |
 
 ## Per collection
@@ -69,7 +69,21 @@ dedupe({
 })
 ```
 
-Documents of different tenants are never compared or merged together, and the queue and the history show the selected tenant only. A collection without the tenant field shows under every tenant. Set `tenantFieldName` when yours differs from `@payloadcms/plugin-multi-tenant`'s.
+Documents of different tenants are never compared or merged together, and the queue and the history show the selected tenant only. A collection that is not scoped shows under every tenant. Set `tenantFieldName` when yours differs from `@payloadcms/plugin-multi-tenant`'s.
+
+Without `collections`, every collection with the tenant field is scoped. Pass the multi-tenant plugin's own `collections` to scope only those, so a `tenant` field that means something else stays ordinary data:
+
+```ts title="payload.config.ts"
+const collections = { customers: {}, settings: { isGlobal: true } }
+
+multiTenantPlugin({ collections })
+dedupe({
+  multiTenancy: { collections },
+  collections: { customers: { match } },
+})
+```
+
+A collection with `isGlobal: true` holds one document per tenant: configuring it in dedupe stops the app at startup.
 
 ## Events
 

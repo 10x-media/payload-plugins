@@ -112,6 +112,18 @@ export type MultiTenancyOptions = {
 	 * @default 'tenant'
 	 */
 	tenantFieldName?: string
+	/**
+	 * The tenant-scoped collections, in the shape `@payloadcms/plugin-multi-tenant` takes them,
+	 * so one object can be passed to both plugins. When set, only these collections are
+	 * scoped; without it, every collection with the tenant field is. A collection with
+	 * `isGlobal: true` holds one document per tenant and cannot be deduplicated.
+	 *
+	 * @example
+	 * const collections = { customers: {}, settings: { isGlobal: true } }
+	 * multiTenantPlugin({ collections })
+	 * dedupe({ multiTenancy: { collections } })
+	 */
+	collections?: Partial<Record<CollectionSlug, { isGlobal?: boolean }>>
 }
 
 export type DedupePluginOptions = {
@@ -233,6 +245,8 @@ export type ResolvedOptions = {
 	overrides: NonNullable<DedupePluginOptions['overrides']>
 	collectionAccess: { read: Access }
 	tenantFieldName: string | null
+	/** The tenant-scoped collections; null to scope every collection with the tenant field. */
+	tenantCollections: string[] | null
 	events: DedupeEventSink | null
 	translations?: TranslationsOption
 }
@@ -351,6 +365,13 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 		})
 	}
 	const multiTenancy = options.multiTenancy === true ? {} : options.multiTenancy
+	for (const { slug } of collections) {
+		if (multiTenancy?.collections?.[slug]?.isGlobal) {
+			throw new Error(
+				`dedupe: "${slug}" is \`isGlobal\` in \`multiTenancy.collections\`: one document per tenant has no duplicates`
+			)
+		}
+	}
 	const { maxGroupSize = DEFAULT_MAX_GROUP_SIZE } = options
 	if (!Number.isInteger(maxGroupSize) || maxGroupSize < 2) {
 		throw new Error('dedupe: `maxGroupSize` must be a whole number of at least 2')
@@ -378,6 +399,7 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 		overrides: options.overrides ?? {},
 		collectionAccess: { read: options.collectionAccess?.read ?? (() => false) },
 		tenantFieldName: multiTenancy ? (multiTenancy.tenantFieldName ?? 'tenant') : null,
+		tenantCollections: multiTenancy?.collections ? Object.keys(multiTenancy.collections) : null,
 		events: options.events ?? null,
 		translations: options.translations,
 	}

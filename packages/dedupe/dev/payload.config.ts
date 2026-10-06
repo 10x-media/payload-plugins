@@ -23,6 +23,7 @@ import { startMemoryMongo } from './helpers/memoryDb'
 import { recentAdapter } from './helpers/recentAdapter'
 import { DEV_EMAIL, seedDev } from './helpers/seed'
 import { seedShowcase } from './helpers/seedShowcase'
+import { seedStaff } from './helpers/seedStaff'
 import { typesenseAdapter } from './helpers/typesenseAdapter'
 import { showcases } from './showcase'
 
@@ -30,6 +31,22 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
 const useDb = process.env.DEV_DB === 'postgres' ? 'postgres' : 'mongo'
 const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
+
+// One object for both plugins: dedupe scopes these collections by tenant and no other, so
+// the `tenant` field of `staff` stays ordinary data.
+const tenantCollections = {
+	customers: {},
+	leads: {},
+	articles: {},
+	companies: {},
+	orders: {},
+	memberships: {},
+	trips: {},
+	notes: {},
+	specimens: {},
+	products: {},
+	showcases: {},
+}
 
 const db =
 	useDb === 'postgres'
@@ -58,19 +75,7 @@ export default buildConfig({
 	plugins: [
 		// Before dedupe, as a host would have it: the tenant field is already on the documents.
 		multiTenantPlugin({
-			collections: {
-				customers: {},
-				leads: {},
-				articles: {},
-				companies: {},
-				orders: {},
-				memberships: {},
-				trips: {},
-				notes: {},
-				specimens: {},
-				products: {},
-				showcases: {},
-			},
+			collections: tenantCollections,
 			tenantsSlug: 'tenants',
 			userHasAccessToAllTenants: () => true,
 		}),
@@ -124,6 +129,16 @@ export default buildConfig({
 						],
 					},
 				},
+				// Its own adapter, whatever DEDUPE_ADAPTER puts on the others.
+				staff: {
+					match: {
+						fields: [
+							{ path: 'name', weight: 40, compare: 'text' },
+							{ path: 'email', weight: 30 },
+						],
+					},
+					adapter: () => recentAdapter,
+				},
 				articles: {
 					match: {
 						fields: [
@@ -134,7 +149,7 @@ export default buildConfig({
 					form: { sidebar: true, confirmCreate: true },
 				},
 			},
-			multiTenancy: true,
+			multiTenancy: { collections: tenantCollections },
 			view: { history: true },
 			...(process.env.DEDUPE_ADAPTER === 'custom' ? { adapter: () => recentAdapter } : {}),
 			...(process.env.DEDUPE_ADAPTER === 'typesense'
@@ -156,6 +171,7 @@ export default buildConfig({
 	onInit: async (payload) => {
 		await seedDev(payload)
 		await seedShowcase(payload)
+		await seedStaff(payload)
 	},
 	typescript: { autoGenerate },
 	admin: {

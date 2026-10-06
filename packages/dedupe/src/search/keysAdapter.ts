@@ -14,7 +14,7 @@ type KeyRow = { doc: string; key: string }
 const keysOf = (req: PayloadRequest, collection: string, doc: AdapterDoc) => {
 	const col = getCollectionContext(req.payload, collection)
 	return {
-		keys: blockingKeys(doc, col.matchFields, tenantOf(req.payload, doc)),
+		keys: blockingKeys(doc, col.matchFields, tenantOf(req.payload, collection, doc)),
 		configHash: col.configHash,
 	}
 }

@@ -342,6 +342,21 @@ export const specimens: CollectionConfig = {
 	],
 }
 
+/**
+ * A `tenant` field the multi-tenant plugin does not scope: here the branch a member answers
+ * for. Left out of `multiTenancy.collections`, it is ordinary data to dedupe.
+ */
+export const staff: CollectionConfig = {
+	slug: 'staff',
+	labels: { singular: 'Staff member', plural: 'Staff' },
+	admin: { useAsTitle: 'name', defaultColumns: ['name', 'email', 'tenant'] },
+	fields: [
+		{ name: 'name', type: 'text', required: true },
+		{ name: 'email', type: 'email' },
+		{ name: 'tenant', type: 'text', label: 'Branch' },
+	],
+}
+
 export const collections = [
 	users,
 	tenants,
@@ -356,6 +371,7 @@ export const collections = [
 	media,
 	specimens,
 	products,
+	staff,
 ]
 
 /** A global that points at a customer, so a merge moves a reference held outside any collection. */

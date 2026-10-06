@@ -236,7 +236,7 @@ export const decideGroup = async (args: {
 						pairKey,
 						docA,
 						docB,
-						tenant: tenantOf(req.payload, a),
+						tenant: tenantOf(req.payload, col.slug, a),
 						score: 0,
 					},
 					req,

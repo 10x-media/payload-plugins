@@ -79,20 +79,34 @@ describe('matchFields', () => {
 })
 
 describe('tenantOf', () => {
-	const tenanted = withContext({ tenantFieldName: 'tenant' })
+	const tenanted = withContext({
+		tenantFieldName: 'tenant',
+		collections: new Map([
+			['customers', { tenanted: true }],
+			['staff', { tenanted: false }],
+		]),
+	})
 
 	it('reads the tenant id whatever shape the relationship arrived in', () => {
-		expect(tenantOf(tenanted, { tenant: 'kyiv' })).toBe('kyiv')
-		expect(tenantOf(tenanted, { tenant: 7 })).toBe('7')
-		expect(tenantOf(tenanted, { tenant: { id: 7, name: 'Kyiv' } })).toBe('7')
+		expect(tenantOf(tenanted, 'customers', { tenant: 'kyiv' })).toBe('kyiv')
+		expect(tenantOf(tenanted, 'customers', { tenant: 7 })).toBe('7')
+		expect(tenantOf(tenanted, 'customers', { tenant: { id: 7, name: 'Kyiv' } })).toBe('7')
 	})
 
 	it('is null for a document without a tenant', () => {
-		expect(tenantOf(tenanted, {})).toBeNull()
-		expect(tenantOf(tenanted, { tenant: null })).toBeNull()
+		expect(tenantOf(tenanted, 'customers', {})).toBeNull()
+		expect(tenantOf(tenanted, 'customers', { tenant: null })).toBeNull()
 	})
 
-	it('is null with multiTenancy off, even on a document with a tenant field', () => {
-		expect(tenantOf(withContext({ tenantFieldName: null }), { tenant: 'kyiv' })).toBeNull()
+	it('is null in a collection that is not tenant-scoped, whatever its tenant field holds', () => {
+		expect(tenantOf(tenanted, 'staff', { tenant: 'kyiv' })).toBeNull()
+	})
+
+	it('is null with multiTenancy off', () => {
+		const off = withContext({
+			tenantFieldName: null,
+			collections: new Map([['customers', { tenanted: false }]]),
+		})
+		expect(tenantOf(off, 'customers', { tenant: 'kyiv' })).toBeNull()
 	})
 })
