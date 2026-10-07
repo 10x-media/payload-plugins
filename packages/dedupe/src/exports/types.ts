@@ -14,6 +14,7 @@ export type {
 	MatchConfig,
 	MatchFieldConfig,
 	MultiTenancyOptions,
+	WriteLocale,
 } from '../options'
 export type { DedupeEvent, DedupeEventSink } from '../plugin/events'
 export type { CheckResponse } from '../plugin/registerEndpoints'

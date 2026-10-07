@@ -288,6 +288,17 @@ export const validatesWrite = (col: CollectionContext): boolean => {
 	return !draft || (typeof drafts === 'object' && drafts.validate === true)
 }
 
+/**
+ * Whether the merge publishes over drafts: the published state is merged, and Payload saves a
+ * draft unchecked, so a locale can be written as one and published with the write locale.
+ */
+export const publishesDrafts = (col: CollectionContext): boolean => {
+	const drafts = col.config.versions?.drafts
+	return (
+		col.hasDrafts && !col.options.draft && !(typeof drafts === 'object' && drafts.validate === true)
+	)
+}
+
 /** The absorbed ids, the one whose pair with the survivor scores highest first. */
 export const bySimilarity = async (args: {
 	req: PayloadRequest

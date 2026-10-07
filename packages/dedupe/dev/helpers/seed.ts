@@ -100,7 +100,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		}>
 
 	const kyiv = (await create(TENANTS, { name: 'Kyiv Office', slug: 'kyiv' })).id
-	const berlin = (await create(TENANTS, { name: 'Berlin Office', slug: 'berlin' })).id
+	const berlin = (await create(TENANTS, { name: 'Berlin Office', slug: 'berlin', locale: 'de' })).id
 
 	const dniproClub = (await create(COMPANIES, { name: 'Dnipro Paddle Club', tenant: kyiv })).id
 	const kyivRowing = (await create(COMPANIES, { name: 'Kyiv Rowing School', tenant: kyiv })).id

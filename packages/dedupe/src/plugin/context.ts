@@ -177,6 +177,16 @@ const buildCollectionContext = (
 		}
 	})
 
+	const { writeLocale } = options
+	if (typeof writeLocale === 'string') {
+		const locales = payload.config.localization ? payload.config.localization.localeCodes : []
+		if (!locales.includes(writeLocale)) {
+			throw new Error(
+				`dedupe: writeLocale "${writeLocale}" on "${options.slug}" is not a locale of the config`
+			)
+		}
+	}
+
 	const absorbed = options.absorbed ?? (config.trash ? 'trash' : 'delete')
 	if (absorbed === 'trash' && !config.trash) {
 		throw new Error(

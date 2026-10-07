@@ -33,6 +33,7 @@ import {
 	type LoadedDoc,
 	loadDocs,
 	loadMergeGroup,
+	publishesDrafts,
 	READ_REFUSED,
 	readableTitle,
 	survivorHasDraft,
@@ -41,6 +42,7 @@ import {
 import { planMerge } from './plan'
 import { richTextHTML } from './richText'
 import { releaseUnique, type UniqueRelease } from './unique'
+import { resolveWriteLocale } from './writeLocale'
 
 export type DocRef = {
 	id: string
@@ -345,9 +347,10 @@ export const buildPlanResponse = async (args: {
 		choices,
 		collection: col.slug,
 		schema: { fields: col.config.flattenedFields, blocks: req.payload.config.blocks },
-		defaultLocale: ctx.defaultLocale,
+		writeLocale: await resolveWriteLocale({ req, ctx, col, survivor }),
 		similar,
 		validates: validatesWrite(col),
+		publishesDrafts: publishesDrafts(col),
 	})
 
 	const decisions = await describeDecisions({

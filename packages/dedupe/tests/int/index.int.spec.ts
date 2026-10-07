@@ -182,6 +182,22 @@ describeForDb('dedupe index', {}, (db) => {
 		}
 	})
 
+	it('refuses at boot a writeLocale the config has no locale for', () => {
+		const { payload } = fixture.booted
+		const key = Symbol.for('@10x-media/dedupe/context')
+		const host = payload as unknown as Record<symbol, unknown>
+		const before = host[key]
+		const adapters = { plugin: getCollectionContext(payload, 'customers').adapter, own: new Map() }
+		const build = (writeLocale: string) => () =>
+			buildContext(payload, resolveOptions({ collections: { guides: { writeLocale } } }), adapters)
+		try {
+			expect(build('fr')).toThrow(/writeLocale "fr" on "guides"/)
+			expect(build('de')).not.toThrow()
+		} finally {
+			host[key] = before
+		}
+	})
+
 	it('refuses at boot a match field that holds rows, a group or rich text, which compare by nothing', () => {
 		const { payload } = fixture.booted
 		const key = Symbol.for('@10x-media/dedupe/context')

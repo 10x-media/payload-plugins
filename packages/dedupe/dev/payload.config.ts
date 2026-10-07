@@ -44,6 +44,7 @@ import { repointCustomers } from './helpers/repointCustomers'
 import { DEV_EMAIL, seedDev } from './helpers/seed'
 import { seedShowcase } from './helpers/seedShowcase'
 import { seedStaff } from './helpers/seedStaff'
+import { tenantLocale } from './helpers/tenantLocale'
 import { typesenseAdapter } from './helpers/typesenseAdapter'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -135,6 +136,8 @@ export default buildConfig({
 						derived.map((spec) =>
 							spec.path === 'profile.score' ? { ...spec, policy: 'manual' } : spec
 						),
+					// The values every language shares are written in the language of the office.
+					writeLocale: tenantLocale('customers'),
 				},
 				leads: { absorbed: 'delete' },
 				specimens: {

@@ -40,6 +40,7 @@ export const KITS = 'kits' as CollectionSlug
 export const HIDX = 'hidx' as CollectionSlug
 export const GUIDES = 'guides' as CollectionSlug
 export const MANUALS = 'manuals' as CollectionSlug
+export const BRIEFS = 'briefs' as CollectionSlug
 export const PAGES = 'pages' as CollectionSlug
 
 export type Doc = Record<string, unknown> & { id: number | string }
@@ -69,6 +70,7 @@ export const pluginOptions: DedupePluginOptions = {
 		tickets: { absorbed: 'delete' },
 		staff: {},
 		hidx: {},
+		briefs: {},
 		manuals: {
 			fields: (derived) =>
 				derived.map((spec) =>
@@ -696,6 +698,18 @@ const manuals: CollectionConfig = {
 	],
 }
 
+/** A title required in every language, on a collection with drafts, and a price kept once for all. */
+const briefs: CollectionConfig = {
+	slug: 'briefs',
+	trash: true,
+	versions: { drafts: true },
+	fields: [
+		{ name: 'title', type: 'text', localized: true, required: true },
+		{ name: 'subtitle', type: 'text', localized: true },
+		{ name: 'price', type: 'number' },
+	],
+}
+
 /** A unique index over a field of a group hidden from the API. */
 const hidx: CollectionConfig = {
 	slug: 'hidx',
@@ -737,6 +751,7 @@ export const collectionsFor = (db: SupportedDb) => [
 	hidx,
 	guides,
 	manuals,
+	briefs,
 ]
 
 /** A new object on every boot: Payload sanitizes the config's blocks in place. */

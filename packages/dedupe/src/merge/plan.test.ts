@@ -52,16 +52,17 @@ describe('planMerge in a language Payload checks', () => {
 			{ name: 'note', type: 'text', localized: true, required: true },
 		] as FlattenedField[],
 	}
-	const run = (validates: boolean) =>
+	const run = (validates: boolean, publishesDrafts = false) =>
 		planMerge({
 			survivor: a({ title: { en: 'A' }, note: { en: 'n' } }),
 			absorbed: [b({ title: { en: 'B', de: 'B de' }, note: { en: 'n' } })],
 			fields,
 			locales: ['en', 'de'],
-			defaultLocale: 'en',
+			writeLocale: 'en',
 			collection: 'docs',
 			schema,
 			validates,
+			publishesDrafts,
 		})
 
 	it('names a required value no document holds in a language it writes', () => {
@@ -70,6 +71,31 @@ describe('planMerge in a language Payload checks', () => {
 
 	it('names nothing where Payload does not check the write, as for a draft', () => {
 		expect(run(false).missing).toEqual([])
+	})
+
+	it('drafts a language whose required value the survivor lacked before, where drafts publish', () => {
+		const plan = run(true, true)
+		expect(plan.missing).toEqual([])
+		expect(plan.drafted).toEqual(['de'])
+		expect(plan.readyToApply).toBe(true)
+	})
+
+	it('names a required value of the write locale, which the publish checks, drafts or not', () => {
+		const plan = planMerge({
+			survivor: a({ title: { de: 'A de' }, note: { de: 'n' }, flag: false }),
+			absorbed: [b({ title: { de: 'B de' }, note: { de: 'n' }, flag: true })],
+			fields: [...fields, spec({ path: 'flag', type: 'checkbox' })],
+			locales: ['en', 'de'],
+			writeLocale: 'en',
+			collection: 'docs',
+			schema: {
+				fields: [...schema.fields, { name: 'flag', type: 'checkbox' }] as FlattenedField[],
+			},
+			choices: { flag: { doc: 'b' } },
+			publishesDrafts: true,
+		})
+		expect(plan.missing).toEqual([{ path: 'note', locale: 'en', reason: 'none' }])
+		expect(plan.drafted).toEqual([])
 	})
 })
 

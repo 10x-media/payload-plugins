@@ -46,6 +46,7 @@ import {
 	loadDocs,
 	loadMergeGroup,
 	localRequest,
+	publishesDrafts,
 	READ_REFUSED,
 	readableTitle,
 	survivorHasDraft,
@@ -53,6 +54,7 @@ import {
 } from './load'
 import { planMerge } from './plan'
 import { releaseUnique } from './unique'
+import { resolveWriteLocale } from './writeLocale'
 
 type ApplyMergeArgs = {
 	req: PayloadRequest
@@ -309,6 +311,7 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		survivorId: survivor.id,
 		absorbedIds: absorbed.map((doc) => doc.id),
 	})
+	const writeLocale = await resolveWriteLocale({ req, ctx, col, survivor })
 	const plan: MergePlan = planMerge({
 		survivor,
 		absorbed,
@@ -317,9 +320,10 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		choices,
 		collection: col.slug,
 		schema: { fields: col.config.flattenedFields, blocks: req.payload.config.blocks },
-		defaultLocale: ctx.defaultLocale,
+		writeLocale,
 		similar,
 		validates: validatesWrite(col),
+		publishesDrafts: publishesDrafts(col),
 	})
 	const missing = missingRefusal(req, col, plan.missing)
 	if (missing) throw new APIError(missing, 409, undefined, true)
@@ -474,13 +478,11 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		}
 
 		const writes: Array<{ locale?: string; data: Record<string, unknown> }> = []
-		if (ctx.localeCodes && ctx.defaultLocale) {
-			const defaultData = mergeData(plan.base, plan.byLocale[ctx.defaultLocale] ?? {})
-			if (Object.keys(defaultData).length > 0) {
-				writes.push({ locale: ctx.defaultLocale, data: defaultData })
-			}
+		if (ctx.localeCodes && writeLocale) {
+			const shared = mergeData(plan.base, plan.byLocale[writeLocale] ?? {})
+			if (Object.keys(shared).length > 0) writes.push({ locale: writeLocale, data: shared })
 			for (const [locale, data] of Object.entries(plan.byLocale)) {
-				if (locale === ctx.defaultLocale) continue
+				if (locale === writeLocale) continue
 				if (Object.keys(data).length > 0) writes.push({ locale, data })
 			}
 		} else if (Object.keys(plan.base).length > 0) {
@@ -498,7 +500,7 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		}
 		// A list whose rows hold values per locale is written into every locale, the same rows
 		// each time, so each locale's values land on the rows the first write made.
-		const first = writes.find((write) => write.locale === ctx.defaultLocale)
+		const first = writes.find((write) => write.locale === writeLocale)
 		const listsPerLocale = first && ctx.localeCodes ? col.spec : []
 		for (const spec of listsPerLocale) {
 			if (spec.localized || (spec.type !== 'array' && spec.type !== 'blocks')) continue
@@ -512,7 +514,7 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 				// required field of it, and the survivor may have none there.
 				// Read before the hidden fields went back into the rows, as the plan reads it.
 				const planned = readPath(plan.base, spec.path)
-				if (locale !== ctx.defaultLocale && !heldIn(planned, field, { locale, known })) continue
+				if (locale !== writeLocale && !heldIn(planned, field, { locale, known })) continue
 				let write = writes.find((entry) => entry.locale === locale)
 				if (!write) {
 					write = { locale, data: {} }
@@ -521,19 +523,29 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 				writePath(write.data, spec.path, inLocale(value, field, { locale, known }))
 			}
 		}
-		for (const write of writes) {
-			await payload.update({
+		const write = (locale: string | undefined, data: Record<string, unknown>, asDraft: boolean) =>
+			payload.update({
 				collection: col.slug,
 				id: survivor.id,
-				data: write.data,
-				...(write.locale ? { locale: write.locale } : {}),
+				data,
+				...(locale ? { locale } : {}),
 				depth: 0,
-				draft,
+				draft: asDraft,
 				overrideAccess: true,
 				overrideLock: true,
 				context: dedupeContext(),
 				req: localRequest(req),
 			})
+		// A drafted locale goes last, as a draft: the publish after it starts from the newest
+		// version and checks the write locale alone, as Payload publishes any draft.
+		const drafted = (entry: { locale?: string }) =>
+			entry.locale !== undefined && plan.drafted.includes(entry.locale)
+		for (const entry of writes.filter((entry) => !drafted(entry))) {
+			await write(entry.locale, entry.data, draft)
+		}
+		for (const entry of writes.filter(drafted)) await write(entry.locale, entry.data, true)
+		if (plan.drafted.length > 0 && writeLocale) {
+			await write(writeLocale, { _status: 'published' }, false)
 		}
 
 		for (const id of late) {

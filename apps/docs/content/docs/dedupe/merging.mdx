@@ -44,7 +44,32 @@ Documents are columns and fields are rows. Pick the primary in a column head and
 
 ## Localized fields
 
-A localized field is decided per locale. Payload checks every required value of a locale the merge writes: one the primary lacks there comes from the most similar document of the group that has it, and where none has it the merge is refused, naming the field and the locale. Drafts merged with `draft: true` are not checked.
+A localized field is decided per locale. Payload saves one locale at a time and checks the required values of that locale only.
+
+The values every locale shares, such as a price, are written in the write locale. Without `writeLocale` it is the default locale when the primary holds every value Payload requires there, else the first locale it does: a primary written in German only is not refused for an empty English. `writeLocale` names the locale, as a code or as a function of the primary, such as the language of its tenant:
+
+```ts
+import { tenantOf } from '@10x-media/dedupe'
+
+dedupe({
+  collections: {
+    customers: {
+      match,
+      writeLocale: async ({ req, survivor }) => {
+        const tenant = tenantOf(req.payload, 'customers', survivor)
+        const office = tenant
+          ? await req.payload.findByID({ collection: 'tenants', id: tenant, depth: 0, req })
+          : null
+        return office?.locale
+      },
+    },
+  },
+})
+```
+
+An answer the config has no locale for is ignored, and a code the config does not have stops the app at startup.
+
+In every locale the merge writes, a required value the primary lacks comes from the most similar document of the group that has it. Where none has it, the merge is refused, naming the field and the locale, with one exception: on a collection with drafts, a locale whose missing values the primary lacked before the merge is written as a draft and published with the write locale, which Payload checks alone, as it publishes any draft. The merge leaves that locale as incomplete as it found it. Drafts merged with `draft: true` are not checked.
 
 ## Applying
 

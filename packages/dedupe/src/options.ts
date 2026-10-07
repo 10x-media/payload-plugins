@@ -74,6 +74,13 @@ export type CollectionDedupeOptions = {
 	 */
 	draft?: boolean
 	/**
+	 * The locale a merge writes the values every locale shares in, and checks first: a code,
+	 * or a function answering one for the survivor, such as its tenant's language. An answer
+	 * the config has no locale for is ignored. Without it, or ignored, the default locale where
+	 * the survivor holds every value Payload requires there, else the first locale it does.
+	 */
+	writeLocale?: WriteLocale
+	/**
 	 * How candidates are looked for in this collection. Receives the plugin's adapter: return
 	 * it, extend it by spreading, or return an adapter of your own, used whole. Needs `match`.
 	 */
@@ -84,6 +91,14 @@ export type CollectionDedupeOptions = {
 	 */
 	checkOnSave?: boolean
 }
+
+export type WriteLocale =
+	| string
+	| ((args: {
+			req: PayloadRequest
+			/** The survivor, read in every locale. */
+			survivor: Record<string, unknown>
+	  }) => Promise<string | null | undefined> | string | null | undefined)
 
 export type DedupeAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 
@@ -226,6 +241,7 @@ export type ResolvedCollectionOptions = {
 	slug: CollectionSlug
 	match: Required<MatchConfig> | null
 	adapter?: DedupeAdapterFactory
+	writeLocale?: WriteLocale
 	fields?: CollectionDedupeOptions['fields']
 	/** Unset: decided by whether the collection has a trash. */
 	absorbed?: 'delete' | 'trash'
@@ -351,6 +367,7 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 			slug: slug as CollectionSlug,
 			match,
 			adapter: opts.adapter,
+			writeLocale: opts.writeLocale,
 			fields: opts.fields,
 			absorbed: opts.absorbed,
 			draft: opts.draft ?? false,

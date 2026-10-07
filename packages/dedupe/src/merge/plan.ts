@@ -45,12 +45,18 @@ type PlanArgs = {
 	 * groups and blocks. Without them only a field's own value is looked at.
 	 */
 	schema?: { fields: readonly FlattenedField[]; blocks?: readonly FlattenedBlock[] }
-	/** The host's default locale, the one every write of the survivor starts in. */
-	defaultLocale?: string | null
+	/** The locale the values every locale shares are written in, the first write of the survivor. */
+	writeLocale?: string | null
 	/** Absorbed ids, the one most like the survivor first: where a required value comes from. */
 	similar?: readonly string[]
 	/** `false` where Payload does not validate the write, as when saving a draft. */
 	validates?: boolean
+	/**
+	 * The collection publishes over drafts: a locale whose required values the survivor lacked
+	 * before the merge is written as a draft and published with `writeLocale`, which Payload
+	 * checks alone, as it publishes any draft.
+	 */
+	publishesDrafts?: boolean
 }
 
 type Resolution = { proposed: unknown; source: DecisionSource; auto: boolean }
@@ -341,9 +347,10 @@ export const planMerge = ({
 	choices = {},
 	collection,
 	schema,
-	defaultLocale,
+	writeLocale,
 	similar = [],
 	validates = true,
+	publishesDrafts = false,
 }: PlanArgs): MergePlan => {
 	const docs = [survivor, ...absorbed]
 	const home: Home = {
@@ -420,11 +427,12 @@ export const planMerge = ({
 					base,
 					byLocale,
 					locales,
-					defaultLocale,
+					writeLocale,
 					similar,
 					schema,
+					publishesDrafts,
 				})
-			: { missing: [], filled: [] }
+			: { missing: [], filled: [], drafted: [] }
 	return {
 		decisions,
 		readyToApply:
@@ -438,47 +446,21 @@ export const planMerge = ({
 
 type Missing = MergePlan['missing'][number]
 
-/**
- * Payload checks every value a language requires when it writes that language, stored ones
- * too. A language is written where the default one is (the shared values change), where a
- * value of it changes, and where a list whose rows hold values per language carries values
- * in it. A required field the result leaves empty there takes the value of the most similar
- * document that has one, unless the reviewer may not take it; what stays empty is missing.
- * `decisions` and `byLocale` take the values filled in.
- */
-const requireInWritten = (args: {
-	survivor: Doc
-	absorbed: readonly Doc[]
-	fields: readonly ReviewedFieldSpec[]
-	decisions: MergeDecision[]
-	base: Record<string, unknown>
-	byLocale: Record<string, Record<string, unknown>>
-	locales: readonly string[]
-	defaultLocale: string | null | undefined
-	similar: readonly string[]
-	schema: { fields: readonly FlattenedField[]; blocks?: readonly FlattenedBlock[] }
-}): Pick<MergePlan, 'filled' | 'missing'> => {
-	const { survivor, absorbed, decisions, base, byLocale, locales, defaultLocale, schema } = args
-	const known = schema.blocks
-	const specs = new Map(args.fields.map((spec) => [spec.path, spec]))
-	const at = new Map(decisions.map((decision, index) => [decision.key, index]))
-	const docs = [survivor, ...absorbed]
-	const order = [...new Set([...args.similar, ...absorbed.map((doc) => String(doc.id))])]
-	// What the survivor holds at `path` once merged: the plan's result, else what it stores.
-	const result = (path: string, locale?: string) => {
-		const index = at.get(locale ? `${path}@${locale}` : path)
-		const decided = index === undefined ? undefined : decisions[index]
-		if (decided) return decided.proposed
-		const stored = readPath(base, path) ?? readPath(survivor, path)
-		return locale && isPlainObject(stored) ? stored[locale] : stored
-	}
+type Schema = { fields: readonly FlattenedField[]; blocks?: readonly FlattenedBlock[] }
 
-	const written = new Set(Object.keys(byLocale))
-	if (defaultLocale && Object.keys(base).length > 0) written.add(defaultLocale)
-	const lists: { path: string; field: FlattenedField }[] = []
-	const leaves: { path: string; field: FlattenedField }[] = []
-	const walk = (fields: readonly FlattenedField[], prefix: string) => {
-		for (const field of fields) {
+type Placed = { path: string; field: FlattenedField }
+
+/**
+ * Where Payload checks values per locale: localized fields (`leaves`, a localized group or
+ * list whole), and lists shared by every locale whose rows hold localized fields (`lists`).
+ */
+const perLocaleFields = (
+	fields: readonly FlattenedField[]
+): { lists: Placed[]; leaves: Placed[] } => {
+	const lists: Placed[] = []
+	const leaves: Placed[] = []
+	const walk = (inner: readonly FlattenedField[], prefix: string) => {
+		for (const field of inner) {
 			if (!('name' in field) || field.type === 'join' || ('virtual' in field && field.virtual))
 				continue
 			const path = prefix ? `${prefix}.${field.name}` : field.name
@@ -492,8 +474,111 @@ const requireInWritten = (args: {
 			}
 		}
 	}
-	walk(schema.fields, '')
+	walk(fields, '')
+	return { lists, leaves }
+}
+
+/** A value of `doc` at `path`, one locale's where a locale is named and the value has them. */
+const readIn =
+	(doc: Record<string, unknown>) =>
+	(path: string, locale?: string): unknown => {
+		const stored = readPath(doc, path)
+		return locale && isPlainObject(stored) ? stored[locale] : stored
+	}
+
+/**
+ * What Payload requires in `locale` that `valueAt` leaves empty: `value` for a required field
+ * of its own, `none` for a list with too few rows, `rows` for a value inside rows or a
+ * localized group, named by its path below the field.
+ */
+const gapsIn = (args: {
+	locale: string
+	schema: Schema
+	valueAt: (path: string, locale?: string) => unknown
+}): { path: string; kind: 'none' | 'rows' | 'value' }[] => {
+	const { locale, schema, valueAt } = args
+	const known = schema.blocks
+	const { lists, leaves } = perLocaleFields(schema.fields)
+	const gaps: { path: string; kind: 'none' | 'rows' | 'value' }[] = []
+	for (const { path, field } of leaves) {
+		const value = valueAt(path, locale)
+		if (
+			field.type === 'array' ||
+			field.type === 'blocks' ||
+			field.type === 'group' ||
+			field.type === 'tab'
+		) {
+			const rows = listOf(value)
+			const fewest = Math.max(
+				'required' in field && field.required ? 1 : 0,
+				'minRows' in field ? (field.minRows ?? 0) : 0
+			)
+			if (field.type !== 'group' && field.type !== 'tab' && rows.length < fewest) {
+				gaps.push({ path, kind: 'none' })
+				continue
+			}
+			const gap = requiredGap(value, field, { known, insideLocale: true })
+			if (gap) gaps.push({ path: `${path}.${gap}`, kind: 'rows' })
+			continue
+		}
+		if ('required' in field && field.required && isEmpty(value)) gaps.push({ path, kind: 'value' })
+	}
 	for (const { path, field } of lists) {
+		const gap = requiredGap(inLocale(valueAt(path), field, { locale, known }), field, {
+			known,
+			insideLocale: false,
+		})
+		if (gap) gaps.push({ path: `${path}.${gap}`, kind: 'rows' })
+	}
+	return gaps
+}
+
+/** Whether `doc`, read in every locale, holds every value Payload requires in `locale`. */
+export const completeIn = (doc: Record<string, unknown>, locale: string, schema: Schema): boolean =>
+	gapsIn({ locale, schema, valueAt: readIn(doc) }).length === 0
+
+/**
+ * Payload checks every value a language requires when it writes that language, stored ones
+ * too. A language is written where `writeLocale` is (the shared values change), where a value
+ * of it changes, and where a list whose rows hold values per language carries values in it. A
+ * required field the result leaves empty there takes the value of the most similar document
+ * that has one, unless the reviewer may not take it; what stays empty is missing. A language
+ * other than `writeLocale` whose every gap the survivor had before the merge is `drafted`
+ * instead, where the collection publishes over drafts. `decisions` and `byLocale` take the
+ * values filled in.
+ */
+const requireInWritten = (args: {
+	survivor: Doc
+	absorbed: readonly Doc[]
+	fields: readonly ReviewedFieldSpec[]
+	decisions: MergeDecision[]
+	base: Record<string, unknown>
+	byLocale: Record<string, Record<string, unknown>>
+	locales: readonly string[]
+	writeLocale: string | null | undefined
+	similar: readonly string[]
+	schema: Schema
+	publishesDrafts: boolean
+}): Pick<MergePlan, 'drafted' | 'filled' | 'missing'> => {
+	const { survivor, absorbed, decisions, base, byLocale, locales, writeLocale, schema } = args
+	const known = schema.blocks
+	const specs = new Map(args.fields.map((spec) => [spec.path, spec]))
+	const at = new Map(decisions.map((decision, index) => [decision.key, index]))
+	const docs = [survivor, ...absorbed]
+	const order = [...new Set([...args.similar, ...absorbed.map((doc) => String(doc.id))])]
+	const before = readIn(survivor)
+	// What the survivor holds at `path` once merged: the plan's result, else what it stores.
+	const result = (path: string, locale?: string) => {
+		const index = at.get(locale ? `${path}@${locale}` : path)
+		const decided = index === undefined ? undefined : decisions[index]
+		if (decided) return decided.proposed
+		const stored = readPath(base, path) ?? readPath(survivor, path)
+		return locale && isPlainObject(stored) ? stored[locale] : stored
+	}
+
+	const written = new Set(Object.keys(byLocale))
+	if (writeLocale && Object.keys(base).length > 0) written.add(writeLocale)
+	for (const { path, field } of perLocaleFields(schema.fields).lists) {
 		const value = readPath(base, path)
 		if (value === undefined) continue
 		for (const locale of locales) {
@@ -503,29 +588,15 @@ const requireInWritten = (args: {
 
 	const missing: Missing[] = []
 	const filled: string[] = []
+	const drafted: string[] = []
 	for (const locale of written) {
-		for (const { path, field } of leaves) {
-			const value = result(path, locale)
-			if (
-				field.type === 'array' ||
-				field.type === 'blocks' ||
-				field.type === 'group' ||
-				field.type === 'tab'
-			) {
-				const rows = listOf(value)
-				const fewest = Math.max(
-					'required' in field && field.required ? 1 : 0,
-					'minRows' in field ? (field.minRows ?? 0) : 0
-				)
-				if (field.type !== 'group' && field.type !== 'tab' && rows.length < fewest) {
-					missing.push({ path, locale, reason: 'none' })
-					continue
-				}
-				const gap = requiredGap(value, field, { known, insideLocale: true })
-				if (gap) missing.push({ path: `${path}.${gap}`, locale, reason: 'rows' })
+		const open: Missing[] = []
+		for (const gap of gapsIn({ locale, schema, valueAt: result })) {
+			if (gap.kind !== 'value') {
+				open.push({ path: gap.path, locale, reason: gap.kind })
 				continue
 			}
-			if (!('required' in field && field.required) || !isEmpty(value)) continue
+			const { path } = gap
 			const key = `${path}@${locale}`
 			const index = at.get(key)
 			const spec = specs.get(path)
@@ -538,7 +609,7 @@ const requireInWritten = (args: {
 						.find((entry) => entry !== undefined && !isEmpty(entry.value))
 				: undefined
 			if (!donor || !decision || index === undefined) {
-				missing.push({ path, locale, reason: held ? 'kept' : 'none' })
+				open.push({ path, locale, reason: held ? 'kept' : 'none' })
 				continue
 			}
 			decisions[index] = {
@@ -552,14 +623,17 @@ const requireInWritten = (args: {
 			writePath(byLocale[locale], path, donor.value)
 			filled.push(key)
 		}
-		for (const { path, field } of lists) {
-			const value = result(path)
-			const gap = requiredGap(inLocale(value, field, { locale, known }), field, {
-				known,
-				insideLocale: false,
-			})
-			if (gap) missing.push({ path: `${path}.${gap}`, locale, reason: 'rows' })
+		if (open.length === 0) continue
+		const lackedBefore = new Set(gapsIn({ locale, schema, valueAt: before }).map((gap) => gap.path))
+		if (
+			args.publishesDrafts &&
+			locale !== writeLocale &&
+			open.every((gap) => lackedBefore.has(gap.path))
+		) {
+			drafted.push(locale)
+		} else {
+			missing.push(...open)
 		}
 	}
-	return { missing, filled }
+	return { missing, filled, drafted }
 }

@@ -98,4 +98,9 @@ export type MergePlan = {
 	missing: { path: string; locale: string; reason: 'kept' | 'none' | 'rows' }[]
 	/** Keys of decisions whose required value came from the most similar document. */
 	filled: string[]
+	/**
+	 * Locales written as a draft, then published with the write locale: every value Payload
+	 * requires there and the result leaves empty, the survivor lacked before the merge.
+	 */
+	drafted: string[]
 }
