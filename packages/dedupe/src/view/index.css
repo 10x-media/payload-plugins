@@ -433,6 +433,34 @@ div.dedupe-merge__list--rows {
 	white-space: nowrap;
 }
 
+/* A field drawn by its own component: the component lays itself out beside the pick, and
+   the row's label already names it. */
+.dedupe-merge__field--drawn {
+	align-items: stretch;
+}
+
+.dedupe-merge__drawn {
+	flex: 1 1 auto;
+	min-width: 0;
+	padding-block: calc(var(--base) / 2);
+}
+
+/* The cell spaces the component; the outer margin it keeps for a form goes, an inline one too. */
+.dedupe-merge__drawn > .form > .render-fields > * {
+	/* biome-ignore lint/complexity/noImportantStyles: nothing less beats a component's inline margin */
+	margin-block: 0 !important;
+}
+
+.dedupe-merge__drawn > .form > .render-fields > .field-type > :is(.field-label, h3) {
+	display: none;
+}
+
+/* A component draws no diff: a value that differs from the primary's is marked on its cell,
+   in the colour the version view marks a change with. */
+.dedupe-merge__cell--differs {
+	box-shadow: inset 3px 0 0 var(--theme-success-500);
+}
+
 .dedupe-merge__row-name {
 	display: flex;
 	align-items: center;

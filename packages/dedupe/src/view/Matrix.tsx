@@ -3,7 +3,7 @@
 import { CheckboxInput, Pill } from '@payloadcms/ui'
 import { type CSSProperties, memo, useRef } from 'react'
 
-import { isEmpty, listOf, normalize } from '../merge/compare'
+import { isEmpty, listOf, normalize, sameValue } from '../merge/compare'
 import { choosable, pickedItems, withChoice } from '../merge/plan'
 import type { DecisionView, DocRef } from '../merge/planResponse'
 import type { MergeChoice } from '../schema/types'
@@ -11,7 +11,15 @@ import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { ColumnHeader } from './ColumnHeader'
 import { Radio } from './native'
-import { isRows, type RowStates, Rows, rowStateKey, useRowStates } from './Rows'
+import {
+	Drawn,
+	drawsForm,
+	type FormStates,
+	formStateKey,
+	isRows,
+	Rows,
+	useFormStates,
+} from './Rows'
 import { diffOf, groupLabel, Plain, useFormat } from './Value'
 
 const baseClass = 'dedupe-merge'
@@ -31,7 +39,7 @@ type RowProps = {
 	/** Takes the key rather than closing over the decision, so the handler stays stable. */
 	onChoose: (key: string, choice: MergeChoice | undefined) => void
 	/** The form state each document's rows are drawn from; only for arrays and blocks. */
-	rowStates: RowStates | undefined
+	rowStates: FormStates | undefined
 	showDiff: boolean
 	survivor: string
 }
@@ -135,19 +143,48 @@ const FieldRow = ({
 								id: (index) => `dedupe-${decision.key}-${doc.id}-${index}`,
 								toggle: (index) => toggle({ doc: doc.id, index }),
 							}}
-							state={rowStates?.[rowStateKey(doc.id, decision.locale)]}
+							state={rowStates?.[formStateKey(doc.id, decision.locale)]}
 						/>
 					)
 				}
+				// A field drawn by its own component is shown with it, and has no diff inside: a cell
+				// that differs from the primary is marked instead.
+				const drawn = planned.component && !isEmpty(valueFor(doc.id))
+				const content = drawn ? (
+					<Drawn
+						collection={collection}
+						decision={planned}
+						state={rowStates?.[formStateKey(doc.id, decision.locale)]}
+					/>
+				) : (
+					shown
+				)
+				const marks = [
+					drawn ? `${baseClass}__field--drawn` : '',
+					drawn &&
+					showDiff &&
+					doc.id !== survivor &&
+					!sameValue(valueFor(doc.id), valueFor(survivor), planned)
+						? `${baseClass}__cell--differs`
+						: '',
+				]
 				const richText = decision.type === 'richText' ? `${baseClass}__rich-text` : ''
 				// A required field cannot be emptied, so its empty cells offer no pick.
 				if (!canPick || (decision.required && isEmpty(valueFor(doc.id)))) {
 					return (
 						<div
-							className={`${baseClass}__cell ${baseClass}__field ${baseClass}__field--read-only ${richText}`}
+							className={[
+								`${baseClass}__cell`,
+								`${baseClass}__field`,
+								`${baseClass}__field--read-only`,
+								richText,
+								...marks,
+							]
+								.filter(Boolean)
+								.join(' ')}
 							key={doc.id}
 						>
-							{shown}
+							{content}
 						</div>
 					)
 				}
@@ -203,6 +240,7 @@ const FieldRow = ({
 							`${baseClass}__field`,
 							picked === doc.id ? `${baseClass}__cell--picked` : '',
 							richText,
+							...marks,
 						]
 							.filter(Boolean)
 							.join(' ')}
@@ -212,7 +250,7 @@ const FieldRow = ({
 						name={decision.key}
 						onChange={() => onChoose(decision.key, { doc: doc.id })}
 					>
-						{shown}
+						{content}
 					</Radio>
 				)
 			})}
@@ -259,7 +297,7 @@ export const Matrix = ({
 	showDiff: boolean
 	survivor: string
 }) => {
-	const rowStates = useRowStates(collection, decisions, docs)
+	const rowStates = useFormStates(collection, decisions, docs)
 	const heads = useRef<HTMLDivElement>(null)
 	const body = useRef<HTMLDivElement>(null)
 	const shown = decisions.filter(
@@ -307,7 +345,7 @@ export const Matrix = ({
 						docs={docs}
 						key={decision.key}
 						onChoose={onChoose}
-						rowStates={isRows(decision) ? rowStates : undefined}
+						rowStates={drawsForm(decision) ? rowStates : undefined}
 						showDiff={showDiff}
 						survivor={survivor}
 					/>

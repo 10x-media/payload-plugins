@@ -27,26 +27,31 @@ const baseClass = 'dedupe-merge'
 export const isRows = (decision: Pick<DecisionView, 'list' | 'type'>): boolean =>
 	decision.list && (decision.type === 'array' || decision.type === 'blocks')
 
-/** The form state a document's rows are drawn from, per locale, or why it could not be built. */
-export type RowStates = Record<string, { state: FormState } | { error: string }>
+/** The form state a document's rows and drawn fields come from, per locale, or why it could not be built. */
+export type FormStates = Record<string, { state: FormState } | { error: string }>
 
-export const rowStateKey = (doc: string, locale: string | undefined): string =>
+export const formStateKey = (doc: string, locale: string | undefined): string =>
 	`${doc}@${locale ?? ''}`
 
+/** A field drawn from form state: rows, or a field with a component of its own. */
+export const drawsForm = (decision: Pick<DecisionView, 'component' | 'list' | 'type'>): boolean =>
+	isRows(decision) || decision.component
+
 /**
- * The form state of every document's arrays and blocks, built from the values the plan holds,
+ * The form state of every document's arrays, blocks and fields with components of their own,
+ * built from the values the plan holds,
  * one request per document and locale, as the bulk edit drawer builds the state of its fields.
  * A document whose rows did not change is not asked for again.
  */
-export const useRowStates = (
+export const useFormStates = (
 	collection: string,
 	decisions: DecisionView[],
 	docs: DocRef[]
-): RowStates => {
+): FormStates => {
 	const { getFormState } = useServerFunctions()
 	const { permissions } = useAuth()
 	const docPermissions = permissions?.collections?.[collection]
-	const [states, setStates] = useState<RowStates>({})
+	const [states, setStates] = useState<FormStates>({})
 	const asked = useRef(new Map<string, string>())
 
 	const requests = useMemo(() => {
@@ -54,9 +59,9 @@ export const useRowStates = (
 			string,
 			{ data: Record<string, unknown>; locale?: string; select: Record<string, unknown> }
 		>()
-		for (const decision of decisions.filter((entry) => !entry.hidden && isRows(entry))) {
+		for (const decision of decisions.filter((entry) => !entry.hidden && drawsForm(entry))) {
 			for (const doc of docs) {
-				const key = rowStateKey(doc.id, decision.locale)
+				const key = formStateKey(doc.id, decision.locale)
 				const request = out.get(key) ?? { data: {}, locale: decision.locale, select: {} }
 				const value = decision.values.find((entry) => entry.doc === doc.id)?.value
 				if (!isEmpty(value)) writePath(request.data, decision.path, value)
@@ -72,7 +77,7 @@ export const useRowStates = (
 			const signature = JSON.stringify([data, select])
 			if (asked.current.get(key) === signature) continue
 			asked.current.set(key, signature)
-			const settle = (state: RowStates[string]) => {
+			const settle = (state: FormStates[string]) => {
 				if (asked.current.get(key) === signature) {
 					setStates((current) => ({ ...current, [key]: state }))
 				}
@@ -179,6 +184,78 @@ const withPicks = (state: FormState, path: string): FormState =>
 			)
 	)
 
+/** The state of one field and what it holds, as the form keeps it. */
+const onlyField = (state: FormState, path: string): FormState =>
+	Object.fromEntries(
+		Object.entries(state).filter(([key]) => key === path || key.startsWith(`${path}.`))
+	)
+
+/** One field of a document as its own edit view draws it, read-only, from the state built for it. */
+const FieldForm = ({
+	collection,
+	path,
+	initialState,
+}: {
+	collection: string
+	path: string
+	initialState: FormState
+}) => {
+	const { getEntityConfig } = useConfig()
+	const { permissions, user } = useAuth()
+	const segments = path.split('.')
+	const field = fieldAt(getEntityConfig({ collectionSlug: collection })?.fields ?? [], segments)
+	// The reader's field access at the level the field sits in, so a field they may not read is not drawn.
+	const fieldPermissions = segments
+		.slice(0, -1)
+		.reduce<SanitizedFieldsPermissions>((level, name) => {
+			if (level === true) return true
+			const entry = level[name]
+			if (entry === undefined) return {}
+			return entry === true ? true : (entry.fields ?? true)
+		}, permissions?.collections?.[collection]?.fields ?? true)
+	if (!field) return <ShimmerEffect height={40} />
+	return (
+		<DocumentInfoProvider
+			collectionSlug={collection}
+			currentEditor={user as TypedUser}
+			hasPublishedDoc={false}
+			initialData={{}}
+			isLocked={false}
+			lastUpdateTime={0}
+			mostRecentVersionIsAutosaved={false}
+			unpublishedVersionCount={0}
+			versionCount={0}
+		>
+			<OperationProvider operation="update">
+				<Form el="div" initialState={initialState}>
+					<RenderFields
+						fields={[field]}
+						forceRender
+						parentIndexPath=""
+						parentPath={segments.slice(0, -1).join('.')}
+						parentSchemaPath={[collection, ...segments.slice(0, -1)].join('.')}
+						permissions={fieldPermissions}
+						readOnly
+					/>
+				</Form>
+			</OperationProvider>
+		</DocumentInfoProvider>
+	)
+}
+
+/** The form state a cell draws, or why it could not be built, while it is being built. */
+const Built = ({
+	state,
+	children,
+}: {
+	state: FormStates[string] | undefined
+	children: (form: FormState) => ReactNode
+}) => {
+	if (state && 'error' in state) return <Banner type="error">{state.error}</Banner>
+	if (!state) return <ShimmerEffect height={40} />
+	return children(state.state)
+}
+
 /**
  * A document's rows as its own edit view draws them, read-only, each with a check in its
  * label: a row opens to its fields, the rows inside it included.
@@ -192,63 +269,56 @@ export const Rows = ({
 	collection: string
 	decision: Pick<DecisionView, 'path'>
 	picks: Picks
-	state: RowStates[string] | undefined
+	state: FormStates[string] | undefined
 }) => {
-	const { getEntityConfig } = useConfig()
-	const { permissions, user } = useAuth()
-	const segments = decision.path.split('.')
-	const field = fieldAt(getEntityConfig({ collectionSlug: collection })?.fields ?? [], segments)
-	// The reader's field access at the level the field sits in, so a field they may not read is not drawn.
-	const fieldPermissions = segments
-		.slice(0, -1)
-		.reduce<SanitizedFieldsPermissions>((level, name) => {
-			if (level === true) return true
-			const entry = level[name]
-			if (entry === undefined) return {}
-			return entry === true ? true : (entry.fields ?? true)
-		}, permissions?.collections?.[collection]?.fields ?? true)
 	const form = state && 'state' in state ? state.state : undefined
 	// A new object makes the form start over, so it only changes with the state it is made from.
 	const initialState = useMemo(
 		() => (form ? withPicks(form, decision.path) : undefined),
 		[form, decision.path]
 	)
-
 	return (
 		<div className={`${baseClass}__cell ${baseClass}__rows`}>
-			{state && 'error' in state ? (
-				<Banner type="error">{state.error}</Banner>
-			) : !field || !initialState ? (
-				<ShimmerEffect height={40} />
-			) : (
-				<PicksContext value={picks}>
-					<DocumentInfoProvider
-						collectionSlug={collection}
-						currentEditor={user as TypedUser}
-						hasPublishedDoc={false}
-						initialData={{}}
-						isLocked={false}
-						lastUpdateTime={0}
-						mostRecentVersionIsAutosaved={false}
-						unpublishedVersionCount={0}
-						versionCount={0}
-					>
-						<OperationProvider operation="update">
-							<Form el="div" initialState={initialState}>
-								<RenderFields
-									fields={[field]}
-									forceRender
-									parentIndexPath=""
-									parentPath={segments.slice(0, -1).join('.')}
-									parentSchemaPath={[collection, ...segments.slice(0, -1)].join('.')}
-									permissions={fieldPermissions}
-									readOnly
-								/>
-							</Form>
-						</OperationProvider>
-					</DocumentInfoProvider>
-				</PicksContext>
-			)}
+			<Built state={state}>
+				{() =>
+					initialState ? (
+						<PicksContext value={picks}>
+							<FieldForm collection={collection} initialState={initialState} path={decision.path} />
+						</PicksContext>
+					) : null
+				}
+			</Built>
+		</div>
+	)
+}
+
+/**
+ * A field drawn by a component of its own, as the document's form draws it. Inert: a component
+ * that ignores `readOnly` still takes no click or key, and a click on it picks the cell.
+ */
+export const Drawn = ({
+	collection,
+	decision,
+	state,
+}: {
+	collection: string
+	decision: Pick<DecisionView, 'path'>
+	state: FormStates[string] | undefined
+}) => {
+	const form = state && 'state' in state ? state.state : undefined
+	const initialState = useMemo(
+		() => (form ? onlyField(form, decision.path) : undefined),
+		[form, decision.path]
+	)
+	return (
+		<div className={`${baseClass}__drawn`} inert>
+			<Built state={state}>
+				{() =>
+					initialState ? (
+						<FieldForm collection={collection} initialState={initialState} path={decision.path} />
+					) : null
+				}
+			</Built>
 		</div>
 	)
 }

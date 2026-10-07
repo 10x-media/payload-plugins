@@ -11,6 +11,11 @@ export const DEDUPE_FIELD_KEY = 'dedupe'
 export type DedupeFieldConfig = {
 	/** How the field combines when two documents merge. Overrides the type default. */
 	policy?: MergePolicy
+	/**
+	 * A group or list drawn by a `Field` component of its own is merged whole, as the component
+	 * shows it. `true` merges it field by field or row by row instead, as one without.
+	 */
+	split?: boolean
 }
 
 /**
@@ -36,12 +41,17 @@ export const readFieldConfig = (field: {
 }): DedupeFieldConfig | undefined => {
 	const raw = field.admin?.custom?.[DEDUPE_FIELD_KEY]
 	if (!raw || typeof raw !== 'object') return undefined
-	const policy = (raw as { policy?: unknown }).policy
-	if (policy === undefined) return {}
-	if (typeof policy !== 'string' || !POLICIES.has(policy)) {
+	const { policy, split } = raw as { policy?: unknown; split?: unknown }
+	if (policy !== undefined && (typeof policy !== 'string' || !POLICIES.has(policy))) {
 		throw new Error(
 			`dedupe: field "${field.name}" declares an unknown merge policy "${String(policy)}"`
 		)
 	}
-	return { policy: policy as MergePolicy }
+	if (split !== undefined && typeof split !== 'boolean') {
+		throw new Error(`dedupe: field "${field.name}" declares \`split\` other than true or false`)
+	}
+	return {
+		...(policy === undefined ? {} : { policy: policy as MergePolicy }),
+		...(split === undefined ? {} : { split }),
+	}
 }

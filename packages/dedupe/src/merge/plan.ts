@@ -115,6 +115,7 @@ const decide = (args: {
 			list: spec.list,
 			required: spec.required,
 			...(spec.relationTo ? { relationTo: spec.relationTo } : {}),
+			component: spec.component,
 			values,
 			...resolution,
 			conflict,

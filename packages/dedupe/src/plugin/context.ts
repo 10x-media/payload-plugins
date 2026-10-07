@@ -11,6 +11,8 @@ import {
 	type Where,
 } from 'payload'
 
+import { fieldIsVirtual } from 'payload/shared'
+
 import { resolveCompare } from '../match/presets'
 import type { ResolvedMatchField } from '../match/score'
 import type { MatchFieldConfig, ResolvedCollectionOptions, ResolvedOptions } from '../options'
@@ -124,16 +126,42 @@ const buildCollectionContext = (
 	const specByPath = new Map(spec.map((entry) => [entry.path, entry]))
 
 	const matchFields: ResolvedMatchField[] = (options.match?.fields ?? []).map((field) => {
-		const found = specByPath.get(field.path)
+		const segments = field.path.split('.')
+		const along = segments.map(
+			(_, index) =>
+				getFieldByPath({
+					fields: config.flattenedFields,
+					path: segments.slice(0, index + 1).join('.'),
+				})?.field
+		)
+		// A field inside a group merged whole has no entry of its own, and is read all the same.
+		const owner = spec.find(
+			(entry) =>
+				entry.type === 'group' &&
+				entry.component &&
+				!entry.localized &&
+				field.path.startsWith(`${entry.path}.`)
+		)
+		const leaf = along.at(-1)
+		const readable =
+			owner &&
+			leaf &&
+			!fieldIsVirtual(leaf) &&
+			!along.some((entry) => entry?.hidden === true) &&
+			!along
+				.slice(owner.path.split('.').length, -1)
+				.some(
+					(entry) =>
+						entry?.type === 'array' ||
+						entry?.type === 'blocks' ||
+						((entry?.type === 'group' || entry?.type === 'tab') && entry.localized === true)
+				)
+		const found =
+			specByPath.get(field.path) ??
+			(readable
+				? { type: leaf.type, localized: 'localized' in leaf && leaf.localized === true }
+				: undefined)
 		if (!found) {
-			const segments = field.path.split('.')
-			const along = segments.map(
-				(_, index) =>
-					getFieldByPath({
-						fields: config.flattenedFields,
-						path: segments.slice(0, index + 1).join('.'),
-					})?.field
-			)
 			const where = `match field "${field.path}" on collection "${options.slug}"`
 			const inside = along
 				.slice(0, -1)

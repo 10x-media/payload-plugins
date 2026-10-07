@@ -27,6 +27,11 @@ export type MergeFieldSpec = {
 	unique: boolean
 	required: boolean
 	relationTo?: string | string[]
+	/**
+	 * Drawn by a `Field` component of its own, which the merge screen shows. A group or list of
+	 * one is merged whole, unless it declares `split`.
+	 */
+	component: boolean
 }
 
 /** A field of the spec as one reviewer merges it. */
@@ -67,6 +72,8 @@ export type MergeDecision = {
 	/** An empty value is never picked for it. */
 	required: boolean
 	relationTo?: string | string[]
+	/** Drawn by a `Field` component of its own, which the merge screen shows. */
+	component: boolean
 	/** Every document's value, the survivor's first. */
 	values: DocValue[]
 	proposed: unknown

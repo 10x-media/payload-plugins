@@ -41,6 +41,7 @@ export const HIDX = 'hidx' as CollectionSlug
 export const GUIDES = 'guides' as CollectionSlug
 export const MANUALS = 'manuals' as CollectionSlug
 export const BRIEFS = 'briefs' as CollectionSlug
+export const CARDS = 'cards' as CollectionSlug
 export const PAGES = 'pages' as CollectionSlug
 
 export type Doc = Record<string, unknown> & { id: number | string }
@@ -71,6 +72,7 @@ export const pluginOptions: DedupePluginOptions = {
 		staff: {},
 		hidx: {},
 		briefs: {},
+		cards: {},
 		manuals: {
 			fields: (derived) =>
 				derived.map((spec) =>
@@ -710,6 +712,34 @@ const briefs: CollectionConfig = {
 	],
 }
 
+/**
+ * Fields drawn by components of their own: a phone as one input over a group, labels as chips
+ * over an array, a color as a swatch. The paths are never resolved: nothing renders here.
+ */
+const cards: CollectionConfig = {
+	slug: 'cards',
+	trash: true,
+	fields: [
+		{ name: 'name', type: 'text' },
+		{
+			name: 'phone',
+			type: 'group',
+			admin: { components: { Field: '/components/Phone#Phone' } },
+			fields: [
+				{ name: 'country', type: 'text' },
+				{ name: 'number', type: 'text' },
+			],
+		},
+		{
+			name: 'labels',
+			type: 'array',
+			admin: { components: { Field: '/components/Labels#Labels' } },
+			fields: [{ name: 'text', type: 'text' }],
+		},
+		{ name: 'color', type: 'text', admin: { components: { Field: '/components/Color#Color' } } },
+	],
+}
+
 /** A unique index over a field of a group hidden from the API. */
 const hidx: CollectionConfig = {
 	slug: 'hidx',
@@ -752,6 +782,7 @@ export const collectionsFor = (db: SupportedDb) => [
 	guides,
 	manuals,
 	briefs,
+	cards,
 ]
 
 /** A new object on every boot: Payload sanitizes the config's blocks in place. */

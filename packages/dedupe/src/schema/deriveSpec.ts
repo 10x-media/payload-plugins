@@ -65,7 +65,16 @@ const policyWithin = (fields: FlattenedField[], prefix: string, known: Known): s
 	return null
 }
 
+/** The field is drawn by a `Field` component of its own. */
+const hasComponent = (field: FlattenedField): boolean =>
+	Boolean((field.admin as { components?: { Field?: unknown } } | undefined)?.components?.Field)
+
+/** A group or list the merge takes whole: drawn as one by its own component, and not split. */
+const whole = (field: FlattenedField): boolean =>
+	hasComponent(field) && readFieldConfig(field)?.split !== true
+
 const isList = (field: FlattenedField): boolean => {
+	if (whole(field)) return false
 	if (field.type === 'array' || field.type === 'blocks') return true
 	if (
 		field.type === 'relationship' ||
@@ -112,7 +121,7 @@ const walk = (args: {
 
 		const localized = fieldShouldBeLocalized({ field, parentIsLocalized: args.parentIsLocalized })
 
-		if ((field.type === 'group' || field.type === 'tab') && !localized) {
+		if ((field.type === 'group' || field.type === 'tab') && !localized && !whole(field)) {
 			if (readFieldConfig(field)?.policy) {
 				throw new Error(
 					`dedupe: field "${path}" declares a merge policy, but a group is merged field by field; declare it on its fields`
@@ -124,7 +133,7 @@ const walk = (args: {
 		const inner = policyWithin(childrenOf(field, args.known), path, args.known)
 		if (inner) {
 			throw new Error(
-				`dedupe: field "${inner}" declares a merge policy inside rows or a localized group, which are merged whole; declare it on "${path}"`
+				`dedupe: field "${inner}" declares a merge policy inside rows, a localized group or a field drawn whole by its own component, which are merged whole; declare it on "${path}"`
 			)
 		}
 
@@ -140,6 +149,7 @@ const walk = (args: {
 			unique: 'unique' in field && field.unique === true,
 			required: 'required' in field && field.required === true,
 			...('relationTo' in field && field.relationTo ? { relationTo: field.relationTo } : {}),
+			component: hasComponent(field),
 		})
 	}
 }

@@ -15,6 +15,7 @@ const spec = (
 	hidden: false,
 	unique: false,
 	required: false,
+	component: false,
 	...overrides,
 })
 

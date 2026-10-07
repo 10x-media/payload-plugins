@@ -36,6 +36,23 @@ customers: {
 
 A path that is not in the schema fails at startup.
 
+### Fields with a component of their own
+
+A field with its own `admin.components.Field` is shown on the merge screen with that component, read-only, as the document's form shows it, and picked as one value. A group or list drawn by such a component is merged whole, never field by field or row by row: a phone stays one phone, and the fields the component keeps inside are never offered alone. A match field may still read a field inside such a group, such as `phone.number`.
+
+A component that is fine with being merged part by part declares it:
+
+```ts
+{
+  name: 'address',
+  type: 'group',
+  admin: { components: { Field: '/components/Address' }, custom: dedupeCustom({ split: true }) },
+  fields: [/* ... */],
+}
+```
+
+The screen draws no diff inside a component: a cell whose value differs from the primary's is marked instead.
+
 ## The screen
 
 Documents are columns and fields are rows. Pick the primary in a column head and a value per field; a list is picked item by item. "Only differences" hides the fields all documents agree on, and each document opens in a drawer.

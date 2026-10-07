@@ -165,6 +165,93 @@ describe('deriveSpec', () => {
 	})
 })
 
+describe('deriveSpec of a field with a component of its own', () => {
+	const own = { components: { Field: '/components/Own#Own' } }
+	const phone: FlattenedField = {
+		name: 'phone',
+		type: 'group',
+		admin: own,
+		fields: [],
+		flattenedFields: [
+			{ name: 'country', type: 'text' },
+			{ name: 'number', type: 'text' },
+		],
+	}
+	const labels: FlattenedField = {
+		name: 'labels',
+		type: 'array',
+		admin: own,
+		fields: [],
+		flattenedFields: [{ name: 'text', type: 'text' }],
+	}
+	const color: FlattenedField = { name: 'color', type: 'text', admin: own }
+	const spec = deriveSpec({ flattenedFields: [phone, labels, color] })
+	const at = (path: string) => spec.find((entry) => entry.path === path)
+
+	it('merges a group drawn by its own component whole, never part by part', () => {
+		expect(spec.map((entry) => entry.path)).toEqual(['phone', 'labels', 'color'])
+		expect(at('phone')).toMatchObject({ type: 'group', list: false, component: true })
+	})
+
+	it('takes a list drawn by its own component whole from one document', () => {
+		expect(at('labels')).toMatchObject({ type: 'array', list: false, component: true })
+	})
+
+	it('marks a value drawn by its own component, to be shown with it', () => {
+		expect(at('color')).toMatchObject({ type: 'text', component: true })
+		expect(deriveSpec({ flattenedFields: [{ name: 'plain', type: 'text' }] })[0]?.component).toBe(
+			false
+		)
+	})
+
+	it('splits a group or list whose component declares it may be merged part by part', () => {
+		const split = { ...own, custom: dedupeCustom({ split: true }) }
+		const parts = deriveSpec({
+			flattenedFields: [
+				{ ...phone, admin: split },
+				{ ...labels, admin: split },
+			] as FlattenedField[],
+		})
+		expect(parts.map((entry) => entry.path)).toEqual(['phone.country', 'phone.number', 'labels'])
+		expect(parts.find((entry) => entry.path === 'labels')).toMatchObject({ list: true })
+	})
+
+	it('takes a policy declared on such a group, and refuses one declared inside it', () => {
+		const declared = deriveSpec({
+			flattenedFields: [
+				{ ...phone, admin: { ...own, custom: dedupeCustom({ policy: 'manual' }) } },
+			] as FlattenedField[],
+		})
+		expect(declared[0]).toMatchObject({ path: 'phone', policy: 'manual' })
+		expect(() =>
+			deriveSpec({
+				flattenedFields: [
+					{
+						...phone,
+						flattenedFields: [
+							{
+								name: 'country',
+								type: 'text',
+								admin: { custom: dedupeCustom({ policy: 'manual' }) },
+							},
+						],
+					},
+				] as FlattenedField[],
+			})
+		).toThrow(/"phone.country".*declare it on "phone"/)
+	})
+
+	it('refuses a split flag that is not a boolean', () => {
+		expect(() =>
+			deriveSpec({
+				flattenedFields: [
+					{ ...phone, admin: { ...own, custom: { dedupe: { split: 'yes' } } } },
+				] as FlattenedField[],
+			})
+		).toThrow(/"phone".*split/)
+	})
+})
+
 describe('resolveSpec', () => {
 	const derived = deriveSpec({ flattenedFields: fields })
 
