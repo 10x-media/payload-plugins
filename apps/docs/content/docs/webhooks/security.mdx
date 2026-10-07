@@ -7,7 +7,7 @@ The plugin's security posture is simple to state: **admin access is the trust bo
 
 ## Operator-supplied URLs (SSRF)
 
-Deliveries POST to whatever URL a subscription specifies, including private and internal hosts. That is the feature working as designed for trusted admins, and an SSRF vector if your admins are not fully trusted. In that case:
+Deliveries POST to whatever URL a subscription specifies, including private and internal hosts. That is the feature working as designed for trusted admins, and an SSRF vector if your admins are not fully trusted. The subscription form checks only that the URL is absolute `http:` or `https:`; it does not judge the host, because localhost and private addresses are what development and internal receivers look like. If your admins are not fully trusted:
 
 - restrict outbound egress from the Payload host at the network layer, or
 - front receivers with an allowlist, or
@@ -15,9 +15,9 @@ Deliveries POST to whatever URL a subscription specifies, including private and 
 
 ## Access defaults
 
-- Both collections require a logged-in user for every permitted operation; delivery rows additionally refuse create and update from any user (server-only writes).
+- Both collections require a **user of the admin collection** (`admin.user`) for every permitted operation; delivery rows additionally refuse create and update from any user (server-only writes). "Any logged-in user" would be too wide here: an app with a second auth collection (customers, members) would let each of those accounts read the delivery log, which stores the full body of every document a watched collection emitted, and register a subscription pointing wherever it liked. If your operators live in another collection, widen the rule through the overrides below.
 - **Rotate secret** runs the subscriptions collection's configured `update` access for the target document. Overriding that access, including scoping it per tenant, governs the endpoint as well, so rotation cannot outlive the rule that guards ordinary writes.
-- **Redeliver** authorizes by login only: any authenticated user may redeliver any delivery. It cannot defer to the deliveries collection's access the way rotation does, because that collection denies create and update to everyone by design. Gate it at the network or reverse-proxy layer if that matters to you.
+- **Redeliver** runs the deliveries collection's configured `read` access for the target delivery: whoever may read a delivery may replay it. The collection denies create and update to everyone by design, so `read` is the rule there is to defer to, and an override that scopes the log per tenant scopes the replay with it. A delivery the caller cannot read answers 403 or 404, exactly as reading it would.
 
 Tighten either through the plugin's own [collection overrides](/webhooks/subscriptions#collection-overrides), which is also the supported way to add role-based or tenant-scoped rules:
 
@@ -30,6 +30,10 @@ webhooks({
   },
 })
 ```
+
+### Outbound requests
+
+A delivery does not follow redirects. A 3xx would re-send the signed request, custom headers included, to an address nobody entered in the subscription, and it is how a public URL reaches an internal host. The redirect is recorded as the failed delivery it is; enter the final URL instead. Only the first 2,000 characters of a response are read, so a receiver cannot make the server buffer an arbitrarily large body.
 
 ### Cross-site requests
 
@@ -71,15 +75,22 @@ What the sealed form adds is binding and detection. The ciphertext is bound by A
 
 That scope is pinned rather than derived from the collection slug, because the slug is a plugin option. Renaming the collection would otherwise make every stored secret fail authentication, with nothing able to recover them. **It must never change once secrets exist.**
 
+### Custom header values
+
+A subscription's custom header values are encrypted at rest with the same key ring, because that is where a receiver's own credential goes. Unlike the signing secret they are **masked, not write-only**: the admin shows dots with a reveal toggle, and a read through REST or GraphQL returns the value to whoever may read the subscription. Plenty of header values are not secrets, and an operator needs to read them back.
+
+A value stored before this release stays as it is and keeps working; it is sealed the next time the subscription is saved. A sealed value that can no longer be decrypted (its key left the ring) refuses the delivery, like an unrecoverable secret does: put the key back, or enter the value again.
+
 ### A secret that cannot be recovered refuses the delivery
 
-The row is marked `dead`, an error is logged naming the subscription, and nothing is sent. The error says which of three things happened, because each has a different fix:
+The row is marked `dead`, an error is logged naming the subscription, and nothing is sent. The error says which of these happened, because each has a different fix:
 
 | What the log says | What happened | What to do |
 |---|---|---|
 | `no configured key authenticates it` | `PAYLOAD_SECRET` changed, or a key was dropped from the ring | Pin the previous key in `secretEncryption.keys`, or rotate the secret |
 | `key id that is not in secretEncryption.keys` | The value was sealed under a key that is no longer configured | Put that key back in the ring, or rotate the secret |
-| `not a canonical 'whsec_' secret` | The row predates encryption at rest | Run [`encryptExistingSecrets`](#then-the-adoption-utility), or rotate the secret |
+| `the stored value is not encrypted` | The row predates encryption at rest. This is decided by the seal, so a plaintext value is refused even when it is already a well-formed `whsec_` secret | Run [`encryptExistingSecrets`](#then-the-adoption-utility), or rotate the secret |
+| `not a canonical 'whsec_' secret` | A sealed value that was not written through the plugin | Rotate the secret |
 
 <Callout type="warn">
 A subscription that is supposed to be signed is never downgraded to an unsigned delivery. Receivers commonly verify only when a signature header is present, so an unsigned POST would sail through that check. A refused delivery is a visible failure you can act on; a silently unsigned one is not.
@@ -144,7 +155,7 @@ Subscriptions created before this release hold plaintext secrets, and **their de
 
 ### Step zero: the schema migration
 
-This release adds columns to the subscriptions collection: `previous_secret`, `previous_secret_expires_at`, and `secret_hint`. (`secret_set` is virtual, computed on read from whether the sealed value is present, so it has no column.) On MongoDB that is free and there is nothing to do. **On any SQL adapter (Postgres, SQLite, Vercel Postgres) the migration has to run first**, or the adoption utility below writes into columns that do not exist yet.
+This release adds columns to the subscriptions collection: `previous_secret`, `previous_secret_expires_at`, and `secret_hint`, and one to the deliveries collection: `subscription_source`. (`secret_set` is virtual, computed on read from whether the sealed value is present, so it has no column.) On MongoDB that is free and there is nothing to do. **On any SQL adapter (Postgres, SQLite, Vercel Postgres) the migration has to run first**, or the adoption utility below writes into columns that do not exist yet.
 
 ```bash
 pnpm payload migrate:create add-webhook-secret-columns

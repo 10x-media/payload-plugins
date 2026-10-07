@@ -24,26 +24,37 @@ webhooks({
 })
 ```
 
+The keys are typed against your generated `CollectionSlug`, so a typo or a global's slug is a type error instead of a source that compiles and never emits. Without generated types the key is a plain `string`.
+
 | Field | Type | Description |
 |---|---|---|
 | `operations` | `('create' \| 'update' \| 'delete')[]` | Which writes emit events. Default: all three. |
 | `includePreviousData` | `boolean` | Add a `previousData` key to the body on `update` events. |
+| `includeDrafts` | `boolean` | Emit for a deliberate save that leaves the document a draft. Default `true`. See [Drafts and autosave](#drafts-and-autosave). |
 | `transform` | `({ doc, previousDoc, operation, req, target }) => unknown` | Reshape or redact before sending. Applied to the body's `data` and, with `includePreviousData`, to `previousData` as well, so redaction covers both. `target` (`'data'` or `'previousData'`) names the slot; on the `previousData` call `doc` is the prior document. |
 
-Events are named `<collection>.<created|updated|deleted>`: a create in `posts` emits `posts.created`. The hooks run `afterChange` and `afterDelete`, so a webhook never blocks or fails the write that caused it.
+Events are named `<collection>.<created|updated|deleted>`: a create in `posts` emits `posts.created`. The hooks run `afterChange` and `afterDelete`, and a webhook is treated as a side effect of the write: if dispatching throws, a `transform` of yours included, the error is logged and the write still succeeds. `transform` runs once per event, before any delivery row is created, so a throw there leaves nothing half-written.
+
+### Drafts and autosave
+
+On a collection with drafts enabled:
+
+- **Autosaves never emit.** The admin autosaves every time an editor pauses, so emitting would send a stream of half-typed documents and fill the delivery log. The deliberate save that follows emits as usual.
+- **A deliberate save that leaves the document a draft emits by default**, and the body's `data._status` says which it was. That default exists because an unpublish is such a save, and a receiver that mirrors published content has to hear about it.
+- Set `includeDrafts: false` on the collection to keep unpublished content from leaving at all. Only saves that leave the document published emit then, so an unpublish goes unannounced; `deleted` is unaffected.
 
 ## Admin-managed subscriptions
 
 The **Webhook Subscriptions** collection (slug `webhook-subscriptions` by default) is where operators register receivers:
 
-- `name`, `url`, and an `enabled` toggle
+- `name`, `url`, and an `enabled` toggle. The URL must be absolute `http:` or `https:` with no embedded credentials (put a receiver token in a custom header instead); anything else is rejected on save rather than surfacing later as a dead delivery. The host is not judged, so localhost and private addresses stay usable (see [Security](/webhooks/security#operator-supplied-urls-ssrf))
 - `events`: a multi-select of every event the opted-in collections can emit
-- `secret`: set on the create form only (generate one or supply your own), then write-only. It is encrypted at rest and stripped from every read; a read carries `secret_set` and `secret_hint` instead. On an existing subscription the **Rotate secret** button is the only way to change it. See [Signing](/webhooks/signing)
+- `secret`: set on the create form only (generate one or supply your own), then write-only. It is encrypted at rest and stripped from every read; a read carries `secret_set` and `secret_hint` instead. On an existing subscription the form shows the hint, read-only, so you can tell which key it holds, and the **Rotate secret** button beside Save is the only way to change it. See [Signing](/webhooks/signing)
 - `previousSecretExpiresAt`: set while a rotation grace period is open, when deliveries carry two signatures
-- `headers`: extra key/value headers injected on every delivery to this subscription. The names the plugin sets (`webhook-id`, `webhook-timestamp`, `webhook-signature`, `X-Webhook-Event`) are reserved and rejected here
+- `headers`: extra key/value headers injected on every delivery to this subscription. The names the plugin sets (`webhook-id`, `webhook-timestamp`, `webhook-signature`, `X-Webhook-Event`) are reserved and rejected here. Values are encrypted at rest, since this is where a receiver's own credential goes (`Authorization: Bearer ...`), and masked in the admin with a reveal toggle; see [Security](/webhooks/security#custom-header-values)
 - `description`: free-form notes
 
-All operations on the collection require a logged-in user.
+All operations on the collection require a user of the admin collection (`admin.user`), not just any logged-in user. See [Access defaults](/webhooks/security#access-defaults).
 
 ## Code subscriptions
 
@@ -64,7 +75,7 @@ webhooks({
 })
 ```
 
-`CodeSubscription` fields: `id`, `url`, `events`, plus optional `secret`, `headers`, and `enabled` (default on). Code and admin subscriptions are merged at delivery time; each matching subscription gets its own delivery row.
+`CodeSubscription` fields: `id`, `url`, `events`, plus optional `secret`, `headers`, and `enabled` (default on). Code and admin subscriptions are merged at delivery time; each matching subscription gets its own delivery row, which records whether it came from code or from the collection, so an `id` that happens to equal a database id cannot be confused with that row.
 
 `secret` must be in `whsec_<base64>` form, the same as an admin-managed one. A malformed value fails at startup, naming the subscription, rather than silently producing signatures no receiver can verify. Code subscriptions are not stored, so they are neither encrypted nor rotatable: change the environment variable and redeploy.
 
@@ -86,7 +97,11 @@ The subscriptions slug can be renamed freely: the stored secrets are bound to a 
 
 ## Collection overrides
 
-Both collections take an `overrides` slot, the same shape the other plugins in this family use. Top-level keys spread over the plugin's defaults, `access` and `admin` merge key by key, your hooks append after the plugin's, and `fields` receives the defaults to compose with. The slug is not overridable here (it has its own option, and the plugin wires it into the delivery task and the endpoints before the override runs).
+Both collections take an `overrides` slot, the same shape the other plugins in this family use. Top-level keys spread over the plugin's defaults, `access` and `admin` merge key by key, your hooks append after the plugin's, and `fields` receives the defaults to compose with. The slug is not overridable here (it has its own option, and the plugin wires it into the delivery task and the endpoints).
+
+Two parts of the plugin's own wiring are added after your override, so it cannot remove them: `endpoints` and `admin.components.edit.beforeDocumentControls` both add to the plugin's entries (the rotate-secret and redeliver endpoints and their buttons) rather than replacing them. The exception is `endpoints: false`, which turns the collection's REST surface off as it does on any collection, the plugin's endpoint and its button included. The write-only response strip also runs after your override, so an `encryptedField` you add through `fields` is stripped from reads like the plugin's own.
+
+`defaultFields` contains unnamed layout rows (Name and URL share one), so compose by appending or by matching on a field's `name` rather than by position.
 
 ```ts title="payload.config.ts"
 webhooks({

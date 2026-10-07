@@ -44,20 +44,21 @@ Each attempt aborts after `timeoutMs` and counts as a failure. In queue mode the
 
 ## The delivery log
 
-The **Webhook Deliveries** collection (slug `webhook-deliveries` by default) is append-only: rows are created and updated by the server, never by admin users (read and delete require login; create and update are closed).
+The **Webhook Deliveries** collection (slug `webhook-deliveries` by default) is append-only: rows are created and updated by the server, never by admin users (read and delete require a user of the admin collection; create and update are closed).
 
 | Field | Meaning |
 |---|---|
 | `status` | `pending`, `success`, `failed` (will retry), or `dead` (no more retries). |
 | `event`, `endpoint`, `subscriptionId` | What fired and where it went. |
+| `subscriptionSource` | `collection` or `code`: which registry `subscriptionId` belongs to. |
 | `attempt` | 1-based attempt count. |
-| `responseStatus`, `responseBody` | The receiver's HTTP status and body (body truncated to 2000 characters). |
+| `responseStatus`, `responseBody` | The receiver's HTTP status and body (only the first 2000 characters are read). A redirect is not followed, so a 3xx shows up here as the failure. |
 | `error`, `durationMs`, `jobId` | Failure message, round-trip time, and the Payload job id when queued. |
 | `payload` | The exact JSON body that was sent. |
 
 ## Redelivery
 
-Every delivery row has a **Redeliver** button, backed by `POST /api/webhook-deliveries/:id/redeliver` (requires a logged-in user; returns `202` with the new delivery id). Redelivery creates a fresh row and replays the original payload to the subscription's current URL through the configured mode, so a corrected endpoint receives the replay. A disabled or deleted subscription is not sent to; the new row lands as `dead`.
+Every delivery row has a **Redeliver** button beside Save, which asks for confirmation first. It is backed by `POST /api/webhook-deliveries/:id/redeliver` (requires read access to that delivery; returns `202` with the new delivery id). Redelivery creates a fresh row and replays the original payload to the subscription's current URL through the configured mode, so a corrected endpoint receives the replay. A disabled or deleted subscription is not sent to; the new row lands as `dead`.
 
 <Callout>
 A redelivery is a **new** delivery: the fresh row means a fresh `webhook-id`, so a receiver deduplicating on that id treats it as a distinct message rather than a repeat, and will process the payload again. Retries of a *failed* delivery keep the original `webhook-id`, so those do deduplicate. If replaying must not double-process, make your handler idempotent on something inside the body (`data.id`, a version field) rather than on `webhook-id` alone.

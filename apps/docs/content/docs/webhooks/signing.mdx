@@ -31,7 +31,7 @@ whsec_9ILRk4RIQ1cGqDbXxLKvcRs1kK5N5Qq5j1CQ5R1c2wA=
 
 The admin form's **Generate** action produces a secret the same shape, from 44 characters of base62. It runs in the browser, so the value is visible and copyable until you save and never again.
 
-The Signing secret field appears on the **create** form only. Once a subscription exists, [rotation](#rotation) is the single way to change its secret, and the **Rotate secret** button is its only control: a stored secret cannot be edited in place, because doing so with no grace window would break every receiver still holding the old one.
+The Signing secret field appears on the **create** form only. Once a subscription exists, [rotation](#rotation) is the single way to change its secret, and the **Rotate secret** button, beside Save, is its only control. The form shows the stored secret's hint (its last six characters) so you can tell which key a subscription holds. A stored secret cannot be edited in place, because doing so with no grace window would break every receiver still holding the old one.
 
 ## Request headers
 
@@ -182,7 +182,7 @@ The response carries the new secret once:
 }
 ```
 
-Both fields of the body are optional: `secret` supplies your own value instead of a generated one, and `graceSeconds` overrides the configured grace period for this rotation. A malformed body, an out-of-range `graceSeconds`, or an unusable `secret` returns 400 and changes nothing. A concurrent rotation of the same subscription returns 409; retry it.
+Both fields of the body are optional: `secret` supplies your own value instead of a generated one, and `graceSeconds` overrides the configured grace period for this rotation. A malformed body, an out-of-range `graceSeconds`, or an unusable `secret` returns 400 and changes nothing. A concurrent rotation of the same subscription returns 409; retry it. An id that does not exist returns 404.
 
 The endpoint runs the subscriptions collection's own `update` access for the target document, so tightening or tenant-scoping that access governs rotation too.
 
