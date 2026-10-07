@@ -13,7 +13,7 @@ import {
 	useModal,
 } from '@payloadcms/ui'
 import { useRouter } from 'next/navigation'
-import { type RefObject, useRef, useState } from 'react'
+import { type RefObject, useEffect, useRef, useState } from 'react'
 
 import type { TranslationKey } from '../translations/keys'
 import { keys } from '../translations/keys'
@@ -41,7 +41,10 @@ const MODAL_CLASS = 'confirmation-modal'
 /** Names the input and its label; `TextInput` derives the input's id from it. */
 const SECRET_PATH = 'webhooksRotatedSecret'
 
-/** Doc-view action that rotates the subscription's signing secret and reveals the new one once. */
+/**
+ * Document control, beside Save, that rotates the subscription's signing secret and reveals the
+ * new one once.
+ */
 export const RotateSecretButton = () => {
 	const { id, collectionSlug, docPermissions } = useDocumentInfo()
 	const { config } = useConfig()
@@ -52,6 +55,25 @@ export const RotateSecretButton = () => {
 	const revealSlug = useDrawerSlug('webhooks-rotate-reveal')
 	const [secret, setSecret] = useState<string | null>(null)
 	const secretRef = useRef<HTMLInputElement>(null)
+
+	/**
+	 * The modal provider closes the latest modal on Escape and offers no way to opt one out, which
+	 * here would discard the only copy of the new secret without the acknowledgement. While a secret
+	 * is on screen the key is stopped on its way down, before the provider's document listener.
+	 */
+	const revealing = secret !== null
+	useEffect(() => {
+		if (!revealing) {
+			return
+		}
+		const swallowEscape = (event: KeyboardEvent) => {
+			if (event.key === 'Escape') {
+				event.stopPropagation()
+			}
+		}
+		window.addEventListener('keydown', swallowEscape, true)
+		return () => window.removeEventListener('keydown', swallowEscape, true)
+	}, [revealing])
 
 	// The server returns 403 for a user the collection's update access denies, but the affordance
 	// should not be there in the first place.
@@ -117,16 +139,16 @@ export const RotateSecretButton = () => {
 	return (
 		<>
 			<Button
-				buttonStyle="secondary"
+				buttonStyle="subtle"
+				margin={false}
 				onClick={() => openModal(confirmSlug)}
-				size="small"
+				size="medium"
 				type="button"
 			>
 				{t(keys.rotateSecret)}
 			</Button>
 			<ConfirmationModal
 				body={t(keys.rotateSecretConfirm)}
-				cancelLabel={t(keys.rotateSecretCancel)}
 				confirmLabel={t(keys.rotateSecret)}
 				heading={t(keys.rotateSecretTitle)}
 				modalSlug={confirmSlug}

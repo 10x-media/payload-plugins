@@ -33,6 +33,7 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 			})
 			const subscription = await resolveSubscriptionById({
 				id: String(delivery.subscriptionId),
+				source: delivery.subscriptionSource,
 				codeSubscriptions: deps.codeSubscriptions,
 				subscriptionsSlug: deps.subscriptionsSlug,
 				payload,

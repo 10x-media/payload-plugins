@@ -18,6 +18,7 @@ import {
 	type ResolvedSubscription,
 	resolveCollectionRow,
 	type SubscriptionRow,
+	withReadableHeaders,
 } from '../plugin/resolveSubscriptions'
 import { eventId } from './eventTypes'
 
@@ -77,16 +78,46 @@ const resolveListening = async (args: {
 	// `JsonObject` is Payload's own shape for a document whose collection is not statically known,
 	// which is the case for every slug this plugin is handed.
 	const docs: JsonObject[] = res.docs
+	const rows = await withReadableHeaders({
+		payload,
+		req: args.req,
+		rows: docs as SubscriptionRow[],
+		subscriptionsSlug: args.deps.subscriptionsSlug,
+	})
 	const collection = await Promise.all(
-		docs.map((row) =>
-			resolveCollectionRow({
-				payload,
-				row: row as SubscriptionRow,
-				subscriptionsSlug: args.deps.subscriptionsSlug,
-			})
+		rows.map((row) =>
+			resolveCollectionRow({ payload, row, subscriptionsSlug: args.deps.subscriptionsSlug })
 		)
 	)
 	return matchSubscriptions([...code, ...collection], args.event)
+}
+
+/**
+ * Whether this write is one a receiver should hear about.
+ *
+ * An autosave never is. On an autosave collection the admin saves a draft every time the editor
+ * pauses, so emitting would send a stream of half-typed documents and fill the delivery log; the
+ * deliberate save that follows emits on its own. The flag only exists on the request's query,
+ * which is where the admin sets it.
+ *
+ * A deliberate save that leaves the document a draft emits unless the collection opted out. It is
+ * the default because an unpublish is such a save, and a receiver mirroring published content has
+ * to hear about that one.
+ */
+const shouldEmit = (args: {
+	config: CollectionWebhookConfig
+	doc: Record<string, unknown>
+	operation: WebhookOperation
+	req: PayloadRequest
+}): boolean => {
+	if (args.operation === 'delete') {
+		return true
+	}
+	const autosave = args.req.query?.autosave
+	if (autosave === true || autosave === 'true') {
+		return false
+	}
+	return args.config.includeDrafts !== false || args.doc._status !== 'draft'
 }
 
 const dispatch = async (args: {
@@ -97,7 +128,10 @@ const dispatch = async (args: {
 	req: PayloadRequest
 }): Promise<void> => {
 	const { deps, operation, doc, previousDoc, req } = args
-	if (!deps.operations.includes(operation)) {
+	if (
+		!deps.operations.includes(operation) ||
+		!shouldEmit({ config: deps.config, doc, operation, req })
+	) {
 		return
 	}
 	const { payload } = req
@@ -107,12 +141,25 @@ const dispatch = async (args: {
 		return
 	}
 
-	const occurredAt = new Date().toISOString()
+	// Built once, before any delivery row exists. The consumer's `transform` runs in here, and it
+	// is the likeliest thing in this function to throw: failing now leaves nothing half-written.
+	// Each delivery then only stamps its own id onto the result.
+	const template = buildPayload({
+		deliveryId: '',
+		collection: deps.collectionSlug,
+		operation,
+		doc,
+		previousDoc,
+		occurredAt: new Date().toISOString(),
+		config: deps.config,
+		req,
+	})
 	for (const subscription of subscriptions) {
 		const created = await payload.create({
 			collection: deps.deliveriesSlug as CollectionSlug,
 			data: {
 				subscriptionId: subscription.id,
+				subscriptionSource: subscription.source,
 				endpoint: subscription.url,
 				event,
 				status: 'pending',
@@ -122,16 +169,7 @@ const dispatch = async (args: {
 			req,
 		})
 		const deliveryId = String(created.id)
-		const body = buildPayload({
-			deliveryId,
-			collection: deps.collectionSlug,
-			operation,
-			doc,
-			previousDoc,
-			occurredAt,
-			config: deps.config,
-			req,
-		})
+		const body = { ...template, id: deliveryId }
 		await payload.update({
 			collection: deps.deliveriesSlug as CollectionSlug,
 			id: deliveryId,
@@ -141,10 +179,14 @@ const dispatch = async (args: {
 		})
 
 		if (deps.mode === 'queue') {
+			// On the caller's request, like the delivery row above, so the two share a transaction:
+			// a write that rolls back takes its job with it, and a runner cannot pick the job up
+			// before the row it points at is committed.
 			await payload.jobs.queue({
 				task: WEBHOOK_DELIVER_TASK,
 				input: { deliveryId },
 				queue: deps.queue,
+				req,
 			})
 			continue
 		}
@@ -193,12 +235,31 @@ const dispatch = async (args: {
 	}
 }
 
+/**
+ * Run a dispatch without letting it fail the write that caused it. A webhook is a side effect of
+ * the write, so a `transform` that throws, a delivery row that will not save, or a queue that is
+ * down is logged and dropped rather than turned into a failed save for the editor.
+ *
+ * On a SQL adapter a failed statement has already poisoned the surrounding transaction, so there
+ * the write still fails; what this guarantees everywhere is that nothing thrown from JavaScript,
+ * the consumer's `transform` above all, can do it.
+ */
+const dispatchSafely = async (args: Parameters<typeof dispatch>[0]): Promise<void> => {
+	try {
+		await dispatch(args)
+	} catch (err) {
+		args.req.payload.logger.error(
+			`@10x-media/webhooks: dispatching ${eventId(args.deps.collectionSlug, args.operation)} failed, so no webhook was sent for this write: ${err instanceof Error ? err.message : String(err)}`
+		)
+	}
+}
+
 /** afterChange hook factory for an opt-in source collection. */
 export const makeAfterChange =
 	(deps: WebhookDispatchDeps): CollectionAfterChangeHook =>
 	async ({ doc, previousDoc, operation, req }) => {
 		const op: WebhookOperation = operation === 'create' ? 'create' : 'update'
-		await dispatch({ deps, operation: op, doc, previousDoc, req })
+		await dispatchSafely({ deps, operation: op, doc, previousDoc, req })
 		return doc
 	}
 
@@ -206,6 +267,6 @@ export const makeAfterChange =
 export const makeAfterDelete =
 	(deps: WebhookDispatchDeps): CollectionAfterDeleteHook =>
 	async ({ doc, req }) => {
-		await dispatch({ deps, operation: 'delete', doc: doc as Record<string, unknown>, req })
+		await dispatchSafely({ deps, operation: 'delete', doc: doc as Record<string, unknown>, req })
 		return doc
 	}

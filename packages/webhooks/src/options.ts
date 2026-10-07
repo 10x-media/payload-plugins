@@ -1,5 +1,5 @@
 import type { KeysConfig } from '@10x-media/fields/encrypted'
-import type { CollectionConfig, Field, PayloadRequest } from 'payload'
+import type { CollectionConfig, CollectionSlug, Field, PayloadRequest } from 'payload'
 
 import {
 	DEFAULT_DELIVERY_QUEUE,
@@ -15,6 +15,14 @@ export type WebhookOperation = 'create' | 'update' | 'delete'
 export type CollectionWebhookConfig = {
 	operations?: WebhookOperation[]
 	includePreviousData?: boolean
+	/**
+	 * Emit for a deliberate save that leaves the document a draft. Default `true`, because an
+	 * unpublish is such a save and a receiver mirroring published content has to hear about it;
+	 * the body carries `_status`, so a receiver can tell. Set `false` to keep unpublished content
+	 * from leaving at all, at the cost of that signal. Autosaves never emit either way, and neither
+	 * setting matters on a collection without drafts.
+	 */
+	includeDrafts?: boolean
 	/**
 	 * Reshape or redact a document before it is sent. Applied to the body's `data` and,
 	 * when `includePreviousData` is set, to `previousData` as well, so redaction cannot
@@ -54,8 +62,9 @@ export type FieldsOverride = (args: { defaultFields: Field[] }) => Field[]
 /**
  * Override slot for a collection this plugin builds. Spread over our defaults, so any collection
  * key can be replaced; `fields` additionally accepts a function that receives our default fields
- * to compose with. The slug is not overridable here: it has its own option, and the plugin wires
- * it into the delivery task and the endpoints before the override runs.
+ * to compose with. Two things are not replaceable: the slug, which has its own option and is wired
+ * into the delivery task and the endpoints, and the plugin's own endpoints, which `endpoints` here
+ * adds to.
  */
 export type CollectionOverride = { fields?: FieldsOverride } & Partial<
 	Omit<CollectionConfig, 'fields' | 'slug'>
@@ -91,7 +100,12 @@ export type WebhooksPluginOptions = {
 	 * whole. App-level `i18n.translations` still wins over both.
 	 */
 	translations?: TranslationsOption
-	collections?: Record<string, true | CollectionWebhookConfig>
+	/**
+	 * Collections that emit events, keyed by slug. Typed against the host's generated
+	 * `CollectionSlug`, so a typo or a global's slug is a type error rather than a source that
+	 * compiles and then never emits; without generated types the key falls back to `string`.
+	 */
+	collections?: Partial<Record<CollectionSlug, true | CollectionWebhookConfig>>
 	subscriptions?: CodeSubscription[]
 	delivery?: DeliveryMode | DeliveryOptions
 	subscriptionsCollection?: { slug?: string; hidden?: boolean; overrides?: CollectionOverride }

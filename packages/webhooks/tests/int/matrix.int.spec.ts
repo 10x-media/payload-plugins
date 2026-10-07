@@ -14,10 +14,12 @@ describeForDb('webhooks outbound cross-db', {}, (db) => {
 	let sink: Server
 	let sinkUrl: string
 	let hits = 0
+	let authorization: string | undefined
 
 	beforeAll(async () => {
-		sink = createServer((_req, res) => {
+		sink = createServer((request, res) => {
 			hits += 1
+			authorization = request.headers.authorization
 			res.writeHead(200)
 			res.end('ok')
 		})
@@ -34,7 +36,15 @@ describeForDb('webhooks outbound cross-db', {}, (db) => {
 		})
 		await booted.payload.create({
 			collection: 'webhook-subscriptions',
-			data: { name: 's', url: sinkUrl, enabled: true, events: ['posts.created'] },
+			data: {
+				name: 's',
+				url: sinkUrl,
+				enabled: true,
+				events: ['posts.created'],
+				// Sealed at rest and decrypted for the send. Header rows are a subdocument array on Mongo
+				// and a joined table on Postgres, and the resolver matches them by row id across two reads.
+				headers: [{ key: 'Authorization', value: 'Bearer matrix-t0ken' }],
+			},
 			overrideAccess: true,
 		})
 		// Listens for a different event. The dispatcher narrows on the event in the `where` clause,
@@ -63,6 +73,8 @@ describeForDb('webhooks outbound cross-db', {}, (db) => {
 		expect(deliveries.totalDocs).toBe(1)
 		expect(deliveries.docs[0]?.status).toBe('success')
 		expect(deliveries.docs[0]?.event).toBe('posts.created')
+		expect(deliveries.docs[0]?.subscriptionSource).toBe('collection')
+		expect(authorization).toBe('Bearer matrix-t0ken')
 	})
 })
 

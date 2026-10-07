@@ -29,7 +29,8 @@
 		"next": "catalog:",
 		"payload": "catalog:",
 		"react": "catalog:",
-		"react-dom": "catalog:"
+		"react-dom": "catalog:",
+		"standardwebhooks": "catalog:"
 	},
 	"devDependencies": {
 		"@10x-media/tsconfig": "workspace:*",

@@ -226,6 +226,21 @@ describe('the rotate-secret endpoint handler', () => {
 		expect(await call({})).toMatchObject({ status: 400 })
 	})
 
+	/**
+	 * The default `access.update` is a boolean that never looks at the document, so an id that does
+	 * not exist gets as far as the rotation. Anything but a 404 would tell the caller to retry.
+	 */
+	it('returns 404 for a subscription that does not exist', async () => {
+		const gone = await subscribe('endpoint-gone')
+		await booted.payload.delete({
+			collection: 'webhook-subscriptions',
+			id: gone.id,
+			overrideAccess: true,
+		})
+		expect(await call({ id: String(gone.id) })).toMatchObject({ status: 404 })
+		expect(await call({ id: 'not-an-id' })).toMatchObject({ status: 404 })
+	})
+
 	it('returns 403 when the collection update access denies this document', async () => {
 		const created = await subscribe('endpoint-denied')
 		const { status } = await call({ access: () => false, id: String(created.id) })

@@ -16,7 +16,39 @@ export type DeliverResult = {
 	durationMs: number
 }
 
-/** POST `body` to `url` with a hard timeout; never throws. */
+/**
+ * Read at most `MAX_RESPONSE_BODY` characters of the response and drop the connection.
+ *
+ * `res.text()` would buffer the whole body first, and the body is whatever the far end chooses to
+ * send: a receiver, or anything else an operator-supplied URL points at, could hand back hundreds
+ * of megabytes inside the timeout, on every delivery.
+ */
+const readCapped = async (res: Response): Promise<string> => {
+	const reader = res.body?.getReader()
+	if (!reader) {
+		return ''
+	}
+	const decoder = new TextDecoder()
+	let text = ''
+	while (text.length < MAX_RESPONSE_BODY) {
+		const { done, value } = await reader.read()
+		if (done) {
+			break
+		}
+		text += decoder.decode(value, { stream: true })
+	}
+	await reader.cancel().catch(() => undefined)
+	return text.slice(0, MAX_RESPONSE_BODY)
+}
+
+/**
+ * POST `body` to `url` with a hard timeout; never throws.
+ *
+ * Redirects are not followed. A redirect would re-send the signed request, custom headers and
+ * all, to an address the operator never entered, and following one is how a public URL reaches an
+ * internal host. The 3xx is recorded as the failed delivery it is, so the fix is to enter the
+ * final URL.
+ */
 export const deliver = async (args: DeliverArgs): Promise<DeliverResult> => {
 	const controller = new AbortController()
 	const timer = setTimeout(() => controller.abort(), args.timeoutMs)
@@ -26,13 +58,13 @@ export const deliver = async (args: DeliverArgs): Promise<DeliverResult> => {
 			method: 'POST',
 			headers: args.headers,
 			body: args.body,
+			redirect: 'manual',
 			signal: controller.signal,
 		})
-		const text = await res.text()
 		return {
 			ok: res.ok,
 			responseStatus: res.status,
-			responseBody: text.slice(0, MAX_RESPONSE_BODY),
+			responseBody: await readCapped(res),
 			durationMs: Date.now() - start,
 		}
 	} catch (err) {

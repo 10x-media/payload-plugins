@@ -219,6 +219,63 @@ describe('webhook secrets are encrypted at rest', () => {
 		expect(isSealed(raw.secret)).toBe(true)
 	})
 
+	/**
+	 * Both rotation fields deny `update`, and the cleanup writes them from a collection hook. Field
+	 * access is settled before collection `beforeChange` hooks run, so the cleanup is not subject
+	 * to it: an ordinary admin save, which is the write that actually happens, clears the row too.
+	 */
+	it('clears a lapsed retired secret on an unprivileged write as well', async () => {
+		const created = await create(booted, 'lapsed-unprivileged')
+		await booted.payload.update({
+			collection: 'webhook-subscriptions',
+			id: String(created.id),
+			data: {
+				previousSecret: generateSecret(),
+				previousSecretExpiresAt: new Date(Date.now() - 60_000).toISOString(),
+			},
+			overrideAccess: true,
+		})
+		expect((await rawDocument(booted, 'lapsed-unprivileged')).previousSecret).toBeTruthy()
+
+		await booted.payload.update({
+			collection: 'webhook-subscriptions',
+			id: String(created.id),
+			data: { name: 'lapsed-unprivileged renamed' },
+			overrideAccess: false,
+			user: { id: 'someone', collection: 'users' } as never,
+		})
+
+		const raw = await rawDocument(booted, 'lapsed-unprivileged renamed')
+		expect(raw.previousSecret).toBeNull()
+		expect(raw.previousSecretExpiresAt).toBeNull()
+		expect(isSealed(raw.secret)).toBe(true)
+	})
+
+	/**
+	 * The hint is what the edit view shows for "which key is this", so an update must not be able
+	 * to relabel it, and denying the write must not stop the seal hook setting it on create.
+	 */
+	it('stores the hint on an unprivileged create and refuses to let an update rewrite it', async () => {
+		const supplied = generateSecret()
+		const created = await booted.payload.create({
+			collection: 'webhook-subscriptions',
+			data: { name: 'hint-guard', url: 'https://example.test', events: [], secret: supplied },
+			overrideAccess: false,
+			user: { id: 'someone', collection: 'users' } as never,
+		})
+		const hint = String((await rawDocument(booted, 'hint-guard')).secret_hint)
+		expect(hint.endsWith(supplied.slice(-SECRET_HINT_SUFFIX))).toBe(true)
+
+		await booted.payload.update({
+			collection: 'webhook-subscriptions',
+			id: String(created.id),
+			data: { secret_hint: 'spoofed' } as never,
+			overrideAccess: false,
+			user: { id: 'someone', collection: 'users' } as never,
+		})
+		expect((await rawDocument(booted, 'hint-guard')).secret_hint).toBe(hint)
+	})
+
 	it('survives a fresh Payload initialization against the same database', async () => {
 		const created = await create(booted, 'restart')
 		const plaintext = String(created[GENERATED_SECRET_KEY])

@@ -183,7 +183,7 @@ export interface WebhookSubscription {
   headers?:
     | {
         key: string;
-        value?: string | null;
+        value?: string;
         id?: string | null;
       }[]
     | null;
@@ -198,6 +198,7 @@ export interface WebhookSubscription {
 export interface WebhookDelivery {
   id: string;
   subscriptionId?: string | null;
+  subscriptionSource?: string | null;
   endpoint?: string | null;
   event?: string | null;
   status?: ('pending' | 'success' | 'failed' | 'dead') | null;
@@ -456,6 +457,7 @@ export interface WebhookSubscriptionsSelect<T extends boolean = true> {
  */
 export interface WebhookDeliveriesSelect<T extends boolean = true> {
   subscriptionId?: T;
+  subscriptionSource?: T;
   endpoint?: T;
   event?: T;
   status?: T;

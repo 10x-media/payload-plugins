@@ -145,6 +145,21 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 		expect(String(delivery?.error)).toMatch(/encryptExistingSecrets/)
 	})
 
+	/**
+	 * A plaintext value that already happens to be canonical `whsec_` would pass the wire-format
+	 * check, so the refusal has to be about the seal: it is unencrypted at rest all the same, and
+	 * signing with it would hide that the row was never adopted.
+	 */
+	it('refuses a plaintext secret even when it is already canonical whsec_', async () => {
+		await clear()
+		await subscribe('plaintext-whsec', generateSecret())
+
+		const { hit, delivery } = await deliver('plaintext-whsec')
+		expect(hit).toBeUndefined()
+		expect(delivery?.status).toBe('dead')
+		expect(String(delivery?.error)).toMatch(/not encrypted.*encryptExistingSecrets/)
+	})
+
 	it('delivers signed again once the legacy row is migrated', async () => {
 		await clear()
 		await subscribe('recovered', LEGACY_SECRET)

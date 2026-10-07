@@ -23,7 +23,8 @@ const mergeHooks = (
  * top-level keys spread over ours, admin/access merge key-by-key, consumer hooks append after
  * plugin hooks, and `fields` composes through the default-fields function. The slug is locked,
  * because the plugin has already wired it into the delivery task, the endpoints, and the
- * subscriptions lookup.
+ * subscriptions lookup. The caller attaches the plugin's endpoints and the encrypted-field
+ * response strip after this runs, so neither can be overridden away.
  */
 export const applyCollectionOverride = (
 	collection: CollectionConfig,

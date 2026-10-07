@@ -31,10 +31,16 @@ test('creating a post produces a successful delivery', async ({ page }) => {
 	await page.goto('/admin/collections/webhook-deliveries')
 	await page.waitForLoadState('networkidle')
 	await expect(page.getByText('posts.created').first()).toBeVisible({ timeout: 15_000 })
+	// The dev sink verifies the signature with the reference Standard Webhooks library and answers
+	// 401 otherwise, so "Delivered" here also means the delivery was signed correctly.
 	await expect(page.getByText('Delivered').first()).toBeVisible()
 })
 
-test('redeliver creates a second delivery', async ({ page }) => {
+/**
+ * A redelivery goes out under a fresh `webhook-id`, so a receiver that dedupes on the id processes
+ * it again. The confirmation is what keeps a stray click from causing that.
+ */
+test('redeliver confirms first, then creates a second delivery', async ({ page }) => {
 	await login(page)
 	await page.goto('/admin/collections/webhook-deliveries')
 	await page.waitForLoadState('networkidle')
@@ -42,6 +48,8 @@ test('redeliver creates a second delivery', async ({ page }) => {
 	await page.locator('tbody tr').first().getByRole('link').first().click()
 	await page.waitForURL('**/admin/collections/webhook-deliveries/**')
 	await page.getByRole('button', { name: 'Redeliver' }).click()
+	await expect(page.getByText('Send this payload again?')).toBeVisible()
+	await page.locator('#confirm-action').click()
 	await expect(page.getByText('Redelivery queued')).toBeVisible()
 	await page.goto('/admin/collections/webhook-deliveries')
 	await page.waitForLoadState('networkidle')
@@ -81,6 +89,12 @@ test('rotating a secret confirms first, then reveals the new secret in a dialog'
 	// unavailable and the copy falls back to a manual one.
 	await expect(revealed).toHaveAttribute('readonly', '')
 	await expect(revealed).not.toBeDisabled()
+
+	// Escape closes the latest modal everywhere else in the admin. Here it would throw away the
+	// only copy of the secret without the acknowledgement, so it has to do nothing.
+	await page.keyboard.press('Escape')
+	await expect(page.getByText('New signing secret')).toBeVisible()
+	await expect(revealed).toHaveValue(/^whsec_/)
 
 	// The copy action lives inside the input, over its trailing edge.
 	const copy = page.getByRole('button', { name: 'Copy' })
@@ -131,6 +145,12 @@ test('an existing subscription offers rotation as the only way to change its sec
 	await expect(page.getByRole('button', { name: 'Rotate secret' })).toBeVisible()
 	await expect(page.getByLabel('Replace value')).toBeHidden()
 	await expect(page.getByLabel('Generate new value')).toBeHidden()
+
+	// With the editor gone, the hint is what says which key this subscription holds: the gap
+	// marker and the last characters, never the secret, and not editable.
+	const hint = page.locator('#field-secret_hint')
+	await expect(hint).toHaveValue(/^·{4}\S{6}$/)
+	await expect(hint).toBeDisabled()
 })
 
 test('the create form offers Generate, where the value can still be copied', async ({ page }) => {

@@ -35,6 +35,7 @@ export const redeliverDelivery = async (args: {
 	// rather than whatever was stored at the time of the original delivery.
 	const subscription = await resolveSubscriptionById({
 		id: String(original.subscriptionId),
+		source: original.subscriptionSource,
 		codeSubscriptions: deps.codeSubscriptions,
 		subscriptionsSlug: deps.subscriptionsSlug,
 		payload,
@@ -44,6 +45,7 @@ export const redeliverDelivery = async (args: {
 		collection: deps.deliveriesSlug as CollectionSlug,
 		data: {
 			subscriptionId: original.subscriptionId,
+			subscriptionSource: original.subscriptionSource ?? subscription?.source,
 			endpoint: subscription?.url ?? original.endpoint,
 			event: original.event,
 			payload: original.payload,
@@ -62,6 +64,7 @@ export const redeliverDelivery = async (args: {
 			task: WEBHOOK_DELIVER_TASK,
 			input: { deliveryId: newId },
 			queue: deps.queue,
+			req,
 		})
 		return { id: newId }
 	}

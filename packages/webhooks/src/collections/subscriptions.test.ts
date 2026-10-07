@@ -1,6 +1,7 @@
 import {
 	type CollectionAfterChangeHook,
 	type CollectionBeforeValidateHook,
+	type Field,
 	type RequestContext,
 	ValidationError,
 } from 'payload'
@@ -14,8 +15,22 @@ import { buildSubscriptionsCollection } from './subscriptions'
 /** A wire string in `@10x-media/fields` sealed form, which is what a duplicate resubmits. */
 const SEALED = 'pfe1.k0.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA'
 
+/** Rows are layout only, so a named field may sit one level down from where it is stored. */
+const named = (fields: Field[], name: string): Field | undefined => {
+	for (const field of fields) {
+		if ('name' in field && field.name === name) {
+			return field
+		}
+		const nested = field.type === 'row' ? named(field.fields, name) : undefined
+		if (nested) {
+			return nested
+		}
+	}
+	return undefined
+}
+
 const find = (c: ReturnType<typeof buildSubscriptionsCollection>, name: string) =>
-	c.fields.find((f) => 'name' in f && f.name === name)
+	named(c.fields, name)
 
 const fakeReq = (context: RequestContext) => ({ context })
 
@@ -133,6 +148,96 @@ describe('buildSubscriptionsCollection', () => {
 		expect(find(c, secretSetName('secret'))).toBeDefined()
 		expect(find(c, secretSetName('previousSecret'))).toBeDefined()
 		expect(find(c, secretHintName('secret'))).toBeDefined()
+	})
+
+	/**
+	 * The secret field is create-only, so on an existing document its hint sibling is the only
+	 * thing that says which key the subscription holds.
+	 */
+	it('shows the active secret hint, read-only, on an existing document only', () => {
+		const hint = find(c, secretHintName('secret'))
+		if (hint?.type !== 'text') {
+			throw new Error('hint field missing')
+		}
+		expect(hint.admin?.hidden).toBe(false)
+		expect(hint.admin?.readOnly).toBe(true)
+		expect(hint.admin?.condition?.({}, {}, { operation: 'update' } as never)).toBe(true)
+		expect(hint.admin?.condition?.({}, {}, { operation: 'create' } as never)).toBe(false)
+		expect(hint.access?.update?.({} as never)).toBe(false)
+		expect(hint.access?.create?.({} as never)).toBe(false)
+	})
+
+	/**
+	 * A subscription decides where every emitted document is sent, so "any logged-in user" would
+	 * let an account in a second auth collection point one at its own server.
+	 */
+	it('allows only users of the admin collection by default', () => {
+		const as = (user: unknown) =>
+			({ req: { payload: { config: { admin: { user: 'users' } } }, user } }) as never
+		for (const operation of ['read', 'create', 'update', 'delete'] as const) {
+			expect(c.access?.[operation]?.(as({ collection: 'users', id: '1' })), operation).toBe(true)
+			expect(c.access?.[operation]?.(as({ collection: 'customers', id: '1' })), operation).toBe(
+				false
+			)
+			expect(c.access?.[operation]?.(as(undefined)), operation).toBe(false)
+		}
+	})
+
+	describe('custom header values', () => {
+		const value = () => {
+			const headers = find(c, 'headers')
+			const field = headers && 'fields' in headers ? named(headers.fields, 'value') : undefined
+			if (!field) {
+				throw new Error('header value field missing')
+			}
+			return field
+		}
+
+		/** This is where a receiver's own credential goes, so it is sealed like the secret is. */
+		it('is an encrypted field, bound to the pinned scope rather than the slug', () => {
+			const marker = (value().custom as Record<string, { encrypted?: { aadScope?: string } }>)[
+				'@10x-media/fields'
+			]?.encrypted
+			expect(marker?.aadScope).toBe('10x-webhooks:subscriptions')
+		})
+	})
+
+	describe('endpoint url', () => {
+		const validateUrl = (value: unknown) => {
+			const url = find(c, 'url')
+			if (!url || !('validate' in url) || !url.validate) {
+				throw new Error('url validate missing')
+			}
+			return (url.validate as (v: unknown, o: unknown) => string | true)(value, {
+				req: { t: (k: string) => k },
+			})
+		}
+
+		it('accepts absolute http and https urls, localhost included', () => {
+			expect(validateUrl('https://crm.example.com/hooks/orders')).toBe(true)
+			expect(validateUrl('http://localhost:3000/api/webhook-sink')).toBe(true)
+			expect(validateUrl('http://10.0.0.5:8080')).toBe(true)
+		})
+
+		/** These save fine as text and then make `fetch` throw at delivery time. */
+		it('rejects anything fetch could not POST to', () => {
+			const unusable = [
+				'123',
+				'example.com/hook',
+				'/api/hook',
+				'ftp://example.com',
+				'mailto:a@b.c',
+				'https://user:pass@crm.example.com/hook',
+			]
+			for (const value of unusable) {
+				expect(validateUrl(value), value).toBe(keys.urlInvalid)
+			}
+		})
+
+		it('still rejects an empty value, which required alone no longer covers', () => {
+			expect(validateUrl(undefined)).toBe('validation:required')
+			expect(validateUrl('  ')).toBe('validation:required')
+		})
 	})
 
 	describe('generated secrets', () => {
@@ -274,10 +379,7 @@ describe('buildSubscriptionsCollection', () => {
 		 */
 		const validateKey = () => {
 			const headers = find(c, 'headers')
-			const key =
-				headers && 'fields' in headers
-					? headers.fields.find((f) => 'name' in f && f.name === 'key')
-					: undefined
+			const key = headers && 'fields' in headers ? named(headers.fields, 'key') : undefined
 			if (!key || !('validate' in key) || !key.validate) {
 				throw new Error('header key validate missing')
 			}

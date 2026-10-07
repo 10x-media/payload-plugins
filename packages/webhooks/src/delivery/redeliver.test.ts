@@ -138,6 +138,8 @@ describe('redeliverDelivery', () => {
 			task: WEBHOOK_DELIVER_TASK,
 			input: { deliveryId: 'del-2' },
 			queue: deps.queue,
+			// The caller's request, so the job shares the transaction the new row was created in.
+			req,
 		})
 	})
 })

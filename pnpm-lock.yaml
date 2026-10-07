@@ -2393,6 +2393,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.6(react@19.2.6)
+      standardwebhooks:
+        specifier: 'catalog:'
+        version: 1.0.0
     devDependencies:
       '@10x-media/tsconfig':
         specifier: workspace:*

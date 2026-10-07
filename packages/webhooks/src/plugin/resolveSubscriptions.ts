@@ -1,5 +1,5 @@
-import { withRawEncrypted } from '@10x-media/fields/encrypted'
-import type { CollectionSlug, Payload, PayloadRequest } from 'payload'
+import { isSealed, withRawEncrypted } from '@10x-media/fields/encrypted'
+import type { CollectionSlug, JsonObject, Payload, PayloadRequest } from 'payload'
 
 import type { CodeSubscription } from '../options'
 import { InvalidSecretError, normalizeSecret } from '../secrets/format'
@@ -42,6 +42,12 @@ export type ResolvedSubscription = {
 	 */
 	secretHidden: boolean
 	headers?: Record<string, string>
+	/**
+	 * A custom header value is stored encrypted and could not be recovered. Refused like an
+	 * unusable secret: a receiver that authenticates on that header would otherwise be sent the
+	 * request without it.
+	 */
+	headersUnusable: boolean
 	enabled: boolean
 }
 
@@ -83,9 +89,13 @@ export type SubscriptionRow = {
 	secret?: string | null
 	previousSecret?: string | null
 	previousSecretExpiresAt?: string | Date | null
-	headers?: { key?: string | null; value?: string | null }[] | null
+	headers?: SubscriptionHeader[] | null
+	/** Set by `withReadableHeaders` when a sealed header value could not be decrypted. */
+	headersUnreadable?: boolean
 	enabled?: boolean | null
 } & Record<string, unknown>
+
+type SubscriptionHeader = { id?: string | null; key?: string | null; value?: string | null }
 
 /**
  * Classify one stored secret field of a row.
@@ -144,9 +154,7 @@ const foldSecrets = (
 	retiredSecretUnusableReason: retired.state === 'unusable' ? retired.reason : undefined,
 })
 
-const rowHeaders = (
-	headers?: { key?: string | null; value?: string | null }[] | null
-): Record<string, string> | undefined => {
+const rowHeaders = (headers?: SubscriptionHeader[] | null): Record<string, string> | undefined => {
 	if (!headers?.length) {
 		return undefined
 	}
@@ -183,8 +191,58 @@ export const fromCollectionRow = (
 	events: row.events ?? [],
 	...foldSecrets(secrets.active, secrets.retired),
 	headers: rowHeaders(row.headers),
+	headersUnusable: row.headersUnreadable === true,
 	enabled: row.enabled !== false,
 })
+
+/**
+ * Swap in decrypted header values for rows read inside the raw window.
+ *
+ * Header values are encrypted at rest, and the window that exposes the signing secret's ciphertext
+ * also stops them being decrypted on read. `encryptedField` offers no way to decrypt a value
+ * inside an array row by path, so the rows that carry sealed values are read once more outside the
+ * window, where the field decrypts itself. Rows with no sealed header, which is every row in
+ * `queue` mode and every subscription without custom headers, cost nothing.
+ *
+ * A value that still does not come back as text marks the row unreadable. The same goes for a row
+ * the second read no longer finds, so ciphertext is never left behind to be sent as a header.
+ */
+export const withReadableHeaders = async (args: {
+	payload: Payload
+	req: PayloadRequest
+	subscriptionsSlug: string
+	rows: SubscriptionRow[]
+}): Promise<SubscriptionRow[]> => {
+	const sealed = args.rows.filter((row) => row.headers?.some((h) => isSealed(h.value)))
+	if (!sealed.length) {
+		return args.rows
+	}
+	const res = await args.payload.find({
+		collection: args.subscriptionsSlug as CollectionSlug,
+		where: { id: { in: sealed.map((row) => row.id) } },
+		limit: sealed.length,
+		depth: 0,
+		overrideAccess: true,
+		req: args.req,
+		select: { headers: true } as never,
+	})
+	const readable = new Map(
+		(res.docs as SubscriptionRow[]).map((doc) => [String(doc.id), doc.headers ?? []])
+	)
+	return args.rows.map((row) => {
+		if (!sealed.includes(row)) {
+			return row
+		}
+		const headers = readable.get(String(row.id))
+		const recovered = (header: SubscriptionHeader) =>
+			!isSealed(header.value) || typeof headers?.find((h) => h.id === header.id)?.value === 'string'
+		return {
+			...row,
+			headers: headers ?? [],
+			headersUnreadable: !headers || !(row.headers ?? []).every(recovered),
+		}
+	})
+}
 
 /**
  * Normalize a subscriptions-collection row read inside the raw window, decrypting both secret
@@ -219,6 +277,11 @@ export const resolveCollectionRow = async (args: {
 			`@10x-media/webhooks: the retired signing secret for ${subject}, still inside its rotation grace window, could not be recovered and has been dropped, so receivers that have not moved off it lose their overlap early. Deliveries continue, signed with the current secret. Reason: ${retired.reason}`
 		)
 	}
+	if (row.headersUnreadable) {
+		payload.logger.error(
+			`@10x-media/webhooks: a custom header value for ${subject} is stored encrypted and could not be decrypted, so deliveries for this subscription will fail instead of being sent without it. Put the key it was sealed under back in secretEncryption.keys, or enter the header value again.`
+		)
+	}
 	return fromCollectionRow(row, { active, retired })
 }
 
@@ -230,6 +293,7 @@ export const fromCodeSubscription = (sub: CodeSubscription): ResolvedSubscriptio
 	events: sub.events,
 	...foldSecrets(plaintextSlot(sub.secret), ABSENT),
 	headers: sub.headers,
+	headersUnusable: false,
 	enabled: sub.enabled !== false,
 })
 
@@ -263,6 +327,13 @@ export const decideDelivery = (subscription: ResolvedSubscription | null): Deliv
 			reason: 'signing secret was not read for signing; refused rather than sent unsigned',
 		}
 	}
+	if (subscription.headersUnusable) {
+		return {
+			deliverable: false,
+			reason:
+				'a custom header value could not be decrypted, so the delivery was refused rather than sent without it: put its key back in secretEncryption.keys, or enter the header value again',
+		}
+	}
 	return { deliverable: true, subscription }
 }
 
@@ -272,17 +343,26 @@ export const matchSubscriptions = (
 	event: string
 ): ResolvedSubscription[] => subs.filter((s) => s.enabled && s.events.includes(event))
 
-/** Look up one subscription by id (code first, then the collection). */
+/**
+ * Look up one subscription by id, in the registry the delivery recorded. A code subscription and a
+ * collection row can share an id, so `source` decides; without one (a delivery written before the
+ * source was stored) code is tried first and then the collection.
+ */
 export const resolveSubscriptionById = async (args: {
 	id: string
+	source?: unknown
 	codeSubscriptions: CodeSubscription[]
 	subscriptionsSlug: string
 	payload: Payload
 	req: PayloadRequest
 }): Promise<ResolvedSubscription | null> => {
-	const code = args.codeSubscriptions.find((s) => s.id === args.id)
+	const code =
+		args.source === 'collection' ? undefined : args.codeSubscriptions.find((s) => s.id === args.id)
 	if (code) {
 		return fromCodeSubscription(code)
+	}
+	if (args.source === 'code') {
+		return null
 	}
 	const res = await withRawEncrypted(args.req, () =>
 		args.payload.find({
@@ -294,7 +374,15 @@ export const resolveSubscriptionById = async (args: {
 			req: args.req,
 		})
 	)
-	const row = res.docs[0] as SubscriptionRow | undefined
+	// `JsonObject` is Payload's own shape for a document whose collection is not statically known,
+	// which is the case for a slug handed over as an option.
+	const docs: JsonObject[] = res.docs
+	const [row] = await withReadableHeaders({
+		payload: args.payload,
+		req: args.req,
+		rows: docs as SubscriptionRow[],
+		subscriptionsSlug: args.subscriptionsSlug,
+	})
 	return row
 		? resolveCollectionRow({
 				payload: args.payload,

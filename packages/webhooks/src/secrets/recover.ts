@@ -2,6 +2,7 @@ import {
 	AuthenticationFailedError,
 	CorruptPlaintextError,
 	decryptFieldValue,
+	isSealed,
 	MalformedCiphertextError,
 	UnknownKeyIdError,
 } from '@10x-media/fields/encrypted'
@@ -40,14 +41,16 @@ const reasonFor = (err: unknown): string => {
 /**
  * Recover the plaintext behind one stored secret field.
  *
- * A value that is not a sealed wire string comes back from `decryptFieldValue` unchanged, which
- * is what an unmigrated pre-encryption secret looks like; the `whsec_` check below is what
- * catches it, so a legacy row is refused with a message naming the adoption utility rather than
- * being signed with silently.
+ * A value that is not a sealed wire string would come back from `decryptFieldValue` unchanged,
+ * which is what an unmigrated pre-encryption secret looks like, so it is refused before it gets
+ * there, with a message naming the adoption utility. The seal is what is checked rather than the
+ * shape of the value: a legacy secret that already happens to be canonical `whsec_` is plaintext
+ * at rest all the same, and signing with it would hide that the row was never adopted.
  *
- * The check insists the recovered value already be canonical rather than normalizing it here.
- * Every write normalizes on the way in, so a stored secret that is not canonical did not come
- * through this plugin, and quietly repairing it would sign with a key the operator never chose.
+ * The canonical check after decryption insists the recovered value already be canonical rather
+ * than normalizing it here. Every write normalizes on the way in, so a stored secret that is not
+ * canonical did not come through this plugin, and quietly repairing it would sign with a key the
+ * operator never chose.
  */
 export const recoverSecret = async (args: {
 	payload: Payload
@@ -55,6 +58,13 @@ export const recoverSecret = async (args: {
 	path: 'previousSecret' | 'secret'
 	value: string
 }): Promise<RecoveredSecret> => {
+	if (!isSealed(args.value)) {
+		return {
+			ok: false,
+			reason:
+				'the stored value is not encrypted, which is what a row written before encryption at rest looks like: run encryptExistingSecrets(), or rotate the secret',
+		}
+	}
 	let plaintext: unknown
 	try {
 		plaintext = await decryptFieldValue(args.payload, {
@@ -70,6 +80,6 @@ export const recoverSecret = async (args: {
 	}
 	return {
 		ok: false,
-		reason: `the recovered value is not a canonical '${SECRET_PREFIX}' secret, which is what a row written before encryption at rest looks like: run encryptExistingSecrets(), or rotate the secret`,
+		reason: `the recovered value is not a canonical '${SECRET_PREFIX}' secret, so it was not written through this plugin; rotate the secret`,
 	}
 }

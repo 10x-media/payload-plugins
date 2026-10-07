@@ -1,7 +1,7 @@
 /**
  * Typed translation keys. Lookups must go through these constants, not string
- * literals. Every key here must have a value in every locale (`en.ts`), or it is
- * a type error.
+ * literals. Every key here must have a value in every locale file beside this one, or
+ * it is a type error.
  */
 export const keys = {
 	pluginName: 'webhooks:pluginName',
@@ -11,6 +11,7 @@ export const keys = {
 	deliveryPlural: 'webhooks:deliveryPlural',
 	fieldName: 'webhooks:fieldName',
 	fieldUrl: 'webhooks:fieldUrl',
+	urlInvalid: 'webhooks:urlInvalid',
 	fieldEnabled: 'webhooks:fieldEnabled',
 	fieldEvents: 'webhooks:fieldEvents',
 	fieldSecret: 'webhooks:fieldSecret',
@@ -18,7 +19,6 @@ export const keys = {
 	fieldPreviousSecretExpires: 'webhooks:fieldPreviousSecretExpires',
 	fieldPreviousSecretExpiresHelp: 'webhooks:fieldPreviousSecretExpiresHelp',
 	rotateSecret: 'webhooks:rotateSecret',
-	rotateSecretCancel: 'webhooks:rotateSecretCancel',
 	rotateSecretAcknowledge: 'webhooks:rotateSecretAcknowledge',
 	rotateSecretCopy: 'webhooks:rotateSecretCopy',
 	rotateSecretCopied: 'webhooks:rotateSecretCopied',
@@ -35,6 +35,7 @@ export const keys = {
 	fieldHeaders: 'webhooks:fieldHeaders',
 	headerReserved: 'webhooks:headerReserved',
 	headerInvalid: 'webhooks:headerInvalid',
+	headerValueInvalid: 'webhooks:headerValueInvalid',
 	fieldDescription: 'webhooks:fieldDescription',
 	statusPending: 'webhooks:statusPending',
 	statusSuccess: 'webhooks:statusSuccess',
@@ -42,6 +43,8 @@ export const keys = {
 	statusDead: 'webhooks:statusDead',
 	redeliver: 'webhooks:redeliver',
 	redeliverDone: 'webhooks:redeliverDone',
+	redeliverFailed: 'webhooks:redeliverFailed',
+	redeliverConfirm: 'webhooks:redeliverConfirm',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

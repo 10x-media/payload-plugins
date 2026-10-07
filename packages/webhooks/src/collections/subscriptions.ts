@@ -1,4 +1,4 @@
-import { isSealed, type KeysConfig } from '@10x-media/fields/encrypted'
+import { encryptedField, isSealed, type KeysConfig } from '@10x-media/fields/encrypted'
 import {
 	type CollectionAfterChangeHook,
 	type CollectionBeforeChangeHook,
@@ -8,12 +8,13 @@ import {
 	ValidationError,
 } from 'payload'
 
-import { ADMIN_GROUP, GENERATED_SECRET_KEY } from '../constants'
+import { ADMIN_GROUP, GENERATED_SECRET_KEY, SECRET_AAD_SCOPE } from '../constants'
 import { isReservedHeader, isValidHeaderName } from '../delivery/headers'
 import { generateSecret, normalizeSecret } from '../secrets/format'
 import { buildSecretFields } from '../secrets/secretFields'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
+import { adminUser } from './access'
 
 /**
  * Carries a create's generated secret from the hook that made it to the hook that returns it.
@@ -128,9 +129,12 @@ const revealGeneratedSecret: CollectionAfterChangeHook = ({ doc, operation, req 
 
 /**
  * Retired key material whose grace window has closed is inert (the resolver ignores a lapsed
- * window), but there is no reason to keep it. Clearing it on the next privileged write of the row
- * is free, needs no scheduler, and cannot race a delivery the way a write from the delivery path
- * could.
+ * window), but there is no reason to keep it. Clearing it on the next write of the row is free,
+ * needs no scheduler, and cannot race a delivery the way a write from the delivery path could.
+ *
+ * Any write qualifies, an ordinary admin save included. Both fields deny `update`, but field access
+ * is settled while the incoming data is validated, before collection `beforeChange` hooks run, so
+ * what this hook sets is not subject to it.
  *
  * Payload merges the stored document into `data`, so the retired secret is present on every
  * update as its own ciphertext; presence alone therefore says nothing. Only an unsealed value or
@@ -155,7 +159,41 @@ const clearLapsedRotation: CollectionBeforeChangeHook = ({ data, originalDoc }) 
 	return { ...data, previousSecret: null, previousSecretExpiresAt: null }
 }
 
-const loggedIn = ({ req }: { req: { user?: unknown } }) => Boolean(req.user)
+/**
+ * An endpoint has to be an absolute `http:` or `https:` URL. Anything else saves fine and then
+ * makes `fetch` throw at delivery time, so the operator would find out from a dead delivery row
+ * rather than from the form. Embedded credentials are the same case: `fetch` refuses a URL that
+ * carries them, and a receiver's token belongs in a custom header. Which hosts are reachable is
+ * deliberately not judged here: localhost and private addresses are what development and internal
+ * receivers look like.
+ */
+const validateUrl = (
+	value: string | null | undefined,
+	{ req }: { req: PayloadRequest }
+): string | true => {
+	if (typeof value !== 'string' || value.trim() === '') {
+		return req.t('validation:required')
+	}
+	const url = URL.canParse(value) ? new URL(value) : null
+	const usable =
+		url !== null &&
+		(url.protocol === 'http:' || url.protocol === 'https:') &&
+		url.username === '' &&
+		url.password === ''
+	return usable ? true : asTranslate(req.t)(keys.urlInvalid)
+}
+
+/**
+ * A line break or a NUL in a header value makes `fetch` throw at delivery time, the same way a
+ * malformed name does. The admin's text input cannot produce one, but REST and GraphQL can.
+ */
+const validateHeaderValue = (
+	value: string | null | undefined,
+	{ req }: { req: PayloadRequest }
+): string | true =>
+	typeof value === 'string' && /[\r\n\0]/.test(value)
+		? asTranslate(req.t)(keys.headerValueInvalid)
+		: true
 
 /** Admin-managed subscriptions collection; `events` options come from the catalog. */
 export const buildSubscriptionsCollection = (args: {
@@ -175,20 +213,33 @@ export const buildSubscriptionsCollection = (args: {
 		defaultColumns: ['name', 'url', 'enabled'],
 		hidden: args.hidden,
 	},
-	access: { read: loggedIn, create: loggedIn, update: loggedIn, delete: loggedIn },
+	access: { read: adminUser, create: adminUser, update: adminUser, delete: adminUser },
 	hooks: {
 		beforeValidate: [generateOnCreate],
 		beforeChange: [normalizeSuppliedSecrets, clearLapsedRotation],
 		afterChange: [revealGeneratedSecret],
 	},
 	fields: [
-		{ name: 'name', type: 'text', required: true, label: labelForKey(keys.fieldName) },
-		{ name: 'url', type: 'text', required: true, label: labelForKey(keys.fieldUrl) },
+		// Rows are unnamed, so they lay the form out without touching the schema or stored data.
+		{
+			type: 'row',
+			fields: [
+				{ name: 'name', type: 'text', required: true, label: labelForKey(keys.fieldName) },
+				{
+					name: 'url',
+					type: 'text',
+					required: true,
+					label: labelForKey(keys.fieldUrl),
+					validate: validateUrl,
+				},
+			],
+		},
 		{
 			name: 'enabled',
 			type: 'checkbox',
 			defaultValue: true,
 			label: labelForKey(keys.fieldEnabled),
+			admin: { position: 'sidebar' },
 		},
 		{
 			name: 'events',
@@ -208,44 +259,61 @@ export const buildSubscriptionsCollection = (args: {
 			access: { create: () => false, update: () => false },
 		},
 		{
-			name: 'rotateSecret',
-			type: 'ui',
-			admin: { components: { Field: '@10x-media/webhooks/client#RotateSecretButton' } },
-		},
-		{
 			name: 'headers',
 			type: 'array',
 			label: labelForKey(keys.fieldHeaders),
 			fields: [
 				{
-					name: 'key',
-					type: 'text',
-					required: true,
-					/**
-					 * A custom `validate` replaces Payload's built-in field validation rather than
-					 * running alongside it, so `required: true` alone would no longer be enforced:
-					 * the empty-value check below is what keeps it.
-					 */
-					validate: (
-						value: string | null | undefined,
-						{ req }: { req: PayloadRequest }
-					): string | true => {
-						if (typeof value !== 'string' || value.trim() === '') {
-							// Payload's own key, so this reads the same as every other required field.
-							return req.t('validation:required')
-						}
-						if (isReservedHeader(value)) {
-							return asTranslate(req.t)(keys.headerReserved, { name: value })
-						}
-						// A name with a space or a colon saves fine and then makes `fetch` throw at
-						// delivery time, so the operator would find out from a dead delivery row rather
-						// than from the form.
-						return isValidHeaderName(value)
-							? true
-							: asTranslate(req.t)(keys.headerInvalid, { name: value })
-					},
+					type: 'row',
+					fields: [
+						{
+							name: 'key',
+							type: 'text',
+							required: true,
+							/**
+							 * A custom `validate` replaces Payload's built-in field validation rather
+							 * than running alongside it, so `required: true` alone would no longer be
+							 * enforced: the empty-value check below is what keeps it.
+							 */
+							validate: (
+								value: string | null | undefined,
+								{ req }: { req: PayloadRequest }
+							): string | true => {
+								if (typeof value !== 'string' || value.trim() === '') {
+									// Payload's own key, so this reads the same as every other required field.
+									return req.t('validation:required')
+								}
+								if (isReservedHeader(value)) {
+									return asTranslate(req.t)(keys.headerReserved, { name: value })
+								}
+								// A name with a space or a colon saves fine and then makes `fetch` throw
+								// at delivery time, so the operator would find out from a dead delivery
+								// row rather than from the form.
+								return isValidHeaderName(value)
+									? true
+									: asTranslate(req.t)(keys.headerInvalid, { name: value })
+							},
+						},
+						/**
+						 * Encrypted at rest, because this is where a receiver's own credential goes
+						 * (`Authorization: Bearer ...`). Masked rather than write-only: plenty of
+						 * header values are not secrets and an operator needs to read them back, and
+						 * `encryptedField` cannot strip a value inside an array row from responses
+						 * anyway. Whoever may read the subscription may still reveal the value.
+						 */
+						...encryptedField(
+							{ name: 'value', type: 'text', validate: validateHeaderValue },
+							{
+								aadScope: SECRET_AAD_SCOPE,
+								keys: args.secretKeys,
+								// The default throws, so one header nobody can decrypt would make the
+								// whole subscription unreadable, in the admin and to the resolver alike.
+								// Null costs that header only, and the resolver refuses the delivery.
+								onDecryptFailure: 'null',
+							}
+						),
+					],
 				},
-				{ name: 'value', type: 'text' },
 			],
 		},
 		{ name: 'description', type: 'textarea', label: labelForKey(keys.fieldDescription) },

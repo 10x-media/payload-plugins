@@ -13,6 +13,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.deliveryPlural]: 'Deliveries',
 	[keys.fieldName]: 'Name',
 	[keys.fieldUrl]: 'Endpoint URL',
+	[keys.urlInvalid]: 'Enter an absolute http:// or https:// URL.',
 	[keys.fieldEnabled]: 'Enabled',
 	[keys.fieldEvents]: 'Events',
 	[keys.fieldSecret]: 'Signing secret',
@@ -23,7 +24,6 @@ export const en: Record<TranslationKey, string> = {
 		'While set, deliveries carry a signature from both the current and the previous secret. After this time only the current one signs.',
 	[keys.rotateSecret]: 'Rotate secret',
 	[keys.rotateSecretTitle]: 'Rotate signing secret',
-	[keys.rotateSecretCancel]: 'Cancel',
 	[keys.rotateSecretAcknowledge]: "I've saved it",
 	[keys.rotateSecretCopy]: 'Copy',
 	[keys.rotateSecretCopied]: 'Copied',
@@ -44,6 +44,7 @@ export const en: Record<TranslationKey, string> = {
 		"'{{name}}' is set by the plugin on every delivery and cannot be overridden.",
 	[keys.headerInvalid]:
 		"'{{name}}' is not a valid HTTP header name. Use letters, digits, and any of !#$%&'*+-.^_`|~ with no spaces.",
+	[keys.headerValueInvalid]: 'A header value cannot contain line breaks.',
 	[keys.fieldDescription]: 'Description',
 	[keys.statusPending]: 'Pending',
 	[keys.statusSuccess]: 'Delivered',
@@ -51,4 +52,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.statusDead]: 'Dead',
 	[keys.redeliver]: 'Redeliver',
 	[keys.redeliverDone]: 'Redelivery queued',
+	[keys.redeliverFailed]: 'Could not redeliver',
+	[keys.redeliverConfirm]:
+		'Send this payload again? It goes out as a new delivery with a new webhook-id, so a receiver that dedupes on the id will process it a second time.',
 }

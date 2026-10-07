@@ -69,9 +69,13 @@ const beginRotation = async (req: PayloadRequest): Promise<boolean> => {
 		// `transactionOptions`, and Postgres does the same with `transactionOptions: false`. The
 		// rotation still runs, and the conditional write still catches the common case, but without
 		// a transaction it cannot survive a genuinely concurrent rotation. Say so rather than
-		// degrading silently.
+		// degrading silently. On MongoDB the usual cause is a standalone server, which has no
+		// transactions whatever the adapter is told, so the advice differs by adapter.
+		const remedy = db.drizzle
+			? "Set 'transactionOptions' on the adapter to enable transactions."
+			: "MongoDB only opens transactions on a replica set, so connect to one and leave the adapter's 'transactionOptions' enabled."
 		req.payload.logger.warn(
-			`@10x-media/webhooks: the database adapter opened no transaction for this rotation, so it runs without snapshot isolation. Two rotations issued at the same moment can both appear to succeed while only one secret survives. Set 'transactionOptions' on the adapter to enable transactions.`
+			`@10x-media/webhooks: the database adapter opened no transaction for this rotation, so it runs without snapshot isolation. Two rotations issued at the same moment can both appear to succeed while only one secret survives. ${remedy}`
 		)
 		return false
 	}

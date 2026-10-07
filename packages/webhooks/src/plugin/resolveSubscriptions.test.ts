@@ -7,8 +7,13 @@ import {
 	fromCollectionRow,
 	matchSubscriptions,
 	plaintextSlot,
+	resolveSubscriptionById,
 	type SecretSlot,
+	withReadableHeaders,
 } from './resolveSubscriptions'
+
+/** A wire string in `@10x-media/fields` sealed form. */
+const SEALED = 'pfe1.k0.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA'
 
 const ABSENT: SecretSlot = { secret: null, state: 'absent' }
 
@@ -60,6 +65,7 @@ describe('fromCollectionRow', () => {
 			retiredSecretUnusableReason: undefined,
 			secretHidden: false,
 			headers: { 'X-A': '1' },
+			headersUnusable: false,
 			enabled: true,
 		})
 	})
@@ -88,6 +94,13 @@ describe('decideDelivery', () => {
 
 	it('delivers a subscription with no secret at all, unsigned', () => {
 		expect(decideDelivery(base).deliverable).toBe(true)
+	})
+
+	/** A receiver that authenticates on the header would otherwise be sent the request without it. */
+	it('refuses a subscription whose encrypted header value could not be recovered', () => {
+		const decision = decideDelivery({ ...base, headersUnusable: true })
+		expect(decision.deliverable).toBe(false)
+		expect(!decision.deliverable && decision.reason).toMatch(/custom header value/)
 	})
 
 	it('refuses an unusable active secret, and says which fix it needs', () => {
@@ -125,6 +138,111 @@ describe('decideDelivery', () => {
 		)
 		expect(decideDelivery(sub).deliverable).toBe(true)
 		expect(sub.retiredSecretUnusable).toBe(true)
+	})
+})
+
+describe('withReadableHeaders', () => {
+	/** A payload whose ordinary read returns `docs`, recording that it was asked. */
+	const reader = (docs: unknown[]) => {
+		const calls: unknown[] = []
+		const payload = {
+			find: (args: unknown) => {
+				calls.push(args)
+				return Promise.resolve({ docs })
+			},
+		}
+		return { calls, payload: payload as never }
+	}
+	const args = { req: {} as never, subscriptionsSlug: 'webhook-subscriptions' }
+
+	it('reads nothing again when no header value is sealed', async () => {
+		const { calls, payload } = reader([])
+		const rows = [{ id: 1, url: 'u', headers: [{ id: 'a', key: 'X-A', value: 'plain' }] }]
+		expect(await withReadableHeaders({ ...args, payload, rows })).toBe(rows)
+		expect(calls).toHaveLength(0)
+	})
+
+	it('swaps in the decrypted values for a row that carried sealed ones', async () => {
+		const { payload } = reader([
+			{ id: 1, headers: [{ id: 'a', key: 'Authorization', value: 'Bearer t0ken' }] },
+		])
+		const [row] = await withReadableHeaders({
+			...args,
+			payload,
+			rows: [{ id: 1, url: 'u', headers: [{ id: 'a', key: 'Authorization', value: SEALED }] }],
+		})
+		expect(row?.headers).toEqual([{ id: 'a', key: 'Authorization', value: 'Bearer t0ken' }])
+		expect(row?.headersUnreadable).toBe(false)
+	})
+
+	/** Ciphertext must never be left in place to go out as the header's value. */
+	it('marks the row unreadable when a sealed value does not come back as text', async () => {
+		const sealedRow = {
+			id: 1,
+			url: 'u',
+			headers: [{ id: 'a', key: 'Authorization', value: SEALED }],
+		}
+		const undecryptable = reader([
+			{ id: 1, headers: [{ id: 'a', key: 'Authorization', value: null }] },
+		])
+		const [nulled] = await withReadableHeaders({
+			...args,
+			payload: undecryptable.payload,
+			rows: [sealedRow],
+		})
+		expect(nulled?.headersUnreadable).toBe(true)
+
+		const gone = reader([])
+		const [missing] = await withReadableHeaders({
+			...args,
+			payload: gone.payload,
+			rows: [sealedRow],
+		})
+		expect(missing?.headersUnreadable).toBe(true)
+		expect(missing?.headers).toEqual([])
+	})
+})
+
+describe('resolveSubscriptionById', () => {
+	const code = [{ id: '2', url: 'https://code.test', events: [] }]
+	/** A collection whose only row also has id 2, the collision a SQL adapter makes easy. */
+	const payload = {
+		find: () => Promise.resolve({ docs: [{ id: 2, url: 'https://row.test', events: [] }] }),
+		logger: { error: () => undefined },
+	} as never
+	const resolve = (source?: string) =>
+		resolveSubscriptionById({
+			id: '2',
+			source,
+			codeSubscriptions: code,
+			subscriptionsSlug: 'webhook-subscriptions',
+			payload,
+			req: { context: {} } as never,
+		})
+
+	/**
+	 * A code subscription's id is whatever its author wrote, so it can equal a database id. The
+	 * delivery records which registry it came from, and that decides.
+	 */
+	it('resolves in the registry the delivery recorded when the id exists in both', async () => {
+		expect((await resolve('collection'))?.url).toBe('https://row.test')
+		expect((await resolve('code'))?.url).toBe('https://code.test')
+	})
+
+	it('tries code first for a delivery written before the source was recorded', async () => {
+		expect((await resolve())?.url).toBe('https://code.test')
+	})
+
+	it('does not fall through to the collection for a code subscription that is gone', async () => {
+		const removed = await resolveSubscriptionById({
+			id: '2',
+			source: 'code',
+			codeSubscriptions: [],
+			subscriptionsSlug: 'webhook-subscriptions',
+			payload,
+			req: { context: {} } as never,
+		})
+		expect(removed).toBeNull()
 	})
 })
 

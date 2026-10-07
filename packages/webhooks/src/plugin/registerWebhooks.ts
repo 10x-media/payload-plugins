@@ -1,9 +1,11 @@
 import { validateEncryptedBoot, withEncryptedQueryRewrite } from '@10x-media/fields/encrypted'
 import {
+	type CollectionConfig,
 	type CollectionSlug,
 	type Config,
 	type Endpoint,
 	Forbidden,
+	NotFound,
 	type PayloadRequest,
 } from 'payload'
 
@@ -128,7 +130,9 @@ const canUpdateSubscription = async (args: {
 /**
  * MongoDB `WriteConflict`, and Postgres `serialization_failure` / `deadlock_detected`. Drivers
  * carry these as codes, which is the reliable signal; the message check stays as a fallback for
- * wrappers that re-throw without one.
+ * wrappers that re-throw without one. The rotation's own write is such a wrapper: Payload's bulk
+ * update collects the driver error into `errors`, keeping only its message, and MongoDB spells
+ * that message both `WriteConflict error` and `Write conflict during plan execution`.
  */
 const WRITE_CONFLICT_CODES = new Set<number | string>([112, '40001', '40P01', 40001])
 
@@ -139,7 +143,42 @@ const isWriteConflict = (err: unknown): boolean => {
 		return true
 	}
 	const message = err instanceof Error ? err.message : String(err)
-	return /write conflict|could not serialize|deadlock detected/i.test(message)
+	return /write ?conflict|could not serialize|deadlock detected/i.test(message)
+}
+
+/**
+ * Attach a document action: its endpoint, and the control beside Save that calls it.
+ *
+ * It runs after the consumer's override, so `overrides.endpoints` and `overrides.admin.components`
+ * add to the plugin's own instead of replacing them; otherwise an override would leave a button
+ * with nothing behind it, or an endpoint with no button. The endpoint goes first in the list, so
+ * a consumer route on the same path cannot shadow it either.
+ *
+ * `endpoints: false` is left alone, control included: that is a consumer turning the collection's
+ * whole REST surface off, which is theirs to decide.
+ */
+const attachDocumentAction = (
+	collection: CollectionConfig,
+	action: { endpoint: Endpoint; control: string }
+): void => {
+	if (collection.endpoints === false) {
+		return
+	}
+	collection.endpoints = [action.endpoint, ...(collection.endpoints ?? [])]
+	const components = collection.admin?.components
+	collection.admin = {
+		...collection.admin,
+		components: {
+			...components,
+			edit: {
+				...components?.edit,
+				beforeDocumentControls: [
+					...(components?.edit?.beforeDocumentControls ?? []),
+					action.control,
+				],
+			},
+		},
+	}
 }
 
 /** Register collections, the delivery task, source hooks, and the redeliver endpoint. */
@@ -149,7 +188,10 @@ export const registerWebhooks = (args: {
 	hasJobsPlugin: boolean
 }): void => {
 	const { config, options } = args
-	const sources = options.collections ?? {}
+	// The option is keyed by `CollectionSlug` for the consumer's benefit; lookups here are by a
+	// runtime `collection.slug`, which is a plain string.
+	const sources: Record<string, true | CollectionWebhookConfig | undefined> =
+		options.collections ?? {}
 	const subscriptionsSlug = options.subscriptionsCollection?.slug ?? DEFAULT_SUBSCRIPTIONS_SLUG
 	const deliveriesSlug = options.deliveriesLog?.slug ?? DEFAULT_DELIVERIES_SLUG
 	const reserved = new Set<string>([...RESERVED_SLUGS, subscriptionsSlug, deliveriesSlug])
@@ -172,14 +214,19 @@ export const registerWebhooks = (args: {
 	config.collections ??= []
 	// The response strip and the where-rewrite that write-only secrets depend on are attached
 	// here rather than left to the fields() plugin, so the secrets stay off every read result
-	// whether or not the consumer installed it.
+	// whether or not the consumer installed it. The override is applied first: the rewrite scans
+	// the fields it is given, so a write-only field a consumer adds through `overrides.fields` is
+	// stripped too, and the strip runs after the consumer's own afterRead hooks.
 	const subscriptions = withEncryptedQueryRewrite(
-		buildSubscriptionsCollection({
-			slug: subscriptionsSlug,
-			events: catalog,
-			hidden: options.subscriptionsCollection?.hidden ?? false,
-			secretKeys: options.secretEncryption?.keys,
-		})
+		applyCollectionOverride(
+			buildSubscriptionsCollection({
+				slug: subscriptionsSlug,
+				events: catalog,
+				hidden: options.subscriptionsCollection?.hidden ?? false,
+				secretKeys: options.secretEncryption?.keys,
+			}),
+			options.subscriptionsCollection?.overrides
+		)
 	)
 
 	const rotateSecretEndpoint: Endpoint = {
@@ -228,6 +275,11 @@ export const registerWebhooks = (args: {
 				if (err instanceof InvalidSecretError) {
 					return Response.json({ error: err.message }, { status: 400 })
 				}
+				// A boolean `access.update` never looks at the document, so a missing id gets this
+				// far. Anything but a 404 would tell the caller to retry an id that will never exist.
+				if (err instanceof NotFound) {
+					return Response.json({ error: 'not found' }, { status: 404 })
+				}
 				if (err instanceof RotationConflictError || isWriteConflict(err)) {
 					return Response.json(
 						{ error: 'the subscription was modified concurrently; retry the rotation' },
@@ -241,26 +293,50 @@ export const registerWebhooks = (args: {
 			}
 		},
 	}
-	subscriptions.endpoints = [...(subscriptions.endpoints || []), rotateSecretEndpoint]
-	config.collections.push(
-		applyCollectionOverride(subscriptions, options.subscriptionsCollection?.overrides)
-	)
-	const deliveries = buildDeliveriesCollection({
-		slug: deliveriesSlug,
-		hidden: options.deliveriesLog?.hidden ?? false,
+	attachDocumentAction(subscriptions, {
+		endpoint: rotateSecretEndpoint,
+		control: '@10x-media/webhooks/client#RotateSecretButton',
 	})
+	config.collections.push(subscriptions)
+	const deliveries = applyCollectionOverride(
+		buildDeliveriesCollection({
+			slug: deliveriesSlug,
+			hidden: options.deliveriesLog?.hidden ?? false,
+		}),
+		options.deliveriesLog?.overrides
+	)
 
 	const redeliverEndpoint: Endpoint = {
 		path: '/:id/redeliver',
 		method: 'post',
 		handler: async (req) => {
-			// coarse auth: any logged-in user may redeliver any delivery (matches the deliveries collection access)
 			if (!req.user) {
 				return Response.json({ error: 'unauthorized' }, { status: 401 })
 			}
 			const id = req.routeParams?.id
 			if (typeof id !== 'string') {
 				return Response.json({ error: 'missing id' }, { status: 400 })
+			}
+			// Replaying a delivery is allowed to whoever may read it. The collection denies create
+			// and update to everyone, so `read` is the access rule there is to defer to, and reading
+			// the row as the caller applies it exactly as configured: an override that scopes the
+			// log per tenant scopes this endpoint with it.
+			try {
+				await req.payload.findByID({
+					collection: deliveriesSlug as CollectionSlug,
+					id,
+					depth: 0,
+					overrideAccess: false,
+					req,
+				})
+			} catch (err) {
+				if (err instanceof Forbidden) {
+					return Response.json({ error: 'forbidden' }, { status: 403 })
+				}
+				if (err instanceof NotFound) {
+					return Response.json({ error: 'not found' }, { status: 404 })
+				}
+				throw err
 			}
 			const result = await redeliverDelivery({
 				deps: {
@@ -278,8 +354,11 @@ export const registerWebhooks = (args: {
 			return Response.json(result, { status: 202 })
 		},
 	}
-	deliveries.endpoints = [...(deliveries.endpoints || []), redeliverEndpoint]
-	config.collections.push(applyCollectionOverride(deliveries, options.deliveriesLog?.overrides))
+	attachDocumentAction(deliveries, {
+		endpoint: redeliverEndpoint,
+		control: '@10x-media/webhooks/client#RedeliverButton',
+	})
+	config.collections.push(deliveries)
 
 	config.jobs ??= {}
 	config.jobs.tasks ??= []
