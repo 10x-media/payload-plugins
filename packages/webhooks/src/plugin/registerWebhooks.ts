@@ -1,4 +1,5 @@
 import { validateEncryptedBoot, withEncryptedQueryRewrite } from '@10x-media/fields/encrypted'
+import { translations as fieldsTranslations } from '@10x-media/fields/i18n'
 import {
 	type CollectionConfig,
 	type CollectionSlug,
@@ -8,6 +9,7 @@ import {
 	NotFound,
 	type PayloadRequest,
 } from 'payload'
+import { deepMergeSimple } from 'payload/shared'
 
 import { buildDeliveriesCollection } from '../collections/deliveries'
 import { buildSubscriptionsCollection } from '../collections/subscriptions'
@@ -210,6 +212,16 @@ export const registerWebhooks = (args: {
 		// config-build time: payload.logger does not exist yet, so console is the only channel
 		warn: (m) => console.warn(m),
 	})
+
+	// The encrypted editor's own strings (Generate, the reveal toggle, the cleared notice) are
+	// registered by the fields() plugin, which a consumer of this plugin does not have to install.
+	// Without them the admin shows the raw keys, `fields:generateValue` as a button's name. The
+	// host's translations go second so they win, fields()'s own registration included.
+	config.i18n ??= {}
+	config.i18n.translations = deepMergeSimple<NonNullable<typeof config.i18n.translations>>(
+		fieldsTranslations,
+		config.i18n.translations ?? {}
+	)
 
 	config.collections ??= []
 	// The response strip and the where-rewrite that write-only secrets depend on are attached

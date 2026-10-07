@@ -154,6 +154,26 @@ describe('webhooks factory', () => {
 		})
 	})
 
+	/**
+	 * The secret editor comes from `@10x-media/fields`, whose strings its own plugin registers. A
+	 * host that installs only this plugin would otherwise see raw keys in the admin.
+	 */
+	it('registers the encrypted editor strings, and lets the host override them', () => {
+		const translationsOf = (config: Config) =>
+			(webhooks({})(config) as Config).i18n?.translations as Record<
+				string,
+				Record<string, Record<string, string>>
+			>
+		expect(translationsOf(fakeConfig()).en?.fields?.generateValue).toBe('Generate new value')
+		expect(translationsOf(fakeConfig()).de?.fields?.generateValue).toBeTruthy()
+
+		const hosted = {
+			collections: [],
+			i18n: { translations: { en: { fields: { generateValue: 'Make one' } } } },
+		} as unknown as Config
+		expect(translationsOf(hosted).en?.fields?.generateValue).toBe('Make one')
+	})
+
 	it('applies the translations option', () => {
 		const out = webhooks({ translations: { de: { [keys.pluginName]: 'Webhooks (DE)' } } })(
 			fakeConfig()

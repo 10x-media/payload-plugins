@@ -112,7 +112,7 @@ test('rotating a secret confirms first, then reveals the new secret in a dialog'
 	await expect(page.getByText('New signing secret')).toBeHidden()
 
 	// The rotation landed: the grace window is now shown on the document.
-	await expect(page.locator('#field-previousSecretExpiresAt')).not.toHaveValue('', {
+	await expect(page.locator('#field-previousSecretExpiresAt input')).not.toHaveValue('', {
 		timeout: 15_000,
 	})
 })

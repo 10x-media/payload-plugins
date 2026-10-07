@@ -21,6 +21,7 @@
 - **Deliveries record `subscriptionSource`**, so a code subscription whose `id` equals a database id can no longer be resolved in place of that row.
 - **Deliveries do not follow redirects and read at most 2,000 characters of the response.** A subscription that relied on a redirect now records the 3xx as a failed delivery; enter the final URL.
 - **A queued delivery's job shares the write's transaction**, so a write that rolls back takes its job with it.
+- **The secret editor's strings are registered by this plugin.** They belong to `@10x-media/fields`, whose own plugin a consumer does not have to install, so without it the admin showed raw keys such as `fields:generateValue`.
 - **`collections` is typed against `CollectionSlug`**, so a typo or a global's slug is a type error instead of a source that compiles and never emits. Without generated types the key stays a `string`.
 - **The subscription URL is validated** as an absolute `http:` or `https:` URL on save, instead of surfacing later as a dead delivery. The host is not judged, so localhost and private addresses still work.
 - **Customer-supplied secrets**: accepted on create and on rotation, normalized to exactly one `whsec_` prefix before sealing, and rejected when they are not canonical padded base64 carrying at least 16 bytes. Malformed code-subscription secrets fail at startup rather than at delivery.
