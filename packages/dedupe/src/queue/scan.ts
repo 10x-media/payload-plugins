@@ -1,7 +1,6 @@
-import { APIError, type PayloadRequest, type Where } from 'payload'
+import { APIError, isolateObjectProperty, type PayloadRequest, type Where } from 'payload'
 
 import { PAIRS_SLUG } from '../collections/slugs'
-import { pairKeyFor } from '../match/keys'
 import { scorePair } from '../match/score'
 import { isLive, type LoadedDoc, loadDocs, localRequest } from '../merge/load'
 import { type CollectionContext, type PluginContext, tenantOf } from '../plugin/context'
@@ -24,6 +23,8 @@ export type ScanSummary = {
 }
 
 const PAGE = 200
+/** Documents the scan indexes at once outside a transaction: each writes only its own keys. */
+const INDEX_AT_ONCE = 10
 const KEY_ROWS_PER_PAGE = 5000
 const CACHE_LIMIT = 5000
 
@@ -33,7 +34,8 @@ const CACHE_LIMIT = 5000
  */
 const eachDocument = async (
 	args: { req: PayloadRequest; ctx: PluginContext; col: CollectionContext },
-	visit: (doc: LoadedDoc) => Promise<void>
+	visit: (doc: LoadedDoc) => Promise<void>,
+	atOnce = 1
 ): Promise<number> => {
 	const { req, ctx, col } = args
 	let last: number | string | null = null
@@ -52,11 +54,14 @@ const eachDocument = async (
 			req: localRequest(req),
 		})
 		const docs = result.docs as LoadedDoc[]
-		for (const doc of docs) {
-			if (!isLive(col, doc)) continue
-			await visit(doc)
-			count++
+		const live = docs.filter((doc) => isLive(col, doc))
+		for (let i = 0; i < live.length; i += atOnce) {
+			// Every one settles before an error stops the walk, so none still writes behind it.
+			const settled = await Promise.allSettled(live.slice(i, i + atOnce).map(visit))
+			const failed = settled.find((one) => one.status === 'rejected')
+			if (failed) throw failed.reason
 		}
+		count += live.length
 		if (docs.length < PAGE) break
 		last = (docs[docs.length - 1] as LoadedDoc).id
 	}
@@ -137,14 +142,34 @@ const scan = async (
 
 	const { adapter } = col
 	if (adapter.index) {
-		summary.indexed = await eachDocument(args, async (doc) => {
-			await adapter.index?.({ req, collection: col.slug, doc })
-		})
+		summary.indexed = await eachDocument(
+			args,
+			async (doc) => {
+				// Its own request each, as Payload gives each job: an adapter that opens a transaction
+				// on it must not hand that transaction to the documents beside it.
+				const own = isolateObjectProperty(req, 'transactionID')
+				await adapter.index?.({ req: own, collection: col.slug, doc })
+			},
+			(await req.transactionID) ? 1 : INDEX_AT_ONCE
+		)
 	}
 
-	const seen = new Set<string>()
 	const seenAt = new Date().toISOString()
 	const load = createCache(args)
+	// Comparison Propagation: a pair is compared in the first scored bucket its documents share.
+	// Each document keeps the numbers of the scored buckets it was in, ascending, so a later
+	// bucket knows the pair was compared without a set of every pair. A bucket over `maxBucket`
+	// gets no number: a pair it held is compared in the next bucket the two share.
+	const bucketsOf = new Map<string, number[]>()
+	let scored = 0
+	const metBefore = (a: number[], b: number[]): boolean => {
+		for (let i = 0, j = 0; i < a.length && j < b.length; ) {
+			if (a[i] === b[j]) return true
+			if ((a[i] as number) < (b[j] as number)) i++
+			else j++
+		}
+		return false
+	}
 
 	const scoreBucket = async (bucket: KeyBucket): Promise<void> => {
 		// A key stored twice, by two saves racing each other, must not pair a document with itself.
@@ -155,16 +180,16 @@ const scan = async (
 			return
 		}
 		summary.buckets++
+		const number = scored++
 		const docs = await load(ids)
+		const earlier = docs.map((doc) => bucketsOf.get(String(doc.id)) ?? [])
 		for (let i = 0; i < docs.length; i++) {
 			for (let j = i + 1; j < docs.length; j++) {
 				const a = docs[i] as LoadedDoc
 				const b = docs[j] as LoadedDoc
 				// The plugin keeps tenants apart whatever an adapter's buckets hold, as the check on save does.
 				if (tenantOf(req.payload, col.slug, a) !== tenantOf(req.payload, col.slug, b)) continue
-				const pairKey = pairKeyFor(col.slug, a.id, b.id)
-				if (seen.has(pairKey)) continue
-				seen.add(pairKey)
+				if (metBefore(earlier[i] as number[], earlier[j] as number[])) continue
 				summary.compared++
 				const result = scorePair(a, b, col.matchFields)
 				// Most pairs in a bucket are strangers; only a match is worth a look-up. A stored
@@ -182,6 +207,9 @@ const scan = async (
 				})
 				if (row && row.status === 'open') summary.pairs++
 			}
+		}
+		for (const [index, doc] of docs.entries()) {
+			bucketsOf.set(String(doc.id), [...(earlier[index] as number[]), number])
 		}
 	}
 

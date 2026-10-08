@@ -91,6 +91,87 @@ describeForDb('dedupe adapter', {}, (db) => {
 		})
 	})
 
+	describe('an adapter that opens a transaction of its own in index', () => {
+		let fixture: Awaited<ReturnType<typeof bootDedupe>>
+		const kept: boolean[] = []
+		const own: DedupeAdapter = {
+			findCandidates: async () => [],
+			// What initTransaction does to the request it is handed, held across a write.
+			index: async ({ req, doc }) => {
+				req.transactionID = `own-${String(doc.id)}`
+				await new Promise((resolve) => setTimeout(resolve, 20))
+				kept.push(req.transactionID === `own-${String(doc.id)}`)
+				req.transactionID = undefined
+			},
+		}
+
+		beforeAll(async () => {
+			fixture = await bootDedupe(db, { adapter: () => own })
+		})
+
+		afterAll(async () => {
+			await fixture.booted.stop()
+		})
+
+		it('gets a request of its own for each document the scan indexes at once', async () => {
+			for (const label of ['iso-a', 'iso-b', 'iso-c']) {
+				await fixture.booted.payload.db.create({
+					collection: CUSTOMERS,
+					data: { name: { en: label }, tenant: 'north' },
+					req: fixture.req,
+				})
+			}
+			kept.length = 0
+			await runScan({
+				req: fixture.req,
+				ctx: getContext(fixture.booted.payload),
+				col: getCollectionContext(fixture.booted.payload, CUSTOMERS),
+			})
+			expect(kept.length).toBeGreaterThanOrEqual(3)
+			expect(kept.every(Boolean)).toBe(true)
+		})
+	})
+
+	describe('an adapter whose index fails for one document', () => {
+		let fixture: Awaited<ReturnType<typeof bootDedupe>>
+		let finished = 0
+		const flaky: DedupeAdapter = {
+			findCandidates: async () => [],
+			index: async ({ doc }) => {
+				if ((doc.name as { en?: string } | undefined)?.en === 'flaky-bad')
+					throw new Error('index down')
+				await new Promise((resolve) => setTimeout(resolve, 50))
+				finished++
+			},
+		}
+
+		beforeAll(async () => {
+			fixture = await bootDedupe(db, { adapter: () => flaky })
+		})
+
+		afterAll(async () => {
+			await fixture.booted.stop()
+		})
+
+		it('stops the scan only once the documents beside it are indexed', async () => {
+			for (const label of ['flaky-bad', 'flaky-a', 'flaky-b']) {
+				await fixture.booted.payload.db.create({
+					collection: CUSTOMERS,
+					data: { name: { en: label }, tenant: 'north' },
+					req: fixture.req,
+				})
+			}
+			finished = 0
+			await expect(
+				runScan({
+					req: fixture.req,
+					ctx: getContext(fixture.booted.payload),
+					col: getCollectionContext(fixture.booted.payload, CUSTOMERS),
+				})
+			).rejects.toThrow('index down')
+			expect(finished).toBe(2)
+		})
+	})
 	describe('an adapter that finds a pair from one of its documents only', () => {
 		let fixture: Awaited<ReturnType<typeof bootDedupe>>
 		const older: DedupeAdapter = {

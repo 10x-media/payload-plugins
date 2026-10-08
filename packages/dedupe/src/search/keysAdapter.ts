@@ -51,8 +51,8 @@ export const bucketPage = (rows: KeyRow[], limit: number): ScanPage => {
  * of its own, so "who shares a key with this document" is an indexed query per key on both
  * databases, and the full scan is one sorted walk over the same rows.
  *
- * Each key is one `create`: the database layer has no bulk insert, so indexing a large
- * collection is a matter of minutes.
+ * The database layer has no bulk insert: each key is one `create`, a document's keys written
+ * together outside a transaction.
  */
 export const keysAdapter = (args: {
 	read: Access
@@ -88,15 +88,22 @@ export const keysAdapter = (args: {
 				req,
 			})
 		}
-		for (const key of keys) {
-			if (kept.has(key)) continue
-			await db.create({
+		const write = (key: string) =>
+			db.create({
 				collection: KEYS_SLUG,
 				data: { target: collection, doc: docId, key, configHash },
 				req,
 				returning: false,
 			})
+		const missing = keys.filter((key) => !kept.has(key))
+		// A transaction runs its writes one after another on one session; outside one they go together.
+		if (await req.transactionID) {
+			for (const key of missing) await write(key)
+			return
 		}
+		const settled = await Promise.allSettled(missing.map(write))
+		const failed = settled.find((one) => one.status === 'rejected')
+		if (failed) throw failed.reason
 	},
 
 	remove: async ({ req, collection, id }) => {
