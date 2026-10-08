@@ -84,7 +84,9 @@ export const hashMatch = (fields: MatchFieldConfig[]): string => {
 				? `fn:${field.compare.keys.toString()}`
 				: field.compare === 'number'
 					? `number:${field.toleranceType ?? 'value'}:${field.tolerance ?? 0}`
-					: (field.compare ?? 'exact')
+					: field.compare === 'text' && field.typos
+						? 'text:typos'
+						: (field.compare ?? 'exact')
 		hash.update(`${field.path}|${compare}|${field.key !== false}\n`)
 	}
 	return hash.digest('hex').slice(0, 12)

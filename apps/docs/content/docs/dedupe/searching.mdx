@@ -10,7 +10,7 @@ Each match field compares by its `compare`:
 | `compare` | Matches |
 | --- | --- |
 | `exact` (default) | The same value, ignoring case, accents and extra spaces. |
-| `text` | The same words in any order, also a name written as one word or two. |
+| `text` | The same words in any order, also a name written as one word or two. A word on one side only makes it a near match. With `typos: true`, words of four letters or more also meet with one letter wrong, missing or extra, at a blocking key per letter. |
 | `phone` | The same last nine digits. |
 | `number` | The same number. With `tolerance`, close numbers too: `toleranceType: 'value'` by size, `'quantity'` by differing digits. |
 | `date` | The same day, or day and month swapped. |

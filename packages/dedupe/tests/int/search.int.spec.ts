@@ -6,6 +6,7 @@ import { KEYS_SLUG, PAIRS_SLUG } from '../../src/collections/slugs'
 import { findDuplicates } from '../../src/index'
 import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
+import type { DedupePluginOptions } from '../../src/options'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
 import { runScan } from '../../src/queue/scan'
 import { bootDedupe, CUSTOMERS, type Doc, POSTS, pluginOptions, TEAMS } from './fixtures'
@@ -478,5 +479,83 @@ describeForDb('dedupe search without the check on save', {}, (db) => {
 			data: { _status: 'draft' } as never,
 		})
 		expect(await fixture.keysFor(doc.id, POSTS)).toEqual([])
+	})
+})
+
+/** The keys adapter asked for candidates: one read per key, side by side outside a transaction. */
+describeForDb('dedupe search, names with typos', {}, (db) => {
+	let fixture: Awaited<ReturnType<typeof bootDedupe>>
+	const customers = pluginOptions.collections?.customers as Exclude<
+		NonNullable<DedupePluginOptions['collections']>[string],
+		boolean | undefined
+	>
+
+	beforeAll(async () => {
+		const fields = customers.match?.fields ?? []
+		fixture = await bootDedupe(db, {
+			collections: {
+				...pluginOptions.collections,
+				customers: {
+					...customers,
+					match: {
+						...customers.match,
+						fields: fields.map((field) =>
+							field.path === 'name' ? { ...field, typos: true } : field
+						),
+					},
+				},
+			},
+		})
+	})
+
+	afterAll(async () => {
+		await fixture.booted.stop()
+	})
+
+	/** The most key reads `run` has waiting at the same moment, and what it returned. */
+	const keyReadsAtOnce = async <T>(run: () => Promise<T>): Promise<[number, T]> => {
+		const { db: adapter } = fixture.booted.payload
+		const find = adapter.find.bind(adapter)
+		let reading = 0
+		let most = 0
+		const spy = vi.spyOn(adapter, 'find').mockImplementation(async (args) => {
+			if (args.collection !== KEYS_SLUG) return find(args)
+			most = Math.max(most, ++reading)
+			try {
+				return await find(args)
+			} finally {
+				reading--
+			}
+		})
+		try {
+			const value = await run()
+			return [most, value]
+		} finally {
+			spy.mockRestore()
+		}
+	}
+	const found = (req: typeof fixture.req, name: string) =>
+		findDuplicates({
+			req,
+			collection: CUSTOMERS,
+			doc: { name, tenant: 'typos' },
+			minScore: 0.1,
+		}).then((list) => list.map((one) => String(one.doc.id)).sort())
+
+	it('finds a name with a slip early in every word, reading its keys side by side', async () => {
+		const john = await fixture.customer({ name: 'John Smith', tenant: 'typos' })
+		const [atOnce, ids] = await keyReadsAtOnce(() => found(fixture.req, 'Jhon Smtih'))
+		expect(ids).toEqual([String(john.id)])
+		expect(atOnce).toBeGreaterThan(1)
+	})
+
+	it('reads the keys one after another inside a transaction, and finds the same', async () => {
+		await fixture.customer({ name: 'Anna Kowalska', tenant: 'typos' })
+		await fixture.customer({ name: 'Anna Kovalska', tenant: 'typos' })
+		const inTransaction = Object.assign(Object.create(fixture.req), { transactionID: 'held' })
+		const [atOnce, ids] = await keyReadsAtOnce(() => found(inTransaction, 'Anna Kowalska'))
+		expect(atOnce).toBe(1)
+		expect(ids).toEqual((await keyReadsAtOnce(() => found(fixture.req, 'Anna Kowalska')))[1])
+		expect(ids).toHaveLength(2)
 	})
 })

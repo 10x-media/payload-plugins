@@ -18,6 +18,17 @@ describe('hashMatch', () => {
 		expect(exact).not.toBe(hashMatch(base))
 	})
 
+	it('changes when typos are turned on, and stays the same without them', () => {
+		const typos = hashMatch([
+			base[0] as MatchFieldConfig,
+			{ ...(base[1] as MatchFieldConfig), typos: true },
+		])
+		expect(typos).not.toBe(hashMatch(base))
+		expect(
+			hashMatch([base[0] as MatchFieldConfig, { ...(base[1] as MatchFieldConfig), typos: false }])
+		).toBe(hashMatch(base))
+	})
+
 	it('stays the same when only a weight or a penalty changes: keys do not depend on them', () => {
 		expect(
 			hashMatch([

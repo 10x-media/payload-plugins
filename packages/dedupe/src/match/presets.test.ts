@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
+import type { CompareFn } from '../options'
 import { presets, resolveCompare } from './presets'
+import { SIMILAR_THRESHOLD } from './score'
 
 describe('exact', () => {
 	it('keys on the normalized value and matches case-insensitively', () => {
@@ -21,16 +23,35 @@ describe('text', () => {
 		])
 	})
 
+	it('with typos, meets words of four letters or more one letter apart, in any script', () => {
+		const typos = resolveCompare('text', { typos: true })
+		const shared = (compare: CompareFn, a: string, b: string) =>
+			compare.keys(a).some((key) => compare.keys(b).includes(key))
+		expect(shared(presets.text, 'Jhon Smtih', 'John Smith')).toBe(false)
+		expect(shared(typos, 'Jhon Smtih', 'John Smith')).toBe(true)
+		expect(shared(typos, 'Müller', 'Mueller')).toBe(true)
+		expect(shared(typos, 'Олена Коваль', 'Олнеа Кваоль')).toBe(true)
+		expect(shared(typos, 'Ann', 'Ian')).toBe(false)
+		expect(shared(typos, 'Kowalski', 'Michalski')).toBe(false)
+	})
+
+	it('counts a word on one side only as similar, never as the same', () => {
+		expect(presets.text.similarity('Anna', 'Anna Schmidt')).toBe(SIMILAR_THRESHOLD)
+		expect(presets.text.similarity('Jan van der Berg', 'Jan Berg')).toBeGreaterThanOrEqual(
+			SIMILAR_THRESHOLD
+		)
+		expect(presets.text.similarity('Jan van der Berg', 'Jan Berg')).toBeLessThan(1)
+	})
+
 	it('shares a prefix key across a late typo', () => {
 		const a = new Set(presets.text.keys('Ivan Petrenko'))
 		const b = presets.text.keys('Ivan Petrenok')
 		expect(b.some((key) => a.has(key))).toBe(true)
 	})
 
-	it('scores swapped and slightly misspelled names as similar, extra words on one side included', () => {
+	it('scores swapped names as the same and slightly misspelled ones as similar', () => {
 		expect(presets.text.similarity('Ivan Petrenko', 'Petrenko Ivan')).toBe(1)
 		expect(presets.text.similarity('Ivan Petrenko', 'Ivan Petrenok')).toBeGreaterThan(0.9)
-		expect(presets.text.similarity('Jan van der Berg', 'Jan Berg')).toBe(1)
 		expect(presets.text.similarity('Ivan Petrenko', 'Olga Koval')).toBeLessThan(0.7)
 	})
 

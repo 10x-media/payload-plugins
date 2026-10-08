@@ -106,6 +106,7 @@ describe('resolveOptions', () => {
 			['a negative tolerance', field({ compare: 'number', tolerance: -1 }), /tolerance/],
 			['a tolerance above 100', field({ compare: 'number', tolerance: 101 }), /tolerance/],
 			['a positive onDiffer', field({ onDiffer: 5 }), /onDiffer/],
+			['typos on a field that is not text', field({ compare: 'number', typos: true }), /typos/],
 		])('refuses %s', (_name, bad, message) => {
 			expect(withMatch({ fields: [bad] })).toThrow(message)
 		})

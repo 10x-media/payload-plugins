@@ -120,25 +120,39 @@ export const keysAdapter = (args: {
 	// the scan skips a bucket over `maxBucket`.
 	findCandidates: async ({ req, collection, doc, limit }) => {
 		const { keys, configHash } = keysOf(req, collection, doc)
-		const ids = new Set<string>()
-		for (const key of keys) {
+		const rowsOf = async (key: string) => {
 			const conditions: Where[] = [
 				{ target: { equals: collection } },
 				{ configHash: { equals: configHash } },
 				{ key: { equals: key } },
 			]
 			if (doc.id !== undefined) conditions.push({ doc: { not_equals: String(doc.id) } })
-			const result = await req.payload.db.find<KeyRow>({
-				collection: KEYS_SLUG,
-				where: { and: conditions },
-				limit: limit + 1,
-				pagination: false,
-				req,
-			})
-			const rows = result.docs
-			if (rows.length > limit) continue
+			return (
+				await req.payload.db.find<KeyRow>({
+					collection: KEYS_SLUG,
+					where: { and: conditions },
+					limit: limit + 1,
+					pagination: false,
+					req,
+				})
+			).docs
+		}
+		const ids = new Set<string>()
+		const take = (rows: KeyRow[]) => {
+			if (rows.length > limit) return
 			for (const row of rows) ids.add(String(row.doc))
-			if (ids.size >= limit) break
+		}
+		// A transaction reads one query after another on its session; outside one they go together.
+		if (await req.transactionID) {
+			for (const key of keys) {
+				take(await rowsOf(key))
+				if (ids.size >= limit) break
+			}
+		} else {
+			for (const rows of await Promise.all(keys.map(rowsOf))) {
+				take(rows)
+				if (ids.size >= limit) break
+			}
 		}
 		return [...ids].slice(0, limit).map((id) => ({ id }))
 	},

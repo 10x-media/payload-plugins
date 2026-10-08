@@ -1,3 +1,5 @@
+import { SIMILAR_THRESHOLD } from './score'
+
 const jaro = (a: string, b: string): number => {
 	if (a === b) return 1
 	if (a.length === 0 || b.length === 0) return 0
@@ -62,8 +64,9 @@ export const editDistance = (a: string, b: string): number => {
 
 /**
  * Every token of the shorter side against its best partner on the longer one, averaged.
- * Order-free, so a swapped given and family name still match, and a middle name present
- * on one side only is a completeness difference rather than a mismatch.
+ * Order-free, so a swapped given and family name still match. A word on the longer side only,
+ * such as a middle name, makes the result similar rather than a mismatch: it is weighed both
+ * ways and never below the similar threshold.
  */
 export const tokenSimilarity = (a: readonly string[], b: readonly string[]): number => {
 	if (a.length === 0 || b.length === 0) return 0
@@ -84,5 +87,12 @@ export const tokenSimilarity = (a: readonly string[], b: readonly string[]): num
 		if (bestIndex >= 0) used.add(bestIndex)
 		total += best
 	}
-	return total / shorter.length
+	const covered = total / shorter.length
+	if (longer.length === shorter.length || covered < SIMILAR_THRESHOLD) return covered
+	const back =
+		longer.reduce(
+			(sum, token) => sum + Math.max(...shorter.map((other) => jaroWinkler(token, other))),
+			0
+		) / longer.length
+	return Math.min(covered, Math.max((covered + back) / 2, SIMILAR_THRESHOLD))
 }

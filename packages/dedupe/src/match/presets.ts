@@ -30,16 +30,31 @@ const exact: CompareFn = {
 	similarity: (a, b) => (foldText(asString(a)) === foldText(asString(b)) ? 1 : 0),
 }
 
+/** Shorter words get no typo keys: one letter is too large a share of them to tell names apart. */
+const TYPO_MIN_LENGTH = 4
+
+/** The text and the text without each of its characters: two texts one edit apart share one. */
+const oneEditKeys = (text: string): string[] => {
+	const chars = [...text]
+	return [text, ...chars.map((_, index) => chars.toSpliced(index, 1).join(''))]
+}
+
+type TextOptions = Pick<MatchFieldConfig, 'typos'>
+
 /**
- * Words in any order, a word present on one side only not counting against. The letters
- * without spaces are a key too and a match on their own, so a name written as one word or two
- * ("Er Gen", "Ergen") meets and counts as the same.
+ * Words in any order; a word present on one side only makes the value similar, not the same.
+ * The letters without spaces are a key too and a match on their own, so a name written as one
+ * word or two ("Er Gen", "Ergen") meets and counts as the same. `typos` adds keys that meet a
+ * word of four letters or more with one letter wrong, missing or extra.
  */
-const text: CompareFn = {
+const textCompare = ({ typos = false }: TextOptions): CompareFn => ({
 	keys: (value) => {
 		const parts = tokens(asString(value))
-		const keys = tokenKeys(parts)
-		return parts.length > 0 ? [...keys, `=${parts.join('')}`] : keys
+		if (parts.length === 0) return []
+		const keys = [...tokenKeys(parts), `=${parts.join('')}`]
+		if (!typos) return keys
+		const long = parts.filter((part) => [...part].length >= TYPO_MIN_LENGTH)
+		return [...new Set([...keys, ...long.flatMap(oneEditKeys).map((key) => `-${key}`)])]
 	},
 	similarity: (a, b) => {
 		const left = tokens(asString(a))
@@ -47,7 +62,7 @@ const text: CompareFn = {
 		if (left.length > 0 && left.join('') === right.join('')) return 1
 		return tokenSimilarity(left, right)
 	},
-}
+})
 
 const phoneTail = (value: unknown): string => digits(asString(value)).slice(-PHONE_SUFFIX)
 
@@ -120,16 +135,11 @@ const numberCompare = ({ tolerance = 0, toleranceType = 'value' }: Tolerance): C
 			keys: (value) => {
 				const text = chars(value)
 				if (!text) return []
-				const keys = new Set([text])
+				if (limit === 0) return [text]
 				// One edit apart, two values share a key: the same character dropped from both, or
 				// the longer one without its extra character against the shorter as it is.
-				if (limit > 0) keys.add(`~${text}`)
-				if (Math.min(KEY_EDITS, Math.floor(text.length * limit)) >= 1) {
-					for (let index = 0; index < text.length; index++) {
-						keys.add(`~${text.slice(0, index)}${text.slice(index + 1)}`)
-					}
-				}
-				return [...keys]
+				const edits = Math.min(KEY_EDITS, Math.floor(text.length * limit)) >= 1
+				return [...new Set([text, ...(edits ? oneEditKeys(text) : [text]).map((key) => `~${key}`)])]
 			},
 			similarity: (a, b) => {
 				const left = chars(a)
@@ -174,7 +184,7 @@ const numberCompare = ({ tolerance = 0, toleranceType = 'value' }: Tolerance): C
 
 export const presets: Record<ComparePreset, CompareFn> = {
 	exact,
-	text,
+	text: textCompare({}),
 	phone,
 	number: numberCompare({}),
 	date,
@@ -182,11 +192,12 @@ export const presets: Record<ComparePreset, CompareFn> = {
 
 export const resolveCompare = (
 	compare: CompareFn | ComparePreset | undefined,
-	tolerance: Tolerance = {}
+	options: Tolerance & TextOptions = {}
 ): CompareFn => {
 	if (typeof compare === 'object') return compare
-	if (compare === 'number' && (tolerance.tolerance || tolerance.toleranceType)) {
-		return numberCompare(tolerance)
+	if (compare === 'number' && (options.tolerance || options.toleranceType)) {
+		return numberCompare(options)
 	}
+	if (compare === 'text' && options.typos) return textCompare(options)
 	return presets[compare ?? 'exact']
 }

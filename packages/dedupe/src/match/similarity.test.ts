@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { SIMILAR_THRESHOLD } from './score'
 import { jaroWinkler, tokenSimilarity } from './similarity'
 
 describe('jaroWinkler', () => {
@@ -22,8 +23,10 @@ describe('tokenSimilarity', () => {
 		expect(tokenSimilarity(['ivan', 'petrenko'], ['petrenko', 'ivan'])).toBe(1)
 	})
 
-	it('does not punish a middle name present on one side', () => {
-		expect(tokenSimilarity(['ivan', 'petrenko'], ['ivan', 'olehovych', 'petrenko'])).toBe(1)
+	it('counts a middle name present on one side as similar, not as a mismatch', () => {
+		const score = tokenSimilarity(['ivan', 'petrenko'], ['ivan', 'olehovych', 'petrenko'])
+		expect(score).toBeGreaterThanOrEqual(SIMILAR_THRESHOLD)
+		expect(score).toBeLessThan(1)
 	})
 
 	it('returns 0 for an empty side', () => {

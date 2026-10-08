@@ -168,7 +168,7 @@ export default buildConfig({
 					match: {
 						fields: [
 							{ path: 'email', weight: 45 },
-							{ path: 'name', weight: 45, compare: 'text' },
+							{ path: 'name', weight: 45, compare: 'text', typos: true },
 						],
 					},
 				},

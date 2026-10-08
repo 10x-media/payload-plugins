@@ -43,6 +43,11 @@ export type MatchFieldConfig = {
 	 * (1234567890 and 1234567891 are 10% apart). Default `value`.
 	 */
 	toleranceType?: 'value' | 'quantity'
+	/**
+	 * With `compare: 'text'`: words of four letters or more also meet with one letter wrong,
+	 * missing or extra ("Jhon", "John"). Adds a blocking key per letter of each such word.
+	 */
+	typos?: boolean
 }
 
 export type MatchConfig = {
@@ -304,6 +309,9 @@ const validateMatchField = (field: MatchFieldConfig, index: number, seen: Set<st
 	const { tolerance, toleranceType } = field
 	if ((tolerance !== undefined || toleranceType !== undefined) && field.compare !== 'number') {
 		fail("`tolerance` and `toleranceType` apply to `compare: 'number'` only")
+	}
+	if (field.typos !== undefined && field.compare !== 'text') {
+		fail("`typos` applies to `compare: 'text'` only")
 	}
 	if (
 		tolerance !== undefined &&
