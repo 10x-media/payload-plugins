@@ -17,8 +17,9 @@ const isDedupeWrite = (context: Record<string, unknown> | undefined): boolean =>
 /**
  * File a saved document as a save files it: indexed inside the write's transaction through
  * `req`, and, with `checkOnSave`, checked by a job queued there, which exists only once the
- * write commits, so a failure in the check leaves the write alone. Checked right away under
- * `disableJobsQueue`.
+ * write commits, so a failure in the check leaves the write alone. Under `disableJobsQueue`
+ * checked right away inside the transaction, a failure logged: an adapter that is down leaves
+ * the write alone, a database error has already ended the transaction.
  */
 const fileDocument = async (args: {
 	req: PayloadRequest
@@ -30,7 +31,14 @@ const fileDocument = async (args: {
 	await col.adapter.index?.({ req, collection: col.slug, doc })
 	if (!col.options.checkOnSave) return
 	if (ctx.options.disableJobsQueue) {
-		await checkDocument({ req, ctx, col, doc })
+		try {
+			await checkDocument({ req, ctx, col, doc })
+		} catch (error) {
+			req.payload.logger.error(
+				{ err: error, collection: col.slug, id: doc.id },
+				'[dedupe] check on save failed'
+			)
+		}
 		return
 	}
 	await req.payload.jobs.queue({
@@ -63,7 +71,7 @@ const afterChange: CollectionAfterChangeHook = async ({ collection, doc, req }) 
 	}
 	if (!col.options.match) return doc
 	// A draft saved over a published document leaves that one as it was. Taken off publication,
-	// a document leaves the index, so it pairs with nothing until published again.
+	// a document leaves the index and its open pairs, as in the trash, until published again.
 	if (col.hasDrafts && !col.options.draft && saved._status === 'draft') {
 		const published = (await req.payload.findByID({
 			collection: col.slug,
@@ -76,6 +84,7 @@ const afterChange: CollectionAfterChangeHook = async ({ collection, doc, req }) 
 		})) as LoadedDoc | null
 		if (!published || !isLive(col, published)) {
 			await col.adapter.remove?.({ req, collection: col.slug, id: String(saved.id) })
+			await closePairsFor({ req, col, docIds: [saved.id], keepDismissed: true })
 		}
 		return doc
 	}

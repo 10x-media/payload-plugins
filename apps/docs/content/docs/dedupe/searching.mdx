@@ -43,9 +43,9 @@ A matching field adds its `weight`, a near match part of it, a differing one `on
 
 Every save indexes the document and, unless `checkOnSave: false`, queues a `dedupe-check` job that compares it with its look-alikes and opens or refreshes their pairs; a pair that no longer qualifies is deleted. The scan compares a whole collection: run it with "Scan now" in the queue, or schedule it with `scan.cron`.
 
-Both need a job worker for the `dedupe` queue, for example `jobs.autoRun: [{ cron: '* * * * *', queue: 'dedupe' }]`. Without one, set `disableJobsQueue: true` and both run inside the request. Across servers, set `jobs.enableConcurrencyControl`.
+Both need a job worker for the `dedupe` queue, for example `jobs.autoRun: [{ cron: '* * * * *', queue: 'dedupe' }]`. Without one, set `disableJobsQueue: true` and both run inside the request. The check then runs inside the save's transaction: a check that fails, such as on an adapter that is down, is logged and the save goes through. Across servers, set `jobs.enableConcurrencyControl`.
 
-A pair marked "Not duplicates" stays marked however often it is found again. Unless `draft` is set, unpublished documents are not searched. While a document is in the trash, its groups are not listed under "Not duplicates"; restored, they are back.
+A pair marked "Not duplicates" stays marked however often it is found again. Unless `draft` is set, unpublished documents are not searched. Taking a document off publication or moving it to the trash closes its open pairs; its "Not duplicates" marks stay. While a document is in the trash, its groups are not listed under "Not duplicates"; restored, they are back.
 
 ## Finding duplicates from code
 

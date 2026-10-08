@@ -1,5 +1,5 @@
 import { describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionSlug } from 'payload'
+import type { CollectionSlug, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 
 import { KEYS_SLUG, PAIRS_SLUG } from '../../src/collections/slugs'
@@ -8,6 +8,7 @@ import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
 import type { DedupePluginOptions } from '../../src/options'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
+import { decidePair } from '../../src/queue/pairs'
 import { runScan } from '../../src/queue/scan'
 import { bootDedupe, CUSTOMERS, type Doc, POSTS, pluginOptions, TEAMS } from './fixtures'
 
@@ -18,12 +19,19 @@ describeForDb('dedupe search', {}, (db) => {
 
 	const ctx = () => getContext(fixture.booted.payload)
 	const col = (slug: CollectionSlug) => getCollectionContext(fixture.booted.payload, slug)
-	const pairsOf = async (id: number | string) =>
+	/** The pairs of a document of `target`: in SQL another collection reuses the same ids. */
+	const pairsOf = async (target: CollectionSlug, id: number | string, req?: PayloadRequest) =>
 		(
 			await fixture.booted.payload.db.find({
 				collection: PAIRS_SLUG,
-				where: { or: [{ docA: { equals: String(id) } }, { docB: { equals: String(id) } }] },
+				where: {
+					and: [
+						{ target: { equals: target } },
+						{ or: [{ docA: { equals: String(id) } }, { docB: { equals: String(id) } }] },
+					],
+				},
 				pagination: false,
+				req,
 			})
 		).docs as unknown as { docA: string; docB: string; status: string }[]
 	/** Calls of `db.find` on one collection while `run` runs. */
@@ -69,7 +77,7 @@ describeForDb('dedupe search', {}, (db) => {
 				name: `Anna Crowd${n}`,
 				phone: `+38${phone}`,
 			})
-			const pairs = await pairsOf(copy.id)
+			const pairs = await pairsOf(CUSTOMERS, copy.id)
 			expect(pairs.map((pair) => [pair.docA, pair.docB].sort())).toContainEqual(
 				[String(original.id), String(copy.id)].sort()
 			)
@@ -113,7 +121,7 @@ describeForDb('dedupe search', {}, (db) => {
 			name: `Stale Pair${n}`,
 			phone: `+3807711${n}2233`,
 		})
-		expect((await pairsOf(a.id)).some((pair) => pair.status === 'open')).toBe(true)
+		expect((await pairsOf(CUSTOMERS, a.id)).some((pair) => pair.status === 'open')).toBe(true)
 		// Written past the plugin's hooks, as an import would: the pair no longer holds.
 		await fixture.booted.payload.update({
 			collection: CUSTOMERS,
@@ -123,7 +131,7 @@ describeForDb('dedupe search', {}, (db) => {
 		})
 		const summary = await runScan({ req: fixture.req, ctx: ctx(), col: col(CUSTOMERS) })
 		expect(summary.removed).toBeGreaterThanOrEqual(1)
-		expect((await pairsOf(a.id)).some((pair) => pair.status === 'open')).toBe(false)
+		expect((await pairsOf(CUSTOMERS, a.id)).some((pair) => pair.status === 'open')).toBe(false)
 	})
 
 	it('finds look-alikes of unsaved values from code, best first, and stores nothing', async () => {
@@ -200,7 +208,7 @@ describeForDb('dedupe search', {}, (db) => {
 				phone: `04411${n}5566`,
 				tenant: 'south',
 			})
-			expect(await pairsOf(south.id)).toEqual([])
+			expect(await pairsOf(CUSTOMERS, south.id)).toEqual([])
 		} finally {
 			adapter.findCandidates = findCandidates
 		}
@@ -221,8 +229,73 @@ describeForDb('dedupe search', {}, (db) => {
 		})
 		expect(await fixture.keysFor(first.id, 'posts')).toEqual([])
 		const second = await create(`Unpublished Twin ${n}`)
-		expect(await pairsOf(second.id)).toEqual([])
+		expect(await pairsOf(POSTS, second.id)).toEqual([])
 	})
+
+	it('closes the open pairs of a document taken off publication, its not-duplicates marks kept', async () => {
+		n++
+		const create = (title: string) =>
+			fixture.booted.payload.create({
+				collection: POSTS,
+				data: { title, _status: 'published' } as never,
+			}) as Promise<Doc>
+		const first = await create(`Withdrawn Twin ${n}`)
+		const second = await create(`Withdrawn Twin ${n}`)
+		await create(`Withdrawn Twin ${n}`)
+		const apart = (await pairsOf(POSTS, first.id)).find(
+			(pair) => pair.docA === String(second.id) || pair.docB === String(second.id)
+		)
+		await decidePair({ req: fixture.req, ctx: ctx(), pair: apart as never, status: 'dismissed' })
+		await fixture.booted.payload.update({
+			collection: POSTS,
+			id: first.id,
+			data: { _status: 'draft' } as never,
+		})
+		expect((await pairsOf(POSTS, first.id)).map((pair) => pair.status)).toEqual(['dismissed'])
+	})
+
+	/** A request inside a transaction of its own, which the test commits or rolls back. */
+	const inTransaction = async () => {
+		const id = await fixture.booted.payload.db.beginTransaction()
+		return { req: { ...fixture.req, transactionID: id ?? undefined } as typeof fixture.req, id }
+	}
+
+	it('leaves no pair behind a save that rolls back', async () => {
+		const twin = { name: 'Rolled Twin', phone: '+49 151 9090901', birthDate: '1990-01-21' }
+		const kept = await fixture.customer({ ...twin, email: 'rolled.a@search.test' })
+		const { req, id } = await inTransaction()
+		await fixture.booted.payload.create({
+			collection: CUSTOMERS,
+			data: { ...twin, email: 'rolled.b@search.test' } as never,
+			req,
+			depth: 0,
+		})
+		expect(await pairsOf(CUSTOMERS, kept.id, req), 'the save found its twin').toHaveLength(1)
+		await fixture.booted.payload.db.rollbackTransaction(id as never)
+		expect(await pairsOf(CUSTOMERS, kept.id)).toEqual([])
+	})
+
+	it('saves a look-alike in the transaction that moved its twin to the trash', async () => {
+		const twin = { name: 'Held Twin', phone: '+49 151 8080801', birthDate: '1991-02-22' }
+		const trashed = await fixture.customer({ ...twin, email: 'held.a@search.test' })
+		const saved = await fixture.customer({ ...twin, email: 'held.b@search.test' })
+		const { req, id } = await inTransaction()
+		const update = (docId: number | string, data: Record<string, unknown>) =>
+			fixture.booted.payload.update({
+				collection: CUSTOMERS,
+				id: docId,
+				data: data as never,
+				req,
+				depth: 0,
+			})
+		await update(trashed.id, { deletedAt: new Date().toISOString() })
+		const outcome = await Promise.race([
+			update(saved.id, { email: 'held.b2@search.test' }).then(() => 'saved'),
+			new Promise((resolve) => setTimeout(() => resolve('waiting'), 10_000)),
+		])
+		await fixture.booted.payload.db.rollbackTransaction(id as never)
+		expect(outcome).toBe('saved')
+	}, 30_000)
 
 	it('keeps a published document in the index while a draft of it is saved', async () => {
 		n++
@@ -239,7 +312,7 @@ describeForDb('dedupe search', {}, (db) => {
 			data: { title: `Drafted Twin ${n}` } as never,
 		})
 		const second = await create(`Drafted Twin ${n}`)
-		expect(await pairsOf(second.id)).toHaveLength(1)
+		expect(await pairsOf(POSTS, second.id)).toHaveLength(1)
 	})
 
 	it('writes no key rows when a save leaves the match fields as they were', async () => {

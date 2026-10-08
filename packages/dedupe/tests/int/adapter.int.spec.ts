@@ -1,6 +1,6 @@
 import { describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionSlug } from 'payload'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 
 import { KEYS_SLUG, PAIRS_SLUG } from '../../src/collections/slugs'
 import type { CollectionDedupeOptions } from '../../src/options'
@@ -172,6 +172,39 @@ describeForDb('dedupe adapter', {}, (db) => {
 			expect(finished).toBe(2)
 		})
 	})
+
+	describe('an adapter that is down, with the check run inside the save', () => {
+		let fixture: Awaited<ReturnType<typeof bootDedupe>>
+		const down: DedupeAdapter = {
+			findCandidates: async () => {
+				throw new Error('search is down')
+			},
+		}
+
+		beforeAll(async () => {
+			fixture = await bootDedupe(db, { adapter: () => down })
+		})
+
+		afterAll(async () => {
+			await fixture.booted.stop()
+		})
+
+		it('saves the document and logs the failed check', async () => {
+			const logged = vi.spyOn(fixture.booted.payload.logger, 'error')
+			try {
+				const [a] = twins('down')
+				const saved = await fixture.customer(a as Record<string, unknown>)
+				expect(saved.id).toBeDefined()
+				expect(logged).toHaveBeenCalledWith(
+					expect.objectContaining({ err: expect.objectContaining({ message: 'search is down' }) }),
+					expect.any(String)
+				)
+			} finally {
+				logged.mockRestore()
+			}
+		})
+	})
+
 	describe('an adapter that finds a pair from one of its documents only', () => {
 		let fixture: Awaited<ReturnType<typeof bootDedupe>>
 		const older: DedupeAdapter = {
