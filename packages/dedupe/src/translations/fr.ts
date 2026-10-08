@@ -17,7 +17,6 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.needsChoice]: 'Décision requise',
 	[keys.applied]: 'Fusionné dans le document principal.',
 	[keys.empty]: 'vide',
-	[keys.backToQueue]: 'Retour aux doublons',
 	[keys.selectTwo]: 'Sélectionnez de 2 à {{max}} documents à fusionner.',
 	[keys.mergeSelected]: 'Fusionner la sélection',
 	[keys.noTransactions]:

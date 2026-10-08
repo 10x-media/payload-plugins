@@ -17,7 +17,6 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.needsChoice]: 'Нужен выбор',
 	[keys.applied]: 'Объединено в основной документ.',
 	[keys.empty]: 'пусто',
-	[keys.backToQueue]: 'Назад к дубликатам',
 	[keys.selectTwo]: 'Выберите от 2 до {{max}} документов для объединения.',
 	[keys.mergeSelected]: 'Объединить выбранные',
 	[keys.noTransactions]:

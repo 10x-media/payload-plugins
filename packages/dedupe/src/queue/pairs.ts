@@ -1,6 +1,6 @@
 import { getTranslation } from '@payloadcms/translations'
 import type { CollectionSlug, PayloadRequest, Where } from 'payload'
-import { toWords } from 'payload/shared'
+import { mergeListSearchAndWhere, toWords } from 'payload/shared'
 
 import { PAIR_STATUSES, PAIRS_SLUG, type PairStatus, pageSize } from '../collections/slugs'
 import { pairKeyFor, sortedPair } from '../match/keys'
@@ -248,7 +248,7 @@ export type QueueGroup = {
 	id: string
 	collection: string
 	/** Every document of the group, the most alike first. */
-	docs: { id: string; title: string; trashed: boolean }[]
+	docs: { id: string; title: string }[]
 	/** The strongest pair's score, and why its two documents match. */
 	score: number
 	signals: SignalView[]
@@ -302,11 +302,6 @@ const docsOf = (group: Link[]): string[] => [
 ]
 
 /**
- * The queue a reviewer sees: one page of groups, every document resolved to its title under
- * the reader's own access, and the number of groups per status. Every configured collection
- * when none is named.
- */
-/**
  * The ids of documents of `target` that exist and that the reader may not read, by the
  * collection's own `read` access. A document deleted since is not among them.
  */
@@ -339,15 +334,77 @@ const unreadable = async (
 	return existing.filter((id) => !readable.has(id))
 }
 
+/** The ids among `ids` of documents of `target` in the trash. */
+const inTrash = async (req: PayloadRequest, target: string, ids: string[]): Promise<string[]> => {
+	const config = req.payload.collections[target as CollectionSlug]?.config
+	if (!config?.trash || ids.length === 0) return []
+	return (
+		await req.payload.find({
+			collection: target as CollectionSlug,
+			where: { and: [{ id: { in: ids } }, { deletedAt: { exists: true } }] },
+			select: {},
+			depth: 0,
+			limit: 0,
+			pagination: false,
+			trash: true,
+			overrideAccess: true,
+			req,
+		})
+	).docs.map((doc) => String(doc.id))
+}
+
+/**
+ * The ids among `ids` of documents of `target` that the list search of the collection finds
+ * for `search`, by the reader's own access, as its list view finds them.
+ */
+const searched = async ({
+	req,
+	target,
+	ids,
+	search,
+}: {
+	req: PayloadRequest
+	target: string
+	ids: string[]
+	search: string
+}): Promise<string[]> => {
+	const config = req.payload.collections[target as CollectionSlug]?.config
+	if (!config || ids.length === 0) return []
+	return (
+		await req.payload.find({
+			collection: target as CollectionSlug,
+			where: mergeListSearchAndWhere({
+				collectionConfig: config,
+				search,
+				where: { id: { in: ids } },
+			}),
+			select: {},
+			depth: 0,
+			limit: 0,
+			pagination: false,
+			trash: true,
+			overrideAccess: false,
+			user: req.user,
+			req,
+		})
+	).docs.map((doc) => String(doc.id))
+}
+
+/**
+ * The queue a reviewer sees: one page of groups, every document resolved to its title under
+ * the reader's own access, and the number of groups per status. Every configured collection
+ * when none is named.
+ */
 export const readQueue = async (args: {
 	req: PayloadRequest
 	ctx: PluginContext
 	collection: string | null
 	status: PairStatus
+	search?: string
 	page: number
 	limit: number
 }): Promise<QueueResponse> => {
-	const { req, ctx } = args
+	const { req, ctx, search } = args
 	const collections = listCollections(ctx, req.i18n)
 	const col = args.collection ? getCollectionContext(req.payload, args.collection) : null
 	const targets = col ? [col.slug as string] : collections.map((entry) => entry.slug)
@@ -382,8 +439,10 @@ export const readQueue = async (args: {
 			req,
 		})
 	).docs
-	// A group with a document the reader may not read is left out, and not counted either.
+	// A group with a document the reader may not read, or one in the trash, is left out, and not
+	// counted either: restored, it is back. A search keeps only the groups with a document it finds.
 	const hidden = new Set<string>()
+	const found = search ? new Set<string>() : null
 	for (const target of new Set(links.map((link) => link.target))) {
 		const ids = [
 			...new Set(
@@ -391,12 +450,15 @@ export const readQueue = async (args: {
 			),
 		]
 		for (const id of await unreadable(req, target, ids)) hidden.add(`${target}:${id}`)
+		for (const id of await inTrash(req, target, ids)) hidden.add(`${target}:${id}`)
+		if (found && search) {
+			for (const id of await searched({ req, target, ids, search })) found.add(`${target}:${id}`)
+		}
 	}
+	const has = (keys: Set<string>, link: Link) =>
+		keys.has(`${link.target}:${link.docA}`) || keys.has(`${link.target}:${link.docB}`)
 	const shownTo = (group: Link[]) =>
-		group.every(
-			(link) =>
-				!hidden.has(`${link.target}:${link.docA}`) && !hidden.has(`${link.target}:${link.docB}`)
-		)
+		group.every((link) => !has(hidden, link)) && (!found || group.some((link) => has(found, link)))
 	const counts = emptyCounts()
 	const byStatus = new Map<PairStatus, Link[][]>()
 	for (const status of PAIR_STATUSES) {
@@ -434,16 +496,12 @@ export const readQueue = async (args: {
 	)
 
 	const titles = new Map<string, string>()
-	const trashed = new Set<string>()
 	for (const target of new Set(shown.map((group) => (group[0] as Link).target))) {
 		const owner = getCollectionContext(req.payload, target)
 		const ids = [...new Set(shown.filter((group) => group[0]?.target === target).flatMap(docsOf))]
 		// Under the reader's own access: a document they may not read shows as its id.
-		const docs = await loadDocs({ req, ctx, col: owner, ids, overrideAccess: false, trash: true })
-		for (const doc of docs) {
-			titles.set(`${target}:${doc.id}`, docTitle(req, owner.slug, doc))
-			if (doc.deletedAt) trashed.add(`${target}:${doc.id}`)
-		}
+		const docs = await loadDocs({ req, ctx, col: owner, ids, overrideAccess: false })
+		for (const doc of docs) titles.set(`${target}:${doc.id}`, docTitle(req, owner.slug, doc))
 	}
 	const decided = shown.flatMap((group) => {
 		const by = full.get(String(latest(group)?.id))?.decidedBy
@@ -458,11 +516,7 @@ export const readQueue = async (args: {
 		return {
 			id: String(strongest.id),
 			collection: target,
-			docs: ids.map((id) => ({
-				id,
-				title: titles.get(`${target}:${id}`) ?? id,
-				trashed: trashed.has(`${target}:${id}`),
-			})),
+			docs: ids.map((id) => ({ id, title: titles.get(`${target}:${id}`) ?? id })),
 			score: strongest.score,
 			signals: labelSignals(
 				req,

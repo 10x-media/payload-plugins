@@ -17,7 +17,6 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.needsChoice]: 'Precisa de uma escolha',
 	[keys.applied]: 'Mesclado no documento principal.',
 	[keys.empty]: 'vazio',
-	[keys.backToQueue]: 'Voltar aos duplicados',
 	[keys.selectTwo]: 'Selecione de 2 a {{max}} documentos para mesclar.',
 	[keys.mergeSelected]: 'Mesclar selecionados',
 	[keys.noTransactions]:

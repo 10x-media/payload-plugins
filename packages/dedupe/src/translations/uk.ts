@@ -17,7 +17,6 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.needsChoice]: 'Потрібен вибір',
 	[keys.applied]: "Об'єднано в основний документ.",
 	[keys.empty]: 'порожньо',
-	[keys.backToQueue]: 'Назад до дублікатів',
 	[keys.selectTwo]: 'Виберіть від 2 до {{max}} документів для обʼєднання.',
 	[keys.mergeSelected]: "Об'єднати вибрані",
 	[keys.noTransactions]:

@@ -1,7 +1,7 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
 import { redirect } from 'next/navigation'
-import type { AdminViewServerProps, Params } from 'payload'
+import type { AdminViewServerProps, CollectionSlug, Params } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 
 import { getContext } from '../plugin/context'
@@ -29,7 +29,7 @@ export async function DedupeMergeView({
 	const survivor = param('survivor')
 	const docs = list('docs')
 	const adminRoute = req.payload.config.routes.admin
-	// As the admin does for a document that does not exist: back to the list, which says why.
+	// A link that names no group goes back to the queue, which says why.
 	if (
 		!collection ||
 		!ctx.collections.has(collection) ||
@@ -38,6 +38,27 @@ export async function DedupeMergeView({
 		(survivor !== undefined && !docs.includes(survivor))
 	) {
 		redirect(formatAdminURL({ adminRoute, path: `${basePath}?missingPair=1` }))
+	}
+	// As the admin does for a document that does not exist, is in the trash or the reader may not
+	// read: back to the list of its collection, which names it.
+	const found = await Promise.all(
+		docs.map((id) =>
+			req.payload.findByID({
+				collection: collection as CollectionSlug,
+				id,
+				select: {},
+				depth: 0,
+				overrideAccess: false,
+				user,
+				req,
+				disableErrors: true,
+			})
+		)
+	)
+	const missing = docs.find((_, index) => !found[index])
+	if (missing) {
+		const query = new URLSearchParams({ collection, notFound: missing })
+		redirect(formatAdminURL({ adminRoute, path: `${basePath}?${query}` }))
 	}
 
 	return (

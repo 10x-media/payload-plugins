@@ -206,7 +206,14 @@ export const loadMergeGroup = async (args: {
 	const ids = [survivorId, ...absorbedIds].map(String)
 	const docs = await Promise.all(ids.map((id) => loadDoc({ ...args, id })))
 	for (const [index, doc] of docs.entries()) {
-		if (!doc) throw new APIError(`Document ${ids[index]} does not exist.`, 404, undefined, true)
+		if (!doc) {
+			throw new APIError(
+				req.t('error:documentNotFound', { id: ids[index] as string }),
+				404,
+				undefined,
+				true
+			)
+		}
 		if (doc.deletedAt) {
 			throw new APIError(
 				`"${await readableTitle(req, col, doc)}" is in the trash.`,

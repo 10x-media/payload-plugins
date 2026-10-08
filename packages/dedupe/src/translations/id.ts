@@ -17,7 +17,6 @@ export const id: Record<TranslationKey, string> = {
 	[keys.needsChoice]: 'Perlu pilihan',
 	[keys.applied]: 'Digabungkan ke dokumen utama.',
 	[keys.empty]: 'kosong',
-	[keys.backToQueue]: 'Kembali ke duplikat',
 	[keys.selectTwo]: 'Pilih 2 sampai {{max}} dokumen untuk digabungkan.',
 	[keys.mergeSelected]: 'Gabungkan yang dipilih',
 	[keys.noTransactions]:

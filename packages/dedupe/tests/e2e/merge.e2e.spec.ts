@@ -716,6 +716,32 @@ test('without two different documents the merge screen returns to the queue and 
 	}
 })
 
+test('a document deleted or in the trash sends the merge screen to the queue of its collection, as the admin does for a document', async ({
+	page,
+	context,
+}) => {
+	const gone = {
+		deleted: (id: string) => context.request.delete(`/api/customers/${id}?trash=false`),
+		trashed: (id: string) =>
+			context.request.patch(`/api/customers/${id}`, {
+				data: { deletedAt: new Date().toISOString() },
+			}),
+	}
+	for (const [label, remove] of Object.entries(gone)) {
+		const [a, b] = (await seedGroup(context.request, label, 2)) as [Customer, Customer]
+		await remove(b.id)
+
+		await page.goto(`${MERGE_PATH}?collection=customers&docs=${a.id},${b.id}`)
+		await expect(page, label).toHaveURL(
+			new RegExp(`/admin/dedupe\\?collection=customers&notFound=${b.id}$`)
+		)
+		await expect(page.locator('.dedupe-queue .banner--type-error')).toHaveText(
+			`The document with ID ${b.id} could not be found. It may have been deleted or never existed, or you may not have access to it.`
+		)
+		await expect(page.locator('.step-nav__last')).toHaveText('Customers')
+	}
+})
+
 test("a field inside groups is labelled as the list's filter labels it, in the admin's language", async ({
 	page,
 	context,

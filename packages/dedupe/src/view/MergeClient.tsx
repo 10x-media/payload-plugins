@@ -340,9 +340,6 @@ export function MergeClient({
 		return (
 			<div className={baseClass}>
 				<Banner type="error">{error}</Banner>
-				<Button buttonStyle="secondary" el="link" margin={false} to={queuePath}>
-					{t(keys.backToQueue)}
-				</Button>
 			</div>
 		)
 	}

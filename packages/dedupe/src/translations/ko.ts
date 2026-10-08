@@ -17,7 +17,6 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.needsChoice]: '선택 필요',
 	[keys.applied]: '기본 문서로 병합되었습니다.',
 	[keys.empty]: '비어 있음',
-	[keys.backToQueue]: '중복 목록으로',
 	[keys.selectTwo]: '병합할 문서를 2개에서 {{max}}개까지 선택하세요.',
 	[keys.mergeSelected]: '선택 항목 병합',
 	[keys.noTransactions]:

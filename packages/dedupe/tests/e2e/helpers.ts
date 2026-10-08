@@ -90,7 +90,9 @@ export const cleanup = async (request: APIRequestContext): Promise<void> => {
 		const body = (await response.json()) as { docs: { id: string; name?: string }[] }
 		for (const doc of body.docs) {
 			if (!String(doc.name ?? '').includes(MARK)) continue
-			await request.delete(`/api/customers/${doc.id}?trash=false`)
+			// Without `trash=true` the delete does not find a document in the trash; with it, it
+			// deletes either kind for good.
+			await request.delete(`/api/customers/${doc.id}?trash=true`)
 		}
 	}
 }

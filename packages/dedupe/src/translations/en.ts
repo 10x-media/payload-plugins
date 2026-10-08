@@ -22,7 +22,6 @@ export const en: Record<TranslationKey, string> = {
 	[keys.needsChoice]: 'Needs a choice',
 	[keys.applied]: 'Merged into the primary.',
 	[keys.empty]: 'empty',
-	[keys.backToQueue]: 'Back to duplicates',
 	[keys.selectTwo]: 'Select 2 to {{max}} documents to merge.',
 	[keys.mergeSelected]: 'Merge selected',
 	[keys.noTransactions]:

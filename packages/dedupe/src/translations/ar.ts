@@ -17,7 +17,6 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.needsChoice]: 'يتطلب اختيارًا',
 	[keys.applied]: 'تم الدمج في المستند الأساسي.',
 	[keys.empty]: 'فارغ',
-	[keys.backToQueue]: 'العودة إلى التكرارات',
 	[keys.selectTwo]: 'اختر من 2 إلى {{max}} مستندات للدمج.',
 	[keys.mergeSelected]: 'دمج المحدد',
 	[keys.noTransactions]:

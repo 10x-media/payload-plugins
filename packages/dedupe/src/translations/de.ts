@@ -17,7 +17,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.needsChoice]: 'Entscheidung nötig',
 	[keys.applied]: 'In das primäre Dokument zusammengeführt.',
 	[keys.empty]: 'leer',
-	[keys.backToQueue]: 'Zurück zu den Duplikaten',
 	[keys.selectTwo]: 'Zum Zusammenführen 2 bis {{max}} Dokumente auswählen.',
 	[keys.mergeSelected]: 'Auswahl zusammenführen',
 	[keys.noTransactions]:

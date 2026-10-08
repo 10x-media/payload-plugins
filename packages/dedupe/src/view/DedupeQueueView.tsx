@@ -35,15 +35,23 @@ export async function DedupeQueueView({
 	const requestedStatus = param('status')
 	const status = isStatus(requestedStatus) ? requestedStatus : 'open'
 	const limit = pageSize(param('limit'))
+	const search = param('search') ?? ''
 	const data = await readQueue({
 		req,
 		ctx,
 		collection: collection || null,
 		status,
+		search,
 		page: Number(param('page')) || 1,
 		limit,
 	})
 	const adminRoute = req.payload.config.routes.admin
+	const notFound = param('notFound')
+	const notice = notFound
+		? req.i18n.t('error:documentNotFound', { id: notFound })
+		: param('missingPair')
+			? t(keys.missingParams)
+			: null
 
 	return (
 		<DefaultTemplate
@@ -67,7 +75,8 @@ export async function DedupeQueueView({
 						limit={limit}
 						maxGroupSize={ctx.options.maxGroupSize}
 						mergePath={formatAdminURL({ adminRoute, path: `${basePath}/merge` })}
-						notice={param('missingPair') ? t(keys.missingParams) : null}
+						notice={notice}
+						search={search}
 						status={status}
 					/>
 				)}

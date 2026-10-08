@@ -24,12 +24,13 @@ describeForDb('dedupe queue', {}, (db) => {
 		return response.json()
 	}
 
-	const queue = (collection: string | null) =>
+	const queue = (collection: string | null, search?: string) =>
 		readQueue({
 			req: fixture.req,
 			ctx: getContext(fixture.booted.payload),
 			collection,
 			status: 'open',
+			search,
 			page: 1,
 			limit: 25,
 		})
@@ -378,17 +379,17 @@ describeForDb('dedupe queue', {}, (db) => {
 				data: { deletedAt: new Date().toISOString() } as never,
 			})
 			expect(await status()).toBe('dismissed')
-			const listed = await readQueue({
-				req: fixture.req,
-				ctx: getContext(payload),
-				collection: 'customers',
-				status: 'dismissed',
-				page: 1,
-				limit: 100,
-			})
-			const row = rowsWith(listed, a)[0]
-			expect(row?.docs.find((doc) => doc.id === String(a.id))?.trashed).toBe(true)
-			expect(row?.docs.find((doc) => doc.id === String(b.id))?.trashed).toBe(false)
+			const dismissed = () =>
+				readQueue({
+					req: fixture.req,
+					ctx: getContext(payload),
+					collection: 'customers',
+					status: 'dismissed',
+					page: 1,
+					limit: 100,
+				})
+			const binned = await dismissed()
+			expect(rowsWith(binned, b), 'a group with a document in the trash is not listed').toEqual([])
 			await payload.update({
 				collection: 'customers' as never,
 				id: a.id,
@@ -396,6 +397,9 @@ describeForDb('dedupe queue', {}, (db) => {
 				trash: true,
 			})
 			expect(await status()).toBe('dismissed')
+			const restored = await dismissed()
+			expect(rowsWith(restored, b), 'restored, the group is back').toHaveLength(1)
+			expect(restored.counts.dismissed, 'the tab counts it again').toBe(binned.counts.dismissed + 1)
 
 			await payload.delete({ collection: 'customers' as never, id: a.id })
 			expect(await status()).toBeUndefined()
@@ -509,6 +513,40 @@ describeForDb('dedupe queue', {}, (db) => {
 		const decision = plan.decisions.find((entry) => entry.path === 'company')
 		expect(JSON.stringify(decision?.relationLabels ?? {})).not.toContain('Secret GmbH')
 	})
+	describe('search', () => {
+		const lead = (email: string) =>
+			fixture.booted.payload.create({ collection: LEADS, data: { email } as never }) as Promise<Doc>
+
+		it('keeps the groups with a document the list search of its collection finds, whole', async () => {
+			const [a, b, c] = [
+				await lead('needle-a@search.test'),
+				await lead('hay-b@search.test'),
+				await lead('hay-c@search.test'),
+			]
+			await pairRow('leads', [a, b])
+			await pairRow('leads', [b, c])
+			const [d, e] = [await lead('hay-d@search.test'), await lead('hay-e@search.test')]
+			await pairRow('leads', [d, e])
+
+			const result = await queue(null, 'needle-a')
+			expect(result.docs.map((row) => row.docs.map((doc) => doc.id).sort())).toEqual([
+				[a, b, c].map((doc) => String(doc.id)).sort(),
+			])
+			expect(result.totalDocs).toBe(1)
+			expect(result.counts).toEqual({ open: 1, dismissed: 0 })
+		})
+
+		it("searches the fields the collection's listSearchableFields names", async () => {
+			const twin = (email: string) =>
+				fixture.customer({ name: 'Search Twin', email, phone: '0151 4444 5555' })
+			const [a, b] = [await twin('by-email@search.test'), await twin('other@search.test')]
+			const result = await queue('customers', 'by-email@search')
+			expect(result.docs.map((row) => row.docs.map((doc) => doc.id).sort())).toEqual([
+				[a, b].map((doc) => String(doc.id)).sort(),
+			])
+		})
+	})
+
 	describe('groups', () => {
 		const lead = (email: string) =>
 			fixture.booted.payload.create({ collection: LEADS, data: { email } as never }) as Promise<Doc>

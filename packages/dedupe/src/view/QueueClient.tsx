@@ -24,7 +24,15 @@ import { keys, type TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { callApi, mergeUrl } from './api'
 import { ChoicePill } from './ChoicePill'
-import { column, ListHeader, ListPages, ListTabs, NoListResults } from './native'
+import {
+	column,
+	ListHeader,
+	ListPages,
+	ListTabs,
+	NoListResults,
+	SearchBar,
+	searchPlaceholder,
+} from './native'
 import { Signals } from './Signals'
 import { SHORT_DATE } from './Value'
 
@@ -45,6 +53,7 @@ type QueueClientProps = {
 	mergePath: string
 	/** An error the page arrived with, shown above the table as the list view shows one. */
 	notice: null | string
+	search: string
 	status: PairStatus
 }
 
@@ -60,14 +69,16 @@ export function QueueClient({
 	maxGroupSize,
 	mergePath,
 	notice,
+	search,
 	status,
 }: QueueClientProps) {
 	const { i18n, t } = useTranslation()
-	const { t: payloadT } = usePayloadTranslation()
+	const { i18n: payloadI18n, t: payloadT } = usePayloadTranslation()
 	const {
 		config: {
 			routes: { api: apiRoute },
 		},
+		getEntityConfig,
 	} = useConfig()
 	const router = useRouter()
 	const pathname = usePathname()
@@ -76,21 +87,35 @@ export function QueueClient({
 	const [navigating, startTransition] = useTransition()
 	const { collections } = data
 
+	// A collection filter is a level of its own, as the trash is under a collection's list: the
+	// merge screen's crumbs lead back to it.
+	const collectionLabel = collections.find((entry) => entry.slug === collection)?.label
 	useEffect(() => {
-		setStepNav([{ label: t(keys.queueTitle) }])
-	}, [setStepNav, t])
+		setStepNav(
+			collectionLabel
+				? [{ label: t(keys.queueTitle), url: pathname }, { label: collectionLabel }]
+				: [{ label: t(keys.queueTitle) }]
+		)
+	}, [setStepNav, t, collectionLabel, pathname])
 
 	/** The address carries the filters, and the server view reads the queue from it. */
 	const navigate = useCallback(
-		(next: { collection?: string; limit?: number; page?: number; status?: PairStatus }) => {
-			const target = { collection, status, limit, page: data.page, ...next }
+		(next: {
+			collection?: string
+			limit?: number
+			page?: number
+			search?: string
+			status?: PairStatus
+		}) => {
+			const target = { collection, status, limit, search, page: data.page, ...next }
 			const query = new URLSearchParams({ status: target.status })
 			if (target.collection) query.set('collection', target.collection)
+			if (target.search) query.set('search', target.search)
 			if (target.page > 1) query.set('page', String(target.page))
 			if (target.limit !== PAGE_SIZE) query.set('limit', String(target.limit))
 			startTransition(() => router.replace(`${pathname}?${query}`, { scroll: false }))
 		},
-		[collection, status, limit, data.page, pathname, router]
+		[collection, status, limit, search, data.page, pathname, router]
 	)
 
 	const scan = useCallback(async () => {
@@ -117,6 +142,18 @@ export function QueueClient({
 		}
 	}, [apiRoute, collection, router, t])
 
+	const placeholder = useMemo(
+		() =>
+			searchPlaceholder(
+				(collection ? [collection] : collections.map((entry) => entry.slug)).flatMap((slug) => {
+					const config = getEntityConfig({ collectionSlug: slug })
+					return config ? [config] : []
+				}),
+				payloadI18n
+			),
+		[collection, collections, getEntityConfig, payloadI18n]
+	)
+
 	const canScan = collection
 		? Boolean(collections.find((entry) => entry.slug === collection)?.hasMatch)
 		: collections.some((entry) => entry.hasMatch)
@@ -124,15 +161,6 @@ export function QueueClient({
 	const columns = useMemo<Column[]>(() => {
 		const rows = data.docs
 		const labels = new Map(collections.map((entry) => [entry.slug, entry.label]))
-		// A document in the trash cannot be merged: nothing to open.
-		const hrefOf = (group: QueueGroup): string | null => {
-			if (group.docs.some((doc) => doc.trashed)) return null
-			return mergeUrl({
-				mergePath,
-				collection: group.collection,
-				docs: group.docs.slice(0, maxGroupSize).map((doc) => doc.id),
-			})
-		}
 		const titlesOf = (group: QueueGroup): string => {
 			const named = group.docs
 				.slice(0, 3)
@@ -145,17 +173,18 @@ export function QueueClient({
 			column(
 				'documents',
 				payloadT('general:documents'),
-				rows.map((group) => {
-					const titles = titlesOf(group)
-					const href = hrefOf(group)
-					return href ? (
-						<Link href={href} key={group.id}>
-							{titles}
-						</Link>
-					) : (
-						<span key={group.id}>{titles}</span>
-					)
-				})
+				rows.map((group) => (
+					<Link
+						href={mergeUrl({
+							mergePath,
+							collection: group.collection,
+							docs: group.docs.slice(0, maxGroupSize).map((doc) => doc.id),
+						})}
+						key={group.id}
+					>
+						{titlesOf(group)}
+					</Link>
+				))
 			),
 			...(collection
 				? []
@@ -219,6 +248,7 @@ export function QueueClient({
 						value={status}
 					/>
 				}
+				description={t(STATUS[status].about)}
 				title={t(keys.queueTitle)}
 				titleActions={
 					canScan ? (
@@ -235,26 +265,39 @@ export function QueueClient({
 				}
 			/>
 
-			<div className={`${baseClass}__controls`}>
-				{collections.length > 1 ? (
-					<ChoicePill
-						groupLabel={t(keys.collection)}
-						onChange={(value) => navigate({ collection: value, page: 1 })}
-						options={[
-							{ label: payloadT('general:allCollections'), value: '' },
-							...collections.map((entry) => ({ label: entry.label, value: entry.slug })),
-						]}
-						value={collection}
-					/>
-				) : null}
-				<p className={`${baseClass}__about`}>{t(STATUS[status].about)}</p>
+			<div className="list-controls">
+				<SearchBar
+					actions={
+						collections.length > 1 ? (
+							<ChoicePill
+								groupLabel={t(keys.collection)}
+								onChange={(value) => navigate({ collection: value, page: 1 })}
+								options={[
+									{ label: payloadT('general:allCollections'), value: '' },
+									...collections.map((entry) => ({ label: entry.label, value: entry.slug })),
+								]}
+								value={collection}
+							/>
+						) : null
+					}
+					label={placeholder}
+					onSearchChange={(next) => navigate({ search: next ?? '', page: 1 })}
+					search={search}
+				/>
 			</div>
 
 			{notice ? <Banner type="error">{notice}</Banner> : null}
 
 			{data.docs.length === 0 ? (
 				<NoListResults>
-					<p className={`${baseClass}__message`}>{t(keys.noPairs)}</p>
+					{search ? (
+						<>
+							<h3>{payloadT('general:noResultsFound')}</h3>
+							<p className={`${baseClass}__message`}>{payloadT('general:noResultsDescription')}</p>
+						</>
+					) : (
+						<p className={`${baseClass}__message`}>{t(keys.noPairs)}</p>
+					)}
 				</NoListResults>
 			) : (
 				<div className={`${baseClass}__table`}>

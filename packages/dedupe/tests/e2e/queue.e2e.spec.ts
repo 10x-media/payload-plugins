@@ -8,6 +8,7 @@ import {
 	MARK,
 	matchingPair,
 	mergeButton,
+	openMerge,
 	openQueue,
 	QUEUE_PATH,
 	queueRow,
@@ -118,7 +119,7 @@ test('marking a pair not duplicates on the merge screen moves it to its tab, and
 	expect((await findPair(context.request, [left.id, right.id]))?.status).toBe('open')
 })
 
-test('a group marked not duplicates with a document in the trash is listed without a link', async ({
+test('a group marked not duplicates leaves the tab while a document is in the trash', async ({
 	page,
 	context,
 }) => {
@@ -136,8 +137,15 @@ test('a group marked not duplicates with a document in the trash is listed witho
 
 	await openQueue(page, 'dismissed')
 	const row = queueRow(page, `${MARK} binned Kowalska`)
+	await expect(row).toHaveCount(0)
+
+	const restored = await context.request.patch(`/api/customers/${right.id}?trash=true`, {
+		data: { deletedAt: null },
+	})
+	expect(restored.ok(), `restore failed: ${restored.status()}`).toBe(true)
+	await openQueue(page, 'dismissed')
 	await expect(row).toBeVisible()
-	await expect(row.getByRole('link')).toHaveCount(0)
+	await expect(row.getByRole('link')).toHaveCount(1)
 })
 
 test('each status tab counts the rows it lists, one per group', async ({ page, context }) => {
@@ -175,6 +183,78 @@ test('documents alike in a chain are one row, and it opens them all', async ({ p
 	await expect(row).toContainText(`${MARK} delta Kowalsky`)
 	await row.getByRole('link').click()
 	await expect(page.locator('.dedupe-merge__head')).toHaveCount(3)
+})
+
+test('the search bar keeps the groups with a document the list search of the collection finds', async ({
+	page,
+	context,
+}) => {
+	for (const label of ['foxtrot', 'golf']) {
+		const [a, b] = matchingPair(label)
+		await createCustomer(context.request, a)
+		await createCustomer(context.request, b)
+	}
+
+	await openQueue(page)
+	const search = page.locator('.search-bar .search-filter__input')
+	// Worded and searched as the customers list does it, by its listSearchableFields.
+	await expect.soft(search).toHaveAttribute('placeholder', 'Search by Name Or Email')
+	await search.fill('golf@e2e')
+	await expect(page).toHaveURL(/search=golf%40e2e/)
+	// The whole group, also the document without that email.
+	await expect(queueRow(page, `${MARK} golf Kowalska`)).toBeVisible()
+	await expect(queueRow(page, `${MARK} foxtrot Kowalska`)).toHaveCount(0)
+	await expect(queueTab(page, 'Open')).toHaveText(/Open\s*1$/)
+
+	await page.reload()
+	await expect(search).toHaveValue('golf@e2e')
+	await expect(queueRow(page, `${MARK} foxtrot Kowalska`)).toHaveCount(0)
+})
+
+test("a status tab's count stands apart from its label and shows on the active tab, as the Versions tab's does", async ({
+	page,
+}) => {
+	await openQueue(page)
+	for (const label of ['Open', 'Not duplicates']) {
+		const tab = queueTab(page, label)
+		const look = await tab.evaluate((button) => {
+			const pill = button.querySelector('.pill-version-count') as HTMLElement
+			const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT)
+			const text = walker.nextNode() as Text
+			const range = document.createRange()
+			range.selectNodeContents(text)
+			return {
+				gap: pill.getBoundingClientRect().left - range.getBoundingClientRect().right,
+				pill: getComputedStyle(pill).backgroundColor,
+				tab: getComputedStyle(button).backgroundColor,
+				active: button.classList.contains('default-list-view-tabs__button--active'),
+			}
+		})
+		expect.soft(look.gap, `the gap after "${label}"`).toBeGreaterThanOrEqual(3)
+		if (label === 'Open') {
+			expect(look.active, 'the queue opens on Open').toBe(true)
+			expect.soft(look.pill, 'the count on the active tab').not.toBe(look.tab)
+		}
+	}
+})
+
+test("the queue names its collection filter in the breadcrumbs, the level the merge screen's lead back to", async ({
+	page,
+	context,
+}) => {
+	const [a, b] = matchingPair('hotel')
+	const left = await createCustomer(context.request, a)
+	const right = await createCustomer(context.request, b)
+	await openMerge(page, { docs: [left.id, right.id] })
+
+	await page.locator('.step-nav').getByRole('link', { name: 'Customers' }).click()
+	await expect(page).toHaveURL(/collection=customers/)
+	await expect(page.locator('.step-nav__last')).toHaveText('Customers')
+	const queue = page.locator('.step-nav').getByRole('link', { name: 'Duplicates' })
+	await expect(queue).toHaveAttribute('href', QUEUE_PATH)
+
+	await queue.click()
+	await expect(page.locator('.step-nav__last')).toHaveText('Duplicates')
 })
 
 test('an empty status says so instead of showing an empty table', async ({ page }) => {

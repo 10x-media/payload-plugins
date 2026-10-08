@@ -20,7 +20,6 @@ export const keys = {
 	needsChoice: 'dedupe:needsChoice',
 	applied: 'dedupe:applied',
 	empty: 'dedupe:empty',
-	backToQueue: 'dedupe:backToQueue',
 	selectTwo: 'dedupe:selectTwo',
 	mergeSelected: 'dedupe:mergeSelected',
 	noTransactions: 'dedupe:noTransactions',

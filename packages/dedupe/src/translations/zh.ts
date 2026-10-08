@@ -17,7 +17,6 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.needsChoice]: '需要选择',
 	[keys.applied]: '已合并到主文档。',
 	[keys.empty]: '空',
-	[keys.backToQueue]: '返回重复项',
 	[keys.selectTwo]: '请选择 2 到 {{max}} 个文档进行合并。',
 	[keys.mergeSelected]: '合并所选',
 	[keys.noTransactions]:

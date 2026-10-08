@@ -1,27 +1,39 @@
 'use client'
 
-import { Button, PageControlsComponent } from '@payloadcms/ui'
+import { getTranslation, type I18nClient } from '@payloadcms/translations'
+import {
+	Button,
+	PageControlsComponent,
+	SearchFilter,
+	SearchIcon,
+	ViewDescription,
+} from '@payloadcms/ui'
 import type { ClientCollectionConfig, ClientField, Column } from 'payload'
+import { fieldAffectsData, flattenTopLevelFields } from 'payload/shared'
 import type React from 'react'
 
 /**
- * Copies of admin markup for pieces `@payloadcms/ui` keeps internal: the list header and
- * tabs, the empty-list notice, a table column and a single radio; and the page controls wired
- * to the plugin's own navigation. The
- * admin loads that package's whole stylesheet, so the class names alone reproduce the
- * appearance; only the behaviour is the plugin's own. The same approach as folder-picker's
- * `native.tsx`.
+ * Copies of admin markup for pieces `@payloadcms/ui` keeps internal: the list header and tabs,
+ * the search bar and its placeholder, the empty-list notice, a table column and a single radio;
+ * and the page controls wired to the plugin's own navigation. The admin loads that package's
+ * whole stylesheet, so the class names alone reproduce the appearance; only the behaviour is the
+ * plugin's own. The same approach as folder-picker's `native.tsx`.
  */
 
 const listHeaderClass = 'list-header'
 
-/** The list view's header: title, the pill actions beside it, the tabs on the right, and a line under it. */
+/**
+ * The list view's header: title, the pill actions beside it, the tabs on the right, a line
+ * under it, and the description below.
+ */
 export const ListHeader = ({
 	actions,
+	description,
 	title,
 	titleActions,
 }: {
 	actions?: React.ReactNode
+	description?: string
 	title: string
 	titleActions?: React.ReactNode
 }) => (
@@ -35,10 +47,76 @@ export const ListHeader = ({
 			</div>
 			{actions ? <div className={`${listHeaderClass}__actions`}>{actions}</div> : null}
 		</div>
+		{description ? (
+			<div className={`${listHeaderClass}__after-header-content`}>
+				<div className="collection-list__sub-header">
+					<ViewDescription description={description} />
+				</div>
+			</div>
+		) : null}
 	</header>
 )
 
-/** The list view's "All / Trash" switch, with a count beside each tab as the Versions tab shows one. */
+/** The list view's search bar, with the pills it carries on the right. */
+export const SearchBar = ({
+	actions,
+	label,
+	onSearchChange,
+	search,
+}: {
+	actions?: React.ReactNode
+	label: string
+	onSearchChange: (search: string) => void
+	search: string
+}) => (
+	<div className="search-bar">
+		<SearchIcon />
+		<SearchFilter handleChange={onSearchChange} label={label} searchQueryParam={search} />
+		{actions ? <div className="search-bar__actions">{actions}</div> : null}
+	</div>
+)
+
+/**
+ * The placeholder of the list view's search, worded as the list view words it for one
+ * collection, over the fields of each of these: those `listSearchableFields` names, or else the
+ * `useAsTitle` one.
+ */
+export const searchPlaceholder = (
+	collections: ClientCollectionConfig[],
+	i18n: I18nClient
+): string => {
+	const labels = new Set<string>()
+	for (const config of collections) {
+		const searchable = config.admin.listSearchableFields
+		let named = false
+		for (const field of flattenTopLevelFields(config.fields, { i18n, moveSubFieldsToTop: true })) {
+			if (!fieldAffectsData(field)) continue
+			const { name, label } = field as { name: string; label?: unknown }
+			if (searchable?.length ? !searchable.includes(name) : name !== config.admin.useAsTitle) {
+				continue
+			}
+			named = true
+			labels.add(
+				getTranslation(
+					typeof label === 'string' || (typeof label === 'object' && label)
+						? (label as Record<string, string> | string)
+						: name,
+					i18n
+				)
+			)
+		}
+		if (!named) labels.add('ID')
+	}
+	const [first = 'ID', ...rest] = [...labels]
+	const last = rest.pop()
+	const searchBy = i18n.t('general:searchBy', { label: [first, ...rest].join(', ') })
+	return last ? `${searchBy} ${i18n.t('general:or')} ${last}` : searchBy
+}
+
+/**
+ * The list view's "All / Trash" switch, with a count beside each tab drawn as the document's
+ * Versions tab draws its own.
+ */
 export const ListTabs = <T extends string>({
 	onChange,
 	tabs,
@@ -54,7 +132,9 @@ export const ListTabs = <T extends string>({
 				buttonStyle="tab"
 				className={[
 					'default-list-view-tabs__button',
+					'doc-tab',
 					tab.value === value && 'default-list-view-tabs__button--active',
+					tab.value === value && 'doc-tab--active',
 				]
 					.filter(Boolean)
 					.join(' ')}
@@ -64,8 +144,15 @@ export const ListTabs = <T extends string>({
 				margin={false}
 				onClick={() => onChange(tab.value)}
 			>
-				{tab.label}
-				{tab.count === undefined ? null : <span className="pill-version-count">{tab.count}</span>}
+				<span className="doc-tab__label">
+					{tab.label}
+					{tab.count === undefined ? null : (
+						<>
+							{' '}
+							<span className="pill-version-count">{tab.count}</span>
+						</>
+					)}
+				</span>
 			</Button>
 		))}
 	</div>

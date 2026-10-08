@@ -28,7 +28,7 @@ Every save indexes the document and, unless `checkOnSave: false`, queues a `dedu
 
 Both need a job worker for the `dedupe` queue, for example `jobs.autoRun: [{ cron: '* * * * *', queue: 'dedupe' }]`. Without one, set `disableJobsQueue: true` and both run inside the request. Across servers, set `jobs.enableConcurrencyControl`.
 
-A pair marked "Not duplicates" stays marked however often it is found again. Unless `draft` is set, unpublished documents are not searched.
+A pair marked "Not duplicates" stays marked however often it is found again. Unless `draft` is set, unpublished documents are not searched. While a document is in the trash, its groups are not listed under "Not duplicates"; restored, they are back.
 
 ## Finding duplicates from code
 

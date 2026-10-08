@@ -6,6 +6,7 @@ export const customers: CollectionConfig = {
 	trash: true,
 	admin: {
 		useAsTitle: 'name',
+		listSearchableFields: ['name', 'email'],
 		defaultColumns: ['name', 'tenant', 'email', 'phone', 'birthDate'],
 		// Dev stand only: open the create form with a look-alike typed in.
 		components: {
