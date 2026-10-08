@@ -69,6 +69,24 @@ describe('buildAuditLogsCollection', () => {
 		expect(many && 'relationTo' in many && many.relationTo).toEqual(['users', 'admins'])
 	})
 
+	it('points impersonator at the same auth collections as user', () => {
+		const relationTo = ['users', 'admins'] as CollectionSlug[]
+		const fields = buildAuditLogsCollection(
+			true,
+			relationTo,
+			undefined,
+			undefined,
+			false,
+			false,
+			true
+		).fields
+		const user = field(fields, 'user')
+		const impersonator = field(fields, 'impersonator')
+		expect(impersonator && 'relationTo' in impersonator && impersonator.relationTo).toEqual(
+			user && 'relationTo' in user ? user.relationTo : undefined
+		)
+	})
+
 	describe('optional fields', () => {
 		it('adds a tenant field only with multi-tenancy on', () => {
 			expect(names(buildAuditLogsCollection().fields)).not.toContain('tenant')
@@ -89,6 +107,15 @@ describe('buildAuditLogsCollection', () => {
 			expect(
 				names(buildAuditLogsCollection(true, 'users', undefined, undefined, false, true).fields)
 			).toContain('group')
+		})
+
+		it('adds an impersonator field only when impersonation is recorded', () => {
+			expect(names(buildAuditLogsCollection().fields)).not.toContain('impersonator')
+			expect(
+				names(
+					buildAuditLogsCollection(true, 'users', undefined, undefined, false, false, true).fields
+				)
+			).toContain('impersonator')
 		})
 	})
 

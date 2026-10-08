@@ -30,6 +30,11 @@ packages/*/videos/out/
 # dev app upload storage
 packages/*/dev/uploads/
 
+# document-preview int test uploads (staticDir resolves against the package dir)
+packages/document-preview/media/
+# document-preview dev seed downloads (extend and MDN sample files)
+packages/document-preview/dev/.seed-cache/
+
 # admin-wiki wiki media uploads
 packages/admin-wiki/dev/wiki-media/
 

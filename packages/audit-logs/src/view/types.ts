@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 export type AuditLogDoc = {
 	id: string
 	operation: 'auth' | 'create' | 'custom' | 'delete' | 'update'
@@ -5,6 +7,9 @@ export type AuditLogDoc = {
 	relationTo: string
 	documentId?: string
 	user?: unknown
+	impersonator?: unknown
+	/** A tenant id, or the tenant itself when the read populated it. */
+	tenant?: unknown
 	locale?: string
 	/** Free text: core sets REST, GraphQL or local, a plugin may set anything else. */
 	payloadAPI?: string
@@ -18,30 +23,51 @@ export type AuditLogDoc = {
 	createdAt: string
 }
 
+/**
+ * The view's filters as the URL carries them. Every list matches any of its
+ * values; the filters combine with AND. Documents and users are `slug:id` when
+ * picked, a bare id when typed in.
+ */
 export type Filters = {
 	changedPaths?: string[]
 	collections?: string[]
 	dateFrom?: string
 	dateTo?: string
-	documentId?: string
-	eventType?: string
+	documents?: string[]
+	eventTypes?: string[]
 	globals?: string[]
-	group?: string
+	groups?: string[]
+	/** `payloadAPI` values: the built-ins, `logs.payloadAPIs`, or any typed in. */
+	apis?: string[]
 	operations?: string[]
 	tenants?: string[]
-	userCollection?: string // used only when user field is polymorphic (multiple auth collections)
-	userIds?: string[]
+	users?: string[]
 }
 
 export type SelectOption = { label: string; value: string }
 
+/** Server-rendered custom event bodies, keyed by entry id. */
+export type RenderedEvents = Record<string, ReactNode>
+
 export type AuditLogsClientProps = {
 	adminRoute: string
 	apiRoute: string
-	collectionSlugs: string[]
+	/** Every collection but the log itself, labelled from its config. */
+	collectionOptions: SelectOption[]
 	docs: Record<string, unknown>[]
 	filters: Filters
-	globalSlugs: string[]
+	globalOptions: SelectOption[]
+	/** Per-tenant singleton collections, offered as globals in the tenant view. */
+	tenantGlobalOptions: SelectOption[]
+	/** The tenants collection, when multi-tenancy is on. */
+	tenantsSlug?: string
+	/** Singular collection labels and global labels by slug, for the rows. */
+	collectionLabels: Record<string, string>
+	globalLabels: Record<string, string>
+	/** Titles of the documents and users the current filters name. */
+	refLabels: Record<string, string>
+	/** `useAsTitle` per collection, to name what the filter drawers pick. */
+	titleFields: Record<string, string>
 	/** Tenant options for the filter dropdown. Only present when multiTenancy is configured. */
 	tenantOptions?: SelectOption[]
 	/** When set, the view is locked to this tenant ID and the tenant filter is hidden. */
@@ -57,4 +83,7 @@ export type AuditLogsClientProps = {
 	debugMode?: boolean
 	/** Whether the archive job is configured (controls visibility of the Archive button). */
 	hasArchive?: boolean
+	renderedEvents?: RenderedEvents
+	/** Custom event types for the Event filter and their badge labels. */
+	customEventTypes: SelectOption[]
 }

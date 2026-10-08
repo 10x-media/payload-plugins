@@ -51,6 +51,28 @@ describe('buildPluginContext', () => {
 		})
 	})
 
+	describe('impersonation', () => {
+		const installed = { '@10x-media/impersonation': () => ({}) }
+
+		it('is off without the impersonation plugin', () => {
+			expect(buildPluginContext(config([]), {}).recordImpersonator).toBe(false)
+		})
+
+		it('is on when the impersonation plugin is installed', () => {
+			expect(buildPluginContext(config([]), {}, installed).recordImpersonator).toBe(true)
+		})
+
+		it('false opts out even with the plugin installed', () => {
+			expect(
+				buildPluginContext(config([]), { impersonation: false }, installed).recordImpersonator
+			).toBe(false)
+		})
+
+		it('true opts in without the plugin', () => {
+			expect(buildPluginContext(config([]), { impersonation: true }).recordImpersonator).toBe(true)
+		})
+	})
+
 	describe('multi-tenancy', () => {
 		it('is absent by default', () => {
 			const ctx = buildPluginContext(config([]), {})

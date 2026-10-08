@@ -19,6 +19,7 @@
 		"form-variants",
 		"content-lock",
 		"conversations",
-		"impersonation"
+		"impersonation",
+		"document-preview"
 	]
 }

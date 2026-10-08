@@ -1,0 +1,31 @@
+.model-viewer {
+	display: flex;
+	flex-direction: column;
+}
+
+.model-viewer__stage {
+	cursor: grab;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+	position: relative;
+	touch-action: none;
+}
+
+.model-viewer__stage:active {
+	cursor: grabbing;
+}
+
+.model-viewer__stage canvas {
+	display: block;
+}
+
+.model-viewer__status {
+	align-items: center;
+	color: var(--theme-elevation-500);
+	display: flex;
+	inset: 0;
+	justify-content: center;
+	pointer-events: none;
+	position: absolute;
+}

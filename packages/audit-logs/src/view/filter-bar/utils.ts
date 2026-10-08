@@ -10,3 +10,9 @@ export const formatDatePill = (iso: string): string => {
 		return iso
 	}
 }
+
+/** `list` with `value` added or removed; an empty list becomes `undefined`. */
+export const toggled = (list: string[] | undefined, value: string): string[] | undefined => {
+	const next = list?.includes(value) ? list.filter((v) => v !== value) : [...(list ?? []), value]
+	return next.length ? next : undefined
+}

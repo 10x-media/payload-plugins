@@ -292,7 +292,6 @@ export type ImpersonationRecord = {
 	impersonatorEmail?: null | string
 	impersonatorLocale?: null | string
 	impersonatorSid: string
-	impersonatorTenantCookie?: null | string
 	impersonatorTitle?: null | string
 	ip?: null | string
 	mode: ImpersonationMode
