@@ -20,7 +20,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.selectTwo]: 'Zum Zusammenführen 2 bis {{max}} Dokumente auswählen.',
 	[keys.mergeSelected]: 'Auswahl zusammenführen',
 	[keys.noTransactions]:
-		'Diese Datenbank öffnet keine Transaktionen. Bricht die Zusammenführung ab, bleiben erledigte Schritte bestehen: Platzhalter in den eingegangenen Dokumenten, verschobene Verweise, einzelne Sprachen des Hauptdokuments. Der Vorgang wird als fehlgeschlagen markiert und nennt die verschobenen Verweise.',
+		'Diese Datenbank öffnet keine Transaktionen. Bricht die Zusammenführung ab, bevor das Hauptdokument geschrieben ist, bekommen die eingegangenen Dokumente ihre Werte zurück. Bricht sie später ab, behält das Hauptdokument das Geschriebene und die eingegangenen Dokumente bleiben bestehen, mit Platzhaltern für die eindeutigen Werte, die sie abgegeben haben. Verweise, die die Anwendung vor dem Fehler auf das Hauptdokument verschoben hat, bleiben dort. Eine Zusammenführung, die zuerst ein Dokument löschen müsste, wird abgelehnt.',
 	[keys.transactionsRequired]:
 		'Zusammenführen ist aus: Diese Datenbank öffnet keine Transaktionen, und das Plugin verlangt eine.',
 	[keys.takenFrom]: 'Übernommen aus {{title}}',

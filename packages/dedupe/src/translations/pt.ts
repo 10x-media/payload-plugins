@@ -20,7 +20,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.selectTwo]: 'Selecione de 2 a {{max}} documentos para mesclar.',
 	[keys.mergeSelected]: 'Mesclar selecionados',
 	[keys.noTransactions]:
-		'Este banco de dados não abre transações. Se a mesclagem falhar no meio, os passos já feitos ficam: marcadores nos documentos mesclados, referências movidas, alguns idiomas do principal. O registro fica como falho e lista o que foi movido.',
+		'Este banco de dados não abre transações. Se a mesclagem falhar antes de gravar o principal, os documentos mesclados recuperam seus valores. Se falhar depois, o principal mantém o que foi gravado e os documentos mesclados permanecem, com marcadores no lugar dos valores únicos que cederam. As referências que a aplicação moveu para o principal antes da falha permanecem lá. Uma mesclagem que teria de excluir um documento antes é recusada.',
 	[keys.transactionsRequired]:
 		'Mesclar está desativado: este banco de dados não abre transações e o plugin exige uma.',
 	[keys.takenFrom]: 'Obtido de {{title}}',

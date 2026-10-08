@@ -20,7 +20,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.selectTwo]: '请选择 2 到 {{max}} 个文档进行合并。',
 	[keys.mergeSelected]: '合并所选',
 	[keys.noTransactions]:
-		'此数据库不支持事务。合并中途失败时，已完成的步骤会保留：被合并文档中的占位值、已移动的引用、主文档的部分语言。合并记录会标记为失败，并列出已移动的内容。',
+		'此数据库不支持事务。若合并在写入主文档之前失败，被合并文档会恢复原值。若之后失败，主文档保留已写入的内容，被合并文档保留原位，其让出的唯一值处留有占位值。失败前应用已移到主文档的引用保持不变。需要先删除文档的合并会被拒绝。',
 	[keys.transactionsRequired]: '合并已关闭：此数据库不支持事务，而插件被设置为必须使用事务。',
 	[keys.takenFrom]: '取自 {{title}}',
 	[keys.error]: '出了点问题。',

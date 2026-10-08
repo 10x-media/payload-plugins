@@ -25,7 +25,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.selectTwo]: 'Select 2 to {{max}} documents to merge.',
 	[keys.mergeSelected]: 'Merge selected',
 	[keys.noTransactions]:
-		'This database opens no transactions. If the merge fails halfway, the steps already done stay done: placeholders on the merged-in documents, moved references, some languages of the primary. The merge record is marked failed and lists what moved.',
+		'This database opens no transactions. If the merge fails before the primary is written, the merged-in documents get their values back. If it fails later, the primary keeps what was written and the merged-in documents stay in place, with placeholders for the unique values they gave up. References the app moved to the primary before the failure stay there. A merge that would have to delete a document first is refused.',
 	[keys.transactionsRequired]:
 		'Merging is off: this database opens no transactions, and the plugin is set to require one.',
 	[keys.takenFrom]: 'Taken from {{title}}',

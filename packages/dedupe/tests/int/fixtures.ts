@@ -552,6 +552,7 @@ const fragile: CollectionConfig = {
 	fields: [
 		{ name: 'title', type: 'text' },
 		{ name: 'seat', type: 'number', unique: true, required: true },
+		{ name: 'email', type: 'email', unique: true },
 	],
 }
 

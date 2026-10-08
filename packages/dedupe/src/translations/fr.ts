@@ -20,7 +20,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.selectTwo]: 'Sélectionnez de 2 à {{max}} documents à fusionner.',
 	[keys.mergeSelected]: 'Fusionner la sélection',
 	[keys.noTransactions]:
-		"Cette base de données n'ouvre pas de transactions. Si la fusion échoue en cours de route, les étapes déjà faites restent : valeurs provisoires dans les documents fusionnés, références déplacées, certaines langues du document principal. L'enregistrement est marqué comme échoué et liste ce qui a été déplacé.",
+		"Cette base de données n'ouvre pas de transactions. Si la fusion échoue avant l'écriture du document principal, les documents fusionnés retrouvent leurs valeurs. Si elle échoue après, le document principal garde ce qui a été écrit et les documents fusionnés restent en place, avec des valeurs provisoires à la place des valeurs uniques cédées. Les références que l'application a déplacées vers le document principal avant l'échec y restent. Une fusion qui devrait d'abord supprimer un document est refusée.",
 	[keys.transactionsRequired]:
 		"La fusion est désactivée : cette base de données n'ouvre pas de transactions et le plugin en exige une.",
 	[keys.takenFrom]: 'Repris de {{title}}',

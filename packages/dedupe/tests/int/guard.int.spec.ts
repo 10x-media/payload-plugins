@@ -1,6 +1,6 @@
 import { describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionSlug, PayloadRequest } from 'payload'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 
 import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
@@ -14,6 +14,7 @@ import {
 	emitted,
 	FRAGILE,
 	KITS,
+	pluginOptions,
 	reqFor,
 	STAFF,
 	VAULTS,
@@ -571,25 +572,89 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		})
 	})
 
-	it('reports a merge that fails halfway without a transaction', async () => {
-		const survivor = await create(FRAGILE, { title: 'keeps', seat: 1 })
-		const absorbed = await create(FRAGILE, { title: 'boom', seat: 2 })
+	/** The database answering as one without transactions does, `transactionOptions: false` too. */
+	const withoutTransactions = async (run: () => Promise<void>) => {
 		const database = fixture.booted.payload.db as { beginTransaction?: unknown }
 		const begin = database.beginTransaction
 		database.beginTransaction = async () => null
 		try {
-			await expect(
-				applyMerge({
-					...group(fixture.req, FRAGILE, [survivor.id, absorbed.id]),
-					choices: { seat: { doc: String(absorbed.id) }, title: { doc: String(absorbed.id) } },
-				})
-			).rejects.toThrow('boom')
+			await run()
 		} finally {
 			database.beginTransaction = begin
 		}
+	}
+	const stored = (id: number | string) =>
+		fixture.booted.payload.findByID({
+			collection: FRAGILE,
+			id,
+			depth: 0,
+			trash: true,
+		}) as Promise<Doc>
+
+	it('puts the placeholders back on a merge that fails halfway without a transaction', async () => {
+		const survivor = await create(FRAGILE, { title: 'keeps', seat: 1 })
+		const absorbed = await create(FRAGILE, { title: 'boom', seat: 2, email: 'boom@guard.test' })
+		await withoutTransactions(async () => {
+			await expect(
+				applyMerge({
+					...group(fixture.req, FRAGILE, [survivor.id, absorbed.id]),
+					choices: { email: { doc: String(absorbed.id) }, title: { doc: String(absorbed.id) } },
+				})
+			).rejects.toThrow('boom')
+		})
 		expect(emitted).toContainEqual(
 			expect.objectContaining({ type: 'merge.failed', survivorId: String(survivor.id) })
 		)
+		expect((await stored(absorbed.id)).email).toBe('boom@guard.test')
+		expect((await stored(survivor.id)).email ?? null).toBeNull()
+	})
+
+	it('logs the values it could not put back, which no merge record keeps', async () => {
+		const { payload } = fixture.booted
+		const survivor = await create(FRAGILE, { title: 'keeps', seat: 3 })
+		const absorbed = await create(FRAGILE, { title: 'boom', seat: 4, email: 'lost@guard.test' })
+		const updateOne = payload.db.updateOne.bind(payload.db)
+		const restore = vi.spyOn(payload.db, 'updateOne').mockImplementation(async (args) => {
+			if ((args.data as { email?: string }).email === 'lost@guard.test') throw new Error('down')
+			return updateOne(args)
+		})
+		const logged = vi.spyOn(payload.logger, 'error')
+		try {
+			await withoutTransactions(async () => {
+				await expect(
+					applyMerge({
+						...group(fixture.req, FRAGILE, [survivor.id, absorbed.id]),
+						choices: { email: { doc: String(absorbed.id) }, title: { doc: String(absorbed.id) } },
+					})
+				).rejects.toThrow('boom')
+			})
+			expect(logged).toHaveBeenCalledWith(
+				expect.objectContaining({
+					id: String(absorbed.id),
+					values: expect.objectContaining({ email: 'lost@guard.test' }),
+				}),
+				expect.any(String)
+			)
+		} finally {
+			restore.mockRestore()
+			logged.mockRestore()
+		}
+	})
+
+	it('refuses, without a transaction, a merge that deletes a document before the survivor is written', async () => {
+		const survivor = await create(FRAGILE, { title: 'keeps', seat: 11 })
+		const absorbed = await create(FRAGILE, { title: 'boom', seat: 12 })
+		const merge = {
+			...group(fixture.req, FRAGILE, [survivor.id, absorbed.id]),
+			choices: { seat: { doc: String(absorbed.id) }, title: { doc: String(absorbed.id) } },
+		}
+		await withoutTransactions(async () => {
+			const plan = await buildPlanResponse(merge)
+			expect(plan.readyToApply).toBe(false)
+			expect(plan.blocked).toMatch(/"Seat".*transaction/)
+			await expect(applyMerge(merge)).rejects.toMatchObject({ status: 409 })
+		})
+		expect((await stored(absorbed.id)).seat).toBe(12)
 	})
 
 	it('says at the plan that the merge cannot apply when transactions are required and missing', async () => {
@@ -657,5 +722,47 @@ describeForDb('dedupe merge guards, told by the plan', {}, (db) => {
 		const plan = await buildPlanResponse(args)
 		expect([plan.readyToApply, plan.refusal]).toEqual([false, 'You may not merge documents.'])
 		await expect(applyMerge(args)).rejects.toMatchObject({ status: 403 })
+	})
+})
+
+describeForDb('dedupe merge guards, merged-in documents deleted', {}, (db) => {
+	let fixture: Awaited<ReturnType<typeof bootDedupe>>
+
+	beforeAll(async () => {
+		fixture = await bootDedupe(db, {
+			collections: { ...pluginOptions.collections, fragile: { absorbed: 'delete' } },
+		})
+	})
+
+	afterAll(async () => {
+		await fixture.booted.stop()
+	})
+
+	it('refuses at the plan, as at the apply, a merge that deletes a document before the survivor is written', async () => {
+		const { payload } = fixture.booted
+		const create = (data: Record<string, unknown>) =>
+			payload.create({ collection: FRAGILE, data: data as never, depth: 0 }) as Promise<Doc>
+		const survivor = await create({ title: 'keeps', seat: 21 })
+		const absorbed = await create({ title: 'other', seat: 22 })
+		const merge = {
+			req: fixture.req,
+			ctx: getContext(payload),
+			col: getCollectionContext(payload, FRAGILE),
+			survivorId: survivor.id,
+			absorbedIds: [absorbed.id],
+			choices: { seat: { doc: String(absorbed.id) } },
+		}
+		const database = payload.db as { beginTransaction?: unknown }
+		const begin = database.beginTransaction
+		database.beginTransaction = async () => null
+		try {
+			const plan = await buildPlanResponse(merge)
+			expect(plan.readyToApply).toBe(false)
+			expect(plan.blocked).toMatch(/"Seat".*transaction/)
+			expect(plan.release).toEqual({})
+			await expect(applyMerge(merge)).rejects.toMatchObject({ status: 409 })
+		} finally {
+			database.beginTransaction = begin
+		}
 	})
 })

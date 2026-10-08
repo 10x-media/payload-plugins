@@ -20,7 +20,7 @@ export const es: Record<TranslationKey, string> = {
 	[keys.selectTwo]: 'Selecciona de 2 a {{max}} documentos para fusionar.',
 	[keys.mergeSelected]: 'Fusionar seleccionados',
 	[keys.noTransactions]:
-		'Esta base de datos no abre transacciones. Si la fusión falla a medias, los pasos ya hechos se quedan: marcadores en los documentos fusionados, referencias movidas, algunos idiomas del principal. El registro queda como fallido y lista lo que se movió.',
+		'Esta base de datos no abre transacciones. Si la fusión falla antes de escribir el principal, los documentos fusionados recuperan sus valores. Si falla después, el principal conserva lo escrito y los documentos fusionados se quedan, con marcadores en lugar de los valores únicos que cedieron. Las referencias que la aplicación movió al principal antes del fallo se quedan allí. Una fusión que tendría que borrar primero un documento se rechaza.',
 	[keys.transactionsRequired]:
 		'Fusionar está desactivado: esta base de datos no abre transacciones y el plugin exige una.',
 	[keys.takenFrom]: 'Tomado de {{title}}',

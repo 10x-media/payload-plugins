@@ -20,7 +20,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.selectTwo]: 'Pilih 2 sampai {{max}} dokumen untuk digabungkan.',
 	[keys.mergeSelected]: 'Gabungkan yang dipilih',
 	[keys.noTransactions]:
-		'Basis data ini tidak membuka transaksi. Jika penggabungan gagal di tengah jalan, langkah yang sudah selesai tetap ada: penanda di dokumen yang digabungkan, referensi yang dipindahkan, sebagian bahasa dokumen utama. Catatan penggabungan ditandai gagal dan mencantumkan apa yang dipindahkan.',
+		'Basis data ini tidak membuka transaksi. Jika penggabungan gagal sebelum dokumen utama ditulis, dokumen yang digabungkan mendapatkan kembali nilainya. Jika gagal setelahnya, dokumen utama menyimpan apa yang sudah ditulis dan dokumen yang digabungkan tetap ada, dengan nilai pengganti untuk nilai unik yang mereka lepaskan. Referensi yang dipindahkan aplikasi ke dokumen utama sebelum kegagalan tetap di sana. Penggabungan yang harus menghapus dokumen lebih dulu ditolak.',
 	[keys.transactionsRequired]:
 		'Penggabungan dimatikan: basis data ini tidak membuka transaksi, dan plugin diatur untuk mewajibkannya.',
 	[keys.takenFrom]: 'Diambil dari {{title}}',

@@ -12,7 +12,7 @@ description: Every option of the plugin and its default.
 | `collections` | `{}` | Per collection: `true` for the merge screen alone, the object below, or `false`. |
 | `access.review` | logged in | Who opens the queue and the merge screen. The collection's `read` access on the documents applies too: the queue lists no group with a document the reader may not read. |
 | `access.merge` | logged in | Who applies a merge. The collection's `read`, `update` and `delete` access apply too. |
-| `requireTransactions` | `false` | Refuse to merge without a database transaction. |
+| `requireTransactions` | `false` | Refuse every merge without a database transaction. Without it, only a merge that would delete a merged-in document first is refused. |
 | `maxGroupSize` | `5` | Most documents in one merge, 2 or more. |
 | `adapter` | keys | Where candidates come from in every collection without its own, see [Adapters](./searching#adapters). |
 | `disableJobsQueue` | `false` | Run the save check and the scan inside the request, for a deployment without a job worker. |

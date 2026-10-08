@@ -259,16 +259,36 @@ export const removalRefusal = async (args: {
 }
 
 /**
+ * Why the merge may not run without a transaction, or null: an absorbed document that can hold
+ * neither a placeholder nor an empty value for a unique value the survivor takes is deleted
+ * before the survivor is written, and without a transaction a failure after that loses it.
+ */
+export const deletionRefusal = async (args: {
+	req: PayloadRequest
+	col: CollectionContext
+	absorbed: LoadedDoc[]
+	deletes: Record<string, string[]>
+}): Promise<string | null> => {
+	const { req, col, absorbed, deletes } = args
+	const doc = absorbed.find((one) => (deletes[String(one.id)]?.length ?? 0) > 0)
+	if (!doc) return null
+	const title = await readableTitle(req, col, doc)
+	const fields = [...new Set(deletes[String(doc.id)]?.map((key) => key.split('@')[0] as string))]
+		.map((path) => `"${fullLabel(path, col, req.i18n)}"`)
+		.join(', ')
+	return `${fields} moves to the primary only by deleting "${title}", which needs a database transaction. Make "${title}" the primary, or keep the primary's value.`
+}
+
+/**
  * Apply a reviewed merge of a group of documents into one.
  *
- * The write order is what makes this safe on a database without transactions (MongoDB
- * on a single node opens none, and Payload does not complain): `hooks.beforeRemove` gets
- * the absorbed documents as they are, then they let go of the unique values the survivor
- * takes, then the survivor is written one locale at a time, and only then do the absorbed
- * documents leave. Any prefix of that sequence leaves every document in place, and a failure
- * is logged and sent as `merge.failed`. The exception is an absorbed document that can hold
- * neither a placeholder nor an empty value for a unique value the survivor takes: it leaves
- * before the survivor is written.
+ * Without a transaction (MongoDB on a single node opens none, and Payload does not complain)
+ * the write order keeps the documents: `hooks.beforeRemove` gets the absorbed documents as
+ * they are, then they let go of the unique values the survivor takes, then the survivor is
+ * written one locale at a time, and only then do the absorbed documents leave. A failure
+ * before the survivor is written puts the absorbed documents' values back. A merge that
+ * would delete an absorbed document before the survivor is written is refused without a
+ * transaction. A failure is logged and sent as `merge.failed`.
  */
 export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult> => {
 	const { req, ctx, col, survivorId, absorbedIds, choices, expected } = args
@@ -389,7 +409,16 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 	if (removing) throw forbidden(removing)
 
 	const transactional = await initTransaction(req)
-	if (!transactional && ctx.options.requireTransactions) {
+	// Ours, or one the caller opened around the merge.
+	const inTransaction = Boolean(await req.transactionID)
+	if (!inTransaction && early.length > 0) {
+		const deletes = Object.fromEntries(
+			early.map((id) => [id, releases.get(id)?.release.deletes ?? []])
+		)
+		const refusal = await deletionRefusal({ req, col, absorbed, deletes })
+		if (refusal) throw new APIError(refusal, 409, undefined, true)
+	}
+	if (!inTransaction && ctx.options.requireTransactions) {
 		throw new APIError(
 			'The database did not open a transaction and `requireTransactions` is on.',
 			503,
@@ -399,6 +428,12 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 	}
 
 	const draft = col.hasDrafts && col.options.draft
+	// What puts the absorbed documents' values back, run when a merge without a transaction
+	// fails before the survivor holds them.
+	/** Each step puts back what a placeholder replaced: `values`, logged should the step fail. */
+	const undo: Array<{ id: string; values: Record<string, unknown>; run: () => Promise<unknown> }> =
+		[]
+	let written = false
 	const remove = (id: string) =>
 		payload.delete({
 			collection: col.slug,
@@ -441,12 +476,23 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 				joins: false,
 				req,
 			})
-			const whole = mergeData(stored ?? {}, update)
-			const data =
+			const shaped = (whole: Record<string, unknown>) =>
 				payload.db.name === 'mongoose'
-					? Object.fromEntries(Object.keys(update).map((key) => [key, whole[key]]))
+					? Object.fromEntries(Object.keys(update).map((key) => [key, whole[key] ?? null]))
 					: Object.fromEntries(Object.entries(whole).filter(([key]) => key !== 'id'))
-			await payload.db.updateOne({ collection: col.slug, id, data, req })
+			await payload.db.updateOne({
+				collection: col.slug,
+				id,
+				data: shaped(mergeData(stored ?? {}, update)),
+				req,
+			})
+			const values = Object.fromEntries(Object.keys(update).map((key) => [key, stored?.[key]]))
+			undo.push({
+				id,
+				values,
+				run: () =>
+					payload.db.updateOne({ collection: col.slug, id, data: shaped(stored ?? {}), req }),
+			})
 			// With drafts every save starts from the newest version, the trash below too: without
 			// the placeholder there it would bring the value back.
 			if (col.hasDrafts) {
@@ -461,18 +507,21 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 					req,
 				})
 				if (latest) {
-					await payload.db.updateVersion({
-						collection: col.slug,
-						id: latest.id,
-						versionData: {
-							createdAt: latest.createdAt,
-							latest: true,
-							parent: latest.parent,
-							updatedAt: latest.updatedAt,
-							version: mergeData(latest.version, update),
-						},
-						req,
-					})
+					const rewrite = (version: typeof latest.version) =>
+						payload.db.updateVersion({
+							collection: col.slug,
+							id: latest.id,
+							versionData: {
+								createdAt: latest.createdAt,
+								latest: true,
+								parent: latest.parent,
+								updatedAt: latest.updatedAt,
+								version,
+							},
+							req,
+						})
+					await rewrite(mergeData(latest.version, update))
+					undo.push({ id, values, run: () => rewrite(latest.version) })
 				}
 			}
 		}
@@ -542,6 +591,7 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 			entry.locale !== undefined && plan.drafted.includes(entry.locale)
 		for (const entry of writes.filter((entry) => !drafted(entry))) {
 			await write(entry.locale, entry.data, draft)
+			written = true
 		}
 		for (const entry of writes.filter(drafted)) await write(entry.locale, entry.data, true)
 		if (plan.drafted.length > 0 && writeLocale) {
@@ -580,6 +630,18 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		if (transactional) await commitTransaction(req)
 	} catch (error) {
 		await killTransaction(req)
+		if (!inTransaction && !written) {
+			for (const step of undo.reverse()) {
+				await step
+					.run()
+					.catch((err: unknown) =>
+						payload.logger.error(
+							{ err, collection: col.slug, id: step.id, values: step.values },
+							'[dedupe] could not put a merged-in document back; its values are logged'
+						)
+					)
+			}
+		}
 		payload.logger.error(
 			{
 				err: error,

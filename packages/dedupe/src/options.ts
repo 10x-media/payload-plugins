@@ -183,8 +183,10 @@ export type DedupePluginOptions = {
 		merge?: DedupeAccess
 	}
 	/**
-	 * Refuse to apply a merge when the database cannot open a transaction (MongoDB
-	 * without a replica set). Off by default: the write order is safe without one.
+	 * Refuse every merge when the database cannot open a transaction (MongoDB without a
+	 * replica set). Off by default: without one, a failure before the survivor is written puts
+	 * the absorbed documents' values back, and a merge that would delete one of them before the
+	 * survivor is written is refused.
 	 */
 	requireTransactions?: boolean
 	/** The most documents one merge takes, the survivor included. Default 5, at least 2. */

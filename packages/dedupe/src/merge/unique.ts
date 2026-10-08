@@ -72,7 +72,7 @@ const members = (value: unknown, spec: Slot['spec']): Set<string> =>
 /**
  * The unique rules as the database enforces them. A unique index over localized fields is one
  * index across every locale on MongoDB, and one per locale in SQL, which accepts it only when
- * all its fields are localized. A field inside a localized group is left out: `rowsTaken`
+ * all its fields are localized. A field inside a localized group is left out: `releaseRows`
  * answers for it.
  */
 const constraintsOf = (
@@ -147,7 +147,11 @@ const placeholdersFor = (
  * `data` already holds in the other locales; what the document holds there is laid under the
  * update when it is written.
  */
-const put = (data: Record<string, unknown>, slot: Slot, value: unknown): void => {
+const put = (
+	data: Record<string, unknown>,
+	slot: Pick<Slot, 'locale' | 'path'>,
+	value: unknown
+): void => {
 	if (!slot.locale) {
 		writePath(data, slot.path, value)
 		return
@@ -157,39 +161,59 @@ const put = (data: Record<string, unknown>, slot: Slot, value: unknown): void =>
 }
 
 /**
- * Whether the field's own validation takes the placeholder. Payload trashes without
- * validating, but a restore validates, so a placeholder it refuses would keep the
- * document in the trash for good.
+ * Whether the field's own validation takes the value. Payload trashes without validating, but
+ * a restore validates, so a placeholder it refuses would keep the document in the trash for good.
  */
-const validates = async (args: ReleaseArgs, slot: Slot, value: unknown): Promise<boolean> => {
+const accepts = async (
+	args: ReleaseArgs,
+	at: {
+		field: FlattenedField
+		value: unknown
+		data: Record<string, unknown>
+		siblingData: unknown
+		path: string[]
+		previousValue: unknown
+	}
+): Promise<boolean> => {
 	const { req, col, absorbed } = args
-	const validate =
-		'validate' in slot.field ? (slot.field.validate as Validate | undefined) : undefined
+	const { field, value } = at
+	const validate = 'validate' in field ? (field.validate as Validate | undefined) : undefined
 	if (!validate) return true
-	const data = structuredClone(absorbed)
-	put(data, slot, value)
-	const parent = slot.path.includes('.')
-		? readPath(data, slot.path.slice(0, slot.path.lastIndexOf('.')))
-		: data
 	try {
 		const result = await validate(value, {
-			...slot.field,
+			...field,
 			id: absorbed.id,
 			collectionSlug: col.slug,
-			data,
+			data: at.data,
 			event: 'submit',
 			operation: 'update',
 			overrideAccess: true,
-			path: slot.path.split('.'),
+			path: at.path,
 			preferences: { fields: {} },
-			previousValue: valueAt(absorbed, slot.path, slot.locale),
+			previousValue: at.previousValue,
 			req,
-			siblingData: parent,
+			siblingData: at.siblingData,
 		} as never)
 		return result === true
 	} catch {
 		return false
 	}
+}
+
+const validates = (args: ReleaseArgs, slot: Slot, value: unknown): Promise<boolean> => {
+	const data = structuredClone(args.absorbed)
+	put(data, slot, value)
+	const parent = slot.path.includes('.')
+		? readPath(data, slot.path.slice(0, slot.path.lastIndexOf('.')))
+		: data
+	return accepts(args, {
+		field: slot.field,
+		value,
+		data,
+		siblingData: parent,
+		path: slot.path.split('.'),
+		previousValue: valueAt(args.absorbed, slot.path, slot.locale),
+	})
 }
 
 const collides = (args: ReleaseArgs, constraint: Constraint, slots: Slot[]): boolean => {
@@ -215,14 +239,29 @@ const collides = (args: ReleaseArgs, constraint: Constraint, slots: Slot[]): boo
 }
 
 /** `insideLocale`: the data is one locale's value, so nothing in it holds a value per locale. */
-type RowWalk = { blocks: FlattenedBlock[]; path: string; out: Set<string>; insideLocale?: boolean }
+type FieldWalk = { blocks: FlattenedBlock[]; path: string; insideLocale?: boolean }
 
-/** Collects every value a unique field holds in these fields, through nested rows and groups. */
-const collectFields = (
-	fields: FlattenedField[],
-	data: Record<string, unknown>,
-	walk: RowWalk
-): void => {
+/** One value a unique field holds, in one locale (`''` for none), and the data holding the field. */
+type UniqueValue = {
+	field: FlattenedField
+	spec: Pick<MergeFieldSpec, 'list' | 'type'>
+	path: string
+	locale: string
+	value: unknown
+	siblingData: Record<string, unknown>
+}
+
+/**
+ * These fields with each value a unique field holds passed through `leaf`, through nested rows
+ * and groups, and lists or groups with a value per locale. `path` keys a value alike in every
+ * document, so two walks can be compared.
+ */
+const mapUnique = async (
+	{ fields, data }: { fields: FlattenedField[]; data: Record<string, unknown> },
+	walk: FieldWalk,
+	leaf: (unique: UniqueValue) => Promise<unknown>
+): Promise<Record<string, unknown>> => {
+	const out = { ...data }
 	for (const field of fields) {
 		const value = data[field.name]
 		const next = { ...walk, path: `${walk.path}.${field.name}` }
@@ -230,45 +269,98 @@ const collectFields = (
 		const container = ['array', 'blocks', 'group', 'tab'].includes(field.type)
 		if (localized && container && value !== null && typeof value === 'object') {
 			// A list or group with a value per locale: each locale's value on its own.
-			for (const one of Object.values(value as Record<string, unknown>)) {
-				collectFields([field], { [field.name]: one }, { ...walk, insideLocale: true })
+			const byLocale: Record<string, unknown> = {}
+			for (const [locale, one] of Object.entries(value as Record<string, unknown>)) {
+				const inLocale = { ...walk, insideLocale: true }
+				byLocale[locale] = (
+					await mapUnique({ fields: [field], data: { [field.name]: one } }, inLocale, leaf)
+				)[field.name]
 			}
+			out[field.name] = byLocale
 		} else if (field.type === 'array' || field.type === 'blocks') {
-			for (const row of Array.isArray(value) ? value : []) {
-				if (row === null || typeof row !== 'object') continue
+			if (!Array.isArray(value)) continue
+			const rows: unknown[] = []
+			for (const row of value) {
+				if (row === null || typeof row !== 'object') {
+					rows.push(row)
+					continue
+				}
 				const rowData = row as Record<string, unknown>
-				collectFields(rowFields(field, rowData, walk.blocks), rowData, next)
+				rows.push(
+					await mapUnique(
+						{ fields: rowFields(field, rowData, walk.blocks), data: rowData },
+						next,
+						leaf
+					)
+				)
 			}
+			out[field.name] = rows
 		} else if (field.type === 'group' || field.type === 'tab') {
 			if (value !== null && typeof value === 'object') {
-				collectFields(field.flattenedFields, value as Record<string, unknown>, next)
+				out[field.name] = await mapUnique(
+					{ fields: field.flattenedFields, data: value as Record<string, unknown> },
+					next,
+					leaf
+				)
 			}
 		} else if ('unique' in field && field.unique && !isEmpty(value)) {
-			const spec = { list: false, type: field.type }
 			// A localized value is indexed per locale.
-			const byLocale =
-				localized && typeof value === 'object' && !Array.isArray(value)
-					? Object.entries(value as Record<string, unknown>)
-					: [['', value] as const]
-			for (const [locale, entry] of byLocale) {
-				for (const item of Array.isArray(entry) ? entry : [entry]) {
-					if (!isEmpty(item)) walk.out.add(`${next.path}|${locale}|${normalize(item, spec)}`)
+			const at = (locale: string, one: unknown) =>
+				leaf({
+					field,
+					spec: { list: false, type: field.type },
+					path: next.path,
+					locale,
+					value: one,
+					siblingData: data,
+				})
+			if (localized && typeof value === 'object' && !Array.isArray(value)) {
+				const byLocale: Record<string, unknown> = {}
+				for (const [locale, one] of Object.entries(value as Record<string, unknown>)) {
+					byLocale[locale] = await at(locale, one)
 				}
+				out[field.name] = byLocale
+			} else {
+				out[field.name] = await at('', value)
 			}
 		}
 	}
+	return out
+}
+
+/** The key of one member of a unique value, alike in every document that holds it. */
+const uniqueKey = ({ spec, path, locale }: UniqueValue, item: unknown): string =>
+	`${path}|${locale}|${normalize(item, spec)}`
+
+/** Every member of a unique value these fields hold, keyed by `uniqueKey`. */
+const uniqueKeys = async (
+	fields: FlattenedField[],
+	data: Record<string, unknown>,
+	walk: FieldWalk
+): Promise<Set<string>> => {
+	const keys = new Set<string>()
+	await mapUnique({ fields, data }, walk, async (unique) => {
+		for (const item of Array.isArray(unique.value) ? unique.value : [unique.value]) {
+			if (!isEmpty(item)) keys.add(uniqueKey(unique, item))
+		}
+		return unique.value
+	})
+	return keys
 }
 
 /**
  * Array and blocks fields, and localized groups, the survivor takes from an absorbed document,
- * where what it takes brings over a value a unique field inside holds. Neither a row nor a
- * field in a localized group has a placeholder of its own, so each of these makes the merge
- * delete the absorbed document.
+ * where what it takes brings over a value a unique field inside holds. The absorbed document
+ * keeps its rows with each such value swapped, written into `update`; one that takes neither a
+ * placeholder nor an empty value makes the merge delete the absorbed document.
  */
-const rowsTaken = (args: ReleaseArgs): string[] => {
+const releaseRows = async (
+	args: ReleaseArgs,
+	update: Record<string, unknown>,
+	release: UniqueRelease
+): Promise<void> => {
 	const { req, col, locales, absorbed, plan, hidden } = args
 	const blocks = req.payload.config.blocks ?? []
-	const keys: string[] = []
 	for (const spec of col.spec) {
 		if (spec.type !== 'array' && spec.type !== 'blocks' && spec.type !== 'group') continue
 		const found = getFieldByPath({ fields: col.config.flattenedFields, path: spec.path })
@@ -277,25 +369,61 @@ const rowsTaken = (args: ReleaseArgs): string[] => {
 			const key = locale ? `${spec.path}@${locale}` : spec.path
 			const decision = plan.decisions.find((entry) => entry.key === key)
 			if (!decision) continue
-			const ours = new Set<string>()
-			const theirs = new Set<string>()
 			const root = [found.field]
 			const full = (value: unknown) =>
 				withHiddenRows(value, found.field, { known: blocks, insideLocale: spec.localized, hidden })
-			collectFields(
-				root,
-				{ [found.field.name]: full(decision.proposed) },
-				{ blocks, path: '', out: ours, insideLocale: spec.localized }
+			const own = full(valueAt(absorbed, spec.path, locale))
+			const walk = { blocks, path: '', insideLocale: spec.localized }
+			const ours = await uniqueKeys(root, { [found.field.name]: full(decision.proposed) }, walk)
+			const theirs = await uniqueKeys(root, { [found.field.name]: own }, walk)
+			if (![...theirs].some((value) => ours.has(value))) continue
+			const result = { marked: false, emptied: false, failed: false }
+			// Each value the survivor takes swapped as a value at the top level is: for a
+			// placeholder, or emptied where the database takes repeated empty values.
+			const swapped = await mapUnique(
+				{ fields: root, data: { [found.field.name]: own } },
+				walk,
+				async (unique) => {
+					const { field, value: entry } = unique
+					const taken = (item: unknown) => !isEmpty(item) && ours.has(uniqueKey(unique, item))
+					const items = Array.isArray(entry) ? entry : [entry]
+					if (!items.some(taken)) return entry
+					for (const mark of placeholdersFor(field, absorbed.id, entry)) {
+						const placeholder = Array.isArray(mark)
+							? [...items.filter((item) => !taken(item)), ...mark]
+							: mark
+						if (
+							col.options.absorbed === 'trash' &&
+							!(await accepts(args, {
+								field,
+								value: placeholder,
+								data: absorbed,
+								siblingData: unique.siblingData,
+								path: unique.path.slice(1).split('.'),
+								previousValue: entry,
+							}))
+						) {
+							continue
+						}
+						result.marked = true
+						return placeholder
+					}
+					if (req.payload.db.name !== 'mongoose' && !('required' in field && field.required)) {
+						result.emptied = true
+						return null
+					}
+					result.failed = true
+					return entry
+				}
 			)
-			collectFields(
-				root,
-				{ [found.field.name]: full(valueAt(absorbed, spec.path, locale)) },
-				{ blocks, path: '', out: theirs, insideLocale: spec.localized }
-			)
-			if ([...theirs].some((value) => ours.has(value))) keys.push(key)
+			if (result.failed) {
+				release.deletes.push(key)
+				continue
+			}
+			put(update, { path: spec.path, locale }, swapped[found.field.name])
+			;(result.marked ? release.marked : release.emptied).push(key)
 		}
 	}
-	return keys
 }
 
 /**
@@ -373,7 +501,7 @@ export const releaseUnique = async (
 		}
 		for (const slot of slots) if (slot.moved) release.deletes.push(slot.key)
 	}
-	release.deletes.push(...rowsTaken(args))
+	await releaseRows(args, update, release)
 
 	if (release.deletes.length > 0) {
 		return { release: { ...release, marked: [], emptied: [] }, update: null }

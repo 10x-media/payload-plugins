@@ -96,7 +96,7 @@ In every locale the merge writes, a required value the primary lacks comes from 
 4. The merged-in documents are trashed, or deleted with `absorbed: 'delete'`.
 5. The pairs of the merged-in documents are deleted, and the primary is checked for new look-alikes.
 
-A failure is logged and sent as `merge.failed`. Without a transaction (MongoDB without a replica set), the steps already done stay done. `requireTransactions: true` refuses such merges.
+A failure is logged and sent as `merge.failed`. Without a transaction (MongoDB without a replica set), a failure before the primary is written puts the merged-in documents' values back and logs any it cannot; one after keeps what was written, and the merged-in documents keep their placeholders. A merge that would delete a merged-in document before the primary is written is refused; `requireTransactions: true` refuses every merge.
 
 The merge is refused when:
 
@@ -110,13 +110,13 @@ A field the reviewer may not update keeps the primary's value. A field they may 
 
 ## Unique values
 
-When the primary takes a unique value, the merged-in document gives it up first:
+When the primary takes a unique value, the merged-in document gives it up first, at the top level, inside rows and inside a localized group alike:
 
 | Field | The merged-in document holds |
 | --- | --- |
 | `text`, `textarea`, `code`, `email` | A placeholder with the value it held: `merged-<id> Anna Kowalska`, or for an email `merged-<id>.anna@mail.com.invalid`. Where the field's validation refuses that, `merged-<id>` (`merged-<id>@dedupe.invalid`). |
 | Any other type, not `required`, on SQL | An empty value. |
-| Any other type on MongoDB or `required`, or a value inside rows or a localized group | Nothing: the merged-in document is deleted instead of trashed. |
+| Any other type on MongoDB or `required` | Nothing: the merged-in document is deleted instead of trashed, before the primary is written. Without a transaction, such a merge is refused. |
 
 The screen shows this before the merge. On Postgres, a merged-in document deleted for good cannot leave while another merged-in document points at it in a `required` field.
 

@@ -5,7 +5,17 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
-import { ACCOUNTS, bootDedupe, COMPANIES, type Doc, HIDX, KITS, POSTS, TICKETS } from './fixtures'
+import {
+	ACCOUNTS,
+	bootDedupe,
+	COMPANIES,
+	type Doc,
+	HIDX,
+	KITS,
+	POSTS,
+	TEAMS,
+	TICKETS,
+} from './fixtures'
 
 /** The fields whose value the survivor takes from the absorbed document. */
 const take = (...keys: string[]): string[] => keys
@@ -342,10 +352,18 @@ describeForDb('dedupe unique values', {}, (db) => {
 		}
 	)
 
-	it('deletes the absorbed document when the survivor takes rows holding a unique value', async () => {
-		for (const [key, rows] of [
-			['phones', (tag: string) => ({ phones: [{ number: `+49 ${tag}` }] })],
-			['links', (tag: string) => ({ links: [{ blockType: 'site', href: `https://${tag}.test` }] })],
+	it('marks a unique value inside rows the survivor takes, as a value at the top', async () => {
+		for (const [key, rows, held] of [
+			[
+				'phones',
+				(tag: string) => ({ phones: [{ number: `+49 ${tag}` }] }),
+				(gone: Doc) => (gone.phones as { number: string }[])[0]?.number,
+			],
+			[
+				'links',
+				(tag: string) => ({ links: [{ blockType: 'site', href: `https://${tag}.test` }] }),
+				(gone: Doc) => (gone.links as { href: string }[])[0]?.href,
+			],
 		] as const) {
 			const survivor = await account()
 			const absorbed = await account()
@@ -368,13 +386,63 @@ describeForDb('dedupe unique values', {}, (db) => {
 				},
 			}
 			const plan = await buildPlanResponse(both)
-			expect(plan.release[String(absorbed.id)]).toEqual({ marked: [], emptied: [], deletes: [key] })
+			expect(plan.release[String(absorbed.id)]).toEqual({ marked: [key], emptied: [], deletes: [] })
 
 			await applyMerge(both)
-			expect(await find(ACCOUNTS, absorbed.id)).toBeNull()
+			const gone = (await find(ACCOUNTS, absorbed.id)) as Doc
+			expect(gone.deletedAt).toBeTruthy()
+			const value = key === 'phones' ? `+49 ${absorbed.id}` : `https://${absorbed.id}.test`
+			expect(held(gone), `${key} keeps its row`).toBe(`merged-${absorbed.id} ${value}`)
 			const kept = (await find(ACCOUNTS, survivor.id)) as Doc
 			expect(kept[key]).toHaveLength(2)
 		}
+	})
+
+	it('marks a unique value in the rows of a localized group, in that locale only', async () => {
+		const team = async (badge: string) => {
+			const doc = await create(TEAMS, {
+				name: `Team ${badge}`,
+				card: { title: `card ${badge}`, lines: [{ text: 'line', badge }] },
+			})
+			await fixture.booted.payload.update({
+				collection: TEAMS,
+				id: doc.id,
+				locale: 'de' as never,
+				data: {
+					card: { title: `karte ${badge}`, lines: [{ text: 'zeile', badge: `de-${badge}` }] },
+				} as never,
+			})
+			return doc
+		}
+		n += 1
+		const survivor = await team(`keep-${n}`)
+		const absorbed = await team(`gone-${n}`)
+		const merge = args(TEAMS, [survivor, absorbed], take('card@en'))
+		const plan = await buildPlanResponse(merge)
+		expect(plan.release[String(absorbed.id)]).toEqual({
+			marked: ['card@en'],
+			emptied: [],
+			deletes: [],
+		})
+		await applyMerge(merge)
+		const gone = (await fixture.booted.payload.findByID({
+			collection: TEAMS,
+			id: absorbed.id,
+			depth: 0,
+			trash: true,
+			locale: 'en' as never,
+		})) as Doc
+		const card = gone.card as { title: string; lines: { badge: string }[] }
+		expect(card.title).toBe(`card gone-${n}`)
+		expect(card.lines[0]?.badge).toBe(`merged-${absorbed.id} gone-${n}`)
+		const german = (await fixture.booted.payload.findByID({
+			collection: TEAMS,
+			id: absorbed.id,
+			depth: 0,
+			trash: true,
+			locale: 'de' as never,
+		})) as Doc
+		expect((german.card as { lines: { badge: string }[] }).lines[0]?.badge).toBe(`de-gone-${n}`)
 	})
 
 	it('empties on Postgres, and deletes on MongoDB, a unique value no placeholder fits', async () => {

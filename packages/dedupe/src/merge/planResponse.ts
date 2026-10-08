@@ -12,7 +12,13 @@ import type { CollectionContext, PluginContext } from '../plugin/context'
 import { fullLabel } from '../schema/deriveSpec'
 import type { MergeChoice, MergeDecision } from '../schema/types'
 import { mergeableSpec, withoutUnreadable } from './access'
-import { accessRefusal, lockRefusal, missingRefusal, removalRefusal } from './apply'
+import {
+	accessRefusal,
+	deletionRefusal,
+	lockRefusal,
+	missingRefusal,
+	removalRefusal,
+} from './apply'
 import {
 	fieldsWithin,
 	inLocale,
@@ -358,8 +364,10 @@ export const buildPlanResponse = async (args: {
 	const available = await transactionsOn(req)
 	const transactions = available ? 'on' : ctx.options.requireTransactions ? 'refused' : 'off'
 	const survivorDraft = await survivorHasDraft({ req, col, id: survivor.id })
-	const release: Record<string, UniqueRelease> = {}
-	if (col.options.absorbed === 'trash') {
+	// What each merged-in document gives up, as the apply works it out in either mode; shown only
+	// for the trash, as a document deleted gives up everything.
+	const released: Record<string, UniqueRelease> = {}
+	{
 		const ids = [survivor.id, ...absorbed.map((doc) => doc.id)]
 		const known = req.payload.config.blocks
 		// The fields hidden from the API, read only where rows or a unique index hold them.
@@ -386,7 +394,7 @@ export const buildPlanResponse = async (args: {
 		const hidden = rowsById(full)
 		const fullOf = new Map(full.map((one) => [String(one.id), one]))
 		for (const doc of absorbed) {
-			release[String(doc.id)] = (
+			released[String(doc.id)] = (
 				await releaseUnique({
 					req,
 					col,
@@ -399,6 +407,7 @@ export const buildPlanResponse = async (args: {
 			).release
 		}
 	}
+	const release = col.options.absorbed === 'trash' ? released : {}
 	// The documents were checked for reading above.
 	const refusal =
 		(await accessRefusal({ req, ctx, col, survivorId: survivor.id })) ??
@@ -406,7 +415,7 @@ export const buildPlanResponse = async (args: {
 			req,
 			col,
 			absorbedIds: absorbed.map((doc) => doc.id),
-			deleted: Object.entries(release)
+			deleted: Object.entries(released)
 				.filter(([, given]) => given.deletes.length > 0)
 				.map(([id]) => id),
 		}))
@@ -414,7 +423,17 @@ export const buildPlanResponse = async (args: {
 	// without a value Payload requires there.
 	const blocked =
 		(await lockRefusal({ req, col, docs: [survivor, ...absorbed] })) ??
-		missingRefusal(req, col, plan.missing)
+		missingRefusal(req, col, plan.missing) ??
+		(available
+			? null
+			: await deletionRefusal({
+					req,
+					col,
+					absorbed,
+					deletes: Object.fromEntries(
+						Object.entries(released).map(([id, given]) => [id, given.deletes])
+					),
+				}))
 
 	const ids = [survivor, ...absorbed].map((doc) => doc.id)
 	const pairKeys = ids.flatMap((a, i) => ids.slice(i + 1).map((b) => pairKeyFor(col.slug, a, b)))
