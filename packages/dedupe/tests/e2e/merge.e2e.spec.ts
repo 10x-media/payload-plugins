@@ -136,6 +136,20 @@ test('identical fields are hidden until the reviewer turns off only differences'
 	await expect(fieldLabel(page, 'Phone')).toBeVisible()
 })
 
+test("the tenant row leaves the admin's selected tenant as it was", async ({ page, context }) => {
+	const group = await seedGroup(context.request, 'tenant')
+	// All tenants, as an admin who picked none sees the admin.
+	await context.clearCookies({ name: 'payload-tenant' })
+	await openMerge(page, { docs: ids(group) })
+	await page.locator('#dedupe-only-differences').click()
+	await expect(
+		page.locator('.dedupe-merge__field--read-only', { hasText: 'Kyiv Office' })
+	).toHaveCount(group.length)
+	await expect(page.locator('.tenantField')).toHaveCount(0)
+	const tenant = (await context.cookies()).find((cookie) => cookie.name === 'payload-tenant')
+	expect(tenant?.value).toBeUndefined()
+})
+
 test('a field the primary left empty is filled from the newest document, with no status label', async ({
 	page,
 	context,
@@ -557,21 +571,21 @@ test('making another document primary keeps the page, without a reload', async (
 	expect(await page.evaluate(() => (window as unknown as { stays?: boolean }).stays)).toBe(true)
 })
 
-test("a document's name opens it in a drawer, and the drawer links to the document", async ({
+test("a document's name opens it in a new tab, and its edit button in a drawer, as an upload field does", async ({
 	page,
 	context,
 }) => {
 	const group = await seedGroup(context.request, 'drawer', 2)
 	await openMerge(page, { docs: ids(group) })
+	const doc = new RegExp(`/collections/customers/${group[0]?.id}$`)
 
 	const head = page.locator('.dedupe-merge__head').first()
-	await expect(head.getByRole('button', { name: 'Inspect' })).toHaveCount(0)
-	await head.locator('.dedupe-merge__head-name').click()
-	const drawer = page.locator('.drawer--is-open')
-	await expect(drawer.locator('.id-label a')).toHaveAttribute(
-		'href',
-		new RegExp(`/collections/customers/${group[0]?.id}$`)
-	)
+	const name = head.locator('.dedupe-merge__head-name')
+	await expect.soft(name).toHaveAttribute('href', doc)
+	await expect.soft(name).toHaveAttribute('target', '_blank')
+
+	await head.getByRole('button', { name: `Edit ${String(group[0]?.name)}` }).click()
+	await expect(page.locator('.drawer--is-open .id-label a')).toHaveAttribute('href', doc)
 	await expect(page).toHaveURL(new RegExp(`survivor=${group[0]?.id}`))
 })
 
@@ -719,4 +733,56 @@ test("a field inside groups is labelled as the list's filter labels it, in the a
 	await context.addCookies([{ name: 'payload-lng', value: 'de', domain: hostname, path: '/' }])
 	await page.reload()
 	await expect.soft(fieldLabel(page, 'Kundenprofil > Bewertung > Punkte')).toBeVisible()
+})
+
+test('a value that differs from the primary is marked word by word, not letter by letter', async ({
+	page,
+	context,
+}) => {
+	const [a, b] = (await seedGroup(context.request, 'words', 2)) as [Customer, Customer]
+	await patchCustomer(context.request, a.id, { note: 'Ships from Kyiv' })
+	await patchCustomer(context.request, b.id, { note: 'Ships from Kharkiv' })
+	await openMerge(page, { docs: ids([a, b]) })
+
+	await expect(cell(page, 'note', b.id).locator('[data-match-type="create"]')).toHaveText([
+		'Kharkiv',
+	])
+})
+
+test("the view's toggles sit in the footer beside its buttons, in view wherever the reviewer scrolls", async ({
+	page,
+	context,
+}) => {
+	const group = await seedGroup(context.request, 'footer')
+	await openMerge(page, { docs: ids(group) })
+	await page.locator('#dedupe-only-differences').click()
+	await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight / 2))
+	expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(0)
+
+	const footer = page.locator('.dedupe-merge__footer')
+	for (const id of ['dedupe-only-differences', 'dedupe-show-diff']) {
+		await expect.soft(footer.locator(`[id="${id}"]`), id).toBeInViewport()
+	}
+	await expect.soft(footer.getByRole('button', { name: 'Not duplicates' })).toBeInViewport()
+})
+
+test('the radio or check of a value sits in a square before it, as wide as the value is tall', async ({
+	page,
+	context,
+}) => {
+	const [a, b] = (await seedGroup(context.request, 'square', 2)) as [Customer, Customer]
+	await openMerge(page, { docs: ids([a, b]) })
+	for (const selector of ['label.dedupe-merge__field', '.dedupe-merge__line']) {
+		const slot = await page
+			.locator(selector)
+			.first()
+			.evaluate((value) => {
+				const box = value.getBoundingClientRect()
+				const label = value.querySelector('.radio-input__label, label.field-label') as HTMLElement
+				return { width: label.getBoundingClientRect().left - box.left, height: box.height }
+			})
+		expect
+			.soft(Math.abs(slot.width - slot.height), `${selector}: ${JSON.stringify(slot)}`)
+			.toBeLessThanOrEqual(2)
+	}
 })

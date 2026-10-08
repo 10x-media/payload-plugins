@@ -358,41 +358,16 @@ export function MergeClient({
 		<div className={baseClass}>
 			<div className={`${baseClass}__header`}>
 				<h1>{t(keys.mergeInto, { title: titleOf(survivor) })}</h1>
-				<div className={`${baseClass}__toggles`}>
-					<CheckboxInput
-						checked={onlyDifferences}
-						id="dedupe-only-differences"
-						label={t(keys.onlyDifferences)}
-						onToggle={() => setOnlyDifferences((value) => !value)}
-					/>
-					<CheckboxInput
-						checked={showDiff}
-						id="dedupe-show-diff"
-						label={t(keys.showDiff)}
-						onToggle={() => setShowDiff((value) => !value)}
-					/>
-				</div>
 			</div>
 
 			{plan.dismissed ? (
 				<Banner>
-					<span className={`${baseClass}__dismissed`}>
-						{t(keys.dismissedNote, {
-							user: plan.dismissed.by ?? '-',
-							date: plan.dismissed.at
-								? formatDate({ date: plan.dismissed.at, i18n, pattern: SHORT_DATE })
-								: '-',
-						})}
-						<Button
-							buttonStyle="secondary"
-							disabled={busy}
-							margin={false}
-							onClick={() => void decide('reopen')}
-							size="small"
-						>
-							{t(keys.reopen)}
-						</Button>
-					</span>
+					{t(keys.dismissedNote, {
+						user: plan.dismissed.by ?? '-',
+						date: plan.dismissed.at
+							? formatDate({ date: plan.dismissed.at, i18n, pattern: SHORT_DATE })
+							: '-',
+					})}
 				</Banner>
 			) : null}
 			{plan.markedApart.map((entry) => (
@@ -486,26 +461,53 @@ export function MergeClient({
 			</div>
 
 			<div className={`${baseClass}__footer`}>
-				{plan.dismissed ? null : (
+				<div className={`${baseClass}__toggles`}>
+					<CheckboxInput
+						checked={onlyDifferences}
+						id="dedupe-only-differences"
+						label={t(keys.onlyDifferences)}
+						onToggle={() => setOnlyDifferences((value) => !value)}
+					/>
+					<CheckboxInput
+						checked={showDiff}
+						id="dedupe-show-diff"
+						label={t(keys.showDiff)}
+						onToggle={() => setShowDiff((value) => !value)}
+					/>
+				</div>
+				{plan.dismissed ? (
+					// Marked not duplicates: reopened before it can be merged.
 					<Button
-						buttonStyle="secondary"
+						buttonStyle="primary"
 						disabled={busy}
 						margin={false}
-						onClick={() => void decide('dismiss')}
+						onClick={() => void decide('reopen')}
 						size="large"
 					>
-						{t(keys.dismiss)}
+						{t(keys.reopen)}
 					</Button>
+				) : (
+					<>
+						<Button
+							buttonStyle="secondary"
+							disabled={busy}
+							margin={false}
+							onClick={() => void decide('dismiss')}
+							size="large"
+						>
+							{t(keys.dismiss)}
+						</Button>
+						<Button
+							buttonStyle="primary"
+							disabled={busy || !answer?.readyToApply}
+							margin={false}
+							onClick={() => openModal(CONFIRM_MODAL)}
+							size="large"
+						>
+							{t(keys.mergeCount, { count: String(docs.length) })}
+						</Button>
+					</>
 				)}
-				<Button
-					buttonStyle="primary"
-					disabled={busy || !answer?.readyToApply}
-					margin={false}
-					onClick={() => openModal(CONFIRM_MODAL)}
-					size="large"
-				>
-					{t(keys.mergeCount, { count: String(docs.length) })}
-				</Button>
 			</div>
 
 			<ConfirmationModal

@@ -1,5 +1,6 @@
 'use client'
 
+import { getTranslation } from '@payloadcms/translations'
 import {
 	Banner,
 	CheckboxInput,
@@ -8,18 +9,28 @@ import {
 	OperationProvider,
 	Pill,
 	RenderFields,
+	RowLabel,
+	SectionTitle,
 	ShimmerEffect,
 	useAuth,
 	useConfig,
+	useTranslation as usePayloadTranslation,
 	useRowLabel,
 	useServerFunctions,
 } from '@payloadcms/ui'
-import type { FormState, SanitizedFieldsPermissions, SelectType, TypedUser } from 'payload'
+import type {
+	ClientField,
+	FormState,
+	SanitizedFieldsPermissions,
+	SelectType,
+	TypedUser,
+} from 'payload'
+import { toWords } from 'payload/shared'
 import { createContext, type ReactNode, use, useEffect, useMemo, useRef, useState } from 'react'
 
 import { isEmpty, writePath } from '../merge/compare'
 import type { DecisionView, DocRef } from '../merge/planResponse'
-import { type Entry, fieldAt } from './Value'
+import { blockOf, fieldAt } from './Value'
 
 const baseClass = 'dedupe-merge'
 
@@ -110,7 +121,8 @@ export const useFormStates = (
 }
 
 type Picks = {
-	entries: Entry[]
+	/** The array or blocks field the rows are of, for the label Payload gives a row by default. */
+	field: ClientField | undefined
 	/** Absent where the reviewer does not pick for the field. */
 	checked?: (index: number) => boolean
 	/** A check that may not be taken off, as the last one of a required list. */
@@ -122,14 +134,36 @@ type Picks = {
 const PicksContext = createContext<Picks | null>(null)
 
 /**
- * A row's label: the check that takes the row, then the label the admin gives it, or the
- * collection's own row label when it has one.
+ * A row's label: the check that takes the row, then the row's label as the admin draws it. The
+ * check takes the label's slot, so Payload's own default is drawn here again, from the parts its
+ * `ArrayRow` and `BlockRow` draw it with, unless the collection has a label of its own.
  */
 const RowPick = ({ own }: { own?: ReactNode }) => {
-	const { rowNumber = 0 } = useRowLabel()
+	const { data, path, rowNumber = 0 } = useRowLabel<{ blockType?: string }>()
+	const { config } = useConfig()
+	const { i18n, t } = usePayloadTranslation()
 	const picks = use(PicksContext)
-	const entry = picks?.entries[rowNumber]
-	if (!picks || !entry) return own ?? null
+	if (!picks) return own ?? null
+	const { field } = picks
+	const number = String(rowNumber + 1).padStart(2, '0')
+	const block =
+		field?.type === 'blocks' ? blockOf(field, data?.blockType, config.blocksMap) : undefined
+	const singular = field?.type === 'array' ? (field.labels?.singular ?? field.label) : undefined
+	const label = block ? (
+		<>
+			<span className="blocks-field__block-number">{number}</span>
+			<Pill
+				className={`blocks-field__block-pill blocks-field__block-pill-${block.slug}`}
+				pillStyle="white"
+				size="small"
+			>
+				{getTranslation(block.labels?.singular ?? toWords(block.slug), i18n)}
+			</Pill>
+			{block.admin?.disableBlockName ? null : <SectionTitle path={`${path}.blockName`} readOnly />}
+		</>
+	) : (
+		`${singular ? getTranslation(singular, i18n) : t('general:row')} ${number}`
+	)
 	return (
 		<span className={`${baseClass}__row-pick`}>
 			{picks.checked ? (
@@ -142,17 +176,7 @@ const RowPick = ({ own }: { own?: ReactNode }) => {
 			) : null}
 			<span className={`${baseClass}__row-title`}>
 				<span className={`${baseClass}__row-name`}>
-					{own ??
-						(entry.block ? (
-							<>
-								{entry.block.number}
-								<Pill pillStyle="white" size="small">
-									{entry.block.label}
-								</Pill>
-							</>
-						) : (
-							entry.title
-						))}
+					<RowLabel CustomComponent={own} label={label} path={path} rowNumber={rowNumber} />
 				</span>
 			</span>
 		</span>

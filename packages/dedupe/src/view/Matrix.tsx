@@ -1,6 +1,6 @@
 'use client'
 
-import { CheckboxInput, Pill } from '@payloadcms/ui'
+import { CheckboxInput, Pill, useConfig } from '@payloadcms/ui'
 import { type CSSProperties, memo, useRef } from 'react'
 
 import { isEmpty, listOf, normalize, sameValue } from '../merge/compare'
@@ -20,7 +20,7 @@ import {
 	Rows,
 	useFormStates,
 } from './Rows'
-import { diffOf, Plain, useFormat } from './Value'
+import { diffOf, fieldAt, Plain, useFormat } from './Value'
 
 const baseClass = 'dedupe-merge'
 
@@ -60,6 +60,7 @@ const FieldRow = ({
 }: RowProps) => {
 	const { t } = useTranslation()
 	const { entry, markup } = useFormat(collection)
+	const { getEntityConfig } = useConfig()
 	const decision = withChoice(planned, choice)
 	const canPick = choosable(decision)
 	// A field waiting for the reviewer shows nothing picked, so every cell, the primary's
@@ -102,6 +103,12 @@ const FieldRow = ({
 		})
 	}
 	const valueFor = (doc: string) => decision.values.find((entry) => entry.doc === doc)?.value
+	const listField = isRows(planned)
+		? fieldAt(
+				getEntityConfig({ collectionSlug: collection })?.fields ?? [],
+				decision.path.split('.')
+			)
+		: undefined
 	const base = markup(decision, valueFor(survivor), { doc: survivor })
 
 	return (
@@ -122,7 +129,7 @@ const FieldRow = ({
 			{docs.map((doc) => {
 				const own = markup(decision, valueFor(doc.id), { doc: doc.id })
 				const shown =
-					showDiff && doc.id !== survivor && own.html ? diffOf(base, own) : <Plain markup={own} />
+					showDiff && doc.id !== survivor && own ? diffOf(base, own) : <Plain html={own} />
 				if (isRows(planned) && !isEmpty(valueFor(doc.id))) {
 					return (
 						<Rows
@@ -130,9 +137,7 @@ const FieldRow = ({
 							decision={planned}
 							key={doc.id}
 							picks={{
-								entries: docList(planned, doc.id).map((value, index) =>
-									entry(decision, value, index)
-								),
+								field: listField,
 								checked: canPick
 									? (index) => checked.has(itemKey({ doc: doc.id, index }))
 									: undefined,
@@ -219,7 +224,7 @@ const FieldRow = ({
 											checked={kept || checked.has(itemKey(item))}
 											className={`${baseClass}__line`}
 											id={`dedupe-${decision.key}-${doc.id}-${index}`}
-											label={entry(decision, value, index).title}
+											label={entry(decision, value, index)}
 											onToggle={() => toggle(item)}
 											readOnly={kept || last(item)}
 										/>

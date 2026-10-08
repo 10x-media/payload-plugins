@@ -1,14 +1,17 @@
 'use client'
 
 import {
+	Button,
 	MoreIcon,
 	Pill,
 	Popup,
 	PopupList,
+	useConfig,
 	useDocumentDrawer,
 	useTranslation as usePayloadTranslation,
 } from '@payloadcms/ui'
 import { formatDate } from '@payloadcms/ui/shared'
+import { formatAdminURL } from 'payload/shared'
 
 import type { DocRef } from '../merge/planResponse'
 import { keys } from '../translations/keys'
@@ -22,9 +25,10 @@ const baseClass = 'dedupe-merge'
 const HEAD_DATE = 'dd.MM.yy HH:mm'
 
 /**
- * One document's column head: its name opening it in a drawer to inspect or correct it in place
- * (the drawer's ID links to the document), a menu to keep all its values or take it out of this
- * merge, its dates, and the radio that makes it the survivor.
+ * One document's column head, laid out as an upload field shows its document: the name opening it
+ * in a new tab and an edit button opening it in a drawer to correct it in place. Then a menu to
+ * keep all its values or take it out of this merge, its dates, and the radio that makes it the
+ * survivor.
  */
 export const ColumnHeader = ({
 	collection,
@@ -45,7 +49,12 @@ export const ColumnHeader = ({
 }) => {
 	const { t } = useTranslation()
 	const { i18n, t: payloadT } = usePayloadTranslation()
-	const [DocumentDrawer, DocumentDrawerToggler] = useDocumentDrawer({
+	const {
+		config: {
+			routes: { admin: adminRoute },
+		},
+	} = useConfig()
+	const [DocumentDrawer, , { openDrawer }] = useDocumentDrawer({
 		id: doc.id,
 		collectionSlug: collection,
 	})
@@ -61,14 +70,30 @@ export const ColumnHeader = ({
 	return (
 		<div className={`${baseClass}__head${survivor ? ` ${baseClass}__head--survivor` : ''}`}>
 			<div className={`${baseClass}__head-title`}>
-				<DocumentDrawerToggler className={`${baseClass}__head-name`} title={doc.title}>
+				<a
+					className={`${baseClass}__head-name`}
+					href={formatAdminURL({ adminRoute, path: `/collections/${collection}/${doc.id}` })}
+					rel="noopener noreferrer"
+					target="_blank"
+					title={doc.title}
+				>
 					{doc.title}
-				</DocumentDrawerToggler>
+				</a>
 				{doc.status ? (
 					<Pill size="small">
 						{payloadT(doc.status === 'draft' ? 'version:draft' : 'version:published')}
 					</Pill>
 				) : null}
+				<Button
+					aria-label={payloadT('general:editLabel', { label: doc.title })}
+					buttonStyle="icon-label"
+					className={`${baseClass}__head-edit`}
+					icon="edit"
+					iconStyle="none"
+					margin={false}
+					onClick={openDrawer}
+					tooltip={payloadT('general:edit')}
+				/>
 				<Popup
 					button={
 						<span aria-label={payloadT('general:moreOptions')} role="img">

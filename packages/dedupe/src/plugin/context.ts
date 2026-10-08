@@ -123,7 +123,11 @@ const buildCollectionContext = (
 		options.fields,
 		options.slug
 	).map((entry) =>
-		tenanted && entry.path === tenantFieldName ? { ...entry, policy: 'survivor' as const } : entry
+		tenanted && entry.path === tenantFieldName
+			? // The multi-tenant field's component selects its tenant for the whole admin when it
+				// mounts, so the merge screen shows the value alone.
+				{ ...entry, policy: 'survivor' as const, component: false }
+			: entry
 	)
 	const specByPath = new Map(spec.map((entry) => [entry.path, entry]))
 

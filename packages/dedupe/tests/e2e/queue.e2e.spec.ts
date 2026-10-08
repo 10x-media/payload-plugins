@@ -7,6 +7,7 @@ import {
 	login,
 	MARK,
 	matchingPair,
+	mergeButton,
 	openQueue,
 	QUEUE_PATH,
 	queueRow,
@@ -108,8 +109,12 @@ test('marking a pair not duplicates on the merge screen moves it to its tab, and
 	await expect(dismissed).toContainText('dev@10xmedia.de')
 	await dismissed.getByRole('link').click()
 	await expect(page.getByText(/Marked as not duplicates by dev@10xmedia\.de/)).toBeVisible()
-	await page.getByRole('button', { name: 'Reopen' }).click()
+	// A group marked not duplicates is reopened before it can be merged, from the footer only.
+	await expect(mergeButton(page)).toHaveCount(0)
+	await expect(page.getByRole('button', { name: 'Reopen' })).toHaveCount(1)
+	await page.locator('.dedupe-merge__footer').getByRole('button', { name: 'Reopen' }).click()
 	await expect(page.getByText(/Marked as not duplicates by/)).toHaveCount(0)
+	await expect(mergeButton(page)).toBeVisible()
 	expect((await findPair(context.request, [left.id, right.id]))?.status).toBe('open')
 })
 

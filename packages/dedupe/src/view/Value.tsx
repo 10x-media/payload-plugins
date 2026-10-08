@@ -23,9 +23,6 @@ const plainText = (html: string): string =>
 
 const baseClass = 'dedupe-merge'
 
-/** Types the version view compares letter by letter; anything else is compared whole. */
-const BY_CHARACTER = new Set(['text', 'textarea', 'email', 'code', 'number'])
-
 /** When something happened, short enough for a column head: `29.09.26 14:08:15`. */
 export const SHORT_DATE = 'dd.MM.yy HH:mm:ss'
 
@@ -38,9 +35,6 @@ export const fieldList = (decisions: DecisionView[], keyList: string[]): string 
 			return decision.locale ? `${decision.label} (${decision.locale})` : decision.label
 		})
 		.join(', ')
-
-/** A value as HTML for the version view's diff, and whether it compares letter by letter. */
-type Markup = { html: string; byCharacter: boolean }
 
 /** How the version view marks a value: added, or removed. */
 export type Mark = 'create' | undefined
@@ -67,13 +61,6 @@ const richTextParagraphs = (value: unknown): string[] | null => {
 		return Array.isArray(record?.children) ? record.children.map(text).join('') : ''
 	}
 	return root.children.map(text).filter((line) => line !== '')
-}
-
-/** One entry of a list as the merge screen labels it: a row's label, or a value. */
-export type Entry = {
-	title: string
-	/** A block row's number and type, drawn apart as the blocks field draws them. */
-	block: { number: string; label: string } | null
 }
 
 type Fielded = ClientField & { name: string; fields?: ClientField[] }
@@ -112,6 +99,21 @@ const rowsOf = (value: unknown): Record<string, unknown>[] =>
 		(row): row is Record<string, unknown> => row !== null && typeof row === 'object'
 	)
 
+/** The block a blocks field's row of type `slug` is: one of its own, or one the config shares. */
+export const blockOf = (
+	field: ClientField,
+	slug: unknown,
+	blocksMap: Record<string, ClientBlock> | undefined
+): ClientBlock | undefined => {
+	const { blockReferences = [], blocks = [] } = field as {
+		blockReferences?: (ClientBlock | string)[]
+		blocks?: ClientBlock[]
+	}
+	return [...blocks, ...blockReferences]
+		.map((block) => (typeof block === 'string' ? blocksMap?.[block] : block))
+		.find((block) => block?.slug === slug)
+}
+
 /** Builds the HTML a value is diffed as and a list is shown as, from the collection's own fields. */
 export const useFormat = (collection: string) => {
 	const { i18n } = useTranslation()
@@ -122,18 +124,9 @@ export const useFormat = (collection: string) => {
 		const { label: own, name } = field as Partial<Fielded> & { label?: unknown }
 		return own ? getTranslation(own as string, i18n) : toWords(name ?? '')
 	}
-	const blockOf = (field: ClientField, slug: unknown): ClientBlock | undefined => {
-		const { blockReferences = [], blocks = [] } = field as {
-			blockReferences?: (ClientBlock | string)[]
-			blocks?: ClientBlock[]
-		}
-		return [...blocks, ...blockReferences]
-			.map((block) => (typeof block === 'string' ? config.blocksMap?.[block] : block))
-			.find((block) => block?.slug === slug)
-	}
 	const rowFields = (field: ClientField, row: Record<string, unknown>): ClientField[] =>
 		field.type === 'blocks'
-			? (blockOf(field, row.blockType)?.fields ?? [])
+			? (blockOf(field, row.blockType, config.blocksMap)?.fields ?? [])
 			: ((field as Fielded).fields ?? [])
 
 	/** A related document's title from the plan, keyed by `collection:id`, or by id at the top level. */
@@ -208,7 +201,7 @@ export const useFormat = (collection: string) => {
 				if (field.type === 'array' || field.type === 'blocks') {
 					const items = rowsOf(value).map((entry, index) => {
 						const nested = entryOf({ field, row: entry, index })
-						return `<li><strong>${marked(mark, escapeDiffHTML(nested.title))}</strong>${body(rowFields(field, entry), entry, { labels, mark })}</li>`
+						return `<li><strong>${marked(mark, escapeDiffHTML(nested))}</strong>${body(rowFields(field, entry), entry, { labels, mark })}</li>`
 					})
 					return [
 						`<div><strong>${marked(mark, escapeDiffHTML(label(field)))}</strong></div><ul>${items.join('')}</ul>`,
@@ -226,19 +219,18 @@ export const useFormat = (collection: string) => {
 		field: ClientField
 		row: Record<string, unknown>
 		index: number
-	}): Entry => {
+	}): string => {
 		const { field, row, index } = args
 		const number = String(index + 1).padStart(2, '0')
-		const block = field.type === 'blocks' ? blockOf(field, row.blockType) : undefined
+		const block =
+			field.type === 'blocks' ? blockOf(field, row.blockType, config.blocksMap) : undefined
 		const blockLabel = block?.labels?.singular
 			? getTranslation(block.labels.singular as string, i18n)
 			: toWords(String(row.blockType))
 		const singular = (field as { labels?: { singular?: unknown } }).labels?.singular
-		const title =
-			field.type === 'blocks'
-				? `${number} · ${blockLabel}`
-				: `${singular ? getTranslation(singular as string, i18n) : label(field)} ${number}`
-		return { title, block: field.type === 'blocks' ? { number, label: blockLabel } : null }
+		return field.type === 'blocks'
+			? `${number} · ${blockLabel}`
+			: `${singular ? getTranslation(singular as string, i18n) : label(field)} ${number}`
 	}
 
 	const item = (
@@ -267,8 +259,8 @@ export const useFormat = (collection: string) => {
 				if (!field || value === null || typeof value !== 'object')
 					return escapeDiffHTML(scalar(value))
 				const row = value as Record<string, unknown>
-				const entry = entryOf({ field, row, index })
-				return `<strong>${marked(mark, escapeDiffHTML(entry.title))}</strong>${body(rowFields(field, row), row, { labels: decision.relationLabels, mark })}`
+				const title = entryOf({ field, row, index })
+				return `<strong>${marked(mark, escapeDiffHTML(title))}</strong>${body(rowFields(field, row), row, { labels: decision.relationLabels, mark })}`
 			}
 			default:
 				return escapeDiffHTML(scalar(value))
@@ -276,7 +268,7 @@ export const useFormat = (collection: string) => {
 	}
 
 	/** One entry of a list: a row with its label, or a single value of a `hasMany` field. */
-	const entry = (decision: Described, value: unknown, index: number): Entry => {
+	const entry = (decision: Described, value: unknown, index: number): string => {
 		const field =
 			decision.type === 'array' || decision.type === 'blocks'
 				? fieldAt(fields, decision.path.split('.'))
@@ -284,7 +276,7 @@ export const useFormat = (collection: string) => {
 		if (field && value !== null && typeof value === 'object') {
 			return entryOf({ field, row: value as Record<string, unknown>, index })
 		}
-		return { title: plainText(item(decision, value, { index })), block: null }
+		return plainText(item(decision, value, { index }))
 	}
 
 	/**
@@ -295,30 +287,20 @@ export const useFormat = (collection: string) => {
 		decision: Described,
 		value: unknown,
 		{ doc, mark }: { doc?: string; mark?: Mark | ((index: number) => Mark) } = {}
-	): Markup => {
-		if (isEmpty(value)) return { html: '', byCharacter: true }
+	): string => {
+		if (isEmpty(value)) return ''
 		const whole = typeof mark === 'function' ? undefined : mark
 		const drawn = doc === undefined ? undefined : decision.html?.[doc]
-		// Compared word by word, as the version view compares rich text.
-		if (drawn !== undefined) return { html: marked(whole, drawn, true), byCharacter: false }
+		if (drawn !== undefined) return marked(whole, drawn, true)
 		if (decision.type === 'richText') {
 			const paragraphs = richTextParagraphs(value) ?? [scalar(value)]
-			return {
-				html: paragraphs.map((line) => `<p>${marked(whole, escapeDiffHTML(line))}</p>`).join(''),
-				byCharacter: true,
-			}
+			return paragraphs.map((line) => `<p>${marked(whole, escapeDiffHTML(line))}</p>`).join('')
 		}
 		if (decision.type === 'point' && Array.isArray(value)) {
-			return {
-				html: `<p>${marked(whole, escapeDiffHTML(value.join(', ')))}</p>`,
-				byCharacter: false,
-			}
+			return `<p>${marked(whole, escapeDiffHTML(value.join(', ')))}</p>`
 		}
 		if (decision.type === 'json') {
-			return {
-				html: `<pre>${marked(whole, escapeDiffHTML(JSON.stringify(value, null, 2)))}</pre>`,
-				byCharacter: false,
-			}
+			return `<pre>${marked(whole, escapeDiffHTML(JSON.stringify(value, null, 2)))}</pre>`
 		}
 		const rows = decision.type === 'array' || decision.type === 'blocks'
 		if (decision.list || rows || Array.isArray(value)) {
@@ -331,48 +313,46 @@ export const useFormat = (collection: string) => {
 							: marked(markOf(index), item(decision, entry, { index }))
 					}</li>`
 			)
-			return { html: `<ul>${items.join('')}</ul>`, byCharacter: false }
+			return `<ul>${items.join('')}</ul>`
 		}
 		if (
 			typeof value === 'object' &&
 			decision.type !== 'relationship' &&
 			decision.type !== 'upload'
 		) {
-			return {
-				html: `<pre>${marked(whole, escapeDiffHTML(JSON.stringify(value, null, 2)))}</pre>`,
-				byCharacter: false,
-			}
+			return `<pre>${marked(whole, escapeDiffHTML(JSON.stringify(value, null, 2)))}</pre>`
 		}
-		return {
-			html: `<p>${marked(whole, item(decision, value))}</p>`,
-			byCharacter: BY_CHARACTER.has(decision.type),
-		}
+		return `<p>${marked(whole, item(decision, value))}</p>`
 	}
 
 	return { entry, markup }
 }
 
 /** A value with nothing marked, for a field no side is chosen for yet. */
-export const Plain = ({ markup }: { markup: Markup }) => {
+export const Plain = ({ html }: { html: string }) => {
 	const { t } = useTranslation()
-	if (!markup.html) return <span className={`${baseClass}__value--empty`}>{t(keys.empty)}</span>
+	if (!html) return <span className={`${baseClass}__value--empty`}>{t(keys.empty)}</span>
 	return (
 		<div
 			className="html-diff"
 			// biome-ignore lint/security/noDangerouslySetInnerHtml: built from escaped values, as the version view does
-			dangerouslySetInnerHTML={{ __html: unescapeDiffHTML(markup.html) }}
+			dangerouslySetInnerHTML={{ __html: unescapeDiffHTML(html) }}
 		/>
 	)
 }
 
-/** `to` as the version view shows a change: what it adds over `from` in the admin's colour. */
-export const diffOf = (from: Markup, to: Markup): ReactNode => {
-	if (!to.html) return <Plain markup={to} />
+/**
+ * `to` as the version view shows a change: what it adds over `from` in the admin's colour, word
+ * by word, so a value unlike the primary's is marked whole rather than in letters it happens to
+ * share with it.
+ */
+export const diffOf = (from: string, to: string): ReactNode => {
+	if (!to) return <Plain html={to} />
 	const { To } = getHTMLDiffComponents({
-		fromHTML: from.html,
-		toHTML: to.html,
+		fromHTML: from,
+		toHTML: to,
 		postProcess: unescapeDiffHTML,
-		tokenizeByCharacter: from.byCharacter && to.byCharacter,
+		tokenizeByCharacter: false,
 	})
 	return To
 }

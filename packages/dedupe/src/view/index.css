@@ -76,12 +76,6 @@
 	white-space: nowrap;
 }
 
-.dedupe-merge__toggles {
-	display: flex;
-	flex-wrap: wrap;
-	gap: var(--base);
-}
-
 /* The merge table, laid out as Payload's "Compare versions": each field's label on a line of
    its own and its values side by side, a column per document. Two documents share the width.
    From three on a column is 40% of it, so two are in view and the edge of the third shows
@@ -146,7 +140,7 @@
 	flex-direction: column;
 	gap: calc(var(--base) / 4);
 	min-width: 0;
-	padding: calc(var(--base) * 0.75) calc(var(--base) / 2) calc(var(--base) / 2);
+	padding: calc(var(--base) * 0.75) 0 calc(var(--base) / 2);
 }
 
 .dedupe-merge__head-title {
@@ -222,8 +216,9 @@
 	overflow-wrap: anywhere;
 }
 
-/* A value is drawn as the admin draws an input: its radio or check, a separator, the value.
-   The value the merge keeps is outlined; colour marks only what differs from the primary. */
+/* A value is drawn as the admin draws an input: its radio or check in a square, a separator,
+   the value. The value the merge keeps is outlined; colour marks only what differs from the
+   primary. */
 .dedupe-merge__field {
 	display: flex;
 	align-items: center;
@@ -231,7 +226,8 @@
 	min-width: 0;
 	min-height: 40px;
 	margin: 0;
-	padding: 0 calc(var(--base) * 0.75);
+	padding-block: 0;
+	padding-inline: calc(var(--base) / 2) calc(var(--base) * 0.75);
 	border: 1px solid var(--theme-elevation-150);
 	border-radius: var(--style-radius-s);
 	background: var(--theme-input-bg);
@@ -254,7 +250,7 @@
 	align-items: center;
 	min-width: 0;
 	margin: 0;
-	margin-inline-start: calc(var(--base) * 0.75);
+	margin-inline-start: calc(var(--base) / 2);
 	padding: calc(var(--base) * 0.4) 0;
 	padding-inline-start: calc(var(--base) * 0.75);
 	border-inline-start: 1px solid var(--theme-elevation-150);
@@ -346,7 +342,8 @@ div.dedupe-merge__list--rows {
 	min-width: 0;
 	min-height: 40px;
 	margin: 0;
-	padding: 0 calc(var(--base) * 0.75);
+	padding-block: 0;
+	padding-inline: calc(var(--base) / 2) calc(var(--base) * 0.75);
 }
 
 /* Rows of an array or blocks as the document's own form draws them, read-only. The field's own
@@ -393,8 +390,21 @@ div.dedupe-merge__list--rows {
 	flex-wrap: wrap;
 }
 
+/* Payload clips the header to cut a long label short, and its focus glow on the check spreads
+   6px: the clip grows by as much on every side, and the header keeps its height. */
 .dedupe-merge__rows .collapsible__header-wrap--has-drag-handle {
 	left: 0;
+	margin-block: -6px;
+	padding-block: 6px;
+	padding-inline-start: 6px;
+}
+
+/* A block row clips once more, in its header: the same room there, its width kept. */
+.dedupe-merge__rows .blocks-field__block-header {
+	width: calc(100% + 12px);
+	max-width: none;
+	margin: -6px;
+	padding: 6px;
 }
 
 .dedupe-merge__rows .collapsible:has(> .collapsible__toggle-wrap .checkbox-input--checked) {
@@ -413,6 +423,12 @@ div.dedupe-merge__list--rows {
 	flex: 0 0 auto;
 	margin: 0;
 	pointer-events: auto;
+}
+
+/* A block's name takes clicks in the form to be edited; here it is read-only, so a click on it
+   opens the row like one anywhere on the header. */
+.dedupe-merge__row-pick .section-title {
+	pointer-events: none;
 }
 
 /* A row's name on one line, cut short. */
@@ -456,9 +472,9 @@ div.dedupe-merge__list--rows {
 	box-shadow: inset 3px 0 0 var(--theme-success-500);
 }
 
+/* Laid out as Payload's block header: its parts stretch to one height, the block's name too. */
 .dedupe-merge__row-name {
 	display: flex;
-	align-items: center;
 	gap: calc(var(--base) * 0.375);
 }
 
@@ -491,14 +507,6 @@ div.dedupe-merge__list--rows {
 	transition: opacity 0.2s;
 }
 
-.dedupe-merge__dismissed {
-	display: flex;
-	flex-wrap: wrap;
-	align-items: center;
-	justify-content: space-between;
-	gap: calc(var(--base) / 2);
-}
-
 /* Stays in reach at the end of a long screen; above the sticky headers of any card. */
 .dedupe-merge__footer {
 	position: sticky;
@@ -512,6 +520,22 @@ div.dedupe-merge__list--rows {
 	padding-block: calc(var(--base) / 2);
 	background: var(--theme-bg);
 	border-top: 1px solid var(--theme-elevation-100);
+}
+
+.dedupe-merge__toggles {
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) / 2) var(--base);
+	margin-inline-end: auto;
+}
+
+.dedupe-merge__toggles .checkbox-input__input {
+	zoom: 0.75;
+}
+
+.dedupe-merge__toggles .checkbox-input label.field-label {
+	padding-left: calc(var(--base) / 3);
+	font-size: 0.9em;
 }
 
 .dedupe-merge__footer .btn {
@@ -539,7 +563,7 @@ div.dedupe-merge__list--rows {
 }
 
 @media (max-width: 768px) {
-	.dedupe-merge__footer .btn {
+	.dedupe-merge__footer :is(.btn, .dedupe-merge__toggles) {
 		flex: 1 1 100%;
 	}
 }
