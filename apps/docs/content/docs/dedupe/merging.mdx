@@ -106,6 +106,8 @@ The merge is refused when:
 - unless `draft` is set, the primary has an unpublished draft or a document was never published;
 - another editor has a document of the group open.
 
+A merged-in document with unpublished changes is marked `Changed`, as Payload marks it. The merge takes its published values; the changes go to the trash with it, as Payload's own trash takes them, or are deleted with it.
+
 A field the reviewer may not update keeps the primary's value. A field they may not read is not shown and is merged by its policy. A merge never brings into view a value that a field's `read` access hides.
 
 ## Unique values

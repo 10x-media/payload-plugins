@@ -40,6 +40,7 @@ import {
 	checkGroup,
 	describeUsers,
 	docAllowed,
+	hasNewerDraft,
 	type LoadedDoc,
 	loadDoc,
 	loadDocs,
@@ -48,7 +49,6 @@ import {
 	publishesDrafts,
 	READ_REFUSED,
 	readableTitle,
-	survivorHasDraft,
 	validatesWrite,
 } from './load'
 import { planMerge } from './plan'
@@ -316,7 +316,7 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 	}
 	// Publishing writes on top of the latest version, draft included, so a merge of the
 	// published state would publish a draft the reviewer never saw.
-	if (await survivorHasDraft({ req, col, id: survivorId })) {
+	if (!col.options.draft && (await hasNewerDraft({ req, col, id: survivorId }))) {
 		throw new APIError(
 			'The surviving document has an unpublished draft. Publish or discard it first.',
 			409,

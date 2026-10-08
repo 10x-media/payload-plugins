@@ -68,4 +68,5 @@ export const de: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'Das Dokument selbst bleibt unverändert. Die hier daraus gewählten Werte werden verworfen.',
 	[keys.andMore]: '{{title}} und {{count}} weitere',
+	[keys.draftDeleted]: '{{title}} hat unveröffentlichte Änderungen, die mit ihm gelöscht werden.',
 }

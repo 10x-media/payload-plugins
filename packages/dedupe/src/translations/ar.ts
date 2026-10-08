@@ -65,4 +65,5 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.removeHeading]: 'إزالة {{title}} من هذا الدمج؟',
 	[keys.removeBody]: 'لا يتغير المستند نفسه. تُلغى القيم المختارة منه في هذه الشاشة.',
 	[keys.andMore]: '{{title}} و{{count}} أخرى',
+	[keys.draftDeleted]: 'لدى {{title}} تغييرات غير منشورة، وستُحذف معه.',
 }

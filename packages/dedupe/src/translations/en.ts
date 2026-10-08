@@ -72,4 +72,5 @@ export const en: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'The document itself stays as it is. The values picked from it on this screen are dropped.',
 	[keys.andMore]: '{{title}} and {{count}} more',
+	[keys.draftDeleted]: '{{title}} has unpublished changes, which are deleted with it.',
 }

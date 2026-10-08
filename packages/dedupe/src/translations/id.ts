@@ -67,4 +67,6 @@ export const id: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'Dokumennya sendiri tidak berubah. Nilai yang dipilih darinya di layar ini dibuang.',
 	[keys.andMore]: '{{title}} dan {{count}} lainnya',
+	[keys.draftDeleted]:
+		'{{title}} memiliki perubahan yang belum diterbitkan, yang ikut terhapus bersamanya.',
 }

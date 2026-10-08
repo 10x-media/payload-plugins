@@ -59,6 +59,7 @@ export const keys = {
 	removeHeading: 'dedupe:removeHeading',
 	removeBody: 'dedupe:removeBody',
 	andMore: 'dedupe:andMore',
+	draftDeleted: 'dedupe:draftDeleted',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

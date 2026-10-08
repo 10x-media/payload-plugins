@@ -68,4 +68,5 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'O documento em si não muda. Os valores escolhidos dele nesta tela são descartados.',
 	[keys.andMore]: '{{title}} e mais {{count}}',
+	[keys.draftDeleted]: '{{title}} tem alterações não publicadas, que são excluídas com ele.',
 }

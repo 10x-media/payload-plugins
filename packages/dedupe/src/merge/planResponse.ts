@@ -35,13 +35,13 @@ import {
 	checkGroup,
 	describeUsers,
 	docTitle,
+	hasNewerDraft,
 	type LoadedDoc,
 	loadDocs,
 	loadMergeGroup,
 	publishesDrafts,
 	READ_REFUSED,
 	readableTitle,
-	survivorHasDraft,
 	validatesWrite,
 } from './load'
 import { planMerge } from './plan'
@@ -54,7 +54,7 @@ export type DocRef = {
 	title: string
 	createdAt: string | null
 	updatedAt: string | null
-	/** `draft` or `published` on a collection with drafts. */
+	/** `draft`, `published`, or `changed` for a draft over what is published, as Payload says it. */
 	status: string | null
 }
 
@@ -69,7 +69,7 @@ export type DecisionView = MergeDecision & {
 export type PlanResponse = {
 	/** The survivor's id; the screen drops an answer for a survivor it has since moved away from. */
 	survivor: string
-	/** Every document of the merge, the survivor first. */
+	/** Every document of the merge, the survivor first; `changed` only in a plan without a pick. */
 	docs: DocRef[]
 	decisions: DecisionView[]
 	readyToApply: boolean
@@ -87,6 +87,8 @@ export type PlanResponse = {
 	 * collection deletes them anyway.
 	 */
 	release: Record<string, UniqueRelease>
+	/** Merged-in documents with unpublished changes, which a merge that deletes them deletes too. */
+	draftsDeleted: string[]
 	/** Decision keys whose result loses pointers at documents of the merge itself. */
 	cleared: string[]
 	/** The survivor has an unpublished draft, which merging the published state would publish. */
@@ -101,16 +103,25 @@ export type PlanResponse = {
 
 const text = (value: unknown): string | null => (typeof value === 'string' ? value : null)
 
-const docRef = async (
-	req: PayloadRequest,
-	col: CollectionContext,
+const docRef = async ({
+	req,
+	col,
+	doc,
+	drafts,
+}: {
+	req: PayloadRequest
+	col: CollectionContext
 	doc: LoadedDoc
-): Promise<DocRef> => ({
+	drafts: boolean
+}): Promise<DocRef> => ({
 	id: String(doc.id),
 	title: await readableTitle(req, col, doc),
 	createdAt: text(doc.createdAt),
 	updatedAt: text(doc.updatedAt),
-	status: text(doc._status),
+	status:
+		drafts && doc._status === 'published' && (await hasNewerDraft({ req, col, id: doc.id }))
+			? 'changed'
+			: text(doc._status),
 })
 
 /** Adds every document `value` points at, to one collection or, polymorphic, to several. */
@@ -363,7 +374,7 @@ export const buildPlanResponse = async (args: {
 
 	const available = await transactionsOn(req)
 	const transactions = available ? 'on' : ctx.options.requireTransactions ? 'refused' : 'off'
-	const survivorDraft = await survivorHasDraft({ req, col, id: survivor.id })
+	const survivorDraft = !col.options.draft && (await hasNewerDraft({ req, col, id: survivor.id }))
 	// What each merged-in document gives up, as the apply works it out in either mode; shown only
 	// for the trash, as a document deleted gives up everything.
 	const released: Record<string, UniqueRelease> = {}
@@ -466,9 +477,15 @@ export const buildPlanResponse = async (args: {
 	)
 	const decider = (ref: string | null) => (ref ? (deciders.get(ref) ?? ref) : null)
 
+	// The screen keeps what the first plan says about the documents and the group; a plan for a
+	// pick answers only what the pick changes.
+	const first = Object.keys(choices).length === 0
+	const refs = await Promise.all(
+		[survivor, ...absorbed].map((doc) => docRef({ req, col, doc, drafts: first }))
+	)
 	return {
 		survivor: String(survivor.id),
-		docs: await Promise.all([survivor, ...absorbed].map((doc) => docRef(req, col, doc))),
+		docs: refs,
 		decisions,
 		readyToApply:
 			plan.readyToApply &&
@@ -486,6 +503,10 @@ export const buildPlanResponse = async (args: {
 					by: decider(pair.decidedBy),
 				})),
 		release,
+		draftsDeleted:
+			col.options.absorbed === 'delete'
+				? refs.slice(1).flatMap((ref) => (ref.status === 'changed' ? [ref.id] : []))
+				: [],
 		cleared: plan.cleared,
 		survivorDraft,
 		refusal,

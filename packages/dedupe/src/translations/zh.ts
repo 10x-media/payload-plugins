@@ -62,4 +62,5 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.removeHeading]: '从此次合并中移除 {{title}}？',
 	[keys.removeBody]: '文档本身不会改变。在此页面上从它选取的值将被放弃。',
 	[keys.andMore]: '{{title}} 等 {{count}} 个',
+	[keys.draftDeleted]: '{{title}} 有未发布的更改，将随之一起删除。',
 }

@@ -421,6 +421,12 @@ export function MergeClient({
 					</div>
 				) : null}
 
+				{plan.draftsDeleted.map((id) => (
+					<div className={`${baseClass}__releases`} key={id}>
+						<Banner type="error">{t(keys.draftDeleted, { title: titleOf(id) })}</Banner>
+					</div>
+				))}
+
 				{answer && answer.cleared.length > 0 ? (
 					<div className={`${baseClass}__releases`}>
 						<Banner type="info">

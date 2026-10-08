@@ -67,4 +67,5 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'Сам документ не змінюється. Значення, вибрані з нього на цьому екрані, скидаються.',
 	[keys.andMore]: '{{title}} і ще {{count}}',
+	[keys.draftDeleted]: 'Документ {{title}} має неопубліковані зміни, вони видаляться разом із ним.',
 }

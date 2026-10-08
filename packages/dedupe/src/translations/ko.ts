@@ -66,4 +66,5 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.removeHeading]: '이 병합에서 {{title}}을(를) 제외할까요?',
 	[keys.removeBody]: '문서 자체는 바뀌지 않습니다. 이 화면에서 이 문서로부터 고른 값은 취소됩니다.',
 	[keys.andMore]: '{{title}} 외 {{count}}개',
+	[keys.draftDeleted]: '{{title}}에 게시되지 않은 변경 사항이 있으며, 함께 삭제됩니다.',
 }

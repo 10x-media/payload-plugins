@@ -526,6 +526,48 @@ describeForDb('dedupe merge', {}, (db) => {
 				depth: 0,
 			}) as Promise<Doc>
 
+		it("says a merged-in document's newer draft as Payload says it, changed, and merges it all the same", async () => {
+			const { booted, req } = fixture
+			const keep = await article({ title: 'Ferries', summary: 'published text' })
+			const drop = await article({ title: 'Ferries', summary: 'the same, twice' })
+			await booted.payload.update({
+				collection: ARTICLES,
+				id: drop.id,
+				data: { title: 'Ferries (draft)' } as never,
+				draft: true,
+				depth: 0,
+			})
+			const args = {
+				req,
+				ctx: getContext(booted.payload),
+				col: getCollectionContext(booted.payload, 'articles'),
+				survivorId: keep.id,
+				absorbedIds: [drop.id],
+				choices: {},
+			}
+			const plan = await buildPlanResponse(args)
+			expect(plan.docs.map((doc) => doc.status)).toEqual(['published', 'changed'])
+			expect(plan.readyToApply).toBe(true)
+			expect(plan.draftsDeleted, 'a trashed document keeps its draft').toEqual([])
+			const options = args.col.options as { absorbed: string }
+			options.absorbed = 'delete'
+			try {
+				expect((await buildPlanResponse(args)).draftsDeleted).toEqual([String(drop.id)])
+			} finally {
+				options.absorbed = 'trash'
+			}
+			await applyMerge(args)
+			const gone = (await booted.payload.findByID({
+				collection: ARTICLES,
+				id: drop.id,
+				depth: 0,
+				trash: true,
+				draft: true,
+			})) as Doc
+			expect(gone.deletedAt).toBeTruthy()
+			expect(gone.title, 'its draft stays with it in the trash').toBe('Ferries (draft)')
+		})
+
 		it('refuses to merge the published state while the survivor has a newer draft', async () => {
 			const { booted, req } = fixture
 			const keep = await article({ title: 'Trains', summary: 'published text' })

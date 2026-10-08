@@ -67,4 +67,6 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'Сам документ не меняется. Значения, выбранные из него на этом экране, сбрасываются.',
 	[keys.andMore]: '{{title}} и ещё {{count}}',
+	[keys.draftDeleted]:
+		'У документа {{title}} есть неопубликованные изменения, они удалятся вместе с ним.',
 }

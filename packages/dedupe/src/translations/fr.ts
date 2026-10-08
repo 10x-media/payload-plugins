@@ -68,4 +68,5 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'Le document lui-même reste inchangé. Les valeurs choisies depuis lui sur cet écran sont abandonnées.',
 	[keys.andMore]: '{{title}} et {{count}} autres',
+	[keys.draftDeleted]: '{{title}} a des modifications non publiées, qui sont supprimées avec lui.',
 }

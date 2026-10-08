@@ -81,7 +81,13 @@ export const ColumnHeader = ({
 				</a>
 				{doc.status ? (
 					<Pill size="small">
-						{payloadT(doc.status === 'draft' ? 'version:draft' : 'version:published')}
+						{payloadT(
+							doc.status === 'draft'
+								? 'version:draft'
+								: doc.status === 'changed'
+									? 'version:changed'
+									: 'version:published'
+						)}
 					</Pill>
 				) : null}
 				<Button

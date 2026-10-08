@@ -76,16 +76,16 @@ export const localRequest = (req: PayloadRequest): PayloadRequest => {
 }
 
 /**
- * Whether merging the published state would publish a draft nobody reviewed: Payload writes on
- * top of the latest version, and the survivor's is a draft newer than what is published.
+ * Whether the document's latest version is a draft over what it published: Payload's `changed`.
+ * On the survivor it refuses the merge, which writes on top of that draft and would publish it.
  */
-export const survivorHasDraft = async (args: {
+export const hasNewerDraft = async (args: {
 	req: PayloadRequest
 	col: CollectionContext
 	id: number | string
 }): Promise<boolean> => {
 	const { req, col, id } = args
-	if (!col.hasDrafts || col.options.draft) return false
+	if (!col.hasDrafts) return false
 	const latest = await req.payload.findByID({
 		collection: col.slug,
 		id,
