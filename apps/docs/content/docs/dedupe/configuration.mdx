@@ -18,7 +18,7 @@ description: Every option of the plugin and its default.
 | `disableJobsQueue` | `false` | Run the save check and the scan inside the request, for a deployment without a job worker. |
 | `queue` | `dedupe` | Jobs queue of the `dedupe-check` and `dedupe-scan` tasks. |
 | `scan.cron` | unset | Scan every matched collection on a schedule. Needs a job runner. |
-| `view` | `{ path: '/dedupe' }` | Admin path of the queue and the merge screen; `false` removes the views. The plugin adds no sidebar link to them. |
+| `view` | `{ path: '/dedupe' }` | Admin path of the queue and the merge screen; `false` removes the views. |
 | `overrides` | `{}` | `keys`, `pairs`: a function over the plugin's collection. Hooks are refused. |
 | `collectionAccess.read` | nobody | REST and GraphQL read access on the plugin's collections. |
 | `multiTenancy` | off | `true` or `{ tenantFieldName, collections }`, see below. |
@@ -81,4 +81,4 @@ dedupe({
 })
 ```
 
-Event types: `pair.found` (also when a pair opens again), `pair.dismissed`, `pair.reopened`, `merge.applied`, `merge.failed`, `scan.finished`. A sink that throws is logged and changes nothing. `pair.found` is sent inside the transaction of the save (with `disableJobsQueue`) or of the merge, so one that fails afterwards may have announced a pair it never stored.
+Event types: `pair.found` (also for a pair found again after it was closed), `pair.dismissed`, `pair.reopened`, `merge.applied`, `merge.failed`, `scan.finished`. A sink that throws is logged and changes nothing. `pair.found` is sent inside the transaction of the save (with `disableJobsQueue`) or of the merge, so one that fails afterwards may have announced a pair it never stored.

@@ -22,7 +22,7 @@ Set a policy on the field:
 ```ts
 import { dedupeCustom } from '@10x-media/dedupe'
 
-{ name: 'notes', type: 'textarea', admin: { custom: dedupeCustom({ policy: 'union' }) } }
+{ name: 'tags', type: 'text', hasMany: true, admin: { custom: dedupeCustom({ policy: 'union' }) } }
 ```
 
 Or in the plugin config:
@@ -34,7 +34,7 @@ customers: {
 }
 ```
 
-A path that is not in the schema fails at startup.
+A path that is not among `derived` fails at startup.
 
 ### Fields with a component of their own
 
@@ -101,7 +101,7 @@ A failure is logged and sent as `merge.failed`. Without a transaction (MongoDB w
 The merge is refused when:
 
 - a document changed since the screen opened;
-- the collection's access denies the reviewer `read` on a document, `update` on the primary or `delete` on a merged-in one;
+- the collection's access denies the reviewer `read` on a document, `update` on the primary, `delete` on a merged-in one, or `update` on one that goes to the trash;
 - a `manual` conflict is open;
 - unless `draft` is set, the primary has an unpublished draft or a document was never published;
 - another editor has a document of the group open.
@@ -120,18 +120,18 @@ When the primary takes a unique value, the merged-in document gives it up first,
 | Any other type, not `required`, on SQL | An empty value. |
 | Any other type on MongoDB or `required` | Nothing: the merged-in document is deleted instead of trashed, before the primary is written. Without a transaction, such a merge is refused. |
 
-The screen shows this before the merge. On Postgres, a merged-in document deleted for good cannot leave while another merged-in document points at it in a `required` field.
+The screen shows this before the merge. On Postgres, a merged-in document deleted for good cannot leave while a document points at it in a `required` field.
 
 ## References
 
 The merge does not move references to the merged-in documents. Documents elsewhere that point at one keep pointing at it:
 
 - with `absorbed: 'trash'`, at a document in the trash, which comes back with them when it is restored;
-- with `absorbed: 'delete'`, on MongoDB at a document that no longer exists, and on Postgres nowhere: the delete removes the reference.
+- with `absorbed: 'delete'`, on MongoDB at a document that no longer exists. On Postgres the delete clears an optional reference, and fails the merge while a `required` one points at it.
 
-A pointer at a document of the same merge is removed from the primary's optional fields, so the primary never points at itself or at a merged-in document.
+A pointer at a document of the same merge, the primary itself or a merged-in one, is removed from the primary's optional fields the reviewer may update.
 
-To move references, use `hooks.beforeRemove`. It runs once per merge, while the merged-in documents still exist, with the merge's `req`: writes through it are part of the merge's transaction, and throwing rolls the merge back where the database opens one. On Postgres it must run before the delete, since the delete removes the references it would move.
+To move references, use `hooks.beforeRemove`. It runs once per merge, while the merged-in documents still exist, with the merge's `req`: writes through it are part of the merge's transaction, and throwing rolls the merge back where the database opens one.
 
 ```ts title="payload.config.ts"
 dedupe({
@@ -199,4 +199,4 @@ dedupe({
 })
 ```
 
-The entry is written through the merge's `req`, so it rolls back with a merge that fails. The dev app runs this example: `packages/dedupe/dev/helpers/auditMerge.ts`.
+The entry is written through the merge's `req`, so it rolls back with a merge that fails. It stores `snapshots` whole, fields hidden from the API included: whoever may read the audit log reads them. The dev app runs this example: `packages/dedupe/dev/helpers/auditMerge.ts`.

@@ -22,7 +22,7 @@ export type DedupeFieldConfig = {
  * Build the `admin.custom` fragment for a field.
  *
  * ```ts
- * { name: 'notes', type: 'textarea', admin: { custom: dedupeCustom({ policy: 'union' }) } }
+ * { name: 'tags', type: 'text', hasMany: true, admin: { custom: dedupeCustom({ policy: 'union' }) } }
  * ```
  *
  * Spread it when the field already carries other custom data:

@@ -16,7 +16,7 @@ Each match field compares by its `compare`:
 | `date` | The same day, or day and month swapped. |
 | `{ keys, similarity }` | Your own: `keys(value)` lists the keys of a value, `similarity(a, b)` returns 0 to 1. |
 
-Only documents that share a key are compared.
+Only documents that share a key are compared. `key: false` scores a field without making keys from it, for one too common to narrow the search, such as a city; at least one match field keeps its keys.
 
 A compare of your own can build on the built-in ones, exported as `comparePresets`. Rules of one language go there, for example ü as ue:
 
@@ -37,7 +37,7 @@ const name = {
 
 ## Score
 
-A matching field adds its `weight`, a near match part of it, a differing one `onDiffer` (a quarter of the weight off by default), and `onDiffer: 'veto'` rules the pair out. Pairs from `minScore` up go to the queue, with the fields that match and differ.
+A matching field adds its `weight`, a near match part of it, a differing one `onDiffer` (a quarter of the weight off by default), and `onDiffer: 'veto'` rules the pair out. The score is their sum over the sum of every match field's weight, fields empty on either side included, from 0 to 1. Pairs from `minScore` up go to the queue, with the fields that match and differ.
 
 ## Save check and scan
 
