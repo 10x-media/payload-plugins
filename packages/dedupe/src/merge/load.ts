@@ -131,9 +131,9 @@ export const loadDocs = async (args: {
 	ids: (number | string)[]
 	/** `false` reads as the request's user, leaving out what they may not read. */
 	overrideAccess?: boolean
-	/** Trashed documents too, such as the absorbed side of a merged pair. */
+	/** Trashed documents too, such as one of a group that went to the trash since. */
 	trash?: boolean
-	/** Fields hidden from the API too, for the copy a merge record keeps. */
+	/** Fields hidden from the API too, as `beforeRemove` receives them. */
 	showHiddenFields?: boolean
 }): Promise<LoadedDoc[]> => {
 	const { req, ctx, col, ids, overrideAccess = true, trash = false, showHiddenFields } = args

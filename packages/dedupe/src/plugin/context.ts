@@ -323,7 +323,7 @@ export const selectedTenant = (ctx: PluginContext, req: PayloadRequest): string 
 	ctx.tenantFieldName ? (parseCookies(req.headers).get('payload-tenant') ?? null) : null
 
 /**
- * What a list of pairs or merges is narrowed to while a tenant is selected: that tenant's
+ * What a list of pairs is narrowed to while a tenant is selected: that tenant's
  * rows, and the rows of collections without the tenant field, which belong to no tenant.
  */
 export const tenantScope = (ctx: PluginContext, req: PayloadRequest): Where[] => {
@@ -365,8 +365,8 @@ export const tenantOf = (
 }
 
 /**
- * The user behind a request as `collection:id`, so a history names them from the right
- * auth collection when the app has several.
+ * The user behind a request as `collection:id`, so the queue names who marked a pair from the
+ * right auth collection when the app has several.
  */
 export const userRef = (req: PayloadRequest): string | null =>
 	req.user ? `${req.user.collection}:${String(req.user.id)}` : null

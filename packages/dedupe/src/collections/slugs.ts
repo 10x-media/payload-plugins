@@ -3,7 +3,7 @@ import type { CollectionSlug } from 'payload'
 export const KEYS_SLUG = 'dedupe-keys' as CollectionSlug
 export const PAIRS_SLUG = 'dedupe-pairs' as CollectionSlug
 
-/** Rows a page of the queue or the history holds when the address names no other number. */
+/** Rows a page of the queue holds when the address names no other number. */
 export const PAGE_SIZE = 25
 
 /** Rows a page holds for a `limit` from the address or a request, 1 to 100. */

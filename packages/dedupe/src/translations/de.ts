@@ -29,7 +29,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.missingParams]: 'Die Zusammenführung braucht eine Sammlung und zwei Dokument-IDs.',
 	[keys.confirmHeading]: 'Zusammenführung anwenden?',
 	[keys.confirmBody]:
-		'{{absorbed}} wird in {{survivor}} zusammengeführt und verlässt die Sammlung. Die Zusammenführung wird mit einer Kopie jedes Dokuments aufgezeichnet.',
+		'{{absorbed}} wird in {{survivor}} zusammengeführt und verlässt die Sammlung.',
 	[keys.primary]: 'Primär · behält seine ID',
 	[keys.makePrimary]: 'Zum Primärdokument machen',
 	[keys.created]: 'Erstellt',
@@ -38,16 +38,16 @@ export const de: Record<TranslationKey, string> = {
 	[keys.showDiff]: 'Unterschiede hervorheben',
 	[keys.mergeCount]: '{{count}} Dokumente zusammenführen',
 	[keys.releaseMarked]:
-		'{{title}} kommt mit einem Platzhalter in {{fields}} in den Papierkorb, weil {{survivor}} diese Werte übernimmt und nur ein Dokument sie haben darf. Der Zusammenführungseintrag behält die Originale.',
+		'{{title}} kommt mit einem Platzhalter in {{fields}} in den Papierkorb, weil {{survivor}} diese Werte übernimmt und nur ein Dokument sie haben darf.',
 	[keys.releaseEmptied]:
-		'{{title}} kommt mit leerem {{fields}} in den Papierkorb, weil {{survivor}} diese Werte übernimmt und nur ein Dokument sie haben darf. Der Zusammenführungseintrag behält die Originale.',
+		'{{title}} kommt mit leerem {{fields}} in den Papierkorb, weil {{survivor}} diese Werte übernimmt und nur ein Dokument sie haben darf.',
 	[keys.pointersCleared]:
 		'Verweise auf Dokumente dieser Zusammenführung fallen aus {{fields}} weg: Danach würden sie auf ein entferntes Dokument oder auf {{survivor}} selbst zeigen.',
 	[keys.survivorDraft]:
 		'{{title}} hat unveröffentlichte Änderungen, die die Zusammenführung veröffentlichen würde. Veröffentliche oder verwirf sie zuerst.',
 	[keys.mayNotApply]: 'Deine Berechtigungen erlauben diese Zusammenführung nicht.',
 	[keys.releaseDeletes]:
-		'{{title}} wird gelöscht statt in den Papierkorb verschoben, weil {{survivor}} {{fields}} übernimmt und nur ein Dokument diese Werte haben darf. Der Zusammenführungseintrag behält eine vollständige Kopie.',
+		'{{title}} wird gelöscht statt in den Papierkorb verschoben, weil {{survivor}} {{fields}} übernimmt und nur ein Dokument diese Werte haben darf.',
 	[keys.signals]: 'Warum sie passen',
 	[keys.takeAll]: 'Alle Werte übernehmen',
 	[keys.similarity]: 'Ähnlichkeit',

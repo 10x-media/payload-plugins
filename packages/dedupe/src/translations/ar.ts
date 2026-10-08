@@ -28,8 +28,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.error]: 'حدث خطأ ما.',
 	[keys.missingParams]: 'تحتاج شاشة الدمج إلى مجموعة ومعرّفي مستندين.',
 	[keys.confirmHeading]: 'تطبيق هذا الدمج؟',
-	[keys.confirmBody]:
-		'سيتم دمج {{absorbed}} في {{survivor}} وإزالته من المجموعة. يُسجَّل الدمج مع نسخة من كل مستند.',
+	[keys.confirmBody]: 'سيتم دمج {{absorbed}} في {{survivor}} وإزالته من المجموعة.',
 	[keys.primary]: 'الأساسي · يحتفظ بمعرّفه',
 	[keys.makePrimary]: 'اجعله أساسيًا',
 	[keys.created]: 'أُنشئ',
@@ -38,15 +37,15 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.showDiff]: 'تمييز الاختلافات',
 	[keys.mergeCount]: 'دمج {{count}} مستندات',
 	[keys.releaseMarked]:
-		'سينتقل {{title}} إلى سلة المهملات مع علامة في {{fields}}، لأن {{survivor}} يأخذ هذه القيم ولا يجوز أن يحملها إلا مستند واحد. يحتفظ سجل الدمج بالقيم الأصلية.',
+		'سينتقل {{title}} إلى سلة المهملات مع علامة في {{fields}}، لأن {{survivor}} يأخذ هذه القيم ولا يجوز أن يحملها إلا مستند واحد.',
 	[keys.releaseEmptied]:
-		'سينتقل {{title}} إلى سلة المهملات مع ترك {{fields}} فارغًا، لأن {{survivor}} يأخذ هذه القيم ولا يجوز أن يحملها إلا مستند واحد. يحتفظ سجل الدمج بالقيم الأصلية.',
+		'سينتقل {{title}} إلى سلة المهملات مع ترك {{fields}} فارغًا، لأن {{survivor}} يأخذ هذه القيم ولا يجوز أن يحملها إلا مستند واحد.',
 	[keys.pointersCleared]:
 		'تُزال الإشارات إلى مستندات هذا الدمج من {{fields}}: بعد الدمج ستشير إلى مستند لم يعد موجودًا أو إلى {{survivor}} نفسه.',
 	[keys.survivorDraft]: 'لدى {{title}} تغييرات غير منشورة سينشرها الدمج. انشرها أو تجاهلها أولًا.',
 	[keys.mayNotApply]: 'صلاحياتك لا تسمح بتطبيق هذا الدمج.',
 	[keys.releaseDeletes]:
-		'سيُحذف {{title}} بدلًا من نقله إلى سلة المهملات، لأن {{survivor}} يأخذ {{fields}} ولا يجوز أن يحمل هذه القيم إلا مستند واحد. يحتفظ سجل الدمج بنسخة كاملة.',
+		'سيُحذف {{title}} بدلًا من نقله إلى سلة المهملات، لأن {{survivor}} يأخذ {{fields}} ولا يجوز أن يحمل هذه القيم إلا مستند واحد.',
 	[keys.signals]: 'سبب التشابه',
 	[keys.takeAll]: 'الاحتفاظ بجميع القيم',
 	[keys.similarity]: 'التشابه',

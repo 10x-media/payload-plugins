@@ -29,8 +29,7 @@ export const es: Record<TranslationKey, string> = {
 	[keys.missingParams]:
 		'La pantalla de fusión necesita una colección y dos identificadores de documento.',
 	[keys.confirmHeading]: '¿Aplicar esta fusión?',
-	[keys.confirmBody]:
-		'{{absorbed}} se fusionará en {{survivor}} y saldrá de la colección. La fusión queda registrada con una copia de cada documento.',
+	[keys.confirmBody]: '{{absorbed}} se fusionará en {{survivor}} y saldrá de la colección.',
 	[keys.primary]: 'Principal · conserva su ID',
 	[keys.makePrimary]: 'Hacer principal',
 	[keys.created]: 'Creado',
@@ -39,16 +38,16 @@ export const es: Record<TranslationKey, string> = {
 	[keys.showDiff]: 'Resaltar diferencias',
 	[keys.mergeCount]: 'Fusionar {{count}} documentos',
 	[keys.releaseMarked]:
-		'{{title}} irá a la papelera con un marcador en {{fields}}, porque {{survivor}} toma esos valores y solo un documento puede tenerlos. El registro de la fusión conserva los originales.',
+		'{{title}} irá a la papelera con un marcador en {{fields}}, porque {{survivor}} toma esos valores y solo un documento puede tenerlos.',
 	[keys.releaseEmptied]:
-		'{{title}} irá a la papelera con {{fields}} vacío, porque {{survivor}} toma esos valores y solo un documento puede tenerlos. El registro de la fusión conserva los originales.',
+		'{{title}} irá a la papelera con {{fields}} vacío, porque {{survivor}} toma esos valores y solo un documento puede tenerlos.',
 	[keys.pointersCleared]:
 		'Los enlaces a documentos de esta fusión se quitan de {{fields}}: tras la fusión apuntarían a un documento eliminado o al propio {{survivor}}.',
 	[keys.survivorDraft]:
 		'{{title}} tiene cambios sin publicar que la fusión publicaría. Publícalos o descártalos primero.',
 	[keys.mayNotApply]: 'Tus permisos no te permiten aplicar esta fusión.',
 	[keys.releaseDeletes]:
-		'{{title}} se eliminará en lugar de ir a la papelera, porque {{survivor}} toma su {{fields}} y solo un documento puede tener esos valores. El registro de la fusión conserva una copia completa.',
+		'{{title}} se eliminará en lugar de ir a la papelera, porque {{survivor}} toma su {{fields}} y solo un documento puede tener esos valores.',
 	[keys.signals]: 'Por qué coinciden',
 	[keys.takeAll]: 'Conservar todos los valores',
 	[keys.similarity]: 'Similitud',

@@ -49,8 +49,8 @@ export type DedupeAdapter = {
 	/** Documents to compare with `doc`. The document itself may be among them. */
 	findCandidates(args: FindCandidatesArgs): Promise<CandidateHit[]>
 	/**
-	 * Called on every save of a document the plugin compares, and for one a merge moved a
-	 * reference in, inside the write's transaction.
+	 * Called on every save of a document the plugin compares and on the primary a merge writes,
+	 * inside the write's transaction, and by the scan for every document it compares.
 	 */
 	index?(args: IndexArgs): Promise<void>
 	/** Called when a document is deleted, trashed, unpublished or merged into another. */

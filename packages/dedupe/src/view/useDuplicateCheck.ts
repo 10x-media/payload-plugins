@@ -9,8 +9,8 @@ import { answerCache, callApi } from './api'
 export type DuplicateCandidate = CheckResponse['candidates'][number]
 
 /**
- * Answers shared by every caller on the page, keyed by the values they were asked for: the
- * sidebar has usually checked the exact values the save button is about to ask about.
+ * Answers shared by every caller on the page, keyed by the values they were asked for: a check
+ * that follows the form has usually asked about the exact values a check on save asks about.
  */
 const remember = answerCache<DuplicateCandidate[]>(5_000)
 
@@ -18,7 +18,7 @@ export type UseDuplicateCheckArgs = {
 	collection: string
 	/** The match field paths; a change to any of them asks again. */
 	paths: string[]
-	/** Quiet time after the last change before the sidebar asks. */
+	/** Quiet time after the last change before it asks. */
 	delay?: number
 	/** `false` asks only through `check`, not as the form changes. */
 	follow?: boolean

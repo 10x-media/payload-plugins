@@ -33,8 +33,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.error]: 'Something went wrong.',
 	[keys.missingParams]: 'The merge screen needs a collection and two document ids.',
 	[keys.confirmHeading]: 'Apply this merge?',
-	[keys.confirmBody]:
-		'{{absorbed}} will be merged into {{survivor}} and leave the collection. The merge is recorded with a copy of every document.',
+	[keys.confirmBody]: '{{absorbed}} will be merged into {{survivor}} and leave the collection.',
 	[keys.primary]: 'Primary · keeps its ID',
 	[keys.makePrimary]: 'Make primary',
 	[keys.created]: 'Created',
@@ -43,16 +42,16 @@ export const en: Record<TranslationKey, string> = {
 	[keys.showDiff]: 'Highlight differences',
 	[keys.mergeCount]: 'Merge {{count}} documents',
 	[keys.releaseMarked]:
-		'{{title}} goes to the trash with a placeholder in {{fields}}, because {{survivor}} takes those values and only one document may hold them. The merge record keeps the originals.',
+		'{{title}} goes to the trash with a placeholder in {{fields}}, because {{survivor}} takes those values and only one document may hold them.',
 	[keys.releaseEmptied]:
-		'{{title}} goes to the trash with {{fields}} left empty, because {{survivor}} takes those values and only one document may hold them. The merge record keeps the originals.',
+		'{{title}} goes to the trash with {{fields}} left empty, because {{survivor}} takes those values and only one document may hold them.',
 	[keys.pointersCleared]:
 		'Pointers at documents of this merge are left out of {{fields}}: after the merge they would point at a document gone or at {{survivor}} itself.',
 	[keys.survivorDraft]:
 		'{{title}} has unpublished changes, which the merge would publish. Publish or discard them first.',
 	[keys.mayNotApply]: 'Your access does not let you apply this merge.',
 	[keys.releaseDeletes]:
-		'{{title}} will be deleted instead of moved to the trash, because {{survivor}} takes its {{fields}} and only one document may hold those values. The merge record keeps a full copy.',
+		'{{title}} will be deleted instead of moved to the trash, because {{survivor}} takes its {{fields}} and only one document may hold those values.',
 	[keys.signals]: 'Why they match',
 	[keys.takeAll]: 'Keep all values',
 	[keys.similarity]: 'Similarity',

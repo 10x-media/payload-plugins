@@ -29,8 +29,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.missingParams]:
 		'A tela de mesclagem precisa de uma coleção e de dois identificadores de documento.',
 	[keys.confirmHeading]: 'Aplicar esta mesclagem?',
-	[keys.confirmBody]:
-		'{{absorbed}} será mesclado em {{survivor}} e sairá da coleção. A mesclagem fica registrada com uma cópia de cada documento.',
+	[keys.confirmBody]: '{{absorbed}} será mesclado em {{survivor}} e sairá da coleção.',
 	[keys.primary]: 'Principal · mantém o ID',
 	[keys.makePrimary]: 'Tornar principal',
 	[keys.created]: 'Criado',
@@ -39,16 +38,16 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.showDiff]: 'Destacar diferenças',
 	[keys.mergeCount]: 'Mesclar {{count}} documentos',
 	[keys.releaseMarked]:
-		'{{title}} vai para a lixeira com um marcador em {{fields}}, porque {{survivor}} fica com esses valores e só um documento pode tê-los. O registro da mesclagem guarda os originais.',
+		'{{title}} vai para a lixeira com um marcador em {{fields}}, porque {{survivor}} fica com esses valores e só um documento pode tê-los.',
 	[keys.releaseEmptied]:
-		'{{title}} vai para a lixeira com {{fields}} vazio, porque {{survivor}} fica com esses valores e só um documento pode tê-los. O registro da mesclagem guarda os originais.',
+		'{{title}} vai para a lixeira com {{fields}} vazio, porque {{survivor}} fica com esses valores e só um documento pode tê-los.',
 	[keys.pointersCleared]:
 		'Os vínculos a documentos desta mesclagem são retirados de {{fields}}: após a mesclagem apontariam para um documento excluído ou para o próprio {{survivor}}.',
 	[keys.survivorDraft]:
 		'{{title}} tem alterações não publicadas que a mesclagem publicaria. Publique ou descarte-as primeiro.',
 	[keys.mayNotApply]: 'Suas permissões não permitem aplicar esta mesclagem.',
 	[keys.releaseDeletes]:
-		'{{title}} será excluído em vez de ir para a lixeira, porque {{survivor}} fica com seu {{fields}} e só um documento pode ter esses valores. O registro da mesclagem guarda uma cópia completa.',
+		'{{title}} será excluído em vez de ir para a lixeira, porque {{survivor}} fica com seu {{fields}} e só um documento pode ter esses valores.',
 	[keys.signals]: 'Por que combinam',
 	[keys.takeAll]: 'Manter todos os valores',
 	[keys.similarity]: 'Semelhança',

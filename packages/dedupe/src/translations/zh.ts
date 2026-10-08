@@ -27,8 +27,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.error]: '出了点问题。',
 	[keys.missingParams]: '合并页面需要一个集合和两个文档 ID。',
 	[keys.confirmHeading]: '应用此合并？',
-	[keys.confirmBody]:
-		'{{absorbed}} 将合并到 {{survivor}} 并从集合中移除。合并会连同每个文档的副本一起记录。',
+	[keys.confirmBody]: '{{absorbed}} 将合并到 {{survivor}} 并从集合中移除。',
 	[keys.primary]: '主文档 · 保留其 ID',
 	[keys.makePrimary]: '设为主文档',
 	[keys.created]: '创建于',
@@ -37,15 +36,15 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.showDiff]: '高亮差异',
 	[keys.mergeCount]: '合并 {{count}} 个文档',
 	[keys.releaseMarked]:
-		'{{title}} 将移入回收站，{{fields}} 中改为占位值，因为 {{survivor}} 接管了这些值，而这些值只能属于一个文档。合并记录保留原始值。',
+		'{{title}} 将移入回收站，{{fields}} 中改为占位值，因为 {{survivor}} 接管了这些值，而这些值只能属于一个文档。',
 	[keys.releaseEmptied]:
-		'{{title}} 将移入回收站，{{fields}} 留空，因为 {{survivor}} 接管了这些值，而这些值只能属于一个文档。合并记录保留原始值。',
+		'{{title}} 将移入回收站，{{fields}} 留空，因为 {{survivor}} 接管了这些值，而这些值只能属于一个文档。',
 	[keys.pointersCleared]:
 		'{{fields}} 中指向本次合并文档的引用会被移除：合并后它们会指向已不存在的文档或 {{survivor}} 本身。',
 	[keys.survivorDraft]: '{{title}} 有未发布的更改，合并会将其发布。请先发布或放弃这些更改。',
 	[keys.mayNotApply]: '您的权限不允许应用此合并。',
 	[keys.releaseDeletes]:
-		'{{title}} 将被删除而不是移入回收站，因为 {{survivor}} 接管了它的 {{fields}}，而这些值只能属于一个文档。合并记录保留完整副本。',
+		'{{title}} 将被删除而不是移入回收站，因为 {{survivor}} 接管了它的 {{fields}}，而这些值只能属于一个文档。',
 	[keys.signals]: '相似原因',
 	[keys.takeAll]: '保留所有值',
 	[keys.similarity]: '相似度',

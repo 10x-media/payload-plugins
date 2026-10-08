@@ -29,8 +29,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.missingParams]:
 		"L'écran de fusion a besoin d'une collection et de deux identifiants de document.",
 	[keys.confirmHeading]: 'Appliquer cette fusion ?',
-	[keys.confirmBody]:
-		'{{absorbed}} sera fusionné dans {{survivor}} et quittera la collection. La fusion est enregistrée avec une copie de chaque document.',
+	[keys.confirmBody]: '{{absorbed}} sera fusionné dans {{survivor}} et quittera la collection.',
 	[keys.primary]: 'Principal · garde son ID',
 	[keys.makePrimary]: 'Rendre principal',
 	[keys.created]: 'Créé',
@@ -39,16 +38,16 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.showDiff]: 'Surligner les différences',
 	[keys.mergeCount]: 'Fusionner {{count}} documents',
 	[keys.releaseMarked]:
-		"{{title}} ira à la corbeille avec un marqueur dans {{fields}}, car {{survivor}} reprend ces valeurs et un seul document peut les porter. L'enregistrement de la fusion garde les originaux.",
+		'{{title}} ira à la corbeille avec un marqueur dans {{fields}}, car {{survivor}} reprend ces valeurs et un seul document peut les porter.',
 	[keys.releaseEmptied]:
-		"{{title}} ira à la corbeille avec {{fields}} vide, car {{survivor}} reprend ces valeurs et un seul document peut les porter. L'enregistrement de la fusion garde les originaux.",
+		'{{title}} ira à la corbeille avec {{fields}} vide, car {{survivor}} reprend ces valeurs et un seul document peut les porter.',
 	[keys.pointersCleared]:
 		'Les liens vers des documents de cette fusion sont retirés de {{fields}} : après la fusion, ils pointeraient vers un document supprimé ou vers {{survivor}} lui-même.',
 	[keys.survivorDraft]:
 		'{{title}} a des modifications non publiées, que la fusion publierait. Publiez-les ou annulez-les d’abord.',
 	[keys.mayNotApply]: 'Vos droits ne vous permettent pas d’appliquer cette fusion.',
 	[keys.releaseDeletes]:
-		"{{title}} sera supprimé au lieu d'aller à la corbeille, car {{survivor}} reprend son {{fields}} et un seul document peut porter ces valeurs. L'enregistrement de la fusion garde une copie complète.",
+		"{{title}} sera supprimé au lieu d'aller à la corbeille, car {{survivor}} reprend son {{fields}} et un seul document peut porter ces valeurs.",
 	[keys.signals]: 'Pourquoi ils correspondent',
 	[keys.takeAll]: 'Garder toutes les valeurs',
 	[keys.similarity]: 'Similarité',

@@ -28,8 +28,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.error]: 'Terjadi kesalahan.',
 	[keys.missingParams]: 'Layar penggabungan memerlukan satu koleksi dan dua ID dokumen.',
 	[keys.confirmHeading]: 'Terapkan penggabungan ini?',
-	[keys.confirmBody]:
-		'{{absorbed}} akan digabungkan ke {{survivor}} dan keluar dari koleksi. Penggabungan dicatat beserta salinan setiap dokumen.',
+	[keys.confirmBody]: '{{absorbed}} akan digabungkan ke {{survivor}} dan keluar dari koleksi.',
 	[keys.primary]: 'Utama · mempertahankan ID',
 	[keys.makePrimary]: 'Jadikan utama',
 	[keys.created]: 'Dibuat',
@@ -38,16 +37,16 @@ export const id: Record<TranslationKey, string> = {
 	[keys.showDiff]: 'Sorot perbedaan',
 	[keys.mergeCount]: 'Gabungkan {{count}} dokumen',
 	[keys.releaseMarked]:
-		'{{title}} masuk ke tempat sampah dengan penanda di {{fields}}, karena {{survivor}} mengambil nilai tersebut dan hanya satu dokumen yang boleh memilikinya. Catatan penggabungan menyimpan nilai aslinya.',
+		'{{title}} masuk ke tempat sampah dengan penanda di {{fields}}, karena {{survivor}} mengambil nilai tersebut dan hanya satu dokumen yang boleh memilikinya.',
 	[keys.releaseEmptied]:
-		'{{title}} masuk ke tempat sampah dengan {{fields}} dikosongkan, karena {{survivor}} mengambil nilai tersebut dan hanya satu dokumen yang boleh memilikinya. Catatan penggabungan menyimpan nilai aslinya.',
+		'{{title}} masuk ke tempat sampah dengan {{fields}} dikosongkan, karena {{survivor}} mengambil nilai tersebut dan hanya satu dokumen yang boleh memilikinya.',
 	[keys.pointersCleared]:
 		'Tautan ke dokumen penggabungan ini dihapus dari {{fields}}: setelah penggabungan, tautan itu akan menunjuk ke dokumen yang sudah tidak ada atau ke {{survivor}} sendiri.',
 	[keys.survivorDraft]:
 		'{{title}} memiliki perubahan yang belum diterbitkan, yang akan diterbitkan oleh penggabungan. Terbitkan atau buang dulu.',
 	[keys.mayNotApply]: 'Akses Anda tidak mengizinkan penggabungan ini diterapkan.',
 	[keys.releaseDeletes]:
-		'{{title}} akan dihapus, bukan dipindahkan ke tempat sampah, karena {{survivor}} mengambil {{fields}} miliknya dan hanya satu dokumen yang boleh memiliki nilai tersebut. Catatan penggabungan menyimpan salinan lengkap.',
+		'{{title}} akan dihapus, bukan dipindahkan ke tempat sampah, karena {{survivor}} mengambil {{fields}} miliknya dan hanya satu dokumen yang boleh memiliki nilai tersebut.',
 	[keys.signals]: 'Mengapa mirip',
 	[keys.takeAll]: 'Simpan semua nilai',
 	[keys.similarity]: 'Kemiripan',

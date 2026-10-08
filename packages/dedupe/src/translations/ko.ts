@@ -28,8 +28,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.error]: '문제가 발생했습니다.',
 	[keys.missingParams]: '병합 화면에는 컬렉션과 문서 ID 두 개가 필요합니다.',
 	[keys.confirmHeading]: '이 병합을 적용할까요?',
-	[keys.confirmBody]:
-		'{{absorbed}}이(가) {{survivor}}(으)로 병합되어 컬렉션에서 제거됩니다. 병합은 각 문서의 사본과 함께 기록됩니다.',
+	[keys.confirmBody]: '{{absorbed}}이(가) {{survivor}}(으)로 병합되어 컬렉션에서 제거됩니다.',
 	[keys.primary]: '기본 · ID 유지',
 	[keys.makePrimary]: '기본으로 지정',
 	[keys.created]: '생성',
@@ -38,16 +37,16 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.showDiff]: '차이 강조',
 	[keys.mergeCount]: '문서 {{count}}개 병합',
 	[keys.releaseMarked]:
-		'{{survivor}}이(가) {{fields}} 값을 가져가고 이 값은 한 문서만 가질 수 있으므로, {{title}}은(는) 해당 필드에 자리 표시 값을 넣은 채 휴지통으로 이동합니다. 병합 기록에 원래 값이 보관됩니다.',
+		'{{survivor}}이(가) {{fields}} 값을 가져가고 이 값은 한 문서만 가질 수 있으므로, {{title}}은(는) 해당 필드에 자리 표시 값을 넣은 채 휴지통으로 이동합니다.',
 	[keys.releaseEmptied]:
-		'{{survivor}}이(가) {{fields}} 값을 가져가고 이 값은 한 문서만 가질 수 있으므로, {{title}}은(는) 해당 필드를 비운 채 휴지통으로 이동합니다. 병합 기록에 원래 값이 보관됩니다.',
+		'{{survivor}}이(가) {{fields}} 값을 가져가고 이 값은 한 문서만 가질 수 있으므로, {{title}}은(는) 해당 필드를 비운 채 휴지통으로 이동합니다.',
 	[keys.pointersCleared]:
 		'{{fields}}에서 이 병합의 문서를 가리키는 링크는 제거됩니다. 병합 후에는 사라진 문서나 {{survivor}} 자신을 가리키게 되기 때문입니다.',
 	[keys.survivorDraft]:
 		'{{title}}에 게시되지 않은 변경 사항이 있으며 병합하면 게시됩니다. 먼저 게시하거나 취소하세요.',
 	[keys.mayNotApply]: '권한이 없어 이 병합을 적용할 수 없습니다.',
 	[keys.releaseDeletes]:
-		'{{survivor}}이(가) {{fields}} 값을 가져가고 이 값은 한 문서만 가질 수 있으므로, {{title}}은(는) 휴지통으로 이동하지 않고 삭제됩니다. 병합 기록에 전체 사본이 보관됩니다.',
+		'{{survivor}}이(가) {{fields}} 값을 가져가고 이 값은 한 문서만 가질 수 있으므로, {{title}}은(는) 휴지통으로 이동하지 않고 삭제됩니다.',
 	[keys.signals]: '비슷한 이유',
 	[keys.takeAll]: '모든 값 유지',
 	[keys.similarity]: '유사도',

@@ -343,9 +343,9 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 	if (locked) throw new APIError(locked, 409, undefined, true)
 
 	// The fields hidden from the API, which the documents as loaded lack: the rows the survivor
-	// takes keep theirs, a unique one frees its value too, and the record's copy holds them,
-	// since nothing else keeps them once a document is deleted. Not an auth collection's
-	// credentials, which Payload hands out decrypted.
+	// takes keep theirs, a unique one frees its value too, and the snapshots `beforeRemove`
+	// receives hold them, since nothing else keeps them once a document is deleted. Not an
+	// auth collection's credentials, which Payload hands out decrypted.
 	const full = await loadDocs({
 		req,
 		ctx,
