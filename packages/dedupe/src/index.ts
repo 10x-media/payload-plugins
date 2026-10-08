@@ -11,6 +11,7 @@ import { registerViews } from './plugin/registerViews'
 import type { DedupeAdapter } from './search/contract'
 import { keysAdapter } from './search/keysAdapter'
 
+export { presets as comparePresets } from './match/presets'
 export { readPath } from './merge/compare'
 export type { DedupePluginOptions } from './options'
 export { matchFields, tenantOf } from './plugin/context'

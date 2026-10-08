@@ -2,7 +2,7 @@ import type { CollectionConfig, Config } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { KEYS_SLUG, PAIRS_SLUG } from './collections/slugs'
-import { dedupe } from './index'
+import { comparePresets, dedupe } from './index'
 import { keys } from './translations'
 
 const customers: CollectionConfig = { slug: 'customers', fields: [] }
@@ -58,5 +58,19 @@ describe('dedupe factory', () => {
 		const i18n = out.i18n?.translations as Record<string, Record<string, Record<string, string>>>
 		expect(i18n.de?.dedupe?.pluginName).toBe('Beispiel')
 		expect(i18n.en?.dedupe?.pluginName).toBe('Dedupe')
+	})
+})
+
+describe('comparePresets', () => {
+	it('exposes the built-in comparisons, so a compare of your own can build on them', () => {
+		const umlauts = (value: unknown) => String(value).replace(/ü/g, 'ue')
+		const own = {
+			keys: (value: unknown) => comparePresets.text.keys(umlauts(value)),
+			similarity: (a: unknown, b: unknown) =>
+				comparePresets.text.similarity(umlauts(a), umlauts(b)),
+		}
+		expect(comparePresets.text.similarity('Jürgen Müller', 'Juergen Mueller')).toBeLessThan(1)
+		expect(own.similarity('Jürgen Müller', 'Juergen Mueller')).toBe(1)
+		expect(own.keys('Jürgen Müller')).toEqual(comparePresets.text.keys('Juergen Mueller'))
 	})
 })

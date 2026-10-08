@@ -18,6 +18,23 @@ Each match field compares by its `compare`:
 
 Only documents that share a key are compared.
 
+A compare of your own can build on the built-in ones, exported as `comparePresets`. Rules of one language go there, for example ü as ue:
+
+```ts
+import { comparePresets } from '@10x-media/dedupe'
+
+const umlauts = (value: unknown) => String(value ?? '').replace(/ü/g, 'ue')
+
+const name = {
+  path: 'name',
+  weight: 40,
+  compare: {
+    keys: (value: unknown) => comparePresets.text.keys(umlauts(value)),
+    similarity: (a: unknown, b: unknown) => comparePresets.text.similarity(umlauts(a), umlauts(b)),
+  },
+}
+```
+
 ## Score
 
 A matching field adds its `weight`, a near match part of it, a differing one `onDiffer` (a quarter of the weight off by default), and `onDiffer: 'veto'` rules the pair out. Pairs from `minScore` up go to the queue, with the fields that match and differ.
@@ -95,6 +112,11 @@ Implement `DedupeAdapter` from `@10x-media/dedupe/types`. Only `findCandidates` 
 
 Over an index the project already keeps current, such as its site search, `findCandidates` is enough. An adapter with an index of its own also writes it in `index` and `remove`.
 
+`index` and `remove` run inside the transaction of the save, delete or merge that calls them, and one that throws fails it. A write to an outside service stays when that transaction rolls back. An adapter with an outside index writes it one of two ways:
+
+- **From a job.** `index` and `remove` queue it with `payload.jobs.queue({ ..., req })`; a rolled-back save takes the job with it. The index follows the database once a worker runs the job.
+- **At once, then checked.** They write at once and queue a job without `req`, which survives a rollback; the job reads the document and writes or deletes it to match. A document is found at once, and a rollback is put right once a worker runs the job.
+
 Only documents in the index are ever found. An index that leaves some out, such as a public search index without blocked users, never finds their duplicates.
 
 `@10x-media/dedupe` exports what an adapter reads:
@@ -107,11 +129,12 @@ Only documents in the index are ever found. An index that leaves some out, such 
 
 ### Example: Typesense
 
-An adapter with its own Typesense index. Each Payload collection has a Typesense collection of the same name, with a `string[]` field per match field and a `tenant` field; one search per value tolerates typos.
+An adapter with its own Typesense index, written at once and checked after a write inside a transaction, the second way above. Each Payload collection has a Typesense collection of the same name, with a `string[]` field per match field and a `tenant` field; one search per value tolerates typos.
 
 ```ts
 import { matchFields, readPath, tenantOf } from '@10x-media/dedupe'
-import type { DedupeAdapter } from '@10x-media/dedupe/types'
+import type { AdapterDoc, DedupeAdapter } from '@10x-media/dedupe/types'
+import type { CollectionSlug, PayloadRequest } from 'payload'
 
 // Typesense reads a dot in a field name as a nested object.
 const fieldName = (path: string) => `f_${path.replaceAll('.', '__')}`
@@ -126,34 +149,78 @@ const texts = (value: unknown): string[] =>
         ? []
         : [String(value).toLowerCase()]
 
-export const typesenseAdapter = (url: string, apiKey: string): DedupeAdapter => {
+export const typesenseAdapter = ({ url, apiKey }: { url: string; apiKey: string }): DedupeAdapter => {
   const call = (path: string, init: RequestInit = {}) =>
     fetch(`${url}${path}`, {
       ...init,
       headers: { 'X-TYPESENSE-API-KEY': apiKey, 'Content-Type': 'application/json' },
     })
 
+  const upsert = async (req: PayloadRequest, collection: string, doc: AdapterDoc) => {
+    const tenant = tenantOf(req.payload, collection, doc)
+    const fields = matchFields(req.payload, collection).map(({ path }) => [
+      fieldName(path),
+      texts(readPath(doc, path)),
+    ])
+    await call(`/collections/${collection}/documents?action=upsert`, {
+      method: 'POST',
+      body: JSON.stringify({
+        id: String(doc.id),
+        ...Object.fromEntries(fields),
+        ...(tenant ? { tenant } : {}),
+      }),
+    })
+  }
+
+  const drop = (collection: string, id: string) =>
+    call(`/collections/${collection}/documents/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
+  // Queued without `req`, so a rolled-back save does not take the check with it.
+  const checkLater = async (req: PayloadRequest, collection: string, id: string) => {
+    if (await req.transactionID) {
+      await req.payload.jobs.queue({ task: 'typesense-check', input: { collection, id }, queue: 'dedupe' })
+    }
+  }
+
   return {
-    index: async ({ req, collection, doc }) => {
-      const tenant = tenantOf(req.payload, collection, doc)
-      const fields = matchFields(req.payload, collection).map(({ path }) => [
-        fieldName(path),
-        texts(readPath(doc, path)),
-      ])
-      await call(`/collections/${collection}/documents?action=upsert`, {
-        method: 'POST',
-        body: JSON.stringify({
-          id: String(doc.id),
-          ...Object.fromEntries(fields),
-          ...(tenant ? { tenant } : {}),
-        }),
-      })
+    register: (config) => {
+      config.jobs = {
+        ...config.jobs,
+        tasks: [
+          ...(config.jobs?.tasks ?? []),
+          {
+            slug: 'typesense-check',
+            inputSchema: [
+              { name: 'collection', type: 'text', required: true },
+              { name: 'id', type: 'text', required: true },
+            ],
+            handler: async ({ input, req }) => {
+              const { collection, id } = input as { collection: CollectionSlug; id: string }
+              const doc = await req.payload.findByID({
+                collection,
+                id,
+                depth: 0,
+                locale: 'all',
+                overrideAccess: true,
+                disableErrors: true,
+              })
+              if (doc && doc._status !== 'draft') await upsert(req, collection, doc)
+              else await drop(collection, id)
+              return { output: {} }
+            },
+          },
+        ],
+      }
     },
 
-    remove: async ({ collection, id }) => {
-      await call(`/collections/${collection}/documents/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      })
+    index: async ({ req, collection, doc }) => {
+      await upsert(req, collection, doc)
+      await checkLater(req, collection, String(doc.id))
+    },
+
+    remove: async ({ req, collection, id }) => {
+      await drop(collection, id)
+      await checkLater(req, collection, id)
     },
 
     findCandidates: async ({ req, collection, doc, limit }) => {

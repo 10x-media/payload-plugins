@@ -1,8 +1,10 @@
 import { matchFields, readPath, tenantOf } from '@10x-media/dedupe'
 import type { AdapterDoc, DedupeAdapter } from '@10x-media/dedupe/types'
-import type { PayloadRequest } from 'payload'
+import type { CollectionSlug, PayloadRequest } from 'payload'
 
 type Connection = { url: string; apiKey: string }
+
+const CHECK_TASK = 'typesense-check'
 
 /** A match field's name in Typesense, which reads a dot as a nested object. */
 const fieldName = (path: string) => `f_${path.replaceAll('.', '__')}`
@@ -87,27 +89,81 @@ export const typesenseAdapter = ({ url, apiKey }: Connection): DedupeAdapter => 
 		return pending
 	}
 
+	const upsert = async (req: PayloadRequest, collection: string, doc: AdapterDoc) => {
+		await ensure(req, collection)
+		const tenant = tenantOf(req.payload, collection, doc)
+		const body = Object.fromEntries([
+			['id', String(doc.id)],
+			...fieldsOf(req, collection).map((field) => [field.name, textsOf(doc, field)]),
+			...(tenant ? [['tenant', tenant]] : []),
+		])
+		const response = await call(`/collections/${collection}/documents?action=upsert`, {
+			method: 'POST',
+			body: JSON.stringify(body),
+		})
+		if (!response.ok) throw new Error(`typesense: ${response.status} ${await response.text()}`)
+	}
+
+	const drop = async (req: PayloadRequest, collection: string, id: string) => {
+		await ensure(req, collection)
+		await call(`/collections/${collection}/documents/${encodeURIComponent(id)}`, {
+			method: 'DELETE',
+		})
+	}
+
+	/**
+	 * A write inside a transaction stays in Typesense when the transaction rolls back. Queued
+	 * without `req`, the check outlives the rollback and writes what the database then holds.
+	 */
+	const checkLater = async (req: PayloadRequest, collection: string, id: string) => {
+		if (!(await req.transactionID)) return
+		await req.payload.jobs.queue({
+			task: CHECK_TASK as never,
+			input: { collection, id } as never,
+			queue: 'dedupe',
+		})
+	}
+
 	return {
+		register: (config) => {
+			config.jobs = {
+				...config.jobs,
+				tasks: [
+					...(config.jobs?.tasks ?? []),
+					{
+						slug: CHECK_TASK,
+						inputSchema: [
+							{ name: 'collection', type: 'text', required: true },
+							{ name: 'id', type: 'text', required: true },
+						],
+						handler: async ({ input, req }) => {
+							const { collection, id } = input as { collection: string; id: string }
+							const doc = await req.payload.findByID({
+								collection: collection as CollectionSlug,
+								id,
+								depth: 0,
+								locale: 'all',
+								overrideAccess: true,
+								disableErrors: true,
+							})
+							// As the plugin indexes: a document in the trash or taken off publication is out.
+							if (doc && doc._status !== 'draft') await upsert(req, collection, doc)
+							else await drop(req, collection, id)
+							return { output: {} }
+						},
+					},
+				],
+			}
+		},
+
 		index: async ({ req, collection, doc }) => {
-			await ensure(req, collection)
-			const tenant = tenantOf(req.payload, collection, doc)
-			const body = Object.fromEntries([
-				['id', String(doc.id)],
-				...fieldsOf(req, collection).map((field) => [field.name, textsOf(doc, field)]),
-				...(tenant ? [['tenant', tenant]] : []),
-			])
-			const response = await call(`/collections/${collection}/documents?action=upsert`, {
-				method: 'POST',
-				body: JSON.stringify(body),
-			})
-			if (!response.ok) throw new Error(`typesense: ${response.status} ${await response.text()}`)
+			await upsert(req, collection, doc)
+			await checkLater(req, collection, String(doc.id))
 		},
 
 		remove: async ({ req, collection, id }) => {
-			await ensure(req, collection)
-			await call(`/collections/${collection}/documents/${encodeURIComponent(id)}`, {
-				method: 'DELETE',
-			})
+			await drop(req, collection, id)
+			await checkLater(req, collection, id)
 		},
 
 		findCandidates: async ({ req, collection, doc, limit }) => {
