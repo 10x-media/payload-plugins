@@ -1095,6 +1095,9 @@ importers:
       '@10x-media/dedupe':
         specifier: workspace:*
         version: link:..
+      '@10x-media/form-variants':
+        specifier: workspace:*
+        version: link:../../form-variants
       '@payloadcms/db-mongodb':
         specifier: 'catalog:'
         version: 3.85.0(payload@3.85.0(graphql@16.14.0)(typescript@5.9.3))(socks@2.8.10)

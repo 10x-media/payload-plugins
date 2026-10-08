@@ -50,12 +50,13 @@ Then run `payload generate:importmap`. The queue is at `/admin/dedupe`. The sear
 
 ## Documentation
 
-Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/docs/dedupe):
+Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/dedupe):
 
-- [Overview](https://docs.10xmedia.de/docs/dedupe)
-- [Configuration](https://docs.10xmedia.de/docs/dedupe/configuration)
-- [Searching](https://docs.10xmedia.de/docs/dedupe/searching)
-- [Merging](https://docs.10xmedia.de/docs/dedupe/merging)
+- [Overview](https://docs.10xmedia.de/dedupe)
+- [Configuration](https://docs.10xmedia.de/dedupe/configuration)
+- [Searching](https://docs.10xmedia.de/dedupe/searching)
+- [Checking before saving](https://docs.10xmedia.de/dedupe/checking)
+- [Merging](https://docs.10xmedia.de/dedupe/merging)
 
 ## License
 

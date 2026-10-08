@@ -1,4 +1,4 @@
 {
 	"title": "Dedupe",
-	"pages": ["index", "configuration", "merging", "searching"]
+	"pages": ["index", "configuration", "merging", "searching", "checking"]
 }

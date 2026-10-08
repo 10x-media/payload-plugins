@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { auditLogs } from '@10x-media/audit-logs'
 import { dedupe } from '@10x-media/dedupe'
+import { formVariants } from '@10x-media/form-variants'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
@@ -46,6 +47,7 @@ import { seedShowcase } from './helpers/seedShowcase'
 import { seedStaff } from './helpers/seedStaff'
 import { tenantLocale } from './helpers/tenantLocale'
 import { typesenseAdapter } from './helpers/typesenseAdapter'
+import { customerVariants } from './variants/customers'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 const migrationDir = path.resolve(dirname, 'migrations')
@@ -215,6 +217,7 @@ export default buildConfig({
 			// The e2e suite reads the pairs back through the REST API.
 			collectionAccess: { read: ({ req }) => Boolean(req.user) },
 		}),
+		formVariants({ collections: { customers: customerVariants } }),
 	],
 	telemetry: false,
 	onInit: async (payload) => {
