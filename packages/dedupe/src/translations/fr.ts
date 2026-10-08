@@ -68,5 +68,9 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'Le document lui-même reste inchangé. Les valeurs choisies depuis lui sur cet écran sont abandonnées.',
 	[keys.andMore]: '{{title}} et {{count}} autres',
+	[keys.groupSize]: 'Taille du groupe',
+	[keys.perMerge]: '{{count}}, jusqu’à {{max}} par fusion',
+	[keys.leftOut]:
+		'Documents similaires absents de cet écran : {{count}}. Ils restent dans « Doublons ».',
 	[keys.draftDeleted]: '{{title}} a des modifications non publiées, qui sont supprimées avec lui.',
 }

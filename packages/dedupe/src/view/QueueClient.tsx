@@ -186,6 +186,20 @@ export function QueueClient({
 					</Link>
 				))
 			),
+			column(
+				'size',
+				t(keys.groupSize),
+				rows.map((group) => (
+					<span key={group.id}>
+						{group.docs.length > maxGroupSize
+							? t(keys.perMerge, {
+									count: String(group.docs.length),
+									max: String(maxGroupSize),
+								})
+							: group.docs.length}
+					</span>
+				))
+			),
 			...(collection
 				? []
 				: [

@@ -68,5 +68,9 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'O documento em si não muda. Os valores escolhidos dele nesta tela são descartados.',
 	[keys.andMore]: '{{title}} e mais {{count}}',
+	[keys.groupSize]: 'Tamanho do grupo',
+	[keys.perMerge]: '{{count}}, até {{max}} por mesclagem',
+	[keys.leftOut]:
+		'Documentos semelhantes fora desta tela: {{count}}. Eles continuam em “Duplicados”.',
 	[keys.draftDeleted]: '{{title}} tem alterações não publicadas, que são excluídas com ele.',
 }

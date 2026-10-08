@@ -68,5 +68,9 @@ export const es: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'El documento en sí no cambia. Se descartan los valores elegidos de él en esta pantalla.',
 	[keys.andMore]: '{{title}} y {{count}} más',
+	[keys.groupSize]: 'Tamaño del grupo',
+	[keys.perMerge]: '{{count}}, hasta {{max}} por fusión',
+	[keys.leftOut]:
+		'Documentos similares que no están en esta pantalla: {{count}}. Siguen en «Duplicados».',
 	[keys.draftDeleted]: '{{title}} tiene cambios sin publicar, que se eliminan con él.',
 }

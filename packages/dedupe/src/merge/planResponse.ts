@@ -9,6 +9,7 @@ import {
 import { PAIRS_SLUG } from '../collections/slugs'
 import { pairKeyFor } from '../match/keys'
 import type { CollectionContext, PluginContext } from '../plugin/context'
+import { countLeftOut } from '../queue/pairs'
 import { fullLabel } from '../schema/deriveSpec'
 import type { MergeChoice, MergeDecision } from '../schema/types'
 import { mergeableSpec, withoutUnreadable } from './access'
@@ -82,6 +83,8 @@ export type PlanResponse = {
 	dismissed: { at: string | null; by: string | null } | null
 	/** Pairs of the group marked not duplicates while the group as a whole is not. */
 	markedApart: { docs: [string, string]; at: string | null; by: string | null }[]
+	/** Documents of the queue group not on this screen, which stay in the queue; 0 for a pick. */
+	leftOut: number
 	/**
 	 * What each absorbed document gives up on its way to the trash, by id; empty when the
 	 * collection deletes them anyway.
@@ -502,6 +505,7 @@ export const buildPlanResponse = async (args: {
 					at: pair.decidedAt,
 					by: decider(pair.decidedBy),
 				})),
+		leftOut: first ? await countLeftOut({ req, col, ids }) : 0,
 		release,
 		draftsDeleted:
 			col.options.absorbed === 'delete'

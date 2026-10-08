@@ -68,5 +68,9 @@ export const de: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'Das Dokument selbst bleibt unverändert. Die hier daraus gewählten Werte werden verworfen.',
 	[keys.andMore]: '{{title}} und {{count}} weitere',
+	[keys.groupSize]: 'Gruppengröße',
+	[keys.perMerge]: '{{count}}, bis zu {{max}} je Zusammenführung',
+	[keys.leftOut]:
+		'Ähnliche Dokumente, die nicht auf dieser Seite sind: {{count}}. Sie bleiben unter „Duplikate“.',
 	[keys.draftDeleted]: '{{title}} hat unveröffentlichte Änderungen, die mit ihm gelöscht werden.',
 }

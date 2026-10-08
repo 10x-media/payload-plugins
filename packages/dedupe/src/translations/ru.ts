@@ -67,6 +67,10 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'Сам документ не меняется. Значения, выбранные из него на этом экране, сбрасываются.',
 	[keys.andMore]: '{{title}} и ещё {{count}}',
+	[keys.groupSize]: 'Размер группы',
+	[keys.perMerge]: '{{count}}, до {{max}} за слияние',
+	[keys.leftOut]:
+		'Похожие документы, которых нет на этом экране: {{count}}. Они останутся в разделе «Дубликаты».',
 	[keys.draftDeleted]:
 		'У документа {{title}} есть неопубликованные изменения, они удалятся вместе с ним.',
 }

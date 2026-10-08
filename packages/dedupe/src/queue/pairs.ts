@@ -296,6 +296,50 @@ const groupPairs = (links: Link[]): Link[][] => {
 	return [...groups.values()].sort((x, y) => (y[0] as Link).score - (x[0] as Link).score)
 }
 
+/**
+ * How many documents open pairs link to `ids`, directly or in a chain, beyond `ids` themselves:
+ * the rest of the queue group a merge of `ids` leaves out. Only those the reader may read count.
+ */
+export const countLeftOut = async (args: {
+	req: PayloadRequest
+	col: CollectionContext
+	ids: (number | string)[]
+}): Promise<number> => {
+	const { req, col } = args
+	const shown = new Set(args.ids.map(String))
+	const reached = new Set(shown)
+	let frontier = [...shown]
+	while (frontier.length > 0) {
+		const { docs } = await req.payload.db.find<Pick<PairRow, 'docA' | 'docB'>>({
+			collection: PAIRS_SLUG,
+			where: {
+				and: [
+					{ target: { equals: col.slug } },
+					{ status: { equals: 'open' } },
+					{ or: [{ docA: { in: frontier } }, { docB: { in: frontier } }] },
+				],
+			},
+			select: { docA: true, docB: true },
+			limit: 0,
+			pagination: false,
+			req,
+		})
+		frontier = [...new Set(docs.flatMap((pair) => [pair.docA, pair.docB]))].filter(
+			(id) => !reached.has(id)
+		)
+		for (const id of frontier) reached.add(id)
+	}
+	const rest = [...reached].filter((id) => !shown.has(id))
+	if (rest.length === 0) return 0
+	const { totalDocs } = await req.payload.count({
+		collection: col.slug as CollectionSlug,
+		where: { id: { in: rest } },
+		overrideAccess: false,
+		req,
+	})
+	return totalDocs
+}
+
 /** The documents of a group in the order of its pairs, the strongest first. */
 const docsOf = (group: Link[]): string[] => [
 	...new Set(group.flatMap((link) => [link.docA, link.docB])),

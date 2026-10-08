@@ -67,5 +67,9 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'Сам документ не змінюється. Значення, вибрані з нього на цьому екрані, скидаються.',
 	[keys.andMore]: '{{title}} і ще {{count}}',
+	[keys.groupSize]: 'Розмір групи',
+	[keys.perMerge]: '{{count}}, до {{max}} за обʼєднання',
+	[keys.leftOut]:
+		'Схожі документи, яких немає на цьому екрані: {{count}}. Вони залишаться в розділі «Дублікати».',
 	[keys.draftDeleted]: 'Документ {{title}} має неопубліковані зміни, вони видаляться разом із ним.',
 }

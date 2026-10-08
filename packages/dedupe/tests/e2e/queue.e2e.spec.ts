@@ -185,6 +185,34 @@ test('documents alike in a chain are one row, and it opens them all', async ({ p
 	await expect(page.locator('.dedupe-merge__head')).toHaveCount(3)
 })
 
+test('a group larger than one merge says so in its row, and the merge screen counts the rest', async ({
+	page,
+	context,
+}) => {
+	const [a, b] = matchingPair('golf')
+	await createCustomer(context.request, a)
+	for (const [index, name] of [
+		'Kowalski',
+		'Kowalsky',
+		'Kovalski',
+		'Kovalska',
+		'Kowalskaja',
+		'Kowalskaya',
+	].entries()) {
+		await createCustomer(context.request, {
+			...b,
+			name: `${MARK} golf ${name}`,
+			email: `golf.${index}@e2e.test`,
+		})
+	}
+
+	await openQueue(page)
+	const row = queueRow(page, `${MARK} golf Kowalska`)
+	await expect(row.locator('.cell-size')).toHaveText('7, up to 5 per merge')
+	await row.getByRole('link').click()
+	await expect(page.locator('.dedupe-merge__head')).toHaveCount(5)
+	await expect(page.getByText('Similar documents not on this screen: 2.')).toBeVisible()
+})
 test('the search bar keeps the groups with a document the list search of the collection finds', async ({
 	page,
 	context,

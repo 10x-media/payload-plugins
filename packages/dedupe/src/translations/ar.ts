@@ -65,5 +65,9 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.removeHeading]: 'إزالة {{title}} من هذا الدمج؟',
 	[keys.removeBody]: 'لا يتغير المستند نفسه. تُلغى القيم المختارة منه في هذه الشاشة.',
 	[keys.andMore]: '{{title}} و{{count}} أخرى',
+	[keys.groupSize]: 'حجم المجموعة',
+	[keys.perMerge]: '{{count}}، حتى {{max}} في كل دمج',
+	[keys.leftOut]:
+		'مستندات مشابهة غير معروضة في هذه الشاشة: {{count}}. تبقى في «المستندات المكررة».',
 	[keys.draftDeleted]: 'لدى {{title}} تغييرات غير منشورة، وستُحذف معه.',
 }

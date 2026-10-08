@@ -62,5 +62,8 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.removeHeading]: '从此次合并中移除 {{title}}？',
 	[keys.removeBody]: '文档本身不会改变。在此页面上从它选取的值将被放弃。',
 	[keys.andMore]: '{{title}} 等 {{count}} 个',
+	[keys.groupSize]: '分组大小',
+	[keys.perMerge]: '{{count}}，每次合并最多 {{max}} 个',
+	[keys.leftOut]: '未在此页面显示的相似文档：{{count}} 个。它们仍保留在“重复文档”中。',
 	[keys.draftDeleted]: '{{title}} 有未发布的更改，将随之一起删除。',
 }

@@ -67,6 +67,10 @@ export const id: Record<TranslationKey, string> = {
 	[keys.removeBody]:
 		'Dokumennya sendiri tidak berubah. Nilai yang dipilih darinya di layar ini dibuang.',
 	[keys.andMore]: '{{title}} dan {{count}} lainnya',
+	[keys.groupSize]: 'Ukuran grup',
+	[keys.perMerge]: '{{count}}, maksimal {{max}} per penggabungan',
+	[keys.leftOut]:
+		'Dokumen serupa yang tidak ada di layar ini: {{count}}. Dokumen itu tetap ada di “Duplikat”.',
 	[keys.draftDeleted]:
 		'{{title}} memiliki perubahan yang belum diterbitkan, yang ikut terhapus bersamanya.',
 }

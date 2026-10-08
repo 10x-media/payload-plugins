@@ -357,6 +357,9 @@ export function MergeClient({
 				<h1>{t(keys.mergeInto, { title: titleOf(survivor) })}</h1>
 			</div>
 
+			{plan.leftOut > 0 ? (
+				<Banner>{t(keys.leftOut, { count: String(plan.leftOut) })}</Banner>
+			) : null}
 			{plan.dismissed ? (
 				<Banner>
 					{t(keys.dismissedNote, {

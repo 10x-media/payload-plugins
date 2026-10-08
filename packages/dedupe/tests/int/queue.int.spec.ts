@@ -570,6 +570,75 @@ describeForDb('dedupe queue', {}, (db) => {
 			expect(result.counts.open).toBe(result.totalDocs)
 		})
 
+		it('counts the documents of a group the merge screen leaves out, along the chain', async () => {
+			const [a, b, c, d, e] = [
+				await lead('rest-a@group.test'),
+				await lead('rest-b@group.test'),
+				await lead('rest-c@group.test'),
+				await lead('rest-d@group.test'),
+				await lead('rest-e@group.test'),
+			]
+			await pairRow('leads', [a, b], 0.9)
+			await pairRow('leads', [b, c], 0.8)
+			await pairRow('leads', [c, d], 0.7)
+			const apart = await pairRow('leads', [d, e], 0.6)
+			await fixture.booted.payload.db.updateOne({
+				collection: PAIRS_SLUG,
+				id: apart.id,
+				data: { status: 'dismissed' },
+			})
+			const leftOut = async (shown: Doc[]) =>
+				(
+					await buildPlanResponse({
+						req: fixture.req,
+						ctx: getContext(fixture.booted.payload),
+						col: getCollectionContext(fixture.booted.payload, LEADS),
+						survivorId: (shown[0] as Doc).id,
+						absorbedIds: shown.slice(1).map((doc) => doc.id),
+						choices: {},
+					})
+				).leftOut
+			expect(await leftOut([a, b]), 'c and d, linked by open pairs').toBe(2)
+			expect(await leftOut([a, b, c, d]), 'e, linked only as not duplicates').toBe(0)
+			const pick = await buildPlanResponse({
+				req: fixture.req,
+				ctx: getContext(fixture.booted.payload),
+				col: getCollectionContext(fixture.booted.payload, LEADS),
+				survivorId: a.id,
+				absorbedIds: [b.id],
+				choices: { email: { doc: String(b.id) } },
+			})
+			expect(pick.leftOut, 'a pick leaves the count to the first plan').toBe(0)
+		})
+
+		it('leaves out of that count the documents the reader may not read', async () => {
+			const vault = (owner: string) =>
+				fixture.booted.payload.create({
+					collection: VAULTS,
+					data: { name: 'Rest vault', owner } as never,
+				}) as Promise<Doc>
+			const [mine, alsoMine, theirs] = [
+				await vault('owner-rest@example.com'),
+				await vault('owner-rest@example.com'),
+				await vault('owner-else@example.com'),
+			]
+			await pairRow('vaults', [mine, alsoMine], 0.9)
+			await pairRow('vaults', [alsoMine, theirs], 0.8)
+			const leftOut = async (email: string) =>
+				(
+					await buildPlanResponse({
+						req: await reqFor(fixture.booted, email),
+						ctx: getContext(fixture.booted.payload),
+						col: getCollectionContext(fixture.booted.payload, VAULTS),
+						survivorId: mine.id,
+						absorbedIds: [alsoMine.id],
+						choices: {},
+					})
+				).leftOut
+			expect(await leftOut('admin-rest@example.com')).toBe(1)
+			expect(await leftOut('owner-rest@example.com')).toBe(0)
+		})
+
 		it('keeps a group whole past one page of pairs', async () => {
 			const { payload } = fixture.booted
 			const chain: Doc[] = []

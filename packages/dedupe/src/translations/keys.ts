@@ -59,6 +59,9 @@ export const keys = {
 	removeHeading: 'dedupe:removeHeading',
 	removeBody: 'dedupe:removeBody',
 	andMore: 'dedupe:andMore',
+	groupSize: 'dedupe:groupSize',
+	perMerge: 'dedupe:perMerge',
+	leftOut: 'dedupe:leftOut',
 	draftDeleted: 'dedupe:draftDeleted',
 } as const
 
