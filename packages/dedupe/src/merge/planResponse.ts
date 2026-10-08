@@ -1,4 +1,3 @@
-import { getTranslation } from '@payloadcms/translations'
 import {
 	APIError,
 	type CollectionSlug,
@@ -7,10 +6,10 @@ import {
 	type PayloadRequest,
 	type SanitizedConfig,
 } from 'payload'
-import { toWords } from 'payload/shared'
 import { PAIRS_SLUG } from '../collections/slugs'
 import { pairKeyFor } from '../match/keys'
 import type { CollectionContext, PluginContext } from '../plugin/context'
+import { fullLabel } from '../schema/deriveSpec'
 import type { MergeChoice, MergeDecision } from '../schema/types'
 import { mergeableSpec, withoutUnreadable } from './access'
 import { accessRefusal, lockRefusal, missingRefusal, removalRefusal } from './apply'
@@ -263,12 +262,7 @@ const describeDecisions = async (args: {
 	const { labels: relationLabels, inRows } = await resolveRelationLabels(req, col, decisions)
 	return Promise.all(
 		decisions.map(async (decision) => {
-			const spec = col.specByPath.get(decision.path)
-			const raw = spec?.label
-			const label =
-				raw === false || raw === undefined
-					? toWords(decision.path.split('.').pop() ?? decision.path)
-					: getTranslation(raw, req.i18n)
+			const label = fullLabel(decision.path, col, req.i18n)
 			// A polymorphic value, and any value inside rows, is keyed as `collection:id`.
 			const slugs = inRows.get(decision.key)
 			const related = slugs

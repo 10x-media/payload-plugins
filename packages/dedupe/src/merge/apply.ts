@@ -1,4 +1,3 @@
-import { getTranslation } from '@payloadcms/translations'
 import {
 	APIError,
 	type CollectionSlug,
@@ -20,7 +19,7 @@ import {
 import { emitEvent } from '../plugin/events'
 import { checkDocument } from '../queue/live'
 import { closePairsFor } from '../queue/pairs'
-import { AUTH_FIELDS } from '../schema/deriveSpec'
+import { AUTH_FIELDS, fullLabel } from '../schema/deriveSpec'
 import type { MergeChoice, MergePlan } from '../schema/types'
 import { mergeableSpec } from './access'
 import {
@@ -187,14 +186,15 @@ export const missingRefusal = (
 	missing: MergePlan['missing']
 ): string | null => {
 	if (missing.length === 0) return null
-	// The field by its label where the spec has it, then the path below it, as `Steps > Text`.
+	// The field as the screen labels it, then the path below it, as `Steps > Text`.
 	const name = (path: string) => {
 		const parts = path.split('.')
 		for (let size = parts.length; size > 0; size -= 1) {
-			const label = col.specByPath.get(parts.slice(0, size).join('.'))?.label
-			if (label === undefined && !col.specByPath.has(parts.slice(0, size).join('.'))) continue
-			const head = label ? getTranslation(label, req.i18n) : toWords(parts[size - 1] as string)
-			return [head, ...parts.slice(size).map((part) => toWords(part))].join(' > ')
+			const at = parts.slice(0, size).join('.')
+			if (!col.specByPath.has(at)) continue
+			return [fullLabel(at, col, req.i18n), ...parts.slice(size).map((part) => toWords(part))].join(
+				' > '
+			)
 		}
 		return parts.map((part) => toWords(part)).join(' > ')
 	}

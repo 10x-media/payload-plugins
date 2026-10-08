@@ -1,7 +1,7 @@
-import type { FlattenedField } from 'payload'
+import type { Field, FlattenedField } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { deriveSpec, resolveSpec } from './deriveSpec'
+import { deriveSpec, fullLabel, labelPrefixes, resolveSpec } from './deriveSpec'
 import { dedupeCustom } from './fieldConfig'
 
 const fields: FlattenedField[] = [
@@ -277,5 +277,84 @@ describe('resolveSpec', () => {
 				'customers'
 			)
 		).toThrow(/no field at path "nope"/)
+	})
+})
+
+describe('labelPrefixes', () => {
+	const sanitized: Field[] = [
+		{ name: 'name', type: 'text', label: 'Name' },
+		{
+			name: 'profile',
+			type: 'group',
+			label: { en: 'Customer profile', de: 'Kundenprofil' },
+			fields: [
+				{ name: 'bio', type: 'textarea', label: 'Bio' },
+				{
+					type: 'collapsible',
+					label: 'Rating',
+					fields: [{ type: 'row', fields: [{ name: 'score', type: 'number', label: 'Score' }] }],
+				},
+			],
+		},
+		{ type: 'group', label: 'Contact', fields: [{ name: 'phone', type: 'text', label: 'Phone' }] },
+		{
+			type: 'tabs',
+			tabs: [
+				{ label: 'Meta', fields: [{ name: 'note', type: 'text', label: 'Note' }] },
+				{ name: 'extra', label: 'Extra', fields: [{ name: 'code', type: 'text', label: 'Code' }] },
+			],
+		},
+		{
+			name: 'addresses',
+			type: 'array',
+			label: 'Addresses',
+			fields: [{ name: 'city', type: 'text', label: 'City' }],
+		},
+	]
+	const prefixes = labelPrefixes(sanitized)
+
+	it("gives each data field the labels the list's filter writes before its own", () => {
+		expect(prefixes.get('name')).toEqual([])
+		expect(prefixes.get('profile')).toEqual([])
+		expect(prefixes.get('profile.bio')).toEqual([{ en: 'Customer profile', de: 'Kundenprofil' }])
+		expect(prefixes.get('profile.score')).toEqual([
+			{ en: 'Customer profile', de: 'Kundenprofil' },
+			'Rating',
+		])
+		expect(prefixes.get('phone')).toEqual(['Contact'])
+		expect(prefixes.get('extra.code')).toEqual(['Extra'])
+	})
+
+	it('leaves out an unnamed tab and a row, as the filter does', () => {
+		expect(prefixes.get('note')).toEqual([])
+	})
+
+	it('stops at a list, which the merge takes as one value', () => {
+		expect(prefixes.get('addresses')).toEqual([])
+		expect(prefixes.has('addresses.city')).toBe(false)
+	})
+})
+
+describe('fullLabel', () => {
+	const col = {
+		labelPrefixes: new Map([
+			['profile.score', [{ en: 'Customer profile', de: 'Kundenprofil' }, 'Rating']],
+			['profile.bio', [{ en: 'Customer profile', de: 'Kundenprofil' }]],
+		]),
+		specByPath: new Map([
+			['profile.score', { label: { en: 'Score', de: 'Punkte' } }],
+			['profile.bio', { label: false }],
+		]),
+	} as unknown as Parameters<typeof fullLabel>[1]
+	const i18n = (language: string) =>
+		({ language, fallbackLanguage: 'en' }) as unknown as Parameters<typeof fullLabel>[2]
+
+	it("joins the labels a field sits in with its own, in the reader's language", () => {
+		expect(fullLabel('profile.score', col, i18n('de'))).toBe('Kundenprofil > Rating > Punkte')
+		expect(fullLabel('profile.score', col, i18n('en'))).toBe('Customer profile > Rating > Score')
+	})
+
+	it('names a field without a label of its own by its name', () => {
+		expect(fullLabel('profile.bio', col, i18n('en'))).toBe('Customer profile > Bio')
 	})
 })

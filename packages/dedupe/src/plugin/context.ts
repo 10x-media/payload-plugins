@@ -16,7 +16,7 @@ import { fieldIsVirtual } from 'payload/shared'
 import { resolveCompare } from '../match/presets'
 import type { ResolvedMatchField } from '../match/score'
 import type { MatchFieldConfig, ResolvedCollectionOptions, ResolvedOptions } from '../options'
-import { deriveSpec, resolveSpec } from '../schema/deriveSpec'
+import { deriveSpec, labelPrefixes, resolveSpec } from '../schema/deriveSpec'
 import type { MergeFieldSpec } from '../schema/types'
 import type { DedupeAdapter } from '../search/contract'
 
@@ -26,6 +26,8 @@ export type CollectionContext = {
 	options: ResolvedCollectionOptions
 	spec: MergeFieldSpec[]
 	specByPath: Map<string, MergeFieldSpec>
+	/** The labels of the groups, named tabs and collapsibles each field sits in, by its path. */
+	labelPrefixes: ReturnType<typeof labelPrefixes>
 	/** Empty when the collection has no `match` config. */
 	matchFields: ResolvedMatchField[]
 	/** Identifies the match config the stored keys and pairs were computed with. */
@@ -228,6 +230,7 @@ const buildCollectionContext = (
 		options: { ...options, absorbed },
 		spec,
 		specByPath,
+		labelPrefixes: labelPrefixes(config.fields),
 		matchFields,
 		configHash: hashMatch(options.match?.fields ?? []),
 		hasDrafts: Boolean(config.versions?.drafts),

@@ -206,11 +206,6 @@
 	background: var(--theme-bg);
 }
 
-.dedupe-merge__label-group {
-	color: var(--theme-elevation-500);
-	font-size: 0.85em;
-}
-
 .dedupe-merge__label-name {
 	display: flex;
 	align-items: center;

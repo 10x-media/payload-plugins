@@ -73,19 +73,30 @@ export const customers: CollectionConfig = {
 				{ name: 'street', type: 'text' },
 			],
 		},
+		// Labels of their own, translated, and a collapsible: the merge screen names these fields
+		// as the list's filter does, `Customer profile > Rating > Score`.
 		{
 			name: 'profile',
 			type: 'group',
+			label: { en: 'Customer profile', de: 'Kundenprofil' },
 			fields: [
 				{ name: 'bio', type: 'textarea', localized: true },
-				{ name: 'score', type: 'number' },
+				{
+					type: 'collapsible',
+					label: { en: 'Rating', de: 'Bewertung' },
+					fields: [{ name: 'score', type: 'number', label: { en: 'Score', de: 'Punkte' } }],
+				},
 			],
 		},
 		{
 			type: 'tabs',
 			tabs: [
 				{ label: 'Meta', fields: [{ name: 'note', type: 'text' }] },
-				{ name: 'extra', label: 'Extra', fields: [{ name: 'code', type: 'text' }] },
+				{
+					name: 'extra',
+					label: 'Extra',
+					fields: [{ name: 'code', type: 'text', label: 'Internal code' }],
+				},
 			],
 		},
 	],

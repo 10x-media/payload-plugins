@@ -29,17 +29,6 @@ const BY_CHARACTER = new Set(['text', 'textarea', 'email', 'code', 'number'])
 /** When something happened, short enough for a column head: `29.09.26 14:08:15`. */
 export const SHORT_DATE = 'dd.MM.yy HH:mm:ss'
 
-/** The groups and tabs a field sits in, as `Profile / Extra`, or `null` at the top level. */
-export const groupLabel = (path: string): string | null => {
-	const cut = path.lastIndexOf('.')
-	if (cut === -1) return null
-	return path
-		.slice(0, cut)
-		.split('.')
-		.map((part) => toWords(part))
-		.join(' / ')
-}
-
 /** Decision keys named as the screen labels them, a localized one with its locale. */
 export const fieldList = (decisions: DecisionView[], keyList: string[]): string =>
 	keyList

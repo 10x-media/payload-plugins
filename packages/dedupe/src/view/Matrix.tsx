@@ -20,7 +20,7 @@ import {
 	Rows,
 	useFormStates,
 } from './Rows'
-import { diffOf, groupLabel, Plain, useFormat } from './Value'
+import { diffOf, Plain, useFormat } from './Value'
 
 const baseClass = 'dedupe-merge'
 
@@ -104,12 +104,9 @@ const FieldRow = ({
 	const valueFor = (doc: string) => decision.values.find((entry) => entry.doc === doc)?.value
 	const base = markup(decision, valueFor(survivor), { doc: survivor })
 
-	const group = groupLabel(decision.path)
-
 	return (
 		<>
 			<div className={`${baseClass}__label`}>
-				{group ? <span className={`${baseClass}__label-group`}>{group}</span> : null}
 				<span className={`${baseClass}__label-name`}>
 					{decision.locale ? (
 						<span className="field-diff__locale-label">{decision.locale}</span>

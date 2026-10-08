@@ -115,7 +115,10 @@ describeForDb('dedupe merge', {}, (db) => {
 				source: String(absorbed.id),
 				relationLabels: { [String(acme.id)]: 'Acme' },
 			})
-			expect(byKey.get('extra.code')).toMatchObject({ proposed: 'K', label: 'Code' })
+			expect(byKey.get('extra.code')).toMatchObject({
+				proposed: 'K',
+				label: 'Extra > Internal code',
+			})
 			expect(plan.readyToApply).toBe(false)
 			expect(plan.docs[0]?.title).toBe('Anna Schmidt')
 		})

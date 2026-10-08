@@ -1,7 +1,22 @@
-import type { FlattenedBlock, FlattenedField, SanitizedCollectionConfig } from 'payload'
-import { fieldIsVirtual, fieldShouldBeLocalized } from 'payload/shared'
-
+import { getTranslation } from '@payloadcms/translations'
+import type {
+	Field,
+	FlattenedBlock,
+	FlattenedField,
+	LabelFunction,
+	PayloadRequest,
+	SanitizedCollectionConfig,
+	StaticLabel,
+} from 'payload'
+import {
+	fieldAffectsData,
+	fieldIsVirtual,
+	fieldShouldBeLocalized,
+	tabHasName,
+	toWords,
+} from 'payload/shared'
 import { blocksOf } from '../merge/compare'
+import type { CollectionContext } from '../plugin/context'
 import { readFieldConfig } from './fieldConfig'
 import type { MergeFieldSpec, MergePolicy } from './types'
 
@@ -201,4 +216,59 @@ export const resolveSpec = (
 		}
 	}
 	return resolved
+}
+
+type Label = LabelFunction | StaticLabel
+
+/**
+ * The labels of the groups, named tabs and collapsibles each data field sits in, outermost
+ * first: what the list view's filter writes before the field's own label. A list is one value
+ * to the merge, so its own fields are not listed.
+ */
+export const labelPrefixes = (fields: Field[]): Map<string, Label[]> => {
+	const out = new Map<string, Label[]>()
+	const own = (label: unknown): Label[] =>
+		label && typeof label !== 'boolean' ? [label as Label] : []
+	const walk = (list: Field[], path: string, labels: Label[]) => {
+		const at = (name: string) => (path ? `${path}.${name}` : name)
+		for (const field of list) {
+			if (field.type === 'tabs') {
+				for (const tab of field.tabs) {
+					if (tabHasName(tab)) walk(tab.fields, at(tab.name), [...labels, ...own(tab.label)])
+					else walk(tab.fields, path, labels)
+				}
+			} else if (field.type === 'row') {
+				walk(field.fields, path, labels)
+			} else if (field.type === 'collapsible') {
+				walk(field.fields, path, [...labels, ...own(field.label)])
+			} else {
+				if (fieldAffectsData(field)) out.set(at(field.name), labels)
+				if (field.type === 'group') {
+					const inner = fieldAffectsData(field) ? at(field.name) : path
+					walk(field.fields, inner, [...labels, ...own(field.label)])
+				}
+			}
+		}
+	}
+	walk(fields, '', [])
+	return out
+}
+
+/**
+ * A field of the spec named as the list view's filter names it: the labels it sits in and its
+ * own, translated and joined, as `Customer profile > Rating > Score`.
+ */
+export const fullLabel = (
+	path: string,
+	col: Pick<CollectionContext, 'labelPrefixes' | 'specByPath'>,
+	i18n: PayloadRequest['i18n']
+): string => {
+	const label = col.specByPath.get(path)?.label
+	return [
+		...(col.labelPrefixes.get(path) ?? []),
+		label === false || label === undefined ? toWords(path.split('.').pop() ?? path) : label,
+	]
+		.map((part) => getTranslation(part, i18n))
+		.filter(Boolean)
+		.join(' > ')
 }

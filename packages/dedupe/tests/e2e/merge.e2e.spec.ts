@@ -69,6 +69,9 @@ const seedGroup = async (
 
 const ids = (docs: Customer[]) => docs.map((doc) => doc.id)
 
+/** `profile.score`, labelled as the list's filter labels it: its group, its collapsible, itself. */
+const SCORE = 'Customer profile > Rating > Score'
+
 /** The "More options" button of the column whose document is named `name`. */
 const columnMenu = (page: Page, name: string) =>
 	page
@@ -124,7 +127,7 @@ test('identical fields are hidden until the reviewer turns off only differences'
 	const group = await seedGroup(context.request, 'hidden')
 	await openMerge(page, { docs: ids(group) })
 
-	for (const label of ['Name', 'Email', 'Note', 'Score']) {
+	for (const label of ['Name', 'Email', 'Note', SCORE]) {
 		await expect(fieldLabel(page, label).first(), `${label} differs`).toBeVisible()
 	}
 	await expect(fieldLabel(page, 'Phone'), 'the same on every document').toHaveCount(0)
@@ -388,7 +391,7 @@ test('a manual field blocks the merge until a document is picked for it', async 
 	const [a, b, c] = (await seedGroup(context.request, 'manual')) as [Customer, Customer, Customer]
 	await openMerge(page, { docs: ids([a, b, c]) })
 
-	const score = fieldLabel(page, 'Score')
+	const score = fieldLabel(page, SCORE)
 	await expect(score.locator('.pill', { hasText: 'Needs a choice' })).toBeVisible()
 	await expect(mergeButton(page)).toBeDisabled()
 
@@ -406,9 +409,9 @@ test("a manual field can keep the primary's value", async ({ page, context }) =>
 		'nothing is picked before the reviewer picks'
 	).not.toBeChecked()
 	await pick(page, 'profile.score', a.id)
-	await expect(
-		fieldLabel(page, 'Score').locator('.pill', { hasText: 'Needs a choice' })
-	).toHaveCount(0)
+	await expect(fieldLabel(page, SCORE).locator('.pill', { hasText: 'Needs a choice' })).toHaveCount(
+		0
+	)
 	await expect(mergeButton(page)).toBeEnabled()
 })
 
@@ -697,4 +700,23 @@ test('without two different documents the merge screen returns to the queue and 
 			'needs a collection and two document ids'
 		)
 	}
+})
+
+test("a field inside groups is labelled as the list's filter labels it, in the admin's language", async ({
+	page,
+	context,
+}) => {
+	const group = await seedGroup(context.request, 'labels', 2)
+	await openMerge(page, { docs: ids(group) })
+	await page.locator('#dedupe-only-differences').click()
+
+	await expect.soft(fieldLabel(page, 'Customer profile > Bio', 'en')).toBeVisible()
+	await expect.soft(fieldLabel(page, SCORE)).toBeVisible()
+	await expect.soft(fieldLabel(page, 'Extra > Internal code')).toBeVisible()
+
+	// As the admin's language switch sets it: for the whole site, the plan's API call included.
+	const { hostname } = new URL(page.url())
+	await context.addCookies([{ name: 'payload-lng', value: 'de', domain: hostname, path: '/' }])
+	await page.reload()
+	await expect.soft(fieldLabel(page, 'Kundenprofil > Bewertung > Punkte')).toBeVisible()
 })
