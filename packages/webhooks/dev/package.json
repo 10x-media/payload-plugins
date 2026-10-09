@@ -20,6 +20,7 @@
 		"migrate:fresh": "bash ../../../scripts/payload.sh . migrate:fresh"
 	},
 	"dependencies": {
+		"@10x-media/fields": "workspace:*",
 		"@10x-media/webhooks": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
@@ -28,7 +29,8 @@
 		"next": "catalog:",
 		"payload": "catalog:",
 		"react": "catalog:",
-		"react-dom": "catalog:"
+		"react-dom": "catalog:",
+		"standardwebhooks": "catalog:"
 	},
 	"devDependencies": {
 		"@10x-media/tsconfig": "workspace:*",

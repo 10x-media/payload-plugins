@@ -1,8 +1,8 @@
-import type { TaskConfig } from 'payload'
+import type { CollectionSlug, JsonObject, TaskConfig } from 'payload'
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import type { CodeSubscription } from '../options'
-import { resolveSubscriptionById } from '../plugin/resolveSubscriptions'
+import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
 import { deriveDeliveryStatus } from './deriveDeliveryStatus'
 import { sendDelivery } from './sendDelivery'
 
@@ -13,6 +13,7 @@ export type DeliverTaskDeps = {
 	codeSubscriptions: CodeSubscription[]
 	timeoutMs: number
 	retries: number
+	allowedHosts?: string[]
 }
 
 /** Native Payload jobs task that performs one queued delivery attempt. */
@@ -24,27 +25,29 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 		handler: async ({ input, job, req }) => {
 			const { payload } = req
 			const deliveryId = (input as { deliveryId: string }).deliveryId
-			const delivery = await payload.findByID({
-				collection: deps.deliveriesSlug,
+			// The slug is a runtime option, so Payload cannot resolve a document type from it.
+			const delivery: JsonObject = await payload.findByID({
+				collection: deps.deliveriesSlug as CollectionSlug,
 				id: deliveryId,
 				overrideAccess: true,
 				req,
 			})
 			const subscription = await resolveSubscriptionById({
 				id: String(delivery.subscriptionId),
+				source: delivery.subscriptionSource,
 				codeSubscriptions: deps.codeSubscriptions,
 				subscriptionsSlug: deps.subscriptionsSlug,
 				payload,
 				req,
 			})
-			if (!subscription?.enabled) {
+			// Includes an undecryptable secret: retrying cannot fix a key problem, so the row dies
+			// here rather than throwing, and is never POSTed unsigned.
+			const decision = decideDelivery(subscription, deps.allowedHosts)
+			if (!decision.deliverable) {
 				await payload.update({
-					collection: deps.deliveriesSlug,
+					collection: deps.deliveriesSlug as CollectionSlug,
 					id: deliveryId,
-					data: {
-						status: 'dead',
-						error: subscription ? 'subscription disabled' : 'subscription not found',
-					},
+					data: { status: 'dead', error: decision.reason },
 					overrideAccess: true,
 					req,
 				})
@@ -53,7 +56,7 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 
 			const attempt = Number(job.totalTried ?? 0) + 1
 			const result = await sendDelivery({
-				subscription,
+				subscription: decision.subscription,
 				deliveryId,
 				event: String(delivery.event),
 				body: JSON.stringify(delivery.payload),
@@ -62,7 +65,7 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 			})
 			const status = deriveDeliveryStatus({ ok: result.ok, attempt, maxRetries: deps.retries })
 			await payload.update({
-				collection: deps.deliveriesSlug,
+				collection: deps.deliveriesSlug as CollectionSlug,
 				id: deliveryId,
 				data: {
 					status,

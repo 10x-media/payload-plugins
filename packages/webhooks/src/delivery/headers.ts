@@ -1,0 +1,60 @@
+/**
+ * Headers the delivery pipeline owns. A subscription's custom headers are spread over the
+ * generated ones, so without this guard a header named `webhook-signature` would replace the
+ * real signature and every receiver would reject the delivery, or worse, verify against an
+ * attacker-chosen value. HTTP header names are case-insensitive, so matching is too.
+ *
+ * `content-type` and `user-agent` are here for the same reason rather than a weaker one: the body
+ * is always `JSON.stringify` output, so a subscription that relabels it `text/plain` mislabels
+ * every delivery it sends and gives the receiver nothing to notice that with.
+ *
+ * The rest belong to the HTTP transport. `fetch` throws on `transfer-encoding`, `keep-alive`,
+ * `upgrade` and `expect`, hangs until the timeout on a `content-length` that disagrees with the
+ * body, and silently replaces `host`, so a subscription setting one either kills every delivery
+ * or looks like it worked when it did not.
+ */
+const RESERVED = new Set([
+	'content-type',
+	'user-agent',
+	'webhook-id',
+	'webhook-timestamp',
+	'webhook-signature',
+	'x-webhook-event',
+	'content-length',
+	'transfer-encoding',
+	'keep-alive',
+	'upgrade',
+	'expect',
+	'host',
+])
+
+/** The reserved names in their canonical spelling, for error messages. */
+export const RESERVED_HEADER_NAMES = [...RESERVED] as const
+
+export const isReservedHeader = (name: string): boolean => RESERVED.has(name.trim().toLowerCase())
+
+/**
+ * RFC 9110 field-name: one or more `tchar`. A name outside this set is not a header at all, and
+ * `fetch` throws on it at delivery time rather than dropping it, so it has to be caught where it
+ * is entered.
+ */
+const HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/
+
+export const isValidHeaderName = (name: string): boolean => HEADER_NAME.test(name.trim())
+
+/**
+ * Custom headers minus any that would collide with the plugin's own, with names trimmed. Names are
+ * validated trimmed, so they are sent trimmed: a padded name in a code subscription, or in a row
+ * saved before the form trimmed it, would otherwise pass validation and make `fetch` throw.
+ */
+export const withoutReservedHeaders = (
+	headers?: Record<string, string>
+): Record<string, string> | undefined => {
+	if (!headers) {
+		return undefined
+	}
+	const entries = Object.entries(headers)
+		.map(([key, value]) => [key.trim(), value] as const)
+		.filter(([key]) => !isReservedHeader(key))
+	return entries.length ? Object.fromEntries(entries) : undefined
+}

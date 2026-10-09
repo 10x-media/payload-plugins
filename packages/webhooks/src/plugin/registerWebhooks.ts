@@ -1,18 +1,234 @@
-import type { Config, Endpoint } from 'payload'
+import { validateEncryptedBoot, withEncryptedQueryRewrite } from '@10x-media/fields/encrypted'
+import { translations as fieldsTranslations } from '@10x-media/fields/i18n'
+import {
+	type CollectionConfig,
+	type CollectionSlug,
+	type Config,
+	type Endpoint,
+	Forbidden,
+	NotFound,
+	type PayloadRequest,
+} from 'payload'
+import { deepMergeSimple } from 'payload/shared'
 
 import { buildDeliveriesCollection } from '../collections/deliveries'
 import { buildSubscriptionsCollection } from '../collections/subscriptions'
 import { DEFAULT_DELIVERIES_SLUG, DEFAULT_SUBSCRIPTIONS_SLUG, RESERVED_SLUGS } from '../constants'
+import { assertAllowedHosts, isAllowedHost } from '../delivery/allowedHosts'
 import { buildDeliverTask } from '../delivery/deliverTask'
+import { isReservedHeader, isValidHeaderName, RESERVED_HEADER_NAMES } from '../delivery/headers'
+import { makeThrottledPrune } from '../delivery/prune'
 import { redeliverDelivery } from '../delivery/redeliver'
 import { eventCatalog } from '../events/eventTypes'
 import { makeAfterChange, makeAfterDelete } from '../events/hooks'
 import {
+	type CodeSubscription,
 	type CollectionWebhookConfig,
 	resolveDeliveryOptions,
+	resolveSecretRotationOptions,
 	type WebhooksPluginOptions,
 } from '../options'
+import { InvalidSecretError, normalizeSecret } from '../secrets/format'
+import { RotationConflictError, rotateSubscriptionSecret } from '../secrets/rotate'
+import { applyCollectionOverride } from './applyCollectionOverride'
 import { resolveMode } from './resolveMode'
+
+/**
+ * Reject a malformed code-subscription secret at config build rather than at delivery. A secret
+ * that is not valid `whsec_<base64>` derives a different HMAC key than any Standard Webhooks
+ * verifier expects, which would otherwise surface as receivers silently rejecting every delivery.
+ */
+const assertCodeSubscriptionSecrets = (subscriptions: CodeSubscription[]): void => {
+	for (const subscription of subscriptions) {
+		if (subscription.secret === undefined) {
+			continue
+		}
+		try {
+			normalizeSecret(subscription.secret)
+		} catch (err) {
+			const reason = err instanceof InvalidSecretError ? err.reason : String(err)
+			throw new InvalidSecretError(reason, `code subscription '${subscription.id}' is unusable`)
+		}
+	}
+}
+
+/**
+ * Refuse a code subscription header the delivery could not send as written. A reserved name is
+ * dropped at runtime, so failing here is about telling the author rather than letting a silently
+ * ignored header look like it worked. A name that is not an HTTP token, or a value with a line
+ * break, makes `fetch` throw on every delivery, which the form already refuses for admin rows.
+ */
+const assertCodeSubscriptionHeaders = (subscriptions: CodeSubscription[]): void => {
+	for (const subscription of subscriptions) {
+		for (const [key, value] of Object.entries(subscription.headers ?? {})) {
+			if (isReservedHeader(key)) {
+				throw new Error(
+					`@10x-media/webhooks: code subscription '${subscription.id}' sets the reserved header '${key}'. The plugin or the HTTP transport owns ${RESERVED_HEADER_NAMES.join(', ')} on every delivery.`
+				)
+			}
+			if (!isValidHeaderName(key)) {
+				throw new Error(
+					`@10x-media/webhooks: code subscription '${subscription.id}' sets the header '${key}', which is not a valid HTTP header name.`
+				)
+			}
+			if (/[\r\n\0]/.test(value)) {
+				throw new Error(
+					`@10x-media/webhooks: code subscription '${subscription.id}' sets a value for '${key}' that contains a line break or NUL.`
+				)
+			}
+		}
+	}
+}
+
+/**
+ * Refuse a code subscription whose host the configured allowlist does not cover. The delivery
+ * path would refuse it anyway, on every event; a subscription that can never deliver is a
+ * configuration mistake, and startup is where its author will see it.
+ */
+const assertCodeSubscriptionHosts = (
+	subscriptions: CodeSubscription[],
+	allowedHosts: string[] | undefined
+): void => {
+	for (const subscription of subscriptions) {
+		if (!isAllowedHost(subscription.url, allowedHosts)) {
+			throw new Error(
+				`@10x-media/webhooks: code subscription '${subscription.id}' points at '${subscription.url}', whose host is not in delivery.allowedHosts.`
+			)
+		}
+	}
+}
+
+/**
+ * A retention window has to be a positive number of days. Zero or a negative value would delete
+ * every finished delivery the moment it was written, which is never what a typo meant.
+ */
+const resolveRetentionDays = (retentionDays: number | undefined): number | undefined => {
+	if (retentionDays === undefined) {
+		return undefined
+	}
+	if (!Number.isFinite(retentionDays) || retentionDays <= 0) {
+		throw new Error(
+			`@10x-media/webhooks: deliveriesLog.retentionDays must be a positive number of days, got ${retentionDays}.`
+		)
+	}
+	return retentionDays
+}
+
+/**
+ * Validate a rotate-secret request body. The configured grace period is checked at config build,
+ * but a per-request override arrives from the network: an unbounded value would keep an exposed
+ * secret signing for years, and a non-numeric one would slip past `graceSeconds > 0` and retire
+ * the old secret instantly with no window and no error.
+ */
+const parseRotateBody = (body: unknown): { secret?: string; graceSeconds?: number } => {
+	const raw = (body ?? {}) as Record<string, unknown>
+	if (raw.secret !== undefined && typeof raw.secret !== 'string') {
+		throw new Error('secret must be a string')
+	}
+	if (raw.graceSeconds === undefined) {
+		return { secret: raw.secret as string | undefined }
+	}
+	if (typeof raw.graceSeconds !== 'number' || !Number.isFinite(raw.graceSeconds)) {
+		throw new Error('graceSeconds must be a finite number')
+	}
+	return { secret: raw.secret as string | undefined, graceSeconds: raw.graceSeconds }
+}
+
+/**
+ * Evaluate the subscriptions collection's configured `update` access for one document, honouring
+ * a `Where` result by checking that the target actually matches it. Read from the runtime config
+ * so a consumer's override of the collection governs this endpoint too.
+ *
+ * Throwing `Forbidden` is as valid a denial as returning false, and Payload's own `executeAccess`
+ * lets it propagate, so an access function written that way would otherwise reach the handler's
+ * generic catch and be reported as a 500.
+ */
+const canUpdateSubscription = async (args: {
+	req: PayloadRequest
+	slug: string
+	id: string
+}): Promise<boolean> => {
+	const { req, slug, id } = args
+	const access = req.payload.collections?.[slug as CollectionSlug]?.config?.access?.update
+	if (!access) {
+		return true
+	}
+	let result: Awaited<ReturnType<typeof access>>
+	try {
+		result = await access({ req, id })
+	} catch (err) {
+		if (err instanceof Forbidden) {
+			return false
+		}
+		throw err
+	}
+	if (typeof result === 'boolean') {
+		return result
+	}
+	const scoped = await req.payload.find({
+		collection: slug as CollectionSlug,
+		where: { and: [{ id: { equals: id } }, result] },
+		limit: 1,
+		depth: 0,
+		overrideAccess: true,
+		req,
+	})
+	return scoped.docs.length > 0
+}
+
+/**
+ * MongoDB `WriteConflict`, and Postgres `serialization_failure` / `deadlock_detected`. Drivers
+ * carry these as codes, which is the reliable signal; the message check stays as a fallback for
+ * wrappers that re-throw without one. The rotation's own write is such a wrapper: Payload's bulk
+ * update collects the driver error into `errors`, keeping only its message, and MongoDB spells
+ * that message both `WriteConflict error` and `Write conflict during plan execution`.
+ */
+const WRITE_CONFLICT_CODES = new Set<number | string>([112, '40001', '40P01', 40001])
+
+/** A concurrent-write rejection from the database, which the caller should retry. */
+const isWriteConflict = (err: unknown): boolean => {
+	const code = (err as { code?: number | string })?.code
+	if (code !== undefined && WRITE_CONFLICT_CODES.has(code)) {
+		return true
+	}
+	const message = err instanceof Error ? err.message : String(err)
+	return /write ?conflict|could not serialize|deadlock detected/i.test(message)
+}
+
+/**
+ * Attach a document action: its endpoint, and the control beside Save that calls it.
+ *
+ * It runs after the consumer's override, so `overrides.endpoints` and `overrides.admin.components`
+ * add to the plugin's own instead of replacing them; otherwise an override would leave a button
+ * with nothing behind it, or an endpoint with no button. The endpoint goes first in the list, so
+ * a consumer route on the same path cannot shadow it either.
+ *
+ * `endpoints: false` is left alone, control included: that is a consumer turning the collection's
+ * whole REST surface off, which is theirs to decide.
+ */
+const attachDocumentAction = (
+	collection: CollectionConfig,
+	action: { endpoint: Endpoint; control: string }
+): void => {
+	if (collection.endpoints === false) {
+		return
+	}
+	collection.endpoints = [action.endpoint, ...(collection.endpoints ?? [])]
+	const components = collection.admin?.components
+	collection.admin = {
+		...collection.admin,
+		components: {
+			...components,
+			edit: {
+				...components?.edit,
+				beforeDocumentControls: [
+					...(components?.edit?.beforeDocumentControls ?? []),
+					action.control,
+				],
+			},
+		},
+	}
+}
 
 /** Register collections, the delivery task, source hooks, and the redeliver endpoint. */
 export const registerWebhooks = (args: {
@@ -21,13 +237,32 @@ export const registerWebhooks = (args: {
 	hasJobsPlugin: boolean
 }): void => {
 	const { config, options } = args
-	const sources = options.collections ?? {}
+	// The option is keyed by `CollectionSlug` for the consumer's benefit; lookups here are by a
+	// runtime `collection.slug`, which is a plain string.
+	const sources: Record<string, true | CollectionWebhookConfig | undefined> =
+		options.collections ?? {}
 	const subscriptionsSlug = options.subscriptionsCollection?.slug ?? DEFAULT_SUBSCRIPTIONS_SLUG
 	const deliveriesSlug = options.deliveriesLog?.slug ?? DEFAULT_DELIVERIES_SLUG
 	const reserved = new Set<string>([...RESERVED_SLUGS, subscriptionsSlug, deliveriesSlug])
-	const sourceSlugs = Object.keys(sources).filter((s) => !reserved.has(s))
+	// Its own collections and Payload's internal ones cannot be sources: a delivery that emitted
+	// a delivery would never stop. Said out loud rather than dropped, like any slug that will
+	// never emit.
+	const forbidden = Object.keys(sources).filter((s) => reserved.has(s))
+	if (forbidden.length) {
+		throw new Error(
+			`@10x-media/webhooks: 'collections' lists ${forbidden.map((s) => `'${s}'`).join(', ')}, which cannot emit events: the plugin's own collections and Payload's internal ones are not sources.`
+		)
+	}
+	const sourceSlugs = Object.keys(sources)
 	const delivery = resolveDeliveryOptions(options.delivery)
+	const rotation = resolveSecretRotationOptions(options.secretRotation)
+	const retentionDays = resolveRetentionDays(options.deliveriesLog?.retentionDays)
+	const prune = retentionDays ? makeThrottledPrune({ deliveriesSlug, retentionDays }) : undefined
 	const codeSubscriptions = options.subscriptions ?? []
+	assertCodeSubscriptionSecrets(codeSubscriptions)
+	assertCodeSubscriptionHeaders(codeSubscriptions)
+	assertAllowedHosts(delivery.allowedHosts)
+	assertCodeSubscriptionHosts(codeSubscriptions, delivery.allowedHosts)
 	const catalog = eventCatalog(Object.fromEntries(sourceSlugs.map((s) => [s, sources[s] ?? true])))
 
 	const mode = resolveMode({
@@ -38,30 +273,143 @@ export const registerWebhooks = (args: {
 		warn: (m) => console.warn(m),
 	})
 
-	config.collections ??= []
-	config.collections.push(
-		buildSubscriptionsCollection({
-			slug: subscriptionsSlug,
-			events: catalog,
-			hidden: options.subscriptionsCollection?.hidden ?? false,
-		})
+	// The encrypted editor's own strings (Generate, the reveal toggle, the cleared notice) are
+	// registered by the fields() plugin, which a consumer of this plugin does not have to install.
+	// Without them the admin shows the raw keys, `fields:generateValue` as a button's name. The
+	// host's translations go second so they win, fields()'s own registration included.
+	config.i18n ??= {}
+	config.i18n.translations = deepMergeSimple<NonNullable<typeof config.i18n.translations>>(
+		fieldsTranslations,
+		config.i18n.translations ?? {}
 	)
-	const deliveries = buildDeliveriesCollection({
-		slug: deliveriesSlug,
-		hidden: options.deliveriesLog?.hidden ?? false,
-	})
 
-	const redeliverEndpoint: Endpoint = {
-		path: '/:id/redeliver',
+	config.collections ??= []
+	// The response strip and the where-rewrite that write-only secrets depend on are attached
+	// here rather than left to the fields() plugin, so the secrets stay off every read result
+	// whether or not the consumer installed it. The override is applied first: the rewrite scans
+	// the fields it is given, so a write-only field a consumer adds through `overrides.fields` is
+	// stripped too, and the strip runs after the consumer's own afterRead hooks.
+	const subscriptions = withEncryptedQueryRewrite(
+		applyCollectionOverride(
+			buildSubscriptionsCollection({
+				slug: subscriptionsSlug,
+				events: catalog,
+				hidden: options.subscriptionsCollection?.hidden ?? false,
+				secretKeys: options.secretEncryption?.keys,
+				allowedHosts: delivery.allowedHosts,
+			}),
+			options.subscriptionsCollection?.overrides
+		)
+	)
+
+	const rotateSecretEndpoint: Endpoint = {
+		path: '/:id/rotate-secret',
 		method: 'post',
 		handler: async (req) => {
-			// coarse auth: any logged-in user may redeliver any delivery (matches the deliveries collection access)
 			if (!req.user) {
 				return Response.json({ error: 'unauthorized' }, { status: 401 })
 			}
 			const id = req.routeParams?.id
 			if (typeof id !== 'string') {
 				return Response.json({ error: 'missing id' }, { status: 400 })
+			}
+			// Rotation is a privileged write, so it defers to the collection's own update access for
+			// this document rather than accepting any logged-in user. Tightening `access.update`, or
+			// scoping it per tenant, governs the endpoint too.
+			if (!(await canUpdateSubscription({ req, slug: subscriptionsSlug, id }))) {
+				return Response.json({ error: 'forbidden' }, { status: 403 })
+			}
+			const body = (await req.json?.().catch(() => ({}))) as unknown
+
+			let secret: string | undefined
+			let graceSeconds: number
+			try {
+				const parsed = parseRotateBody(body)
+				secret = parsed.secret
+				graceSeconds =
+					parsed.graceSeconds === undefined
+						? rotation.graceSeconds
+						: resolveSecretRotationOptions({ graceSeconds: parsed.graceSeconds }).graceSeconds
+			} catch (err) {
+				return Response.json({ error: (err as Error).message }, { status: 400 })
+			}
+
+			try {
+				const result = await rotateSubscriptionSecret({
+					payload: req.payload,
+					req,
+					subscriptionsSlug,
+					id,
+					secret,
+					graceSeconds,
+				})
+				return Response.json(result, { status: 200 })
+			} catch (err) {
+				if (err instanceof InvalidSecretError) {
+					return Response.json({ error: err.message }, { status: 400 })
+				}
+				// A boolean `access.update` never looks at the document, so a missing id gets this
+				// far. Anything but a 404 would tell the caller to retry an id that will never exist.
+				if (err instanceof NotFound) {
+					return Response.json({ error: 'not found' }, { status: 404 })
+				}
+				if (err instanceof RotationConflictError || isWriteConflict(err)) {
+					return Response.json(
+						{ error: 'the subscription was modified concurrently; retry the rotation' },
+						{ status: 409 }
+					)
+				}
+				req.payload.logger.error(
+					`@10x-media/webhooks: rotating the secret for subscription ${id} failed: ${err instanceof Error ? err.message : String(err)}`
+				)
+				return Response.json({ error: 'could not rotate the secret' }, { status: 500 })
+			}
+		},
+	}
+	attachDocumentAction(subscriptions, {
+		endpoint: rotateSecretEndpoint,
+		control: '@10x-media/webhooks/client#RotateSecretButton',
+	})
+	config.collections.push(subscriptions)
+	const deliveries = applyCollectionOverride(
+		buildDeliveriesCollection({
+			slug: deliveriesSlug,
+			hidden: options.deliveriesLog?.hidden ?? false,
+		}),
+		options.deliveriesLog?.overrides
+	)
+
+	const redeliverEndpoint: Endpoint = {
+		path: '/:id/redeliver',
+		method: 'post',
+		handler: async (req) => {
+			if (!req.user) {
+				return Response.json({ error: 'unauthorized' }, { status: 401 })
+			}
+			const id = req.routeParams?.id
+			if (typeof id !== 'string') {
+				return Response.json({ error: 'missing id' }, { status: 400 })
+			}
+			// Replaying a delivery is allowed to whoever may read it. The collection denies create
+			// and update to everyone, so `read` is the access rule there is to defer to, and reading
+			// the row as the caller applies it exactly as configured: an override that scopes the
+			// log per tenant scopes this endpoint with it.
+			try {
+				await req.payload.findByID({
+					collection: deliveriesSlug as CollectionSlug,
+					id,
+					depth: 0,
+					overrideAccess: false,
+					req,
+				})
+			} catch (err) {
+				if (err instanceof Forbidden) {
+					return Response.json({ error: 'forbidden' }, { status: 403 })
+				}
+				if (err instanceof NotFound) {
+					return Response.json({ error: 'not found' }, { status: 404 })
+				}
+				throw err
 			}
 			const result = await redeliverDelivery({
 				deps: {
@@ -71,6 +419,7 @@ export const registerWebhooks = (args: {
 					mode,
 					timeoutMs: delivery.timeoutMs,
 					queue: delivery.queue,
+					allowedHosts: delivery.allowedHosts,
 				},
 				deliveryId: id,
 				payload: req.payload,
@@ -79,7 +428,10 @@ export const registerWebhooks = (args: {
 			return Response.json(result, { status: 202 })
 		},
 	}
-	deliveries.endpoints = [...(deliveries.endpoints || []), redeliverEndpoint]
+	attachDocumentAction(deliveries, {
+		endpoint: redeliverEndpoint,
+		control: '@10x-media/webhooks/client#RedeliverButton',
+	})
 	config.collections.push(deliveries)
 
 	config.jobs ??= {}
@@ -91,14 +443,17 @@ export const registerWebhooks = (args: {
 			codeSubscriptions,
 			timeoutMs: delivery.timeoutMs,
 			retries: delivery.retries,
+			allowedHosts: delivery.allowedHosts,
 		})
 	)
 
+	const hooked = new Set<string>()
 	for (let i = 0; i < config.collections.length; i++) {
 		const collection = config.collections[i]
 		if (!collection || !sourceSlugs.includes(collection.slug)) {
 			continue
 		}
+		hooked.add(collection.slug)
 		const cfg = sources[collection.slug]
 		const collectionConfig: CollectionWebhookConfig = cfg === true || cfg === undefined ? {} : cfg
 		const deps = {
@@ -115,6 +470,8 @@ export const registerWebhooks = (args: {
 			mode,
 			timeoutMs: delivery.timeoutMs,
 			queue: delivery.queue,
+			allowedHosts: delivery.allowedHosts,
+			prune,
 		}
 		config.collections[i] = {
 			...collection,
@@ -124,5 +481,33 @@ export const registerWebhooks = (args: {
 				afterDelete: [...(collection.hooks?.afterDelete ?? []), makeAfterDelete(deps)],
 			},
 		}
+	}
+
+	// A slug with no hook attached never emits, while the subscription form still offers its
+	// events. That is a typo on a host without generated types, or a collection another plugin
+	// has not registered yet at the point this one runs; either way it is silent otherwise.
+	const unhooked = sourceSlugs.filter((s) => !hooked.has(s))
+	if (unhooked.length) {
+		throw new Error(
+			`@10x-media/webhooks: 'collections' lists ${unhooked.map((s) => `'${s}'`).join(', ')}, but no collection with that slug is registered when this plugin runs, so it would never emit. Check the slug. A collection that another plugin adds is only visible if that plugin runs first, and webhooks() runs early (order 10), so a collection from a later plugin cannot be listed here.`
+		)
+	}
+
+	/**
+	 * Resolve the key ring at boot rather than on the first delivery.
+	 *
+	 * The `fields()` plugin does this for its own consumers; this plugin calls `encryptedField`
+	 * standalone, the same reason it applies `withEncryptedQueryRewrite` itself, so the check is
+	 * its to make. Without it a misconfigured `secretEncryption.keys` (an env var that resolved
+	 * empty, key material under the entropy floor, a provider that throws) boots clean and first
+	 * surfaces as a refused delivery, which reads like a corrupt secret rather than a bad config.
+	 */
+	const previousOnInit = config.onInit
+	config.onInit = async (payload) => {
+		await previousOnInit?.(payload)
+		// No plugin-level keys argument: the factory stamps `secretEncryption.keys` onto each
+		// marker, so the scan already sees them, and passing them again would mask whether any
+		// field still falls back to the PAYLOAD_SECRET-derived ring.
+		await validateEncryptedBoot(payload)
 	}
 }

@@ -18,9 +18,9 @@ webhooks({
 |---|---|
 | `'auto'` (default) | Queue when a job runner is likely (`config.jobs.autoRun` set, or [`@10x-media/jobs`](/jobs) installed); inline otherwise. |
 | `'queue'` | Always enqueue a Payload job (task `webhooksDeliver`). Something must run the queue, or deliveries stay `pending`; the plugin logs a warning when it cannot detect a runner. |
-| `'inline'` | Send inside the `afterChange`/`afterDelete` hook. Zero moving parts, but adds outbound-HTTP latency to every matching write, and a failure is final (no retries). |
+| `'inline'` | Send inside the `afterChange`/`afterDelete` hook. Zero moving parts, but adds outbound-HTTP latency to every matching write, and a failure is final (no retries). Deliveries for one write are sent together, so the write waits for the slowest receiver rather than for all of them in turn. |
 
-Inline mode exists so the plugin is useful with no queue infrastructure at all: no worker, no cron, just the hook. The cost sits on the write path, where matching subscriptions are delivered sequentially and each attempt waits up to `timeoutMs`. Queue mode moves that latency out of the request and buys retries and crash recovery, which is why `auto` switches to it as soon as a runner is detectable.
+Inline mode exists so the plugin is useful with no queue infrastructure at all: no worker, no cron, just the hook. The cost sits on the write path, where the deliveries for one write are sent together and the write waits for the slowest of them, up to `timeoutMs`. Queue mode moves that latency out of the request and buys retries and crash recovery, which is why `auto` switches to it as soon as a runner is detectable.
 
 Pass an object to tune the rest:
 
@@ -44,26 +44,50 @@ Each attempt aborts after `timeoutMs` and counts as a failure. In queue mode the
 
 ## The delivery log
 
-The **Webhook Deliveries** collection (slug `webhook-deliveries` by default) is append-only: rows are created and updated by the server, never by admin users (read and delete require login; create and update are closed).
+The **Webhook Deliveries** collection (slug `webhook-deliveries` by default) is append-only: rows are created and updated by the server, never by admin users (read and delete require a user of the admin collection; create and update are closed).
+
+The log stores the full body of every delivery, so it grows with every write to a watched collection. Set a retention window to trim it:
+
+```ts title="payload.config.ts"
+webhooks({
+  collections: { posts: true },
+  deliveriesLog: { retentionDays: 30 },
+})
+```
+
+Only finished rows (`success` or `dead`) older than the window are deleted; a `pending` or `failed` row still has an attempt ahead of it and is kept. Pruning needs no scheduler: it runs after an event is dispatched, at most once an hour per process, so an install that goes quiet keeps its last rows until the next event. For an exact schedule, call it from your own cron:
+
+```ts
+import { pruneDeliveries } from '@10x-media/webhooks'
+
+await pruneDeliveries(payload, { olderThanDays: 30 })
+```
+
+Unset, the log is never pruned.
 
 | Field | Meaning |
 |---|---|
 | `status` | `pending`, `success`, `failed` (will retry), or `dead` (no more retries). |
 | `event`, `endpoint`, `subscriptionId` | What fired and where it went. |
+| `subscriptionSource` | `collection` or `code`: which registry `subscriptionId` belongs to. |
 | `attempt` | 1-based attempt count. |
-| `responseStatus`, `responseBody` | The receiver's HTTP status and body (body truncated to 2000 characters). |
+| `responseStatus`, `responseBody` | The receiver's HTTP status and body (only the first 2000 characters are read). A redirect is not followed, so a 3xx shows up here as the failure. |
 | `error`, `durationMs`, `jobId` | Failure message, round-trip time, and the Payload job id when queued. |
 | `payload` | The exact JSON body that was sent. |
 
 ## Redelivery
 
-Every delivery row has a **Redeliver** button, backed by `POST /api/webhook-deliveries/:id/redeliver` (requires a logged-in user; returns `202` with the new delivery id). Redelivery creates a fresh row and replays the original payload to the subscription's current URL through the configured mode, so a corrected endpoint receives the replay. A disabled or deleted subscription is not sent to; the new row lands as `dead`.
+Every delivery row has a **Redeliver** button beside Save, which asks for confirmation first. It is backed by `POST /api/webhook-deliveries/:id/redeliver` (requires read access to that delivery; returns `202` with the new delivery's `id` and its `status`: `pending` when it was queued, `success` or `dead` when it was sent inline, which is what the button reports; a replay that can already be seen to be going nowhere, because its subscription is gone, disabled or off the host allowlist, is `dead` in either mode). Redelivery creates a fresh row and replays the original payload to the subscription's current URL through the configured mode, so a corrected endpoint receives the replay. A disabled or deleted subscription is not sent to; the new row lands as `dead`.
+
+<Callout>
+A redelivery is a **new** delivery: the fresh row means a fresh `webhook-id`, so a receiver deduplicating on that id treats it as a distinct message rather than a repeat, and will process the payload again. Retries of a *failed* delivery keep the original `webhook-id`, so those do deduplicate. If replaying must not double-process, make your handler idempotent on something inside the body (`data.id`, a version field) rather than on `webhook-id` alone.
+</Callout>
 
 ## The body
 
 ```json
 {
-  "id": "<delivery-id>",
+  "id": "msg_<delivery-id>",
   "event": "posts.updated",
   "collection": "posts",
   "operation": "update",
@@ -72,3 +96,5 @@ Every delivery row has a **Redeliver** button, backed by `POST /api/webhook-deli
   "previousData": { "...": "present on update when includePreviousData is on" }
 }
 ```
+
+`id` is the same string as the `webhook-id` header. A redelivery carries its own, since it is a new delivery.
