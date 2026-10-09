@@ -1,0 +1,84 @@
+---
+title: Configuration
+description: Every option of the plugin and its default.
+---
+
+## Plugin options
+
+| Option | Default | |
+| --- | --- | --- |
+| `disabled` | `false` | Turns the plugin off. Its collections stay in the schema. |
+| `translations` | unset | Overrides for the plugin's strings, per locale. |
+| `collections` | `{}` | Per collection: `true` for the merge screen alone, the object below, or `false`. |
+| `access.review` | logged in | Who opens the queue and the merge screen. The collection's `read` access on the documents applies too: the queue lists no group with a document the reader may not read. |
+| `access.merge` | logged in | Who applies a merge. The collection's `read`, `update` and `delete` access apply too. |
+| `requireTransactions` | `false` | Refuse every merge without a database transaction. Without it, only a merge that would delete a merged-in document first is refused. |
+| `maxGroupSize` | `5` | Most documents in one merge, 2 or more. A larger queue group opens its most alike documents; the merge screen counts the rest, which stay in the queue. |
+| `adapter` | keys | Where candidates come from in every collection without its own, see [Adapters](./searching#adapters). |
+| `disableJobsQueue` | `false` | Run the save check and the scan inside the request, for a deployment without a job worker. |
+| `queue` | `dedupe` | Jobs queue of the `dedupe-check` and `dedupe-scan` tasks. |
+| `scan.cron` | unset | Scan every matched collection on a schedule. Needs a job runner. |
+| `view` | `{ path: '/dedupe' }` | Admin path of the queue and the merge screen; `false` removes the views. |
+| `overrides` | `{}` | `keys`, `pairs`: a function over the plugin's collection. Hooks are refused. |
+| `collectionAccess.read` | nobody | REST and GraphQL read access on the plugin's collections. |
+| `multiTenancy` | off | `true` or `{ tenantFieldName, collections }`, see below. |
+| `events` | unset | `{ emit(event, req) }`, see below. |
+| `hooks.beforeRemove` | unset | Runs in every merge before the merged-in documents leave, see [References](./merging#references). |
+
+## Per collection
+
+| Option | Default | |
+| --- | --- | --- |
+| `match.fields` | required for search | `{ path, weight, compare?, onDiffer?, key?, tolerance?, toleranceType?, typos? }` per field, see [Searching](./searching). |
+| `match.minScore` | `0.35` | Lowest score kept as a pair. |
+| `match.maxBucket` | `2000` | Larger key buckets are skipped by the scan. |
+| `match.candidateLimit` | `200` | Most documents the save check compares. |
+| `adapter` | the plugin's | Where this collection's candidates come from: `(base) => adapter`, given the plugin's adapter. Needs `match`. |
+| `fields` | derived | `(derived) => spec`, see [Merging](./merging). |
+| `absorbed` | `trash`, or `delete` without a trash | What happens to the merged-in documents: `trash` or `delete`. `trash` needs `trash: true` on the collection. |
+| `draft` | `false` | On a collection with drafts, merge the latest drafts and save the result as a draft. By default the published documents are merged and the result is published. |
+| `writeLocale` | the default locale, or the first the primary is complete in | The locale the values every locale shares are written in: a code, or `({ req, survivor }) => code`. See [Merging](./merging#localized-fields). |
+| `checkOnSave` | `true` with a match | Look for duplicates of the document on every save and queue the pairs. The document is indexed on every save either way, so `findDuplicates` finds it before the next scan. |
+
+An invalid match config stops the app at startup with an error naming the field.
+
+## Multi-tenancy
+
+```ts title="payload.config.ts"
+dedupe({
+  multiTenancy: true,
+  collections: { customers: { match } },
+})
+```
+
+Documents of different tenants are never compared or merged together, and the queue shows the selected tenant only. A collection that is not scoped shows under every tenant. Set `tenantFieldName` when yours differs from `@payloadcms/plugin-multi-tenant`'s.
+
+Without `collections`, every collection with the tenant field is scoped. Pass the multi-tenant plugin's own `collections` to scope only those, so a `tenant` field that means something else stays ordinary data:
+
+```ts title="payload.config.ts"
+const collections = { customers: {}, settings: { isGlobal: true } }
+
+multiTenantPlugin({ collections })
+dedupe({
+  multiTenancy: { collections },
+  collections: { customers: { match } },
+})
+```
+
+A collection with `isGlobal: true` holds one document per tenant: configuring it in dedupe stops the app at startup.
+
+## Events
+
+```ts title="payload.config.ts"
+dedupe({
+  events: {
+    emit: async (event, req) => {
+      if (event.type === 'merge.applied') {
+        await notify(req, `${event.absorbedIds.join(', ')} merged into ${event.survivorId}`)
+      }
+    },
+  },
+})
+```
+
+Event types: `pair.found` (also for a pair found again after it was closed), `pair.dismissed`, `pair.reopened`, `merge.applied`, `merge.failed`, `scan.finished`. A sink that throws is logged and changes nothing. `pair.found` is sent inside the transaction of the save (with `disableJobsQueue`) or of the merge, so one that fails afterwards may have announced a pair it never stored.
