@@ -40,6 +40,20 @@ describe('withoutReservedHeaders', () => {
 		})
 	})
 
+	/**
+	 * These belong to the HTTP transport. `fetch` throws on some, hangs on a wrong
+	 * `content-length`, and silently replaces `host`, so none of them can be a custom header.
+	 */
+	it('reserves the transport headers fetch refuses or overrides', () => {
+		for (const name of ['Content-Length', 'Transfer-Encoding', 'Keep-Alive', 'Upgrade', 'Expect']) {
+			expect(isReservedHeader(name), name).toBe(true)
+		}
+		expect(isReservedHeader('Host')).toBe(true)
+		// `fetch` passes this one through as written, so there is nothing to protect.
+		expect(isReservedHeader('Connection')).toBe(false)
+		expect(isReservedHeader('Authorization')).toBe(false)
+	})
+
 	it('drops every reserved name regardless of case', () => {
 		const custom = Object.fromEntries(
 			RESERVED_HEADER_NAMES.map((name) => [name.toUpperCase(), 'x'])

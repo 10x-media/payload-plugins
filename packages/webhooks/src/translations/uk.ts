@@ -9,6 +9,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.fieldName]: 'Назва',
 	[keys.fieldUrl]: 'URL ендпоінта',
 	[keys.urlInvalid]: 'Вкажіть абсолютний URL з http:// або https://.',
+	[keys.urlHostNotAllowed]: 'Цей хост не входить до списку дозволених хостів для вебхуків.',
 	[keys.fieldEnabled]: 'Увімкнено',
 	[keys.fieldEvents]: 'Події',
 	[keys.fieldSecret]: 'Секрет для підпису',
@@ -37,7 +38,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.rotateSecretRejected]: 'Заміну відхилено. Перевірте вказаний секрет',
 	[keys.fieldHeaders]: 'Власні заголовки',
 	[keys.headerReserved]:
-		"Заголовок '{{name}}' плагін задає під час кожної доставки, перевизначити його не можна.",
+		"Заголовок '{{name}}' плагін або HTTP-транспорт задає під час кожної доставки, перевизначити його не можна.",
 	[keys.headerInvalid]:
 		"'{{name}}' не є допустимим іменем HTTP-заголовка. Використовуйте літери, цифри та символи !#$%&'*+-.^_`|~ без пробілів.",
 	[keys.headerValueInvalid]: 'Значення заголовка не може містити переноси рядків.',
@@ -48,6 +49,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.statusDead]: 'Відкинуто',
 	[keys.redeliver]: 'Доставити повторно',
 	[keys.redeliverDone]: 'Повторну доставку поставлено в чергу',
+	[keys.redeliverSent]: 'Доставлено повторно',
 	[keys.redeliverFailed]: 'Не вдалося доставити повторно',
 	[keys.redeliverConfirm]:
 		'Надіслати ці дані ще раз? Вони підуть новою доставкою з новим webhook-id, тож отримувач, який відсіює дублікати за id, обробить їх повторно.',

@@ -42,7 +42,14 @@ export const RedeliverButton = () => {
 			if (!res.ok) {
 				throw new Error(String(res.status))
 			}
-			toast.success(t(keys.redeliverDone))
+			// The endpoint answers 202 whatever happened to the replay, so the outcome is in the
+			// body: queued, sent, or refused and rejected, which must not read as a success.
+			const { status } = (await res.json()) as { status?: string }
+			if (status === 'dead') {
+				toast.error(t(keys.redeliverFailed))
+				return
+			}
+			toast.success(t(status === 'success' ? keys.redeliverSent : keys.redeliverDone))
 		} catch {
 			toast.error(t(keys.redeliverFailed))
 		}

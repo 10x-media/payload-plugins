@@ -17,11 +17,16 @@ export type SecretMigrationReport = {
 	/** Rows carrying no secret at all, so there was nothing to encrypt. */
 	noSecret: number
 	/**
+	 * Rows whose custom header values were stored before header values were encrypted, and are now
+	 * sealed. Counted apart from `migrated`: a row can need one, the other, or both.
+	 */
+	headersSealed: number
+	/**
 	 * Secrets that could not be normalized, one entry per field, each needing a manual rotation. A
 	 * row whose other secret field migrated fine appears in `migrated` as well: one unusable field
 	 * is no reason to leave a recoverable one in plaintext.
 	 */
-	failed: { field: SecretPath; id: string; reason: string }[]
+	failed: { field: SecretPath | 'headers'; id: string; reason: string }[]
 }
 
 export type EncryptExistingSecretsOptions = {
@@ -32,6 +37,53 @@ export type EncryptExistingSecretsOptions = {
 }
 
 const SECRET_FIELDS: SecretPath[] = ['secret', 'previousSecret']
+
+/**
+ * Seal a row's custom header values that predate header encryption.
+ *
+ * The row was read inside the raw window, so its header values are exactly as stored: a sealed
+ * one is ciphertext, anything else is legacy plaintext. Writing the array back as it is seals the
+ * plaintext ones and passes the sealed ones through untouched, which is what the encrypted field
+ * does with a value it recognises.
+ *
+ * It is its own write rather than part of the secret patch, so a header the form would now refuse
+ * (a reserved name saved before it was reserved) is reported without holding the secret back.
+ */
+const sealHeaderValues = async (args: {
+	doc: JsonObject
+	dryRun?: boolean
+	id: string
+	payload: Payload
+	report: SecretMigrationReport
+	slug: string
+}): Promise<void> => {
+	const headers = args.doc.headers as { value?: unknown }[] | null | undefined
+	const legacy = headers?.some(
+		(header) => typeof header.value === 'string' && header.value !== '' && !isSealed(header.value)
+	)
+	if (!legacy) {
+		return
+	}
+	if (args.dryRun) {
+		args.report.headersSealed += 1
+		return
+	}
+	try {
+		await args.payload.update({
+			collection: args.slug as CollectionSlug,
+			id: args.id,
+			data: { headers } as never,
+			overrideAccess: true,
+		})
+		args.report.headersSealed += 1
+	} catch (err) {
+		args.report.failed.push({
+			field: 'headers',
+			id: args.id,
+			reason: err instanceof Error ? err.message : String(err),
+		})
+	}
+}
 
 /**
  * Adoption path for subscriptions written before secrets were encrypted at rest. Each plaintext
@@ -63,6 +115,7 @@ export const encryptExistingSecrets = async (
 		migrated: 0,
 		alreadyEncrypted: 0,
 		noSecret: 0,
+		headersSealed: 0,
 		failed: [],
 	}
 	// The raw window rides on a request, and the scan has no caller to borrow one from. Its own
@@ -87,6 +140,14 @@ export const encryptExistingSecrets = async (
 		for (const doc of result.docs) {
 			report.scanned += 1
 			const id = String((doc as { id: string | number }).id)
+			await sealHeaderValues({
+				doc: doc as JsonObject,
+				dryRun: options.dryRun,
+				id,
+				payload,
+				report,
+				slug,
+			})
 			const patch: Record<string, string> = {}
 			let populated = 0
 			let failures = 0
@@ -126,13 +187,26 @@ export const encryptExistingSecrets = async (
 			}
 			if (!options.dryRun) {
 				// Written as plaintext, outside the raw window: the encrypted field's beforeChange
-				// validates and seals it.
-				await payload.update({
-					collection: slug as CollectionSlug,
-					id,
-					data: patch,
-					overrideAccess: true,
-				})
+				// validates and seals it. Payload validates the rest of the stored row along with
+				// it, so a row that is invalid for some unrelated reason is reported and the run
+				// goes on: one bad row must not leave every later one in plaintext.
+				try {
+					await payload.update({
+						collection: slug as CollectionSlug,
+						id,
+						data: patch,
+						overrideAccess: true,
+					})
+				} catch (err) {
+					for (const field of Object.keys(patch) as SecretPath[]) {
+						report.failed.push({
+							field,
+							id,
+							reason: err instanceof Error ? err.message : String(err),
+						})
+					}
+					continue
+				}
 			}
 			report.migrated += 1
 		}

@@ -14,6 +14,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.fieldName]: 'Name',
 	[keys.fieldUrl]: 'Endpoint URL',
 	[keys.urlInvalid]: 'Enter an absolute http:// or https:// URL.',
+	[keys.urlHostNotAllowed]: 'This host is not on the list of allowed webhook hosts.',
 	[keys.fieldEnabled]: 'Enabled',
 	[keys.fieldEvents]: 'Events',
 	[keys.fieldSecret]: 'Signing secret',
@@ -41,7 +42,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.rotateSecretRejected]: 'The rotation was rejected. Check the secret you supplied',
 	[keys.fieldHeaders]: 'Custom headers',
 	[keys.headerReserved]:
-		"'{{name}}' is set by the plugin on every delivery and cannot be overridden.",
+		"'{{name}}' is set by the plugin or the HTTP transport on every delivery and cannot be overridden.",
 	[keys.headerInvalid]:
 		"'{{name}}' is not a valid HTTP header name. Use letters, digits, and any of !#$%&'*+-.^_`|~ with no spaces.",
 	[keys.headerValueInvalid]: 'A header value cannot contain line breaks.',
@@ -52,6 +53,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.statusDead]: 'Dead',
 	[keys.redeliver]: 'Redeliver',
 	[keys.redeliverDone]: 'Redelivery queued',
+	[keys.redeliverSent]: 'Redelivered',
 	[keys.redeliverFailed]: 'Could not redeliver',
 	[keys.redeliverConfirm]:
 		'Send this payload again? It goes out as a new delivery with a new webhook-id, so a receiver that dedupes on the id will process it a second time.',

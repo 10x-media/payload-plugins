@@ -9,6 +9,7 @@ export const es: Record<TranslationKey, string> = {
 	[keys.fieldName]: 'Nombre',
 	[keys.fieldUrl]: 'URL del endpoint',
 	[keys.urlInvalid]: 'Introduzca una URL absoluta con http:// o https://.',
+	[keys.urlHostNotAllowed]: 'Este host no está en la lista de hosts permitidos para webhooks.',
 	[keys.fieldEnabled]: 'Activado',
 	[keys.fieldEvents]: 'Eventos',
 	[keys.fieldSecret]: 'Secreto de firma',
@@ -37,7 +38,7 @@ export const es: Record<TranslationKey, string> = {
 	[keys.rotateSecretRejected]: 'La rotación fue rechazada. Revise el secreto que ha indicado',
 	[keys.fieldHeaders]: 'Cabeceras personalizadas',
 	[keys.headerReserved]:
-		"El plugin establece '{{name}}' en cada entrega y no se puede sobrescribir.",
+		"El plugin o el transporte HTTP establece '{{name}}' en cada entrega y no se puede sobrescribir.",
 	[keys.headerInvalid]:
 		"'{{name}}' no es un nombre de cabecera HTTP válido. Use letras, dígitos y cualquiera de !#$%&'*+-.^_`|~ sin espacios.",
 	[keys.headerValueInvalid]: 'El valor de una cabecera no puede contener saltos de línea.',
@@ -48,6 +49,7 @@ export const es: Record<TranslationKey, string> = {
 	[keys.statusDead]: 'Descartada',
 	[keys.redeliver]: 'Reenviar',
 	[keys.redeliverDone]: 'Reenvío en cola',
+	[keys.redeliverSent]: 'Reenviada',
 	[keys.redeliverFailed]: 'No se pudo reenviar',
 	[keys.redeliverConfirm]:
 		'¿Enviar esta carga otra vez? Sale como una entrega nueva con un webhook-id nuevo, así que un receptor que deduplique por el id la procesará por segunda vez.',

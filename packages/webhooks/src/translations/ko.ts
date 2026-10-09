@@ -9,6 +9,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.fieldName]: '이름',
 	[keys.fieldUrl]: '엔드포인트 URL',
 	[keys.urlInvalid]: 'http:// 또는 https://로 시작하는 절대 URL을 입력하세요.',
+	[keys.urlHostNotAllowed]: '이 호스트는 허용된 웹훅 호스트 목록에 없습니다.',
 	[keys.fieldEnabled]: '활성화됨',
 	[keys.fieldEvents]: '이벤트',
 	[keys.fieldSecret]: '서명 시크릿',
@@ -35,7 +36,8 @@ export const ko: Record<TranslationKey, string> = {
 		'교체하는 동안 이 구독이 변경되었습니다. 새 시크릿이 여전히 필요하다면 새로 고친 뒤 다시 시도하세요',
 	[keys.rotateSecretRejected]: '교체가 거부되었습니다. 입력한 시크릿을 확인하세요',
 	[keys.fieldHeaders]: '사용자 정의 헤더',
-	[keys.headerReserved]: "'{{name}}'은(는) 플러그인이 모든 전송에 설정하므로 덮어쓸 수 없습니다.",
+	[keys.headerReserved]:
+		"'{{name}}'은(는) 플러그인 또는 HTTP 전송 계층이 모든 전송에 설정하므로 덮어쓸 수 없습니다.",
 	[keys.headerInvalid]:
 		"'{{name}}'은(는) 올바른 HTTP 헤더 이름이 아닙니다. 공백 없이 영문자, 숫자, 그리고 !#$%&'*+-.^_`|~ 문자만 사용하세요.",
 	[keys.headerValueInvalid]: '헤더 값에는 줄바꿈을 넣을 수 없습니다.',
@@ -46,6 +48,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.statusDead]: '중단됨',
 	[keys.redeliver]: '다시 전송',
 	[keys.redeliverDone]: '재전송이 대기열에 추가되었습니다',
+	[keys.redeliverSent]: '다시 전송했습니다',
 	[keys.redeliverFailed]: '다시 전송하지 못했습니다',
 	[keys.redeliverConfirm]:
 		'이 페이로드를 다시 보낼까요? 새 webhook-id가 붙은 새 전송으로 나가므로, id로 중복을 걸러내는 수신 측은 이를 한 번 더 처리합니다.',

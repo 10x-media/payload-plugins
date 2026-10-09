@@ -3,7 +3,7 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import type { CollectionConfig, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { GENERATED_SECRET_KEY } from '../../src/constants'
-import { webhooks } from '../../src/index'
+import { pruneDeliveries, webhooks } from '../../src/index'
 import { resolveSubscriptionById } from '../../src/plugin/resolveSubscriptions'
 import { rotateSubscriptionSecret } from '../../src/secrets/rotate'
 
@@ -75,6 +75,18 @@ describeForDb('webhooks outbound cross-db', {}, (db) => {
 		expect(deliveries.docs[0]?.event).toBe('posts.created')
 		expect(deliveries.docs[0]?.subscriptionSource).toBe('collection')
 		expect(authorization).toBe('Bearer matrix-t0ken')
+	})
+
+	// The prune deletes through the adapter rather than the Local API, so its `where` has to
+	// translate on both. Run from a point in the future instead of backdating the row.
+	it(`prunes finished deliveries past the retention window on ${db}`, async () => {
+		const total = async () =>
+			(await booted.payload.count({ collection: 'webhook-deliveries', overrideAccess: true }))
+				.totalDocs
+		await pruneDeliveries(booted.payload, { olderThanDays: 30 })
+		expect(await total()).toBe(1)
+		await pruneDeliveries(booted.payload, { olderThanDays: 30, now: Date.now() + 31 * 86_400_000 })
+		expect(await total()).toBe(0)
 	})
 })
 

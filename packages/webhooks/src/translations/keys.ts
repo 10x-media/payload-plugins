@@ -12,6 +12,7 @@ export const keys = {
 	fieldName: 'webhooks:fieldName',
 	fieldUrl: 'webhooks:fieldUrl',
 	urlInvalid: 'webhooks:urlInvalid',
+	urlHostNotAllowed: 'webhooks:urlHostNotAllowed',
 	fieldEnabled: 'webhooks:fieldEnabled',
 	fieldEvents: 'webhooks:fieldEvents',
 	fieldSecret: 'webhooks:fieldSecret',
@@ -43,6 +44,7 @@ export const keys = {
 	statusDead: 'webhooks:statusDead',
 	redeliver: 'webhooks:redeliver',
 	redeliverDone: 'webhooks:redeliverDone',
+	redeliverSent: 'webhooks:redeliverSent',
 	redeliverFailed: 'webhooks:redeliverFailed',
 	redeliverConfirm: 'webhooks:redeliverConfirm',
 } as const

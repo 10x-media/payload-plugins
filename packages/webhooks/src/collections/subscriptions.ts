@@ -15,6 +15,7 @@ import {
 } from 'payload'
 
 import { ADMIN_GROUP, GENERATED_SECRET_KEY, SECRET_AAD_SCOPE } from '../constants'
+import { isAllowedHost } from '../delivery/allowedHosts'
 import { isReservedHeader, isValidHeaderName } from '../delivery/headers'
 import { generateSecret, normalizeSecret } from '../secrets/format'
 import { buildSecretFields } from '../secrets/secretFields'
@@ -172,22 +173,38 @@ const clearLapsedRotation: CollectionBeforeChangeHook = ({ data, originalDoc }) 
  * carries them, and a receiver's token belongs in a custom header. Which hosts are reachable is
  * deliberately not judged here: localhost and private addresses are what development and internal
  * receivers look like.
+ *
+ * A URL the write is not changing is not judged at all. Payload validates the whole document on
+ * every update, the stored fields included, so a rule added after a row was saved (this one, or a
+ * host allowlist configured later) would otherwise fail every write to that row: rotating its
+ * secret, adopting it, even switching it off. The delivery path enforces the same rules when the
+ * row fires, so nothing is let through by leaving it alone here.
  */
-const validateUrl = (
-	value: string | null | undefined,
-	{ req }: { req: PayloadRequest }
-): string | true => {
-	if (typeof value !== 'string' || value.trim() === '') {
-		return req.t('validation:required')
+const makeValidateUrl =
+	(allowedHosts: string[] | undefined) =>
+	(
+		value: string | null | undefined,
+		{ previousValue, req }: { previousValue?: unknown; req: PayloadRequest }
+	): string | true => {
+		if (typeof value !== 'string' || value.trim() === '') {
+			return req.t('validation:required')
+		}
+		if (value === previousValue) {
+			return true
+		}
+		const url = URL.canParse(value) ? new URL(value) : null
+		const usable =
+			url !== null &&
+			(url.protocol === 'http:' || url.protocol === 'https:') &&
+			url.username === '' &&
+			url.password === ''
+		if (!usable) {
+			return asTranslate(req.t)(keys.urlInvalid)
+		}
+		// Only when the install configured an allowlist; the delivery path enforces it again for
+		// rows saved before it was set.
+		return isAllowedHost(value, allowedHosts) ? true : asTranslate(req.t)(keys.urlHostNotAllowed)
 	}
-	const url = URL.canParse(value) ? new URL(value) : null
-	const usable =
-		url !== null &&
-		(url.protocol === 'http:' || url.protocol === 'https:') &&
-		url.username === '' &&
-		url.password === ''
-	return usable ? true : asTranslate(req.t)(keys.urlInvalid)
-}
 
 /**
  * A line break or a NUL in a header value makes `fetch` throw at delivery time, the same way a
@@ -223,6 +240,7 @@ export const buildSubscriptionsCollection = (args: {
 	events: string[]
 	hidden: boolean
 	secretKeys?: KeysConfig
+	allowedHosts?: string[]
 }): CollectionConfig => ({
 	slug: args.slug,
 	labels: {
@@ -252,7 +270,7 @@ export const buildSubscriptionsCollection = (args: {
 					type: 'text',
 					required: true,
 					label: labelForKey(keys.fieldUrl),
-					validate: validateUrl,
+					validate: makeValidateUrl(args.allowedHosts),
 				},
 			],
 		},
@@ -302,11 +320,17 @@ export const buildSubscriptionsCollection = (args: {
 							 */
 							validate: (
 								value: string | null | undefined,
-								{ req }: { req: PayloadRequest }
+								{ previousValue, req }: { previousValue?: unknown; req: PayloadRequest }
 							): string | true => {
 								if (typeof value !== 'string' || value.trim() === '') {
 									// Payload's own key, so this reads the same as every other required field.
 									return req.t('validation:required')
+								}
+								// A name this write is not changing is left alone, for the reason given on
+								// the URL validator: a name reserved after the row was saved must not fail
+								// every later write to it. The send drops reserved names regardless.
+								if (value === previousValue) {
+									return true
 								}
 								if (isReservedHeader(value)) {
 									return asTranslate(req.t)(keys.headerReserved, { name: value })

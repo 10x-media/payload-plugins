@@ -238,6 +238,36 @@ describe('buildSubscriptionsCollection', () => {
 			expect(validateUrl(undefined)).toBe('validation:required')
 			expect(validateUrl('  ')).toBe('validation:required')
 		})
+
+		/**
+		 * Payload validates the stored fields on every update. A rule added after a row was saved
+		 * must not fail every later write to that row: rotating it, adopting it, switching it off.
+		 */
+		it('does not judge a url the write is not changing', () => {
+			const url = find(c, 'url') as { validate: (v: unknown, o: unknown) => string | true }
+			const options = (previousValue: unknown) => ({ previousValue, req: { t: (k: string) => k } })
+			expect(url.validate('123', options('123'))).toBe(true)
+			expect(url.validate('123', options('https://was.fine'))).toBe(keys.urlInvalid)
+			expect(url.validate('', options(''))).toBe('validation:required')
+		})
+
+		/** Opt-in: with no list every host passes, which is what the cases above rely on. */
+		it('rejects a host outside a configured allowlist', () => {
+			const restricted = buildSubscriptionsCollection({
+				slug: 'webhook-subscriptions',
+				events: [],
+				hidden: false,
+				allowedHosts: ['*.example.com'],
+			})
+			const url = find(restricted, 'url')
+			const validate = (value: string) =>
+				(url as { validate: (v: unknown, o: unknown) => string | true }).validate(value, {
+					req: { t: (k: string) => k },
+				})
+			expect(validate('https://crm.example.com/hooks')).toBe(true)
+			expect(validate('http://localhost:3000/hook')).toBe(keys.urlHostNotAllowed)
+			expect(validate('123')).toBe(keys.urlInvalid)
+		})
 	})
 
 	describe('generated secrets', () => {
@@ -410,6 +440,16 @@ describe('buildSubscriptionsCollection', () => {
 			for (const name of ['X Custom', 'X:Custom', 'X\tCustom', 'Ünicode']) {
 				expect(validateKey()(name)).toBe(keys.headerInvalid)
 			}
+		})
+
+		/** A name reserved after the row was saved must not block every later write to it. */
+		it('does not judge a name the write is not changing', () => {
+			const headers = find(c, 'headers')
+			const key = headers && 'fields' in headers ? named(headers.fields, 'key') : undefined
+			const validate = (key as { validate: (v: unknown, o: unknown) => string | true }).validate
+			const options = (previousValue: unknown) => ({ previousValue, req: { t: (k: string) => k } })
+			expect(validate('Host', options('Host'))).toBe(true)
+			expect(validate('Host', options('X-Was-Fine'))).toBe(keys.headerReserved)
 		})
 
 		it('accepts an ordinary header name', () => {

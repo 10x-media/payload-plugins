@@ -4,8 +4,11 @@ import type {
 	CollectionAfterDeleteHook,
 	CollectionSlug,
 	JsonObject,
+	Payload,
 	PayloadRequest,
+	SanitizedCollectionConfig,
 } from 'payload'
+import { hasAutosaveEnabled } from 'payload/shared'
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import { buildPayload } from '../delivery/buildPayload'
@@ -33,6 +36,9 @@ export type WebhookDispatchDeps = {
 	mode: 'queue' | 'inline'
 	timeoutMs: number
 	queue: string
+	allowedHosts?: string[]
+	/** Trims the delivery log when a retention window is configured. Cheap to call every time. */
+	prune?: (payload: Payload) => void
 }
 
 /** Max collection subscriptions scanned per event (pagination is a future enhancement). */
@@ -100,11 +106,20 @@ const resolveListening = async (args: {
  * deliberate save that follows emits on its own. The flag only exists on the request's query,
  * which is where the admin sets it.
  *
+ * The first of those saves carries no flag at all. Opening "Create new" on an autosave collection
+ * makes the admin create the document there and then, as an empty draft, through the Local API on
+ * the signed-in user's request. That is what is skipped: a draft create on an autosave collection,
+ * made through the Local API with a user. The document's first deliberate save then arrives as an
+ * `updated`. A create over REST or GraphQL, and a Local API create with no user (an import, a
+ * seed), are deliberate and emit. Application code that creates such a draft through the Local
+ * API on a user's behalf is indistinguishable from the admin's and is skipped with it.
+ *
  * A deliberate save that leaves the document a draft emits unless the collection opted out. It is
  * the default because an unpublish is such a save, and a receiver mirroring published content has
  * to hear about that one.
  */
 const shouldEmit = (args: {
+	collection?: SanitizedCollectionConfig
 	config: CollectionWebhookConfig
 	doc: Record<string, unknown>
 	operation: WebhookOperation
@@ -117,20 +132,31 @@ const shouldEmit = (args: {
 	if (autosave === true || autosave === 'true') {
 		return false
 	}
+	if (
+		args.operation === 'create' &&
+		args.doc._status === 'draft' &&
+		args.req.payloadAPI === 'local' &&
+		args.req.user &&
+		args.collection &&
+		hasAutosaveEnabled(args.collection)
+	) {
+		return false
+	}
 	return args.config.includeDrafts !== false || args.doc._status !== 'draft'
 }
 
 const dispatch = async (args: {
+	collection?: SanitizedCollectionConfig
 	deps: WebhookDispatchDeps
 	operation: WebhookOperation
 	doc: Record<string, unknown>
 	previousDoc?: Record<string, unknown>
 	req: PayloadRequest
 }): Promise<void> => {
-	const { deps, operation, doc, previousDoc, req } = args
+	const { collection, deps, operation, doc, previousDoc, req } = args
 	if (
 		!deps.operations.includes(operation) ||
-		!shouldEmit({ config: deps.config, doc, operation, req })
+		!shouldEmit({ collection, config: deps.config, doc, operation, req })
 	) {
 		return
 	}
@@ -154,6 +180,7 @@ const dispatch = async (args: {
 		config: deps.config,
 		req,
 	})
+	const inline: { body: string; deliveryId: string; subscription: ResolvedSubscription }[] = []
 	for (const subscription of subscriptions) {
 		const created = await payload.create({
 			collection: deps.deliveriesSlug as CollectionSlug,
@@ -191,7 +218,7 @@ const dispatch = async (args: {
 			continue
 		}
 
-		const decision = decideDelivery(subscription)
+		const decision = decideDelivery(subscription, deps.allowedHosts)
 		if (!decision.deliverable) {
 			await payload.update({
 				collection: deps.deliveriesSlug as CollectionSlug,
@@ -202,17 +229,38 @@ const dispatch = async (args: {
 			})
 			continue
 		}
+		inline.push({ body: JSON.stringify(body), deliveryId, subscription })
+	}
 
+	// The sends go out together, so the write waits for the slowest receiver rather than for every
+	// receiver in turn: five that each run to the timeout cost one timeout, not five. Only the
+	// network calls are concurrent. The results are written one at a time below, because the
+	// write's transaction is a single session and does not take concurrent operations.
+	const sent = await Promise.all(
+		inline.map(async ({ body, deliveryId, subscription }) => {
+			try {
+				return await sendDelivery({
+					subscription,
+					deliveryId,
+					event,
+					body,
+					timeoutMs: deps.timeoutMs,
+					now: Date.now(),
+				})
+			} catch (err) {
+				// Recorded as the failed attempt it is, so the row ends `dead` with the reason
+				// rather than sitting `pending` with nothing left to send it.
+				return { ok: false, error: err instanceof Error ? err.message : String(err), durationMs: 0 }
+			}
+		})
+	)
+	for (const [index, { deliveryId }] of inline.entries()) {
+		const result = sent[index]
+		if (!result) {
+			continue
+		}
 		// best-effort: a delivery failure must never abort the caller's write
 		try {
-			const result = await sendDelivery({
-				subscription,
-				deliveryId,
-				event,
-				body: JSON.stringify(body),
-				timeoutMs: deps.timeoutMs,
-				now: Date.now(),
-			})
 			await payload.update({
 				collection: deps.deliveriesSlug as CollectionSlug,
 				id: deliveryId,
@@ -252,14 +300,15 @@ const dispatchSafely = async (args: Parameters<typeof dispatch>[0]): Promise<voi
 			`@10x-media/webhooks: dispatching ${eventId(args.deps.collectionSlug, args.operation)} failed, so no webhook was sent for this write: ${err instanceof Error ? err.message : String(err)}`
 		)
 	}
+	args.deps.prune?.(args.req.payload)
 }
 
 /** afterChange hook factory for an opt-in source collection. */
 export const makeAfterChange =
 	(deps: WebhookDispatchDeps): CollectionAfterChangeHook =>
-	async ({ doc, previousDoc, operation, req }) => {
+	async ({ collection, doc, previousDoc, operation, req }) => {
 		const op: WebhookOperation = operation === 'create' ? 'create' : 'update'
-		await dispatchSafely({ deps, operation: op, doc, previousDoc, req })
+		await dispatchSafely({ collection, deps, operation: op, doc, previousDoc, req })
 		return doc
 	}
 

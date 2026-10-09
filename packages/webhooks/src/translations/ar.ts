@@ -9,6 +9,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.fieldName]: 'الاسم',
 	[keys.fieldUrl]: 'عنوان URL لنقطة النهاية',
 	[keys.urlInvalid]: 'أدخل عنوان URL مطلقًا يبدأ بـ http:// أو https://.',
+	[keys.urlHostNotAllowed]: 'هذا المضيف غير مدرج في قائمة المضيفين المسموح بهم لـ Webhooks.',
 	[keys.fieldEnabled]: 'مفعّل',
 	[keys.fieldEvents]: 'الأحداث',
 	[keys.fieldSecret]: 'مفتاح التوقيع السري',
@@ -35,7 +36,8 @@ export const ar: Record<TranslationKey, string> = {
 		'تغيّر هذا الاشتراك أثناء التدوير. أعد التحميل وحاول مجددًا إن كنت ما زلت بحاجة إلى مفتاح جديد',
 	[keys.rotateSecretRejected]: 'رُفض التدوير. تحقق من المفتاح السري الذي أدخلته',
 	[keys.fieldHeaders]: 'ترويسات مخصصة',
-	[keys.headerReserved]: "تضبط الإضافة الترويسة '{{name}}' في كل عملية تسليم ولا يمكن تجاوزها.",
+	[keys.headerReserved]:
+		"تضبط الإضافة أو طبقة نقل HTTP الترويسة '{{name}}' في كل عملية تسليم ولا يمكن تجاوزها.",
 	[keys.headerInvalid]:
 		"'{{name}}' ليس اسم ترويسة HTTP صالحًا. استخدم الأحرف والأرقام وأيًّا من الرموز !#$%&'*+-.^_`|~ دون مسافات.",
 	[keys.headerValueInvalid]: 'لا يمكن أن تحتوي قيمة الترويسة على فواصل أسطر.',
@@ -46,6 +48,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.statusDead]: 'متوقف نهائيًا',
 	[keys.redeliver]: 'إعادة التسليم',
 	[keys.redeliverDone]: 'تمت جدولة إعادة التسليم',
+	[keys.redeliverSent]: 'تمت إعادة التسليم',
 	[keys.redeliverFailed]: 'تعذّرت إعادة التسليم',
 	[keys.redeliverConfirm]:
 		'هل تريد إرسال هذه الحمولة مجددًا؟ ستُرسل كعملية تسليم جديدة بمعرّف webhook-id جديد، ولذلك فإن المستقبِل الذي يزيل التكرار اعتمادًا على المعرّف سيعالجها مرة ثانية.',

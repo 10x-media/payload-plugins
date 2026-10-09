@@ -50,7 +50,8 @@ test('redeliver confirms first, then creates a second delivery', async ({ page }
 	await page.getByRole('button', { name: 'Redeliver' }).click()
 	await expect(page.getByText('Send this payload again?')).toBeVisible()
 	await page.locator('#confirm-action').click()
-	await expect(page.getByText('Redelivery queued')).toBeVisible()
+	// The dev app delivers inline, so the replay has already been sent by the time it answers.
+	await expect(page.getByText('Redelivered')).toBeVisible()
 	await page.goto('/admin/collections/webhook-deliveries')
 	await page.waitForLoadState('networkidle')
 	await expect(page.locator('tbody tr')).toHaveCount(rowsBefore + 1)

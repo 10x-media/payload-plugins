@@ -14,8 +14,10 @@ import { deepMergeSimple } from 'payload/shared'
 import { buildDeliveriesCollection } from '../collections/deliveries'
 import { buildSubscriptionsCollection } from '../collections/subscriptions'
 import { DEFAULT_DELIVERIES_SLUG, DEFAULT_SUBSCRIPTIONS_SLUG, RESERVED_SLUGS } from '../constants'
+import { assertAllowedHosts, isAllowedHost } from '../delivery/allowedHosts'
 import { buildDeliverTask } from '../delivery/deliverTask'
 import { isReservedHeader, isValidHeaderName, RESERVED_HEADER_NAMES } from '../delivery/headers'
+import { makeThrottledPrune } from '../delivery/prune'
 import { redeliverDelivery } from '../delivery/redeliver'
 import { eventCatalog } from '../events/eventTypes'
 import { makeAfterChange, makeAfterDelete } from '../events/hooks'
@@ -61,7 +63,7 @@ const assertCodeSubscriptionHeaders = (subscriptions: CodeSubscription[]): void 
 		for (const [key, value] of Object.entries(subscription.headers ?? {})) {
 			if (isReservedHeader(key)) {
 				throw new Error(
-					`@10x-media/webhooks: code subscription '${subscription.id}' sets the reserved header '${key}'. The plugin sets ${RESERVED_HEADER_NAMES.join(', ')} on every delivery.`
+					`@10x-media/webhooks: code subscription '${subscription.id}' sets the reserved header '${key}'. The plugin or the HTTP transport owns ${RESERVED_HEADER_NAMES.join(', ')} on every delivery.`
 				)
 			}
 			if (!isValidHeaderName(key)) {
@@ -76,6 +78,40 @@ const assertCodeSubscriptionHeaders = (subscriptions: CodeSubscription[]): void 
 			}
 		}
 	}
+}
+
+/**
+ * Refuse a code subscription whose host the configured allowlist does not cover. The delivery
+ * path would refuse it anyway, on every event; a subscription that can never deliver is a
+ * configuration mistake, and startup is where its author will see it.
+ */
+const assertCodeSubscriptionHosts = (
+	subscriptions: CodeSubscription[],
+	allowedHosts: string[] | undefined
+): void => {
+	for (const subscription of subscriptions) {
+		if (!isAllowedHost(subscription.url, allowedHosts)) {
+			throw new Error(
+				`@10x-media/webhooks: code subscription '${subscription.id}' points at '${subscription.url}', whose host is not in delivery.allowedHosts.`
+			)
+		}
+	}
+}
+
+/**
+ * A retention window has to be a positive number of days. Zero or a negative value would delete
+ * every finished delivery the moment it was written, which is never what a typo meant.
+ */
+const resolveRetentionDays = (retentionDays: number | undefined): number | undefined => {
+	if (retentionDays === undefined) {
+		return undefined
+	}
+	if (!Number.isFinite(retentionDays) || retentionDays <= 0) {
+		throw new Error(
+			`@10x-media/webhooks: deliveriesLog.retentionDays must be a positive number of days, got ${retentionDays}.`
+		)
+	}
+	return retentionDays
 }
 
 /**
@@ -208,12 +244,25 @@ export const registerWebhooks = (args: {
 	const subscriptionsSlug = options.subscriptionsCollection?.slug ?? DEFAULT_SUBSCRIPTIONS_SLUG
 	const deliveriesSlug = options.deliveriesLog?.slug ?? DEFAULT_DELIVERIES_SLUG
 	const reserved = new Set<string>([...RESERVED_SLUGS, subscriptionsSlug, deliveriesSlug])
-	const sourceSlugs = Object.keys(sources).filter((s) => !reserved.has(s))
+	// Its own collections and Payload's internal ones cannot be sources: a delivery that emitted
+	// a delivery would never stop. Said out loud rather than dropped, like any slug that will
+	// never emit.
+	const forbidden = Object.keys(sources).filter((s) => reserved.has(s))
+	if (forbidden.length) {
+		throw new Error(
+			`@10x-media/webhooks: 'collections' lists ${forbidden.map((s) => `'${s}'`).join(', ')}, which cannot emit events: the plugin's own collections and Payload's internal ones are not sources.`
+		)
+	}
+	const sourceSlugs = Object.keys(sources)
 	const delivery = resolveDeliveryOptions(options.delivery)
 	const rotation = resolveSecretRotationOptions(options.secretRotation)
+	const retentionDays = resolveRetentionDays(options.deliveriesLog?.retentionDays)
+	const prune = retentionDays ? makeThrottledPrune({ deliveriesSlug, retentionDays }) : undefined
 	const codeSubscriptions = options.subscriptions ?? []
 	assertCodeSubscriptionSecrets(codeSubscriptions)
 	assertCodeSubscriptionHeaders(codeSubscriptions)
+	assertAllowedHosts(delivery.allowedHosts)
+	assertCodeSubscriptionHosts(codeSubscriptions, delivery.allowedHosts)
 	const catalog = eventCatalog(Object.fromEntries(sourceSlugs.map((s) => [s, sources[s] ?? true])))
 
 	const mode = resolveMode({
@@ -247,6 +296,7 @@ export const registerWebhooks = (args: {
 				events: catalog,
 				hidden: options.subscriptionsCollection?.hidden ?? false,
 				secretKeys: options.secretEncryption?.keys,
+				allowedHosts: delivery.allowedHosts,
 			}),
 			options.subscriptionsCollection?.overrides
 		)
@@ -369,6 +419,7 @@ export const registerWebhooks = (args: {
 					mode,
 					timeoutMs: delivery.timeoutMs,
 					queue: delivery.queue,
+					allowedHosts: delivery.allowedHosts,
 				},
 				deliveryId: id,
 				payload: req.payload,
@@ -392,14 +443,17 @@ export const registerWebhooks = (args: {
 			codeSubscriptions,
 			timeoutMs: delivery.timeoutMs,
 			retries: delivery.retries,
+			allowedHosts: delivery.allowedHosts,
 		})
 	)
 
+	const hooked = new Set<string>()
 	for (let i = 0; i < config.collections.length; i++) {
 		const collection = config.collections[i]
 		if (!collection || !sourceSlugs.includes(collection.slug)) {
 			continue
 		}
+		hooked.add(collection.slug)
 		const cfg = sources[collection.slug]
 		const collectionConfig: CollectionWebhookConfig = cfg === true || cfg === undefined ? {} : cfg
 		const deps = {
@@ -416,6 +470,8 @@ export const registerWebhooks = (args: {
 			mode,
 			timeoutMs: delivery.timeoutMs,
 			queue: delivery.queue,
+			allowedHosts: delivery.allowedHosts,
+			prune,
 		}
 		config.collections[i] = {
 			...collection,
@@ -425,6 +481,16 @@ export const registerWebhooks = (args: {
 				afterDelete: [...(collection.hooks?.afterDelete ?? []), makeAfterDelete(deps)],
 			},
 		}
+	}
+
+	// A slug with no hook attached never emits, while the subscription form still offers its
+	// events. That is a typo on a host without generated types, or a collection another plugin
+	// has not registered yet at the point this one runs; either way it is silent otherwise.
+	const unhooked = sourceSlugs.filter((s) => !hooked.has(s))
+	if (unhooked.length) {
+		throw new Error(
+			`@10x-media/webhooks: 'collections' lists ${unhooked.map((s) => `'${s}'`).join(', ')}, but no collection with that slug is registered when this plugin runs, so it would never emit. Check the slug. A collection that another plugin adds is only visible if that plugin runs first, and webhooks() runs early (order 10), so a collection from a later plugin cannot be listed here.`
+		)
 	}
 
 	/**

@@ -9,6 +9,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.fieldName]: 'Название',
 	[keys.fieldUrl]: 'URL эндпоинта',
 	[keys.urlInvalid]: 'Укажите абсолютный URL с http:// или https://.',
+	[keys.urlHostNotAllowed]: 'Этот хост не входит в список разрешённых хостов для вебхуков.',
 	[keys.fieldEnabled]: 'Включено',
 	[keys.fieldEvents]: 'События',
 	[keys.fieldSecret]: 'Секрет для подписи',
@@ -37,7 +38,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.rotateSecretRejected]: 'Замена отклонена. Проверьте указанный секрет',
 	[keys.fieldHeaders]: 'Свои заголовки',
 	[keys.headerReserved]:
-		"Заголовок '{{name}}' плагин задаёт при каждой доставке, переопределить его нельзя.",
+		"Заголовок '{{name}}' плагин или HTTP-транспорт задаёт при каждой доставке, переопределить его нельзя.",
 	[keys.headerInvalid]:
 		"'{{name}}' не является допустимым именем HTTP-заголовка. Используйте буквы, цифры и символы !#$%&'*+-.^_`|~ без пробелов.",
 	[keys.headerValueInvalid]: 'Значение заголовка не может содержать переносы строк.',
@@ -48,6 +49,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.statusDead]: 'Отброшено',
 	[keys.redeliver]: 'Доставить повторно',
 	[keys.redeliverDone]: 'Повторная доставка поставлена в очередь',
+	[keys.redeliverSent]: 'Доставлено повторно',
 	[keys.redeliverFailed]: 'Не удалось доставить повторно',
 	[keys.redeliverConfirm]:
 		'Отправить эти данные ещё раз? Они уйдут новой доставкой с новым webhook-id, поэтому получатель, который отсекает дубликаты по id, обработает их повторно.',

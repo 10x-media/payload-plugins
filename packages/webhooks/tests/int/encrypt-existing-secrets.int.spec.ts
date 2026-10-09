@@ -69,6 +69,100 @@ describe('encryptExistingSecrets', () => {
 		expect(String(stored)).not.toContain(LEGACY_SECRET)
 	})
 
+	/**
+	 * Header values were plaintext before they were encrypted, and unlike the secret nothing
+	 * refuses them at delivery, so without this they would sit in the clear until someone happened
+	 * to save the subscription.
+	 */
+	it('seals custom header values stored before header encryption', async () => {
+		await clear()
+		await booted.payload.create({
+			collection: 'webhook-subscriptions',
+			data: {
+				name: 'headers',
+				url: 'https://example.test',
+				events: [],
+				headers: [{ key: 'Authorization', value: 'Bearer receiver-t0ken' }],
+			},
+			overrideAccess: true,
+		})
+		await collection().updateOne(
+			{ name: 'headers' },
+			{ $set: { 'headers.0.value': 'Bearer legacy-t0ken' } }
+		)
+
+		const dry = await encryptExistingSecrets(booted.payload, { dryRun: true })
+		expect(dry.headersSealed).toBe(1)
+		const untouched = (await collection().findOne({ name: 'headers' }))?.headers as {
+			value: unknown
+		}[]
+		expect(untouched[0]?.value).toBe('Bearer legacy-t0ken')
+
+		const report = await encryptExistingSecrets(booted.payload)
+		expect(report).toMatchObject({ headersSealed: 1, failed: [] })
+		const stored = (await collection().findOne({ name: 'headers' }))?.headers as {
+			value: unknown
+		}[]
+		expect(isSealed(stored[0]?.value)).toBe(true)
+
+		const read = await booted.payload.find({
+			collection: 'webhook-subscriptions',
+			where: { name: { equals: 'headers' } },
+			overrideAccess: true,
+		})
+		expect(read.docs[0]?.headers?.[0]?.value).toBe('Bearer legacy-t0ken')
+		// Idempotent: a second run finds nothing left to seal.
+		expect((await encryptExistingSecrets(booted.payload)).headersSealed).toBe(0)
+	})
+
+	/**
+	 * Payload validates the whole stored row on every update. A header name that has since become
+	 * reserved is not something this run is changing, so it must not hold the row's secret back.
+	 */
+	it('migrates the secret of a row whose stored header name has since become reserved', async () => {
+		await clear()
+		await booted.payload.create({
+			collection: 'webhook-subscriptions',
+			data: {
+				name: 'reserved-header',
+				url: 'https://example.test',
+				events: [],
+				headers: [{ key: 'X-Route', value: 'a' }],
+			},
+			overrideAccess: true,
+		})
+		await collection().updateOne(
+			{ name: 'reserved-header' },
+			{
+				$set: {
+					secret: LEGACY_SECRET,
+					'headers.0.key': 'Host',
+					'headers.0.value': 'legacy.internal',
+				},
+			}
+		)
+
+		const report = await encryptExistingSecrets(booted.payload)
+		expect(report).toMatchObject({ migrated: 1, headersSealed: 1, failed: [] })
+		expect(isSealed(await rawSecret('reserved-header'))).toBe(true)
+	})
+
+	/** One row that will not save must be reported by id, not end the run for every row after it. */
+	it('reports a row that fails to save and carries on with the rest', async () => {
+		await clear()
+		const broken = await makeLegacy('broken')
+		await makeLegacy('fine')
+		// A stored row that no longer satisfies a required field, whatever the reason.
+		await collection().updateOne({ name: 'broken' }, { $unset: { url: '' } })
+
+		const report = await encryptExistingSecrets(booted.payload)
+		expect(report.scanned).toBe(2)
+		expect(report.migrated).toBe(1)
+		expect(report.failed).toHaveLength(1)
+		expect(report.failed[0]).toMatchObject({ field: 'secret', id: String(broken.id) })
+		expect(isSealed(await rawSecret('fine'))).toBe(true)
+	})
+
 	it('leaves the operator holding a usable secret: the old value plus the prefix', async () => {
 		await clear()
 		const created = await makeLegacy('recoverable')

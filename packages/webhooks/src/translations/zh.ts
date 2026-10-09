@@ -9,6 +9,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.fieldName]: '名称',
 	[keys.fieldUrl]: '端点 URL',
 	[keys.urlInvalid]: '请输入以 http:// 或 https:// 开头的完整 URL。',
+	[keys.urlHostNotAllowed]: '此主机不在允许的 Webhook 主机列表中。',
 	[keys.fieldEnabled]: '已启用',
 	[keys.fieldEvents]: '事件',
 	[keys.fieldSecret]: '签名密钥',
@@ -33,7 +34,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.rotateSecretConflict]: '轮换期间此订阅已被修改。如果仍需新密钥，请刷新后重试',
 	[keys.rotateSecretRejected]: '轮换被拒绝。请检查您提供的密钥',
 	[keys.fieldHeaders]: '自定义请求头',
-	[keys.headerReserved]: "'{{name}}' 由插件在每次投递时设置，无法覆盖。",
+	[keys.headerReserved]: "'{{name}}' 由插件或 HTTP 传输层在每次投递时设置，无法覆盖。",
 	[keys.headerInvalid]:
 		"'{{name}}' 不是有效的 HTTP 请求头名称。请使用字母、数字和 !#$%&'*+-.^_`|~ 中的字符，且不能包含空格。",
 	[keys.headerValueInvalid]: '请求头的值不能包含换行符。',
@@ -44,6 +45,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.statusDead]: '已放弃',
 	[keys.redeliver]: '重新投递',
 	[keys.redeliverDone]: '重新投递已加入队列',
+	[keys.redeliverSent]: '已重新投递',
 	[keys.redeliverFailed]: '无法重新投递',
 	[keys.redeliverConfirm]:
 		'要再次发送此负载吗？它会作为一条带有新 webhook-id 的新投递发出，因此按 id 去重的接收方会再处理一次。',

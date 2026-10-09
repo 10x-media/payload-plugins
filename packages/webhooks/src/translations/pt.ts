@@ -9,6 +9,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.fieldName]: 'Nome',
 	[keys.fieldUrl]: 'URL do endpoint',
 	[keys.urlInvalid]: 'Introduza um URL absoluto com http:// ou https://.',
+	[keys.urlHostNotAllowed]: 'Este host não está na lista de hosts permitidos para webhooks.',
 	[keys.fieldEnabled]: 'Ativado',
 	[keys.fieldEvents]: 'Eventos',
 	[keys.fieldSecret]: 'Segredo de assinatura',
@@ -37,7 +38,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.rotateSecretRejected]: 'A rotação foi rejeitada. Verifique o segredo que indicou',
 	[keys.fieldHeaders]: 'Cabeçalhos personalizados',
 	[keys.headerReserved]:
-		"'{{name}}' é definido pelo plugin em cada entrega e não pode ser substituído.",
+		"'{{name}}' é definido pelo plugin ou pelo transporte HTTP em cada entrega e não pode ser substituído.",
 	[keys.headerInvalid]:
 		"'{{name}}' não é um nome de cabeçalho HTTP válido. Use letras, dígitos e qualquer um de !#$%&'*+-.^_`|~, sem espaços.",
 	[keys.headerValueInvalid]: 'O valor de um cabeçalho não pode conter quebras de linha.',
@@ -48,6 +49,7 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.statusDead]: 'Descartada',
 	[keys.redeliver]: 'Reenviar',
 	[keys.redeliverDone]: 'Reenvio na fila',
+	[keys.redeliverSent]: 'Reenviada',
 	[keys.redeliverFailed]: 'Não foi possível reenviar',
 	[keys.redeliverConfirm]:
 		'Enviar esta carga outra vez? Sai como uma nova entrega com um novo webhook-id, por isso um recetor que deduplique pelo id vai processá-la uma segunda vez.',

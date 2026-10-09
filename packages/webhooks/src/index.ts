@@ -5,6 +5,8 @@ import { registerTranslations } from './plugin/registerTranslations'
 import { registerWebhooks } from './plugin/registerWebhooks'
 
 export { GENERATED_SECRET_KEY } from './constants'
+export type { PruneDeliveriesOptions } from './delivery/prune'
+export { pruneDeliveries } from './delivery/prune'
 export type {
 	CollectionOverride,
 	FieldsOverride,

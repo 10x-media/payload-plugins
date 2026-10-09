@@ -13,6 +13,7 @@ export type DeliverTaskDeps = {
 	codeSubscriptions: CodeSubscription[]
 	timeoutMs: number
 	retries: number
+	allowedHosts?: string[]
 }
 
 /** Native Payload jobs task that performs one queued delivery attempt. */
@@ -41,7 +42,7 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 			})
 			// Includes an undecryptable secret: retrying cannot fix a key problem, so the row dies
 			// here rather than throwing, and is never POSTed unsigned.
-			const decision = decideDelivery(subscription)
+			const decision = decideDelivery(subscription, deps.allowedHosts)
 			if (!decision.deliverable) {
 				await payload.update({
 					collection: deps.deliveriesSlug as CollectionSlug,

@@ -9,6 +9,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.fieldName]: 'Nama',
 	[keys.fieldUrl]: 'URL endpoint',
 	[keys.urlInvalid]: 'Masukkan URL absolut dengan http:// atau https://.',
+	[keys.urlHostNotAllowed]: 'Host ini tidak ada dalam daftar host webhook yang diizinkan.',
 	[keys.fieldEnabled]: 'Aktif',
 	[keys.fieldEvents]: 'Event',
 	[keys.fieldSecret]: 'Secret penandatanganan',
@@ -36,7 +37,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.rotateSecretRejected]: 'Rotasi ditolak. Periksa secret yang Anda berikan',
 	[keys.fieldHeaders]: 'Header kustom',
 	[keys.headerReserved]:
-		"'{{name}}' diatur oleh plugin pada setiap pengiriman dan tidak dapat ditimpa.",
+		"'{{name}}' diatur oleh plugin atau transport HTTP pada setiap pengiriman dan tidak dapat ditimpa.",
 	[keys.headerInvalid]:
 		"'{{name}}' bukan nama header HTTP yang valid. Gunakan huruf, angka, dan karakter !#$%&'*+-.^_`|~ tanpa spasi.",
 	[keys.headerValueInvalid]: 'Nilai header tidak boleh berisi baris baru.',
@@ -47,6 +48,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.statusDead]: 'Dihentikan',
 	[keys.redeliver]: 'Kirim ulang',
 	[keys.redeliverDone]: 'Pengiriman ulang masuk antrean',
+	[keys.redeliverSent]: 'Terkirim ulang',
 	[keys.redeliverFailed]: 'Tidak dapat mengirim ulang',
 	[keys.redeliverConfirm]:
 		'Kirim payload ini lagi? Payload dikirim sebagai pengiriman baru dengan webhook-id baru, sehingga penerima yang melakukan deduplikasi berdasarkan id akan memprosesnya untuk kedua kalinya.',

@@ -1,6 +1,7 @@
 import { isSealed, withRawEncrypted } from '@10x-media/fields/encrypted'
 import type { CollectionSlug, JsonObject, Payload, PayloadRequest } from 'payload'
 
+import { isAllowedHost } from '../delivery/allowedHosts'
 import type { CodeSubscription } from '../options'
 import { InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { recoverSecret } from '../secrets/recover'
@@ -308,12 +309,25 @@ export type DeliveryDecision =
  * unconditionally. An unrecoverable *retired* secret is not a refusal, because the delivery can
  * still be signed with the active secret, which is strictly better than not delivering.
  */
-export const decideDelivery = (subscription: ResolvedSubscription | null): DeliveryDecision => {
+export const decideDelivery = (
+	subscription: ResolvedSubscription | null,
+	// Required, though it may be undefined: a call site that forgot it would allow every host.
+	allowedHosts: string[] | undefined
+): DeliveryDecision => {
 	if (!subscription) {
 		return { deliverable: false, reason: 'subscription not found' }
 	}
 	if (!subscription.enabled) {
 		return { deliverable: false, reason: 'subscription disabled' }
+	}
+	// Checked here as well as on save, for a row stored before the allowlist was configured or
+	// written past the form. A refusal rather than a failed attempt, so a queued delivery does
+	// not spend its retries on a host that will never be allowed.
+	if (!isAllowedHost(subscription.url, allowedHosts)) {
+		return {
+			deliverable: false,
+			reason: 'the endpoint host is not in delivery.allowedHosts, so the delivery was refused',
+		}
 	}
 	if (subscription.secretUnusable) {
 		return {

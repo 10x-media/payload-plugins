@@ -50,6 +50,61 @@ describe('webhooks factory', () => {
 		expect(withHeaders({ '  X-Padded  ': '1' })).not.toThrow()
 	})
 
+	describe('source collections', () => {
+		const withPosts = () => ({ collections: [{ slug: 'posts', fields: [] }] }) as unknown as Config
+
+		/**
+		 * A slug with no hook attached never emits, while the subscription form still offers its
+		 * events. Without generated types nothing else catches the typo.
+		 */
+		it('refuses a slug that matches no registered collection', () => {
+			expect(() => webhooks({ collections: { psots: true } })(withPosts())).toThrow(
+				/'psots'.*never emit/
+			)
+			expect(() => webhooks({ collections: { posts: true } })(withPosts())).not.toThrow()
+		})
+
+		it('refuses its own collections and Payload internals as sources', () => {
+			expect(() => webhooks({ collections: { 'webhook-deliveries': true } })(withPosts())).toThrow(
+				/cannot emit events/
+			)
+			expect(() => webhooks({ collections: { 'payload-jobs': true } })(withPosts())).toThrow(
+				/cannot emit events/
+			)
+		})
+	})
+
+	describe('delivery.allowedHosts', () => {
+		it('refuses a code subscription whose host is not on the list', () => {
+			const subscriptions = [{ id: 'crm', url: 'https://crm.elsewhere.test/hook', events: [] }]
+			expect(() =>
+				webhooks({ subscriptions, delivery: { allowedHosts: ['*.example.com'] } })(fakeConfig())
+			).toThrow(/code subscription 'crm'.*allowedHosts/)
+			expect(() => webhooks({ subscriptions })(fakeConfig())).not.toThrow()
+		})
+
+		it('refuses a list entry that is a url rather than a hostname', () => {
+			expect(() =>
+				webhooks({ delivery: { allowedHosts: ['https://hooks.example.com'] } })(fakeConfig())
+			).toThrow(/is not a hostname/)
+		})
+
+		it('refuses a list entry that is a url rather than a hostname', () => {
+			expect(() =>
+				webhooks({ delivery: { allowedHosts: ['https://hooks.example.com'] } })(fakeConfig())
+			).toThrow(/is not a hostname/)
+		})
+	})
+
+	it('refuses a retention window that is not a positive number of days', () => {
+		for (const retentionDays of [0, -1, Number.NaN]) {
+			expect(() => webhooks({ deliveriesLog: { retentionDays } })(fakeConfig())).toThrow(
+				/retentionDays/
+			)
+		}
+		expect(() => webhooks({ deliveriesLog: { retentionDays: 30 } })(fakeConfig())).not.toThrow()
+	})
+
 	describe('collection overrides', () => {
 		const built = (options: Parameters<typeof webhooks>[0]) => {
 			const out = webhooks(options)(fakeConfig()) as Config

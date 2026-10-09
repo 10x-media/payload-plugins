@@ -9,6 +9,8 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.fieldName]: 'Nom',
 	[keys.fieldUrl]: "URL de l'endpoint",
 	[keys.urlInvalid]: 'Saisissez une URL absolue en http:// ou https://.',
+	[keys.urlHostNotAllowed]:
+		'Cet hôte ne figure pas dans la liste des hôtes autorisés pour les webhooks.',
 	[keys.fieldEnabled]: 'Activé',
 	[keys.fieldEvents]: 'Événements',
 	[keys.fieldSecret]: 'Secret de signature',
@@ -37,7 +39,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.rotateSecretRejected]: 'Le renouvellement a été refusé. Vérifiez le secret fourni',
 	[keys.fieldHeaders]: 'En-têtes personnalisés',
 	[keys.headerReserved]:
-		"'{{name}}' est défini par le plugin à chaque livraison et ne peut pas être remplacé.",
+		"'{{name}}' est défini par le plugin ou par le transport HTTP à chaque livraison et ne peut pas être remplacé.",
 	[keys.headerInvalid]:
 		"'{{name}}' n'est pas un nom d'en-tête HTTP valide. Utilisez des lettres, des chiffres et les caractères !#$%&'*+-.^_`|~, sans espace.",
 	[keys.headerValueInvalid]: "La valeur d'un en-tête ne peut pas contenir de saut de ligne.",
@@ -48,6 +50,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.statusDead]: 'Abandonnée',
 	[keys.redeliver]: 'Relivrer',
 	[keys.redeliverDone]: 'Nouvelle livraison mise en file',
+	[keys.redeliverSent]: 'Relivrée',
 	[keys.redeliverFailed]: 'Impossible de relivrer',
 	[keys.redeliverConfirm]:
 		'Renvoyer cette charge utile ? Elle part comme une nouvelle livraison avec un nouveau webhook-id, un destinataire qui déduplique sur cet identifiant la traitera donc une seconde fois.',

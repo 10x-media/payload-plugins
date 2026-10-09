@@ -3,7 +3,7 @@ import { isSealed } from '@10x-media/fields/encrypted'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
 import type { CollectionConfig, PayloadRequest } from 'payload'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { webhooks } from '../../src/index'
+import { pruneDeliveries, webhooks } from '../../src/index'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 const articles: CollectionConfig = {
@@ -12,6 +12,14 @@ const articles: CollectionConfig = {
 	versions: { drafts: true },
 }
 const fragile: CollectionConfig = { slug: 'fragile', fields: [{ name: 'title', type: 'text' }] }
+const notes: CollectionConfig = {
+	slug: 'notes',
+	fields: [{ name: 'title', type: 'text' }],
+	versions: { drafts: { autosave: true } },
+}
+
+/** How long the sink holds a request to `/slow` before answering. */
+const SLOW_MS = 400
 
 type Hit = { headers: IncomingHttpHeaders; body: string }
 
@@ -26,8 +34,11 @@ describe('dispatch hardening', () => {
 	let sink: Server
 	let sinkUrl: string
 	let hits: Hit[] = []
+	/** Requests the sink is holding on `/slow` right now, and the most it has held at once. */
+	let slowInFlight = 0
+	let slowPeak = 0
 
-	const rawSubscriptions = () => {
+	const raw = (collection: string) => {
 		const { connection } = booted.payload.db as unknown as {
 			connection: {
 				collection: (name: string) => {
@@ -39,8 +50,9 @@ describe('dispatch hardening', () => {
 				}
 			}
 		}
-		return connection.collection('webhook-subscriptions')
+		return connection.collection(collection)
 	}
+	const rawSubscriptions = () => raw('webhook-subscriptions')
 
 	const subscribe = (name: string, data: Record<string, unknown> = {}) =>
 		booted.payload.create({
@@ -72,8 +84,20 @@ describe('dispatch hardening', () => {
 			})
 			request.on('end', () => {
 				hits.push({ headers: request.headers, body })
-				res.writeHead(200)
-				res.end('ok')
+				const answer = () => {
+					res.writeHead(200)
+					res.end('ok')
+				}
+				if (request.url === '/slow') {
+					slowInFlight += 1
+					slowPeak = Math.max(slowPeak, slowInFlight)
+					setTimeout(() => {
+						slowInFlight -= 1
+						answer()
+					}, SLOW_MS)
+				} else {
+					answer()
+				}
 			})
 		})
 		await new Promise<void>((r) => sink.listen(0, r))
@@ -92,11 +116,13 @@ describe('dispatch hardening', () => {
 							throw new Error('transform blew up')
 						},
 					},
+					notes: true,
 				},
-				delivery: { mode: 'inline', retries: 0 },
+				// The sink is the only host on the list, which every other case here relies on.
+				delivery: { mode: 'inline', retries: 0, allowedHosts: ['127.0.0.1'] },
 			}),
 			db: 'mongo',
-			collections: [posts, articles, fragile],
+			collections: [posts, articles, fragile, notes],
 		})
 	})
 
@@ -155,6 +181,49 @@ describe('dispatch hardening', () => {
 			expect(JSON.parse(hits[0]?.body ?? '{}').data.title).toBe('saved')
 		})
 
+		/**
+		 * Opening "Create new" on an autosave collection makes the admin create the document at
+		 * once, as an empty draft, through the Local API and so without the autosave flag.
+		 */
+		it('stays silent for the draft an autosave collection creates up front', async () => {
+			await subscribe('autosave-create', { events: ['notes.created', 'notes.updated'] })
+			// What the admin does on "Create new": a Local API create, as the signed-in user.
+			const note = await booted.payload.create({
+				collection: 'notes',
+				data: {},
+				draft: true,
+				overrideAccess: true,
+				user: { id: 'u1', collection: 'users' } as never,
+			})
+			expect(hits).toHaveLength(0)
+
+			await booted.payload.update({
+				collection: 'notes',
+				id: note.id,
+				data: { _status: 'published', title: 'written' } as never,
+				overrideAccess: true,
+			})
+			expect(hits).toHaveLength(1)
+			expect(JSON.parse(hits[0]?.body ?? '{}').event).toBe('notes.updated')
+		})
+
+		/**
+		 * Only the admin's own up-front create is skipped. An import or a seed creates drafts on an
+		 * autosave collection too, deliberately, and has no user on the request.
+		 */
+		it('still emits for a scripted draft create on an autosave collection', async () => {
+			await subscribe('autosave-import', { events: ['notes.created'] })
+			await booted.payload.create({
+				collection: 'notes',
+				data: { title: 'imported' },
+				overrideAccess: true,
+			})
+			expect(hits).toHaveLength(1)
+			const body = JSON.parse(hits[0]?.body ?? '{}')
+			expect(body.event).toBe('notes.created')
+			expect(body.data._status).toBe('draft')
+		})
+
 		it('keeps draft saves from leaving a collection that opted out, and emits on publish', async () => {
 			await subscribe('drafts')
 			const article = await booted.payload.create({
@@ -191,6 +260,93 @@ describe('dispatch hardening', () => {
 		expect(created.title).toBe('still saved')
 		expect(hits).toHaveLength(0)
 		expect(await deliveries()).toHaveLength(0)
+	})
+
+	/**
+	 * Inline deliveries hold the write open. Sent in turn, three receivers that each take
+	 * `SLOW_MS` would hold it for three times that; sent together, for about one. Asserted on how
+	 * many requests the sink held at once rather than on the clock, which a busy runner bends.
+	 */
+	it('sends inline deliveries together rather than one after another', async () => {
+		for (const name of ['slow-1', 'slow-2', 'slow-3']) {
+			await subscribe(name, { url: `${sinkUrl}/slow` })
+		}
+		slowPeak = 0
+		await booted.payload.create({ collection: 'posts', data: { title: 'x' }, overrideAccess: true })
+
+		expect(hits).toHaveLength(3)
+		expect(slowPeak).toBe(3)
+		expect((await deliveries()).map((d) => d.status)).toEqual(['success', 'success', 'success'])
+	})
+
+	describe('delivery.allowedHosts', () => {
+		it('rejects a subscription for a host that is not on the list', async () => {
+			await expect(subscribe('elsewhere', { url: 'https://elsewhere.test/hook' })).rejects.toThrow()
+		})
+
+		/** A row saved before the list existed, or written past the form, is refused when it fires. */
+		it('refuses the delivery for a stored subscription whose host is not on the list', async () => {
+			await subscribe('stale')
+			await rawSubscriptions().updateOne(
+				{ name: 'stale' },
+				{ $set: { url: 'http://localhost:9/hook' } }
+			)
+			await booted.payload.create({
+				collection: 'posts',
+				data: { title: 'x' },
+				overrideAccess: true,
+			})
+			expect(hits).toHaveLength(0)
+			const [delivery] = await deliveries()
+			expect(delivery?.status).toBe('dead')
+			expect(String(delivery?.error)).toMatch(/allowedHosts/)
+		})
+
+		/**
+		 * The list is enforced on the URL a write sets, not on the one already stored, or an
+		 * off-list row could not even be switched off.
+		 */
+		it('still lets a stored off-list subscription be saved, and refuses a new off-list url', async () => {
+			const created = await subscribe('stale-save')
+			await rawSubscriptions().updateOne(
+				{ name: 'stale-save' },
+				{ $set: { url: 'http://localhost:9/hook' } }
+			)
+			const update = (data: Record<string, unknown>) =>
+				booted.payload.update({
+					collection: 'webhook-subscriptions',
+					id: created.id,
+					data,
+					overrideAccess: true,
+				})
+
+			await expect(update({ enabled: false })).resolves.toMatchObject({ enabled: false })
+			await expect(update({ url: 'https://elsewhere.test/hook' })).rejects.toThrow()
+		})
+	})
+
+	/**
+	 * The log stores the full body of every delivery. Only finished rows go: one still waiting on
+	 * an attempt is kept however old it is.
+	 */
+	it('prunes finished deliveries older than the retention window, and nothing else', async () => {
+		await subscribe('prune')
+		for (const title of ['old-done', 'old-pending', 'recent']) {
+			await booted.payload.create({ collection: 'posts', data: { title }, overrideAccess: true })
+		}
+		const long = new Date(Date.now() - 40 * 86_400_000)
+		const byTitle = (title: string) => ({ 'payload.data.title': title })
+		await raw('webhook-deliveries').updateOne(byTitle('old-done'), { $set: { createdAt: long } })
+		await raw('webhook-deliveries').updateOne(byTitle('old-pending'), {
+			$set: { createdAt: long, status: 'pending' },
+		})
+
+		await pruneDeliveries(booted.payload, { olderThanDays: 30 })
+
+		const left = (await deliveries()).map(
+			(d) => (d.payload as { data: { title: string } }).data.title
+		)
+		expect(left.sort()).toEqual(['old-pending', 'recent'])
 	})
 
 	it('records which registry a delivery subscription came from', async () => {

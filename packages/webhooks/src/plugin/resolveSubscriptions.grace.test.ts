@@ -73,7 +73,7 @@ describe('unusable secrets', () => {
 		expect(resolved.retiredSecretUnusable).toBe(true)
 		expect(resolved.retiredSecretUnusableReason).toBe('corrupt')
 		expect(resolved.secrets).toEqual([current])
-		expect(decideDelivery(resolved).deliverable).toBe(true)
+		expect(decideDelivery(resolved, undefined).deliverable).toBe(true)
 	})
 
 	it('still refuses when the active secret is the unusable one, whatever the retired slot holds', () => {
@@ -83,7 +83,7 @@ describe('unusable secrets', () => {
 		)
 		expect(resolved.secretUnusable).toBe(true)
 		expect(resolved.secrets).toEqual([previous])
-		expect(decideDelivery(resolved).deliverable).toBe(false)
+		expect(decideDelivery(resolved, undefined).deliverable).toBe(false)
 	})
 
 	it('does not flag a subscription that simply has no secret', () => {
@@ -94,7 +94,7 @@ describe('unusable secrets', () => {
 		expect(resolved.secretUnusable).toBe(false)
 		expect(resolved.secretHidden).toBe(false)
 		expect(resolved.secrets).toEqual([])
-		expect(decideDelivery(resolved).deliverable).toBe(true)
+		expect(decideDelivery(resolved, undefined).deliverable).toBe(true)
 	})
 
 	/**
@@ -111,7 +111,7 @@ describe('unusable secrets', () => {
 		expect(resolved.secretHidden).toBe(true)
 		expect(resolved.secretUnusable).toBe(false)
 		expect(resolved.secrets).toEqual([])
-		const decision = decideDelivery(resolved)
+		const decision = decideDelivery(resolved, undefined)
 		expect(decision.deliverable).toBe(false)
 		expect(decision.deliverable === false && decision.reason).toMatch(/not read for signing/)
 	})
@@ -124,7 +124,7 @@ describe('decideDelivery', () => {
 	)
 
 	it('allows a healthy subscription and narrows it', () => {
-		const decision = decideDelivery(base)
+		const decision = decideDelivery(base, undefined)
 		expect(decision.deliverable).toBe(true)
 		if (decision.deliverable) {
 			expect(decision.subscription.secrets).toEqual([current])
@@ -132,8 +132,8 @@ describe('decideDelivery', () => {
 	})
 
 	it('refuses a missing or disabled subscription', () => {
-		expect(decideDelivery(null)).toMatchObject({ reason: 'subscription not found' })
-		expect(decideDelivery({ ...base, enabled: false })).toMatchObject({
+		expect(decideDelivery(null, undefined)).toMatchObject({ reason: 'subscription not found' })
+		expect(decideDelivery({ ...base, enabled: false }, undefined)).toMatchObject({
 			reason: 'subscription disabled',
 		})
 	})

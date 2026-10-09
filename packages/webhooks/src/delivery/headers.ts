@@ -7,6 +7,11 @@
  * `content-type` and `user-agent` are here for the same reason rather than a weaker one: the body
  * is always `JSON.stringify` output, so a subscription that relabels it `text/plain` mislabels
  * every delivery it sends and gives the receiver nothing to notice that with.
+ *
+ * The rest belong to the HTTP transport. `fetch` throws on `transfer-encoding`, `keep-alive`,
+ * `upgrade` and `expect`, hangs until the timeout on a `content-length` that disagrees with the
+ * body, and silently replaces `host`, so a subscription setting one either kills every delivery
+ * or looks like it worked when it did not.
  */
 const RESERVED = new Set([
 	'content-type',
@@ -15,6 +20,12 @@ const RESERVED = new Set([
 	'webhook-timestamp',
 	'webhook-signature',
 	'x-webhook-event',
+	'content-length',
+	'transfer-encoding',
+	'keep-alive',
+	'upgrade',
+	'expect',
+	'host',
 ])
 
 /** The reserved names in their canonical spelling, for error messages. */

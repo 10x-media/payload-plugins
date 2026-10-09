@@ -93,12 +93,22 @@ describe('decideDelivery', () => {
 	)
 
 	it('delivers a subscription with no secret at all, unsigned', () => {
-		expect(decideDelivery(base).deliverable).toBe(true)
+		expect(decideDelivery(base, undefined).deliverable).toBe(true)
+	})
+
+	/** Enforced at delivery too, for a row saved before the allowlist was configured. */
+	it('refuses a subscription whose host is outside a configured allowlist', () => {
+		const elsewhere = { ...base, url: 'https://elsewhere.test/hook' }
+		const decision = decideDelivery(elsewhere, ['hooks.example.com'])
+		expect(decision.deliverable).toBe(false)
+		expect(!decision.deliverable && decision.reason).toMatch(/allowedHosts/)
+		expect(decideDelivery(elsewhere, undefined).deliverable).toBe(true)
+		expect(decideDelivery(elsewhere, ['elsewhere.test']).deliverable).toBe(true)
 	})
 
 	/** A receiver that authenticates on the header would otherwise be sent the request without it. */
 	it('refuses a subscription whose encrypted header value could not be recovered', () => {
-		const decision = decideDelivery({ ...base, headersUnusable: true })
+		const decision = decideDelivery({ ...base, headersUnusable: true }, undefined)
 		expect(decision.deliverable).toBe(false)
 		expect(!decision.deliverable && decision.reason).toMatch(/custom header value/)
 	})
@@ -111,7 +121,7 @@ describe('decideDelivery', () => {
 				retired: ABSENT,
 			}
 		)
-		const decision = decideDelivery(sub)
+		const decision = decideDelivery(sub, undefined)
 		expect(decision.deliverable).toBe(false)
 		expect(decision.deliverable === false && decision.reason).toContain(
 			'the ring is missing its key'
@@ -123,7 +133,7 @@ describe('decideDelivery', () => {
 			{ id: 1, url: 'u' },
 			{ active: { secret: null, state: 'hidden' }, retired: ABSENT }
 		)
-		const decision = decideDelivery(sub)
+		const decision = decideDelivery(sub, undefined)
 		expect(decision.deliverable).toBe(false)
 		expect(decision.deliverable === false && decision.reason).toMatch(/not read for signing/)
 	})
@@ -136,7 +146,7 @@ describe('decideDelivery', () => {
 				retired: { reason: 'corrupt', secret: null, state: 'unusable' },
 			}
 		)
-		expect(decideDelivery(sub).deliverable).toBe(true)
+		expect(decideDelivery(sub, undefined).deliverable).toBe(true)
 		expect(sub.retiredSecretUnusable).toBe(true)
 	})
 })

@@ -9,6 +9,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fieldName]: 'Name',
 	[keys.fieldUrl]: 'Endpoint-URL',
 	[keys.urlInvalid]: 'Geben Sie eine absolute URL mit http:// oder https:// ein.',
+	[keys.urlHostNotAllowed]: 'Dieser Host steht nicht auf der Liste der erlaubten Webhook-Hosts.',
 	[keys.fieldEnabled]: 'Aktiviert',
 	[keys.fieldEvents]: 'Ereignisse',
 	[keys.fieldSecret]: 'Signaturgeheimnis',
@@ -37,7 +38,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.rotateSecretRejected]: 'Die Rotation wurde abgelehnt. Prüfen Sie das angegebene Geheimnis',
 	[keys.fieldHeaders]: 'Eigene Header',
 	[keys.headerReserved]:
-		"'{{name}}' wird vom Plugin bei jeder Zustellung gesetzt und kann nicht überschrieben werden.",
+		"'{{name}}' wird vom Plugin oder vom HTTP-Transport bei jeder Zustellung gesetzt und kann nicht überschrieben werden.",
 	[keys.headerInvalid]:
 		"'{{name}}' ist kein gültiger HTTP-Headername. Verwenden Sie Buchstaben, Ziffern und die Zeichen !#$%&'*+-.^_`|~ ohne Leerzeichen.",
 	[keys.headerValueInvalid]: 'Ein Header-Wert darf keine Zeilenumbrüche enthalten.',
@@ -48,6 +49,7 @@ export const de: Record<TranslationKey, string> = {
 	[keys.statusDead]: 'Aufgegeben',
 	[keys.redeliver]: 'Erneut zustellen',
 	[keys.redeliverDone]: 'Erneute Zustellung eingereiht',
+	[keys.redeliverSent]: 'Erneut zugestellt',
 	[keys.redeliverFailed]: 'Erneute Zustellung fehlgeschlagen',
 	[keys.redeliverConfirm]:
 		'Diese Nutzlast erneut senden? Sie geht als neue Zustellung mit neuer webhook-id raus, ein Empfänger, der anhand der ID dedupliziert, verarbeitet sie also ein zweites Mal.',

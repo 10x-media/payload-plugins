@@ -54,6 +54,14 @@ export type DeliveryOptions = {
 	timeoutMs?: number
 	retries?: number
 	queue?: string
+	/**
+	 * Hostnames deliveries may be sent to. Unset, every host is allowed, localhost and private
+	 * addresses included, which is what development and internal receivers need. Set, it is an
+	 * allowlist: an exact hostname, or `*.example.com` for any subdomain. A subscription for any
+	 * other host is rejected on save, a code subscription for one fails at startup, and a row
+	 * that already points at one is refused at delivery time. An empty list allows no host at all.
+	 */
+	allowedHosts?: string[]
 }
 
 /** Replace the default fields, or transform them (the idiomatic Payload form). */
@@ -109,7 +117,18 @@ export type WebhooksPluginOptions = {
 	subscriptions?: CodeSubscription[]
 	delivery?: DeliveryMode | DeliveryOptions
 	subscriptionsCollection?: { slug?: string; hidden?: boolean; overrides?: CollectionOverride }
-	deliveriesLog?: { slug?: string; hidden?: boolean; overrides?: CollectionOverride }
+	deliveriesLog?: {
+		slug?: string
+		hidden?: boolean
+		overrides?: CollectionOverride
+		/**
+		 * Days a finished delivery (`success` or `dead`) is kept. Unset, the log is never pruned.
+		 * The log stores the full body of every delivery, so it grows with every write to a watched
+		 * collection. Pruning runs after an event is dispatched, at most once an hour per process;
+		 * `pruneDeliveries` is exported for a cron that wants it on a schedule.
+		 */
+		retentionDays?: number
+	}
 	secretEncryption?: SecretEncryptionOptions
 	secretRotation?: SecretRotationOptions
 }
@@ -142,6 +161,7 @@ export type ResolvedDeliveryOptions = {
 	timeoutMs: number
 	retries: number
 	queue: string
+	allowedHosts?: string[]
 }
 
 export const resolveDeliveryOptions = (
@@ -154,5 +174,6 @@ export const resolveDeliveryOptions = (
 		timeoutMs: opts.timeoutMs ?? DEFAULT_TIMEOUT_MS,
 		retries: opts.retries ?? DEFAULT_RETRIES,
 		queue: opts.queue ?? DEFAULT_DELIVERY_QUEUE,
+		allowedHosts: opts.allowedHosts,
 	}
 }
