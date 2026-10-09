@@ -251,6 +251,7 @@
 		"webhooks-initial-beta",
 		"webhooks-locales",
 		"webhooks-previous-data-transform",
-		"webhooks-redeliver-endpoint"
+		"webhooks-redeliver-endpoint",
+		"webhooks-standard-webhooks-signing"
 	]
 }
