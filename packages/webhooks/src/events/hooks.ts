@@ -9,7 +9,7 @@ import type {
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import { buildPayload } from '../delivery/buildPayload'
-import { sendDelivery } from '../delivery/sendDelivery'
+import { messageId, sendDelivery } from '../delivery/sendDelivery'
 import type { CodeSubscription, CollectionWebhookConfig, WebhookOperation } from '../options'
 import {
 	decideDelivery,
@@ -169,7 +169,7 @@ const dispatch = async (args: {
 			req,
 		})
 		const deliveryId = String(created.id)
-		const body = { ...template, id: deliveryId }
+		const body = { ...template, id: messageId(deliveryId) }
 		await payload.update({
 			collection: deps.deliveriesSlug as CollectionSlug,
 			id: deliveryId,

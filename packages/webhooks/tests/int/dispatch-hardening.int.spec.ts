@@ -234,6 +234,40 @@ describe('dispatch hardening', () => {
 			expect(hits[0]?.headers.authorization).toBe('Bearer plain-legacy')
 		})
 
+		/**
+		 * The admin reads the value back and resubmits it on every save. Read as null, the save would
+		 * write null over the receiver's credential; read as it is, the save seals it.
+		 */
+		it('reads a header value stored before encryption back as it is, and seals it on save', async () => {
+			const created = await withAuth('legacy-save')
+			await rawSubscriptions().updateOne(
+				{ name: 'legacy-save' },
+				{ $set: { 'headers.0.value': 'Bearer plain-legacy' } }
+			)
+			const read = await booted.payload.findByID({
+				collection: 'webhook-subscriptions',
+				id: created.id,
+				overrideAccess: true,
+			})
+			expect(read.headers?.[0]?.value).toBe('Bearer plain-legacy')
+
+			await booted.payload.update({
+				collection: 'webhook-subscriptions',
+				id: created.id,
+				data: { headers: read.headers },
+				overrideAccess: true,
+			})
+			const raw = await rawSubscriptions().findOne({ name: 'legacy-save' })
+			expect(isSealed((raw?.headers as { value: unknown }[])[0]?.value)).toBe(true)
+
+			await booted.payload.create({
+				collection: 'posts',
+				data: { title: 'x' },
+				overrideAccess: true,
+			})
+			expect(hits[0]?.headers.authorization).toBe('Bearer plain-legacy')
+		})
+
 		/** Sending without it, or sending the ciphertext, are both worse than not sending. */
 		it('refuses the delivery when a sealed value cannot be decrypted', async () => {
 			await withAuth('unreadable')
@@ -256,6 +290,11 @@ describe('dispatch hardening', () => {
 			await expect(
 				subscribe('crlf', { headers: [{ key: 'X-Trace', value: 'a\r\nInjected: 1' }] })
 			).rejects.toThrow()
+		})
+
+		it('stores a padded header name trimmed, as it was validated', async () => {
+			const created = await subscribe('padded', { headers: [{ key: '  X-Padded ', value: '1' }] })
+			expect(created.headers?.[0]?.key).toBe('X-Padded')
 		})
 	})
 

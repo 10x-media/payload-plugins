@@ -52,6 +52,10 @@ describe('withoutReservedHeaders', () => {
 		expect(withoutReservedHeaders(custom)).toEqual(custom)
 	})
 
+	it('sends a padded name trimmed, as it was validated', () => {
+		expect(withoutReservedHeaders({ '  X-Padded ': '1' })).toEqual({ 'X-Padded': '1' })
+	})
+
 	it('handles an absent header map', () => {
 		expect(withoutReservedHeaders(undefined)).toBeUndefined()
 		expect(withoutReservedHeaders({})).toBeUndefined()

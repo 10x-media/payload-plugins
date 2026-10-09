@@ -79,7 +79,7 @@ That scope is pinned rather than derived from the collection slug, because the s
 
 A subscription's custom header values are encrypted at rest with the same key ring, because that is where a receiver's own credential goes. Unlike the signing secret they are **masked, not write-only**: the admin shows dots with a reveal toggle, and a read through REST or GraphQL returns the value to whoever may read the subscription. Plenty of header values are not secrets, and an operator needs to read them back.
 
-A value stored before this release stays as it is and keeps working; it is sealed the next time the subscription is saved. A sealed value that can no longer be decrypted (its key left the ring) refuses the delivery, like an unrecoverable secret does: put the key back, or enter the value again.
+A value stored before this release reads back and delivers as it is, and is sealed the next time the subscription is saved. A sealed value that can no longer be decrypted (its key left the ring) refuses the delivery, like an unrecoverable secret does: put the key back, or enter the value again.
 
 ### A secret that cannot be recovered refuses the delivery
 
@@ -135,7 +135,9 @@ This is [not the same thing](/webhooks/signing#two-different-things-are-called-r
    await rotateEncryptedFields(payload, { collections: ['webhook-subscriptions'] })
    ```
 
-3. Drop `k1` from the ring.
+3. Re-save every subscription that has custom headers, from the admin or with a `payload.update` that resubmits its `headers`. `rotateEncryptedFields` does not reach fields inside an array, so header values stay sealed under `k1` until a save re-seals them.
+
+4. Drop `k1` from the ring. A header value still sealed under it can no longer be decrypted, and that subscription's deliveries are refused until the value is entered again.
 
 ### Changing PAYLOAD_SECRET
 

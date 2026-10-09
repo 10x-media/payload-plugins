@@ -3,7 +3,7 @@ import type { CollectionSlug, JsonObject, Payload, PayloadRequest } from 'payloa
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import type { CodeSubscription } from '../options'
 import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
-import { sendDelivery } from './sendDelivery'
+import { messageId, sendDelivery } from './sendDelivery'
 
 /** Dependencies for re-dispatching a stored delivery. */
 export type RedeliverDeps = {
@@ -48,7 +48,6 @@ export const redeliverDelivery = async (args: {
 			subscriptionSource: original.subscriptionSource ?? subscription?.source,
 			endpoint: subscription?.url ?? original.endpoint,
 			event: original.event,
-			payload: original.payload,
 			status: 'pending',
 			attempt: 0,
 		},
@@ -56,6 +55,15 @@ export const redeliverDelivery = async (args: {
 		req,
 	})
 	const newId = String(created.id)
+	// A replay is a new delivery with its own `webhook-id`, so the body is restamped to match it.
+	const body = { ...(original.payload as JsonObject), id: messageId(newId) }
+	await payload.update({
+		collection: deps.deliveriesSlug as CollectionSlug,
+		id: newId,
+		data: { payload: body },
+		overrideAccess: true,
+		req,
+	})
 
 	if (deps.mode === 'queue') {
 		// deliverTask re-resolves the subscription (and re-checks enabled) when it runs, so no
@@ -84,7 +92,7 @@ export const redeliverDelivery = async (args: {
 		subscription: decision.subscription,
 		deliveryId: newId,
 		event: String(original.event),
-		body: JSON.stringify(original.payload),
+		body: JSON.stringify(body),
 		timeoutMs: deps.timeoutMs,
 		now: Date.now(),
 	})

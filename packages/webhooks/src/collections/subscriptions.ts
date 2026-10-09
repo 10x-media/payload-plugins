@@ -1,9 +1,15 @@
-import { encryptedField, isSealed, type KeysConfig } from '@10x-media/fields/encrypted'
+import {
+	type DecryptFailurePolicy,
+	encryptedField,
+	isSealed,
+	type KeysConfig,
+} from '@10x-media/fields/encrypted'
 import {
 	type CollectionAfterChangeHook,
 	type CollectionBeforeChangeHook,
 	type CollectionBeforeValidateHook,
 	type CollectionConfig,
+	type FieldHook,
 	type PayloadRequest,
 	ValidationError,
 } from 'payload'
@@ -195,6 +201,22 @@ const validateHeaderValue = (
 		? asTranslate(req.t)(keys.headerValueInvalid)
 		: true
 
+const trimHeaderName: FieldHook = ({ value }) => (typeof value === 'string' ? value.trim() : value)
+
+/**
+ * Read policy for an encrypted header value that does not open.
+ *
+ * A sealed value no configured key opens reads as null. The default throws, so one such header
+ * would make the whole subscription unreadable, in the admin and to the resolver alike; null costs
+ * that header only, and the resolver refuses the delivery.
+ *
+ * A value that is not sealed at all was stored before header values were encrypted, and comes back
+ * as it is. The field reports it as a decrypt failure too, and nulling it would show the admin an
+ * empty value that the next save then writes back, silently dropping a receiver's credential.
+ * Passed through, the next save seals it instead.
+ */
+const headerDecryptFailure: DecryptFailurePolicy = ({ value }) => (isSealed(value) ? null : value)
+
 /** Admin-managed subscriptions collection; `events` options come from the catalog. */
 export const buildSubscriptionsCollection = (args: {
 	slug: string
@@ -270,6 +292,9 @@ export const buildSubscriptionsCollection = (args: {
 							name: 'key',
 							type: 'text',
 							required: true,
+							// Validation judges the trimmed name, so that is the one stored: a padded
+							// name would pass the form and then make `fetch` throw at delivery time.
+							hooks: { beforeValidate: [trimHeaderName] },
 							/**
 							 * A custom `validate` replaces Payload's built-in field validation rather
 							 * than running alongside it, so `required: true` alone would no longer be
@@ -306,10 +331,7 @@ export const buildSubscriptionsCollection = (args: {
 							{
 								aadScope: SECRET_AAD_SCOPE,
 								keys: args.secretKeys,
-								// The default throws, so one header nobody can decrypt would make the
-								// whole subscription unreadable, in the admin and to the resolver alike.
-								// Null costs that header only, and the resolver refuses the delivery.
-								onDecryptFailure: 'null',
+								onDecryptFailure: headerDecryptFailure,
 							}
 						),
 					],

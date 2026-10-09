@@ -68,7 +68,7 @@ A redelivery is a **new** delivery: the fresh row means a fresh `webhook-id`, so
 
 ```json
 {
-  "id": "<delivery-id>",
+  "id": "msg_<delivery-id>",
   "event": "posts.updated",
   "collection": "posts",
   "operation": "update",
@@ -77,3 +77,5 @@ A redelivery is a **new** delivery: the fresh row means a fresh `webhook-id`, so
   "previousData": { "...": "present on update when includePreviousData is on" }
 }
 ```
+
+`id` is the same string as the `webhook-id` header. A redelivery carries its own, since it is a new delivery.

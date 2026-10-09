@@ -31,13 +31,19 @@ const HEADER_NAME = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/
 
 export const isValidHeaderName = (name: string): boolean => HEADER_NAME.test(name.trim())
 
-/** Custom headers minus any that would collide with the plugin's own. */
+/**
+ * Custom headers minus any that would collide with the plugin's own, with names trimmed. Names are
+ * validated trimmed, so they are sent trimmed: a padded name in a code subscription, or in a row
+ * saved before the form trimmed it, would otherwise pass validation and make `fetch` throw.
+ */
 export const withoutReservedHeaders = (
 	headers?: Record<string, string>
 ): Record<string, string> | undefined => {
 	if (!headers) {
 		return undefined
 	}
-	const entries = Object.entries(headers).filter(([key]) => !isReservedHeader(key))
+	const entries = Object.entries(headers)
+		.map(([key, value]) => [key.trim(), value] as const)
+		.filter(([key]) => !isReservedHeader(key))
 	return entries.length ? Object.fromEntries(entries) : undefined
 }

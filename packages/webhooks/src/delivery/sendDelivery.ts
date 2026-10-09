@@ -7,6 +7,17 @@ import { signatureHeader, signPayload } from './sign'
 const USER_AGENT = '10x-media-webhooks'
 
 /**
+ * The id a receiver sees for one delivery, in the `webhook-id` header and as the body's `id`.
+ *
+ * Opaque rather than the delivery row's primary key: on a SQL adapter that key is a sequential
+ * integer, so consecutive deliveries would publish this install's volume to every receiver and
+ * make a poor dedupe key for anyone consuming webhooks from more than one source. The MAC covers
+ * the header, so both sides must use the same string, and the body carries the same one so the
+ * two cannot be told apart.
+ */
+export const messageId = (deliveryId: string): string => `${MESSAGE_ID_PREFIX}${deliveryId}`
+
+/**
  * Assemble headers (+ signatures) and POST the body to the subscription's URL. The `body` string
  * is signed and sent unchanged: the Standard Webhooks MAC covers the exact transmitted bytes, so
  * nothing may parse and re-serialize it between here and the wire.
@@ -33,22 +44,19 @@ export const sendDelivery = (args: {
 		)
 	}
 	const timestamp = Math.floor(now / 1000)
-	// Opaque and stable across retries, rather than the delivery row's primary key: on a SQL
-	// adapter that key is a sequential integer, so consecutive deliveries would publish this
-	// install's volume to every receiver and make a poor dedupe key for anyone consuming webhooks
-	// from more than one source. The MAC covers it, so both sides must use the same string.
-	const messageId = `${MESSAGE_ID_PREFIX}${deliveryId}`
+	// Stable across retries, since a retry re-sends the same delivery row.
+	const id = messageId(deliveryId)
 	const headers: Record<string, string> = {
 		'Content-Type': 'application/json',
 		'User-Agent': USER_AGENT,
-		'webhook-id': messageId,
+		'webhook-id': id,
 		'webhook-timestamp': String(timestamp),
 		'X-Webhook-Event': event,
 		...withoutReservedHeaders(subscription.headers),
 	}
 	if (subscription.secrets.length) {
 		headers['webhook-signature'] = signatureHeader(
-			subscription.secrets.map((secret) => signPayload({ secret, id: messageId, timestamp, body }))
+			subscription.secrets.map((secret) => signPayload({ secret, id, timestamp, body }))
 		)
 	}
 	return deliver({ url: subscription.url, body, headers, timeoutMs })

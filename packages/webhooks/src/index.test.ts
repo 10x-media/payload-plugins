@@ -40,6 +40,16 @@ describe('webhooks factory', () => {
 		).toThrow(/reserved header/)
 	})
 
+	it('rejects a code subscription header that fetch could not send', () => {
+		const withHeaders = (headers: Record<string, string>) => () =>
+			webhooks({ subscriptions: [{ id: 'crm', url: 'https://x', events: [], headers }] })(
+				fakeConfig()
+			)
+		expect(withHeaders({ 'X Custom': '1' })).toThrow(/not a valid HTTP header name/)
+		expect(withHeaders({ 'X-Trace': 'a\r\nInjected: 1' })).toThrow(/line break/)
+		expect(withHeaders({ '  X-Padded  ': '1' })).not.toThrow()
+	})
+
 	describe('collection overrides', () => {
 		const built = (options: Parameters<typeof webhooks>[0]) => {
 			const out = webhooks(options)(fakeConfig()) as Config

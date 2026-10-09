@@ -130,6 +130,17 @@ describe('interoperability with the standardwebhooks verifier', () => {
 		expect(payload).toMatchObject({ event: 'posts.created' })
 	})
 
+	/** The body's id is the opaque message id too, so the row's primary key never leaves either way. */
+	it('carries the webhook-id as the body id', async () => {
+		await clear()
+		await subscribe('body-id')
+
+		const hit = await captureDelivery('body id matches header')
+
+		expect(String(hit.headers['webhook-id'])).toMatch(/^msg_/)
+		expect(JSON.parse(hit.body).id).toBe(hit.headers['webhook-id'])
+	})
+
 	it('is rejected by the verifier when the body is altered in transit', async () => {
 		await clear()
 		const created = await subscribe('tampered')

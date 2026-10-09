@@ -15,7 +15,7 @@ import { buildDeliveriesCollection } from '../collections/deliveries'
 import { buildSubscriptionsCollection } from '../collections/subscriptions'
 import { DEFAULT_DELIVERIES_SLUG, DEFAULT_SUBSCRIPTIONS_SLUG, RESERVED_SLUGS } from '../constants'
 import { buildDeliverTask } from '../delivery/deliverTask'
-import { isReservedHeader, RESERVED_HEADER_NAMES } from '../delivery/headers'
+import { isReservedHeader, isValidHeaderName, RESERVED_HEADER_NAMES } from '../delivery/headers'
 import { redeliverDelivery } from '../delivery/redeliver'
 import { eventCatalog } from '../events/eventTypes'
 import { makeAfterChange, makeAfterDelete } from '../events/hooks'
@@ -51,16 +51,27 @@ const assertCodeSubscriptionSecrets = (subscriptions: CodeSubscription[]): void 
 }
 
 /**
- * Refuse a code subscription that tries to set a header the delivery pipeline owns. Runtime
- * filtering already drops these, so failing here is about telling the author rather than
- * letting a silently ignored header look like it worked.
+ * Refuse a code subscription header the delivery could not send as written. A reserved name is
+ * dropped at runtime, so failing here is about telling the author rather than letting a silently
+ * ignored header look like it worked. A name that is not an HTTP token, or a value with a line
+ * break, makes `fetch` throw on every delivery, which the form already refuses for admin rows.
  */
 const assertCodeSubscriptionHeaders = (subscriptions: CodeSubscription[]): void => {
 	for (const subscription of subscriptions) {
-		for (const key of Object.keys(subscription.headers ?? {})) {
+		for (const [key, value] of Object.entries(subscription.headers ?? {})) {
 			if (isReservedHeader(key)) {
 				throw new Error(
 					`@10x-media/webhooks: code subscription '${subscription.id}' sets the reserved header '${key}'. The plugin sets ${RESERVED_HEADER_NAMES.join(', ')} on every delivery.`
+				)
+			}
+			if (!isValidHeaderName(key)) {
+				throw new Error(
+					`@10x-media/webhooks: code subscription '${subscription.id}' sets the header '${key}', which is not a valid HTTP header name.`
+				)
+			}
+			if (/[\r\n\0]/.test(value)) {
+				throw new Error(
+					`@10x-media/webhooks: code subscription '${subscription.id}' sets a value for '${key}' that contains a line break or NUL.`
 				)
 			}
 		}

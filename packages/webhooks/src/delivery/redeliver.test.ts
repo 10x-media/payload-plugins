@@ -47,6 +47,15 @@ describe('redeliverDelivery', () => {
 		vi.restoreAllMocks()
 	})
 
+	/** A replay goes out under its own `webhook-id`, and the body's `id` is that same string. */
+	it('restamps the replayed body with the new delivery message id', async () => {
+		const { payload, updates } = makePayload(null)
+
+		await redeliverDelivery({ deps, deliveryId: 'del-1', payload, req })
+
+		expect(updates[0]).toEqual({ payload: { data: { id: 'p1' }, id: 'msg_del-2' } })
+	})
+
 	it('marks the new delivery dead without sending when the subscription is disabled', async () => {
 		const { payload, updates, creates } = makePayload({
 			id: 'sub-1',
@@ -60,7 +69,7 @@ describe('redeliverDelivery', () => {
 
 		expect(result.id).toBe('del-2')
 		expect(fetchSpy).not.toHaveBeenCalled()
-		expect(updates).toEqual([{ status: 'dead', error: 'subscription disabled' }])
+		expect(updates.slice(1)).toEqual([{ status: 'dead', error: 'subscription disabled' }])
 		expect(creates[0]?.endpoint).toBe('https://receiver.test/hook')
 	})
 
@@ -76,7 +85,7 @@ describe('redeliverDelivery', () => {
 		await redeliverDelivery({ deps, deliveryId: 'del-1', payload, req })
 
 		expect(fetchSpy).not.toHaveBeenCalled()
-		expect(updates).toEqual([{ status: 'dead', error: 'subscription disabled' }])
+		expect(updates.slice(1)).toEqual([{ status: 'dead', error: 'subscription disabled' }])
 		expect(creates[0]?.endpoint).toBe('https://receiver.test/new-hook')
 		expect(creates[0]?.endpoint).not.toBe(original.endpoint)
 	})
@@ -88,7 +97,7 @@ describe('redeliverDelivery', () => {
 		await redeliverDelivery({ deps, deliveryId: 'del-1', payload, req })
 
 		expect(fetchSpy).not.toHaveBeenCalled()
-		expect(updates).toEqual([{ status: 'dead', error: 'subscription not found' }])
+		expect(updates.slice(1)).toEqual([{ status: 'dead', error: 'subscription not found' }])
 		expect(creates[0]?.endpoint).toBe(original.endpoint)
 	})
 
