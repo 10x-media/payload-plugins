@@ -36,7 +36,10 @@ export default defineConfig({
 			DEV_DB: process.env.DEV_DB ?? 'mongo',
 			DATABASE_URI_MONGO: `mongodb://localhost:${mongoPort}/{{pluginSlug}}_e2e?replicaSet=rs0&directConnection=true`,
 			DATABASE_URI_POSTGRES: `postgres://e2e:e2e@localhost:${pgPort}/{{pluginSlug}}_e2e`,
-			PAYLOAD_SECRET: 'e2e-secret',
+			// At least 16 bytes: a plugin that stores anything through `encryptedField` derives its
+			// key from this, and `@10x-media/fields` refuses to derive one from less, which fails
+			// Payload's init and leaves every e2e test running against an empty admin.
+			PAYLOAD_SECRET: 'e2e-secret-material-32-bytes-minimum!!',
 		},
 	},
 })
