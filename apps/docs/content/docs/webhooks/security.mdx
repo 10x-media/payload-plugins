@@ -9,9 +9,26 @@ The plugin's security posture is simple to state: **admin access is the trust bo
 
 Deliveries POST to whatever URL a subscription specifies, including private and internal hosts. That is the feature working as designed for trusted admins, and an SSRF vector if your admins are not fully trusted. The subscription form checks only that the URL is absolute `http:` or `https:`; it does not judge the host, because localhost and private addresses are what development and internal receivers look like. If your admins are not fully trusted:
 
+- set `delivery.allowedHosts` (below), or
 - restrict outbound egress from the Payload host at the network layer, or
-- front receivers with an allowlist, or
 - drop admin-managed subscriptions entirely and use only [code subscriptions](/webhooks/subscriptions#code-subscriptions), whose URLs live in your repository and environment.
+
+### Allowing only named hosts
+
+`delivery.allowedHosts` turns the open default into an allowlist:
+
+```ts title="payload.config.ts"
+webhooks({
+  collections: { posts: true },
+  delivery: { allowedHosts: ['hooks.example.com', '*.partners.example.com'] },
+})
+```
+
+An entry is an exact hostname, or `*.example.com` for any subdomain (not `example.com` itself); the port is not part of the match. Once set, a subscription for any other host is rejected on save, a code subscription for one fails at startup, and a row that already points at one is refused at delivery time and marked `dead`. Leave it unset in development, where the receiver is usually localhost. An entry that is not a bare hostname (a URL, a port, a path) fails at startup, and an empty list allows no host at all.
+
+The list is checked against the URL a save sets, not the one already stored. A subscription saved before the list existed can still be renamed, rotated or switched off; what it cannot do is deliver, or be pointed at another host that is not on the list.
+
+It is an allowlist rather than a block on private addresses on purpose. A name on the list is one you chose, whereas blocking private ranges would have to resolve DNS and pin the result to mean anything, since a public name can point at an internal address. Because deliveries do not follow redirects, an allowed host cannot hand the request on to one that is not.
 
 ## Access defaults
 
@@ -79,7 +96,7 @@ That scope is pinned rather than derived from the collection slug, because the s
 
 A subscription's custom header values are encrypted at rest with the same key ring, because that is where a receiver's own credential goes. Unlike the signing secret they are **masked, not write-only**: the admin shows dots with a reveal toggle, and a read through REST or GraphQL returns the value to whoever may read the subscription. Plenty of header values are not secrets, and an operator needs to read them back.
 
-A value stored before this release reads back and delivers as it is, and is sealed the next time the subscription is saved. A sealed value that can no longer be decrypted (its key left the ring) refuses the delivery, like an unrecoverable secret does: put the key back, or enter the value again.
+A value stored before this release reads back and delivers as it is, and is sealed the next time the subscription is saved or by the [adoption utility](#then-the-adoption-utility), which counts those rows as `headersSealed`. A sealed value that can no longer be decrypted (its key left the ring) refuses the delivery, like an unrecoverable secret does: put the key back, or enter the value again.
 
 ### A secret that cannot be recovered refuses the delivery
 
@@ -172,12 +189,12 @@ Run it once, ideally after a dry run:
 import { encryptExistingSecrets } from '@10x-media/webhooks'
 
 const report = await encryptExistingSecrets(payload, { dryRun: true })
-// { scanned, migrated, alreadyEncrypted, noSecret, failed: [{ id, field, reason }] }
+// { scanned, migrated, alreadyEncrypted, noSecret, headersSealed, failed: [{ id, field, reason }] }
 ```
 
 Drop `dryRun` to write. It is idempotent, so re-running is safe.
 
-The utility does not invent new secrets: a legacy 48-character hex secret is already valid base64, so it keeps its characters and gains a `whsec_` prefix. Anything it cannot normalize is reported by row id and field name; rotate those subscriptions. A row's other secret field still migrates, so one unusable value does not strand a recoverable one in plaintext, which is why a row can appear in both `migrated` and `failed`.
+The utility does not invent new secrets: a legacy 48-character hex secret is already valid base64, so it keeps its characters and gains a `whsec_` prefix. Anything it cannot normalize is reported by row id and field name; rotate those subscriptions. A row's other secret field still migrates, so one unusable value does not strand a recoverable one in plaintext, which is why a row can appear in both `migrated` and `failed`. Custom header values stored before header encryption are sealed in the same run and counted as `headersSealed`; a header name that has since become reserved does not hold a row back, since the run is not changing it. A row that will not save for some other reason is reported in `failed` with its id, and the run carries on with the rest.
 
 <Callout type="warn">
 Receivers must be updated regardless of this migration. The signature format, the header names, and the key derivation all changed, so an unchanged receiver will reject every delivery. See [Signing](/webhooks/signing).

@@ -24,7 +24,7 @@ webhooks({
 })
 ```
 
-The keys are typed against your generated `CollectionSlug`, so a typo or a global's slug is a type error instead of a source that compiles and never emits. Without generated types the key is a plain `string`.
+The keys are typed against your generated `CollectionSlug`, so a typo or a global's slug is a type error instead of a source that compiles and never emits. Without generated types the key is a plain `string`, so the plugin also checks at startup: a slug that matches no registered collection throws rather than silently never emitting, and so does one of the plugin's own collections or a Payload internal one. A collection added by another plugin has to be registered before `webhooks()` runs.
 
 | Field | Type | Description |
 |---|---|---|
@@ -39,7 +39,7 @@ Events are named `<collection>.<created|updated|deleted>`: a create in `posts` e
 
 On a collection with drafts enabled:
 
-- **Autosaves never emit.** The admin autosaves every time an editor pauses, so emitting would send a stream of half-typed documents and fill the delivery log. The deliberate save that follows emits as usual.
+- **Autosaves never emit.** The admin autosaves every time an editor pauses, so emitting would send a stream of half-typed documents and fill the delivery log. The deliberate save that follows emits as usual. The admin also creates an empty draft the moment "Create new" is opened on an autosave collection, and that create does not emit either: the document's first deliberate save arrives as `updated`. It is recognised as a draft create on an autosave collection made through the Local API on a signed-in user's request, so a create over REST or GraphQL, or a Local API create with no user (an import, a seed), still emits `created`. Your own code creating such a draft through the Local API on a user's behalf is indistinguishable from the admin's and is skipped with it.
 - **A deliberate save that leaves the document a draft emits by default**, and the body's `data._status` says which it was. That default exists because an unpublish is such a save, and a receiver that mirrors published content has to hear about it.
 - Set `includeDrafts: false` on the collection to keep unpublished content from leaving at all. Only saves that leave the document published emit then, so an unpublish goes unannounced; `deleted` is unaffected.
 
@@ -47,11 +47,11 @@ On a collection with drafts enabled:
 
 The **Webhook Subscriptions** collection (slug `webhook-subscriptions` by default) is where operators register receivers:
 
-- `name`, `url`, and an `enabled` toggle. The URL must be absolute `http:` or `https:` with no embedded credentials (put a receiver token in a custom header instead); anything else is rejected on save rather than surfacing later as a dead delivery. The host is not judged, so localhost and private addresses stay usable (see [Security](/webhooks/security#operator-supplied-urls-ssrf))
+- `name`, `url`, and an `enabled` toggle. The URL must be absolute `http:` or `https:` with no embedded credentials (put a receiver token in a custom header instead); anything else is rejected on save rather than surfacing later as a dead delivery. The host is not judged unless you configure [`delivery.allowedHosts`](/webhooks/security#operator-supplied-urls-ssrf), so by default localhost and private addresses stay usable
 - `events`: a multi-select of every event the opted-in collections can emit
 - `secret`: set on the create form only (generate one or supply your own), then write-only. It is encrypted at rest and stripped from every read; a read carries `secret_set` and `secret_hint` instead. On an existing subscription the form shows the hint, read-only, so you can tell which key it holds, and the **Rotate secret** button beside Save is the only way to change it. See [Signing](/webhooks/signing)
 - `previousSecretExpiresAt`: set while a rotation grace period is open, when deliveries carry two signatures
-- `headers`: extra key/value headers injected on every delivery to this subscription. The names the plugin sets (`webhook-id`, `webhook-timestamp`, `webhook-signature`, `X-Webhook-Event`, `Content-Type`, `User-Agent`) are reserved and rejected here. Values are encrypted at rest, since this is where a receiver's own credential goes (`Authorization: Bearer ...`), and masked in the admin with a reveal toggle; see [Security](/webhooks/security#custom-header-values)
+- `headers`: extra key/value headers injected on every delivery to this subscription. The names the plugin sets (`webhook-id`, `webhook-timestamp`, `webhook-signature`, `X-Webhook-Event`, `Content-Type`, `User-Agent`) are reserved and rejected here, and so are the ones that belong to the HTTP transport (`Host`, `Content-Length`, `Transfer-Encoding`, `Keep-Alive`, `Upgrade`, `Expect`), which `fetch` either refuses or silently replaces. A name or URL that a save is not changing is not re-checked, so a rule introduced after a subscription was stored never stops that subscription being saved, rotated or switched off; the delivery path applies the rule when it fires. Values are encrypted at rest, since this is where a receiver's own credential goes (`Authorization: Bearer ...`), and masked in the admin with a reveal toggle; see [Security](/webhooks/security#custom-header-values)
 - `description`: free-form notes
 
 All operations on the collection require a user of the admin collection (`admin.user`), not just any logged-in user. See [Access defaults](/webhooks/security#access-defaults).
