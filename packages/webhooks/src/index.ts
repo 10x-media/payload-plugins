@@ -11,6 +11,9 @@ export type {
 	CollectionOverride,
 	FieldsOverride,
 	SecretEncryptionOptions,
+	SubscriptionFilter,
+	SubscriptionScope,
+	WebhookSubscriptionInfo,
 	WebhooksPluginOptions,
 } from './options'
 export type {

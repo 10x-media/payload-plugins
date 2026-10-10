@@ -8,7 +8,9 @@ import {
 	matchSubscriptions,
 	plaintextSlot,
 	resolveSubscriptionById,
+	rowInfo,
 	type SecretSlot,
+	subscriptionInfo,
 	withReadableHeaders,
 } from './resolveSubscriptions'
 
@@ -70,7 +72,47 @@ describe('fromCollectionRow', () => {
 			headers: { 'X-A': '1' },
 			headersUnusable: false,
 			enabled: true,
+			// The row as the application's callbacks see it: no header values.
+			record: { id: 7, url: 'https://x', events: ['posts.created'], enabled: null },
 		})
+	})
+
+	/** `record` is what `filter` and `owner.resolve` are handed, so key material must not be in it. */
+	it('keeps the secrets and header values out of the record, and application fields in', () => {
+		const r = fromCollectionRow(
+			{
+				id: 7,
+				url: 'https://x',
+				secret: 'sealed-secret',
+				previousSecret: 'sealed-previous',
+				headers: [{ key: 'Authorization', value: 'Bearer t0ken' }],
+				headersUnreadable: false,
+				tenant: 'a',
+			},
+			{ active: { secret, state: 'ok' }, retired: ABSENT }
+		)
+		expect(r.record).toEqual({ id: 7, url: 'https://x', tenant: 'a' })
+		expect(JSON.stringify(subscriptionInfo(r))).not.toContain(secret)
+		expect(subscriptionInfo(r)).toEqual({
+			id: '7',
+			source: 'collection',
+			url: 'https://x',
+			events: [],
+			record: { id: 7, url: 'https://x', tenant: 'a' },
+		})
+	})
+
+	it('describes a stored row for a callback without resolving its secrets', () => {
+		expect(
+			rowInfo({ id: 3, url: 'https://x', events: ['posts.created'], secret: 's', owner: 9 })
+		).toEqual({
+			id: '3',
+			source: 'collection',
+			url: 'https://x',
+			events: ['posts.created'],
+			record: { id: 3, url: 'https://x', events: ['posts.created'], owner: 9 },
+		})
+		expect(rowInfo({})).toMatchObject({ id: '', url: '', events: [] })
 	})
 
 	it('carries the active secret first and the retired one after it', () => {
@@ -295,6 +337,17 @@ describe('fromCodeSubscription', () => {
 
 	it('yields no secrets when none is configured', () => {
 		expect(fromCodeSubscription({ id: 'c', url: 'u', events: [] }).secrets).toEqual([])
+	})
+
+	it('keeps its secret and headers out of the record', () => {
+		const sub = fromCodeSubscription({
+			id: 'c',
+			url: 'https://x',
+			events: [],
+			secret: generateSecret(),
+			headers: { Authorization: 'Bearer t0ken' },
+		})
+		expect(sub.record).toEqual({ id: 'c', url: 'https://x', events: [] })
 	})
 
 	it('is never hidden: a code secret is already in the clear', () => {

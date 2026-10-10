@@ -1,5 +1,5 @@
 import type { KeysConfig } from '@10x-media/fields/encrypted'
-import type { CollectionConfig, CollectionSlug, Field, PayloadRequest } from 'payload'
+import type { CollectionConfig, CollectionSlug, Field, PayloadRequest, Where } from 'payload'
 
 import {
 	DEFAULT_DELIVERY_QUEUE,
@@ -12,6 +12,56 @@ import type { UrlPolicy } from './delivery/destination'
 import type { TranslationsOption } from './translations'
 
 export type WebhookOperation = 'create' | 'update' | 'delete'
+
+export type MaybePromise<T> = Promise<T> | T
+
+/**
+ * What a `filter` or `owner.resolve` callback is shown of a subscription. `record` is the stored
+ * row at depth 0 for an admin-managed subscription, fields added through
+ * `subscriptionsCollection.overrides` included, or the config object for a code subscription.
+ * The signing secrets and the custom header values are never part of it.
+ */
+export type WebhookSubscriptionInfo = {
+	id: string
+	source: 'code' | 'collection'
+	url: string
+	events: string[]
+	record: Record<string, unknown>
+}
+
+/**
+ * Decide per subscription whether a document is delivered to it. Runs before a delivery row
+ * exists, so `false` leaves no record of the document and sends nothing. A filter that throws is
+ * logged and counts as `false`.
+ *
+ * It runs for code subscriptions as well, with `source: 'code'`; return `true` for those to keep
+ * a monitoring subscription receiving everything. It is a business rule, not the tenant boundary:
+ * `enforceOwnerAccess` is what guarantees a subscription cannot receive what its owner cannot read.
+ */
+export type SubscriptionFilter = (args: {
+	doc: Record<string, unknown>
+	previousDoc?: Record<string, unknown>
+	operation: WebhookOperation
+	subscription: WebhookSubscriptionInfo
+	req: PayloadRequest
+}) => MaybePromise<boolean>
+
+/**
+ * Narrow which subscriptions are loaded for a document, with a `Where` over the subscriptions
+ * collection that is combined with the plugin's own `enabled` and `events` constraints. A
+ * multi-tenant install then reads its own tenant's rows per write instead of every subscriber to
+ * the event.
+ *
+ * A performance dimension, not a boundary, and it cuts both ways: a subscription the `Where`
+ * leaves out is never considered, so `or` in the rows that carry no tenant of their own. A scope
+ * that throws is logged and ignored. Code subscriptions are not affected by it.
+ */
+export type SubscriptionScope = (args: {
+	doc: Record<string, unknown>
+	previousDoc?: Record<string, unknown>
+	operation: WebhookOperation
+	req: PayloadRequest
+}) => MaybePromise<Where | null | undefined>
 
 export type CollectionWebhookConfig = {
 	operations?: WebhookOperation[]
@@ -37,6 +87,10 @@ export type CollectionWebhookConfig = {
 		req: PayloadRequest
 		target: 'data' | 'previousData'
 	}) => unknown
+	/** Decide per subscription whether this document is delivered. See `SubscriptionFilter`. */
+	filter?: SubscriptionFilter
+	/** Narrow the subscriptions loaded for this document. See `SubscriptionScope`. */
+	scope?: SubscriptionScope
 }
 
 export type CodeSubscription = {

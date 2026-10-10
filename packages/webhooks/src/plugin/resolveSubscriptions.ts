@@ -2,7 +2,7 @@ import { isSealed, withRawEncrypted } from '@10x-media/fields/encrypted'
 import type { CollectionSlug, JsonObject, Payload, PayloadRequest } from 'payload'
 
 import { REFUSAL_REASON, type UrlPolicy, urlRefusal } from '../delivery/destination'
-import type { CodeSubscription } from '../options'
+import type { CodeSubscription, WebhookSubscriptionInfo } from '../options'
 import { InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { recoverSecret } from '../secrets/recover'
 import { secretSetName } from '../secrets/secretFields'
@@ -50,6 +50,11 @@ export type ResolvedSubscription = {
 	 */
 	headersUnusable: boolean
 	enabled: boolean
+	/**
+	 * The row or config object behind this subscription, without its key material. What the
+	 * application's own callbacks are handed; the delivery path reads `secrets` and `headers`.
+	 */
+	record: Record<string, unknown>
 }
 
 /**
@@ -97,6 +102,30 @@ export type SubscriptionRow = {
 } & Record<string, unknown>
 
 type SubscriptionHeader = { id?: string | null; key?: string | null; value?: string | null }
+
+const KEY_MATERIAL = new Set(['secret', 'previousSecret', 'headers', 'headersUnreadable'])
+
+/** A row or code subscription with the secrets and header values removed. */
+export const publicRecord = (row: Record<string, unknown>): Record<string, unknown> =>
+	Object.fromEntries(Object.entries(row).filter(([key]) => !KEY_MATERIAL.has(key)))
+
+/** The callback-facing view of a stored row, before or without resolving its secrets. */
+export const rowInfo = (row: Record<string, unknown>): WebhookSubscriptionInfo => ({
+	id: String(row.id ?? ''),
+	source: 'collection',
+	url: typeof row.url === 'string' ? row.url : '',
+	events: Array.isArray(row.events) ? row.events : [],
+	record: publicRecord(row),
+})
+
+/** The callback-facing view of a resolved subscription. */
+export const subscriptionInfo = (subscription: ResolvedSubscription): WebhookSubscriptionInfo => ({
+	id: subscription.id,
+	source: subscription.source,
+	url: subscription.url,
+	events: subscription.events,
+	record: subscription.record,
+})
 
 /**
  * Classify one stored secret field of a row.
@@ -194,6 +223,7 @@ export const fromCollectionRow = (
 	headers: rowHeaders(row.headers),
 	headersUnusable: row.headersUnreadable === true,
 	enabled: row.enabled !== false,
+	record: publicRecord(row),
 })
 
 /**
@@ -296,6 +326,7 @@ export const fromCodeSubscription = (sub: CodeSubscription): ResolvedSubscriptio
 	headers: sub.headers,
 	headersUnusable: false,
 	enabled: sub.enabled !== false,
+	record: publicRecord(sub),
 })
 
 export type DeliveryDecision =
