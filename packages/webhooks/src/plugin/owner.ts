@@ -237,13 +237,20 @@ const readAsOwner = async (args: {
 	}
 }
 
-type OwnerMemo = Map<string, Promise<SubscriptionOwner | null>>
+type OwnerMemo = Map<string, { at: number; owner: Promise<SubscriptionOwner | null> }>
 
 /**
- * Resolve a subscription's owner at most once per request. Applications back `resolve` with a
- * query of their own, and a write that touches many documents asks about the same subscriptions
- * for each one. `updatedAt` is part of the key, so a subscription edited mid-request is asked
- * about again.
+ * How long a resolved owner is reused on one request. Long enough to cover a bulk operation,
+ * which is what the memo is for. Short enough that a job working through documents on a single
+ * request for minutes does not go on acting on what an owner was allowed when it started.
+ */
+const OWNER_MEMO_MS = 5_000
+
+/**
+ * Resolve a subscription's owner once per request, for a few seconds at a time. Applications
+ * back `resolve` with a query of their own, and a write that touches many documents asks about
+ * the same subscriptions for each one. `updatedAt` is part of the key, so a subscription edited
+ * mid-request is asked about again.
  */
 const resolveOwnerOnce = (args: {
 	ownership: SubscriptionOwnership
@@ -254,16 +261,18 @@ const resolveOwnerOnce = (args: {
 	const memo: OwnerMemo = existing ?? new Map()
 	args.req.context[OWNER_MEMO_CONTEXT] = memo
 	const key = `${args.subscription.source}:${args.subscription.id}:${String(args.subscription.record.updatedAt ?? '')}`
-	let pending = memo.get(key)
-	if (!pending) {
-		pending = resolveOwner({
-			ownership: args.ownership,
-			subscription: subscriptionInfo(args.subscription),
-			req: args.req,
-		})
-		memo.set(key, pending)
+	const now = Date.now()
+	const cached = memo.get(key)
+	if (cached && now - cached.at < OWNER_MEMO_MS) {
+		return cached.owner
 	}
-	return pending
+	const owner = resolveOwner({
+		ownership: args.ownership,
+		subscription: subscriptionInfo(args.subscription),
+		req: args.req,
+	})
+	memo.set(key, { at: now, owner })
+	return owner
 }
 
 /** Whether a subscription may be sent a document, who it acts as, and their view of it. */

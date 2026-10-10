@@ -88,7 +88,7 @@ webhooks({
 
 ## What `enforceOwnerAccess` does
 
-**On save.** The subscription's owner is resolved, and must be able to read every collection its events come from, by that collection's own `access.read`. A tenant asking for `invoices.created` without read access to `invoices` gets a 403. This is a collection hook, so REST, GraphQL and the Local API are all covered, `overrideAccess: true` included.
+**On save.** The subscription's owner is resolved, and must be able to read every collection its events come from, by that collection's own `access.read`. A tenant asking for `invoices.created` without read access to `invoices` gets a 403. This is a collection hook, so REST, GraphQL and the Local API are all covered, `overrideAccess: true` included. A create is checked whole. An update is checked for what it changes: a new owner, and any event the subscription did not already hold.
 
 **On every write to a watched collection.** For each subscription listening, the plugin reads the document through the Local API *as the owner*, with access control on. If that returns nothing, nothing is recorded and nothing is sent. If it returns the document, **that result is the body**: the document at depth 0, with the owner's field-level read access applied. An admin-only field an operator just edited does not travel to a tenant's receiver, and neither does a populated relationship.
 
@@ -98,6 +98,7 @@ Things to know:
 
 - An owner-bound subscription never receives `previousData`. The previous version cannot be re-read as the owner, and a document that moved from one tenant to another would otherwise show the new tenant the old one's data.
 - A subscription whose owner cannot be resolved (the user was deleted, the field is empty) is skipped, with a warning in the log. It fails closed.
+- Such a subscription, or one whose owner has since lost access to a collection, can still be switched off, renamed, have its secret rotated, or be deleted. It cannot be given new events until its owner can read them, or a new owner unless the caller may name one.
 - Your read access runs on a request the plugin builds for the owner. It has `req.user`, the locale and the write's transaction, and **no headers or cookies**. Access rules that pick a tenant from a cookie or a header see none; key them on the user.
 - That read joins the write's transaction, which is how it sees a document that is not committed yet, but it cannot end it. If your read access or a read hook throws for the owner, that is logged and read as a denial for that subscription, and the write is unaffected.
 - On a collection with drafts the owner is read the latest version. A draft save therefore sends the draft to owners who may read drafts, and nothing to owners who may only read published content.
@@ -115,6 +116,8 @@ Whether the *caller* may name that owner is a separate question, asked on create
 - `owner.canActAs` replaces that rule. The example lets operators assign anyone.
 
 Lock the owner field with field access as well, as the example does. Field access strips a tenant's attempt silently; `canActAs` is what still holds if a code path bypasses field access.
+
+Stamp the owner in a collection `beforeValidate` hook, as the example does, or in a collection `beforeChange` hook. The check runs after those. A field-level `beforeChange` hook runs later still, so an owner set there is not seen and the save is refused as having none.
 
 Return `{ global: true }` from `resolve` only for rows a tenant cannot create. A global subscription skips both checks.
 

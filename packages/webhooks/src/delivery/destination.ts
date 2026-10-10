@@ -23,7 +23,7 @@ export const REFUSAL_REASON: Record<UrlRefusal, string> = {
 		'the endpoint is a loopback, private or otherwise non-public address and delivery.allowPrivateAddresses is off, so the delivery was refused',
 }
 
-const BLOCKED_AT_SOCKET =
+export const BLOCKED_AT_SOCKET =
 	'the endpoint resolves to a loopback, private or otherwise non-public address, so the delivery was refused'
 
 /**
@@ -66,6 +66,12 @@ export const isPublicAddress = (address: string): boolean => {
 /** A URL's host without the brackets the URL parser keeps around an IPv6 literal. */
 export const hostOf = (url: string): string => new URL(url).hostname.replace(/^\[|\]$/g, '')
 
+/** Whether a URL names an address outright, and one deliveries are not sent to. */
+export const isPrivateLiteral = (url: string): boolean => {
+	const host = hostOf(url)
+	return ipaddr.isValid(host) && !isPublicAddress(host)
+}
+
 /**
  * Why a URL may not be delivered to, or null when it may.
  *
@@ -99,8 +105,7 @@ export const urlRefusal = (
 	if (url.protocol === 'http:' && !policy.allowHttp) {
 		return 'insecure'
 	}
-	const host = hostOf(value)
-	if (!policy.allowPrivateAddresses && ipaddr.isValid(host) && !isPublicAddress(host)) {
+	if (!policy.allowPrivateAddresses && isPrivateLiteral(value)) {
 		return 'private'
 	}
 	return null

@@ -252,7 +252,7 @@ export type WebhooksPluginOptions = {
 	owner?: SubscriptionOwnership
 	/**
 	 * Guarantee that a subscription never receives a document its owner could not read. Checked on
-	 * save (the owner must be able to read every collection the subscription's events come from)
+	 * save (the owner must be able to read every collection the save subscribes it to)
 	 * and again per document on dispatch, where the document is re-read through Payload's access
 	 * control as the owner and that view, at depth 0, is what is sent. `previousData` is not sent
 	 * to an owner-bound subscription. Requires `owner`, and explicit access functions for both of

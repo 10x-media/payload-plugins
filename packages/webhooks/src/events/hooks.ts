@@ -270,6 +270,9 @@ type DeleteClearance = Map<string, DeliveryAuthorization>
 
 const DENIED: DeliveryAuthorization = { allowed: false }
 
+/** What a global subscription is always given: the hook's own document, and no owner to record. */
+const GLOBAL_VERDICT: DeliveryAuthorization = { allowed: true, owner: null }
+
 /** A code subscription and a collection row can share an id, so the registry is part of the key. */
 const subscriptionKey = (subscription: ResolvedSubscription): string =>
 	`${subscription.source}:${subscription.id}`
@@ -339,8 +342,14 @@ const dispatch = async (args: {
 	const inline: { body: string; deliveryId: string; subscription: ResolvedSubscription }[] = []
 	for await (const page of listening({ deps, event, req, scope, raw: deps.mode === 'inline' })) {
 		for (const subscription of page) {
+			// A code subscription is global, so it is never waiting on a pre-check: one that failed, or
+			// never ran, must not cost it the delete.
+			const cleared =
+				clearance && subscription.source === 'code'
+					? GLOBAL_VERDICT
+					: clearance?.get(subscriptionKey(subscription))
 			const verdict = clearance
-				? (clearance.get(subscriptionKey(subscription)) ?? DENIED)
+				? (cleared ?? DENIED)
 				: await authorizeDelivery({
 						ownership: deps.ownership,
 						enforce: deps.enforceOwnerAccess,
@@ -408,8 +417,8 @@ const dispatch = async (args: {
 				})
 				continue
 			}
-			// ponytail: inline sends for one write are held in memory and fired together. Fine for the
-			// handful of receivers inline mode is for; an install with hundreds per event wants `queue`.
+			// Inline sends for one write are held in memory and fired together. That suits the handful
+			// of receivers inline mode is for; an install with hundreds per event wants `queue`.
 			inline.push({ body: JSON.stringify(body), deliveryId, subscription })
 		}
 	}
@@ -502,7 +511,8 @@ export const makeAfterChange =
  * gone, so the verdicts (and each owner's view of the document) are taken here and consumed by
  * the afterDelete dispatch. The document is still committed and the delete has not written yet,
  * so the reads stay out of the caller's transaction. A pre-check that fails clears nobody: the
- * delete goes ahead and owner-bound subscriptions hear nothing.
+ * delete goes ahead and owner-bound subscriptions hear nothing. Code subscriptions are global and
+ * do not depend on it.
  *
  * `scope` narrows by the document, which this hook is not handed, so with one configured the
  * document is read first. Without that every subscriber to the event would be resolved and asked
@@ -571,7 +581,7 @@ export const makeAfterDelete =
 	(deps: WebhookDispatchDeps): CollectionAfterDeleteHook =>
 	async ({ doc, id, req }) => {
 		const key = clearanceKey(deps.collectionSlug, id)
-		// Under enforcement a missing clearance means the pre-check never ran: nobody is cleared.
+		// Under enforcement a missing clearance means the pre-check never ran: no owner is cleared.
 		const clearance = deps.enforceOwnerAccess
 			? ((req.context[key] as DeleteClearance | undefined) ?? new Map())
 			: undefined

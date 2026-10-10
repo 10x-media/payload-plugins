@@ -1,8 +1,8 @@
 import { createServer, type Server } from 'node:http'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
 import type { Access, CollectionConfig, CollectionSlug, TypedUser } from 'payload'
-import { handleEndpoints } from 'payload'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { createLocalReq, handleEndpoints } from 'payload'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { webhooks } from '../../src/index'
 import type { DeliveryMode } from '../../src/options'
 import { LOCAL_SINK } from './localSink'
@@ -85,7 +85,9 @@ const boot = (mode: DeliveryMode) =>
 				// The subscriptions collection has no such field, so the query this builds is invalid.
 				notes: { scope: () => ({ noSuchField: { equals: 'x' } }) },
 			},
-			subscriptions: [{ id: 'ops', url: `${sinkUrl}/ops`, events: ['fragile.created'] }],
+			subscriptions: [
+				{ id: 'ops', url: `${sinkUrl}/ops`, events: ['fragile.created', 'notes.deleted'] },
+			],
 			delivery: { mode, retries: 0, ...LOCAL_SINK },
 			enforceOwnerAccess: true,
 			owner: {
@@ -197,8 +199,8 @@ describe('owner access, the paths around the happy one (inline)', () => {
 		booted = await boot('inline')
 		memberA = await member('a')
 		memberB = await member('b')
-		await subscribe('pa', memberA, ['posts.created', 'posts.deleted'])
-		await subscribe('pb', memberB, ['posts.created', 'posts.deleted'])
+		await subscribe('pa', memberA, ['posts.created', 'posts.updated', 'posts.deleted'])
+		await subscribe('pb', memberB, ['posts.created', 'posts.updated', 'posts.deleted'])
 		await subscribe('aa', memberA, ['articles.created', 'articles.updated'])
 		await subscribe('na', memberA, ['notes.created'])
 		// Past the save guard, which would refuse it: the owner cannot read `fragile` at all.
@@ -311,6 +313,145 @@ describe('owner access, the paths around the happy one (inline)', () => {
 		})
 		expect(pathsHit()).toEqual(['/pa', '/pa', '/pb'])
 		expect(hits.every((h) => h.body.event === 'posts.deleted')).toBe(true)
+	})
+
+	it('clears each document of a bulk update on its own', async () => {
+		for (const tenant of ['a', 'a', 'b']) {
+			await booted.payload.create({
+				collection: 'posts',
+				data: { title: 'bulk-u', tenant },
+				overrideAccess: true,
+			})
+		}
+		hits = []
+		await booted.payload.update({
+			collection: 'posts',
+			where: { title: { equals: 'bulk-u' } },
+			data: { title: 'changed' },
+			overrideAccess: true,
+		})
+		expect(pathsHit()).toEqual(['/pa', '/pa', '/pb'])
+		expect(hits.every((h) => h.body.event === 'posts.updated')).toBe(true)
+		expect(hits.every((h) => (h.body.data as { title?: string }).title === 'changed')).toBe(true)
+	})
+
+	/**
+	 * The pre-check exists for owner-bound subscriptions. A code subscription is global and needs
+	 * none, so a pre-check that fails must not cost it the event.
+	 */
+	it('still tells a code subscription about a delete whose pre-check failed', async () => {
+		const note = await booted.payload.create({
+			collection: 'notes',
+			data: { title: 'x', tenant: 'a' },
+			overrideAccess: true,
+		})
+		hits = []
+		const find = booted.payload.find.bind(booted.payload)
+		let failed = false
+		const spy = vi.spyOn(booted.payload, 'find').mockImplementation(((
+			args: Parameters<typeof find>[0]
+		) => {
+			if (!failed && args.collection === 'notes') {
+				failed = true
+				return Promise.reject(new Error('the document could not be read'))
+			}
+			return find(args)
+		}) as never)
+		try {
+			await booted.payload.delete({ collection: 'notes', id: note.id, overrideAccess: true })
+		} finally {
+			spy.mockRestore()
+		}
+		expect(failed).toBe(true)
+		expect(pathsHit()).toEqual(['/ops'])
+	})
+
+	/**
+	 * Such a row cannot deliver, and nothing about switching it off, renaming it or rotating its
+	 * secret changes that. An operator has to be able to do those without first inventing an owner.
+	 */
+	it('lets a subscription whose owner is gone still be switched off', async () => {
+		const gone = await member('c')
+		const id = await subscribe('pc', gone, ['posts.created'])
+		await booted.payload.delete({ collection: 'users', id: gone.id, overrideAccess: true })
+		const updated = await booted.payload.update({
+			collection: 'webhook-subscriptions',
+			id,
+			data: { enabled: false },
+			overrideAccess: true,
+		})
+		expect(updated.enabled).toBe(false)
+	})
+
+	it('lets a subscription be switched off after its owner lost access, and still refuses it more', async () => {
+		const demoted = (await booted.payload.create({
+			collection: 'users',
+			data: { email: 'd@test.dev', password: 'test1234', role: 'admin', tenant: 'd' },
+			overrideAccess: true,
+		})) as unknown as TypedUser
+		const id = await subscribe('fd', demoted, ['fragile.created'])
+		await booted.payload.update({
+			collection: 'users',
+			id: demoted.id,
+			data: { role: 'member' },
+			overrideAccess: true,
+		})
+		await expect(
+			booted.payload.update({
+				collection: 'webhook-subscriptions',
+				id,
+				data: { events: ['fragile.created', 'fragile.deleted'] },
+				overrideAccess: true,
+			})
+		).rejects.toMatchObject({ status: 403 })
+		const updated = await booted.payload.update({
+			collection: 'webhook-subscriptions',
+			id,
+			data: { enabled: false },
+			overrideAccess: true,
+		})
+		expect(updated.enabled).toBe(false)
+	})
+
+	/**
+	 * A job that works through many documents on one request must not keep acting on what an owner
+	 * was allowed to read when it started.
+	 */
+	it('asks about an owner again once the answer has aged, on a request that is reused', async () => {
+		const req = await createLocalReq({}, booted.payload)
+		await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'first', tenant: 'a' },
+			overrideAccess: true,
+			req,
+		})
+		expect(pathsHit()).toEqual(['/pa'])
+		await booted.payload.update({
+			collection: 'users',
+			id: memberA.id,
+			data: { tenant: 'elsewhere' },
+			overrideAccess: true,
+		})
+		hits = []
+		const now = Date.now()
+		const clock = vi.spyOn(Date, 'now').mockImplementation(() => now + 60_000)
+		try {
+			await booted.payload.create({
+				collection: 'posts',
+				data: { title: 'second', tenant: 'a' },
+				overrideAccess: true,
+				req,
+			})
+		} finally {
+			clock.mockRestore()
+			await booted.payload.update({
+				collection: 'users',
+				id: memberA.id,
+				data: { tenant: 'a' },
+				overrideAccess: true,
+			})
+		}
+		expect(pathsHit()).toEqual([])
 	})
 
 	/** No user on the request means trusted server code only when it came through the Local API. */

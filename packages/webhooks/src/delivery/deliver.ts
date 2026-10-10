@@ -1,4 +1,10 @@
-import { BlockedDestinationError, guardedDispatcher, transport } from './destination'
+import {
+	BLOCKED_AT_SOCKET,
+	BlockedDestinationError,
+	guardedDispatcher,
+	isPrivateLiteral,
+	transport,
+} from './destination'
 
 /** Max response-body characters retained for the delivery log. */
 const MAX_RESPONSE_BODY = 2_000
@@ -54,9 +60,13 @@ const readCapped = async (res: Awaited<ReturnType<typeof transport.fetch>>): Pro
  * final URL.
  *
  * With `guarded`, the socket's DNS lookup refuses any non-public address, so a public name cannot
- * be pointed at an internal host after it was saved.
+ * be pointed at an internal host after it was saved. An address literal never reaches that lookup,
+ * so it is judged here: the guard does not depend on a caller having checked the URL first.
  */
 export const deliver = async (args: DeliverArgs): Promise<DeliverResult> => {
+	if (args.guarded && URL.canParse(args.url) && isPrivateLiteral(args.url)) {
+		return { ok: false, error: BLOCKED_AT_SOCKET, durationMs: 0 }
+	}
 	const controller = new AbortController()
 	const timer = setTimeout(() => controller.abort(), args.timeoutMs)
 	const start = Date.now()

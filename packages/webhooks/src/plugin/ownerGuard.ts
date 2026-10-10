@@ -5,17 +5,25 @@ import { actingReq, canActAsOwner, canReadCollection, resolveOwner, sameOwner } 
 import { rowInfo } from './resolveSubscriptions'
 
 /**
- * Reject a subscription save its owner may not make: one that acts as nobody, one whose caller
- * may not name that owner, or one that listens to a collection the owner cannot read.
+ * Reject a subscription save that would give it something its owner may not have: an owner the
+ * caller may not name, or an event from a collection the owner cannot read.
  *
  * A collection hook rather than field validation, so REST, GraphQL and the Local API are all
- * covered and `overrideAccess` does not skip it. It runs last among the `beforeChange` hooks, so
- * it judges the row as it will be stored, after an application hook has stamped its owner.
+ * covered and `overrideAccess` does not skip it. It runs after every other collection-level
+ * `beforeChange` hook, so it sees an owner stamped in `beforeValidate` or in a collection
+ * `beforeChange`. Field-level `beforeChange` hooks run later still, and an owner stamped there
+ * is not seen: the save is refused as having none.
  *
- * The owner is asked about on every save, but whether the caller may *name* that owner only on
- * create or when the save changes who it is: an operator switching a tenant's subscription off is
- * not claiming to be the tenant. The checks read other collections' committed state, so they stay
- * out of this write's transaction.
+ * It judges what the save changes. A create is judged whole. On an update, whether the caller
+ * may *name* the owner is asked only when the save changes who that is, and only events the row
+ * did not already hold are checked against the owner's access. So an operator can switch a
+ * tenant's subscription off without claiming to be the tenant, and a subscription whose owner
+ * has since been deleted, or has lost access, can still be switched off, renamed or have its
+ * secret rotated. Nothing is given away by that: what such a row may receive is decided again,
+ * per document, every time it would fire.
+ *
+ * The checks read other collections' committed state, so they stay out of this write's
+ * transaction.
  */
 export const makeOwnerGuard =
 	(args: {
@@ -30,19 +38,24 @@ export const makeOwnerGuard =
 			user: req.user as OwnerUser | null,
 		})
 		const subscription = rowInfo({ ...(originalDoc ?? {}), ...data })
+		const stored = operation === 'update' && originalDoc ? rowInfo(originalDoc) : null
 		const owner = await resolveOwner({ ownership, subscription, req: checkReq })
+		const previous = stored
+			? await resolveOwner({ ownership, subscription: stored, req: checkReq })
+			: null
+		const sameOwnerAsStored = stored !== null && sameOwner(previous, owner)
 		if (!owner) {
+			// It had no owner before this save either, so it could not deliver and still cannot.
+			if (sameOwnerAsStored) {
+				return data
+			}
 			throw new APIError(
 				'This subscription has no owner, so it cannot be saved while enforceOwnerAccess is on.',
 				403
 			)
 		}
-		const previous =
-			operation === 'update' && originalDoc
-				? await resolveOwner({ ownership, subscription: rowInfo(originalDoc), req: checkReq })
-				: null
 		if (
-			(operation === 'create' || !sameOwner(previous, owner)) &&
+			!sameOwnerAsStored &&
 			!(await canActAsOwner({
 				ownership,
 				owner,
@@ -56,10 +69,12 @@ export const makeOwnerGuard =
 		if (owner.global) {
 			return data
 		}
+		// Under a new owner every event is new to them. Under the same one, only what this save adds.
+		const held = new Set(sameOwnerAsStored && stored ? stored.events : [])
 		const checked = new Set<string>()
 		for (const event of subscription.events) {
 			const slug = args.eventSources[event]
-			if (!slug || checked.has(slug)) {
+			if (!slug || held.has(event) || checked.has(slug)) {
 				continue
 			}
 			checked.add(slug)

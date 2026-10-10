@@ -145,6 +145,21 @@ describe('deliver', () => {
 		lookup.mockRestore()
 	})
 
+	/** Node skips the lookup for an address literal, so the guard has to judge one itself. */
+	it('refuses a private address literal on its own when guarded', async () => {
+		const before = okHits
+		const r = await deliver({
+			url: `${url}/ok`,
+			body: '{}',
+			headers: {},
+			timeoutMs: 1000,
+			guarded: true,
+		})
+		expect(r.ok).toBe(false)
+		expect(r.error).toMatch(/non-public address/)
+		expect(okHits).toBe(before)
+	})
+
 	it('refuses a mixed public and private answer', async () => {
 		const lookup = vi.spyOn(transport, 'lookup').mockImplementation(((
 			_host: string,
