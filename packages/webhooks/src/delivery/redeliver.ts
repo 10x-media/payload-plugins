@@ -1,8 +1,13 @@
 import type { CollectionSlug, JsonObject, Payload, PayloadRequest } from 'payload'
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
-import type { CodeSubscription } from '../options'
-import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
+import type { CodeSubscription, SubscriptionOwnership } from '../options'
+import { ownerStamp, resolveOwner } from '../plugin/owner'
+import {
+	decideDelivery,
+	resolveSubscriptionById,
+	subscriptionInfo,
+} from '../plugin/resolveSubscriptions'
 import type { UrlPolicy } from './destination'
 import { messageId, sendDelivery } from './sendDelivery'
 
@@ -15,6 +20,8 @@ export type RedeliverDeps = {
 	timeoutMs: number
 	queue: string
 	urlPolicy: UrlPolicy
+	/** Set when `owner` is configured: a replay is then held to the owner it was made for. */
+	ownership?: SubscriptionOwnership
 }
 
 /**
@@ -50,6 +57,26 @@ export const redeliverDelivery = async (args: {
 		payload,
 		req,
 	})
+	// The stored body was built for whoever owned the subscription then. If it acts as someone else
+	// now, replaying would hand the previous owner's view of the document to the new one.
+	const madeFor = {
+		ownerId: typeof original.ownerId === 'string' ? original.ownerId : undefined,
+		ownerCollection:
+			typeof original.ownerCollection === 'string' ? original.ownerCollection : undefined,
+	}
+	const actsAs =
+		deps.ownership && subscription
+			? ownerStamp(
+					await resolveOwner({
+						ownership: deps.ownership,
+						subscription: subscriptionInfo(subscription),
+						req,
+					})
+				)
+			: madeFor
+	const ownerChanged =
+		(actsAs.ownerId ?? '') !== (madeFor.ownerId ?? '') ||
+		(actsAs.ownerCollection ?? '') !== (madeFor.ownerCollection ?? '')
 	const created = await payload.create({
 		collection: deps.deliveriesSlug as CollectionSlug,
 		data: {
@@ -59,6 +86,9 @@ export const redeliverDelivery = async (args: {
 			event: original.event,
 			status: 'pending',
 			attempt: 0,
+			// Carried over, so the replay stays visible to the owner it belongs to instead of becoming
+			// an unowned row holding their payload.
+			...(madeFor.ownerId ? madeFor : {}),
 		},
 		overrideAccess: true,
 		req,
@@ -73,6 +103,21 @@ export const redeliverDelivery = async (args: {
 		overrideAccess: true,
 		req,
 	})
+
+	if (ownerChanged) {
+		await payload.update({
+			collection: deps.deliveriesSlug as CollectionSlug,
+			id: newId,
+			data: {
+				status: 'dead',
+				error:
+					'the subscription changed owner since this delivery was made, so it was not replayed',
+			},
+			overrideAccess: true,
+			req,
+		})
+		return { id: newId, status: 'dead' }
+	}
 
 	// Decided before queuing as well as before sending. The task decides again when it runs, but
 	// a replay that can already be seen to be going nowhere (subscription gone, disabled, host

@@ -1,6 +1,7 @@
 import { createServer, type Server } from 'node:http'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
 import type { Access, CollectionConfig, FieldAccess, TypedUser } from 'payload'
+import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { webhooks } from '../../src/index'
 import { LOCAL_SINK } from './localSink'
@@ -441,5 +442,185 @@ describe('saving a subscription under enforceOwnerAccess', () => {
 		expect(String((updated.owner as { id?: unknown })?.id ?? updated.owner)).toBe(
 			String(memberA.id)
 		)
+	})
+})
+
+describe('the REST surface, as another tenant', () => {
+	const tokens = new Map<string, string>()
+	const tokenFor = async (email: string) => {
+		const cached = tokens.get(email)
+		if (cached) {
+			return cached
+		}
+		const { token } = await booted.payload.login({
+			collection: 'users',
+			data: { email, password: 'test1234' },
+		})
+		tokens.set(email, String(token))
+		return String(token)
+	}
+	/** One REST call as a logged-in user, written the way it reads: `'PATCH /path'`. */
+	const rest = async (email: string, call: string, body?: unknown) => {
+		const [method, path] = call.split(' ')
+		return handleEndpoints({
+			config: booted.payload.config,
+			payloadInstanceCacheKey: booted.cacheKey,
+			request: new Request(`http://localhost:3000/api${path}`, {
+				method,
+				headers: {
+					Authorization: `JWT ${await tokenFor(email)}`,
+					'Content-Type': 'application/json',
+				},
+				body: body === undefined ? undefined : JSON.stringify(body),
+			}),
+		})
+	}
+	const denied = (status: number) => expect([403, 404]).toContain(status)
+
+	let deliveryA: string
+	let deliveryOps: string
+
+	beforeAll(async () => {
+		await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'rest', tenant: 'a' },
+			overrideAccess: true,
+		})
+		deliveryA = String((await deliveriesFor(subA))[0]?.id)
+		deliveryOps = String((await deliveriesFor('ops'))[0]?.id)
+	})
+
+	it('lists only the subscriptions the caller owns', async () => {
+		const res = await rest('b@test.dev', 'GET /webhook-subscriptions?limit=100')
+		const ids = ((await res.json()) as { docs: { id: unknown }[] }).docs.map((d) => String(d.id))
+		expect(ids).toEqual([subB])
+	})
+
+	it('refuses reading, updating and deleting a subscription of another tenant by id', async () => {
+		denied((await rest('b@test.dev', `GET /webhook-subscriptions/${subA}`)).status)
+		denied(
+			(await rest('b@test.dev', `PATCH /webhook-subscriptions/${subA}`, { enabled: false })).status
+		)
+		denied((await rest('b@test.dev', `DELETE /webhook-subscriptions/${subA}`)).status)
+		const still = await booted.payload.findByID({
+			collection: 'webhook-subscriptions',
+			id: subA,
+			overrideAccess: true,
+		})
+		expect(still.enabled).toBe(true)
+	})
+
+	it('never returns a secret on a read, and refuses rotating the secret of another tenant', async () => {
+		const own = await rest('a@test.dev', `GET /webhook-subscriptions/${subA}`)
+		const doc = (await own.json()) as Record<string, unknown>
+		expect(doc.secret_set).toBe(true)
+		expect(doc).not.toHaveProperty('secret')
+		expect(doc).not.toHaveProperty('previousSecret')
+		denied(
+			(await rest('b@test.dev', `POST /webhook-subscriptions/${subA}/rotate-secret`, {})).status
+		)
+	})
+
+	it('creates a subscription owned by the caller whatever owner the body names', async () => {
+		const res = await rest('b@test.dev', 'POST /webhook-subscriptions', {
+			name: 'sneaky',
+			url: `${sinkUrl}/sneaky`,
+			events: ALL,
+			owner: admin.id,
+		})
+		expect(res.status).toBe(201)
+		const { doc } = (await res.json()) as { doc: { id: string; owner: unknown } }
+		expect(String((doc.owner as { id?: unknown })?.id ?? doc.owner)).toBe(String(memberB.id))
+		await booted.payload.delete({
+			collection: 'webhook-subscriptions',
+			id: doc.id,
+			overrideAccess: true,
+		})
+	})
+
+	it('cannot move a subscription to another owner over REST', async () => {
+		await rest('b@test.dev', `PATCH /webhook-subscriptions/${subB}`, { owner: admin.id })
+		const row = await booted.payload.findByID({
+			collection: 'webhook-subscriptions',
+			id: subB,
+			depth: 0,
+			overrideAccess: true,
+		})
+		expect(String(row.owner)).toBe(String(memberB.id))
+	})
+
+	it('refuses subscribing to a collection the caller cannot read', async () => {
+		const res = await rest('b@test.dev', 'POST /webhook-subscriptions', {
+			name: 'vault',
+			url: `${sinkUrl}/vault`,
+			events: ['vaults.created'],
+		})
+		expect(res.status).toBe(403)
+	})
+
+	it('scopes the delivery log: no listing, reading or deleting rows of another tenant', async () => {
+		const list = await rest('b@test.dev', 'GET /webhook-deliveries?limit=100')
+		const rows = ((await list.json()) as { docs: { ownerId?: string }[] }).docs
+		expect(rows.every((r) => r.ownerId === String(memberB.id))).toBe(true)
+		denied((await rest('b@test.dev', `GET /webhook-deliveries/${deliveryA}`)).status)
+		denied((await rest('b@test.dev', `DELETE /webhook-deliveries/${deliveryA}`)).status)
+		denied((await rest('a@test.dev', `DELETE /webhook-deliveries/${deliveryA}`)).status)
+	})
+
+	it('refuses replaying a delivery of another tenant, or of the code subscription, by id', async () => {
+		hits = []
+		denied((await rest('b@test.dev', `POST /webhook-deliveries/${deliveryA}/redeliver`)).status)
+		denied((await rest('a@test.dev', `POST /webhook-deliveries/${deliveryOps}/redeliver`)).status)
+		expect(hits).toHaveLength(0)
+	})
+
+	it('lets the owner replay their own delivery, and keeps the replay theirs', async () => {
+		hits = []
+		const res = await rest('a@test.dev', `POST /webhook-deliveries/${deliveryA}/redeliver`)
+		expect(res.status).toBe(202)
+		const { id, status } = (await res.json()) as { id: string; status: string }
+		expect(status).toBe('success')
+		expect(pathsHit()).toEqual(['/a'])
+		const replay = await booted.payload.findByID({
+			collection: 'webhook-deliveries',
+			id,
+			overrideAccess: true,
+		})
+		expect(replay.ownerId).toBe(String(memberA.id))
+	})
+
+	/** The delivery is readable, the subscription behind it is not. */
+	it('refuses a replay when the caller can read the delivery but not its subscription', async () => {
+		const collection = booted.payload.collections['webhook-deliveries']
+		if (!collection) {
+			throw new Error('the deliveries collection is not registered')
+		}
+		const configured = collection.config.access.read
+		collection.config.access.read = () => true
+		try {
+			hits = []
+			expect(
+				(await rest('b@test.dev', `POST /webhook-deliveries/${deliveryA}/redeliver`)).status
+			).toBe(403)
+			expect(hits).toHaveLength(0)
+		} finally {
+			collection.config.access.read = configured
+		}
+	})
+
+	/** Review Focus 5. Runs last: it reassigns subA. */
+	it('refuses replaying a delivery after its subscription changed owner', async () => {
+		await booted.payload.update({
+			collection: 'webhook-subscriptions',
+			id: subA,
+			data: { owner: memberB.id, events: ALL },
+			user: admin,
+			overrideAccess: false,
+		})
+		hits = []
+		const res = await rest('admin@test.dev', `POST /webhook-deliveries/${deliveryA}/redeliver`)
+		expect(res.status).toBe(202)
+		expect(((await res.json()) as { status: string }).status).toBe('dead')
+		expect(hits).toHaveLength(0)
 	})
 })

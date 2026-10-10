@@ -6,6 +6,7 @@ import {
 	type Config,
 	type Endpoint,
 	Forbidden,
+	type JsonObject,
 	NotFound,
 	type PayloadRequest,
 } from 'payload'
@@ -136,21 +137,22 @@ const parseRotateBody = (body: unknown): { secret?: string; graceSeconds?: numbe
 }
 
 /**
- * Evaluate the subscriptions collection's configured `update` access for one document, honouring
- * a `Where` result by checking that the target actually matches it. Read from the runtime config
- * so a consumer's override of the collection governs this endpoint too.
+ * Evaluate a collection's configured `read` or `update` access for one document, honouring a
+ * `Where` result by checking that the target actually matches it. Read from the runtime config
+ * so a consumer's override of the collection governs the plugin's endpoints too.
  *
  * Throwing `Forbidden` is as valid a denial as returning false, and Payload's own `executeAccess`
  * lets it propagate, so an access function written that way would otherwise reach the handler's
  * generic catch and be reported as a 500.
  */
-const canUpdateSubscription = async (args: {
+const canAccessDocument = async (args: {
 	req: PayloadRequest
 	slug: string
 	id: string
+	operation: 'read' | 'update'
 }): Promise<boolean> => {
-	const { req, slug, id } = args
-	const access = req.payload.collections?.[slug as CollectionSlug]?.config?.access?.update
+	const { req, slug, id, operation } = args
+	const access = req.payload.collections?.[slug as CollectionSlug]?.config?.access?.[operation]
 	if (!access) {
 		return true
 	}
@@ -358,7 +360,7 @@ export const registerWebhooks = (args: {
 			// Rotation is a privileged write, so it defers to the collection's own update access for
 			// this document rather than accepting any logged-in user. Tightening `access.update`, or
 			// scoping it per tenant, governs the endpoint too.
-			if (!(await canUpdateSubscription({ req, slug: subscriptionsSlug, id }))) {
+			if (!(await canAccessDocument({ req, slug: subscriptionsSlug, id, operation: 'update' }))) {
 				return Response.json({ error: 'forbidden' }, { status: 403 })
 			}
 			const body = (await req.json?.().catch(() => ({}))) as unknown
@@ -448,8 +450,10 @@ export const registerWebhooks = (args: {
 			// and update to everyone, so `read` is the access rule there is to defer to, and reading
 			// the row as the caller applies it exactly as configured: an override that scopes the
 			// log per tenant scopes this endpoint with it.
+			// Named apart from `delivery`, the resolved delivery options this handler also closes over.
+			let row: JsonObject
 			try {
-				await req.payload.findByID({
+				row = await req.payload.findByID({
 					collection: deliveriesSlug as CollectionSlug,
 					id,
 					depth: 0,
@@ -465,6 +469,27 @@ export const registerWebhooks = (args: {
 				}
 				throw err
 			}
+			// The delivery being readable is half of it. A replay also fires the subscription's
+			// webhook, so the caller has to be someone who may see that subscription: otherwise a log
+			// shared more widely than the subscriptions would let a reader trigger anyone's endpoint.
+			// A code subscription has no row to ask about, so the delivery's read access is the whole
+			// rule for it; a tenant-scoped rule matches on the owner columns, which its rows never carry.
+			const subscriptionId = String(row.subscriptionId ?? '')
+			const isCode =
+				row.subscriptionSource === 'code' ||
+				(row.subscriptionSource !== 'collection' &&
+					codeSubscriptions.some((s) => s.id === subscriptionId))
+			if (
+				!isCode &&
+				!(await canAccessDocument({
+					req,
+					slug: subscriptionsSlug,
+					id: subscriptionId,
+					operation: 'read',
+				}))
+			) {
+				return Response.json({ error: 'forbidden' }, { status: 403 })
+			}
 			const result = await redeliverDelivery({
 				deps: {
 					deliveriesSlug,
@@ -474,6 +499,7 @@ export const registerWebhooks = (args: {
 					timeoutMs: delivery.timeoutMs,
 					queue: delivery.queue,
 					urlPolicy: delivery.urlPolicy,
+					ownership,
 				},
 				deliveryId: id,
 				payload: req.payload,
