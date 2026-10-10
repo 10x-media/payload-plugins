@@ -325,3 +325,122 @@ describeForDb('webhooks rotation concurrency', {}, (db) => {
 		}
 	})
 })
+
+/**
+ * The owner read happens inside the write's own transaction, through a request the plugin builds
+ * itself. Whether that request sees the uncommitted row is adapter behaviour, a session on Mongo
+ * and a connection on Postgres, so it is proven on both.
+ */
+describeForDb('webhooks owner access cross-db', {}, (db) => {
+	let booted: BootedPayload
+	let sink: Server
+	let paths: string[] = []
+
+	const tenantUsers: CollectionConfig = {
+		slug: 'users',
+		auth: true,
+		access: { read: () => true },
+		fields: [{ name: 'tenant', type: 'text' }],
+	}
+	const tenantPosts: CollectionConfig = {
+		slug: 'posts',
+		access: {
+			read: ({ req }) =>
+				req.user ? { tenant: { equals: (req.user as { tenant?: string }).tenant } } : false,
+		},
+		fields: [
+			{ name: 'title', type: 'text' },
+			{ name: 'tenant', type: 'text' },
+		],
+	}
+	const allow = () => true
+
+	beforeAll(async () => {
+		sink = createServer((request, res) => {
+			paths.push(request.url ?? '')
+			res.writeHead(200)
+			res.end('ok')
+		})
+		await new Promise<void>((r) => sink.listen(0, r))
+		const addr = sink.address()
+		if (addr === null || typeof addr === 'string') {
+			throw new Error('no port')
+		}
+		const sinkUrl = `http://127.0.0.1:${addr.port}`
+		booted = await bootPayload({
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', ...LOCAL_SINK },
+				enforceOwnerAccess: true,
+				owner: {
+					resolve: async ({ subscription, req }) => ({
+						user: {
+							...(await req.payload.findByID({
+								collection: 'users',
+								id: subscription.record.owner as number | string,
+								depth: 0,
+								overrideAccess: true,
+								req,
+							})),
+							collection: 'users',
+						},
+					}),
+				},
+				subscriptionsCollection: {
+					overrides: {
+						access: { read: allow, create: allow, update: allow, delete: allow },
+						fields: ({ defaultFields }) => [
+							...defaultFields,
+							{ name: 'owner', type: 'relationship', relationTo: 'users' },
+						],
+					},
+				},
+				deliveriesLog: { overrides: { access: { read: allow, delete: allow } } },
+			}),
+			db,
+			collections: [tenantUsers, tenantPosts],
+		})
+		for (const tenant of ['a', 'b']) {
+			const user = await booted.payload.create({
+				collection: 'users',
+				data: { email: `${tenant}@test.dev`, password: 'test1234', tenant },
+				overrideAccess: true,
+			})
+			await booted.payload.create({
+				collection: 'webhook-subscriptions',
+				data: {
+					name: tenant,
+					url: `${sinkUrl}/${tenant}`,
+					enabled: true,
+					events: ['posts.created', 'posts.deleted'],
+					owner: user.id,
+				},
+				overrideAccess: true,
+			})
+		}
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+		await new Promise<void>((r) => sink.close(() => r()))
+	})
+
+	it(`sees the uncommitted document as its owner, and only as its owner, on ${db}`, async () => {
+		const post = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'x', tenant: 'a' },
+			overrideAccess: true,
+		})
+		expect(paths).toEqual(['/a'])
+		// The owner read ran on the write's own transaction, and left it standing.
+		const kept = await booted.payload.count({
+			collection: 'posts',
+			where: { id: { equals: post.id } },
+			overrideAccess: true,
+		})
+		expect(kept.totalDocs).toBe(1)
+		paths = []
+		await booted.payload.delete({ collection: 'posts', id: post.id, overrideAccess: true })
+		expect(paths).toEqual(['/a'])
+	})
+})

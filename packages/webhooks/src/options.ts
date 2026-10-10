@@ -63,6 +63,44 @@ export type SubscriptionScope = (args: {
 	req: PayloadRequest
 }) => MaybePromise<Where | null | undefined>
 
+/**
+ * A user whose read access a subscription is evaluated against. Pass the real user document,
+ * the thing Payload would put on `req.user`, with its `collection`. Without one the admin
+ * collection is assumed, the way Payload's own Local API does.
+ */
+export type OwnerUser = { id: number | string; collection?: string } & Record<string, unknown>
+
+/**
+ * Who a subscription acts as. `{ user }` binds it to that user: it can only subscribe to
+ * collections the user can read, and only ever receives documents the user can read, as the user
+ * reads them. `{ global: true }` marks trusted infrastructure and skips both checks, which is
+ * right for a subscription an operator manages and wrong for anything a tenant can create.
+ */
+export type SubscriptionOwner = { global: true; user?: never } | { global?: false; user: OwnerUser }
+
+export type SubscriptionOwnership = {
+	/**
+	 * Called when a subscription is saved and for every candidate subscription at dispatch (once
+	 * per subscription per request). `null` means no owner could be determined, which under
+	 * `enforceOwnerAccess` rejects the save and skips the delivery. Never return
+	 * `{ global: true }` just because an owner field is empty, unless only operators can create
+	 * subscriptions. Code subscriptions are always global and never reach this.
+	 *
+	 * `req` is a request of its own, outside the transaction of the write being dispatched: it
+	 * reads committed data, and nothing it does can roll that write back.
+	 */
+	resolve: (args: {
+		subscription: WebhookSubscriptionInfo
+		req: PayloadRequest
+	}) => MaybePromise<SubscriptionOwner | null>
+	/**
+	 * Whether the caller may save a subscription that acts as `owner`. Asked on create and whenever
+	 * a save changes who the owner is. Without it, a logged-in user may only act as themselves and
+	 * never as the global owner. Server code with no user on the request is trusted and not asked.
+	 */
+	canActAs?: (args: { owner: SubscriptionOwner; req: PayloadRequest }) => MaybePromise<boolean>
+}
+
 export type CollectionWebhookConfig = {
 	operations?: WebhookOperation[]
 	includePreviousData?: boolean
@@ -199,6 +237,21 @@ export type WebhooksPluginOptions = {
 	}
 	secretEncryption?: SecretEncryptionOptions
 	secretRotation?: SecretRotationOptions
+	/**
+	 * Who each admin-managed subscription acts as. With it set, delivery rows record their owner
+	 * in `ownerId` and `ownerCollection` (two new columns on a SQL adapter), which is what a
+	 * tenant-scoped `deliveriesLog.overrides.access.read` matches on.
+	 */
+	owner?: SubscriptionOwnership
+	/**
+	 * Guarantee that a subscription never receives a document its owner could not read. Checked on
+	 * save (the owner must be able to read every collection the subscription's events come from)
+	 * and again per document on dispatch, where the document is re-read through Payload's access
+	 * control as the owner and that view, at depth 0, is what is sent. `previousData` is not sent
+	 * to an owner-bound subscription. Requires `owner`, and explicit access functions for both of
+	 * the plugin's collections.
+	 */
+	enforceOwnerAccess?: boolean
 }
 
 export type ResolvedSecretRotationOptions = {

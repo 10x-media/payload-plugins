@@ -9,7 +9,11 @@ const as = (user: unknown) =>
 	({ req: { payload: { config: { admin: { user: 'users' } } }, user } }) as never
 
 describe('buildDeliveriesCollection', () => {
-	const c = buildDeliveriesCollection({ slug: 'webhook-deliveries', hidden: false })
+	const c = buildDeliveriesCollection({
+		slug: 'webhook-deliveries',
+		hidden: false,
+		ownerStamp: false,
+	})
 
 	it('uses the slug and is admin-read-only', () => {
 		expect(c.slug).toBe('webhook-deliveries')

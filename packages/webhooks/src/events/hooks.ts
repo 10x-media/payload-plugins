@@ -2,6 +2,7 @@ import { withRawEncrypted } from '@10x-media/fields/encrypted'
 import type {
 	CollectionAfterChangeHook,
 	CollectionAfterDeleteHook,
+	CollectionBeforeDeleteHook,
 	CollectionSlug,
 	JsonObject,
 	Payload,
@@ -15,7 +16,20 @@ import { WEBHOOK_DELIVER_TASK } from '../constants'
 import { buildPayload, type WebhookBody } from '../delivery/buildPayload'
 import type { UrlPolicy } from '../delivery/destination'
 import { messageId, sendDelivery } from '../delivery/sendDelivery'
-import type { CodeSubscription, CollectionWebhookConfig, WebhookOperation } from '../options'
+import type {
+	CodeSubscription,
+	CollectionWebhookConfig,
+	OwnerUser,
+	SubscriptionOwnership,
+	WebhookOperation,
+} from '../options'
+import {
+	actingReq,
+	authorizeDelivery,
+	type DeliveryAuthorization,
+	type OwnerReads,
+	ownerStamp,
+} from '../plugin/owner'
 import {
 	decideDelivery,
 	fromCodeSubscription,
@@ -40,6 +54,8 @@ export type WebhookDispatchDeps = {
 	timeoutMs: number
 	queue: string
 	urlPolicy: UrlPolicy
+	ownership?: SubscriptionOwnership
+	enforceOwnerAccess: boolean
 	/** Trims the delivery log when a retention window is configured. Cheap to call every time. */
 	prune?: (payload: Payload) => void
 }
@@ -226,6 +242,18 @@ const shouldEmit = (args: {
 	return args.config.includeDrafts !== false || args.doc._status !== 'draft'
 }
 
+/** Verdicts for a document about to be deleted, by subscription, taken while it could be read. */
+type DeleteClearance = Map<string, DeliveryAuthorization>
+
+const DENIED: DeliveryAuthorization = { allowed: false }
+
+/** A code subscription and a collection row can share an id, so the registry is part of the key. */
+const subscriptionKey = (subscription: ResolvedSubscription): string =>
+	`${subscription.source}:${subscription.id}`
+
+const clearanceKey = (collectionSlug: string, id: unknown): string =>
+	`webhooksDeleteClearance:${collectionSlug}:${String(id)}`
+
 const dispatch = async (args: {
 	collection?: SanitizedCollectionConfig
 	deps: WebhookDispatchDeps
@@ -233,8 +261,10 @@ const dispatch = async (args: {
 	doc: Record<string, unknown>
 	previousDoc?: Record<string, unknown>
 	req: PayloadRequest
+	/** Verdicts taken before a delete, since the document can no longer be read as anyone. */
+	clearance?: DeleteClearance
 }): Promise<void> => {
-	const { collection, deps, operation, doc, previousDoc, req } = args
+	const { clearance, collection, deps, operation, doc, previousDoc, req } = args
 	if (
 		!deps.operations.includes(operation) ||
 		!shouldEmit({ collection, config: deps.config, doc, operation, req })
@@ -245,26 +275,68 @@ const dispatch = async (args: {
 	const event = eventId(deps.collectionSlug, operation)
 	const occurredAt = new Date().toISOString()
 	const scope = await resolveScope({ deps, operation, doc, previousDoc, req })
-	// Built once, before the first delivery row exists. The consumer's `transform` runs in here, and
-	// it is the likeliest thing in this function to throw: failing then leaves nothing half-written.
-	// Each delivery only stamps its own id onto the result.
-	let template: WebhookBody | undefined
-	const inline: { body: string; deliveryId: string; subscription: ResolvedSubscription }[] = []
-	for await (const page of listening({ deps, event, req, scope, raw: deps.mode === 'inline' })) {
-		for (const subscription of page) {
-			if (!(await passesFilter({ deps, subscription, operation, doc, previousDoc, req }))) {
-				continue
-			}
-			template ??= buildPayload({
+	const reads: OwnerReads = new Map()
+
+	/**
+	 * One body per view of the document: the hook's own for global subscriptions, and one per
+	 * owner for owner-bound ones, built from what that owner can read. Built before the delivery
+	 * row it is for, and the consumer's `transform` runs in here, so a throw leaves no row behind;
+	 * a view that failed is remembered as null so it is logged once and not once per subscriber.
+	 * An owner view carries no `previousData`: the previous version cannot be re-read as the owner.
+	 */
+	const templates = new Map<string, WebhookBody | null>()
+	const templateFor = (verdict: DeliveryAuthorization & { allowed: true }): WebhookBody | null => {
+		const stamp = verdict.doc ? ownerStamp(verdict.owner) : {}
+		const key = verdict.doc ? `${stamp.ownerCollection}:${stamp.ownerId}` : ''
+		const existing = templates.get(key)
+		if (existing !== undefined) {
+			return existing
+		}
+		let template: WebhookBody | null = null
+		try {
+			template = buildPayload({
 				deliveryId: '',
 				collection: deps.collectionSlug,
 				operation,
-				doc,
-				previousDoc,
+				doc: verdict.doc ?? doc,
+				previousDoc: verdict.doc ? undefined : previousDoc,
 				occurredAt,
 				config: deps.config,
 				req,
 			})
+		} catch (err) {
+			payload.logger.error(
+				`@10x-media/webhooks: building the body for ${event} failed, so no webhook was sent for this view of the document: ${err instanceof Error ? err.message : String(err)}`
+			)
+		}
+		templates.set(key, template)
+		return template
+	}
+
+	const inline: { body: string; deliveryId: string; subscription: ResolvedSubscription }[] = []
+	for await (const page of listening({ deps, event, req, scope, raw: deps.mode === 'inline' })) {
+		for (const subscription of page) {
+			const verdict = clearance
+				? (clearance.get(subscriptionKey(subscription)) ?? DENIED)
+				: await authorizeDelivery({
+						ownership: deps.ownership,
+						enforce: deps.enforceOwnerAccess,
+						subscription,
+						req,
+						collection: deps.collectionSlug,
+						id: doc.id as number | string,
+						reads,
+					})
+			if (!verdict.allowed) {
+				continue
+			}
+			if (!(await passesFilter({ deps, subscription, operation, doc, previousDoc, req }))) {
+				continue
+			}
+			const template = templateFor(verdict)
+			if (!template) {
+				continue
+			}
 			const created = await payload.create({
 				collection: deps.deliveriesSlug as CollectionSlug,
 				data: {
@@ -274,6 +346,7 @@ const dispatch = async (args: {
 					event,
 					status: 'pending',
 					attempt: 0,
+					...ownerStamp(verdict.owner),
 				},
 				overrideAccess: true,
 				req,
@@ -399,10 +472,72 @@ export const makeAfterChange =
 		return doc
 	}
 
+/**
+ * beforeDelete hook factory, registered only under `enforceOwnerAccess`.
+ *
+ * The guard asks Payload whether the owner can read the document, which nobody can once it is
+ * gone, so the verdicts (and each owner's view of the document) are taken here and consumed by
+ * the afterDelete dispatch. The document is still committed and the delete has not written yet,
+ * so the reads stay out of the caller's transaction. A pre-check that fails clears nobody: the
+ * delete goes ahead and owner-bound subscriptions hear nothing.
+ */
+export const makeBeforeDelete =
+	(deps: WebhookDispatchDeps): CollectionBeforeDeleteHook =>
+	async ({ id, req }) => {
+		if (!deps.operations.includes('delete')) {
+			return
+		}
+		const clearance: DeleteClearance = new Map()
+		try {
+			const guardReq = await actingReq(req, { detached: true, user: req.user as OwnerUser | null })
+			const reads: OwnerReads = new Map()
+			for await (const page of listening({
+				deps,
+				event: eventId(deps.collectionSlug, 'delete'),
+				req: guardReq,
+				scope: null,
+				raw: false,
+			})) {
+				for (const subscription of page) {
+					const verdict = await authorizeDelivery({
+						ownership: deps.ownership,
+						enforce: true,
+						subscription,
+						req: guardReq,
+						collection: deps.collectionSlug,
+						id,
+						reads,
+						detached: true,
+					})
+					if (verdict.allowed) {
+						clearance.set(subscriptionKey(subscription), verdict)
+					}
+				}
+			}
+		} catch (err) {
+			req.payload.logger.error(
+				`@10x-media/webhooks: the owner check before deleting ${deps.collectionSlug} ${String(id)} failed, so the delete is not delivered to owner-bound subscriptions: ${err instanceof Error ? err.message : String(err)}`
+			)
+		}
+		req.context[clearanceKey(deps.collectionSlug, id)] = clearance
+	}
+
 /** afterDelete hook factory for an opt-in source collection. */
 export const makeAfterDelete =
 	(deps: WebhookDispatchDeps): CollectionAfterDeleteHook =>
-	async ({ doc, req }) => {
-		await dispatchSafely({ deps, operation: 'delete', doc: doc as Record<string, unknown>, req })
+	async ({ doc, id, req }) => {
+		const key = clearanceKey(deps.collectionSlug, id)
+		// Under enforcement a missing clearance means the pre-check never ran: nobody is cleared.
+		const clearance = deps.enforceOwnerAccess
+			? ((req.context[key] as DeleteClearance | undefined) ?? new Map())
+			: undefined
+		req.context[key] = undefined
+		await dispatchSafely({
+			deps,
+			operation: 'delete',
+			doc: doc as Record<string, unknown>,
+			req,
+			clearance,
+		})
 		return doc
 	}

@@ -10,8 +10,11 @@ export { pruneDeliveries } from './delivery/prune'
 export type {
 	CollectionOverride,
 	FieldsOverride,
+	OwnerUser,
 	SecretEncryptionOptions,
 	SubscriptionFilter,
+	SubscriptionOwner,
+	SubscriptionOwnership,
 	SubscriptionScope,
 	WebhookSubscriptionInfo,
 	WebhooksPluginOptions,

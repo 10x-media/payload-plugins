@@ -19,8 +19,8 @@ import { buildDeliverTask } from '../delivery/deliverTask'
 import { isReservedHeader, isValidHeaderName, RESERVED_HEADER_NAMES } from '../delivery/headers'
 import { makeThrottledPrune } from '../delivery/prune'
 import { redeliverDelivery } from '../delivery/redeliver'
-import { eventCatalog } from '../events/eventTypes'
-import { makeAfterChange, makeAfterDelete } from '../events/hooks'
+import { eventCatalog, eventId } from '../events/eventTypes'
+import { makeAfterChange, makeAfterDelete, makeBeforeDelete } from '../events/hooks'
 import {
 	type CodeSubscription,
 	type CollectionWebhookConfig,
@@ -31,6 +31,7 @@ import {
 import { InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { RotationConflictError, rotateSubscriptionSecret } from '../secrets/rotate'
 import { applyCollectionOverride } from './applyCollectionOverride'
+import { makeOwnerGuard } from './ownerGuard'
 import { resolveMode } from './resolveMode'
 
 /**
@@ -230,6 +231,30 @@ const attachDocumentAction = (
 	}
 }
 
+/**
+ * Under `enforceOwnerAccess` the defaults are not good enough to fall back on. They allow every
+ * user of the admin collection, and in an app whose tenants sign in to the admin that is every
+ * tenant: each could read the others' subscriptions and the full body of their deliveries. So
+ * the rules have to be stated, and the error names the ones that are not.
+ */
+const assertExplicitAccess = (options: WebhooksPluginOptions): void => {
+	const subscriptions = options.subscriptionsCollection?.overrides?.access
+	const deliveries = options.deliveriesLog?.overrides?.access
+	const missing = [
+		...(['read', 'create', 'update', 'delete'] as const)
+			.filter((op) => !subscriptions?.[op])
+			.map((op) => `subscriptionsCollection.overrides.access.${op}`),
+		...(['read', 'delete'] as const)
+			.filter((op) => !deliveries?.[op])
+			.map((op) => `deliveriesLog.overrides.access.${op}`),
+	]
+	if (missing.length) {
+		throw new Error(
+			`@10x-media/webhooks: enforceOwnerAccess is on, so who may manage subscriptions and read the delivery log has to be stated: set ${missing.join(', ')}. The defaults allow every user of the admin collection, which in a multi-tenant app is every tenant. See https://docs.10xmedia.de/webhooks/multi-tenancy.`
+		)
+	}
+}
+
 /** Register collections, the delivery task, source hooks, and the redeliver endpoint. */
 export const registerWebhooks = (args: {
 	config: Config
@@ -259,6 +284,23 @@ export const registerWebhooks = (args: {
 	const retentionDays = resolveRetentionDays(options.deliveriesLog?.retentionDays)
 	const prune = retentionDays ? makeThrottledPrune({ deliveriesSlug, retentionDays }) : undefined
 	const codeSubscriptions = options.subscriptions ?? []
+	const ownership = options.owner
+	const enforceOwnerAccess = options.enforceOwnerAccess === true
+	if (enforceOwnerAccess) {
+		if (!ownership?.resolve) {
+			throw new Error(
+				'@10x-media/webhooks: enforceOwnerAccess needs owner.resolve, which tells the plugin who each subscription acts as.'
+			)
+		}
+		assertExplicitAccess(options)
+	}
+	// Every operation, whatever a collection's `operations` narrows to: a stored subscription may
+	// still list an event that is no longer emitted, and its source collection is judged the same.
+	const eventSources = Object.fromEntries(
+		sourceSlugs.flatMap((slug) =>
+			(['create', 'update', 'delete'] as const).map((op) => [eventId(slug, op), slug])
+		)
+	)
 	assertCodeSubscriptionSecrets(codeSubscriptions)
 	assertCodeSubscriptionHeaders(codeSubscriptions)
 	assertAllowedHosts(delivery.allowedHosts)
@@ -370,11 +412,23 @@ export const registerWebhooks = (args: {
 		endpoint: rotateSecretEndpoint,
 		control: '@10x-media/webhooks/client#RotateSecretButton',
 	})
+	// Added after the consumer's override, and last, so an override cannot drop it and it judges
+	// the row as the application's own hooks left it.
+	if (enforceOwnerAccess && ownership) {
+		subscriptions.hooks = {
+			...subscriptions.hooks,
+			beforeChange: [
+				...(subscriptions.hooks?.beforeChange ?? []),
+				makeOwnerGuard({ ownership, eventSources }),
+			],
+		}
+	}
 	config.collections.push(subscriptions)
 	const deliveries = applyCollectionOverride(
 		buildDeliveriesCollection({
 			slug: deliveriesSlug,
 			hidden: options.deliveriesLog?.hidden ?? false,
+			ownerStamp: Boolean(ownership),
 		}),
 		options.deliveriesLog?.overrides
 	)
@@ -472,6 +526,8 @@ export const registerWebhooks = (args: {
 			queue: delivery.queue,
 			urlPolicy: delivery.urlPolicy,
 			prune,
+			ownership,
+			enforceOwnerAccess,
 		}
 		config.collections[i] = {
 			...collection,
@@ -479,6 +535,11 @@ export const registerWebhooks = (args: {
 				...collection.hooks,
 				afterChange: [...(collection.hooks?.afterChange ?? []), makeAfterChange(deps)],
 				afterDelete: [...(collection.hooks?.afterDelete ?? []), makeAfterDelete(deps)],
+				...(enforceOwnerAccess
+					? {
+							beforeDelete: [...(collection.hooks?.beforeDelete ?? []), makeBeforeDelete(deps)],
+						}
+					: {}),
 			},
 		}
 	}
