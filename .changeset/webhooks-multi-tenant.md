@@ -9,15 +9,16 @@ Make the plugin safe when subscriptions are created by tenants rather than by tr
 - **`collections.<slug>.filter`**: decide per subscription whether a document is delivered. It receives the stored subscription, fields you added included, never its secret. A rejection leaves no delivery row.
 - **`collections.<slug>.scope`**: narrow the subscriptions loaded for a document with a `Where`, so a tenanted install reads its own tenant's rows per write.
 - **No more 1,000-subscription ceiling.** Subscriptions for an event are paged through instead of scanned up to a cap, and `events` is indexed on MongoDB.
-- **Redelivery checks the subscription too.** The caller needs read access to the delivery and to the subscription behind it. A replay keeps the original's owner, and is refused when the subscription has changed owner since.
+- **Redelivery checks the subscription too.** The caller needs read access to the delivery and to the subscription behind it. A replay keeps the original's owner, and is refused when the subscription has changed owner since. A queued delivery is held to the same rule on every attempt.
 - **Delivery rows record `ownerId` and `ownerCollection`** when `owner` is configured.
 - **A stored URL that is not an absolute `http(s)` URL is refused as `dead` on the first attempt**, with the reason, instead of failing every retry.
-- **New dependencies:** `undici` and `ipaddr.js`, the two libraries Payload's own SSRF-safe fetch is built on.
+- **New dependencies:** `undici` and `ipaddr.js`, the two libraries Payload's own SSRF-safe fetch is built on. Deliveries are now sent with `undici`'s `fetch` and its own dispatcher, so a test that stubs `globalThis.fetch`, or a process-wide dispatcher set with `setGlobalDispatcher`, no longer sees deliveries to admin-managed subscriptions.
+- **Bulk updates and deletes no longer lose deliveries in `inline` mode.** Their documents dispatch concurrently on one request, and a shared window onto the sealed secrets made some of them refuse to send. Subscriptions are now read on a request of their own, outside the write's transaction.
 
 **Action required**
 
 1. If any admin-managed subscription points at `http:` or at an internal address, either move it to a code subscription, or set `delivery.allowHttp` / `delivery.allowPrivateAddresses`. Until then its deliveries are recorded as `dead` with the reason.
-2. If you configure `owner`, run a schema migration on a SQL adapter: the delivery log gains `owner_id` and `owner_collection`. Without `owner` there is no schema change.
+2. On a SQL adapter, run a schema migration (`pnpm payload migrate:create`): the subscriptions' events table gains an index on its value column, and, if you configure `owner`, the delivery log gains `owner_id` and `owner_collection`. MongoDB needs nothing.
 3. Under `enforceOwnerAccess`, existing subscriptions have no owner and stop delivering until one is assigned.
 
 See [Multi-tenancy](https://docs.10xmedia.de/webhooks/multi-tenancy) and [Security](https://docs.10xmedia.de/webhooks/security#subscription-urls-ssrf).

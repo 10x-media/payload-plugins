@@ -104,9 +104,16 @@ const resolveScope = async (args: {
  * every watched write. `matchSubscriptions` still runs over the result: it is the authority on
  * what a subscription listens for, and the `where` is only a narrowing.
  *
- * `raw` opens the encrypted window so the rows carry their sealed secrets. `queue` mode and the
- * delete pre-check leave it shut: the task re-resolves each subscription when it runs, and a
- * pre-check never sends, so decrypting would recover plaintext only to throw it away.
+ * The rows are read on a request of their own, outside the caller's transaction. Subscriptions
+ * are committed state, so nothing is lost, and two things are gained. A query that fails (the
+ * application's `scope` can produce one) cannot roll the caller's write back. And the window onto
+ * sealed fields that `raw` opens belongs to this walk alone: a bulk operation dispatches its
+ * documents concurrently on one request, and a shared window would be closed by whichever
+ * dispatch finished first, leaving the others with secrets that read as hidden.
+ *
+ * `raw` opens that window so the rows carry their sealed secrets. `queue` mode and the delete
+ * pre-check leave it shut: the task re-resolves each subscription when it runs, and a pre-check
+ * never sends, so decrypting would recover plaintext only to throw it away.
  */
 export async function* listening(args: {
 	deps: WebhookDispatchDeps
@@ -120,15 +127,14 @@ export async function* listening(args: {
 	if (code.length) {
 		yield code
 	}
-	const where: Where = {
-		and: [
-			{ enabled: { not_equals: false } },
-			{ events: { in: [args.event] } },
-			...(args.scope ? [args.scope] : []),
-		],
-	}
-	for (let page = 1; ; page += 1) {
-		const read = () =>
+	const readReq = await actingReq(args.req, {
+		detached: true,
+		user: args.req.user as OwnerUser | null,
+	})
+	const listeners: Where[] = [{ enabled: { not_equals: false } }, { events: { in: [args.event] } }]
+	let where: Where = { and: args.scope ? [...listeners, args.scope] : listeners }
+	const read = (page: number) => {
+		const find = () =>
 			payload.find({
 				collection: args.deps.subscriptionsSlug as CollectionSlug,
 				where,
@@ -137,15 +143,32 @@ export async function* listening(args: {
 				sort: 'id',
 				depth: 0,
 				overrideAccess: true,
-				req: args.req,
+				req: readReq,
 			})
-		const res = args.raw ? await withRawEncrypted(args.req, () => read()) : await read()
+		return args.raw ? withRawEncrypted(readReq, () => find()) : find()
+	}
+	for (let page = 1; ; page += 1) {
+		let res: Awaited<ReturnType<typeof read>>
+		try {
+			res = await read(page)
+		} catch (err) {
+			// Only a scope can make this query invalid, and only from its first page. It is a
+			// narrowing, so the answer to a broken one is every listener, the same as one that throws.
+			if (!args.scope || page !== 1) {
+				throw err
+			}
+			payload.logger.error(
+				`@10x-media/webhooks: scope for ${args.deps.collectionSlug} returned a query the subscriptions collection cannot run, so every subscription to the event is considered instead: ${err instanceof Error ? err.message : String(err)}`
+			)
+			where = { and: listeners }
+			res = await read(page)
+		}
 		// `JsonObject` is Payload's own shape for a document whose collection is not statically known,
 		// which is the case for every slug this plugin is handed.
 		const docs: JsonObject[] = res.docs
 		const rows = await withReadableHeaders({
 			payload,
-			req: args.req,
+			req: readReq,
 			rows: docs as SubscriptionRow[],
 			subscriptionsSlug: args.deps.subscriptionsSlug,
 		})
@@ -480,6 +503,10 @@ export const makeAfterChange =
  * the afterDelete dispatch. The document is still committed and the delete has not written yet,
  * so the reads stay out of the caller's transaction. A pre-check that fails clears nobody: the
  * delete goes ahead and owner-bound subscriptions hear nothing.
+ *
+ * `scope` narrows by the document, which this hook is not handed, so with one configured the
+ * document is read first. Without that every subscriber to the event would be resolved and asked
+ * about on every delete, which is the cost `scope` is there to avoid.
  */
 export const makeBeforeDelete =
 	(deps: WebhookDispatchDeps): CollectionBeforeDeleteHook =>
@@ -491,11 +518,28 @@ export const makeBeforeDelete =
 		try {
 			const guardReq = await actingReq(req, { detached: true, user: req.user as OwnerUser | null })
 			const reads: OwnerReads = new Map()
+			let scope: Where | null = null
+			if (deps.config.scope) {
+				const found = await req.payload.find({
+					collection: deps.collectionSlug as CollectionSlug,
+					where: { id: { equals: id } },
+					limit: 1,
+					depth: 0,
+					pagination: false,
+					overrideAccess: true,
+					trash: true,
+					req: guardReq,
+				})
+				const docs: JsonObject[] = found.docs
+				if (docs[0]) {
+					scope = await resolveScope({ deps, operation: 'delete', doc: docs[0], req })
+				}
+			}
 			for await (const page of listening({
 				deps,
 				event: eventId(deps.collectionSlug, 'delete'),
 				req: guardReq,
-				scope: null,
+				scope,
 				raw: false,
 			})) {
 				for (const subscription of page) {

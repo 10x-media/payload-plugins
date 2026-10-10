@@ -353,6 +353,19 @@ describeForDb('webhooks owner access cross-db', {}, (db) => {
 			{ name: 'tenant', type: 'text' },
 		],
 	}
+	/** Read access that throws for any user, the way a broken access function does. */
+	const guarded: CollectionConfig = {
+		slug: 'guarded',
+		access: {
+			read: ({ req }) => {
+				if (req.user) {
+					throw new Error('access blew up')
+				}
+				return false
+			},
+		},
+		fields: [{ name: 'title', type: 'text' }],
+	}
 	const allow = () => true
 
 	beforeAll(async () => {
@@ -369,7 +382,7 @@ describeForDb('webhooks owner access cross-db', {}, (db) => {
 		const sinkUrl = `http://127.0.0.1:${addr.port}`
 		booted = await bootPayload({
 			plugin: webhooks({
-				collections: { posts: true },
+				collections: { posts: true, guarded: true },
 				delivery: { mode: 'inline', ...LOCAL_SINK },
 				enforceOwnerAccess: true,
 				owner: {
@@ -398,7 +411,7 @@ describeForDb('webhooks owner access cross-db', {}, (db) => {
 				deliveriesLog: { overrides: { access: { read: allow, delete: allow } } },
 			}),
 			db,
-			collections: [tenantUsers, tenantPosts],
+			collections: [tenantUsers, tenantPosts, guarded],
 		})
 		for (const tenant of ['a', 'b']) {
 			const user = await booted.payload.create({
@@ -442,5 +455,37 @@ describeForDb('webhooks owner access cross-db', {}, (db) => {
 		paths = []
 		await booted.payload.delete({ collection: 'posts', id: post.id, overrideAccess: true })
 		expect(paths).toEqual(['/a'])
+	})
+
+	/**
+	 * The owner read joins the write's transaction through a promise of its id, which is what
+	 * keeps a throw inside it from rolling the write back. That is adapter behaviour as well.
+	 */
+	it(`leaves the write standing when the owner read throws on ${db}`, async () => {
+		const owner = await booted.payload.find({ collection: 'users', limit: 1, overrideAccess: true })
+		// Past the save guard, which would refuse a collection its owner cannot read.
+		await booted.payload.db.create({
+			collection: 'webhook-subscriptions',
+			data: {
+				name: 'g',
+				url: 'http://127.0.0.1:1/g',
+				enabled: true,
+				events: ['guarded.created'],
+				owner: owner.docs[0]?.id,
+			},
+		})
+		paths = []
+		const doc = await booted.payload.create({
+			collection: 'guarded',
+			data: { title: 'x' },
+			overrideAccess: true,
+		})
+		const kept = await booted.payload.count({
+			collection: 'guarded',
+			where: { id: { equals: doc.id } },
+			overrideAccess: true,
+		})
+		expect(kept.totalDocs).toBe(1)
+		expect(paths).toEqual([])
 	})
 })

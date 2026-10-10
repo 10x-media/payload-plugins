@@ -43,7 +43,13 @@ export const makeOwnerGuard =
 				: null
 		if (
 			(operation === 'create' || !sameOwner(previous, owner)) &&
-			!(await canActAsOwner({ ownership, owner, req: checkReq }))
+			!(await canActAsOwner({
+				ownership,
+				owner,
+				req: checkReq,
+				// Server code, not merely a request without a user: an anonymous REST call has none either.
+				trusted: !req.user && req.payloadAPI === 'local',
+			}))
 		) {
 			throw new APIError('You may not save a subscription that acts as this owner.', 403)
 		}

@@ -2,12 +2,8 @@ import type { CollectionSlug, JsonObject, Payload, PayloadRequest } from 'payloa
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import type { CodeSubscription, SubscriptionOwnership } from '../options'
-import { ownerStamp, resolveOwner } from '../plugin/owner'
-import {
-	decideDelivery,
-	resolveSubscriptionById,
-	subscriptionInfo,
-} from '../plugin/resolveSubscriptions'
+import { ANOTHER_OWNER_REASON, madeForAnotherOwner } from '../plugin/owner'
+import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
 import type { UrlPolicy } from './destination'
 import { messageId, sendDelivery } from './sendDelivery'
 
@@ -59,24 +55,12 @@ export const redeliverDelivery = async (args: {
 	})
 	// The stored body was built for whoever owned the subscription then. If it acts as someone else
 	// now, replaying would hand the previous owner's view of the document to the new one.
-	const madeFor = {
-		ownerId: typeof original.ownerId === 'string' ? original.ownerId : undefined,
-		ownerCollection:
-			typeof original.ownerCollection === 'string' ? original.ownerCollection : undefined,
-	}
-	const actsAs =
-		deps.ownership && subscription
-			? ownerStamp(
-					await resolveOwner({
-						ownership: deps.ownership,
-						subscription: subscriptionInfo(subscription),
-						req,
-					})
-				)
-			: madeFor
-	const ownerChanged =
-		(actsAs.ownerId ?? '') !== (madeFor.ownerId ?? '') ||
-		(actsAs.ownerCollection ?? '') !== (madeFor.ownerCollection ?? '')
+	const ownerChanged = await madeForAnotherOwner({
+		ownership: deps.ownership,
+		subscription,
+		row: original,
+		req,
+	})
 	const created = await payload.create({
 		collection: deps.deliveriesSlug as CollectionSlug,
 		data: {
@@ -88,7 +72,9 @@ export const redeliverDelivery = async (args: {
 			attempt: 0,
 			// Carried over, so the replay stays visible to the owner it belongs to instead of becoming
 			// an unowned row holding their payload.
-			...(madeFor.ownerId ? madeFor : {}),
+			...(typeof original.ownerId === 'string'
+				? { ownerId: original.ownerId, ownerCollection: original.ownerCollection }
+				: {}),
 		},
 		overrideAccess: true,
 		req,
@@ -108,11 +94,7 @@ export const redeliverDelivery = async (args: {
 		await payload.update({
 			collection: deps.deliveriesSlug as CollectionSlug,
 			id: newId,
-			data: {
-				status: 'dead',
-				error:
-					'the subscription changed owner since this delivery was made, so it was not replayed',
-			},
+			data: { status: 'dead', error: ANOTHER_OWNER_REASON },
 			overrideAccess: true,
 			req,
 		})

@@ -36,14 +36,32 @@ export const transport = { fetch: undiciFetch, lookup: dnsLookup }
 export class BlockedDestinationError extends Error {}
 
 /**
+ * Ranges ipaddr.js files under plain `unicast` that still lead inward: IPv4-compatible IPv6
+ * (`::a.b.c.d`, deprecated, and another spelling of an IPv4 address), the local-use NAT64 prefix
+ * of RFC 8215, and deprecated site-local addresses, which networks that still carry them use the
+ * way they use RFC 1918.
+ */
+const INWARD_RANGES = ['::/96', '64:ff9b:1::/48', 'fec0::/10'].map((cidr) => ipaddr.parseCIDR(cidr))
+
+/**
  * Whether an address is one a public receiver can have. Classification is ipaddr.js's: anything
  * outside its `unicast` range is refused, which covers loopback, RFC 1918, link-local (the cloud
  * metadata address), carrier-grade NAT, unique-local, multicast, and the translation prefixes
  * (NAT64, 6to4, Teredo) that reach an IPv4 address through an IPv6 one. `process` unwraps an
  * IPv4-mapped IPv6 address first. Unparseable input is refused.
  */
-export const isPublicAddress = (address: string): boolean =>
-	ipaddr.isValid(address) && ipaddr.process(address).range() === 'unicast'
+export const isPublicAddress = (address: string): boolean => {
+	if (!ipaddr.isValid(address)) {
+		return false
+	}
+	const parsed = ipaddr.process(address)
+	return (
+		parsed.range() === 'unicast' &&
+		!INWARD_RANGES.some(
+			([range, bits]) => parsed.kind() === range.kind() && parsed.match(range, bits)
+		)
+	)
+}
 
 /** A URL's host without the brackets the URL parser keeps around an IPv6 literal. */
 export const hostOf = (url: string): string => new URL(url).hostname.replace(/^\[|\]$/g, '')

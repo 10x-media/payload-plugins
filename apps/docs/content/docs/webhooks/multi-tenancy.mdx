@@ -94,12 +94,13 @@ webhooks({
 
 **On delete.** The same read happens in `beforeDelete`, while the document still exists.
 
-Three consequences to know:
+Things to know:
 
 - An owner-bound subscription never receives `previousData`. The previous version cannot be re-read as the owner, and a document that moved from one tenant to another would otherwise show the new tenant the old one's data.
 - A subscription whose owner cannot be resolved (the user was deleted, the field is empty) is skipped, with a warning in the log. It fails closed.
 - Your read access runs on a request the plugin builds for the owner. It has `req.user`, the locale and the write's transaction, and **no headers or cookies**. Access rules that pick a tenant from a cookie or a header see none; key them on the user.
-- That read shares the write's transaction, which is how it sees a document that is not committed yet. A flat denial is handled, but a read access function that *throws* fails the write it was checking, the same way it would fail a REST read.
+- That read joins the write's transaction, which is how it sees a document that is not committed yet, but it cannot end it. If your read access or a read hook throws for the owner, that is logged and read as a denial for that subscription, and the write is unaffected.
+- On a collection with drafts the owner is read the latest version. A draft save therefore sends the draft to owners who may read drafts, and nothing to owners who may only read published content.
 
 `transform` still runs, on the owner's view, and is still the tool for reshaping the body. It is not the tenant boundary and does not need to be.
 
@@ -109,7 +110,7 @@ Three consequences to know:
 
 Whether the *caller* may name that owner is a separate question, asked on create and whenever a save changes the owner:
 
-- Server code with no user on the request is trusted.
+- Server code, a Local API call with no user on it, is trusted. An anonymous REST or GraphQL request is not.
 - A logged-in user may only act as themselves, and never as `{ global: true }`.
 - `owner.canActAs` replaces that rule. The example lets operators assign anyone.
 
@@ -148,13 +149,13 @@ collections: {
 }
 ```
 
-`subscription.record` is the stored row with any fields you added, never the secret or header values. `filter` runs for code subscriptions too (`source: 'code'`). With `scope`, a write loads one tenant's subscriptions instead of every subscriber to the event; without it the plugin still pages through all of them, so nothing is dropped, only slower.
+`subscription.record` is the stored row with any fields you added, never the secret or header values. `filter` runs for code subscriptions too (`source: 'code'`). With `scope`, a write loads one tenant's subscriptions instead of every subscriber to the event; without it the plugin still pages through all of them, so nothing is dropped, only slower. A `scope` that throws, or returns a query the subscriptions collection cannot run (a field it does not have), is logged and ignored.
 
 Both callbacks get the write's own `req`. A Local API call made with it that throws rolls back the write's transaction, as it would in any hook, so pass `disableErrors: true` to lookups that may miss.
 
 ## Redelivery
 
-Replaying a delivery requires read access to the delivery **and** to its subscription. A replay keeps the original's owner columns. If the subscription has changed owner since, the replay is refused and recorded as `dead`: the stored body was built for the previous owner.
+Replaying a delivery requires read access to the delivery **and** to its subscription. A replay keeps the original's owner columns. If the subscription has changed owner since, the replay is refused and recorded as `dead`: the stored body was built for the previous owner. A queued delivery is held to the same rule each time it is attempted, so reassigning a subscription never sends the new owner what was queued for the old one. Deliveries made before `owner` was configured carry no owner and are refused the same way.
 
 ## Use queue mode
 
@@ -162,4 +163,4 @@ A tenant's receiver being slow must not slow your writes. Set `delivery: { mode:
 
 ## Migrating
 
-`owner` adds `ownerId` and `ownerCollection` to the delivery log, and the example adds `owner` to subscriptions. On a SQL adapter run a migration (`pnpm payload migrate:create webhook-owner`). Existing subscriptions have no owner and stop delivering under `enforceOwnerAccess` until you assign one, through the Local API or the admin as an operator.
+`owner` adds `ownerId` and `ownerCollection` to the delivery log, and the example adds `owner` to subscriptions. This release also indexes the subscriptions' `events`. On a SQL adapter run a migration (`pnpm payload migrate:create webhook-owner`). Existing subscriptions have no owner and stop delivering under `enforceOwnerAccess` until you assign one, through the Local API or the admin as an operator.

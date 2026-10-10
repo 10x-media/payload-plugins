@@ -524,6 +524,7 @@ export const registerWebhooks = (args: {
 			timeoutMs: delivery.timeoutMs,
 			retries: delivery.retries,
 			urlPolicy: delivery.urlPolicy,
+			ownership,
 		})
 	)
 

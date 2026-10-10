@@ -26,6 +26,11 @@ describe('isPublicAddress', () => {
 		'64:ff9b::7f00:1',
 		'2002:7f00:1::',
 		'2001:db8::1',
+		// Ranges ipaddr.js files under plain unicast, each a way to an internal host.
+		'::7f00:1',
+		'::127.0.0.1',
+		'64:ff9b:1::7f00:1',
+		'fec0::1',
 		'not-an-ip',
 		'',
 	])('refuses %s', (address) => {
@@ -54,6 +59,8 @@ describe('urlRefusal', () => {
 		'https://[::ffff:127.0.0.1]/hook',
 		'https://169.254.169.254/latest/meta-data',
 		'https://10.0.0.5:8443/hook',
+		'https://[::7f00:1]/hook',
+		'https://[fec0::1]/hook',
 	])('refuses %s as a private address', (url) => {
 		expect(urlRefusal(url, strict, 'collection')).toBe('private')
 	})

@@ -26,10 +26,19 @@ const OWNER_MEMO_CONTEXT = 'webhooksOwnerMemo'
  *
  * Payload's `createLocalReq` writes `user` onto whatever request it is handed, so reusing the
  * live request with another user would re-authenticate the caller's own write. The fresh one
- * carries the caller's transaction unless `detached`, so a read as the owner sees the document
- * the write has not committed yet; it carries no headers or cookies, because the owner is not
- * the caller. `detached` is for reads of committed state from a hook that runs before the
- * write's own first statement.
+ * carries no headers or cookies and an empty context, because the owner is not the caller:
+ * a flag the writer's request was given (an internal job marking itself privileged, another
+ * dispatch's open window onto sealed fields) must not widen what the owner is shown.
+ *
+ * Unless `detached`, it joins the caller's transaction, so a read as the owner sees the document
+ * the write has not committed yet. It joins without the power to end it. Payload rolls a
+ * transaction back when an operation on it throws, and reports nothing to whoever else is using
+ * it, so the caller's write would vanish while its API call returned success. Payload skips that
+ * rollback for a transaction id that is still a promise, and both database adapters await one,
+ * so the id is handed over as a promise: the read happens inside the transaction, and a throw
+ * from an access function or a read hook stays a failed read.
+ *
+ * `detached` is for reads of committed state, which is everything but the document being written.
  */
 export const actingReq = (
 	req: PayloadRequest,
@@ -38,11 +47,14 @@ export const actingReq = (
 	createLocalReq(
 		{
 			req: {
-				context: req.context,
+				context: {},
 				fallbackLocale: req.fallbackLocale,
 				i18n: req.i18n,
 				locale: req.locale,
-				transactionID: options.detached ? undefined : req.transactionID,
+				transactionID:
+					options.detached || req.transactionID === undefined
+						? undefined
+						: Promise.resolve(req.transactionID),
 			},
 			user: (options.user ?? undefined) as TypedUser | undefined,
 		},
@@ -126,21 +138,26 @@ const ownerKey = (owner: SubscriptionOwner): string => {
  * Whether the caller may save a subscription that acts as `owner`.
  *
  * Naming an owner is a request to receive that owner's documents, so it is authenticated, not
- * trusted. Server code with no user on the request may name anyone. A logged-in user may only
- * act as themselves, and never as the global owner, unless the application's `canActAs` says
- * otherwise.
+ * trusted. `trusted` is server code: a Local API call with no user on it, which may name anyone.
+ * It is the caller's to establish, because having no user is not enough: an anonymous REST or
+ * GraphQL request has none either. Everyone else may only act as themselves, and never as the
+ * global owner, unless the application's `canActAs` says otherwise.
  */
 export const canActAsOwner = async (args: {
 	ownership: SubscriptionOwnership
 	owner: SubscriptionOwner
 	req: PayloadRequest
+	trusted: boolean
 }): Promise<boolean> => {
 	const { owner, ownership, req } = args
-	if (!req.user) {
+	if (args.trusted) {
 		return true
 	}
 	if (ownership.canActAs) {
 		return Boolean(await ownership.canActAs({ owner, req }))
+	}
+	if (!req.user) {
+		return false
 	}
 	return sameOwner(owner, { user: { id: req.user.id, collection: req.user.collection } })
 }
@@ -180,11 +197,13 @@ export const canReadCollection = async (args: {
  * control on, so collection access (boolean or `Where`), field-level read access and anything a
  * tenant plugin adds to the collection all apply exactly as they do over REST. Depth 0: a
  * populated relationship would carry other documents along. Trashed documents are included, so
- * the update that trashes one is still readable by whoever may read the trash.
+ * the update that trashes one is still readable by whoever may read the trash. `draft` asks for
+ * the latest version on a collection with drafts, which is the one a draft save just wrote; the
+ * main document still holds the last published content at that point.
  *
- * This read is on the write's own transaction, which is what lets it see a document the write
- * has not committed. `disableErrors` is therefore load-bearing: without it a flat `false` from
- * read access is thrown, and Payload rolls back the transaction of an operation that throws.
+ * `disableErrors` turns a flat `false` from read access into an empty result. Anything else that
+ * throws here (an access function, a read hook) is caught below and read as a denial, and cannot
+ * touch the write: see `actingReq`.
  */
 const readAsOwner = async (args: {
 	req: PayloadRequest
@@ -202,6 +221,7 @@ const readAsOwner = async (args: {
 			pagination: false,
 			overrideAccess: false,
 			disableErrors: true,
+			draft: true,
 			trash: true,
 			req: await actingReq(args.req, { detached: args.detached, user: args.user }),
 		})
@@ -310,3 +330,37 @@ export const authorizeDelivery = async (args: {
 	const doc = await pending
 	return doc ? { allowed: true, owner, doc } : DENIED
 }
+
+/**
+ * Whether a stored delivery was made for a different owner than its subscription acts as now.
+ *
+ * The body of an owner-bound delivery is that owner's view of the document. If the subscription
+ * has since been handed to someone else, sending it (a replay, or a queued attempt that had not
+ * run yet) would give the previous owner's view to the new one. A row with no owner recorded,
+ * made before `owner` was configured or for a global subscription, counts as made for nobody.
+ */
+export const madeForAnotherOwner = async (args: {
+	ownership: SubscriptionOwnership | undefined
+	subscription: ResolvedSubscription | null
+	row: Record<string, unknown>
+	req: PayloadRequest
+}): Promise<boolean> => {
+	if (!args.ownership || !args.subscription) {
+		return false
+	}
+	const now = ownerStamp(
+		await resolveOwner({
+			ownership: args.ownership,
+			subscription: subscriptionInfo(args.subscription),
+			req: args.req,
+		})
+	)
+	return (
+		(now.ownerId ?? '') !== String(args.row.ownerId ?? '') ||
+		(now.ownerCollection ?? '') !== String(args.row.ownerCollection ?? '')
+	)
+}
+
+/** What a delivery refused for that reason records. */
+export const ANOTHER_OWNER_REASON =
+	'the subscription acts as a different owner than this delivery was made for (it changed owner, or the delivery predates ownership), so it was not sent'

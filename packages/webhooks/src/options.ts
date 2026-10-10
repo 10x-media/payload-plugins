@@ -57,7 +57,8 @@ export type SubscriptionFilter = (args: {
  *
  * A performance dimension, not a boundary, and it cuts both ways: a subscription the `Where`
  * leaves out is never considered, so `or` in the rows that carry no tenant of their own. A scope
- * that throws is logged and ignored. Code subscriptions are not affected by it.
+ * that throws, or returns a query the subscriptions collection cannot run, is logged and ignored.
+ * Code subscriptions are not affected by it.
  */
 export type SubscriptionScope = (args: {
 	doc: Record<string, unknown>
@@ -99,7 +100,9 @@ export type SubscriptionOwnership = {
 	/**
 	 * Whether the caller may save a subscription that acts as `owner`. Asked on create and whenever
 	 * a save changes who the owner is. Without it, a logged-in user may only act as themselves and
-	 * never as the global owner. Server code with no user on the request is trusted and not asked.
+	 * never as the global owner. Server code, a Local API call with no user on it, is trusted and
+	 * not asked. `req` is a request of the plugin's own carrying the caller's user, not the
+	 * caller's request: it has no headers.
 	 */
 	canActAs?: (args: { owner: SubscriptionOwner; req: PayloadRequest }) => MaybePromise<boolean>
 }

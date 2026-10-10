@@ -296,8 +296,8 @@ export const buildSubscriptionsCollection = (args: {
 			name: 'events',
 			type: 'select',
 			hasMany: true,
-			// Every watched write queries this field. A multikey index on Mongo; the drizzle adapters
-			// keep a hasMany select in its own table and ignore the flag, so no SQL schema changes.
+			// Every watched write queries this field. A multikey index on Mongo, and an index on the
+			// value column of the select's own table on the SQL adapters, which is a schema change there.
 			index: true,
 			label: labelForKey(keys.fieldEvents),
 			options: args.events.length

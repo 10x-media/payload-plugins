@@ -1,7 +1,8 @@
 import type { CollectionSlug, JsonObject, TaskConfig } from 'payload'
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
-import type { CodeSubscription } from '../options'
+import type { CodeSubscription, SubscriptionOwnership } from '../options'
+import { ANOTHER_OWNER_REASON, madeForAnotherOwner } from '../plugin/owner'
 import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
 import { deriveDeliveryStatus } from './deriveDeliveryStatus'
 import type { UrlPolicy } from './destination'
@@ -15,6 +16,8 @@ export type DeliverTaskDeps = {
 	timeoutMs: number
 	retries: number
 	urlPolicy: UrlPolicy
+	/** Set when `owner` is configured: an attempt is then held to the owner the row was made for. */
+	ownership?: SubscriptionOwnership
 }
 
 /** Native Payload jobs task that performs one queued delivery attempt. */
@@ -49,6 +52,25 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 					collection: deps.deliveriesSlug as CollectionSlug,
 					id: deliveryId,
 					data: { status: 'dead', error: decision.reason },
+					overrideAccess: true,
+					req,
+				})
+				return { output: {} }
+			}
+			// Between the write that queued this and the attempt running, or between two attempts, the
+			// subscription may have been handed to another owner. The body is the previous owner's view.
+			if (
+				await madeForAnotherOwner({
+					ownership: deps.ownership,
+					subscription: decision.subscription,
+					row: delivery,
+					req,
+				})
+			) {
+				await payload.update({
+					collection: deps.deliveriesSlug as CollectionSlug,
+					id: deliveryId,
+					data: { status: 'dead', error: ANOTHER_OWNER_REASON },
 					overrideAccess: true,
 					req,
 				})
