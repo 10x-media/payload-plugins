@@ -37,6 +37,9 @@ export type WebhookSubscriptionInfo = {
  * It runs for code subscriptions as well, with `source: 'code'`; return `true` for those to keep
  * a monitoring subscription receiving everything. It is a business rule, not the tenant boundary:
  * `enforceOwnerAccess` is what guarantees a subscription cannot receive what its owner cannot read.
+ *
+ * `req` is the write's own request. As in any hook, a Local API call made with it that throws
+ * rolls the write's transaction back, so pass `disableErrors: true` to a lookup that may miss.
  */
 export type SubscriptionFilter = (args: {
 	doc: Record<string, unknown>
@@ -148,11 +151,12 @@ export type DeliveryOptions = {
 	retries?: number
 	queue?: string
 	/**
-	 * Hostnames deliveries may be sent to. Unset, every host is allowed, localhost and private
-	 * addresses included, which is what development and internal receivers need. Set, it is an
+	 * Hostnames deliveries may be sent to. Unset, no host is ruled out by name. Set, it is an
 	 * allowlist: an exact hostname, or `*.example.com` for any subdomain. A subscription for any
 	 * other host is rejected on save, a code subscription for one fails at startup, and a row
 	 * that already points at one is refused at delivery time. An empty list allows no host at all.
+	 * It is independent of `allowPrivateAddresses`: a listed host still has to be public unless
+	 * that is on.
 	 */
 	allowedHosts?: string[]
 	/**
