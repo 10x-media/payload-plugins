@@ -296,7 +296,7 @@ export const registerWebhooks = (args: {
 				events: catalog,
 				hidden: options.subscriptionsCollection?.hidden ?? false,
 				secretKeys: options.secretEncryption?.keys,
-				allowedHosts: delivery.allowedHosts,
+				urlPolicy: delivery.urlPolicy,
 			}),
 			options.subscriptionsCollection?.overrides
 		)
@@ -419,7 +419,7 @@ export const registerWebhooks = (args: {
 					mode,
 					timeoutMs: delivery.timeoutMs,
 					queue: delivery.queue,
-					allowedHosts: delivery.allowedHosts,
+					urlPolicy: delivery.urlPolicy,
 				},
 				deliveryId: id,
 				payload: req.payload,
@@ -443,7 +443,7 @@ export const registerWebhooks = (args: {
 			codeSubscriptions,
 			timeoutMs: delivery.timeoutMs,
 			retries: delivery.retries,
-			allowedHosts: delivery.allowedHosts,
+			urlPolicy: delivery.urlPolicy,
 		})
 	)
 
@@ -470,7 +470,7 @@ export const registerWebhooks = (args: {
 			mode,
 			timeoutMs: delivery.timeoutMs,
 			queue: delivery.queue,
-			allowedHosts: delivery.allowedHosts,
+			urlPolicy: delivery.urlPolicy,
 			prune,
 		}
 		config.collections[i] = {

@@ -1,7 +1,7 @@
 import { isSealed, withRawEncrypted } from '@10x-media/fields/encrypted'
 import type { CollectionSlug, JsonObject, Payload, PayloadRequest } from 'payload'
 
-import { isAllowedHost } from '../delivery/allowedHosts'
+import { REFUSAL_REASON, type UrlPolicy, urlRefusal } from '../delivery/destination'
 import type { CodeSubscription } from '../options'
 import { InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { recoverSecret } from '../secrets/recover'
@@ -311,8 +311,8 @@ export type DeliveryDecision =
  */
 export const decideDelivery = (
 	subscription: ResolvedSubscription | null,
-	// Required, though it may be undefined: a call site that forgot it would allow every host.
-	allowedHosts: string[] | undefined
+	// Required: a call site that forgot it would allow every destination.
+	policy: UrlPolicy
 ): DeliveryDecision => {
 	if (!subscription) {
 		return { deliverable: false, reason: 'subscription not found' }
@@ -320,14 +320,12 @@ export const decideDelivery = (
 	if (!subscription.enabled) {
 		return { deliverable: false, reason: 'subscription disabled' }
 	}
-	// Checked here as well as on save, for a row stored before the allowlist was configured or
+	// Checked here as well as on save, for a row stored before the policy was configured or
 	// written past the form. A refusal rather than a failed attempt, so a queued delivery does
-	// not spend its retries on a host that will never be allowed.
-	if (!isAllowedHost(subscription.url, allowedHosts)) {
-		return {
-			deliverable: false,
-			reason: 'the endpoint host is not in delivery.allowedHosts, so the delivery was refused',
-		}
+	// not spend its retries on a destination that will never be allowed.
+	const refusal = urlRefusal(subscription.url, policy, subscription.source)
+	if (refusal) {
+		return { deliverable: false, reason: REFUSAL_REASON[refusal] }
 	}
 	if (subscription.secretUnusable) {
 		return {

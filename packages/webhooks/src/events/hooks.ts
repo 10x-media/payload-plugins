@@ -12,6 +12,7 @@ import { hasAutosaveEnabled } from 'payload/shared'
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import { buildPayload } from '../delivery/buildPayload'
+import type { UrlPolicy } from '../delivery/destination'
 import { messageId, sendDelivery } from '../delivery/sendDelivery'
 import type { CodeSubscription, CollectionWebhookConfig, WebhookOperation } from '../options'
 import {
@@ -36,7 +37,7 @@ export type WebhookDispatchDeps = {
 	mode: 'queue' | 'inline'
 	timeoutMs: number
 	queue: string
-	allowedHosts?: string[]
+	urlPolicy: UrlPolicy
 	/** Trims the delivery log when a retention window is configured. Cheap to call every time. */
 	prune?: (payload: Payload) => void
 }
@@ -218,7 +219,7 @@ const dispatch = async (args: {
 			continue
 		}
 
-		const decision = decideDelivery(subscription, deps.allowedHosts)
+		const decision = decideDelivery(subscription, deps.urlPolicy)
 		if (!decision.deliverable) {
 			await payload.update({
 				collection: deps.deliveriesSlug as CollectionSlug,
@@ -246,6 +247,7 @@ const dispatch = async (args: {
 					body,
 					timeoutMs: deps.timeoutMs,
 					now: Date.now(),
+					urlPolicy: deps.urlPolicy,
 				})
 			} catch (err) {
 				// Recorded as the failed attempt it is, so the row ends `dead` with the reason

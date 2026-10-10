@@ -8,6 +8,7 @@ import {
 	DEFAULT_TIMEOUT_MS,
 	MAX_ROTATION_GRACE_SECONDS,
 } from './constants'
+import type { UrlPolicy } from './delivery/destination'
 import type { TranslationsOption } from './translations'
 
 export type WebhookOperation = 'create' | 'update' | 'delete'
@@ -62,6 +63,19 @@ export type DeliveryOptions = {
 	 * that already points at one is refused at delivery time. An empty list allows no host at all.
 	 */
 	allowedHosts?: string[]
+	/**
+	 * Let admin-managed subscriptions point at loopback, private, link-local and other non-public
+	 * addresses. Default `false`: a subscription URL is input from whoever may create one, and a
+	 * delivery to an internal address is a request made from inside your network on their behalf.
+	 * Turn it on for local development, or when receivers are internal and every subscription
+	 * author is trusted. Code subscriptions are never held to this.
+	 */
+	allowPrivateAddresses?: boolean
+	/**
+	 * Let admin-managed subscriptions use `http:`. Default `false`: the body is the document and the
+	 * custom headers are where a receiver's credential goes. Code subscriptions are never held to this.
+	 */
+	allowHttp?: boolean
 }
 
 /** Replace the default fields, or transform them (the idiomatic Payload form). */
@@ -162,6 +176,7 @@ export type ResolvedDeliveryOptions = {
 	retries: number
 	queue: string
 	allowedHosts?: string[]
+	urlPolicy: UrlPolicy
 }
 
 export const resolveDeliveryOptions = (
@@ -175,5 +190,10 @@ export const resolveDeliveryOptions = (
 		retries: opts.retries ?? DEFAULT_RETRIES,
 		queue: opts.queue ?? DEFAULT_DELIVERY_QUEUE,
 		allowedHosts: opts.allowedHosts,
+		urlPolicy: {
+			allowedHosts: opts.allowedHosts,
+			allowHttp: opts.allowHttp ?? false,
+			allowPrivateAddresses: opts.allowPrivateAddresses ?? false,
+		},
 	}
 }

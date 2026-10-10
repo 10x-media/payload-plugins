@@ -4,6 +4,7 @@ import { WEBHOOK_DELIVER_TASK } from '../constants'
 import type { CodeSubscription } from '../options'
 import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
 import { deriveDeliveryStatus } from './deriveDeliveryStatus'
+import type { UrlPolicy } from './destination'
 import { sendDelivery } from './sendDelivery'
 
 /** Shared dependencies the delivery task closes over. */
@@ -13,7 +14,7 @@ export type DeliverTaskDeps = {
 	codeSubscriptions: CodeSubscription[]
 	timeoutMs: number
 	retries: number
-	allowedHosts?: string[]
+	urlPolicy: UrlPolicy
 }
 
 /** Native Payload jobs task that performs one queued delivery attempt. */
@@ -42,7 +43,7 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 			})
 			// Includes an undecryptable secret: retrying cannot fix a key problem, so the row dies
 			// here rather than throwing, and is never POSTed unsigned.
-			const decision = decideDelivery(subscription, deps.allowedHosts)
+			const decision = decideDelivery(subscription, deps.urlPolicy)
 			if (!decision.deliverable) {
 				await payload.update({
 					collection: deps.deliveriesSlug as CollectionSlug,
@@ -62,6 +63,7 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 				body: JSON.stringify(delivery.payload),
 				timeoutMs: deps.timeoutMs,
 				now: Date.now(),
+				urlPolicy: deps.urlPolicy,
 			})
 			const status = deriveDeliveryStatus({ ok: result.ok, attempt, maxRetries: deps.retries })
 			await payload.update({

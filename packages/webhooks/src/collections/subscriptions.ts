@@ -15,11 +15,17 @@ import {
 } from 'payload'
 
 import { ADMIN_GROUP, GENERATED_SECRET_KEY, SECRET_AAD_SCOPE } from '../constants'
-import { isAllowedHost } from '../delivery/allowedHosts'
+import {
+	hostOf,
+	resolvesToBlocked,
+	type UrlPolicy,
+	type UrlRefusal,
+	urlRefusal,
+} from '../delivery/destination'
 import { isReservedHeader, isValidHeaderName } from '../delivery/headers'
 import { generateSecret, normalizeSecret } from '../secrets/format'
 import { buildSecretFields } from '../secrets/secretFields'
-import { keys } from '../translations/keys'
+import { keys, type TranslationKey } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
 import { adminUser } from './access'
 
@@ -170,9 +176,9 @@ const clearLapsedRotation: CollectionBeforeChangeHook = ({ data, originalDoc }) 
  * An endpoint has to be an absolute `http:` or `https:` URL. Anything else saves fine and then
  * makes `fetch` throw at delivery time, so the operator would find out from a dead delivery row
  * rather than from the form. Embedded credentials are the same case: `fetch` refuses a URL that
- * carries them, and a receiver's token belongs in a custom header. Which hosts are reachable is
- * deliberately not judged here: localhost and private addresses are what development and internal
- * receivers look like.
+ * carries them, and a receiver's token belongs in a custom header. The scheme and the host are
+ * judged by the install's URL policy: https and a public address unless `delivery.allowHttp` or
+ * `delivery.allowPrivateAddresses` say otherwise.
  *
  * A URL the write is not changing is not judged at all. Payload validates the whole document on
  * every update, the stored fields included, so a rule added after a row was saved (this one, or a
@@ -180,30 +186,35 @@ const clearLapsedRotation: CollectionBeforeChangeHook = ({ data, originalDoc }) 
  * secret, adopting it, even switching it off. The delivery path enforces the same rules when the
  * row fires, so nothing is let through by leaving it alone here.
  */
+const REFUSAL_KEY: Record<UrlRefusal, TranslationKey> = {
+	invalid: keys.urlInvalid,
+	host: keys.urlHostNotAllowed,
+	insecure: keys.urlNotHttps,
+	private: keys.urlPrivateAddress,
+}
+
 const makeValidateUrl =
-	(allowedHosts: string[] | undefined) =>
-	(
+	(policy: UrlPolicy) =>
+	async (
 		value: string | null | undefined,
 		{ previousValue, req }: { previousValue?: unknown; req: PayloadRequest }
-	): string | true => {
+	): Promise<string | true> => {
 		if (typeof value !== 'string' || value.trim() === '') {
 			return req.t('validation:required')
 		}
 		if (value === previousValue) {
 			return true
 		}
-		const url = URL.canParse(value) ? new URL(value) : null
-		const usable =
-			url !== null &&
-			(url.protocol === 'http:' || url.protocol === 'https:') &&
-			url.username === '' &&
-			url.password === ''
-		if (!usable) {
-			return asTranslate(req.t)(keys.urlInvalid)
+		const refusal = urlRefusal(value, policy, 'collection')
+		if (refusal) {
+			return asTranslate(req.t)(REFUSAL_KEY[refusal])
 		}
-		// Only when the install configured an allowlist; the delivery path enforces it again for
-		// rows saved before it was set.
-		return isAllowedHost(value, allowedHosts) ? true : asTranslate(req.t)(keys.urlHostNotAllowed)
+		// Told now rather than through a dead delivery row. The socket enforces the same rule on
+		// every send, so a name that changes its answer later gains nothing by passing here.
+		if (!policy.allowPrivateAddresses && (await resolvesToBlocked(hostOf(value)))) {
+			return asTranslate(req.t)(keys.urlPrivateAddress)
+		}
+		return true
 	}
 
 /**
@@ -240,7 +251,7 @@ export const buildSubscriptionsCollection = (args: {
 	events: string[]
 	hidden: boolean
 	secretKeys?: KeysConfig
-	allowedHosts?: string[]
+	urlPolicy: UrlPolicy
 }): CollectionConfig => ({
 	slug: args.slug,
 	labels: {
@@ -270,7 +281,7 @@ export const buildSubscriptionsCollection = (args: {
 					type: 'text',
 					required: true,
 					label: labelForKey(keys.fieldUrl),
-					validate: makeValidateUrl(args.allowedHosts),
+					validate: makeValidateUrl(args.urlPolicy),
 				},
 			],
 		},

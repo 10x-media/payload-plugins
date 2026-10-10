@@ -3,6 +3,7 @@ import type { CollectionSlug, JsonObject, Payload, PayloadRequest } from 'payloa
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import type { CodeSubscription } from '../options'
 import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
+import type { UrlPolicy } from './destination'
 import { messageId, sendDelivery } from './sendDelivery'
 
 /** Dependencies for re-dispatching a stored delivery. */
@@ -13,7 +14,7 @@ export type RedeliverDeps = {
 	mode: 'queue' | 'inline'
 	timeoutMs: number
 	queue: string
-	allowedHosts?: string[]
+	urlPolicy: UrlPolicy
 }
 
 /**
@@ -76,7 +77,7 @@ export const redeliverDelivery = async (args: {
 	// Decided before queuing as well as before sending. The task decides again when it runs, but
 	// a replay that can already be seen to be going nowhere (subscription gone, disabled, host
 	// off the list) should say so now, not report itself as queued.
-	const decision = decideDelivery(subscription, deps.allowedHosts)
+	const decision = decideDelivery(subscription, deps.urlPolicy)
 	if (!decision.deliverable) {
 		await payload.update({
 			collection: deps.deliveriesSlug as CollectionSlug,
@@ -104,6 +105,7 @@ export const redeliverDelivery = async (args: {
 		body: JSON.stringify(body),
 		timeoutMs: deps.timeoutMs,
 		now: Date.now(),
+		urlPolicy: deps.urlPolicy,
 	})
 	await payload.update({
 		collection: deps.deliveriesSlug as CollectionSlug,

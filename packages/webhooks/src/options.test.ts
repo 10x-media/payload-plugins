@@ -9,6 +9,8 @@ describe('resolveDeliveryOptions', () => {
 			timeoutMs: 10_000,
 			retries: 4,
 			queue: 'default',
+			// A subscription URL is input, so the default holds it to https and a public address.
+			urlPolicy: { allowedHosts: undefined, allowHttp: false, allowPrivateAddresses: false },
 		})
 	})
 
@@ -22,7 +24,18 @@ describe('resolveDeliveryOptions', () => {
 			timeoutMs: 500,
 			retries: 4,
 			queue: 'default',
+			urlPolicy: { allowedHosts: undefined, allowHttp: false, allowPrivateAddresses: false },
 		})
+	})
+
+	it('carries the url policy an install opts into', () => {
+		expect(
+			resolveDeliveryOptions({
+				allowedHosts: ['hooks.example.com'],
+				allowHttp: true,
+				allowPrivateAddresses: true,
+			}).urlPolicy
+		).toEqual({ allowedHosts: ['hooks.example.com'], allowHttp: true, allowPrivateAddresses: true })
 	})
 })
 

@@ -1,6 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import { buildDeliverTask } from './deliverTask'
+import { transport } from './destination'
 
 const deps = {
 	deliveriesSlug: 'webhook-deliveries',
@@ -8,6 +9,7 @@ const deps = {
 	codeSubscriptions: [],
 	timeoutMs: 5000,
 	retries: 3,
+	urlPolicy: { allowHttp: true, allowPrivateAddresses: true },
 }
 
 const delivery = {
@@ -45,7 +47,7 @@ describe('buildDeliverTask', () => {
 			events: ['posts.updated'],
 			enabled: false,
 		})
-		const fetchSpy = vi.spyOn(globalThis, 'fetch')
+		const fetchSpy = vi.spyOn(transport, 'fetch')
 
 		const task = buildDeliverTask(deps)
 		await (task.handler as Handler)({

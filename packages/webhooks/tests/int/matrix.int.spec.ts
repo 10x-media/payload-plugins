@@ -6,6 +6,7 @@ import { GENERATED_SECRET_KEY } from '../../src/constants'
 import { pruneDeliveries, webhooks } from '../../src/index'
 import { resolveSubscriptionById } from '../../src/plugin/resolveSubscriptions'
 import { rotateSubscriptionSecret } from '../../src/secrets/rotate'
+import { LOCAL_SINK } from './localSink'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -30,7 +31,10 @@ describeForDb('webhooks outbound cross-db', {}, (db) => {
 		}
 		sinkUrl = `http://127.0.0.1:${addr.port}`
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: 'inline' }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', ...LOCAL_SINK },
+			}),
 			db,
 			collections: [posts],
 		})
@@ -156,7 +160,10 @@ describeForDb('webhooks rotation lifecycle', {}, (db) => {
 		}
 		sinkUrl = `http://127.0.0.1:${addr.port}`
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'inline', retries: 0 } }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
+			}),
 			db,
 			collections: [posts],
 		})
@@ -244,7 +251,10 @@ describeForDb('webhooks rotation concurrency', {}, (db) => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: 'inline' }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', ...LOCAL_SINK },
+			}),
 			db,
 			collections: [posts],
 		})

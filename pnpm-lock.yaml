@@ -2296,6 +2296,13 @@ importers:
         version: 5.9.3
 
   packages/webhooks:
+    dependencies:
+      ipaddr.js:
+        specifier: ^2.2.0
+        version: 2.2.0
+      undici:
+        specifier: ^7.24.4
+        version: 7.30.0
     devDependencies:
       '@10x-media/fields':
         specifier: workspace:*

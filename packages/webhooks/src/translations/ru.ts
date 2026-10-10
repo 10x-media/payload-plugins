@@ -10,6 +10,10 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.fieldUrl]: 'URL эндпоинта',
 	[keys.urlInvalid]: 'Укажите абсолютный URL с http:// или https://.',
 	[keys.urlHostNotAllowed]: 'Этот хост не входит в список разрешённых хостов для вебхуков.',
+	[keys.urlNotHttps]:
+		'Введите URL с https://. Незашифрованный http:// не разрешён для конечных точек вебхуков.',
+	[keys.urlPrivateAddress]:
+		'Этот адрес частный, локальный или недоступен из интернета, поэтому отправлять на него вебхуки нельзя.',
 	[keys.fieldEnabled]: 'Включено',
 	[keys.fieldEvents]: 'События',
 	[keys.fieldSecret]: 'Секрет для подписи',
