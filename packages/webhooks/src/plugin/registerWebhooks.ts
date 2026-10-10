@@ -6,6 +6,7 @@ import {
 	type Config,
 	type Endpoint,
 	Forbidden,
+	type JsonObject,
 	NotFound,
 	type PayloadRequest,
 } from 'payload'
@@ -19,8 +20,8 @@ import { buildDeliverTask } from '../delivery/deliverTask'
 import { isReservedHeader, isValidHeaderName, RESERVED_HEADER_NAMES } from '../delivery/headers'
 import { makeThrottledPrune } from '../delivery/prune'
 import { redeliverDelivery } from '../delivery/redeliver'
-import { eventCatalog } from '../events/eventTypes'
-import { makeAfterChange, makeAfterDelete } from '../events/hooks'
+import { eventCatalog, eventId } from '../events/eventTypes'
+import { makeAfterChange, makeAfterDelete, makeBeforeDelete } from '../events/hooks'
 import {
 	type CodeSubscription,
 	type CollectionWebhookConfig,
@@ -31,6 +32,7 @@ import {
 import { InvalidSecretError, normalizeSecret } from '../secrets/format'
 import { RotationConflictError, rotateSubscriptionSecret } from '../secrets/rotate'
 import { applyCollectionOverride } from './applyCollectionOverride'
+import { makeOwnerGuard } from './ownerGuard'
 import { resolveMode } from './resolveMode'
 
 /**
@@ -135,21 +137,22 @@ const parseRotateBody = (body: unknown): { secret?: string; graceSeconds?: numbe
 }
 
 /**
- * Evaluate the subscriptions collection's configured `update` access for one document, honouring
- * a `Where` result by checking that the target actually matches it. Read from the runtime config
- * so a consumer's override of the collection governs this endpoint too.
+ * Evaluate a collection's configured `read` or `update` access for one document, honouring a
+ * `Where` result by checking that the target actually matches it. Read from the runtime config
+ * so a consumer's override of the collection governs the plugin's endpoints too.
  *
  * Throwing `Forbidden` is as valid a denial as returning false, and Payload's own `executeAccess`
  * lets it propagate, so an access function written that way would otherwise reach the handler's
  * generic catch and be reported as a 500.
  */
-const canUpdateSubscription = async (args: {
+const canAccessDocument = async (args: {
 	req: PayloadRequest
 	slug: string
 	id: string
+	operation: 'read' | 'update'
 }): Promise<boolean> => {
-	const { req, slug, id } = args
-	const access = req.payload.collections?.[slug as CollectionSlug]?.config?.access?.update
+	const { req, slug, id, operation } = args
+	const access = req.payload.collections?.[slug as CollectionSlug]?.config?.access?.[operation]
 	if (!access) {
 		return true
 	}
@@ -230,6 +233,30 @@ const attachDocumentAction = (
 	}
 }
 
+/**
+ * Under `enforceOwnerAccess` the defaults are not good enough to fall back on. They allow every
+ * user of the admin collection, and in an app whose tenants sign in to the admin that is every
+ * tenant: each could read the others' subscriptions and the full body of their deliveries. So
+ * the rules have to be stated, and the error names the ones that are not.
+ */
+const assertExplicitAccess = (options: WebhooksPluginOptions): void => {
+	const subscriptions = options.subscriptionsCollection?.overrides?.access
+	const deliveries = options.deliveriesLog?.overrides?.access
+	const missing = [
+		...(['read', 'create', 'update', 'delete'] as const)
+			.filter((op) => !subscriptions?.[op])
+			.map((op) => `subscriptionsCollection.overrides.access.${op}`),
+		...(['read', 'delete'] as const)
+			.filter((op) => !deliveries?.[op])
+			.map((op) => `deliveriesLog.overrides.access.${op}`),
+	]
+	if (missing.length) {
+		throw new Error(
+			`@10x-media/webhooks: enforceOwnerAccess is on, so who may manage subscriptions and read the delivery log has to be stated: set ${missing.join(', ')}. The defaults allow every user of the admin collection, which in a multi-tenant app is every tenant. See https://docs.10xmedia.de/webhooks/multi-tenancy.`
+		)
+	}
+}
+
 /** Register collections, the delivery task, source hooks, and the redeliver endpoint. */
 export const registerWebhooks = (args: {
 	config: Config
@@ -259,6 +286,23 @@ export const registerWebhooks = (args: {
 	const retentionDays = resolveRetentionDays(options.deliveriesLog?.retentionDays)
 	const prune = retentionDays ? makeThrottledPrune({ deliveriesSlug, retentionDays }) : undefined
 	const codeSubscriptions = options.subscriptions ?? []
+	const ownership = options.owner
+	const enforceOwnerAccess = options.enforceOwnerAccess === true
+	if (enforceOwnerAccess) {
+		if (!ownership?.resolve) {
+			throw new Error(
+				'@10x-media/webhooks: enforceOwnerAccess needs owner.resolve, which tells the plugin who each subscription acts as.'
+			)
+		}
+		assertExplicitAccess(options)
+	}
+	// Every operation, whatever a collection's `operations` narrows to: a stored subscription may
+	// still list an event that is no longer emitted, and its source collection is judged the same.
+	const eventSources = Object.fromEntries(
+		sourceSlugs.flatMap((slug) =>
+			(['create', 'update', 'delete'] as const).map((op) => [eventId(slug, op), slug])
+		)
+	)
 	assertCodeSubscriptionSecrets(codeSubscriptions)
 	assertCodeSubscriptionHeaders(codeSubscriptions)
 	assertAllowedHosts(delivery.allowedHosts)
@@ -296,7 +340,7 @@ export const registerWebhooks = (args: {
 				events: catalog,
 				hidden: options.subscriptionsCollection?.hidden ?? false,
 				secretKeys: options.secretEncryption?.keys,
-				allowedHosts: delivery.allowedHosts,
+				urlPolicy: delivery.urlPolicy,
 			}),
 			options.subscriptionsCollection?.overrides
 		)
@@ -316,7 +360,7 @@ export const registerWebhooks = (args: {
 			// Rotation is a privileged write, so it defers to the collection's own update access for
 			// this document rather than accepting any logged-in user. Tightening `access.update`, or
 			// scoping it per tenant, governs the endpoint too.
-			if (!(await canUpdateSubscription({ req, slug: subscriptionsSlug, id }))) {
+			if (!(await canAccessDocument({ req, slug: subscriptionsSlug, id, operation: 'update' }))) {
 				return Response.json({ error: 'forbidden' }, { status: 403 })
 			}
 			const body = (await req.json?.().catch(() => ({}))) as unknown
@@ -370,11 +414,23 @@ export const registerWebhooks = (args: {
 		endpoint: rotateSecretEndpoint,
 		control: '@10x-media/webhooks/client#RotateSecretButton',
 	})
+	// Added after the consumer's override, and last, so an override cannot drop it and it judges
+	// the row as the application's own hooks left it.
+	if (enforceOwnerAccess && ownership) {
+		subscriptions.hooks = {
+			...subscriptions.hooks,
+			beforeChange: [
+				...(subscriptions.hooks?.beforeChange ?? []),
+				makeOwnerGuard({ ownership, eventSources }),
+			],
+		}
+	}
 	config.collections.push(subscriptions)
 	const deliveries = applyCollectionOverride(
 		buildDeliveriesCollection({
 			slug: deliveriesSlug,
 			hidden: options.deliveriesLog?.hidden ?? false,
+			ownerStamp: Boolean(ownership),
 		}),
 		options.deliveriesLog?.overrides
 	)
@@ -394,8 +450,10 @@ export const registerWebhooks = (args: {
 			// and update to everyone, so `read` is the access rule there is to defer to, and reading
 			// the row as the caller applies it exactly as configured: an override that scopes the
 			// log per tenant scopes this endpoint with it.
+			// Named apart from `delivery`, the resolved delivery options this handler also closes over.
+			let row: JsonObject
 			try {
-				await req.payload.findByID({
+				row = await req.payload.findByID({
 					collection: deliveriesSlug as CollectionSlug,
 					id,
 					depth: 0,
@@ -411,6 +469,27 @@ export const registerWebhooks = (args: {
 				}
 				throw err
 			}
+			// The delivery being readable is half of it. A replay also fires the subscription's
+			// webhook, so the caller has to be someone who may see that subscription: otherwise a log
+			// shared more widely than the subscriptions would let a reader trigger anyone's endpoint.
+			// A code subscription has no row to ask about, so the delivery's read access is the whole
+			// rule for it; a tenant-scoped rule matches on the owner columns, which its rows never carry.
+			const subscriptionId = String(row.subscriptionId ?? '')
+			const isCode =
+				row.subscriptionSource === 'code' ||
+				(row.subscriptionSource !== 'collection' &&
+					codeSubscriptions.some((s) => s.id === subscriptionId))
+			if (
+				!isCode &&
+				!(await canAccessDocument({
+					req,
+					slug: subscriptionsSlug,
+					id: subscriptionId,
+					operation: 'read',
+				}))
+			) {
+				return Response.json({ error: 'forbidden' }, { status: 403 })
+			}
 			const result = await redeliverDelivery({
 				deps: {
 					deliveriesSlug,
@@ -419,7 +498,8 @@ export const registerWebhooks = (args: {
 					mode,
 					timeoutMs: delivery.timeoutMs,
 					queue: delivery.queue,
-					allowedHosts: delivery.allowedHosts,
+					urlPolicy: delivery.urlPolicy,
+					ownership,
 				},
 				deliveryId: id,
 				payload: req.payload,
@@ -443,7 +523,8 @@ export const registerWebhooks = (args: {
 			codeSubscriptions,
 			timeoutMs: delivery.timeoutMs,
 			retries: delivery.retries,
-			allowedHosts: delivery.allowedHosts,
+			urlPolicy: delivery.urlPolicy,
+			ownership,
 		})
 	)
 
@@ -470,8 +551,10 @@ export const registerWebhooks = (args: {
 			mode,
 			timeoutMs: delivery.timeoutMs,
 			queue: delivery.queue,
-			allowedHosts: delivery.allowedHosts,
+			urlPolicy: delivery.urlPolicy,
 			prune,
+			ownership,
+			enforceOwnerAccess,
 		}
 		config.collections[i] = {
 			...collection,
@@ -479,6 +562,11 @@ export const registerWebhooks = (args: {
 				...collection.hooks,
 				afterChange: [...(collection.hooks?.afterChange ?? []), makeAfterChange(deps)],
 				afterDelete: [...(collection.hooks?.afterDelete ?? []), makeAfterDelete(deps)],
+				...(enforceOwnerAccess
+					? {
+							beforeDelete: [...(collection.hooks?.beforeDelete ?? []), makeBeforeDelete(deps)],
+						}
+					: {}),
 			},
 		}
 	}

@@ -1,3 +1,11 @@
+import {
+	BLOCKED_AT_SOCKET,
+	BlockedDestinationError,
+	guardedDispatcher,
+	isPrivateLiteral,
+	transport,
+} from './destination'
+
 /** Max response-body characters retained for the delivery log. */
 const MAX_RESPONSE_BODY = 2_000
 
@@ -6,6 +14,8 @@ export type DeliverArgs = {
 	body: string
 	headers: Record<string, string>
 	timeoutMs: number
+	/** Refuse a destination that resolves to a non-public address, at the socket. */
+	guarded: boolean
 }
 
 export type DeliverResult = {
@@ -23,7 +33,7 @@ export type DeliverResult = {
  * send: a receiver, or anything else an operator-supplied URL points at, could hand back hundreds
  * of megabytes inside the timeout, on every delivery.
  */
-const readCapped = async (res: Response): Promise<string> => {
+const readCapped = async (res: Awaited<ReturnType<typeof transport.fetch>>): Promise<string> => {
 	const reader = res.body?.getReader()
 	if (!reader) {
 		return ''
@@ -48,18 +58,26 @@ const readCapped = async (res: Response): Promise<string> => {
  * all, to an address the operator never entered, and following one is how a public URL reaches an
  * internal host. The 3xx is recorded as the failed delivery it is, so the fix is to enter the
  * final URL.
+ *
+ * With `guarded`, the socket's DNS lookup refuses any non-public address, so a public name cannot
+ * be pointed at an internal host after it was saved. An address literal never reaches that lookup,
+ * so it is judged here: the guard does not depend on a caller having checked the URL first.
  */
 export const deliver = async (args: DeliverArgs): Promise<DeliverResult> => {
+	if (args.guarded && URL.canParse(args.url) && isPrivateLiteral(args.url)) {
+		return { ok: false, error: BLOCKED_AT_SOCKET, durationMs: 0 }
+	}
 	const controller = new AbortController()
 	const timer = setTimeout(() => controller.abort(), args.timeoutMs)
 	const start = Date.now()
 	try {
-		const res = await fetch(args.url, {
+		const res = await transport.fetch(args.url, {
 			method: 'POST',
 			headers: args.headers,
 			body: args.body,
 			redirect: 'manual',
 			signal: controller.signal,
+			...(args.guarded ? { dispatcher: guardedDispatcher() } : {}),
 		})
 		return {
 			ok: res.ok,
@@ -68,11 +86,15 @@ export const deliver = async (args: DeliverArgs): Promise<DeliverResult> => {
 			durationMs: Date.now() - start,
 		}
 	} catch (err) {
-		return {
-			ok: false,
-			error: err instanceof Error ? err.message : String(err),
-			durationMs: Date.now() - start,
-		}
+		// A refusal from the guarded lookup arrives wrapped in undici's own "fetch failed".
+		const cause = err instanceof Error ? err.cause : undefined
+		const error =
+			cause instanceof BlockedDestinationError
+				? cause.message
+				: err instanceof Error
+					? err.message
+					: String(err)
+		return { ok: false, error, durationMs: Date.now() - start }
 	} finally {
 		clearTimeout(timer)
 	}

@@ -8,6 +8,7 @@ import { GENERATED_SECRET_KEY } from '../../src/constants'
 import { webhooks } from '../../src/index'
 import { generateSecret, secretKey } from '../../src/secrets/format'
 import { rotateSubscriptionSecret } from '../../src/secrets/rotate'
+import { LOCAL_SINK } from './localSink'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -100,7 +101,10 @@ describe('signing secret rotation', () => {
 		}
 		sinkUrl = `http://127.0.0.1:${addr.port}`
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'inline', retries: 0 } }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
+			}),
 			db: 'mongo',
 			collections: [posts],
 		})
@@ -211,7 +215,10 @@ describe('signing secret rotation', () => {
 		const result = await rotate({ id: String(created.id), graceSeconds: 3600 })
 
 		const restarted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'inline', retries: 0 } }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
+			}),
 			db: 'mongo',
 			collections: [posts],
 			attachTo: booted,

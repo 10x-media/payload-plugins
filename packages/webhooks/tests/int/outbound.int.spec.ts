@@ -3,6 +3,7 @@ import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness
 import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { webhooks } from '../../src/index'
+import { LOCAL_SINK } from './localSink'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -43,7 +44,10 @@ afterAll(async () => {
 
 const boot = (delivery: 'inline' | 'queue', retries = 4): Promise<BootedPayload> =>
 	bootPayload({
-		plugin: webhooks({ collections: { posts: true }, delivery: { mode: delivery, retries } }),
+		plugin: webhooks({
+			collections: { posts: true },
+			delivery: { mode: delivery, retries, ...LOCAL_SINK },
+		}),
 		db: 'mongo',
 		collections: [posts],
 	})

@@ -6,6 +6,9 @@ import { generateSecret } from '../secrets/format'
 import { sendDelivery } from './sendDelivery'
 import { signatureHeader, signPayload } from './sign'
 
+/** The open policy: these cases are about everything but where a delivery may go. */
+const OPEN = { allowHttp: true, allowPrivateAddresses: true }
+
 let server: Server
 let url: string
 type Hit = { headers: IncomingHttpHeaders; body: string }
@@ -58,6 +61,7 @@ describe('sendDelivery', () => {
 			body,
 			timeoutMs: 1000,
 			now,
+			urlPolicy: OPEN,
 		})
 		expect(r.ok).toBe(true)
 		expect(received?.body).toBe(body)
@@ -79,6 +83,7 @@ describe('sendDelivery', () => {
 			body: '{"id":"d_headers"}',
 			timeoutMs: 1000,
 			now: 1_700_000_000_000,
+			urlPolicy: OPEN,
 		})
 		const hit = lastHit()
 		if (!hit) {
@@ -114,6 +119,7 @@ describe('sendDelivery', () => {
 			body,
 			timeoutMs: 1000,
 			now,
+			urlPolicy: OPEN,
 		})
 		const header = String(received?.headers['webhook-signature'])
 		expect(header.split(' ')).toEqual([
@@ -132,6 +138,7 @@ describe('sendDelivery', () => {
 			body,
 			timeoutMs: 1000,
 			now,
+			urlPolicy: OPEN,
 		})
 		expect(received?.body).toBe(body)
 		expect(received?.headers['webhook-signature']).toBe(
@@ -166,6 +173,7 @@ describe('sendDelivery', () => {
 			body,
 			timeoutMs: 1000,
 			now,
+			urlPolicy: OPEN,
 		})
 		expect(received?.headers['webhook-id']).toBe(`${MESSAGE_ID_PREFIX}d5`)
 		expect(received?.headers['webhook-signature']).toBe(
@@ -194,6 +202,7 @@ describe('sendDelivery', () => {
 			body: '{}',
 			timeoutMs: 1000,
 			now: 1,
+			urlPolicy: OPEN,
 		})
 		expect(received?.headers['webhook-signature']).toBeUndefined()
 		expect(received?.headers['webhook-id']).toBe(`${MESSAGE_ID_PREFIX}d2`)

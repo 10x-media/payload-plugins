@@ -1,0 +1,169 @@
+---
+title: Multi-tenancy
+description: Letting tenants manage their own webhooks without ever receiving another tenant's data.
+---
+
+By default the plugin assumes whoever can create a subscription is trusted: a subscription receives every document of every event it lists. That is right when only operators manage webhooks, and wrong the moment a customer can. This page is the configuration for the second case.
+
+Three things have to hold, and each has its own mechanism:
+
+| Guarantee | Mechanism |
+|---|---|
+| A tenant only sees and edits its own subscriptions and delivery log | `overrides.access` on both collections |
+| A subscription only receives what its owner can read | `owner` + `enforceOwnerAccess` |
+| A tenant cannot point a webhook at your internal network | the [URL policy](/webhooks/security#subscription-urls-ssrf), on by default |
+
+## The configuration
+
+```ts title="payload.config.ts"
+import type { Access, FieldAccess } from 'payload'
+import { webhooks } from '@10x-media/webhooks'
+
+/** Your own role check. The cast is only needed without generated types. */
+const isAdmin = (user: unknown) => (user as { role?: string } | null)?.role === 'admin'
+const adminField: FieldAccess = ({ req }) => isAdmin(req.user)
+
+/** A tenant user sees the subscriptions it owns; an operator sees all of them. */
+const ownScope: Access = ({ req }) => {
+  if (!req.user) return false
+  return isAdmin(req.user) ? true : { owner: { equals: req.user.id } }
+}
+
+/** Delivery rows record who they were made for. */
+const ownDeliveries: Access = ({ req }) => {
+  if (!req.user) return false
+  return isAdmin(req.user)
+    ? true
+    : { ownerId: { equals: String(req.user.id) }, ownerCollection: { equals: 'users' } }
+}
+
+webhooks({
+  collections: { posts: true },
+  enforceOwnerAccess: true,
+  owner: {
+    resolve: async ({ subscription, req }) => {
+      const ownerId = subscription.record.owner
+      if (typeof ownerId !== 'string' && typeof ownerId !== 'number') return null
+      try {
+        const user = await req.payload.findByID({
+          collection: 'users', id: ownerId, depth: 0, overrideAccess: true, req,
+        })
+        return { user: { ...user, collection: 'users' } }
+      } catch {
+        return null // the owner was deleted
+      }
+    },
+    canActAs: ({ owner, req }) =>
+      isAdmin(req.user) || (!owner.global && String(owner.user.id) === String(req.user?.id)),
+  },
+  subscriptionsCollection: {
+    overrides: {
+      access: { read: ownScope, create: ({ req }) => Boolean(req.user), update: ownScope, delete: ownScope },
+      fields: ({ defaultFields }) => [
+        ...defaultFields,
+        {
+          name: 'owner',
+          type: 'relationship',
+          relationTo: 'users',
+          index: true,
+          access: { create: adminField, update: adminField },
+        },
+      ],
+      hooks: {
+        beforeValidate: [
+          // Field access has already dropped an owner the caller may not set.
+          ({ data, operation, req }) =>
+            operation === 'create' && req.user && data && data.owner == null
+              ? { ...data, owner: req.user.id }
+              : data,
+        ],
+      },
+    },
+  },
+  deliveriesLog: {
+    overrides: { access: { read: ownDeliveries, delete: ({ req }) => isAdmin(req.user) } },
+  },
+})
+```
+
+## What `enforceOwnerAccess` does
+
+**On save.** The subscription's owner is resolved, and must be able to read every collection its events come from, by that collection's own `access.read`. A tenant asking for `invoices.created` without read access to `invoices` gets a 403. This is a collection hook, so REST, GraphQL and the Local API are all covered, `overrideAccess: true` included. A create is checked whole. An update is checked for what it changes: a new owner, and any event the subscription did not already hold.
+
+**On every write to a watched collection.** For each subscription listening, the plugin reads the document through the Local API *as the owner*, with access control on. If that returns nothing, nothing is recorded and nothing is sent. If it returns the document, **that result is the body**: the document at depth 0, with the owner's field-level read access applied. An admin-only field an operator just edited does not travel to a tenant's receiver, and neither does a populated relationship.
+
+**On delete.** The same read happens in `beforeDelete`, while the document still exists.
+
+Things to know:
+
+- An owner-bound subscription never receives `previousData`. The previous version cannot be re-read as the owner, and a document that moved from one tenant to another would otherwise show the new tenant the old one's data.
+- A subscription whose owner cannot be resolved (the user was deleted, the field is empty) is skipped, with a warning in the log. It fails closed.
+- Such a subscription, or one whose owner has since lost access to a collection, can still be switched off, renamed, have its secret rotated, or be deleted. It cannot be given new events until its owner can read them, or a new owner unless the caller may name one.
+- Your read access runs on a request the plugin builds for the owner. It has `req.user`, the locale and the write's transaction, and **no headers or cookies**. Access rules that pick a tenant from a cookie or a header see none; key them on the user.
+- That read joins the write's transaction, which is how it sees a document that is not committed yet, but it cannot end it. If your read access or a read hook throws for the owner, that is logged and read as a denial for that subscription, and the write is unaffected.
+- On a collection with drafts the owner is read the latest version. A draft save therefore sends the draft to owners who may read drafts, and nothing to owners who may only read published content.
+
+`transform` still runs, on the owner's view, and is still the tool for reshaping the body. It is not the tenant boundary and does not need to be.
+
+## Who may own a subscription
+
+`owner.resolve` says who a subscription acts as. It is handed a request of its own, outside the transaction of the write being dispatched, so it reads committed data and a lookup that fails (the owner was deleted) cannot roll that write back. It is called once per subscription per request.
+
+Whether the *caller* may name that owner is a separate question, asked on create and whenever a save changes the owner:
+
+- Server code, a Local API call with no user on it, is trusted. An anonymous REST or GraphQL request is not.
+- A logged-in user may only act as themselves, and never as `{ global: true }`.
+- `owner.canActAs` replaces that rule. The example lets operators assign anyone.
+
+Lock the owner field with field access as well, as the example does. Field access strips a tenant's attempt silently; `canActAs` is what still holds if a code path bypasses field access.
+
+Stamp the owner in a collection `beforeValidate` hook, as the example does, or in a collection `beforeChange` hook. The check runs after those. A field-level `beforeChange` hook runs later still, so an owner set there is not seen and the save is refused as having none.
+
+Return `{ global: true }` from `resolve` only for rows a tenant cannot create. A global subscription skips both checks.
+
+## Operator-wide webhooks
+
+Use [code subscriptions](/webhooks/subscriptions#code-subscriptions) for anything that should see every tenant's events. They are always global, are not editable from the admin, keep their URL and secret in your environment, and coexist with tenant subscriptions: each matching subscription gets its own delivery.
+
+```ts
+webhooks({
+  subscriptions: [{
+    id: 'ops',
+    url: process.env.OPS_WEBHOOK_URL!,
+    secret: process.env.OPS_WEBHOOK_SECRET,
+    events: ['posts.created', 'posts.deleted'],
+  }],
+})
+```
+
+Their delivery rows carry no `ownerId`, so a tenant-scoped `read` rule like the one above never matches them.
+
+## Filtering and scale
+
+`filter` is a per-subscription business rule, and `scope` narrows which subscriptions are loaded at all:
+
+```ts
+collections: {
+  posts: {
+    filter: ({ doc, subscription }) =>
+      subscription.source === 'code' || subscription.record.tenant === doc.tenant,
+    scope: ({ doc }) => ({ or: [{ tenant: { equals: doc.tenant } }, { tenant: { exists: false } }] }),
+  },
+}
+```
+
+`subscription.record` is the stored row with any fields you added, never the secret or header values. `filter` runs for code subscriptions too (`source: 'code'`). With `scope`, a write loads one tenant's subscriptions instead of every subscriber to the event; without it the plugin still pages through all of them, so nothing is dropped, only slower. A `scope` that throws, or returns a query the subscriptions collection cannot run (a field it does not have), is logged and ignored.
+
+Both callbacks get the write's own `req`. A Local API call made with it that throws rolls back the write's transaction, as it would in any hook, so pass `disableErrors: true` to lookups that may miss.
+
+## Redelivery
+
+Replaying a delivery requires read access to the delivery **and** to its subscription. A replay keeps the original's owner columns. If the subscription has changed owner since, the replay is refused and recorded as `dead`: the stored body was built for the previous owner. A queued delivery is held to the same rule each time it is attempted, so reassigning a subscription never sends the new owner what was queued for the old one. Deliveries made before `owner` was configured carry no owner and are refused the same way.
+
+## Use queue mode
+
+A tenant's receiver being slow must not slow your writes. Set `delivery: { mode: 'queue' }` and run a jobs worker; see [Deliveries](/webhooks/deliveries#modes).
+
+## Migrating
+
+`owner` adds `ownerId` and `ownerCollection` to the delivery log, and the example adds `owner` to subscriptions. This release also indexes the subscriptions' `events`. On a SQL adapter run a migration (`pnpm payload migrate:create webhook-owner`). Existing subscriptions have no owner and stop delivering under `enforceOwnerAccess` until you assign one, through the Local API or the admin as an operator.

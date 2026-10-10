@@ -73,7 +73,13 @@ export default buildConfig({
 			},
 		},
 	],
-	plugins: [webhooks({ collections: { posts: true }, delivery: 'inline' })],
+	plugins: [
+		webhooks({
+			collections: { posts: true },
+			// The sink is this app's own /api/webhook-sink on localhost.
+			delivery: { mode: 'inline', allowHttp: true, allowPrivateAddresses: true },
+		}),
+	],
 	telemetry: false,
 	onInit: async (payload) => {
 		await seedDev(payload)
