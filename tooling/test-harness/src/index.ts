@@ -1,5 +1,7 @@
 export type { BootedPayload, BootPayloadOptions, SupportedDb, TestDbMode } from './bootPayload'
 export { bootPayload } from './bootPayload'
 export { installTestClock, type TestClock } from './clock'
+export type { SqliteTestDb } from './db/sqlite'
 export { describeForDb, expectForDb, skipForDb } from './describeForDb'
+export { onRelease, type ReleaseHook } from './release'
 export { withSeed } from './seed'
