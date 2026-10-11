@@ -40,12 +40,14 @@ pnpm start <name>                       # start a built dev app (next start)
 
 # Tests (tiered, Payload-aligned)
 pnpm test                               # all tests, all packages (Mongo in-memory, fast)
-pnpm test <name>                        # one plugin's full test suite
+pnpm test <name>                        # one plugin's full test suite (analytics: its clock pass first)
 pnpm test:unit [name]                   # src/**/*.test.ts (co-located with source)
 pnpm test:int [name]                    # tests/int/**/*.int.spec.ts (Mongo in-memory)
 pnpm test:matrix [name]                 # cross-DB run; Mongo in-memory + Postgres via testcontainers (Docker)
 pnpm test:container [name]              # both DBs via testcontainers (Mongo container + Postgres container)
 pnpm test:e2e <name>                    # docker compose + build + Playwright
+E2E_DBS=postgres pnpm test:e2e analytics  # analytics e2e on some databases (default: mongo postgres sqlite)
+pnpm test:upgrade analytics             # upgrade beta.11 installs per the upgrading page (UPGRADE_DBS, UPGRADE_VARIANTS select)
 
 # Docs showcase clips (clipwright; needs `pnpm dev <name>` running on :3000)
 pnpm videos <name>                      # render packages/<name>/videos/*.video.ts
@@ -69,6 +71,8 @@ pnpm lint [name] / pnpm lint:fix [name]
 pnpm typecheck [name]
 pnpm format
 pnpm check:template                     # template/package parity for verbatim-shared files
+pnpm api:check / pnpm api:update        # API reports + docs entry points pages (build first)
+pnpm docs:check                         # docs links + analytics docs examples typecheck
 
 # Scaffolding + release
 pnpm new                                # scaffold a new plugin (interactive)
@@ -95,11 +99,18 @@ Modeled after Payload's own monorepo test pattern: Mongo runs in-memory via `mon
 |---|---|---|
 | Unit | Pure functions, no DB; co-located `src/**/*.test.ts` | `pnpm test:unit [name]` |
 | Int (Mongo) | Single-DB integration, fast (MongoMemoryReplSet) | `pnpm test:int [name]` |
-| Int (matrix) | Cross-DB run for the same suite (Mongo in-memory + Postgres in container) | `pnpm test:matrix [name]` |
+| Int (matrix) | Cross-DB run for the same suite (Mongo in-memory + Postgres in container; analytics adds SQLite twice, engine on worker threads and on the main thread) | `pnpm test:matrix [name]` |
 | Int (full container) | Both DBs containerized (max prod parity) | `pnpm test:container [name]` |
-| E2E | Production build + Playwright + docker compose | `pnpm test:e2e <name>` |
+| E2E | Production build + Playwright + docker compose; analytics runs every database in `E2E_DBS`, both tenancy modes and a slow-source pass | `pnpm test:e2e <name>` |
+| Upgrade (analytics) | 1.0.0-beta.11 installs (all tasks, no task, sync alone, multi-tenant), from a temporary worktree of its tag, upgraded per the upgrading page on each database in `UPGRADE_DBS` | `pnpm test:upgrade analytics` |
 
-Postgres-touching tiers (matrix, container, e2e) require Docker locally and on CI. This mirrors Payload's own monorepo test pattern (Mongo in-memory, Postgres in real Docker).
+Postgres-touching tiers (matrix, container, e2e, upgrade) require Docker locally and on CI. This mirrors Payload's own monorepo test pattern (Mongo in-memory, Postgres in real Docker).
+
+Analytics' `test` script runs `test:clock` first: its unit suite again at 00:05 UTC on 2026-11-02 in `America/Adak`, about 30 seconds, so a test that leans on the real clock or zone fails every run. `pnpm test analytics <file>` still pays for that pass; `pnpm test:unit analytics` and the int lanes skip it. Its vitest config caps a Mongo lane at 3 workers and a Postgres lane at 4, runs a SQLite lane in forked workers with unhandled errors failing the run (a vitest worker thread ended mid-statement aborts the whole run inside libsql), and lets each boot's native engine go idle before the harness destroys it (`onRelease` from `@10x-media/payload-test-harness`).
+
+The analytics dev app runs `next start` for e2e, so on Postgres and SQLite it applies its committed migration chain at boot (`prodMigrations`, one chain per database and tenancy mode under `dev/migrations/`) instead of pushing a schema. A config change that alters the schema needs a new migration there: `DEV_DB=<db> [TENANCY=on] pnpm migrate:create analytics <name>`; `--skip-empty` creating nothing proves a chain current.
+
+`.github/workflows/payload-latest.yml` runs the analytics unit tests and its Mongo int lane against the newest Payload 3.x every Monday and on `workflow_dispatch`, with pnpm overrides applied in the runner only; a red run there is news about Payload, not about the branch.
 
 ### Bundle isolation gates (`test:dist`)
 
@@ -113,6 +124,8 @@ Unbounded that peaked at 67 node processes and more than 16 GB on a 4-vCPU CI ru
 
 Unfiltered `pnpm build` has the same eleven-way fan-out. The short commands forward extra args to the task rather than to turbo, so cap it with the env var instead: `TURBO_CONCURRENCY=3 pnpm build`.
 
+CI's `test` and `test-matrix` jobs run turbo with `--concurrency=4` for a milder form of the same problem: each package's vitest runs three workers, each booting Payload and a mongod (or a Postgres container). Run locally with three workers per package, a whole-workspace `test` failed seven of 28 tasks at turbo's default of ten (mongod launch and hook timeouts; about 7.4 GB of node) and one at four (form-builder's per-boot Postgres containers, which pass alone; about 5.9 GB). Keep the cap.
+
 ## Affected scoping in CI
 
 `ci.yml` does not run the whole workspace on every push. Each of `lint`, `typecheck`, `build`, `test`, and `test-matrix` starts with a `scope` step (`scripts/ci-affected.sh`) that resolves the git range into `TURBO_SCM_BASE`/`TURBO_SCM_HEAD` and emits `steps.scope.outputs.flag`, which is either `--affected` or empty. The turbo invocation interpolates that flag, so an empty one means the job runs everything.
@@ -121,7 +134,9 @@ The base comes from the workflow-level `AFFECTED_BASE_SHA`: a pull request's bas
 
 Scoping is by **package graph**, never by directory. A change to `jobs` also selects `automations`, because `automations` depends on it. `--filter` and `--affected` intersect rather than union, so `build` stays `--filter='./packages/*'` and simply narrows within it.
 
-`e2e` reuses the same scope step in its own `e2e-scope` job, which turns `turbo ls` into a matrix with one `pnpm test:e2e <plugin>` leg per plugin. A plugin is picked when it *or its dev app* is affected, because the dev app is what Playwright drives and it can import other plugins: a `fields` change selects `admin-wiki-dev` rather than `admin-wiki`, and still runs admin-wiki's e2e. It runs on pull requests and `workflow_dispatch`, not on pushes to `main`, and the `no_e2e` label opts a pull request out. Labels are read from the triggering event, so adding one takes effect on the next push, the same as `no-release`.
+`e2e` reuses the same scope step in its own `e2e-scope` job, which turns `turbo ls` into a matrix with one `pnpm test:e2e <plugin>` leg per plugin, except that a plugin listed in the job's `E2E_DATABASES` (analytics) gets one leg per database, passed as `E2E_DBS`. A plugin is picked when it *or its dev app* is affected, because the dev app is what Playwright drives and it can import other plugins: a `fields` change selects `admin-wiki-dev` rather than `admin-wiki`, and still runs admin-wiki's e2e. It runs on pull requests and `workflow_dispatch`, not on pushes to `main`, and the `no_e2e` label opts a pull request out of these legs. Labels are read from the triggering event, so adding one takes effect on the next push, the same as `no-release`.
+
+`analytics-upgrade` (`pnpm test:upgrade analytics`, every database) runs on pull requests and `workflow_dispatch` too. It has its own scope step and runs the test only when `turbo ls` with that flag still lists `@10x-media/analytics`, so the fallback always runs it; its full-history checkout also brings the `@10x-media/analytics@1.0.0-beta.11` tag it checks out. `no_e2e` does not skip it: it drives no browser, and it is the only check of the upgrading page's migration edits.
 
 **What forces the whole workspace**, and this is the part to keep intact when editing any of it:
 
@@ -135,7 +150,7 @@ Verify a scoping change with `turbo ls`, which applies the filter without hashin
 pnpm exec turbo ls --filter='...[<base>...<head>]'
 ```
 
-`check:dist` runs as `--only-built`, skipping packages an affected build deliberately left without a `dist/`. `check:template` and `check:registry` stay unscoped: template drift is exactly the class of bug that hides in the packages a scoped run skips.
+`check:dist` and `api:check` run as `--only-built`, skipping packages an affected build deliberately left without a `dist/`. `check:template` and `check:registry` stay unscoped: template drift is exactly the class of bug that hides in the packages a scoped run skips.
 
 Two consequences worth knowing. `main` keeps `cancel-in-progress: true`, so if a push cancels an in-flight run, the next run only covers its own commits rather than re-testing the backlog; the cancelled changes were still covered by their own pull request. And the `test` job's Mongo pre-cache step runs even when nothing is affected, so a docs-only pull request still pays for that download.
 

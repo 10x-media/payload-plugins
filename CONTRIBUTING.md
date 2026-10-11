@@ -26,15 +26,20 @@ pnpm lint [name]
 pnpm lint:fix [name]
 pnpm typecheck [name]
 pnpm format
+pnpm api:check          # API reports match the built declarations (build first), docs entry points pages match the reports
+pnpm api:update         # rewrite the API reports, then the docs entry points pages, after an intended change
+pnpm docs:check         # docs internal links, and the analytics docs' code examples type-checked
 
 # Tests (see tiers below)
 pnpm test               # all packages, Mongo in-memory
-pnpm test <name>        # one plugin
+pnpm test <name>        # one plugin (analytics runs its ~30 s clock pass first; test:unit skips it)
 pnpm test:unit [name]
 pnpm test:int [name]
 pnpm test:matrix [name]
 pnpm test:container [name]
 pnpm test:e2e <name>
+E2E_DBS=postgres pnpm test:e2e analytics   # analytics e2e on some databases (default: mongo postgres sqlite)
+pnpm test:upgrade analytics                # upgrade 1.0.0-beta.11 installs (UPGRADE_DBS, UPGRADE_VARIANTS select)
 
 # Docs showcase clips (needs `pnpm dev <name>` already running)
 pnpm videos <name>
@@ -42,34 +47,60 @@ pnpm videos <name>
 
 `<name>` is the directory name under `packages/` (e.g. `automations`).
 
+### Generated types and migrations
+
+`pnpm generate:types <name>` and `pnpm migrate:create <name> <migration-name>` both load the dev app's `payload.config.ts`, so what they produce follows whichever config branch that file takes from the environment (a plugin dev app may switch databases or turn tenancy on through variables). Each run of `generate:types` rewrites the dev app's `payload-types.ts` from scratch, so run the variant whose types you want to keep last. `migrate:*` keeps `PAYLOAD_SKIP_AUTOGEN=1` in `scripts/payload.sh`: Payload's init would otherwise start `generate:types` in the background and rewrite `payload-types.ts` as a side effect of creating a migration.
+
+### The analytics dev app's database
+
+`pnpm dev analytics` picks its database from `DEV_DB`:
+
+| `DEV_DB` | Database |
+|---|---|
+| unset or `mongo` | MongoDB in memory, or `DATABASE_URI_MONGO` |
+| `postgres` | `DATABASE_URI_POSTGRES`, else the e2e container's `postgres://e2e:e2e@localhost:35432/analytics_e2e` |
+| `sqlite` | a libsql file under `packages/analytics/dev/.sqlite/` (gitignored), or `DATABASE_URI_SQLITE`, in WAL mode with a 5 s busy timeout, so the native engine runs its statements on worker threads |
+
+Postgres and SQLite push their schema in development. `TENANCY=on` switches to the multi-tenant config, and on SQLite to a file of its own.
+
+`next start`, which the e2e suite runs, is production, where Payload never pushes a schema: on Postgres and SQLite the dev app applies its committed migrations at boot instead (`prodMigrations`), one chain per database and tenancy mode under `dev/migrations/` (`postgres`, `postgres-tenancy`, `sqlite`, `sqlite-tenancy`). A change to the dev config or the plugin that alters the schema needs a migration in each chain it reaches: `DEV_DB=sqlite TENANCY=on pnpm migrate:create analytics <name>`, and the same for the other three. `pnpm migrate:create analytics check --skip-empty` with the same variables creates nothing while a chain is current.
+
 ## Test tiers
 
 | Tier | When | Docker? | Command |
 |---|---|---|---|
 | Unit | Pure functions, no DB; co-located `src/**/*.test.ts` | No | `pnpm test:unit [name]` |
 | Int (Mongo) | Integration, fast (MongoMemoryReplSet) | No | `pnpm test:int [name]` |
-| Int (matrix) | Cross-DB: Mongo in-memory + Postgres container | Yes | `pnpm test:matrix [name]` |
+| Int (matrix) | Cross-DB: Mongo in-memory + Postgres container (+ SQLite file for `analytics`, twice: the native engine on worker threads, then on the main thread with `ANALYTICS_SQLITE_THREAD=main`) | Yes | `pnpm test:matrix [name]` |
 | Int (container) | Both DBs containerized | Yes | `pnpm test:container [name]` |
 | E2E | Production build + Playwright + docker compose | Yes | `pnpm test:e2e <name>` |
+| Upgrade (`analytics`) | A 1.0.0-beta.11 install upgraded the way the upgrading page says | Yes | `pnpm test:upgrade analytics` |
 
-There is no in-process Postgres option. Postgres tiers always use a real Docker container (`postgres:16` via testcontainers).
+There is no in-process Postgres option. Postgres tiers always use a real Docker container (`postgres:16` via testcontainers). SQLite needs no Docker: each boot opens its own libsql file in a temp directory.
+
+The analytics e2e suite builds the dev app once and runs it on every database in `E2E_DBS` (default `mongo postgres sqlite`), each in both tenancy modes, then once more with `ANALYTICS_SLOW_SOURCE_MS=10000`, where the in-memory source answers 10 s late and is the default, for the checks that an edit view and the dashboard never wait on a source. Its lifecycle checks (a tab covered by another, a page left, a prerendered page) drive a Chromium the suite starts itself in the new headless mode, since Chromium refuses to prerender for a page a DevTools client is attached to and Playwright's focus emulation keeps every page it drives visible.
+
+The upgrade test (`packages/analytics/scripts/upgrade.sh`) checks the `@10x-media/analytics@1.0.0-beta.11` tag out into a temporary worktree and, for each install shape in `UPGRADE_VARIANTS` (`tasks`: retention, warming and sync; `none`; `sync` alone, whose task enum lacks the retired tasks; `scoped`: multi-tenant, each tenant given a `native` provider document), migrates a fresh database with that release and ingests through its endpoint, then upgrades on this tree: `migrate:create` answering "create" to every prompt, the upgrading page's edits applied by `tests/upgrade/editMigration.ts` (which fails when a statement the page names is missing), `migrate`, `migrate:status` all run, `migrate:create --skip-empty` creating nothing, and reads through the new endpoints. MongoDB takes the `drop-legacy-mongo` predefined migration instead. It removes the worktree, its migrations and its containers on exit, however it ends. It installs that release's dependencies, so it needs the npm registry or a pnpm store that already holds them.
+
+A separate workflow (`.github/workflows/payload-latest.yml`) runs the analytics unit tests and its Mongo int lane against the newest Payload 3.x every week and on demand.
 
 ## Parallel development and worktrees
 
 Everything is safe to run in parallel across multiple git worktrees, with no per-worktree setup:
 
 - **Tests** (unit, int, matrix, container) bind ephemeral ports: testcontainers let the OS assign a free host port per container, and in-memory Mongo picks a random port. Each worktree has its own `node_modules`, and the turbo cache is content-hashed, so concurrent runs never collide.
-- **e2e self-isolates.** `scripts/e2e.sh` derives both its `COMPOSE_PROJECT_NAME` and its host ports (Mongo/Postgres/Next) from the worktree, so two worktrees can run e2e at once untouched. Pin them with `MONGO_E2E_PORT` / `PG_E2E_PORT` / `E2E_NEXT_PORT` if you ever need fixed ports.
+- **e2e self-isolates.** `scripts/e2e.sh` derives both its `COMPOSE_PROJECT_NAME` and its host ports (Mongo/Postgres/Next) from the worktree, so two worktrees can run e2e at once untouched. Pin them with `MONGO_E2E_PORT` / `PG_E2E_PORT` / `E2E_NEXT_PORT` if you ever need fixed ports. The analytics upgrade test takes a compose project and ports of its own the same way (`MONGO_UPGRADE_PORT` / `PG_UPGRADE_PORT`), so it can run beside an e2e run of the same worktree.
 - **Dev server.** `pnpm dev <name>` defaults to port 3000 (`${PORT:-3000}`); set `PORT` to run a second dev server from another worktree.
 
 ## Writing tests
 
 Integration tests use the `@10x-media/payload-test-harness` helpers:
 
-- `bootPayload({ plugin, db, seed?, collections?, configOverrides? })`: boots a real Payload instance on the given DB (`'mongo'` or `'postgres'`) and returns `{ payload, db, stop }`. Always call `stop()` in `afterAll`.
-- `describeForDb(name, { dbs? }, (db) => { ... })`: runs the block once per DB. Omit `dbs` to honor the `DB_MATRIX` env (defaults to Mongo). Two separate things decide what a cross-DB run covers: the package's own `test:matrix` (or `test:container`) script decides **which spec files** run in each lane, and each block's `dbs` option decides **which lanes that block joins**. Most plugins' scripts still name individual spec files, so a spec left out of that list is silently excluded from Postgres however it is written; `@10x-media/analytics` is currently the only plugin whose script runs its whole `tests/int` directory on both lanes. A `dbs` pin also overrides the env, so a block pinned to `['mongo']` never runs on Postgres: pin only what is genuinely single-DB, say why in a comment, and add new specs to the script's file list when the script uses one.
-- A suite that boots Payload many times can share one Postgres server across the whole run instead of starting a container per boot: start `startSharedPostgresServer()` from a vitest `globalSetup` and publish its URL on `PAYLOAD_TEST_POSTGRES_SERVER` (see `packages/analytics/tests/setup/sharedPostgres.ts`). Each boot then takes its own database on it. Cap that lane's workers as well (`@10x-media/analytics` sets `maxWorkers: 4` on its int project whenever `DB_MATRIX` names postgres): a many-core machine otherwise boots enough Payloads at once to push the one shared server into recovery mode, which fails specs that changed nothing.
-- `expectForDb(db, { mongo, postgres })` and `skipForDb(...)`: assert or skip per adapter when behavior legitimately differs (for example, Mongo lacks native cascade deletes).
+- `bootPayload({ plugin, db, seed?, collections?, configOverrides?, attachTo?, disableOnInit? })`: boots a real Payload instance on the given DB (`'mongo'`, `'postgres'` or `'sqlite'`) and returns `{ payload, db, connectionString, stop }`. SQLite runs on a temp libsql file with WAL and a 5 s busy timeout, and without transactions, as Payload's SQLite adapter does by default; `sqliteTestAdapter` (from `@10x-media/payload-test-harness/db/sqlite`, for a boot that sets `transactionOptions`) keeps that timeout on every connection a libsql transaction hands over, where libsql itself opens them without it. `attachTo` boots a second instance on an existing boot's database (the same file on SQLite); `disableOnInit` skips every `onInit`, the way a jobs worker boots. Always call `stop()` in `afterAll`.
+- `describeForDb(name, { dbs? }, (db) => { ... })`: runs the block once per DB. Omit `dbs` to honor the `DB_MATRIX` env (comma-separated `mongo`, `postgres`, `sqlite`; defaults to Mongo; an unknown name fails the run). Two separate things decide what a cross-DB run covers: the package's own `test:matrix` (or `test:container`) script decides **which spec files** run in each lane, and each block's `dbs` option decides **which lanes that block joins**. Most plugins' scripts still name individual spec files, so a spec left out of that list is silently excluded from Postgres however it is written; `@10x-media/analytics` is currently the only plugin whose script runs its whole `tests/int` directory on every lane, SQLite included. A `dbs` pin also overrides the env, so a block pinned to `['mongo']` never runs on Postgres: pin only what is genuinely single-DB, say why in a comment, and add new specs to the script's file list when the script uses one.
+- A suite that boots Payload many times can share one Postgres server across the whole run instead of starting a container per boot: start `startSharedPostgresServer()` from a vitest `globalSetup` and publish its URL on `PAYLOAD_TEST_POSTGRES_SERVER` (see `packages/analytics/tests/setup/sharedPostgres.ts`). Each boot then takes its own database on it. Cap that lane's workers as well (`@10x-media/analytics` sets `maxWorkers: 4` on its int project whenever `DB_MATRIX` names postgres, and 3 for mongo): a many-core machine otherwise boots enough Payloads at once to push the one shared server into recovery mode, which fails specs that changed nothing.
+- A plugin whose background work outlives a request registers `onRelease((payload) => ...)` from a vitest setup file; the harness awaits it (15 s at most) before every `payload.destroy()`, so nothing is still running against the database when a test file's worker ends. Run a SQLite lane in forked workers (`pool: 'forks'`): vitest ends a worker thread with `terminate()`, and libsql aborts the whole run when that lands mid-statement.
+- `expectForDb(db, { postgres: x }, fallback)` and `skipForDb(...)`: assert or skip per adapter when behavior legitimately differs (for example, Mongo lacks native cascade deletes). Name only the adapters that differ; the fallback covers the rest.
 
 ## Adding a plugin
 
@@ -91,6 +122,10 @@ Every plugin in `packages/<slug>/` follows the same shape (`packages/automations
 - unit tests co-located with their source (`src/**/*.test.ts`, pure functions, no DB), `tests/int` (boot Payload via the harness), `tests/e2e` (Playwright against the dev app).
 
 Only `dist/` is published (built by tsdown). The `development` export condition points at `src/` so tests and typecheck never need a build; `publishConfig.exports` rewrites the map to `dist/` at publish time.
+
+A package that sets `"apiReport": true` in its `package.json` (`@10x-media/analytics` does) keeps an [API Extractor](https://api-extractor.com/) report per `publishConfig.exports` entry in `api/`, generated from the built declarations by `scripts/api-report.ts`. Every type an entry's signatures reach must be exported from that entry, and each export carries a release tag: untagged is stable, `@beta` may change in a minor, `@internal` is exported for wiring only (a component path an import map resolves). After changing a public export, run `pnpm build <name>` and `pnpm api:update`, review the report diff and commit it with the change; it is what tells a reviewer, and you when picking the changeset bump, what the public surface gained or lost. CI's build job runs `pnpm api:check`, which fails on a stale or missing report, on a forgotten export, and on a docs entry points page (`apps/docs/content/docs/analytics/reference/entry-points.mdx`) the reports no longer generate; `pnpm api:update` regenerates it from `scripts/docs-entry-points.ts`, which also holds the prose beside each entry's list.
+
+`pnpm docs:check` checks every internal link of the docs, and type-checks each `ts` and `tsx` block of the analytics docs against the package's source (`packages/analytics/tests/docs/checkExamples.ts`). A block that is deliberately incomplete opts out with `partial` in its fence meta (```` ```ts partial ````); a package an example imports that no workspace package installs is declared in `packages/analytics/tests/docs/stubs/`. CI's lint job runs it when a change reaches the docs app or analytics.
 
 ## Changeset requirement
 
@@ -144,7 +179,9 @@ Examples: `feat(jobs): add stuck-job sweeper`, `fix(harness): close the pg pool 
 4. Open a pull request. CI runs lint, typecheck, tests, and e2e; all must pass. It scopes each of
    those to the packages your change reaches through the dependency graph, so a pull request touching
    one plugin does not run the other ten. E2E runs for each plugin whose package or dev app your
-   change reaches; apply the `no_e2e` label to skip it (it takes effect on the next push). Changes to
+   change reaches, analytics as one job per database; apply the `no_e2e` label to skip it (it takes
+   effect on the next push). A change reaching analytics also runs its upgrade test, which `no_e2e`
+   does not skip. Changes to
    shared config, the root manifest, the `pnpm-workspace.yaml` catalog, `.github/`, or `scripts/`
    fall back to the whole workspace, and so does a manual `workflow_dispatch` run when you want the
    full suite on demand.
