@@ -3,36 +3,54 @@ title: Privacy
 description: What the native engine stores about a visitor, what it never stores, and what an access or erasure request can find.
 ---
 
-This page describes the code: which values a visit leaves in your database, where each one comes from, and how long it stays. It makes no legal claim and is not advice. Whether an install needs a consent banner, a notice, or a record of processing is a question about your jurisdiction, your other processors and the data your own site puts into an event, and the operator answers it.
+This page describes the code: which values a visit leaves in your database and in the visitor's browser, where each one comes from, and how long it stays. It makes no legal claim and is not advice; what it leaves to you is listed [at the end](#not-covered).
 
-Everything below is about the [native engine](/analytics/native), which stores events in your own Payload collections. A slot filled by a [provider adapter](/analytics/adapters) is a different story, and it is [at the end](#when-a-vendor-captures-instead).
+Everything below is about the [native engine](/analytics/native), which stores hits in your own Payload collections. A slot filled by a [provider adapter](/analytics/providers) is a different story, and it is [at the end](#when-a-vendor-captures-instead).
 
-## What one stored event holds
+## What one stored hit holds
 
-One row in `analytics-events`, column by column, and where its value came from:
+One row in `analytics-hits`, column by column, and where its value came from:
 
 | Column | From | Value |
 |---|---|---|
-| `timestamp` | the server | the instant ingest accepted the beacon |
-| `type` | the page | `pageview`, `event` or `goal` |
+| `id` | derived | a time-ordered id made from `ts`; on a sale sent with an order id, `o`, then `w.` when a browser sent it or `s.` when server code recorded it, then an HMAC-SHA256 digest of its scope, a refund flag, its goal, the order id and, on a refund, the refund id, keyed from the Payload secret. That is what stores a retried order once. The order id itself is stored in no column, and without the secret it cannot be recovered from the id, however few order numbers there are to try |
+| `ts` | the server | the instant ingest accepted the beacon, less the time the tracker says it waited in the page (`ageMs`); on an engagement, also less its time since its pageview, so it is filed at its pageview's start. Each is believed up to a day |
+| `lastAt` | the server | on an engagement only, the instant it arrived |
+| `type` | the page | `pageview`, `event`, `goal` or `engagement` |
 | `name` | the page | the event name or the goal slug, capped at 128 |
-| `path` | the page | `location.pathname` as sent, capped at 512 |
+| `path` | the page | `location.pathname` as sent, capped at 512; a sale or refund server code records without a path is filed under `/orders`, the same for every order |
 | `hostname` | the request | the host the request carried, capped at 253 (see [where the hostname comes from](/analytics/native#where-the-hostname-comes-from)) |
-| `referrer` | the page | `document.referrer` with its query and fragment removed, capped at 512 |
-| `referrerHost` | derived | the referrer's bare host, lowercased, `www.` stripped; absent for a same-site referral |
+| `landing` | derived | whether a pageview opened a visit from outside the site: a page load whose referrer is another site, or none |
+| `server` | derived | whether server code recorded the hit rather than a browser |
+| `ref` | derived | on a pageview that opened a visit, the referring site's bare host, lowercased, `www.` stripped |
 | `device`, `browser`, `os` | the request | classes derived from the `user-agent` header: `mobile`, `chrome`, `ios` and their siblings |
 | `language` | the request | the first `accept-language` tag, lowercased (`de-de`) |
 | `country`, `region`, `city` | the request | whatever the [geo resolver](#geo) answered, each capped at 128 |
 | `source`, `channel`, `channelVersion` | derived | the visit's named origin and its acquisition channel, classified from the referrer host, the campaign keys and the ad click ids |
+| `clickId` | the page's query string | the name of the ad click id the query carried (`gclid`), never its value |
 | `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` | the page's query string | the five `utm_*` values, each capped at 128 |
-| `visitorHash`, `sessionId` | derived | the [daily hash](#the-visitor-hash) and the session derived from it |
-| `durationMs`, `scrollDepth` | the page | how long the pageview was open, and its deepest scroll when scroll capture is on |
-| `props` | the page | flat scalars the site sent: at most 20 entries, keys up to 64, string values up to 256 |
-| `value`, `currency` | the page | revenue, normally on a goal completion |
-| `goals` | derived | the goals this event completed, matched at ingest |
-| `scope` | the request | the tenant the install's `scopeResolver` answered, on a scoped install only |
+| `v` | derived | the [visitor id](#the-visitor-id) of the day, or empty for a server event with no visitor of its own |
+| `durationMs`, `scrollDepth` | the page | on an engagement row, the time the page was visible and how much deeper it was scrolled since the previous one; a pageview carries a `scrollDepth` of 0 when scroll capture is on |
+| `props` | the page | flat scalars the site sent: at most 20 entries, keys up to 64, string values up to 256; on a sale, also its lines under `items`, at most 20, each an id and optionally a name, a quantity and a price. An `orderId` prop sent beside an order is dropped |
+| `value`, `currency`, `originalValue`, `originalCurrency` | the page | revenue, normally on a goal completion, and the amount and currency as sent whenever `value` holds something else: an amount converted to the reporting currency, or 0 when no conversion answered |
+| `goals`, `conversions`, `revenue` | derived | the goals this hit completed, matched at ingest, each with what it was worth (and its amount before conversion, when it was converted), how many, and what they were worth together |
+| `item` | the page | the [content item](/analytics/items) an event or a goal belongs to, as `<collection>:<id>`, kept only for a collection the install binds as items and, from a page, only with the signature the server wrote for it (the signature itself is not stored). With `native({ items: { signature: 'optional' } })` a page's unsigned refs are kept too |
+| `impressions` | the page | on an engagement only, the content items seen since the previous one, as the same refs |
+| `scope` | the request | the tenant the install's `scope.resolve` answered on a scoped install, empty otherwise |
 
-There is no column for the visitor's IP address, and none for the raw user agent: only the three classes derived from it. There is no column for the raw query string, and none for a name, an email address or an account id, unless the site itself puts one into a `path` or a prop.
+A [refund](/analytics/revenue#refunds) server code records with no visitor of its own is stored with the place, device and origin of the visit its sale counts in, copied from that sale's stored hits when the refund is recorded, so it lands in its sale's rows. Its `v` stays empty: nothing links it to the visitor's other hits.
+
+There is no column for the visitor's IP address, and none for the raw user agent: only the three classes derived from it. There is no column for the raw query string or for the referring URL, and none for a name, an email address or an account id, unless the site itself puts one into a `path` or a prop. There is no session column either: visits are cut from the hits each time they are counted, and nothing about one is stored.
+
+### Engagement rows
+
+Time on a page, scroll depth and the content items seen arrive after the pageview, as rows of type `engagement`. One holds its time (`ts`, and `lastAt` for when it arrived), its page's `path` and `hostname`, its `v`, its `scope`, and the `durationMs`, `scrollDepth` and `impressions` it adds. It holds nothing else: none of the visitor's classes, place or origin, which are on the visit's other hits, and never a `name`, `props`, `value`, `goals` or `item`. Its `ts` is its pageview's start, which the tracker sends with it and ingest believes when it falls within the day before the engagement arrives, and its visitor id is computed with that day's salt, so an engagement sent after midnight carries the same id as its pageview rather than linking that visit to the next day's ids. The tracker sends one when the tab is hidden, when the page is left, when the next page opens, or early, once 50 content items have been seen since the previous one, and never while the browser is [excluded](#taking-a-browser-out-of-capture). It is delivered only once its slot's [gate](/analytics/consent) is open: a native slot that is still pending keeps it in the page's queue until then.
+
+### Content items
+
+An engagement can also carry the [content items](/analytics/items) seen on its page, as `impressions`, a list of refs (`<collection>:<id>`). A view is therefore one entry on an engagement row, kept with that row, and a number in the item's daily totals once its day is counted. A click on an item is an ordinary event row whose `item` column names the item. The item's display name, which a page may put in `data-analytics-item-name` for the vendor slots, never reaches native at all: the tracker leaves it off the wire.
+
+Because the engagement row carries the day's `v`, its `impressions` record which items one anonymous visitor saw on one day, and the rows sharing that `v` show what else that visitor did that day. That record lasts as long as the raw hits do. No address or user agent is stored with it: `v` is computed from them under the day's salt. While that salt exists, a candidate address and agent can be tested against `v`; once it is deleted, none can be matched to it again ([the visitor id](#the-visitor-id)).
 
 ## No cookie
 
@@ -42,104 +60,129 @@ The tracker's only browser storage is `localStorage`, and it holds at most these
 
 | Key | Written when | Holds |
 |---|---|---|
-| `analytics:consent` | a consent decision is made | `granted` or `denied` |
-| `analytics:exclude` | a visit carries the [exclusion link](/analytics/capture#excluding-your-own-visits), or `exclude()` is called | `1` or `0` |
-| `plausible_ignore`, `umami.disabled` | exclusion is set, on an install with that vendor's slot | the vendor's own opt-out value |
-| PostHog's own opt-out key | exclusion is set, on an install with a PostHog slot | written by PostHog's SDK, not by the tracker |
+| `analytics:exclude` | a visit carries a valid [exclusion link](/analytics/capture#the-exclusion-link), the analytics view's switch is used, or `exclude(true)` is called | `1`. Putting the browser back removes the key rather than writing one: a link ending `=0`, which needs no token, the switch, or `exclude(false)` |
+| `plausible_ignore`, `umami.disabled` | the browser is excluded, or the site's consent manager closes that vendor's slot through the [gate](/analytics/consent) once the slot counts as open (it opened, it does not wait and so is open from boot, or the site loads the vendor scripts itself with `snippets={false}`), on an install with that vendor's slot; a refusal of a waiting slot that never opened writes nothing. Removed when the slot opens on a browser that is not excluded, or when exclusion is cleared while the slot is open | the vendor's own opt-out value |
+| PostHog's own opt-in and opt-out key | the same, through `posthog.opt_out_capturing()`, on an install with a PostHog slot; and when a PostHog slot opens, through `posthog.opt_in_capturing()`, which stores the opt-in instead. The plugin's snippet sets `opt_out_persistence_by_default`, so an opt-out also deletes PostHog's own `ph_<token>_posthog` storage, distinct id included, and keeps none while it holds; an opt-in lets PostHog write it again | written by PostHog's SDK, not by the tracker |
 
-A browser with storage blocked reads as "no decision" and is never asked to store anything twice; nothing throws. `analytics:exclude` is also read by a server-rendered GA4 snippet, which is how an excluded browser turns that tag off before it reports anything.
+GA4's switch, `window['ga-disable-<measurementId>']`, is a property of the page, not stored. Closing a GA4 slot whose tag already ran on the page also sets Google's consent mode to denied for that page, which is not stored either. The `_ga` and `_ga_<measurementId>` cookies such a tag already set stay: consent mode stops the tag reading and writing them, and deletes nothing.
 
-The beacon is a same-origin `POST`, so the browser attaches the site's own cookies to it the way it attaches them to any same-origin request. Ingest reads no cookie and stores nothing from one.
+No consent decision is stored: the gate lives in the page's memory, and the site's consent manager states its decision again on every page load. What a refusal can leave behind is a vendor's own opt-out from the table above, and only for a slot that counted as open; what an opening can leave behind is PostHog's own opt-in. 1.0.0-beta.11 kept a decision under the `analytics:consent` key; the tracker deletes it once a slot opens on a page it counts, and never reads it.
 
-## The visitor hash
+The tracker reads `analytics:exclude` only once a slot opens, at boot for a slot that does not wait. Before any answer, storage is touched only by the exclusion link's own write, by a server-rendered GA4 snippet reading `analytics:exclude` (which is how an excluded browser turns that tag off before it reports anything), and by a refusal on a site that loads the vendor scripts itself ([storage before an answer](/analytics/consent#storage-before-an-answer)). A browser with storage blocked reads as not excluded, and nothing throws.
 
-There is no visitor id. Each event carries a hash, computed at ingest and never sent from the browser:
+The beacon is a same-origin `POST` (cross-origin only from a site listed in [`capture.allowedOrigins`](/analytics/reference/options#capture)), so the browser attaches the site's own cookies to it the way it attaches them to any same-origin request. Ingest reads no cookie and stores nothing from one. The install's own code that ingest calls receives the request, though: `scope.resolve`, the hostname, reporting timezone and currency resolvers get it without its `cookie` and `authorization` headers and without a signed-in user, so a staff member's session never decides where their visit is filed, and a [custom geo resolver](/analytics/geo#custom-pipelines) gets the request's headers as sent, cookies included, and may read them.
+
+## The visitor id
+
+Nothing the browser sends identifies a visitor, and no identifier is stored for longer than a day. Each hit carries `v`, computed at ingest:
 
 ```
-visitorHash = HMAC-SHA256(key: the day's salt, message: "<client address>|<user agent>|<hostname>")
-sessionId   = HMAC-SHA256(key: visitorHash, message: "<UTC hour>"), first 32 hex characters
+v = HMAC-SHA256(key: the day's salt, message: "<client address>|<user agent>|<hostname>"), base64url, first 16 characters
 ```
 
-The salt is 16 random bytes, one per UTC day, held in `payload.kv`. The same browser on two days therefore gets two different hashes, and the stored values alone do not connect them. Only someone holding both days' salts and the visit's exact address, user agent and hostname could.
+The salt is 32 random bytes, one per calendar date in the scope's reporting timezone, held in `analytics-state`. The same browser on two days therefore gets two different ids, and the stored values alone do not connect them. Only someone holding both days' salts and the visit's exact address, user agent and hostname could. A server event that came with neither an address nor a user agent of its own gets an empty `v` and belongs to no visitor, and so does one recorded with `identity: 'none'`, whatever request it came with.
 
-Old salts are deleted, so that link cannot be rebuilt later. Ingest deletes the days 2 to 8 back each time it creates a new day's salt, which happens when that day's first event arrives, and the [nightly prune task](/analytics/native#the-daily-salts), when an install registers one, deletes the days 2 to 62 back. Once a day's salt is gone, nobody, the operator included, can recompute that day's hashes from an address and an agent, or join them to another day's.
+Old salts are deleted, so that link cannot be rebuilt later. A day's salt expires once the third UTC day after its own has begun, and is deleted by whichever comes first after that: a process fetching a salt for a later day than any before, which on an install receiving hits every day is that same day, or a [maintenance](/analytics/native#maintenance) run ([the daily salts](/analytics/native#the-daily-salts)). Once a day's salt is gone, nobody, the operator included, can recompute that day's ids from an address and an agent, or join them to another day's.
 
-While a day's salt exists, that day's hashes can be recomputed by someone who holds the salt and guesses the exact address, user agent and hostname a visit had. That is what makes a same-day distinct count exact, and it lasts until the salt is swept: two days later on an install that receives events every day.
+While a day's salt exists, whoever holds it can test candidate address, user agent and hostname triples against that day's ids, and for a known user agent and hostname the IPv4 address space, about 4.3 billion values, is small enough to try in full. That is what makes a same-day distinct count exact, and it lasts until the salt is deleted.
 
 ## The client address
 
-The address behind a beacon is read from `x-forwarded-for` (or `x-real-ip`), per [`trustedProxyHops`](/analytics/native#trusted-proxies). It is used for two things: the hash above, and the geo lookup below. It is written to no column, no log line and no cache.
+The address behind a beacon is read from the platform's own header under [`trustedPlatform`](/analytics/geo#which-headers-to-trust) (`x-real-ip` on Vercel, `cf-connecting-ip` on Cloudflare), and otherwise from `x-forwarded-for` (or `x-real-ip`), per [`trustedProxyHops`](/analytics/native#trusted-proxies). With neither option set, the visitor can write the address the plugin reads, and a production boot says so once in the log. The address is used for two things: the visitor id above, and the geo lookup below. It is written to no column, no log line and no cache.
 
 ## Geo
 
-Country, region and city are resolved at ingest, and nothing leaves your server to do it. The default reads headers your platform already set (`x-vercel-ip-country`, `x-vercel-ip-country-region`, `x-vercel-ip-city`, `cf-ipcountry`). The optional MaxMind path reads a GeoLite2 file from your own disk. No third-party geo service is contacted on either path. A [custom resolver](/analytics/geo#custom-pipelines) is the install's own code, and whatever it calls is the install's own arrangement.
+Country, region and city are resolved at ingest, and nothing leaves your server to do it. The default reads the headers your platform already set, for the platform [`trustedPlatform`](/analytics/geo#which-headers-to-trust) names (`x-vercel-ip-country`, `x-vercel-ip-country-region` and `x-vercel-ip-city` on Vercel; `cf-ipcountry`, `cf-region-code` and `cf-ipcity` on Cloudflare), and none at all without it, since a visitor can send those headers themselves. The optional MaxMind path reads a GeoLite2 file from your own disk. No third-party geo service is contacted on either path. A [custom resolver](/analytics/geo#custom-pipelines) is the install's own code, and whatever it calls is the install's own arrangement.
 
 ## The query string
 
-The tracker sends the page's query string with a pageview, capped at 512 characters. Ingest reads exactly two things out of it: the five `utm_*` keys, and the ad click ids (`gclid`, `gbraid`, `wbraid`, `msclkid`, `ttclid`, and `fbclid`, which only names the platform). Everything else is discarded in the same pass, and the raw string is stored nowhere, so a session token or an email address that happens to sit in a URL never reaches the events collection.
+The tracker sends a pageview the campaign keys of the page's query string and nothing else: the five `utm_*` keys, each value capped at 128 characters, and the names of the ad click ids it carries (`gclid`, `gbraid`, `wbraid`, `msclkid`, `ttclid`, and `fbclid`, which only names the platform), with `1` in place of the id itself. The rest of the query string never leaves the page, so a session token or an email address that happens to sit in a URL is not on the wire, and ingest stores the values it reads rather than the string.
 
 Turn even that off when your URLs carry identifiers you would rather not have on the wire at all:
 
 ```ts
-capture: { autoCapture: { query: false } }
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+export const plugin = analytics({
+  adapters: [native()],
+  capture: { gate: 'all', autoCapture: { query: false } },
+})
 ```
 
 Nothing then carries campaign attribution, which costs the install its `utm*` breakdowns and leaves the channel classifier with the referrer alone. [Auto-capture](/analytics/capture#auto-capture) has the full trade.
 
-The stored referrer is stripped the same way: everything from the first `#` or `?` on is removed before it is stored, because a same-origin navigation puts the previous page's whole URL into `document.referrer`, query string included.
+The referring URL never leaves the page. A same-origin navigation puts the previous page's whole URL into `document.referrer`, query string included, so the tracker sends only its origin: scheme, host and port. Ingest reads whether it came from another site, and keeps only that site's bare host, on the pageview that opened the visit.
+
+An outbound link or a file download is sent as where it leads, its origin (scheme, host and any port) and path: its query string, fragment and credentials never leave the page, so a signed download link or a reset token in one is not on the wire either.
 
 ## What your own site puts in a row
 
 `path`, an event's `name` and its `props` are whatever the site sends. A page at `/invoices/anna@example.com` stores that path, and `track('signup', { email })` stores that address. Nothing in the plugin can tell such a value from any other string.
 
-That is the install's data, under the install's control: it is in the site's own URLs and its own `track` calls, and it is queryable and deletable in `analytics-events` like any other Payload collection.
+That is the install's data, under the install's control: it is in the site's own URLs and its own `track` calls, and it is queryable and deletable in `analytics-hits` through the Local API like any other Payload collection, whose access functions keep REST and GraphQL out. A path and an event name are also values of the daily totals in `analytics-aggregates`: rows whose `dim` is `page` or `event` hold them in `value`, and a content item's per-page rows (`dim` `item`, `dim2` `page`) hold the path in `value2`. Removing one there means deleting those rows as well.
 
 ## Consent
 
-The decision lives in the browser. Nothing about a consent choice is recorded server-side: no column, no log, no event.
+The plugin stores no consent state and has no default. It records no decision on the server (no column, no log, no event), and keeps none of its own in the browser: what a refusal can leave there is a vendor's own opt-out, set only for a slot that counted as open, and what an opening can leave is PostHog's own opt-in ([No cookie](#no-cookie) lists them).
 
-Native capture defaults to `consent: 'none'`, because it is cookieless. Every vendor slot defaults to `'required'`: its snippet stays out of the server-rendered HTML and its events wait in a bounded in-memory queue until a decision arrives. Both defaults are overridable per slot, per adapter or with a resolver, in either direction. [Consent](/analytics/capture#consent) has the API and where the decision is stored.
+In the browser, `capture.gate` and `setGate` are the whole mechanism. `capture.gate` says which capture slots wait, and the boot fails without it whenever a slot can fill. The site's consent manager calls `setGate` in the browser to open or close them. A slot that waits keeps its snippet out of the server-rendered HTML, and its events wait in a queue of at most 100, in the page's memory, until it opens; closing drops them. [Consent](/analytics/consent) has the details.
+
+The gate does not reach server code. `trackServerEvent`, the server `purchase` and `refund`, and the form-builder goal action record through native directly. With `identity: 'request'` they store the `v`, location, device and language of the visitor behind the request, as a beacon would. With `identity: 'none'` they read none of these from the request: the hit belongs to no visitor (a refund still takes its sale's stored attribution, [as above](#what-one-stored-hit-holds)), and only its scope, timezone and goals come from the request. A call that names neither gets `'none'` while `capture.gate` holds a slot the native beacon could fill, and `'request'` otherwise; which identity a server event gets is the site's decision ([what the gate does not cover](/analytics/consent#what-the-gate-does-not-cover)).
 
 ## Bots
 
-Crawlers, link-preview fetchers, monitors and headless clients are dropped at ingest, decided from the `user-agent` header before the body is read. A dropped beacon is answered exactly like a kept one and nothing about it is stored. See [Bot filtering](/analytics/native#bot-filtering).
+Crawlers, link-preview fetchers, monitors and headless clients are dropped at ingest, decided from the `user-agent` header before the body is read. A dropped beacon is answered exactly like a kept one and nothing about it is stored. See [Bot filtering](/analytics/native#bot-filtering). By default ([`capture.skip`](/analytics/capture#pages-that-are-not-counted)) the tracker sends nothing from a browser that reports `navigator.webdriver`, from a draft preview or from Payload's live preview. A vendor snippet the server rendered for a slot that does not wait has already run in the first and the last of those, and counts by that vendor's own rules.
 
 ## Taking a browser out of capture
 
-`?analytics_exclude=1` on any page stops that browser being captured, and `=0` puts it back. The flag is local to the browser, no server state and no cookie, and it is what a site's own staff use to keep themselves out of their own numbers. [Excluding your own visits](/analytics/capture#excluding-your-own-visits) has the details, the vendor switches it also sets, and what a link with that parameter costs when it reaches a real visitor.
+A site's own staff keep themselves out of their own numbers with a flag in their browser, `analytics:exclude` in `localStorage`. The flag is local to that browser: no server state and no cookie. Three things set it:
+
+- **The exclusion link**, which is off by default. With `capture.exclusion` on, a page opened with `?analytics_exclude=<token>` (the parameter can be renamed) excludes the browser, and `?analytics_exclude=0`, which needs no token, puts it back by removing the flag. The token is signed with the Payload secret for the site's scope, so a link anyone could type does nothing. The link is for staff only: the tracker removes it from the address the moment the page opens, and browsers send only the site's origin to other sites by default, never the full address, so the token does not travel on.
+- **The analytics view.** Staff with access to the view copy their link from its "Your own visits" panel, and where the admin is served from the site itself, a switch there sets the flag in that browser directly.
+- **The site's own code**, through the tracker's `exclude()` or `setExcluded()` from `useAnalytics()`, whether or not the link is on.
+
+To exclude a browser, open the analytics view, choose **Get exclusion link**, and open the link once in each browser and profile to leave out: with `capture.exclusion.sites` set the view hands out each site's whole link, and without it the part to add to the site's address. [Excluding your own visits](/analytics/capture#excluding-your-own-visits) has the details, including the vendor switches the flag also sets.
 
 ## Aggregates
 
-Two other collections hold what the raw events add up to:
-
-- `analytics-rollups` holds counts per bucket (pageviews, events, visitors, sessions, conversions, revenue, duration and scroll sums), keyed by granularity, period, path, dimension, dimension value and hostname, plus the scope on a scoped install. There is no visitor identifier in a rollup row.
-- `analytics-seen` is the ledger that makes daily distinct counts exact. Each row is a bucket key, a kind (`visitor` or `session`), the hash itself, and the period. It holds the same day-scoped hashes the events do and expires with them.
+What the hits add up to lives in `analytics-aggregates`: per scope, local day, hostname and dimension value, the counts every metric is computed from (pageviews, events, visitors, visits, bounces, conversions, revenue, time and scroll, and the views of and clicks on [content items](/analytics/items)). There is no visitor id in a row of daily totals: visitors are a count. `analytics-state` holds the daily salts, a marker per counted day (with a `failures` count of the times counting it started without finishing), the leases that coordinate counting, and the cursors maintenance resumes from (`cursor:maintain:<scope>` for a scope's last full pass, `cursor:maintain-rotation` for whose turn is next); the salts are the only value there that touches a visitor.
 
 ## An access or erasure request
 
-The plugin writes no identifier of its own. The one visitor-shaped value is a hash whose key is deleted within days and which cannot be inverted while the key exists, so the events alone offer no handle to look a person up by and no way to answer "show me this visitor's history" from the events alone.
+The plugin writes no identifier of its own. The one visitor-shaped value is a day's id whose key is deleted within days. While that key exists, whoever holds it can test a candidate address, user agent and hostname against the day's ids, and enumerate the IPv4 address space for a known agent and hostname ([the visitor id](#the-visitor-id)); the hits themselves hold no address, name or account, so they offer no handle to look a person up by without one, and no way to answer "show me this visitor's history" across days.
 
-What remains is what the site itself sent. If your pages carry an identifier in a path, or your `track` calls put one in `props`, those rows are findable by exactly that value, and `payload.delete` on `analytics-events` removes them. If they do not, there is nothing to find, and an erasure that matters is already handled by [retention](#retention).
+What remains is what the site itself sent. If your pages carry an identifier in a path, or your `track` calls put one in `props`, those hits are findable by exactly that value, and `payload.delete` on `analytics-hits` removes them; a path or an event name is also a value of the daily totals, in `value` or, on an item's per-page rows, in `value2`, as [above](#what-your-own-site-puts-in-a-row). If they do not, there is nothing to find.
+
+A sale sent with an order id is the one row the plugin itself makes findable: its `id` is built from a digest of its scope, a refund flag, its goal and the order id (and on a refund, the refund id), keyed from the Payload secret, as [above](#what-one-stored-hit-holds), so whoever holds the order id and the secret, the operator, can compute the digest and find the row. The plugin puts the order id itself in no column, path, prop or daily total. A sale recorded from the browser also carries that day's `v`, which leads from it to the visitor's other hits of the day, for as long as the raw hits are kept. Deleting the sale's row and the rows that share its `v` removes that trail. Past the raw retention a sale's row stays as a tombstone for as long as its day's totals (see [retention](#retention)): findable by the order id and the secret still, but with `v` emptied and nothing about the visitor or the visit left on it.
 
 ## Retention
 
-| Store | Window | Option |
+| Store | Kept by default | Option |
 |---|---|---|
-| `analytics-events`, `analytics-seen` | rows older than the window | `retentionDays`, unset keeps them |
-| `analytics-rollups` | rows whose period is older than the window | `rollupRetentionDays`, requires `retentionDays` |
-| the daily salts | days 2 to 8 back when a day's first event arrives, days 2 to 62 back in the task | none |
+| `analytics-hits` | 90 days, today counted; maintenance deletes older hits once their day is counted for good. A sale's or refund's row is kept past that as a tombstone (its order key, scope, time, page, goal, item and amounts; no `v`, place, device, campaign or props) for as long as its day's totals | `native({ retention: { rawDays } })`, `null` keeps every hit; the tombstones go with `aggregateDays` |
+| `analytics-aggregates` | every day's totals, for as long as the install runs | `native({ retention: { aggregateDays } })`, at least `rawDays` |
+| the daily salts, in `analytics-state` | until the third UTC day after their own has begun, then deleted as [above](#the-visitor-id) | none |
+| the browser's `analytics:exclude` | until the visitor clears the site's data, or the flag is cleared | none |
 
-```ts
-native({ retentionDays: 90, rollupRetentionDays: 730 })
-```
+Deleting hits and totals takes [maintenance](/analytics/native#maintenance): the `analytics-maintain` task on a jobs runner, or, while no runner keeps it on time, the short runs ingest starts on a site that receives hits. An install with neither deletes nothing until one of them runs.
 
-The nightly task registers only when a window is set, and pruning is install-wide: it sweeps every scope, because it is infrastructure rather than a per-tenant policy. [Retention pruning](/analytics/native#retention-pruning) has the rest, including what setting a window adds to an install that runs no jobs.
+[Retention](/analytics/native#retention) has the option and the details.
 
 ## When a vendor captures instead
 
 A slot filled by GA4, Plausible, Umami or PostHog is that vendor collecting the data, under that vendor's own terms. Its script runs in the visitor's browser and sets whatever cookies and storage it sets; this page says nothing about what it keeps or for how long, and the vendor's own policy is the one that applies.
 
-Two things the plugin does change there:
+What the plugin does change there:
 
-- Its SDK is served through your origin by the [first-party proxy](/analytics/proxy), so the requests are first-party rather than third-party. The proxy relays the visitor's address to the vendor in `x-forwarded-for`, which is what keeps the vendor's geo correct. It never forwards the request's `cookie` or `authorization` header upstream, and never passes a `set-cookie` back down; the vendor's script sets its own storage directly, in the browser.
-- Consent gating and the exclusion link cover the vendor slot too, as far as they reach: no vendor script is injected while consent is withheld or the browser is excluded, and the exclusion also sets each vendor's own opt-out switch. A GA4 snippet the server rendered reads the exclusion flag itself, before its own first `gtag()` call, since that is the only point GA4 honours the switch. [Excluding your own visits](/analytics/capture#excluding-your-own-visits) states exactly what a slot whose snippet the server rendered can still record.
+- Its SDK is served through your origin by the [first-party proxy](/analytics/proxy), so the requests are first-party rather than third-party. The proxy relays the visitor's address to the vendor in `x-forwarded-for`, which is what keeps the vendor's geo correct; it is the address the install's own trust settings resolved, and none of the platform headers about the visitor's address or place that the [proxy](/analytics/proxy#runtime-endpoint) lists is relayed besides. It never forwards the request's `cookie` or `authorization` header upstream, and never passes a `set-cookie` back down; the vendor's script sets its own storage directly, in the browser.
+- The gate and the exclusion flag cover the vendor slot too, as far as they reach: the tracker injects no vendor script while the slot's gate is pending or closed or the browser is excluded. Excluding the browser sets the vendor's own opt-out switch, and so does closing a slot whose script may have run; a GA4 tag that already ran is also told through consent mode that every storage type is denied, since its switch counts only before the page's first `gtag()` call. A GA4 snippet the server rendered reads the exclusion flag itself, ahead of that call; it reads no refusal, so a GA4 slot `capture.gate` does not hold measures each page load until the consent manager closes it again ([revoking](/analytics/consent#revoking)). Closing a slot deletes nothing the vendor stored before. [Excluding your own visits](/analytics/capture#excluding-your-own-visits) states exactly what a slot whose snippet the server rendered can still record.
+
+## Not covered
+
+These are the operator's decisions, and nothing in the plugin makes them:
+
+- whether an install needs consent, for which slot and under which category, which is what `capture.gate` and your consent manager express;
+- whether it needs a notice, a record of processing, a data processing agreement or a legal basis, and which one;
+- what the site's own paths, event names and props put into a row;
+- what a vendor filling a slot collects, keeps and shares.

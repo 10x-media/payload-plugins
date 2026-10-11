@@ -12,6 +12,7 @@ Bind each URL-bearing collection with a path resolver:
 ```ts title="payload.config.ts"
 analytics({
   adapters: [native()],
+  capture: { gate: 'all' },
   collections: {
     pages: {
       path: (doc) => (doc.slug ? `/${doc.slug}` : null),
@@ -22,8 +23,9 @@ analytics({
 })
 ```
 
-- `path` maps a document to the pathname its analytics were recorded under. Return `null` when the document has no URL yet (unsaved, unpublished); fields then render a "New" state instead of querying.
-- `pathField` names a document field whose stored value is the path. It is a fallback, used only when `path` is absent or returns `null`. A binding must define at least one of the two (validated at startup).
+- `path` maps a document to the pathname its analytics were recorded under. Return `null` when the document has no URL yet (unsaved, unpublished); fields then render a "New" state instead of querying (see [empty states](#unsupported-metrics-and-empty-states)).
+- `pathField` names a document field whose stored value is the path, used as written (so it has to hold the leading slash), and a dotted name reads a nested field. It is a fallback, used only when `path` is absent or returns `null`.
+- `item: true` binds the collection as [content items](/analytics/items): content shown on other pages, such as an offer or a banner, whose documents are counted under `<slug>:<id>` wherever they appear. It needs no path, and a binding with a path as well is bound as both. A binding must define at least one of `path`, `pathField` and `item` (validated at startup).
 - `hostname` filters adapter queries to one site in multi-domain setups: a static string, or a resolver with the same signature as `path`. Omit it (or return `null`) to query across every domain the data source records. A value that carries a scheme, a port or capitals is reduced to the bare lowercased host first, so a tenant's `https://Example.com/` domain field still matches what the native engine [stored](/analytics/native#what-counts-as-a-hostname); a value that is no hostname at all reaches the adapter unchanged.
 
 The `collections` keys are typed against your generated `CollectionSlug` union, and with generated types present each binding's resolvers receive that collection's document type. Without generated types, `doc` degrades to `Record<string, unknown>`.
@@ -33,19 +35,23 @@ The `collections` keys are typed against your generated `CollectionSlug` union, 
 Resolvers can be async and receive `(doc, ctx)` where `ctx.req` is the current `PayloadRequest`, so related documents can be looked up:
 
 ```ts
-collections: {
-  posts: {
-    path: async (doc, ctx) => {
-      if (!doc.slug) return null
-      const cat = await ctx.req.payload.findByID({
-        collection: 'categories',
-        id: doc.category as string,
-        req: ctx.req,
-      })
-      return `/${cat.slug}/${doc.slug}`
+analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  collections: {
+    posts: {
+      path: async (doc, ctx) => {
+        if (typeof doc.slug !== 'string' || typeof doc.category !== 'string') return null
+        const category = await ctx.req.payload.findByID({
+          collection: 'categories',
+          id: doc.category,
+          req: ctx.req,
+        })
+        return `/${String(category.slug)}/${doc.slug}`
+      },
     },
   },
-},
+})
 ```
 
 Nothing is persisted: paths are computed at read time and memoized once per document per request. Keep resolvers cheap (they can run for many documents in one list view); pass `req` into nested Payload calls so the request data loader dedupes them. When the path is already stored on the document, `pathField` is the zero-cost choice. `hostname` resolvers may be async too and run right before each per-document read.
@@ -54,47 +60,149 @@ Nothing is persisted: paths are computed at read time and memoized once per docu
 
 ```ts title="collections/pages.ts"
 import {
+  analyticsFields,
   analyticsStat,
   analyticsStatRow,
-  analyticsFields,
-  analyticsTab,
   analyticsTabsField,
 } from '@10x-media/analytics'
+import type { CollectionConfig } from 'payload'
 
-fields: [
-  analyticsStat({ metric: 'pageviews' }),                     // one stat card
-  analyticsStat({ metric: 'visitors', position: 'sidebar' }), // opt in to the sidebar
-  analyticsStatRow({ metrics: ['pageviews', 'visitors', 'avgDuration'] }),
-  ...analyticsFields({ metrics: ['pageviews', 'sessions'] }), // separate fields, spread in
-  analyticsTabsField(),                                       // a standalone "Analytics" tab
-]
+export const Pages: CollectionConfig = {
+  slug: 'pages',
+  fields: [
+    { name: 'slug', type: 'text' },
+    analyticsStat({ metric: 'pageviews' }), // one stat card
+    analyticsStat({ metric: 'visitors', position: 'sidebar' }), // opt in to the sidebar
+    analyticsStatRow({ metrics: ['pageviews', 'visitors', 'avgDuration'] }),
+    ...analyticsFields({ metrics: ['pageviews', 'sessions'] }), // separate fields, spread in
+    analyticsTabsField(), // a standalone "Analytics" tab
+  ],
+}
 ```
 
 | Factory | Returns | Use |
 |---|---|---|
 | `analyticsStat` | `UIField` | A single metric card. |
-| `analyticsStatRow` | `UIField` | A row of cards. Default metrics: pageviews, visitors, sessions, avgDuration. |
+| `analyticsStatRow` | `UIField` | A row of cards. Default metrics: pageviews, visitors, sessions, avgDuration (time on page). On a source with no time on page (Plausible, Umami), pass your own list, for example with `visitDuration` (time per visit). |
 | `analyticsFields` | `UIField[]` | One field per metric; spread into `fields`. |
 | `analyticsTab` | `Tab` | An unnamed tab to push into your own tabs field's `tabs` array. |
 | `analyticsTabsField` | `TabsField` | A ready-made tabs field wrapping a single `analyticsTab`. |
 
 Every factory accepts `timeframe` (`today`, `last7days`, `last30days` (default), `last90days`, `thisMonth`, `thisYear`, `lastYear`, `allTime`) and `adapter` (an adapter id, when several are configured).
 
+### While a document loads
+
+Payload renders every field of a document as its edit view loads, the fields of tabs nobody has opened included, and again when the form resets after a save. No display field holds that load back on an analytics source:
+
+- **Stat fields** (`analyticsStat`, `analyticsStatRow`, `analyticsFields`) each sit behind their own Suspense boundary and show Payload's shimmer while they read. A read the [cache](/analytics/cache) answers, an expired entry included, shows at once. A read still waiting on its source after 2 seconds shows **Still loading. Reload the page in a moment to see the numbers.** in place of the numbers; the read carries on in the background, kept alive past the response through Next's `after()` like the [cache's own refreshes](/analytics/cache#stale-serving), so the next load finds it cached.
+- **The Analytics tab** never reads a source while the document renders. Its first answer comes only from what the cache already keeps (this server's memory and the cache store, asked for at most about 150 ms), and Payload mounts a tab's fields only once the tab is opened, which is when the panel reads anything else. With nothing kept, the panel shows a shimmer and reads through the [document endpoint](#reading-it-yourself). With an answer kept past its freshness, it shows those numbers at once, noted as saved data, and asks the source again: the new numbers replace them when they arrive, and the saved ones stay if the source fails. A fresh answer needs no read at all.
+
+### Whose numbers a document shows
+
+A page belongs to one tenant, so its panel reports that tenant, never whichever one the reader happens to have selected.
+
+The collection's binding names the field the document's scope is read from, as `scopeField`. It defaults to `'tenant'` on a scoped install, which is the multi-tenant plugin's own relationship field, and to `false` (the request's own scope) otherwise. The value is read whether the field holds a raw id or a populated document, and from the first entry of an array of either; a document that names none falls back to the request's scope.
+
+```ts
+import type { AnalyticsPluginOptions } from '@10x-media/analytics'
+
+const path = (doc: Record<string, unknown>) => (typeof doc.slug === 'string' ? `/${doc.slug}` : null)
+
+export const collections: AnalyticsPluginOptions['collections'] = {
+  offers: { item: true }, // scoped install: the tenant field
+  pages: { path, scopeField: 'site' }, // a host-owned relationship field
+  posts: { path, scopeField: false }, // read the request's own scope
+}
+```
+
+A named field has to exist on the collection once every plugin has run, or the boot fails with an error naming it. That includes the `'tenant'` default, so a collection shared by every tenant, with no tenant field of its own, sets `scopeField: false`. On an install without `scope.resolve`, any `scopeField` other than `false` fails the boot.
+
+The reader still has to be able to read the document itself: every read goes through `payload.findByID` with `overrideAccess: false`, so a document they cannot open has no analytics either. On top of that, a page belonging to a tenant that is not the reader's own is a cross-tenant read like any other, and needs [`access.crossScope.named`](/analytics/multi-tenancy#4-who-sees-what); without it the panel says the numbers are not theirs to see rather than showing them. Platform staff who can already name a tenant are unaffected.
+
+`scopeField` is server configuration and nothing else. Every read of a collection's documents, by the panel, the stat fields, the live counter and the document, sources and realtime endpoints alike, looks it up on the binding: no request parameter names it, so nobody can point it at a different field of a document they happen to own.
+
+### The panel's source switcher
+
+`sources` decides what the panel's data-source select offers. `'auto'` (the default) is every source the document's own scope holds that this reader may read through, which on a scoped install means that tenant's [provider documents](/analytics/multi-tenancy#which-sources-a-request-sees), plus the platform's own config adapters for a reader `access.crossScope.unscopedSource` allows. A list of adapter ids narrows that further. One surviving source draws no select.
+
+```ts
+analyticsTab({ sources: ['native', 'plausible:42'] })
+```
+
+A source that cannot narrow its query to the document's scope is left out whatever the reader's grants are: a page-level panel showing every tenant's numbers would read as this page's, so the platform's own shared source appears here only when it can filter (a PostHog `scopeProperty`, or native).
+
 ## The interactive Analytics tab
 
-`analyticsTab` (and `analyticsTabsField`) renders an interactive panel by default: metric cards with period-over-period deltas (on every source, unless its adapter set `comparison: false` or the previous window starts before the source's `maxLookbackDays`, where the delta is omitted rather than the read failed), a daily trend chart for the first metric, and a timeframe picker that refetches without leaving the document. Reads go through an authenticated `GET /api/analytics/document` endpoint that enforces read access on the document itself, so analytics never leak for content a user cannot see. Pass `interactive: false` to render the static stats row instead.
+`analyticsTab` (and `analyticsTabsField`) renders an interactive panel by default: metric cards with period-over-period deltas (on every source, unless its adapter set `comparison: false` or the previous window starts before the source's `maxLookbackDays`, where the delta is omitted rather than the read failed), a trend chart for the first metric, and a **Date range** select that refetches without leaving the document. Reads go through an authenticated `GET /api/_x/document` endpoint that enforces read access on the document itself, so analytics never leak for content a user cannot see. Pass `interactive: false` to render the static stats row instead.
 
-The endpoint also serves your own UIs: `collection`, `id`, `timeframe` (or `timeframe=custom` with `from`/`to`), `metrics` (comma-separated), `dataSource`, and the `compare=1` / `series=1` flags mirror the panel's reads. `from` and `to` read exactly like the [query endpoint's](/analytics/data-sources): a `YYYY-MM-DD` day is that whole calendar day in the [reporting timezone](/analytics/timezone), `to` included, and a datetime must carry `Z` or an offset. An offset-less datetime, or a `to` before `from`, answers `400 invalid_param` naming the bound at fault in `param`; an inverted window blames `to`.
+### What the panel shows
 
-Its refusals are the plugin-wide [error envelope](/analytics/data-sources#errors), and every answer is `Cache-Control: private, no-store`. Four cases are deliberately one `404 not_found`: a collection with no binding, a missing `id`, a document that does not exist, and a document this caller may not read. Telling them apart would confirm which documents exist to a reader who may not see them. A read that fails for any other reason is a logged `500 internal`, which earlier releases also answered as a `404`; treat a `404` as "nothing to show here" and a `500` as this install being broken.
+Top to bottom, and each block is left out rather than shown empty when the source cannot serve it:
+
+- **A toolbar** laid out like the [analytics view's](/analytics/analytics-view): **Data source** (only when the page has more than one, see [the source switcher](#the-panels-source-switcher)) and **Date range** on the left, under the same names the view uses, and the live counter on the right. Everything wraps on a narrow screen rather than scrolling sideways.
+- **Metric cards.** Pageviews, visitors and sessions, plus **time on page**, **conversions**, **revenue** and **scroll depth** wherever the source serves them. Those four are asked for on spec: a source that serves none of them shows three cards and logs nothing, because they were not requested by name. Time on page is per pageview on every source, so a vendor without such a number (Plausible, Umami) shows no card for it rather than its time per visit. Revenue is formatted in the [reporting currency](/analytics/revenue) when one is configured, and is a plain number otherwise. An average with nothing to average over shows a dash rather than a zero, and no delta: a page nobody viewed has no average time, and one nobody scrolled has no scroll depth. Pass `metrics` to ask for an exact list instead, which does warn about anything the source cannot serve.
+- **A live counter**, on sources that count live visitors: a small dot and **3 visitors active right now**, worded for the count in the admin's language ([counted phrases](/analytics/reference/translations#counted-phrases)), how many people are on **this page**, at the right end of the toolbar and in line with the select boxes. It is polled every fifteen seconds, pauses while the browser tab is hidden, and the count it reads is keyed per page, so two documents never share one. The dot greys out with **Live updates paused** when a poll is refused. A screen reader hears the count only when it changed, at most once a minute, from a hidden region beside it.
+- **A trend** for the first metric, bucketed as the [trend widget's](/analytics/widgets#the-built-in-widgets) is: by hour for **Today**, by day up to a month, by week for **Last 90 days** and by month past that. Weeks and months are read from the engine, each average weighted by what it was taken over.
+- **A row of up to three ranked lists**: top countries, top sources and devices, for this page alone. Each is a table whose header row only assistive tech sees. Each is read as a `page eq <path>` filter rather than as the per-page report, because that is the only shape a source can group a second dimension by. A source that cannot filter by page shows nothing for that block rather than an error, and a list that could not cover the whole range says so.
+
+Under them, one line says what the reads behind the panel say about their numbers, worded as [in the view](/analytics/analytics-view#notes-on-the-numbers): days still being counted, rare values grouped together, days whose counting failed, a time zone that could not be found, a saved read, a shortened one with the days it kept (**Only data from Mar 3, 2026 onward is shown.**), and how long ago a snapshot updated today. The stat row and the stat card show the same line under their numbers, and nothing when the read carries none.
+
+The headline numbers take the source's first place, and only they can fail the panel. The comparison and the trend are read beside them and the lists once they have answered; when one of those fails, the panel keeps every number that did arrive and adds **Some of these numbers could not be loaded right now.** with a **Try again** button (the document endpoint's answer carries `incomplete: true`).
+
+Both extras are optional:
+
+```ts
+analyticsTab({
+  // false leaves the lists out; an array picks other dimensions (at most three).
+  breakdowns: ['country', 'browser'],
+  // false leaves the live counter out and stops its poll.
+  liveVisitors: false,
+})
+```
+
+<Callout type="warn">
+On the native engine the ranked lists are read from raw hits, since one page broken down by a second dimension has no daily totals of its own. They reach back [`retention.rawDays`](/analytics/native#retention), 90 days by default, and a longer range starts there and is marked as clamped. The cards and the trend above them read the page's daily totals and cover the whole range.
+</Callout>
+
+### Reports: a page or an item
+
+A collection bound as [content items](/analytics/items) reads each document as an item: how often it was seen and clicked wherever it appeared. The panel then shows **Views**, **Viewers**, **Clicks**, **Click rate**, **Conversions**, **Conversion rate** and, on an install that measures money, **Revenue**, a trend of views per day, and three lists: **Pages it was seen on**, and the **Countries** and **Devices** of the people who clicked it. It draws no live counter, and its lists are fixed: `breakdowns: false` still leaves them out, and a list of dimensions is ignored there.
+
+`report` decides which reading a panel or a stat field takes:
+
+| `report` | Reads |
+|---|---|
+| `'auto'` (default) | The item where the collection is bound as one, the page otherwise. A collection bound as both draws a **Show** select, **Views and clicks** and **Page visits**, opening on the item. |
+| `'item'` | The document as an item, alone. On a collection not bound as items it says analytics is not set up there. |
+| `'page'` | The document's own page, alone, as before. |
+
+```ts
+analyticsTab({ report: 'page' })
+analyticsStatRow({ report: 'item' })
+```
+
+A stat row left on its default metrics shows the item's views, viewers, clicks and conversions rather than a page's; a list of metrics you passed is read as given, and a page metric an item cannot have (pageviews, sessions, time on page) is dropped like one the source cannot serve. On a scope whose default source cannot read items, the panel reads through one that can, and the panel's data-source select offers only those; a scope with none shows **Not available for this data source**. The document's tenant, and who may see its numbers, are decided exactly as for a page.
+
+### Reading it yourself
+
+The endpoint also serves your own UIs: `collection`, `id`, `timeframe` (or `timeframe=custom` with `from`/`to`), `metrics` (comma-separated), `optional` (metrics that should not warn when the source lacks them), `dimensions` (comma-separated, at most three, each ranked for the document's page), `limit` (rows per ranked list, 1 to 25), `dataSource`, and the `compare=1` / `series=1` flags mirror the panel's reads. `fresh=1` reads past an expired cache entry to its source, answering the saved numbers only if the source fails; without it an expired entry answers at once while it refreshes in the background. `report=item` or `report=page` picks the reading; without it the collection's binding decides, the item first. An item read with no `metrics` reads the panel's own item metrics.
+
+The live counter reads the [live endpoint](/analytics/reference/endpoints#live-endpoint) with `collection` and `id` instead of a path: the endpoint resolves the document's own path through its binding, under the caller's own read access, so nothing client-side has to know or send it. Its refusals for the document are the same uniform `404` the document endpoint gives. `from` and `to` read exactly like the [query endpoint's](/analytics/reference/endpoints): a `YYYY-MM-DD` day is that whole calendar day in the [reporting timezone](/analytics/timezone), `to` included, and a datetime must carry `Z` or an offset. An offset-less datetime, a year before 1970, or a `to` before `from`, answers `400 invalid_param` naming the bound at fault in `param`; an inverted window blames `to`. A window longer than 366 days answers `400 range_too_long` naming `to`.
+
+Its refusals are the plugin-wide [error envelope](/analytics/reference/endpoints#errors), and every answer is `Cache-Control: private, no-store`. Four cases are deliberately one `404 not_found`: a collection with no binding, a missing `id`, a document that does not exist, and a document this caller may not read. Telling them apart would confirm which documents exist to a reader who may not see them. A read that fails for any other reason is a logged `500 internal`; treat a `404` as "nothing to show here" and a `500` as this install being broken. [The document endpoint](/analytics/reference/endpoints#document-endpoint) lists every parameter and refusal.
+
+Server code reads the same numbers without a request to the endpoint: `readForField` from `@10x-media/analytics` (also on `/rsc`) takes `req`, `collectionSlug`, the document as `data`, `metrics`, `timeframe` and `now`, with the panel's other reads as options, and answers a `FieldReadResult` with a `status`, exactly as the stat fields render it. It is gated like every read ([Who a custom read answers to](/analytics/widgets#who-a-custom-read-answers-to)).
 
 Composing the tab into an existing tabs field:
 
 ```ts
-{
+import { analyticsTab } from '@10x-media/analytics'
+import type { Field } from 'payload'
+
+export const tabs: Field = {
   type: 'tabs',
   tabs: [
-    { label: 'Content', fields: [/* ... */] },
+    { label: 'Content', fields: [{ name: 'title', type: 'text' }] },
     analyticsTab({ metrics: ['pageviews', 'visitors'] }),
   ],
 }
@@ -110,18 +218,24 @@ analyticsStatRow({ labels: { pageviews: { en: 'Views', de: 'Aufrufe' } } })
 analyticsTab({ label: 'Traffic', description: 'Last 30 days', labels: { visitors: 'People' } })
 ```
 
-Defaults come from the plugin's [translations](/analytics/i18n), so overriding strings globally works there too.
+Defaults come from the plugin's [translations](/analytics/reference/translations), so overriding strings globally works there too. That includes the labels the factories write as locale maps, which the plugin swaps for your `translations` once it runs (see [Where the strings land](/analytics/reference/translations#where-the-strings-land)).
 
 ## The import map
 
 The stat components are server components. After adding fields, regenerate the import map so the admin resolves `@10x-media/analytics/rsc`:
 
 ```bash
-payload generate:importmap
+pnpm payload generate:importmap
 ```
 
 ## Unsupported metrics and empty states
 
 Requested metrics the active adapter does not support are dropped from the read, with one server-side warning per field render naming the dropped metrics and the adapter. The supported remainder renders normally. Only when nothing survives does the field show its muted "not available" state.
 
-A document with nothing to show yet renders a muted "New" badge: both a document with no resolvable path (unsaved or unbound) and a bound page that has not gathered a single tracked metric read as new. The configuration states stay specific messages rather than an error: no binding for the collection, no provider connected, and a data source that cannot answer per page.
+The panel's own four extra cards (time on page, conversions, revenue, scroll depth) are exempt from that warning, because nothing asked for them by name. Name a metric in `metrics` and it warns like any other.
+
+A document reads as **New** when it has no resolvable path (unsaved or unbound), or when nothing was counted for it in the date range and its `createdAt` falls inside that range; one created before the range, or in a collection without `timestamps`, simply had no visits and is shown as such. The stat fields show a muted "New" badge or their zeros. The Analytics tab shows the badge with **Numbers will show up here once people visit this page.**, or says **No visits in this date range.** in place of the cards and the trend (**Numbers will show up here once people see this item.** and **No views in this date range.** for an item), and keeps its **Date range** select and live counter so the range can be widened. The configuration states stay specific messages rather than an error: no binding for the collection, no provider connected, and a data source that cannot answer per page.
+
+A read that fails with nothing cached says why rather than showing a blank, worded as the [widgets](/analytics/widgets#the-card) word it (`FieldReadStatus`): `busy` for an outage or a timeout, with how long to wait when the source or the plugin knows and a **Try again** button; `invalid` for a read the source refused as asked; `range-too-long` for a custom range over 366 days; `misconfigured` and `host-refused` for a source whose settings or address were refused. The Analytics tab shows each in Payload's error banner, the stat fields in place of their numbers.
+
+One more state is about the reader rather than the document. A page whose own scope resolves to a tenant holding no source this reader may read through says **Analytics for this page are not available to you**, and the live counter does not poll. That is a different answer from **New** or no visits, which both mean a readable source with nothing counted, and it is what another tenant's page looks like to someone who can open the document but not its numbers. A reader `access.read` denies (by default, anyone outside the admin collection) sees the same state on every document, and so does one whose selected tenant they do not belong to; neither read reaches a source.

@@ -1,0 +1,599 @@
+---
+title: Endpoints
+description: Every endpoint the plugin registers, with its method, who may call it, its parameters, what it answers, its errors and its cache headers.
+---
+
+The plugin's admin surfaces, its browser tracker and its capture proxy all talk to the server through the endpoints below, and your own code can call the same ones. The read endpoints are authenticated and gated exactly as the admin is; the capture endpoints are public, since a visitor's browser calls them.
+
+## Where the endpoints answer
+
+Every endpoint hangs off one base under Payload's `routes.api`: `/_x` by default, so the paths read `/api/_x/query`, `/api/_x/e` and so on. `routes.base` moves all of them together:
+
+```ts
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+export const plugin = analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  routes: { base: '/hub' }, // GET /api/hub/query, POST /api/hub/e, ...
+})
+```
+
+| Method | Path | Who may call it | Mounted when |
+|---|---|---|---|
+| `GET` | `/api/_x/query` | [readers](#who-may-read) | always: the [query endpoint](#query-endpoint) |
+| `GET` | `/api/_x/sources` | readers | always: the [sources endpoint](#sources-endpoint) |
+| `POST` | `/api/_x/refresh` | readers | always: the [refresh endpoint](#refresh-endpoint) |
+| `GET` | `/api/_x/goals` | readers | always: the [goals endpoint](#goals-endpoint) |
+| `GET` | `/api/_x/document` | readers | `collections` binds at least one collection: the [document endpoint](#document-endpoint) |
+| `GET` | `/api/_x/live` | readers | a config adapter reads realtime, or the install runs provider documents: the [live endpoint](#live-endpoint) |
+| `GET` | `/api/_x/exclusion` | readers `access.view` admits | `capture.exclusion` is on: the [exclusion endpoint](#exclusion-endpoint) |
+| `POST` | `/api/_x/e` | anyone | `native()` is listed, unless `native({ ingestPath })` moves it: the [ingest endpoint](#ingest-endpoint) |
+| `GET` | `/api/_x/config` | anyone | an adapter declares capture, or the install runs provider documents: the [tracker config](#tracker-config-endpoint) |
+| `GET`, `POST`, `OPTIONS`, `PUT`, `PATCH`, `DELETE` | `/api/_x/p/:slot/:path*` | anyone | as the tracker config: the [capture proxy](#capture-proxy) |
+| `GET` | `/api/_x/flags/:code` | anyone | `countryFlags` is `true`, the default: the [flag route](#flags-endpoint) |
+
+A base is plain path segments (letters, digits, `-`, `_`, `.` and `~`, none starting with a dot) with no trailing slash, and it cannot start with `/globals`, which Payload routes to its globals.
+
+Payload hands every API path whose first segment is a collection slug to that collection before it looks at a plugin's endpoints, so a collection named like the base's first segment would answer `404` for everything the plugin mounts. It also looks that segment up on a plain object, so a first segment that every JavaScript object carries as a name (`constructor`, `toString`, `__proto__` and the like) fails every request too. And it answers a request with the first root endpoint whose method and path match, so an endpoint registered before the plugin's that matches one of its paths takes its requests. The boot refuses all three instead, naming what is in the way and `routes.base`. The checks run when the plugin builds its config, at init, and whenever a runtime is built, so a worker started without `onInit` and a reloaded config are held to them as well.
+
+Admin code reads the base from the client config, where the plugin leaves it under `admin.custom`: `analyticsRoutes(config)` from `@10x-media/analytics/client` answers every path above, relative to `routes.api`. Server code passes `payload.config` to the same function, exported from the package root. A config the plugin never touched answers the default base.
+
+The plugin's own requests from the admin, and the paths the tracker config hands a visitor's browser, are relative to the page's origin and carry the Next `basePath` that Payload's `withPayload` publishes, the way Payload's own admin builds its requests. `serverURL` plays no part in them.
+
+The plugin builds its runtime on an instance's first request when nothing has yet, so a worker booted without `onInit`, or an instance whose config was just reloaded, serves every endpoint.
+
+## Who may read
+
+Every read endpoint asks the same questions, in order:
+
+1. **A signed-in user**, or `401 unauthorized`.
+2. **`access.read`**, which defaults to the users of the admin collection (`admin.user`), or `403 forbidden`. A user of any other auth collection is refused.
+3. **The scope.** A request reads its own scope, as [`scope.resolve`](/analytics/concepts#scope) answers it at the `admin` call site. A tenant needs its user to belong to it (`scope.member`). Naming another scope needs `access.crossScope.named`, and `*` (every scope at once) needs `access.crossScope.aggregate`; either refusal is `400 untrusted_scope`. On a scoped install, a request that resolves no scope reads nothing unless the reader has `access.crossScope.aggregate`: `null` usually means no tenant is selected rather than "everything". A request whose resolver throws reads nothing, whatever its reader may do. A resolver that answers `*` is refused and logged; the wildcard is a reader's request, never a request's own.
+
+Granting `access.read` never widens which scope a user reads: the two gates are independent. On an unscoped install every `access.crossScope` gate is `isAdminUser`, and a request naming a scope other than `*` is refused, since there is none to name.
+
+Every answer of a read endpoint, success or failure, carries `Cache-Control: private, no-store`: the engine already caches, and what an answer holds depends on the caller's cookies, so no shared cache may ever keep one.
+
+## Sources endpoint
+
+`GET /api/_x/sources` answers the [sources](/analytics/concepts#sources-and-adapters) the request resolves, which is what the widget data source and metric pickers are built from:
+
+```jsonc
+{
+  "defaultId": "native",
+  "sources": [
+    {
+      "id": "native",
+      "label": "Payload",
+      "kind": "config",
+      "capabilities": { "metrics": ["pageviews", "visitors"], "...": "..." }
+    },
+    { "id": "plausible:68f3a1", "label": "Alpha Plausible", "kind": "runtime", "capabilities": { "...": "..." } }
+  ]
+}
+```
+
+`label` is the adapter's label (the native engine's is **Payload**), or a provider document's name; a `native` provider document keeps the id `native` and lends it the document's name. `defaultId` is the [default source](/analytics/concepts#sources-and-adapters): `defaultAdapter`, else the first config adapter, and the first source left when the scope's listing drops that one.
+
+It takes **no scope parameter**, deliberately, so a tenant can never enumerate another tenant's sources. `collection` and `id` together list the sources of that document's own scope instead, for the document panel's source switcher: a document that is not bound, missing or not the caller's to read answers `404 not_found`, a failed document read `500 internal`, and a document in a scope the caller may not read `400 untrusted_scope`.
+
+On a scoped install, a request whose scope cannot be resolved, whose resolution throws, or whose resolved tenant the user does not belong to gets `{ "defaultId": null, "sources": [] }` rather than an error: a failed resolution is indistinguishable from a forged one, so it fails closed. An unscoped install has no scope to get wrong and falls back to the config adapters.
+
+What a tenant's listing holds is [Which sources a request sees](/analytics/multi-tenancy#which-sources-a-request-sees): a config adapter that cannot narrow its query to one scope (no `capabilities.scopedQueries`) is left out of every tenant's listing, however privileged the reader.
+
+### Capability gating
+
+Each row carries the source's `SerializedCapabilities`, a deliberate allowlist so adapter internals (credentials, rate limits, TTLs) never become client contract:
+
+| Field | Shape | What gates on it |
+|---|---|---|
+| `metrics` | metric keys the source serves | the `metrics` parameter, and which metric a picker offers |
+| `dimensions` | dimension keys it can break down by | the `dimensions` parameter, and which breakdown tabs exist |
+| `filters` | each filterable dimension, with the operators it takes (`eq`, `contains`, `matches`) | the `dimension` and `operator` of each `filters` entry, as a pair |
+| `metricReach` | where a metric is read when not under every dimension, only when the source declares one | which metric a breakdown offers, and a metric outside its reach is `unsupported_metric` |
+| `realtime`, `realtimeWindowMinutes` | boolean, plus the window it reports over | whether a realtime surface renders at all |
+| `perItemQuery` | boolean, present only when `true` | the `item` parameter, and whether a document's [item report](/analytics/items#the-item-report-on-a-document) can read it |
+| `comparison` | boolean, `true` unless the adapter opted out | the `compare` parameter |
+| `minGranularity` | the finest bucket it can return | the `granularity` parameter |
+| `maxLookbackDays` | days, or `null` for unbounded | how far back a read is narrowed, visibly |
+
+The pickers use it to hide what a source cannot answer; the query endpoint uses the **selected** source's own copy to reject what it was asked for anyway. That is one gate, applied twice, so a request built by hand is validated exactly like one a picker produced. Validation is always against the selected source, never against the union of the configured adapters: an install with [runtime providers](/analytics/multi-tenancy) is open-world, so a tenant's own adapter serving a metric no config adapter declares reads it through this endpoint. `revenue` is served only on an install whose [`revenue`](/analytics/revenue) option is on.
+
+The [native engine](/analytics/native#dimensions) declares the widest set: every dimension it classifies at ingest is groupable and filterable with `eq` and `contains`, `goal` included, and with `matches` on MongoDB and Postgres. A vendor adapter declares whatever its own API serves, which is usually less ([Providers](/analytics/providers#filters)).
+
+## Query endpoint
+
+`GET /api/_x/query` is the read primitive: one audited path through access control, scope gating, capability validation and the [cached engine](/analytics/cache). Build your own dashboard on it, script a report against it, or read it from an admin component. Every section of the [analytics view](/analytics/analytics-view) but its realtime strip reads through it.
+
+### Parameters
+
+| Parameter | Shape | Default | Validation |
+|---|---|---|---|
+| `metrics` | comma list of metric keys | required | 1 to 10 after dedupe; every entry a known metric, and one the source serves. `visits` and `sessions` are one count: on a source that serves one of the two names alone (native serves `sessions`), the other is read as it and answered under the name asked for |
+| `dimensions` | comma list of dimension keys | none (totals only) | at most 2 after dedupe; every entry in `capabilities.dimensions` |
+| `from` | `YYYY-MM-DD`, or an ISO datetime carrying `Z` or an offset | required | a real calendar day, in 1970 or later |
+| `to` | same as `from` | required | not before `from`; the window must not exceed 366 days |
+| `granularity` | `minute`, `hour`, `day`, `week`, `month` | none (no time series) | not finer than `capabilities.minGranularity`. A source that answers days is read by day for `week` and `month`, and the engine folds the days into Monday weeks or calendar months in the effective timezone |
+| `filters` | JSON array of `{ dimension, operator, value }` | none | at most 10; each dimension in `capabilities.filters`, with an operator listed for that dimension; each value 1 to 256 characters; on the native engine, a `matches` value [every database reads alike](#patterns-on-the-native-engine) |
+| `limit` | integer | `50` | 1 to 500 |
+| `order` | `<metric>:asc` or `<metric>:desc` | the first metric, descending | the metric must be one of `metrics` |
+| `compare` | `previous` | none | only when `capabilities.comparison`, and only for a range with a comparable previous window. A previous window beyond the source's lookback is dropped rather than rejected |
+| `source` | a source id from the sources endpoint | the request's default source | must be a source this request resolves |
+| `path` | string | none | at most 512 characters |
+| `hostname` | string | none | at most 253 characters |
+| `item` | a [content item](/analytics/items) ref, `<collection>:<id>` | none | a well-formed ref of at most 128 characters, its id written as `encodeURIComponent` writes it, on a source declaring `perItemQuery` |
+| `timezone` | IANA zone | the request's resolved [reporting timezone](/analytics/timezone) | must be a zone the runtime knows |
+| `timeframe` | a preset: `today`, `last7days`, `last30days`, `last90days`, `thisMonth`, `thisYear`, `lastYear`, `allTime` | none | names the preset `from` and `to` were worked out from. It never changes the window; when that window is the preset's whole days as of now (or the comparison window before them), the read is kept for [warming](/analytics/cache#warming) |
+| `scope` | string, or `*` for every scope | the request's own scope | [Who may read](#who-may-read): another scope needs `access.crossScope.named`, `*` needs `access.crossScope.aggregate`, and the reader's own tenant needs them to belong to it. At most 256 characters, and an install without tenants takes no name but `*` |
+
+Unknown parameters are ignored, and a parameter that is present but blank is treated as absent. The scope, the source and the timezone are resolved first; then the parameters are checked in a fixed order and the first failure wins, so a request with two problems is told about the first one: metrics, dimensions, `from`/`to`, granularity, filters, limit, order, compare, path, hostname, item, each metric's [reach](/analytics/reference/adapter-contract#metric-reach), timeframe. A `compare=previous` on a range too long to have a previous window then answers `invalid_param` naming `compare`.
+
+`item` reads one content item rather than a page or the site: its totals, its views per day with `granularity=day`, and with `dimensions=page` the pages it was seen on. Any other dimension is ranked from the raw rows its clicks, goals and events left, which never include a view. A malformed ref, and a ref on a source that cannot read one item, answer `400 invalid_param` naming `item`. To list items instead, ask for `dimensions=item`; to narrow any read to one item's clicks, goals and events, filter on the `item` dimension.
+
+A value outside the contract's own union is `invalid_param`; a contract-valid value the selected source does not serve gets its own `unsupported_*` code. Asking for a `limit` above 500 is a rejection, not a clamp.
+
+#### Patterns on the native engine
+
+The native engine runs a `matches` value as a regular expression in the database (MongoDB's `$regex`, Postgres' `~*`; on SQLite it offers no `matches`), so it takes only patterns that JavaScript, Postgres and MongoDB read alike and that cannot backtrack without end, at most 256 characters long:
+
+- literal characters, and ASCII punctuation escaped with a backslash;
+- `.`, `^` and `$`, classes such as `[a-z0-9_-]` or `[^/]`, and `\d`, `\w`, `\s` and their capitals (only the lower-case three inside a class);
+- groups `(...)` and `(?:...)`, and alternatives with `|`;
+- the quantifiers `*`, `+`, `?` and `{n}`, `{n,}`, `{n,m}` up to 255, never lazy or possessive, and never on a group that itself holds a quantifier or an alternative.
+
+Anything else (a lookaround, a back-reference, `\b`, `(a+)+`) answers `400 invalid_param` naming `filters` before the read runs, and so does a pattern the database still refuses.
+
+### Dates and the reporting timezone
+
+A date-only bound (`2026-09-01`) means the **whole calendar day in the effective timezone**: `from` is that day's first instant, `to` is its last, so the `to` day is included in full. The effective timezone is the `timezone` parameter when given, otherwise whatever `reportingTimezone` resolves for this request.
+
+A datetime bound must carry `Z` or a `±HH:MM` offset (`2026-09-01T06:00:00+02:00`) and is taken as the instant it names. An offset-less datetime is rejected rather than read in the server process's own zone, and so are the loose forms `Date` would otherwise accept (`2026`, `Sep 1 2026`). A bound in a year before 1970 is rejected too, as `invalid_param` naming it: nothing was counted before then.
+
+Windows longer than 366 days answer `range_too_long`. Shorter ones can still be narrowed: the engine clamps the range's start to the source's `maxLookbackDays`, sets `result.meta.clamped: true` and names the instant the read starts at in `result.meta.dataFrom`. A source with no lookback (`null`) is still held to 1970: a window starting earlier, such as a `1970-01-01` day in a zone east of UTC, starts at `1970-01-01T00:00:00.000Z`. The echoed `query` is what you **asked** for, before that clamp, so `meta.clamped` is how a client learns the read covered less than the request named.
+
+The native engine sets `clamped` at the other end as well. A window that starts or ends partway through a day (an instant bound, or on an **All sites** read a tenant whose own zone cuts its days elsewhere) is cut there from that day's raw hits. Once retention has deleted them, the day cannot be cut: a cut day that held no hits is left out without a word, and one that held hits is left out with `clamped`, moving `dataFrom` past it at the start or setting `meta.dataTo`, the instant the read ends at, before it at the end.
+
+### Response
+
+```jsonc
+{
+  "result": {
+    "rows": [{ "dimensions": { "page": "/pricing" }, "metrics": { "pageviews": 812 } }],
+    "totals": { "pageviews": 4120 },
+    "meta": {
+      "provider": "native",
+      "fetchedAt": "2026-09-08T07:12:31.402Z"  // when the source was read
+      // "clamped": true  the read covers less than the range: it starts later, or ends earlier
+      // "dataFrom": "..."   where a clamped read starts
+      // "dataTo": "..."     where a clamped read ends
+      // "visitorsAre": "sumOfDaily"  a visitors number adds up daily visitors
+      // "partial": { "missingDays": 3 }  these days are not counted yet, so the numbers are a floor
+      // "capped": { "days": 2 }  on these days a value the read asks about was folded into (other) past raw retention
+      // "failed": { "days": 1 }  counting these days was given up: each reads an earlier count, or nothing
+      // "asOf": "..."  when a snapshot last brought the numbers up to date, older than fetchedAt
+      // "timezoneUnresolved": true  the scope's zone never resolved: cut in UTC, nothing counted for later
+      // "currency": "EUR"  what revenue is in: the source's own (Plausible, GA4), else the reporting currency or the one currency the read filters to
+      // "mixedCurrencies": ["EUR", "USD"]  revenue adds amounts in these currencies, which nothing converted
+      // "sampled": true  the source counted from a sample (GA4 on a large property), so the numbers are estimates
+      // "stale": true    an expired cache entry, served at once while it refreshes or because the refresh failed
+      // "sourceError": "misconfigured"  on a stale answer: the refresh was refused as set up ("host-refused" for a host), so check the source
+      // "unappliedFilters": [...]  filters the source could not carry, so the rows are wider
+      // "goalsUnresolved": true    the goal numbers are absent from this read
+    }
+  },
+  "comparison": { "...": "..." },  // the same shape over the previous window, asked for with compare=previous
+  "currency": "EUR",  // what revenue is in, when anything says
+  "source": { "id": "native", "label": "Payload", "kind": "config" },
+  "capabilities": { "metrics": ["pageviews"], "...": "..." },
+  "builtinGoalSlugs": ["purchase"],  // which of query.goalSlugs the install never declared: the latent purchase goal
+  "itemLabels": { "offers:12": "Spring sale", "offers:13": null },  // only when the read names a content item
+  "query": {
+    "metrics": ["pageviews"],
+    "dateRange": { "start": "2026-09-01T00:00:00.000Z", "end": "2026-09-07T23:59:59.999Z" },
+    "limit": 50,
+    "goalSlugs": ["signup", "purchase"],  // the scope's slugs, [] when it configures none, or "unresolved"; absent when the read asks about no goals
+    "timezone": "UTC"
+  }
+}
+```
+
+`QueryResponse` from `@10x-media/analytics/types` types the answer.
+
+`query` is the request after validation and defaulting, with the date range as ISO instants, so a client renders the window it actually got rather than the one it typed. `meta` is passed through from the engine untouched, but for `currency`, which the endpoint fills with the reporting currency only when the source named none. `meta.stale` is `true` when the answer is a cache entry past its TTL, served at once while it refreshes or because the refresh failed, and `meta.asOf` then says when it was fetched ([stale serving](/analytics/cache#stale-serving)); that is worth a badge rather than an error. `meta.sourceError` beside it says the refresh failed because of how the source is set up rather than an outage, which is worth a note to check its settings. A breakdown is ranked by `order` and cut to `limit` by the engine, whatever the source sent, before it is cached; one with a `limit` and no `order` is ranked by its first metric, descending, and asked of its source that way too. Rows with no value for the ordering metric come last either way. A read with `meta.partial` is cached for the short realtime TTL, so the days it left out are read again soon; one with `meta.capped` or `meta.failed` stays so and is cached as long as any other. `meta.failed` counts days whose counting failed again and again until the engine gave up: each is read from an earlier count when it had one and left out otherwise, until a [rebuild](/analytics/native#rebuilding-days) counts it again while its raw hits are kept.
+
+`itemLabels` is there whenever the read names a [content item](/analytics/items): its `item` parameter, an `item` filter, or a row's `item` value in either window. It maps each ref to its document's title, read through the collection's `useAsTitle` with the caller's own access (`overrideAccess: false`), or to `null` for a document that was deleted, that the caller may not open, whose collection is not bound as items, or whose id no document of that collection could have. Render `null` as a removed or hidden item, never as the ref. The titles are resolved for each request rather than cached with the read, since two callers may see different documents, and only the first 600 refs of one answer are looked up; any past that read `null`.
+
+`comparison` is the equal-length window immediately preceding the range, aligned to whole days in the effective timezone. It is omitted when that window starts before the source's `maxLookbackDays`, measured from today: the read is served without it rather than failed, so a client renders the numbers and drops the delta.
+
+`meta.unappliedFilters` lists the narrowing a source could not carry, which means the rows answer a wider question than the request asked: `filters` entries it had to drop (an `eq` value with a comma on Umami among them), and on Umami a goal slug whose comma its value list cannot escape. `meta.goalsUnresolved` says the read's goal numbers could not be resolved: the goal resolver failed, the caller sent no goal slugs, or the provider rejected the goal request and the rest of the read was served without it. A scope that simply has no goals configured answers an empty goal table instead, with no flag. The echoed `query.goalSlugs` is how a client tells the two apart, and `builtinGoalSlugs` names the slugs the install never declared, so a scope whose only slug is the latent `purchase` goal still reads as having no goals.
+
+<Callout type="warn">
+**A far-past absolute range is served unclamped, but loses its comparison.** The engine's clamp floors a read at that read's **own end** minus the source's lookback, so a window that is itself shorter than the lookback is never narrowed however far back it sits. The comparison guard measures from **today** instead, because that is where a provider measures its own lookback from, so such a range answers in full and its previous window is dropped.
+</Callout>
+
+<Callout type="info">
+**An unconfigured source answers `200`, not an error.** A source whose credentials are unset returns an empty `rows` array, no `totals`, and `meta.provider` set to its adapter id. The read is short-circuited before any network call, so nothing distinguishes it from a real window with no traffic. If that matters to your surface, check the source's configuration rather than inferring it from an empty result.
+</Callout>
+
+### Examples
+
+Top pages over a week, busiest first:
+
+```http
+GET /api/_x/query?metrics=pageviews,visitors&dimensions=page&from=2026-09-01&to=2026-09-07&order=pageviews:desc&limit=10
+```
+
+```jsonc
+{
+  "result": {
+    "rows": [
+      { "dimensions": { "page": "/pricing" }, "metrics": { "pageviews": 812, "visitors": 604 } },
+      { "dimensions": { "page": "/blog/launch" }, "metrics": { "pageviews": 455, "visitors": 402 } }
+    ],
+    "totals": { "pageviews": 4120, "visitors": 2980 },
+    "meta": { "provider": "native", "fetchedAt": "2026-09-08T07:12:31.402Z" }
+  },
+  "source": { "id": "native", "label": "Payload", "kind": "config" },
+  "capabilities": { "...": "..." },
+  "query": { "...": "..." }
+}
+```
+
+Conversions and revenue per [goal](/analytics/goals) for August, against July:
+
+```http
+GET /api/_x/query?metrics=conversions,revenue&dimensions=goal&from=2026-08-01&to=2026-08-31&compare=previous
+```
+
+`comparison` then carries the same shape over `2026-07-01` to `2026-07-31`, ready to diff row by row.
+
+Daily pageviews from Germany only. `filters` is a JSON array, so URL-encode it:
+
+```http
+GET /api/_x/query?metrics=pageviews&granularity=day&from=2026-09-01&to=2026-09-07&filters=%5B%7B%22dimension%22%3A%22country%22%2C%22operator%22%3A%22eq%22%2C%22value%22%3A%22DE%22%7D%5D
+```
+
+```ts
+// the same filter, built rather than typed
+const filters = JSON.stringify([{ dimension: 'country', operator: 'eq', value: 'DE' }])
+export const url = `/api/_x/query?metrics=pageviews&granularity=day&from=2026-09-01&to=2026-09-07&filters=${encodeURIComponent(filters)}`
+```
+
+A source whose `capabilities.filters` does not list `country` answers `unsupported_filter` instead, which is the signal to drop the filter chip rather than to retry.
+
+### From admin code
+
+`fetchQuery` wraps the endpoint for client components, with the credentials (same-origin, as the admin itself is), the JSON handling and an in-flight dedupe already done. It takes the query endpoint's URL, which `analyticsRoutes` builds from the client config:
+
+```tsx title="TopPages.tsx"
+'use client'
+
+import { analyticsRoutes, fetchQuery, QueryFetchError } from '@10x-media/analytics/client'
+import type { AnalyticsRow } from '@10x-media/analytics/types'
+import { useConfig } from '@payloadcms/ui'
+import { useEffect, useState } from 'react'
+
+export const TopPages = () => {
+  const { config } = useConfig()
+  const endpoint = `${config.routes.api}${analyticsRoutes(config).query}`
+  const [rows, setRows] = useState<AnalyticsRow[]>([])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchQuery(
+      endpoint,
+      {
+        metrics: ['pageviews', 'visitors'],
+        dimensions: ['page'],
+        from: '2026-09-01',
+        to: '2026-09-07',
+        order: { metric: 'pageviews', direction: 'desc' },
+        limit: 10,
+      },
+      { signal: controller.signal },
+    )
+      .then(({ result }) => setRows(result.rows))
+      .catch((err: unknown) => {
+        if (err instanceof QueryFetchError) {
+          // err.status, err.code, err.error?.param, err.retryAfter
+        }
+      })
+    return () => controller.abort()
+  }, [endpoint])
+
+  return <ul>{rows.map((row) => <li key={row.dimensions?.page}>{row.dimensions?.page}</li>)}</ul>
+}
+```
+
+- `buildQueryUrl(endpoint, request)` returns the same URL without fetching it, written in a fixed field order so two requests with identical values always produce the same string. The endpoint is used as given.
+- Concurrent calls for one URL and one `scope` share a single fetch; the entry clears on settle, so a later call refetches and a failed one retries. Pass the reader's request scope as `scope` (`fetchQuery(endpoint, request, { signal, scope })`), so a read started for one tenant is never handed to the next one's caller after a switch. A caller's `AbortSignal` rejects that caller alone; once every caller sharing a fetch has aborted, the fetch itself is aborted, which frees its place in the source's queue for whatever was asked next. A caller without a signal keeps it running.
+- Any non-2xx throws `QueryFetchError` with `status` always set. `error` carries the [envelope](#errors)'s `code` and `message` (plus `param` when one applies), and `code` repeats the code on the error itself, so branch on `code` and fall back to `status`. It is left undefined for a body this release cannot read: one that is not the envelope, and one carrying a code a newer server added, which is reported as a generic failure rather than typed into a lie. `retryAfter` is a whole number of seconds: a fractional header floors, and the HTTP-date form of `Retry-After` yields no value at all. A network-level failure propagates as itself.
+
+`QueryRequest` takes an optional `scope`, the `scope` parameter. Omit it and the helper reads the caller's own scope, which is what an admin surface wants.
+
+`QueryRequest` and the response types are exported from `@10x-media/analytics/types`, along with `DIMENSION_KEYS` and `FILTER_OPERATORS` for building pickers of your own.
+
+## Refresh endpoint
+
+```http
+POST /api/_x/refresh
+Content-Type: application/json
+
+{ "scope": "acme" }
+```
+
+It bumps one scope's [cache epoch](/analytics/cache#invalidation), which retires every cached read keyed on the old one across every instance, and answers the new token:
+
+```json
+{ "epoch": "mu70fj8y-bbbad86a" }
+```
+
+The token is opaque: a value to compare for change, never one to parse, order or count with.
+
+The body is optional and carries one optional `scope`. An empty body, a body that is not a JSON object, a body with no `scope`, and a `scope` that is blank once trimmed all mean the caller's own resolved scope, so a bare `POST` with nothing at all is the ordinary call. A body larger than 4 KiB answers `413 payload_too_large`; one that could not be read, or a `scope` that is not a string, answers `400 invalid_param` with `param: 'scope'`.
+
+Scope is decided by the same code the query endpoint reads with, so this endpoint refuses every request that endpoint refuses, a resolver that throws included, with `400 untrusted_scope`. Naming another scope requires `access.crossScope.named` (`access.crossScope.aggregate` for `*`); an install without tenants has no scope to name, so it refuses every name but `*`, and no install takes a name longer than 256 characters. A request that resolves no scope at all on a scoped install is refused the same way unless the caller has `access.crossScope.aggregate`, since the install-wide token it would otherwise bump is the one every cross-scope read keys on.
+
+A named scope with nothing to refresh answers `{ "epoch": "0" }` and writes nothing: one that `scope.list` does not list, or, without `scope.list`, one that owns no cached read, no provider document and no token yet. An install with its own `cache.store` and no `scope.list` cannot be asked, so every name passes there.
+
+`scope: "*"` bumps the install-wide token rather than every scope's, because a cross-scope read stamps no scope on its query and its entries key on exactly that token ([Cross-scope entries](/analytics/cache#cross-scope-entries-key-on-the-install-wide-token)).
+
+An instance bumps a given scope at most once every five seconds for this endpoint. Inside that window the call answers `200` with the token already in force, without retiring anything again, so a looped `POST` cannot turn one scope's cached reads into provider calls over and over. A saved provider or goal document needs no refresh at all: it retires its scope's reads by itself, on every instance within ten seconds ([Invalidation](/analytics/cache#invalidation)). This is a debounce of invalidation, not request rate limiting, which belongs in front of Payload. A token that could not be written answers `503 unavailable` with `Retry-After: 30`; an `access.read` check that throws answers `500 internal`, as on every other endpoint, since a retry would only throw again.
+
+`refreshCache` wraps it for client components, beside `fetchQuery`, and takes the refresh endpoint's URL the same way:
+
+```ts
+import { analyticsRoutes, refreshCache } from '@10x-media/analytics/client'
+import type { ClientConfig } from 'payload'
+
+export const refresh = async (config: ClientConfig, signal: AbortSignal) => {
+  const endpoint = `${config.routes.api}${analyticsRoutes(config).refresh}`
+  const { epoch } = await refreshCache(endpoint) // the caller's own scope
+  await refreshCache(endpoint, { scope: 'acme', signal }) // a reader access.crossScope.named allows
+  return epoch
+}
+```
+
+Unlike `fetchQuery` it is not deduped: a reader pressing Refresh twice means it twice, and the `AbortSignal` goes straight to the fetch because no other caller shares it. Any non-2xx throws `QueryFetchError`, with the same `status`, `error` and `retryAfter` a failed read carries. An answer whose `epoch` this client cannot read is reported as `'0'` rather than typed into a lie, since callers act on the refresh having happened rather than on the token.
+
+A refresh invalidates; it does not re-read. Nothing is fetched from the source until a surface asks, so the next read of that scope pays the cold round trip.
+
+## Goals endpoint
+
+`GET /api/_x/goals` lists the goals the request's scope can see, which is what the [goal picker](/analytics/goals#2-pick-a-goal-in-a-block) offers: the config goals merged with the [goals collection](/analytics/goals#5-let-editors-manage-goals)'s for the request's own scope, the collection's read through its own read access with the reader's user.
+
+```jsonc
+{
+  "goals": [
+    { "slug": "book-demo", "name": "Book a demo", "source": "config" },
+    { "slug": "newsletter", "name": "Newsletter signup", "source": "collection" }
+  ],
+  "collection": { "slug": "analytics-goals" }  // null when the collection is off
+}
+```
+
+`include=builtin` adds the latent built-in `purchase` goal, tagged `source: 'builtin'`, when nothing else claims its slug. There is no scope parameter, so a tenant can only ever enumerate their own goals. A tenant the user does not belong to answers `400 untrusted_scope`. A resolution that throws answers `200` with the config goals on an unscoped install and an empty list on a scoped one, rather than an error the picker would have to render. `GoalsResponse` types the answer.
+
+## Document endpoint
+
+`GET /api/_x/document` is the read behind a document's [Analytics tab](/analytics/display-fields#the-interactive-analytics-tab). It reads one bound document's numbers in that document's own scope, and only for a caller who may read the document itself.
+
+| Parameter | Shape | Default |
+|---|---|---|
+| `collection`, `id` | a bound collection's slug and a document id | required |
+| `timeframe` | a preset or `custom` | `last30days`; an unknown value reads as the default |
+| `from`, `to` | days or instants, as on the query endpoint | required with `timeframe=custom` |
+| `report` | `page` or `item` | the binding's first report, the item before the page |
+| `metrics` | comma list, at most 8; unknown keys are dropped | a page report's pageviews, visitors, visits and time on page; an item report's views, clicks and outcomes |
+| `optional` | comma list of metrics a source may leave out without a warning | the panel's own |
+| `dimensions` | comma list, at most 3 | none |
+| `limit` | rows per list, held to 1 to 25 | the read's own |
+| `dataSource` | a source id | the document scope's default |
+| `compare`, `series`, `fresh` | `1` to read the previous window, a series, or past an expired cache entry | off |
+
+It answers a `FieldReadResult`. A collection that is not bound, a missing `id`, a document that does not exist and one the caller may not read are deliberately one answer, `404 not_found`; a document read that fails for any other reason is a logged `500 internal`. A custom bound that will not parse, or names a year before 1970, answers `400 invalid_param` naming `from` or `to` (an inverted window blames `to`); a custom window longer than 366 days answers `400 range_too_long` naming `to`, as on the query endpoint; and a document in a scope the caller may not read `400 untrusted_scope`.
+
+## Live endpoint
+
+`GET /api/_x/live` is the realtime read the [live counters](/analytics/widgets) poll.
+
+| Parameter | Shape | Default |
+|---|---|---|
+| `metric` | `visitors` or `pageviews` | `visitors` |
+| `windowMinutes` | `5`, `15`, `30` or `60` | `30` |
+| `dataSource` | a source id | the default source |
+| `series` | `0` to answer the total alone | the minutes too |
+| `scope` | as on the query endpoint | the request's own |
+| `collection`, `id` | a bound document, to count its own page in its own scope | none: the whole site |
+
+It answers `{ status, adapterId, activeNow, series: [{ date, value }], provider?, scope?, ... }`, with the read's notices beside them (`WidgetRealtimeResult`). A document with no path yet answers `200` with `status: 'unavailable'`. On the native engine the total and its minutes are counted together, and a part that fails fails the whole read rather than answering an empty `series` that would read as nobody being there. A failed live read is classified like any other: `400 invalid_param` (`param: 'query'`) when the source refused it as asked, `502 source_misconfigured` (`param: 'source'` or `'host'`), and `503 unavailable` with the source lane's `Retry-After`. A request that fails before the read is a `500 internal`, a configuration bug rather than an outage: an `access.read` resolver that throws is the case to look for. The counters stop polling on a `401` or a `403` and keep polling, paused, through a `502` or a `503`.
+
+## Exclusion endpoint
+
+`GET /api/_x/exclusion` answers one scope's token for the [exclusion link](/analytics/capture#the-exclusion-link), which the analytics view's [Your own visits](/analytics/analytics-view#your-own-visits) panel shows staff. It is mounted only while `capture.exclusion` is on.
+
+```jsonc
+{
+  "param": "analytics_exclude", // the query parameter the tracker reads
+  "token": "kq3...",            // its value for this scope, base64url
+  "sameOrigin": null,           // see below
+  "sites": ["https://example.com/"] // the scope's site addresses, from capture.exclusion.sites
+}
+```
+
+`sameOrigin` says whether a switch in this browser can stand in for the link. It is `true` when the admin's own address resolves to the scope the way a visit would, `false` when it resolves to another, and `null` on an unscoped install, which cannot tell whether its website runs at the admin's address. `sites` lists the scope's site addresses as [`capture.exclusion.sites`](/analytics/capture#excluding-your-own-visits) names them, each trimmed to its origin and path, without repeats, and leaving out anything that is not an `http(s)` URL. It is empty when the install names none, and when the function naming them throws, which is logged: the token is answered either way. `ExclusionResponse` from `@10x-media/analytics/types` types the answer.
+
+The endpoint is gated like every read and by `access.view` on top. It takes an optional `scope`, checked as on every read endpoint, so `scope=*` from a reader `access.crossScope.aggregate` denies answers `400 untrusted_scope`; from one it admits, `400 invalid_param`, because a link belongs to one site. Whoever holds a token can leave any browser out of that scope's numbers, which is why it is never cached. A token that could not be made, and an `access.read` or `access.view` check that throws, answer `500 internal`.
+
+## Ingest endpoint
+
+`POST /api/_x/e` is the [native engine](/analytics/native#the-ingest-endpoint)'s public beacon endpoint, one event per request, in the shape the browser tracker posts. `native({ ingestPath })` moves it, and [`ingestRoute`](/analytics/capture#taking-beacons-in-a-route-of-your-own) takes the same beacons in a Next route handler of your own.
+
+It answers `202` with `{ "ok": true }` for a stored event, and exactly the same for every event it [drops on purpose](/analytics/native#dropped-events): a crawler's user agent, a cross-site request from an origin [`capture.allowedOrigins`](/analytics/capture#beacons-from-other-sites) does not list, a request that resolves no scope on a scoped install, a hostname the `hostname` option refuses, a same-site request (`Sec-Fetch-Site: same-site`) whose `Origin` host resolves to another scope than the request's, a scope whose provider documents grant it no native engine, and an `orderId` no sale can be stored under (empty, longer than 255 characters, holding a control character, or unsigned where [`revenue.orderSignature`](/analytics/revenue#recorded-in-the-browser-and-by-the-webhook) requires a signature). The answer never says which of those happened, so a forged host or order id does not tell a prober which tenants take beacons; which capture slots a host fills is public all the same, on the [tracker config](#tracker-config-endpoint). A store that fails to write the hit is logged, at most once a minute, and the beacon is answered `202` too.
+
+A body over 64 KiB answers `413 payload_too_large`. An event that fails its required fields answers `400 invalid_param` naming the first field at fault, checked in the order `type`, `path`, `hostname`, `name`, `revenue`, then `value`, before the request's scope, hostname or grant is looked at; unparseable JSON names `type`, and a body that died in transit names nothing. `name` is required on an event and a goal only. The body is the event [the browser tracker posts](/analytics/capture#what-the-tracker-sends-to-native), whose optional `ageMs` says how long, by the page's own clock, the event waited in the page before it was sent (a pending consent gate, a prerendered page): ingest files the event that much before it arrived, believing a value from 0 to a day and ignoring any other.
+
+## Tracker config endpoint
+
+`GET /api/_x/config` answers the request's `TrackerConfig`, what [`initTracker()`](/analytics/reference/tracker#inittracker) boots from: the filled capture slots with their snippets, the paths the browser posts to, the scope's goals as a browser may see them, and the exclusion and skip settings. It carries only what an adapter declared as public, never a query credential and never a goal's admin-facing name.
+
+It is public, sets no cookie and has no refusal of its own; a failure resolving the config answers `500 internal` in the envelope. It answers `Cache-Control: private, max-age=60` with `Vary: Host, Cookie`: its payload is resolved per request at the `capture` call site, so a scoped install serves each scope its own slots and goals, and `Cookie` is in the key because Next's draft mode cookie sets `draft`. An install where no adapter declares capture and no provider documents run does not mount it, and `initTracker()` then boots a tracker whose calls do nothing.
+
+## Capture proxy
+
+`/api/_x/p/:slot/:path*` relays a vendor's tracker and beacons through your origin ([First-party proxy](/analytics/proxy#runtime-endpoint)). `GET` and `POST` are forwarded along the routes the slot's adapter declares; `OPTIONS` answers `204` with `Allow: GET, POST, OPTIONS`; `PUT`, `PATCH` and `DELETE` answer `405` with the same `Allow`. Otherwise it relays the vendor's own status.
+
+Its refusals have no body and no error code, since a vendor SDK, not admin code, reads them: `404` for an unknown or empty slot or a path outside the declared routes, a path segment that decodes to `.` or `..` or holds a `/` or `\` included; `405` with `Allow: GET, OPTIONS` for a `POST` to a route that serves the vendor's script; `403` for a cross-site `POST` from an unlisted origin, and for a same-site `POST` to the `tenant` slot whose `Origin` host resolves to another scope than the request's; `413` for a body over `capture.proxy.maxBodyBytes`, `400` for a body that died in transit, and `502` when the vendor cannot be reached in time. Anything else that fails answers a bare `500`. Every answer carries `X-Content-Type-Options: nosniff`.
+
+## Flags endpoint
+
+`GET /api/_x/flags/:code` serves one country's flag, mounted only while `countryFlags` is `true`. `code` is a two-letter ISO 3166-1 alpha-2 code, in either case, with or without a `.svg` suffix. It answers the SVG with `Cache-Control: public, max-age=31536000, immutable`, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'`, so an image opened directly can do nothing. It reads no database, no user and no scope. A code it does not know answers `404 not_found`, and anything that is not two letters `400 invalid_param` naming `code`, both in the [error envelope](#errors).
+
+## Errors
+
+Every endpoint the plugin registers answers a refusal in one shape, with one vocabulary of codes, whatever it refused, the capture proxy aside:
+
+```jsonc
+{
+  "error": {
+    "code": "unsupported_metric",                 // one of the codes below
+    "message": "source does not serve revenue",   // safe to render
+    "param": "metrics"                            // absent when nothing single is at fault
+  }
+}
+```
+
+`code` is what to branch on, `message` is what to show, and `param` names the query parameter, body field or event field at fault when one is. Messages are safe to display: adapter configuration and upstream error text never reach the response. The server log has them instead: a read that fails is logged with its error's cause chain, so the database driver's or the vendor's own error under the plugin's wrapper is there to read.
+
+Every error answer carries `Cache-Control: private, no-store`, the public ingest endpoint's included. Every `503 unavailable` and `429 rate_limited` carries `Retry-After` in whole seconds: for a source, how long until its [breaker](/analytics/cache#circuit-breaker) lets a request through again or the pause its vendor asked for ends; `2` for a scope with too many reads waiting; and `30` when nothing knows better, as when this Payload instance runs without the plugin. A `502` carries none, since waiting will not change a source's settings.
+
+### The codes
+
+| `error.code` | Status | What it means |
+|---|---|---|
+| `invalid_param` | `400` | a parameter, body field or event field is missing or malformed, or the source refused the read as asked: a vendor's `400`, a native `matches` pattern outside [the subset](#patterns-on-the-native-engine), a statement the database refuses as written |
+| `unsupported_metric` | `400` | a known metric the selected source does not serve, or does not serve under the read's breakdown |
+| `unsupported_dimension` | `400` | a known dimension the source cannot break down by |
+| `unsupported_filter` | `400` | a dimension `capabilities.filters` does not list |
+| `unsupported_operator` | `400` | an operator `capabilities.filters` does not list for that dimension |
+| `unsupported_granularity` | `400` | finer than `capabilities.minGranularity` |
+| `range_too_long` | `400` | the window exceeds 366 days |
+| `untrusted_scope` | `400` | a scope this caller may not read or refresh, a tenant the user selected without belonging to it included |
+| `unauthorized` | `401` | no signed-in user |
+| `forbidden` | `403` | `access.read` denied the request, or on the exclusion endpoint `access.view` |
+| `not_found` | `404` | the document or flag asked about is unknown, or not this caller's to read |
+| `unknown_source` | `404` | no source resolves for the request, or the named one is outside its listing |
+| `payload_too_large` | `413` | the request body is over that endpoint's cap |
+| `rate_limited` | `429` | the scope already has as many reads with nothing cached waiting on their sources as [`cache.concurrency.perScope`](/analytics/cache#cold-reads-per-scope) allows |
+| `internal` | `500` | an unexpected failure; the detail is logged, never returned |
+| `source_misconfigured` | `502` | the source cannot work as it is set up, so retrying will not help: the vendor refused its key or its property (HTTP 401, 403, 404, gRPC not found, permission denied, unauthenticated), a credential would not decrypt, a [provider document](/analytics/providers#where-a-document-may-connect)'s host is not allowed or resolves to a private address, or the database lacks a table or column the native engine reads, or refuses its user the privilege |
+| `unavailable` | `503` | this Payload instance runs without the plugin, or a source is down, slow or held back by its open [breaker](/analytics/cache#circuit-breaker) (HTTP 408, 429, 5xx, gRPC deadline, quota, internal, unavailable, a timeout, a database statement timeout) with no cached entry to serve |
+
+The union is exported as `AnalyticsErrorCode` (with `QueryErrorCode` as an alias), and its values as `ANALYTICS_ERROR_CODES`. It is open to additions, so treat a code you do not recognize as a generic failure of its status rather than exhausting over it.
+
+### Which endpoint answers which
+
+| Endpoint | Status | `error.code` | `param` | When |
+|---|---|---|---|---|
+| `/_x/query` | `400` | `invalid_param` | the parameter at fault | any malformed parameter, including `compare=previous` on a source whose adapter set `comparison: false` or on a range too long to have a previous window |
+| `/_x/query` | `400` | `invalid_param` | `query`, or the parameter at fault | the source refused the read as asked (HTTP 400, 413, 414, 422 or 431, gRPC invalid argument, a statement the database refuses as written), such as a pattern its regex dialect rejects, which names `filters`. Never answered from a stale entry, never retried, and never counted against the breaker |
+| `/_x/query` | `400` | `unsupported_metric` | `metrics` | a known metric this source does not serve, or not under the read's breakdown |
+| `/_x/query` | `400` | `unsupported_dimension` | `dimensions` | a known dimension this source cannot break down by |
+| `/_x/query` | `400` | `unsupported_filter` | `filters` | a dimension `capabilities.filters` does not list; the message names it |
+| `/_x/query` | `400` | `unsupported_operator` | `filters` | an operator `capabilities.filters` does not list for that dimension; the message names both |
+| `/_x/query` | `400` | `unsupported_granularity` | `granularity` | finer than `capabilities.minGranularity` |
+| `/_x/query` | `400` | `range_too_long` | `to` | the window exceeds 366 days |
+| `/_x/query` | `400` | `untrusted_scope` | `scope` | a `scope` naming another scope from a caller `access.crossScope.named` denies, `*` from one `access.crossScope.aggregate` denies, a tenant, named or the request's own, that `scope.member` says the user does not belong to, any name but `*` on an install without tenants, or a name over 256 characters |
+| `/_x/query` | `401` | `unauthorized` | | no signed-in user |
+| `/_x/query` | `403` | `forbidden` | | `access.read` denied the request |
+| `/_x/query` | `404` | `unknown_source` | | no source resolves for this request at all, a scoped request that resolves no scope included unless the reader may aggregate |
+| `/_x/query` | `404` | `unknown_source` | `source` | a `source` id outside this request's own listing, a shared source that cannot narrow its query to the request's tenant included |
+| `/_x/query` | `429` | `rate_limited` | | a read with nothing cached, from a scope that already has [`cache.concurrency.perScope`](/analytics/cache#cold-reads-per-scope) such reads waiting. `Retry-After: 2`. A read with something cached is never refused |
+| `/_x/query` | `500` | `internal` | | an unexpected failure; the detail is logged with the adapter id |
+| `/_x/query` | `502` | `source_misconfigured` | `host` | the source's provider document names a host the install does not allow, or one that resolves to a private address, and no cached entry is left to serve. The message names `providers.hosts.allow`; the logged detail names the host, the answer does not |
+| `/_x/query` | `502` | `source_misconfigured` | `source` | the vendor refused the source's key or property, its credential would not decrypt, or the database lacks a table or column the native engine reads or refuses its user, and no cached entry is left to serve. The source's [breaker](/analytics/cache#circuit-breaker) for that scope then opens: the source is not asked again for 30 seconds the first time, twice as long after each failed retry up to ten minutes, and every read of that scope through it in between is answered the same way at once |
+| `/_x/query` | `503` | `unavailable` | | this Payload instance runs without the plugin, or the source failed as an outage with no cached entry to fall back on: a database statement timeout is one, and so is a native read SQLite refuses before it runs because it could not finish in time, which never counts against the breaker |
+| `/_x/sources` | `400` | `untrusted_scope` | | with `collection` and `id`, the document belongs to a scope the caller may not read |
+| `/_x/sources` | `401` | `unauthorized` | | no signed-in user |
+| `/_x/sources` | `403` | `forbidden` | | `access.read` denied the request |
+| `/_x/sources` | `404` | `not_found` | | with `collection` and `id`, the document is unbound, missing or not the caller's to read |
+| `/_x/sources` | `500` | `internal` | | the listing failed for any other reason, or with `collection` and `id` the document read did; logged |
+| `/_x/refresh` | `400` | `invalid_param` | `scope` | `scope` is present but not a string, or the body could not be read |
+| `/_x/refresh` | `400` | `untrusted_scope` | `scope` | a scope the matching `access.crossScope` gate denies, the wildcard included, a request resolving no scope on a scoped install from a caller `access.crossScope.aggregate` denies, a resolver that throws, a tenant the user does not belong to, any name but `*` on an install without tenants, or a name over 256 characters |
+| `/_x/refresh` | `401` | `unauthorized` | | no signed-in user |
+| `/_x/refresh` | `403` | `forbidden` | | `access.read` denied the request |
+| `/_x/refresh` | `413` | `payload_too_large` | | the body is over 4 KiB |
+| `/_x/refresh` | `500` | `internal` | | the `access.read` check threw; logged |
+| `/_x/refresh` | `503` | `unavailable` | | this Payload instance runs without the plugin, or the token could not be written; logged |
+| `/_x/goals` | `400` | `untrusted_scope` | | the request's own tenant is one `scope.member` says the user does not belong to |
+| `/_x/goals` | `401` | `unauthorized` | | no signed-in user |
+| `/_x/goals` | `403` | `forbidden` | | `access.read` denied the request |
+| `/_x/goals` | `500` | `internal` | | the `access.read` check threw; logged. A goal resolution that throws answers `200` instead ([Goals endpoint](#goals-endpoint)) |
+| `/_x/document` | `400` | `invalid_param` | `from` or `to` | `timeframe=custom` with a bound that will not parse or names a year before 1970. An inverted window blames `to` |
+| `/_x/document` | `400` | `range_too_long` | `to` | `timeframe=custom` with a window over 366 days |
+| `/_x/document` | `400` | `untrusted_scope` | | the document belongs to a tenant the reader may not read across into, or it names none and the request's own tenant is one the user does not belong to |
+| `/_x/document` | `401` | `unauthorized` | | no signed-in user |
+| `/_x/document` | `403` | `forbidden` | | `access.read` denied the request |
+| `/_x/document` | `404` | `not_found` | | the collection is not bound, the `id` is missing, the document does not exist, or this caller may not read it. The four are deliberately one answer |
+| `/_x/document` | `500` | `internal` | | the read failed for any other reason, an `access.read` that throws included; logged with the collection slug |
+| `/_x/document` | `503` | `unavailable` | | this Payload instance runs without the plugin |
+| `/_x/live` | `400` | `invalid_param` | `query` | the source refused the live read as asked |
+| `/_x/live` | `400` | `untrusted_scope` | `scope`, or none for a document's own scope | a `scope` the matching `access.crossScope` gate denies, a tenant the user does not belong to, any name but `*` on an install without tenants, a name over 256 characters, or a document in a scope the reader may not read |
+| `/_x/live` | `401` | `unauthorized` | | no signed-in user |
+| `/_x/live` | `403` | `forbidden` | | `access.read` denied the request |
+| `/_x/live` | `404` | `not_found` | | with `collection` and `id`, the document is unbound, missing or not the caller's to read |
+| `/_x/live` | `500` | `internal` | | the request failed before the read, or the document read failed |
+| `/_x/live` | `502` | `source_misconfigured` | `source` or `host` | the source's key or property was refused, its credential would not decrypt, or its host is not allowed, as on `/_x/query`. No `Retry-After` |
+| `/_x/live` | `503` | `unavailable` | | the source failed as an outage, or a part of the live read did. `Retry-After` comes from the source's lane |
+| `/_x/exclusion` | `400` | `invalid_param` | `scope` | `scope=*` from a reader `access.crossScope.aggregate` admits: an exclusion link belongs to one site |
+| `/_x/exclusion` | `400` | `untrusted_scope` | `scope` | a `scope` the matching `access.crossScope` gate denies (`*` included), a request resolving no scope on a scoped install from a caller `access.crossScope.aggregate` denies, a resolver that throws, a tenant the user does not belong to, any name but `*` on an install without tenants, or a name over 256 characters |
+| `/_x/exclusion` | `401` | `unauthorized` | | no signed-in user |
+| `/_x/exclusion` | `403` | `forbidden` | | `access.read` or `access.view` denied the request |
+| `/_x/exclusion` | `404` | `not_found` | | this instance's runtime has the link off. While `capture.exclusion` is off the route is not mounted at all, and Payload answers its own `404` |
+| `/_x/exclusion` | `500` | `internal` | | the token could not be made, or the `access.read` or `access.view` check threw; logged |
+| `/_x/e` | `400` | `invalid_param` | the first field at fault | `type`, `path`, `hostname`, `name`, `revenue` or `value` is missing or invalid, checked in that order. Unparseable JSON names `type`. A body that died in transit sends no `param` |
+| `/_x/e` | `413` | `payload_too_large` | | the body is over 64 KiB |
+| `/_x/e` | `500` | `internal` | | a host resolver threw, such as `scope.resolve`; logged at most once a minute. A store that fails to write answers `202` and is logged the same way |
+| `/_x/config` | `500` | `internal` | | the tracker config could not be resolved; logged |
+| `/_x/flags/:code` | `400` | `invalid_param` | `code` | not a two-letter code |
+| `/_x/flags/:code` | `404` | `not_found` | | a code with no flag |
+
+### Reading a code from admin code
+
+`readErrorCode` answers the code of a parsed body, and `undefined` for anything it cannot read: a body that is not the envelope, and a code this release does not know. A client therefore never branches on a word it cannot act on.
+
+```ts
+import { analyticsRoutes, readErrorCode } from '@10x-media/analytics/client'
+import type { ClientConfig } from 'payload'
+
+export const sourcesFailPermanently = async (config: ClientConfig): Promise<boolean> => {
+  const res = await fetch(`${config.routes.api}${analyticsRoutes(config).sources}`, {
+    credentials: 'same-origin',
+  })
+  if (res.ok) return false
+  const code = readErrorCode(await res.json().catch(() => null))
+  // 'unauthorized' and 'forbidden' will not fix themselves on a retry; anything else may
+  return code === 'unauthorized' || code === 'forbidden'
+}
+```
+
+`readResponseError` is the same read over a `Response` nothing has parsed yet, so the `catch` above is not yours to write: it answers the whole error (`code`, `message` and `param`), and `undefined` for a body that is not JSON, an empty one and an already-consumed one included, rather than throwing.
+
+`fetchQuery` and `refreshCache` already do this: `QueryFetchError.error` is the same parsed envelope. The plugin's own pickers and the realtime counter read the code the same way, which is why the counter stops polling on a `401` or a `403` and keeps polling through a `502` or a `503`.
+
+`readErrorCode` is exported from the package root, `@10x-media/analytics/client` and `@10x-media/analytics/types`; `readResponseError` from `@10x-media/analytics/client`; `ANALYTICS_ERROR_CODES` from the package root, `/client` and `/types`; and the builder `analyticsError` from the root. `QueryError` and `QueryErrorCode` are aliases of `AnalyticsError` and `AnalyticsErrorCode`.
+
+## Scope on the read endpoints
+
+Scope comes from the request, exactly as it does everywhere else ([Who may read](#who-may-read)): a tenant cannot read another tenant's numbers by asking for them.
+
+- An explicit `scope` parameter naming another scope is honored only for readers `access.crossScope.named` allows; anyone else gets `400 untrusted_scope`. A reader naming their own tenant reads it as usual.
+- A tenant scope, named or the request's own, also needs its user to belong to it (`scope.member`), unless `access.crossScope.named` grants it.
+- `scope=*` reads every scope at once, behind `access.crossScope.aggregate`.
+- An install without tenants has no scope to name, so any `scope` but `*` answers `400 untrusted_scope` there, and so does a name longer than 256 characters on any install.
+- On a scoped install, a request resolving no scope at all reads every scope only for a reader `access.crossScope.aggregate` allows, and answers `404 unknown_source` for everyone else.
+- A config adapter that cannot narrow its query to one scope is not among a tenant's sources, so naming it under a tenant answers `404 unknown_source` with `param: 'source'`, for every reader. It is read install-wide (with no tenant selected, by a reader who may aggregate) or across every scope with `scope=*`.
+
+See [Multi-tenancy](/analytics/multi-tenancy) for the full recipe.

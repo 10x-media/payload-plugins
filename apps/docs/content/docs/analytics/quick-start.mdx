@@ -3,71 +3,117 @@ title: Quick start
 description: Install the plugin, track pageviews with the native engine, and see numbers in the admin.
 ---
 
-This walkthrough uses the [native engine](/analytics/native) so nothing external is required. Swap in a [provider adapter](/analytics/adapters) at any point; everything else stays the same.
+This walkthrough adds the plugin to a Payload app made with `create-payload-app` and its blank template, and uses the [native engine](/analytics/native), so nothing external is required. Swap in a [provider adapter](/analytics/providers) at any point; everything else stays the same. The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
 
 ## Install
 
 ```bash
-pnpm add @10x-media/analytics
+pnpm add @10x-media/analytics @10x-media/fields
 ```
+
+`@10x-media/fields` is a required peer: the providers collection stores its keys in its encrypted fields.
 
 ## Configure
 
+Add the plugin, a collection to bind, and the dashboard layout to the `payload.config.ts` the template made. Shown on its own, with MongoDB:
+
 ```ts title="payload.config.ts"
-import { buildConfig } from 'payload'
 import { analytics, analyticsDefaultWidgets, analyticsStatRow } from '@10x-media/analytics'
 import { native } from '@10x-media/analytics/adapters/native'
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { buildConfig } from 'payload'
 
 export default buildConfig({
+  db: mongooseAdapter({ url: process.env.DATABASE_URL ?? '' }),
+  secret: process.env.PAYLOAD_SECRET ?? '',
   admin: {
     // Widgets render on Payload's Modular Dashboard. The app owns the layout;
     // spread the plugin's defaults into it (or compose your own).
-    dashboard: { defaultLayout: [...analyticsDefaultWidgets()] },
+    dashboard: { widgets: [], defaultLayout: [...analyticsDefaultWidgets()] },
   },
   collections: [
     {
       slug: 'pages',
       fields: [
         { name: 'slug', type: 'text' },
-        analyticsStatRow(), // pageviews, visitors, sessions, avg duration
+        analyticsStatRow(), // pageviews, visitors, visits, time on page
       ],
     },
   ],
   plugins: [
     analytics({
       adapters: [native()],
+      // Required, and the site operator's choice: 'all' holds every capture slot until your
+      // consent manager calls setGate, 'off' captures without waiting. This walkthrough uses
+      // 'off' so numbers appear at once. The plugin does not decide this; see Consent.
+      capture: { gate: 'off' },
       collections: {
         // Bind documents to the URL path their analytics were recorded under.
-        pages: { path: (doc) => (doc.slug ? `/${doc.slug}` : null) },
+        pages: { path: (doc) => (typeof doc.slug === 'string' ? `/${doc.slug}` : null) },
       },
     }),
   ],
 })
 ```
 
-Then regenerate the import map so the admin resolves the plugin's server components:
+`DATABASE_URL` is the variable the template's `.env` holds. The plugin runs on MongoDB, Postgres (`@payloadcms/db-postgres` or `@payloadcms/db-vercel-postgres`) and SQLite (`@payloadcms/db-sqlite`). On Cloudflare D1 it reads vendor adapters only: `native()` refuses D1 at boot and stops on an in-memory SQLite database, and it does not run on MongoDB-compatible services such as Amazon DocumentDB. No other database adapter is supported.
+
+On SQLite, open the database in WAL mode with a busy timeout of at least five seconds. The native engine then counts on worker threads of its own, and the site keeps answering while it does; without them it runs on the main thread, and the boot warns ([SQLite](/analytics/native#sqlite)):
+
+```ts title="payload.config.ts"
+import { sqliteAdapter } from '@payloadcms/db-sqlite'
+
+export const db = sqliteAdapter({
+  client: { url: process.env.DATABASE_URL ?? '' },
+  wal: true,
+  busyTimeout: 5000,
+})
+```
+
+`capture.gate` has no default because whether a site may measure before a visitor answers is not the plugin's call. Choose one of:
+
+| `capture.gate` | Means |
+|---|---|
+| `'all'` | Every capture slot waits until your consent manager opens it with `setGate` ([Consent](/analytics/consent)). Nothing is sent before then, so without a manager wired to the gate nothing is counted. |
+| `'off'` | Nothing waits: capture starts with the page. |
+| `['tenant']`, `['global']` | Only the slots listed wait. |
+| `({ slot, adapterId, kind }) => boolean` | You decide per slot; `({ kind }) => kind !== 'native'` captures native at once and holds every vendor. |
+
+On Vercel or behind Cloudflare, also set `trustedPlatform: 'vercel'` or `'cloudflare'`, so visitor countries come from the platform's own headers; see [Geo resolution](/analytics/geo#which-headers-to-trust).
+
+Then regenerate the generated types, so the binding above and your own code know the `pages` collection (until then `tsc` and `next build` fail on it), and the import map, so the admin resolves the plugin's components:
 
 ```bash
-payload generate:importmap
+pnpm payload generate:types
+pnpm payload generate:importmap
 ```
 
 ## Capture events
 
-Boot the browser tracker from your root layout. It sends pageviews (including SPA route changes), outbound-link and file-download events, and any goal you tag:
+Boot the browser tracker from the site's root layout. In a Payload app that is the layout of the `(frontend)` route group: Payload's own `app/(payload)/layout.tsx` renders the admin's page, so the tracker never goes in a layout above both. Keep what the template's layout already has, its stylesheet and its `metadata`, and add the tracker:
 
-```tsx title="app/layout.tsx"
-import { AnalyticsScripts, getTrackerConfig } from '@10x-media/analytics/rsc'
+```tsx title="src/app/(frontend)/layout.tsx"
+import { AnalyticsScripts, getTrackerConfig } from '@10x-media/analytics/site'
 import config from '@payload-config'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
+import React from 'react'
+import './styles.css'
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+export const metadata = {
+  description: 'A blank template using Payload in a Next.js app.',
+  title: 'Payload Blank Template',
+}
+
+export default async function RootLayout(props: { children: React.ReactNode }) {
+  const { children } = props
   const payload = await getPayload({ config })
   const tracker = await getTrackerConfig(payload, { headers: await headers() })
+
   return (
     <html lang="en">
       <body>
-        {children}
+        <main>{children}</main>
         <AnalyticsScripts config={tracker} />
       </body>
     </html>
@@ -75,24 +121,36 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 }
 ```
 
-Outside Next, `initTracker()` from `@10x-media/analytics/tracker` does the same from the browser. Full setup, including consent and the vendor slots, is on [Capture](/analytics/capture).
+The tracker sends pageviews (including SPA route changes), outbound-link and file-download events, and any goal you tag. A statically rendered layout, or a site outside Next, boots it from the browser with `initTracker()` from `@10x-media/analytics/tracker` instead. Full setup, including the vendor slots, is on [Capture](/analytics/capture); wiring the gate to your consent manager is on [Consent](/analytics/consent).
 
-The native engine's beacon endpoint (`POST /api/analytics/ingest`) stays public, so a host that would rather post events itself still can; see [Native engine](/analytics/native#the-ingest-endpoint) for the event shape.
+The native engine's beacon endpoint (`POST /api/_x/e`) stays public, so a host that would rather post events itself still can; see [Native engine](/analytics/native#the-ingest-endpoint) for the event shape.
+
+## What the boot says
+
+Two notices are expected with this config, and neither is an error:
+
+- **Payload's job controls.** `native()` registers the `analytics-maintain` task, which turns Payload's jobs on, and the plugin restricts every job control your config left unset to the users of the admin collection. The boot names them, on every start: `analytics: Payload's job controls the config left unset now admit users of the "users" collection only: ...`. Set `jobs.access` (`run`, `queue` and `cancel`) and the `access` of `jobs.jobsCollectionOverrides` in your Payload config to choose who may run, queue, cancel and read jobs yourself, which also ends the notice ([Who may run jobs](/analytics/native#who-may-run-jobs)).
+- **Spoofable addresses, in production.** With `NODE_ENV=production`, an install that sets neither `trustedPlatform` nor `trustedProxyHops` logs `analytics: visitor IP addresses and countries can be spoofed on this install. ...` once per start, since it then reads them from headers a visitor can write. Set `trustedPlatform: 'vercel'` or `'cloudflare'` on those platforms, or `trustedProxyHops` to the number of proxies in front of the app ([Which headers to trust](/analytics/geo#which-headers-to-trust)).
+
+Neither prints while `next build` collects page data: the server that serves requests says them. On SQLite without WAL and a busy timeout, the engine also warns once, on its first statement, that it runs on the main thread, naming `sqliteAdapter({ wal: true, busyTimeout: 5000 })`.
 
 ## Verify
 
 1. Hit a few frontend pages.
-2. Open **Analytics** in the admin nav (`/admin/analytics`): the [analytics view](/analytics/analytics-view) shows the cards, the trend and a breakdown of everything captured so far. It is the first thing to open after installing, and the fastest way to tell whether events are landing.
+2. Open **Analytics** in the admin nav (`/admin/analytics`): the [analytics view](/analytics/analytics-view) shows the cards, the trend and a breakdown of everything captured so far. It is the first thing to open after installing, and the fastest way to tell whether events are landing. On a site this new, today's numbers are at most ten seconds old when a read answers them, so reload the view after a moment, or press **Refresh** to read again at once. A busy day is read from a snapshot up to a few minutes old instead ([How a read is answered](/analytics/native#how-a-read-is-answered)).
 3. Open the admin dashboard: the trend, metric, and breakdown widgets show the same traffic.
 4. Open a `pages` document whose slug matches a tracked path: the stat row shows that document's numbers.
 
 ## Where to go next
 
 - Read the full report and share a filtered view as a link: [Analytics view](/analytics/analytics-view).
-- Point the plugin at an existing provider instead: [Adapters](/analytics/adapters), and serve its tracker from your own origin with the [first-party proxy](/analytics/proxy).
+- Point the plugin at an existing provider instead: [Providers](/analytics/providers), and serve its tracker from your own origin with the [first-party proxy](/analytics/proxy).
 - Mark conversions and read revenue: [Goals](/analytics/goals).
 - Bind more collections and tune the fields: [Display fields](/analytics/display-fields).
-- Configure the dashboard: [Widgets](/analytics/widgets).
-- Read the numbers from your own code: [Data sources](/analytics/data-sources) and the query endpoint.
-- Production concerns: [geo resolution](/analytics/geo), [caching and warming](/analytics/cache), [bot filtering](/analytics/native#bot-filtering), [retention](/analytics/native#retention-pruning), and the Mongo `ensureIndexes` note in [Native engine](/analytics/native#production-note-mongo).
+- Configure the dashboard: [Widgets](/analytics/widgets), and restyle any of it: [Customizing](/analytics/customizing).
+- Read the numbers from your own code: the [query endpoint](/analytics/reference/endpoints#query-endpoint).
+- Before production:
+  - On Postgres or SQLite in migrate mode, create and run the migration for the plugin's collections and Payload's jobs tables: `pnpm payload migrate:create`, then `pnpm payload migrate` ([Upgrading](/analytics/upgrading) has what an upgrade from an earlier beta needs).
+  - Run the `analytics-maintain` task: a jobs worker or a scheduler calling Payload's run endpoint counts each day once it closes, whatever traffic the site gets ([Running it](/analytics/native#running-it)). Without one, page views and visits do that work as they come.
+  - Then [geo resolution](/analytics/geo), [caching and warming](/analytics/cache), [bot filtering](/analytics/native#bot-filtering), [retention](/analytics/native#retention), the Mongo `ensureIndexes` note in [Native engine](/analytics/native#production-note-mongo), and on Postgres the [pool size](/analytics/native#production-note-postgres) the engine shares with your app.
 - Answer what the install stores about a visitor, and keep your own visits out of it: [Privacy](/analytics/privacy).

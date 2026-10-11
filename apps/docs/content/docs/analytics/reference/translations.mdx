@@ -1,0 +1,93 @@
+---
+title: Translations
+description: The plugin's admin strings, their typed keys, counted phrases, and how to override or add a language.
+---
+
+Every string the plugin shows in the admin (metric names, widget labels, timeframe names, empty states, notes) is a typed translation under the `analytics:` namespace. Override or extend them through the `translations` option:
+
+```ts title="payload.config.ts"
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import { keys } from '@10x-media/analytics/i18n'
+
+export const plugin = analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  translations: {
+    en: { [keys.metricPageviews]: 'Views' },
+    de: {
+      [keys.adminGroup]: 'Statistik-Einstellungen',
+      [keys.metricPageviews]: 'Seitenaufrufe',
+      [keys.timeframeLast30Days]: 'Letzte 30 Tage',
+    },
+  },
+})
+```
+
+A value you set wins over the built-in one key by key; a language the plugin does not ship is added whole. Your app's own `i18n.translations` wins over both. Every key the option names must be one of the plugin's own, as `keys` and `pluralKeys` export them: any other, a key a release removed or one outside the `analytics:` namespace, fails the boot, naming it.
+
+## What `@10x-media/analytics/i18n` exports
+
+| Export | What it is |
+|---|---|
+| `keys` | One constant per singular string, such as `keys.metricPageviews` for `'analytics:metricPageviews'`. A typo fails to compile. |
+| `pluralKeys` | The counted phrases, one constant per plural form: [below](#counted-phrases). |
+| `translations` | The built-in strings, per language, in the nested shape Payload reads (`translations.en.analytics.metricPageviews`). It is where to look up the English text of any key. |
+| `TranslationKey` (also `AnalyticsTranslationKeys`), `SingularKey`, `PluralVariant`, `PluralName`, `PluralCategory` | The key types. `TranslationKey` is `SingularKey \| PluralVariant`. |
+| `TranslationsOption` | The `translations` option's shape: a record of language codes to partial key maps. |
+
+Most keys are grouped by the surface they serve, by prefix: `metric*` (metric names), `timeframe*` (window names), `channel*` (native's traffic channels), `value*` (labels for stored values), `state*` (empty and failure states), `view*` (the analytics view), `widget*` (dashboard widgets and their fields), `panel*` and `field*` (display fields), `filter*`, `date*`, `comparison*`, `chart*`, `goal*` and `goals*` (goals and their collection), `provider*` and `providers*` (the providers collection), `item*`, `sync*`, `live*` and `action*`. [Stability](/analytics/reference/stability#open-unions) says how keys change between releases: a key is removed only in a major, while its English text may change in any release.
+
+## Languages
+
+The plugin ships eleven languages and names itself in each: **Analytics** in English and German, Arabic **التحليلات**, Chinese **分析**, French **Statistiques**, Indonesian **Analitik**, Korean **분석**, Portuguese **Análises**, Russian **Аналитика**, Spanish **Analítica** and Ukrainian **Аналітика**. `viewNavLabel` and `viewTitle` are the view's nav link and heading, and `tabAnalytics` the document tab; `view.navLabel` still overrides the link alone. The goals, providers and sync collections sit in a nav group of their own, `adminGroup` (**Analytics settings** in English), so the nav shows the group and the view's link once each. `pluginName` names nothing the admin shows; it stays a key, so a `translations` entry naming it still boots. `pt` is Brazilian Portuguese, and `zh` addresses the reader as 您.
+
+A language your admin supports that the plugin ships no strings for (Japanese, Dutch, Polish and the rest of Payload's languages) reads the English strings rather than raw keys such as `analytics:viewTitle`, under anything you set for it yourself, key by key, through `i18n.translations` or the `translations` option.
+
+## Where the strings land
+
+Most strings are looked up per request, so they follow the admin language and every override as soon as Payload reads them. A few places take no lookup at all: the nav group (`admin.group`), a select's options and its description, a text field's placeholder and a display field's label are read as written. For those the plugin writes a map with a string per language, built once at boot from three layers, each winning over the next: your app's own `i18n.translations`, then the plugin's `translations` option, then the built-in strings. A language only you define is added to those maps too, and a map falls back to Payload's `fallbackLanguage` before English. That covers the field factories as well (`analyticsTab`, `analyticsStat`, `analyticsProviderFields` and the rest): they run before the plugin sees its options, so the plugin swaps their labels for yours once it does.
+
+Numbers and durations are written by `Intl` in the admin language rather than translated: a duration is each of its units as the language writes it, joined as it lists units (**1h 2m 3s**, **1 Min., 23 Sek.**), built the same way on the server and in the browser whether or not the runtime has `Intl.DurationFormat`, and the realtime widget's window options name their minutes the same way.
+
+## Counted phrases
+
+A phrase written around a number, such as **3 visitors active right now**, has one string per plural form the language has, keyed `<key>_<form>`: `pluralKeys.liveVisitors.one`, `pluralKeys.liveVisitors.other`, and so on. Each shipped language defines exactly the forms `Intl.PluralRules` lists for it (English and German two, Spanish, French and Portuguese three, Russian and Ukrainian four, Arabic six, Chinese, Indonesian and Korean one), and `{{count}}` is the number as the language writes it:
+
+```ts title="payload.config.ts"
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import { pluralKeys } from '@10x-media/analytics/i18n'
+
+export const plugin = analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  translations: {
+    en: {
+      [pluralKeys.liveVisitors.one]: '{{count}} person here now',
+      [pluralKeys.liveVisitors.other]: '{{count}} people here now',
+    },
+  },
+})
+```
+
+The plugin picks the form with `Intl.PluralRules` itself rather than through Payload's `t(key, { count })`, which sends every count above five to `_many`: right for no language the plugin ships. It is wrong for Russian, Ukrainian and Arabic, where 22 is a different form from 25, and for Spanish, French and Portuguese, whose `_many` is the form for round millions (**1 millón de visitantes**), not for six. A language you add with fewer forms than its rules ask for falls back to its `_other` string. Where a counter draws the number large, the words before and after `{{count}}` sit around it in the order your string puts them.
+
+| Phrase | Used for |
+|---|---|
+| `pluralKeys.liveVisitors` | Visitors in the last minutes: the view's realtime strip, the realtime widget, the document panel's live counter, and what each says to a screen reader. |
+| `pluralKeys.livePageviews` | Pageviews in the last minutes, on a realtime widget set to pageviews. `{{duration}}` names the minutes (**12 pageviews in the last 30 minutes**). |
+
+## Placeholders
+
+A sentence with a value in it is one template, so each language puts the value where it belongs rather than the plugin gluing words together: `viewFilterChip` (`'{{dimension}} {{operator}} {{value}}'`), `viewFilterRemove` (`'Remove filter: {{filter}}'`), `viewScopeShowing` (`'Showing: {{site}}'`), `viewErrorRetryAfter` (`'Try again in {{duration}}.'`), `stateClampedFrom` (`'Only data from {{date}} onward is shown.'`), `stateClampedTo` and `stateClampedBetween` (`{{from}}`, `{{to}}`), `comparisonChangeLabel` (`'{{direction}} {{change}} vs. previous period'`) and `comparisonDirectionLabel`, `chartLabel` (`'{{metric}}, {{window}}'`), and the widget caption's `widgetFilterCaption` and `widgetCaptionWithFilter`. An override that leaves a placeholder out drops that value. Lists, such as the currencies a revenue note names, are joined as the language joins a list (**EUR and USD**, **EUR und USD**), and a span of days as it writes one.
+
+## Keys that name data
+
+A handful of keys name data rather than chrome. Twelve of them are how the native engine's [traffic channels](/analytics/native#traffic-channels) are shown: `channelDirect`, `channelOrganicSearch`, `channelPaidSearch`, `channelOrganicSocial`, `channelPaidSocial`, `channelOrganicVideo`, `channelPaidVideo`, `channelEmail`, `channelAffiliate`, `channelDisplay`, `channelReferral` and `channelPaidOther`. `channelDirect` doubles as the label for the native `source` value `direct`, which is the one origin that is not a name. `valueNotSet` is what a row a source answered with no value at all reads as (**Not set** in English), on any dimension and any source.
+
+Override them to rename a channel in the admin; the stored value, the filters and the URL keep their lowercase tokens either way. Only native's tokens go through these keys: a provider classifies into its own vocabulary and its rows render exactly as it reports them.
+
+Because [display-field labels](/analytics/display-fields#labels) default to these translations, overriding a metric's key here renames it everywhere at once; per-field `label` and `labels` options are the targeted alternative. Widget titles are editor-entered content, not translations; localize those with [`widgets.localizeText`](/analytics/widgets#options).
+
+How overrides merge, and how to add a language the plugin does not ship, is covered once for all plugins in [Translations](/concepts/translations).

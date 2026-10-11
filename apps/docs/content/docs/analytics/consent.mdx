@@ -1,0 +1,372 @@
+---
+title: Consent
+description: The gate your consent manager drives. The plugin stores no consent state and decides nothing about consent.
+---
+
+The plugin does not handle consent. It stores no consent state, it has no default, and it does not decide which tracking needs consent. Whether an install needs consent at all, and for which slot, is the site operator's decision, and your consent manager (c15t, Cookiebot, a banner of your own) owns the banner, the categories, the visitor's stored answer and the record of it.
+
+What the plugin gives that manager is a gate in front of each [capture slot](/analytics/capture#capture-slots): you say on the server which slots wait, and the manager opens or closes them in the browser. The gate holds what the browser tracker sends; events your server code records are [outside it](#what-the-gate-does-not-cover).
+
+## Which slots wait
+
+`capture.gate` is required whenever a slot can fill. Without it the boot stops:
+
+```
+analytics: capture.gate is required: 'all' holds every slot until your consent manager calls setGate, 'off' captures without a gate, or list the slots that wait. The plugin does not decide which tracking needs consent.
+```
+
+```ts
+import type { CaptureGate } from '@10x-media/analytics'
+
+export const every: CaptureGate = 'all' // every slot waits
+export const none: CaptureGate = 'off' // no slot waits
+export const listed: CaptureGate = ['tenant'] // only the slots listed wait
+export const perSlot: CaptureGate = ({ kind }) => kind !== 'native' // decide per slot from the adapter filling it
+```
+
+Pass one of them as `analytics({ capture: { gate } })`.
+
+The function form receives `{ slot, adapterId, kind }` per request and answers `true` for a slot that waits. Any answer other than `false` holds the slot, and so does a function that throws. The answer travels to the browser as each slot's `gated` flag in the [tracker config](/analytics/capture#plain-html-and-other-frameworks).
+
+## The gate in the browser
+
+Each slot's gate is `pending`, `open` or `closed`, held in memory only:
+
+| | A slot that waits | A slot that does not |
+|---|---|---|
+| At boot | `pending` | `open` |
+| Events | wait in a queue of at most 100 per slot; past that the oldest is dropped | delivered |
+| Its vendor script | not loaded | loaded |
+
+Only a native slot queues the [engagement](/analytics/capture#what-the-tracker-sends-to-native) messages that carry time on page and scroll: a vendor slot would drop one on delivery anyway. The items seen on a page are never queued.
+
+**Opening** a slot clears the vendor's own opt-out switch (unless the browser is [excluded](/analytics/capture#excluding-your-own-visits)), injects the slot's snippet, clears the switch once more after the snippet ran (PostHog's global exists only from then on), then sends what waited, in order. **Closing** a slot drops what waited and stops delivery to it. When the vendor's script may be running, because the slot was open or because the site loads the vendor scripts itself (`snippets={false}`), closing also sets the vendor's own opt-out, the same switches staff exclusion uses (`plausible_ignore`, `umami.disabled`, PostHog's `opt_out_capturing()`, GA4's `ga-disable-<measurementId>`). A slot that waits and never opened on the page ran nothing, so closing it writes nothing; a slot that does not wait counts as open from boot, so closing it by name always sets the vendor's switch. A slot can be opened and closed any number of times.
+
+A slot the config does not fill, such as the tenant slot of an unscoped install, reads `closed` and no answer opens it: nothing is captured there. Until the tracker has booted, `gate` reads what the answers so far say; a `false` given before the window knows which slots wait reads `pending`, since it closes a slot that waits and leaves one that does not open.
+
+The gate is not stored. The next page load starts pending again, and your consent manager states the decision on every page load, which it does anyway because it reads its own stored answer there. What closing can leave behind is the vendor's own switch, and only for a vendor whose script may have run ([Privacy](/analytics/privacy#no-cookie) lists each). 1.0.0-beta.11 kept a decision under the `analytics:consent` key; the tracker deletes it once a slot opens on a page that is counted, and nothing reads it.
+
+### Storage before an answer
+
+While every slot that fills waits for an answer, the tracker reads and writes no browser storage. It reads the [exclusion flag](/analytics/capture#the-flag) once a slot opens, at boot for a slot that does not wait, so `tracker.excluded` and `useAnalytics().excluded` read `false` until then. Three things touch `localStorage` before any answer all the same:
+
+- **The exclusion link.** A page opened with a valid [exclusion link](/analytics/capture#the-exclusion-link) writes the flag at once, open slot or not. Only staff are handed the link.
+- **A GA4 snippet the server rendered**, for a slot that does not wait, reads the flag itself ahead of its first `gtag()` call, the only place GA4 honours its switch.
+- **A refusal under `snippets={false}`.** The site loads the vendor scripts itself, so closing a slot sets that vendor's opt-out even when the slot never opened: Plausible's and Umami's `localStorage` key, and PostHog's own stored opt-out when its SDK is on the page.
+
+## setGate
+
+```ts partial
+setGate(true)               // open every slot that waits
+setGate(false)              // close every slot that waits
+setGate({ tenant: true })   // answer the slots named; a slot left out keeps its gate
+setGate({ global: false })  // naming a slot closes it even when it does not wait
+```
+
+A boolean answers for the slots `capture.gate` holds and leaves the others alone, so `gate: ['tenant']` with `setGate(false)` keeps the global slot capturing. A record answers for the slots it names, whether they wait or not: it is how you revoke one slot by name, though a slot that does not wait renders its snippet again on the next page load (see [revoking](#revoking)). A slot that does not wait is open from the start, and the first `true` naming it still clears its vendor's switch, as an opening does.
+
+From React, `useAnalytics()` carries it, next to the current state:
+
+```tsx partial
+'use client'
+import { useAnalytics } from '@10x-media/analytics/react'
+
+const { setGate, gate } = useAnalytics()
+gate // { global: 'open', tenant: 'pending' }; a change re-renders the component
+```
+
+`setGate` is safe before the tracker exists. A bridge component often answers in an effect that runs before the boot effect of `<AnalyticsScripts />` or `<AnalyticsProvider>`; the answer is kept for the window and the tracker boots with it, so nothing is sent or loaded before it applies. Outside React, the tracker has the same two members:
+
+```ts
+import { initTracker } from '@10x-media/analytics/tracker'
+
+const tracker = await initTracker()
+tracker.setGate(true)
+tracker.gate // { global: 'open', tenant: 'closed' } on an install without tenancy, whose tenant slot nothing fills
+```
+
+## Server render
+
+`<AnalyticsScripts />` from `@10x-media/analytics/site` renders what may run before any decision:
+
+- a slot that does not wait renders its vendor snippet with the page;
+- a slot that waits renders nothing. Its snippet still reaches the browser, as data inside the tracker config, and the tracker injects it once the slot opens;
+- the tracker itself boots with every waiting slot `pending`.
+
+A server that already knows the decision passes it, in the same shape as `setGate`:
+
+```tsx partial
+<AnalyticsScripts config={tracker} gate={{ tenant: true }} />
+```
+
+A slot it opens renders its snippet and boots open; one it closes renders nothing and boots closed. Pass it only from a decision your own code owns. Do not parse a consent manager's cookie to get one: c15t marks its cookie format `@internal`, so it can change in any release.
+
+`<AnalyticsProvider config={tracker} gate={...}>` from `@10x-media/analytics/react` takes the same `gate`, for a tree that boots the tracker from the provider rather than from `<AnalyticsScripts />`.
+
+## Revoking
+
+A `setGate(false)` (or `{ tenant: false }`) after an open closes the slot: what was queued is dropped, nothing more is delivered to it, and the vendor's own opt-out is set. A script tag already in the page stays there, and the vendor's switch is what silences it. Vendors keep their own switch across page loads (PostHog persists its opt-out, Plausible and Umami read a `localStorage` key), which is why opening a slot clears that switch again. PostHog's opt-out also deletes its own `ph_<token>_posthog` storage, because the plugin's snippet initialises it with `opt_out_persistence_by_default`.
+
+GA4 honours its switch only when it is set before the page's first `gtag()` call, so a GA4 tag that already ran is also told through Google's [consent mode](https://developers.google.com/tag-platform/security/concepts/consent-mode) that `analytics_storage`, `ad_storage`, `ad_user_data` and `ad_personalization` are denied. That stops the tag reading and writing its cookies for the rest of the page, though Google may still send cookieless pings until the page is left, and it applies to every Google tag on that page's `gtag`. Nothing grants consent back on the same page, since your own consent mode setup may hold any of those types: a GA4 slot opened again after a refusal measures fully from the next page load. A bridge that wants a revoke complete at once can reload the page after `setGate(false)`.
+
+What the next page load does depends on whether `capture.gate` holds the slot:
+
+- **A slot that waits** loads nothing while your manager answers `false`: its snippet is neither rendered nor injected, so the revoke holds from that load on.
+- **A slot that does not wait** renders its snippet with every page, before any answer. Plausible, Umami and PostHog read the switch they stored and stay silent. GA4 has no stored switch: its tag runs, reads and writes its cookies and sends its page view on every load, until your bridge closes the slot by name again. A refusal holds for GA4 only when `capture.gate` holds its slot.
+
+Closing a slot deletes nothing a vendor stored before it, PostHog's own storage aside: GA4's `_ga` and `_ga_<measurementId>` cookies, and whatever else a vendor's script wrote, stay. Clearing what a vendor stored after a refusal is your consent manager's job, as it is for every script the plugin does not load. Nor does closing delete what native already stored: those hits stay until [raw retention](/analytics/native#retention) deletes them (`retention.rawDays`, 90 days by default), and the daily totals counted from them stay, as counts with no visitor id in them.
+
+A page restored from the back/forward cache comes back as it was left, its gate open, though the visitor may have refused in another tab since. On such a restore the tracker puts every slot `capture.gate` holds back to `pending` and forgets the answers it had, so what the page sends waits in the queue until your consent manager answers again; a slot that does not wait stays as it was. A vendor script already running on the page keeps running until a refusal sets its switch. Answer on `pageshow` when `event.persisted` says the page was restored, from the manager's stored answer:
+
+```ts
+import { initTracker } from '@10x-media/analytics/tracker'
+
+/** Your consent manager's stored answer, read again: another tab may have changed it. */
+declare function measurementGranted(): boolean
+
+const tracker = await initTracker()
+
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) {
+    tracker.setGate(measurementGranted())
+  }
+})
+```
+
+The recipes below do the same from React.
+
+## What the gate does not cover
+
+The gate holds what the tracker sends from the browser, and nothing else:
+
+- **Server code.** `trackServerEvent`, the server `purchase` and `refund`, and the form-builder [goal action](/analytics/goals#3-track-a-form-submission) record through the native engine directly. No browser gate sees these calls, and the plugin cannot read your consent manager's answer on the server: their `identity`, below, decides whether the visitor behind the request is in the hit.
+- **A slot that does not wait.** Its snippet runs with the page, before any answer, and counts by that vendor's own rules.
+- **The ingest endpoint.** It is public, so a beacon posted by anything other than the tracker is counted like the tracker's.
+
+A server event's `identity` is `'request'` or `'none'`. `'request'` attributes it to the visitor behind the request (`req`, or `ip` and `userAgent`) as a beacon would: the day's visitor id, and the location, device and language the request carries. `'none'` records it as no visitor's: no visitor id, and no address, agent, language or location read from the request, which still supplies the event's scope, timezone and goals. The event still counts, as a conversion or a sale, under no visitor of its own.
+
+A call that names no identity gets the install's default:
+
+- **`'none'`** while `capture.gate` holds a slot the native beacon could fill: the global slot when native fills it, and the tenant slot on any scoped install. A call that passes `ip` or `userAgent` anyway has them set aside, and the log says so once.
+- **`'request'`** otherwise, which is what `gate: 'off'` gives.
+
+A sale recorded as no visitor's keeps its place in the visit all the same when the browser recorded it too: the webhook's amount moves onto the browser's record of the order, which carries the visit ([recorded in the browser and by the webhook](/analytics/revenue#recorded-in-the-browser-and-by-the-webhook)), and that record exists only once the native slot's gate opened. Where your own code knows the visitor's answer, pass the identity that matches it:
+
+```ts
+import {
+  purchase,
+  type ServerEventInput,
+  type ServerPurchaseInput,
+  trackServerEvent,
+} from '@10x-media/analytics'
+import type { Payload, PayloadRequest } from 'payload'
+
+/** Your own server-side record of the visitor's answer, never a parse of the manager's cookie. */
+declare function measuredVisitor(req: PayloadRequest): Promise<boolean>
+
+export const record = async (
+  payload: Payload,
+  req: PayloadRequest,
+  event: ServerEventInput,
+  sale: ServerPurchaseInput
+) => {
+  const identity = (await measuredVisitor(req)) ? 'request' : 'none'
+  await trackServerEvent(payload, event, { req, identity })
+  await purchase(payload, sale, { req, identity })
+}
+```
+
+The goal action takes the same option, as a value or a function of the submission:
+
+```ts
+import { trackGoalAction } from '@10x-media/analytics'
+import type { PayloadRequest } from 'payload'
+
+declare function measuredVisitor(req: PayloadRequest): Promise<boolean>
+
+export const goalAction = trackGoalAction({
+  hostname: 'example.com',
+  identity: async ({ req }) => (req && (await measuredVisitor(req)) ? 'request' : 'none'),
+})
+```
+
+A queued action runs under the jobs runner's request, never the submitter's, so no visitor's answer can be read there, and `'none'` keeps the runner's own address and agent out of the hit. A webhook that passes no `req`, `ip` or `userAgent` is no visitor's under either identity. Which identity a server event gets is the operator's decision.
+
+## When the manager loads the vendor scripts itself
+
+Some consent managers inject every vendor SDK themselves, from their own list. `snippets={false}` keeps the plugin out of that:
+
+```tsx partial
+<AnalyticsScripts config={tracker} snippets={false} />
+```
+
+The plugin then renders no vendor snippet and injects none either, whatever the gate says. Each vendor slot forwards events once that vendor's own global exists (`posthog`, `plausible`, `umami`, `gtag`), checking for up to 10 seconds per event. The gate still applies: events wait while a slot is pending and are dropped once it is closed, and since the manager may have loaded the vendor whatever the gate said, closing sets that vendor's own switch even for a slot that never opened. `<AnalyticsProvider snippets={false}>` does the same.
+
+## Recipe: c15t
+
+This is the setup for a Next.js App Router site running `@c15t/nextjs` 1.8 (checked against 1.8.5), with analytics filed under c15t's `measurement` category. Which category analytics belongs to is your decision. Install the 1.x line: `@c15t/nextjs` 2.x has no `@c15t/nextjs/client` entry, which this recipe uses, and the recipe does not cover it.
+
+```bash
+pnpm add @c15t/nextjs@^1.8
+```
+
+```ts title="payload.config.ts"
+analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+})
+```
+
+The bridge reads c15t's state through `useConsentManager()` (`consents`, `hasConsented`, `isLoadingConsentInfo`) and answers the gate:
+
+```tsx title="components/AnalyticsGate.tsx"
+'use client'
+import { useAnalytics } from '@10x-media/analytics/react'
+import { useConsentManager } from '@c15t/nextjs/headless'
+import { useCallback, useEffect, useRef } from 'react'
+
+export function AnalyticsGate() {
+  const { consents, hasConsented, isLoadingConsentInfo } = useConsentManager()
+  const { setGate } = useAnalytics()
+  const opened = useRef(false)
+  const granted = consents.measurement === true
+  const decided = hasConsented()
+  const answer = useCallback(() => {
+    if (isLoadingConsentInfo) return
+    if (granted) {
+      opened.current = true
+      setGate(true)
+    } else if (decided || opened.current) {
+      // A refusal, or a reset that withdrew an answer this page had opened the gate on.
+      opened.current = false
+      setGate(false)
+    }
+  }, [isLoadingConsentInfo, granted, decided, setGate])
+  useEffect(() => answer(), [answer])
+  useEffect(() => {
+    // A page restored from the back/forward cache holds its gate pending until answered again.
+    const restored = (event: PageTransitionEvent) => {
+      if (event.persisted) answer()
+    }
+    window.addEventListener('pageshow', restored)
+    return () => window.removeEventListener('pageshow', restored)
+  }, [answer])
+  return null
+}
+```
+
+Until the visitor decides, the gate stays pending and nothing waits longer than the page: the queue lives in memory. `hasConsented()` is true once c15t holds a saved answer, so a visitor who refused closes the gate on every page load. `resetConsents()` clears that answer without granting or refusing anything, which is why the bridge remembers that it opened the gate and closes it again. On a page restored from the back/forward cache the bridge answers again from its own `pageshow` listener, with the answer c15t holds in that page: nothing in c15t changed, so it reports nothing the bridge could wait for.
+
+Render the bridge under both providers in the site's root layout, with the tracker config resolved on the server. c15t's `options` (where it keeps answers, which categories it asks for) are its own, and nothing in them changes for the plugin:
+
+```tsx title="app/(frontend)/layout.tsx"
+import { AnalyticsProvider } from '@10x-media/analytics/react'
+import { getTrackerConfig } from '@10x-media/analytics/site'
+import { ConsentManagerProvider, CookieBanner } from '@c15t/nextjs'
+import config from '@payload-config'
+import { headers } from 'next/headers'
+import { getPayload } from 'payload'
+import { AnalyticsGate } from '@/components/AnalyticsGate'
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const payload = await getPayload({ config })
+  const tracker = await getTrackerConfig(payload, { headers: await headers() })
+  return (
+    <html lang="en">
+      <body>
+        <ConsentManagerProvider
+          options={{
+            mode: 'c15t',
+            backendURL: '/api/c15t',
+            consentCategories: ['necessary', 'measurement'],
+          }}
+        >
+          <AnalyticsProvider config={tracker}>
+            <AnalyticsGate />
+            {children}
+          </AnalyticsProvider>
+          <CookieBanner />
+        </ConsentManagerProvider>
+      </body>
+    </html>
+  )
+}
+```
+
+`backendURL` is where c15t's client sends its own API requests: whether this visitor should see the banner, and each answer, which the backend keeps as a consent record. It names a c15t backend, one you run with `@c15t/backend` or a hosted c15t instance, here through a path of your own site that you route to it (a Next rewrite or a route handler under `/api/c15t`). Nothing in the plugin answers there. Without a backend at that address every request fails with a `404`: c15t falls back to keeping the answer in the browser and queues each one it could not send in `localStorage`, to send again on a later page load. The banner and the bridge still work in the page.
+
+To run without a backend, use c15t's offline mode instead: `options={{ mode: 'offline', consentCategories: ['necessary', 'measurement'] }}`, with no `backendURL`. c15t then sends no request at all, keeps the answer in the browser alone (a cookie and `localStorage`), shows the banner until there is one, and keeps no consent record anywhere else, which may matter if you need to prove a consent later. The bridge above works the same in either mode.
+
+Three more things:
+
+- **One loader per vendor.** When GA4 or PostHog fills a plugin slot, drop that vendor from c15t's `scripts` option (passed through `ClientSideOptionsProvider` from `@c15t/nextjs/client` in the App Router); otherwise the page runs two copies of the tag and counts everything twice ([Running beside an existing setup](/analytics/providers#running-beside-an-existing-setup) has the migration order). Pixels and every vendor the plugin does not capture for stay with c15t.
+- **No `gate` prop from the cookie.** Do not pass the server render a `gate` read from the c15t cookie; let the bridge answer in the browser.
+- **Server code is not gated.** The bridge answers for the browser alone. With `gate: 'all'`, `trackServerEvent`, `purchase` and the goal action record their events as no visitor's unless your code passes `identity: 'request'` where it knows the visitor consented ([what the gate does not cover](#what-the-gate-does-not-cover)).
+
+## Recipe: any consent manager
+
+Every consent manager offers a way to read the current decision and to hear when it changes. Map that to `setGate` in one client component, rendered under `<AnalyticsProvider>` or anywhere on a page that renders `<AnalyticsScripts />`:
+
+```tsx
+'use client'
+import { useAnalytics } from '@10x-media/analytics/react'
+import { useEffect } from 'react'
+
+/** Your manager's API: replace these two with its own read and change event. */
+declare function readDecision(): 'granted' | 'denied' | undefined
+declare function onDecisionChange(listener: () => void): () => void
+
+export function AnalyticsGate() {
+  const { setGate } = useAnalytics()
+  useEffect(() => {
+    let opened = false
+    const answer = () => {
+      const decision = readDecision()
+      if (decision === 'granted') {
+        opened = true
+        setGate(true)
+      } else if (decision === 'denied' || opened) {
+        // A refusal, or a withdrawn answer that had opened the gate on this page.
+        opened = false
+        setGate(false)
+      }
+    }
+    // A page restored from the back/forward cache holds its gate pending until answered again.
+    const restored = (event: PageTransitionEvent) => {
+      if (event.persisted) answer()
+    }
+    answer()
+    window.addEventListener('pageshow', restored)
+    const stop = onDecisionChange(answer)
+    return () => {
+      window.removeEventListener('pageshow', restored)
+      stop()
+    }
+  }, [setGate])
+  return null
+}
+```
+
+A manager that can withdraw an answer without refusing (a reset, a consent record that expired) reads as undecided again; the bridge closes a gate it opened rather than leaving it open until the next page load. On a page restored from the back/forward cache it reads the manager's answer again, which picks up a refusal given in another tab when the manager reads its stored answer there. Answer per slot when your manager has more than one category for them, for example `setGate({ global: measurement, tenant: marketing })`. Without React, call `tracker.setGate()` on the tracker `initTracker()` resolved, from the same two hooks.
+
+## A custom script loader
+
+`<AnalyticsScripts />` is a server component and takes no function. A site that loads scripts through its own loader passes `loadScript` to `<AnalyticsProvider>`, from a client component of its own, since a function cannot cross from a server component either:
+
+```tsx
+'use client'
+import { AnalyticsProvider, type LoadScript, type TrackerConfig } from '@10x-media/analytics/react'
+
+/** Your framework's loader: resolves once the script has run. */
+declare const loadScript: LoadScript
+
+export function Analytics({ config, children }: { config: TrackerConfig; children: React.ReactNode }) {
+  return (
+    <AnalyticsProvider config={config} loadScript={loadScript}>
+      {children}
+    </AnalyticsProvider>
+  )
+}
+```
+
+Render that instead of `<AnalyticsScripts />`: whichever component boots the tracker first owns its options.

@@ -1,0 +1,154 @@
+---
+title: Tracker
+description: How to boot the browser tracker, its methods, its React and server components, its config, and the attributes it reads.
+---
+
+The browser tracker is what captures on your site: it sends pageviews, events, goals and sales to every filled [capture slot](/analytics/capture#capture-slots), behind the [gate](/analytics/consent) your consent manager drives. [Capture](/analytics/capture) is the guide; this page is its API.
+
+## Booting it
+
+A page holds one tracker. Every way to boot it below takes a hold on that same tracker, so rendering two of them together never counts twice: whichever boots first creates it, and its options stick.
+
+| From | Use it in | Boots from |
+|---|---|---|
+| `<AnalyticsScripts />`, `@10x-media/analytics/site` | a server component, usually the root layout | the config `getTrackerConfig` resolved on the server |
+| `<AnalyticsProvider>`, `@10x-media/analytics/react` | a client component wrapping your tree | the same server-resolved config, handed down as a prop |
+| `initTracker()`, `@10x-media/analytics/tracker` | any page, a static one or one without React | the config it fetches from the [tracker config endpoint](/analytics/reference/endpoints#tracker-config-endpoint) |
+
+### Server render
+
+```tsx title="app/layout.tsx"
+import { AnalyticsScripts, getTrackerConfig } from '@10x-media/analytics/site'
+import config from '@payload-config'
+import { headers } from 'next/headers'
+import { getPayload } from 'payload'
+
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const payload = await getPayload({ config })
+  const tracker = await getTrackerConfig(payload, { headers: await headers() })
+  return (
+    <html lang="en">
+      <body>
+        {children}
+        <AnalyticsScripts config={tracker} />
+      </body>
+    </html>
+  )
+}
+```
+
+`getTrackerConfig(payload, { headers?, draft? })` resolves the request's `TrackerConfig`. Pass the incoming `headers` so a scoped install resolves the request's scope; `draft` says the page renders in Next's draft mode, and left out it is read from Next's draft mode cookie among the headers ([Next.js](/analytics/capture#nextjs)).
+
+`<AnalyticsScripts>` renders each ungated slot's vendor snippet and boots the tracker:
+
+| Prop | Type | What it does |
+|---|---|---|
+| `config` | `TrackerConfig` | Required: what `getTrackerConfig` resolved. |
+| `gate` | `GateState` | The decision your own server code already knows, applied at boot ([Server render](/analytics/consent#server-render)). |
+| `nonce` | `string` | Your CSP nonce, for every script it renders or the tracker injects. |
+| `snippets` | `boolean` | `false` renders and injects no vendor script, for a consent manager that loads the vendor SDKs itself. |
+
+It takes no `loadScript`: a function cannot cross from a server component.
+
+### React
+
+`<AnalyticsProvider>` takes the same props as `<AnalyticsScripts>`, plus `loadScript` and `children`. Render it from a client component of your own to boot the tracker from React, or to load the vendor scripts through your framework's own loader.
+
+`useAnalytics()` answers an `AnalyticsApi` from any client component, with or without a provider above it, as long as a tracker was booted on the page:
+
+| Member | What it is |
+|---|---|
+| `track`, `trackGoal`, `purchase`, `refund` | The tracker's methods, [below](#the-tracker). |
+| `setGate(state)` | Answers the gate. Safe before the tracker boots: the answer is kept for the window and applied at boot. |
+| `gate` | Each slot's `GateStatus`; a change re-renders the component. |
+| `setExcluded(next)`, `excluded` | The tracker's `exclude()` and `excluded`, `false` until the tracker has read the browser's flag. |
+
+The tracker is resolved per call, not per render, so a component that renders before the boot effect runs still works. A call to `track`, `trackGoal`, `purchase`, `refund` or `setExcluded` that finds neither a provider nor a booted tracker throws; `setGate` never does.
+
+### initTracker
+
+```ts
+import { initTracker } from '@10x-media/analytics/tracker'
+
+export const tracker = await initTracker()
+```
+
+`initTracker({ endpoint?, ...TrackerOptions })` fetches the config from `endpoint`, `DEFAULT_TRACKER_ENDPOINT` (`/api/_x/config`) by default: pass your own when the app moved Payload's `routes.api` or the plugin's `routes.base`, or serves under a Next `basePath`. A failed fetch or a non-ok answer resolves to a tracker whose calls do nothing, so a missing config never breaks the page that awaited it. Its `destroy()` gives this call's hold back, and the tracker ends once nothing holds it.
+
+`createTracker(config, options?)` builds a tracker from a `TrackerConfig` you already have. It is a tracker of its own rather than the page's shared one, so `useAnalytics` does not reach it; prefer the three above.
+
+### Tracker options
+
+`TrackerOptions`, taken by `initTracker`, `createTracker` and the props above:
+
+| Option | Type | What it does |
+|---|---|---|
+| `gate` | `GateState` | The answer the host already has at boot, applied before anything is delivered. |
+| `snippets` | `boolean` | `false` injects no vendor script; each vendor slot forwards once its vendor's global exists. Default `true`. |
+| `nonce` | `string` | The CSP nonce for the scripts the default loader injects. |
+| `loadScript` | `LoadScript` | `(script: SnippetScript) => Promise<void>`: your own script loader, resolving once the script has run. |
+| `window` | `TrackerWindow` | The window to run in. |
+
+## The tracker
+
+| Member | What it does |
+|---|---|
+| `track(name, props?, { item? })` | Sends a custom event to every filled slot. `props` are flat scalars; `item` files it under a [content item](/analytics/items) as well. |
+| `trackGoal(slug, { value?, currency?, item? })` | Completes a [goal](/analytics/goals). Without a `value`, a vendor slot receives the goal's own fixed value from the config. |
+| `purchase({ value, currency?, orderId?, items?, props?, goal?, item? })` | Records a [sale](/analytics/revenue#recording-a-sale) against `goal`, `purchase` by default. A negative `value` is dropped. |
+| `refund(input)` | Does nothing in the browser, with a warning in development: refunds are recorded from server code. |
+| `setGate(state)` | Opens or closes capture slots: [Consent](/analytics/consent#setgate). |
+| `gate` | Each slot's gate, `pending`, `open` or `closed`. |
+| `exclude(next)`, `excluded` | Takes this browser out of capture, or puts it back ([Excluding your own visits](/analytics/capture#excluding-your-own-visits)). `excluded` reads `false` until a slot opens and the tracker reads the browser's flag, or the exclusion link sets it. |
+| `page()` | Sends a pageview for the current address. The tracker calls it itself on boot and on every single-page app navigation. |
+| `flush()` | Sends the open page's [engagement](/analytics/capture#what-the-tracker-sends-to-native) now, when it gained anything since the last one. |
+| `destroy()` | Sends the open page's engagement and ends the tracker: every listener and history patch is detached and nothing more is sent. On the page's shared tracker it gives one hold back, and the tracker ends once nothing holds it. |
+
+Server code records through other functions of the same names, from `@10x-media/analytics`: [`trackServerEvent`, `purchase` and `refund`](/analytics/goals#4-track-from-server-code).
+
+### Types
+
+| Type | Shape |
+|---|---|
+| `GateState` | `boolean \| Partial<Record<CaptureSlot, boolean \| undefined>>`. A boolean answers for every slot `capture.gate` holds; a record for the slots it names, held or not, and a slot left `undefined` keeps its gate. |
+| `GateStatus` | `'pending' \| 'open' \| 'closed'` |
+| `CaptureSlot` | `'global' \| 'tenant'` |
+| `TrackGoalOptions` | `{ value?, currency?, item? }` |
+| `PurchaseInput` | `{ value, currency?, orderId?, items?, props?, goal?, item? }`. `orderId` keeps a checkout that fires twice counting once, and lets the server's record of the same sale take its place. |
+| `RefundInput` | `{ orderId, value, currency?, props? }` |
+| `RevenueItem` | `{ id, name?, quantity?, price? }`, one line of a sale |
+| `ItemOptions` | `{ item? }`: a signed item ref, as `signItemRef` writes it |
+
+## The config
+
+`TrackerConfig` is what the server resolves for one request and the tracker boots from. It carries only what a browser may see:
+
+| Field | What it holds |
+|---|---|
+| `slots` | One `TrackerSlotConfig` per filled slot: `slot`, `adapterId`, `kind`, `client`, `path` (its proxy mount), `snippet` (the scripts to render or inject) and `gated` (whether it waits for the gate). |
+| `ingestPath` | Where the native engine takes beacons, behind the app's base path. |
+| `goals` | The scope's goals as a browser may see them: `slug`, `match`, `value` and `currency`, never the admin-facing name. |
+| `autoCapture` | The resolved [auto-capture](/analytics/capture#auto-capture) settings. |
+| `exclusion` | While the exclusion link is on, its parameter and the SHA-256 of the scope's token, never the token. |
+| `skip` | Present only when `capture.skip` turns one of its two off. |
+| `draft` | `true` on a page rendered in draft mode, which the tracker does not count. |
+| `admin` | While previews are skipped, the admin's address as SHA-256 digests (`AdminDigest`), so a page can tell the live preview from a visit without learning where the admin runs. |
+
+`EXCLUSION_STORAGE_KEY` (`analytics:exclude`) and `DEFAULT_EXCLUSION_PARAM` (`analytics_exclude`) are exported beside it.
+
+## Attributes
+
+The tracker reads these attributes on click, and on a form that carries them on its submit alone, and `@10x-media/analytics/attributes` exports their names and helpers that spread them into your markup ([Attach goals to your own components](/analytics/integrations)):
+
+| Attribute | Constant | What it does |
+|---|---|---|
+| `data-analytics-goal` | `GOAL_ATTRIBUTE` | Completes the goal it names. `goalAttributes(slug, { value?, currency? })` writes it. |
+| `data-analytics-value`, `data-analytics-currency` | `VALUE_ATTRIBUTE`, `CURRENCY_ATTRIBUTE` | The amount and currency of that completion. |
+| `data-analytics-event` | `EVENT_ATTRIBUTE` | Sends the custom event it names. `eventAttributes(name, props?)` writes it. |
+| `data-analytics-prop-<name>` | `EVENT_PROP_PREFIX` | One prop of that event. |
+| `data-analytics-item` | `ITEM_ATTRIBUTE` | Marks a [content item](/analytics/items#marking-an-element): its views and clicks. `itemAttributes({ ref, name })` writes it from a signed ref, `itemAttributes({ collection, id, name })` from an unsigned one. |
+| `data-analytics-item-name` | `ITEM_NAME_ATTRIBUTE` | The item's display name, sent to vendor slots only. |
+
+The events the tracker sends by itself are named `OUTBOUND_EVENT` (`outbound_link`), `DOWNLOAD_EVENT` (`file_download`), `SCROLL_EVENT` (`scroll_depth`) and `ITEM_CLICK_EVENT` (`item_click`).
+
+What the tracker posts to the native engine, field by field, is on [Capture](/analytics/capture#what-the-tracker-sends-to-native); what it keeps in the browser is on [Privacy](/analytics/privacy#no-cookie).

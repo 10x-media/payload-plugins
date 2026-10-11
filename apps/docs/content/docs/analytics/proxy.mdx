@@ -1,40 +1,51 @@
 ---
 title: First-party proxy
-description: Serve a vendor's tracker through your own origin, with a runtime endpoint or Next.js rewrites.
+description: Serve a vendor's tracker through your own origin, with the runtime endpoint or a Next.js route handler of your own.
 ---
 
 A vendor's tracker normally loads from the vendor's domain and posts events there. Routing both through your own origin instead is what the vendors themselves recommend: ad blockers and DNS filters that block `*.posthog.com` do not block your site, the browser makes no third-party request, and there is one domain to reason about in a CSP.
 
-The plugin does it two ways. Both are driven by the same descriptor each adapter declares (`capture.proxy.routes`), so what is forwarded is identical either way.
+The plugin does it two ways. Both relay by the descriptor each adapter declares (`capture.proxy.routes`) and by the same rules, so what is forwarded, and what comes back, is identical either way.
 
-| | Runtime endpoint | Next rewrites |
+| | Runtime endpoint | Route handler |
 |---|---|---|
-| Setup | None. Registered automatically. | `captureRewrites` in `next.config`. |
-| Resolves per | Request (slot, scope, runtime providers) | Build |
-| Multi-tenant | Yes | One adapter per mount path |
-| Cost | Your Node process handles every beacon | The platform's edge handles it |
+| Setup | None. Registered automatically. | `captureRoute` in `app/<mount>/[...path]/route.ts`, and `capture.paths`. |
+| Resolves per | Request (slot, scope, runtime providers) | Nothing: the one adapter the route was built with |
+| Multi-tenant | Yes | One adapter per route |
+| Cost | Payload's REST routing, which signs every request in before the handler runs | A Next route handler, outside Payload's routing |
 
-Use rewrites when one vendor serves the whole install and you would rather the traffic never touched your app server. Use the runtime endpoint for anything per-tenant, and for a first setup, because it needs no config at all.
+Use a route handler when one vendor serves the whole install and you would rather its traffic skipped Payload's routing. Use the runtime endpoint for anything per-tenant, and for a first setup, because it needs no config at all.
 
 ## Runtime endpoint
 
-Mounted at `/api/analytics/p/<slot>/*`, one mount per [capture slot](/analytics/capture#capture-slots). It registers whenever capture is possible: a config adapter declares `capture`, or [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) are enabled. Each slot's snippet already points at its own mount, so nothing needs configuring.
+Mounted at `/api/_x/p/<slot>/*`, one mount per [capture slot](/analytics/capture#capture-slots). It registers whenever capture is possible: a config adapter declares `capture`, or [runtime providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) are enabled. Each slot's snippet already points at its own mount, so nothing needs configuring.
 
 What it does with a request:
 
-- **Only declared routes forward.** The slot's adapter is resolved, its `capture.proxy.routes` are matched in declaration order, and the upstream URL is compiled from the route's own template. An unknown slot, an unfilled slot, an adapter without capture, or a path outside the declared routes is a `404` and nothing leaves the server. Upstream hosts come only from the descriptor, so this is never an open proxy. A matched wildcard whose segment is `.` or `..` is refused, so a request cannot walk out of the route's prefix on the vendor host.
-- **Methods.** `GET` and `POST` are proxied. `OPTIONS` is answered locally with `204` and `Allow: GET, POST, OPTIONS`, before slot resolution, so a preflight leaks nothing about which slots exist. `PUT`, `PATCH`, and `DELETE` answer `405`.
+- **Only declared routes forward.** The slot's adapter is resolved, its `capture.proxy.routes` are matched in declaration order, and the upstream URL is compiled from the route's own template. An unknown slot, an unfilled slot, an adapter without capture, or a path outside the declared routes is a `404` and nothing leaves the server. Upstream hosts come only from the descriptor, so this is never an open proxy. A matched path parameter whose segment is `.` or `..`, or whose decoded segment holds `/` or `\` (an encoded `%2F` or `%5C`), answers `404` too, so a request cannot walk out of the route's prefix on the vendor host.
+- **Methods.** `GET` and `POST` are proxied, except that a `POST` to a `script` route answers `405` with `Allow: GET, OPTIONS`: nothing is posted to a vendor's bundle. `OPTIONS` is answered locally with `204` and `Allow: GET, POST, OPTIONS`, before slot resolution, so a preflight leaks nothing about which slots exist. `PUT`, `PATCH`, and `DELETE` answer `405`.
 - **Request headers.** Allowlisted: `content-type`, `accept`, `accept-encoding`, `accept-language`, `user-agent`, `origin`, `referer`, `if-none-match`, `if-modified-since`, plus anything the descriptor names in `forwardHeaders`. `cookie`, `authorization`, and `proxy-authorization` are never forwarded, whatever a descriptor asks for, so Payload's own session never reaches a vendor.
-- **Client IP.** `X-Forwarded-For` is set from the resolved client IP, and the incoming forwarding chain (`x-forwarded-*`, `forwarded`, `x-real-ip`) is never passed through. Without this every visitor would geo-locate to your server. Confirm your platform gives the app a real client IP; most do by default. Which entry of the incoming chain counts as that client IP is the plugin's [`trustedProxyHops`](#trusted-proxies), below.
-- **Response.** Status and body stream back. Headers are allowlisted to `content-type`, `cache-control`, `etag`, `last-modified`, `vary`. `set-cookie` never comes back. `content-encoding` and `content-length` are deliberately dropped, because `fetch` decodes the body but leaves both describing the compressed bytes. `location` is not forwarded either, so an upstream 3xx arrives without it rather than redirecting off your origin.
+- **Client IP.** `X-Forwarded-For` is set from the resolved client IP. The incoming `x-forwarded-for`, `x-forwarded-host`, `x-forwarded-proto`, `forwarded` and `x-real-ip` are never passed through, and neither are the platform headers about the visitor's address and place: `x-vercel-forwarded-for`, `x-vercel-ip-country`, `x-vercel-ip-country-region`, `x-vercel-ip-city`, `cf-connecting-ip`, `cf-connecting-ipv6`, `cf-ipcountry`, `cf-region`, `cf-region-code`, `cf-ipcity` and `true-client-ip`, whatever a descriptor's `forwardHeaders` asks for. No built-in adapter sets `forwardHeaders`; a custom one that names another header (`x-vercel-ip-latitude`, say) relays it. Without this every visitor would geo-locate to your server. Which header the client IP comes from is the plugin's [`trustedPlatform`](/analytics/geo#which-headers-to-trust) or [`trustedProxyHops`](#trusted-proxies), below.
+- **Other sites.** A `POST` that a page on another site made the visitor's browser send, which the browser marks `Sec-Fetch-Site: cross-site`, answers `403` unless its `Origin` is listed in [`capture.allowedOrigins`](/analytics/capture#beacons-from-other-sites). So does a `POST` to the `tenant` slot from a sibling subdomain's page (`Sec-Fetch-Site: same-site`) whose `Origin` host `scope.resolve` maps to another scope than the request's; an `Origin` no scope answers for passes. Nothing is forwarded for either.
+- **Response.** Status and body stream back. Of the upstream headers only `cache-control`, `etag`, `last-modified` and `vary` pass, and the first three only on a `script` route. A `data` route answers about one visitor, so it always carries `Cache-Control: private, no-store` and no `etag` or `last-modified`, whatever the vendor sent: a cache in front of the site never keeps one visitor's answer for another. `set-cookie` never comes back. `content-encoding` and `content-length` are deliberately dropped, because `fetch` decodes the body but leaves both describing the compressed bytes. `location` is not forwarded either, so an upstream 3xx arrives without it rather than redirecting off your origin.
+- **Content type.** Every route declares a `kind`, and the kind decides the content type, never the vendor. A `script` route is always served as `text/javascript; charset=utf-8`. A `data` route keeps the vendor's type when it is `application/json` or `text/plain`, and anything else becomes `text/plain; charset=utf-8`. Every answer carries `X-Content-Type-Options: nosniff`, so a browser never guesses a type of its own, and every `data` answer also carries `Content-Security-Policy: sandbox; default-src 'none'`. A vendor answering HTML on your origin therefore puts neither a script nor a page there, even when someone opens the URL directly.
+- **Connection.** A slot filled from a [provider document](/analytics/providers#where-a-document-may-connect) reaches its vendor through the same guarded connection the document's reads use, so a host that resolves to a private address is refused here too, and the request answers `502`. A slot filled by an adapter from `adapters` uses that adapter's `fetch` option when it has one, and the global `fetch` otherwise.
 - **Body cap.** A `POST` over `capture.proxy.maxBodyBytes` (default 1 MiB, which clears a PostHog batch carrying session-replay data) is refused with `413` before anything is forwarded, and a body that dies in transit answers `400`. Bodies are buffered, not streamed, since the cap has to be enforced before forwarding anyway.
 - **Timeout.** `capture.proxy.timeoutMs` (default 10000) is a deadline for the upstream response *headers* only, so a large tracker bundle still streams to completion. A timeout or a network failure answers `502` with no body and no echo of the upstream URL.
-- **No error body.** Every status above is sent bodyless, and this is the one endpoint the plugin registers that answers no [error envelope](/analytics/data-sources#errors). It relays a vendor SDK's own traffic, and that SDK, not admin code, reads the answer. Read the status alone; there is no `code` to branch on and nothing to parse.
+- **No error body.** Every status above is sent bodyless, and this is the one endpoint the plugin registers that answers no [error envelope](/analytics/reference/endpoints#errors). It relays a vendor SDK's own traffic, and that SDK, not admin code, reads the answer. Read the status alone; there is no `code` to branch on and nothing to parse.
 
 ```ts
 analytics({
-  adapters: [posthog({ projectId, apiKey, projectToken: 'phc_...', region: 'eu' })],
+  adapters: [
+    posthog({
+      projectId: process.env.POSTHOG_PROJECT_ID ?? '',
+      apiKey: process.env.POSTHOG_API_KEY ?? '',
+      projectToken: 'phc_...',
+      region: 'eu',
+    }),
+  ],
   capture: {
+    gate: 'all',
     proxy: { timeoutMs: 5000, maxBodyBytes: 512 * 1024 },
   },
 })
@@ -49,10 +60,16 @@ The endpoint is public and carries every beacon, so it is not rate limited: a pe
 `trustedProxyHops` is a plugin option, not a per-adapter one, because one helper reads the client address for this proxy, for the native visitor hash, and for the [geo resolvers](/analytics/geo):
 
 ```ts
-analytics({ adapters: [posthog({ /* ... */ })], trustedProxyHops: 1 })
+analytics({
+  adapters: [posthog({ projectId: '12345', apiKey: process.env.POSTHOG_API_KEY ?? '', projectToken: 'phc_...' })],
+  capture: { gate: 'all' },
+  trustedProxyHops: 1,
+})
 ```
 
-Unset, the **leftmost** `x-forwarded-for` entry is read. That is the originating client for honest traffic and is whatever the client wrote otherwise, so the address this endpoint forwards upstream, and the one geo runs on, are both spoofable.
+On Vercel or behind Cloudflare, set [`trustedPlatform`](/analytics/geo#which-headers-to-trust) instead, which reads the address from the header the platform's edge writes. The two cannot be set together.
+
+Unset, the **leftmost** `x-forwarded-for` entry is read, or `x-real-ip` when the request carries no chain. That is the originating client for honest traffic and is whatever the client wrote otherwise, so the address this endpoint forwards upstream, and the one geo runs on, are both spoofable.
 
 Set to `n`, the entry `n` from the **right** is read: the address the outermost trusted proxy saw, which no client can write past. A chain shorter than `n` yields no address at all rather than falling back to `x-real-ip`, which the client can write too. The value must be a non-negative integer or the boot fails.
 
@@ -60,92 +77,101 @@ Set to `n`, the entry `n` from the **right** is read: the address the outermost 
 
 **Leave it unset if your proxy sets only `x-real-ip`.** The count is read off `x-forwarded-for` alone, and at `n >= 1` that chain is the only source: a proxy that forwards the client address in `x-real-ip` and writes no chain yields no address at all, and every visitor then hashes and geo-locates as one. Unset, `x-real-ip` is still consulted. The same applies to the hostname [native ingest](/analytics/native#where-the-hostname-comes-from) stores: `x-forwarded-host` is read only at one hop or more, so a proxy that does not send it leaves the `Host` header in charge either way.
 
-## Next rewrites
+## A route handler of your own
 
-`captureRewrites` maps each mounted adapter's declared routes onto Next rewrite entries. The two dialects are the same `path-to-regexp` one, so nothing is translated beyond prefixing each `source` with the mount path.
+`captureRoute` from `@10x-media/analytics/next` relays one adapter's routes from a Next.js route handler, by the runtime endpoint's rules: only declared routes, the same header allowlists, no cookie or credential upstream, no `set-cookie` back, and the same content types, `nosniff` and sandbox. Mount it as a catch-all under the path the slot's snippet will point at:
 
-```ts title="next.config.ts"
-import { captureRewrites } from '@10x-media/analytics/next'
-import { plausible } from '@10x-media/analytics/adapters/plausible'
+```ts title="app/ph/[...path]/route.ts"
 import { posthog } from '@10x-media/analytics/adapters/posthog'
+import { captureRoute } from '@10x-media/analytics/next'
 
-const nextConfig = {
-  // PostHog's capture endpoints use trailing slashes.
-  skipTrailingSlashRedirect: true,
-  async rewrites() {
-    // Only the capture descriptor's routes are read here, so the read credentials can
-    // be left empty; the capture config (projectToken, domain) is what must be real.
-    return captureRewrites([
-      { path: '/ph', adapter: posthog({ projectId: '', apiKey: '', region: 'eu', projectToken: 'phc_...' }) },
-      { path: '/pa', adapter: plausible({ siteId: '', apiKey: '', domain: 'example.com' }) },
-    ])
-  },
-}
+const relay = captureRoute({
+  path: '/ph',
+  // Only the capture config is read here, so the read credentials can be left empty.
+  adapter: posthog({ projectId: '', apiKey: '', region: 'eu', projectToken: 'phc_...' }),
+  trustedProxyHops: 1, // the plugin's own value
+})
 
-export default nextConfig
+export { relay as GET, relay as POST, relay as OPTIONS }
 ```
 
 Then point the slot at the same path so its snippet stops using the runtime mount:
 
 ```ts
-analytics({ capture: { paths: { global: '/ph' } } })
+analytics({
+  adapters: [posthog({ projectId: '12345', apiKey: process.env.POSTHOG_API_KEY ?? '', region: 'eu', projectToken: 'phc_...' })],
+  capture: { gate: 'all', paths: { global: '/ph' } },
+  trustedProxyHops: 1,
+})
 ```
 
-Notes:
+What differs from the runtime endpoint:
 
-- `skipTrailingSlashRedirect: true` is required whenever a mounted adapter sets `capture.proxy.trailingSlashes`, which today means PostHog.
-- An adapter with no capture support, or with capture but no proxy routes (native, GA4), contributes nothing rather than throwing, so one unfilled mount never blanks the others.
-- A mount path that normalizes to the site root throws: an unprefixed catch-all route would swallow the whole app. So do two mounts whose paths are equal or nested (`/ph` and `/ph/x`), because Next matches rewrites first-match-wins and the earlier catch-all would silently shadow the later mount. Mere string-prefix siblings (`/ph` and `/phx`) are fine.
-- Next always strips a trailing slash from the matched path before substituting it into `destination`, unlike the runtime endpoint, which can be told to keep one. Harmless for every vendor supported today.
-- `posthogProxyRewrites({ path, region })` still works and is now a thin wrapper over `captureRewrites`. It is **deprecated**: prefer `captureRewrites` with a `posthog()` instance, which also covers the other vendors and multiple mounts. Its emitted rewrites are unchanged apart from the capture-group name (`:path*` became `:p*`, which Next resolves identically).
+- **The adapter is fixed.** The route relays the adapter it was built with, for every request: no slot, scope or provider document is resolved. Build it with the same capture config as the one in `adapters`, so the snippet and the route agree.
+- **The plugin's options do not reach it.** Pass `trustedProxyHops` or `trustedPlatform` (not both) and `allowedOrigins` as the plugin has them; without a trust option the leftmost `x-forwarded-for` entry is forwarded upstream ([Trusted proxies](#trusted-proxies)). `timeoutMs` (default 10000) and `maxBodyBytes` (default 1 MiB) stand in for `capture.proxy`.
+- **Methods.** Export the handler as `GET`, `POST` and `OPTIONS`. It answers `OPTIONS` with `204` itself, and any other method that reaches it with `405`.
+- **No scope.** A cross-site `POST` is refused with `403` unless `allowedOrigins` lists it, but the runtime endpoint's check of a sibling subdomain's post against the tenant slot does not apply.
+- **Connection and logs.** The vendor is reached through the adapter's own `fetch` option, else the global `fetch`. With no Payload logger at hand, a failure is logged with `console.warn`: an upstream that fails answers `502`, and an error in the route itself `500`.
+- **Refused when built.** A mount that normalizes to the site root, an adapter with no proxy routes (native, GA4, or a PostHog without `projectToken`), both trust options at once, a `timeoutMs` or `maxBodyBytes` that is not a positive number, and an `allowedOrigins` entry that is not one exact origin each throw when the route module loads.
+- **Trailing slashes.** PostHog's capture endpoints end in a slash (its descriptor sets `capture.proxy.trailingSlashes`), so set `skipTrailingSlashRedirect: true` in `next.config`: otherwise Next redirects `/ph/e/` to `/ph/e` before the route runs.
+- **A Next `basePath`.** Pass `path` and `capture.paths` without it. The route finds its mount anywhere in the address, and the tracker config puts the base path in front of every path it hands out.
+
+### Next rewrites
+
+`captureRewrites` and `posthogProxyRewrites` from `@10x-media/analytics/next` throw when called. A Next rewrite to a vendor forwards every request header, the visitor's cookies and the site's `payload-token` among them, and passes the vendor's `set-cookie` back to the site. Relay the vendor with [`captureRoute`](#a-route-handler-of-your-own) instead, or leave `capture.paths` unset to use the runtime endpoint.
 
 ## Per-vendor routes
 
-Each row is the adapter's own descriptor, relative to the mount path. An adapter declares one only when the public config that capture needs is present, so a read-only PostHog (no `projectToken`) or a Plausible with neither `domain` nor `scriptId` contributes no routes here and nothing to `captureRewrites`.
+Each row is the adapter's own descriptor, relative to the mount path. An adapter declares one only when the public config that capture needs is present, so a read-only PostHog (no `projectToken`) or a Plausible with neither `domain` nor a valid `scriptId` has no routes here, and `captureRoute` refuses it. A custom adapter that declares capture gives each of its routes a `kind` the same way: `script` for anything the browser runs, `data` for everything else.
 
 ### PostHog
 
 `capture.proxy.trailingSlashes` is set, so the runtime endpoint preserves a request's trailing slash upstream.
 
-| Route | Upstream |
-|---|---|
-| `/static/:p*` | `https://<region>-assets.i.posthog.com/static/:p*` |
-| `/array/:p*` | `https://<region>-assets.i.posthog.com/array/:p*` |
-| `/:p*` | `https://<region>.i.posthog.com/:p*` |
+| Route | Kind | Upstream (PostHog Cloud) | Upstream (self-hosted) |
+|---|---|---|---|
+| `/static/:p*` | `script` | `https://<region>-assets.i.posthog.com/static/:p*` | `<host>/static/:p*` |
+| `/array/:p*` | `script` | `https://<region>-assets.i.posthog.com/array/:p*` | `<host>/array/:p*` |
+| `/:p*` | `data` | `https://<region>.i.posthog.com/:p*` | none |
+| `/e`, `/i/v0/e`, `/batch`, `/capture`, `/track`, `/engage`, `/decide`, `/flags`, `/s` | `data` | covered by `/:p*` | `<host>` and the same path |
 
-`<region>` is `us` or `eu`, from `posthog({ region })`, else derived from `host` (an `eu.posthog.com` host means `eu`, everything else `us`). Capture requires `projectToken`, the public `phc_...` browser key: without it the adapter declares no capture and these routes do not exist. The private `apiKey` used for reads never reaches the browser. The snippet is PostHog's official install stub plus `posthog.init(token, { api_host: <path>, ui_host: 'https://<region>.posthog.com' })`. The stub injects `array.js` itself, deriving the URL from `api_host` (the `.i.posthog.com` rewrite is a no-op on a first-party path), so it lands on `<path>/static/array.js`, exactly the route above.
+PostHog Cloud's ingest host takes capture and nothing else, so the catch-all relays to it. A self-hosted instance is the whole PostHog app as well, its login, signup, password reset, API and admin included, and the site server's address is often one it trusts: its proxy relays the bundle and the paths posthog-js captures on (events, the older batch endpoints, flags and session replay) and answers every other path 404 without a request leaving the server.
+
+A `host` on `posthog.com` (`us.posthog.com`, `eu.posthog.com`, the older `app.posthog.com`), or none, is PostHog Cloud: `<region>` is `us` or `eu`, from `posthog({ region })`, else derived from `host` (an `eu.posthog.com` host means `eu`, everything else `us`). Any other `host` is a self-hosted instance, the same address reads use, base path included, from the adapter or the [provider document](/analytics/providers#provider-documents): capture goes there too, whatever `region` says, since an instance serves its own bundle and takes its own events, which is also where posthog-js sends everything for an `api_host` that is not PostHog Cloud's. Capture requires `projectToken`, the public `phc_...` browser key: without it the adapter declares no capture and these routes do not exist. The private `apiKey` used for reads never reaches the browser.
+
+The snippet is PostHog's official install stub plus `posthog.init(token, { api_host: <path>, ui_host: <app>, capture_pageview: 'history_change', opt_out_persistence_by_default: true })`. `<app>` is `posthog({ uiHost })`, else `https://<region>.posthog.com` on PostHog Cloud; a self-hosted instance gets no `ui_host` unless `uiHost` names one, because every page carries the snippet and the instance's address has no business in it. Without it, links PostHog's toolbar shows point at the proxy path rather than the app. `opt_out_persistence_by_default` has an opt-out, from a closed [gate](/analytics/consent) or an excluded browser, delete PostHog's own `ph_<token>_posthog` storage as well. The stub injects `array.js` itself, deriving the URL from `api_host` (the `.i.posthog.com` rewrite is a no-op on a first-party path), so it lands on `<path>/static/array.js`, exactly the route above. [`capture_pageview: 'history_change'`](https://posthog.com/docs/libraries/js/config) has PostHog capture a pageview whenever the path changes through the history API, beside the first page load: the plugin's PostHog sink forwards no pageview of its own, so without it every navigation of a single-page app after the first would go uncounted.
 
 ### Plausible
 
-| Route | Upstream |
-|---|---|
-| `/js/:script*` | `<host>/js/:script*` |
-| `/api/event` | `<host>/api/event` |
+| Route | Kind | Upstream |
+|---|---|---|
+| `/js/:script*` | `script` | `<host>/js/:script*` |
+| `/api/event` | `data` | `<host>/api/event` |
 
 `<host>` is `plausible({ host })`, defaulting to `https://plausible.io`; pass your own for a self-hosted Community Edition instance. The snippet depends on which of the two script models you configure:
 
 - `domain` (the legacy tag): one deferred `<path>/js/script.js` tag with `data-domain` and `data-api="<path>/api/event"`.
 - `scriptId` (the per-site model): an async `<path>/js/pa-<scriptId>.js` tag plus the official stub and `plausible.init({ endpoint: '<path>/api/event' })`.
 
-`domain` wins when both are set, and with neither, the adapter declares no capture at all. `siteId` is the Stats API id for reads and is unrelated to either.
+`domain` wins when both are set, and with neither, the adapter declares no capture at all. `scriptId` lands in the script's address, so it takes letters, digits, `_` and `-` alone, up to 64 characters; the adapter ignores any other value, as if it were unset. `siteId` is the Stats API id for reads and is unrelated to either.
 
 ### Umami
 
-| Route | Upstream (cloud) | Upstream (self-hosted) |
-|---|---|---|
-| `/script.js` | `https://cloud.umami.is/script.js` | `<origin>/script.js` |
-| `/api/send` | `https://gateway.umami.is/api/send` | `<origin>/api/send` |
+| Route | Kind | Upstream (cloud) | Upstream (self-hosted) |
+|---|---|---|---|
+| `/script.js` | `script` | `https://cloud.umami.is/script.js` | `<origin>/script.js` |
+| `/api/send` | `data` | `https://gateway.umami.is/api/send` | `<origin>/api/send` |
 
-Umami Cloud serves the script and collects events on two different hosts, which is why the two routes differ there. For a self-hosted instance, `<origin>` is derived from `umami({ host })` by stripping a trailing `/api`, so the one `host` value (`https://analytics.example.com/api`) serves both the Stats API and the tracker. The snippet is a single deferred `<path>/script.js` tag with `data-website-id` and `data-host-url="<path>"`.
+Umami Cloud serves the script and collects events on two different hosts, which is why the two routes differ there. For a self-hosted instance, `<origin>` is derived from `umami({ host })` by stripping a trailing `/api`, so the one `host` value (`https://analytics.example.com/api`) serves both the Stats API and the tracker. A provider document names that origin itself (`https://analytics.example.com`), and the plugin adds `/api` for the Stats API. The snippet is a single deferred `<path>/script.js` tag with `data-website-id` and `data-host-url="<path>"`.
 
 ### GA4
 
-No routes. GA4 [captures](/analytics/capture#ga4) once `measurementId` is set, but the tag is served from `googletagmanager.com` with the id in the query string, so there is nothing first-party to proxy: the descriptor declares an empty route list, the slot's runtime mount answers 404, and `captureRewrites` emits nothing for it. Use Google's own server-side tagging if you need first-party collection for GA.
+No routes. GA4 [captures](/analytics/capture#ga4) once `measurementId` is set, but the tag is served from `googletagmanager.com` with the id in the query string, so there is nothing first-party to proxy: the descriptor declares an empty route list, the slot's runtime mount answers 404, and `captureRoute` refuses a GA4 adapter. Use Google's own server-side tagging if you need first-party collection for GA.
 
 ### Native
 
-No proxy routes and no snippet: the plugin's own tracker is the client, and it posts straight to the [ingest endpoint](/analytics/native#the-ingest-endpoint) on your origin. Nothing to proxy.
+No proxy routes and no snippet: the plugin's own tracker is the client, and it posts straight to the [ingest endpoint](/analytics/native#the-ingest-endpoint) on your origin. Nothing to proxy. A site taking many beacons a second can take them in a route of its own with [`ingestRoute`](/analytics/capture#taking-beacons-in-a-route-of-your-own).
 
 ## Content Security Policy
 
-Both paths keep every request same-origin, so `connect-src 'self'` and `script-src 'self'` cover the vendor traffic. Pass a nonce to `<AnalyticsScripts nonce>` and it reaches every script the plugin renders or injects, including the `array.js` tag PostHog's stub inserts on its own: the stub copies the running inline's nonce onto that tag, so a nonce policy without `strict-dynamic` does not pass the inline and then block the bundle.
+Both paths keep every request same-origin, so `connect-src 'self'` and `script-src 'self'` cover the vendor traffic, except GA4's: its tag loads from `www.googletagmanager.com` and reports to Google's own hosts, which `script-src` and `connect-src` then have to name. Pass a nonce to `<AnalyticsScripts nonce>` and it reaches every script the plugin renders or injects, including the `array.js` tag PostHog's stub inserts on its own: the stub copies the running inline's nonce onto that tag, so a nonce policy without `strict-dynamic` does not pass the inline and then block the bundle.

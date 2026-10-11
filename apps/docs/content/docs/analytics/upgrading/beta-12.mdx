@@ -1,0 +1,562 @@
+---
+title: From 1.0.0-beta.11
+description: Everything 1.0.0-beta.12 changes for an install upgrading from 1.0.0-beta.11, and what to do about each change.
+---
+
+1.0.0-beta.12 rebuilds the native engine's storage, leaves consent to your consent manager, moves the read and capture endpoints under one base, and tightens who may read what. Every install has edits to make, and every Postgres or SQLite install in migrate mode has one reviewed migration to run. This page lists every change against 1.0.0-beta.11, grouped by theme, each with what to do.
+
+## Before you start
+
+Work through these in order; each links to its details below. A step that names a kind of install applies to that kind only. The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+1. **Before anything boots, prepare a development database Payload pushes its schema to.** The push cannot follow this release's storage change, and the app does not start. On Postgres run the SQL under [Push mode](#push-mode) first; a pushed SQLite file cannot follow the change at all, so start it again from a new file. Databases in migrate mode and MongoDB skip this step.
+2. **Upgrade the packages together.** `@10x-media/analytics` needs Payload `^3.83.0` (`payload`, `@payloadcms/next`, `@payloadcms/ui`) and `@10x-media/fields`, which is now a required peer, at the range [Supported versions](/analytics/reference/stability#supported-versions) lists. `react-datepicker` is no longer a peer.
+3. **Load the config, and fix what it refuses.** Loading it (the dev server, or any `payload` command) fails on a [removed option](#removed-options), naming each it finds and what replaces it: the `native()` options in one message, then the plugin's own in another, so it can take two runs. Rename each, but remove `access.platformRead` and `scopes` from an install without `scope.resolve`. The same checks refuse what 1.0.0-beta.11 let through ([Options](#options)), a translation override of a removed key among them, and a widget's `requires.perPageQuery` or `requires.filterOperators`, each named with its replacement.
+4. **Set [`capture.gate`](#consent).** It is required whenever a capture slot can fill; `({ kind }) => kind !== 'native'` keeps what 1.0.0-beta.11 did by default. Where the gate holds native, server tracking records events as no visitor's by default: server code that knows the visitor's answer passes `identity: 'request'`.
+5. **On a scoped install, add [`scope.member`](#access-and-tenancy), and resolve the `capture` call site from the host.** `tenantMembership()` covers `@payloadcms/plugin-multi-tenant`. `scope.resolve` is now asked for a visitor's hit without the signed-in user, their cookies or their authorization header, so answer it from the request's host: a beacon whose scope it does not resolve is answered `202` and dropped.
+6. **Turn [money](#money) on** with `revenue: true` or `revenue: { currency }` if the install reports revenue: it is off unless set. Give every goal that has an amount a currency.
+7. **Move the [imports](#entry-points-and-exports)** of `AnalyticsScripts` and `getTrackerConfig` to `@10x-media/analytics/site`, and the browser's consent calls to `setGate`. Where `next.config` calls `captureRewrites` or `posthogProxyRewrites`, which now throw, relay the vendor through a [`captureRoute`](/analytics/proxy#a-route-handler-of-your-own) route handler instead.
+8. **Regenerate the import map** (`pnpm payload generate:importmap`): the widget drawer's pickers and the goal field moved to new component paths.
+9. **Migrate the [database](#storage-and-the-database)**: the predefined migration on MongoDB, and a generated and edited one on every Postgres or SQLite install in migrate mode. On a scoped install with the providers collection, the same migration gives every tenant that keeps native analytics its `native` provider document; in push mode, create them in the admin ([Scoped installs](#scoped-installs)).
+10. **Run the [maintenance task](#jobs)** on a jobs runner, and let a scheduler that calls Payload's run endpoint in through `jobs.access.run`.
+11. **On Vercel or behind Cloudflare, set [`trustedPlatform`](#capture)** in place of `trustedProxyHops`, which it excludes, or visitor countries stop being read.
+12. **If pages on another site post beacons, list its origin in [`capture.allowedOrigins`](#endpoints).** A page on another registrable domain than the one the endpoints answer on (a separate frontend on a domain of its own) sends them cross-site, and ingest answers each `202` and drops it.
+13. **Re-issue [exclusion links](#capture)** with `capture.exclusion: true`: the old unsigned ones no longer work.
+14. **List self-hosted vendor hosts** of provider documents in [`providers.hosts.allow`](#access-and-tenancy). A host on `http://`, a vendor beside the app on its own network, also takes `providers.hosts.allowPrivateNetwork: true`, without which neither the list nor the document accepts it.
+15. **On SQLite, open the database with `sqliteAdapter({ wal: true, busyTimeout: 5000 })`**, so the native engine counts on worker threads of its own, and leave `transactionOptions` unset ([SQLite](/analytics/native#sqlite)). Native runs on a database file: it refuses an in-memory database and an embedded replica.
+
+## Removed options
+
+An option this release removed or renamed fails the boot, naming what replaces it and linking to [Upgrading](/analytics/upgrading#removed-options). These are the options 1.0.0-beta.11 accepted:
+
+| Removed | Use instead |
+|---|---|
+| `scopeResolver` | `scope.resolve` |
+| `scopes` | `scope.list` for the scopes the cron jobs run over, `scope.label` for the view caption; an install without `scope.resolve` removes it |
+| `access.platformRead` | `access.crossScope` (a function grants all three cross-scope gates); an install without `scope.resolve` removes it, since there every gate is `isAdminUser` |
+| `capture.consent` | `capture.gate`: `'all'`, `'off'`, a list of slots, or `({ slot, adapterId, kind }) => boolean`; `({ kind }) => kind !== 'native'` reproduces the old default |
+| `sync.collectionSlug` | `sync.collection.slug` |
+| `sync.hidden` | `sync.collection.hidden` |
+| `sync.cron` | `jobs.tasks.sync.cron`, beside the queue it runs on |
+| `cache.warm.cron` | `jobs.tasks.warm.cron`, beside the queue it runs on; `cache.warm` keeps `windowHours` and `maxReads` |
+| `goals.collection.enabled` | `goals.collection: false` to leave the collection off; an object turns it on |
+| `native({ retentionDays })` | `native({ retention: { rawDays } })`, how many days of raw hits are kept and read |
+| `native({ rollupRetentionDays })` | `native({ retention: { aggregateDays } })` for the daily totals that replaced rollups, which are kept for every day unless it is set |
+
+## Options
+
+What else changed in what the options take, and what the boot refuses:
+
+| Change | What to do |
+|---|---|
+| `capture.gate` is required whenever a capture slot can fill, the native one included; the boot stops without it | choose it ([Consent](/analytics/consent#which-slots-wait)); `({ kind }) => kind !== 'native'` reproduces 1.0.0-beta.11 |
+| Money is off unless `revenue` is set: the `revenue` metric, the `currency` dimension and every amount field are gone without it, and the boot warns when a config goal carries a `value` while it is off | `revenue: true`, or `revenue: { currency: 'EUR' }` to report in one currency ([Revenue](/analytics/revenue#turning-money-on)) |
+| `revenue.browserAmounts`, new, defaults to `'fixed'`: a goal's fixed value wins over an amount the browser sends | `revenue: { browserAmounts: 'trust' }` keeps the old order ([Amounts from the browser](/analytics/revenue#amounts-from-the-browser)) |
+| A string `reportingTimezone` that is not a time zone fails the boot (it used to read as UTC); a resolver answering one logs a warning once per value | fix the zone's name |
+| `scope.member` is required with `scope.resolve` | `tenantMembership()`, or `() => true` for a resolver that derives the scope from `req.user` itself |
+| Options that only mean something on a scoped install fail the boot without `scope.resolve`: `scope.list`, `scope.label`, `scope.member`, `access.crossScope`, an adapter id in `capture.slots.tenant`, `capture.paths.tenant`, a `collections.<slug>.scopeField` other than `false`, and `goals.collection.scopeField` or `providers.collection.scopeField` | remove them from an unscoped install, and remove `access.platformRead` and `scopes` there rather than renaming them |
+| A `scope.resolve` that answers `'*'` is refused | answer a tenant or `null`; a reader asks for every scope with `scope=*` |
+| On a scoped install a binding reads its document's scope from `collections.<slug>.scopeField`, by default `'tenant'`, and the boot fails when the collection has no such field | add the field, name another one, or set `scopeField: false` to read the request's own scope ([Whose numbers a document shows](/analytics/display-fields#whose-numbers-a-document-shows)) |
+| `disabled: true` checks every option and keeps the plugin's schema, rather than returning the config untouched ([Switching it off](/analytics/reference/options#switching-it-off)) | a switched-off install gains the plugin's tables: generate its migration as for a running one; `@10x-media/fields` stays a required peer |
+| `adapters` is required in the type | pass it, empty only with `disabled: true` |
+| The boot checks every option and refuses what 1.0.0-beta.11 let through: a key no option takes, at any level; two adapters with the same `id`; a `cache.ttl` value that is not a whole number of seconds, 0 or more (`'300'` included); a `cache.timeoutMs`, `sync.lookbackDays`, `capture.proxy.timeoutMs` or `capture.proxy.maxBodyBytes` value that is not a whole number of at least 1; a `widgets.disabled` slug that names no widget, and a `widgets.register` entry without its `slug`, `component` and `label`; a `translations` key that is not one of the plugin's own | follow the message, which names the path |
+| A `widgets.register` entry's `requires` takes only `metrics`, `dimensions`, `filters`, `realtime`, `perItemQuery` and `path`: `perPageQuery` and `filterOperators` fail the boot, naming their replacement, rather than being ignored | `requires: { path: true }` for `perPageQuery`, and `filters` naming each operator with its dimension, such as `[{ dimension: 'page', operator: 'contains' }]`, for `filterOperators` ([Custom widgets](/analytics/widgets#custom-widgets)) |
+| A collection override may not rename a plugin collection (`slug` does), remove, rename or retype a field the plugin writes, drop its indexes, add a required field without a fixed `defaultValue`, or turn off `timestamps` on the providers and goals collections; `overrides` must be a function, and on Postgres a table or index name over 63 characters fails. The checks run again at init against the assembled config ([Renaming the plugin's collections](/analytics/reference/options#renaming-the-plugins-collections)) | move a renaming override to the collection's `slug` option, and shorten a name Postgres would refuse |
+| A goal path pattern holds at most 32 segments and four `**`; `**` inside a segment no longer crosses slashes; a path deeper than 128 segments matches nothing | split a longer pattern; write `/docs/**` for any depth |
+| GA4's Data API client and `maxmind` are handed over through `sdks`, so a traced or standalone build ships them; without it a production boot warns | `sdks: { ga4: { BetaAnalyticsDataClient }, maxmind: { open } }` |
+
+## Endpoints
+
+Every endpoint moved under one base, `routes.base`, default `/_x`, with no alias at the old paths:
+
+| 1.0.0-beta.11 | Now |
+|---|---|
+| `GET /api/analytics/query` | `GET /api/_x/query` |
+| `GET /api/analytics/sources` | `GET /api/_x/sources` |
+| `POST /api/analytics/refresh` | `POST /api/_x/refresh` |
+| `GET /api/analytics/goals` | `GET /api/_x/goals` |
+| `GET /api/analytics/document` | `GET /api/_x/document` |
+| `GET /api/analytics/realtime` | `GET /api/_x/live` |
+| `POST /api/analytics/ingest` | `POST /api/_x/e` |
+| `GET /api/analytics/tracker` | `GET /api/_x/config` |
+| `/api/analytics/p/:slot/*` | `/api/_x/p/:slot/:path*` |
+
+The tracker and the admin build these paths themselves, so only code of your own that calls them changes: build them with `analyticsRoutes(config)` ([Where the endpoints answer](/analytics/reference/endpoints#where-the-endpoints-answer)). A page that boots with `initTracker({ endpoint })` passes the new config path. A Next route mounted for the old ingest path, or a CDN rule written for the old paths, moves too.
+
+`fetchQuery`, `buildQueryUrl` and `refreshCache` from `@10x-media/analytics/client` take the endpoint's URL, the API route followed by `analyticsRoutes(config).query` or `.refresh`. The API route alone, which 1.0.0-beta.11 took (`fetchQuery('/api', ...)`), still works and reads from the default `/_x` base, so code written for 1.0.0-beta.11 keeps working; an install that sets its own `routes.base` passes the full URL.
+
+| Change | What to do |
+|---|---|
+| A read the vendor refuses as asked (HTTP 400, 413, 414, 422, 431, gRPC invalid argument) answers `400 invalid_param` with `param: 'query'` (was `503`) | treat it as a request to fix, not to retry |
+| A refused key or property (HTTP 401, 403, 404), a credential that will not decrypt, or a provider host the install does not allow answers the new `502 source_misconfigured` (was `503`), with `param: 'source'` or `'host'` | send the reader to the source's settings; [the error codes](/analytics/reference/endpoints#the-codes) |
+| A native read the database refuses as written answers `400 invalid_param`, a missing table, column or privilege answers `502 source_misconfigured`, and a statement timeout counts as a timeout (all were `503`) | fix the query, or the database user's grants |
+| The new `429 rate_limited` (with `Retry-After: 2`) when a scope has too many reads waiting on their sources | retry after the wait |
+| The live endpoint answers `400` and `502` where it answered `503`; `Retry-After` is capped at ten minutes | as above |
+| The document endpoint refuses a range over 366 days with `400 range_too_long` and `param: 'to'`, as the query endpoint does, and both refuse a date before 1970 with `400 invalid_param`, where a year below 100 read as one in the 1900s | ask for a year or less, from 1970 on |
+| An install without `scope.resolve` refuses a read or a refresh naming a scope other than `*` with `400 untrusted_scope`, where any signed-in user could name one; on every install a scope name over 256 characters is refused | drop the `scope` parameter on an unscoped install |
+| A config adapter that cannot narrow its query to one tenant is no longer among a tenant's sources: naming it under a tenant answers `404 unknown_source` with `param: 'source'` (was `403 forbidden`) | read it install-wide, or give the tenant its own provider document |
+| A `POST` another site's page makes a visitor's browser send is dropped by ingest (still `202`) and refused by the capture proxy (`403`), unless its origin is in `capture.allowedOrigins`; on a scoped install so is one from a sibling subdomain whose host resolves to another tenant | list your other sites there ([Beacons from other sites](/analytics/capture#beacons-from-other-sites)); each tenant's pages post to their own host |
+| A body carrying `revenue` or a negative `value` answers `400` (1.0.0-beta.11 ignored the one and dropped the negative amount) | record refunds from server code ([Refunds](/analytics/revenue#refunds)) |
+| The capture proxy decides each answer's content type from the route's `kind`, sends `X-Content-Type-Options: nosniff` and sandboxes data answers; it answers `404` for a path segment holding an encoded `/` or `\`, and `405` with `Allow` for a `POST` to a script route | a custom adapter declares `kind` on each proxy route ([Custom adapters](#custom-adapters)) |
+| `capabilities` on the sources and query endpoints: `filters` is a map from each filterable dimension to the operators it takes (was a list of dimensions beside `filterOperators`), `filterOperators` and `perPageQuery` are gone, and `metricReach` and `perItemQuery` are new | a client of your own reads the operators per dimension from `filters` ([Sources endpoint](/analytics/reference/endpoints#sources-endpoint)) |
+| `result.meta.fetchedAt` is when the source was read (was the range's end); a cached answer keeps the stamp it was stored with | read freshness from `fetchedAt`, and from `asOf` where a read sets it |
+| `metrics=visits` on native, which serves `sessions`, answers that count under the name asked for (was `400 unsupported_metric`); the same holds the other way round and in the widgets and the document panel | nothing |
+| A breakdown with a `limit` and no `order` is ranked by its first metric, highest first, where a source could answer any subset | pass `order` for another ranking |
+| The sources, goals, tracker config and ingest endpoints answer an unexpected failure with `500 internal` in the [error envelope](/analytics/reference/endpoints#errors) (was Payload's own error answer); the capture proxy answers a bare `500` | branch on `error.code` as for every other endpoint |
+
+## Access and tenancy
+
+| Change | What to do |
+|---|---|
+| `access.read` defaults to the users of the admin collection (`admin.user`), where any signed-in user read before; so does every cross-scope gate on an unscoped install | a second auth collection that should read analytics needs `access.read` of your own |
+| The goals, sync and providers collections admit only the admin collection's users by default, and reading the sync collection also takes `access.read` | set the collection's `access` to widen it ([Sync](/analytics/sync)) |
+| The analytics view names goals and the scope only to a reader `access.read` admits, even where `access.view` is wider | nothing |
+| Every read refuses a tenant its user does not belong to (`scope.member`), the read helpers of `@10x-media/analytics/rsc` included; a refused endpoint answers `400 untrusted_scope` | add `scope.member` ([Multi-tenancy](/analytics/multi-tenancy)) |
+| `access.platformRead` is now `access.crossScope`, three gates: `named`, `aggregate` and `unscopedSource`; on a scoped install each denies by default, as `platformRead` did | a function grants all three ([Who sees what](/analytics/multi-tenancy#4-who-sees-what)); an unscoped install removes the option |
+| On a scoped install a request that resolves no tenant reads nothing unless the reader passes `access.crossScope.aggregate` | grant `aggregate` to the readers who should see every tenant at once |
+| With the providers collection, a tenant reads a config adapter only for a reader `access.crossScope.unscopedSource` admits, where every config adapter that could narrow to a scope was readable by any tenant; a tenant's own provider documents are filtered to those the reader may read (`providers.collection.sourceAccess`) | grant `unscopedSource` to the readers who should still read a shared config adapter under a tenant ([Which sources a request sees](/analytics/multi-tenancy#which-sources-a-request-sees)) |
+| `scope.resolve` is asked at the `capture` call site (beacons, the tracker config, the proxy, server tracking with a request) without the signed-in user, their cookies or their authorization header; the timezone and currency resolvers get the same request there | resolve a visit's scope from its host, never from the admin's tenant cookie ([The call site](/analytics/multi-tenancy#the-call-site)): a beacon it resolves to no tenant is answered `202` and dropped |
+| A tenant capture slot left to its default takes the tenant's default source when that source captures, and otherwise the first of its sources that does (1.0.0-beta.11 took the default source, and left the slot empty when that source could not capture) | nothing |
+| A provider document's `host` must be an `https` address, and a self-hosted one the install does not list fails as `502 source_misconfigured` and captures nothing | list it in `providers.hosts.allow` ([Where a document may connect](/analytics/providers#where-a-document-may-connect)); an `http://` host also needs `providers.hosts.allowPrivateNetwork: true`, without which neither `allow` nor the document's `host` field accepts it |
+| On a scoped install running the providers collection, a tenant stores and reads native visits only with an enabled `native` provider document: without one its beacons are answered `202` and dropped, it sees no native source and its tracker config carries no native beacon (1.0.0-beta.11 served every tenant) | create the documents in the upgrade's migration ([Scoped installs](#scoped-installs)) |
+| On a scoped install a provider document's connection (type, host, the ids its adapter reads) changes only with `access.crossScope.named`, and a change clears its stored key | enter the key again in the same save ([Changing where a document connects](/analytics/providers#changing-where-a-document-connects)) |
+| An install that keeps provider settings in a store of its own (`providers.resolve`) builds each adapter with the `fetch` and `hosts` it is handed, and calls `refreshProviders` when settings change | [Keeping the settings somewhere else](/analytics/providers#keeping-the-settings-somewhere-else) |
+| Once the plugin registers a task, Payload's job controls your config left unset admit only the admin collection's users | let a cron in through `jobs.access.run` ([Who may run jobs](/analytics/native#who-may-run-jobs)) |
+
+## Consent
+
+The tracker no longer stores a consent decision: your consent manager opens and closes a [gate](/analytics/consent) on every page load. The tracker never reads the `analytics:consent` key 1.0.0-beta.11 wrote, and deletes it once a slot opens, so a visitor who answered before the upgrade is pending until your manager answers again.
+
+| Removed | Use instead |
+|---|---|
+| `capture.consent` | `capture.gate` ([Removed options](#removed-options)) |
+| `tracker.consent('granted')`, `consent('denied')` from `useAnalytics()` | `setGate(true)`, `setGate(false)`; `setGate({ tenant: true })` for one slot |
+| `persistConsent` | nothing: no decision is stored |
+| `CONSENT_STORAGE_KEY`, `CONSENT_QUEUE_LIMIT`, `readConsent`, `writeConsent`, `createConsentQueue`, `ConsentState` from `/tracker` | your consent manager's own state; `GateState` and `GateStatus` are the new types |
+| `TrackerSlotConfig.requiresConsent` | `gated`; a config cached from 1.0.0-beta.11 is still read, and one carrying neither holds the slot |
+| `TrackerBoot` from `/react` | `<AnalyticsScripts />` or `<AnalyticsProvider>` |
+| `loadScript` on `<AnalyticsProvider>` or `createTracker`, used to hand the vendor scripts to a consent manager | `snippets={false}` on `<AnalyticsScripts />` or `<AnalyticsProvider>` (`snippets: false` for `createTracker`), and the manager loads them ([Consent](/analytics/consent#when-the-manager-loads-the-vendor-scripts-itself)); `loadScript` stays for a framework script loader |
+| `CaptureConsentOption`, `ConsentMode`, `ConsentResolver` from the package root | `CaptureGate` |
+
+Opening a slot clears that vendor's own opt-out unless the browser is excluded; closing one whose script may have run sets it, and a GA4 tag that already ran is told through consent mode that every storage type is denied. The vendor snippets changed with the gate and the exclusion prelude, so a CSP that allows them by hash needs the new hashes.
+
+| Change | What to do |
+|---|---|
+| The tracker reads the exclusion flag only once the first slot opens, so `excluded` reads `false` until then; what still touches the browser's storage before an answer is listed under [Storage before an answer](/analytics/consent#storage-before-an-answer) | nothing |
+| A page restored from the back/forward cache puts its held slots back to pending rather than keeping the answer it had | answer again from a `pageshow` handler whose event is `persisted` ([Revoking](/analytics/consent#revoking)) |
+| While `capture.gate` holds a slot native may fill, server tracking (`trackServerEvent`, the server `purchase` and `refund`, `trackGoalAction`) records an event as no visitor's by default: no visitor id, and no location, device or language read from the request. With `gate: 'off'` it keeps the request's visitor. An `ip` or `userAgent` passed without an `identity` and set aside by that default is logged once | pass `identity: 'request'` where your own code knows the visitor's answer allows it ([What the gate does not cover](/analytics/consent#what-the-gate-does-not-cover)) |
+| An event that waited in the browser carries its age (`ageMs`), so it is filed when it happened rather than when its slot opened | nothing |
+
+## Capture
+
+These change what is counted without any option to rename:
+
+| Change | What to do |
+|---|---|
+| The exclusion link is off by default and signed: `?analytics_exclude=1` no longer excludes a browser, and the tracker's `exclusionParam` option and `readExclusionParam` are gone | `capture.exclusion: true`, then hand staff the link the analytics view gives them ([Excluding your own visits](/analytics/capture#excluding-your-own-visits)); a browser already excluded stays excluded |
+| On Vercel and Cloudflare the visitor's country, region and city come from the platform's headers only with `trustedPlatform` set; without it no platform header is read, and `trustedPlatform` and `trustedProxyHops` exclude each other | `trustedPlatform: 'vercel'` or `'cloudflare'` in place of `trustedProxyHops` ([Which headers to trust](/analytics/geo#which-headers-to-trust)) |
+| `captureRewrites` and `posthogProxyRewrites` from `@10x-media/analytics/next` throw when called: a Next rewrite to a vendor forwards every request header, the visitor's cookies and the site's `payload-token` among them, and passes the vendor's `set-cookie` back | relay the vendor through `captureRoute` in a route handler, or leave `capture.paths` unset to use the plugin's own proxy ([A route handler of your own](/analytics/proxy#a-route-handler-of-your-own)) |
+| Browsers reporting `navigator.webdriver`, draft mode pages and the live preview are not counted | `capture.skip: { automation: false }` for an end-to-end suite that asserts on captured hits; `previews: false` to count previews |
+| `props.url` on `outbound_link` and `file_download` drops the query string, the fragment and credentials | nothing: rows recorded before keep what they stored |
+| The tracker sends native only the referrer's origin, and of the page's query string only the campaign keys (the `utm_*` keys and the names of the click ids) | nothing: ingest only ever kept the referrer's host and those keys |
+| A page the browser only prerenders sends nothing and loads no vendor script until it is shown | nothing |
+| A Plausible `scriptId` that is not up to 64 letters, digits, `_` and `-` renders no snippet, and the providers collection refuses it | fix the id |
+| A form carrying `data-analytics-goal` or `data-analytics-event` answers its submit alone, once per submission: a click inside it no longer completes the goal, and an element tagged around a form no longer counts again on its submit | nothing: a form tagged at its root counts submissions, where it used to count clicks too ([Tag the element](/analytics/goals#1-tag-the-element)) |
+| `initTracker()` resolves the window's one tracker, shared with `AnalyticsScripts`, `AnalyticsProvider` and `useAnalytics`, and its `destroy` gives its hold back | call it once per page, as before |
+| PostHog captures each single-page app navigation (`capture_pageview: 'history_change'`), and a self-hosted `host` takes capture itself instead of PostHog Cloud's US region, through its capture paths alone; the snippet names no `ui_host` for it | nothing; pass `posthog({ uiHost })` for toolbar links to open the app |
+| A tenant slot of the same vendor as the global slot (a tenant's own PostHog beside the platform's) is left out of the tracker config, with a warning | nothing: it used to init onto the platform's SDK and send into the platform's project |
+
+## Money
+
+| Change | What to do |
+|---|---|
+| Money is off unless the `revenue` option is set ([Options](#options)) | `revenue: true` or `revenue: { currency }` |
+| A goal with an amount needs a currency, in the goals collection and in the form-builder goal action, through the API as much as in the admin; a goal saved earlier with an amount and no currency asks for one on its next save | give each a currency; `trackGoalAction({ defaultCurrency })` fills it in where the action's fields are out of the plugin's reach |
+| Ingest refuses a body carrying `revenue` or a negative `value` with a `400` ([Endpoints](#endpoints)) | record refunds from server code |
+| Each goal an event completes carries its own amount, converted from that goal's own currency | nothing |
+| An invalid Plausible `revenueCurrency` throws when the adapter is built, and a blank one no longer turns Plausible's revenue on | fix the code |
+| `Tracker` and `AnalyticsCommands` gain the required `purchase` and `refund` | code that implements either itself adds them ([Types and components](#types-and-components)) |
+
+Sales and refunds have calls of their own in this release, `purchase` and `refund`, with order ids that make a sale count once however many times it is recorded; see [Revenue](/analytics/revenue) and [Added](#added).
+
+## The native engine
+
+The engine was rebuilt on raw hits counted into daily totals ([Native engine](/analytics/native)), and its old storage is not converted: the reports count from the first hit stored after the upgrade. [Storage and the database](#storage-and-the-database) has the migration.
+
+| Change | What to do |
+|---|---|
+| Raw hits are kept 90 days by default, and filtered and hourly reads reach back as far as raw hits are kept; daily totals are kept for every day | `native({ retention: { rawDays, aggregateDays } })` ([Retention](/analytics/native#retention)) |
+| Daily totals keep at most 10,000 pages and 100 currencies per hostname a day, with the other caps of `native({ caps })`: what a day sends beyond a cap stays exact while its raw hits are kept, and is folded into one row after that (`meta.capped`) | raise a cap, or lift it with `null`, where a site needs more ([Daily totals and caps](/analytics/native#daily-totals-and-caps)) |
+| A visit is a visitor's hits on one hostname with no gap over 30 minutes; hour series are the reporting timezone's local hours; breakdowns list no `(other)` row | nothing |
+| Hits record a referrer only on the pageview that opened a visit, engagement rows carry no visitor attributes, and a click id is stored by name, never its value | nothing |
+| `goal` is a filterable dimension, and `currency` groups each amount by the currency it was sent in | nothing |
+| Server events never join the host's transaction: they stay when it rolls back, and on SQLite one made inside an open transaction is written once it ends | nothing ([Server events and host transactions](/analytics/native#server-events-and-host-transactions)) |
+| A server event with no request, `ip` or `userAgent` belongs to no visitor, and `event.timezone` only picks the salt's day | pass `req` where there is one, and `identity: 'request'` where the gate holds native ([Consent](#consent)) |
+| Native never sets `meta.sampled`; it sets `meta.partial`, `capped`, `failed`, `clamped` with `dataFrom` and `dataTo`, `asOf` and `visitorsAre` | caption them as the admin does |
+| A day whose count fails three times is marked failed: reads use an earlier count of it when there is one, and leave it out otherwise (`meta.failed`) | count it again with [`rebuildDays`](/analytics/native#rebuilding-days) once the cause is fixed |
+| Native refuses Cloudflare D1 at boot, and needs MongoDB 5.0, Postgres 12 or SQLite 3.35 or later. MongoDB-compatible services (Amazon DocumentDB, Azure Cosmos DB, Firestore) are not supported. On SQLite it opens a connection of its own to the database file, so an in-memory database, an embedded replica or a second copy of libsql stops it (`502 source_misconfigured`, warned once) | keep D1 installs on vendor adapters; run native on a SQLite file |
+| On Postgres the engine shares the host's pool: its long reads, counts and analytical transactions hold at most a third of `pool.max` connections, and all its work at most one fewer than the pool | size `postgresAdapter({ pool: { max } })` with that share in mind ([Production note (Postgres)](/analytics/native#production-note-postgres)) |
+| A live read fails as a whole, `503` with `Retry-After`, when any part of it fails | retry after the wait |
+| A write buffer batch that fails as a whole (a lock, a lost connection) is retried once after 500 ms and then dropped; only a batch a row of which was refused is retried row by row | nothing |
+| A `geoResolver` that throws, or answers something other than text for a field, has the event stored without a location instead of failing the beacon, and is logged at most once an hour | nothing ([Geo](/analytics/geo)) |
+| `NativeAdapter.flush(payload)` takes the Payload instance whose write buffer it flushes (was `flush()`), since every engine structure is kept per instance | pass `payload`; a test waits for all background work with `settleAnalytics(payload)` from `@10x-media/analytics/testing` |
+
+## Storage and the database
+
+This release replaces the storage of the [native engine](/analytics/native), and every Postgres or SQLite install in migrate mode needs one migration, `native()` or not; MongoDB needs one only where it ran `native()` or [warming](/analytics/cache#warming). Each is described below. Every install gains the `analytics-cache` collection, where reads are now [cached](/analytics/cache) unless `cache.store` names a store of its own: on Postgres and SQLite that is the `analytics_cache` table, created by the same generated migration, and MongoDB creates it on first use. An install that runs only vendor adapters stores no hits, so beyond the cache its database changes only where it runs [sync](/analytics/sync) or [warming](/analytics/cache#warming), which gain the `analytics-state` collection for their leases and heartbeats (and sync a `visit_duration` column); where it keeps goals in the [goals collection](/analytics/goals#5-let-editors-manage-goals), which gains a `browser` column; and where it keeps provider settings in the [providers collection](/analytics/providers#provider-documents), which gains the `ga4_currency` and `posthog_scope_property` columns and the `native` provider. On Postgres and SQLite that takes the same generated migration, with the [edits below](#edits-before-you-run-it) and the cache table in it; MongoDB needs nothing beyond the [queued warm runs](#mongodb) of an install that ran warming. Where `payload_jobs` exists (1.0.0-beta.11 registered sync, warming or native retention), the edits also delete the queued runs of the retired task names.
+
+The engine needs Postgres 12 or later, SQLite 3.35 or later, or MongoDB 5.0 or later.
+
+### What changed in storage
+
+| Up to 1.0.0-beta.11 | This release |
+|---|---|
+| `analytics-events`, one row per event | `analytics-hits`, one row per hit |
+| `analytics-rollups`, counters per time bucket | `analytics-aggregates`, the totals of each counted day per scope, hostname and dimension value |
+| `analytics-seen`, the visitors each bucket already counted | nothing: visits and visitors are counted from the hits |
+| the daily salts in Payload's key-value store, as `analytics:salt:<date>` | the daily salts in `analytics-state`, beside the day markers and leases |
+| cached reads in Payload's key-value store, as `analytics\|...` and `rt:...`, never deleted | `analytics-cache`, on every install, where expired reads are deleted; live counts are kept in memory only |
+
+The old data is not converted. The new collections start empty, and the reports count from the first hit stored after the upgrade. The migrations below delete the old collections; export them first if you want to keep their numbers.
+
+The new collections are hidden from the admin, have no REST or GraphQL endpoints, and take text ids the engine makes, so no sequence is created for them. [Storage](/analytics/native#storage) describes what each one holds.
+
+### MongoDB
+
+MongoDB creates the new collections on first use, so there is no schema to migrate. One migration removes the old storage. Create it from the predefined migration the package ships, then run it:
+
+```sh
+pnpm payload migrate:create analytics_storage --file @10x-media/analytics/migrations/drop-legacy-mongo
+pnpm payload migrate
+```
+
+The created file calls `dropLegacyNative` from `@10x-media/analytics/migrations`, which:
+
+- drops `analytics-events`, `analytics-rollups` and `analytics-seen` with their documents and indexes (with the Mongo adapter's default pluralization, the last one is named `analytics-seens`);
+- deletes the old daily salts (`analytics:salt:<date>`) and the old cached reads (`analytics|...`, `rt:...`) from Payload's key-value store;
+- deletes the queued runs of the old retention task, `analytics-prune-events`, and of the warm task under its old name, `analytics-warm-cache`, from `payload-jobs`.
+
+It logs what it removed. Run again, it finds nothing and changes nothing.
+
+An install that ran warming without `native()` has no old storage, but its schedule left a queued run of `analytics-warm-cache` in `payload-jobs` that no task answers any more. It runs the same migration: there is no old collection for it to drop, and it still deletes that run and the old cached reads. MongoDB cannot drop a collection inside a transaction, so this works outside the migration's own: what it removed stays removed even if a later step of the same migration fails. Its `down` restores nothing.
+
+### Postgres and SQLite
+
+#### Push mode
+
+The schema push of development mode, Payload's default outside production, fails on the same statements the migration below needs edited for, and the app does not start. On Postgres, drop the old tables and the queued runs of the old retention and warm tasks first, and the push does the rest on the next start:
+
+```sql
+DELETE FROM payload_jobs WHERE task_slug::text IN ('analytics-prune-events', 'analytics-warm-cache');
+DROP TABLE analytics_events, analytics_rollups, analytics_seen CASCADE;
+DROP TYPE enum_analytics_events_type;
+```
+
+Run the `DELETE` whenever `payload_jobs` exists, which it does once 1.0.0-beta.11 registered any task (sync, warming or native retention), whether or not a run is queued, and leave it out when the table does not exist yet. The push recreates the task enums without `analytics-prune-events` and `analytics-warm-cache`, and a queued run of either would hold that value. The `::text` cast keeps the statement valid on an enum that never had one of the two labels, as on an install that ran sync alone.
+
+On SQLite the push fails even then, so a pushed development file cannot follow the change: start it again from a new file, and export first what you want to keep.
+
+#### Migrate mode
+
+Generate the migration with Payload's own command after upgrading the package:
+
+```sh
+pnpm payload migrate:create analytics_storage
+```
+
+The command asks, for each new table, whether it is created or renamed from one of the old ones. Answer **create table** every time, and **create enum** for each new enum on Postgres: `analytics_hits` is not a renamed `analytics_events`, and a rename would carry the old columns and rows into it. Generate it from the config you run in production, since the migration holds what that config adds, the providers collection and the jobs tables included.
+
+#### What the migration contains
+
+Review the generated file before running it. Upgrading from 1.0.0-beta.11, it holds:
+
+- `CREATE TABLE` for `analytics_hits`, `analytics_aggregates` and `analytics_state`, with an index on `(scope, ts)` for the hits, on `(scope, dim, dim2, day)` and on `(scope, dim, value, day)` for the aggregates, and on `(kind, status, day)` and `(kind, scope, day)` for the state;
+- `CREATE TABLE` for `analytics_cache`, with a unique index on `key` and indexes on `stale_until` and `read_at`, on every install that does not set `cache.store`;
+- `DROP TABLE` for `analytics_events`, `analytics_rollups` and `analytics_seen`, and on Postgres `DROP TYPE "public"."enum_analytics_events_type"`;
+- the old tables' columns, foreign keys and indexes removed from `payload_locked_documents_rels`; SQLite does this by rebuilding the table;
+- Payload's jobs tables, `payload_jobs` and `payload_jobs_log` with their enums on Postgres, and `payload_jobs_stats` for the tasks' schedules, when the install ran no task before; when it did, the task enums are recreated with `analytics-maintain` added, `analytics-warm` in place of `analytics-warm-cache` when warming is on, and `analytics-prune-events` gone (with `jobs: false`, only the removals);
+- on an install with sync or warming but no `native()`, the `analytics_state` table for their leases and heartbeats;
+- with the goals collection, its `browser` column, for a goal that ignores completions sent from a browser;
+- with sync, the sync collection's `visit_duration` column (`analytics_daily` unless renamed), for [time per visit](#time-on-page-and-time-per-visit);
+- with the providers collection: the `ga4_currency` and `posthog_scope_property` columns on `analytics_providers`, and the `native` provider as a value of its enum and as the column's default; SQLite rebuilds the table for this.
+
+The index names come from Payload, which names an index after its columns and adds a number when another table already uses the name.
+
+#### Edits before you run it
+
+Some of the generated statements fail as Drizzle writes them. Edit the generated file first.
+
+On Postgres:
+
+1. `DROP TABLE ... CASCADE` already removes the old tables' foreign keys from `payload_locked_documents_rels`, so the three `DROP CONSTRAINT` statements after it fail. Add `IF EXISTS` to each of them:
+
+   ```sql
+   ALTER TABLE "payload_locked_documents_rels" DROP CONSTRAINT IF EXISTS "payload_locked_documents_rels_analytics_events_fk";
+   ```
+
+   and the same for `payload_locked_documents_rels_analytics_rollups_fk` and `payload_locked_documents_rels_analytics_seen_fk`.
+
+2. When `payload_jobs` exists, which it does once 1.0.0-beta.11 registered any task (sync, warming or native retention), whether or not a run is queued, delete the queued runs of the old retention task and of the warm task under its old name: the recreated task enums cannot hold either slug. Make this the first statement of the `db.execute` block, and leave it out when the table does not exist yet, since the migration creates it:
+
+   ```sql
+   DELETE FROM "payload_jobs" WHERE "task_slug"::text IN ('analytics-prune-events', 'analytics-warm-cache');
+   ```
+
+   The `::text` cast keeps it valid on an enum that never had one of the two labels, as on an install that ran sync alone.
+
+3. With the providers collection, Postgres refuses to use an enum value in the transaction that added it, and the migration runs in one. Move the `ALTER TYPE "public"."enum_analytics_providers_provider" ADD VALUE ...` statement out of `db.execute` and run it on the adapter's own connection, which commits it at once:
+
+   ```ts
+   import { type MigrateUpArgs, type PostgresAdapter, sql } from '@payloadcms/db-postgres'
+
+   export async function up({ db, payload }: MigrateUpArgs): Promise<void> {
+     await (payload.db as unknown as PostgresAdapter).drizzle.execute(
+       sql`ALTER TYPE "public"."enum_analytics_providers_provider" ADD VALUE IF NOT EXISTS 'native' BEFORE 'plausible';`
+     )
+     await db.execute(sql`
+       -- the rest of the generated statements
+     `)
+   }
+   ```
+
+On SQLite:
+
+1. Dropping the second old table fails while `payload_locked_documents_rels` still references the first. Move the three `DROP TABLE` statements for `analytics_events`, `analytics_rollups` and `analytics_seen` below the statements that rebuild `payload_locked_documents_rels`, which end with that table's `CREATE INDEX` statements.
+2. With the providers collection, the rebuild of `analytics_providers` copies two columns the old table does not have. Remove `"ga4_currency"` and `"posthog_scope_property"` from both column lists of the `INSERT INTO __new_analytics_providers` statement.
+3. When `payload_jobs` existed before the upgrade (1.0.0-beta.11 registered sync, warming or native retention), delete the queued runs of the old retention task and of the warm task under its old name, which nothing runs any more, with one more statement at the end of `up`:
+
+   ```ts partial
+   await db.run(
+     sql`DELETE FROM payload_jobs WHERE task_slug IN ('analytics-prune-events', 'analytics-warm-cache');`
+   )
+   ```
+
+#### At the end of `up`
+
+The old salts in Payload's key-value store are left behind on Postgres and SQLite: a few rows named `analytics:salt:<date>` in `payload_kv`, which hash no visitor once the old tables are gone. `deleteLegacySalts` from `@10x-media/analytics/migrations` removes them; end the generated migration's `up` with it:
+
+```ts partial
+import { deleteLegacySalts } from '@10x-media/analytics/migrations'
+
+// at the end of up({ db, payload, req })
+await deleteLegacySalts({ payload })
+```
+
+It deletes only keys starting with `analytics:salt:`, answers how many, and finds nothing the second time. On a scoped install with the providers collection, the tenants' `native` documents come after it ([Scoped installs](#scoped-installs)).
+
+Then run it:
+
+```sh
+pnpm payload migrate
+```
+
+### Scoped installs
+
+On a scoped install running the providers collection, native is now granted per tenant: a tenant stores and reads native visits only while it holds an enabled provider document of type **Payload** (`provider: 'native'`), where 1.0.0-beta.11 served every tenant. A tenant without one sees no native source, gets no native beacon in its tracker config, and has its beacons answered `202` and dropped; what it stored before is kept ([Native is a provider type](/analytics/multi-tenancy#native-is-a-provider-type)). An install without `scope.resolve`, or without the providers collection, is unaffected.
+
+Create the documents in the upgrade's own migration, so no beacon arrives between the deploy and the documents: at the end of the generated migration's `up` on Postgres and SQLite, after `deleteLegacySalts`, and at the end of the `drop-legacy-mongo` migration's `up` on MongoDB. On Postgres that works because edit 3 committed the `native` enum value on the adapter's own connection first. Write through the migration's `req` and as a user `access.crossScope.named` admits: the providers collection stamps every write with a scope, and refuses one for another tenant from anyone else, `overrideAccess` or not.
+
+```ts partial
+// At the end of up({ payload, req }): one document per tenant that keeps native analytics, written
+// as a user access.crossScope admits (the first user here: pick one that qualifies).
+const [platformAdmin] = (await payload.find({ collection: 'users', limit: 1, req })).docs
+for (const scope of ['tenant-a', 'tenant-b']) {
+  await payload.create({
+    collection: 'analytics-providers',
+    data: { name: 'Payload', provider: 'native', enabled: true, scope },
+    req,
+    user: platformAdmin,
+  })
+}
+```
+
+Passing `user` sets it on the migration's `req`. With `@payloadcms/plugin-multi-tenant` and `providers.collection.scopeField: 'tenant'`, set `tenant` in `data` instead of `scope`. Where there are more than a few tenants, read them from your tenants collection rather than listing them. A development database in push mode runs no migration: create the documents in the admin instead, one provider of type **Payload** per tenant, or in a seed of your own written the same way.
+
+The documents decide which tenants store; `scope.resolve` still decides which tenant a beacon is for. It is asked at the `capture` call site from what the request itself carries, without the signed-in user, their cookies or their authorization header, so resolve it from the host ([The call site](/analytics/multi-tenancy#the-call-site)): a beacon it resolves to no tenant is dropped too.
+
+### Old cached reads
+
+Earlier releases cached reads in Payload's key-value store and never deleted them, so an install that ran one for a while holds many rows named `analytics|...` (reads) and `rt:...` (live counts) in `payload_kv`, or the `payload-kv` collection on MongoDB. Nothing reads them any more. `deleteLegacyCache` from `@10x-media/analytics/migrations` removes them, on any database and whether or not the install runs `native()`, from the `up` of any migration:
+
+```ts partial
+import { deleteLegacyCache } from '@10x-media/analytics/migrations'
+
+// in up({ db, payload, req })
+await deleteLegacyCache({ payload })
+```
+
+It deletes only keys in those two shapes, answers how many, and finds nothing the second time. On MongoDB, `dropLegacyNative` already calls it.
+
+## Jobs
+
+`native()` registers the `analytics-maintain` task, unless `jobs` is `false`. It counts closed days, snapshots today and deletes what retention lets go; without a runner, reads and ingest do that work as they go ([Maintenance](/analytics/native#maintenance)). The warm task is now `analytics-warm`, no longer `analytics-warm-cache`, and it and `analytics-sync` follow `jobs.queue` and their own `jobs.tasks` entries: `sync.cron` and `cache.warm.cron` fail the boot, naming `jobs.tasks.sync.cron` and `jobs.tasks.warm.cron` (see [the `jobs` option](/analytics/native#the-jobs-option)). The old engine's retention task, `analytics-prune-events`, is gone. Warming no longer reads `admin.dashboard.defaultLayout`: it repeats the reads readers made (see [Warming](/analytics/cache#warming)).
+
+Registering a task turns Payload's jobs on, which adds the `payload-jobs` collection to an install that had no task before, and the `payload-jobs-stats` global with it unless every task is unscheduled (`cron: false`). The task runs through Payload's job runner; [running it](/analytics/native#running-it) says how to set one up. A scheduler calling Payload's `/api/payload-jobs/run` endpoint is refused unless the jobs config's `access.run` lets it in, so set that before pointing a cron at it.
+
+Once the plugin registers a task, it restricts every job control your Payload config left unset to users of the admin collection: `jobs.access.run` (the `/run` and `/handle-schedules` endpoints), `jobs.access.queue` and `jobs.access.cancel`, the `payload-jobs` collection's create, read, update and delete (composed over your own `jobsCollectionOverrides`), and the `payload-jobs-stats` global. Payload otherwise lets any signed-in user use them, a customer of a second auth collection included, and on Payload before 3.89 that covers reading and changing every job of every plugin. A control you set is never changed, and the boot says once which ones it restricted. If a second auth collection queues or cancels your own jobs with `overrideAccess: false`, set `jobs.access` to allow it; see [who may run jobs](/analytics/native#who-may-run-jobs).
+
+Each of the plugin's tasks runs at most four minutes per run and leaves the rest to the next one, and one lease per task keeps two runs apart. On Postgres, queued runs of the renamed or retired tasks must be deleted before the task enum changes: [Edits before you run it](#edits-before-you-run-it).
+
+## Reads and the cache
+
+| Change | What to do |
+|---|---|
+| Reads are cached in the `analytics-cache` collection, or a `cache.store` of your own, rather than Payload's key-value store; live counts are kept in each instance's memory only | delete the old entries with `deleteLegacyCache` ([Old cached reads](#old-cached-reads)) |
+| An expired entry is answered at once while it refreshes (`meta.stale`), and `meta.sourceError` says when the refresh failed because of how the source is set up; `cache.timeoutMs` bounds reads with nothing cached only | caption them ([Stale serving](/analytics/cache#stale-serving)) |
+| `order` and `limit` are applied by the engine before an answer is cached, whatever the source sent | nothing |
+| A vendor's average with no value reads `null`, not `0` | treat `null` as no data |
+| Each source has its own lane (16 requests across an instance's vendor sources, 4 per source by default), with retries, `Retry-After` and a circuit breaker; `rateLimit.maxConcurrent` is a lane's size | `cache.concurrency` ([Reaching the sources](/analytics/cache#reaching-the-sources)) |
+| Native reads have a lane of their own, outside `cache.concurrency`: 8 reads at once, or on Postgres a third of `pool.max`, between 1 and 8. On a source every tenant shares, one tenant holds at most half of a lane and the circuit breaker counts each tenant's failures apart | nothing |
+| Warming replays the reads readers made recently, per scope, rather than the dashboard's default layout | nothing |
+| Editing a goal reaches every instance within 10 seconds (was 30) | nothing |
+| A native read whose window reaches into today is fresh for 10 seconds at most, whatever `cache.ttl` says, and is read again rather than served stale once it expires. Today itself is read live up to 5,000 hits on Postgres and 2,000 elsewhere, and above that from a snapshot taken in the background, served for one to five minutes by how busy the day is (`meta.asOf`) | nothing ([TTLs](/analytics/cache#ttls)) |
+| `WidgetReadStatus`, `WidgetRealtimeStatus` and `FieldReadStatus` gain `busy`, `invalid`, `no-access`, `no-scope`, `misconfigured` and `host-refused`, `WidgetReadStatus` and `FieldReadStatus` also `range-too-long`, and `readForWidgetRealtime` no longer throws. A read that fails for a while (a timeout, a rate limit, a source down) is `busy`, where it was `unavailable`, which is left for a source that cannot answer the read at all | an exhaustive `switch` over them needs the new cases; the unions may grow again ([Stability](/analytics/reference/stability#open-unions)) |
+| `sync` writes a metric a source did not report as `null`, and reads as the system principal rather than as a user | nothing |
+
+## Custom adapters
+
+An adapter of your own implements the [adapter contract](/analytics/reference/adapter-contract), which changed:
+
+| Change | What to do |
+|---|---|
+| `capabilities.filters` is a `FilterOperatorMap`, the operators each filterable dimension takes; `filterOperators`, `perPageQuery`, `batchPageReport` and `quotaModel` are gone | declare `filters: { page: ['eq', 'contains'] }` and drop the removed fields |
+| `avgDuration` is time per pageview and `visitDuration` (new) time per visit; `visits` and `sessions` must answer one number | serve a per-visit time as `visitDuration` ([Metrics](/analytics/reference/adapter-contract#metrics)) |
+| `capabilities.metricReach` (new) says where a metric is read when not under every dimension | declare it rather than answering empty columns |
+| A source is asked for series by `minute`, `hour` or `day` only: the engine folds weeks and months from days unless the source declares `calendarBuckets: true` | an adapter that answers weeks and months itself declares `calendarBuckets: true`; one that does not needs nothing ([Weeks and months](/analytics/reference/adapter-contract#weeks-and-months)) |
+| `close(payload)` (new, optional) runs once per Payload instance the adapter was attached to, and on `payload.destroy()`; an adapter built from a provider document is closed once the document changes, goes away or sits unused | release per-instance resources there |
+| `registerSchema` (new, optional) keeps an adapter's collections while the plugin is switched off | implement it when `register` adds collections |
+| `AdapterRegisterContext` gains the required `resolveTimezoneStrict` and `revenue` (`{ enabled, dimension, currency, convert?, browserAmounts?, orderSignature? }`), and optional members such as `jobs` (an `AdapterJobs`) | code that builds a context itself, a test's, adds the two; an adapter that only reads one needs nothing |
+| `ServerTrack`, an adapter's `ingest.track`, takes the Payload instance first: `(payload, event, opts?)` (was `(event, opts?)`) | an adapter of your own with server tracking takes `payload` first |
+| `meta.fetchedAt` is when the source was read, never the range's end; `AdapterContext.now` is the plugin's clock to stamp it from, and the engine replaces a later or unreadable `fetchedAt` with the moment it got the answer | stamp it from `ctx.now()` ([Results](/analytics/reference/adapter-contract#results)) |
+| `capabilities.recommendedTtl` takes an optional `today`, which caps an answer reaching into the current day whatever `cache.ttl` says | nothing; declare it only for a source cheap to read again |
+| `ctx.upstream`, `ctx.remainingMs` and `capabilities.upstreamAware` (new) let an adapter send each vendor request through its lane | [Requests to the vendor](/analytics/reference/adapter-contract#requests-to-the-vendor) |
+| Each `capture.proxy.routes` entry needs a `kind`, `'script'` or `'data'` | add it ([Capture support](/analytics/reference/adapter-contract#capture-support)) |
+| What an adapter throws decides the error code: a `status`, a gRPC `code`, `retryAfterMs` | throw `ProviderHttpError` ([Errors](/analytics/reference/adapter-contract#errors)) |
+
+## Entry points and exports
+
+The package gained `@10x-media/analytics/site` for a site's server components, and `/tracker` now exports only what a page boots and calls ([Entry points](/analytics/reference/entry-points)). Removed since 1.0.0-beta.11:
+
+| Entry | Removed | Use instead |
+|---|---|---|
+| `/rsc` | `AnalyticsScripts`, `AnalyticsScriptsProps`, `getTrackerConfig` | the same from `@10x-media/analytics/site`, which loads no admin UI |
+| `/rsc` | `TrackerConfig`, `TrackerSlotConfig` | the same types from `/site`, `/tracker` or `/types` |
+| `/rsc` | `widgetCardStyle`, `widgetLabelStyle` | the `WidgetCard` family, or the `analytics-card analytics-widget` classes ([Admin styles](#admin-styles)) |
+| `/react` | `TrackerBoot`, `TrackerBootProps` | `<AnalyticsScripts />` or `<AnalyticsProvider>` |
+| `/tracker` | `GOAL_ATTRIBUTE`, `OUTBOUND_EVENT`, `DOWNLOAD_EVENT`, `SCROLL_EVENT` | the same from `@10x-media/analytics/attributes` |
+| `/tracker` | `readExclusion`, `writeExclusion`, `subscribeExclusion`, `readExclusionParam` | `tracker.excluded` and `tracker.exclude()`, or `excluded` and `setExcluded` from `useAnalytics()` |
+| `/tracker` | `CONSENT_QUEUE_LIMIT`, `CONSENT_STORAGE_KEY`, `ConsentState`, `createConsentQueue`, `readConsent`, `writeConsent` | [Consent](#consent) |
+| `/tracker` | `createNoopTracker`, `createAutoCapture`, `AutoCapture`, `AutoCaptureHandlers`, `createPageTracking`, `PageTracking`, `createScriptLoader`, `acquireTracker`, `TrackerLease`, `PAGEVIEW_BUFFER_MS` | nothing: `initTracker`, `createTracker` and the components cover them |
+| `/tracker` | the sinks: `createNativeSink`, `createGa4Sink`, `Ga4SinkArgs`, `GA4_DISABLE_PREFIX`, `createPlausibleSink`, `PLAUSIBLE_IGNORE_KEY`, `createPosthogSink`, `createUmamiSink`, `UMAMI_DISABLED_KEY`, `VendorSinkArgs`, `Sink`, `TrackerEvent` | nothing: the tracker builds its own |
+| root | `CaptureConsentOption`, `ConsentMode`, `ConsentResolver` | `CaptureGate` |
+| root | `PlatformReadAccess`, `ScopesResolver` | `CrossScopeAccess`, `ScopeListResolver` |
+
+`captureRewrites` and `posthogProxyRewrites` stay exported from `/next`, `@deprecated`, but throw when called ([Capture](#capture)).
+
+Release tags now mark every export: an untagged one is stable, a `@beta` one may change in a minor release, and an `@internal` one is exported only for Payload's import map ([Stability](/analytics/reference/stability)). The five picker paths 1.0.0-beta.11 registered stay exported, marked `@deprecated` with the server path that replaces each, so an import map generated before the upgrade still renders them ([Component paths](/analytics/reference/stability#component-paths)). Of what 1.0.0-beta.11 exported untagged:
+
+| Now | Exports | What to do |
+|---|---|---|
+| `@internal` | `AnalyticsView`, `AnalyticsViewProps`, `AnalyticsStatField` and `AnalyticsPanelField` from `/rsc`; `AnalyticsNavLink`, `AnalyticsNavLinkProps` and `DateRangeField` from `/client` | stop importing them: the plugin registers each, and [`view.Component`](/analytics/customizing#the-analytics-views-body) and the field factories are the seams |
+| `@beta` | the built-in widget components, `analyticsDefaultWidgets`, `widgetFilters`, `CustomWidgetDef` and `WidgetFilter`; `BarList`, `TrendChart`, `TrendPoint` and `RealtimeCounter`; `AnalyticsViewClient`, `AnalyticsViewClientProps` and `ViewGoal`; the widget drawer's pickers and their props, `useAnalyticsSources`, `useFilterCapabilities`, `useAnalyticsGoals`, `AnalyticsSources`, `FilterCapabilities`, `WireGoal` and `GoalsResponse` | nothing now; read a minor release's notes before upgrading code that uses them |
+
+## Admin styles
+
+The admin surfaces read one stylesheet in Payload's `payload` CSS layer instead of inline styles and injected `<style>` tags, so a rule in your admin CSS outside a layer now wins over the plugin's whatever its specificity, and a rule that had to outrank an inline style no longer needs `!important`. See [Styling](/analytics/customizing#styling) for the tokens and classes. Every admin module imports the stylesheet, and the package exports it as `@10x-media/analytics/styles.css`.
+
+| Removed | Use instead |
+|---|---|
+| `widgetCardStyle`, `widgetLabelStyle` from `/rsc` | the `analytics-card analytics-widget` classes, which `WidgetCard` renders; a title in the label look is `WidgetCard`'s `title` |
+| The `react-datepicker` peer dependency | nothing: the range picker is Payload's own `DatePicker` |
+| `.analytics-view__table`, the goals table's inline styles | `.analytics-table`, shared by the view, the widgets and the Analytics tab |
+| `.analytics-view__bars-head`, `.analytics-view__bars-head-dimension` | the table's own header row, `.analytics-table thead`; a ranked table also carries `.analytics-bars` |
+| `.analytics-view__scroll` | `.analytics-table__scroll` |
+| `.analytics-view__sort`, `.analytics-view__sort--metric`, `.analytics-view__sort--secondary` | `.analytics-table__sort` and its arrow, `.analytics-table__sort-arrow` |
+| `.analytics-view__value` | `.analytics-table__value` |
+| `.analytics-view__date`, the view's two day inputs | the range picker (`.analytics-view__control--dates`); a custom range is one history entry, written once both days are picked |
+| The view's pulsing placeholder blocks | Payload's `ShimmerEffect`, still classed `.analytics-view__skeleton` |
+| A delta's colored text | Payload's `Pill`, tinted by the `--analytics-delta-*` tokens |
+
+Other markup changed under the same classes:
+
+- A `BarList` is a `<table>` in which only each row's label is a button; a `TrendChart` carries a hidden data table and draws in a fixed `viewBox`.
+- The border under the breakdown tabs moved from `.analytics-view__tabs` to `.analytics-view__breakdown-head`, and a stat field that has no numbers to show is no longer drawn at 60% opacity: it carries `.analytics-stat--muted`.
+- The breakdown's tab and panel ids are generated, so the fixed `analytics-view-tab-*` and `analytics-view-breakdown-panel` ids are gone, and the plugin's selects no longer carry Payload's `#field-analytics-*` ids.
+- A missing value is markup, a dash with a hidden "no value" beside it, rather than a bare `-` in the text.
+- Muted text reads the new `--analytics-text-muted` token (`--theme-elevation-600`), and bars fill with the new `--analytics-bar-fill` rather than `--analytics-chart-1`; widgets draw soft bars with dark labels.
+- The overview shows at most five card columns; a bucket still counting (today, this hour) is drawn dashed and its label says "so far".
+
+The package now declares `"sideEffects": ["*.css"]` rather than `false`. A `BarList` or `TrendChart` drawn outside the admin imports the stylesheet itself; import `@10x-media/analytics/styles.css` where your bundler does not follow it.
+
+## Admin behavior and wording
+
+| Change | What to do |
+|---|---|
+| The view writes each step with `history.pushState` and `replaceState`; only the **Site** select goes through `router.push` | nothing; Back and Forward restore each step without a server round trip |
+| The custom range is Payload's `DatePicker`, committed once both days are picked; `DateRangeField` stores UTC midnight of each picked day, and the view's and the widgets' ranges stop at today | nothing |
+| `visits` and `sessions` are one count, named **Visits**: a source serving both keeps `sessions`, the view's `?metric=visits` is rewritten to it, and a read naming the one a source does not serve is answered from the other | a custom adapter that answers them as two different numbers loses `visits` |
+| Labels renamed in every language: **Last 12 months** (was "Last year"), **Time on page** (was "Avg. time") and **Visits** (was "Sessions"); a visitors total that adds up each day's visitors reads **Visitors, counted per day** | a host override of those keys keeps its own wording |
+| The goals, providers and sync collections sit in a nav group of their own, **Analytics settings** (the `adminGroup` key, a map by language), where 1.0.0-beta.11 grouped them under the string `'Analytics'`, so the nav names the view's **Analytics** link once; `viewNavLabel`, `viewTitle` and `tabAnalytics` read in the admin's language in every bundled locale. `pluginName` is no longer read, and stays a key you may override | a host collection that sat in the plugin's `'Analytics'` group moves to the same map of labels, built below |
+| Languages the plugin ships no strings for read the English ones; label maps fall back to Payload's `fallbackLanguage` before English; `pt` is Brazilian Portuguese and `zh` uses 您 | nothing |
+| Filter chips read as words (**Country is Germany**), and widget captions name values the way the view does | nothing |
+| Translation keys removed: `viewFrom`, `viewTo`, `viewSortAscending`, `viewSortDescending`, `widgetRealtimeCaption` (now `pluralKeys.liveVisitors` and `pluralKeys.livePageviews`), `goalFieldValue`, `goalFieldValueFixed`, `goalFieldValueProp`, `goalFieldValuePropHelp` (now `goalFieldAmount`, `goalFieldAmountHelp`, `goalFieldAmountProp`, `goalFieldAmountPropHelp` and `goalErrorCurrencyRequired`); `TranslationKey` is `SingularKey \| PluralVariant`. A `translations` override of a removed key now fails the boot | move the override to the new key, or drop it |
+| Placeholders changed: `viewErrorRetryAfter` is `'Try again in {{duration}}.'` and `viewFilterRemove` is `'Remove filter: {{filter}}'` | an override without the placeholder drops the value |
+| Client requests use `credentials: 'same-origin'` (were `'include'`) | nothing for an admin served from the same origin as its API |
+| The plugin registers `goalField()` and every widget-drawer picker at new server component paths, which read the scope on the server | regenerate the import map. Until then the five paths 1.0.0-beta.11 registered still render, keyed by the scope the page's cookies select; only the widget filter's value field and the goal amount control, which are new, render nothing |
+| The realtime card reads its minutes in the reporting timezone, names the zone on its last time label and in every tooltip, and draws three labels | nothing |
+| Plausible's **Website address** and **Script ID** fields each say what they take, and a write-only key field keeps its help text in every language | nothing |
+
+A host collection joins the plugin's group with the same labels, one per language, read from the built-in strings:
+
+```ts title="collections/Reports.ts"
+import { translations } from '@10x-media/analytics/i18n'
+import type { CollectionConfig } from 'payload'
+
+const analyticsSettings: Record<string, string> = {}
+for (const [language, strings] of Object.entries(translations)) {
+  const label = strings.analytics?.adminGroup
+  if (label) analyticsSettings[language] = label
+}
+
+export const Reports: CollectionConfig = {
+  slug: 'reports',
+  admin: { group: analyticsSettings },
+  fields: [{ name: 'title', type: 'text' }],
+}
+```
+
+A `translations` override of `adminGroup` renames the plugin's group; set the same text here.
+
+## Types and components
+
+| Change | What to do |
+|---|---|
+| A metric value is `number \| null`, where `null` means no data: `AnalyticsRow.metrics`, `AnalyticsResult.totals`, `BreakdownRow.value`, `SeriesPoint.value`, `WidgetSeriesResult.total` and `previousTotal`, and `TrendPoint.value` are `MetricValue`s. An average with nothing to average over reads as a dash with no delta, ranks last and breaks a trend line, where it read `0` | handle `null` wherever your code reads a number |
+| `MetricKey` gains `impressions`, `interactions` and `visitDuration`, and `DimensionKey` (`DIMENSION_KEYS`) gains `currency` and `item` | an exhaustive `Record` or `switch` over either adds them; both unions may grow again ([Stability](/analytics/reference/stability#open-unions)) |
+| `Tracker` gains the required `purchase`, `refund`, `setGate` and `gate`, and `track` an optional third argument, `{ item }`; `AnalyticsCommands` gains `purchase`, `refund` and `setGate`, and `AnalyticsApi` `gate` | code that implements `Tracker` itself, such as a test double, adds them |
+| `ResolvedAutoCapture` gains a required `items`, and `AnalyticsBinding` an optional `item` | code that builds a `ResolvedAutoCapture` itself adds `items` |
+| `BreakdownRow.label` is the display label, `''` for no value (was `'(none)'`), and the stored value moved to `dimensionValue` | a custom widget that filters or links by `label` uses `dimensionValue` |
+| `readForWidgetSeries` and the trend surfaces read by week past 31 days and by month past 120, where they always read by day, and name the bucket their points carry in `seriesGranularity` | a custom widget labels its points by that bucket rather than as days |
+| `RealtimeCounterProps.label` and `timezone` are required, `caption` is optional; `TrendPoint.at` is required | pass them |
+| `AnalyticsViewClientProps` takes `endpoints` in place of `apiRoute`, and a required `countryFlags`; `AnalyticsViewProps` loses `pluginOptions`, since the view reads the options the plugin resolved | code that renders the view's body itself passes the new props |
+| The built-in widgets' default exports, `AnalyticsStatField` and `AnalyticsPanelField` are synchronous components that suspend, where they were async functions; the two fields are `@internal`, for the import map alone | render them as components; code that awaited one as a function gets a Suspense element |
+| `/tracker` no longer exports `PAGEVIEW_BUFFER_MS` | nothing: pageviews are sent at once |
+
+Added, for reference: `view.Component`, `countryFlags.Component`, `widgets.overrides`, the `/client` `@beta` set (with `RequestFailure` beside `RequestState`, and `TrendChart`'s `maxTicks`), `WidgetView` and `WidgetViewProps` from `/rsc` and `/types`, `pluralKeys` and the plural types, `BuiltInWidgetSlug`, `AnalyticsComponent`, `QueryFetchError.code`, `TrendPoint.inProgress` and `TrendPoint.upcoming`, `FieldReadResult.incomplete` and `retryAfterMs`, `capabilities.metricReach`, and `visitDuration` on widgets and in the sync collection.
+
+## Time on page and time per visit
+
+`avgDuration` means time on page, engaged time per pageview, on every source, and `visitDuration` time per visit. Until now a vendor's `avgDuration` was its time per visit, so the same label stood for two numbers. See [Providers](/analytics/providers#time-on-page-and-time-per-visit) for what each source declares.
+
+| Change | What to do |
+|---|---|
+| GA4 answers `avgDuration` as `userEngagementDuration` over `screenPageViews`, under every breakdown but `event` and `goal`, and `visitDuration` as `averageSessionDuration` | nothing: its **Time on page** is now engaged time per view rather than the length of a session |
+| Plausible and Umami no longer offer `avgDuration`; their per-visit duration is `visitDuration` | a widget saved on **Time on page** against them shows **Not available for this data source**: pick **Time per visit** in its drawer. Name `visitDuration` in a stat row or an `analyticsStat` that named `avgDuration` for them |
+| Plausible offers `scrollDepth` only by page, filtered by page or for one page, and `bounceRate` and `visitDuration` under every breakdown but `goal`; Umami's pageviews, visits, bounce rate and time per visit are whole-site numbers | nothing: the view and the pickers leave out what a source cannot answer, and the query endpoint refuses it with `unsupported_metric` |
+| Cached reads are keyed anew, so no read answers from an entry stored under the old meaning | nothing: the first read of each query after the upgrade reaches the source |
+| The sync collection gains a `visitDuration` column; the next sync run moves each GA4, Plausible and Umami row's stored `avgDuration` there (see [Sync](/analytics/sync#time-per-visit-moved-to-visitduration)) | Postgres and SQLite in migrate mode: generate and run the migration that adds `visit_duration` |
+| A custom adapter that served a per-visit time as `avgDuration` | serve it as `visitDuration`, and declare `avgDuration` only for a time per pageview; restrict either with `metricReach` where it holds only under some breakdowns |
+
+## Added
+
+For reference, what 1.0.0-beta.12 adds beside the changes above, none of which an install has to adopt: the `@10x-media/analytics/site` entry; the gate API (`setGate`, `gate`, `GateState`, `GateStatus`, the `gate` and `snippets` props), which `capture.gate` drives; `capture.exclusion`, `capture.allowedOrigins` and `capture.skip`; `captureRoute` from `/next`; `routes.base`; `trustedPlatform`; `jobs`; `cache.store`, `cache.collection` and `cache.concurrency`; `hooks.afterRead`; `providers.hosts`, `providers.collection.connectionAccess` and `providers.collection.sourceAccess`; sales and refunds: `purchase` and `refund` on the server and in the browser, order ids up to 255 characters that native stores only as a digest keyed by the Payload secret, `revenue.orderSignature` and `signOrderId`, and a goal's `browser: false`; `identity` on server calls; `collections.<slug>.scopeField` and `item`; [content items](/analytics/items); native filters with `matches` on Postgres and MongoDB, for patterns those databases and JavaScript read alike ([Patterns on the native engine](/analytics/reference/endpoints#patterns-on-the-native-engine)); `meta.failed` and `meta.dataTo`; `view.Component`, `countryFlags`, `widgets.overrides` and the `@beta` sections of `/client`; `capabilities.metricReach` and the `visitDuration` metric; `ProviderHttpError`, `parseRetryAfter` and `refreshProviders`; `ReadonlyViewGate`, `AnalyticsWidgetProps`, `WidgetView` and `WidgetViewProps`; the event names on `/attributes`; the adapter contract types on every adapter entry, `AdapterContext.now`, `close(payload)` and `recommendedTtl.today` among them; `sdks` and its types (`Ga4Sdk`, `Ga4Client`, `Ga4ReportResponse`, `Ga4ReportRow`, `MaxmindSdk`, `MaxmindReader`), which the real packages fit, so neither is needed to type-check; `pluralKeys` and the plural types; `BuiltInWidgetSlug`, `AnalyticsComponent`, `QueryFetchError.code`, `TrendPoint.inProgress` and `TrendPoint.upcoming`; `settleAnalytics` from `/testing`; and the `@10x-media/analytics/migrations` helpers.

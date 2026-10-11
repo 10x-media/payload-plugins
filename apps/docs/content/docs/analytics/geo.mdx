@@ -3,16 +3,37 @@ title: Geo resolution
 description: Resolve visitor country, region, and city at ingest, with headers, MaxMind, or your own resolver.
 ---
 
-The [native engine](/analytics/native) resolves geo per ingested event, server-side. Resolution never blocks ingestion: on any failure the geo fields stay empty and the event is stored anyway.
+The [native engine](/analytics/native) resolves geo per ingested event, server-side. Resolution never costs an event: the built-in resolvers leave the geo fields empty on any failure, and a [resolver of your own](#custom-pipelines) that throws, or answers something other than text for a field, has the event stored without a location instead. A throwing resolver is logged the first time, then at most once an hour while it keeps failing.
 
-## Default: platform headers
+## Platform headers
 
-Out of the box, geo comes from headers your hosting platform already injects. `platformHeaderResolver` reads:
+On Vercel or behind Cloudflare, the platform's edge already writes each visitor's location into the request. The default resolver, `platformHeaderResolver`, reads those headers for the platform the plugin's [`trustedPlatform`](#which-headers-to-trust) names, and for no other:
 
-- `x-vercel-ip-country`, `x-vercel-ip-country-region`, `x-vercel-ip-city` (Vercel)
-- `cf-ipcountry` (Cloudflare, as the country fallback)
+| `trustedPlatform` | Country | Region | City |
+|---|---|---|---|
+| `'vercel'` | `x-vercel-ip-country` | `x-vercel-ip-country-region` | `x-vercel-ip-city` |
+| `'cloudflare'` | `cf-ipcountry` | `cf-region-code` | `cf-ipcity` |
+| unset | none | none | none |
 
-On Vercel or behind Cloudflare this means country-level analytics with zero configuration and zero databases.
+With one line of config this is country-level analytics with no database. Unset, no platform header is read at all: a visitor who sends `cf-ipcountry` themselves changes nothing. Cloudflare sends `cf-region-code` and `cf-ipcity` only once its visitor location headers are turned on; without them only the country is stored.
+
+## Which headers to trust
+
+Two plugin options decide where a visitor's address and location come from. They cannot both be set; the boot fails if they are.
+
+```ts
+analytics({ adapters: [native()], capture: { gate: 'all' }, trustedPlatform: 'vercel' }) // on Vercel
+analytics({ adapters: [native()], capture: { gate: 'all' }, trustedPlatform: 'cloudflare' }) // behind Cloudflare
+analytics({ adapters: [native()], capture: { gate: 'all' }, trustedProxyHops: 1 }) // behind a proxy you run
+```
+
+- **`trustedPlatform`** relies on the platform's edge replacing these headers on every request, whatever the visitor sent. Vercel sets `x-real-ip` to the visitor's address along with its `x-vercel-ip-*` headers; Cloudflare sets `cf-connecting-ip` and `cf-ipcountry` on every request it proxies. Set it only when every request reaches the app through that platform. Behind Cloudflare that means the app accepts traffic from Cloudflare alone, because a request that reaches it directly can carry the same headers with any value.
+- **`trustedProxyHops`** counts the proxies you run in front of the app, from the right of `x-forwarded-for`, and reads no platform header. [Trusted proxies](/analytics/proxy#trusted-proxies) has the details.
+- **Neither:** the address is the leftmost `x-forwarded-for` entry, or `x-real-ip` when the request carries no chain, both of which the visitor can write, and no location header is read.
+
+The answer covers every place the plugin reads a visitor's address: the native visitor hash, geo, and the address the [capture proxy](/analytics/proxy#runtime-endpoint) forwards to a vendor. A [`captureRoute`](/analytics/proxy#a-route-handler-of-your-own) handler runs outside the plugin, so pass it the same option.
+
+In production (`NODE_ENV=production`), an install that sets neither option logs one warning at boot, saying visitor IP addresses and countries can be spoofed, when it reads them at all: native ingest, a proxied vendor, the providers collection or `providers.resolve`. While neither `trustedPlatform` nor a `trustedProxyHops` of 1 or more is set, the first request whose `x-forwarded-for` lists two or more addresses logs one more warning.
 
 ## MaxMind (optional)
 
@@ -22,15 +43,25 @@ For self-hosted deployments without geo headers, point the engine at a MaxMind G
 native({ geoDbPath: '/data/GeoLite2-City.mmdb' })
 ```
 
-This composes headers-first with MaxMind: IP lookup runs only when headers did not already supply a country. It requires two things you provide:
+This composes headers-first with MaxMind: IP lookup runs only when headers did not already supply a country. It requires two things you provide: the `maxmind` package, an optional peer dependency the app installs and passes in, and a downloaded `.mmdb` file (GeoLite2 is free with a MaxMind account).
 
 ```bash
-pnpm add maxmind   # optional peer dependency, loaded lazily
+pnpm add maxmind
 ```
 
-and a downloaded `.mmdb` file (GeoLite2 is free with a MaxMind account). If the library is missing, the file is unreadable, or a lookup fails, resolution degrades to empty fields with a single logged warning.
+```ts title="payload.config.ts"
+import { open } from 'maxmind'
 
-The address it looks up is the one `x-forwarded-for` reports, and which entry of that chain counts is the plugin's [`trustedProxyHops`](/analytics/proxy#trusted-proxies). Unset, it is the leftmost entry, which a client can write: a visitor who sets the header geo-locates wherever they please. Set to the number of proxies actually in front of the app, it is the address the outermost trusted one saw, and a chain shorter than that count resolves no geo at all rather than trusting `x-real-ip`. An install that geo-locates from MaxMind and sits behind its own proxy should set it.
+analytics({
+  adapters: [native({ geoDbPath: '/data/GeoLite2-City.mmdb' })],
+  capture: { gate: 'off' },
+  sdks: { maxmind: { open } },
+})
+```
+
+`sdks.maxmind` is what the database is opened with, by `geoDbPath` and by a [`maxmindResolver`](#custom-pipelines) in a pipeline of your own alike; `maxmindResolver({ dbPath, sdk })` hands one resolver its own instead. Passed in, the package is part of what the app imports, so a standalone or serverless build ships it. Without it the plugin loads `maxmind` by name on the first lookup, which works where the full `node_modules` is present and fails in a build that only ships what the app imports. A production boot logs a warning naming `sdks.maxmind` when `geoDbPath` would do that, or a `maxmindResolver` passed as `geoResolver`, directly or through `composeGeoResolvers`. If the package is missing, the file is unreadable, or a lookup fails, resolution degrades to empty fields with a single logged warning. `sdks.maxmind` is typed by its shape, `MaxmindSdk`, whose `open` resolves a `MaxmindReader`: `maxmind`'s own `open` fits it, and none of the plugin's types import the package, so an app without it type-checks, with `skipLibCheck` off too.
+
+The address it looks up is the one the install's [request trust](#which-headers-to-trust) resolves: the platform's own header under `trustedPlatform`, else the `x-forwarded-for` entry [`trustedProxyHops`](/analytics/proxy#trusted-proxies) picks. With neither, it is the leftmost entry, which a client can write: a visitor who sets the header geo-locates wherever they please. Set to the number of proxies actually in front of the app, `trustedProxyHops` reads the address the outermost trusted one saw, and a chain shorter than that count resolves no geo at all rather than trusting `x-real-ip`. An install that geo-locates from MaxMind and sits behind its own proxy should set it.
 
 ## Custom pipelines
 
@@ -47,22 +78,30 @@ import {
 } from '@10x-media/analytics/geo'
 ```
 
-A `GeoResolver` is `(headers: Headers, opts?: { trustedProxyHops?: number }) => Geo | Promise<Geo>` where `Geo` is `{ country?, region?, city? }`. Compose resolvers left to right; the first one that produces a country wins:
+A `GeoResolver` is `(headers: Headers, opts?: GeoResolverOptions) => Geo | Promise<Geo>` where `Geo` is `{ country?, region?, city? }` and the options are `{ trustedProxyHops?: number; trustedPlatform?: 'vercel' | 'cloudflare'; maxmind?: { open } }`, the last being the plugin's `sdks.maxmind`. Compose resolvers left to right; the first one that produces a country wins:
 
 ```ts
+declare function lookupInMyService(address: string | null): Promise<Geo>
+
 native({
   geoResolver: composeGeoResolvers(
     platformHeaderResolver,
     maxmindResolver({ dbPath: '/data/GeoLite2-City.mmdb' }),
-    async (headers) => lookupInMyService(headers.get('x-real-ip')),
+    async (headers) => {
+      try {
+        return await lookupInMyService(headers.get('x-real-ip'))
+      } catch {
+        return {}
+      }
+    },
   ),
 })
 ```
 
-The second argument carries the install's `trustedProxyHops`, and is passed to every resolver in the chain. Resolvers that read only platform headers ignore it; one that does its own IP lookup should apply the same rule `maxmindResolver` does, reading the entry that many hops from the right of `x-forwarded-for`. The example above reads `x-real-ip` directly and is unaffected either way. The parameter is optional, so a one-argument resolver written before this option existed still type-checks and still runs.
+The second argument carries the install's request trust, `trustedProxyHops` and `trustedPlatform`, and is passed to every resolver in the chain. A resolver that reads platform headers should read them only when `trustedPlatform` names that platform, as `platformHeaderResolver` does; one that does its own IP lookup should apply the same rule `maxmindResolver` does, reading the platform's address header under `trustedPlatform` and otherwise the entry that many hops from the right of `x-forwarded-for`. The example above reads `x-real-ip` directly, which only a host that trusts that header should do. It answers no place when its service fails rather than throwing: a throw ends the chain, so the resolvers after it are never asked, and the event is stored without a location with a warning in the log. The parameter is optional, so a one-argument resolver written before these options existed still type-checks and still runs.
 
 Use `noopResolver` to disable geo entirely (`geoResolver: noopResolver`).
 
 ## Where geo shows up
 
-Geo lands on each raw event and in the site-wide country rollup, which powers the Countries [dashboard widget](/analytics/widgets) and the `country` dimension. Events without a resolved country are simply omitted from country breakdowns; totals are unaffected.
+Geo lands on each stored hit and, through the visit the hit belongs to, in the daily totals by country, region and city, which power the Countries [dashboard widget](/analytics/widgets) and the `country` dimension. Hits without a resolved country are simply omitted from country breakdowns; totals are unaffected.

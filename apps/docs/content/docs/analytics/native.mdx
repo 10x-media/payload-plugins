@@ -9,52 +9,85 @@ description: Self-hosted, cookieless analytics stored inside Payload.
 import { analytics } from '@10x-media/analytics'
 import { native } from '@10x-media/analytics/adapters/native'
 
-analytics({ adapters: [native()] })
+analytics({ adapters: [native()], capture: { gate: 'all' } })
 ```
 
-Registering it adds three hidden collections (`analytics-events`, `analytics-rollups`, `analytics-seen`) and a public beacon endpoint. Metrics served: `pageviews`, `visitors`, `sessions`, `events`, `avgDuration`, `conversions`, `revenue`, `scrollDepth`. Dimensions: `page`, `referrer`, `source`, `channel`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event`, `goal`, each of them detailed under [dimensions](#dimensions). Realtime is supported.
+It runs on MongoDB 5.0 or later, Postgres 12 or later and SQLite 3.35 or later (the libsql client Payload's SQLite adapter uses ships a newer one). On a MongoDB server older than 5.0 hits are still stored, but every count and read refuses with a `SourceMisconfiguredError`, and the boot logs the reason once: the engine cuts visits with `$setWindowFields`, which 5.0 added. For the same reason, services that only speak MongoDB's protocol (Amazon DocumentDB, Azure Cosmos DB, Firestore) are not supported. Cloudflare D1 (`@payloadcms/db-d1-sqlite`) is not supported yet: the boot fails with a message saying so. The vendor adapters read on D1, and the sync and warm tasks keep their leases, cursor and heartbeat in `analytics-state` there as everywhere else, through Payload's database API since the plugin runs no SQL of its own on D1. The one difference is how fast a killed run's lease frees up: [within twice its length](#one-run-at-a-time).
+
+Registering it adds three hidden collections (`analytics-hits`, `analytics-aggregates` and `analytics-state`, see [storage](#storage)), a public beacon endpoint and, unless `jobs` is `false`, the `analytics-maintain` task (see [maintenance](#maintenance)). Metrics served: `pageviews`, `visitors`, `sessions`, `bounceRate`, `avgDuration`, `visitDuration`, `scrollDepth`, `events`, `conversions`, and `revenue` on an install that [measures money](/analytics/revenue). Dimensions: `page`, `referrer`, `source`, `channel`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event`, `goal`, and `currency` on an install that measures money, each of them detailed under [dimensions](#dimensions). An install that binds a collection as [content items](/analytics/items) also gets the `impressions` and `interactions` metrics, the `item` dimension and filter, and `perItemQuery`. Realtime is supported, and a week or a month is counted exactly from its days.
+
+## Storage
+
+Every beacon is stored as one row of `analytics-hits`, a **hit**: a pageview, an event, a goal or an engagement, with its time, its page and hostname, the day's [visitor id](/analytics/privacy#the-visitor-id) and what ingest classified about it. Storing one is a single insert with no read before it, and nothing is counted when it arrives.
+
+A day is counted once it is over in its scope's [reporting timezone](/analytics/timezone). Its hits are cut into [visits](#visits-and-visitors) and summed into `analytics-aggregates`: one row of **daily totals** per scope, local day, hostname and dimension value (the site as a whole, one page, one country, one goal by channel), each holding the counts every metric is computed from. Averages are never stored, only what they divide, so a week or a month adds its days up exactly. How many values one dimension keeps per day is [capped](#daily-totals-and-caps), and [how a read is answered](#how-a-read-is-answered) says when a day is counted.
+
+A day's totals carry a generation: a count writes its rows beside the ones reads use and then switches reads to them (see [Writing a day's totals](#writing-a-days-totals)). A row's id is therefore a 22-character hash of its key (scope, day, hostname, dimension and value) and its generation, so two generations of a row sit side by side without a longer key in the table or its index.
+
+`analytics-state` holds, one row each:
+
+- the [daily salts](#the-daily-salts), `salt:<date>`;
+- a marker per day of each scope, `day:<scope>:<date>`: whether and in which zone the day was counted, which generation reads use, the day's lease while a process counts it, and in its value where its count started when not at midnight and `failures`, the counts [maintenance](#maintenance) started on it since the last one that completed;
+- the lease of a maintenance run, `lease:maintain`, and of the sync and warm tasks;
+- where maintenance last cut each scope's raw hits, `pruned:<scope>` and `cursor:prune:<scope>`;
+- each scope's last maintenance pass, `cursor:maintain:<scope>`, and the scope the last run reached, `cursor:maintain-rotation`;
+- a note per day write whose old rows are still to be deleted, `drop:<scope>:<date>:<generation>`;
+- when each task last ran, `heartbeat:<task>`.
+
+The three collections are hidden from the admin, have no REST or GraphQL endpoints, and refuse every request through their access functions: the engine reads and writes them itself. `native({ collections })` renames and reshapes them, within what the engine reads: see [Renaming the plugin's collections](/analytics/reference/options#renaming-the-plugins-collections). Their ids are text the engine generates, so no database sequence is involved. A migrate-mode Postgres or SQLite install creates their tables with a generated migration (`payload migrate:create`); push mode and MongoDB need nothing. An install upgrading from 1.0.0-beta.11 or earlier also removes the old engine's storage, which is not converted: [Upgrading](/analytics/upgrading) has the migration for each database.
 
 ## The ingest endpoint
 
-`POST /api/analytics/ingest` (path configurable via `ingestPath`) accepts one event per request. The plugin's own [browser tracker](/analytics/capture) posts exactly this shape:
+`POST /api/_x/e` accepts one event per request. It moves with the plugin's [`routes.base`](/analytics/reference/endpoints#where-the-endpoints-answer), and `ingestPath` moves it on its own. The plugin's own [browser tracker](/analytics/capture) posts this shape:
 
 ```ts
 interface RawEventInput {
-  type: 'pageview' | 'event' | 'goal'
+  type: 'pageview' | 'event' | 'goal' | 'engagement'
   path: string          // required
   hostname?: string     // optional; the stored hostname comes from the request, see below
-  name?: string         // event name, or the goal slug; required unless type is 'pageview'
+  name?: string         // event name, or the goal slug; required on an event and a goal
   referrer?: string
-  query?: string        // the page's query string, no leading '?'; read on any type
-  durationMs?: number
+  query?: string        // the page's campaign keys as a query string, no leading '?'; read on any type
+  durationMs?: number   // visible time an engagement adds; kept on a pageview from an older tracker
+  sinceMs?: number      // an engagement: milliseconds since its pageview was sent, at most a day
+  ageMs?: number        // any type: milliseconds the event waited in the page before it was sent, at most a day
+  nav?: 1               // a pageview a single-page app made in place, without loading a page
   props?: Record<string, unknown>
   value?: number        // revenue for a goal completion, in `currency`
   currency?: string     // ISO 4217
-  scrollDepth?: number  // deepest scroll on a pageview, 0-100
+  scrollDepth?: number  // 0 on a pageview that measures scroll, the increase on an engagement; 0-100
+  item?: string         // an event or a goal: the content item it belongs to, `<collection>:<id>`
+  impressions?: string[] // an engagement: the content items seen since the previous one
+  orderId?: string      // a sale: the order's id, whose digest keys its row so a retried sale counts once
+  items?: { id: string; name?: string; quantity?: number; price?: number }[] // a sale's lines
 }
 ```
 
-An event is rejected only on its required fields: a known `type`, a non-empty string `path`, and a non-empty string `name` on everything but a pageview. `hostname` is not one of them: it is optional on the wire, and a body that carries one is only type-checked, since the stored value comes from the request rather than from the body (see [Where the hostname comes from](#where-the-hostname-comes-from)). Optional fields are sanitized rather than rejected, so one malformed attribute costs an attribute instead of the whole event: `value` must be a finite number `>= 0`, `currency` must match `/^[A-Z]{3}$/`, `scrollDepth` is clamped to 100 and rounded, `durationMs` must be a finite number between 0 and 86,400,000 (a day) or it is dropped, `name` is truncated to 128 characters (it is the `event` dimension's bucket key) and `path` to 512 (another rollup bucket key; the hostname is a third, and is [refused rather than truncated](#what-counts-as-a-hostname) past 253), and `props` keeps at most 20 flat scalar entries with keys up to 64 characters and string values truncated to 256. The request body is capped at 64 KiB (`413 payload_too_large` above it) and unparseable JSON answers `400 invalid_param`.
+The exported `RawEventInput` type, which [`ingestRoute`](/analytics/capture#taking-beacons-in-a-route-of-your-own) and server code share, also has `revenue` and `refundId`. Only server code sets them: a beacon carrying `revenue: true` or a negative `value` is refused.
 
-The server derives the rest at ingest time: the hostname the event is stored under, the [dimensions](#dimensions) below, a salted daily visitor hash (the salt rotates per UTC day, so visitors cannot be tracked across days), and the [goals](/analytics/goals) the event completed, stamped onto the stored event. The endpoint responds `202` on success and `400` on an invalid body. A beacon whose user agent belongs to automated traffic is answered with that same `202` and stored nowhere; see [bot filtering](#bot-filtering).
+An event is rejected only on its required fields: a known `type`, a non-empty string `path`, and a non-empty string `name` on an event and a goal; and on the two server-only values above. An event whose `orderId` is not one (empty, longer than 255 characters, holding a control character, or unsigned where [`revenue.orderSignature`](/analytics/revenue#recorded-in-the-browser-and-by-the-webhook) requires a signature) is dropped rather than stored as a sale without its key, which would count again on every reload, and answered like any [dropped event](#dropped-events). `hostname` is not one of them: it is optional on the wire, and a body that carries one is only type-checked, since the stored value comes from the request rather than from the body (see [Where the hostname comes from](#where-the-hostname-comes-from)). Optional fields are sanitized rather than rejected, so one malformed attribute costs an attribute instead of the whole event: `value` must be a finite number `>= 0`, `currency` must match `/^[A-Z]{3}$/`, `scrollDepth` is clamped to 100 and rounded, `durationMs` must be a finite number between 0 and 1,800,000 (half an hour, the most one engagement carries) or it is dropped, `sinceMs` is read on an engagement alone and `ageMs` on any type, each only as a number from 0 to 86,400,000, a day (see [Time on page and scroll depth](#time-on-page-and-scroll-depth)), `nav` is read on a pageview alone and only as `1`, `name` is truncated to 128 characters (it is what the `event` dimension groups by) and `path` to 512 (what the `page` dimension groups by; the hostname is held to [a shape of its own](#what-counts-as-a-hostname) and refused rather than truncated past 253), and `props` keeps at most 20 flat scalar entries with keys up to 64 characters and string values truncated to 256. `item` and every entry of `impressions` must be a ref of a collection bound as an item, at most 128 characters with its id written as `encodeURIComponent` writes it, with an id that collection could hold, and carrying the signature the server wrote for it (see [content items](#content-items)); anything else is dropped, and `impressions` keeps at most 50 distinct refs. The request body is capped at 64 KiB (`413 payload_too_large` above it) and unparseable JSON answers `400 invalid_param`.
 
-A refusal is the same [error envelope](/analytics/data-sources#errors) the authenticated endpoints answer: `{ "error": { "code", "message", "param"? } }`. The `400` names the first field the event failed on in `param`, checked as `type`, `path`, `hostname`, `name`, so a tracker author is not left guessing which one was refused; a missing `hostname` never lands there, only a non-string one does. Unparseable JSON names `type`, and a body that died in transit (a beacon from an unloading tab) names nothing. The `413` is `payload_too_large` and names nothing either.
+The server derives the rest at ingest time: the hostname the event is stored under, the [dimensions](#dimensions) below, a [visitor id](/analytics/privacy#the-visitor-id) hashed with the day's salt (a new salt each day of the scope's reporting timezone, so a visitor cannot be followed from one day to the next), and the [goals](/analytics/goals) the event completed, stamped onto the stored hit. The endpoint responds `202` on success and `400` on an invalid body. A beacon whose user agent belongs to automated traffic is answered with that same `202` and stored nowhere; see [bot filtering](#bot-filtering).
 
-`query` never reaches storage. It is capped at 512 characters, parsed for its five `utm_*` keys and for the [ad click ids](#traffic-channels) the channel classifier reads, and thrown away, so a session token or an email address that happens to be in the URL is not written to the events collection. The endpoint reads it on any event type; the tracker only sends it with pageviews, and sending it at all is optional: [`capture.autoCapture.query: false`](/analytics/capture#auto-capture) stops the tracker putting it on the wire.
+A refusal is the same [error envelope](/analytics/reference/endpoints#errors) the authenticated endpoints answer: `{ "error": { "code", "message", "param"? } }`. The `400` names the first field the event failed on in `param`, checked as `type`, `path`, `hostname`, `name`, `revenue`, then `value`, so a tracker author is not left guessing which one was refused; a missing `hostname` never lands there, only a non-string one does. Unparseable JSON names `type`, and a body that died in transit (a beacon from an unloading tab) names nothing. The `413` is `payload_too_large` and names nothing either.
 
-A `goal` event counts under `events`, never under `pageviews`, and is kept out of the `event` dimension breakdown: its name is a goal slug, and it appears under the `goal` dimension instead. `revenue` is summed as a plain number in the event's own currency, with no conversion; see the currency note on [Goals](/analytics/goals#how-native-reports-them). `scrollDepth` averages over the pageviews that actually reported one, tracked by its own sample counter so a pageview whose tracker never sent a depth does not drag the average down.
+`query` never reaches storage. It is capped at 512 characters, parsed for its five `utm_*` keys and for the [ad click ids](#traffic-channels) the channel classifier reads, and thrown away, so a session token or an email address that happens to be in the URL is never stored. The tracker puts only those keys on the wire in the first place: each `utm_*` key's value, and each click id by name with a placeholder value. The endpoint reads `query` on any event type; the tracker sends it with a pageview and repeats it on that pageview's engagement, so both land under the same campaign, and sending it at all is optional: [`capture.autoCapture.query: false`](/analytics/capture#auto-capture) stops the tracker putting it on the wire.
 
-Events are written atomically, via `$inc` on Mongo and `ON CONFLICT DO UPDATE` on Postgres, so concurrent ingestion is safe.
+A `goal` event counts under `events`, never under `pageviews`, and is kept out of the `event` dimension breakdown: its name is a goal slug, and it appears under the `goal` dimension instead. `revenue` is summed in the install's reporting currency when it sets one, and as a plain number in each event's own currency when it does not; see [Revenue](/analytics/revenue#one-reporting-currency-per-tenant). An `engagement` counts as nothing at all, and only adds time, scroll and the items it saw; see [Time on page and scroll depth](#time-on-page-and-scroll-depth).
+
+Storing a hit is one insert with no read before it, so concurrent beacons never wait on each other. A beacon the database fails to store still answers `202`, and the failures are logged at most once a minute.
+
+Payload signs every REST request in before its handler runs, which a beacon has no use for. A site taking many beacons a second can take them in a Next.js route of its own with [`ingestRoute`](/analytics/capture#taking-beacons-in-a-route-of-your-own), which applies every rule on this page and stores the same rows.
 
 ### Where the hostname comes from
 
 The stored hostname is the host the request itself carried, not the one its body claims. With the plugin's [`trustedProxyHops`](#trusted-proxies) set to `n` of 1 or more, that is the `x-forwarded-host` entry `n` from the right, the value the outermost trusted proxy wrote; otherwise it is the `Host` header. The count runs from the right for the same reason it does on `x-forwarded-for`: a proxy that appends rather than replaces leaves whatever the client sent at the head of the chain, so the leftmost value is the attacker-controlled end. When the chain yields nothing usable, whether it is shorter than `n` or carries junk, `Host` is used instead, since the peer is still the trusted proxy. A request that yields no usable hostname at all is dropped.
 
-The `Origin` header is deliberately never read. A scripted client can pair a valid `Host` with any `Origin` it likes, so reading it would leave the hole this closes: one client minting unlimited hostname bucket families inside a scope it is legitimately allowed to send to. The request host is what the edge routes on, so it can only ever be a host that reaches the install.
+The `Origin` header never decides the hostname. A scripted client can pair a valid `Host` with any `Origin` it likes, so storing it would leave the hole this closes: one client minting unlimited hostnames inside a scope it is legitimately allowed to send to. The request host is what the edge routes on, so it can only ever be a host that reaches the install. Ingest reads `Origin` only to [drop](#dropped-events) a beacon a browser sent from another site's page.
 
 #### What counts as a hostname
 
-One shape, everywhere: the request's host, a `hostname` list entry, a `platformHostnames` entry and a resolver's answer are all held to it, because two spellings of one host would open two rollup bucket families, and [pruning rollups](#retention-pruning) is opt-in.
+One shape, everywhere: the request's host, a `hostname` list entry, a `platformHostnames` entry and a resolver's answer are all held to it, because two spellings of one host would be counted as two hosts, each with daily totals of its own, and daily totals are kept.
 
 A value is lowercased, loses its port, its brackets and every trailing root dot, and must then be either dot-separated labels of `a-z`, `0-9`, `_` and `-` (which covers every IPv4 literal) or an IPv6 literal of hex groups and colons, within 253 characters. `Example.COM:3000`, `example.com.` and `example.com..` are therefore one hostname, and `[::1]:3000` is stored as `::1`. Anything else is not a hostname and the event is dropped: a leading or doubled dot, an unclosed bracket, a percent-encoded or non-ASCII spelling, a port that is not digits, a scheme, or a name over the cap, which is refused rather than truncated into a name of its own.
 
@@ -80,27 +113,29 @@ The request host is stored only when the list holds it, and the event is dropped
 native({ hostname: ['example.com', 'www.example.com'] })
 ```
 
-Entries are bare hostnames, lowercased at boot: a scheme or a port in an entry fails the boot rather than silently matching nothing, and an empty list is refused for the same reason. **This is the form to use on a single-site install with no `scopeResolver` and no edge that validates `Host`.** There, `Host` is exactly as forgeable as the body was, and the list is the only thing that bounds which hostnames can be written.
+Entries are bare hostnames, lowercased at boot: a scheme or a port in an entry fails the boot rather than silently matching nothing, and an empty list is refused for the same reason. **This is the form to use on a single-site install with no `scope.resolve` and no edge that validates `Host`.** There, `Host` is exactly as forgeable as the body was, and the list is the only thing that bounds which hostnames can be written.
 
 #### A resolver
 
 ```ts
+declare function tenantOwnsOrigin(req: PayloadRequest, tenant: string, origin: string): Promise<boolean>
+
 native({
   hostname: async ({ req, scope }) => {
     // A split deployment: the page is on the tenant's domain, the API is not, so the
     // page's own origin is validated against what the scope already resolved. `claimed`,
     // the body's own hostname, is available here too and is the one value never trusted.
     const origin = req.headers.get('origin')
-    return origin && (await tenantOwnsOrigin(req, scope, origin)) ? new URL(origin).hostname : null
+    return origin && scope && (await tenantOwnsOrigin(req, scope, origin)) ? new URL(origin).hostname : null
   },
 })
 ```
 
-It receives the body's claim, the request, and the scope the request already resolved to, and returns the hostname to store or `null` to drop the event. **The answer must be a [hostname](#what-counts-as-a-hostname)**: it is normalized and then held to the same shape a request host is, and anything else drops the event. A resolver answering a tenant id, a slug or a label would otherwise write free text per event and reopen exactly the unbounded bucket families this closes. A resolver that throws drops the event too: ingest is a public path, so a broken lookup loses one event rather than the response.
+It receives the body's claim, the request, and the scope the request already resolved to, and returns the hostname to store or `null` to drop the event. **The answer must be a [hostname](#what-counts-as-a-hostname)**: it is normalized and then held to the same shape a request host is, and anything else drops the event. A resolver answering a tenant id, a slug or a label would otherwise write free text per event and reopen exactly the unbounded hostnames this closes. A resolver that throws drops the event too: ingest is a public path, so a broken lookup loses one event rather than the response.
 
 #### Scoped installs and `platformHostnames`
 
-On an install with a `scopeResolver`, an event whose request resolves no scope is dropped. Nothing is listed for that: a tenant who adds a custom domain is counted the moment the tenant document is saved, because the rule is "the request resolved to a tenant" and that lookup is the install's own. See [Multi-tenancy](/analytics/multi-tenancy#capture-slots-per-tenant) for the resolver to write.
+On a scoped install, an event whose request resolves no scope is dropped. Nothing is listed for that: a tenant who adds a custom domain is counted the moment the tenant document is saved, because the rule is "the request resolved to a tenant" and that lookup is the install's own. See [Multi-tenancy](/analytics/multi-tenancy#capture-slots-per-tenant) for the resolver to write.
 
 `platformHostnames` is the exception, and it is a static list on purpose:
 
@@ -110,10 +145,54 @@ native({ platformHostnames: ['app.example.com', 'www.example.com'] })
 
 Those are the platform's own domains, which are infrastructure rather than tenants: they change with a deploy, not with a signup, so listing them costs nothing. A request from one of them ingests under the null scope even though it resolves no tenant. Tenant domains never belong here.
 
-<Callout type="info">
-**A dropped event answers exactly what an accepted one answers**: `202` with `{ "ok": true }`, the same headers, and nothing per event in the log. A prober therefore learns nothing about which hosts or tenants exist, and a public endpoint is not a log amplifier, since an attacker would otherwise choose how much it writes.
+`scope.resolve` runs for every beacon, before the event is stored: every pageview, every event and every engagement. A resolver that looks the request's host up in the database runs that query just as often, so keep each host's answer for a short while:
 
-The server log still says it once. The first drop of each reason (`scopeResolver` answered no scope, or the `hostname` option refused the request host) writes one `warn` line naming the option to check, and every later drop of that reason is silent for the life of the process. So if events stop arriving, that line is where to start; past it, the endpoint is deliberately quiet.
+```ts
+declare function tenantByHost(req: PayloadRequest): Promise<string | null>
+
+const TTL_MS = 60_000
+const MAX_HOSTS = 1_000
+const tenantsByHost = new Map<string, { tenant: string | null; at: number }>()
+
+/** `tenantByHost` from Multi-tenancy, asked at most once a minute for each host. */
+const cachedTenantByHost = async (req: PayloadRequest): Promise<string | null> => {
+  const host = req.headers.get('host')?.split(':')[0]?.toLowerCase() ?? ''
+  const known = tenantsByHost.get(host)
+  if (known && Date.now() - known.at < TTL_MS) {
+    return known.tenant
+  }
+  const tenant = await tenantByHost(req)
+  tenantsByHost.delete(host)
+  tenantsByHost.set(host, { tenant, at: Date.now() })
+  if (tenantsByHost.size > MAX_HOSTS) {
+    const oldest = tenantsByHost.keys().next().value
+    if (oldest !== undefined) {
+      tenantsByHost.delete(oldest)
+    }
+  }
+  return tenant
+}
+```
+
+Call it at the `capture` call site in place of `tenantByHost` from the [worked example](/analytics/multi-tenancy#a-worked-example). The map holds at most 1,000 hosts, oldest dropped first, because `Host` is whatever a request says it is, and a host that resolves no tenant is remembered like any other. A domain added to a tenant is then counted within a minute rather than at once.
+
+### Dropped events
+
+Ingest drops an event, storing nothing, when:
+
+- `scope.resolve` answers no scope for the request on a scoped install, and its host is not in `platformHostnames`;
+- the `hostname` option refuses the request host;
+- on a scoped install that keeps its sources as [provider documents](/analytics/providers#provider-documents), the scope has no enabled native one;
+- a page on another site sent the beacon (`Sec-Fetch-Site: cross-site`) from an origin [`capture.allowedOrigins`](/analytics/capture#beacons-from-other-sites) does not list;
+- a page on a sibling subdomain sent it (`Sec-Fetch-Site: same-site`) from an origin `scope.resolve` maps to another scope than the request's, so one tenant's pages cannot post into another's numbers;
+- its `orderId` is [not one ingest can keep](#the-ingest-endpoint).
+
+Automated traffic is dropped the same way, before any of these; see [bot filtering](#bot-filtering).
+
+<Callout type="info">
+**A dropped event answers exactly what an accepted one answers**: `202` with `{ "ok": true }`, the same headers, and nothing per event in the log. The response therefore does not tell a prober whether a host, a tenant or an order id was taken, and a public endpoint is not a log amplifier, since an attacker would otherwise choose how much it writes. The [tracker config](/analytics/reference/endpoints#tracker-config-endpoint) a page loads does say which capture slots its host fills, by design.
+
+The server log still says it once. The first drop of each reason writes one `warn` line naming the option to check, and every later drop of that reason is silent for the life of the process. So if events stop arriving, that line is where to start; past it, the endpoint is deliberately quiet.
 </Callout>
 
 ### Trusted proxies
@@ -121,12 +200,46 @@ The server log still says it once. The first drop of each reason (`scopeResolver
 `trustedProxyHops` is a plugin option rather than a native one, because the same client address is read by the native visitor hash, by the [geo resolvers](/analytics/geo), and by the [capture proxy](/analytics/proxy#runtime-endpoint):
 
 ```ts
-analytics({ adapters: [native()], trustedProxyHops: 1 })
+analytics({ adapters: [native()], capture: { gate: 'all' }, trustedProxyHops: 1 })
 ```
 
 Unset, the leftmost `x-forwarded-for` entry is used, which is correct for honest traffic and is whatever the client wrote for the rest. Set to `n`, the entry `n` from the right is used, which is the address the outermost trusted proxy saw, and a chain shorter than `n` yields no address rather than falling back to the client-writable `x-real-ip`. It also lets the native ingest read `x-forwarded-host` for the event's hostname. It must be a non-negative integer or the boot fails.
 
 There is no default of 1. An install behind a CDN plus a proxy would then read the CDN's address for every visitor, collapsing geo and the visitor hash onto one value, which is worse than a spoofable one. Count the hops your own deployment actually has.
+
+On Vercel or behind Cloudflare, set [`trustedPlatform`](/analytics/geo#which-headers-to-trust) instead: the address then comes from the header the platform's edge writes (`x-real-ip` or `cf-connecting-ip`), and so does the visitor's location. The two options cannot be set together.
+
+## Time on page and scroll depth
+
+The tracker sends a pageview the moment a page is tracked. What the visitor does on the page after that arrives as `engagement` events:
+
+- **Time** counts only while the tab is visible. It pauses when the visitor switches to another tab or app, and carries on when they come back.
+- **Scroll depth** is how far down the page the visitor got, as a percentage of its height. It is measured while the page is the one on screen: on each scroll, at most once per animation frame, and once its first screen has had a second to render, so a page too short to scroll still has a depth. An engagement carries the deepest point measured, never where the layout sits when it is sent, which on a single-page app's navigation is already the next page's. It is measured only with [`autoCapture.scrollDepth`](/analytics/capture#auto-capture) on.
+
+A page the browser prerenders (Chrome's speculation rules) is not tracked until a visitor actually opens it: its pageview waits for the page to be shown, so a prerender nobody opens counts nothing, and its time and scroll are measured from that moment.
+
+Each engagement carries what was added since the one before it: the visible time since then, how many points deeper the page was scrolled, and the [content items](/analytics/items) seen, plus how long ago its pageview was sent, as `sinceMs`. The tracker sends one when the tab is hidden, when the page is left, and before the next pageview of a single-page app, and never when nothing is new: under a second of time, no deeper scroll and no item seen. A page restored from the browser's back/forward cache carries on with the pageview it already sent.
+
+**One engagement carries at most 30 minutes of time.** A tab left in front for longer than that between two messages counts 30 minutes for that stretch, so one forgotten tab cannot stretch an average for hours, and ingest drops a `durationMs` above it outright.
+
+An engagement is stored as a row of its own, with its page's path and hostname, its pageview's visitor id, the time and scroll it adds and the [content items](#content-items) it saw. It carries nothing else about the visitor: place, device, language and where the visit came from are on the visit's other hits, and a read takes them from the [visit](#visits-and-visitors) the engagement belongs to. A read narrowed to one device or one campaign therefore still finds the time spent under it. It is never counted as a pageview, an event, a visitor or a visit.
+
+**An engagement is filed at its pageview's start.** Its row's `ts` is the moment it arrived less the `sinceMs` it was sent with, so its time and scroll count on that moment's day, and its visitor id is computed with that day's salt: the row carries its pageview's visitor, and time sent after midnight in the reporting timezone still counts toward the day its pageview was on. Its arrival is kept beside it as `lastAt`, which is what keeps a long read on one page inside one visit.
+
+**An event the page held is filed when it happened.** An event the tracker kept in the page before sending it, such as a pageview waiting for its slot's [consent gate](/analytics/consent) to answer, carries `ageMs`, how long it waited. Ingest files every event `ageMs` before it arrived, and an engagement `ageMs` plus `sinceMs` before, so a pageview sent once the visitor answers lands before the engagements that follow it. Ingest believes each only from 0 to a day, and the two together move an event back at most a day; a value outside that counts as 0, so neither a lying body nor a stale tab can move time further. The tracker measures both, and the visible time, with the page's own steady clock (`performance.now()`) rather than its date, so a visitor whose clock is wrong has their time filed beside their pageview all the same.
+
+| Metric | Is |
+|---|---|
+| `avgDuration` | All the visible time sent for the read's pageviews, divided by the number of pageviews. |
+| `scrollDepth` | All the scroll sent for the read's pageviews, divided by the pageviews that measure it, and never above 100. A pageview sent with scroll capture on carries `scrollDepth: 0`, so it counts even when its visitor never scrolled; one sent with it off carries none and is left out. One engagement carries at most 100, but nothing limits how many arrive for one pageview, so the average is capped at the whole page rather than letting a forged series read past it. |
+
+With nothing to average over, either reads `null` rather than `0`, and daily totals and raw hits answer alike, cap included.
+
+A pageview that still carries its own `durationMs` or `scrollDepth`, which is what a tracker cached from before engagement existed sends, keeps counting as it always has, so the averages stay right while old cached scripts age out. A `durationMs` or `scrollDepth` sent on an event or a goal is dropped at ingest: neither feeds either average.
+
+An engagement that carries only the items it saw is stored all the same: its row is where those views are kept.
+
+What is not measured: the last stretch of a tab that closes without the browser hiding it or firing `pagehide` first (a crash, a killed process) is lost, while its pageview is not, since that went out at the start. An engagement whose `sinceMs` ingest did not believe is filed on arrival (less any `ageMs`), so its time can land on a day its pageview is not on. **Active right now** counts visitors with a pageview, an event or a goal in the window, never one with only an engagement.
 
 ## Bot filtering
 
@@ -144,7 +257,7 @@ The decision is one pass over the lowercased agent for a small built-in set of m
 
 Each marker is a plain substring, matched anywhere in the agent, which is what makes `bot` cover `Googlebot`, `AhrefsBot`, `Twitterbot`, `Slackbot`, `LinkedInBot`, `Discordbot`, `TelegramBot` and `UptimeRobot` without an entry of its own. The slash in `curl/`, `wget/`, `axios/` and `java/` is part of the marker, so those match the version that follows and nothing else. The list is deliberately small and hand-held rather than a vendor feed: every entry is justified against a real agent and pinned by a table of them, alongside a table of real browser and in-app-browser agents none of them may match.
 
-Two consequences of matching mid-word. `Cubot` handset models are removed from the agent before the scan, so a Cubot phone is a visitor rather than a crawler. And **an empty or absent user agent counts as automated**, since every real browser sends one.
+Matching mid-word has consequences of its own. `Cubot` handset models are removed from the agent before the scan, so a Cubot phone is a visitor rather than a crawler. And **an empty or absent user agent counts as automated**, since every real browser sends one.
 
 That last one is the single drop that does say something. A beacon with no agent at all is answered and stored like any other bot, and warns once per process that an intermediary may be stripping the header, because a proxy that strips it would otherwise take an install's numbers to zero with nothing to look at. A recognized marker stays silent.
 
@@ -170,18 +283,14 @@ native({ filterBots: (ua) => isBot(ua) || ua.includes('internal-probe') })
 
 [`trackServerEvent`](/analytics/goals#4-track-from-server-code) is never filtered. It writes through its own path rather than the endpoint, whatever agent it attributes the event to, because it is host code the install wrote rather than a request off the internet. The synthetic server agent is not a bot to `isBot` either.
 
-<Callout type="warn">
-**Your numbers fall on upgrade**, to what real visitors did. Nothing is backfilled, so hits already stored keep counting and a range spanning the upgrade mixes filtered days with unfiltered ones. The `browser` breakdown's `other` bucket drops the most: that is where an agent the classifier did not recognize used to land, and a crawler's agent is the common case of one.
-</Callout>
-
 ## Dimensions
 
-Everything the engine can know about a hit is classified once, at ingest, and stored on the event row. A breakdown then reads the stored value rather than re-deriving it, so the day-bucketed rollups and the raw-event path can never disagree about what a bucket is called.
+Everything the engine can know about a hit is classified once, at ingest, and stored on its row. Daily totals and raw reads then read the same stored value rather than re-deriving it, so they can never disagree about what a row is called.
 
 | Dimension | Derived from | Stored as |
 |---|---|---|
 | `page` | the event's `path` | verbatim, capped at 512 |
-| `referrer` | the referring URL's host | lowercased, `www.` stripped, capped at 253; nothing for a same-site referral |
+| `referrer` | the referring URL's host | lowercased, `www.` stripped, capped at 253; nothing for a referral from the [site itself](#referrers) |
 | `source` | `utm_source`, else the referrer host | the visit's named origin, lowercased: the tag (capped at 128), the host, or `direct` when it has neither |
 | `channel` | `utm_medium`, the ad click ids, `utm_source` and the referrer host | one of the twelve [traffic channel](#traffic-channels) tokens, lowercase |
 | `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` | the `query` field's `utm_*` keys | decoded, trimmed, case as sent, capped at 128 |
@@ -191,19 +300,24 @@ Everything the engine can know about a hit is classified once, at ingest, and st
 | `country`, `region`, `city` | the [geo resolvers](/analytics/geo) | as the resolver reports them, each capped at 128 |
 | `language` | the first `accept-language` tag | lowercased without its `q` factor (`de-de`), capped at 16 |
 | `event` | a custom event's `name` | verbatim, capped at 128 |
-| `goal` | the [goals](/analytics/goals) the event completed | a json column: groupable, but the one dimension a filter cannot name |
+| `goal` | the [goals](/analytics/goals) the event completed | each completion, so a goal is grouped and filtered like any other dimension |
+| `currency` | the code an amount was sent in (`originalCurrency`, else `currency`) | declared only on an install that [measures money](/analytics/revenue); its revenue is each amount as it was sent, and a pageview is never grouped by it ([gross per currency](/analytics/revenue#gross-per-currency)) |
 
-A dimension the event does not carry emits no bucket at all, so an unattributed hit never lands in an "unknown" row. Keys are capped because each value becomes a rollup bucket key: an uncapped one exceeds Mongo's index key limit, and on Postgres a btree key over 2704 bytes fails the write outright.
+A dimension the hit does not carry adds no row at all, so an unattributed hit never lands in an "unknown" row. Values are capped because each one becomes a key of the daily totals: an uncapped one exceeds Mongo's index key limit, and on Postgres a btree key over 2704 bytes fails the write outright.
+
+`referrer`, `source`, `channel` and the five `utm*` keys say where a **visit** came from, and `country`, `region`, `city`, `device`, `browser`, `os` and `language` who made it: a read takes all of them from the [visit](#visits-and-visitors) a hit belongs to rather than from the hit itself. Where a visit came from is decided by the visitor's latest visit that day that came in from outside the site, so a visit that resumes after a pause through an internal link keeps the campaign that brought the visitor; who made it, by the visit's first hit. `page`, `event`, `goal`, `currency` and `item` are the hit's own. A conversion is therefore credited to the source and campaign of the visit it happened in, on whichever page it happened.
+
+A hit with no visitor of its own, which server code records without a request or [as no visitor's](#server-events-and-host-transactions), belongs to no visit, so a read takes these from the hit itself. Such a hit claims no source or channel unless it carries a referrer or a campaign tag, so a webhook's sale with neither lands in no row of them rather than under `direct`. A server [refund](/analytics/revenue#refunds) is the exception that makes breakdowns add up: it is stored with the attribution of the visit its sale counts in, so it lands in its sale's rows.
 
 Every cap is applied server-side, on a public endpoint, so a hand-rolled body cannot get past it. `browser`, `os` and `language` come off the request headers, so a [server-side event](/analytics/goals#4-track-from-server-code) without a request reports none of them rather than inventing a visitor. `browser` answers `other` for any agent it does not recognize, which is where a crawler's hit used to land; with [bot filtering](#bot-filtering) on, which is the default, that hit never reaches the pipeline at all.
 
 ### Referrers
 
-Three things happen to a referrer:
+A referrer goes through this:
 
-- **`referrer` on the event row** keeps the origin and the path, with everything from the first `#` or `?` onwards removed, capped at 512. A same-origin navigation puts the previous page's whole URL in `document.referrer`, so the query string routinely carries a reset token or an email address; stripping it is what keeps that out of the events collection.
-- **The `referrer` dimension** groups by the bare host: lowercased, no scheme, port, path or `www.`. A **same-site referral reports no host at all**, so a site's own domain can never top its referrers breakdown.
-- **The `source` dimension** is the visit's named origin: its `utm_source` tag when it carries one, else the referrer host, else `direct`. That is what `source` means on Plausible (`visit:source`) and GA4 (`sessionSource`), so a report reads the same column whichever source answered it. The tag is lowercased and capped at 128 characters like every other campaign key, so `utm_source=Newsletter` and `utm_source=newsletter` are one row while the `utmSource` dimension keeps the tag as written; the host arrives lowercased and `www.`-stripped from the `referrer` dimension's own derivation. A campaign tagged `utm_source=direct` shares the `direct` bucket with untagged traffic.
+- **The referring URL is never stored.** Ingest reads it for two things: whether the pageview opened a visit from outside the site, and the bare host below. A same-origin navigation puts the previous page's whole URL in `document.referrer`, so its query string routinely carries a reset token or an email address; storing none of it keeps that out of the database.
+- **The `referrer` dimension** groups by the bare host of the page that opened the visit: lowercased, no scheme, port, path or `www.`. A **referral from the site itself reports no host at all**, so a site's own domain can never top its referrers breakdown. The site is the hostname the hit is on and every other hostname its scope records hits under (on an unscoped install, the whole install's): a link from `www.example.com` to `shop.example.com` in one scope opens no visit and reports no referrer, and the visit it leads to is `direct` unless the link carries campaign tags. The engine knows a scope's hostnames from its daily totals of the last 30 days and from the hits each process stored since, so a hostname's first beacons, before a day of it is counted or the process saw it, still count a link from it as a referral.
+- **The `source` dimension** is the visit's named origin: its `utm_source` tag when it carries one, else the referrer host, else `direct`. That is what `source` means on Plausible (`visit:source`) and GA4 (`sessionSource`), so a report reads the same column whichever source answered it. The tag is lowercased and capped at 128 characters like every other campaign key, so `utm_source=Newsletter` and `utm_source=newsletter` are one row while the `utmSource` dimension keeps the tag as written; the host arrives lowercased and `www.`-stripped from the `referrer` dimension's own derivation. A campaign tagged `utm_source=direct` shares the `direct` row with untagged traffic.
 - **The `channel` dimension** is the acquisition channel that origin classifies into, which is what a report is usually asked for ("how much of last month was paid search?").
 
 ### Traffic channels
@@ -226,244 +340,528 @@ The host lists: search is `bing.com`, `duckduckgo.com`, `baidu.com`, `ecosia.org
 
 The brands that run one site per country are matched on the label rather than a fixed suffix: `google.de`, `google.co.uk` and `news.google.com` are search, while `google.evil.com` is not, because the label must be followed by exactly one more label, or by two when the first is a registrar second level (`co`, `com`, `net`, `org`, `ac`, `gov`, `edu`).
 
-Webmail hosts (`mail.google.com`, `mail.yahoo.com`, `outlook.live.com`, `outlook.office.com`, `mail.proton.me`) belong to no platform, so a visit from one is `referral` rather than `email`. A referrer proves a link was opened in a mail client, never that the mail was the newsletter an `email` bucket would take credit for.
+Webmail hosts (`mail.google.com`, `mail.yahoo.com`, `outlook.live.com`, `outlook.office.com`, `mail.proton.me`) belong to no platform, so a visit from one is `referral` rather than `email`. A referrer proves a link was opened in a mail client, never that the mail was the newsletter an `email` row would take credit for.
 
-Every event also stores `channelVersion`, the version of the rules that classified it. It exists so that a later task that reclassifies stored rows can find the ones an older rule set decided; nothing reads it today, and it is stamped on events only, never on rollups.
+Every hit also stores `channelVersion`, the version of the rules that classified it. A [rebuild](#rebuilding-days) with `reclassify` finds the hits an older rule set decided by it and classifies them again. It is stamped on hits only, never on daily totals.
 
-<Callout type="warn">
-**Nothing is backfilled.** Rows written before this release stored a traffic channel in `source` (one of the earlier six tokens: `direct`, `search`, `social`, `email`, `paid`, `referral`) and carry no `channel` at all. A Sources tab spanning the upgrade therefore mixes those tokens with origins until the older days age out of the window, and a channel breakdown starts at the upgrade rather than at the beginning of your data.
-</Callout>
-
-The tokens are what is stored, filtered and put in a URL; the admin renders them through [typed translations](/analytics/i18n), so a channel breakdown reads **Paid search** or **Direct** in the reader's language. A `source` row is shown as it was stored, except `direct`, which renders through the same translated label.
+The tokens are what is stored, filtered and put in a URL; the admin renders them through [typed translations](/analytics/reference/translations), so a channel breakdown reads **Paid search** or **Direct** in the reader's language. A `source` row is shown as it was stored, except `direct`, which renders through the same translated label.
 
 ## Write batching (opt-in)
 
-By default each ingest is persisted before the endpoint responds. Under load, batch writes in memory:
+By default each beacon's hit is stored before the endpoint answers. Under load, hold hits in memory and write them in batches:
 
 ```ts
-native({ buffer: true }) // flush at 50 events or 2000 ms, whichever first
-native({ buffer: { maxSize: 100, maxAgeMs: 1000 } })
+native({ buffer: true }) // 200 hits or one second, whichever comes first
+native({ buffer: { maxSize: 500, maxAgeMs: 2000, maxPending: 10_000 } })
 ```
 
-Batching coalesces per-bucket upserts and cuts database round trips. The trade is durability: the endpoint responds before the batch is persisted, so a hard crash can lose up to `maxAgeMs` of events (the same best-effort model Plausible and Umami use). Call `native().flush()` on graceful shutdown to drain the buffer; keep a reference to the adapter instance if you need to.
+| Limit | Default | Is |
+|---|---|---|
+| `maxSize` | 200 | hits one write carries at most |
+| `maxAgeMs` | 1000 | how long the first hit of a batch waits for its write |
+| `maxPending` | 5000 | hits held at once; past it, a beacon waits for a write rather than memory growing |
 
-Whether or not you opt in, **every flush writes its rollup buckets and its seen-ledger rows in a handful of statements**, not one per bucket. The rollup upserts go out as two multi-row statements, the counters and then the visitor and session increments the ledger gate just granted (a Mongo `bulkWrite`, a Postgres `ON CONFLICT DO UPDATE` that reads each row's own increments), and the ledger's insert-if-new gate as a single `insertMany` / `ON CONFLICT DO NOTHING ... RETURNING`. A fully attributed pageview therefore costs 4 round trips rather than the 161 the bucket-at-a-time path needed, and a buffered batch pays those three writes once for the whole batch, though each event row is still its own insert. Counting is unchanged: bumps landing on the same bucket are summed before the statement goes out, which Postgres requires anyway, since it rejects a statement whose `DO UPDATE` would touch one row twice.
+Each limit is a whole number of at least 1, and `maxPending` may not be below `maxSize`; anything else fails the boot.
 
-## Uniques and sessions
+The trade is durability: the endpoint answers before the hit is written, so a process that dies takes its unwritten hits with it. The buffer is written out when the event loop runs dry and on `SIGTERM` and `SIGINT`, each of which waits up to five seconds for the last write before handing the signal on. A process that ends with `process.exit()`, or that a host's own signal handler exits at once, cannot write any more: the log names how many hits were lost, and destroying Payload first (`await payload.destroy()`) writes them. A serverless platform can freeze or stop a function between requests with hits still held, so the boot warns when the buffer is on and `VERCEL`, `AWS_LAMBDA_FUNCTION_NAME` or `NETLIFY` is set: turn it off there.
 
-Distinct counts are exact per UTC day: a dedicated `analytics-seen` ledger records first-sightings at every granularity they are queried (per page, site-wide, site-wide per country), so uniques are read directly, never summed across breakdowns. Across a multi-day range the daily counts are summed, so longer-range uniques are approximate, the same trade Plausible, Fathom, and Umami make.
+A batch the database refuses for something every row would meet (a lock, a timeout, a lost connection) is written again once, half a second later, and dropped if that fails the same way. A batch refused for the values of a row in it is written again one hit at a time, and the hits refused a second time are dropped. Either way the log says how many, at most one error line each minute. An order never waits in the buffer: it is written at once, so a retried webhook meets the one already stored (see [revenue](/analytics/revenue#from-a-payment-webhook)), and neither does a server event recorded with `flush: true`.
+
+`adapter.flush(payload)` writes out what one Payload instance's buffer holds right away; keep a reference to the adapter instance to call it.
+
+## Visits and visitors
+
+A **visitor** is a visitor id: a keyed hash of the client address, the user agent and the hostname under the day's salt (see [privacy](/analytics/privacy#the-visitor-id)). A new salt each day of the reporting timezone means a new id each day, so the engine counts distinct visitors exactly within one day, and across a range of days adds each day's count up: someone who came on two days counts twice. A read says which it did in `meta.visitorsAre`, `distinct` for a single day and `sumOfDaily` otherwise, and the adapter declares `sumOfDaily` in `capabilities.semantics.visitors`, the rule for any range. Plausible, Fathom and Umami make the same trade. Both are per hostname: the hostname is part of the id, so someone who visits two hostnames of one scope on the same day is one visitor on each, and a read across hostnames adds the two up.
+
+While a scope's [reporting timezone](/analytics/timezone) has never resolved, and no day of it was ever counted, its visitor ids change at midnight UTC and its days are read in UTC, which is the zone they were hashed in. Once the zone resolves, the days still kept as raw hits are counted in it, and someone active on both sides of midnight UTC within one of those local days counts as two visitors that day.
+
+A **visit**, the `sessions` metric, is one visitor's hits on one hostname with no gap of more than 30 minutes between them. An engagement extends its visit to the moment it arrived, so a long read on one page does not split it. A visit that runs past midnight in the reporting timezone becomes two, since the visitor id changes with the day, and the second usually reads as direct. A server event that came with no address and no user agent of its own, or was recorded with `identity: 'none'` (the default while `capture.gate` holds the native slot, see [server events](#server-events-and-host-transactions)), belongs to no visitor and to no visit, and a read groups it by its own attributes (see [dimensions](#dimensions)).
+
+| Metric | Is |
+|---|---|
+| `sessions` | visits |
+| `bounceRate` | the share of visits with exactly one pageview and no event or goal, in percent; an engagement counts neither way |
+| `visitDuration` | the visible time sent in a visit, averaged over visits, in milliseconds |
+
+Nothing about a visit is stored. It is cut from the hits when a day is counted, and again by a read that needs visits from raw hits, which is why a breakdown by where visits came from is exact for every day it reads.
 
 ### Production note (Mongo)
 
-Exact distinct counting relies on a unique index on `analytics-seen` being live under concurrent ingestion. Configure the Mongoose adapter with `ensureIndexes: true`:
+The engine's reads lean on its indexes, `(scope, ts)` on the hits above all. Mongoose builds missing indexes in the background once the app connects; configure the adapter with `ensureIndexes: true` to have them built before the first read instead:
 
 ```ts
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 
-mongooseAdapter({ url: process.env.DATABASE_URI, ensureIndexes: true })
+mongooseAdapter({ url: process.env.DATABASE_URI ?? '', ensureIndexes: true })
 ```
 
-On Postgres the unique index comes from migrations; nothing extra is needed once they have run.
+On Postgres and SQLite the indexes come with the migration that creates the tables, or with the schema push.
 
-## Filters and hour granularity
+### Production note (Postgres)
 
-`AnalyticsQuery.filters` narrows a read to matching raw events, honored on **every dimension above except `goal`** with the `eq` and `contains` operators (`contains` is case-insensitive on both Mongo and Postgres; on Postgres `%` and `_` in the value act as wildcards, while Mongo escapes them; a `matches` filter is dropped, since native has no regex engine over stored events). `contains` on `source` takes a free-text value like any other dimension, so that same `%` and `_` difference applies to it. `granularity: 'hour'` buckets a series into UTC hours instead of days.
+The engine runs on the connection pool Payload's Postgres adapter opens, and always leaves the host one connection of it: all of the engine's work together holds at most `max - 1` connections, and its long work (raw reads, day counts and the transactions they run in) at most a third, `floor(max / 3)`, at least 1. Reads through the plugin wait before that, in the native read lane, which lets a third of `max` run at once, between 1 and 8 and never more than that long-work share; on MongoDB and SQLite it lets 8 run. On a scoped install one scope holds at most half of the lane.
 
-Both a filtered read and an hour-granularity read bypass the day-bucketed rollups and aggregate raw events directly, so they are bounded by [retention](#retention-pruning): a range reaching further back than `retentionDays` is clamped, and the read is capped at the same 50,000-event window as realtime, past which `meta.sampled` reports `true`. `realtime()` scans raw events under that same cap and sets `meta.sampled` the same way. An unfiltered, day-granularity read still comes from the exact rollup buckets and has no such cap. Hour buckets floor to the UTC hour regardless of `reportingTimezone`; day buckets stay timezone-aligned. `binding.hostname` (see [display fields](/analytics/display-fields)) filters both paths.
+node-postgres opens at most 10 connections unless told otherwise, which leaves the engine 3 for long work and lets 3 reads run at once. Size the pool for the dashboards and the beacons you expect:
 
-## Hostname buckets
+```ts
+import { postgresAdapter } from '@payloadcms/db-postgres'
 
-Rollups are keyed by hostname: every delta write emits both a hostname-less bucket family and a per-hostname family, so `binding.hostname` filters native reads with exact unique counts instead of an approximation. This doubles rollup storage for installs that ingest from more than one hostname, one extra bucket set per distinct hostname.
+postgresAdapter({ pool: { connectionString: process.env.DATABASE_URI ?? '', max: 30 } })
+```
+
+A count a read starts stops at the read's time limit, and one maintenance runs has none ([statement settings](#statement-settings-on-postgres)).
+
+## How a read is answered
+
+A read is cut into the local days of its scope's reporting timezone, and each day is answered from where it is counted best:
+
+- **A closed day** reads its daily totals. [Maintenance](#maintenance) counts each day once it closes, so a read usually finds it counted. A read spends at most three seconds on the days it finds uncounted, newest first, and starts one only when its predicted cost fits what is left of them: the day's hits (from its last count, or counted off the index no further than the time left allows) times what a hit costs the database: about 30 microseconds on Postgres, 40 on SQLite and 80 on MongoDB to start with, then what the host's own counts of 5,000 hits or more took, kept between half and twenty times those figures. While no jobs runner keeps `analytics-maintain` on time, the read counts such a day; while one does, the read counts nothing and reads at most seven of them from their raw hits instead, leaving the counting to the runner. A day that does not fit is left out, `meta.partial.missingDays` says how many, and [maintenance](#without-a-jobs-runner) is started in the background. A day without a single hit is marked empty and costs nothing again: under the day's lease, after a second look still finds no hit, so a server event dated on that day and stored meanwhile reopens it and is counted rather than lost.
+- **Today** reads its raw hits live while it holds at most 5,000 hits on Postgres and 2,000 on SQLite and MongoDB, which a count stopping just past that tells. A busier day is read from a count of its totals taken in the background, a snapshot, and `meta.asOf` says when it was taken. A snapshot is served for a minute up to 50,000 hits, then for two minutes rising to five at 500,000, and at least twenty times as long as taking it costs, up to those five minutes; past that age a read serves it once more and takes another in the background. Until the first snapshot exists, a read answers today from its raw hits when that fits its three seconds and leaves it out otherwise, and the snapshot is taken once the read has answered. `native({ today })` sets both limits (see [Options](#options)). The plugin's [cache](/analytics/cache) asks again for a read reaching into today every 10 seconds, but past those hits what it gets back is a snapshot one to five minutes old.
+- **A day maintenance gave up on** (`failed`, see [maintenance](#maintenance)) is read from its last count when it has one and left out otherwise, and `meta.failed.days` says on how many days of the range either happened. A read never counts such a day itself.
+- **Part of a day**, where a range starts or ends inside one, reads its raw hits. That happens to an All sites read too, which cuts each scope's days in that scope's own zone: a range starting at midnight in one zone starts inside another zone's day. A part older than [`retention.rawDays`](#retention) has no raw hits left to cut: one whose day held no hits is left out without a word, and one whose day held some starts the read after that day or ends it before, with `meta.clamped` and `meta.dataFrom` or `meta.dataTo` saying where.
+
+A closed day is counted in the zone it is read in, from midnight to midnight. After the scope's [reporting timezone](/analytics/timezone) changes, a day counted in the old zone is counted again in the new one, by maintenance, or by the next read that needs it while no jobs runner keeps maintenance on time, as long as maintenance has deleted none of its raw hits; a day some of whose raw hits are gone keeps the totals it has, in the old zone. The first day counted in the new zone after those starts where the last of them ended rather than at its own midnight, so that one day runs a few hours longer or shorter, and no hit is counted twice or lost at the seam.
+
+A scope whose reporting timezone cannot be resolved is read in the zone its newest counted day was counted in. One with no day counted at all is read in UTC, as its hits were hashed: its days come from raw hits alone, nothing is counted, snapshotted or marked for later reads, and `meta.timezoneUnresolved` is set.
+
+Hostnames are counted apart: every row of daily totals belongs to one hostname, so `binding.hostname` (see [display fields](/analytics/display-fields)) reads that hostname's rows, and a read across hostnames adds them up, visitors included, each counted [per hostname](#visits-and-visitors).
+
+Native declares no limit on how far back a read may reach, so the plugin starts a range that begins before 1970 at 1970 instead, and says so in `meta.clamped` and `meta.dataFrom`.
+
+Through the plugin's [cache](/analytics/cache), a read from a closed day into today that asks only for counts of events (`pageviews`, `events`, `conversions`, `revenue`, `impressions`, `interactions`), as totals or a day series without a breakdown, is cut at today's start: its closed days are kept for the aggregate TTL and only today is read again. Visitors, visits and averages do not add up across such a cut, since each scope's days start at its own midnight, so a read asking for any of them reads its whole window each time.
+
+### Filters and hour granularity
+
+`AnalyticsQuery.filters` narrows a read on **every dimension above**, `goal` included, with `eq` and `contains`, and on MongoDB and Postgres with `matches` too: a case-insensitive regular expression of at most 256 characters, which the database runs in its own dialect (Postgres `~*`, MongoDB `$regex`). Native therefore takes only patterns JavaScript, Postgres and MongoDB read alike: plain characters and escaped punctuation, `.`, `\d`, `\w`, `\s` and their negations (inside a class, `\d`, `\w` and `\s` only), classes and ranges, groups `(...)` and `(?:...)`, `|`, `^`, `$`, and the quantifiers `*`, `+`, `?` and `{n}`, `{n,}`, `{n,m}` up to 255. Anything else is refused with `400 invalid_param` and `param: 'filters'` before it reaches the database: lookarounds, named groups, backreferences and other escapes, lazy quantifiers, and a repeated group holding a quantifier or an alternative (`(a+)+`, `(a|b)*`), which could backtrack without end. So is a pattern the database itself refuses. SQLite has no regular expressions to run one, so there native declares no `matches` and a filter using it is refused as unsupported. `contains` is case-insensitive and literal on every database: `%` and `_` in the value match themselves. On SQLite, case is folded for ASCII letters only.
+
+A read with one `eq` filter reads that value's daily totals, and so do a goal broken down by channel, source or campaign and an item broken down by page. On a day whose totals [folded](#daily-totals-and-caps) that value into their `(other)` row, it reads that day's raw hits instead while they are kept, so it stays exact; once they are deleted it reads the totals, which miss what was folded, and `meta.capped.days` says on how many days. Every other filtered read and every `granularity: 'hour'` series comes from the raw hits, grouped and ordered in the database; a breakdown filtered by one `eq` value still takes its totals from that value's daily totals. Those reach back as far as raw hits are read, [`retention.rawDays`](#retention): a range starting earlier is cut at that day, `meta.clamped` is set and `meta.dataFrom` says where the data starts. Native never samples, so `meta.sampled` is never set. Hour buckets are the local hours of the reporting timezone, so a half-hour zone keeps its series on its own hours. Goal completions broken down by item, or an item read filtered by a goal, are refused with `invalid_param`: a read counts one or the other.
+
+A read of raw hits that cuts visits first keeps only the visitors who can add to its answer: those with a hit passing each of its filters (a visit's country, source or campaign is one of its visitor's own hits', so a visit filter looks at the visitor's hits of the day, and a page, event or currency filter at the hits of the range), and for a range starting after midnight, those with a hit in it. A filter matching a few visitors then reads a few visitors' hits, and the numbers are the same as cutting everyone's visits first. A raw read too big for its time over several days is read again day by day, newest first, for at most four seconds, and the days it leaves unread count in `meta.partial.missingDays`.
+
+`realtime()` reads the raw hits of the last 5 to 60 minutes: their visitors and pageviews, by the minute when the query asks for `granularity: 'minute'`, and the pages or the sources with the most visitors when its dimensions name `page` or `source`. It reads nothing more than the query asks for, so the document panel's counter reads one total, and it cuts the visits behind the sources for the visitors active in the window alone. An All sites read names every scope, so each scope's `(scope, ts)` index serves it. A part it cannot read in time fails the whole read, which answers `503` with `Retry-After` and shows as busy, rather than an empty list that would read as no activity.
 
 ## Geo resolution
 
-The engine resolves country, region, and city per event: platform headers first (Vercel, Cloudflare), MaxMind only when headers do not supply a country. Pass `geoDbPath` for MaxMind or `geoResolver` for a custom pipeline. Details on [Geo](/analytics/geo).
+The engine resolves country, region, and city per event: the headers of the platform [`trustedPlatform`](/analytics/geo#which-headers-to-trust) names first (Vercel or Cloudflare; none without it), MaxMind only when headers do not supply a country. Pass `geoDbPath` for MaxMind or `geoResolver` for a custom pipeline. Details on [Geo](/analytics/geo).
 
-## Retention pruning
+## Daily totals and caps
 
-One Payload task (`analytics-prune-events`) on a nightly schedule (03:00 UTC) sweeps every store the engine owns. **It is registered only when you set a window**, so an install that sets neither option registers no task at all:
+A day's totals keep one row per value of each dimension, per scope and hostname. A dimension whose values whoever sends a beacon picks (referrers, campaign tags, cities, and pages and currencies too) is capped: past its cap, the values with the fewest pageviews (for an item, the fewest views) are folded into one `(other)` row. That row keeps every count that adds up (pageviews, events, conversions, revenue, bounces, time and scroll) and leaves visitors, visits and visit time unknown, since one person can be in several of the values folded together. A goal by channel, source or campaign and an item by page are capped per goal and per item, and their `(other)` row keeps the goal or the item, so one goal's long tail never folds another's.
+
+| Kind | Values kept per day |
+|---|---|
+| `page` | 10,000 |
+| `referrer`, `source`, `city` | 500 |
+| `region`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `event` | 300 |
+| `goalPairs`, a goal's channels, sources and campaigns, each | 300 per goal |
+| `itemPages`, the pages an item was seen or clicked on | 2,000 per item |
+| `language` | 200 |
+| `currency` | 100 |
+| `item`, `goal`, `country`, `device`, `browser`, `os`, `channel` | every one |
+
+Pages and currencies are capped high, 10,000 pages and 100 currencies per hostname and day: a site's own content bounds its pages, but a beacon can name any path and any currency code, and a flood of made-up ones would otherwise add rows to the totals without end. Items, goals and the rest keep every value, since signing, config or a fixed list bounds them. A [document panel](/analytics/display-fields) reads one page's or one item's totals, and a page folded on a busy day stays exact through its raw hits, as below.
+
+No breakdown lists `(other)`. A top-N read ranks the values the days kept, and the `(other)` row counts only in its dimension's total, so a value folded on a day it ranked past the cap misses that day's few hits there. A read of one value (an `eq` filter, a document panel's `path`, a goal's channels, sources or campaigns, an item's pages) reads its raw hits on the days it was folded, and so stays exact while they are kept (see [filters](#filters-and-hour-granularity)); once they are deleted, it reads what the totals kept, and `meta.capped.days` says on how many days that missed the folded part.
+
+`caps` changes any of them, a whole number of at least 1, or `null` to keep every value:
 
 ```ts
-native({ retentionDays: 90, rollupRetentionDays: 730 })
+native({ caps: { page: 5000, utmContent: 100, referrer: null } })
 ```
 
-| Store | Deleted | Option |
+An unknown kind or a value that is neither fails the boot. Raw hits are never capped, so a read that comes from them sees every value.
+
+## Maintenance
+
+`native()` registers one task with Payload's jobs queue, `analytics-maintain`, scheduled every 15 minutes on the `default` queue unless [`jobs`](#the-jobs-option) says otherwise. A run does this, in order:
+
+1. Deletes the [daily salts](#the-daily-salts) whose time is up, and the old totals a count left behind: a count notes its day (a `drop:` row) before it writes the day's new totals beside the old ones, and a run that stopped before deleting the old ones leaves the note, which stays until those rows are gone, however long that takes.
+2. Counts the days already marked due, oldest first across every scope, for at most half of the run's time.
+3. Takes the scopes in turn, starting after the one the last run reached (`cursor:maintain-rotation`), so a run out of time leaves the rest to the next and no scope waits behind the others for good. Each scope gets one of three passes, by what changed since its last whole one (`cursor:maintain:<scope>`):
+   - **Skipped**, when it has no new hit since, on the same local day, zone and settings.
+   - **A light pass**, when it has new hits on the same local day: it looks again at the order records stored since, and retakes today's snapshot when due.
+   - **A full pass** on a new local day, after its reporting timezone or the settings changed (`retention`, or a version of the engine that counts differently), or when its last pass did not finish. It finds the closed days that hold hits and have no marker yet and gives them one; looks again at the order records stored since; counts the scope's due days, oldest first, for at most a quarter of the run's time, leaving the rest to the next run's second step; marks the days without a single hit empty, at most 31 per scope and run, so reads skip them; retakes the snapshot of today when today holds more hits than [a read](#how-a-read-is-answered) reads live and the one it has is older than it is served; and deletes the raw hits past [retention](#retention), keeping an order's records as tombstones, and the daily totals too when `retention.aggregateDays` is set, with the tombstones of their days, 5,000 rows per statement.
+
+   A scope whose reporting timezone has never resolved is never counted, but its raw hits are still deleted once they are older than `retention.rawDays` in every zone, and every run warns about it. The scopes are every one holding raw hits or day markers, so a scope whose hits were all deleted still has its totals pruned.
+4. Counts, in the same run, the days the order records it looked at marked due.
+5. Records that it ran, as the task's [heartbeat](#one-run-at-a-time).
+6. Deletes up to 10,000 [cached reads](/analytics/cache#expiry) past their stale window, in batches of 1,000. The run's output counts them as `sweptCache`.
+
+A day is due when it closed and was never counted whole; when it was counted for the first time after it closed, which makes it provisional, and it ended a day and a quarter hour ago, so no hit can still reach it and a last count turns it final; when something marked it to be counted again, such as a [rebuild](#rebuilding-days) or a late order record; and when it was counted under an older version of the engine or in another zone while all its raw hits are still kept. Marking a day frees its lease, so it can be counted again at once: a count still running on it finds its result refused.
+
+Looking again at an order record means this: where the other record of the same sale lies on a day already counted whose raw hits are whole, that day is marked to be counted again. Ingest does this as it stores the record; maintenance catches a check that failed, a process that stopped first, and a server event held for a host transaction on SQLite.
+
+**A day that cannot be counted.** Each count maintenance starts on a day adds one to the day's `failures`, and a count that completes clears them. A day whose count started three times without completing, whether it threw or its process died, is marked `failed` the next time maintenance would start it, with a warning, and maintenance stops trying: its raw hits are pruned as they age, and [reads](#how-a-read-is-answered) take it from its last count or leave it out, with `meta.failed`. Once the cause is fixed, [rebuild](#rebuilding-days) it while its raw hits are kept.
+
+The run's output counts what it did, among other things `scopesPassed` (light and full passes), `scopesSkipped`, and `markedFailed`, the days it gave up on.
+
+A run stops between two days once it has worked for four minutes, and leaves the rest to the next one. One lease keeps a second run out, so two workers, or a worker and a web process, never do the same work twice, and every day has a lease of its own besides: a run and a read never count the same day at once. Where the engine asks the install's timezone or currency resolver with no request of its own (in a run that ingest or a read started, say), each call gets a fresh local request, so nothing a resolver puts on `req.context` outlives it.
+
+### Without a jobs runner
+
+Nothing breaks when no job runner ever runs the task. A read counts the closed days it needs itself when they fit its budget (see [how a read is answered](#how-a-read-is-answered)), and ingest, or a read that leaves a day uncounted, starts a short run in the background, which stops between two days once two seconds are spent, at most once every 10 minutes per process. The beacon is answered without waiting for it, and on SQLite without its [worker threads](#sqlite) the run leaves any day too big to count in about 150 ms to the job. A serverless platform may freeze a function as soon as it has answered, which pauses such a run until the next request wakes it, so a serverless install keeps maintenance on time with a scheduled run (see [Running it](#running-it)). Ingest does this when `jobs` is `false`, and when the task's last run is older than twice its interval (30 minutes on the default schedule) or never happened. While a runner keeps the task on time, ingest only deletes expired salts.
+
+A site with steady traffic is therefore maintained either way. A runner is what makes it independent of traffic, and it is the one to have on a site whose busiest days hold hundreds of thousands of hits: counting a day of 670,000 hits took 12 to 14 seconds on Postgres, 18 to 26 on SQLite and 44 on MongoDB on a laptop (see [capacity](#capacity)), far more than the three seconds a read spends on uncounted days, so a read never starts one and leaves it out until a run has counted it.
+
+### The `jobs` option
+
+`jobs` sits on `analytics()`, beside `adapters`, and covers every task the plugin registers. Each one is registered only with the feature it serves:
+
+| Task | Registered with | What a run does | Default schedule | When no runner runs it |
+|---|---|---|---|---|
+| `analytics-maintain` | `native()` | Counts closed days, snapshots today, deletes old raw hits, expired salts and expired cached reads ([Maintenance](#maintenance)). | Every 15 minutes | Reads and ingest do the work as they go ([Without a jobs runner](#without-a-jobs-runner)). |
+| `analytics-sync` | `sync` | Copies each vendor source's recent daily metrics into the [sync collection](/analytics/sync). | Every 6 hours | Nothing copies them. The instances serving reads warn once when its last run is more than two intervals old, unless it is unscheduled (`cron: false`). |
+| `analytics-warm` | `cache.warm` | Reads again the reads readers asked for recently whose cached answer expires before its next run ([Warming](/analytics/cache#warming)). | Every 30 minutes | Nothing is warmed. An expired answer is still served at once while a refresh runs. |
+
+```ts
+analytics({
+  adapters: [native(), plausible({ siteId: 'example.com', apiKey: process.env.PLAUSIBLE_API_KEY ?? '' })],
+  capture: { gate: 'all' },
+  sync: true,
+  cache: { warm: true },
+  jobs: {
+    queue: 'analytics',
+    tasks: { maintain: { cron: '0 * * * *' }, sync: { cron: '0 4 * * *' } },
+  },
+})
+```
+
+| Option | Type | Default | Description |
+|---|---|---|---|
+| `jobs` | `false \| { queue?, tasks?, state? }` | `{}` | `false` registers none of the tasks. The native engine's upkeep then happens on requests; `sync` or `cache.warm` beside `jobs: false` fails the boot, since only their tasks do their work. |
+| `jobs.queue` | `string` | `'default'` | The queue every task is scheduled on. |
+| `jobs.tasks.maintain`, `jobs.tasks.sync`, `jobs.tasks.warm` | `{ queue?, cron? }` | | One task's own queue and schedule. |
+| `jobs.tasks.<task>.queue` | `string` | `jobs.queue` | The queue the task is scheduled on. |
+| `jobs.state` | `{ slug?, overrides? }` | `analytics-state` | On an install without `native()`, the collection the sync and warm tasks keep their leases and heartbeats in. Refused beside `native()`, whose `collections.state` names it, and on an install running neither task. |
+| `jobs.tasks.<task>.cron` | `string \| false` | above | Its schedule: five fields, six with seconds first, or a nickname such as `'@hourly'`. `false` registers it unscheduled, to run only when something queues it. |
+
+The boot fails on a malformed entry, on an entry for a task the install does not register (`maintain` without `native()`, `sync` without `sync`, `warm` without `cache.warm`), and on `sync.cron` or `cache.warm.cron`, which these entries replaced. When a task's last run is judged late, its interval is read off its schedule (every n minutes or hours, hourly, daily, or a nickname); for any other schedule, and for `cron: false`, it is the task's default interval.
+
+Registering a task turns Payload's jobs on, which adds the `payload-jobs` collection and adds each task's name to the names it stores; a task with a schedule also adds the `payload-jobs-stats` global, where Payload records when each one was last queued, so an install whose every task has `cron: false` adds no global. A migrate-mode Postgres or SQLite install takes them in with its next generated migration.
+
+#### One run at a time
+
+Every run takes a lease in `analytics-state` before it works: `analytics-maintain` one per run (`lease:maintain`, which it renews while it works, so a day that takes longer to count than the lease lasts never lets a second run in) and one per day it counts, `analytics-sync` and `analytics-warm` one each, `lease:analytics-sync` and `lease:analytics-warm`, which the run renews every 40 seconds while it works. A second run that finds the lease taken does nothing and says so in its output (`ran: false`), so two workers, or a worker and a web process, never do the same work twice. Each lease is renewed every third of its length while its run works. A run that was killed stops renewing, and its lease lets the next run in when it runs out: within two minutes for sync and warming (four on Cloudflare D1, where a lease is held one two-minute slot at a time and a run always holds the next slot too), within 14 minutes for a maintenance run the job runner made (its four minutes plus a day's lease), about 10 for one ingest started, and within 10 for the day it was counting. An install with sync or warming but no `native()` registers `analytics-state` for these leases, renamed and reshaped through `jobs.state` (see [Renaming the plugin's collections](/analytics/reference/options#renaming-the-plugins-collections)).
+
+On a host that turned on Payload's `jobs.enableConcurrencyControl`, each task also carries Payload's concurrency key `analytics:<task>`: one run of it at a time. A newly queued run waits for the one before it rather than replacing it: Payload's `supersedes` would delete every unfinished job under the key, failed ones included, and with them the record of a run that was marked stopped. The schedule queues no second run while one waits anyway. A rebuild queued on `analytics-maintain` keys on its own window, so it never waits behind a scheduled run's key. Payload refuses a concurrency key without that setting, so the plugin sets none then; the leases hold either way.
+
+Runs record the time in `analytics-state` as the task's heartbeat, `heartbeat:<task>`: every run of `analytics-maintain` the job runner makes, even one that found the lease taken or ran out of time (a run ingest started records none), and every run of `analytics-sync` or `analytics-warm` that held the lease, finished or not. The native engine reads `analytics-maintain`'s to decide whether requests do its work. With `sync` on and `jobs` not `false`, every instance serving reads checks `analytics-sync`'s at most every ten minutes and warns once when it is older than two intervals, since nothing else does a sync's work; an unscheduled sync (`cron: false`) is not checked.
+
+### Running it
+
+Payload runs scheduled tasks through its job runner, set up once for the whole app: `jobs.autoRun` in a server that keeps running, a separate worker process, or a scheduler calling Payload's run endpoint. A queue that nothing runs never runs its tasks, so name the queue `jobs` uses in the runner. A queue of its own, such as `jobs: { queue: 'analytics' }`, keeps a long maintenance run from holding up the app's other jobs and lets one worker take just this one.
+
+Payload's CLI is a worker as it stands: every minute it queues the tasks that are due on the queue and runs them.
+
+```sh
+pnpm payload jobs:run --cron "* * * * *" --queue analytics --handle-schedules
+```
+
+A worker of your own can boot Payload without `onInit`; the plugin builds what it needs on first use. On a SQLite file, run a worker beside the web process only once the adapter has `wal: true` and a `busyTimeout` of at least 5,000 ms ([why](#on-the-main-thread)).
+
+```ts title="worker.ts"
+import { getPayload } from 'payload'
+import config from '@payload-config'
+
+const payload = await getPayload({ config, disableOnInit: true })
+
+setInterval(async () => {
+  await payload.jobs.handleSchedules({ queue: 'analytics' })
+  await payload.jobs.run({ queue: 'analytics' })
+}, 60_000)
+```
+
+On Vercel, a [Vercel Cron](https://vercel.com/docs/cron-jobs) calls `/api/payload-jobs/run`, which queues the tasks that are due and then runs them. Let the cron in with `jobs.access.run` as [Payload's docs](https://payloadcms.com/docs/jobs-queue/queues#vercel-cron-example) show: left unset, the endpoint admits [users of the admin collection only](#who-may-run-jobs), which a cron never signs in as.
+
+```json title="vercel.json"
+{
+  "crons": [{ "path": "/api/payload-jobs/run?queue=analytics", "schedule": "*/15 * * * *" }]
+}
+```
+
+Give the route serving it at least 300 seconds: each task's run works for up to four minutes (`analytics-sync` and `analytics-warm` as much as `analytics-maintain`), and a function stopped earlier leaves its job half done. A run that reaches its four minutes stops between two pieces of work and leaves the rest to the next: maintenance carries on with the oldest day still due and the scope after the last it reached, warming with the reads it did not get to, and sync with the scope it stopped at, which it records in `analytics-state` (`cursor:analytics-sync`) so that no scope waits behind the others for good. Its output then says `finished: false`. Payload runs the jobs one call picks up side by side unless it is asked to run them in sequence, so one call serving all three tasks still fits the 300 seconds; a call made with `sequential: true` does not.
+
+```ts title="app/(payload)/api/[...slug]/route.ts"
+export const maxDuration = 300
+```
+
+A scheduler that calls less often than every 15 minutes runs the task as often as it calls. Set `jobs.tasks.maintain.cron` to the same cadence, so that a run is only judged late once it really is.
+
+The same runner runs `analytics-sync` and `analytics-warm` when they are registered, on `jobs.queue` unless their own entries name another queue, so one worker covers all three.
+
+Payload queues a scheduled task only while no run of it is waiting or processing, and never runs a job again that a killed process left `processing` (a deploy, a timeout). Left alone, that one job would stop every later run. Before it is scheduled, each task marks such a job on its schedule's queue failed once it has gone 14 minutes without an update while `processing`, longer than any run lasts (its four minutes and the 10-minute lease on the day it was counting, or the read still out when its time ran out), and only while no run holds the task's lease: a run renewing it is alive however old its job. The next run is then queued as usual.
+
+### Who may run jobs
+
+Registering a task turns Payload's jobs on for the whole app, and Payload lets any signed-in user use them unless the config says otherwise: a customer signed in through a second auth collection could queue `analytics-maintain` over and over, push a waiting run's `waitUntil` into the next century so maintenance never runs again, or, on Payload before 3.89, read and change every job of every plugin. So once the plugin registers a task, every job control your Payload config left unset admits users of the admin collection (`admin.user`) only:
+
+| Control | What it gates |
+|---|---|
+| `jobs.access.run` | the `/api/payload-jobs/run` and `/api/payload-jobs/handle-schedules` endpoints |
+| `jobs.access.queue`, `jobs.access.cancel` | `payload.jobs.queue()` and `payload.jobs.cancel()` called with `overrideAccess: false` |
+| the `payload-jobs` collection's `create`, `read`, `update` and `delete` | its REST and GraphQL API, and Local API calls with `overrideAccess: false` (Payload 3.89 and later deny them all anyway) |
+| the `payload-jobs-stats` global's `read` and `update` | where Payload records when each scheduled task was last queued |
+
+A control you set is never changed: the collection's access is composed over your own `jobs.jobsCollectionOverrides`, and an operation it sets keeps your function. Nothing in Payload's config reaches the stats global, so the plugin narrows it at init on top of what it allows, never wider. The boot says once which controls it restricted. Payload's own runners (`autoRun`, `payload jobs:run`, `payload.jobs.run()` from a worker) skip these checks, so they keep running every task.
+
+To choose otherwise, set them in your Payload config:
+
+```ts
+import { isAdminUser } from '@10x-media/analytics'
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { buildConfig } from 'payload'
+
+export default buildConfig({
+  db: mongooseAdapter({ url: process.env.DATABASE_URI ?? '' }),
+  secret: process.env.PAYLOAD_SECRET ?? '',
+  jobs: {
+    access: {
+      run: ({ req }) =>
+        isAdminUser({ req }) || req.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`,
+    },
+  },
+})
+```
+
+A [switched-off](/analytics/reference/options#switching-it-off) plugin keeps the same restrictions while it keeps a task.
+
+### Writing a day's totals
+
+A count writes a day's new totals beside the rows reads use, 500 rows per statement. It then switches reads to them with one conditional update of the day's marker, which only the run holding the day's lease can make (on Postgres and SQLite, `UPDATE ... WHERE lease_owner = <the run>`), and deletes the old rows after that, 2,000 per statement on Postgres and SQLite. No transaction spans the write: a host write that meets it waits out one statement at most, and a run that freezes midway holds no lock, while the day's 10-minute lease lets the next run in once it runs out. A run that lost its lease meanwhile, because the day was marked to be counted again, finds its update refused and deletes what it wrote; one that stopped before deleting the old rows leaves its note to [maintenance](#maintenance).
+
+### Statement settings on Postgres
+
+A day's count and every read of raw hits run in a transaction of their own, which turns JIT compilation off and gives sorts 64 MB of `work_mem`, both for that transaction alone (`SET LOCAL`): compiling a count's plan took about three seconds and saved less, and the default 4 MB sends a busy day's sorts to disk. The settings go to the server with `BEGIN` in one round trip, and nothing else of the connection or of the pool changes. A count or a raw read that a read started also sets `statement_timeout` to the read's time limit, less any wait for a connection, so Postgres cancels it there (on MongoDB, the pipelines of such a count or read share one `maxTimeMS` deadline); a count maintenance runs has no limit.
+
+### Shutdown
+
+`payload.destroy()` closes the engine before Payload closes its database: work already running (a short run a beacon started, today's count being retaken) finishes on the open connection, the [buffer](#write-batching-opt-in) and any [deferred server event](#server-events-and-host-transactions) are written, and nothing new starts. The engine of a destroyed instance refuses every read and write. On SQLite, the engine's [worker threads](#sqlite) stop after that, once what they run has finished.
+
+On `SIGTERM` and `SIGINT` the engine writes what it holds, waiting up to five seconds, and then hands the signal back, so the process stops as it would have. On `process.exit()` nothing can be written any more, and the log says how many hits were lost. Destroy Payload before exiting a script or a worker of your own: `await payload.destroy()`, then `process.exit()`.
+
+## SQLite
+
+libsql, the client Payload's SQLite adapter uses, runs the statements of a local file synchronously: while one runs, the Node process serves nothing else. Counting a day of 670,000 hits took 18 to 26 seconds on a laptop ([capacity](#capacity)), so where the engine runs its statements decides whether the site keeps answering meanwhile.
+
+### Worker threads
+
+When the database can take it, the engine runs its statements on worker threads of its own, each with its own connection to the same file, and the process keeps serving requests while they run. It decides on its first statement, and takes them when:
+
+- the database is in WAL mode (`PRAGMA journal_mode` answers `wal`), so a long read never holds up a writer, and
+- the adapter waits at least 5 seconds for a lock (its `busyTimeout`), so the site's own writes wait out the engine's short write transactions instead of failing.
+
+```ts title="payload.config.ts"
+import { sqliteAdapter } from '@payloadcms/db-sqlite'
+import { buildConfig } from 'payload'
+
+export default buildConfig({
+  db: sqliteAdapter({ client: { url: process.env.DATABASE_URL ?? 'file:./payload.db' }, wal: true, busyTimeout: 5000 }),
+  secret: process.env.PAYLOAD_SECRET ?? '',
+})
+```
+
+There are three threads, each started on first use: one for writes and short reads, one for the reads a dashboard makes, one for counting days, so a count holds up neither a beacon nor a widget. The engine's writes queue one at a time, and each of its write transactions runs on its thread whole: it never holds the lock while it waits on the main thread, where a host write may be waiting for that same lock. A thread keeps no process alive while idle, starts again when it stops on its own, and stops after `payload.destroy()` once what it runs has finished. A request a thread has not answered in 15 minutes, longer than any day's lease, fails, and the next one starts on a fresh thread.
+
+The threads load `@libsql/client` where the host's adapter does: through `@payloadcms/db-sqlite` installed under the working directory, or from the working directory itself, where Next's standalone output keeps the client it traced. Two copies of SQLite in one process do not see each other's locks, so the engine compares the native library each thread loaded with the one the host loaded, and takes no thread when they differ or cannot be compared. When neither place has the client, the warning says where it looked.
+
+What still holds up the process:
+
+- A host write that meets one of the engine's writes waits for it on the main thread, as it would for any other writer, because the adapter's own client is synchronous. A day's totals are [written](#writing-a-days-totals) 500 rows per statement and their old rows deleted 2,000 per statement, so a host write waits out one statement at most: beside the first count of a 670,000-hit day, the longest host write across the load suite's runs took 0.1 to 0.3 s, and 0.1 to 0.5 s while the day was counted again, while the host's writes around them took 2 to 5 ms at p95.
+- Handing a busy day's rows between threads, and turning them into totals, runs on the main thread in slices: the longest measured 90 ms for a day of 670,000 hits.
+- A process that ends with `process.exit()` while a thread is inside a statement ends with libsql's own abort (exit code 134) instead of the code it asked for. The database stays intact, since SQLite survives a crash; destroying Payload first waits for the threads and avoids it.
+
+On the load suite (see [capacity](#capacity)), with the engine on worker threads: while a day of 670,000 hits was counted (18 s), storing a hit took 0.3 ms at p95; across a 30-day dashboard, its filtered reads of up to 4 seconds included, the event loop never went longer than 22 ms without running a 10 ms timer. On the main thread the same count holds the process for the whole 18 s.
+
+### On the main thread
+
+Otherwise (another journal mode, a shorter busy timeout, worker threads that could not start) the statements run on the main thread, and the engine warns once per database client, on its first statement, naming `sqliteAdapter({ wal: true, busyTimeout: 5000 })`.
+
+There it runs them on a connection of its own to the same file, opened through the host's `@libsql/client`, since running them on the adapter's own client could lose the app's writes. Where it cannot open one, the engine stays off, and says why once: an in-memory database (a second connection would open another, empty one), an embedded replica (`syncUrl`), no `@libsql/client` to resolve, or a client that loads another copy of libsql than the app's, or one that cannot be shown to load the same. Every read of native then answers `502 source_misconfigured`, and nothing is stored or counted until it is fixed.
+
+On the main thread, the engine bounds what one statement may hold the thread for, predicted from the hits it reads, and runs one statement per turn of the event loop, so a read made of many short ones never holds the process as one:
+
+- a raw read predicted to take longer than about 150 ms (past about 6,000 hits for a read that cuts visits, 30,000 for one that does not) is refused, and a range is read day by day instead, leaving out the days that are still too big (`meta.partial`);
+- a read counts an uncounted day only when its count fits those 150 ms, about 3,750 hits; today is served from its snapshot above 2,000 hits, and a read retakes no snapshot that would take longer;
+- maintenance started by ingest never counts a day or takes a snapshot that would take longer either: those wait for the `analytics-maintain` job, and the first one it leaves is warned about.
+
+That keeps each stall short (across the same dashboard, 66 ms at the longest, its filtered reads of those 30,000-hit days answering no day at all), and limits what the web process counts by itself to small days. Past that, turn WAL and the busy timeout on, which moves the engine to worker threads. Do not move the job to a second process instead: without both settings, that process's locks make the web process's own writes fail with `SQLITE_BUSY`, and libsql can then lose writes it reports done (see [Transactions on SQLite](#transactions-on-sqlite)). A second process is safe once the adapter has `wal: true` and a `busyTimeout` of at least 5,000 ms.
+
+### Choosing the mode
+
+`native({ sqlite: { thread } })` picks it, and the `ANALYTICS_SQLITE_THREAD` environment variable does where the option is not set:
+
+| `thread` | What runs where |
+|---|---|
+| `'auto'` (default) | Worker threads when the database is in WAL mode and `busyTimeout` is at least 5,000 ms, else the main thread with a warning. |
+| `'worker'` | Worker threads whatever the database: a journal mode or busy timeout that does not suit is warned about, and every statement fails where threads cannot work (an in-memory database, an embedded replica, no `@libsql/client` to load, another copy of libsql than the host's). |
+| `'main'` | The main thread, with no thread started and no warning. |
+
+A remote libsql database (Turso and other `libsql:`, `http(s):` or `ws(s):` URLs) answers over the network, which never holds up the process, and always runs on the main thread.
+
+### Transactions on SQLite
+
+Leave `transactionOptions` unset on `sqliteAdapter`, as Payload does by default. With it set, `@libsql/client` 0.14 hands each of the host's transactions the connection the adapter opened, and opens the next one without the busy timeout the adapter set on that first connection only. From the second transaction on, a write then fails at once with `SQLITE_BUSY` whenever another connection holds the write lock, instead of waiting for it: the engine's own connection and threads, a jobs worker, another instance of the app. After one such failure libsql may also lose later writes on that connection while reporting them done, and every transaction leaves one file descriptor open. The plugin warns at boot when a local SQLite file's adapter sets `transactionOptions`. A host that needs them re-applies `PRAGMA busy_timeout` on the client after each transaction.
+
+The plugin's own cache writes through Payload's database API (an answer stored, a read noted for warming, expired entries swept) never wait on a transaction the host holds open in the same process, which on SQLite would be waiting on the process's own lock: they queue behind the engine's writes, restore the busy timeout first, and are skipped while a host transaction is open. A skipped write means the next read asks the source again; a skipped sweep runs on its next turn.
+
+## Capacity
+
+How much one install takes depends on its host, so these are measurements rather than limits: the repository's load suite (`packages/analytics/tests/load`) on an Apple Silicon laptop with 12 cores and 24 GB, against Postgres 16 in a container with its default settings, SQLite through libsql on a WAL file, and MongoDB 7 in memory. Every figure is per scope, since each scope's days are counted on their own. A range spans the suite's runs between 2026-10-07 and 2026-10-09, some of them beside other work on the same laptop.
+
+| Measured | Postgres | SQLite | MongoDB |
+|---|---|---|---|
+| Counting a day of 670,000 hits | 12 to 14 s | 18 to 26 s, on a [worker thread](#sqlite) (on the main thread, the process blocked meanwhile) | 44 s |
+| Counting a day of 30,000 hits | 0.7 s | 1 s, on a worker thread (blocked likewise on the main thread) | 2.1 s |
+| Top 10 pages of 30 days to now, p95 | 0.14 s | 0.07 s | 0.23 s |
+| Live view on a 670,000-hit day: counter, top 10 sources | 29 ms, 0.33 s | 25 ms; the sources refused as busy (`503`) after 31 ms | 0.10 s, 2.2 s |
+| 30 days of 30,000 hits filtered by a value 3% of visitors share | 0.43 s | 0.89 s | 2.2 s |
+| A document panel's sources, countries or devices of one page, 30 days of 30,000 hits | 0.6 to 0.7 s | 2.3 s | 4.0 to 4.8 s |
+| A document panel's totals of one page, the same 30 days | 3 ms | 16 ms | 2 ms |
+| 30 days of 30,000 hits filtered by a value a third of visitors share | 2.6 s | 4.0 s, 5 days left out | 13 s, 16 days left out |
+
+Widgets read daily totals and today's [snapshot](#how-a-read-is-answered), so they stay fast at any volume whose days are counted on time; filtered views and a document panel's breakdowns read raw hits, so they cost with the hits of their range and the share of visitors their filter keeps; a read too big for its time answers its newest days and says how many it left out. At about a million hits a month, the 30,000 a day above, a panel's breakdowns take the times in that table; at ten million a month they leave days out (`meta.partial`) on every database. On that laptop, the engine is meant for:
+
+| Supported | Postgres | SQLite | MongoDB |
+|---|---|---|---|
+| Dashboards, with a jobs runner | up to about 670,000 hits a day | up to about 200,000 on [worker threads](#sqlite); on the main thread, the runner counts in the web process and holds it for each count, about a second per 30,000 hits | up to about 200,000 |
+| Dashboards, with no runner | up to about 100,000 hits a day | up to about 100,000 on worker threads, 3,500 on the main thread | up to about 30,000 |
+| Filtered views and document panels under a second, over 30 days | about 40,000 hits a day for a filter a few percent of visitors share, 10,000 for a broad one | about 10,000 and 5,000 | about 5,000 and 2,000 |
+
+- **A separate worker** for [maintenance](#running-it) keeps counting out of the web process once a day takes longer to count than your web process should spend beside its requests, from about 200,000 hits a day. On SQLite, run one only once the adapter has `wal: true` and a `busyTimeout` of at least 5,000 ms, which also puts the engine on worker threads: without them, the worker's locks make the web process's own writes fail ([On the main thread](#on-the-main-thread)).
+- **Past these volumes**, or when broad filters over long ranges must answer in under a second, serve those reads from a [vendor adapter](/analytics/providers) beside native, or keep the hits in a store built for that volume. The engine reads and writes hits through one interface of its own, the seam such a store would plug into; that is not an option yet.
+
+To place your host on these tables, mark your busiest recent day with [`rebuildDays`](#rebuilding-days), time the maintenance run that counts it again, and compare it with the counting rows at that many hits: the ratio scales the rest. A database across a network adds its round trip to every statement, and a widget runs about a dozen.
+
+### Disk
+
+What a row takes on the same suite, its share of the indexes included (MongoDB's compressed, as it stores them):
+
+| Per row, table + indexes | Postgres | SQLite | MongoDB |
+|---|---|---|---|
+| A row of daily totals | 186 + 189 B | 127 + 107 B | 104 + 193 B |
+| A raw hit | 190 + 99 B | 198 + 82 B | 85 + 68 B |
+
+Raw hits are kept for [`retention.rawDays`](#retention), 90 days by default: at a million hits a month that is about 3 million rows, some 0.85 GB on Postgres and SQLite and under half a gigabyte on MongoDB. Daily totals are kept for every day unless `retention.aggregateDays` is set, so they grow every year. How many rows a day keeps depends on how many values its dimensions see, up to the [caps](#daily-totals-and-caps); each 10,000 rows a day adds about 1.4 GB a year on Postgres, 0.85 GB on SQLite and 1.1 GB on MongoDB.
+
+### Many tenants
+
+What grows with the number of scopes is the work done across all of them: a maintenance run visits every scope in turn, and an All sites read reads every scope's day markers. The suite's tenants case (`tests/load/tenants.load.ts`) measures 1,000 tenants of 30 hits a day on each of two closed days, on the same laptop:
+
+| 1,000 tenants | Postgres | SQLite |
 |---|---|---|
-| `analytics-events`, `analytics-seen` | rows older than the window | `retentionDays`, unset keeps them forever |
-| `analytics-rollups` | rows whose `period` is older than the window | `rollupRetentionDays`, requires `retentionDays` |
-| the daily visitor salts in `payload.kv` | the days 2 to 62 before today | none, swept whenever the task runs |
+| A maintenance run with nothing new, every scope skipped | 331 to 414 ms | 88 to 99 ms |
+| A maintenance run after every tenant had a visit since, a light pass each | 2.3 to 2.5 s | 354 to 403 ms |
+| All sites, totals of 30 days, p50 | 217 ms | 268 ms |
+| All sites, top 10 sources of 30 days, p50 | 231 ms | 330 ms |
+| One site, totals of 30 days, p50 | 2.4 ms | 1.0 ms |
+| All sites, live visitors of 30 minutes, p50 | 14.1 ms | 10.8 ms |
+| Counting a day of 670,000 hits, in the same run | 13.6 s | 26.3 s |
 
-Like all scheduled work here, the task fires only if Payload's jobs runner is active (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler); run it on demand with `payload.jobs.queue({ task: 'analytics-prune-events' })` followed by `payload.jobs.run()`. It prunes the whole install, across every scope: it is infrastructure rather than a per-tenant policy.
+MongoDB was not measured with many tenants.
 
-Deletes go through the database adapter's bulk delete, so no document is loaded in order to be deleted, whatever the window matches. That is also why the task reports no count: knowing one would cost exactly the read the bulk delete avoids. It bypasses collection hooks and access control, which these three collections do not use.
+## Retention
+
+```ts
+native({ retention: { rawDays: 180, aggregateDays: 730 } })
+```
+
+`retention.rawDays` is how many days of raw hits are kept, today counted, and so how far back [filtered and hourly reads](#filters-and-hour-granularity) reach. A longer range starts at the oldest of those days and says so. Maintenance deletes older hits, and records where it cut each scope's: a day whose count started before that cut keeps the totals it has, in any zone, and is never counted again. It takes a whole number of days of at least 1, or `null` to keep every hit; the default is 90.
+
+`retention.aggregateDays` is how many days of daily totals are kept, today counted, and maintenance deletes older totals with their day markers. A read reaching further back starts at the oldest kept day and says so in `meta.clamped` and `meta.dataFrom`, rather than reading the days before it as zeros. The default, `null`, keeps every day's totals: they are what an unfiltered read of any range is served from, and they hold counts, never a visitor id. It must be at least `rawDays`, which must then be a number: totals deleted while their raw hits are kept would be counted again by the next read.
+
+Pruning never deletes:
+
+- a raw hit of a day that is not final yet, or of one counted in an older zone or by an older version of the engine and due to be counted again, however old it is: the cut is the start of the retention's oldest day or of the oldest day still to be counted, whichever comes first;
+- the daily totals of a day that is not final yet;
+- anything of a scope whose run did not finish looking for uncounted days.
+
+A day [maintenance gave up on](#maintenance) is not due to be counted, so it holds none of this back: its raw hits and its totals age out like a final day's.
+
+An order's records are the exception. Past `rawDays` each is kept as a **tombstone** until its day's totals are deleted (with `aggregateDays`; never by default): its key, scope, time, page, goal, item and sale, with `v` emptied and the visitor's place, device, campaign and props cleared. The other record of the order still finds it, so a sale [both sides recorded](/analytics/revenue#recorded-in-the-browser-and-by-the-webhook) keeps counting once after the first day's raw hits are gone, and a retried webhook meets the key its first delivery stored and counts nothing. A retry arriving after the tombstone is deleted is counted again.
+
+`retentionDays` and `rollupRetentionDays`, the options of the engine this one replaced, fail the boot with a message naming what took their place.
 
 ### The daily salts
 
-The salt of a UTC day is what that day's visitor hashes are salted with, and nothing reads one older than yesterday's, since an event arriving just before midnight is still hashed with yesterday's. Keys are deleted by computed name rather than by listing them, so a sweep costs no scan, works on every kv adapter, and a day already gone is a no-op.
+A day's salt is what that day's visitor ids are computed with: one per calendar date, shared by every scope, and created by the first hit that needs it, or ahead of midnight by the first hit of the day before. A salt is deleted once the third UTC day after its own has begun, which leaves room for the zones furthest from UTC and for an engagement filed at its pageview's start up to a day earlier. Every maintenance run deletes the salts whose time is up, and so does a process whenever it fetches a salt for a later day than any it fetched before, so no jobs runner is needed for it. Once a day's salt is gone, nobody can compute that day's visitor ids again (see [privacy](/analytics/privacy#the-visitor-id)).
 
-They are swept from two places, because they accumulate whether or not you set a window and no install should need a jobs runner to stop that:
+## Rebuilding days
 
-- **At ingest**, when a first event opens a new UTC day, the seven days before the two most recent are deleted. No jobs, no schedule, at most seven deletes per instance per day, and the hash never waits on them.
-- **In the nightly task**, the days 2 to 62 back, which covers the nightly runs a stopped jobs runner could have missed.
-
-An install that is down for longer than 62 days keeps the salts older than that: nothing lists keys to find them, and they are inert, one small value per day. Delete them by hand if they bother you.
-
-`rollupRetentionDays` is off by default because rollups are the long-term store: they are what an unfiltered, day-granularity read is served from, and they outlive the raw events they were built from. It takes a whole number of days above zero, and **it requires `retentionDays`**: pruning rollups while keeping raw events forever would make an unfiltered long window answer less than the same window filtered, since a filtered read goes to the events that are still there. For the same reason **it may not be shorter than `retentionDays`**. Both rules fail the boot rather than the sweep. Once a rollup row is pruned, the day it covered reports nothing rather than falling back to raw events, which have their own, shorter, window.
-
-<Callout type="info">
-Rollups grow per day with the cardinality of the dimensions: one row per distinct referrer host, `source`, city, campaign, `utmContent` and `utmTerm` you receive, plus one extra bucket set per distinct hostname you ingest from. `source` is the one to watch, since it holds whatever `utm_source` a visit was tagged with: its cardinality is bounded only by the 128-character cap, not by a fixed vocabulary the way `channel` is. A site with a long tail of campaign URLs should plan storage for that tail, or bound it with `rollupRetentionDays`.
-</Callout>
-
-<Callout type="warn">
-**Setting a window gives an install with no jobs of its own the jobs collection.** Payload registers `payload-jobs` as soon as one task exists, plus the `payload-jobs-stats` global for a task carrying a schedule, so an install that had no tasks or workflows at all gains both the moment it sets `retentionDays` or `rollupRetentionDays`. Push-mode installs pick the tables up on the next boot; a migrate-mode Postgres install needs a migration creating them, the same as for any other new collection. This has always been true of `retentionDays`; setting no window registers no task and changes nothing.
-</Callout>
-
-## Upgrading an existing install
-
-The hostname bucket family above adds a required `hostname` column to `analytics-rollups`; the [sync tier](/analytics/sync) separately adds a required `scope` column to its collection. Existing installs need a migration backfilling both to `''` (the hostname-less / no-scope sentinel):
+`rebuildDays` counts a stretch of days again from their raw hits:
 
 ```ts
-import type { MigrateUpArgs } from '@payloadcms/db-mongodb'
+import { rebuildDays } from '@10x-media/analytics'
 
-export async function up({ payload }: MigrateUpArgs): Promise<void> {
-  if (payload.db.name === 'mongoose') {
-    const db = payload.db as unknown as {
-      collections: Record<string, { collection: { updateMany: (f: object, u: object) => Promise<unknown> } }>
-    }
-    await db.collections['analytics-rollups']?.collection.updateMany(
-      { hostname: { $exists: false } },
-      { $set: { hostname: '' } }
-    )
-    await db.collections['analytics-daily']?.collection.updateMany(
-      { scope: { $exists: false } },
-      { $set: { scope: '' } }
-    )
-    return
-  }
-  const db = payload.db as unknown as { drizzle: { execute: (q: string) => Promise<unknown> } }
-  await db.drizzle.execute(
-    `ALTER TABLE analytics_rollups ADD COLUMN IF NOT EXISTS hostname varchar NOT NULL DEFAULT ''`
-  )
-  await db.drizzle.execute(
-    `ALTER TABLE analytics_daily ADD COLUMN IF NOT EXISTS scope varchar NOT NULL DEFAULT ''`
-  )
-}
+const { reclassified, dirty } = await rebuildDays(payload, {
+  from: new Date('2026-09-01T00:00:00Z'),
+  to: new Date('2026-10-01T00:00:00Z'),
+  reclassify: true,
+})
 ```
 
-Push-mode dev installs pick up the new columns and the widened unique indexes (rollups gain `hostname`; sync's becomes `source + date + scope`) automatically on next boot; the snippet above is for migrate-mode installs, where a schema push never runs. On Postgres, migrate-mode installs also need to rebuild both unique indexes to include the new column: Payload only creates them from the current config on a fresh index build, so an existing production Postgres install keeps its old `(granularity, period, path, dimension, dimvalue)` and `(source, date)` unique indexes until this migration (or a follow-up one) drops and recreates them with `hostname` and `scope` appended.
+It marks every closed day of the range that holds raw hits, and the next maintenance run, or the first read that needs one of them, counts it again. `dirty` says how many days it marked. `scope` limits it to one scope; without one it covers every scope with raw hits or day markers.
 
-The two consequences of skipping that rebuild are not the same. Rollups write through `ON CONFLICT`, and the conflict target must match the unique index exactly; once the config declares `hostname` in the target list but the live index still lacks it, Postgres cannot infer an arbiter index for the conflict, and **every** native rollup write fails, not just the ones that would collide, with error `42P10` (`no unique or exclusion constraint matching the ON CONFLICT specification`). The sync collection instead upserts via a find-then-create, so its stale `(source, date)` index does not reject writes outright; rows that only differ by `scope` can still collide against it and stomp on each other's synced values.
+`reclassify: true` first classifies again the hits whose [channel](#traffic-channels) was decided by an older version of the rules. Each distinct combination of referrer host, `utm_source`, `utm_medium` and click id is classified once with the current rules, and its hits are updated a day at a time; `reclassified` says how many changed. Do this over the retention window after an upgrade whose changelog says the channel rules changed.
 
-Previously-scoped rollups installs already carry `scope` on their old index, so their rebuilt index is `(granularity, period, path, dimension, dimvalue, hostname, scope)`, not just `(..., hostname)`.
+A day some of whose raw hits maintenance already deleted keeps the totals it has, since counting it again would lose them; a day past `retention.rawDays` whose hits are all still there is counted again. A day that has not closed yet is left alone: today is read live anyway. A changed [reporting timezone](/analytics/timezone) needs no rebuild at all.
 
-Rebuild the indexes explicitly. `payload migrate:create` in the consumer app will typically generate the equivalent DDL automatically once the collection config above is in place; the statements below are the Postgres shape it produces, for reference or for a hand-written migration. Index names are assigned by Payload/Drizzle per install and can differ from the ones below, so confirm the actual name first with `\d analytics_rollups` (or `\d analytics_daily`) before dropping anything:
-
-```sql
-DROP INDEX IF EXISTS analytics_rollups_granularity_period_path_dimension_dimvalue_idx;
-CREATE UNIQUE INDEX analytics_rollups_bucket_idx
-  ON analytics_rollups (granularity, period, path, dimension, dimvalue, hostname);
-DROP INDEX IF EXISTS analytics_daily_source_date_idx;
-CREATE UNIQUE INDEX analytics_daily_source_date_scope_idx
-  ON analytics_daily (source, date, scope);
-```
-
-If your `sync` config sets a custom `collectionSlug`, adjust the `analytics-daily` table/collection name in both the migration snippet and the DDL above to match; the reference migration only knows the default slug.
-
-## Upgrading for goal metrics
-
-Goal support adds four required numeric counters to `analytics-rollups` (`conversions`, `revenue`, `scrollDepthSum`, `scrollSamples`, all defaulting to 0), four optional fields to `analytics-events` (`value`, `currency`, `scrollDepth`, `goals`), and the `goal` member of the events `type` select. Push-mode dev installs pick all of that up on the next boot; migrate-mode installs need a migration. This one mirrors the plugin's own:
+The maintenance task runs a rebuild too, right after deleting expired salts and before it counts any day, so the days it marks are counted in the same run:
 
 ```ts
-import type { MigrateUpArgs } from '@payloadcms/db-mongodb'
+import { MAINTAIN_TASK_SLUG } from '@10x-media/analytics/adapters/native'
 
-export async function up({ payload }: MigrateUpArgs): Promise<void> {
-  if (payload.db.name === 'mongoose') {
-    const db = payload.db as unknown as {
-      collections: Record<string, { collection: { updateMany: (f: object, u: object) => Promise<unknown> } }>
-    }
-    // One pass per counter, each matching only its own absence, so a row half-patched by
-    // an interrupted run is completed without resetting what it already carries.
-    for (const counter of ['conversions', 'revenue', 'scrollDepthSum', 'scrollSamples']) {
-      await db.collections['analytics-rollups']?.collection.updateMany(
-        { [counter]: { $exists: false } },
-        { $set: { [counter]: 0 } }
-      )
-    }
-    return
-  }
-  const db = payload.db as unknown as { drizzle: { execute: (q: string) => Promise<unknown> } }
-  for (const column of ['conversions', 'revenue', 'scroll_depth_sum', 'scroll_samples']) {
-    await db.drizzle.execute(
-      `ALTER TABLE analytics_rollups ADD COLUMN IF NOT EXISTS ${column} numeric NOT NULL DEFAULT 0`
-    )
-  }
-  await db.drizzle.execute(`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS value numeric`)
-  await db.drizzle.execute(`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS currency varchar`)
-  await db.drizzle.execute(`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS scroll_depth numeric`)
-  await db.drizzle.execute(`ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS goals jsonb`)
-  await db.drizzle.execute(`ALTER TYPE enum_analytics_events_type ADD VALUE IF NOT EXISTS 'goal'`)
-}
+await payload.jobs.queue({
+  task: MAINTAIN_TASK_SLUG,
+  queue: 'analytics',
+  input: { rebuild: { from: '2026-09-01T00:00:00Z', to: '2026-10-01T00:00:00Z', reclassify: true } },
+})
 ```
 
-Mongo needs only the rollup backfill: an absent event field is simply absent there. Every statement is idempotent, so running it against a schema that already has the columns is a no-op.
+An input it cannot read fails the job rather than running anything.
 
-Two Postgres details worth keeping if you hand-write your own version. The statements go through `payload.db.drizzle`, the pool handle, rather than the transaction-bound `db` argument, so each one autocommits; that is what keeps `ALTER TYPE ... ADD VALUE` out of an open transaction and lets the new enum member be usable straight away. And the migration is deliberately irreversible: Postgres cannot drop an enum member once it exists, so `down` does nothing.
+## Server events and host transactions
 
-Rows written before the migration read back as zero rather than `NaN`, so an install that has not run it yet reports 0 conversions instead of breaking, but it cannot ingest a `goal` event on Postgres until the enum member exists.
+[`trackServerEvent`](/analytics/goals#4-track-from-server-code) never joins a transaction the host holds. Its hit is stored on the engine's own connection, so it stays when the host's own work rolls back: a sale recorded inside a transaction that later fails is still a sale the processor took.
 
-## Upgrading for dimension columns
+SQLite has one writer at a time, and a host transaction holds that lock until it ends. A call made inside an open transaction on SQLite (a `req` whose transaction has begun and not ended) is therefore not written right away: it resolves at once, and the event is recorded once that transaction has ended, committed or rolled back. Waiting there instead would wait on the very caller it is part of, and `flush: true` does not change that. An event still waiting after ten minutes is recorded anyway, `adapter.flush(payload)` records the waiting events whose transaction has ended, and closing the instance records all of them. At most 10,000 wait at once: past that, a call's event is dropped. One that cannot be stored or is dropped is logged, at most one line a minute. On MongoDB and Postgres the call records the event exactly as it would outside a transaction.
 
-Serving the dimensions above adds eleven optional fields to `analytics-events`: `browser`, `os`, `language`, the five `utm*` keys, `referrerHost` (the bare host the `referrer` dimension reads, derived at ingest because a `where` cannot reduce a URL to its host at read time), `channel`, and the numeric `channelVersion` beside it. The rollups collection is unchanged, since its rows are keyed by `(dimension, dimvalue)` text columns.
+### Whose event it is
 
-Mongo needs nothing: the fields are optional, and an event written before this release simply carries none of them, which is already what "no bucket for that dimension" means. Push-mode dev installs pick the columns up on the next boot. A migrate-mode Postgres install needs this, which is the plugin's own migration statement for statement:
+A server event's `identity` says whether the request behind it names a visitor. A call that passes none gets `'none'` while [`capture.gate`](/analytics/consent) holds a capture slot native could fill (the global slot when native is the source that fills it, and the tenant slot on any scoped install), since server code cannot know that visitor's answer: the event counts, as a conversion or a sale, under no visitor and no visit. With `capture.gate: 'off'` it gets `'request'`, and the request's address and agent make it its visitor's, as a beacon would. The same default applies to `trackServerEvent`, the server `purchase` and `refund`, and the form-builder goal action. Where your code knows the visitor's answer, pass `identity: 'request'` on that call ([what the gate does not cover](/analytics/consent#what-the-gate-does-not-cover)). A call that passes an `ip` or a `userAgent` but no identity while the default is `'none'` has them set aside, and the log says so once.
 
-```ts
-import type { MigrateDownArgs, MigrateUpArgs } from '@payloadcms/db-mongodb'
+## Content items
 
-export async function up({ payload }: MigrateUpArgs): Promise<void> {
-  if (payload.db.name === 'mongoose') {
-    return
-  }
-  const db = payload.db as unknown as { drizzle: { execute: (query: string) => Promise<unknown> } }
-  for (const column of [
-    'browser',
-    'os',
-    'language',
-    'utm_source',
-    'utm_medium',
-    'utm_campaign',
-    'utm_content',
-    'utm_term',
-    'referrer_host',
-    'channel',
-  ]) {
-    await db.drizzle.execute(
-      `ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS ${column} varchar`
-    )
-  }
-  await db.drizzle.execute(
-    `ALTER TABLE analytics_events ADD COLUMN IF NOT EXISTS channel_version numeric`
-  )
-}
+A [content item](/analytics/items) is counted from the rows that carry it: a view is an entry of an engagement's `impressions`, and a click or a conversion is an event or a goal whose `item` names it. A day's totals keep one row per item, the item's total, and one per item and page, the item on one page. Nothing else reads them, so an item's numbers never reach a site, page, event or goal total.
 
-/** Deliberately irreversible: dropping the columns would discard already-attributed events. */
-export async function down(_args: MigrateDownArgs): Promise<void> {}
-```
+| Arrives as | Adds to the item's rows |
+|---|---|
+| A view, on an engagement | `impressions: 1`, and nothing to the site, the page or any other dimension |
+| An event or a goal carrying the item | `events`, `interactions` for an `item_click`, and the completion's `conversions` and `revenue` |
 
-Every statement is `ADD COLUMN IF NOT EXISTS`, so the migration is re-runnable and leaves a push-mode schema alone. Events ingested before it runs keep their old attribution: nothing backfills a browser onto a row whose user agent was never stored, so the new breakdowns start at the migration rather than at the beginning of your data.
+An event or a goal carrying an item still counts on its own page and site exactly as it would without one, which is why an `item_click` appears among the events, and why the site's and every page's `interactions` are the item clicks that happened there. An item's rows count the distinct people who saw or clicked it, by the day's visitor id. A read with `item` reads those rows: its totals, its views per day and its `page` breakdown, ranked by views and listing only the pages it was seen on. An `item eq` filter matches the same rows, views included, so its `visitors` are the people who saw or clicked it; adding `event eq item_click` keeps the people who clicked. Any other breakdown of one item, and an `item eq` filter combined with anything else, reads the raw hits and reaches back [`retention.rawDays`](#retention).
+
+An event recorded from server code (`trackServerEvent`, and the server `purchase` and `refund`) that carries an item adds to the item's total and to no page: its path is where it was recorded, `/orders` for a sale unless the call names one, not a page anyone saw the item on. A sale the browser and the webhook [both recorded](/analytics/revenue#recorded-in-the-browser-and-by-the-webhook) counts on the browser's record with the webhook's item when the webhook names one, still on no page, and with the browser's own item otherwise.
+
+A ref a page sends is kept only with the signature `signItemRef` and `itemAttributesFor` write (see [signed refs](/analytics/items#signed-refs)), checked against a key derived from the instance's secret, with no database read; a ref without one, or with one that does not match, is dropped and its event kept. Server code's own refs need none. `native({ items: { signature: 'optional' } })` keeps unsigned refs from pages too, for a site that cannot sign where it renders; a wrong signature is dropped either way. The id check below stays on in both modes: a ref the server signed for an id its collection could not hold would otherwise reach the item title lookups, where one id the database cannot cast fails the whole lookup.
+
+Ingest keeps a ref only when its id could be one of its collection's ids, decided at boot from config alone: a custom `id` field's type, else what the database generates. On Mongo that is a 24-character ObjectId in lowercase hex, on Postgres an integer within its `integer` column for `serial` ids or a lowercase uuid for `idType: 'uuid'`, and a custom text id takes anything. A ref whose id the database could not cast is dropped like the ref of an unbound collection, and its event kept, so a forged view counts nothing. The [Content tab](/analytics/items#the-content-tab)'s title lookup skips such an id too, and should the database still refuse one, every other item keeps its title.
 
 ## Options
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `buffer` | `boolean \| { maxSize?, maxAgeMs? }` | off | In-memory write batching (50 events / 2000 ms). |
+| `buffer` | `boolean \| { maxSize?, maxAgeMs?, maxPending? }` | off | [Write batching](#write-batching-opt-in) in memory: 200 hits, one second, 5,000 held. |
+| `caps` | `Partial<Record<CapKey, number \| null>>` | see [caps](#daily-totals-and-caps) | Values each dimension keeps per day in the daily totals; `null` keeps every one. |
+| `collections` | `{ hits?, aggregates?, state? }`, each `{ slug?, overrides? }` | the `analytics-` slugs | Renames and reshapes the [three collections](#storage); see [Renaming the plugin's collections](/analytics/reference/options#renaming-the-plugins-collections) for what an override may change. |
 | `filterBots` | `boolean \| ((ua: string) => boolean)` | `true` | Drop automated traffic at ingest by its [user agent](#bot-filtering). `false` counts every beacon; a function replaces the built-in rule. |
 | `geoDbPath` | `string` | none | Path to a MaxMind `.mmdb`; enables IP-level geo lookup. |
-| `geoResolver` | `GeoResolver` | platform headers (+ MaxMind when `geoDbPath` set) | Custom geo pipeline. |
-| `hostname` | `'request' \| string[] \| EventHostnameResolver` | `'request'` | Where a stored event's [hostname comes from](#where-the-hostname-comes-from). A list keeps only the hostnames it names; a resolver decides per event and `null` drops it. |
-| `ingestPath` | `string` | `/analytics/ingest` | Beacon endpoint path (served under `/api`). The tracker config follows it, so the browser posts to the moved mount. |
+| `geoResolver` | `GeoResolver` | the `trustedPlatform` headers (+ MaxMind when `geoDbPath` set) | Custom geo pipeline. |
+| `hostname` | `'request' \| string[] \| EventHostnameResolver` | `'request'` | Where a stored hit's [hostname comes from](#where-the-hostname-comes-from). A list keeps only the hostnames it names; a resolver decides per event and `null` drops it. |
+| `ingestPath` | `string` | `<routes.base>/e` | Beacon endpoint path (served under `/api`). The tracker config follows it, so the browser posts to the moved mount. |
+| `items` | `{ signature?: 'required' \| 'optional' }` | `'required'` | Whether a page's [content item](#content-items) refs need the server's signature. |
 | `platformHostnames` | `string[]` | `[]` | On a [scoped install](#scoped-installs-and-platformhostnames), the platform's own domains, which ingest under the null scope instead of being dropped. |
-| `retentionDays` | `number` | keep forever | Nightly [pruning window](#retention-pruning) for raw events and the seen ledger. Zero or less keeps them forever, anything else is a whole number of days. Setting it registers the prune task. |
-| `rollupRetentionDays` | `number` | keep forever | Nightly [pruning window](#retention-pruning) for rollup rows. A whole number of days above zero, requires `retentionDays` and never shorter than it. |
+| `retention` | `{ rawDays?: number \| null, aggregateDays?: number \| null }` | `{ rawDays: 90, aggregateDays: null }` | How long [raw hits and daily totals](#retention) are kept. |
+| `sqlite` | `{ thread?: 'auto' \| 'worker' \| 'main' }` | `{ thread: 'auto' }` | On a local SQLite file, where the engine runs its statements: on [worker threads](#sqlite) when the database is in WAL mode with a busy timeout of at least 5,000 ms, else on the main thread under stall budgets. `ANALYTICS_SQLITE_THREAD` sets it where this does not. |
+| `today` | `{ snapshotAboveHits?: number, maxAgeMs?: number }` | 5,000 hits on Postgres, 2,000 elsewhere; an age set by the day's hits | How [today](#how-a-read-is-answered) is read: live from its raw hits up to `snapshotAboveHits` hits (a whole number, 0 for always from a snapshot), else from a snapshot served while at most `maxAgeMs` old (a whole number of ms, at least 1,000), which replaces the age by volume. |
 
-`trustedProxyHops` sits on `analytics()` rather than here; see [Trusted proxies](#trusted-proxies).
+`trustedProxyHops` and `jobs` sit on `analytics()` rather than here; see [Trusted proxies](#trusted-proxies) and [the `jobs` option](#the-jobs-option).

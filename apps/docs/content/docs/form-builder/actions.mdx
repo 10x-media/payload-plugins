@@ -268,6 +268,21 @@ It runs on every form save, once per stored instance of the action, alongside fi
 
 A custom action's `type` is registered as a Payload block whose slug is that type. Because Payload resolves blocks globally by slug, a `type` that matches one of your own content-block slugs would merge the two definitions and pollute the stored action. The plugin throws a clear error at boot if it detects such a collision, so pick an action `type` that no content block shares.
 
+## Track a submission as an analytics goal
+
+[`@10x-media/analytics`](/analytics) ships a ready-made action, `trackGoalAction`, that records a submission as a conversion. Neither plugin imports the other: the host registers it, like any custom action.
+
+```ts title="payload.config.ts"
+import { GOAL_ACTION_TYPE, trackGoalAction } from '@10x-media/analytics'
+import { formBuilder } from '@10x-media/form-builder'
+
+formBuilder({
+  actions: { [GOAL_ACTION_TYPE]: trackGoalAction({ hostname: 'example.com' }) },
+})
+```
+
+Each form then gets a **Track analytics goal** block under its Actions tab, with a goal picker and an optional amount, its currency picked in the same row. The action is not `essential`, so a failed write is logged and the submission still succeeds. See [Goals](/analytics/goals#3-track-a-form-submission) for what it records and where its hostname comes from, and [Attach goals to your own components](/analytics/integrations) for the other hookups.
+
 ## Run model
 
 Actions run as a Payload job (task `form-builder-actions`) when a runner is present: `config.jobs.autoRun` set, or the [Jobs plugin](/jobs) installed (see [Jobs family interop](/concepts/jobs-family)). Without a runner, an inline fallback runs them after the submission row is stored, so a project with zero queue infrastructure still gets its emails sent. The fallback is bounded: the submit response waits at most the dispatch deadline for action work, then returns while the remainder finishes (or fails, logged) in the background, so a slow webhook receiver cannot hold a visitor's submit hostage. Either way an action error never fails the submission, unless the action declared otherwise, below.
