@@ -1,15 +1,22 @@
 import type { PayloadRequest } from 'payload'
+import { type GatedScope, isGatedScope } from '../access/principal'
+import { readGate } from '../access/readGate'
 import { type SerializedCapabilities, serializeCapabilities } from '../core/capabilities'
-import { type AnalyticsAdapter, PLATFORM_SCOPE } from '../core/contract'
+import type { AnalyticsAdapter } from '../core/contract'
 import type { AdapterRegistry } from '../core/registry'
-import { resolveRequestedScope } from '../core/scopedRead'
+import {
+	needsUnscopedSourceAccess,
+	resolveRequestedScope,
+	visibleRegistryFor,
+} from '../core/scopedRead'
 import type { QuerySourceRef } from '../query/response'
 import {
 	type AnalyticsRuntime,
 	getRuntime,
-	type PlatformReadGate,
-	platformReadGate,
+	resolvableScope,
 	resolveRegistryFor,
+	type ScopeGates,
+	scopeGates,
 } from './runtime'
 
 /** One readable source on the wire: its identity plus the capabilities a client gates on. */
@@ -17,7 +24,7 @@ export interface RequestSource extends QuerySourceRef {
 	capabilities: SerializedCapabilities
 }
 
-export interface RequestSources {
+interface RequestSources {
 	/** Wire rows for the resolved scope, in registry order; empty when none resolve. */
 	sources: RequestSource[]
 	defaultId: string | null
@@ -27,14 +34,14 @@ export interface RequestSources {
 	scope: string | null
 }
 
-export interface ResolveSourcesArgs {
+interface ResolveSourcesArgs {
 	/**
-	 * A scope {@link resolveRequestedScope} already decided and gated for this request. It
-	 * replaces this call's own resolution, so pass only what that helper returned.
+	 * A scope {@link resolveRequestedScope} already cleared for this request, which replaces this
+	 * call's own resolution. Only that helper mints one.
 	 */
-	scope?: string | null
-	/** Shared `platformRead` decision; one is created per call when omitted. */
-	platformRead?: PlatformReadGate
+	scope?: GatedScope
+	/** Shared cross-scope decisions; one set is created per call when omitted. */
+	gates?: ScopeGates
 }
 
 const empty = (): RequestSources => ({
@@ -65,12 +72,36 @@ const fromRegistry = (args: {
 }
 
 /**
- * The sources a request may read, resolved once for both read endpoints: the request's
- * own scope (or one a caller already had gated), the per-scope registry, and each adapter's
- * serialized capabilities. {@link resolveRequestedScope} owns the scope decision, so a
- * cross-scope resolution resolves no sources at all rather than another tenant's. A
- * resolution that fails outright degrades instead: nothing on a scoped install, where it is
- * indistinguishable from a forged request, and the static config registry otherwise.
+ * Sources that can answer about one scope. Under a tenant scope a shared adapter unable to narrow
+ * would report every tenant's numbers, so it is dropped however privileged the reader.
+ */
+const narrowToScope = (runtime: AnalyticsRuntime, resolved: RequestSources): RequestSources => {
+	const scope = resolved.scope
+	if (scope === null) {
+		return resolved
+	}
+	const narrowable = resolved.sources.filter((source) => {
+		const adapter = resolved.adapters.get(source.id)
+		return adapter !== undefined && !needsUnscopedSourceAccess(runtime, adapter, scope)
+	})
+	if (narrowable.length === resolved.sources.length) {
+		return resolved
+	}
+	const kept = new Set(narrowable.map((source) => source.id))
+	return {
+		sources: narrowable,
+		defaultId:
+			resolved.defaultId !== null && kept.has(resolved.defaultId)
+				? resolved.defaultId
+				: (narrowable[0]?.id ?? null),
+		adapters: new Map([...resolved.adapters].filter(([id]) => kept.has(id))),
+		scope,
+	}
+}
+
+/**
+ * Sources a request may read, shared by every listing surface. A denied, cross-scope or non-member
+ * read lists nothing; a failed resolution lists nothing when scoped, else the config registry.
  */
 export const resolveSourcesForRequest = async (
 	req: PayloadRequest,
@@ -80,26 +111,40 @@ export const resolveSourcesForRequest = async (
 	if (!runtime) {
 		return empty()
 	}
-	const allowed = args.platformRead ?? platformReadGate(runtime, req)
+	try {
+		if (!(await readGate(runtime, req))) {
+			return empty()
+		}
+	} catch (err) {
+		req.payload.logger?.warn(`analytics: access.read failed, listing no sources: ${String(err)}`)
+		return empty()
+	}
+	const gates = args.gates ?? scopeGates(runtime, req)
 	const degrade = (): RequestSources =>
 		runtime.scoped ? empty() : fromRegistry({ runtime, registry: runtime.registry, scope: null })
 	try {
 		let scope: string | null
 		if (args.scope !== undefined) {
-			scope = args.scope
+			if (!isGatedScope(args.scope)) {
+				return empty()
+			}
+			scope = args.scope.value
 		} else {
-			const requested = await resolveRequestedScope({ runtime, req, platformRead: allowed })
+			const requested = await resolveRequestedScope({ runtime, req, gates })
 			if (!requested.ok) {
 				return requested.reason === 'failed' ? degrade() : empty()
 			}
 			scope = requested.scope
 		}
-		const registry = await resolveRegistryFor(runtime, {
+		const resolved = await resolveRegistryFor(runtime, {
 			payload: req.payload,
 			req,
-			scope: scope === PLATFORM_SCOPE ? null : scope,
+			scope: resolvableScope(scope),
 		})
-		return fromRegistry({ runtime, registry, scope })
+		const registry = await visibleRegistryFor({ runtime, req, resolved, scope, gates })
+		return registry
+			? narrowToScope(runtime, fromRegistry({ runtime, registry, scope }))
+			: { ...empty(), scope }
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: source resolution failed: ${String(err)}`)
 		return degrade()

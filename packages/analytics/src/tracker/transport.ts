@@ -1,11 +1,8 @@
 import type { TrackerWindow } from './types'
 
 /**
- * Posts one JSON payload to a first-party path. `sendBeacon` first, because it survives the
- * unload the pageview flush happens in; `fetch` with `keepalive` covers the browsers (and
- * the blocked-beacon cases) where it is missing or refuses the payload. Delivery is
- * fire-and-forget: a failed send is dropped rather than retried, so analytics never
- * interferes with the page.
+ * Posts one JSON payload: `sendBeacon` first, since it survives unload, then `fetch` with
+ * `keepalive`. Fire-and-forget: a failed send is dropped, never retried.
  */
 export const sendPayload = (win: TrackerWindow, url: string, body: unknown): void => {
 	const json = JSON.stringify(body)

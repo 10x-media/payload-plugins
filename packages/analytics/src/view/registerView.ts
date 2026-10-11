@@ -1,6 +1,7 @@
 import type { Config } from 'payload'
 import { formatAdminURL } from 'payload/shared'
-import type { AnalyticsPluginOptions, ResolvedView } from '../core/options'
+import type { ResolvedView } from '../core/options'
+import { addComponentDependency, VIEW_DEPENDENCY } from '../plugin/adminDependencies'
 
 /** Key the view is registered under in `admin.components.views`. */
 export const VIEW_KEY = 'analytics'
@@ -12,25 +13,25 @@ export const NAV_LINK_COMPONENT = '@10x-media/analytics/client#AnalyticsNavLink'
 
 export interface RegisterViewArgs {
 	view: false | ResolvedView
-	/**
-	 * The app's own options, handed to the server component untouched: it resolves them
-	 * again per request, because `access.view` and the resolvers are functions the config
-	 * cannot serialize into client props.
-	 */
-	pluginOptions: AnalyticsPluginOptions
+	/** The view's title per language, for the browser tab. */
+	title?: Record<string, string>
 }
 
 /**
- * Mounts the analytics view and its nav link. The link is a client component with no
- * access context, so it is registered whenever the view is: a reader `access.view`
- * denies follows it and lands on the view's no-access message.
+ * Mounts view and nav link; the link has no access context, so a reader `access.view` denies lands
+ * on the no-access message. `meta` titles the tab in fallback language until the view retitles it.
  */
 export const registerView = (config: Config, args: RegisterViewArgs): void => {
-	const { view, pluginOptions } = args
+	const { view, title } = args
 	if (view === false) {
 		return
 	}
 	const href = formatAdminURL({ adminRoute: config.routes?.admin ?? '/admin', path: view.path })
+	const fallbackLanguage = config.i18n?.fallbackLanguage ?? 'en'
+	const metaTitle = title?.[fallbackLanguage] ?? title?.en
+	if (view.Component !== undefined) {
+		addComponentDependency(config, VIEW_DEPENDENCY, view.Component)
+	}
 	config.admin = {
 		...config.admin,
 		components: {
@@ -38,9 +39,10 @@ export const registerView = (config: Config, args: RegisterViewArgs): void => {
 			views: {
 				...config.admin?.components?.views,
 				[VIEW_KEY]: {
-					Component: { path: VIEW_COMPONENT, serverProps: { pluginOptions } },
+					Component: { path: VIEW_COMPONENT },
 					path: view.path,
 					exact: true,
+					...(metaTitle === undefined ? {} : { meta: { title: metaTitle } }),
 				},
 			},
 			afterNavLinks: [

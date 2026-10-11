@@ -11,15 +11,13 @@ const source = (
 	label: id,
 	kind: 'config',
 	capabilities: {
-		perPageQuery: true,
 		realtime: false,
 		comparison: false,
 		minGranularity: 'day',
 		maxLookbackDays: null,
 		metrics: metrics as WireSource['capabilities']['metrics'],
 		dimensions: [],
-		filters: [],
-		filterOperators: ['eq'],
+		filters: {},
 		...extra,
 	},
 })
@@ -84,15 +82,23 @@ describe('satisfiesSerialized', () => {
 	})
 
 	it('passes a filters requirement the source can serve', () => {
-		const withFilters = { ...caps, filters: ['country'] as never }
+		const withFilters = { ...caps, filters: { country: ['eq' as const] } }
 		expect(satisfiesSerialized(withFilters, { filters: ['country'] })).toBe(true)
 	})
 
-	it('fails a filterOperators requirement the source cannot serve', () => {
-		expect(satisfiesSerialized(caps, { filterOperators: ['contains'] })).toBe(false)
+	it('fails a pair whose operator the source does not take for that dimension', () => {
+		const withFilters = { ...caps, filters: { country: ['eq' as const] } }
+		expect(
+			satisfiesSerialized(withFilters, {
+				filters: [{ dimension: 'country', operator: 'contains' }],
+			})
+		).toBe(false)
 	})
 
-	it('passes a filterOperators requirement the source can serve', () => {
-		expect(satisfiesSerialized(caps, { filterOperators: ['eq'] })).toBe(true)
+	it('passes a pair the source takes', () => {
+		const withFilters = { ...caps, filters: { country: ['eq' as const] } }
+		expect(
+			satisfiesSerialized(withFilters, { filters: [{ dimension: 'country', operator: 'eq' }] })
+		).toBe(true)
 	})
 })

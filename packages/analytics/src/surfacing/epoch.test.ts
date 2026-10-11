@@ -1,6 +1,13 @@
 import { inMemoryKVAdapter, type KVAdapter, type Payload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import { createEpochStore, epochKeyFor, INITIAL_EPOCH } from './epoch'
+import {
+	configEpochKeyFor,
+	createEpochFallback,
+	createEpochStore,
+	epochKeyFor,
+	INITIAL_EPOCH,
+	kvEpochBackend,
+} from './epoch'
 
 const memoryKv = (): KVAdapter => inMemoryKVAdapter().init({} as never)
 
@@ -107,21 +114,36 @@ describe('createEpochStore', () => {
 		expect(spy).toHaveBeenCalledTimes(2)
 	})
 
-	it('answers the initial token and warns once when the KV get throws', async () => {
+	it('answers a token of the outage’s own, never the initial one, and warns once when the KV get throws', async () => {
 		const kv = memoryKv()
 		vi.spyOn(kv, 'get').mockRejectedValue(new Error('kv down'))
 		const warn = vi.fn()
 		const store = createEpochStore(fakePayload(kv, warn), { memoMs: 0 })
-		expect(await store.get('tenant-a')).toBe(INITIAL_EPOCH)
-		expect(await store.get('tenant-b')).toBe(INITIAL_EPOCH)
+		const a = await store.get('tenant-a')
+		expect(a).toMatch(/^outage-/)
+		expect(await store.get('tenant-a')).toBe(a)
+		expect(await store.get('tenant-b')).not.toBe(a)
 		expect(warn).toHaveBeenCalledTimes(1)
+	})
+
+	it('answers the last token it read while the KV get throws, and one bumped since', async () => {
+		const kv = memoryKv()
+		const store = createEpochStore(fakePayload(kv), { memoMs: 0 })
+		const bumped = await store.bump('tenant-a')
+		const get = vi.spyOn(kv, 'get').mockRejectedValue(new Error('kv down'))
+		expect(await store.get('tenant-a')).toBe(bumped)
+		get.mockRestore()
+		await kv.set(epochKeyFor('tenant-a'), { value: 'elsewhere' })
+		expect(await store.get('tenant-a')).toBe('elsewhere')
+		vi.spyOn(kv, 'get').mockRejectedValue(new Error('kv down'))
+		expect(await store.get('tenant-a')).toBe('elsewhere')
 	})
 
 	it('survives a payload with no logger when the KV get throws', async () => {
 		const kv = memoryKv()
 		vi.spyOn(kv, 'get').mockRejectedValue(new Error('kv down'))
 		const store = createEpochStore({ kv } as unknown as Payload)
-		expect(await store.get('tenant-a')).toBe(INITIAL_EPOCH)
+		expect(await store.get('tenant-a')).toMatch(/^outage-/)
 	})
 
 	it('logs and rethrows when the KV set in bump throws', async () => {
@@ -145,5 +167,57 @@ describe('createEpochStore', () => {
 		await kv.set(epochKeyFor('tenant-a'), { value: '' })
 		const store = createEpochStore(fakePayload(kv))
 		expect(await store.get('tenant-a')).toBe(INITIAL_EPOCH)
+	})
+
+	it('keeps its tokens wherever its backend does', async () => {
+		const kv = memoryKv()
+		const tokens = new Map<string, string>()
+		const store = createEpochStore(fakePayload(kv), {
+			backend: {
+				get: async (scope) => tokens.get(scope ?? '') ?? INITIAL_EPOCH,
+				set: async (scope, token) => {
+					tokens.set(scope ?? '', token)
+				},
+			},
+		})
+		const bumped = await store.bump('tenant-a')
+		expect(tokens.get('tenant-a')).toBe(bumped)
+		expect(await kv.get(epochKeyFor('tenant-a'))).toBeNull()
+		expect(await createEpochStore(fakePayload(kv)).get('tenant-a')).toBe(INITIAL_EPOCH)
+	})
+
+	it('keeps configuration tokens in KV apart from the refresh tokens', async () => {
+		const kv = memoryKv()
+		const config = createEpochStore(fakePayload(kv), {
+			backend: kvEpochBackend(fakePayload(kv), configEpochKeyFor),
+		})
+		const bumped = await config.bump('tenant-a')
+		expect(await kv.get(configEpochKeyFor('tenant-a'))).toEqual({ value: bumped })
+		expect(await createEpochStore(fakePayload(kv)).get('tenant-a')).toBe(INITIAL_EPOCH)
+		expect(configEpochKeyFor(null)).toBe('analytics:config-epoch:global')
+		expect(configEpochKeyFor('a:b')).toBe('analytics:config-epoch:s:a%3Ab')
+	})
+})
+
+describe('createEpochFallback', () => {
+	it('answers the last epoch read for the scope, else one token per outage, never a shared one', () => {
+		const fallback = createEpochFallback(() => 0)
+		const outage = fallback.failed('a')
+		expect(outage).toMatch(/^outage-/)
+		expect(fallback.failed('a')).toBe(outage)
+		expect(fallback.failed('b')).not.toBe(outage)
+		expect(fallback.read('a', 'E1')).toBe('E1')
+		expect(fallback.failed('a')).toBe('E1')
+		expect(fallback.outage('a')).not.toBe(outage)
+	})
+
+	it('starts a new outage token once a read ended the last outage', () => {
+		const fallback = createEpochFallback()
+		const first = fallback.outage(null)
+		expect(fallback.outage(null)).toBe(first)
+		fallback.read(null, 'E2')
+		const second = fallback.outage(null)
+		expect(second).not.toBe(first)
+		expect(second).not.toBe('E2')
 	})
 })

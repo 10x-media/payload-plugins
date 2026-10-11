@@ -5,33 +5,81 @@ import type { SerializedCapabilities } from '../core/capabilities'
 import { type AnalyticsResult, DIMENSION_KEYS, FILTER_OPERATORS } from '../core/contract'
 import type { QueryRequest } from '../query/fetchQuery'
 import type { QueryResponse } from '../query/response'
+import { a11yViolations } from '../testing/a11y'
 import { keys } from '../translations/keys'
 import { METRIC_KEYS } from '../translations/metricKeys'
+import { QueryFetchError } from '../ui/data/request'
 import { AnalyticsViewClient } from './AnalyticsViewClient'
 import { VIEW_METRIC_ORDER } from './gating'
 import type { AnalyticsViewClientProps } from './viewProps'
 
 const mocks = vi.hoisted(() => ({
 	search: '',
+	/** Re-renders whatever reads `useSearchParams`, as Next does when the address changes. */
+	listeners: new Set<() => void>(),
 	replace: vi.fn<(url: string) => void>(),
 	push: vi.fn<(url: string) => void>(),
-	fetchQueryMock: vi.fn<(apiRoute: string, request: QueryRequest) => Promise<unknown>>(),
-	refreshCacheMock: vi.fn<(apiRoute: string) => Promise<{ epoch: string }>>(),
+	fetchQueryMock: vi.fn<(endpoint: string, request: QueryRequest) => Promise<unknown>>(),
+	refreshCacheMock: vi.fn<(endpoint: string) => Promise<{ epoch: string }>>(),
 }))
 
-vi.mock('next/navigation', () => ({
-	usePathname: () => '/admin/analytics',
-	useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
-	useSearchParams: () => new URLSearchParams(mocks.search),
-}))
+/** Moves the address the mocked router reports, and tells every reader. */
+const navigate = (search: string): void => {
+	mocks.search = search.startsWith('?') ? search.slice(1) : search
+	for (const listener of mocks.listeners) {
+		listener()
+	}
+}
+
+vi.mock('next/navigation', async () => {
+	const { useSyncExternalStore } = await import('react')
+	const subscribe = (listener: () => void) => {
+		mocks.listeners.add(listener)
+		return () => {
+			mocks.listeners.delete(listener)
+		}
+	}
+	return {
+		usePathname: () => '/admin/analytics',
+		useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
+		useSearchParams: () => new URLSearchParams(useSyncExternalStore(subscribe, () => mocks.search)),
+	}
+})
 
 vi.mock('../query/fetchQuery', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../query/fetchQuery')>()
 	return { ...actual, fetchQuery: mocks.fetchQueryMock, refreshCache: mocks.refreshCacheMock }
 })
 
-vi.mock('@payloadcms/ui', () => ({
+vi.mock('@payloadcms/ui', async () => ({
+	...(await import('../testing/selectMocks')).selectMocks,
 	Banner: ({ children }: { children?: ReactNode }) => <div role="alert">{children}</div>,
+	DatePicker: ({
+		onChange,
+		overrides,
+	}: {
+		onChange?: (picked: [Date | null, Date | null]) => void
+		overrides?: { id?: string; startDate?: Date | null; endDate?: Date | null }
+	}) => {
+		const day = (date: Date | null | undefined): string =>
+			date
+				? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+				: ''
+		const date = (value: string | undefined): Date | null => {
+			const [year, month, dayOfMonth] = (value ?? '').split('-').map(Number)
+			return year && month && dayOfMonth ? new Date(year, month - 1, dayOfMonth) : null
+		}
+		return (
+			<input
+				id={overrides?.id}
+				onChange={(event) => {
+					const [from, to] = event.target.value.split('..')
+					onChange?.([date(from), date(to)])
+				}}
+				value={`${day(overrides?.startDate)}..${day(overrides?.endDate)}`}
+			/>
+		)
+	},
 	Button: ({
 		children,
 		onClick,
@@ -47,41 +95,31 @@ vi.mock('@payloadcms/ui', () => ({
 			{children}
 		</button>
 	),
-	Pill: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
-	SelectInput: ({
-		label,
-		options,
-		value,
-		onChange,
-	}: {
-		label?: string
-		options?: { value: string; label: string }[]
-		value?: string
-		onChange?: (option: { value: string; label: string }) => void
-	}) => (
-		<select
-			aria-label={String(label)}
-			onChange={(event) => onChange?.({ value: event.target.value, label: event.target.value })}
-			value={value}
-		>
-			{(options ?? []).map((option) => (
-				<option key={option.value} value={option.value}>
-					{option.label}
-				</option>
-			))}
-		</select>
+	Pill: ({ children, className }: { children?: ReactNode; className?: string }) => (
+		<span className={className}>{children}</span>
 	),
-	useTranslation: () => ({ i18n: { language: 'en' }, t: (key: string) => key }),
+	ShimmerEffect: ({ className }: { className?: string }) => (
+		<div aria-hidden="true" className={className} />
+	),
+	useTranslation: () => ({
+		i18n: { language: 'en' },
+		t: (key: string, vars?: Record<string, string>) =>
+			vars ? `${key} ${JSON.stringify(vars)}` : key,
+	}),
 	XIcon: () => <span aria-hidden="true" />,
 }))
+
+/** The window the toolbar names, as the language writes a span of days. */
+const daysCaption = (): string | null | undefined =>
+	document.querySelector('.analytics-view__captions > span')?.textContent
 
 const nativeCaps: SerializedCapabilities = {
 	metrics: [...VIEW_METRIC_ORDER],
 	dimensions: [...DIMENSION_KEYS],
-	filters: [...DIMENSION_KEYS],
-	filterOperators: [...FILTER_OPERATORS],
+	filters: Object.fromEntries(
+		DIMENSION_KEYS.map((dimension) => [dimension, [...FILTER_OPERATORS]])
+	),
 	realtime: false,
-	perPageQuery: true,
 	comparison: true,
 	minGranularity: 'hour',
 	maxLookbackDays: null,
@@ -93,8 +131,9 @@ const props = (overrides: Partial<AnalyticsViewClientProps> = {}): AnalyticsView
 		sources: [{ id: 'native', label: 'Native', kind: 'config', capabilities: nativeCaps }],
 	},
 	goals: [{ slug: 'signup', name: 'Signup' }],
+	countryFlags: true,
 	defaults: { range: 'last30days', metric: 'pageviews' },
-	apiRoute: '/api',
+	endpoints: { query: '/api/_x/query', refresh: '/api/_x/refresh', live: '/api/_x/live' },
 	adminRoute: '/admin',
 	timezone: 'Europe/Berlin',
 	locale: 'en',
@@ -139,16 +178,35 @@ const goalsUnresolvedResult: AnalyticsResult = {
 	},
 }
 
+/** Has every goal breakdown answer as a source that could not read its goals. */
+const answerGoalsUnresolved = (): void => {
+	mocks.fetchQueryMock.mockImplementation((_route, request) =>
+		Promise.resolve(
+			request.dimensions?.[0] === 'goal'
+				? { ...answer(request, { goalsUnresolved: true }), result: goalsUnresolvedResult }
+				: answer(request)
+		)
+	)
+}
+
 class ResizeObserverStub {
 	observe(): void {}
 	unobserve(): void {}
 	disconnect(): void {}
 }
 
+const pushed = (): string[] =>
+	vi.mocked(window.history.pushState).mock.calls.map((call) => String(call[2]))
+
+const replaced = (): string[] =>
+	vi.mocked(window.history.replaceState).mock.calls.map((call) => String(call[2]))
+
 beforeEach(() => {
 	mocks.search = ''
 	mocks.replace.mockReset()
 	mocks.push.mockReset()
+	vi.spyOn(window.history, 'pushState').mockImplementation(() => {})
+	vi.spyOn(window.history, 'replaceState').mockImplementation(() => {})
 	mocks.fetchQueryMock.mockReset()
 	mocks.fetchQueryMock.mockImplementation((_route, request) => Promise.resolve(answer(request)))
 	mocks.refreshCacheMock.mockReset()
@@ -163,12 +221,31 @@ beforeEach(() => {
 afterEach(() => {
 	cleanup()
 	vi.unstubAllGlobals()
+	vi.restoreAllMocks()
 })
 
 const renderView = async (overrides: Partial<AnalyticsViewClientProps> = {}) => {
 	const result = render(<AnalyticsViewClient {...props(overrides)} />)
 	await act(async () => {})
 	return result
+}
+
+const clickRefresh = async (): Promise<void> => {
+	await act(async () => {
+		fireEvent.click(screen.getByRole('button', { name: keys.viewRefresh }))
+	})
+}
+
+/** Holds every refresh open until the returned call answers it. */
+const holdRefresh = (): ((value: { epoch: string }) => void) => {
+	let settle: ((value: { epoch: string }) => void) | undefined
+	mocks.refreshCacheMock.mockImplementation(
+		() =>
+			new Promise<{ epoch: string }>((resolve) => {
+				settle = resolve
+			})
+	)
+	return (value) => settle?.(value)
 }
 
 describe('AnalyticsViewClient', () => {
@@ -185,18 +262,38 @@ describe('AnalyticsViewClient', () => {
 		expect(screen.queryByRole('tablist')).toBeNull()
 	})
 
-	it('writes the charted metric to the URL when a card is clicked', async () => {
+	it('asks a per-site reader with no site selected to choose one', async () => {
+		await renderView({ sources: { defaultId: null, sources: [] }, needsScope: true })
+		expect(screen.getByText(keys.stateNoScope)).toBeDefined()
+		expect(screen.queryByText(keys.viewNoSources)).toBeNull()
+	})
+
+	// A click is a step on the client alone: the router would re-run Payload's whole admin page.
+	it('pushes the charted metric to the history when a card is clicked, not through the router', async () => {
 		await renderView()
 		const cards = within(screen.getByRole('group', { name: keys.viewOverview }))
 		fireEvent.click(cards.getByRole('button', { name: new RegExp(METRIC_KEYS.visitors) }))
-		expect(mocks.push).toHaveBeenCalledWith('/admin/analytics?metric=visitors', { scroll: false })
+		expect(window.history.pushState).toHaveBeenCalledWith(
+			null,
+			'',
+			'/admin/analytics?metric=visitors'
+		)
+		expect(mocks.push).not.toHaveBeenCalled()
 		expect(mocks.replace).not.toHaveBeenCalled()
+		expect(window.history.replaceState).not.toHaveBeenCalled()
+	})
+
+	it('pushes nothing for picking what is already showing', async () => {
+		await renderView()
+		const cards = within(screen.getByRole('group', { name: keys.viewOverview }))
+		fireEvent.click(cards.getByRole('button', { name: new RegExp(METRIC_KEYS.pageviews) }))
+		expect(window.history.pushState).not.toHaveBeenCalled()
 	})
 
 	it('adds an eq filter chip and rewrites the URL when a breakdown row is clicked', async () => {
 		const { rerender } = await renderView()
 		fireEvent.click(screen.getByRole('button', { name: /\/pricing/ }))
-		const url = mocks.push.mock.calls[0]?.[0] as string
+		const url = pushed()[0] ?? ''
 		expect(url).toContain('filters=')
 		const written = new URLSearchParams(url.slice(url.indexOf('?') + 1))
 		expect(JSON.parse(String(written.get('filters')))).toEqual([
@@ -211,59 +308,40 @@ describe('AnalyticsViewClient', () => {
 		expect(filtered?.filters).toEqual([{ dimension: 'page', operator: 'eq', value: '/pricing' }])
 	})
 
-	it('replaces history for a day edit, so the range picker leaves one entry behind', async () => {
+	it('pushes one history entry for a picked range, once both days are picked', async () => {
 		mocks.search = 'range=custom&from=2026-06-01&to=2026-06-10'
 		await renderView()
-		fireEvent.change(screen.getByLabelText(keys.viewFrom), { target: { value: '2026-06-05' } })
-		await act(async () => {
-			await new Promise((resolve) => setTimeout(resolve, 600))
-		})
-		expect(mocks.replace).toHaveBeenCalledTimes(1)
-		expect(String(mocks.replace.mock.calls[0]?.[0])).toContain('from=2026-06-05')
+		const dates = screen.getByLabelText(keys.viewDates)
+		fireEvent.change(dates, { target: { value: '2026-06-05..' } })
+		expect(window.history.pushState).not.toHaveBeenCalled()
+		fireEvent.change(dates, { target: { value: '2026-06-05..2026-06-08' } })
+		expect(window.history.pushState).toHaveBeenCalledTimes(1)
+		const url = pushed()[0] ?? ''
+		expect(url).toContain('from=2026-06-05')
+		expect(url).toContain('to=2026-06-08')
+		expect(window.history.replaceState).not.toHaveBeenCalled()
 		expect(mocks.push).not.toHaveBeenCalled()
 	})
 
-	it('drops a pending day edit when a click lands inside the debounce window', async () => {
-		const filters = JSON.stringify([{ dimension: 'page', operator: 'eq', value: '/pricing' }])
-		mocks.search = new URLSearchParams({
-			range: 'custom',
-			from: '2026-06-01',
-			to: '2026-06-10',
-			filters,
-		}).toString()
-		await renderView()
-		fireEvent.change(screen.getByLabelText(keys.viewFrom), { target: { value: '2026-06-05' } })
-		fireEvent.click(screen.getByRole('button', { name: new RegExp(keys.viewFilterRemove) }))
-		await act(async () => {
-			await new Promise((resolve) => setTimeout(resolve, 600))
-		})
-		expect(mocks.push).toHaveBeenCalledTimes(1)
-		expect(String(mocks.push.mock.calls[0]?.[0])).not.toContain('filters=')
-		expect(mocks.replace).not.toHaveBeenCalled()
-		expect(screen.getAllByText(/\/pricing/).length).toBeGreaterThan(1)
-	})
-
-	it('bases a later day edit on the click that cancelled the earlier one', async () => {
+	it('picks a range on top of the state the last click committed', async () => {
 		mocks.search = 'range=custom&from=2026-06-01&to=2026-06-10'
 		const { rerender } = await renderView()
-		fireEvent.change(screen.getByLabelText(keys.viewFrom), { target: { value: '2026-06-05' } })
 		const cards = within(screen.getByRole('group', { name: keys.viewOverview }))
 		fireEvent.click(cards.getByRole('button', { name: new RegExp(METRIC_KEYS.visitors) }))
 
-		const url = String(mocks.push.mock.calls[0]?.[0])
+		const url = pushed()[0] ?? ''
 		expect(url).toContain('metric=visitors')
 		mocks.search = url.slice(url.indexOf('?') + 1)
 		rerender(<AnalyticsViewClient {...props()} />)
 		await act(async () => {})
 
-		fireEvent.change(screen.getByLabelText(keys.viewTo), { target: { value: '2026-06-08' } })
-		await act(async () => {
-			await new Promise((resolve) => setTimeout(resolve, 600))
+		fireEvent.change(screen.getByLabelText(keys.viewDates), {
+			target: { value: '2026-06-01..2026-06-08' },
 		})
-		const replaced = String(mocks.replace.mock.calls.at(-1)?.[0])
-		expect(replaced).toContain('metric=visitors')
-		expect(replaced).toContain('from=2026-06-01')
-		expect(replaced).toContain('to=2026-06-08')
+		const picked = pushed().at(-1) ?? ''
+		expect(picked).toContain('metric=visitors')
+		expect(picked).toContain('from=2026-06-01')
+		expect(picked).toContain('to=2026-06-08')
 	})
 
 	it('badges a read served from an expired cache', async () => {
@@ -281,12 +359,21 @@ describe('AnalyticsViewClient', () => {
 		expect(screen.queryByText(keys.stateSampled)).toBeNull()
 	})
 
-	it('notes a read that hit the source event scan cap', async () => {
+	it('notes a read the source counted from a sample', async () => {
 		mocks.fetchQueryMock.mockImplementation((_route, request) =>
 			Promise.resolve(answer(request, { sampled: true }))
 		)
 		await renderView()
 		expect(screen.getByText(keys.stateSampled)).toBeDefined()
+	})
+
+	it('notes days still being counted and values grouped together, once for every section', async () => {
+		mocks.fetchQueryMock.mockImplementation((_route, request) =>
+			Promise.resolve(answer(request, { partial: { missingDays: 2 }, capped: { days: 1 } }))
+		)
+		await renderView()
+		expect(screen.getAllByText(keys.statePartial)).toHaveLength(1)
+		expect(screen.getAllByText(keys.stateCapped)).toHaveLength(1)
 	})
 
 	it('notes a read the source answered without one of the filters it carried', async () => {
@@ -302,13 +389,7 @@ describe('AnalyticsViewClient', () => {
 	})
 
 	it('says the goals could not be read rather than showing them as unconverted', async () => {
-		mocks.fetchQueryMock.mockImplementation((_route, request) =>
-			Promise.resolve(
-				request.dimensions?.[0] === 'goal'
-					? { ...answer(request, { goalsUnresolved: true }), result: goalsUnresolvedResult }
-					: answer(request)
-			)
-		)
+		answerGoalsUnresolved()
 		await renderView()
 		expect(screen.getByText(keys.stateGoalsUnresolved)).toBeDefined()
 		expect(screen.queryByText(keys.stateNoBreakdown)).toBeNull()
@@ -316,13 +397,7 @@ describe('AnalyticsViewClient', () => {
 
 	it('repeats the unresolved-goals state on the goals tab, where the breakdown is empty too', async () => {
 		mocks.search = 'tab=goals'
-		mocks.fetchQueryMock.mockImplementation((_route, request) =>
-			Promise.resolve(
-				request.dimensions?.[0] === 'goal'
-					? { ...answer(request, { goalsUnresolved: true }), result: goalsUnresolvedResult }
-					: answer(request)
-			)
-		)
+		answerGoalsUnresolved()
 		await renderView()
 		expect(screen.getAllByText(keys.stateGoalsUnresolved)).toHaveLength(2)
 	})
@@ -349,12 +424,6 @@ describe('AnalyticsViewClient', () => {
 		expect(breakdown?.limit).toBe(25)
 	})
 
-	const clickRefresh = async (): Promise<void> => {
-		await act(async () => {
-			fireEvent.click(screen.getByRole('button', { name: keys.viewRefresh }))
-		})
-	}
-
 	it('refreshes the cache and reissues every section read', async () => {
 		await renderView()
 		const before = mocks.fetchQueryMock.mock.calls.length
@@ -363,7 +432,7 @@ describe('AnalyticsViewClient', () => {
 		await clickRefresh()
 
 		expect(mocks.refreshCacheMock).toHaveBeenCalledTimes(1)
-		expect(mocks.refreshCacheMock.mock.calls[0]?.[0]).toBe('/api')
+		expect(mocks.refreshCacheMock.mock.calls[0]?.[0]).toBe('/api/_x/refresh')
 		expect(mocks.fetchQueryMock.mock.calls.length).toBe(before + 4)
 	})
 
@@ -388,29 +457,17 @@ describe('AnalyticsViewClient', () => {
 		await clickRefresh()
 		expect(screen.getByText(keys.viewRefreshFailed)).toBeDefined()
 
-		let settle: ((value: { epoch: string }) => void) | undefined
-		mocks.refreshCacheMock.mockImplementation(
-			() =>
-				new Promise<{ epoch: string }>((resolve) => {
-					settle = resolve
-				})
-		)
+		const settle = holdRefresh()
 		await clickRefresh()
 
 		expect(screen.queryByText(keys.viewRefreshFailed)).toBeNull()
 		await act(async () => {
-			settle?.({ epoch: 'tok-2' })
+			settle({ epoch: 'tok-2' })
 		})
 	})
 
 	it('marks the button aria-disabled while the refresh is in flight', async () => {
-		let settle: ((value: { epoch: string }) => void) | undefined
-		mocks.refreshCacheMock.mockImplementation(
-			() =>
-				new Promise<{ epoch: string }>((resolve) => {
-					settle = resolve
-				})
-		)
+		const settle = holdRefresh()
 		await renderView()
 		await clickRefresh()
 
@@ -419,9 +476,314 @@ describe('AnalyticsViewClient', () => {
 		expect(pending.hasAttribute('disabled')).toBe(false)
 
 		await act(async () => {
-			settle?.({ epoch: 'tok-2' })
+			settle({ epoch: 'tok-2' })
 		})
 		expect(screen.getByRole('button', { name: keys.viewRefresh })).toBeDefined()
 		expect(mocks.refreshCacheMock).toHaveBeenCalledTimes(1)
+	})
+})
+
+describe('AnalyticsViewClient accessibility', () => {
+	it('has no structural accessibility violations with every section drawn and compared', async () => {
+		mocks.search = 'compare=1'
+		mocks.fetchQueryMock.mockImplementation((_route, request) => {
+			const current = answer(request)
+			return Promise.resolve({
+				...current,
+				comparison: { ...current.result, totals: { pageviews: 1000, visitors: 500 } },
+			})
+		})
+		const { container } = await renderView()
+		expect(container.querySelector('.analytics-delta')).not.toBeNull()
+		expect(a11yViolations(container)).toEqual([])
+	})
+
+	it('titles each panel with a heading that names its region', async () => {
+		await renderView()
+		expect(
+			screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent)
+		).toEqual([METRIC_KEYS.pageviews, keys.viewBreakdowns, keys.goalsCollectionPlural])
+		expect(screen.getByRole('region', { name: METRIC_KEYS.pageviews })).toBeDefined()
+		expect(screen.getByRole('region', { name: keys.viewBreakdowns })).toBeDefined()
+		expect(screen.getByRole('region', { name: keys.goalsCollectionPlural })).toBeDefined()
+	})
+
+	it('reads the trend from a hidden data table and the lists as tables with headers', async () => {
+		const { container } = await renderView()
+		const trend = screen.getByRole('region', { name: METRIC_KEYS.pageviews })
+		expect(within(trend).getByRole('img').getAttribute('aria-label')).toContain(
+			METRIC_KEYS.pageviews
+		)
+		const data = within(trend).getByRole('table')
+		expect(data.parentElement?.className).toBe('analytics-sr-only')
+		expect(
+			within(data)
+				.getAllByRole('columnheader')
+				.map((header) => header.textContent)
+		).toEqual([keys.viewTrendPeriod, METRIC_KEYS.pageviews])
+		const breakdown = container.querySelector<HTMLElement>('.analytics-view__breakdown')
+		if (!breakdown) {
+			throw new Error('no breakdown')
+		}
+		expect(within(breakdown).getByRole('table').querySelector('[aria-sort]')?.textContent).toBe(
+			METRIC_KEYS.pageviews
+		)
+		expect(
+			within(breakdown)
+				.getAllByRole('rowheader')
+				.map((cell) => cell.textContent)
+		).toEqual(['/pricing', '/about'])
+	})
+
+	// A roving tab strip keeps one tab in the order; everything else a reader can use is in it.
+	it('keeps every control in the tab order but the tabs not selected', async () => {
+		const { container } = await renderView()
+		const out = [...container.querySelectorAll('[tabindex="-1"]')]
+		expect(out.length).toBeGreaterThan(0)
+		expect(out.every((element) => element.getAttribute('role') === 'tab')).toBe(true)
+		expect(out.every((element) => element.getAttribute('aria-selected') === 'false')).toBe(true)
+		for (const button of container.querySelectorAll('button')) {
+			expect(button.hasAttribute('disabled')).toBe(false)
+		}
+	})
+})
+
+describe('AnalyticsViewClient site', () => {
+	const alpha = { current: 'alpha', own: 'alpha', ownLabel: 'Alpha', canAggregate: true }
+	const caption = (): Element | null => document.querySelector('.analytics-view__title + span')
+
+	// The select names the site the numbers belong to, so a caption beside the title would
+	// say the same thing twice.
+	it('drops the Showing caption where the Site select says it', async () => {
+		await renderView({ scopes: alpha })
+		expect(screen.getByLabelText(keys.viewScopeSite)).toBeDefined()
+		expect(screen.queryByText(new RegExp(keys.viewScopeShowing))).toBeNull()
+		expect(caption()).toBeNull()
+	})
+
+	it('keeps the caption for a reader the select is not drawn for', async () => {
+		await renderView({ scopes: { ...alpha, canAggregate: false } })
+		expect(screen.queryByLabelText(keys.viewScopeSite)).toBeNull()
+		expect(caption()?.textContent).toBe(
+			`${keys.viewScopeShowing} ${JSON.stringify({ site: '⁨Alpha⁩' })}`
+		)
+	})
+
+	it('writes All sites to the URL tagged with the tenant it was picked from', async () => {
+		await renderView({ scopes: alpha })
+		fireEvent.change(screen.getByLabelText(keys.viewScopeSite), { target: { value: '*' } })
+		expect(mocks.push).toHaveBeenCalledWith('/admin/analytics?scope=*%3Aalpha', {
+			scroll: false,
+		})
+	})
+
+	it('writes nothing for the tenant itself, leaving the URL bare', async () => {
+		mocks.search = 'scope=*%3Aalpha'
+		await renderView({ scopes: { ...alpha, current: '*' }, scopeParam: '*:alpha' })
+		fireEvent.change(screen.getByLabelText(keys.viewScopeSite), { target: { value: 'alpha' } })
+		expect(mocks.push).toHaveBeenCalledWith('/admin/analytics', { scroll: false })
+	})
+
+	// The scope is the one thing the server resolves, so it is the one step through the router.
+	it('changes the scope through the router and nothing else through it', async () => {
+		await renderView({ scopes: alpha })
+		fireEvent.change(screen.getByLabelText(keys.viewScopeSite), { target: { value: '*' } })
+		expect(mocks.push).toHaveBeenCalledTimes(1)
+		expect(window.history.pushState).not.toHaveBeenCalled()
+		const cards = within(screen.getByRole('group', { name: keys.viewOverview }))
+		fireEvent.click(cards.getByRole('button', { name: new RegExp(METRIC_KEYS.visitors) }))
+		expect(mocks.push).toHaveBeenCalledTimes(1)
+		expect(window.history.pushState).toHaveBeenCalledTimes(1)
+	})
+})
+
+describe('AnalyticsViewClient source switch', () => {
+	const plausibleCaps: SerializedCapabilities = { ...nativeCaps }
+	const twoSources = (): Partial<AnalyticsViewClientProps> => ({
+		sources: {
+			defaultId: 'native',
+			sources: [
+				{ id: 'native', label: 'Native', kind: 'config', capabilities: nativeCaps },
+				{ id: 'plausible', label: 'Beta Plausible', kind: 'config', capabilities: plausibleCaps },
+			],
+		},
+	})
+	const refused = () =>
+		new QueryFetchError(502, {
+			code: 'source_misconfigured',
+			message: 'refused host',
+			param: 'host',
+		})
+
+	it('says once that the source itself failed, and draws no section that only repeats it', async () => {
+		mocks.fetchQueryMock.mockImplementation(() => Promise.reject(refused()))
+		const { container } = await renderView(twoSources())
+		expect(screen.getAllByText(keys.viewErrorHostRefused)).toHaveLength(1)
+		expect(container.querySelector('.analytics-view__breakdown')).toBeNull()
+		expect(screen.queryByLabelText(keys.widgetFieldLimit)).toBeNull()
+		expect(screen.queryByRole('region', { name: METRIC_KEYS.pageviews })).toBeNull()
+		expect(screen.queryByRole('region', { name: keys.goalsCollectionPlural })).toBeNull()
+	})
+
+	it('keeps each section saying its own failure when it is not the source failing', async () => {
+		mocks.fetchQueryMock.mockImplementation(() => Promise.reject(new Error('network down')))
+		await renderView()
+		expect(screen.getAllByText(keys.viewErrorGeneric).length).toBeGreaterThan(1)
+	})
+
+	// Neither while the new source loads nor after it fails.
+	it("never shows the previous source's numbers under the new one's name", async () => {
+		const { rerender } = await renderView(twoSources())
+		expect(screen.getByText('1,234')).toBeDefined()
+
+		let fail: ((err: unknown) => void) | undefined
+		mocks.fetchQueryMock.mockImplementation(
+			() =>
+				new Promise((_resolve, reject) => {
+					fail = reject
+				})
+		)
+		fireEvent.change(screen.getByLabelText(keys.viewSourceLabel), {
+			target: { value: 'plausible' },
+		})
+		expect(pushed()).toEqual(['/admin/analytics?source=plausible'])
+		mocks.search = 'source=plausible'
+		rerender(<AnalyticsViewClient {...props(twoSources())} />)
+
+		expect(screen.queryByText('1,234')).toBeNull()
+		expect(screen.queryByRole('button', { name: /\/pricing/ })).toBeNull()
+		expect(document.querySelectorAll('.analytics-view__skeleton').length).toBeGreaterThan(0)
+
+		await act(async () => {
+			fail?.(refused())
+		})
+		await act(async () => {})
+		expect(screen.queryByText('1,234')).toBeNull()
+		expect(screen.queryByRole('button', { name: /\/pricing/ })).toBeNull()
+		expect(screen.getAllByText(keys.viewErrorHostRefused).length).toBeGreaterThan(0)
+		expect(screen.queryByText(keys.viewErrorMisconfigured)).toBeNull()
+	})
+
+	it('keeps the numbers on screen, dimmed, while another window of the same source loads', async () => {
+		const { rerender } = await renderView()
+		mocks.fetchQueryMock.mockImplementation(() => new Promise(() => {}))
+		mocks.search = 'range=last7days'
+		rerender(<AnalyticsViewClient {...props()} />)
+		expect(screen.getByText('1,234')).toBeDefined()
+		expect(screen.getByRole('group', { name: keys.viewOverview }).getAttribute('aria-busy')).toBe(
+			'true'
+		)
+	})
+})
+
+describe('AnalyticsViewClient address', () => {
+	it('replaces a correction in the history, never through the router', async () => {
+		mocks.search = 'source=retired&metric=visitors'
+		await renderView()
+		await act(async () => {
+			await new Promise((resolve) => setTimeout(resolve, 0))
+		})
+		expect(replaced()).toEqual(['/admin/analytics?metric=visitors'])
+		expect(mocks.replace).not.toHaveBeenCalled()
+		expect(mocks.push).not.toHaveBeenCalled()
+	})
+
+	// Back and Forward are the router's own `popstate` handling of the entries the view pushed;
+	// this emulates it (Next patches `pushState` the same way) to show the view follows.
+	it('restores each step on Back and Forward without a server round trip', async () => {
+		History.prototype.replaceState.call(window.history, null, '', '/admin/analytics')
+		vi.mocked(window.history.pushState).mockImplementation((data, unused, url) => {
+			History.prototype.pushState.call(window.history, data, unused, url)
+			navigate(window.location.search)
+		})
+		const onPop = () => {
+			navigate(window.location.search)
+		}
+		window.addEventListener('popstate', onPop)
+		try {
+			await renderView()
+			const pressed = (): string | undefined =>
+				within(screen.getByRole('group', { name: keys.viewOverview }))
+					.getAllByRole('button')
+					.find((button) => button.getAttribute('aria-pressed') === 'true')?.textContent ??
+				undefined
+			expect(pressed()).toContain(METRIC_KEYS.pageviews)
+
+			const cards = within(screen.getByRole('group', { name: keys.viewOverview }))
+			await act(async () => {
+				fireEvent.click(cards.getByRole('button', { name: new RegExp(METRIC_KEYS.visitors) }))
+			})
+			expect(pressed()).toContain(METRIC_KEYS.visitors)
+
+			// jsdom traverses through a chain of zero-delay timers, so a fixed wait races it under
+			// load: the step is done when its popstate has fired, after the router's own listener.
+			const traversed = (): Promise<void> =>
+				new Promise((resolve) => {
+					window.addEventListener('popstate', () => resolve(), { once: true })
+				})
+			await act(async () => {
+				const popped = traversed()
+				window.history.back()
+				await popped
+			})
+			expect(window.location.search).toBe('')
+			expect(pressed()).toContain(METRIC_KEYS.pageviews)
+
+			await act(async () => {
+				const popped = traversed()
+				window.history.forward()
+				await popped
+			})
+			expect(window.location.search).toBe('?metric=visitors')
+			expect(pressed()).toContain(METRIC_KEYS.visitors)
+			expect(mocks.push).not.toHaveBeenCalled()
+		} finally {
+			window.removeEventListener('popstate', onPop)
+		}
+	})
+})
+
+describe('AnalyticsViewClient clock', () => {
+	afterEach(() => {
+		vi.useRealTimers()
+	})
+
+	// One clock: the window the toolbar names and the window the reads ask for move together.
+	it('moves the caption and the reads to the new day together when the reader comes back', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] })
+		// 23:30 in Berlin, the reporting zone.
+		vi.setSystemTime(new Date('2026-09-14T21:30:00.000Z'))
+		await renderView()
+		expect(daysCaption()).toBe('Aug 16 \u2013 Sep 14, 2026')
+		expect(mocks.fetchQueryMock.mock.calls.at(-1)?.[1].to).toBe('2026-09-14')
+
+		vi.setSystemTime(new Date('2026-09-14T22:30:00.000Z'))
+		await act(async () => {
+			document.dispatchEvent(new Event('visibilitychange'))
+		})
+		expect(daysCaption()).toBe('Aug 17 \u2013 Sep 15, 2026')
+		expect(mocks.fetchQueryMock.mock.calls.at(-1)?.[1].to).toBe('2026-09-15')
+	})
+
+	// The refresh moves the clock past midnight, so its reads are the new day's; reissuing the old
+	// day's would abort them and leave every section loading for good.
+	it('leaves no section loading after a refresh that crossed midnight in the reporting zone', async () => {
+		vi.useFakeTimers({ toFake: ['Date'] })
+		// 23:30 in Berlin, the reporting zone.
+		vi.setSystemTime(new Date('2026-09-14T21:30:00.000Z'))
+		const settle = holdRefresh()
+		await renderView()
+
+		vi.setSystemTime(new Date('2026-09-14T22:30:00.000Z'))
+		await clickRefresh()
+		await act(async () => {
+			settle({ epoch: 'tok-2' })
+		})
+
+		const after = mocks.fetchQueryMock.mock.calls.slice(4).map((call) => call[1].to)
+		expect(after.length).toBeGreaterThan(0)
+		expect(new Set(after)).toEqual(new Set(['2026-09-15']))
+		expect(document.querySelectorAll('[aria-busy="true"]')).toHaveLength(0)
+		expect(daysCaption()).toBe('Aug 17 \u2013 Sep 15, 2026')
 	})
 })

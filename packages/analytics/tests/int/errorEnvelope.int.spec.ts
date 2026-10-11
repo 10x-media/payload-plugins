@@ -9,21 +9,18 @@ import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { native } from '../../src/native/nativeAdapter'
 import { makeDocumentHandler } from '../../src/plugin/documentEndpoint'
-import {
-	DOCUMENT_PATH,
-	GOALS_PATH,
-	PROXY_PATH,
-	REALTIME_PATH,
-	SOURCES_PATH,
-} from '../../src/plugin/paths'
 import { makeRealtimeHandler } from '../../src/plugin/realtimeEndpoint'
+import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
 import { makeSourcesHandler } from '../../src/plugin/sourcesEndpoint'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import { ingestRequest } from './ingestRequest'
+import { nativeOf } from './nativeHelpers'
 
 type ErrorBody = { error: { code: string; message: string; param?: string } }
 
 const NO_STORE = 'private, no-store'
+
+const routes = routePaths(DEFAULT_ROUTE_BASE)
 
 /** Every error answer is the envelope and nothing else; the code is returned for the case. */
 const errorOf = async (res: Response): Promise<ErrorBody['error']> => {
@@ -60,7 +57,7 @@ const deadUpstream = (): AnalyticsAdapter => ({
 	id: 'vendor',
 	label: 'Vendor',
 	capture: {
-		proxy: { routes: [{ source: '/:p*', upstream: 'http://127.0.0.1:1/:p*' }] },
+		proxy: { routes: [{ source: '/:p*', upstream: 'http://127.0.0.1:1/:p*', kind: 'data' }] },
 		snippet: () => ({ scripts: [] }),
 		client: { kind: 'posthog' },
 	},
@@ -106,7 +103,11 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 			plugin: analytics({
 				adapters: [native(), failingRealtime(), deadUpstream()],
 				collections: { pages: { path }, brittle: { path } },
-				capture: { slots: { global: 'vendor' }, proxy: { timeoutMs: 300, maxBodyBytes: 1024 } },
+				capture: {
+					gate: 'off',
+					slots: { global: 'vendor' },
+					proxy: { timeoutMs: 300, maxBodyBytes: 1024 },
+				},
 				access: {
 					read: ({ req }) => {
 						const email = (req.user as { email?: string } | null)?.email
@@ -137,23 +138,24 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 	const noRuntime = { logger: { warn: () => undefined } }
 
 	const document = (query: string, user?: TypedUser, payload?: unknown) =>
-		makeDocumentHandler()(reqFor(`http://x/api${DOCUMENT_PATH}?${query}`, user, payload))
+		makeDocumentHandler()(reqFor(`http://x/api${routes.document}?${query}`, user, payload))
 
 	const realtime = (user?: TypedUser, query = 'metric=visitors') =>
-		makeRealtimeHandler()(reqFor(`http://x/api${REALTIME_PATH}?${query}`, user))
+		makeRealtimeHandler()(reqFor(`http://x/api${routes.live}?${query}`, user))
 
 	const proxy = (init: RequestInit = {}, slot = 'global') =>
-		makeProxyHandler()(
-			Object.assign(new Request(`http://x/api${PROXY_PATH}/global/e`, init), {
+		makeProxyHandler(routes.proxy)(
+			Object.assign(new Request(`http://x/api${routes.proxy}/global/e`, init), {
 				payload: booted.payload,
 				routeParams: { slot },
 			}) as unknown as PayloadRequest
 		)
 
 	const sources = (user?: TypedUser) =>
-		makeSourcesHandler()(reqFor(`http://x/api${SOURCES_PATH}`, user))
+		makeSourcesHandler()(reqFor(`http://x/api${routes.sources}`, user))
 
-	const goals = (user?: TypedUser) => makeGoalsHandler()(reqFor(`http://x/api${GOALS_PATH}`, user))
+	const goals = (user?: TypedUser) =>
+		makeGoalsHandler()(reqFor(`http://x/api${routes.goals}`, user))
 
 	it(`answers the document endpoint's 401 as unauthorized, uncached, on ${db}`, async () => {
 		const res = await document('collection=pages&id=1')
@@ -190,10 +192,8 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 		expect((await errorOf(res)).code).toBe('not_found')
 	})
 
-	// An id no database could hold is a request that is wrong, not an install that is broken:
-	// mongo disregards an invalid `_id` and postgres reads a non-numeric id as null, so both
-	// raise NotFound. Pinned because a `findByID` that validated ids instead would turn this
-	// into a logged 500 any reader could loop.
+	// Mongo disregards an invalid `_id` and postgres reads a non-numeric id as null, so both raise
+	// NotFound; an id-validating `findByID` would make this a logged 500 any reader could loop.
 	it(`answers a malformed document id as not_found rather than internal on ${db}`, async () => {
 		const res = await document('collection=pages&id=not-an-id', ALLOWED)
 		expect(res.status).toBe(404)
@@ -278,6 +278,20 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 		expect((await errorOf(denied)).code).toBe('forbidden')
 	})
 
+	// A read gate that throws is a configuration bug: each read endpoint answers it as the 500
+	// envelope, never Payload's own error page, and the goals listing never falls back to a 200.
+	it(`answers a throwing read gate as internal on the document, sources and goals endpoints on ${db}`, async () => {
+		for (const res of [
+			await document('collection=pages&id=1', BROKEN),
+			await sources(BROKEN),
+			await goals(BROKEN),
+		]) {
+			expect(res.status).toBe(500)
+			expect(res.headers.get('cache-control')).toBe(NO_STORE)
+			expect((await errorOf(res)).code).toBe('internal')
+		}
+	})
+
 	it(`keeps a goals listing out of every shared cache on ${db}`, async () => {
 		const res = await goals(ALLOWED)
 		expect(res.status).toBe(200)
@@ -285,7 +299,7 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 	})
 
 	it(`names the first field an invalid event fails on, in the envelope, on ${db}`, async () => {
-		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver })
+		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver, target: nativeOf })
 		const res = await handler(ingestRequest(booted.payload, { type: 'pageview', hostname: 'h' }))
 		expect(res.status).toBe(400)
 		expect(await errorOf(res)).toMatchObject({ code: 'invalid_param', param: 'path' })
@@ -293,10 +307,10 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 
 	// A body that died in transit names no field, because none of them was ever read.
 	it(`answers an unreadable event body as an invalid_param naming nothing on ${db}`, async () => {
-		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver })
+		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver, target: nativeOf })
 		const res = await handler(
 			Object.assign(
-				new Request('http://x/api/analytics/ingest', {
+				new Request(`http://x/api${routes.ingest}`, {
 					method: 'POST',
 					body: dyingBody(),
 					// A visitor's agent: the bot filter answers 202 before a body is ever read.
@@ -318,7 +332,7 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 	})
 
 	it(`answers an event body over the cap as payload_too_large on ${db}`, async () => {
-		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver })
+		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver, target: nativeOf })
 		const res = await handler(
 			ingestRequest(booted.payload, {
 				type: 'pageview',

@@ -1,33 +1,52 @@
+import { jsLiteral } from '../../capture/jsLiteral'
 import type { CaptureSupport } from '../../core/capture'
-import type {
-	AdapterContext,
-	AnalyticsAdapter,
-	AnalyticsCapabilities,
-	AnalyticsQuery,
-	AnalyticsResult,
-	AnalyticsRow,
-	DimensionKey,
-	FilterOperator,
-	MetricKey,
+import {
+	type AdapterContext,
+	type AnalyticsAdapter,
+	type AnalyticsCapabilities,
+	type AnalyticsQuery,
+	type AnalyticsResult,
+	type AnalyticsRow,
+	DIMENSION_KEYS,
+	type DimensionKey,
+	type FilterOperator,
+	type MetricKey,
+	type MetricReach,
+	type MetricValues,
 } from '../../core/contract'
-import { DEFAULT_TIMEZONE, zonedCalendarDay } from '../../timeframe/tz'
+import type { FetchLike } from '../../core/fetch'
+import { vendorReading } from '../../core/metricValues'
+import { currencyOption } from '../../goals/currency'
 import {
 	emptyGoalBreakdown,
 	type GoalKeyedRow,
 	goalHint,
 	hintSlugs,
 	mergeGoalRows,
-	providerMetricKeys,
 	readGoalPair,
 	splitGoalMetrics,
 } from '../goalRead'
-import { fetchJson } from '../http/fetchJson'
-import { dayIso } from '../series'
+import { withoutTrailingSlash } from '../http/baseUrl'
+import {
+	calendarDays,
+	declaredFilters,
+	everyOperatorOn,
+	mappedKeys,
+	providerMetricKeys,
+	readableMetrics,
+} from '../mapping'
+import { readTime } from '../readTime'
+import { datedRows, dayIso } from '../series'
+import { upstreamJson } from '../upstream'
+import { isScriptId } from './scriptId'
 
 export interface PlausibleConfig {
 	siteId: string
 	apiKey: string
-	/** Base URL for self-hosted CE. Defaults to Plausible Cloud. */
+	/**
+	 * Address of a self-hosted Community Edition, with the base path when it runs under one.
+	 * Defaults to Plausible Cloud.
+	 */
 	host?: string
 	/** Maximum days of historical data. Defaults to 730. Pass null to disable clamping. */
 	maxLookbackDays?: number | null
@@ -37,32 +56,30 @@ export interface PlausibleConfig {
 	 */
 	domain?: string
 	/**
-	 * Per-site tracker id (`pa-<id>.js`) for the newer per-site script model. The adapter
-	 * declares `capture` only when one of it and `domain` is set.
+	 * Per-site tracker id (`pa-<id>.js`) for the newer per-site script model: letters, digits, `_`
+	 * and `-`. Any other value is dropped, and capture then needs `domain`.
 	 */
 	scriptId?: string
 	/**
-	 * The ISO currency of the site's revenue goals. Declaring it turns on the `revenue`
-	 * metric: Plausible serves `total_revenue` only where a revenue goal exists, and errors
-	 * the whole request on a site that has none.
+	 * The ISO 4217 currency of the site's revenue goals. Declaring it turns on `revenue`: Plausible
+	 * errors the whole request for `total_revenue` on a site without a revenue goal.
 	 */
 	revenueCurrency?: string
+	/** The fetch reads and the capture proxy reach Plausible with. Unset, the global fetch. */
+	fetch?: FetchLike
 }
 
+const PLAUSIBLE_CLOUD = 'https://plausible.io'
+
 /**
- * Plausible's official per-site stub, as served on plausible.io's own pages: `plausible.q`
- * queues calls the tracker replays on load, and `plausible.init` parks the options on
- * `plausible.o` for it to read. It makes the inline safe next to the async loader in either
- * order, which the bare `plausible.init(...)` call was not. `init` is guarded with `||`
- * (the official one assigns unconditionally) because here the tracker is a separate async
- * tag and may win the race, and overwriting the real `init` with the stub would lose the
- * endpoint.
+ * Plausible's official per-site stub, safe beside the async loader in either order. `init` is
+ * guarded with `||` because the loader may win the race, and overwriting it would lose the endpoint.
  */
 const PLAUSIBLE_STUB =
 	'window.plausible=window.plausible||function(){(window.plausible.q=window.plausible.q||[]).push(arguments)},window.plausible.init=window.plausible.init||function(e){window.plausible.o=e||{}};'
 
-function buildCapture(config: PlausibleConfig): CaptureSupport {
-	const base = config.host ?? 'https://plausible.io'
+function buildCapture(config: PlausibleConfig, scriptId: string | undefined): CaptureSupport {
+	const base = withoutTrailingSlash(config.host ?? PLAUSIBLE_CLOUD)
 	const scripts = (path: string) => {
 		if (config.domain) {
 			return [
@@ -73,11 +90,11 @@ function buildCapture(config: PlausibleConfig): CaptureSupport {
 				},
 			]
 		}
-		if (config.scriptId) {
+		if (scriptId) {
 			return [
-				{ src: `${path}/js/pa-${config.scriptId}.js`, async: true },
+				{ src: `${path}/js/pa-${encodeURIComponent(scriptId)}.js`, async: true },
 				{
-					inline: `${PLAUSIBLE_STUB}plausible.init({endpoint:${JSON.stringify(`${path}/api/event`)}})`,
+					inline: `${PLAUSIBLE_STUB}plausible.init({endpoint:${jsLiteral(`${path}/api/event`)}})`,
 				},
 			]
 		}
@@ -86,9 +103,10 @@ function buildCapture(config: PlausibleConfig): CaptureSupport {
 	return {
 		proxy: {
 			routes: [
-				{ source: '/js/:script*', upstream: `${base}/js/:script*` },
-				{ source: '/api/event', upstream: `${base}/api/event` },
+				{ source: '/js/:script*', upstream: `${base}/js/:script*`, kind: 'script' },
+				{ source: '/api/event', upstream: `${base}/api/event`, kind: 'data' },
 			],
+			...(config.fetch ? { fetch: config.fetch } : {}),
 		},
 		snippet: ({ path }) => ({ scripts: scripts(path) }),
 		client: { kind: 'plausible' },
@@ -101,7 +119,7 @@ const METRIC_MAP: Partial<Record<MetricKey, string>> = {
 	visits: 'visits',
 	sessions: 'visits',
 	bounceRate: 'bounce_rate',
-	avgDuration: 'visit_duration',
+	visitDuration: 'visit_duration',
 	events: 'events',
 	scrollDepth: 'scroll_depth',
 	// Both only mean anything under an event:goal filter or dimension, which is the one
@@ -130,31 +148,51 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 	goal: 'event:goal',
 }
 
-/**
- * Stats API v2 filter operators, available on every dimension this adapter offers as a
- * filter (event:goal is the grammar's one exception, taking `is` and `contains` only, and
- * is a breakdown here rather than a filter). `matches` is an re2 full match, so a pattern
- * has to cover the whole value (`/docs/.*`, not `^/docs`).
- */
+/** `matches` is an re2 full match, so a pattern must cover the whole value (`/docs/.*`, not `^/docs`). */
 const OPERATOR_MAP: Record<FilterOperator, string> = {
 	eq: 'is',
 	contains: 'contains',
 	matches: 'matches',
 }
 
-const plausibleMetrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_MAP) as MetricKey[])
+const plausibleMetrics: ReadonlySet<MetricKey> = new Set<MetricKey>([
+	'pageviews',
+	'visitors',
+	'visits',
+	'sessions',
+	'bounceRate',
+	'visitDuration',
+	'events',
+	'scrollDepth',
+	'conversions',
+	'revenue',
+])
 // A site without revenue goals has no total_revenue at all, so the metric is opt-in.
 const plausibleMetricsNoRevenue: ReadonlySet<MetricKey> = new Set(
 	[...plausibleMetrics].filter((m) => m !== 'revenue')
 )
-const plausibleDimensions: ReadonlySet<DimensionKey> = new Set(
-	Object.keys(DIMENSION_MAP) as DimensionKey[]
+const plausibleDimensions = mappedKeys(DIMENSION_KEYS, DIMENSION_MAP)
+const withoutGoal: readonly DimensionKey[] = [...plausibleDimensions].filter(
+	(dimension) => dimension !== 'goal'
 )
-// `goal` is a breakdown, not a filter: the read's own goal slugs own the event:goal clause,
-// and the grammar allows no `matches` on it anyway.
-const plausibleFilters: ReadonlySet<DimensionKey> = new Set(
-	[...plausibleDimensions].filter((dimension) => dimension !== 'goal')
-)
+/**
+ * The Stats API refuses bounce rate and duration under event dimensions but event:page, and scroll
+ * depth without event:page. Its `time_on_page` is per visit, not per pageview, so none is offered.
+ */
+const plausibleReach: Partial<Record<MetricKey, MetricReach>> = {
+	bounceRate: { dimensions: withoutGoal },
+	visitDuration: { dimensions: withoutGoal },
+	scrollDepth: { dimensions: withoutGoal, requires: 'page' },
+}
+const plausibleFilters = everyOperatorOn(plausibleDimensions)
+
+/** One Stats API v2 filter: `[operator, dimension, values]`. */
+type PlausibleClause = [operator: string, dimension: string, values: string[]]
+
+/** The parts of a v2 query a read adds to the site, the window, the metrics and the filters. */
+interface QueryShape {
+	dimensions?: string[]
+}
 
 /** `total_revenue` is an object, and null when the rows mix currencies. Every other metric is a number. */
 type PlausibleMetricValue = number | { value: number | null } | null
@@ -171,83 +209,102 @@ interface PlausibleResponse {
 const revenueAmount = (raw: PlausibleMetricValue | undefined): number | undefined =>
 	typeof raw === 'object' && raw !== null && typeof raw.value === 'number' ? raw.value : undefined
 
-// visit_duration is reported in seconds; the contract avgDuration is milliseconds.
+// visit_duration is reported in seconds; the contract's visitDuration is milliseconds.
 const toContractValue = (metric: MetricKey, raw: number): number =>
-	metric === 'avgDuration' ? Math.round(raw * 1000) : raw
+	metric === 'visitDuration' ? Math.round(raw * 1000) : raw
+
+/** One result row's contract metrics, each read back by Plausible name from the request's `names`. */
+const readRow = (metrics: MetricKey[], names: string[], row: PlausibleResult): MetricValues => {
+	const out: MetricValues = {}
+	for (const metric of metrics) {
+		const name = METRIC_MAP[metric]
+		const raw = name === undefined ? undefined : row.metrics[names.indexOf(name)]
+		if (metric === 'revenue') {
+			const amount = revenueAmount(raw)
+			if (amount !== undefined) {
+				out.revenue = amount
+			}
+			continue
+		}
+		// Plausible answers an average it has no samples for with null, which stays no
+		// data here rather than becoming a 0 the reports would read as a real value.
+		const value = vendorReading(metric, raw)
+		out[metric] = value === null ? null : toContractValue(metric, value)
+	}
+	return out
+}
+
+/** A response's rows keyed by their dimension values; undefined when the request was never sent. */
+const keyedRows = (
+	response: PlausibleResponse | undefined,
+	metrics: MetricKey[],
+	names: string[]
+): GoalKeyedRow[] | undefined =>
+	response?.results.map((row) => ({ keys: row.dimensions, metrics: readRow(metrics, names, row) }))
 
 /**
- * Plausible identifies a goal by its display name in the site's own goal list ("Signup",
- * "Visit /thank-you"), so a plugin goal's slug must equal that name for its conversions to
- * read. Conversions are the `events` metric on goal rows, which is the dashboard's Total
- * Conversions; revenue is `total_revenue`, which Plausible serves only for a revenue goal
- * and reports as an object whose `value` is null when the rows mix currencies. Revenue is
- * offered only when `revenueCurrency` says the site has such a goal: asking for it on a site
- * without one errors the request.
+ * The Plausible adapter. A goal's slug must equal its display name in the site's goal list for its
+ * conversions to read; `revenue` needs `revenueCurrency`.
  */
 export function plausible(config: PlausibleConfig): AnalyticsAdapter {
-	const host = config.host ?? 'https://plausible.io'
+	const host = withoutTrailingSlash(config.host ?? PLAUSIBLE_CLOUD)
 	const maxLookbackDays = config.maxLookbackDays !== undefined ? config.maxLookbackDays : 730
-	const revenueGoals = Boolean(config.revenueCurrency)
+	const revenueCurrency = currencyOption('plausible({ revenueCurrency })', config.revenueCurrency)
+	const revenueGoals = revenueCurrency !== undefined
+	// Dropped rather than escaped, like GA4's measurement id: it lands in the page's script address.
+	const scriptId = isScriptId(config.scriptId) ? config.scriptId : undefined
 
 	const capabilities: AnalyticsCapabilities = {
-		perPageQuery: true,
 		realtime: false,
 		minGranularity: 'day',
 		maxLookbackDays,
 		metrics: revenueGoals ? plausibleMetrics : plausibleMetricsNoRevenue,
 		dimensions: plausibleDimensions,
+		metricReach: plausibleReach,
 		filters: plausibleFilters,
-		filterOperators: new Set(['eq', 'contains', 'matches']),
-		batchPageReport: true,
+		semantics: { visitors: 'distinct', sessions: 'provider' },
 		rateLimit: { requestsPerHour: 600 },
 		recommendedTtl: { realtime: 300, aggregate: 3600 },
+		upstreamAware: true,
 	}
-
 	return {
 		id: 'plausible',
 		label: 'Plausible',
 		capabilities,
-		...(config.domain || config.scriptId ? { capture: buildCapture(config) } : {}),
+		...(config.domain || scriptId ? { capture: buildCapture(config, scriptId) } : {}),
 		isConfigured: () => Boolean(config.siteId && config.apiKey),
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
-			const fetchedAt = q.dateRange.end.toISOString()
+			const fetchedAt = readTime(ctx)
 			const dims = (q.dimensions ?? []).filter((d) => DIMENSION_MAP[d])
 			const goalBreakdown = dims.includes('goal')
 			const hint = goalHint(q)
-			const slugs = hintSlugs(hint)
-			const empty = goalBreakdown ? emptyGoalBreakdown({ provider: 'plausible', q, hint }) : null
+			const empty = goalBreakdown
+				? emptyGoalBreakdown({ provider: 'plausible', fetchedAt, hint })
+				: null
 			if (empty) {
 				return empty
 			}
-			const wanted = q.metrics.filter((m) => METRIC_MAP[m] && (revenueGoals || m !== 'revenue'))
 			const { siteMetrics, goalMetrics, unresolved } = splitGoalMetrics({
-				wanted,
+				wanted: readableMetrics(capabilities, q, dims),
 				goalOnly: GOAL_METRICS,
 				goalBreakdown,
 				hint,
 			})
-			const siteKeys = providerMetricKeys(siteMetrics, METRIC_MAP)
-			const goalKeys = providerMetricKeys(goalMetrics, METRIC_MAP)
+			const siteNames = providerMetricKeys(siteMetrics, METRIC_MAP)
+			const goalNames = providerMetricKeys(goalMetrics, METRIC_MAP)
 
-			const filters: Array<[string, string, string[]]> = []
+			const filters: PlausibleClause[] = []
 			if (q.path) {
 				filters.push(['is', 'event:page', [q.path]])
 			}
 			if (q.hostname) {
 				filters.push(['is', 'event:hostname', [q.hostname]])
 			}
-			// Capability gating (filters/filterOperators) is the real contract upstream; an
-			// unsupported dimension is dropped here as the safety net.
-			for (const filter of q.filters ?? []) {
-				const mapped = plausibleFilters.has(filter.dimension)
-					? DIMENSION_MAP[filter.dimension]
-					: undefined
-				if (!mapped) {
-					continue
-				}
-				filters.push([OPERATOR_MAP[filter.operator], mapped, [filter.value]])
+			for (const { filter, field } of declaredFilters(capabilities, q.filters, DIMENSION_MAP)) {
+				filters.push([OPERATOR_MAP[filter.operator], field, [filter.value]])
 			}
-			const goalFilters: Array<[string, string, string[]]> = slugs
+			const slugs = hintSlugs(hint)
+			const goalFilters: PlausibleClause[] = slugs
 				? [...filters, ['is', 'event:goal', slugs]]
 				: filters
 			const siteFilters = goalBreakdown ? goalFilters : filters
@@ -257,76 +314,45 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 			const meta = (): AnalyticsResult['meta'] => ({
 				provider: 'plausible',
 				fetchedAt,
+				...(revenueCurrency ? { currency: revenueCurrency } : {}),
 				...(unresolved || goalsFailed ? { goalsUnresolved: true as const } : {}),
 			})
 
-			const readMetrics = (
-				ms: MetricKey[],
-				keys: string[],
-				row: PlausibleResult
-			): Partial<Record<MetricKey, number>> => {
-				const out: Partial<Record<MetricKey, number>> = {}
-				for (const m of ms) {
-					const raw = row.metrics[keys.indexOf(METRIC_MAP[m] as string)]
-					if (m === 'revenue') {
-						const amount = revenueAmount(raw)
-						if (amount !== undefined) {
-							out.revenue = amount
-						}
-						continue
-					}
-					out[m] = toContractValue(m, typeof raw === 'number' ? raw : 0)
-				}
-				return out
-			}
-
+			const dateRange = calendarDays(q)
 			const postQuery = (
-				metrics: string[],
-				clauses: Array<[string, string, string[]]>,
-				extra: Record<string, unknown>
+				names: string[],
+				clauses: PlausibleClause[],
+				shape: QueryShape
 			): Promise<PlausibleResponse> =>
-				fetchJson<PlausibleResponse>(`${host}/api/v2/query`, {
+				upstreamJson<PlausibleResponse>(ctx, `${host}/api/v2/query`, {
 					method: 'POST',
 					headers: { authorization: `Bearer ${config.apiKey}` },
 					body: {
 						site_id: config.siteId,
-						metrics,
-						date_range: [
-							zonedCalendarDay(q.dateRange.start, q.timezone ?? DEFAULT_TIMEZONE),
-							zonedCalendarDay(q.dateRange.end, q.timezone ?? DEFAULT_TIMEZONE),
-						],
+						metrics: names,
+						date_range: dateRange,
 						...(clauses.length ? { filters: clauses } : {}),
-						...extra,
+						...shape,
 					},
-					signal: ctx.signal,
 					provider: 'plausible',
+					fetch: config.fetch,
 				})
-
-			const keyedRows = (
-				response: PlausibleResponse | undefined,
-				ms: MetricKey[],
-				keys: string[]
-			): GoalKeyedRow[] | undefined =>
-				response?.results.map((row) => ({
-					keys: row.dimensions,
-					metrics: readMetrics(ms, keys, row),
-				}))
 
 			/**
 			 * One request shape read twice, plainly and goal-filtered, unioned per row. A row the
 			 * goal read has no counterpart for carries no conversions: no goal was completed there.
 			 */
-			const readPair = async (extra: Record<string, unknown>): Promise<GoalKeyedRow[]> => {
+			const readPair = async (shape: QueryShape): Promise<GoalKeyedRow[]> => {
 				const pair = await readGoalPair({
-					site: siteKeys.length ? () => postQuery(siteKeys, siteFilters, extra) : undefined,
-					goals: goalKeys.length ? () => postQuery(goalKeys, goalFilters, extra) : undefined,
+					site: siteNames.length ? () => postQuery(siteNames, siteFilters, shape) : undefined,
+					goals: goalNames.length ? () => postQuery(goalNames, goalFilters, shape) : undefined,
 				})
 				if (pair.failed) {
 					goalsFailed = true
 				}
 				return mergeGoalRows(
-					keyedRows(pair.site, siteMetrics, siteKeys),
-					keyedRows(pair.goals, goalMetrics, goalKeys)
+					keyedRows(pair.site, siteMetrics, siteNames),
+					keyedRows(pair.goals, goalMetrics, goalNames)
 				)
 			}
 
@@ -335,14 +361,11 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 					readPair({ dimensions: ['time:day'] }),
 					readPair({}),
 				])
-				const rows: AnalyticsRow[] = []
-				for (const row of series) {
-					const ts = dayIso(row.keys[0] ?? '')
-					if (ts) {
-						rows.push({ timestamp: ts, metrics: row.metrics })
-					}
+				return {
+					rows: datedRows(series, dayIso),
+					totals: totalRows[0]?.metrics ?? {},
+					meta: meta(),
 				}
-				return { rows, totals: totalRows[0]?.metrics ?? {}, meta: meta() }
 			}
 
 			if (!dims.length) {
@@ -350,16 +373,13 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 				return { rows: [{ metrics: totals }], totals, meta: meta() }
 			}
 
-			const merged = await readPair({ dimensions: dims.map((d) => DIMENSION_MAP[d] as string) })
+			const merged = await readPair({ dimensions: dims.flatMap((d) => DIMENSION_MAP[d] ?? []) })
 			const rows: AnalyticsRow[] = merged.map((row) => {
-				const dimValues: Partial<Record<DimensionKey, string>> = {}
-				for (let i = 0; i < dims.length; i++) {
-					const d = dims[i]
-					if (d !== undefined) {
-						dimValues[d] = row.keys[i] ?? ''
-					}
+				const dimensions: Partial<Record<DimensionKey, string>> = {}
+				for (const [i, d] of dims.entries()) {
+					dimensions[d] = row.keys[i] ?? ''
 				}
-				return { dimensions: dimValues, metrics: row.metrics }
+				return { dimensions, metrics: row.metrics }
 			})
 			return { rows, totals: undefined, meta: meta() }
 		},

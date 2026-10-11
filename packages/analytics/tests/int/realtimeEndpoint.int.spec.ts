@@ -9,7 +9,10 @@ import { makeRealtimeHandler } from '../../src/plugin/realtimeEndpoint'
 describeForDb('realtime endpoint', {}, (db) => {
 	let booted: BootedPayload
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native()], capture: { gate: 'off' } }),
+			db,
+		})
 	})
 	afterAll(async () => {
 		await booted.stop()
@@ -19,16 +22,17 @@ describeForDb('realtime endpoint', {}, (db) => {
 		({ url, user, payload: booted.payload }) as unknown as PayloadRequest
 
 	it('401s without an authenticated user, and no cache may hold that answer either', async () => {
-		const res = await handler(
-			reqFor('http://x/api/analytics/realtime?metric=visitors&windowMinutes=30', null)
-		)
+		const res = await handler(reqFor('http://x/api/_x/live?metric=visitors&windowMinutes=30', null))
 		expect(res.status).toBe(401)
 		expect(res.headers.get('cache-control')).toBe('private, no-store')
 	})
 
 	it('returns the realtime payload for an authenticated user', async () => {
 		const res = await handler(
-			reqFor('http://x/api/analytics/realtime?metric=visitors&windowMinutes=30', { id: '1' })
+			reqFor('http://x/api/_x/live?metric=visitors&windowMinutes=30', {
+				id: '1',
+				collection: 'users',
+			})
 		)
 		expect(res.status).toBe(200)
 		const body = (await res.json()) as { status: string; activeNow: number; series: unknown[] }
@@ -38,15 +42,37 @@ describeForDb('realtime endpoint', {}, (db) => {
 
 	it('clamps an out-of-allowlist windowMinutes to the default', async () => {
 		const res = await handler(
-			reqFor('http://x/api/analytics/realtime?metric=visitors&windowMinutes=9999', { id: '1' })
+			reqFor('http://x/api/_x/live?metric=visitors&windowMinutes=9999', {
+				id: '1',
+				collection: 'users',
+			})
 		)
 		const body = (await res.json()) as { series: unknown[] }
 		expect(body.series.length).toBe(31)
 	})
 
+	it('answers the total alone, with no series, when the poll asks for series=0', async () => {
+		const user = { id: '1', collection: 'users' }
+		const drawn = await handler(
+			reqFor('http://x/api/_x/live?metric=visitors&windowMinutes=15', user)
+		)
+		const counted = await handler(
+			reqFor('http://x/api/_x/live?metric=visitors&windowMinutes=15&series=0', user)
+		)
+		const series = (await drawn.json()) as { activeNow: number; series: unknown[] }
+		const total = (await counted.json()) as { status: string; activeNow: number; series: unknown[] }
+		expect(total.status).toBe('ok')
+		expect(total.series).toEqual([])
+		expect(series.series.length).toBe(16)
+		expect(total.activeNow).toBe(series.activeNow)
+	})
+
 	it('never lets a shared cache hold a reading', async () => {
 		const res = await handler(
-			reqFor('http://x/api/analytics/realtime?metric=visitors&windowMinutes=30', { id: '1' })
+			reqFor('http://x/api/_x/live?metric=visitors&windowMinutes=30', {
+				id: '1',
+				collection: 'users',
+			})
 		)
 		expect(res.headers.get('cache-control')).toBe('private, no-store')
 	})
@@ -58,6 +84,7 @@ describeForDb('realtime endpoint access control', {}, (db) => {
 		booted = await bootPayload({
 			plugin: analytics({
 				adapters: [native()],
+				capture: { gate: 'off' },
 				access: {
 					read: ({ req }) => {
 						const email = (req.user as { email?: string } | null)?.email
@@ -77,7 +104,7 @@ describeForDb('realtime endpoint access control', {}, (db) => {
 
 	const call = (email: string) =>
 		makeRealtimeHandler()({
-			url: 'http://x/api/analytics/realtime?metric=visitors&windowMinutes=30',
+			url: 'http://x/api/_x/live?metric=visitors&windowMinutes=30',
 			user: { id: '1', email },
 			payload: booted.payload,
 		} as unknown as PayloadRequest)
@@ -114,7 +141,10 @@ const failingRealtime = (): AnalyticsAdapter => {
 describeForDb('realtime endpoint with a failing source', {}, (db) => {
 	let booted: BootedPayload
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [failingRealtime()] }), db })
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [failingRealtime()], capture: { gate: 'off' } }),
+			db,
+		})
 	})
 	afterAll(async () => {
 		await booted.stop()
@@ -123,8 +153,8 @@ describeForDb('realtime endpoint with a failing source', {}, (db) => {
 	// The widget polls this every few seconds: an outage is a retryable answer, not a 500.
 	it('answers a retryable 503 rather than throwing', async () => {
 		const res = await makeRealtimeHandler()({
-			url: 'http://x/api/analytics/realtime?metric=visitors&windowMinutes=30',
-			user: { id: '1' },
+			url: 'http://x/api/_x/live?metric=visitors&windowMinutes=30',
+			user: { id: '1', collection: 'users' },
 			payload: booted.payload,
 		} as unknown as PayloadRequest)
 		expect(res.status).toBe(503)

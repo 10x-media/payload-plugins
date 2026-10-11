@@ -1,11 +1,8 @@
-import type { AnalyticsQuery, AnalyticsResult, MetricKey } from '../core/contract'
+import type { AnalyticsQuery, AnalyticsResult, MetricKey, MetricValues } from '../core/contract'
 
 /**
- * What a read tells a provider about this install's goals: the slugs its goal rows are
- * restricted to (possibly none, for an install that configured none), `'unresolved'` when
- * the resolver failed, or null when the caller set no hint at all. Nothing in a provider
- * marks which of its events are this install's goals, so a provider adapter counts
- * conversions for the hinted names and for no others.
+ * The goal slugs a read restricts goal rows to, `'unresolved'` when the resolver failed, or null for
+ * no hint. Providers cannot tell goals from events, so they count only the hinted names.
  */
 export type GoalHint = { slugs: string[] } | 'unresolved' | null
 
@@ -38,31 +35,31 @@ type GoalsUnresolvedMeta = Omit<
 /** A `goal` breakdown a provider was asked for without the hint that defines its rows. */
 export const goalsUnresolvedResult = (
 	provider: string,
-	q: AnalyticsQuery,
+	fetchedAt: string,
 	meta?: GoalsUnresolvedMeta
 ): AnalyticsResult => ({
 	rows: [],
 	meta: {
 		provider,
-		fetchedAt: q.dateRange.end.toISOString(),
+		fetchedAt,
 		...meta,
 		goalsUnresolved: true,
 	},
 })
 
 /**
- * The answer a `goal` breakdown owes before it reads, or null when its hint names rows to
- * read. A failed or absent hint is reported with `goalsUnresolved`; an install that
- * configured no goals gets the same empty rows without the flag.
+ * The answer a `goal` breakdown owes before reading, or null when its hint names rows. A failed or
+ * absent hint sets `goalsUnresolved`; an install with no goals gets the same empty rows unflagged.
  */
 export const emptyGoalBreakdown = ({
 	provider,
-	q,
+	fetchedAt,
 	hint,
 	meta,
 }: {
 	provider: string
-	q: AnalyticsQuery
+	/** When the read began, which the empty answer is stamped with. */
+	fetchedAt: string
 	hint: GoalHint
 	meta?: GoalsUnresolvedMeta
 }): AnalyticsResult | null => {
@@ -70,8 +67,8 @@ export const emptyGoalBreakdown = ({
 		return null
 	}
 	return hintFailed(hint)
-		? goalsUnresolvedResult(provider, q, meta)
-		: { rows: [], meta: { provider, fetchedAt: q.dateRange.end.toISOString(), ...meta } }
+		? goalsUnresolvedResult(provider, fetchedAt, meta)
+		: { rows: [], meta: { provider, fetchedAt, ...meta } }
 }
 
 export interface GoalMetricSplit {
@@ -84,10 +81,8 @@ export interface GoalMetricSplit {
 }
 
 /**
- * How a provider that serves goal metrics only under a goal filter splits one read in two.
- * A goal breakdown restricts every row it returns, so its single request carries everything;
- * anywhere else the goal metrics need a request of their own, because filtering the whole
- * read would scope the site metrics to goal hits as well.
+ * How a provider that serves goal metrics only under a goal filter splits a read: a goal breakdown
+ * is one request, anything else needs a second so site metrics are not scoped to goal hits.
  */
 export const splitGoalMetrics = ({
 	wanted,
@@ -111,27 +106,17 @@ export const splitGoalMetrics = ({
 	}
 }
 
-/**
- * Provider metric names for a contract metric list, deduped: several contract metrics can
- * alias one provider metric (sessions and visits both map to Plausible's `visits`), so each
- * is read back from its provider key's position rather than from the request index.
- */
-export const providerMetricKeys = (
-	metrics: MetricKey[],
-	map: Partial<Record<MetricKey, string>>
-): string[] => [...new Set(metrics.map((m) => map[m] as string))]
-
 export interface GoalKeyedRow {
 	/** The row's dimension values in the request's dimension order; empty for a totals row. */
 	keys: string[]
-	metrics: Partial<Record<MetricKey, number>>
+	metrics: MetricValues
+	/** What the row's averages were taken over, as `AnalyticsRow.samples`. */
+	samples?: Partial<Record<MetricKey, number>>
 }
 
 /**
- * The two halves of a pair read unioned by dimension key. A row only the site request
- * returned keeps its conversions absent (no goal fired there); a row only the goal request
- * returned is appended carrying its goal metrics alone, since the site request answers a
- * different ranking and its own limit may have cut the row off.
+ * A pair read unioned by dimension key. A site-only row has no conversions; a goal-only row is kept
+ * with its goal metrics alone, since the site request's own limit may have cut it.
  */
 export const mergeGoalRows = (
 	site: GoalKeyedRow[] | undefined,
@@ -151,17 +136,16 @@ export const mergeGoalRows = (
 			return row
 		}
 		byKey.delete(key)
-		return { keys: row.keys, metrics: { ...row.metrics, ...goalRow.metrics } }
+		return { ...row, metrics: { ...row.metrics, ...goalRow.metrics } }
 	})
 	return [...merged, ...byKey.values()]
 }
 
 /** The same union over a pair's totals rows, which carry no dimensions to key on. */
 export const mergeGoalTotals = (
-	site: Partial<Record<MetricKey, number>> | undefined,
-	goals: Partial<Record<MetricKey, number>> | undefined
-): Partial<Record<MetricKey, number>> | undefined =>
-	site || goals ? { ...site, ...goals } : undefined
+	site: MetricValues | undefined,
+	goals: MetricValues | undefined
+): MetricValues | undefined => (site || goals ? { ...site, ...goals } : undefined)
 
 export interface GoalPair<Response> {
 	site: Response | undefined
@@ -171,11 +155,8 @@ export interface GoalPair<Response> {
 }
 
 /**
- * One request shape issued twice, plainly and goal-filtered. Sequential rather than
- * concurrent: the engine takes a single limiter permit per `adapter.query`, so a parallel
- * pair would exceed the provider's declared concurrency. A goal request the provider rejects
- * (a property with no key events, a site with no revenue goals) costs the read its
- * conversions rather than all of it, unless there is no site half left to serve.
+ * One request shape issued plainly then goal-filtered, sequentially to stay within the engine's one
+ * limiter permit. A rejected goal request costs only the conversions while a site half remains.
  */
 export const readGoalPair = async <Response>({
 	site,

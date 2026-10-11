@@ -8,7 +8,7 @@ const bareConfig = (): Config => ({}) as Config
 
 const register = (config: Config, options: Omit<AnalyticsPluginOptions, 'adapters'> = {}): void => {
 	const pluginOptions: AnalyticsPluginOptions = { adapters: [memoryAdapter()], ...options }
-	registerView(config, { view: resolveOptions(pluginOptions).view, pluginOptions })
+	registerView(config, { view: resolveOptions(pluginOptions).view })
 }
 
 const viewOf = (config: Config) => config.admin?.components?.views?.[VIEW_KEY]
@@ -23,12 +23,11 @@ describe('registerView', () => {
 		expect(view?.Component).toMatchObject({ path: VIEW_COMPONENT })
 	})
 
-	it('hands the raw plugin options to the server component', () => {
+	it('hands the server component no options: it reads what the plugin resolved', () => {
 		const config = bareConfig()
 		const pluginOptions: AnalyticsPluginOptions = { adapters: [memoryAdapter()] }
-		registerView(config, { view: resolveOptions(pluginOptions).view, pluginOptions })
-		const component = viewOf(config)?.Component
-		expect(component).toMatchObject({ serverProps: { pluginOptions } })
+		registerView(config, { view: resolveOptions(pluginOptions).view })
+		expect(viewOf(config)?.Component).toEqual({ path: VIEW_COMPONENT })
 	})
 
 	it('adds a nav link pointing at the admin-prefixed view path', () => {
@@ -82,5 +81,17 @@ describe('registerView', () => {
 		expect(config.admin?.components?.afterNavLinks).toHaveLength(2)
 		expect(config.admin?.components?.afterNavLinks?.[0]).toBe('@app/Link')
 		expect(config.admin?.components?.beforeNavLinks).toEqual(['@app/Before'])
+	})
+
+	// Payload titles a custom view's tab from its meta, which no request's language reaches.
+	it("titles the browser tab in the app's fallback language", () => {
+		const title = { en: 'Analytics', de: 'Statistiken' }
+		const pluginOptions: AnalyticsPluginOptions = { adapters: [memoryAdapter()] }
+		const english = bareConfig()
+		registerView(english, { view: resolveOptions(pluginOptions).view, title })
+		expect(viewOf(english)?.meta).toEqual({ title: 'Analytics' })
+		const german = { i18n: { fallbackLanguage: 'de' } } as Config
+		registerView(german, { view: resolveOptions(pluginOptions).view, title })
+		expect(viewOf(german)?.meta).toEqual({ title: 'Statistiken' })
 	})
 })

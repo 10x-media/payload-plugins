@@ -1,20 +1,24 @@
 import type { NamedGroupField, TextFieldSingleValidation } from 'payload'
 import { type AnalyticsFilter, DIMENSION_KEYS, FILTER_OPERATORS } from '../core/contract'
+import { isRecord } from '../core/values'
 import { MAX_QUERY_FILTER_VALUE_LENGTH } from '../query/limits'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
+import { THIRD } from './fieldRows'
 import type { WidgetFilter } from './types'
 
 /** importMap paths of the scoped pickers; the factory never imports the components. */
-export const FILTER_DIMENSION_COMPONENT = '@10x-media/analytics/client#FilterDimensionSelectField'
-export const FILTER_OPERATOR_COMPONENT = '@10x-media/analytics/client#FilterOperatorSelectField'
+export const FILTER_DIMENSION_COMPONENT =
+	'@10x-media/analytics/rsc#FilterDimensionSelectFieldServer'
+export const FILTER_OPERATOR_COMPONENT = '@10x-media/analytics/rsc#FilterOperatorSelectFieldServer'
+export const FILTER_VALUE_COMPONENT = '@10x-media/analytics/rsc#FilterValueFieldServer'
 
 /**
  * The dimension is the gate: without one there is no filter, so an empty value is fine.
  * With one, a blank value would filter on nothing and read as an accident.
  */
 const validateValue: TextFieldSingleValidation = (value, { req, siblingData }) => {
-	const dimension = (siblingData as { dimension?: unknown } | undefined)?.dimension
+	const dimension = isRecord(siblingData) ? siblingData.dimension : undefined
 	if (typeof dimension !== 'string' || dimension.trim() === '') return true
 	const trimmed = typeof value === 'string' ? value.trim() : ''
 	if (trimmed === '') return asTranslate(req.t)(keys.widgetFilterValueRequired)
@@ -24,14 +28,10 @@ const validateValue: TextFieldSingleValidation = (value, { req, siblingData }) =
 }
 
 /**
- * The stored group as query filters: one entry, or none at all. A group without both a
- * dimension and a value is still being configured, and the value is stored exactly as it
- * was typed, so the query's own trimming and cap are applied here rather than assumed.
+ * The stored group as zero or one query filter; the value is stored as typed, so it is trimmed
+ * and capped here. An unknown dimension is no filter; an unknown operator becomes `eq`.
  *
- * Both keys are text fields the pickers fill, so a hand-edited layout or a widget saved
- * against an older contract can hold anything. A dimension the contract does not define
- * has no label to caption it with, so it is no filter at all; an undefined operator falls
- * back to `eq`, the field's own default.
+ * @beta
  */
 export const widgetFilters = (data: { filter?: WidgetFilter }): AnalyticsFilter[] => {
 	const { dimension, operator, value } = data.filter ?? {}
@@ -49,9 +49,8 @@ export const widgetFilters = (data: { filter?: WidgetFilter }): AnalyticsFilter[
 }
 
 /**
- * The optional one-filter group every filterable widget carries. Text-backed rather than
- * select-backed on purpose: the servable dimensions and operators are per source and per
- * request, so the option lists are the client pickers' to build, not the config's.
+ * Optional one-filter group every filterable widget carries. Text- rather than select-backed:
+ * servable dimensions and operators vary per source and request, so client pickers list them.
  */
 export const filterField = (): NamedGroupField => ({
 	name: 'filter',
@@ -60,24 +59,31 @@ export const filterField = (): NamedGroupField => ({
 	admin: { description: labelForKey(keys.widgetFieldFilterDescription) },
 	fields: [
 		{
-			name: 'dimension',
-			type: 'text',
-			label: labelForKey(keys.widgetFieldFilterDimension),
-			admin: { components: { Field: { path: FILTER_DIMENSION_COMPONENT } } },
-		},
-		{
-			name: 'operator',
-			type: 'text',
-			defaultValue: 'eq',
-			label: labelForKey(keys.widgetFieldFilterOperator),
-			admin: { components: { Field: { path: FILTER_OPERATOR_COMPONENT } } },
-		},
-		{
-			name: 'value',
-			type: 'text',
-			maxLength: MAX_QUERY_FILTER_VALUE_LENGTH,
-			label: labelForKey(keys.widgetFieldFilterValue),
-			validate: validateValue,
+			// A row carries no name, so the three keep their `filter.<name>` paths.
+			type: 'row',
+			fields: [
+				{
+					name: 'dimension',
+					type: 'text',
+					label: labelForKey(keys.widgetFieldFilterDimension),
+					admin: { width: THIRD, components: { Field: { path: FILTER_DIMENSION_COMPONENT } } },
+				},
+				{
+					name: 'operator',
+					type: 'text',
+					defaultValue: 'eq',
+					label: labelForKey(keys.widgetFieldFilterOperator),
+					admin: { width: THIRD, components: { Field: { path: FILTER_OPERATOR_COMPONENT } } },
+				},
+				{
+					name: 'value',
+					type: 'text',
+					maxLength: MAX_QUERY_FILTER_VALUE_LENGTH,
+					label: labelForKey(keys.widgetFieldFilterValue),
+					validate: validateValue,
+					admin: { width: THIRD, components: { Field: { path: FILTER_VALUE_COMPONENT } } },
+				},
+			],
 		},
 	],
 })

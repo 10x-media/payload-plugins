@@ -1,18 +1,16 @@
 import type { DateRange } from '../core/contract'
 import { DATE_ONLY, parseDayOrInstant } from '../query/dates'
 import { zonedCalendarDay } from '../timeframe/tz'
+import { dateTimeFormat } from '../translations/intl'
 import type { WidgetRange } from './types'
 
 const NOON_MS = 12 * 3_600_000
 
 /**
- * The calendar day a stored bound names. The `dayOnly` picker stores the picked day at the
- * admin browser's local midnight, so the instant lands on that day or the one before it in
- * UTC depending on the browser's offset; a 12-hour shift recovers the picked day for every
- * offset in (-12, +12]. Zones at +12:45 and beyond (Chatham in DST, Kiritimati) recover the
- * day before, and the uninhabited UTC-12 the day after.
+ * Calendar day a stored bound names. The `dayOnly` picker stores the browser's local midnight,
+ * so a 12-hour shift recovers the picked day for every offset in (-12, +12].
  */
-const pickedDay = (raw: string): string | null => {
+export const pickedDay = (raw: string): string | null => {
 	if (DATE_ONLY.test(raw)) {
 		return raw
 	}
@@ -24,11 +22,8 @@ const pickedDay = (raw: string): string | null => {
 }
 
 /**
- * Resolve a widget's explicit custom range to a concrete DateRange, or undefined when the
- * widget is on a relative preset, the custom range is incomplete, or either bound names no
- * real day (a corrupt or hand-set widgetData would otherwise reach the cache key and throw
- * on `toISOString`). The two picked days are read inclusively in `timezone`, the reporting
- * timezone the read resolves in: `from` at the first instant of its day, `to` at the last.
+ * A widget's custom range, inclusive in `timezone`; undefined on a preset, when incomplete, or
+ * when a bound names no real day (corrupt widgetData would otherwise throw in the cache key).
  */
 export const resolveCustomRange = (
 	timeframe: string | undefined,
@@ -51,13 +46,34 @@ export const resolveCustomRange = (
 	return { start, end }
 }
 
-const formatDay = (d: Date, locale: string, timeZone: string): string =>
-	d.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric', timeZone })
+/**
+ * Whether a custom range sets both bounds yet one names no real day or a day before 1970: the
+ * widget says the read is invalid rather than reading the last 30 days in its place.
+ */
+export const isUnreadableCustomRange = (
+	timeframe: string | undefined,
+	range: WidgetRange | undefined
+): boolean =>
+	timeframe === 'custom' &&
+	Boolean(range?.from && range?.to) &&
+	resolveCustomRange(timeframe, range, 'UTC') === undefined
 
 /**
- * Server-side caption for a custom range, e.g. "Jun 1, 2026 - Jun 23, 2026". Both bounds
- * render in the reporting timezone, so the caption names the days that were read rather
- * than the days the server's own zone would spell them as.
+ * Caption for a range as the language writes a span of days ("Jun 1 to 23, 2026"), in the
+ * reporting timezone so it names the days that were read, not the server zone's.
  */
-export const formatRangeCaption = (range: DateRange, locale: string, timezone: string): string =>
-	`${formatDay(range.start, locale, timezone)} - ${formatDay(range.end, locale, timezone)}`
+export const formatRangeCaption = (range: DateRange, locale: string, timezone: string): string => {
+	const format = dateTimeFormat(locale, {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+		timeZone: timezone,
+	})
+	try {
+		// Node's ICU writes thin spaces around the span's dash where browsers write plain ones, and
+		// the toolbar renders on both sides of a hydration.
+		return format.formatRange(range.start, range.end).replace(/[\u2009\u202f]/g, ' ')
+	} catch {
+		return `${format.format(range.start)} - ${format.format(range.end)}`
+	}
+}

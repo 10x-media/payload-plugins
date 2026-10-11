@@ -10,7 +10,6 @@ import {
 	hintSlugs,
 	mergeGoalRows,
 	mergeGoalTotals,
-	providerMetricKeys,
 	readGoalPair,
 	splitGoalMetrics,
 } from './goalRead'
@@ -62,7 +61,7 @@ describe('hintFailed', () => {
 
 describe('emptyGoalBreakdown', () => {
 	const breakdown = (hint: GoalHint): AnalyticsResult | null =>
-		emptyGoalBreakdown({ provider: 'umami', q: q(), hint })
+		emptyGoalBreakdown({ provider: 'umami', fetchedAt: q().dateRange.end.toISOString(), hint })
 
 	it('flags the rows it cannot define when the hint failed or was never set', () => {
 		expect(breakdown('unresolved')?.meta.goalsUnresolved).toBe(true)
@@ -85,7 +84,9 @@ describe('goalsUnresolvedResult', () => {
 		const unappliedFilters = [
 			{ dimension: 'country' as const, operator: 'eq' as const, value: 'DE' },
 		]
-		const result = goalsUnresolvedResult('umami', q(), { unappliedFilters })
+		const result = goalsUnresolvedResult('umami', q().dateRange.end.toISOString(), {
+			unappliedFilters,
+		})
 		expect(result.rows).toEqual([])
 		expect(result.meta).toEqual({
 			provider: 'umami',
@@ -154,18 +155,6 @@ describe('splitGoalMetrics', () => {
 			splitGoalMetrics({ wanted: ['pageviews'], goalOnly, goalBreakdown: false, hint: null })
 				.unresolved
 		).toBe(false)
-	})
-})
-
-describe('providerMetricKeys', () => {
-	it('dedupes contract metrics that alias one provider metric', () => {
-		expect(
-			providerMetricKeys(['visits', 'sessions', 'pageviews'], {
-				visits: 'visits',
-				sessions: 'visits',
-				pageviews: 'pageviews',
-			})
-		).toEqual(['visits', 'pageviews'])
 	})
 })
 

@@ -2,15 +2,14 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import type { CollectionConfig, Endpoint, Payload, PayloadRequest } from 'payload'
 import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import type { TrackerConfig } from '../../src/capture/trackerConfig'
 import { GOALS_SLUG } from '../../src/goals/collection'
 import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
 import { getRuntime } from '../../src/plugin/runtime'
+import { DAY_MS } from '../../src/timeframe/tz'
+import type { TrackerConfig } from '../../src/tracker/config'
 import { ingestRequest } from './ingestRequest'
-
-const DAY_MS = 86_400_000
 
 const configGoals: Goal[] = [
 	{ slug: 'purchase', name: 'Purchase (config)', match: { kind: 'goal' }, value: { fixed: 5 } },
@@ -22,7 +21,7 @@ const ingestInto = async (
 	headers?: Record<string, string>
 ): Promise<void> => {
 	const endpoint = (payload.config.endpoints ?? []).find(
-		(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		(e): e is Endpoint => typeof e === 'object' && e.path === '/_x/e'
 	)
 	if (!endpoint || typeof endpoint.handler !== 'function') {
 		throw new Error('ingest endpoint not registered')
@@ -44,7 +43,7 @@ describeForDb('analytics goals collection: unscoped', {}, (db) => {
 	const byGoal = async (): Promise<Record<string, { conversions: number; revenue: number }>> => {
 		const result = await adapter.query(
 			{ metrics: ['conversions', 'revenue'], dimensions: ['goal'], dateRange: range },
-			{}
+			{ payload: booted.payload }
 		)
 		return Object.fromEntries(
 			result.rows.map((r) => [String(r.dimensions?.goal), r.metrics])
@@ -56,6 +55,8 @@ describeForDb('analytics goals collection: unscoped', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [adapter],
+				capture: { gate: 'off' },
+				revenue: true,
 				goals: { defaults: configGoals, collection: true },
 			}),
 		})
@@ -83,10 +84,26 @@ describeForDb('analytics goals collection: unscoped', {}, (db) => {
 			slug: 'purchase',
 			match: { kind: 'goal' },
 			value: { fixed: 42 },
+			currency: 'EUR',
 		})
 		await ingestInto(booted.payload, { type: 'goal', name: 'purchase', path: '/checkout' })
 		// 42 from the collection document, not the config goal's 5.
 		expect((await byGoal()).purchase).toEqual({ conversions: 1, revenue: 42 })
+	})
+
+	it('refuses an amount saved without a currency, and keeps the stored shape', async () => {
+		await expect(
+			create({ name: 'Lead', slug: 'lead', match: { kind: 'goal' }, value: { fixed: 30 } })
+		).rejects.toMatchObject({ data: { errors: [{ path: 'currency' }] } })
+		const doc = (await create({
+			name: 'Lead',
+			slug: 'lead',
+			match: { kind: 'event', name: 'lead_sent' },
+			value: { fixed: 30, prop: 'total' },
+			currency: 'EUR',
+		})) as unknown as Record<string, unknown>
+		expect(doc.value).toEqual({ fixed: 30, prop: 'total' })
+		expect(doc.currency).toBe('EUR')
 	})
 
 	it('stops matching a goal the editor disables', async () => {
@@ -117,6 +134,29 @@ describeForDb('analytics goals collection: unscoped', {}, (db) => {
 		await expect(
 			create({ name: 'Book Demo', slug: 'Book Demo', match: { kind: 'goal' } })
 		).rejects.toThrow()
+	})
+
+	it('refuses an address pattern over the matcher caps, and saves one within them', async () => {
+		await expect(
+			create({
+				name: 'Too deep',
+				slug: 'too-deep',
+				match: { kind: 'path', pattern: `/${Array(33).fill('a').join('/')}` },
+			})
+		).rejects.toThrow(/pattern/i)
+		await expect(
+			create({
+				name: 'Too wild',
+				slug: 'too-wild',
+				match: { kind: 'path', pattern: '/**/a/**/b/**/c/**/d/**' },
+			})
+		).rejects.toThrow(/pattern/i)
+		const saved = await create({
+			name: 'Docs',
+			slug: 'docs-read',
+			match: { kind: 'path', pattern: `/docs/**/${Array(30).fill('*').join('/')}` },
+		})
+		expect(saved).toMatchObject({ slug: 'docs-read' })
 	})
 })
 
@@ -167,8 +207,9 @@ describeForDb('analytics goals collection: scoped', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [native()],
-				scopeResolver: ({ req }) => scopeByEmail[emailOf(req)] ?? null,
-				access: { platformRead: ({ req }) => PLATFORM_EMAILS.has(emailOf(req)) },
+				capture: { gate: 'off' },
+				scope: { member: () => true, resolve: ({ req }) => scopeByEmail[emailOf(req)] ?? null },
+				access: { crossScope: ({ req }) => PLATFORM_EMAILS.has(emailOf(req)) },
 				goals: { collection: true },
 			}),
 		})
@@ -285,15 +326,21 @@ describeForDb('analytics goals collection: scoped', {}, (db) => {
 		expect(scopes).toContain('tenant-b')
 	})
 
-	it('resolves each scope only its own goals', async () => {
+	// The built-in purchase goal rides every scope's list: it matches at ingest whatever a
+	// scope declares, which is what makes a sale count before anyone declares a goal.
+	it('resolves each scope only its own goals, beside the built-in one', async () => {
 		const runtime = getRuntime(booted.payload)
 		const req = { payload: booted.payload } as unknown as PayloadRequest
-		expect((await runtime?.resolveGoals?.(req, 'tenant-a'))?.map((g) => g.name)).toEqual(['Signup'])
+		expect((await runtime?.resolveGoals?.(req, 'tenant-a'))?.map((g) => g.name)).toEqual([
+			'Signup',
+			'Purchase',
+		])
 		expect(new Set((await runtime?.resolveGoals?.(req, 'tenant-b'))?.map((g) => g.name))).toEqual(
-			new Set(['Signup B', 'B only'])
+			new Set(['Signup B', 'B only', 'Purchase'])
 		)
 		expect(await runtime?.resolveGoalsDetailed?.(req, 'tenant-a')).toEqual([
 			{ goal: expect.objectContaining({ slug: 'signup' }), source: 'collection' },
+			{ goal: expect.objectContaining({ slug: 'purchase' }), source: 'builtin' },
 		])
 	})
 
@@ -323,7 +370,7 @@ describeForDb('analytics goals collection: tracker config', {}, (db) => {
 		const res = await handleEndpoints({
 			config: booted.payload.config,
 			payloadInstanceCacheKey: booted.cacheKey,
-			request: new Request(`${origin}/api/analytics/tracker`),
+			request: new Request(`${origin}/api/_x/config`),
 		})
 		expect(res.status).toBe(200)
 		return ((await res.json()) as TrackerConfig).goals
@@ -334,8 +381,9 @@ describeForDb('analytics goals collection: tracker config', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [native()],
-				scopeResolver: ({ req }) => req.host?.split(':')[0] ?? null,
-				access: { platformRead: () => true },
+				capture: { gate: 'off' },
+				scope: { member: () => true, resolve: ({ req }) => req.host?.split(':')[0] ?? null },
+				access: { crossScope: () => true },
 				goals: { defaults: configGoals, collection: true },
 			}),
 		})
@@ -404,7 +452,8 @@ describeForDb('analytics goals collection: scope field boot check', {}, (db) => 
 			db,
 			plugin: analytics({
 				adapters: [native()],
-				scopeResolver: () => 'tenant-a',
+				capture: { gate: 'off' },
+				scope: { member: () => true, resolve: () => 'tenant-a' },
 				goals: { collection: { scopeField: 'tenant', overrides: hostScopeField } },
 			}),
 		})
@@ -427,7 +476,8 @@ describeForDb('analytics goals collection: scope field boot check', {}, (db) => 
 				attachTo: booted,
 				plugin: analytics({
 					adapters: [native()],
-					scopeResolver: () => 'tenant-a',
+					capture: { gate: 'off' },
+					scope: { member: () => true, resolve: () => 'tenant-a' },
 					goals: { collection: { scopeField: 'tenant' } },
 				}),
 			})

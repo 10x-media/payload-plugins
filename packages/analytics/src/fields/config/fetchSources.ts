@@ -1,6 +1,7 @@
 import type { SerializedCapabilities } from '../../core/capabilities'
-import { readResponseError } from '../../plugin/errors'
-import { SOURCES_PATH } from '../../plugin/paths'
+import { isRecord } from '../../core/values'
+import { requestShaped } from '../../ui/data/request'
+import { createSharedCache } from '../../ui/data/sharedCache'
 
 export interface WireSource {
 	id: string
@@ -14,39 +15,31 @@ export interface SourcesResponse {
 	sources: WireSource[]
 }
 
-const cache = new Map<string, Promise<SourcesResponse>>()
+const isStringList = (value: unknown): value is string[] =>
+	Array.isArray(value) && value.every((entry) => typeof entry === 'string')
+
+/** The parts of a source the pickers read: who it is and the lists its capabilities gate on. */
+const isWireSource = (value: unknown): value is WireSource =>
+	isRecord(value) &&
+	typeof value.id === 'string' &&
+	typeof value.label === 'string' &&
+	(value.kind === 'config' || value.kind === 'runtime') &&
+	isRecord(value.capabilities) &&
+	isStringList(value.capabilities.metrics) &&
+	isStringList(value.capabilities.dimensions) &&
+	isRecord(value.capabilities.filters)
+
+const isSourcesResponse = (value: unknown): value is SourcesResponse =>
+	isRecord(value) &&
+	(value.defaultId === null || typeof value.defaultId === 'string') &&
+	Array.isArray(value.sources) &&
+	value.sources.every(isWireSource)
+
+const cache = createSharedCache<SourcesResponse>()
 
 /**
- * Fetch the caller-scope source list once per user per admin session and share
- * it between every picker instance on the page; a failed fetch clears its cache
- * entry so a later mount retries instead of pinning the error. Keying by user
- * id keeps a soft-navigation logout/login from serving the previous user's
- * cached sources.
+ * Source list shared by every picker on the page, keyed by scope so a login or tenant switch reads
+ * again. A refusal or misshapen answer rejects and drops the entry, so a later mount retries.
  */
-export const fetchSources = (
-	serverURL: string,
-	apiRoute: string,
-	userKey: string
-): Promise<SourcesResponse> => {
-	const url = `${serverURL}${apiRoute}${SOURCES_PATH}`
-	const key = `${userKey}:${url}`
-	const hit = cache.get(key)
-	if (hit) return hit
-	const p = fetch(url, { credentials: 'include' })
-		.then(async (res) => {
-			if (!res.ok) {
-				// The picker shows one failed state either way, so the code rides in the message
-				// rather than inventing a second: a denied listing and a down one read alike in
-				// the console otherwise.
-				const code = (await readResponseError(res))?.code
-				throw new Error(`analytics: sources ${res.status}${code ? ` ${code}` : ''}`)
-			}
-			return (await res.json()) as SourcesResponse
-		})
-		.catch((err) => {
-			cache.delete(key)
-			throw err
-		})
-	cache.set(key, p)
-	return p
-}
+export const fetchSources = (url: string, scope: string): Promise<SourcesResponse> =>
+	cache.read({ route: url, scope }, () => requestShaped(url, isSourcesResponse))

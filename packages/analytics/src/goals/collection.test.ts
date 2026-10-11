@@ -2,14 +2,18 @@ import type {
 	CheckboxField,
 	CollectionConfig,
 	Field,
+	GroupField,
 	NumberField,
 	SelectField,
 	TextField,
 	Where,
 } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
+import { keys, translations } from '../translations'
+import { builtInStaticLabel } from '../translations/staticLabel'
 import type { BuildGoalsCollectionArgs } from './collection'
 import { buildGoalsCollection, GOALS_SLUG } from './collection'
+import { MAX_PATTERN_GLOBSTARS, MAX_PATTERN_SEGMENTS } from './pathMatch'
 
 const named = (fields: Field[] | undefined, name: string): Field | undefined =>
 	fields?.find((f) => 'name' in f && f.name === name)
@@ -39,7 +43,7 @@ const unscopedArgs: Omit<BuildGoalsCollectionArgs, 'slug' | 'onChange'> = {
 	scoped: false,
 	scopeField: 'scope',
 	resolveScope: async () => null,
-	platformRead: async () => false,
+	crossScope: async () => false,
 }
 
 const build = (overrides: Partial<BuildGoalsCollectionArgs> = {}) =>
@@ -51,14 +55,24 @@ describe('buildGoalsCollection', () => {
 	it('uses the given slug and admin-only access by default', async () => {
 		expect(collection.slug).toBe('analytics-goals')
 		const read = collection.access?.read
-		expect(await read?.({ req: { user: null } } as never)).toBe(false)
-		expect(await read?.({ req: { user: { id: 1 } } } as never)).toBe(true)
+		const from = (user: unknown) =>
+			({ req: { user, payload: { config: { admin: { user: 'users' } } } } }) as never
+		expect(await read?.(from(null))).toBe(false)
+		expect(await read?.(from({ id: 1, collection: 'users' }))).toBe(true)
+		expect(await read?.(from({ id: 1, collection: 'customers' }))).toBe(false)
 	})
 
 	it('lists goals by name', () => {
 		expect(collection.admin?.useAsTitle).toBe('name')
 		expect(collection.admin?.defaultColumns).toEqual(['name', 'slug', 'match.kind', 'enabled'])
-		expect(collection.admin?.group).toBe('Analytics')
+	})
+
+	it('sits in the plugin nav group, named in every shipped language', () => {
+		// `admin.group` takes no label function, so it carries the locale map rather than a key.
+		const group = collection.admin?.group as Record<string, string>
+		expect(group).toEqual(builtInStaticLabel(keys.adminGroup))
+		expect(group.en).toBe('Analytics settings')
+		expect(Object.keys(group).sort()).toEqual(Object.keys(translations).sort())
 	})
 
 	it('rejects a slug that is not kebab-case and accepts one that is', () => {
@@ -91,16 +105,72 @@ describe('buildGoalsCollection', () => {
 		expect(pattern?.admin?.condition?.({}, { kind: 'goal' }, {} as never)).toBe(false)
 	})
 
+	it('refuses an address pattern over the matcher caps, in the editor language', () => {
+		const pattern = named(groupFields(collection.fields, 'match'), 'pattern') as TextField
+		const validate = pattern.validate as (v: unknown, o: unknown) => true | string
+		const deepest = `/${Array(32).fill('a').join('/')}`
+		expect(validate(deepest, { req: fakeReq() })).toBe(true)
+		expect(validate('/**/a/**/b/**/c/**', { req: fakeReq() })).toBe(true)
+		expect(validate(undefined, { req: fakeReq() })).toBe(true)
+		expect(validate(`${deepest}/a`, { req: fakeReq() })).toBe('analytics:goalErrorPatternLimits')
+		expect(validate('/**/a/**/b/**/c/**/d/**', { req: fakeReq() })).toBe(
+			'analytics:goalErrorPatternLimits'
+		)
+	})
+
+	it('leaves the limits to the caps in every locale rather than writing the numbers in', () => {
+		for (const [locale, table] of Object.entries(translations)) {
+			const message = table.analytics?.goalErrorPatternLimits ?? ''
+			expect(message, locale).toContain('{{segments}}')
+			expect(message, locale).toContain('{{globstars}}')
+			expect(message, locale).not.toMatch(/\d/)
+		}
+	})
+
+	it('fills the limits into the message from the matcher caps', () => {
+		const pattern = named(groupFields(collection.fields, 'match'), 'pattern') as TextField
+		const validate = pattern.validate as (v: unknown, o: unknown) => true | string
+		const t = (key: string, vars?: Record<string, unknown>) => `${key} ${JSON.stringify(vars)}`
+		expect(validate('/**/a/**/b/**/c/**/d/**', { req: { t } })).toBe(
+			`analytics:goalErrorPatternLimits ${JSON.stringify({
+				segments: MAX_PATTERN_SEGMENTS,
+				globstars: MAX_PATTERN_GLOBSTARS,
+			})}`
+		)
+	})
+
 	it('keeps a fixed value non-negative and the currency an ISO 4217 code', () => {
-		const fixed = deep(groupFields(collection.fields, 'value'), 'fixed') as NumberField
+		const fixed = deep(collection.fields, 'fixed') as NumberField
 		expect(fixed.min).toBe(0)
-		const currency = named(collection.fields, 'currency') as TextField
+		const currency = deep(collection.fields, 'currency') as TextField
 		const validate = currency.validate as (v: unknown, o: unknown) => true | string
 		expect(validate('EUR', { req: fakeReq() })).toBe(true)
 		expect(validate(undefined, { req: fakeReq() })).toBe(true)
 		expect(validate('', { req: fakeReq() })).toBe(true)
 		expect(validate('eur', { req: fakeReq() })).toBe('analytics:goalErrorCurrency')
 		expect(validate('EURO', { req: fakeReq() })).toBe('analytics:goalErrorCurrency')
+	})
+
+	it('asks for a currency once the goal carries an amount, and only then', () => {
+		const currency = deep(collection.fields, 'currency') as TextField
+		const validate = currency.validate as (v: unknown, o: unknown) => true | string
+		const withData = (data: unknown) => ({ req: fakeReq(), data, siblingData: data })
+		expect(validate('', withData({ value: { fixed: 10 } }))).toBe(
+			'analytics:goalErrorCurrencyRequired'
+		)
+		expect(validate(null, withData({ value: { fixed: 0 } }))).toBe(
+			'analytics:goalErrorCurrencyRequired'
+		)
+		expect(validate('EUR', withData({ value: { fixed: 10 } }))).toBe(true)
+		expect(validate('eur', withData({ value: { fixed: 10 } }))).toBe('analytics:goalErrorCurrency')
+		for (const data of [
+			{},
+			{ value: null },
+			{ value: { prop: 'total' } },
+			{ value: { fixed: null } },
+		]) {
+			expect(validate('', withData(data))).toBe(true)
+		}
 	})
 
 	it('pins uniqueness in the database where the plugin owns the scope field', () => {
@@ -130,7 +200,7 @@ describe('buildGoalsCollection', () => {
 		expect(named(hostOwned.fields, 'tenant')).toBeUndefined()
 	})
 
-	it('invalidates the resolver cache on change and on delete', async () => {
+	it('reports the scopes a change or a delete touched', async () => {
 		const onChange = vi.fn()
 		const withHooks = build({ onChange })
 		await withHooks.hooks?.afterChange?.[0]?.({ doc: {} } as never)
@@ -139,13 +209,37 @@ describe('buildGoalsCollection', () => {
 	})
 
 	it('stamps the resolved scope on create in scoped installs', async () => {
-		const scoped = build({ scoped: true, resolveScope: async () => 'tenant-a' })
+		const scoped = build({
+			scoped: true,
+			resolveScope: async () => 'tenant-a',
+			member: () => true,
+		})
 		const data = await scoped.hooks?.beforeChange?.[0]?.({
 			data: { slug: 'demo' },
 			operation: 'create',
 			req: fakeReq(),
 		} as never)
 		expect(data).toEqual({ slug: 'demo', scope: 'tenant-a' })
+	})
+
+	// The same functions guard providers and goals, so a selector pointed at another tenant
+	// opens neither collection there.
+	it('refuses a scope its user does not belong to, on read and on create', async () => {
+		const scoped = build({
+			scoped: true,
+			resolveScope: async () => 'tenant-b',
+			member: ({ scope }) => scope === 'tenant-a',
+		})
+		const req = { user: { id: 1 } }
+		expect(await scoped.access?.read?.({ req } as never)).toBe(false)
+		expect(await scoped.access?.create?.({ req } as never)).toBe(false)
+		await expect(
+			scoped.hooks?.beforeChange?.[0]?.({
+				data: { slug: 'demo' },
+				operation: 'create',
+				req: fakeReq(),
+			} as never)
+		).rejects.toThrow(/does not belong to/)
 	})
 
 	it('applies access overrides over the defaults', () => {
@@ -200,7 +294,7 @@ describe('goals collection slug uniqueness', () => {
 
 	it('scopes the lookup to the request scope in scoped installs', async () => {
 		const find = vi.fn(async (_args: { where: Where; pagination?: boolean }) => ({ docs: [] }))
-		await hookFor({ scoped: true, resolveScope: async () => 'tenant-a' })({
+		await hookFor({ scoped: true, resolveScope: async () => 'tenant-a', member: () => true })({
 			data: { slug: 'demo' },
 			operation: 'create',
 			req: fakeReq(find),
@@ -211,7 +305,7 @@ describe('goals collection slug uniqueness', () => {
 
 	it('ignores a scope declared in the body by an ordinary tenant user', async () => {
 		const find = vi.fn(async (_args: { where: Where }) => ({ docs: [] }))
-		await hookFor({ scoped: true, resolveScope: async () => 'tenant-a' })({
+		await hookFor({ scoped: true, resolveScope: async () => 'tenant-a', member: () => true })({
 			data: { slug: 'demo', scope: 'tenant-b' },
 			operation: 'create',
 			req: fakeReq(find),
@@ -222,12 +316,23 @@ describe('goals collection slug uniqueness', () => {
 		expect(where).not.toContain('tenant-b')
 	})
 
+	// "Slug taken" in a tenant the user merely selected would say what that tenant owns.
+	it('never checks a scope the user selected but does not belong to', async () => {
+		const find = vi.fn(async (_args: { where: Where }) => ({ docs: [] }))
+		await hookFor({ scoped: true, resolveScope: async () => 'tenant-b', member: () => false })({
+			data: { slug: 'demo' },
+			operation: 'create',
+			req: fakeReq(find),
+		} as never)
+		expect(JSON.stringify(find.mock.calls[0]?.[0]?.where)).not.toContain('tenant-b')
+	})
+
 	it('honours the scope a platform admin declares', async () => {
 		const find = vi.fn(async (_args: { where: Where }) => ({ docs: [] }))
 		await hookFor({
 			scoped: true,
 			resolveScope: async () => 'tenant-a',
-			platformRead: async () => true,
+			crossScope: async () => true,
 		})({
 			data: { slug: 'demo', scope: 'tenant-b' },
 			operation: 'create',
@@ -243,7 +348,7 @@ describe('goals collection slug uniqueness', () => {
 		await hookFor({
 			scoped: true,
 			resolveScope: async () => 'tenant-a',
-			platformRead: async () => true,
+			crossScope: async () => true,
 		})({ data: { slug: 'demo' }, operation: 'create', req: fakeReq(find) } as never)
 		const where = JSON.stringify(find.mock.calls[0]?.[0]?.where)
 		expect(where).not.toContain('tenant-a')
@@ -254,5 +359,204 @@ describe('goals collection slug uniqueness', () => {
 		const find = vi.fn(async () => ({ docs: [] }))
 		await hookFor()({ data: {}, operation: 'update', req: fakeReq(find) } as never)
 		expect(find).not.toHaveBeenCalled()
+	})
+})
+
+describe('goals collection field overrides', () => {
+	// The list is the editor's own goals and nothing else: no explainer above it, no table of
+	// the built-in ones, which the goal picker already offers under their own heading.
+	it('opens on the list itself, with no description and nothing above the table', () => {
+		const collection = build()
+		expect(collection.admin?.description).toBeUndefined()
+		expect(collection.admin?.components).toBeUndefined()
+	})
+
+	it('puts enabled in the sidebar', () => {
+		const collection = build()
+		expect((deep(collection.fields, 'enabled') as CheckboxField).admin?.position).toBe('sidebar')
+	})
+
+	it('hands each override the plugin default and takes what it returns', () => {
+		const collection = build({
+			fields: {
+				name: ({ field }): Field => ({ ...(field as TextField), label: 'Conversion' }),
+				enabled: ({ field }): Field => ({ ...(field as CheckboxField), defaultValue: false }),
+			},
+		})
+		expect((deep(collection.fields, 'name') as TextField).label).toBe('Conversion')
+		expect((deep(collection.fields, 'enabled') as CheckboxField).defaultValue).toBe(false)
+	})
+
+	it('accepts a slug replaced by a sidebar row holding a hidden checkbox', () => {
+		const collection = build({
+			fields: {
+				slug: ({ field }): Field => ({
+					type: 'row',
+					admin: { position: 'sidebar' },
+					fields: [
+						{
+							name: 'generateSlug',
+							type: 'checkbox',
+							defaultValue: true,
+							admin: { hidden: true },
+						},
+						{
+							...(field as TextField),
+							admin: { components: { Field: { path: '@/fields/slug#SlugField' } } },
+						},
+					],
+				}),
+			},
+		})
+		// The replacement is a layout field, so it cannot share the name row and stands alone.
+		const row = collection.fields.find(
+			(field) => field.type === 'row' && field.admin?.position === 'sidebar'
+		)
+		expect(row).toBeDefined()
+		expect(deep(collection.fields, 'slug')).toBeDefined()
+		expect(deep(collection.fields, 'generateSlug')).toBeDefined()
+	})
+
+	it('still enforces kebab-case and uniqueness for a replaced slug field', async () => {
+		const collection = build({
+			fields: { slug: ({ field }): Field => ({ ...(field as TextField), validate: undefined }) },
+		})
+		const hook = collection.hooks?.beforeValidate?.[0] as (args: unknown) => Promise<unknown>
+		const find = vi.fn(async () => ({ docs: [] }))
+		await expect(
+			hook({ data: { slug: 'Book Demo' }, operation: 'create', req: fakeReq(find) })
+		).rejects.toThrow()
+		expect(find).not.toHaveBeenCalled()
+		await expect(
+			hook({ data: { slug: 'book-demo' }, operation: 'create', req: fakeReq(find) })
+		).resolves.toBeDefined()
+		expect(find).toHaveBeenCalledTimes(1)
+	})
+
+	it('fails the boot when a slug replacement drops the slug field', () => {
+		expect(() =>
+			build({ fields: { slug: (): Field => ({ name: 'handle', type: 'text' }) } })
+		).toThrow(/must return a field named "slug"/)
+	})
+})
+
+/** Every stored path in the tree: named groups nest, rows and collapsibles do not. */
+const dataPaths = (fields: Field[], prefix = ''): string[] =>
+	fields.flatMap((field) => {
+		if (field.type === 'group' && 'name' in field) {
+			return dataPaths(field.fields, `${prefix}${field.name}.`)
+		}
+		if ('name' in field) {
+			return [`${prefix}${field.name}`]
+		}
+		return 'fields' in field ? dataPaths(field.fields, prefix) : []
+	})
+
+const shown = (field: Field | undefined, data: Record<string, unknown> = {}): boolean =>
+	field?.admin?.condition?.(data, {}, {} as never) !== false
+
+describe('goals collection amount', () => {
+	const valueGroup = (collection: CollectionConfig) =>
+		named(collection.fields, 'value') as GroupField
+
+	it('stores what it always stored: value.fixed, value.prop and a top-level currency', () => {
+		const fields = build().fields
+		expect(dataPaths(fields)).toEqual([
+			'name',
+			'slug',
+			'enabled',
+			'browser',
+			'match.kind',
+			'match.name',
+			'match.pattern',
+			'value.fixed',
+			'value.prop',
+			'currency',
+			'scope',
+		])
+		expect((deep(fields, 'fixed') as NumberField).type).toBe('number')
+		expect((deep(fields, 'prop') as TextField).type).toBe('text')
+		expect((named(fields, 'currency') as TextField).type).toBe('text')
+	})
+
+	it('has no collapsible, and the value group no heading or gutter of its own', () => {
+		const collection = build()
+		expect(collection.fields.some((field) => field.type === 'collapsible')).toBe(false)
+		expect(valueGroup(collection).label).toBe(false)
+		expect(valueGroup(collection).admin?.hideGutter).toBe(true)
+	})
+
+	it('draws the amount as the Amount control, which edits the hidden top-level currency', () => {
+		const fields = build().fields
+		expect((deep(fields, 'fixed') as NumberField).admin?.components?.Field).toEqual({
+			path: '@10x-media/analytics/client#GoalAmountField',
+			clientProps: { currencyPath: '../currency' },
+		})
+		const currency = named(fields, 'currency') as TextField
+		// Hidden rather than disabled, so the form keeps its value and saves it.
+		expect(currency.admin?.hidden).toBe(true)
+		expect(currency.admin?.disabled).toBeUndefined()
+		expect(shown(currency)).toBe(true)
+	})
+
+	it('hands the control the reporting currency when the install has one fixed code', () => {
+		const fixed = deep(build({ defaultCurrency: 'EUR' }).fields, 'fixed') as NumberField
+		expect(fixed.admin?.components?.Field).toEqual({
+			path: '@10x-media/analytics/client#GoalAmountField',
+			clientProps: { currencyPath: '../currency', defaultCurrency: 'EUR' },
+		})
+	})
+
+	it('offers the amount inside the action for an action trigger only', () => {
+		const prop = deep(build().fields, 'prop')
+		expect(shown(prop, { match: { kind: 'event' } })).toBe(true)
+		expect(shown(prop, { match: { kind: 'goal' } })).toBe(false)
+		expect(shown(prop, { match: { kind: 'path' } })).toBe(false)
+		expect(shown(prop)).toBe(false)
+	})
+
+	it('hides the amount and its currency while the install measures no money', () => {
+		const off = build({ revenue: false })
+		expect(shown(valueGroup(off))).toBe(false)
+		expect(shown(named(off.fields, 'currency'))).toBe(false)
+		// Hidden rather than removed, so a goal that already carries an amount keeps it.
+		expect(dataPaths(off.fields)).toEqual(dataPaths(build().fields))
+		expect(valueGroup(build()).admin?.condition).toBeUndefined()
+	})
+
+	it('hands the value and currency overrides the defaults and keeps what they return', () => {
+		const handed: Field[] = []
+		const collection = build({
+			fields: {
+				value: ({ field }): Field => {
+					handed.push(field)
+					return { ...(field as GroupField), label: 'Worth' }
+				},
+				currency: ({ field }): Field => {
+					handed.push(field)
+					return { ...(field as TextField), defaultValue: 'EUR' }
+				},
+			},
+		})
+		const [value, currency] = handed
+		expect((deep([value as Field], 'fixed') as NumberField).admin?.components?.Field).toMatchObject(
+			{
+				path: '@10x-media/analytics/client#GoalAmountField',
+			}
+		)
+		expect((currency as TextField).admin?.hidden).toBe(true)
+		expect(valueGroup(collection).label).toBe('Worth')
+		expect((named(collection.fields, 'currency') as TextField).defaultValue).toBe('EUR')
+	})
+
+	it('lets a host replace the whole value group, and still hides it while money is off', () => {
+		const replacement = (): Field => ({
+			name: 'value',
+			type: 'group',
+			fields: [{ name: 'fixed', type: 'number' }],
+		})
+		const fixed = deep(build({ fields: { value: replacement } }).fields, 'fixed') as NumberField
+		expect(fixed.admin?.components?.Field).toBeUndefined()
+		expect(shown(valueGroup(build({ revenue: false, fields: { value: replacement } })))).toBe(false)
 	})
 })

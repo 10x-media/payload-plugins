@@ -23,6 +23,7 @@
 		"@10x-media/analytics": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/db-sqlite": "catalog:",
 		"@payloadcms/next": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"next": "catalog:",

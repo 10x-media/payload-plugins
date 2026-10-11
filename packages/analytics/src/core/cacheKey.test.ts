@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { buildCacheKey } from './cacheKey'
+import { buildCacheKey, buildRealtimeKey, type CacheKeyEpochs, keyedQuery } from './cacheKey'
 import type { AnalyticsQuery } from './contract'
+
+const epochs: CacheKeyEpochs = { config: '0', refresh: '0' }
 
 const base: AnalyticsQuery = {
 	path: '/pricing',
@@ -8,197 +10,147 @@ const base: AnalyticsQuery = {
 	dateRange: { start: new Date('2026-01-01'), end: new Date('2026-01-31') },
 }
 
+const key = (q: AnalyticsQuery, source = 'ga4', e: CacheKeyEpochs = epochs): string =>
+	buildCacheKey(source, q, e)
+
 describe('buildCacheKey', () => {
-	it('is stable regardless of metric order', () => {
-		const a = buildCacheKey('ga4', base)
-		const b = buildCacheKey('ga4', { ...base, metrics: ['visitors', 'pageviews'] })
-		expect(a).toBe(b)
-	})
-	it('differs by provider', () => {
-		expect(buildCacheKey('ga4', base)).not.toBe(buildCacheKey('plausible', base))
-	})
-	it('differs by path', () => {
-		expect(buildCacheKey('ga4', base)).not.toBe(buildCacheKey('ga4', { ...base, path: '/about' }))
-	})
-	it('uses "site" when path is omitted', () => {
-		const { path: _path, ...siteWide } = base
-		expect(buildCacheKey('ga4', siteWide)).toContain('site')
-	})
-	it('differs by sort order', () => {
-		const asc = buildCacheKey('ga4', { ...base, order: { metric: 'pageviews', direction: 'asc' } })
-		const desc = buildCacheKey('ga4', {
-			...base,
-			order: { metric: 'pageviews', direction: 'desc' },
-		})
-		expect(asc).not.toBe(desc)
-	})
-	it('is stable for two reads on the same UTC day with different sub-day ends', () => {
-		const a = buildCacheKey('native', {
-			metrics: ['pageviews'],
-			dateRange: {
-				start: new Date('2026-06-01T00:00:00.000Z'),
-				end: new Date('2026-06-23T08:00:00.000Z'),
-			},
-		})
-		const b = buildCacheKey('native', {
-			metrics: ['pageviews'],
-			dateRange: {
-				start: new Date('2026-06-01T00:00:00.000Z'),
-				end: new Date('2026-06-23T19:45:12.913Z'),
-			},
-		})
-		expect(a).toBe(b)
-	})
-	it('differs once the end crosses into the next UTC day', () => {
-		const a = buildCacheKey('native', {
-			metrics: ['pageviews'],
-			dateRange: {
-				start: new Date('2026-06-01T00:00:00.000Z'),
-				end: new Date('2026-06-23T23:00:00.000Z'),
-			},
-		})
-		const b = buildCacheKey('native', {
-			metrics: ['pageviews'],
-			dateRange: {
-				start: new Date('2026-06-01T00:00:00.000Z'),
-				end: new Date('2026-06-24T01:00:00.000Z'),
-			},
-		})
-		expect(a).not.toBe(b)
-	})
-	it('keys a closed window on its exact bounds', () => {
-		const key = buildCacheKey('native', {
-			metrics: ['pageviews'],
-			timezone: 'Europe/Berlin',
-			dateRange: {
-				start: new Date('2026-05-31T22:00:00.000Z'),
-				end: new Date('2026-06-23T21:59:59.999Z'),
-			},
-		})
-		expect(key).toContain('2026-05-31T22:00:00.000Z_2026-06-23T21:59:59.999Z')
-	})
-	it('separates a closed window from the narrower one that snapped to the same day', () => {
-		// The picker's raw local-midnight instants and the inclusive window they now resolve
-		// to both end on Jun 23 in Berlin; a day-snapped key served the narrow answer for both.
-		const stored = buildCacheKey('native', {
-			metrics: ['pageviews'],
-			timezone: 'Europe/Berlin',
-			dateRange: {
-				start: new Date('2026-05-31T22:00:00.000Z'),
-				end: new Date('2026-06-22T22:00:00.000Z'),
-			},
-		})
-		const inclusive = buildCacheKey('native', {
-			metrics: ['pageviews'],
-			timezone: 'Europe/Berlin',
-			dateRange: {
-				start: new Date('2026-05-31T22:00:00.000Z'),
-				end: new Date('2026-06-23T21:59:59.999Z'),
-			},
-		})
-		expect(inclusive).not.toBe(stored)
-	})
-	it('reads "closed" in the query timezone, not in UTC', () => {
-		const range = {
-			start: new Date('2026-05-31T22:00:00.000Z'),
-			end: new Date('2026-06-23T21:59:59.999Z'),
+	it('is r: and a 43-character base64url digest, whatever the query holds', () => {
+		const long = key({ ...base, path: `/${'a'.repeat(5_000)}`, scope: 'x|y:z' })
+		for (const k of [key(base), long]) {
+			expect(k).toMatch(/^r:[A-Za-z0-9_-]{43}$/)
 		}
-		// The same instant ends a Berlin day but falls mid-day in UTC, which still snaps.
-		expect(buildCacheKey('native', { metrics: ['pageviews'], dateRange: range })).toContain(
-			'2026-06-24T00:00:00.000Z'
-		)
-	})
-	it('writes the unscoped key in its documented segment order', () => {
-		expect(buildCacheKey('ga4', base)).toBe(
-			'analytics|e0|ga4|_|/pricing|pageviews,visitors||2026-01-01T00:00:00.000Z_2026-02-01T00:00:00.000Z|_||_|_'
-		)
 	})
 
-	it('writes the epoch segment right after the namespace', () => {
+	it('is stable regardless of the order of every set and of the query keys', () => {
+		const shuffled: AnalyticsQuery = {
+			dateRange: base.dateRange,
+			metrics: ['visitors', 'pageviews'],
+			path: '/pricing',
+		}
+		expect(key(shuffled)).toBe(key(base))
+		const filtered = (order: 'ab' | 'ba'): AnalyticsQuery => {
+			const a = { dimension: 'country' as const, operator: 'eq' as const, value: 'DE' }
+			const b = { operator: 'contains' as const, value: 'blog', dimension: 'page' as const }
+			return {
+				...base,
+				dimensions: order === 'ab' ? ['page', 'country'] : ['country', 'page'],
+				filters: order === 'ab' ? [a, b] : [b, a],
+				goalSlugs: order === 'ab' ? ['signup', 'purchase'] : ['purchase', 'signup'],
+			}
+		}
+		expect(key(filtered('ab'))).toBe(key(filtered('ba')))
+	})
+
+	it('reads a repeated member of a set once', () => {
+		expect(key({ ...base, metrics: ['pageviews', 'visitors', 'pageviews'] })).toBe(key(base))
+	})
+
+	it('differs by source, path, order and every epoch', () => {
+		const all = [
+			key(base),
+			key(base, 'plausible'),
+			key({ ...base, path: '/about' }),
+			key({ ...base, order: { metric: 'pageviews', direction: 'asc' } }),
+			key({ ...base, order: { metric: 'pageviews', direction: 'desc' } }),
+			key(base, 'ga4', { config: 'c1', refresh: '0' }),
+			key(base, 'ga4', { config: '0', refresh: 'c1' }),
+			key({ ...base, limit: 10 }),
+			key({ ...base, granularity: 'day' }),
+		]
+		expect(new Set(all).size).toBe(all.length)
+	})
+
+	// Each pair shared one key under the delimited format the plugin wrote before.
+	it('keys apart queries a delimited format would collide', () => {
+		const { path: _path, ...siteWide } = base
+		expect(key(siteWide)).not.toBe(key({ ...base, path: 'site' }))
+		expect(key(base)).not.toBe(key({ ...base, hostname: '_' }))
 		expect(
-			buildCacheKey('ga4', base, { epoch: 'mfa1-9c2b' }).startsWith('analytics|emfa1-9c2b|ga4|')
-		).toBe(true)
-	})
-
-	it("reads an absent epoch as '0', so one key format covers every caller", () => {
-		expect(buildCacheKey('ga4', base)).toBe(buildCacheKey('ga4', base, { epoch: '0' }))
-	})
-
-	it('never lets two epochs share an entry', () => {
-		const keys = new Set(
-			['0', 'mfa1-aaaa', 'mfa1-bbbb', 'mfa2-aaaa'].map((e) =>
-				buildCacheKey('ga4', base, { epoch: e })
-			)
+			key({ ...base, filters: [{ dimension: 'country', operator: 'eq', value: 'DE;pageeqx' }] })
+		).not.toBe(
+			key({
+				...base,
+				filters: [
+					{ dimension: 'country', operator: 'eq', value: 'DE' },
+					{ dimension: 'page', operator: 'eq', value: 'x' },
+				],
+			})
 		)
-		expect(keys.size).toBe(4)
-	})
-
-	// The segment sits at a fixed position, so an adapter whose id reads like an epoch
-	// still keys apart from the epoch of that token.
-	it('cannot confuse an epoch with a provider id', () => {
-		expect(buildCacheKey('e5', base, { epoch: '0' })).not.toBe(
-			buildCacheKey('e0', base, { epoch: '5' })
-		)
-	})
-	it('partitions the key by scope', () => {
-		const unscoped = buildCacheKey('ga4', base)
-		const a = buildCacheKey('ga4', { ...base, scope: 'tenant-a' })
-		const b = buildCacheKey('ga4', { ...base, scope: 'tenant-b' })
-		expect(a).not.toBe(unscoped)
-		expect(a).not.toBe(b)
-		expect(a).toBe(buildCacheKey('ga4', { ...base, scope: 'tenant-a' }))
-	})
-	it('encodes scope values so a delimiter cannot forge another key segment', () => {
-		expect(buildCacheKey('ga4', { ...base, scope: 'a|b' }).endsWith('|a%7Cb')).toBe(true)
-	})
-	it('keeps the key unchanged for an explicit UTC timezone', () => {
-		expect(buildCacheKey('ga4', { ...base, timezone: 'UTC' })).toBe(buildCacheKey('ga4', base))
-	})
-	it('partitions the key by a non-UTC timezone', () => {
-		const utc = buildCacheKey('ga4', base)
-		const berlin = buildCacheKey('ga4', { ...base, timezone: 'Europe/Berlin' })
-		expect(berlin).not.toBe(utc)
-		expect(berlin).toContain('Europe/Berlin')
-	})
-	it('orders the timezone segment before the scope segment', () => {
-		const key = buildCacheKey('ga4', { ...base, timezone: 'Europe/Berlin', scope: 'tenant-a' })
-		expect(key.endsWith('|Europe/Berlin|tenant-a')).toBe(true)
-	})
-	it('partitions the key by the goal hint, which decides what rows a provider returns', () => {
-		const none = buildCacheKey('plausible', base)
-		const one = buildCacheKey('plausible', { ...base, goalSlugs: ['signup'] })
-		const two = buildCacheKey('plausible', { ...base, goalSlugs: ['signup', 'purchase'] })
-		expect(one).not.toBe(none)
-		expect(one).not.toBe(two)
-		expect(two).toBe(buildCacheKey('plausible', { ...base, goalSlugs: ['purchase', 'signup'] }))
-	})
-
-	it('keeps the key unchanged for a scope with no goals, which asks for the same rows', () => {
-		expect(buildCacheKey('plausible', { ...base, goalSlugs: [] })).toBe(
-			buildCacheKey('plausible', base)
+		expect(key(base, 'e5', { config: '0', refresh: '0' })).not.toBe(
+			key(base, 'e0', { config: '0', refresh: '5' })
 		)
 	})
 
-	// A failed resolver answers no goal rows; sharing the healthy key would serve that
-	// degraded answer to every later read until it expired.
-	it('keys a failed goal resolver apart from every healthy hint', () => {
-		const unresolved = buildCacheKey('plausible', { ...base, goalSlugs: 'unresolved' })
-		expect(unresolved).not.toBe(buildCacheKey('plausible', { ...base, goalSlugs: [] }))
-		expect(unresolved).not.toBe(buildCacheKey('plausible', base))
-		expect(unresolved).not.toBe(buildCacheKey('plausible', { ...base, goalSlugs: ['signup'] }))
-		expect(unresolved.endsWith('|goals:!unresolved')).toBe(true)
+	it('partitions by scope, timezone, item and goal hint', () => {
+		const all = [
+			key(base),
+			key({ ...base, scope: 'tenant-a' }),
+			key({ ...base, scope: 'tenant-b' }),
+			key({ ...base, timezone: 'Europe/Berlin' }),
+			key({ ...base, scope: 'Europe/Berlin' }),
+			key({ ...base, item: 'offers:1' }),
+			key({ ...base, item: 'offers:2' }),
+			key({ ...base, goalSlugs: ['signup'] }),
+			key({ ...base, goalSlugs: ['signup', 'purchase'] }),
+			key({ ...base, goalSlugs: 'unresolved' }),
+			key({ ...base, goalSlugs: ['unresolved'] }),
+		]
+		expect(new Set(all).size).toBe(all.length)
 	})
 
-	// `unresolved` is a legal goal slug, so a sentinel spelled like one would hand a scope
-	// that configured that goal the degraded answer of a scope whose resolver failed.
-	it('keys a goal named "unresolved" apart from the failed-resolver sentinel', () => {
-		expect(buildCacheKey('plausible', { ...base, goalSlugs: ['unresolved'] })).not.toBe(
-			buildCacheKey('plausible', { ...base, goalSlugs: 'unresolved' })
+	it('keys an explicit UTC and an empty goal hint like their absence, which ask the same', () => {
+		expect(key({ ...base, timezone: 'UTC' })).toBe(key(base))
+		expect(key({ ...base, goalSlugs: [] })).toBe(key(base))
+		expect(key({ ...base, dimensions: [], filters: [] })).toBe(key(base))
+	})
+
+	it('shares one entry between two reads of the same UTC day with different ends', () => {
+		const read = (end: string) =>
+			key({
+				metrics: ['pageviews'],
+				dateRange: { start: new Date('2026-06-01T00:00:00.000Z'), end: new Date(end) },
+			})
+		expect(read('2026-06-23T08:00:00.000Z')).toBe(read('2026-06-23T19:45:12.913Z'))
+		expect(read('2026-06-23T23:00:00.000Z')).not.toBe(read('2026-06-24T01:00:00.000Z'))
+	})
+
+	it('keys a closed window on its exact bounds, in the query timezone', () => {
+		const berlin = (end: string) =>
+			keyedQuery({
+				metrics: ['pageviews'],
+				timezone: 'Europe/Berlin',
+				dateRange: { start: new Date('2026-05-31T22:00:00.000Z'), end: new Date(end) },
+			}).window
+		expect(berlin('2026-06-23T21:59:59.999Z')).toBe(
+			'2026-05-31T22:00:00.000Z_2026-06-23T21:59:59.999Z'
 		)
+		// The picker's raw local midnight snaps; the inclusive window it resolves to does not.
+		expect(berlin('2026-06-22T22:00:00.000Z')).not.toBe(berlin('2026-06-23T21:59:59.999Z'))
+		const utc = keyedQuery({
+			metrics: ['pageviews'],
+			dateRange: {
+				start: new Date('2026-05-31T22:00:00.000Z'),
+				end: new Date('2026-06-23T21:59:59.999Z'),
+			},
+		}).window
+		expect(utc).toBe('2026-05-31T00:00:00.000Z_2026-06-24T00:00:00.000Z')
 	})
+})
 
-	it('two instance ids of one provider type produce distinct keys', () => {
-		const q = base
-		expect(buildCacheKey('posthog:a', q)).not.toBe(buildCacheKey('posthog:b', q))
+describe('buildRealtimeKey', () => {
+	const parts = { metric: 'visitors', windowMinutes: 30, series: true }
+
+	it('keys every part and epoch apart, under its own prefix', () => {
+		const all = [
+			buildRealtimeKey('native', parts, epochs),
+			buildRealtimeKey('native', { ...parts, windowMinutes: 5 }, epochs),
+			buildRealtimeKey('native', { ...parts, scope: 'a' }, epochs),
+			buildRealtimeKey('native', { ...parts, path: '/a' }, epochs),
+			buildRealtimeKey('native', { ...parts, series: false }, epochs),
+			buildRealtimeKey('native', parts, { config: '0', refresh: '1' }),
+			buildRealtimeKey('plausible', parts, epochs),
+		]
+		expect(new Set(all).size).toBe(all.length)
+		expect(all[0]).toMatch(/^rt:[A-Za-z0-9_-]{43}$/)
 	})
 })

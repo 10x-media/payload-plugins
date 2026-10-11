@@ -1,11 +1,9 @@
 import { parseDayOrInstant } from '../query/dates'
 import { MAX_QUERY_RANGE_DAYS } from '../query/limits'
+import { DAY_MS } from '../timeframe/tz'
 import { formatRangeCaption } from '../widgets/range'
 import type { DayRange } from './gating'
 
-const DAY_MS = 86_400_000
-
-/** Epoch ms of a `YYYY-MM-DD` day read as UTC, or null when it is not one. */
 const dayValue = (day: string): number | null => {
 	const ms = Date.parse(`${day}T00:00:00.000Z`)
 	return Number.isNaN(ms) ? null : ms
@@ -24,10 +22,8 @@ export const dayRangeDays = (range: DayRange): number => {
 }
 
 /**
- * The nearest window the source and the endpoint can both serve, keeping the bound the
- * admin just picked and moving the other one. A window longer than the source's lookback
- * would answer for a shorter span than the picker shows, and one past the endpoint's own
- * cap would not answer at all.
+ * Nearest window source and endpoint both serve, keeping the bound just picked. Past the lookback
+ * it would answer a shorter span than the picker shows; past the endpoint cap, nothing.
  */
 export const clampDayRange = (
 	range: DayRange,
@@ -45,7 +41,7 @@ export const clampDayRange = (
 			? { from: range.from, to: range.from }
 			: { from: range.to, to: range.to }
 	}
-	if (Math.round((to - from) / DAY_MS) + 1 <= cap) {
+	if (dayRangeDays(range) <= cap) {
 		return range
 	}
 	return edited === 'from'
@@ -54,9 +50,8 @@ export const clampDayRange = (
 }
 
 /**
- * Caption for a day window, rendered in the reporting timezone the days are read in. Falls
- * back to the raw days when a bound names no calendar day, so a hand-edited URL captions
- * what it asked for rather than rendering `Invalid Date`.
+ * Caption in the reporting timezone; raw days when a bound names no calendar day, so a hand-edited
+ * URL captions what it asked for rather than `Invalid Date`.
  */
 export const dayRangeCaption = (range: DayRange, locale: string, timezone: string): string => {
 	const start = parseDayOrInstant(range.from, { timezone, edge: 'start' })

@@ -1,72 +1,27 @@
+import { expect, type Page, test } from '@playwright/test'
 import {
-	type APIRequestContext,
-	type BrowserContext,
-	expect,
-	type Page,
-	test,
-} from '@playwright/test'
-
-const PLATFORM = { email: 'dev@10xmedia.de', password: 'password' }
-
-interface DocumentRead {
-	status: string
-	metrics?: { pageviews?: number; conversions?: number; revenue?: number }
-}
-
-const login = async (
-	request: APIRequestContext,
-	credentials: { email: string; password: string }
-): Promise<void> => {
-	const res = await request.post('/api/users/login', { data: credentials })
-	expect(res.ok(), `login as ${credentials.email}`).toBeTruthy()
-}
-
-const docIdBySlug = async (request: APIRequestContext, slug: string): Promise<string> => {
-	const res = await request.get(`/api/pages?where[slug][equals]=${slug}&depth=0&limit=1`)
-	expect(res.ok(), `lookup page "${slug}"`).toBeTruthy()
-	const { docs } = (await res.json()) as { docs: Array<{ id: string | number }> }
-	const id = docs[0]?.id
-	expect(id, `page "${slug}" seeded`).toBeDefined()
-	return String(id)
-}
-
-const readDocument = async (
-	request: APIRequestContext,
-	id: string,
-	metrics: string
-): Promise<DocumentRead> => {
-	const res = await request.get(
-		`/api/analytics/document?collection=pages&id=${id}&metrics=${metrics}`
-	)
-	expect(res.ok(), 'document analytics read').toBeTruthy()
-	return (await res.json()) as DocumentRead
-}
-
-const ingested = (page: Page): Promise<unknown> =>
-	page.waitForResponse(
-		(res) => res.url().includes('/api/analytics/ingest') && res.request().method() === 'POST'
-	)
+	docIdBySlug,
+	ingested,
+	localOrigin,
+	login,
+	readDocument,
+	setTenantCookie,
+	tenantId,
+} from './helpers'
 
 /**
- * Converts twice on the home page, then leaves for `/thank-you`. The two buttons cover both
- * ways an event reaches the tracker: the CTA's `data-analytics-goal` attribute through
- * auto-capture, and a `useAnalytics().track` call from a client component with no provider
- * above it. Both go out immediately; the pageview only on the navigation's `pagehide`.
- *
- * Waiting on the ingest responses rather than polling a read is deliberate: an aggregate
- * read is cached for the adapter's TTL, so a read taken one moment too early would pin an
- * empty answer in the cache for minutes and no amount of retrying would recover it.
+ * Converts through auto-capture and a provider-less `useAnalytics().track`, awaiting each beacon
+ * rather than polling a read: one taken too early pins an empty answer in the cache for minutes.
  */
 const visitAndConvert = async (page: Page, origin = ''): Promise<void> => {
+	const pageview = ingested(page)
 	await page.goto(`${origin}/`)
+	await pageview
 	for (const name of ['Book a demo', 'Sign up']) {
 		const sent = ingested(page)
 		await page.getByRole('button', { name }).click()
 		await sent
 	}
-	const pageview = ingested(page)
-	await page.goto(`${origin}/thank-you`)
-	await pageview
 }
 
 test('a frontend visit and two goal clicks land as a pageview and conversions', async ({
@@ -74,7 +29,7 @@ test('a frontend visit and two goal clicks land as a pageview and conversions', 
 }) => {
 	await visitAndConvert(page)
 
-	await login(page.request, PLATFORM)
+	await login(page.request)
 	const home = await docIdBySlug(page.request, 'home')
 	const read = await readDocument(page.request, home, 'pageviews,conversions')
 	expect(read.status).toBe('ok')
@@ -82,83 +37,77 @@ test('a frontend visit and two goal clicks land as a pageview and conversions', 
 	// One per button: the attribute goal and the tracked `signup` event.
 	expect(read.metrics?.conversions ?? 0).toBeGreaterThanOrEqual(2)
 
-	const realtime = await page.request.get('/api/analytics/realtime?metric=pageviews')
+	const realtime = await page.request.get('/api/_x/live?metric=pageviews')
 	expect(realtime.ok()).toBeTruthy()
 	const { activeNow } = (await realtime.json()) as { activeNow: number }
 	expect(activeNow).toBeGreaterThanOrEqual(1)
 })
 
-test('the exclusion link stops beacons in this browser until it is cleared', async ({ page }) => {
+test('the signed exclusion link stops beacons in this browser until it is cleared', async ({
+	page,
+}) => {
+	await login(page.request)
+	const link = await page.request.get('/api/_x/exclusion')
+	expect(link.ok(), 'exclusion link').toBeTruthy()
+	const { param, token } = (await link.json()) as { param: string; token: string }
+
 	const posts: string[] = []
 	page.on('request', (req) => {
-		if (req.method() === 'POST' && req.url().includes('/api/analytics/ingest')) {
+		if (req.method() === 'POST' && req.url().includes('/api/_x/e')) {
 			posts.push(req.url())
 		}
 	})
 
-	await page.goto('/?analytics_exclude=1')
-	// The tracker reads the parameter and leaves the address bar alone, so the link a staff
-	// member was given still reads as the page they asked for.
-	expect(page.url()).toContain('analytics_exclude=1')
+	// A link anyone could type is not the token, so the visit counts. The parameter still leaves
+	// the address, which happens as it is read and before any check.
+	const forged = ingested(page)
+	await page.goto(`/?${param}=1`)
+	await forged
+	await expect(page).not.toHaveURL(new RegExp(param))
+
+	posts.length = 0
+	await page.goto(`/?${param}=${token}`)
+	// The tracker takes a valid link out of the address once it has checked it, so a copied
+	// address or a screenshot does not pass the token on.
+	await expect(page).not.toHaveURL(new RegExp(param))
 	await page.getByRole('button', { name: 'Book a demo' }).click()
-	// The navigation is the barrier: a pageview held for its duration is flushed on
-	// `pagehide`, and the goal click above would already have gone out on its own.
+	// The navigation is the barrier: the goal would have gone out on the click, and the page's
+	// engagement on `pagehide`, all before the next page has loaded.
 	await page.goto('/thank-you')
 	expect(posts, 'no beacon while excluded').toEqual([])
 
-	await page.goto('/?analytics_exclude=0')
 	const resumed = ingested(page)
-	await page.goto('/thank-you')
+	await page.goto(`/?${param}=0`)
 	await resumed
 	// Only the cleared visit can have sent anything: the excluded pages were checked above
 	// and this beacon is ordered after them in the same browser.
 	expect(posts.length, 'beacons resume once the flag is cleared').toBeGreaterThanOrEqual(1)
+	await expect(page).not.toHaveURL(new RegExp(param))
 })
 
 test('@tenancy an anonymous visit is attributed to the hostname tenant', async ({
 	browser,
 	baseURL,
 }) => {
-	// Chromium resolves every *.localhost name to loopback, so the dev app's hostname
-	// scope resolver sees a real tenant subdomain without any DNS or hosts-file setup.
-	const port = new URL(baseURL ?? 'http://localhost:3100').port
 	const visitor = await browser.newContext()
 	const visitorPage = await visitor.newPage()
-	await visitAndConvert(visitorPage, `http://alpha.localhost:${port}`)
+	await visitAndConvert(visitorPage, localOrigin(baseURL, 'alpha'))
 	await visitor.close()
 
 	const admin = await browser.newContext()
-	await login(admin.request, PLATFORM)
+	await login(admin.request)
 	const home = await docIdBySlug(admin.request, 'home')
-
-	const tenantsRes = await admin.request.get('/api/tenants?depth=0&limit=10')
-	expect(tenantsRes.ok()).toBeTruthy()
-	const { docs: tenants } = (await tenantsRes.json()) as {
-		docs: Array<{ id: string | number; slug: string }>
-	}
-	const idOf = (slug: string): string => {
-		const id = tenants.find((t) => t.slug === slug)?.id
-		expect(id, `tenant "${slug}" seeded`).toBeDefined()
-		return String(id)
-	}
 
 	// The platform admin reads any scope it selects, so one session can check both sides of
 	// the boundary: the conversion belongs to alpha and must not appear under beta.
-	const selectTenant = async (context: BrowserContext, id: string): Promise<void> => {
-		await context.addCookies([
-			{ name: 'payload-tenant', value: id, url: baseURL ?? 'http://localhost:3100' },
-		])
-	}
-
-	await selectTenant(admin, idOf('alpha'))
+	await setTenantCookie(admin, await tenantId(admin.request, 'alpha'), localOrigin(baseURL))
 	const alphaRead = await readDocument(admin.request, home, 'pageviews,conversions')
 	expect(alphaRead.status).toBe('ok')
 	expect(alphaRead.metrics?.conversions ?? 0).toBeGreaterThanOrEqual(2)
 
-	// Beta has its own seeded traffic on this path, so its pageviews are the proof the read
-	// reached data at all: a scope that answered with nothing would pass a bare `conversions
-	// === 0` vacuously.
-	await selectTenant(admin, idOf('beta'))
+	// Beta's seeded pageviews on this path prove the read reached data: an empty scope would
+	// pass a bare `conversions === 0` vacuously.
+	await setTenantCookie(admin, await tenantId(admin.request, 'beta'), localOrigin(baseURL))
 	const betaRead = await readDocument(admin.request, home, 'pageviews,conversions')
 	expect(betaRead.status).toBe('ok')
 	expect(betaRead.metrics).toBeDefined()

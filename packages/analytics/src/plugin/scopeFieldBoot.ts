@@ -10,31 +10,32 @@ const hasField = (fields: Field[], name: string): boolean =>
 			return hasField(field.fields, name)
 		}
 		if ('tabs' in field) {
-			return field.tabs.some(
-				(tab) => !('name' in tab && tab.name) && hasField(tab.fields as Field[], name)
-			)
+			return field.tabs.some((tab) => !('name' in tab && tab.name) && hasField(tab.fields, name))
 		}
 		return false
 	})
 
-export interface ValidateScopeFieldArgs {
+interface ValidateScopeFieldArgs {
 	/** Option path quoted in the error, e.g. `goals.collection.scopeField`. */
 	option: string
 	slug: string
 	scopeField: string
+	/** What the error tells the host to do instead; defaults to the plugin collections' advice. */
+	remedy?: string
 }
 
 /**
- * Fails the boot when a `scopeField` the plugin does not own never materialized on the
- * collection. A tenant plugin registers its field after this plugin runs, so the check
- * waits for the assembled config at init rather than guessing at config time.
+ * Fails boot when a `scopeField` the plugin does not own never materialized. Checked at init
+ * because a tenant plugin registers its field after this plugin runs.
  */
 export const validateScopeField = (payload: Payload, args: ValidateScopeFieldArgs): void => {
 	const collection = payload.config.collections.find((c) => c.slug === args.slug)
 	if (!collection || hasField(collection.fields, args.scopeField)) {
 		return
 	}
+	const remedy =
+		args.remedy ?? 'register the collection with your tenant plugin or use the default scope field'
 	throw new Error(
-		`analytics: ${args.option} "${args.scopeField}" does not exist on ${args.slug}; register the collection with your tenant plugin or use the default scope field`
+		`analytics: ${args.option} "${args.scopeField}" does not exist on ${args.slug}; ${remedy}`
 	)
 }

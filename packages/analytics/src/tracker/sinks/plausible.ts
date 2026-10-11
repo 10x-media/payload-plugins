@@ -1,15 +1,17 @@
-import type { Sink, TrackerWindow } from '../types'
+import type { Sink } from '../types'
 import {
 	createVendorSink,
+	itemProps,
+	orderProps,
 	type VendorSinkArgs,
 	vendorEventName,
+	vendorGlobal,
 	vendorStorageExclusion,
 } from './vendor'
 
 /**
  * Plausible's own opt-out flag, which its script checks before every event
- * (https://plausible.io/docs/excluding-localstorage). Set it and the script logs
- * "Ignoring Event: localStorage flag" instead of counting the visit.
+ * (https://plausible.io/docs/excluding-localstorage).
  */
 export const PLAUSIBLE_IGNORE_KEY = 'plausible_ignore'
 
@@ -18,23 +20,21 @@ interface PlausibleOptions {
 	revenue?: { amount: number; currency?: string }
 }
 
-type PlausibleWindow = TrackerWindow & {
-	plausible?: (name: string, options?: PlausibleOptions) => void
-}
+type Plausible = (name: string, options?: PlausibleOptions) => void
 
 /**
- * Forwards events and goals to the `plausible` queue function. Revenue uses Plausible's
- * documented ecommerce shape, `{ revenue: { amount, currency } }`
- * (https://plausible.io/docs/ecommerce-revenue-tracking). The per-site snippet publishes the
- * `plausible.q` stub, so calls made before the tracker loads are replayed by it.
+ * Forwards events and goals to the `plausible` queue, revenue in its ecommerce shape. Props are
+ * scalars, so a sale's lines are left out and its order id travels as the `orderId` prop.
  */
-export const createPlausibleSink = (args: VendorSinkArgs): Sink =>
-	createVendorSink(args, {
+export const createPlausibleSink = (args: VendorSinkArgs): Sink => {
+	const plausible = () => vendorGlobal<Plausible>(args.win, 'plausible')
+	return createVendorSink(args, {
 		exclude: vendorStorageExclusion(args.win, PLAUSIBLE_IGNORE_KEY, 'true'),
-		has: () => typeof (args.win as PlausibleWindow).plausible === 'function',
+		has: () => typeof plausible() === 'function',
 		dispatch: (event) => {
+			const props = { ...event.props, ...orderProps(event), ...itemProps(event) }
 			const options: PlausibleOptions = {
-				...(event.props ? { props: event.props } : {}),
+				...(Object.keys(props).length > 0 ? { props } : {}),
 				...(event.value === undefined
 					? {}
 					: {
@@ -44,6 +44,7 @@ export const createPlausibleSink = (args: VendorSinkArgs): Sink =>
 							},
 						}),
 			}
-			;(args.win as PlausibleWindow).plausible?.(vendorEventName(event), options)
+			plausible()?.(vendorEventName(event), options)
 		},
 	})
+}

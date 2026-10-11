@@ -1,41 +1,40 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { Endpoint, PayloadRequest, TypedUser } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { readForField } from '../../src/fields/readForDocument'
 import { analytics } from '../../src/index'
-import { flushBatch } from '../../src/native/ingest/flushBatch'
-import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
-import { CHANNEL_TAXONOMY_VERSION } from '../../src/native/ingest/source'
+import type { NormalizedEvent } from '../../src/native/ingest/normalizeEvent'
 import { native } from '../../src/native/nativeAdapter'
-import { DOCUMENT_PATH } from '../../src/plugin/paths'
+import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
+import { DAY_MS } from '../../src/timeframe/tz'
+import { callEndpoint } from './endpointHelpers'
+import { storeEvents } from './nativeHelpers'
+import { readerRequest } from './readerRequest'
 
-// Anchored to the real clock because the endpoint resolves its own `now`; the seeded
-// offsets keep 2 views in the current 7-day window and 1 in the window before it at
-// any time of day.
+const routes = routePaths(DEFAULT_ROUTE_BASE)
+
+// Real clock because the endpoint resolves its own `now`; seeded offsets keep 2 views in the
+// current 7-day window and 1 in the window before it at any time of day.
 const NOW = new Date()
-const DAY_MS = 86_400_000
 
-const pageview = (daysAgo: number, visitor: string): StoredEvent => ({
+const pageview = (daysAgo: number, visitorId: string): NormalizedEvent => ({
 	timestamp: new Date(NOW.getTime() - daysAgo * DAY_MS),
 	type: 'pageview',
 	path: '/about',
 	hostname: 'example.com',
-	visitorHash: visitor,
-	sessionId: `${visitor}-s`,
+	visitorId,
 	durationMs: 30_000,
-	channel: 'direct',
-	channelVersion: CHANNEL_TAXONOMY_VERSION,
 })
 
 describeForDb('document analytics endpoint', {}, (db) => {
 	let booted: BootedPayload
 	let pageId: string
-	const fakeUser = { id: 'test-user', collection: 'users' } as unknown as TypedUser
+	const fakeUser = { id: 'test-user', collection: 'users' }
 
 	beforeAll(async () => {
 		booted = await bootPayload({
 			plugin: analytics({
 				adapters: [native()],
+				capture: { gate: 'off' },
 				collections: { pages: { path: (doc) => (doc.slug ? `/${doc.slug as string}` : null) } },
 			}),
 			db,
@@ -55,30 +54,15 @@ describeForDb('document analytics endpoint', {}, (db) => {
 		})
 		pageId = String((page as { id: string | number }).id)
 		// Current 7-day window: 2 views; the 7 days before: 1 view.
-		await flushBatch(booted.payload, [pageview(1, 'a'), pageview(2, 'b'), pageview(9, 'c')])
+		await storeEvents(booted.payload, [pageview(1, 'a'), pageview(2, 'b'), pageview(9, 'c')])
 	})
 
 	afterAll(async () => {
 		await booted.stop()
 	})
 
-	const handler = () => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === DOCUMENT_PATH
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('document endpoint not registered')
-		}
-		return endpoint.handler
-	}
-
-	const call = async (query: string, user?: TypedUser): Promise<Response> =>
-		handler()({
-			payload: booted.payload,
-			user,
-			url: `http://localhost/api${DOCUMENT_PATH}?${query}`,
-			headers: new Headers(),
-		} as unknown as PayloadRequest)
+	const call = (query: string, user?: typeof fakeUser): Promise<Response> =>
+		callEndpoint(booted.payload, { path: routes.document, query, user })
 
 	it(`rejects anonymous requests on ${db}`, async () => {
 		const res = await call(`collection=pages&id=${pageId}`)
@@ -134,42 +118,27 @@ describeForDb('document analytics endpoint', {}, (db) => {
 		expect(body.timezone).toBe('UTC')
 	})
 
-	it(`readForField reports the resolved reporting timezone on ${db}`, async () => {
-		const req = { payload: booted.payload } as unknown as PayloadRequest
-		const res = await readForField({
-			req,
+	const readAbout = (extra: { compare?: boolean; series?: boolean } = {}) =>
+		readForField({
+			req: readerRequest(booted.payload),
 			collectionSlug: 'pages',
 			data: { id: pageId, slug: 'about' },
 			metrics: ['pageviews'],
 			timeframe: 'last7days',
 			now: NOW,
+			...extra,
 		})
+
+	it(`readForField reports the resolved reporting timezone on ${db}`, async () => {
+		const res = await readAbout()
 		expect(res.timezone).toBe('UTC')
 	})
 
 	it(`readForField omits comparison and series unless requested on ${db}`, async () => {
-		const doc = { id: pageId, slug: 'about' }
-		const req = { payload: booted.payload } as unknown as PayloadRequest
-		const plain = await readForField({
-			req,
-			collectionSlug: 'pages',
-			data: doc,
-			metrics: ['pageviews'],
-			timeframe: 'last7days',
-			now: NOW,
-		})
+		const plain = await readAbout()
 		expect(plain.previousMetrics).toBeUndefined()
 		expect(plain.points).toBeUndefined()
-		const rich = await readForField({
-			req,
-			collectionSlug: 'pages',
-			data: doc,
-			metrics: ['pageviews'],
-			timeframe: 'last7days',
-			now: NOW,
-			compare: true,
-			series: true,
-		})
+		const rich = await readAbout({ compare: true, series: true })
 		expect(rich.metrics.pageviews).toBe(2)
 		expect(rich.previousMetrics?.pageviews).toBe(1)
 		expect(rich.points?.length).toBeGreaterThan(0)

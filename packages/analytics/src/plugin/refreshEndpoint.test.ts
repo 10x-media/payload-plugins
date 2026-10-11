@@ -1,5 +1,6 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
+import { allCrossScope } from '../core/options'
 import { createRegistry } from '../core/registry'
 import type { EpochStore } from '../surfacing/epoch'
 import { memoryAdapter } from '../testing/memoryAdapter'
@@ -23,6 +24,7 @@ const runtimeWith = (overrides: Partial<AnalyticsRuntime> = {}): AnalyticsRuntim
 	registry: createRegistry([memoryAdapter()]),
 	configAdapterIds: new Set(['memory']),
 	bindings: {},
+	readAccess: () => true,
 	engine: { read: async (adapter, query) => adapter.query(query, {}) },
 	ttl: {},
 	comparison: true,
@@ -30,7 +32,7 @@ const runtimeWith = (overrides: Partial<AnalyticsRuntime> = {}): AnalyticsRuntim
 	...overrides,
 })
 
-const logger = { warn: vi.fn() }
+const logger = { warn: vi.fn(), error: vi.fn() }
 
 const reqWith = (
 	runtime: AnalyticsRuntime | null,
@@ -65,12 +67,50 @@ describe('makeRefreshHandler', () => {
 	it('reads the scope out of the body for a caller allowed to name one', async () => {
 		const bump = vi.fn(async () => 'tok-3')
 		const res = await makeRefreshHandler()(
-			reqWith(runtimeWith({ epoch: epochStore({ bump }), platformRead: () => true }), {
-				bytes: encode({ scope: 'tenant-b' }),
-			})
+			reqWith(
+				runtimeWith({
+					scoped: true,
+					epoch: epochStore({ bump }),
+					crossScope: allCrossScope(() => true),
+				}),
+				{ bytes: encode({ scope: 'tenant-b' }) }
+			)
 		)
 		expect(res.status).toBe(200)
 		expect(bump).toHaveBeenCalledWith('tenant-b')
+	})
+
+	it('refuses a named scope on an install without tenants, bumping nothing', async () => {
+		const bump = vi.fn(async () => 'tok-3')
+		const res = await makeRefreshHandler()(
+			reqWith(runtimeWith({ epoch: epochStore({ bump }), crossScope: allCrossScope(() => true) }), {
+				bytes: encode({ scope: 'made-up' }),
+			})
+		)
+		expect(res.status).toBe(400)
+		expect(((await res.json()) as ErrorBody).error.code).toBe('untrusted_scope')
+		expect(bump).not.toHaveBeenCalled()
+	})
+
+	it('bumps only a named scope scope.list knows, and nothing for one it does not', async () => {
+		const bump = vi.fn(async () => 'tok-4')
+		const runtime = runtimeWith({
+			scoped: true,
+			epoch: epochStore({ bump }),
+			crossScope: allCrossScope(() => true),
+			scopeList: () => ['tenant-a'],
+		})
+		const unknown = await makeRefreshHandler()(
+			reqWith(runtime, { bytes: encode({ scope: 'made-up' }) })
+		)
+		expect(unknown.status).toBe(200)
+		expect(await unknown.json()).toEqual({ epoch: '0' })
+		expect(bump).not.toHaveBeenCalled()
+		const known = await makeRefreshHandler()(
+			reqWith(runtime, { bytes: encode({ scope: 'tenant-a' }) })
+		)
+		expect(await known.json()).toEqual({ epoch: 'tok-4' })
+		expect(bump).toHaveBeenCalledWith('tenant-a')
 	})
 
 	it('ignores a body that is not an object, rather than failing the refresh', async () => {
@@ -119,6 +159,24 @@ describe('makeRefreshHandler', () => {
 		expect(res.headers.get('Cache-Control')).toBe('private, no-store')
 	})
 
+	it('answers a throwing access.read with the internal envelope, as every endpoint does', async () => {
+		const bump = vi.fn(async () => 'tok-1')
+		const res = await makeRefreshHandler()(
+			reqWith(
+				runtimeWith({
+					epoch: epochStore({ bump }),
+					readAccess: () => {
+						throw new Error('access misconfigured')
+					},
+				})
+			)
+		)
+		expect(res.status).toBe(500)
+		expect(((await res.json()) as ErrorBody).error.code).toBe('internal')
+		expect(res.headers.get('Retry-After')).toBeNull()
+		expect(bump).not.toHaveBeenCalled()
+	})
+
 	it('503s while the plugin has no runtime to refresh', async () => {
 		const res = await makeRefreshHandler()(reqWith(null))
 		expect(res.status).toBe(503)
@@ -154,7 +212,7 @@ describe('makeRefreshHandler', () => {
 					epoch: epochStore({ bump }),
 					scoped: true,
 					resolveScope: async () => null,
-					platformRead: () => false,
+					crossScope: allCrossScope(() => false),
 				})
 			)
 		)
@@ -169,9 +227,12 @@ describe('makeRefreshHandler', () => {
 	it('reads whitespace as no scope at all, rather than as a named one', async () => {
 		const bump = vi.fn(async () => 'tok-4')
 		const res = await makeRefreshHandler()(
-			reqWith(runtimeWith({ epoch: epochStore({ bump }), platformRead: () => false }), {
-				bytes: encode({ scope: '   ' }),
-			})
+			reqWith(
+				runtimeWith({ epoch: epochStore({ bump }), crossScope: allCrossScope(() => false) }),
+				{
+					bytes: encode({ scope: '   ' }),
+				}
+			)
 		)
 		expect(res.status).toBe(200)
 		expect(bump).toHaveBeenCalledWith(null)
@@ -236,7 +297,11 @@ describe('makeRefreshHandler debounce', () => {
 
 	it('debounces one scope at a time', async () => {
 		const bump = vi.fn<EpochStore['bump']>(async () => 'tok-9')
-		const runtime = runtimeWith({ epoch: epochStore({ bump }), platformRead: () => true })
+		const runtime = runtimeWith({
+			scoped: true,
+			epoch: epochStore({ bump }),
+			crossScope: allCrossScope(() => true),
+		})
 		const { handler } = clocked()
 
 		await handler(reqWith(runtime, { bytes: encode({ scope: 'tenant-a' }) }))

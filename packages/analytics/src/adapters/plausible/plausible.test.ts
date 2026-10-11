@@ -1,7 +1,10 @@
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { LINE_SEPARATOR } from '../../capture/jsLiteral'
+import { filterableDimensions, filterOperatorsFor, metricReaches } from '../../core/capabilities'
 import type { AnalyticsQuery } from '../../core/contract'
+import type { FetchLike } from '../../core/fetch'
 import { plausible } from './plausible'
 
 const server = setupServer()
@@ -10,7 +13,7 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 const q = (over: Partial<AnalyticsQuery> = {}): AnalyticsQuery => ({
-	metrics: ['pageviews', 'visitors', 'avgDuration'],
+	metrics: ['pageviews', 'visitors', 'visitDuration'],
 	dateRange: { start: new Date('2026-01-01T00:00:00Z'), end: new Date('2026-01-31T23:59:59Z') },
 	...over,
 })
@@ -52,8 +55,109 @@ describe('plausible adapter', () => {
 		expect(captured.metrics).toEqual(['pageviews', 'visitors', 'visit_duration'])
 		expect(captured.filters).toEqual([['is', 'event:page', ['/pricing']]])
 		expect(captured.date_range).toEqual(['2026-01-01', '2026-01-31'])
-		expect(result.totals).toEqual({ pageviews: 120, visitors: 80, avgDuration: 42000 })
+		expect(result.totals).toEqual({ pageviews: 120, visitors: 80, visitDuration: 42000 })
 		expect(result.meta.provider).toBe('plausible')
+	})
+
+	// Plausible answers an average it has no samples for with null; a 0 there would read as a
+	// measured zero-second visit and a page nobody scrolled.
+	it('keeps an average Plausible answers with null as null, and a missing count as 0', async () => {
+		server.use(
+			http.post('https://plausible.io/api/v2/query', () =>
+				HttpResponse.json({
+					results: [{ metrics: [null, null, null], dimensions: [] }],
+					meta: {},
+					query: {},
+				})
+			)
+		)
+		const result = await plausible({ siteId: 's', apiKey: 'k' }).query(
+			q({ metrics: ['pageviews', 'visitDuration', 'scrollDepth'], path: '/pricing' }),
+			{}
+		)
+		expect(result.totals).toEqual({ pageviews: 0, visitDuration: null, scrollDepth: null })
+	})
+
+	it('offers no time on page, and declares where its visit and scroll numbers are read', () => {
+		const { capabilities } = plausible({ siteId: 's', apiKey: 'k' })
+		expect(capabilities.metrics.has('avgDuration')).toBe(false)
+		expect(capabilities.metrics.has('visitDuration')).toBe(true)
+		expect(metricReaches(capabilities, 'scrollDepth', {})).toBe(false)
+		expect(metricReaches(capabilities, 'scrollDepth', { path: true })).toBe(true)
+		expect(metricReaches(capabilities, 'scrollDepth', { dimensions: ['page'] })).toBe(true)
+		expect(
+			metricReaches(capabilities, 'scrollDepth', {
+				dimensions: ['country'],
+				filters: [{ dimension: 'page', operator: 'contains' }],
+			})
+		).toBe(true)
+		expect(metricReaches(capabilities, 'visitDuration', { dimensions: ['goal'] })).toBe(false)
+		expect(metricReaches(capabilities, 'bounceRate', { dimensions: ['goal'] })).toBe(false)
+		expect(metricReaches(capabilities, 'visitDuration', { dimensions: ['page'] })).toBe(true)
+	})
+
+	it('leaves scroll depth out of a whole-site read, which Plausible refuses', async () => {
+		const sent: string[][] = []
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				const body: unknown = await request.json()
+				const metrics = Reflect.get(Object(body), 'metrics')
+				sent.push(Array.isArray(metrics) ? metrics.map(String) : [])
+				return HttpResponse.json({ results: [{ metrics: [5], dimensions: [] }] })
+			})
+		)
+		const result = await plausible({ siteId: 's', apiKey: 'k' }).query(
+			q({ metrics: ['pageviews', 'scrollDepth'] }),
+			{}
+		)
+		expect(sent).toEqual([['pageviews']])
+		expect(result.totals).toEqual({ pageviews: 5 })
+	})
+
+	it('names its revenue currency on every read, and none without one', async () => {
+		server.use(
+			http.post('https://plausible.io/api/v2/query', () =>
+				HttpResponse.json({ results: [{ metrics: [3], dimensions: [] }], meta: {}, query: {} })
+			)
+		)
+		const withRevenue = await plausible({ siteId: 's', apiKey: 'k', revenueCurrency: 'eur' }).query(
+			q({ metrics: ['pageviews'] }),
+			{}
+		)
+		expect(withRevenue.meta.currency).toBe('EUR')
+		const without = await plausible({ siteId: 's', apiKey: 'k' }).query(
+			q({ metrics: ['pageviews'] }),
+			{}
+		)
+		expect(without.meta.currency).toBeUndefined()
+	})
+
+	it('sends every request through upstream, the signal it is handed included', async () => {
+		const signals: Array<AbortSignal | null> = []
+		server.use(
+			http.post('https://plausible.io/api/v2/query', ({ request }) => {
+				signals.push(request.signal)
+				return HttpResponse.json({
+					results: [{ metrics: [1], dimensions: [] }],
+					meta: {},
+					query: {},
+				})
+			})
+		)
+		const lane = new AbortController()
+		let sent = 0
+		const upstream = <T>(fn: (signal?: AbortSignal) => Promise<T>): Promise<T> => {
+			sent++
+			return fn(lane.signal)
+		}
+		await plausible({ siteId: 's', apiKey: 'k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'day' }),
+			{ upstream }
+		)
+		// A day series is two requests: the series and its totals.
+		expect(sent).toBe(2)
+		expect(signals).toHaveLength(2)
+		expect(plausible({ siteId: 's', apiKey: 'k' }).capabilities.upstreamAware).toBe(true)
 	})
 
 	it('adds an event:hostname filter when a hostname is provided', async () => {
@@ -76,12 +180,14 @@ describe('plausible adapter', () => {
 		])
 	})
 
-	it('declares filters as the mapped dimensions except goal, with every contract operator', () => {
+	it('declares filters as the mapped dimensions except goal, each with every contract operator', () => {
 		const caps = plausible({ siteId: 's', apiKey: 'k' }).capabilities
-		expect(caps.filters).toEqual(
-			new Set([...caps.dimensions].filter((dimension) => dimension !== 'goal'))
+		expect(filterableDimensions(caps).sort()).toEqual(
+			[...caps.dimensions].filter((dimension) => dimension !== 'goal').sort()
 		)
-		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
+		for (const dimension of filterableDimensions(caps)) {
+			expect(filterOperatorsFor(caps, dimension)).toEqual(['eq', 'contains', 'matches'])
+		}
 	})
 
 	it.each([
@@ -212,7 +318,7 @@ describe('plausible adapter', () => {
 		)
 		const adapter = plausible({ siteId: 'example.com', apiKey: 'k' })
 		expect(adapter.capabilities.dimensions.has('channel')).toBe(true)
-		expect(adapter.capabilities.filters.has('channel')).toBe(true)
+		expect(filterOperatorsFor(adapter.capabilities, 'channel')).toContain('eq')
 		await adapter.query(
 			q({ filters: [{ dimension: 'channel', operator: 'eq', value: 'Paid Search' }] }),
 			{}
@@ -253,21 +359,64 @@ describe('plausible adapter', () => {
 			})
 		)
 		const result = await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
-			q({ metrics: ['pageviews', 'visitors', 'avgDuration'], granularity: 'day' }),
+			q({ metrics: ['pageviews', 'visitors', 'visitDuration'], granularity: 'day' }),
 			{}
 		)
 		expect(result.rows).toEqual([
 			{
 				timestamp: '2026-01-01T00:00:00.000Z',
-				metrics: { pageviews: 10, visitors: 7, avgDuration: 30000 },
+				metrics: { pageviews: 10, visitors: 7, visitDuration: 30000 },
 			},
 			{
 				timestamp: '2026-01-02T00:00:00.000Z',
-				metrics: { pageviews: 25, visitors: 18, avgDuration: 40000 },
+				metrics: { pageviews: 25, visitors: 18, visitDuration: 40000 },
 			},
 		])
-		expect(result.totals).toEqual({ pageviews: 35, visitors: 20, avgDuration: 35000 })
+		expect(result.totals).toEqual({ pageviews: 35, visitors: 20, visitDuration: 35000 })
 	})
+
+	it('formats both range bounds as calendar days in the reporting timezone', async () => {
+		let captured: { date_range?: string[] } = {}
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				captured = (await request.json()) as typeof captured
+				return HttpResponse.json({ results: [], meta: {}, query: {} })
+			})
+		)
+		await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+			q({
+				timezone: 'America/New_York',
+				dateRange: {
+					start: new Date('2026-09-01T04:00:00.000Z'),
+					end: new Date('2026-09-08T03:59:59.999Z'),
+				},
+			}),
+			{}
+		)
+		expect(captured.date_range).toEqual(['2026-09-01', '2026-09-07'])
+	})
+
+	it('does not roll the start bound back a day for zones east of UTC', async () => {
+		let captured: { date_range?: string[] } = {}
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				captured = (await request.json()) as typeof captured
+				return HttpResponse.json({ results: [], meta: {}, query: {} })
+			})
+		)
+		await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
+			q({
+				timezone: 'Europe/Berlin',
+				dateRange: {
+					start: new Date('2026-08-31T22:00:00.000Z'),
+					end: new Date('2026-09-07T21:59:59.999Z'),
+				},
+			}),
+			{}
+		)
+		expect(captured.date_range).toEqual(['2026-09-01', '2026-09-07'])
+	})
+
 	describe('goals and conversions', () => {
 		interface Body {
 			metrics: string[]
@@ -292,7 +441,7 @@ describe('plausible adapter', () => {
 			const caps = plausible({ siteId: 's', apiKey: 'k' }).capabilities
 			expect(caps.dimensions.has('goal')).toBe(true)
 			expect(caps.metrics.has('conversions')).toBe(true)
-			expect(caps.filters.has('goal')).toBe(false)
+			expect(filterOperatorsFor(caps, 'goal')).toEqual([])
 		})
 
 		it('offers revenue only once a revenue currency says the site has a revenue goal', () => {
@@ -304,6 +453,14 @@ describe('plausible adapter', () => {
 					'revenue'
 				)
 			).toBe(true)
+		})
+
+		it('refuses a revenue currency that is not an ISO 4217 code, and reads a blank one as none', () => {
+			expect(() => plausible({ siteId: 's', apiKey: 'k', revenueCurrency: 'EU' })).toThrow(
+				'analytics: plausible({ revenueCurrency }) must be an ISO 4217 currency code such as "EUR", got "EU"'
+			)
+			const blank = plausible({ siteId: 's', apiKey: 'k', revenueCurrency: ' ' })
+			expect(blank.capabilities.metrics.has('revenue')).toBe(false)
 		})
 
 		// total_revenue needs a revenue goal: a site without one errors the whole request, so a
@@ -577,12 +734,30 @@ describe('plausible adapter', () => {
 	})
 })
 
+describe('plausible fetch', () => {
+	it('reads and proxies through the fetch it is given, the global one otherwise', async () => {
+		const urls: string[] = []
+		const fetch: FetchLike = async (input) => {
+			urls.push(String(input))
+			return Response.json({ results: [{ metrics: [7, 3, 12], dimensions: [] }] })
+		}
+		const adapter = plausible({ siteId: 's', apiKey: 'k', domain: 'site.test', fetch })
+		const result = await adapter.query(q(), {})
+		expect(result.totals?.pageviews).toBe(7)
+		expect(urls).toEqual(['https://plausible.io/api/v2/query'])
+		expect(adapter.capture?.proxy.fetch).toBe(fetch)
+		expect(plausible({ siteId: 's', apiKey: 'k', domain: 'site.test' }).capture?.proxy.fetch).toBe(
+			undefined
+		)
+	})
+})
+
 describe('plausible capture', () => {
 	it('builds the two proxy routes against the cloud host by default', () => {
 		const capture = plausible({ siteId: 'example.com', apiKey: 'k', domain: 'example.com' }).capture
 		expect(capture?.proxy.routes).toEqual([
-			{ source: '/js/:script*', upstream: 'https://plausible.io/js/:script*' },
-			{ source: '/api/event', upstream: 'https://plausible.io/api/event' },
+			{ source: '/js/:script*', upstream: 'https://plausible.io/js/:script*', kind: 'script' },
+			{ source: '/api/event', upstream: 'https://plausible.io/api/event', kind: 'data' },
 		])
 	})
 
@@ -594,8 +769,8 @@ describe('plausible capture', () => {
 			domain: 'example.com',
 		}).capture
 		expect(capture?.proxy.routes).toEqual([
-			{ source: '/js/:script*', upstream: 'https://p.acme.io/js/:script*' },
-			{ source: '/api/event', upstream: 'https://p.acme.io/api/event' },
+			{ source: '/js/:script*', upstream: 'https://p.acme.io/js/:script*', kind: 'script' },
+			{ source: '/api/event', upstream: 'https://p.acme.io/api/event', kind: 'data' },
 		])
 	})
 
@@ -627,6 +802,31 @@ describe('plausible capture', () => {
 		expect(inline.endsWith('plausible.init({endpoint:"/pl/api/event"})')).toBe(true)
 	})
 
+	it('escapes the mount path so it cannot break out of the inline script', () => {
+		const capture = plausible({ siteId: 'example.com', apiKey: 'k', scriptId: 'abc123' }).capture
+		const inline =
+			capture?.snippet({ path: `/pl</script><script>alert(1)${LINE_SEPARATOR}` }).scripts[1]
+				?.inline ?? ''
+
+		expect(inline).not.toContain('</script>')
+		expect(inline).not.toContain(LINE_SEPARATOR)
+		expect(inline).toContain('\\u003c')
+	})
+
+	// A path in the id would walk the site's script tag out of the proxy route to any address.
+	it('drops a script id that is not a bare token, and captures nothing with it', () => {
+		for (const scriptId of [
+			'x/../../../../../../api/media/file/evil',
+			'x/../../../../../..//evil.example/x',
+			'x?callback=',
+			'',
+		]) {
+			expect(plausible({ siteId: 'example.com', apiKey: 'k', scriptId }).capture).toBeUndefined()
+		}
+		const kept = plausible({ siteId: 'example.com', apiKey: 'k', scriptId: 'Rs_Zm-6' }).capture
+		expect(kept?.snippet({ path: '/pl' }).scripts[0]?.src).toBe('/pl/js/pa-Rs_Zm-6.js')
+	})
+
 	it('prefers the legacy tag when both domain and scriptId are set', () => {
 		const capture = plausible({
 			siteId: 'example.com',
@@ -642,48 +842,6 @@ describe('plausible capture', () => {
 	// with, so a read-only install gets no proxy and no snippet rather than an empty one.
 	it('declares no capture when neither domain nor scriptId is set', () => {
 		expect(plausible({ siteId: 'example.com', apiKey: 'k' }).capture).toBeUndefined()
-	})
-
-	it('formats both range bounds as calendar days in the reporting timezone', async () => {
-		let captured: { date_range?: string[] } = {}
-		server.use(
-			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
-				captured = (await request.json()) as typeof captured
-				return HttpResponse.json({ results: [], meta: {}, query: {} })
-			})
-		)
-		await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
-			q({
-				timezone: 'America/New_York',
-				dateRange: {
-					start: new Date('2026-09-01T04:00:00.000Z'),
-					end: new Date('2026-09-08T03:59:59.999Z'),
-				},
-			}),
-			{}
-		)
-		expect(captured.date_range).toEqual(['2026-09-01', '2026-09-07'])
-	})
-
-	it('does not roll the start bound back a day for zones east of UTC', async () => {
-		let captured: { date_range?: string[] } = {}
-		server.use(
-			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
-				captured = (await request.json()) as typeof captured
-				return HttpResponse.json({ results: [], meta: {}, query: {} })
-			})
-		)
-		await plausible({ siteId: 'example.com', apiKey: 'k' }).query(
-			q({
-				timezone: 'Europe/Berlin',
-				dateRange: {
-					start: new Date('2026-08-31T22:00:00.000Z'),
-					end: new Date('2026-09-07T21:59:59.999Z'),
-				},
-			}),
-			{}
-		)
-		expect(captured.date_range).toEqual(['2026-09-01', '2026-09-07'])
 	})
 
 	it('client carries only the kind, no site credentials', () => {

@@ -105,10 +105,8 @@ vi.mock('@payloadcms/ui', () => {
 const caps = (over: Partial<SerializedCapabilities> = {}): SerializedCapabilities => ({
 	metrics: ['pageviews'],
 	dimensions: ['page'],
-	filters: ['page'],
-	filterOperators: ['eq'],
+	filters: { page: ['eq'] },
 	realtime: false,
-	perPageQuery: false,
 	comparison: true,
 	minGranularity: 'day',
 	maxLookbackDays: null,
@@ -132,8 +130,8 @@ const answer = (body: SourcesResponse) =>
 const twoSources: SourcesResponse = {
 	defaultId: 'alpha',
 	sources: [
-		source('alpha', { filters: ['page', 'country'] }),
-		source('beta', { filters: ['referrer'] }),
+		source('alpha', { filters: { page: ['eq'], country: ['eq'] } }),
+		source('beta', { filters: { referrer: ['eq'] } }),
 	],
 }
 
@@ -242,7 +240,7 @@ describe('FilterDimensionSelectField', () => {
 	})
 
 	it('says the source cannot filter when it offers no dimensions', async () => {
-		answer({ defaultId: 'flat', sources: [source('flat', { filters: [] })] })
+		answer({ defaultId: 'flat', sources: [source('flat', { filters: {} })] })
 		mocks.sourceId = 'flat'
 
 		render(<FilterDimensionSelectField {...props()} />)
@@ -279,7 +277,7 @@ describe('FilterDimensionSelectField', () => {
 	})
 
 	it('renders a notice alongside the configured description rather than in place of it', async () => {
-		answer({ defaultId: 'flat', sources: [source('flat', { filters: [] })] })
+		answer({ defaultId: 'flat', sources: [source('flat', { filters: {} })] })
 		mocks.sourceId = 'flat'
 
 		render(
@@ -332,13 +330,13 @@ describe('FilterDimensionSelectField', () => {
 		expect(screen.getByTestId('wrap').getAttribute('data-classname')).toBe('custom-dimension')
 	})
 
-	it('fetches the sources endpoint with credentials', async () => {
+	it('fetches the sources endpoint relative to the page, with credentials', async () => {
 		answer(twoSources)
 
 		render(<FilterDimensionSelectField {...props()} />)
 
 		await screen.findByRole('option', { name: keys.viewDimensionPage })
-		expect(fetchMock.mock.calls[0]?.[0]).toBe('https://cms.test/api/analytics/sources')
-		expect((fetchMock.mock.calls[0]?.[1] as RequestInit)?.credentials).toBe('include')
+		expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/_x/sources')
+		expect((fetchMock.mock.calls[0]?.[1] as RequestInit)?.credentials).toBe('same-origin')
 	})
 })

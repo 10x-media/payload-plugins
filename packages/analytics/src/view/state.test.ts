@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest'
 import type { SerializedCapabilities } from '../core/capabilities'
 import { gate } from './gating'
 import {
+	aggregateFrom,
+	aggregateToken,
 	coerceState,
 	DEFAULT_VIEW_LIMIT,
+	isAggregateToken,
+	normalizeViewState,
 	parseViewState,
 	rangeFor,
 	serializeViewState,
@@ -106,6 +110,23 @@ describe('parseViewState', () => {
 		])
 	})
 
+	it('drops a filter repeating a dimension, operator and value already taken', () => {
+		const filters = (value: unknown) =>
+			parse(`filters=${encodeURIComponent(JSON.stringify(value))}`).filters
+		expect(
+			filters([
+				{ dimension: 'page', operator: 'eq', value: '/docs' },
+				{ dimension: 'page', operator: 'eq', value: ' /docs ' },
+				{ dimension: 'page', operator: 'contains', value: '/docs' },
+				{ dimension: 'country', operator: 'eq', value: '/docs' },
+			])
+		).toEqual([
+			{ dimension: 'page', operator: 'eq', value: '/docs' },
+			{ dimension: 'page', operator: 'contains', value: '/docs' },
+			{ dimension: 'country', operator: 'eq', value: '/docs' },
+		])
+	})
+
 	it('keeps only the first ten filters', () => {
 		const many = Array.from({ length: 12 }, (_, i) => ({
 			dimension: 'page',
@@ -118,6 +139,54 @@ describe('parseViewState', () => {
 	it('drops an order whose direction is not asc or desc', () => {
 		expect(parse('order=visitors:sideways').order).toBeUndefined()
 		expect(parse('order=visitors').order).toBeUndefined()
+	})
+})
+
+describe('parseViewState scope', () => {
+	// The host owns which tenant a request resolves to, so the only thing a URL may say about
+	// the scope is that it wants every one of them at once.
+	it('keeps the cross-scope wildcard and drops any named scope', () => {
+		expect(parse('scope=*').scope).toBe('*')
+		expect(parse('scope=alpha').scope).toBeUndefined()
+		expect(parse('').scope).toBeUndefined()
+		expect(parse('scope=%20%20').scope).toBeUndefined()
+		expect(serializeViewState({ ...baseState, scope: '*' }, defaults).get('scope')).toBe('*')
+	})
+
+	// The tag says which tenant the aggregate was chosen from, which is what lets the server
+	// drop it once the host's selector has moved on.
+	it('keeps a tagged aggregate token and round-trips it', () => {
+		expect(parse('scope=*%3Aalpha').scope).toBe('*:alpha')
+		expect(aggregateToken('alpha')).toBe('*:alpha')
+		expect(aggregateToken('')).toBe('*')
+		expect(aggregateFrom('*:alpha')).toBe('alpha')
+		expect(aggregateFrom('*')).toBe('')
+		expect(isAggregateToken('*:alpha')).toBe(true)
+		expect(isAggregateToken('alpha')).toBe(false)
+		expect(serializeViewState({ ...baseState, scope: '*:alpha' }, defaults).get('scope')).toBe(
+			'*:alpha'
+		)
+	})
+})
+
+describe('normalizeViewState', () => {
+	const served = { sourceIds: ['native', 'plausible:1'] }
+
+	it('returns the same object when there is nothing to correct', () => {
+		const state = { ...baseState, source: 'native' }
+		expect(normalizeViewState(state, served)).toBe(state)
+	})
+
+	// The address outlives a tenant switch: a source the new scope does not hold has to go, or
+	// the toolbar would name a picker entry that answers nothing.
+	it('drops a source the resolved scope does not serve', () => {
+		const next = normalizeViewState({ ...baseState, source: 'plausible:gone' }, served)
+		expect(next.source).toBeUndefined()
+	})
+
+	it('replaces the scope with the one the server resolved', () => {
+		expect(normalizeViewState({ ...baseState, scope: '*' }, served).scope).toBeUndefined()
+		expect(normalizeViewState(baseState, { ...served, scope: '*' }).scope).toBe('*')
 	})
 })
 
@@ -196,10 +265,8 @@ describe('serializeViewState', () => {
 const caps = (over: Partial<SerializedCapabilities> = {}): SerializedCapabilities => ({
 	metrics: ['pageviews', 'visitors'],
 	dimensions: ['page', 'country'],
-	filters: ['page'],
-	filterOperators: ['eq'],
+	filters: { page: ['eq'] },
 	realtime: false,
-	perPageQuery: true,
 	comparison: false,
 	minGranularity: 'day',
 	maxLookbackDays: null,
@@ -219,6 +286,14 @@ describe('coerceState', () => {
 		)
 		expect(coerced.metric).toBe('pageviews')
 		expect(coerced.tab).toBe('pages')
+	})
+
+	it('opens a link naming visits on the sessions card of a source that shows the count as sessions', () => {
+		const coerced = coerceState(
+			{ ...baseState, metric: 'visits' },
+			gate(caps({ metrics: ['pageviews', 'visits', 'sessions'] }))
+		)
+		expect(coerced.metric).toBe('sessions')
 	})
 
 	it('drops filters the source cannot apply and operators it does not support', () => {
@@ -272,6 +347,24 @@ describe('coerceState', () => {
 		)
 		expect(coerced.granularity).toBe('hour')
 		expect(coerced.compare).toBe(true)
+	})
+})
+
+describe('coerceState item columns', () => {
+	const itemCaps = caps({
+		metrics: ['pageviews', 'visitors', 'impressions', 'interactions'],
+		dimensions: ['page', 'item'],
+	})
+
+	it('keeps a sort on an item column, which no card offers', () => {
+		const state = parse('tab=content&order=interactions:desc')
+		const coerced = coerceState(state, gate(itemCaps))
+		expect(coerced.tab).toBe('content')
+		expect(coerced.order).toEqual({ metric: 'interactions', direction: 'desc' })
+	})
+
+	it('never opens the cards on an item metric', () => {
+		expect(coerceState(parse('metric=impressions'), gate(itemCaps)).metric).toBe('pageviews')
 	})
 })
 

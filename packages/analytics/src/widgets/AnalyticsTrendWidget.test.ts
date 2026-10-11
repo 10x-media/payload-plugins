@@ -1,5 +1,4 @@
 import type { PayloadRequest, WidgetServerProps } from 'payload'
-import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type {
 	AdapterContext,
@@ -11,28 +10,26 @@ import type {
 } from '../core/contract'
 import { createRegistry } from '../core/registry'
 import { setRuntime } from '../plugin/runtime'
+import { renderSettled } from '../testing/renderSettled'
+import { previousWindow } from '../timeframe/comparison'
 import { resolveTimeframe } from '../timeframe/presets'
-import { en } from '../translations/en'
 import { keys } from '../translations/keys'
 import AnalyticsTrendWidget from './AnalyticsTrendWidget'
-import { previousWindow } from './comparison'
 import { formatRangeCaption } from './range'
 import type { MetricWidgetData } from './types'
 import type { WidgetView } from './viewLink'
+import { captionT, hrefIn, TEST_VIEW as view } from './widgetTestKit'
 
 const NOW = new Date('2026-06-03T12:00:00.000Z')
 
 const capabilities: AnalyticsCapabilities = {
-	perPageQuery: true,
 	realtime: false,
 	comparison: true,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews']),
 	dimensions: new Set(),
-	filters: new Set(),
-	filterOperators: new Set(['eq']),
-	batchPageReport: false,
+	filters: {},
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 300 },
 }
@@ -59,6 +56,7 @@ const req = (): PayloadRequest => {
 		registry: createRegistry([adapter]),
 		configAdapterIds: new Set(['native']),
 		bindings: {},
+		readAccess: () => true,
 		engine: { read: async (a, query) => a.query(query, {}) },
 		ttl: { aggregate: 3600, realtime: 300 },
 		comparison: true,
@@ -67,16 +65,11 @@ const req = (): PayloadRequest => {
 }
 
 const renderWidget = async (widgetData: MetricWidgetData, view?: WidgetView): Promise<string> =>
-	renderToStaticMarkup(
-		await AnalyticsTrendWidget({ req: req(), widgetData, view } as unknown as WidgetServerProps)
+	renderSettled(
+		AnalyticsTrendWidget({ req: req(), widgetData, view } as unknown as WidgetServerProps)
 	)
 
-const hrefIn = (html: string): string | undefined =>
-	html.match(/<a[^>]+href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&')
-
 describe('AnalyticsTrendWidget comparison', () => {
-	// The chart injects its stylesheet inline, so every class name appears in the markup
-	// either way; assertions match the rendered element instead.
 	it('overlays the previous period when compare is on', async () => {
 		const html = await renderWidget({ metric: 'pageviews', timeframe: 'last7days', compare: true })
 		expect(html).toContain('<div class="analytics-chart__legend">')
@@ -95,6 +88,13 @@ describe('AnalyticsTrendWidget comparison', () => {
 		)
 	})
 
+	// A preset window runs up to now, so today is still being counted: dashed, and said so.
+	it('marks the day still counting, and says "so far" where it names it', async () => {
+		const html = await renderWidget({ metric: 'pageviews', timeframe: 'last7days' })
+		expect(html).toContain('analytics-chart__line analytics-chart__line--partial')
+		expect(html.split('analytics:chartSoFar').length - 1).toBe(1)
+	})
+
 	it('draws one series when compare is off', async () => {
 		const html = await renderWidget({ metric: 'pageviews', timeframe: 'last7days' })
 		expect(html).not.toContain('<div class="analytics-chart__legend">')
@@ -103,13 +103,29 @@ describe('AnalyticsTrendWidget comparison', () => {
 	})
 })
 
-describe('AnalyticsTrendWidget view link', () => {
-	const view = {
-		path: '/analytics',
-		defaultRange: 'last30days',
-		defaultMetric: 'pageviews',
-	} as const
+describe('AnalyticsTrendWidget card', () => {
+	it('charts in the body, following the height the card has left', async () => {
+		const html = await renderWidget({ metric: 'pageviews', timeframe: 'last7days' })
+		const body = html.slice(html.indexOf('class="analytics-widget__body"'))
+		expect(body).toContain('class="analytics-chart analytics-chart--trend analytics-chart--fill"')
+		expect(html.indexOf('analytics-widget__value-row')).toBeLessThan(
+			html.indexOf('analytics-widget__body')
+		)
+	})
 
+	it('puts the delta beside the headline number and the window in the header', async () => {
+		const html = await renderWidget({ metric: 'pageviews', timeframe: 'last7days' })
+		const row = html.slice(
+			html.indexOf('analytics-widget__value-row'),
+			html.indexOf('analytics-widget__body')
+		)
+		expect(row).toContain('analytics-delta__caption">analytics:comparisonVsPrevious<')
+		const header = /<div class="analytics-widget__header"[^>]*>(.*?)<\/div>/.exec(html)?.[1] ?? ''
+		expect(header).toContain('analytics:timeframeLast7Days')
+	})
+})
+
+describe('AnalyticsTrendWidget view link', () => {
 	it('carries its window, comparison and the adapter that served it into the view', async () => {
 		const html = await renderWidget(
 			{ metric: 'pageviews', timeframe: 'last7days', compare: true },
@@ -136,26 +152,13 @@ describe('AnalyticsTrendWidget view link', () => {
 	})
 })
 
-/** The two caption templates, which carry the `{{vars}}` the assertions read. */
-const TEMPLATES: Record<string, string> = {
-	[keys.widgetFilterCaption]: en[keys.widgetFilterCaption],
-	[keys.widgetCaptionWithFilter]: en[keys.widgetCaptionWithFilter],
-}
-
-/**
- * Every key stands in for itself, except the caption templates, which come from the real
- * bundle so the assertion sees the same one-pass `{{vars}}` fill Payload's own `t` makes.
- */
-const fakeT = (key: string, vars?: Record<string, string | number>): string =>
-	(TEMPLATES[key] ?? key).replace(/\{\{(.*?)\}\}/g, (match, name: string) => {
-		const value = vars?.[name.trim()]
-		return value === undefined ? match : String(value)
-	})
-
 const filterableReq = (filters: DimensionKey[]): PayloadRequest => {
 	const filtering: AnalyticsAdapter = {
 		...adapter,
-		capabilities: { ...capabilities, filters: new Set(filters) },
+		capabilities: {
+			...capabilities,
+			filters: Object.fromEntries(filters.map((dimension) => [dimension, ['eq'] as const])),
+		},
 	}
 	const payload = {
 		config: { routes: { admin: '/admin' } },
@@ -164,11 +167,12 @@ const filterableReq = (filters: DimensionKey[]): PayloadRequest => {
 		registry: createRegistry([filtering]),
 		configAdapterIds: new Set(['native']),
 		bindings: {},
+		readAccess: () => true,
 		engine: { read: async (a, query) => a.query(query, {}) },
 		ttl: { aggregate: 3600, realtime: 300 },
 		comparison: false,
 	})
-	return { payload, i18n: { t: fakeT, language: 'en' } } as unknown as PayloadRequest
+	return { payload, i18n: { t: captionT, language: 'en' } } as unknown as PayloadRequest
 }
 
 const renderFiltered = async (
@@ -176,8 +180,8 @@ const renderFiltered = async (
 	widgetData: MetricWidgetData,
 	view?: WidgetView
 ): Promise<string> =>
-	renderToStaticMarkup(
-		await AnalyticsTrendWidget({
+	renderSettled(
+		AnalyticsTrendWidget({
 			req: filterableReq(filters),
 			widgetData,
 			view,
@@ -185,12 +189,6 @@ const renderFiltered = async (
 	)
 
 describe('AnalyticsTrendWidget filter', () => {
-	const view = {
-		path: '/analytics',
-		defaultRange: 'last30days',
-		defaultMetric: 'pageviews',
-	} as const
-
 	it('appends the filter sentence to the caption', async () => {
 		const html = await renderFiltered(['page'], {
 			metric: 'pageviews',
@@ -198,7 +196,7 @@ describe('AnalyticsTrendWidget filter', () => {
 			filter: { dimension: 'page', operator: 'eq', value: '/blog' },
 		})
 		expect(html).toContain(
-			'analytics:timeframeLast7Days where analytics:viewDimensionPage analytics:filterOperatorEq /blog'
+			'analytics:timeframeLast7Days where analytics:viewDimensionPage analytics:filterOperatorEq \u2068/blog\u2069'
 		)
 	})
 
@@ -268,12 +266,13 @@ describe('AnalyticsTrendWidget state notices', () => {
 			registry: createRegistry([degraded]),
 			configAdapterIds: new Set(['native']),
 			bindings: {},
+			readAccess: () => true,
 			engine: { read: async (a, query) => a.query(query, {}) },
 			ttl: { aggregate: 3600, realtime: 300 },
 			comparison: false,
 		})
-		return renderToStaticMarkup(
-			await AnalyticsTrendWidget({
+		return renderSettled(
+			AnalyticsTrendWidget({
 				req: { payload, i18n: { t: (key: string) => key, language: 'en' } },
 				widgetData: { metric: 'pageviews', timeframe: 'last7days' },
 			} as unknown as WidgetServerProps)
@@ -286,5 +285,22 @@ describe('AnalyticsTrendWidget state notices', () => {
 
 	it('says nothing about caching on a fresh series', async () => {
 		expect(await renderWith({})).not.toContain(keys.viewStale)
+	})
+
+	it('says a series stands on goals the source could not read', async () => {
+		expect(await renderWith({ goalsUnresolved: true })).toContain(keys.stateGoalsUnresolved)
+		expect(await renderWith({})).not.toContain(keys.stateGoalsUnresolved)
+	})
+})
+
+describe('AnalyticsTrendWidget custom range', () => {
+	it('says a range before 1970 is invalid instead of charting the last 30 days', async () => {
+		const html = await renderWidget({
+			metric: 'pageviews',
+			timeframe: 'custom',
+			range: { from: '1969-12-01', to: '1970-01-05' },
+		})
+		expect(html).toContain(keys.viewErrorInvalid)
+		expect(html).not.toContain('<svg')
 	})
 })

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
 	type ChannelInput,
 	classifyChannel,
+	clickIdOf,
 	deriveSource,
 	type SourceInput,
 	TRAFFIC_CHANNELS,
@@ -238,6 +239,19 @@ describe('classifyChannel', () => {
 		}
 	})
 
+	// A stored hit keeps the click id by name instead of its query, and is classified again from it.
+	it('answers the same from the click id alone as from the query it was read out of', () => {
+		for (const [, input] of CASES) {
+			const { query, ...kept } = input
+			expect(classifyChannel({ ...kept, clickId: clickIdOf(query) })).toBe(classifyChannel(input))
+		}
+	})
+
+	it('reads the click id it is handed over the query beside it', () => {
+		expect(classifyChannel({ query: 'gclid=1', clickId: 'ttclid' })).toBe('paid-social')
+		expect(classifyChannel({ clickId: 'GCLID' })).toBe('paid-search')
+	})
+
 	it('separates paid from organic on every platform it knows', () => {
 		expect(TRAFFIC_CHANNELS).toEqual([
 			'direct',
@@ -253,6 +267,24 @@ describe('classifyChannel', () => {
 			'referral',
 			'paid-other',
 		])
+	})
+})
+
+describe('clickIdOf', () => {
+	it('names the first paid network click id, whatever its case, and never keeps its value', () => {
+		expect(clickIdOf('utm_source=x&MSCLKID=abc&gclid=def')).toBe('msclkid')
+		expect(clickIdOf('fbclid=a&ttclid=b')).toBe('ttclid')
+	})
+
+	it("names Facebook's only when no paid one came with it", () => {
+		expect(clickIdOf('fbclid=a&utm_medium=social')).toBe('fbclid')
+	})
+
+	it('names nothing for an empty value, an unknown key or no query at all', () => {
+		expect(clickIdOf('gclid=&fbclid=')).toBeUndefined()
+		expect(clickIdOf('ref=abc&constructor=1')).toBeUndefined()
+		expect(clickIdOf('')).toBeUndefined()
+		expect(clickIdOf(undefined)).toBeUndefined()
 	})
 })
 

@@ -1,6 +1,7 @@
 import type {
 	Config,
 	Field,
+	PayloadComponent,
 	SelectField,
 	SelectFieldSingleValidation,
 	Widget,
@@ -8,41 +9,43 @@ import type {
 } from 'payload'
 import { type CapabilityRequirement, satisfiesCapabilities } from '../core/capabilities'
 import type { AnalyticsAdapter, MetricKey } from '../core/contract'
+import { isMetricKey } from '../core/guards'
+import type {
+	AnalyticsComponent,
+	AnalyticsCountryFlags,
+	AnalyticsWidgetOverride,
+	AnalyticsWidgetOverrides,
+} from '../core/options'
+import { isRecord } from '../core/values'
+import type { BuiltInWidgetSlug } from '../core/widgetSlugs'
 import { dateRangeField } from '../fields/dateRange/field'
 import { TIMEFRAME_PRESETS } from '../timeframe/presets'
-import { de } from '../translations/de'
-import { en } from '../translations/en'
-import type { TranslationKey } from '../translations/keys'
-import { keys } from '../translations/keys'
+import { numberFormat } from '../translations/intl'
+import { keys, type SingularKey } from '../translations/keys'
 import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
 import { labelForKey } from '../translations/server'
+import { builtInStaticLabel, type StaticLabelFor } from '../translations/staticLabel'
+import { withoutVisitsAlias } from '../view/metricAliases'
 import { BREAKDOWN_SPECS, type BreakdownSpec } from './breakdownTypes'
-import { buildCustomWidgets, type CustomWidgetDef } from './customWidget'
+import { buildCustomWidgets, type CustomWidgetDef, widgetIsSupported } from './customWidget'
+import { fieldByName, HALF, THIRD, TWO_THIRDS } from './fieldRows'
 import { filterField } from './filterField'
 import { GOAL_ROW_LIMITS, WIDGET_METRICS } from './types'
-import type { WidgetView } from './viewLink'
-
-/**
- * Select options must carry static labels: `filterOptions` results are serialized
- * into client form state at request time, where a label function cannot cross the
- * server/client boundary.
- */
-const staticLabel = (key: TranslationKey): Record<string, string> => ({
-	de: de[key],
-	en: en[key],
-})
+import type { WidgetView, WidgetViewProps } from './viewLink'
 
 export interface RegisterWidgetsArgs {
 	adapters: AnalyticsAdapter[]
 	multiProvider: boolean
 	/**
-	 * True when a tenant's own runtime adapter can exist (`providers.collection` or
-	 * `providers.resolve`). Such an adapter's capabilities are unknown at config time, so
-	 * gating on the config-adapter union would impose a false ceiling: widgets and metric
-	 * options open up, and the per-request sources endpoint plus client pickers narrow per
-	 * request instead.
+	 * A tenant's runtime adapter can exist (`providers.collection` or `providers.resolve`). Its
+	 * capabilities are unknown at config time, so widgets open up and pickers narrow per request.
 	 */
 	providersEnabled: boolean
+	/**
+	 * Whether the install measures money (default on). False drops `revenue` from every metric
+	 * picker, even the multi-provider one that offers the whole contract.
+	 */
+	revenue?: boolean
 	disabled: string[]
 	register: CustomWidgetDef[]
 	localizeText?: boolean
@@ -55,36 +58,30 @@ export interface RegisterWidgetsArgs {
 	 * absent means no view to link to, and the widgets render without the footer link.
 	 */
 	view?: WidgetView
+	/** The install's `countryFlags`; false drops the flag beside a country name. */
+	countryFlags?: boolean | AnalyticsCountryFlags
+	/**
+	 * Install's static labels. Select options need them: `filterOptions` results are serialized
+	 * into client form state, where a label function cannot cross. Built-ins when absent.
+	 */
+	staticLabel?: StaticLabelFor
+	/** `widgets.overrides`: a built-in widget's component, name or settings, by slug. */
+	overrides?: AnalyticsWidgetOverrides
 }
 
 interface WidgetDef {
-	slug: string
+	slug: BuiltInWidgetSlug
 	component: string
-	label: TranslationKey
+	label: SingularKey
 	requires?: CapabilityRequirement
 	minWidth?: WidgetWidth
 	maxWidth?: WidgetWidth
 	fields: (args: RegisterWidgetsArgs) => Field[]
 }
 
-export const widgetIsSupported = (
-	requires: CapabilityRequirement | undefined,
-	adapters: AnalyticsAdapter[]
-): boolean => !requires || adapters.some((a) => satisfiesCapabilities(a.capabilities, requires))
-
 /**
- * The widget metric select. Options are limited to metrics at least one configured
- * adapter can serve, mirroring the OR-across-adapters gating used to hide whole widgets;
- * `extra` layers on further requirements (a breakdown widget's dimension, realtime) so
- * the picker never offers a metric the read path would report as unavailable. In
- * multi-provider installs `filterOptions` additionally narrows the picker to the selected
- * `dataSource`'s capabilities; an id not known at config time (a runtime/DB provider)
- * keeps the union. The default clamps to the first option when the preferred metric is
- * not servable, and options can come out empty for exotic adapter sets, which
- * {@link registerWidgets} treats as "skip this widget". When `providersEnabled`, the
- * config-adapter filter is skipped entirely: a tenant's own runtime adapter may serve
- * metrics no config adapter does, so every candidate is offered and `filterOptions` alone
- * narrows once a `dataSource` is picked.
+ * Metric select offering what some configured adapter serves (every candidate when
+ * `providersEnabled`), narrowed per picked source. With no options the widget is skipped.
  */
 const metricSelectField = (
 	candidates: MetricKey[],
@@ -92,27 +89,45 @@ const metricSelectField = (
 	opts: {
 		extra?: Omit<CapabilityRequirement, 'metrics'>
 		preferredDefault?: MetricKey
+		width?: string
 	} = {}
 ): Field => {
-	const { extra, preferredDefault = 'pageviews' } = opts
+	const { extra, preferredDefault = 'pageviews', width } = opts
 	const supports = (adapter: AnalyticsAdapter, metric: MetricKey): boolean =>
 		satisfiesCapabilities(adapter.capabilities, { ...extra, metrics: [metric] })
+	// Money first, then capabilities: an install that measures none reports no revenue, which
+	// the multi-provider branch below would otherwise offer on the strength of the contract.
+	const offered = args.revenue === false ? candidates.filter((m) => m !== 'revenue') : candidates
+	const staticLabel = args.staticLabel ?? builtInStaticLabel
 	const options = (
 		args.providersEnabled
-			? candidates
-			: candidates.filter((m) => args.adapters.some((a) => supports(a, m)))
+			? offered
+			: offered.filter((m) => args.adapters.some((a) => supports(a, m)))
 	).map((m) => ({ value: m, label: staticLabel(METRIC_KEYS[m]) }))
-	const defaultValue = options.some((o) => o.value === preferredDefault)
-		? preferredDefault
-		: options[0]?.value
+	const preferred = withoutVisitsAlias(options.map((o) => o.value))
+	const defaultValue = preferred.includes(preferredDefault) ? preferredDefault : preferred[0]
 	const filterOptions: SelectField['filterOptions'] = ({ options: opts, siblingData }) => {
-		const sourceId = (siblingData as { dataSource?: unknown } | undefined)?.dataSource
+		const sibling = isRecord(siblingData) ? siblingData : undefined
+		const sourceId = sibling?.dataSource
 		const adapter =
-			typeof sourceId === 'string' ? args.adapters.find((a) => a.id === sourceId) : undefined
-		if (!adapter) {
-			return opts
-		}
-		return opts.filter((o) => typeof o === 'object' && supports(adapter, o.value as MetricKey))
+			args.multiProvider && typeof sourceId === 'string'
+				? args.adapters.find((a) => a.id === sourceId)
+				: undefined
+		const optionValue = (option: (typeof opts)[number]): string =>
+			typeof option === 'object' ? option.value : option
+		const served = adapter
+			? opts.filter((option) => {
+					const value = optionValue(option)
+					return isMetricKey(value) && supports(adapter, value)
+				})
+			: opts
+		// `visits` stays offered only to a widget that already reads it: the admin names both
+		// counts alike, so a picker holding both would list one count twice.
+		const shown = withoutVisitsAlias(served.map(optionValue).filter(isMetricKey))
+		return served.filter(
+			(option) =>
+				optionValue(option) !== 'visits' || shown.includes('visits') || sibling?.metric === 'visits'
+		)
 	}
 	return {
 		name: 'metric',
@@ -126,30 +141,50 @@ const metricSelectField = (
 			isClearable: false,
 			components: {
 				Field: {
-					path: '@10x-media/analytics/client#MetricSelectField',
+					path: '@10x-media/analytics/rsc#MetricSelectFieldServer',
 					...(extra ? { clientProps: { requires: extra } } : {}),
 				},
 			},
+			...(width ? { width } : {}),
 		},
-		...(args.multiProvider ? { filterOptions } : {}),
+		filterOptions,
 	}
 }
 
-const titleField = (args: RegisterWidgetsArgs, placeholder: string): Field => ({
+type RowEntry = [make: (width?: string) => Field, width: string]
+
+/**
+ * One `row` of fields, or the bare field when the install left only one: a row holding a single
+ * half-width field reads as a mistake.
+ */
+const rowOf = (entries: Array<RowEntry | null>): Field[] => {
+	const present = entries.filter((entry): entry is RowEntry => entry !== null)
+	const only = present[0]
+	if (only === undefined) {
+		return []
+	}
+	if (present.length === 1) {
+		return [only[0]()]
+	}
+	return [{ type: 'row', fields: present.map(([make, width]) => make(width)) }]
+}
+
+/** Its placeholder is a locale map: Payload reads a placeholder where no label function runs. */
+const titleField = (args: RegisterWidgetsArgs, placeholder: SingularKey): Field => ({
 	name: 'title',
 	type: 'text',
 	label: labelForKey(keys.widgetFieldTitle),
 	...(args.localizeText ? { localized: true } : {}),
-	admin: { placeholder },
+	admin: { placeholder: (args.staticLabel ?? builtInStaticLabel)(placeholder) },
 })
 
-const timeframeSelectField = (): Field => ({
+const timeframeSelectField = (width?: string): Field => ({
 	name: 'timeframe',
 	type: 'select',
 	required: true,
 	defaultValue: 'last30days',
 	label: labelForKey(keys.widgetFieldTimeframe),
-	admin: { isClearable: false },
+	admin: { isClearable: false, ...(width ? { width } : {}) },
 	options: [
 		...TIMEFRAME_PRESETS.map((p) => ({ value: p, label: labelForKey(TIMEFRAME_KEYS[p]) })),
 		{ value: 'custom', label: labelForKey(keys.widgetTimeframeCustom) },
@@ -157,14 +192,24 @@ const timeframeSelectField = (): Field => ({
 })
 
 /** Reads the previous period too: the trend overlays it, the goals table deltas against it. */
-const compareField = (): Field => ({
+const compareField = (width?: string): Field => ({
 	name: 'compare',
 	type: 'checkbox',
 	defaultValue: false,
 	label: labelForKey(keys.widgetFieldCompare),
+	admin: { style: { alignSelf: 'flex-end' }, ...(width ? { width } : {}) },
 })
 
-const dataSourceField = (args: RegisterWidgetsArgs): Field => ({
+/**
+ * Payload's select validator rejects any value absent from `options`, but runtime (DB-registered)
+ * provider ids are only known per request, not at config time.
+ */
+const validateSourceId: SelectFieldSingleValidation = (value) =>
+	value === undefined || value === null || (typeof value === 'string' && value.length > 0)
+		? true
+		: 'invalid data source'
+
+const dataSourceField = (args: RegisterWidgetsArgs, width?: string): Field => ({
 	name: 'dataSource',
 	type: 'select',
 	label: labelForKey(keys.widgetFieldDataSource),
@@ -172,22 +217,23 @@ const dataSourceField = (args: RegisterWidgetsArgs): Field => ({
 	admin: {
 		// Clearing would leave no source; the widget always reads through one.
 		isClearable: false,
-		components: { Field: { path: '@10x-media/analytics/client#SourceSelectField' } },
+		components: { Field: { path: '@10x-media/analytics/rsc#SourceSelectFieldServer' } },
+		...(width ? { width } : {}),
 	},
 	options: args.adapters.map((a) => ({ value: a.id, label: a.label })),
-	// Payload's select validator rejects any value absent from `options`, but runtime
-	// (DB-registered) provider ids are only known per request, not at config time.
-	validate: ((value) =>
-		value === undefined || value === null || (typeof value === 'string' && value.length > 0)
-			? true
-			: 'invalid data source') as SelectFieldSingleValidation,
+	validate: validateSourceId,
 })
 
+/**
+ * Alone on its line, never in a row: it is the form's one conditional field, and a row whose
+ * other half never disappears would leave a gap wherever the condition is false.
+ */
 const customRangeField = (): Field =>
 	dateRangeField({
 		name: 'range',
 		label: labelForKey(keys.widgetFieldRange),
 		pickerAppearance: 'dayOnly',
+		untilToday: true,
 		overrides: (f) => ({
 			...f,
 			admin: {
@@ -197,78 +243,131 @@ const customRangeField = (): Field =>
 		}),
 	})
 
-/** The metric select in a widget's field list. */
-export const findMetricField = (fields: Field[]): Field | undefined =>
-	fields.find((field) => 'name' in field && field.name === 'metric')
+/** The metric select in a widget's field list, wherever the form's rows put it. */
+export const findMetricField = (fields: Field[]): Field | undefined => fieldByName(fields, 'metric')
 
-const metricWidgetFields = (args: RegisterWidgetsArgs, extra: Field[] = []): Field[] => [
-	titleField(args, en[keys.widgetFieldTitlePlaceholder]),
-	metricSelectField(WIDGET_METRICS, args),
-	timeframeSelectField(),
-	customRangeField(),
-	...extra,
-	...(args.multiProvider ? [dataSourceField(args)] : []),
-	filterField(),
-]
-
-const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): Field[] => [
-	titleField(args, en[spec.label]),
-	metricSelectField(WIDGET_METRICS, args, {
-		extra: { dimensions: [spec.dimension] },
-		...(spec.preferredDefault ? { preferredDefault: spec.preferredDefault } : {}),
-	}),
-	timeframeSelectField(),
-	customRangeField(),
-	{
-		name: 'limit',
-		type: 'number',
-		defaultValue: 5,
-		min: 1,
-		max: 20,
-		label: labelForKey(keys.widgetFieldLimit),
-	},
-	...(args.multiProvider ? [dataSourceField(args)] : []),
-	filterField(),
-]
+const breakdownLimitField = (width?: string): Field => ({
+	name: 'limit',
+	type: 'number',
+	defaultValue: 5,
+	min: 1,
+	max: 20,
+	label: labelForKey(keys.widgetFieldLimit),
+	...(width ? { admin: { width } } : {}),
+})
 
 /** A select, not the breakdown's free number: the goals table is a summary, not a report. */
-const goalLimitField = (): Field => ({
+const goalLimitField = (width?: string): Field => ({
 	name: 'limit',
 	type: 'select',
 	defaultValue: String(GOAL_ROW_LIMITS[0]),
 	label: labelForKey(keys.widgetFieldLimit),
-	admin: { isClearable: false },
+	admin: { isClearable: false, ...(width ? { width } : {}) },
 	options: GOAL_ROW_LIMITS.map((limit) => ({ value: String(limit), label: String(limit) })),
 })
 
-const goalsWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
-	titleField(args, en[keys.widgetGoals]),
-	timeframeSelectField(),
+const WINDOW_MINUTES = [5, 15, 30, 60]
+
+const minutesFormat = (locale: string): Intl.NumberFormat =>
+	numberFormat(locale, { style: 'unit', unit: 'minute', unitDisplay: 'short' })
+
+/**
+ * A number of minutes in every language the install's labels carry, as each writes it: an
+ * option label is static, so it cannot be formatted for the reader when the form renders.
+ */
+const minutesLabel = (args: RegisterWidgetsArgs, minutes: number): Record<string, string> => {
+	const locales = Object.keys((args.staticLabel ?? builtInStaticLabel)(keys.widgetFieldWindow))
+	return Object.fromEntries(
+		locales.map((locale) => [locale, minutesFormat(locale).format(minutes)])
+	)
+}
+
+const windowMinutesField = (args: RegisterWidgetsArgs, width?: string): Field => ({
+	name: 'windowMinutes',
+	type: 'select',
+	defaultValue: '30',
+	label: labelForKey(keys.widgetFieldWindow),
+	admin: { isClearable: false, ...(width ? { width } : {}) },
+	options: WINDOW_MINUTES.map((minutes) => ({
+		value: String(minutes),
+		label: minutesLabel(args, minutes),
+	})),
+})
+
+const metricRow = (args: RegisterWidgetsArgs, candidates: MetricKey[]): Field[] =>
+	rowOf([
+		[(width) => metricSelectField(candidates, args, { width }), HALF],
+		[timeframeSelectField, HALF],
+	])
+
+const metricWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
+	titleField(args, keys.widgetFieldTitlePlaceholder),
+	...metricRow(args, WIDGET_METRICS),
 	customRangeField(),
-	goalLimitField(),
-	...(args.comparison === false ? [] : [compareField()]),
 	...(args.multiProvider ? [dataSourceField(args)] : []),
+	filterField(),
+]
+
+const trendWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
+	titleField(args, keys.widgetFieldTitlePlaceholder),
+	...metricRow(args, WIDGET_METRICS),
+	customRangeField(),
+	...rowOf([
+		args.multiProvider ? [(width) => dataSourceField(args, width), HALF] : null,
+		args.comparison === false ? null : [compareField, HALF],
+	]),
+	filterField(),
+]
+
+const breakdownWidgetFields = (args: RegisterWidgetsArgs, spec: BreakdownSpec): Field[] => [
+	titleField(args, spec.label),
+	...rowOf([
+		[
+			(width) =>
+				metricSelectField(spec.metrics ?? WIDGET_METRICS, args, {
+					extra: { dimensions: [spec.dimension] },
+					preferredDefault: spec.preferredDefault,
+					width,
+				}),
+			HALF,
+		],
+		[timeframeSelectField, HALF],
+	]),
+	customRangeField(),
+	...rowOf([
+		[breakdownLimitField, THIRD],
+		args.multiProvider ? [(width) => dataSourceField(args, width), TWO_THIRDS] : null,
+	]),
+	filterField(),
+]
+
+const goalsWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
+	titleField(args, keys.widgetGoals),
+	...rowOf([
+		[timeframeSelectField, HALF],
+		[goalLimitField, HALF],
+	]),
+	customRangeField(),
+	...rowOf([
+		args.comparison === false ? null : [compareField, HALF],
+		args.multiProvider ? [(width) => dataSourceField(args, width), HALF] : null,
+	]),
 ]
 
 const realtimeWidgetFields = (args: RegisterWidgetsArgs): Field[] => [
-	titleField(args, en[keys.widgetFieldTitlePlaceholder]),
-	metricSelectField(['visitors', 'pageviews'], args, {
-		extra: { realtime: true },
-		preferredDefault: 'visitors',
-	}),
-	{
-		name: 'windowMinutes',
-		type: 'select',
-		defaultValue: '30',
-		label: labelForKey(keys.widgetFieldWindow),
-		admin: { isClearable: false },
-		options: [
-			{ value: '5', label: '5 min' },
-			{ value: '15', label: '15 min' },
-			{ value: '30', label: '30 min' },
-			{ value: '60', label: '60 min' },
+	titleField(args, keys.widgetFieldTitlePlaceholder),
+	...rowOf([
+		[
+			(width) =>
+				metricSelectField(['visitors', 'pageviews'], args, {
+					extra: { realtime: true },
+					preferredDefault: 'visitors',
+					width,
+				}),
+			HALF,
 		],
-	},
+		[(width) => windowMinutesField(args, width), HALF],
+	]),
 	...(args.multiProvider ? [dataSourceField(args)] : []),
 ]
 
@@ -288,15 +387,15 @@ const WIDGET_DEFS: WidgetDef[] = [
 		requires: { metrics: ['pageviews'] },
 		minWidth: 'small',
 		maxWidth: 'full',
-		fields: (args) => metricWidgetFields(args, args.comparison === false ? [] : [compareField()]),
+		fields: trendWidgetFields,
 	},
 	{
 		slug: 'analytics-realtime',
 		component: '@10x-media/analytics/rsc#AnalyticsRealtimeWidget',
 		label: keys.widgetRealtimeLabel,
 		requires: { realtime: true },
-		minWidth: 'small' as WidgetWidth,
-		maxWidth: 'medium' as WidgetWidth,
+		minWidth: 'small',
+		maxWidth: 'medium',
 		fields: realtimeWidgetFields,
 	},
 	{
@@ -304,8 +403,8 @@ const WIDGET_DEFS: WidgetDef[] = [
 		component: '@10x-media/analytics/rsc#AnalyticsGoalsWidget',
 		label: keys.widgetGoals,
 		requires: { metrics: ['conversions'], dimensions: ['goal'] },
-		minWidth: 'small' as WidgetWidth,
-		maxWidth: 'large' as WidgetWidth,
+		minWidth: 'small',
+		maxWidth: 'large',
 		fields: goalsWidgetFields,
 	},
 	...BREAKDOWN_SPECS.map(
@@ -314,15 +413,55 @@ const WIDGET_DEFS: WidgetDef[] = [
 			component: '@10x-media/analytics/rsc#AnalyticsBreakdownWidget',
 			label: spec.label,
 			requires: { dimensions: [spec.dimension] },
-			minWidth: 'small' as WidgetWidth,
-			maxWidth: 'large' as WidgetWidth,
+			minWidth: 'small',
+			maxWidth: 'large',
 			fields: (args) => breakdownWidgetFields(args, spec),
 		})
 	),
 ]
 
+/**
+ * The widget's component: the plugin's own, or the host's in its place. Either way it keeps the
+ * plugin's server props, which the host's own `serverProps` add to.
+ */
+const componentOf = (
+	path: string,
+	serverProps: WidgetViewProps,
+	override: AnalyticsComponent | undefined
+): PayloadComponent => {
+	if (override === undefined) {
+		return { path, serverProps }
+	}
+	if (typeof override === 'string') {
+		return { path: override, serverProps }
+	}
+	return { ...override, serverProps: { ...serverProps, ...override.serverProps } }
+}
+
+/** A host's `fields` override, which has to hand back a list of fields. */
+const overriddenFields = (
+	slug: string,
+	defaultFields: Field[],
+	override?: AnalyticsWidgetOverride['fields']
+) => {
+	if (!override) {
+		return defaultFields
+	}
+	const fields = override({ defaultFields })
+	if (!Array.isArray(fields)) {
+		throw new Error(
+			`analytics: widgets.overrides.${slug}.fields must return an array of fields, got ${typeof fields}`
+		)
+	}
+	return fields
+}
+
 export const registerWidgets = (config: Config, args: RegisterWidgetsArgs): void => {
 	const built: Widget[] = []
+	const serverProps: WidgetViewProps = {
+		view: args.view ?? false,
+		countryFlags: args.countryFlags ?? true,
+	}
 	for (const def of WIDGET_DEFS) {
 		if (args.disabled.includes(def.slug)) {
 			continue
@@ -330,18 +469,19 @@ export const registerWidgets = (config: Config, args: RegisterWidgetsArgs): void
 		if (!args.providersEnabled && !widgetIsSupported(def.requires, args.adapters)) {
 			continue
 		}
-		const fields = def.fields(args)
+		const defaults = def.fields(args)
 		// A required metric select with no servable option would make the widget
 		// impossible to configure; skip it like an unsupported widget.
-		const metricField = findMetricField(fields)
+		const metricField = findMetricField(defaults)
 		if (metricField && 'options' in metricField && metricField.options.length === 0) {
 			continue
 		}
+		const override = args.overrides?.[def.slug]
 		built.push({
 			slug: def.slug,
-			Component: { path: def.component, serverProps: { view: args.view ?? false } },
-			label: labelForKey(def.label),
-			fields,
+			Component: componentOf(def.component, serverProps, override?.Component),
+			label: override?.label ?? labelForKey(def.label),
+			fields: overriddenFields(def.slug, defaults, override?.fields),
 			minWidth: def.minWidth,
 			maxWidth: def.maxWidth,
 		})
@@ -350,8 +490,10 @@ export const registerWidgets = (config: Config, args: RegisterWidgetsArgs): void
 	if (!built.length) {
 		return
 	}
-	config.admin ??= {}
-	config.admin.dashboard ??= { widgets: [] }
-	config.admin.dashboard.widgets ??= []
-	config.admin.dashboard.widgets.push(...built)
+	// New objects all the way down: the host may share its `admin` or `dashboard` across configs.
+	const dashboard = config.admin?.dashboard
+	config.admin = {
+		...config.admin,
+		dashboard: { ...dashboard, widgets: [...(dashboard?.widgets ?? []), ...built] },
+	}
 }

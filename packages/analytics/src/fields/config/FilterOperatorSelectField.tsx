@@ -1,98 +1,74 @@
 'use client'
 
-import {
-	FieldDescription,
-	type ReactSelectOption,
-	SelectInput,
-	useField,
-	withCondition,
-} from '@payloadcms/ui'
-import { mergeFieldStyles } from '@payloadcms/ui/shared'
+import { useField, useFormFields, withCondition } from '@payloadcms/ui'
 import type { TextFieldClientProps } from 'payload'
 import { useMemo } from 'react'
-import { FILTER_OPERATORS, type FilterOperator } from '../../core/contract'
-import { keys } from '../../translations/keys'
+import { isDimensionKey, isFilterOperator } from '../../core/guards'
+import { siblingPath } from '../../goals/amountField'
 import { FILTER_OPERATOR_KEYS } from '../../translations/metricKeys'
 import { useTranslation } from '../../translations/useTranslation'
+import { FilterKeySelect, filterNotice, keyOptions } from './FilterKeySelect'
 import { useFilterCapabilities } from './useFilterCapabilities'
 
+/** @beta */
 export type FilterOperatorSelectFieldProps = TextFieldClientProps & {
 	/**
 	 * Path of the sibling source select this picker narrows against, for custom widgets
 	 * whose source field is named differently. Defaults to `'dataSource'`.
 	 */
 	sourceFieldPath?: string
+	/**
+	 * Path of the dimension picker this operator belongs to. Defaults to the sibling named
+	 * `dimension`, which is where the built-in filter group keeps it.
+	 */
+	dimensionFieldPath?: string
 }
 
-const asOperator = (value: string): FilterOperator | undefined =>
-	FILTER_OPERATORS.find((op) => op === value)
-
 /**
- * Operator picker for a widget's filter group: offers only the operators the widget's
- * chosen source supports, unioned over the request's sources while none is chosen. It is
- * not clearable, because a filter always compares somehow; the dimension is the gate that
- * turns the filter off.
+ * Offers only operators the chosen source takes for the chosen dimension. Not clearable: a filter
+ * always compares somehow, and the dimension is what turns it off.
  */
 const FilterOperatorSelectFieldComponent = (props: FilterOperatorSelectFieldProps) => {
-	const { field, path: pathFromProps, readOnly, sourceFieldPath } = props
+	const { dimensionFieldPath, field, path: pathFromProps, readOnly, sourceFieldPath } = props
 	const { t } = useTranslation()
-	const { error, operators, resolved } = useFilterCapabilities(sourceFieldPath)
 	const {
-		customComponents: { AfterInput, BeforeInput, Description, Error: ErrorComponent, Label } = {},
-		disabled,
-		path,
-		setValue,
-		showError,
-		value,
-	} = useField<string>({ potentiallyStalePath: pathFromProps })
-
-	const options = useMemo(() => {
-		const offered = operators.map((op) => ({ label: t(FILTER_OPERATOR_KEYS[op]), value: op }))
-		if (!value || operators.some((op) => op === value)) return offered
-		const known = asOperator(value)
-		return [{ label: known ? t(FILTER_OPERATOR_KEYS[known]) : value, value }, ...offered]
-	}, [operators, t, value])
-	const style = useMemo(() => mergeFieldStyles(field), [field])
-
-	const notice = error
-		? t(keys.fieldFilterError)
-		: resolved && operators.length === 0
-			? t(keys.fieldFilterEmpty)
-			: null
+		error,
+		operators: anyOperators,
+		operatorsFor,
+		resolved,
+	} = useFilterCapabilities(sourceFieldPath)
+	const fieldState = useField<string>({ potentiallyStalePath: pathFromProps })
+	const stored = fieldState.value
+	const dimension = useFormFields(([fields]) => {
+		const picked = fields?.[dimensionFieldPath ?? siblingPath(fieldState.path, 'dimension')]?.value
+		return isDimensionKey(picked) ? picked : undefined
+	})
+	const operators = useMemo(
+		() => (dimension === undefined ? anyOperators : operatorsFor(dimension)),
+		[anyOperators, dimension, operatorsFor]
+	)
+	const options = useMemo(
+		() =>
+			keyOptions({
+				offered: operators,
+				stored,
+				isKey: isFilterOperator,
+				labelOf: (operator) => t(FILTER_OPERATOR_KEYS[operator]),
+			}),
+		[operators, t, stored]
+	)
 
 	return (
-		<SelectInput
-			AfterInput={AfterInput}
-			BeforeInput={BeforeInput}
-			className={field.admin?.className}
-			Description={
-				notice ? (
-					<>
-						{Description ?? <FieldDescription description={field.admin?.description} path={path} />}
-						<div className="field-description">{notice}</div>
-					</>
-				) : (
-					Description
-				)
-			}
-			description={field.admin?.description}
-			Error={ErrorComponent}
+		<FilterKeySelect
+			field={field}
+			fieldState={fieldState}
 			isClearable={false}
-			Label={Label}
-			label={field.label}
-			name={field.name}
-			onChange={(selected: ReactSelectOption | ReactSelectOption[]) => {
-				const option = Array.isArray(selected) ? selected[0] : selected
-				setValue(option?.value ? String(option.value) : null)
-			}}
+			notice={filterNotice(t, { error, resolved, offered: operators.length })}
 			options={options}
-			path={path}
-			readOnly={readOnly || disabled || field.admin?.readOnly}
-			showError={showError}
-			style={style}
-			value={value}
+			readOnly={readOnly}
 		/>
 	)
 }
 
+/** @beta */
 export const FilterOperatorSelectField = withCondition(FilterOperatorSelectFieldComponent)

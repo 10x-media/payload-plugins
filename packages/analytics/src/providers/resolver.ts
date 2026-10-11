@@ -1,18 +1,15 @@
-import { createLocalReq, type Where } from 'payload'
+import type { Where } from 'payload'
 import type { AnalyticsAdapter } from '../core/contract'
-import {
-	type AdapterRegistry,
-	createRegistry,
-	type RegistryResolver,
-	type ResolveRegistryArgs,
-} from '../core/registry'
-import { adapterFromProviderDoc, type ProviderDoc } from './factory'
-import { SECRET_PATHS } from './secrets'
+import type { FetchLike } from '../core/fetch'
+import { createRegistry, type ScopeRegistry } from '../core/registry'
+import { HostRefusedError } from '../core/sourceErrors'
 
-export const PROVIDERS_CACHE_TTL_MS = 30_000
-
-/** Produces the runtime adapters layered onto the static base for one scope. */
-export type ProvidersSource = (args: ResolveRegistryArgs) => Promise<AnalyticsAdapter[]>
+/** One provider document's adapter, tagged with the document that configured it. */
+export interface ProviderAdapter {
+	adapter: AnalyticsAdapter
+	/** Document id, or the adapter's own id for a `providers.resolve` adapter with no document. */
+	docId: string
+}
 
 export interface RegistryBase {
 	adapters: AnalyticsAdapter[]
@@ -20,129 +17,39 @@ export interface RegistryBase {
 }
 
 /**
- * Append runtime adapters after the static base. Ids are disjoint by
- * construction (instance ids carry a ':', config ids do not); an extra that
- * still collides with a base id (a custom providers.resolve returning a plain
- * provider id) is skipped so config adapters always win, and the default
- * adapter is always a config adapter.
+ * Appends document adapters to the config base and records their grants; one sharing a base id (a
+ * `native` document) takes its place, keeping the id, default and grant lookups. The first document
+ * per id wins.
  */
-export const combineRegistries = (
-	base: RegistryBase,
-	extra: AnalyticsAdapter[]
-): AdapterRegistry => {
-	if (extra.length === 0) {
-		return createRegistry(base.adapters, base.defaultId)
-	}
-	const seen = new Set(base.adapters.map((a) => a.id))
+export const combineRegistries = (base: RegistryBase, extra: ProviderAdapter[]): ScopeRegistry => {
+	const indexById = new Map(base.adapters.map((adapter, index) => [adapter.id, index]))
 	const merged = [...base.adapters]
-	for (const adapter of extra) {
-		if (!seen.has(adapter.id)) {
+	const grants = new Map<string, string>()
+	for (const { adapter, docId } of extra) {
+		if (grants.has(adapter.id)) {
+			continue
+		}
+		grants.set(adapter.id, docId)
+		const index = indexById.get(adapter.id)
+		if (index === undefined) {
 			merged.push(adapter)
-			seen.add(adapter.id)
+		} else {
+			merged[index] = adapter
 		}
 	}
-	return createRegistry(merged, base.defaultId)
-}
-
-const setAtPath = (doc: Record<string, unknown>, path: string, value: unknown): void => {
-	const [group, field] = path.split('.') as [string, string]
-	const target = doc[group]
-	if (target && typeof target === 'object') {
-		;(target as Record<string, unknown>)[field] = value
-	}
-}
-
-const getAtPath = (doc: Record<string, unknown>, path: string): unknown => {
-	const [group, field] = path.split('.') as [string, string]
-	const target = doc[group]
-	return target && typeof target === 'object'
-		? (target as Record<string, unknown>)[field]
-		: undefined
+	return { registry: createRegistry(merged, base.defaultId), grants }
 }
 
 /**
- * Look up a scope's enabled provider documents and build adapters from them.
- * Reads raw ciphertext inside a withRawEncrypted window (write-only secrets
- * are stripped from ordinary reads), then decrypts each credential through
- * the fields key ring. Legacy plaintext rows pass through decryptFieldValue
- * unchanged, so pre-encryption documents keep working until re-saved.
+ * One scope's provider documents. '' is not castable on a relationship scope field, so install-wide
+ * lookups there resolve config adapters only; readable lookups share this clause.
  */
-export const collectionProvidersSource = (slug: string, scopeField: string): ProvidersSource => {
-	return async ({ payload, req, scope }) => {
-		const { decryptFieldValue, withRawEncrypted } = await import('@10x-media/fields/encrypted')
-		const readReq = req ?? (await createLocalReq({}, payload))
-		// The empty string is not castable on a relationship-typed scopeField, so install-wide
-		// lookups on a host-owned relationship field resolve the config adapters only.
-		const scopeWhere: Where =
-			scope === null
-				? { or: [{ [scopeField]: { equals: null } }, { [scopeField]: { equals: '' } }] }
-				: { [scopeField]: { equals: scope } }
-		const { docs } = await withRawEncrypted(readReq, () =>
-			payload.find({
-				collection: slug as never,
-				where: { and: [{ enabled: { equals: true } }, scopeWhere] },
-				limit: 100,
-				pagination: false,
-				depth: 0,
-				overrideAccess: true,
-				req: readReq,
-			})
-		)
-		const adapters: AnalyticsAdapter[] = []
-		for (const raw of docs as Array<Record<string, unknown>>) {
-			try {
-				const doc = structuredClone(raw) as Record<string, unknown>
-				for (const { path } of SECRET_PATHS) {
-					const value = getAtPath(doc, path)
-					if (typeof value === 'string' && value !== '') {
-						const plain = await decryptFieldValue(payload, { collection: slug, path, value })
-						setAtPath(doc, path, typeof plain === 'string' ? plain : '')
-					}
-				}
-				const adapter = adapterFromProviderDoc(doc as ProviderDoc)
-				if (adapter) adapters.push(adapter)
-			} catch (err) {
-				// A corrupted or key-rotated-away ciphertext must not take the whole
-				// scope's registry down; skip just this document's adapter.
-				payload.logger.warn(
-					`analytics: provider document "${String(raw.id)}" (${String(raw.provider)}) failed to decrypt, skipping it: ${String(err)}`
-				)
-			}
-		}
-		return adapters
-	}
-}
+export const providerScopeWhere = (scopeField: string, scope: string | null): Where =>
+	scope === null
+		? { or: [{ [scopeField]: { equals: null } }, { [scopeField]: { equals: '' } }] }
+		: { [scopeField]: { equals: scope } }
 
-export interface ScopedRegistryResolver {
-	resolver: RegistryResolver
-	/** Drops every cached scope registry; wired to the provider collection's change hooks. */
-	invalidate: () => void
-}
-
-/**
- * Cache resolved registries per scope for a short TTL so widget-heavy dashboards
- * do not re-query the provider collection on every read. Invalidation clears all
- * scopes at once: a document's scope binding can itself change, so per-scope
- * eviction could leave a stale entry under the old scope.
- */
-export const createScopedRegistryResolver = (args: {
-	base: RegistryBase
-	source: ProvidersSource
-	ttlMs?: number
-}): ScopedRegistryResolver => {
-	const ttlMs = args.ttlMs ?? PROVIDERS_CACHE_TTL_MS
-	const cache = new Map<string | null, { registry: AdapterRegistry; expiresAt: number }>()
-	return {
-		resolver: async (resolveArgs) => {
-			const now = Date.now()
-			const hit = cache.get(resolveArgs.scope)
-			if (hit && hit.expiresAt > now) {
-				return hit.registry
-			}
-			const registry = combineRegistries(args.base, await args.source(resolveArgs))
-			cache.set(resolveArgs.scope, { registry, expiresAt: now + ttlMs })
-			return registry
-		},
-		invalidate: () => cache.clear(),
-	}
+/** A fetch that refuses every request, for an adapter that would otherwise go out unguarded. */
+export const noGuardedConnection: FetchLike = async (input) => {
+	throw new HostRefusedError(new URL(input).host, 'no guarded connection is available')
 }

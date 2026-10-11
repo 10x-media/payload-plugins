@@ -16,21 +16,84 @@ export type ResolveRegistryArgs = {
 }
 
 /**
- * The seam every read path resolves its adapters through. The static config
- * registry is the base for all scopes; runtime provider sources (collection,
- * `providers.resolve`) layer per-scope adapters on top of it.
+ * One scope's adapters, and which its own provider documents put there. A `native` document grants
+ * the config native adapter, so a granted id can name a config adapter.
  */
-export type RegistryResolver = (args: ResolveRegistryArgs) => Promise<AdapterRegistry>
+export interface ScopeRegistry {
+	registry: AdapterRegistry
+	/** Adapter id to the id of the provider document granting it to this scope. */
+	grants: ReadonlyMap<string, string>
+}
 
-/** Wrap a config-time registry as a resolver: every scope sees the same adapters. */
-export const staticRegistryResolver =
-	(registry: AdapterRegistry): RegistryResolver =>
-	() =>
-		Promise.resolve(registry)
+/** The grants of a registry no provider document adds to. */
+export const NO_GRANTS: ReadonlyMap<string, string> = new Map()
 
+/**
+ * The seam every read resolves its adapters through: the config registry for all scopes, with
+ * runtime provider sources layered per scope on top.
+ */
+export type RegistryResolver = (args: ResolveRegistryArgs) => Promise<ScopeRegistry>
+
+/**
+ * The registry minus the adapters `keep` rejects, or null when it rejects all. The default survives
+ * only if kept.
+ */
+export const filterRegistry = (
+	registry: AdapterRegistry,
+	keep: (adapter: AnalyticsAdapter) => boolean
+): AdapterRegistry | null => {
+	const kept = registry.all().filter(keep)
+	if (kept.length === 0) {
+		return null
+	}
+	if (kept.length === registry.all().length) {
+		return registry
+	}
+	const defaultId = registry.default().id
+	return createRegistry(kept, kept.some((a) => a.id === defaultId) ? defaultId : undefined)
+}
+
+/**
+ * Each adapter's copy without revenue, made once: reads reach a source through a lane keyed on the
+ * adapter object, so one adapter must narrow to one object however many registries are built.
+ */
+const withoutRevenueCopies = new WeakMap<AnalyticsAdapter, AnalyticsAdapter>()
+
+const dropRevenue = (adapter: AnalyticsAdapter): AnalyticsAdapter => {
+	if (!adapter.capabilities.metrics.has('revenue')) {
+		return adapter
+	}
+	const made = withoutRevenueCopies.get(adapter)
+	if (made) {
+		return made
+	}
+	const copy: AnalyticsAdapter = {
+		...adapter,
+		capabilities: {
+			...adapter.capabilities,
+			metrics: new Set([...adapter.capabilities.metrics].filter((metric) => metric !== 'revenue')),
+		},
+	}
+	withoutRevenueCopies.set(adapter, copy)
+	return copy
+}
+
+/**
+ * The registry with `revenue` gone from every adapter: the one place an install measuring no money
+ * hides the metric from every reader at once.
+ */
+export const withoutRevenue = (registry: AdapterRegistry): AdapterRegistry => {
+	const all = registry.all()
+	if (!all.some((adapter) => adapter.capabilities.metrics.has('revenue'))) {
+		return registry
+	}
+	return createRegistry(all.map(dropRevenue), registry.default().id)
+}
+
+/** A registry over `adapters`, reading through `defaultId` or else the first when none is named. */
 export function createRegistry(adapters: AnalyticsAdapter[], defaultId?: string): AdapterRegistry {
-	if (adapters.length === 0) throw new Error('analytics: at least one adapter is required')
-	const first = adapters[0] as AnalyticsAdapter
+	const [first] = adapters
+	if (first === undefined) throw new Error('analytics: at least one adapter is required')
 	const byId = new Map(adapters.map((a) => [a.id, a]))
 	if (defaultId !== undefined && !byId.has(defaultId)) {
 		throw new Error(`analytics: unknown default adapter "${defaultId}"`)

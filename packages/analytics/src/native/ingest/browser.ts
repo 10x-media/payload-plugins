@@ -5,9 +5,8 @@ export type BrowserName = 'chrome' | 'safari' | 'firefox' | 'edge' | 'opera' | '
 export type OsName = 'ios' | 'android' | 'windows' | 'macos' | 'linux' | 'chromeos' | 'other'
 
 /**
- * Order is the whole algorithm: every Chromium fork still calls itself Chrome, and every iOS
- * browser still calls itself Safari, so the fork has to be recognized before the engine it
- * borrowed the token from.
+ * Order matters: Chromium forks still claim Chrome and iOS browsers still claim Safari, so a fork
+ * must match before the engine it borrowed the token from.
  */
 const BROWSERS: ReadonlyArray<[RegExp, BrowserName]> = [
 	[/edg(?:a|ios|e)?\//, 'edge'],
@@ -40,9 +39,8 @@ const lookup = <T>(table: ReadonlyArray<[RegExp, T]>, ua: string, fallback: T): 
 }
 
 /**
- * Coarse browser family from a user-agent string, `other` for anything unrecognized (a bot,
- * a crawler, an HTTP client), and undefined when the agent is the synthetic server one so
- * server events abstain from the browser breakdown rather than skewing it.
+ * Coarse browser family, `other` when unrecognized, undefined for the synthetic server agent so
+ * server events abstain from the breakdown rather than skewing it.
  */
 export const classifyBrowser = (ua: string): BrowserName | undefined =>
 	lookup(BROWSERS, ua, 'other')

@@ -1,143 +1,113 @@
-import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { afterAll, beforeAll, expect, it, vi } from 'vitest'
-import { analytics } from '../../src/index'
-import { EVENTS_SLUG } from '../../src/native/collections/events'
-import { ROLLUPS_SLUG } from '../../src/native/collections/rollups'
-import { SEEN_SLUG } from '../../src/native/collections/seen'
-import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
-import { makeIngestHandler } from '../../src/native/ingest/endpoint'
-import { dailySalt, saltKey } from '../../src/native/ingest/salt'
-import { native } from '../../src/native/nativeAdapter'
 import {
-	PRUNE_TASK_SLUG,
-	type PruneOptions,
-	pruneEventsTask,
-} from '../../src/native/retention/pruneTask'
-import { ingestRequest } from './ingestRequest'
+	type BootedPayload,
+	bootPayload,
+	describeForDb,
+	installTestClock,
+	type TestClock,
+} from '@10x-media/payload-test-harness'
+import { afterAll, beforeAll, expect, it } from 'vitest'
+import { analytics } from '../../src/index'
+import { native } from '../../src/native/nativeAdapter'
+import { ulid } from '../../src/native/store/ids'
+import type { HitRow } from '../../src/native/store/types'
+import { MAINTAIN_TASK_SLUG } from '../../src/native/tasks/maintainTask'
+import { addCalendarDays, calendarDayOf, calendarDayStart } from '../../src/timeframe/calendar'
+import { DAY_MS } from '../../src/timeframe/tz'
+import { countHits, nativeOf } from './nativeHelpers'
 
-const DAY_MS = 86_400_000
-// Pinned, so a run and the assertions after it cannot straddle a UTC midnight. Offsetting the
-// task's clock forward is what makes a fixture written now older than a real positive window.
-const NOW = Date.now()
-const at = (offsetDays: number) => (): number => NOW + offsetDays * DAY_MS
-
-const ingest = (booted: BootedPayload, path: string) =>
-	makeIngestHandler({ geoResolver: platformHeaderResolver })(
-		ingestRequest(booted.payload, { type: 'pageview', path, hostname: 'h', durationMs: 500 })
-	)
-
-const prune = async (booted: BootedPayload, options: PruneOptions): Promise<void> => {
-	const handler = pruneEventsTask(options).handler as (args: {
-		req: { payload: BootedPayload['payload'] }
-	}) => Promise<unknown>
-	await handler({ req: { payload: booted.payload } })
-}
-
-const counts = async (booted: BootedPayload): Promise<Record<string, number>> => {
-	const entries = await Promise.all(
-		[EVENTS_SLUG, SEEN_SLUG, ROLLUPS_SLUG].map(async (slug) => {
-			const { totalDocs } = await booted.payload.count({ collection: slug as never })
-			return [slug, totalDocs] as const
-		})
-	)
-	return Object.fromEntries(entries)
-}
-
-describeForDb('native retention', {}, (db) => {
-	let booted: BootedPayload
-
-	beforeAll(async () => {
-		booted = await bootPayload({
-			plugin: analytics({ adapters: [native({ retentionDays: 30, rollupRetentionDays: 365 })] }),
-			db,
-		})
-	})
-
-	afterAll(async () => {
-		await booted.stop()
-	})
-
-	it('registers the nightly task', () => {
-		const slugs = (booted.payload.config.jobs?.tasks ?? []).map((task) => task.slug)
-		expect(slugs).toContain(PRUNE_TASK_SLUG)
-	})
-
-	it('keeps everything still inside its window', async () => {
-		await ingest(booted, '/fresh')
-		await prune(booted, { retentionDays: 30, rollupRetentionDays: 365, now: at(0) })
-		const after = await counts(booted)
-		expect(after[EVENTS_SLUG]).toBeGreaterThan(0)
-		expect(after[SEEN_SLUG]).toBeGreaterThan(0)
-		expect(after[ROLLUPS_SLUG]).toBeGreaterThan(0)
-	})
-
-	// A window of zero means "keep everything" wherever it is configured, so the task must never
-	// read it as a cutoff of now and wipe the store.
-	it('deletes nothing for a window of zero, however far the clock has moved', async () => {
-		const before = await counts(booted)
-		await prune(booted, { retentionDays: 0, rollupRetentionDays: -1, now: at(400) })
-		expect(await counts(booted)).toEqual(before)
-	})
-
-	it('prunes events and the seen ledger while rollups keep their own window', async () => {
-		await ingest(booted, '/old')
-		const before = await counts(booted)
-		expect(before[EVENTS_SLUG]).toBeGreaterThan(0)
-		await prune(booted, { retentionDays: 30, now: at(40) })
-		const after = await counts(booted)
-		expect(after[EVENTS_SLUG]).toBe(0)
-		expect(after[SEEN_SLUG]).toBe(0)
-		expect(after[ROLLUPS_SLUG]).toBe(before[ROLLUPS_SLUG])
-	})
-
-	it('prunes rollups once a rollup window is set', async () => {
-		await ingest(booted, '/rolled')
-		expect((await counts(booted))[ROLLUPS_SLUG]).toBeGreaterThan(0)
-		await prune(booted, { retentionDays: 30, rollupRetentionDays: 90, now: at(400) })
-		expect((await counts(booted))[ROLLUPS_SLUG]).toBe(0)
-	})
-
-	it('sweeps the daily salts from two days back, keeping today and yesterday', async () => {
-		const days = [0, 1, 2, 3, 70]
-		const keys = days.map((day) => saltKey(new Date(NOW - day * DAY_MS)))
-		await Promise.all(keys.map((key) => booted.payload.kv.set(key, { salt: 'test' })))
-		await prune(booted, { now: at(0) })
-		const present = await Promise.all(keys.map((key) => booted.payload.kv.has(key)))
-		expect(present).toEqual([true, true, false, false, true])
-	})
+/** A landing pageview on `/` at `ts`, by a visitor of its own. */
+const pageviewAt = (ts: Date, v: string): HitRow => ({
+	id: ulid(ts),
+	scope: '',
+	ts,
+	type: 'pageview',
+	hostname: 'h',
+	path: '/',
+	v,
+	landing: true,
+	server: false,
 })
 
-describeForDb('native retention left unset', {}, (db) => {
+describeForDb('native retention', {}, (db) => {
+	const adapter = native({ retention: { rawDays: 30 } })
 	let booted: BootedPayload
+	let clock: TestClock
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+		// Held still, so the raw floor the engine reports is the one this spec works out.
+		clock = installTestClock(new Date())
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [adapter], capture: { gate: 'off' } }),
+			db,
+		})
+		const now = clock.now().getTime()
+		await nativeOf(booted.payload).store.append([
+			pageviewAt(new Date(now - 40 * DAY_MS), 'old-visitor'),
+			pageviewAt(new Date(now - 60_000), 'new-visitor'),
+		])
 	})
 
 	afterAll(async () => {
+		clock?.reset()
 		await booted.stop()
+	})
+
+	const lastSixtyDays = () => {
+		const now = clock.now().getTime()
+		return { start: new Date(now - 60 * DAY_MS), end: new Date(now + 60_000) }
+	}
+
+	// A read only raw hits answer (a `contains` filter) reads them back `rawDays` days at most.
+	it('reads raw hits back as far as retention.rawDays, and says where a longer read starts', async () => {
+		const filtered = await adapter.query(
+			{
+				metrics: ['pageviews'],
+				dateRange: lastSixtyDays(),
+				filters: [{ dimension: 'page', operator: 'contains', value: '/' }],
+				timezone: 'UTC',
+			},
+			{ payload: booted.payload }
+		)
+		expect(filtered.totals).toEqual({ pageviews: 1 })
+		const floorDay = addCalendarDays(calendarDayOf(clock.now(), 'UTC'), -29)
+		expect(filtered.meta).toMatchObject({
+			clamped: true,
+			dataFrom: calendarDayStart(floorDay, 'UTC').toISOString(),
+		})
+		expect(adapter.capabilities.filterLookbackDays).toBe(30)
+	})
+
+	it('answers an unfiltered read over every day, its older days from their daily totals', async () => {
+		const plain = await adapter.query(
+			{ metrics: ['pageviews', 'visitors'], dateRange: lastSixtyDays() },
+			{ payload: booted.payload }
+		)
+		expect(plain.totals).toEqual({ pageviews: 2, visitors: 2 })
+		expect(plain.meta.clamped).toBeUndefined()
+	})
+
+	it('deletes no raw hit while reading, the ones past rawDays included', async () => {
+		expect(await countHits(booted.payload)).toBe(2)
+	})
+
+	it('prunes the raw hits past rawDays once maintenance has counted their day, keeping its totals', async () => {
+		const report = await nativeOf(booted.payload).engine.maintain({ budgetMs: 120_000 })
+		expect(report.prunedHits).toBe(1)
+		expect(await countHits(booted.payload)).toBe(1)
+		const plain = await adapter.query(
+			{ metrics: ['pageviews', 'visitors'], dateRange: lastSixtyDays() },
+			{ payload: booted.payload }
+		)
+		expect(plain.totals).toEqual({ pageviews: 2, visitors: 2 })
 	})
 
 	// One task is what turns Payload's jobs on, the payload-jobs collection and the stats global
-	// with it, so an install that configured no window must gain neither from this plugin.
-	it('registers no prune task and brings no jobs collection with it', () => {
-		const slugs = (booted.payload.config.jobs?.tasks ?? []).map((task) => task.slug)
-		expect(slugs).not.toContain(PRUNE_TASK_SLUG)
-		expect(booted.payload.config.jobs?.enabled).toBe(false)
-		expect(booted.payload.config.collections.map((c) => c.slug)).not.toContain('payload-jobs')
-	})
-
-	it('still sweeps the salts a new day made stale, with no task to run', async () => {
-		const now = new Date('2031-05-10T11:00:00.000Z')
-		const key = (daysAgo: number): string => saltKey(new Date(now.getTime() - daysAgo * DAY_MS))
-		await booted.payload.kv.set(key(1), { salt: 'yesterday' })
-		await booted.payload.kv.set(key(2), { salt: 'stale' })
-		await dailySalt(booted.payload, now)
-		// The sweep is fire and forget, so the assertion waits for it rather than the caller.
-		await vi.waitFor(async () => {
-			expect(await booted.payload.kv.has(key(2))).toBe(false)
-		})
-		expect(await booted.payload.kv.has(key(1))).toBe(true)
-		expect(await booted.payload.kv.has(key(0))).toBe(true)
+	// with it.
+	it('registers its maintenance task, which turns Payload’s jobs on', () => {
+		expect(booted.payload.config.jobs?.tasks?.map((task) => task.slug)).toEqual([
+			MAINTAIN_TASK_SLUG,
+		])
+		expect(booted.payload.config.jobs?.enabled).toBe(true)
+		expect(booted.payload.config.collections.map((c) => c.slug)).toContain('payload-jobs')
 	})
 })

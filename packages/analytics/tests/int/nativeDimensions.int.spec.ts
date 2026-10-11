@@ -3,20 +3,21 @@ import type { Endpoint, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { DimensionKey } from '../../src/core/contract'
 import { analytics } from '../../src/index'
-import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { native } from '../../src/native/nativeAdapter'
+import { isRawDimension } from '../../src/native/store/rawRead'
+import { calendarDayOf } from '../../src/timeframe/calendar'
 import { ingestRequest } from './ingestRequest'
+import { aroundNow, nativeOf, storedHits } from './nativeHelpers'
 
 const CHROME_MAC =
 	'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 const FIREFOX_WINDOWS =
 	'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0'
-const RANGE = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
 
 const CAMPAIGN_QUERY =
 	'utm_source=newsletter&utm_medium=email&utm_campaign=spring&utm_content=hero&utm_term=shoes'
 
-/** The dimensions this branch adds, with the value each fixture ingest should report. */
+/** Dimensions under test, with the value each fixture ingest should report. */
 const ADDED: ReadonlyArray<readonly [DimensionKey, string]> = [
 	['referrer', 'example.org'],
 	['channel', 'email'],
@@ -36,7 +37,7 @@ type IngestHandler = (req: PayloadRequest) => Promise<Response>
 
 const ingestHandler = (booted: BootedPayload): IngestHandler => {
 	const endpoint = (booted.payload.config.endpoints ?? []).find(
-		(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		(e): e is Endpoint => typeof e === 'object' && e.path === '/_x/e'
 	)
 	if (!endpoint || typeof endpoint.handler !== 'function') {
 		throw new Error('ingest endpoint not registered')
@@ -60,7 +61,15 @@ describeForDb('native dimensions: ingest to breakdowns', {}, (db) => {
 	}
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
+		booted = await bootPayload({
+			// The fixtures carry Vercel's location headers, which only a Vercel install reads.
+			plugin: analytics({
+				adapters: [adapter],
+				capture: { gate: 'off' },
+				trustedPlatform: 'vercel',
+			}),
+			db,
+		})
 		// Two campaign visitors from a www referrer on Chrome/macOS, one plain Firefox/Windows
 		// visitor with nothing but a user agent, and one server event that knows none of it.
 		for (const visitor of ['visitor-a', 'visitor-b']) {
@@ -86,6 +95,7 @@ describeForDb('native dimensions: ingest to breakdowns', {}, (db) => {
 			{ 'user-agent': FIREFOX_WINDOWS }
 		)
 		await adapter.ingest?.track?.(
+			booted.payload,
 			{ type: 'event', name: 'invoice_paid', path: '/hook', hostname: 'site.com' },
 			{ flush: true }
 		)
@@ -100,15 +110,15 @@ describeForDb('native dimensions: ingest to breakdowns', {}, (db) => {
 		extra: Record<string, unknown> = {}
 	): Promise<Record<string, number>> => {
 		const result = await adapter.query(
-			{ metrics: ['pageviews'], dimensions: [dimension], dateRange: RANGE, ...extra },
-			{}
+			{ metrics: ['pageviews'], dimensions: [dimension], dateRange: aroundNow(), ...extra },
+			{ payload: booted.payload }
 		)
 		return Object.fromEntries(
 			result.rows.map((row) => [row.dimensions?.[dimension], row.metrics.pageviews ?? 0])
 		)
 	}
 
-	it('serves a rollup breakdown row per new dimension, from the values ingest derived', async () => {
+	it('serves a breakdown row per new dimension, from the values ingest derived', async () => {
 		for (const [dimension, value] of ADDED) {
 			expect(await breakdown(dimension)).toMatchObject({ [value]: 2 })
 		}
@@ -127,12 +137,27 @@ describeForDb('native dimensions: ingest to breakdowns', {}, (db) => {
 		expect(Object.keys(await breakdown('language'))).toEqual(['de-de'])
 	})
 
-	it('serves the same breakdown from raw events as from the rollups', async () => {
+	it("serves the same breakdown from the day's aggregate rows as from its raw hits", async () => {
+		const { engine, store } = nativeOf(booted.payload)
+		const [first] = await storedHits(booted.payload)
+		const day = calendarDayOf(new Date(String(first?.ts)), 'UTC')
+		expect(await engine.snapshot({ scope: '', day, tz: 'UTC' })).toMatchObject({
+			outcome: 'completed',
+		})
 		for (const [dimension] of ADDED) {
-			const rollups = await breakdown(dimension)
-			// granularity 'hour' bypasses the rollups and aggregates raw events instead.
-			const events = await breakdown(dimension, { granularity: 'hour' })
-			expect(events).toEqual(rollups)
+			if (!isRawDimension(dimension)) {
+				throw new Error(`${dimension} is a dimension the engine aggregates`)
+			}
+			const raw = await breakdown(dimension)
+			const rows = await store.readAggregates({
+				days: [[day, day]],
+				dim: dimension,
+				groupBy: 'value',
+			})
+			const aggregated = Object.fromEntries(
+				rows.flatMap((row) => (row.value ? [[row.value, row.parts.pageviews ?? 0]] : []))
+			)
+			expect(aggregated, dimension).toEqual(raw)
 		}
 	})
 
@@ -141,10 +166,10 @@ describeForDb('native dimensions: ingest to breakdowns', {}, (db) => {
 			const result = await adapter.query(
 				{
 					metrics: ['pageviews', 'visitors'],
-					dateRange: RANGE,
+					dateRange: aroundNow(),
 					filters: [{ dimension, operator: 'eq', value }],
 				},
-				{}
+				{ payload: booted.payload }
 			)
 			expect(result.totals).toEqual({ pageviews: 2, visitors: 2 })
 		}
@@ -155,10 +180,10 @@ describeForDb('native dimensions: ingest to breakdowns', {}, (db) => {
 			const result = await adapter.query(
 				{
 					metrics: ['pageviews'],
-					dateRange: RANGE,
+					dateRange: aroundNow(),
 					filters: [{ dimension, operator: 'contains', value: value.slice(0, 3) }],
 				},
-				{}
+				{ payload: booted.payload }
 			)
 			expect(result.totals).toEqual({ pageviews: 2 })
 		}
@@ -182,16 +207,10 @@ describeForDb('native dimensions: ingest to breakdowns', {}, (db) => {
 			{ type: 'pageview', path: '/hostile', referrer: {} },
 			{ 'user-agent': `${CHROME_MAC} hostile` }
 		)
-		const { docs } = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: '/hostile' } } as never,
-			pagination: false,
-			overrideAccess: true,
-		})
+		const docs = await storedHits(booted.payload, { path: { equals: '/hostile' } })
 		expect(docs).toHaveLength(1)
-		const event = docs[0] as unknown as { referrer?: string; referrerHost?: string }
-		expect(event.referrer ?? null).toBeNull()
-		expect(event.referrerHost ?? null).toBeNull()
+		expect(docs[0]?.ref ?? null).toBeNull()
+		expect(docs[0]).not.toHaveProperty('referrer')
 	})
 
 	it('narrows a breakdown by a filter on another new dimension', async () => {
@@ -199,10 +218,10 @@ describeForDb('native dimensions: ingest to breakdowns', {}, (db) => {
 			{
 				metrics: ['pageviews'],
 				dimensions: ['browser'],
-				dateRange: RANGE,
+				dateRange: aroundNow(),
 				filters: [{ dimension: 'utmCampaign', operator: 'eq', value: 'spring' }],
 			},
-			{}
+			{ payload: booted.payload }
 		)
 		expect(result.rows.map((row) => row.dimensions?.browser)).toEqual(['chrome'])
 	})
@@ -227,7 +246,8 @@ describeForDb('native dimensions: scope isolation', {}, (db) => {
 		booted = await bootPayload({
 			plugin: analytics({
 				adapters: [adapter],
-				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+				capture: { gate: 'off' },
+				scope: { member: () => true, resolve: ({ req }) => req.headers.get('x-tenant') },
 			}),
 			db,
 		})
@@ -242,8 +262,8 @@ describeForDb('native dimensions: scope isolation', {}, (db) => {
 	it("keeps one tenant's browser breakdown out of the other's", async () => {
 		const forScope = async (scope: string): Promise<string[]> => {
 			const result = await adapter.query(
-				{ metrics: ['pageviews'], dimensions: ['browser'], dateRange: RANGE, scope },
-				{}
+				{ metrics: ['pageviews'], dimensions: ['browser'], dateRange: aroundNow(), scope },
+				{ payload: booted.payload }
 			)
 			return result.rows.map((row) => row.dimensions?.browser ?? '')
 		}

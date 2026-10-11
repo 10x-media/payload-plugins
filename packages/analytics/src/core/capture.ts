@@ -1,7 +1,18 @@
+import type { CaptureSnippet, TrackerSlotConfig } from '../tracker/config'
+import type { FetchLike } from './fetch'
+
+/** What a proxied route serves: a script the browser runs, or data its tracker sends and reads. */
+export type ProxyRouteKind = 'script' | 'data'
+
 /** One rewrite the runtime proxy endpoint answers, source pattern to vendor upstream. */
 export interface ProxyRoute {
 	source: string
 	upstream: string
+	/**
+	 * How the runtime proxy labels the answer: `script` as JavaScript; `data` keeps JSON or plain
+	 * text, else becomes plain text, and is sandboxed so it never runs as a page of the site.
+	 */
+	kind: ProxyRouteKind
 }
 
 /** Routes a Next rewrites helper and the runtime proxy endpoint both consume. */
@@ -9,38 +20,27 @@ export interface ProxyDescriptor {
 	routes: ProxyRoute[]
 	forwardHeaders?: string[]
 	/**
-	 * The vendor serves some paths only with a trailing slash (PostHog's capture
-	 * endpoints). Both slash forms always match; this decides what reaches the vendor:
-	 * true keeps the request's trailing slash on the upstream path, absent or false
-	 * normalizes it away. Next apps proxying such a vendor through rewrites also need
-	 * `skipTrailingSlashRedirect: true`.
+	 * True keeps the request's trailing slash upstream (PostHog's capture endpoints need it); absent
+	 * or false strips it. Next rewrites to such a vendor also need `skipTrailingSlashRedirect: true`.
 	 */
 	trailingSlashes?: boolean
+	/**
+	 * The fetch the runtime proxy reaches these routes with, the same one the adapter reads with.
+	 * Unset, the global fetch.
+	 */
+	fetch?: FetchLike
 }
-
-export interface SnippetScript {
-	src?: string
-	inline?: string
-	attrs?: Record<string, string>
-	async?: boolean
-	defer?: boolean
-	type?: string
-}
-
-export interface CaptureSnippet {
-	scripts: SnippetScript[]
-}
-
-export type CaptureClientKind = 'native' | 'posthog' | 'plausible' | 'umami' | 'ga4'
 
 /**
- * Pure descriptor of how a vendor's browser tracker is proxied and booted, consumed by
- * a later runtime proxy endpoint, a Next rewrites helper, and a snippet renderer. Never
- * carries private/secret credentials (e.g. PostHog's Query API key); only what the
- * browser is allowed to see.
+ * How a vendor's browser tracker is proxied and booted. Carries only what the browser may see,
+ * never a secret credential such as PostHog's Query API key.
  */
 export interface CaptureSupport {
 	proxy: ProxyDescriptor
-	snippet(args: { path: string }): CaptureSnippet
-	client: { kind: CaptureClientKind } & Record<string, string | number | boolean>
+	/**
+	 * `scope` is the request's resolved scope, which a vendor able to carry it stamps on every event.
+	 * Null when unscoped or unresolved.
+	 */
+	snippet(args: { path: string; scope?: string | null }): CaptureSnippet
+	client: TrackerSlotConfig['client']
 }

@@ -1,0 +1,1477 @@
+@layer payload-default, payload;
+
+/*
+ * Every rule sits in Payload's `payload` layer: it outranks Payload's own `payload-default`
+ * styles and loses to any unlayered rule in the host's admin CSS, whatever the specificity.
+ */
+@layer payload {
+	:root {
+		--analytics-chart-1: var(--theme-success-500, #1587ba);
+		--analytics-chart-comparison: var(--theme-elevation-500, #808080);
+		--analytics-card-bg: var(--theme-elevation-50, #f5f5f5);
+		--analytics-card-border: var(--theme-border-color, var(--theme-elevation-150, #dddddd));
+		--analytics-card-radius: var(--style-radius-m, 4px);
+		--analytics-card-padding: calc(var(--base, 20px) * 0.8);
+		--analytics-text-muted: var(--theme-elevation-600, #656565);
+		/* The base palette rather than a theme step, so light text on it reads in either theme. */
+		--analytics-bar-fill: var(--color-success-600, #0b6e99);
+		--analytics-bar-label: var(--theme-elevation-800, #333333);
+		--analytics-bar-label-on-fill: var(--color-base-0, #ffffff);
+		--analytics-delta-up-fg: var(--theme-success-800, #0a3d55);
+		--analytics-delta-up-bg: var(--theme-success-150, #d7eef8);
+		--analytics-delta-down-fg: var(--theme-error-800, #6b1f1d);
+		--analytics-delta-down-bg: var(--theme-error-150, #fbe4e3);
+	}
+
+	.analytics-sr-only {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+		border: 0;
+	}
+
+	/* Payload's focus ring on every control the plugin draws. */
+	.analytics-metric--action:focus-visible,
+	.analytics-table__scroll:focus-visible,
+	.analytics-table__sort:focus-visible,
+	.analytics-table__filter:focus-visible,
+	.analytics-chart__plot:focus-visible,
+	.analytics-view__chips > .analytics-view__label:focus-visible {
+		outline: var(--accessibility-outline, 2px solid var(--theme-elevation-800));
+		outline-offset: 2px;
+	}
+
+	/* Drawn inside: a pill's label clips what overflows it, and the tabs sit close on the head's rule. */
+	.analytics-view__chip-remove:focus-visible,
+	.analytics-view__tab:focus-visible {
+		outline: var(--accessibility-outline, 2px solid var(--theme-elevation-800));
+		outline-offset: -2px;
+	}
+
+	:where(
+		.analytics-widget__title,
+		.analytics-view__label,
+		.analytics-panel__label,
+		.analytics-metric__label,
+		.analytics-table thead th
+	) {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-card {
+		box-sizing: border-box;
+		padding: var(--analytics-card-padding);
+		background: var(--analytics-card-bg);
+		border: 1px solid var(--analytics-card-border);
+		border-radius: var(--analytics-card-radius);
+	}
+
+	.analytics-card .shimmer-effect {
+		--shine-bg: var(--theme-elevation-100);
+		--shine-fg: var(--theme-elevation-150);
+	}
+
+	.analytics-metric {
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+		min-width: 0;
+	}
+
+	/* A label that wraps (a long translation, a summed count) keeps the numbers of a row in line. */
+	.analytics-metric__value {
+		margin-block-start: auto;
+		font-size: 1.5rem;
+		font-weight: 700;
+		line-height: 1.1;
+		font-variant-numeric: tabular-nums;
+		color: var(--theme-elevation-800);
+	}
+
+	.analytics-metric--action {
+		font: inherit;
+		color: inherit;
+		text-align: start;
+		cursor: pointer;
+		transition: border-color 100ms cubic-bezier(0, 0.2, 0.2, 1);
+	}
+
+	.analytics-metric--action:hover {
+		border-color: var(--theme-elevation-250);
+	}
+
+	.analytics-metric--action[aria-pressed="true"] {
+		background: var(--theme-elevation-100);
+		border-color: var(--theme-elevation-600);
+	}
+
+	.analytics-widget {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		height: 100%;
+		min-width: 0;
+	}
+
+	/*
+	 * Always one line, so the numbers of a row of cards line up: the title takes what the window
+	 * leaves, the window up to 60%, and either is cut short rather than wrapped.
+	 */
+	.analytics-widget__header {
+		display: flex;
+		align-items: baseline;
+		justify-content: space-between;
+		column-gap: 0.75rem;
+	}
+
+	.analytics-widget__title {
+		flex: 1 1 0;
+		min-width: 0;
+		margin: 0;
+		overflow: hidden;
+		font-family: inherit;
+		line-height: inherit;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.analytics-widget__caption {
+		flex: 0 1 auto;
+		min-width: 0;
+		max-width: 60%;
+		margin-inline-start: auto;
+		overflow: hidden;
+		font-size: 0.75rem;
+		color: var(--analytics-text-muted);
+		text-align: end;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.analytics-widget__value-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		column-gap: 0.625rem;
+		row-gap: 0.25rem;
+	}
+
+	.analytics-widget__value {
+		font-size: 1.75rem;
+		font-weight: 700;
+		line-height: 1.1;
+		font-variant-numeric: tabular-nums;
+		color: var(--theme-elevation-800);
+	}
+
+	.analytics-widget__value-caption {
+		font-size: 0.75rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-widget__body {
+		display: flex;
+		flex: 1 1 auto;
+		flex-direction: column;
+		min-height: 0;
+	}
+
+	.analytics-widget__empty {
+		display: flex;
+		flex: 1 1 auto;
+		align-items: center;
+		justify-content: center;
+		font-size: 0.8125rem;
+		color: var(--analytics-text-muted);
+		text-align: center;
+	}
+
+	.analytics-widget__note {
+		font-size: 0.6875rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-widget__footer {
+		display: flex;
+		justify-content: flex-end;
+		margin-block-start: auto;
+	}
+
+	.analytics-widget__link {
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: var(--analytics-text-muted);
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+
+	/* Holds the footer's line while the card loads, so the finished card is no taller. */
+	.analytics-widget__link--placeholder {
+		visibility: hidden;
+	}
+
+	/*
+	 * A loading card stands as tall as the finished one, value and body alike, so a dashboard row keeps
+	 * its height when the reads answer.
+	 */
+	.analytics-widget__loading {
+		display: flex;
+		flex: 1 1 auto;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.analytics-widget__shimmer-value {
+		flex: none;
+		width: 45%;
+		height: calc(1.75rem * 1.1);
+	}
+
+	.analytics-widget__loading--realtime .analytics-widget__shimmer-value {
+		height: calc(1.75rem * 1.1 + 3px);
+	}
+
+	.analytics-widget__shimmer {
+		flex: 1 1 auto;
+		width: 100%;
+		min-height: 2.5rem;
+	}
+
+	.analytics-widget__loading--trend .analytics-widget__shimmer {
+		min-height: 140px;
+	}
+
+	.analytics-widget__loading--realtime .analytics-widget__shimmer {
+		min-height: 100px;
+	}
+
+	.analytics-widget__loading--breakdown .analytics-widget__shimmer {
+		min-height: calc(var(--analytics-rows, 5) * 2.2rem);
+	}
+
+	/* A head row over the goals, each row as tall as a table row with its delta. */
+	.analytics-widget__loading--goals .analytics-widget__shimmer {
+		min-height: calc((var(--analytics-rows, 5) + 1) * 2.35rem);
+	}
+
+	/* A narrow card scrolls its own table sideways rather than pushing the page wider. */
+	.analytics-table__scroll {
+		max-width: 100%;
+		overflow-x: auto;
+	}
+
+	.analytics-table {
+		width: 100%;
+		font-size: 0.8125rem;
+		color: var(--theme-elevation-800);
+		border-collapse: collapse;
+	}
+
+	.analytics-table :is(th, td) {
+		text-align: end;
+	}
+
+	.analytics-table thead th {
+		padding-block: 0.25rem 0.375rem;
+		padding-inline: 0.5rem;
+		white-space: nowrap;
+		border-block-end: 1px solid var(--theme-elevation-150);
+	}
+
+	.analytics-table tbody :is(th, td) {
+		padding-block: 0.375rem;
+		padding-inline: 0.5rem;
+		font-variant-numeric: tabular-nums;
+		border-block-end: 1px solid var(--theme-elevation-100);
+	}
+
+	.analytics-table tbody th {
+		font-weight: inherit;
+	}
+
+	.analytics-table :is(th, td):first-child {
+		padding-inline-start: 0;
+		text-align: start;
+	}
+
+	.analytics-table :is(th, td):last-child {
+		padding-inline-end: 0;
+	}
+
+	/* A narrow card cuts a long label short on one line; its full text is the cell's title. */
+	.analytics-table--truncate .analytics-table__label {
+		width: 100%;
+		max-width: 0;
+	}
+
+	.analytics-table--truncate .analytics-table__label-text {
+		display: block;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	/* A goal's name takes what the numbers leave and wraps there, so a phone shows all of it. */
+	.analytics-goals-widget__table .analytics-table__label {
+		width: 100%;
+		overflow-wrap: anywhere;
+	}
+
+	.analytics-table__value {
+		display: inline-flex;
+		gap: 0.5rem;
+		align-items: center;
+		justify-content: flex-end;
+	}
+
+	.analytics-table__sort {
+		display: inline-flex;
+		gap: 0.25rem;
+		align-items: center;
+		padding: 0;
+		margin: 0;
+		font: inherit;
+		letter-spacing: inherit;
+		color: inherit;
+		text-transform: inherit;
+		cursor: pointer;
+		background: none;
+		border: 0;
+	}
+
+	.analytics-table__sort:hover,
+	[aria-sort] > .analytics-table__sort {
+		color: var(--theme-elevation-800);
+	}
+
+	.analytics-table__sort-arrow {
+		flex: none;
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.5px;
+		vector-effect: non-scaling-stroke;
+	}
+
+	.analytics-table__sort-arrow--ascending {
+		transform: rotate(180deg);
+	}
+
+	.analytics-table__filter {
+		padding: 0;
+		margin: 0;
+		font: inherit;
+		color: inherit;
+		text-align: start;
+		cursor: pointer;
+		background: none;
+		border: 0;
+	}
+
+	/* In a narrow card the caption wraps under the pill whole, rather than in pieces beside it. */
+	.analytics-delta {
+		display: inline-flex;
+		flex-wrap: wrap;
+		gap: 0.125rem 0.375rem;
+		/* Not `baseline`: the value's flex box would take its baseline from the arrow glyph. */
+		align-items: center;
+		font-size: 0.75rem;
+		line-height: 1.25;
+	}
+
+	.analytics-delta__change {
+		padding-block: 0;
+		padding-inline: 0.375rem;
+		font-size: inherit;
+		font-weight: 600;
+		line-height: 1.125rem;
+		border-radius: var(--style-radius-s, 3px);
+	}
+
+	.analytics-delta__change .pill__label {
+		display: inline-flex;
+		gap: 0.25rem;
+		align-items: center;
+	}
+
+	.analytics-delta__change--up {
+		color: var(--analytics-delta-up-fg);
+		background: var(--analytics-delta-up-bg);
+	}
+
+	.analytics-delta__change--down {
+		color: var(--analytics-delta-down-fg);
+		background: var(--analytics-delta-down-bg);
+	}
+
+	.analytics-delta__arrow {
+		flex-shrink: 0;
+	}
+
+	.analytics-delta__arrow--down {
+		transform: rotate(180deg);
+	}
+
+	.analytics-delta__caption {
+		font-size: 0.6875rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-live {
+		display: inline-flex;
+		gap: 0.5rem;
+		align-items: center;
+		/* As tall as a Payload select, so a toolbar aligned to the boxes' bottom edge centers it on them. */
+		min-height: 40px;
+		font-size: 0.8125rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-live__dot {
+		flex: none;
+		width: 0.5rem;
+		height: 0.5rem;
+		background: var(--theme-success-500);
+		border-radius: 50%;
+	}
+
+	.analytics-live__dot--paused {
+		background: var(--theme-elevation-300);
+	}
+
+	.analytics-live__count {
+		font-weight: 600;
+		color: var(--theme-elevation-800);
+	}
+
+	/* The "New" pill keeps the colors of Payload's own light-gray pill. */
+	.analytics-empty-state:not(.analytics-empty-state--new) {
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-empty-state--new {
+		padding-block: 0.125rem;
+		padding-inline: 0.5rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		line-height: 1.4;
+		letter-spacing: 0.03em;
+		border-radius: 999px;
+	}
+
+	.analytics-flag {
+		display: inline-block;
+		width: 20px;
+		height: 15px;
+		object-fit: cover;
+		vertical-align: middle;
+		border-radius: 1px;
+	}
+
+	.analytics-flag--failed {
+		visibility: hidden;
+	}
+
+	.analytics-chart {
+		display: flex;
+		flex-direction: column;
+		width: 100%;
+	}
+
+	.analytics-chart--trend {
+		flex: 1 1 0;
+		min-height: var(--analytics-chart-height, 160px);
+	}
+
+	.analytics-chart--fill {
+		flex: 1 1 auto;
+	}
+
+	.analytics-chart__plot {
+		position: relative;
+		flex: 1 1 auto;
+		width: 100%;
+		min-height: 0;
+	}
+
+	.analytics-chart__legend {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		align-items: center;
+		margin-block-end: 0.35rem;
+		font-size: 0.6875rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-chart__legend-item {
+		display: inline-flex;
+		gap: 0.35rem;
+		align-items: center;
+	}
+
+	.analytics-chart__legend-swatch {
+		width: 0.75rem;
+		height: 0.125rem;
+		background: var(--analytics-chart-1);
+		border-radius: 999px;
+	}
+
+	/* Dashed like its line, so the two series differ by more than their hue. */
+	.analytics-chart__legend-swatch--comparison {
+		width: 0.875rem;
+		background: repeating-linear-gradient(
+			to right,
+			var(--analytics-chart-comparison) 0 4px,
+			transparent 4px 7px
+		);
+		border-radius: 0;
+	}
+
+	.analytics-chart__legend-range {
+		color: var(--analytics-text-muted);
+	}
+
+	/* The drawing area: the SVG stretches over it, and dots, cursor and readout sit on it by share. */
+	.analytics-chart__canvas {
+		position: absolute;
+		inset-block: 8px 18px;
+		inset-inline: 8px;
+	}
+
+	.analytics-chart__svg {
+		position: absolute;
+		inset: 0;
+		display: block;
+		width: 100%;
+		height: 100%;
+		overflow: visible;
+	}
+
+	/*
+	 * Time runs right to left: the drawing mirrors here, the overlays through their logical insets.
+	 * `[dir="rtl"] *` stands in for `:dir(rtl)` where a browser lacks it, which `:is()` forgives.
+	 */
+	.analytics-chart__canvas:is(:dir(rtl), [dir="rtl"] *) > .analytics-chart__svg {
+		transform: scaleX(-1);
+	}
+
+	.analytics-chart__grid {
+		stroke: var(--theme-elevation-150, #dddddd);
+		stroke-width: 1;
+		vector-effect: non-scaling-stroke;
+	}
+
+	.analytics-chart__area {
+		stroke: none;
+	}
+
+	.analytics-chart__line {
+		fill: none;
+		stroke: var(--analytics-chart-1);
+		stroke-width: 2;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		vector-effect: non-scaling-stroke;
+	}
+
+	/* The bucket still counting: the stretch of line into it is drawn dashed. */
+	.analytics-chart__line--partial {
+		stroke-dasharray: 4 3;
+		stroke-linecap: butt;
+	}
+
+	.analytics-chart__comparison {
+		fill: none;
+		stroke: var(--analytics-chart-comparison);
+		stroke-width: 1.5;
+		stroke-dasharray: 4 3;
+		stroke-linejoin: round;
+		vector-effect: non-scaling-stroke;
+	}
+
+	:where(.analytics-chart__dot, .analytics-chart__active, .analytics-chart__cursor) {
+		position: absolute;
+		box-sizing: border-box;
+		pointer-events: none;
+	}
+
+	:where(.analytics-chart__dot, .analytics-chart__active) {
+		inset-block-start: var(--analytics-y, 50%);
+		inset-inline-start: var(--analytics-x, 0);
+		border-radius: 50%;
+	}
+
+	.analytics-chart__dot {
+		width: 7px;
+		height: 7px;
+		margin-block-start: -3.5px;
+		margin-inline-start: -3.5px;
+		background: var(--theme-elevation-0, #ffffff);
+		border: 2px solid var(--analytics-chart-1);
+	}
+
+	.analytics-chart__dot--comparison {
+		width: 6.5px;
+		height: 6.5px;
+		margin-block-start: -3.25px;
+		margin-inline-start: -3.25px;
+		border: 1.5px solid var(--analytics-chart-comparison);
+	}
+
+	.analytics-chart__cursor {
+		inset-block: 0;
+		inset-inline-start: var(--analytics-x, 0);
+		border-inline-start: 1px dashed var(--theme-elevation-300, #b3b3b3);
+	}
+
+	.analytics-chart__active {
+		width: 9px;
+		height: 9px;
+		margin-block-start: -4.5px;
+		margin-inline-start: -4.5px;
+		background: var(--analytics-chart-1);
+		border: 2px solid var(--theme-elevation-0, #ffffff);
+	}
+
+	.analytics-chart__active--comparison {
+		width: 8px;
+		height: 8px;
+		margin-block-start: -4px;
+		margin-inline-start: -4px;
+		background: var(--analytics-chart-comparison);
+	}
+
+	.analytics-chart__axis {
+		position: absolute;
+		inset-block-end: 0;
+		inset-inline: 8px;
+		height: 18px;
+		font-size: 0.6875rem;
+		line-height: 1;
+		color: var(--analytics-text-muted);
+		white-space: nowrap;
+		pointer-events: none;
+	}
+
+	.analytics-chart__tick {
+		position: absolute;
+		inset-block-end: 2px;
+		inset-inline-start: var(--analytics-x, 0);
+		transform: translateX(-50%);
+	}
+
+	.analytics-chart__tick--middle:is(:dir(rtl), [dir="rtl"] *) {
+		transform: translateX(50%);
+	}
+
+	.analytics-chart__tick--start {
+		transform: none;
+	}
+
+	.analytics-chart__tick--end {
+		inset-inline: auto 0;
+		transform: none;
+	}
+
+	.analytics-chart__tooltip {
+		--analytics-tip-x: -50%;
+		--analytics-tip-y: calc(-100% - 10px);
+		position: absolute;
+		inset-block-start: var(--analytics-y, 0);
+		inset-inline-start: var(--analytics-x, 0);
+		z-index: 10;
+		padding-block: 0.4rem;
+		padding-inline: 0.6rem;
+		font-size: 0.75rem;
+		white-space: nowrap;
+		pointer-events: none;
+		background: var(--theme-elevation-0, #ffffff);
+		border: 1px solid var(--theme-elevation-150, #dddddd);
+		border-radius: var(--style-radius-m, 6px);
+		box-shadow: 0 4px 16px rgb(0 0 0 / 18%);
+		transform: translate(var(--analytics-tip-x), var(--analytics-tip-y));
+		animation: analytics-fade 0.12s ease-out;
+	}
+
+	.analytics-chart__tooltip:is(:dir(rtl), [dir="rtl"] *) {
+		--analytics-tip-x: 50%;
+	}
+
+	/* Near either end of the axis the readout opens inward, so it stays on the card. */
+	.analytics-chart__tooltip--start,
+	.analytics-chart__tooltip--start:is(:dir(rtl), [dir="rtl"] *) {
+		--analytics-tip-x: 0%;
+	}
+
+	.analytics-chart__tooltip--end {
+		--analytics-tip-x: -100%;
+	}
+
+	.analytics-chart__tooltip--end:is(:dir(rtl), [dir="rtl"] *) {
+		--analytics-tip-x: 100%;
+	}
+
+	/* Over a point high in the plot it opens below, clear of the legend above. */
+	.analytics-chart__tooltip--below {
+		--analytics-tip-y: 10px;
+	}
+
+	/* Follows the pointer, whose coordinates are physical whichever way the page reads. */
+	.analytics-chart__tooltip--pointer {
+		--analytics-tip-x: -50%;
+		position: fixed;
+		inset-inline-start: auto;
+		left: var(--analytics-x, 0);
+	}
+
+	.analytics-chart__tooltip--pointer:is(:dir(rtl), [dir="rtl"] *) {
+		--analytics-tip-x: -50%;
+	}
+
+	.analytics-chart__tooltip-label {
+		margin-block-end: 0.15rem;
+		font-weight: 600;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-chart__tooltip-value {
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+		color: var(--theme-elevation-800, #333333);
+	}
+
+	.analytics-chart__tooltip-comparison {
+		display: flex;
+		gap: 0.5rem;
+		justify-content: space-between;
+		margin-block-start: 0.2rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-chart__tooltip-previous {
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+	}
+
+	@keyframes analytics-fade {
+		from {
+			opacity: 0;
+		}
+
+		to {
+			opacity: 1;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.analytics-chart__tooltip {
+			animation: none;
+		}
+	}
+
+	/* A ranked table whose label cells carry each row's share as a bar. */
+	.analytics-table.analytics-bars thead th {
+		padding-block: 0 0.35rem;
+		border: 0;
+	}
+
+	.analytics-table.analytics-bars tbody :is(th, td) {
+		padding-block: 0.175rem;
+		border: 0;
+	}
+
+	.analytics-table.analytics-bars :is(td, thead th:not(:first-child)) {
+		padding-inline-start: 0.6rem;
+	}
+
+	.analytics-table.analytics-bars td {
+		color: var(--analytics-text-muted);
+		white-space: nowrap;
+	}
+
+	.analytics-table.analytics-bars td.analytics-bars__value {
+		font-weight: 600;
+		color: var(--theme-elevation-800, #333333);
+	}
+
+	/* The label column takes what the numbers leave and cuts a long label short. */
+	.analytics-bars .analytics-table__label {
+		width: 100%;
+		max-width: 0;
+		padding-inline: 0;
+	}
+
+	.analytics-bars__track {
+		position: relative;
+		display: block;
+		box-sizing: border-box;
+		width: 100%;
+		height: 1.85rem;
+		overflow: hidden;
+		border-radius: var(--style-radius-s, 4px);
+	}
+
+	.analytics-bars__track::before {
+		position: absolute;
+		inset-block: 0;
+		inset-inline-start: 0;
+		width: var(--analytics-bar, 0%);
+		content: "";
+		background: var(--analytics-bar-fill);
+		border-radius: inherit;
+		transition: filter 0.1s ease;
+	}
+
+	.analytics-bars__row:hover .analytics-bars__track::before {
+		filter: brightness(1.12);
+	}
+
+	/*
+	 * The label spans the whole track and is painted by a gradient that changes color exactly
+	 * where the bar ends, so the part over the bar and the part over bare track both read.
+	 */
+	.analytics-bars__label {
+		position: relative;
+		display: block;
+		padding-block: 0;
+		padding-inline: 0.6rem;
+		overflow: hidden;
+		font-size: 0.8125rem;
+		line-height: 1.85rem;
+		color: transparent;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		background: linear-gradient(
+			to right,
+			var(--analytics-bar-label-on-fill) var(--analytics-bar, 0%),
+			var(--analytics-bar-label) var(--analytics-bar, 0%)
+		);
+		-webkit-background-clip: text;
+		background-clip: text;
+	}
+
+	/*
+	 * The bar grows from the right, so the light part of the label is on the right too. Read off
+	 * the track, which a left-to-right label (a path) does not turn around.
+	 */
+	.analytics-bars__track:is(:dir(rtl), [dir="rtl"] *) .analytics-bars__label {
+		background: linear-gradient(
+			to left,
+			var(--analytics-bar-label-on-fill) var(--analytics-bar, 0%),
+			var(--analytics-bar-label) var(--analytics-bar, 0%)
+		);
+		-webkit-background-clip: text;
+		background-clip: text;
+	}
+
+	/*
+	 * On a right-to-left page a path keeps its own direction, so a cut one loses its end rather
+	 * than its start, and still lines up with the labels around it.
+	 */
+	.analytics-table__label:is(:dir(rtl), [dir="rtl"] *) [dir="ltr"] {
+		text-align: end;
+	}
+
+	/* Forced colors drop the fill, so the bar becomes a rule under its label. */
+	@media (forced-colors: active) {
+		.analytics-bars__label {
+			color: CanvasText;
+			background: none;
+		}
+
+		.analytics-bars__track::before {
+			background: none;
+			border-block-end: 0.25rem solid CanvasText;
+		}
+	}
+
+	.analytics-bars__decoration {
+		margin-inline-end: 0.4rem;
+	}
+
+	.analytics-bars--soft .analytics-bars__track {
+		background: var(--theme-elevation-100, #ebebeb);
+	}
+
+	.analytics-bars--soft .analytics-bars__track::before {
+		background: color-mix(in srgb, var(--analytics-chart-1) 25%, transparent);
+	}
+
+	.analytics-bars--soft .analytics-bars__label {
+		--analytics-bar-label-on-fill: var(--analytics-bar-label);
+	}
+
+	.analytics-bars__track.analytics-table__filter {
+		display: block;
+		width: 100%;
+	}
+
+	.analytics-bars__empty {
+		font-size: 0.8125rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-view {
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+		padding-block-end: 1.5rem;
+	}
+
+	.analytics-view__title {
+		margin: 0;
+	}
+
+	/* A panel's title, a heading for navigation that keeps the small label look. */
+	.analytics-view__heading {
+		margin: 0;
+		font-family: inherit;
+		line-height: inherit;
+	}
+
+	.analytics-view__toolbar {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.analytics-view__controls {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		align-items: flex-end;
+	}
+
+	.analytics-view__control {
+		min-width: 10rem;
+	}
+
+	/* Room for two localized dates and Payload's calendar icon, never wider than a phone's row. */
+	.analytics-view__control--dates {
+		min-width: min(19.5rem, 100%);
+	}
+
+	.analytics-view__control .field-type {
+		margin-block-end: 0;
+	}
+
+	/*
+	 * An open menu is as wide as its longest option, so no option breaks over two lines. Through
+	 * `min-width`: react-select's own unlayered style sets the width, and wins over this layer.
+	 */
+	.analytics-select .rs__menu {
+		min-width: max-content;
+	}
+
+	.analytics-select .rs__option {
+		white-space: nowrap;
+	}
+
+	.analytics-view__field-label {
+		display: block;
+		margin-block-end: 0.35rem;
+		font-size: 0.8125rem;
+		color: var(--theme-elevation-600);
+	}
+
+	.analytics-view__toggle {
+		align-items: center;
+		height: 40px;
+		margin: 0;
+	}
+
+	/* Wide enough for the pending label in every locale, so the row never moves mid-refresh. */
+	.analytics-view__refresh {
+		align-items: center;
+		justify-content: center;
+		min-width: 10.5rem;
+		height: 40px;
+		margin: 0;
+	}
+
+	.analytics-view__captions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem;
+		align-items: center;
+		margin-inline-start: auto;
+		font-size: 0.8125rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-view__chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.4rem;
+		align-items: center;
+	}
+
+	.analytics-view__chip-remove {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		padding: 0;
+		margin-inline-start: 0.15rem;
+		vertical-align: middle;
+		color: inherit;
+		cursor: pointer;
+		background: none;
+		border: 0;
+	}
+
+	.analytics-view__chip-remove .icon {
+		width: 1rem;
+		height: 1rem;
+	}
+
+	/*
+	 * At most five cards a row, each wide enough for a revenue total; a card whose number still
+	 * outgrows it shrinks the number rather than spilling it.
+	 */
+	.analytics-view__cards {
+		display: grid;
+		grid-template-columns: repeat(
+				auto-fit,
+				minmax(min(100%, max(12.5rem, calc((100% - 4 * 0.75rem) / 5))), 1fr)
+			);
+		gap: 0.75rem;
+	}
+
+	.analytics-view__card {
+		container-type: inline-size;
+	}
+
+	.analytics-view__card .analytics-metric__value {
+		font-size: min(1.5rem, 13cqi);
+		overflow-wrap: anywhere;
+	}
+
+	.analytics-view__panel {
+		display: flex;
+		flex-direction: column;
+		gap: 0.625rem;
+	}
+
+	.analytics-view__error {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		align-items: flex-start;
+	}
+
+	.analytics-view__caption {
+		font-size: 0.75rem;
+		color: var(--analytics-text-muted);
+	}
+
+	/* The breakdown's tabs, with the filter a row click set beside them. */
+	.analytics-view__breakdown-head {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 0.75rem;
+		align-items: center;
+		justify-content: space-between;
+		border-block-end: 1px solid var(--theme-elevation-150);
+	}
+
+	.analytics-view__section[aria-busy="true"] {
+		opacity: 0.6;
+		transition: opacity 100ms ease-out;
+	}
+
+	.analytics-view__tabs {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem;
+	}
+
+	.analytics-view__tab {
+		height: 40px;
+		padding-block: 0;
+		padding-inline: 0.75rem;
+		font: inherit;
+		font-size: 0.8125rem;
+		color: var(--analytics-text-muted);
+		cursor: pointer;
+		background: none;
+		border: 0;
+		border-block-end: 2px solid transparent;
+	}
+
+	.analytics-view__tab:hover {
+		color: var(--theme-elevation-800);
+	}
+
+	.analytics-view__tab[aria-selected="true"] {
+		color: var(--theme-elevation-800);
+		border-block-end-color: var(--theme-elevation-800);
+	}
+
+	/* The breakdown's number columns keep their widths as rows come and go. */
+	.analytics-view__col--value {
+		width: 5.5rem;
+	}
+
+	:is(
+		.analytics-view__col--secondary,
+		.analytics-view__col--tertiary,
+		.analytics-view__col--quaternary
+	) {
+		width: 4.5rem;
+	}
+
+	/*
+	 * Each placeholder is built from the lengths of what it stands in for, so the first answer
+	 * moves nothing: `1lh` is the inherited line box a label or a cell sits in.
+	 */
+	.analytics-view__skeleton {
+		border-radius: var(--style-radius-s, 3px);
+	}
+
+	.analytics-view__skeleton--label {
+		width: 50%;
+		height: 0.6875rem;
+		margin-block: calc((1lh - 0.6875rem) / 2);
+	}
+
+	/* The card is a size container, so the number's own `13cqi` cap reads the same width. */
+	.analytics-view__skeleton--value {
+		width: 40%;
+		height: calc(min(1.5rem, 13cqi) * 1.1);
+		margin-block-start: auto;
+	}
+
+	.analytics-view__skeleton--delta {
+		width: 35%;
+		height: 1.125rem;
+	}
+
+	.analytics-view__skeleton--chart {
+		height: var(--analytics-chart-height, 10rem);
+		border-radius: var(--style-radius-m, 6px);
+	}
+
+	/* A ranked table: its head row, then a track per row at the rows' pitch. */
+	.analytics-view__skeleton-table {
+		--analytics-skeleton-head: calc(1lh + 0.35rem);
+		--analytics-skeleton-row: 1.85rem;
+		--analytics-skeleton-gap: 0.35rem;
+		display: flex;
+		flex-direction: column;
+		gap: var(--analytics-skeleton-gap);
+		padding-block: calc(var(--analytics-skeleton-head) + var(--analytics-skeleton-gap) / 2)
+			calc(var(--analytics-skeleton-gap) / 2);
+	}
+
+	.analytics-view__skeleton-table > .analytics-view__skeleton {
+		height: var(--analytics-skeleton-row);
+	}
+
+	/* A plain table: head and rows each a line, their padding and a 1px rule. */
+	.analytics-view__skeleton-table--table {
+		--analytics-skeleton-head: calc(1lh + 0.625rem + 1px);
+		--analytics-skeleton-row: 0.8125rem;
+		--analytics-skeleton-gap: calc(1lh + 0.75rem + 1px - 0.8125rem);
+	}
+
+	.analytics-view__empty {
+		font-size: 0.8125rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-view__no-sources {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		align-items: flex-start;
+		padding-block: 2rem;
+		padding-inline: 1rem;
+	}
+
+	.analytics-view__exclusion > .btn {
+		align-self: flex-start;
+		margin: 0;
+	}
+
+	.analytics-view__exclusion-text {
+		font-size: 0.8125rem;
+		color: var(--theme-elevation-600);
+	}
+
+	.analytics-view__exclusion-sites {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+		padding: 0;
+		margin: 0;
+		list-style: none;
+	}
+
+	.analytics-view__exclusion-link {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+	}
+
+	.analytics-view__exclusion-link > .btn {
+		flex: none;
+		margin: 0;
+	}
+
+	.analytics-view__exclusion-input {
+		box-sizing: border-box;
+		flex: 1;
+		min-width: 0;
+		height: 40px;
+		padding-block: 0;
+		padding-inline: 0.625rem;
+		font-family: var(--font-mono, monospace);
+		font-size: 0.8125rem;
+		color: var(--theme-elevation-800);
+		background: var(--theme-input-bg);
+		border: 1px solid var(--theme-elevation-150);
+		border-radius: var(--style-radius-s, 3px);
+	}
+
+	.analytics-view__exclusion-input:focus {
+		outline: 0;
+		border-color: var(--theme-elevation-400);
+	}
+
+	@media (max-width: 768px) {
+		.analytics-view__captions {
+			margin-inline-start: 0;
+		}
+
+		.analytics-view__control {
+			flex: 1 1 100%;
+		}
+	}
+
+	.analytics-panel {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.analytics-panel__toolbar,
+	.analytics-panel__controls {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		align-items: flex-end;
+	}
+
+	.analytics-panel__controls {
+		flex: 1 1 auto;
+		min-width: 0;
+	}
+
+	.analytics-panel__control {
+		flex: 0 1 14rem;
+		min-width: min(11rem, 100%);
+	}
+
+	.analytics-panel__live {
+		margin-inline-start: auto;
+	}
+
+	.analytics-panel__body {
+		transition: opacity 0.15s;
+	}
+
+	.analytics-panel__body--dimmed {
+		opacity: 0.5;
+	}
+
+	.analytics-panel__content {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+	}
+
+	.analytics-panel__empty {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 0.5rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-panel__cards {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 1.5rem;
+	}
+
+	.analytics-panel__card {
+		min-width: 7rem;
+	}
+
+	.analytics-panel__lists {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+		gap: 1.5rem;
+	}
+
+	.analytics-panel__list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		min-width: 0;
+	}
+
+	:where(.analytics-panel__caption, .analytics-stat__caption) {
+		font-size: 0.75rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-panel__notice {
+		font-size: 0.6875rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-stat {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--base, 1rem);
+		align-items: flex-end;
+	}
+
+	.analytics-stat__caption {
+		width: 100%;
+	}
+
+	.analytics-goal-select .rs__group-heading {
+		padding-block: calc(var(--base) * 0.5) calc(var(--base) * 0.25);
+		padding-inline: calc(var(--base) * 0.75);
+		margin: 0;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		line-height: 1.4;
+		letter-spacing: 0.04em;
+		color: var(--analytics-text-muted);
+		text-transform: uppercase;
+		cursor: default;
+	}
+
+	/* The halves and the gap match Payload's own two-field row, so the amount lines up above. */
+	.analytics-goal-amount__row {
+		display: flex;
+		gap: calc(var(--base) * 0.5);
+		align-items: flex-start;
+	}
+
+	.analytics-goal-amount__row > * {
+		flex: 1 1 0;
+		min-width: 0;
+	}
+
+	/*
+	 * Payload hides the month title for its dropdowns, which only the first month of two draws:
+	 * the second shows its title instead, in the row the first one's dropdowns take.
+	 */
+	.analytics-date-range .react-datepicker__month-container
+		~ .react-datepicker__month-container
+		.react-datepicker__current-month {
+		display: block;
+		padding-block: 10px;
+		padding-inline: 0;
+		font-size: 1rem;
+		font-weight: 500;
+		line-height: 17px;
+	}
+
+	.analytics-date-range
+		.react-datepicker__month-container
+		~ .react-datepicker__month-container
+		.react-datepicker__header__dropdown {
+		display: none;
+	}
+
+	.analytics-date-range
+		.react-datepicker__day--in-selecting-range:not(.react-datepicker__day--selecting-range-start) {
+		background-color: var(--theme-elevation-100);
+	}
+
+	.analytics-date-range
+		:is(
+			.react-datepicker__day--range-start,
+			.react-datepicker__day--range-end,
+			.react-datepicker__day--selecting-range-start,
+			.react-datepicker__month-text--range-start,
+			.react-datepicker__month-text--range-end
+		) {
+		font-weight: 700;
+		color: var(--theme-elevation-0);
+		background-color: var(--theme-elevation-800);
+	}
+
+	/* A read's state in place of its numbers, with its retry under the message. */
+	.analytics-state {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		align-items: center;
+	}
+
+	.analytics-state--start {
+		align-items: flex-start;
+	}
+
+	.analytics-state__after {
+		font-size: 0.75rem;
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-panel__state {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		align-items: flex-start;
+	}
+
+	/* The panel's placeholder, at the chart's height and the lists' row pitch. */
+	.analytics-panel__skeleton-chart {
+		--analytics-chart-height: 140px;
+	}
+
+	.analytics-panel__skeleton-rows {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		padding-block-end: 0.35rem;
+	}
+
+	.analytics-panel__skeleton-rows > .analytics-view__skeleton {
+		height: 1.85rem;
+	}
+
+	.analytics-panel__skeleton-caption {
+		width: 6rem;
+		height: 0.75rem;
+		margin-block: calc((1lh - 0.75rem) / 2);
+		font-size: 0.75rem;
+	}
+
+	/* A loaded card is as wide as its label and number with their delta beside it. */
+	.analytics-panel__card--skeleton {
+		width: 10rem;
+	}
+
+	.analytics-panel__skeleton-notice {
+		width: 40%;
+		height: 0.6875rem;
+		margin-block: calc((1lh - 0.6875rem) / 2);
+		font-size: 0.6875rem;
+	}
+}

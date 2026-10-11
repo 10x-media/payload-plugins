@@ -1,0 +1,4118 @@
+[
+	{
+		"$match": {
+			"scope": "tenant-a",
+			"ts": {
+				"$gte": {
+					"$date": "2026-10-05T22:00:00.000Z"
+				},
+				"$lt": {
+					"$date": "2026-10-06T22:00:00.000Z"
+				}
+			},
+			"_id": {
+				"$not": {
+					"$gte": "o",
+					"$lt": "p"
+				}
+			}
+		}
+	},
+	{
+		"$unionWith": {
+			"coll": "analytics-hits",
+			"pipeline": [
+				{
+					"$match": {
+						"scope": "tenant-a",
+						"ts": {
+							"$gte": {
+								"$date": "2026-10-05T22:00:00.000Z"
+							},
+							"$lt": {
+								"$date": "2026-10-06T22:00:00.000Z"
+							}
+						},
+						"_id": {
+							"$gte": "o",
+							"$lt": "p"
+						}
+					}
+				},
+				{
+					"$set": {
+						"tid": {
+							"$cond": [
+								{
+									"$eq": [
+										{
+											"$substrBytes": ["$_id", 0, 3]
+										},
+										"ow."
+									]
+								},
+								{
+									"$concat": [
+										"os.",
+										{
+											"$substrBytes": [
+												"$_id",
+												3,
+												{
+													"$subtract": [
+														{
+															"$strLenBytes": "$_id"
+														},
+														3
+													]
+												}
+											]
+										}
+									]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": [
+												{
+													"$substrBytes": ["$_id", 0, 3]
+												},
+												"os."
+											]
+										},
+										{
+											"$concat": [
+												"ow.",
+												{
+													"$substrBytes": [
+														"$_id",
+														3,
+														{
+															"$subtract": [
+																{
+																	"$strLenBytes": "$_id"
+																},
+																3
+															]
+														}
+													]
+												}
+											]
+										},
+										null
+									]
+								}
+							]
+						}
+					}
+				},
+				{
+					"$lookup": {
+						"from": "analytics-hits",
+						"localField": "tid",
+						"foreignField": "_id",
+						"pipeline": [
+							{
+								"$project": {
+									"ts": 1,
+									"item": 1,
+									"conversions": 1,
+									"revenue": 1,
+									"goals": 1,
+									"value": 1,
+									"originalValue": 1,
+									"currency": 1,
+									"originalCurrency": 1
+								}
+							}
+						],
+						"as": "tw"
+					}
+				},
+				{
+					"$set": {
+						"tw": {
+							"$first": "$tw"
+						}
+					}
+				},
+				{
+					"$match": {
+						"$expr": {
+							"$not": [
+								{
+									"$and": [
+										{
+											"$eq": [
+												{
+													"$substrBytes": ["$_id", 0, 3]
+												},
+												"os."
+											]
+										},
+										{
+											"$eq": [
+												{
+													"$type": "$tw"
+												},
+												"object"
+											]
+										},
+										{
+											"$lte": [
+												{
+													"$abs": {
+														"$subtract": ["$tw.ts", "$ts"]
+													}
+												},
+												86400000
+											]
+										}
+									]
+								}
+							]
+						}
+					}
+				},
+				{
+					"$set": {
+						"cr": {
+							"$cond": [
+								{
+									"$and": [
+										{
+											"$eq": [
+												{
+													"$substrBytes": ["$_id", 0, 3]
+												},
+												"ow."
+											]
+										},
+										{
+											"$eq": [
+												{
+													"$type": "$tw"
+												},
+												"object"
+											]
+										}
+									]
+								},
+								{
+									"$cond": [
+										{
+											"$lte": [
+												{
+													"$abs": {
+														"$subtract": ["$tw.ts", "$ts"]
+													}
+												},
+												86400000
+											]
+										},
+										1,
+										0
+									]
+								},
+								null
+							]
+						}
+					}
+				},
+				{
+					"$set": {
+						"conversions": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.conversions", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$conversions"
+									]
+								}
+							]
+						},
+						"revenue": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.revenue", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$revenue"
+									]
+								}
+							]
+						},
+						"goals": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.goals", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$goals"
+									]
+								}
+							]
+						},
+						"value": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.value", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$value"
+									]
+								}
+							]
+						},
+						"originalValue": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.originalValue", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$originalValue"
+									]
+								}
+							]
+						},
+						"currency": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.currency", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$currency"
+									]
+								}
+							]
+						},
+						"originalCurrency": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.originalCurrency", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$originalCurrency"
+									]
+								}
+							]
+						},
+						"item": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.item", "$item"]
+								},
+								"$item"
+							]
+						},
+						"server": {
+							"$cond": [
+								{
+									"$and": [
+										{
+											"$eq": ["$cr", 1]
+										},
+										{
+											"$eq": [
+												{
+													"$type": "$tw.item"
+												},
+												"string"
+											]
+										}
+									]
+								},
+								true,
+								"$server"
+							]
+						}
+					}
+				},
+				{
+					"$unset": ["tid", "tw", "cr"]
+				}
+			]
+		}
+	},
+	{
+		"$project": {
+			"_id": 1,
+			"scope": 1,
+			"ts": 1,
+			"hostname": 1,
+			"v": 1,
+			"type": 1,
+			"path": 1,
+			"server": {
+				"$ifNull": ["$server", false]
+			},
+			"name": {
+				"$ifNull": ["$name", null]
+			},
+			"item": {
+				"$ifNull": ["$item", null]
+			},
+			"durationMs": {
+				"$ifNull": ["$durationMs", null]
+			},
+			"scrollDepth": {
+				"$ifNull": ["$scrollDepth", null]
+			},
+			"conversions": {
+				"$ifNull": ["$conversions", null]
+			},
+			"revenue": {
+				"$ifNull": ["$revenue", null]
+			},
+			"eng": {
+				"$cond": [
+					{
+						"$eq": ["$type", "engagement"]
+					},
+					1,
+					0
+				]
+			},
+			"sentCurrency": {
+				"$ifNull": [
+					"$originalCurrency",
+					{
+						"$ifNull": ["$currency", null]
+					}
+				]
+			},
+			"sentRevenue": {
+				"$sum": {
+					"$map": {
+						"input": {
+							"$ifNull": ["$goals", []]
+						},
+						"in": {
+							"$ifNull": ["$$this.sent", "$$this.value"]
+						}
+					}
+				}
+			},
+			"act": {
+				"$ifNull": ["$lastAt", "$ts"]
+			},
+			"landing": {
+				"$ifNull": ["$landing", false]
+			},
+			"a": {
+				"$cond": [
+					{
+						"$eq": ["$type", "engagement"]
+					},
+					"$$REMOVE",
+					{
+						"ref": "$ref",
+						"source": "$source",
+						"channel": "$channel",
+						"clickId": "$clickId",
+						"utmSource": "$utmSource",
+						"utmMedium": "$utmMedium",
+						"utmCampaign": "$utmCampaign",
+						"utmContent": "$utmContent",
+						"utmTerm": "$utmTerm",
+						"country": "$country",
+						"region": "$region",
+						"city": "$city",
+						"language": "$language",
+						"device": "$device",
+						"browser": "$browser",
+						"os": "$os"
+					}
+				]
+			},
+			"goals": {
+				"$ifNull": ["$goals", []]
+			},
+			"impressions": {
+				"$ifNull": ["$impressions", []]
+			}
+		}
+	},
+	{
+		"$setWindowFields": {
+			"partitionBy": {
+				"s": "$scope",
+				"h": "$hostname",
+				"v": "$v"
+			},
+			"sortBy": {
+				"ts": 1,
+				"_id": 1
+			},
+			"output": {
+				"prevAct": {
+					"$max": "$act",
+					"window": {
+						"documents": ["unbounded", -1]
+					}
+				}
+			}
+		}
+	},
+	{
+		"$set": {
+			"starts": {
+				"$cond": [
+					{
+						"$eq": ["$v", ""]
+					},
+					null,
+					{
+						"$cond": [
+							{
+								"$or": [
+									{
+										"$eq": ["$prevAct", null]
+									},
+									{
+										"$gt": [
+											"$ts",
+											{
+												"$add": ["$prevAct", 1800000]
+											}
+										]
+									}
+								]
+							},
+							1,
+							0
+						]
+					}
+				]
+			}
+		}
+	},
+	{
+		"$setWindowFields": {
+			"partitionBy": {
+				"s": "$scope",
+				"h": "$hostname",
+				"v": "$v"
+			},
+			"sortBy": {
+				"ts": 1,
+				"_id": 1
+			},
+			"output": {
+				"sn": {
+					"$sum": "$starts",
+					"window": {
+						"documents": ["unbounded", "current"]
+					}
+				}
+			}
+		}
+	},
+	{
+		"$set": {
+			"sn": {
+				"$cond": [
+					{
+						"$eq": ["$v", ""]
+					},
+					null,
+					"$sn"
+				]
+			}
+		}
+	},
+	{
+		"$unset": ["act", "prevAct", "starts"]
+	},
+	{
+		"$setWindowFields": {
+			"partitionBy": {
+				"s": "$scope",
+				"h": "$hostname",
+				"v": "$v",
+				"sn": "$sn",
+				"x": {
+					"$cond": [
+						{
+							"$eq": ["$sn", null]
+						},
+						"$_id",
+						null
+					]
+				}
+			},
+			"sortBy": {
+				"eng": 1,
+				"ts": 1,
+				"_id": 1
+			},
+			"output": {
+				"entryId": {
+					"$first": "$_id",
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"f": {
+					"$first": "$a",
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"s_pv": {
+					"$sum": {
+						"$cond": [
+							{
+								"$eq": ["$type", "pageview"]
+							},
+							1,
+							0
+						]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"s_int": {
+					"$sum": {
+						"$cond": [
+							{
+								"$in": ["$type", ["event", "goal"]]
+							},
+							1,
+							0
+						]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"s_ms": {
+					"$sum": {
+						"$ifNull": ["$durationMs", 0]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"v_act": {
+					"$max": {
+						"$cond": [
+							{
+								"$eq": ["$eng", 0]
+							},
+							1,
+							0
+						]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"v_ss": {
+					"$sum": {
+						"$ifNull": ["$scrollDepth", 0]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"v_sc": {
+					"$sum": {
+						"$cond": [
+							{
+								"$and": [
+									{
+										"$eq": ["$type", "pageview"]
+									},
+									{
+										"$ne": ["$scrollDepth", null]
+									}
+								]
+							},
+							1,
+							0
+						]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"v_conv": {
+					"$sum": {
+						"$ifNull": ["$conversions", 0]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"v_rev": {
+					"$sum": {
+						"$ifNull": ["$revenue", 0]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"v_int": {
+					"$sum": {
+						"$cond": [
+							{
+								"$and": [
+									{
+										"$eq": ["$type", "event"]
+									},
+									{
+										"$eq": ["$name", "item_click"]
+									},
+									{
+										"$eq": [
+											{
+												"$type": "$item"
+											},
+											"string"
+										]
+									},
+									{
+										"$ne": ["$item", ""]
+									}
+								]
+							},
+							1,
+							0
+						]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				}
+			}
+		}
+	},
+	{
+		"$set": {
+			"f": {
+				"$cond": [
+					{
+						"$or": [
+							{
+								"$eq": ["$_id", "$entryId"]
+							},
+							{
+								"$gt": [
+									{
+										"$size": {
+											"$ifNull": ["$goals", []]
+										}
+									},
+									0
+								]
+							}
+						]
+					},
+					"$f",
+					"$$REMOVE"
+				]
+			}
+		}
+	},
+	{
+		"$set": {
+			"o": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					"$a",
+					"$$REMOVE"
+				]
+			}
+		}
+	},
+	{
+		"$unset": "a"
+	},
+	{
+		"$setWindowFields": {
+			"partitionBy": {
+				"s": "$scope",
+				"h": "$hostname",
+				"v": "$v"
+			},
+			"sortBy": {
+				"sn": 1,
+				"eng": 1,
+				"ts": 1,
+				"_id": 1
+			},
+			"output": {
+				"landed": {
+					"$max": {
+						"$cond": [
+							{
+								"$and": [
+									{
+										"$eq": ["$_id", "$entryId"]
+									},
+									{
+										"$eq": ["$eng", 0]
+									},
+									{
+										"$eq": ["$landing", true]
+									}
+								]
+							},
+							{
+								"n": "$sn",
+								"a": "$f"
+							},
+							null
+						]
+					},
+					"window": {
+						"documents": ["unbounded", "current"]
+					}
+				}
+			}
+		}
+	},
+	{
+		"$set": {
+			"e_ref": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.ref", null]
+					},
+					{
+						"$cond": [
+							{
+								"$eq": ["$landed", null]
+							},
+							"$f.ref",
+							"$landed.a.ref"
+						]
+					}
+				]
+			},
+			"e_source": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.source", null]
+					},
+					{
+						"$cond": [
+							{
+								"$eq": ["$landed", null]
+							},
+							"$f.source",
+							"$landed.a.source"
+						]
+					}
+				]
+			},
+			"e_channel": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.channel", null]
+					},
+					{
+						"$cond": [
+							{
+								"$eq": ["$landed", null]
+							},
+							"$f.channel",
+							"$landed.a.channel"
+						]
+					}
+				]
+			},
+			"e_clickId": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.clickId", null]
+					},
+					{
+						"$cond": [
+							{
+								"$eq": ["$landed", null]
+							},
+							"$f.clickId",
+							"$landed.a.clickId"
+						]
+					}
+				]
+			},
+			"e_utmSource": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.utmSource", null]
+					},
+					{
+						"$cond": [
+							{
+								"$eq": ["$landed", null]
+							},
+							"$f.utmSource",
+							"$landed.a.utmSource"
+						]
+					}
+				]
+			},
+			"e_utmMedium": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.utmMedium", null]
+					},
+					{
+						"$cond": [
+							{
+								"$eq": ["$landed", null]
+							},
+							"$f.utmMedium",
+							"$landed.a.utmMedium"
+						]
+					}
+				]
+			},
+			"e_utmCampaign": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.utmCampaign", null]
+					},
+					{
+						"$cond": [
+							{
+								"$eq": ["$landed", null]
+							},
+							"$f.utmCampaign",
+							"$landed.a.utmCampaign"
+						]
+					}
+				]
+			},
+			"e_utmContent": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.utmContent", null]
+					},
+					{
+						"$cond": [
+							{
+								"$eq": ["$landed", null]
+							},
+							"$f.utmContent",
+							"$landed.a.utmContent"
+						]
+					}
+				]
+			},
+			"e_utmTerm": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.utmTerm", null]
+					},
+					{
+						"$cond": [
+							{
+								"$eq": ["$landed", null]
+							},
+							"$f.utmTerm",
+							"$landed.a.utmTerm"
+						]
+					}
+				]
+			},
+			"e_country": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.country", null]
+					},
+					"$f.country"
+				]
+			},
+			"e_region": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.region", null]
+					},
+					"$f.region"
+				]
+			},
+			"e_city": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.city", null]
+					},
+					"$f.city"
+				]
+			},
+			"e_language": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.language", null]
+					},
+					"$f.language"
+				]
+			},
+			"e_device": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.device", null]
+					},
+					"$f.device"
+				]
+			},
+			"e_browser": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.browser", null]
+					},
+					"$f.browser"
+				]
+			},
+			"e_os": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.os", null]
+					},
+					"$f.os"
+				]
+			},
+			"entry": {
+				"$cond": [
+					{
+						"$and": [
+							{
+								"$ne": ["$sn", null]
+							},
+							{
+								"$eq": ["$_id", "$entryId"]
+							},
+							{
+								"$eq": ["$eng", 0]
+							}
+						]
+					},
+					1,
+					0
+				]
+			},
+			"bounce": {
+				"$cond": [
+					{
+						"$and": [
+							{
+								"$ne": ["$sn", null]
+							},
+							{
+								"$eq": ["$_id", "$entryId"]
+							},
+							{
+								"$eq": ["$eng", 0]
+							},
+							{
+								"$eq": ["$s_pv", 1]
+							},
+							{
+								"$eq": ["$s_int", 0]
+							}
+						]
+					},
+					1,
+					0
+				]
+			},
+			"rep": {
+				"$cond": [
+					{
+						"$eq": ["$_id", "$entryId"]
+					},
+					1,
+					0
+				]
+			}
+		}
+	},
+	{
+		"$unset": ["f", "o", "landed", "entryId", "landing"]
+	},
+	{
+		"$set": {
+			"facts": {
+				"$concatArrays": [
+					{
+						"$cond": [
+							{
+								"$eq": ["$rep", 1]
+							},
+							{
+								"$concatArrays": [
+									[
+										{
+											"k": 0,
+											"a": "",
+											"b": "",
+											"pageviews": "$s_pv",
+											"events": "$s_int",
+											"visitors": {
+												"$cond": [
+													{
+														"$and": [
+															{
+																"$eq": ["$v_act", 1]
+															},
+															{
+																"$ne": ["$v", ""]
+															}
+														]
+													},
+													1,
+													0
+												]
+											},
+											"sessions": {
+												"$cond": [
+													{
+														"$and": [
+															{
+																"$eq": ["$v_act", 1]
+															},
+															{
+																"$ne": ["$sn", null]
+															}
+														]
+													},
+													1,
+													0
+												]
+											},
+											"entries": "$entry",
+											"bounces": "$bounce",
+											"sessionMs": "$s_ms",
+											"durationMs": "$s_ms",
+											"scrollSum": "$v_ss",
+											"scrollSamples": "$v_sc",
+											"conversions": "$v_conv",
+											"revenue": "$v_rev",
+											"impressions": 0,
+											"interactions": "$v_int",
+											"once": 1
+										}
+									],
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_ref"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_ref", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 1,
+													"a": "$e_ref",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_source"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_source", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 2,
+													"a": "$e_source",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_channel"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_channel", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 3,
+													"a": "$e_channel",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_utmSource"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_utmSource", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 4,
+													"a": "$e_utmSource",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_utmMedium"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_utmMedium", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 5,
+													"a": "$e_utmMedium",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_utmCampaign"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_utmCampaign", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 6,
+													"a": "$e_utmCampaign",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_utmContent"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_utmContent", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 7,
+													"a": "$e_utmContent",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_utmTerm"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_utmTerm", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 8,
+													"a": "$e_utmTerm",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_country"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_country", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 9,
+													"a": "$e_country",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_region"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_region", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 10,
+													"a": "$e_region",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_city"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_city", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 11,
+													"a": "$e_city",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_language"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_language", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 12,
+													"a": "$e_language",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_device"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_device", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 13,
+													"a": "$e_device",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_browser"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_browser", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 14,
+													"a": "$e_browser",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									},
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$e_os"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$e_os", ""]
+													}
+												]
+											},
+											[
+												{
+													"k": 15,
+													"a": "$e_os",
+													"b": "",
+													"pageviews": "$s_pv",
+													"events": "$s_int",
+													"visitors": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$v", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$v_act", 1]
+																	},
+																	{
+																		"$ne": ["$sn", null]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													},
+													"entries": "$entry",
+													"bounces": "$bounce",
+													"sessionMs": "$s_ms",
+													"durationMs": "$s_ms",
+													"scrollSum": "$v_ss",
+													"scrollSamples": "$v_sc",
+													"conversions": "$v_conv",
+													"revenue": "$v_rev",
+													"impressions": 0,
+													"interactions": "$v_int",
+													"once": 1
+												}
+											],
+											[]
+										]
+									}
+								]
+							},
+							[]
+						]
+					},
+					{
+						"$cond": [
+							{
+								"$and": [
+									{
+										"$eq": [
+											{
+												"$type": "$path"
+											},
+											"string"
+										]
+									},
+									{
+										"$ne": ["$path", ""]
+									}
+								]
+							},
+							[
+								{
+									"k": 16,
+									"a": "$path",
+									"b": "",
+									"pageviews": {
+										"$cond": [
+											{
+												"$eq": ["$type", "pageview"]
+											},
+											1,
+											0
+										]
+									},
+									"events": {
+										"$cond": [
+											{
+												"$in": ["$type", ["event", "goal"]]
+											},
+											1,
+											0
+										]
+									},
+									"visitors": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$eng", 0]
+													},
+													{
+														"$ne": ["$v", ""]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"sessions": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$eng", 0]
+													},
+													{
+														"$ne": ["$sn", null]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"entries": "$entry",
+									"bounces": "$bounce",
+									"sessionMs": "$s_ms",
+									"durationMs": {
+										"$ifNull": ["$durationMs", 0]
+									},
+									"scrollSum": {
+										"$ifNull": ["$scrollDepth", 0]
+									},
+									"scrollSamples": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "pageview"]
+													},
+													{
+														"$ne": ["$scrollDepth", null]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"conversions": {
+										"$ifNull": ["$conversions", 0]
+									},
+									"revenue": {
+										"$ifNull": ["$revenue", 0]
+									},
+									"impressions": 0,
+									"interactions": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "event"]
+													},
+													{
+														"$eq": ["$name", "item_click"]
+													},
+													{
+														"$eq": [
+															{
+																"$type": "$item"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$item", ""]
+													}
+												]
+											},
+											1,
+											0
+										]
+									}
+								}
+							],
+							[]
+						]
+					},
+					{
+						"$cond": [
+							{
+								"$and": [
+									{
+										"$eq": ["$type", "event"]
+									},
+									{
+										"$and": [
+											{
+												"$eq": [
+													{
+														"$type": "$name"
+													},
+													"string"
+												]
+											},
+											{
+												"$ne": ["$name", ""]
+											}
+										]
+									}
+								]
+							},
+							[
+								{
+									"k": 17,
+									"a": "$name",
+									"b": "",
+									"pageviews": {
+										"$cond": [
+											{
+												"$eq": ["$type", "pageview"]
+											},
+											1,
+											0
+										]
+									},
+									"events": {
+										"$cond": [
+											{
+												"$in": ["$type", ["event", "goal"]]
+											},
+											1,
+											0
+										]
+									},
+									"visitors": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$eng", 0]
+													},
+													{
+														"$ne": ["$v", ""]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"sessions": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$eng", 0]
+													},
+													{
+														"$ne": ["$sn", null]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"entries": "$entry",
+									"bounces": "$bounce",
+									"sessionMs": "$s_ms",
+									"durationMs": {
+										"$ifNull": ["$durationMs", 0]
+									},
+									"scrollSum": {
+										"$ifNull": ["$scrollDepth", 0]
+									},
+									"scrollSamples": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "pageview"]
+													},
+													{
+														"$ne": ["$scrollDepth", null]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"conversions": {
+										"$ifNull": ["$conversions", 0]
+									},
+									"revenue": {
+										"$ifNull": ["$revenue", 0]
+									},
+									"impressions": 0,
+									"interactions": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "event"]
+													},
+													{
+														"$eq": ["$name", "item_click"]
+													},
+													{
+														"$eq": [
+															{
+																"$type": "$item"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$item", ""]
+													}
+												]
+											},
+											1,
+											0
+										]
+									}
+								}
+							],
+							[]
+						]
+					},
+					{
+						"$cond": [
+							{
+								"$and": [
+									{
+										"$eq": [
+											{
+												"$type": "$sentCurrency"
+											},
+											"string"
+										]
+									},
+									{
+										"$ne": ["$sentCurrency", ""]
+									}
+								]
+							},
+							[
+								{
+									"k": 18,
+									"a": "$sentCurrency",
+									"b": "",
+									"pageviews": {
+										"$cond": [
+											{
+												"$eq": ["$type", "pageview"]
+											},
+											1,
+											0
+										]
+									},
+									"events": {
+										"$cond": [
+											{
+												"$in": ["$type", ["event", "goal"]]
+											},
+											1,
+											0
+										]
+									},
+									"visitors": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$eng", 0]
+													},
+													{
+														"$ne": ["$v", ""]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"sessions": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$eng", 0]
+													},
+													{
+														"$ne": ["$sn", null]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"entries": "$entry",
+									"bounces": "$bounce",
+									"sessionMs": "$s_ms",
+									"durationMs": {
+										"$ifNull": ["$durationMs", 0]
+									},
+									"scrollSum": {
+										"$ifNull": ["$scrollDepth", 0]
+									},
+									"scrollSamples": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "pageview"]
+													},
+													{
+														"$ne": ["$scrollDepth", null]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"conversions": {
+										"$ifNull": ["$conversions", 0]
+									},
+									"revenue": {
+										"$ifNull": ["$sentRevenue", 0]
+									},
+									"impressions": 0,
+									"interactions": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "event"]
+													},
+													{
+														"$eq": ["$name", "item_click"]
+													},
+													{
+														"$eq": [
+															{
+																"$type": "$item"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$item", ""]
+													}
+												]
+											},
+											1,
+											0
+										]
+									}
+								}
+							],
+							[]
+						]
+					},
+					{
+						"$reduce": {
+							"input": "$goals",
+							"initialValue": [],
+							"in": {
+								"$concatArrays": [
+									"$$value",
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": [
+															{
+																"$type": "$$this.slug"
+															},
+															"string"
+														]
+													},
+													{
+														"$ne": ["$$this.slug", ""]
+													}
+												]
+											},
+											{
+												"$concatArrays": [
+													[
+														{
+															"k": 19,
+															"a": "$$this.slug",
+															"b": "",
+															"pageviews": {
+																"$cond": [
+																	{
+																		"$eq": ["$type", "pageview"]
+																	},
+																	1,
+																	0
+																]
+															},
+															"events": {
+																"$cond": [
+																	{
+																		"$in": ["$type", ["event", "goal"]]
+																	},
+																	1,
+																	0
+																]
+															},
+															"visitors": {
+																"$cond": [
+																	{
+																		"$and": [
+																			{
+																				"$eq": ["$eng", 0]
+																			},
+																			{
+																				"$ne": ["$v", ""]
+																			}
+																		]
+																	},
+																	1,
+																	0
+																]
+															},
+															"sessions": {
+																"$cond": [
+																	{
+																		"$and": [
+																			{
+																				"$eq": ["$eng", 0]
+																			},
+																			{
+																				"$ne": ["$sn", null]
+																			}
+																		]
+																	},
+																	1,
+																	0
+																]
+															},
+															"entries": "$entry",
+															"bounces": "$bounce",
+															"sessionMs": "$s_ms",
+															"durationMs": {
+																"$ifNull": ["$durationMs", 0]
+															},
+															"scrollSum": {
+																"$ifNull": ["$scrollDepth", 0]
+															},
+															"scrollSamples": {
+																"$cond": [
+																	{
+																		"$and": [
+																			{
+																				"$eq": ["$type", "pageview"]
+																			},
+																			{
+																				"$ne": ["$scrollDepth", null]
+																			}
+																		]
+																	},
+																	1,
+																	0
+																]
+															},
+															"conversions": {
+																"$cond": [
+																	{
+																		"$gt": [
+																			{
+																				"$ifNull": ["$conversions", 0]
+																			},
+																			0
+																		]
+																	},
+																	1,
+																	0
+																]
+															},
+															"revenue": {
+																"$ifNull": ["$$this.value", 0]
+															},
+															"impressions": 0,
+															"interactions": {
+																"$cond": [
+																	{
+																		"$and": [
+																			{
+																				"$eq": ["$type", "event"]
+																			},
+																			{
+																				"$eq": ["$name", "item_click"]
+																			},
+																			{
+																				"$eq": [
+																					{
+																						"$type": "$item"
+																					},
+																					"string"
+																				]
+																			},
+																			{
+																				"$ne": ["$item", ""]
+																			}
+																		]
+																	},
+																	1,
+																	0
+																]
+															}
+														}
+													],
+													{
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": [
+																			{
+																				"$type": "$e_channel"
+																			},
+																			"string"
+																		]
+																	},
+																	{
+																		"$ne": ["$e_channel", ""]
+																	}
+																]
+															},
+															[
+																{
+																	"k": 20,
+																	"a": "$$this.slug",
+																	"b": "$e_channel",
+																	"pageviews": {
+																		"$cond": [
+																			{
+																				"$eq": ["$type", "pageview"]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"events": {
+																		"$cond": [
+																			{
+																				"$in": ["$type", ["event", "goal"]]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"visitors": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$eng", 0]
+																					},
+																					{
+																						"$ne": ["$v", ""]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"sessions": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$eng", 0]
+																					},
+																					{
+																						"$ne": ["$sn", null]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"entries": "$entry",
+																	"bounces": "$bounce",
+																	"sessionMs": "$s_ms",
+																	"durationMs": {
+																		"$ifNull": ["$durationMs", 0]
+																	},
+																	"scrollSum": {
+																		"$ifNull": ["$scrollDepth", 0]
+																	},
+																	"scrollSamples": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "pageview"]
+																					},
+																					{
+																						"$ne": ["$scrollDepth", null]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"conversions": {
+																		"$cond": [
+																			{
+																				"$gt": [
+																					{
+																						"$ifNull": ["$conversions", 0]
+																					},
+																					0
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"revenue": {
+																		"$ifNull": ["$$this.value", 0]
+																	},
+																	"impressions": 0,
+																	"interactions": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "event"]
+																					},
+																					{
+																						"$eq": ["$name", "item_click"]
+																					},
+																					{
+																						"$eq": [
+																							{
+																								"$type": "$item"
+																							},
+																							"string"
+																						]
+																					},
+																					{
+																						"$ne": ["$item", ""]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	}
+																}
+															],
+															[]
+														]
+													},
+													{
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": [
+																			{
+																				"$type": "$e_source"
+																			},
+																			"string"
+																		]
+																	},
+																	{
+																		"$ne": ["$e_source", ""]
+																	}
+																]
+															},
+															[
+																{
+																	"k": 21,
+																	"a": "$$this.slug",
+																	"b": "$e_source",
+																	"pageviews": {
+																		"$cond": [
+																			{
+																				"$eq": ["$type", "pageview"]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"events": {
+																		"$cond": [
+																			{
+																				"$in": ["$type", ["event", "goal"]]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"visitors": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$eng", 0]
+																					},
+																					{
+																						"$ne": ["$v", ""]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"sessions": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$eng", 0]
+																					},
+																					{
+																						"$ne": ["$sn", null]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"entries": "$entry",
+																	"bounces": "$bounce",
+																	"sessionMs": "$s_ms",
+																	"durationMs": {
+																		"$ifNull": ["$durationMs", 0]
+																	},
+																	"scrollSum": {
+																		"$ifNull": ["$scrollDepth", 0]
+																	},
+																	"scrollSamples": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "pageview"]
+																					},
+																					{
+																						"$ne": ["$scrollDepth", null]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"conversions": {
+																		"$cond": [
+																			{
+																				"$gt": [
+																					{
+																						"$ifNull": ["$conversions", 0]
+																					},
+																					0
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"revenue": {
+																		"$ifNull": ["$$this.value", 0]
+																	},
+																	"impressions": 0,
+																	"interactions": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "event"]
+																					},
+																					{
+																						"$eq": ["$name", "item_click"]
+																					},
+																					{
+																						"$eq": [
+																							{
+																								"$type": "$item"
+																							},
+																							"string"
+																						]
+																					},
+																					{
+																						"$ne": ["$item", ""]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	}
+																}
+															],
+															[]
+														]
+													},
+													{
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": [
+																			{
+																				"$type": "$e_utmCampaign"
+																			},
+																			"string"
+																		]
+																	},
+																	{
+																		"$ne": ["$e_utmCampaign", ""]
+																	}
+																]
+															},
+															[
+																{
+																	"k": 22,
+																	"a": "$$this.slug",
+																	"b": "$e_utmCampaign",
+																	"pageviews": {
+																		"$cond": [
+																			{
+																				"$eq": ["$type", "pageview"]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"events": {
+																		"$cond": [
+																			{
+																				"$in": ["$type", ["event", "goal"]]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"visitors": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$eng", 0]
+																					},
+																					{
+																						"$ne": ["$v", ""]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"sessions": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$eng", 0]
+																					},
+																					{
+																						"$ne": ["$sn", null]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"entries": "$entry",
+																	"bounces": "$bounce",
+																	"sessionMs": "$s_ms",
+																	"durationMs": {
+																		"$ifNull": ["$durationMs", 0]
+																	},
+																	"scrollSum": {
+																		"$ifNull": ["$scrollDepth", 0]
+																	},
+																	"scrollSamples": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "pageview"]
+																					},
+																					{
+																						"$ne": ["$scrollDepth", null]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"conversions": {
+																		"$cond": [
+																			{
+																				"$gt": [
+																					{
+																						"$ifNull": ["$conversions", 0]
+																					},
+																					0
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"revenue": {
+																		"$ifNull": ["$$this.value", 0]
+																	},
+																	"impressions": 0,
+																	"interactions": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "event"]
+																					},
+																					{
+																						"$eq": ["$name", "item_click"]
+																					},
+																					{
+																						"$eq": [
+																							{
+																								"$type": "$item"
+																							},
+																							"string"
+																						]
+																					},
+																					{
+																						"$ne": ["$item", ""]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	}
+																}
+															],
+															[]
+														]
+													}
+												]
+											},
+											[]
+										]
+									}
+								]
+							}
+						}
+					},
+					{
+						"$cond": [
+							{
+								"$and": [
+									{
+										"$eq": ["$eng", 0]
+									},
+									{
+										"$and": [
+											{
+												"$eq": [
+													{
+														"$type": "$item"
+													},
+													"string"
+												]
+											},
+											{
+												"$ne": ["$item", ""]
+											}
+										]
+									}
+								]
+							},
+							{
+								"$concatArrays": [
+									[
+										{
+											"k": 23,
+											"a": "$item",
+											"b": "",
+											"pageviews": 0,
+											"events": {
+												"$cond": [
+													{
+														"$in": ["$type", ["event", "goal"]]
+													},
+													1,
+													0
+												]
+											},
+											"visitors": {
+												"$cond": [
+													{
+														"$ne": ["$v", ""]
+													},
+													1,
+													0
+												]
+											},
+											"sessions": 0,
+											"entries": 0,
+											"bounces": 0,
+											"sessionMs": 0,
+											"durationMs": 0,
+											"scrollSum": 0,
+											"scrollSamples": 0,
+											"conversions": {
+												"$ifNull": ["$conversions", 0]
+											},
+											"revenue": {
+												"$ifNull": ["$revenue", 0]
+											},
+											"impressions": 0,
+											"interactions": {
+												"$cond": [
+													{
+														"$and": [
+															{
+																"$eq": ["$type", "event"]
+															},
+															{
+																"$eq": ["$name", "item_click"]
+															},
+															{
+																"$eq": [
+																	{
+																		"$type": "$item"
+																	},
+																	"string"
+																]
+															},
+															{
+																"$ne": ["$item", ""]
+															}
+														]
+													},
+													1,
+													0
+												]
+											}
+										}
+									],
+									{
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$ne": ["$server", true]
+													},
+													{
+														"$and": [
+															{
+																"$eq": [
+																	{
+																		"$type": "$path"
+																	},
+																	"string"
+																]
+															},
+															{
+																"$ne": ["$path", ""]
+															}
+														]
+													}
+												]
+											},
+											[
+												{
+													"k": 24,
+													"a": "$item",
+													"b": "$path",
+													"pageviews": 0,
+													"events": {
+														"$cond": [
+															{
+																"$in": ["$type", ["event", "goal"]]
+															},
+															1,
+															0
+														]
+													},
+													"visitors": {
+														"$cond": [
+															{
+																"$ne": ["$v", ""]
+															},
+															1,
+															0
+														]
+													},
+													"sessions": 0,
+													"entries": 0,
+													"bounces": 0,
+													"sessionMs": 0,
+													"durationMs": 0,
+													"scrollSum": 0,
+													"scrollSamples": 0,
+													"conversions": {
+														"$ifNull": ["$conversions", 0]
+													},
+													"revenue": {
+														"$ifNull": ["$revenue", 0]
+													},
+													"impressions": 0,
+													"interactions": {
+														"$cond": [
+															{
+																"$and": [
+																	{
+																		"$eq": ["$type", "event"]
+																	},
+																	{
+																		"$eq": ["$name", "item_click"]
+																	},
+																	{
+																		"$eq": [
+																			{
+																				"$type": "$item"
+																			},
+																			"string"
+																		]
+																	},
+																	{
+																		"$ne": ["$item", ""]
+																	}
+																]
+															},
+															1,
+															0
+														]
+													}
+												}
+											],
+											[]
+										]
+									}
+								]
+							},
+							[]
+						]
+					},
+					{
+						"$cond": [
+							{
+								"$eq": ["$eng", 1]
+							},
+							{
+								"$reduce": {
+									"input": "$impressions",
+									"initialValue": [],
+									"in": {
+										"$concatArrays": [
+											"$$value",
+											{
+												"$cond": [
+													{
+														"$and": [
+															{
+																"$eq": [
+																	{
+																		"$type": "$$this"
+																	},
+																	"string"
+																]
+															},
+															{
+																"$ne": ["$$this", ""]
+															}
+														]
+													},
+													{
+														"$concatArrays": [
+															[
+																{
+																	"k": 23,
+																	"a": "$$this",
+																	"b": "",
+																	"pageviews": 0,
+																	"events": {
+																		"$cond": [
+																			{
+																				"$in": ["$type", ["event", "goal"]]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"visitors": {
+																		"$cond": [
+																			{
+																				"$ne": ["$v", ""]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"sessions": 0,
+																	"entries": 0,
+																	"bounces": 0,
+																	"sessionMs": 0,
+																	"durationMs": 0,
+																	"scrollSum": 0,
+																	"scrollSamples": 0,
+																	"conversions": {
+																		"$ifNull": ["$conversions", 0]
+																	},
+																	"revenue": {
+																		"$ifNull": ["$revenue", 0]
+																	},
+																	"impressions": 1,
+																	"interactions": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "event"]
+																					},
+																					{
+																						"$eq": ["$name", "item_click"]
+																					},
+																					{
+																						"$eq": [
+																							{
+																								"$type": "$item"
+																							},
+																							"string"
+																						]
+																					},
+																					{
+																						"$ne": ["$item", ""]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	}
+																}
+															],
+															{
+																"$cond": [
+																	{
+																		"$and": [
+																			{
+																				"$ne": ["$server", true]
+																			},
+																			{
+																				"$and": [
+																					{
+																						"$eq": [
+																							{
+																								"$type": "$path"
+																							},
+																							"string"
+																						]
+																					},
+																					{
+																						"$ne": ["$path", ""]
+																					}
+																				]
+																			}
+																		]
+																	},
+																	[
+																		{
+																			"k": 24,
+																			"a": "$$this",
+																			"b": "$path",
+																			"pageviews": 0,
+																			"events": {
+																				"$cond": [
+																					{
+																						"$in": ["$type", ["event", "goal"]]
+																					},
+																					1,
+																					0
+																				]
+																			},
+																			"visitors": {
+																				"$cond": [
+																					{
+																						"$ne": ["$v", ""]
+																					},
+																					1,
+																					0
+																				]
+																			},
+																			"sessions": 0,
+																			"entries": 0,
+																			"bounces": 0,
+																			"sessionMs": 0,
+																			"durationMs": 0,
+																			"scrollSum": 0,
+																			"scrollSamples": 0,
+																			"conversions": {
+																				"$ifNull": ["$conversions", 0]
+																			},
+																			"revenue": {
+																				"$ifNull": ["$revenue", 0]
+																			},
+																			"impressions": 1,
+																			"interactions": {
+																				"$cond": [
+																					{
+																						"$and": [
+																							{
+																								"$eq": ["$type", "event"]
+																							},
+																							{
+																								"$eq": ["$name", "item_click"]
+																							},
+																							{
+																								"$eq": [
+																									{
+																										"$type": "$item"
+																									},
+																									"string"
+																								]
+																							},
+																							{
+																								"$ne": ["$item", ""]
+																							}
+																						]
+																					},
+																					1,
+																					0
+																				]
+																			}
+																		}
+																	],
+																	[]
+																]
+															}
+														]
+													},
+													[]
+												]
+											}
+										]
+									}
+								}
+							},
+							[]
+						]
+					}
+				]
+			}
+		}
+	},
+	{
+		"$project": {
+			"_id": 0,
+			"h": "$hostname",
+			"v": 1,
+			"n": "$sn",
+			"facts": 1
+		}
+	},
+	{
+		"$unwind": "$facts"
+	},
+	{
+		"$group": {
+			"_id": {
+				"k": "$facts.k",
+				"a": "$facts.a",
+				"b": "$facts.b",
+				"h": "$h",
+				"v": "$v"
+			},
+			"visitors": {
+				"$max": "$facts.visitors"
+			},
+			"visits": {
+				"$addToSet": {
+					"$cond": [
+						{
+							"$eq": ["$facts.sessions", 1]
+						},
+						{
+							"n": "$n",
+							"ms": "$facts.sessionMs"
+						},
+						"$$REMOVE"
+					]
+				}
+			},
+			"pageviews": {
+				"$sum": "$facts.pageviews"
+			},
+			"events": {
+				"$sum": "$facts.events"
+			},
+			"entries": {
+				"$sum": "$facts.entries"
+			},
+			"bounces": {
+				"$sum": "$facts.bounces"
+			},
+			"durationMs": {
+				"$sum": "$facts.durationMs"
+			},
+			"scrollSum": {
+				"$sum": "$facts.scrollSum"
+			},
+			"scrollSamples": {
+				"$sum": "$facts.scrollSamples"
+			},
+			"conversions": {
+				"$sum": "$facts.conversions"
+			},
+			"revenue": {
+				"$sum": "$facts.revenue"
+			},
+			"impressions": {
+				"$sum": "$facts.impressions"
+			},
+			"interactions": {
+				"$sum": "$facts.interactions"
+			}
+		}
+	},
+	{
+		"$set": {
+			"sessions": {
+				"$size": "$visits"
+			},
+			"sessionMs": {
+				"$sum": "$visits.ms"
+			}
+		}
+	},
+	{
+		"$group": {
+			"_id": {
+				"k": "$_id.k",
+				"a": "$_id.a",
+				"b": "$_id.b",
+				"h": "$_id.h"
+			},
+			"pageviews": {
+				"$sum": "$pageviews"
+			},
+			"events": {
+				"$sum": "$events"
+			},
+			"visitors": {
+				"$sum": "$visitors"
+			},
+			"sessions": {
+				"$sum": "$sessions"
+			},
+			"entries": {
+				"$sum": "$entries"
+			},
+			"bounces": {
+				"$sum": "$bounces"
+			},
+			"sessionMs": {
+				"$sum": "$sessionMs"
+			},
+			"durationMs": {
+				"$sum": "$durationMs"
+			},
+			"scrollSum": {
+				"$sum": "$scrollSum"
+			},
+			"scrollSamples": {
+				"$sum": "$scrollSamples"
+			},
+			"conversions": {
+				"$sum": "$conversions"
+			},
+			"revenue": {
+				"$sum": "$revenue"
+			},
+			"impressions": {
+				"$sum": "$impressions"
+			},
+			"interactions": {
+				"$sum": "$interactions"
+			}
+		}
+	},
+	{
+		"$set": {
+			"views": {
+				"$cond": [
+					{
+						"$in": ["$_id.k", [23, 24]]
+					},
+					"$impressions",
+					"$pageviews"
+				]
+			},
+			"cap": {
+				"$cond": [
+					{
+						"$eq": ["$_id.k", 1]
+					},
+					500,
+					{
+						"$cond": [
+							{
+								"$eq": ["$_id.k", 2]
+							},
+							500,
+							{
+								"$cond": [
+									{
+										"$eq": ["$_id.k", 4]
+									},
+									300,
+									{
+										"$cond": [
+											{
+												"$eq": ["$_id.k", 5]
+											},
+											300,
+											{
+												"$cond": [
+													{
+														"$eq": ["$_id.k", 6]
+													},
+													300,
+													{
+														"$cond": [
+															{
+																"$eq": ["$_id.k", 7]
+															},
+															300,
+															{
+																"$cond": [
+																	{
+																		"$eq": ["$_id.k", 8]
+																	},
+																	300,
+																	{
+																		"$cond": [
+																			{
+																				"$eq": ["$_id.k", 10]
+																			},
+																			300,
+																			{
+																				"$cond": [
+																					{
+																						"$eq": ["$_id.k", 11]
+																					},
+																					500,
+																					{
+																						"$cond": [
+																							{
+																								"$eq": ["$_id.k", 12]
+																							},
+																							200,
+																							{
+																								"$cond": [
+																									{
+																										"$eq": ["$_id.k", 16]
+																									},
+																									10000,
+																									{
+																										"$cond": [
+																											{
+																												"$eq": ["$_id.k", 17]
+																											},
+																											300,
+																											{
+																												"$cond": [
+																													{
+																														"$eq": ["$_id.k", 18]
+																													},
+																													100,
+																													{
+																														"$cond": [
+																															{
+																																"$eq": ["$_id.k", 20]
+																															},
+																															300,
+																															{
+																																"$cond": [
+																																	{
+																																		"$eq": ["$_id.k", 21]
+																																	},
+																																	300,
+																																	{
+																																		"$cond": [
+																																			{
+																																				"$eq": ["$_id.k", 22]
+																																			},
+																																			300,
+																																			{
+																																				"$cond": [
+																																					{
+																																						"$eq": ["$_id.k", 24]
+																																					},
+																																					2000,
+																																					null
+																																				]
+																																			}
+																																		]
+																																	}
+																																]
+																															}
+																														]
+																													}
+																												]
+																											}
+																										]
+																									}
+																								]
+																							}
+																						]
+																					}
+																				]
+																			}
+																		]
+																	}
+																]
+															}
+														]
+													}
+												]
+											}
+										]
+									}
+								]
+							}
+						]
+					}
+				]
+			}
+		}
+	},
+	{
+		"$setWindowFields": {
+			"partitionBy": {
+				"k": "$_id.k",
+				"h": "$_id.h",
+				"a": {
+					"$cond": [
+						{
+							"$in": ["$_id.k", [20, 21, 22, 24]]
+						},
+						"$_id.a",
+						""
+					]
+				}
+			},
+			"sortBy": {
+				"views": -1,
+				"events": -1,
+				"_id.a": 1,
+				"_id.b": 1
+			},
+			"output": {
+				"rn": {
+					"$sum": 1,
+					"window": {
+						"documents": ["unbounded", "current"]
+					}
+				}
+			}
+		}
+	},
+	{
+		"$set": {
+			"o": {
+				"$cond": [
+					{
+						"$and": [
+							{
+								"$ne": ["$cap", null]
+							},
+							{
+								"$gt": ["$rn", "$cap"]
+							}
+						]
+					},
+					1,
+					0
+				]
+			}
+		}
+	},
+	{
+		"$group": {
+			"_id": {
+				"k": "$_id.k",
+				"a": {
+					"$cond": [
+						"$o",
+						{
+							"$cond": [
+								{
+									"$in": ["$_id.k", [20, 21, 22, 24]]
+								},
+								"$_id.a",
+								""
+							]
+						},
+						"$_id.a"
+					]
+				},
+				"b": {
+					"$cond": ["$o", "", "$_id.b"]
+				},
+				"h": "$_id.h",
+				"o": "$o"
+			},
+			"pageviews": {
+				"$sum": "$pageviews"
+			},
+			"events": {
+				"$sum": "$events"
+			},
+			"visitors": {
+				"$sum": "$visitors"
+			},
+			"sessions": {
+				"$sum": "$sessions"
+			},
+			"entries": {
+				"$sum": "$entries"
+			},
+			"bounces": {
+				"$sum": "$bounces"
+			},
+			"sessionMs": {
+				"$sum": "$sessionMs"
+			},
+			"durationMs": {
+				"$sum": "$durationMs"
+			},
+			"scrollSum": {
+				"$sum": "$scrollSum"
+			},
+			"scrollSamples": {
+				"$sum": "$scrollSamples"
+			},
+			"conversions": {
+				"$sum": "$conversions"
+			},
+			"revenue": {
+				"$sum": "$revenue"
+			},
+			"impressions": {
+				"$sum": "$impressions"
+			},
+			"interactions": {
+				"$sum": "$interactions"
+			}
+		}
+	}
+]

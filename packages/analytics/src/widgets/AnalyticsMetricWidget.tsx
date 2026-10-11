@@ -1,124 +1,112 @@
-import type { WidgetServerProps } from 'payload'
-import type { MetricKey } from '../core/contract'
+import { currentDate } from '../core/clock'
 import { formatMetricValue } from '../fields/format'
-import { requestTimezone } from '../plugin/runtime'
-import type { TimeframePreset } from '../timeframe/presets'
-import { DEFAULT_TIMEZONE } from '../timeframe/tz'
-import { keys, type TranslationKey } from '../translations/keys'
-import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
+import { revenueCurrencyOf } from '../goals/currency'
+import { requestCurrency } from '../plugin/runtime'
+import { intlLocale } from '../translations/intl'
+import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { ComparisonDelta } from './ComparisonDelta'
-import { cardStyle, labelStyle } from './cardChrome'
-import { captionWithFilter } from './filterCaption'
 import { widgetFilters } from './filterField'
-import { formatRangeCaption, resolveCustomRange } from './range'
-import { readForWidget, type WidgetReadStatus } from './readForWidget'
+import { widgetNotice } from './notices'
+import { readForWidget } from './readForWidget'
+import { metricWidgetTitle, placeholderTitle } from './titleForecast'
 import type { MetricWidgetData } from './types'
-import { type WidgetViewProps, widgetViewHref } from './viewLink'
-import { WidgetViewLink } from './WidgetViewLink'
+import { type AnalyticsWidgetProps, widgetLink } from './viewLink'
+import { WidgetCard, WidgetNote, WidgetValue } from './WidgetCard'
+import { WidgetFrame, WidgetStateCard } from './WidgetFrame'
+import { storedWidgetData } from './widgetData'
+import { resolveWidgetWindow, widgetCaption, windowReadArgs } from './widgetWindow'
 
-const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
-	'not-configured': keys.stateNotConfigured,
-	unavailable: keys.stateUnavailable,
-	'filter-unsupported': keys.stateFilterUnsupported,
+const CLASS_NAME = 'analytics-metric-widget'
+
+const dataOf = (props: AnalyticsWidgetProps): MetricWidgetData => storedWidgetData(props.widgetData)
+
+/**
+ * The card's frame paints at once; its number streams in when the read answers.
+ *
+ * @beta
+ */
+export default function AnalyticsMetricWidget(props: AnalyticsWidgetProps) {
+	return (
+		<WidgetFrame
+			className={CLASS_NAME}
+			kind="metric"
+			widget={props}
+			{...placeholderTitle(props.req, dataOf(props), { series: false })}
+		>
+			<MetricWidgetBody {...props} />
+		</WidgetFrame>
+	)
 }
 
-export default async function AnalyticsMetricWidget(props: WidgetServerProps & WidgetViewProps) {
-	const data = (props.widgetData ?? {}) as MetricWidgetData
-	const metric: MetricKey = data.metric ?? 'pageviews'
-	const rawTimeframe = data.timeframe ?? 'last30days'
-	// Only a custom range needs the reporting timezone before the read; a preset window
-	// resolves inside the read path, which resolves the timezone there as it always has.
-	const timezone = rawTimeframe === 'custom' ? await requestTimezone(props.req) : undefined
-	const customRange = timezone ? resolveCustomRange(rawTimeframe, data.range, timezone) : undefined
-	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
+async function MetricWidgetBody(props: AnalyticsWidgetProps) {
+	const data = dataOf(props)
+	const metric = data.metric ?? 'pageviews'
 	const t = asTranslate(props.req.i18n.t)
-	const locale = props.req.i18n.language ?? 'en-US'
-	const title = data.title?.trim() || t(METRIC_KEYS[metric])
+	const locale = intlLocale(props.req.i18n.language)
+	const window = await resolveWidgetWindow(props.req, data)
+	if (window.unreadable) {
+		return (
+			<WidgetStateCard
+				className={CLASS_NAME}
+				locale={locale}
+				status="invalid"
+				t={t}
+				title={metricWidgetTitle(data, t)}
+			/>
+		)
+	}
+	const reporting = await requestCurrency(props.req)
 	const filters = widgetFilters(data)
+	const now = currentDate()
 	const result = await readForWidget({
 		req: props.req,
 		metrics: [metric],
-		timeframe,
 		adapterId: data.dataSource,
-		now: new Date(),
-		range: customRange,
+		now,
 		filters,
-		...(timezone ? { timezone } : {}),
+		...windowReadArgs(window),
 	})
-	// The adapter that answered, which on a scoped or runtime-provider install is not the
-	// id the widget asked for.
-	const href = widgetViewHref(props.view, props.req, {
-		timeframe: rawTimeframe,
-		timezone: timezone ?? DEFAULT_TIMEZONE,
-		...(customRange ? { range: customRange } : {}),
-		...(result.adapterId ? { source: result.adapterId } : {}),
-		metric,
-		filters,
-	})
-
+	const link = widgetLink(props, t, { window, adapterId: result.adapterId, metric, filters })
 	if (result.status !== 'ok') {
 		return (
-			<div className="analytics-metric-widget" style={cardStyle}>
-				<span style={labelStyle}>{title}</span>
-				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
-				<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
-			</div>
+			<WidgetStateCard
+				className={CLASS_NAME}
+				link={link}
+				locale={locale}
+				retryAfterMs={result.retryAfterMs}
+				status={result.status}
+				t={t}
+				title={metricWidgetTitle(data, t)}
+			/>
 		)
 	}
 
-	const windowCaption =
-		customRange && timezone
-			? formatRangeCaption(customRange, locale, timezone)
-			: t(TIMEFRAME_KEYS[timeframe])
-	const caption = captionWithFilter(windowCaption, filters[0], t)
+	const caption = await widgetCaption(props.req, { window, filters, read: result, locale, t })
 	const value = result.metrics[metric]
+	const currency = result.currency ?? revenueCurrencyOf(filters, reporting)
 	return (
-		<div className="analytics-metric-widget" style={cardStyle}>
-			<span style={labelStyle}>{title}</span>
-			<span
-				style={{
-					fontSize: '2rem',
-					fontWeight: 700,
-					lineHeight: 1.1,
-					color: 'var(--theme-elevation-800)',
-				}}
+		<WidgetCard
+			className={CLASS_NAME}
+			caption={caption}
+			link={link}
+			title={metricWidgetTitle(data, t, result.visitorsSummed)}
+		>
+			<WidgetValue
+				noValueLabel={t(keys.stateNoValue)}
+				value={formatMetricValue(metric, value, { locale, currency })}
 			>
-				{value === undefined ? '–' : formatMetricValue(metric, value, locale)}
-			</span>
-			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
-			{result.comparisonRange ? (
-				<ComparisonDelta
-					current={value}
-					previous={result.previousMetrics?.[metric]}
-					metric={metric}
-					locale={locale}
-					t={t}
-				/>
-			) : null}
-			{result.clamped ? (
-				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
-					{t(keys.stateClamped)}
-				</span>
-			) : null}
-			{result.filtersUnapplied ? (
-				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
-					{t(keys.stateFiltersUnapplied)}
-				</span>
-			) : null}
-			{result.sampled ? (
-				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
-					{t(keys.stateSampled)}
-				</span>
-			) : null}
-			{result.goalsUnresolved || result.noGoals ? (
-				// A conversions total with no goals behind it is a number about nothing, which
-				// the plain caption would read as "nobody converted".
-				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
-					{t(result.goalsUnresolved ? keys.stateGoalsUnresolved : keys.stateNoGoals)}
-				</span>
-			) : null}
-			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
-		</div>
+				{result.comparisonRange ? (
+					<ComparisonDelta
+						current={value}
+						previous={result.previousMetrics?.[metric]}
+						metric={metric}
+						locale={locale}
+						t={t}
+					/>
+				) : null}
+			</WidgetValue>
+			<WidgetNote>{widgetNotice(result, { t, locale, now, timeZone: result.timezone })}</WidgetNote>
+		</WidgetCard>
 	)
 }

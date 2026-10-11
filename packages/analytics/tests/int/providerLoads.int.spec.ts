@@ -5,7 +5,8 @@ import { plausible } from '../../src/adapters/plausible/plausible'
 import { posthog } from '../../src/adapters/posthog/posthog'
 import { umami } from '../../src/adapters/umami/umami'
 import { analytics } from '../../src/index'
-import { kvCacheStore } from '../../src/surfacing/cacheStore'
+import { CACHE_SLUG } from '../../src/surfacing/cacheCollection'
+import { collectionCacheStore } from '../../src/surfacing/collectionCacheStore'
 import { createEngine } from '../../src/surfacing/engine'
 
 describeForDb('analytics provider adapters load', {}, (db) => {
@@ -38,8 +39,7 @@ describeForDb('analytics provider adapters load', {}, (db) => {
 
 	it('serves an unconfigured adapter as a no-network empty result through the engine', async () => {
 		const engine = createEngine({
-			store: kvCacheStore(booted.payload.kv),
-			queue: { concurrency: 2 },
+			store: collectionCacheStore(booted.payload, { slug: CACHE_SLUG }),
 			ttl: { aggregate: 60, realtime: 5 },
 			timeoutMs: 15_000,
 		})
@@ -54,8 +54,7 @@ describeForDb('analytics provider adapters load', {}, (db) => {
 
 	it('serves an unconfigured PostHog adapter as a no-network empty result', async () => {
 		const engine = createEngine({
-			store: kvCacheStore(booted.payload.kv),
-			queue: { concurrency: 2 },
+			store: collectionCacheStore(booted.payload, { slug: CACHE_SLUG }),
 			ttl: { aggregate: 60, realtime: 5 },
 			timeoutMs: 15_000,
 		})

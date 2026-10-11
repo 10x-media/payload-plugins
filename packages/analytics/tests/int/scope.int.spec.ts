@@ -2,13 +2,14 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import type { PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
-import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { requestHostname } from '../../src/native/ingest/requestHost'
 import { native } from '../../src/native/nativeAdapter'
 import { getRuntime, resolveRegistryFor, resolveScopeFor } from '../../src/plugin/runtime'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import { readForWidget } from '../../src/widgets/readForWidget'
 import { ingestRequest } from './ingestRequest'
+import { storedHits } from './nativeHelpers'
+import { readerRequest } from './readerRequest'
 
 describeForDb('analytics scope seam', {}, (db) => {
 	const mem = memoryAdapter()
@@ -18,8 +19,8 @@ describeForDb('analytics scope seam', {}, (db) => {
 		booted = await bootPayload({
 			plugin: analytics({
 				adapters: [mem],
-				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
-				access: { platformRead: () => true },
+				scope: { member: () => true, resolve: ({ req }) => req.headers.get('x-tenant') },
+				access: { crossScope: () => true },
 			}),
 			db,
 		})
@@ -31,12 +32,11 @@ describeForDb('analytics scope seam', {}, (db) => {
 	})
 
 	const reqWithTenant = (tenant?: string): PayloadRequest =>
-		({
-			payload: booted.payload,
+		readerRequest(booted.payload, {
 			headers: new Headers(tenant ? { 'x-tenant': tenant } : {}),
-		}) as unknown as PayloadRequest
+		})
 
-	it('resolves the request scope through the configured scopeResolver', async () => {
+	it('resolves the request scope through the configured scope.resolve', async () => {
 		const runtime = getRuntime(booted.payload)
 		expect(runtime).toBeDefined()
 		if (!runtime) return
@@ -49,12 +49,12 @@ describeForDb('analytics scope seam', {}, (db) => {
 		if (!runtime) throw new Error('runtime missing')
 		const forNull = await resolveRegistryFor(runtime, { payload: booted.payload, scope: null })
 		const forTenant = await resolveRegistryFor(runtime, { payload: booted.payload, scope: 't1' })
-		expect(forNull.default().id).toBe('memory')
-		expect(forTenant.default().id).toBe('memory')
-		expect(forTenant.all()).toEqual(forNull.all())
+		expect(forNull.registry.default().id).toBe('memory')
+		expect(forTenant.registry.default().id).toBe('memory')
+		expect(forTenant.registry.all()).toEqual(forNull.registry.all())
 	})
 
-	it('reads identically for scoped and unscoped requests against a scope-agnostic adapter granted platformRead', async () => {
+	it('reads identically for scoped and unscoped requests against a scope-agnostic adapter granted crossScope', async () => {
 		const now = new Date()
 		const unscoped = await readForWidget({
 			req: reqWithTenant(),
@@ -95,13 +95,13 @@ describeForDb('analytics scope seam: runtime provider instance routing', {}, (db
 		await booted.stop()
 	})
 
-	const req = (): PayloadRequest => ({ payload: booted.payload }) as unknown as PayloadRequest
+	const req = (): PayloadRequest => readerRequest(booted.payload)
 
 	it('resolves an instance-id adapter through the registry and serves a read', async () => {
 		const runtime = getRuntime(booted.payload)
 		if (!runtime) throw new Error('runtime missing')
 		const registry = await resolveRegistryFor(runtime, { payload: booted.payload, scope: null })
-		expect(registry.get('memory:doc9').id).toBe('memory:doc9')
+		expect(registry.registry.get('memory:doc9').id).toBe('memory:doc9')
 
 		const result = await readForWidget({
 			req: req(),
@@ -140,7 +140,8 @@ describeForDb(
 			booted = await bootPayload({
 				plugin: analytics({
 					adapters: [mem],
-					scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+					capture: { gate: 'off' },
+					scope: { member: () => true, resolve: ({ req }) => req.headers.get('x-tenant') },
 					providers: {
 						resolve: async () => [{ ...seeded, id: 'memory:doc1', label: 'Instance' }],
 					},
@@ -154,19 +155,30 @@ describeForDb(
 		})
 
 		const reqWithTenant = (): PayloadRequest =>
-			({
-				payload: booted.payload,
-				headers: new Headers({ 'x-tenant': 't1' }),
-			}) as unknown as PayloadRequest
+			readerRequest(booted.payload, { headers: new Headers({ 'x-tenant': 't1' }) })
 
-		it('denies a scoped read through the shared config adapter without platformRead', async () => {
+		it('denies a scoped read that names the shared config adapter without crossScope', async () => {
+			const result = await readForWidget({
+				req: reqWithTenant(),
+				metrics: ['pageviews'],
+				timeframe: 'last7days',
+				adapterId: 'memory',
+				now: new Date(),
+			})
+			expect(result.status).toBe('unavailable')
+		})
+
+		// The default is picked out of what this reader may actually read, so a tenant whose
+		// only readable source is its own runtime one is served by it rather than refused.
+		it('falls to the tenant own runtime adapter when the shared one is gated away', async () => {
 			const result = await readForWidget({
 				req: reqWithTenant(),
 				metrics: ['pageviews'],
 				timeframe: 'last7days',
 				now: new Date(),
 			})
-			expect(result.status).toBe('unavailable')
+			expect(result.status).toBe('ok')
+			expect(result.adapterId).toBe('memory:doc1')
 		})
 
 		it('leaves a scoped read through a runtime instance adapter ungated', async () => {
@@ -196,7 +208,11 @@ describeForDb('analytics scope seam: native ingest attribution', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [native({ platformHostnames: ['platform.example'] })],
-				scopeResolver: ({ req }) => TENANTS.get(req.headers.get('host') ?? '') ?? null,
+				capture: { gate: 'off' },
+				scope: {
+					member: () => true,
+					resolve: ({ req }) => TENANTS.get(req.headers.get('host') ?? '') ?? null,
+				},
 			}),
 		})
 	})
@@ -206,7 +222,7 @@ describeForDb('analytics scope seam: native ingest attribution', {}, (db) => {
 	})
 
 	const ingest = (path: string, host: string) => {
-		const endpoint = booted.payload.config.endpoints?.find((e) => e.path === '/analytics/ingest')
+		const endpoint = booted.payload.config.endpoints?.find((e) => e.path === '/_x/e')
 		if (!endpoint) {
 			throw new Error('ingest endpoint not registered')
 		}
@@ -220,17 +236,11 @@ describeForDb('analytics scope seam: native ingest attribution', {}, (db) => {
 	}
 
 	/** Just what attribution decided: the stored hostname and the scope it was stamped with. */
-	const rows = async (path: string): Promise<Array<[string, string | undefined]>> => {
-		const { docs } = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: path } },
-			pagination: false,
-		})
-		return (docs as unknown as Array<{ hostname: string; scope?: string }>).map((row) => [
+	const rows = async (path: string): Promise<Array<[unknown, unknown]>> =>
+		(await storedHits(booted.payload, { path: { equals: path } })).map((row) => [
 			row.hostname,
 			row.scope,
 		])
-	}
 
 	it('drops an unknown host and keeps a tenant host, answering both identically', async () => {
 		const kept = await ingest('/scoped', 't1.example')
@@ -257,7 +267,7 @@ const tenantFor = (req: PayloadRequest, trustedProxyHops?: number): string | nul
 	TENANT_BY_HOST.get(requestHostname(req.headers, { trustedProxyHops }) ?? '') ?? null
 
 const ingestWith = (booted: BootedPayload, path: string, headers: Record<string, string>) => {
-	const endpoint = booted.payload.config.endpoints?.find((e) => e.path === '/analytics/ingest')
+	const endpoint = booted.payload.config.endpoints?.find((e) => e.path === '/_x/e')
 	if (!endpoint) {
 		throw new Error('ingest endpoint not registered')
 	}
@@ -269,17 +279,11 @@ const ingestWith = (booted: BootedPayload, path: string, headers: Record<string,
 const attributionRows = async (
 	booted: BootedPayload,
 	path: string
-): Promise<Array<[string, string | undefined]>> => {
-	const { docs } = await booted.payload.find({
-		collection: EVENTS_SLUG as never,
-		where: { path: { equals: path } },
-		pagination: false,
-	})
-	return (docs as unknown as Array<{ hostname: string; scope?: string }>).map((row) => [
+): Promise<Array<[unknown, unknown]>> =>
+	(await storedHits(booted.payload, { path: { equals: path } })).map((row) => [
 		row.hostname,
 		row.scope,
 	])
-}
 
 describeForDb('analytics scope seam: forwarded host at a trusted hop', {}, (db) => {
 	let booted: BootedPayload
@@ -289,8 +293,9 @@ describeForDb('analytics scope seam: forwarded host at a trusted hop', {}, (db) 
 			db,
 			plugin: analytics({
 				adapters: [native()],
+				capture: { gate: 'off' },
 				trustedProxyHops: 1,
-				scopeResolver: ({ req }) => tenantFor(req, 1),
+				scope: { member: () => true, resolve: ({ req }) => tenantFor(req, 1) },
 			}),
 		})
 	})
@@ -331,7 +336,8 @@ describeForDb('analytics scope seam: forwarded host with no trusted hop', {}, (d
 			db,
 			plugin: analytics({
 				adapters: [native()],
-				scopeResolver: ({ req }) => tenantFor(req),
+				capture: { gate: 'off' },
+				scope: { member: () => true, resolve: ({ req }) => tenantFor(req) },
 			}),
 		})
 	})

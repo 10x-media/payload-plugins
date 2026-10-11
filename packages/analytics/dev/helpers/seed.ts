@@ -1,322 +1,35 @@
-import type { Payload, PayloadRequest } from 'payload'
-import { GOALS_SLUG } from '../../src/goals/collection'
-import { EVENTS_SLUG } from '../../src/native/collections/events'
-import { classifyBrowser, classifyOs } from '../../src/native/ingest/browser'
-import { flushBatch } from '../../src/native/ingest/flushBatch'
-import { primaryLanguage } from '../../src/native/ingest/language'
-import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
-import { referrerHost, storedReferrer } from '../../src/native/ingest/referrer'
-import {
-	CHANNEL_TAXONOMY_VERSION,
-	classifyChannel,
-	deriveSource,
-} from '../../src/native/ingest/source'
-import { extractUtm } from '../../src/native/ingest/utm'
+import { GOALS_SLUG, signItemRef } from '@10x-media/analytics'
+import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
+import { DEFAULT_JOBS } from '../../src/core/jobs'
+import { getRuntime, resolveTimezoneFor } from '../../src/plugin/runtime'
 import { syncTask } from '../../src/sync/syncTask'
-import { startOfDayInTz } from '../../src/timeframe/tz'
-import { DEV_REPORTING_TIMEZONE, pagePath } from '../config/shared'
-import { GOAL_SCOPE_FIELD, tenancyScopes } from '../config/tenancy'
-import { devMemoryAdapter } from './adapters'
+import {
+	DEV_ADMIN_EMAIL,
+	DEV_REPORTING_CURRENCY,
+	DEV_REPORTING_TIMEZONE,
+	OFFER_GOAL,
+	pagePath,
+} from '../config/shared'
+import { TENANT_SCOPE_FIELD, tenancyScopes } from '../config/tenancy'
+import type { Tenant, User } from '../payload-types'
+import { SEED_DAYS, seedTraffic } from './storeTraffic'
+import type { SiteProfile } from './traffic'
 
-const DEV_EMAIL = 'dev@10xmedia.de'
+/**
+ * A seeded page or offer is stamped as created the day before its oldest seeded traffic, as a
+ * real site's documents predate their visits; created at boot, every one without visits in a
+ * window would read as new there.
+ */
+const seededCreatedAt = (): string =>
+	new Date(Date.now() - (SEED_DAYS + 1) * 86_400_000).toISOString()
+
 const DEV_PASSWORD = 'password'
 const ALPHA_EMAIL = 'alpha@10xmedia.de'
 const BETA_EMAIL = 'beta@10xmedia.de'
 
-const SEED_PATHS = ['/', '/about', '/pricing', '/blog', '/contact']
-const SEED_DEVICES = ['desktop', 'mobile', 'tablet'] as const
-const SEED_VISITOR_COUNT = 6
-const SEED_HOSTNAME = 'localhost'
-const DAY_MS = 24 * 60 * 60 * 1000
-
-/** Country, region and city together, so all three geography levels rank real rows. */
-const SEED_GEO = [
-	{ country: 'US', region: 'California', city: 'San Francisco' },
-	{ country: 'DE', region: 'Berlin', city: 'Berlin' },
-	{ country: 'GB', region: 'England', city: 'London' },
-	{ country: 'FR', region: 'Ile-de-France', city: 'Paris' },
-]
-
-/**
- * One visitor per browser and OS family, each carrying the `accept-language` of the country
- * it is paired with below, so the browsers, operating systems and languages breakdowns all
- * rank several rows and a row reads as a plausible visitor rather than a random pairing.
- */
-const SEED_AGENTS = [
-	{
-		ua: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
-		acceptLanguage: 'en-US,en;q=0.9',
-	},
-	{
-		ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-		acceptLanguage: 'de-DE,de;q=0.9,en;q=0.8',
-	},
-	{
-		ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0',
-		acceptLanguage: 'en-GB,en;q=0.9',
-	},
-	{
-		ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0',
-		acceptLanguage: 'fr-FR,fr;q=0.9',
-	},
-]
-
-/**
- * Raw referrers as a browser sends them: two search engines, two social hops, a video
- * platform, an unlisted host for the referral channel, one empty value for direct traffic,
- * and one same-site referrer, which contributes no `referrer` row and reads as `direct`. The
- * `source` and `channel` dimensions are classified from the same value rather than stated, so
- * they cannot drift apart in the seed.
- */
-const SEED_REFERRERS = [
-	'https://www.google.com/search?q=payload+analytics',
-	'',
-	'https://t.co/9xQz1',
-	'https://news.ycombinator.com/item?id=41000000',
-	'https://www.bing.com/search?q=payload+cms',
-	`http://${SEED_HOSTNAME}/pricing?ref=nav`,
-	'https://www.youtube.com/watch?v=payload-analytics',
-	'https://www.reddit.com/r/nextjs/comments/analytics',
-]
-
-/**
- * Campaign landings, as the tracker sends them on a pageview: the query string, and the
- * referrer the click actually arrived through where the channel depends on it. Every seventh
- * pageview carries one, so the campaigns widget ranks them against an unattributed majority,
- * and 7 shares no factor with the other fixture lists, so a campaign is not pinned to one
- * browser, device or path. Between them they cover the paid, email, affiliate and display
- * channels the referrer list alone cannot produce: the third carries an ad click id and no
- * medium at all, which is how most paid search actually arrives.
- *
- * Which campaign lands is picked by the day rather than by the pageview counter: a 30-day
- * window, the range every widget opens on, spans only a handful of multiples of seven, so a
- * counter-keyed pick would leave the last campaigns of this list out of the default view
- * entirely.
- */
-const SEED_CAMPAIGNS: Array<{ query: string; referrer?: string }> = [
-	{ query: 'utm_source=newsletter&utm_medium=email&utm_campaign=spring' },
-	{ query: 'utm_source=twitter&utm_medium=social&utm_campaign=launch' },
-	{ query: 'utm_source=google&utm_campaign=brand&gclid=abc' },
-	{
-		query: 'utm_source=facebook&utm_medium=paid-social&utm_campaign=retarget',
-		referrer: 'https://www.facebook.com/',
-	},
-	{ query: 'utm_source=partner-network&utm_medium=affiliate&utm_campaign=review' },
-	{ query: 'utm_source=adroll&utm_medium=display&utm_campaign=awareness' },
-]
-const CAMPAIGN_EVERY = 7
-
-/**
- * The dimension fields only, so spreading one can never blank a required one that is not
- * attribution. `channel` and `channelVersion` are always derived, so they are always set.
- */
-type SeedAttribution = Pick<
-	StoredEvent,
-	| 'country'
-	| 'region'
-	| 'city'
-	| 'device'
-	| 'source'
-	| 'channel'
-	| 'channelVersion'
-	| 'browser'
-	| 'os'
-	| 'language'
-	| 'referrer'
-	| 'referrerHost'
-	| 'utmSource'
-	| 'utmMedium'
-	| 'utmCampaign'
-	| 'utmContent'
-	| 'utmTerm'
->
-
-/**
- * Everything ingest would classify from a real request, derived here with the ingest
- * helpers themselves: seeded events bypass the endpoint, so a hand-written literal would be
- * the one place the seed and a live hit could disagree on what a bucket is called. `index`
- * walks the fixture lists so the combinations vary across the span deterministically, and
- * `day` picks the campaign, for the reason {@link SEED_CAMPAIGNS} gives.
- */
-const attributionFor = (index: number, day: number): SeedAttribution => {
-	const agent = SEED_AGENTS[index % SEED_AGENTS.length]
-	const geo = SEED_GEO[index % SEED_GEO.length]
-	const campaign =
-		index % CAMPAIGN_EVERY === 0 ? SEED_CAMPAIGNS[day % SEED_CAMPAIGNS.length] : undefined
-	const referrer = campaign?.referrer ?? SEED_REFERRERS[index % SEED_REFERRERS.length] ?? ''
-	const query = campaign?.query
-	const browser = agent ? classifyBrowser(agent.ua) : undefined
-	const os = agent ? classifyOs(agent.ua) : undefined
-	const language = agent ? primaryLanguage(agent.acceptLanguage) : undefined
-	const referrerValue = storedReferrer(referrer)
-	const host = referrerHost(referrer, SEED_HOSTNAME)
-	const utm = extractUtm(query)
-	return {
-		country: geo?.country,
-		region: geo?.region,
-		city: geo?.city,
-		device: SEED_DEVICES[index % SEED_DEVICES.length],
-		source: deriveSource({ referrerHost: host, utmSource: utm.utmSource }),
-		channel: classifyChannel({
-			referrerHost: host,
-			utmSource: utm.utmSource,
-			utmMedium: utm.utmMedium,
-			query,
-		}),
-		channelVersion: CHANNEL_TAXONOMY_VERSION,
-		...(browser ? { browser } : {}),
-		...(os ? { os } : {}),
-		...(language ? { language } : {}),
-		...(referrerValue ? { referrer: referrerValue } : {}),
-		...(host ? { referrerHost: host } : {}),
-		...utm,
-	}
-}
-
-/** Named custom events, so the events breakdown widget has rows on a fresh boot. */
-const SEED_EVENT_NAMES = ['signup', 'download', 'video-play']
-
-/**
- * One conversion every third dense day, so the goals widget shows a table on a fresh boot and
- * every preset compares against a previous window that also converted.
- */
-const CONVERSION_EVERY_DAYS = 3
-
-/**
- * Two years, so every preset compares against a populated previous window and the widgets
- * always show a real percentage: `lastYear` looks back 365 days and compares against the
- * 365 before that. (`allTime` is the one preset with no previous window by definition, and
- * omits its comparison.)
- */
-const SEED_DAYS = 730
-
-/** The recent span carrying realistic day-to-day traffic and the dimension breakdowns. */
-const SEED_DENSE_DAYS = 180
-
-/** Tenancy mode: alpha runs roughly 3x beta's volume so the isolation is visually obvious. */
-const ALPHA_SCALE = 3
-const BETA_SCALE = 1
-
-/**
- * Traffic decays with age and wobbles day to day, so each window is measurably busier than
- * the one before it and no comparison lands on a flat 0%. Beyond the dense span the seed
- * thins to an occasional pageview: enough to give the year-long presets a real baseline
- * without paying for two years of daily rollups on every dev boot. Deterministic: the same
- * `day` always yields the same count.
- */
-const pageviewsForDay = (day: number): number =>
-	day < SEED_DENSE_DAYS
-		? Math.max(1, Math.round(6 * Math.exp(-day / 90) * (1 + 0.3 * Math.sin(day * 1.7))))
-		: day % 3 === 0
-			? 1
-			: 0
-
-/**
- * Builds a deterministic span of pageview events, plus the named custom events and goal
- * completions the events and goals surfaces read. `scale` multiplies the daily pageview
- * volume (alpha and beta get different scales in tenancy mode); `scope` stamps every event;
- * `goal` names the goal the seeded conversions complete (the install's own collection goal,
- * per tenant in tenancy mode) and the path they happen on, which is that goal's own CTA page
- * rather than the site root: `/` carries the conversions the e2e specs fire by hand, and one
- * of them asserts the other tenant's root has none. A scoped install has no scope-less bucket
- * family (rollups make `scope` required, '' = null scope), so omitting `scope` is only
- * correct for a genuinely unscoped install.
- *
- * Seeded events bypass the ingest endpoint, so goal matching never runs on them: a
- * conversion has to carry its completion explicitly, at the value the goal document states.
- */
-const buildSeedEvents = (
-	now: Date,
-	opts: { scale?: number; scope?: string; goal?: { slug: string; path: string } } = {}
-): StoredEvent[] => {
-	const scale = opts.scale ?? 1
-	const events: StoredEvent[] = []
-	const scoped = opts.scope !== undefined ? { scope: opts.scope } : {}
-	for (let day = 0; day < SEED_DAYS; day++) {
-		const pageviewsToday = Math.max(0, Math.round(pageviewsForDay(day) * scale))
-		for (let i = 0; i < pageviewsToday; i++) {
-			// Pair consecutive pageviews onto one visitor (and drift the window across days)
-			// so visitors stay realistically below pageviews rather than one-to-one.
-			const visitorHash = `seed-visitor-${(day + Math.floor(i / 2)) % SEED_VISITOR_COUNT}`
-			events.push({
-				timestamp: new Date(now.getTime() - day * DAY_MS + i * 90_000),
-				type: 'pageview',
-				path: SEED_PATHS[(day + i) % SEED_PATHS.length] ?? '/',
-				hostname: SEED_HOSTNAME,
-				visitorHash,
-				sessionId: `${visitorHash}-d${day}`,
-				durationMs: 30_000 + ((day + i) % 5) * 30_000,
-				...attributionFor(day + i, day),
-				timezone: DEV_REPORTING_TIMEZONE,
-				...scoped,
-			})
-		}
-		if (day >= SEED_DENSE_DAYS) {
-			continue
-		}
-		const visitorHash = `seed-visitor-${day % SEED_VISITOR_COUNT}`
-		const attribution = {
-			hostname: SEED_HOSTNAME,
-			visitorHash,
-			sessionId: `${visitorHash}-d${day}`,
-			...attributionFor(day, day),
-			timezone: DEV_REPORTING_TIMEZONE,
-			...scoped,
-		}
-		events.push({
-			timestamp: new Date(now.getTime() - day * DAY_MS + 60_000),
-			type: 'event',
-			name: SEED_EVENT_NAMES[day % SEED_EVENT_NAMES.length] ?? 'signup',
-			path: SEED_PATHS[day % SEED_PATHS.length] ?? '/',
-			...attribution,
-		})
-		if (opts.goal && day % CONVERSION_EVERY_DAYS === 0) {
-			events.push({
-				timestamp: new Date(now.getTime() - day * DAY_MS + 120_000),
-				type: 'goal',
-				name: opts.goal.slug,
-				path: opts.goal.path,
-				value: GOAL_VALUE,
-				currency: GOAL_CURRENCY,
-				goals: [{ slug: opts.goal.slug, value: GOAL_VALUE }],
-				...attribution,
-			})
-		}
-	}
-	return events
-}
-
-/**
- * Flush the seed one rollup period at a time, several periods at once. Every rollup bucket
- * and seen-ledger row is keyed by the event's period (`bucketKey` includes it), so batches
- * from different periods touch disjoint rows and cannot race; only the per-batch work is
- * serial. Grouping must use the same timezone-aware day the rollups bucket on, not the UTC
- * day, or two events sharing a local day could land in different batches and race. Without
- * this the ledger's insert-if-new gate runs sequentially across the whole span and the boot
- * seed takes minutes.
- */
-const flushSeedEvents = async (payload: Payload, events: StoredEvent[]): Promise<void> => {
-	const byDay = new Map<string, StoredEvent[]>()
-	for (const event of events) {
-		const day = startOfDayInTz(event.timestamp, event.timezone).toISOString()
-		const batch = byDay.get(day)
-		if (batch) {
-			batch.push(event)
-		} else {
-			byDay.set(day, [event])
-		}
-	}
-	const batches = [...byDay.values()]
-	// Past ~24 the in-memory mongo contends and the seed gets slower, not faster.
-	const CONCURRENCY = 24
-	for (let i = 0; i < batches.length; i += CONCURRENCY) {
-		await Promise.all(batches.slice(i, i + CONCURRENCY).map((b) => flushBatch(payload, b)))
-	}
-}
-
 const SEED_PAGES = [
-	// `home` is the site root through `pagePath`, so the CTA's conversions have a document
-	// to surface on.
+	// `home` is the site root through `pagePath`, so what happens on `/` has a document to
+	// surface on.
 	{ title: 'Home', slug: 'home' },
 	{ title: 'About', slug: 'about' },
 	{ title: 'Pricing', slug: 'pricing' },
@@ -325,47 +38,41 @@ const SEED_PAGES = [
 ]
 
 /**
- * Mirror the native seed into the memory provider so multi-provider reads have data. The
- * provider counts pageviews only, so the seeded custom events and conversions stay out of it
- * rather than arriving there as extra pageviews.
+ * Each tenant reports in a zone of its own, so their days end at different instants: alpha on the
+ * US west coast, beta in Berlin, and the platform itself in the dev app's own zone.
  */
-const seedMemoryAdapter = (events: StoredEvent[]): void => {
-	for (const event of events) {
-		if (event.type !== 'pageview') {
-			continue
-		}
-		devMemoryAdapter.record({
-			path: event.path,
-			timestamp: event.timestamp,
-			visitor: event.visitorHash,
-		})
-	}
-}
-
-interface TenantDoc {
-	id: string | number
-	slug: string
-}
-
 const SEED_TENANTS = [
-	{ slug: 'alpha', name: 'Alpha' },
-	{ slug: 'beta', name: 'Beta' },
+	{ slug: 'alpha', name: 'Alpha', timezone: 'America/Los_Angeles' },
+	{ slug: 'beta', name: 'Beta', timezone: 'Europe/Berlin' },
 ] as const
 
-/** Seeds the `tenants` collection, idempotent, and resolves the alpha/beta docs either way. */
-const seedTenants = async (payload: Payload): Promise<{ alpha: TenantDoc; beta: TenantDoc }> => {
-	const tenantCount = await payload.count({ collection: 'tenants' as never })
+type TenantKey = (typeof SEED_TENANTS)[number]['slug']
+type SeededTenants = Record<TenantKey, Tenant>
+
+/**
+ * Seeds the `tenants` collection and resolves the alpha/beta docs either way. Idempotent: a tenant
+ * from before tenants had a timezone is given its zone, and nothing else is touched.
+ */
+const seedTenants = async (payload: Payload): Promise<SeededTenants> => {
+	const tenantCount = await payload.count({ collection: 'tenants' })
 	if (tenantCount.totalDocs === 0) {
 		for (const tenant of SEED_TENANTS) {
-			await payload.create({
-				collection: 'tenants' as never,
-				data: { name: tenant.name, slug: tenant.slug } as never,
-			})
+			await payload.create({ collection: 'tenants', data: { ...tenant } })
 		}
 		payload.logger.info(`Seeded tenants: ${SEED_TENANTS.map((t) => t.slug).join(', ')}`)
 	}
-	const found = (await payload.find({ collection: 'tenants' as never, pagination: false }))
-		.docs as unknown as TenantDoc[]
+	const found = (await payload.find({ collection: 'tenants', pagination: false })).docs
+	for (const tenant of SEED_TENANTS) {
+		const doc = found.find((t) => t.slug === tenant.slug)
+		if (doc && !doc.timezone) {
+			doc.timezone = tenant.timezone
+			await payload.update({
+				collection: 'tenants',
+				id: doc.id,
+				data: { timezone: tenant.timezone },
+			})
+		}
+	}
 	const alpha = found.find((t) => t.slug === 'alpha')
 	const beta = found.find((t) => t.slug === 'beta')
 	if (!alpha || !beta) {
@@ -375,11 +82,8 @@ const seedTenants = async (payload: Payload): Promise<{ alpha: TenantDoc; beta: 
 }
 
 /** Assigns `alpha@`/`beta@` to their tenant via the multi-tenant plugin's `tenants` array field. */
-const seedTenantUsers = async (
-	payload: Payload,
-	tenants: { alpha: TenantDoc; beta: TenantDoc }
-): Promise<void> => {
-	const assignments: Array<{ email: string; tenant: string | number }> = [
+const seedTenantUsers = async (payload: Payload, tenants: SeededTenants): Promise<void> => {
+	const assignments: Array<{ email: string; tenant: string }> = [
 		{ email: ALPHA_EMAIL, tenant: tenants.alpha.id },
 		{ email: BETA_EMAIL, tenant: tenants.beta.id },
 	]
@@ -391,53 +95,108 @@ const seedTenantUsers = async (
 		if (existing.totalDocs === 0) {
 			await payload.create({
 				collection: 'users',
-				data: { email, password: DEV_PASSWORD, tenants: [{ tenant }] } as never,
+				data: { email, password: DEV_PASSWORD, tenants: [{ tenant }] },
 			})
 			payload.logger.info(`Seeded tenant admin: ${email} / ${DEV_PASSWORD}`)
 		}
 	}
 }
 
-const SEED_PROVIDERS = [
-	{ tenantKey: 'alpha', name: 'Alpha Plausible', siteId: 'alpha.example.com' },
-	{ tenantKey: 'beta', name: 'Beta Plausible', siteId: 'beta.example.com' },
-] as const
+type SeedProvider =
+	| { tenantKey: TenantKey; provider: 'native'; name: string }
+	| { tenantKey: TenantKey; provider: 'plausible'; name: string; siteId: string }
 
 /**
- * One enabled placeholder Plausible provider per tenant, so the source picker and the
- * Analytics Providers admin view have something to show. Dummy credentials: reads through
- * this provider fail and degrade, which is fine for a demo of the provider surface itself.
- * Stamped as the platform admin (`dev@10xmedia.de`) so the stampScope hook accepts the
- * explicit `tenant` value instead of trying to resolve one from a (cookie-less) seed req.
+ * Alpha stores its visits here and reads them here, and nothing else. Beta does the same and
+ * also runs a Plausible project of its own, so the two tenants offer visibly different source
+ * lists: one source and no picker for alpha, two and a picker for beta.
+ */
+const SEED_PROVIDERS: SeedProvider[] = [
+	{ tenantKey: 'alpha', provider: 'native', name: 'Alpha site database' },
+	{ tenantKey: 'beta', provider: 'native', name: 'Beta site database' },
+	{ tenantKey: 'beta', provider: 'plausible', name: 'Beta Plausible', siteId: 'beta.example.com' },
+]
+
+/**
+ * A tenant reads and captures native only with a `native` provider document, so each gets one.
+ * Beta's Plausible document carries dummy credentials: its reads fail and degrade, which is
+ * enough to show a second source in the picker. Created as the platform admin, so the scope
+ * stamping hook accepts the explicit `tenant` rather than resolving one from a cookie-less req.
  */
 const seedTenantProviders = async (
 	payload: Payload,
-	tenants: { alpha: TenantDoc; beta: TenantDoc },
-	platformAdmin: { id: string | number }
+	tenants: SeededTenants,
+	platformAdmin: User
 ): Promise<void> => {
-	const count = await payload.count({ collection: 'analytics-providers' as never })
+	const count = await payload.count({ collection: 'analytics-providers' })
 	if (count.totalDocs > 0) {
 		return
 	}
-	for (const { tenantKey, name, siteId } of SEED_PROVIDERS) {
+	for (const entry of SEED_PROVIDERS) {
 		await payload.create({
-			collection: 'analytics-providers' as never,
+			collection: 'analytics-providers',
 			data: {
-				name,
-				provider: 'plausible',
+				name: entry.name,
+				provider: entry.provider,
 				enabled: true,
-				tenant: tenants[tenantKey].id,
-				plausible: { siteId, apiKey: 'dev-dummy-api-key' },
-			} as never,
-			user: platformAdmin as never,
+				tenant: tenants[entry.tenantKey].id,
+				...(entry.provider === 'plausible'
+					? { plausible: { siteId: entry.siteId, apiKey: 'dev-dummy-api-key' } }
+					: {}),
+			},
+			user: platformAdmin,
 		})
 	}
 	payload.logger.info(`Seeded analytics-providers: ${SEED_PROVIDERS.map((p) => p.name).join(', ')}`)
 }
 
+/**
+ * One tenant-owned document per tenant, shown on that tenant's pages as an offer card, so an
+ * offer's Analytics tab has numbers on a fresh boot. Unlike the shared `pages`, these belong to
+ * a tenant, which is the point: beta's admin opening alpha's offer is refused rather than shown
+ * beta's numbers.
+ */
+const SEED_OFFERS = [
+	{ tenantKey: 'alpha', title: 'Alpha offer', slug: 'alpha-offer' },
+	{ tenantKey: 'beta', title: 'Beta offer', slug: 'beta-offer' },
+] as const satisfies ReadonlyArray<{ tenantKey: TenantKey; title: string; slug: string }>
+
+/** Stamped as the platform admin, for the reason {@link seedTenantProviders} gives. */
+const seedTenantOffers = async (
+	payload: Payload,
+	tenants: SeededTenants,
+	platformAdmin: User
+): Promise<Partial<Record<TenantKey, string>>> => {
+	const count = await payload.count({ collection: 'offers' })
+	if (count.totalDocs === 0) {
+		for (const entry of SEED_OFFERS) {
+			await payload.create({
+				collection: 'offers',
+				data: {
+					title: entry.title,
+					slug: entry.slug,
+					tenant: tenants[entry.tenantKey].id,
+					createdAt: seededCreatedAt(),
+				},
+				user: platformAdmin,
+			})
+		}
+		payload.logger.info(`Seeded offers: ${SEED_OFFERS.map((o) => o.slug).join(', ')}`)
+	}
+	const signedRefOf = async (tenant: Tenant): Promise<string | undefined> => {
+		const { docs } = await payload.find({
+			collection: 'offers',
+			where: { tenant: { equals: tenant.id } },
+			limit: 1,
+			depth: 0,
+		})
+		return signItemRef(payload, 'offers', docs[0]?.id)
+	}
+	return { alpha: await signedRefOf(tenants.alpha), beta: await signedRefOf(tenants.beta) }
+}
+
 /** Every seeded collection goal is worth the same fixed amount, so revenue is checkable. */
 const GOAL_VALUE = 10
-const GOAL_CURRENCY = 'EUR'
 
 interface SeedGoalPage {
 	goal: { slug: string; name: string }
@@ -460,7 +219,7 @@ const SEED_GOAL_PAGE: SeedGoalPage = {
  * alpha and nothing at all for beta: the same isolation the providers seed demonstrates, on
  * the goals surface.
  */
-const SEED_TENANT_GOAL_PAGES: Array<SeedGoalPage & { tenantKey: 'alpha' | 'beta' }> = [
+const SEED_TENANT_GOAL_PAGES: Array<SeedGoalPage & { tenantKey: TenantKey }> = [
 	{
 		tenantKey: 'alpha',
 		goal: { slug: 'alpha-newsletter', name: 'Alpha newsletter signup' },
@@ -484,55 +243,52 @@ const SEED_TENANT_GOAL_PAGES: Array<SeedGoalPage & { tenantKey: 'alpha' | 'beta'
 ]
 
 /**
- * A goal document and its CTA page, both guarded by slug so a re-boot against a populated
- * database adds neither twice. The scope is written under whatever field the install points
- * `scopeField` at (`GOAL_SCOPE_FIELD` for the tenancy fragment), never a hard-coded key:
- * writing `scope` to a collection scoped by a tenant plugin's own relationship field would
- * land every seeded goal install-wide instead. Stamped as the platform admin for the same
- * reason the provider seed is: the hook that stamps the scope only honours an explicit one
- * from a request it recognizes as platform-wide, and the seed carries no tenant cookie.
+ * A goal document and its CTA page, each created once by slug. The scope goes under the field
+ * `goals.collection.scopeField` names; created as the platform admin, for the reason
+ * {@link seedTenantProviders} gives.
  */
 const seedGoalPage = async (
 	payload: Payload,
 	entry: SeedGoalPage,
 	opts: {
-		platformAdmin: { id: string | number }
-		scope?: { field: string; value: string | number }
+		platformAdmin: User
+		scope?: { field: string; value: string }
 	}
 ): Promise<void> => {
 	const { platformAdmin, scope } = opts
 	const existingGoal = await payload.count({
-		collection: GOALS_SLUG as never,
+		collection: GOALS_SLUG,
 		where: { slug: { equals: entry.goal.slug } },
 	})
 	if (existingGoal.totalDocs === 0) {
 		await payload.create({
-			collection: GOALS_SLUG as never,
+			collection: GOALS_SLUG,
 			data: {
 				name: entry.goal.name,
 				slug: entry.goal.slug,
 				enabled: true,
 				match: { kind: 'goal' },
 				value: { fixed: GOAL_VALUE },
-				currency: GOAL_CURRENCY,
+				currency: DEV_REPORTING_CURRENCY,
 				...(scope ? { [scope.field]: scope.value } : {}),
-			} as never,
+			},
 			overrideAccess: true,
-			user: platformAdmin as never,
+			user: platformAdmin,
 		})
 		payload.logger.info(`Seeded collection goal: ${entry.goal.slug}`)
 	}
 
 	const existingPage = await payload.count({
-		collection: 'pages' as never,
+		collection: 'pages',
 		where: { slug: { equals: entry.page.slug } },
 	})
 	if (existingPage.totalDocs === 0) {
 		await payload.create({
-			collection: 'pages' as never,
+			collection: 'pages',
 			data: {
 				title: entry.page.title,
 				slug: entry.page.slug,
+				createdAt: seededCreatedAt(),
 				layout: [
 					{
 						blockType: 'cta',
@@ -541,22 +297,102 @@ const seedGoalPage = async (
 						goal: entry.goal.slug,
 					},
 				],
-			} as never,
+			},
 		})
 		payload.logger.info(`Seeded CTA page: /${entry.page.slug}`)
 	}
 }
 
+/** The path a goal's CTA page is served at. */
+const goalPathOf = (entry: SeedGoalPage): { slug: string; path: string } => {
+	const path = pagePath(entry.page)
+	if (!path) {
+		throw new Error(`analytics dev seed: goal page "${entry.goal.slug}" has no path`)
+	}
+	return { slug: entry.goal.slug, path }
+}
+
+const tenantGoal = (tenantKey: TenantKey): SeedGoalPage => {
+	const entry = SEED_TENANT_GOAL_PAGES.find((e) => e.tenantKey === tenantKey)
+	if (!entry) {
+		throw new Error(`analytics dev seed: no goal page for tenant "${tenantKey}"`)
+	}
+	return entry
+}
+
+/** The reporting zone the install resolves for a scope, which its days are counted in. */
+const zoneOf = async (payload: Payload, req: PayloadRequest, scope: string): Promise<string> => {
+	const runtime = getRuntime(payload)
+	return runtime ? resolveTimezoneFor(runtime, req, scope || null) : DEV_REPORTING_TIMEZONE
+}
+
+/** What tenancy mode seeds before its traffic: the tenants, and each one's signed offer ref. */
+interface TenancySeed {
+	tenants: SeededTenants
+	offers: Partial<Record<TenantKey, string>>
+}
+
 /**
- * Seed the dev Payload app: an admin user to log in with, page documents matching the
- * seeded traffic paths (so the per-document Analytics tab shows real numbers), a
- * two-year span of sample pageviews in both the native engine and the memory provider,
- * one sync pass so the analytics-daily collection has rows to inspect, and one
- * editor-managed goal with the CTA page that converts it. In tenancy mode, additionally
- * seeds the `tenants` collection, a tenant-scoped admin per tenant, a scaled-volume
- * traffic span per tenant, one placeholder provider doc per tenant, and one goal plus CTA
- * page per tenant instead of the unscoped pair.
- * Idempotent (each block is skipped once its collection is populated).
+ * The sites the seed fills: the single install's own, or in tenancy mode alpha (about three times
+ * beta's volume, mostly American), beta (mostly German-speaking) and a small platform site under
+ * the null scope, each on its own host and in its own zone, each converting its own goal.
+ */
+const sitesOf = async (payload: Payload, tenancy?: TenancySeed): Promise<SiteProfile[]> => {
+	const req = await createLocalReq({}, payload)
+	if (!tenancy) {
+		return [
+			{
+				key: 'site',
+				hostname: 'localhost',
+				tz: await zoneOf(payload, req, ''),
+				visitsPerDay: 150,
+				regulars: 40,
+				goal: goalPathOf(SEED_GOAL_PAGE),
+			},
+		]
+	}
+	const { tenants, offers } = tenancy
+	const alpha = String(tenants.alpha.id)
+	const beta = String(tenants.beta.id)
+	return [
+		{
+			key: 'platform',
+			scope: '',
+			hostname: 'localhost',
+			tz: await zoneOf(payload, req, ''),
+			visitsPerDay: 20,
+			regulars: 6,
+		},
+		{
+			key: 'alpha',
+			scope: alpha,
+			hostname: 'alpha.localhost',
+			tz: await zoneOf(payload, req, alpha),
+			visitsPerDay: 140,
+			regulars: 36,
+			countryBoost: { US: 2.2, CA: 1.5 },
+			goal: goalPathOf(tenantGoal('alpha')),
+			...(offers.alpha ? { offer: offers.alpha, offerGoal: OFFER_GOAL } : {}),
+		},
+		{
+			key: 'beta',
+			scope: beta,
+			hostname: 'beta.localhost',
+			tz: await zoneOf(payload, req, beta),
+			visitsPerDay: 50,
+			regulars: 14,
+			countryBoost: { DE: 2.5, CH: 2, PL: 1.5 },
+			goal: goalPathOf(tenantGoal('beta')),
+			...(offers.beta ? { offer: offers.beta, offerGoal: OFFER_GOAL } : {}),
+		},
+	]
+}
+
+/**
+ * Seeds the dev app: an admin, the pages the traffic visits, an editor-managed goal with its CTA
+ * page, nine weeks of native traffic with every closed day counted, and one sync pass. Tenancy
+ * mode adds tenants, a tenant admin, providers, an offer and a goal page per tenant. Idempotent:
+ * documents are created once, and traffic only adds what is missing.
  */
 export const seedDev = async (
 	payload: Payload,
@@ -565,99 +401,64 @@ export const seedDev = async (
 	const { tenancy = false } = opts
 
 	const existingDevAdmin = (
-		await payload.find({ collection: 'users', where: { email: { equals: DEV_EMAIL } }, limit: 1 })
-	).docs[0] as { id: string | number } | undefined
-	const platformAdmin: { id: string | number } =
-		existingDevAdmin ??
-		((await payload.create({
+		await payload.find({
 			collection: 'users',
-			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
-		})) as unknown as { id: string | number })
+			where: { email: { equals: DEV_ADMIN_EMAIL } },
+			limit: 1,
+		})
+	).docs[0]
+	const platformAdmin =
+		existingDevAdmin ??
+		(await payload.create({
+			collection: 'users',
+			data: { email: DEV_ADMIN_EMAIL, password: DEV_PASSWORD },
+		}))
 	if (!existingDevAdmin) {
-		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
+		payload.logger.info(`Seeded dev admin: ${DEV_ADMIN_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
-	const pageCount = await payload.count({ collection: 'pages' as never })
+	const pageCount = await payload.count({ collection: 'pages' })
 	if (pageCount.totalDocs === 0) {
 		for (const page of SEED_PAGES) {
-			await payload.create({ collection: 'pages' as never, data: page as never })
+			await payload.create({ collection: 'pages', data: { ...page, createdAt: seededCreatedAt() } })
 		}
 		payload.logger.info(`Seeded ${SEED_PAGES.length} pages matching the traffic paths`)
 	}
 
-	const tenants = tenancy ? await seedTenants(payload) : undefined
-	if (tenants) {
+	let scoped: TenancySeed | undefined
+	if (tenancy) {
+		const tenants = await seedTenants(payload)
 		await seedTenantUsers(payload, tenants)
-	}
-
-	// Each scope converts its own goal on that goal's own CTA page, so a tenant's goals
-	// widget lists that tenant's goal and never the other one.
-	const conversionsFor = (entry: SeedGoalPage): { slug: string; path: string } => {
-		const path = pagePath(entry.page)
-		if (!path) {
-			throw new Error(`analytics dev seed: goal page "${entry.goal.slug}" has no path`)
-		}
-		return { slug: entry.goal.slug, path }
-	}
-	const tenantGoal = (tenantKey: 'alpha' | 'beta'): SeedGoalPage => {
-		const entry = SEED_TENANT_GOAL_PAGES.find((e) => e.tenantKey === tenantKey)
-		if (!entry) {
-			throw new Error(`analytics dev seed: no goal page for tenant "${tenantKey}"`)
-		}
-		return entry
-	}
-	const events = [
-		// Tenancy mode is a scoped install, so even the install-wide pass needs the
-		// explicit null-scope stamp ('') rather than an absent scope key.
-		...buildSeedEvents(
-			new Date(),
-			tenants ? { scope: '' } : { goal: conversionsFor(SEED_GOAL_PAGE) }
-		),
-		...(tenants
-			? buildSeedEvents(new Date(), {
-					scale: ALPHA_SCALE,
-					scope: String(tenants.alpha.id),
-					goal: conversionsFor(tenantGoal('alpha')),
-				})
-			: []),
-		...(tenants
-			? buildSeedEvents(new Date(), {
-					scale: BETA_SCALE,
-					scope: String(tenants.beta.id),
-					goal: conversionsFor(tenantGoal('beta')),
-				})
-			: []),
-	]
-	seedMemoryAdapter(events)
-	const eventCount = await payload.count({ collection: EVENTS_SLUG as never })
-	if (eventCount.totalDocs === 0) {
-		await flushSeedEvents(payload, events)
-		payload.logger.info(`Seeded ${events.length} analytics events`)
-	}
-
-	if (tenants) {
 		await seedTenantProviders(payload, tenants, platformAdmin)
+		const offers = await seedTenantOffers(payload, tenants, platformAdmin)
 		for (const entry of SEED_TENANT_GOAL_PAGES) {
 			await seedGoalPage(payload, entry, {
 				platformAdmin,
-				scope: { field: GOAL_SCOPE_FIELD, value: String(tenants[entry.tenantKey].id) },
+				scope: { field: TENANT_SCOPE_FIELD, value: String(tenants[entry.tenantKey].id) },
 			})
 		}
+		scoped = { tenants, offers }
 	} else {
 		await seedGoalPage(payload, SEED_GOAL_PAGE, { platformAdmin })
 	}
 
-	const dailyCount = await payload.count({ collection: 'analytics-daily' as never })
+	const traffic = await seedTraffic(payload, await sitesOf(payload, scoped))
+	payload.logger.info(
+		`Seeded ${traffic.hits} analytics hits in ${traffic.storeMs} ms and counted ${traffic.days} day${traffic.days === 1 ? '' : 's'} in ${traffic.countMs} ms`
+	)
+
+	const dailyCount = await payload.count({ collection: 'analytics-daily' })
 	if (dailyCount.totalDocs === 0) {
 		const task = syncTask({
-			cron: '0 */6 * * *',
+			schedule: DEFAULT_JOBS.sync,
 			lookbackDays: 14,
 			collectionSlug: 'analytics-daily',
 			scopes: tenancy ? tenancyScopes : undefined,
 		})
 		const handler = task.handler
 		if (typeof handler === 'function') {
-			const req = { payload } as unknown as PayloadRequest
+			const req = await createLocalReq({}, payload)
+			// The sync handler reads `req` alone; a job and its task helpers exist only in a queued run.
 			await handler({ req } as unknown as Parameters<typeof handler>[0])
 			payload.logger.info('Seeded analytics-daily via one sync pass')
 		}

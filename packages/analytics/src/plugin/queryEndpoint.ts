@@ -1,28 +1,41 @@
 import type { PayloadHandler } from 'payload'
+import { readGate } from '../access/readGate'
 import { serializeCapabilities } from '../core/capabilities'
-import {
-	type AnalyticsQuery,
-	type AnalyticsResult,
-	type DateRange,
-	PLATFORM_SCOPE,
-} from '../core/contract'
+import { currentDate } from '../core/clock'
+import type { AnalyticsQuery, AnalyticsResult, DateRange } from '../core/contract'
+import { aliasMetrics, askedResult, servedQuery } from '../core/metricAliases'
 import { resolveQueryScope, resolveRequestedScope } from '../core/scopedRead'
+import { describeWithCauses } from '../core/sourceErrors'
+import { revenueCurrencyOf } from '../goals/currency'
 import { parseQueryParams, readParam } from '../query/parse'
 import type { QueryResponse, SerializedAnalyticsQuery } from '../query/response'
-import { previousWindow, withinLookback } from '../widgets/comparison'
-import { analyticsError, errorResponse, NO_STORE, RETRY_AFTER } from './errors'
-import { goalSlugsFor } from './goalHint'
-import { QUERY_PATH } from './paths'
+import type { ReadOptions } from '../surfacing/engine'
+import { previousWindow, withinLookback } from '../timeframe/comparison'
+import {
+	analyticsError,
+	errorResponse,
+	NO_STORE,
+	notAvailableResponse,
+	readDeniedResponse,
+	unauthorizedResponse,
+	untrustedScopeResponse,
+} from './errors'
+import { goalHintFor } from './goalHint'
+import { itemRefsOf, resolveItemLabels } from './itemLabels'
+import { queryParams } from './queryParams'
 import { resolveSourcesForRequest } from './readContextForRequest'
-import { getRuntime, platformReadGate, readAccessFor, resolveTimezoneFor } from './runtime'
-
-export { QUERY_PATH }
+import { readFailureResponse } from './readFailure'
+import {
+	getRuntime,
+	resolvableScope,
+	resolveCurrencyFor,
+	resolveTimezoneFor,
+	scopeGates,
+} from './runtime'
 
 /**
- * The query as the response echoes it: the date range's instants as ISO strings, every
- * other field as the read carried it. `goalSlugs` rides along unchanged, so a client sees
- * the scope's slugs, an empty list for a scope with no goals, or the string `'unresolved'`
- * when the resolver failed.
+ * The query as the response echoes it, the range as ISO strings. `goalSlugs` rides along: the
+ * scope's slugs, `[]` for no goals, or `'unresolved'` when the resolver failed.
  */
 export const serializeQuery = (query: AnalyticsQuery): SerializedAnalyticsQuery => ({
 	...query,
@@ -32,67 +45,47 @@ export const serializeQuery = (query: AnalyticsQuery): SerializedAnalyticsQuery 
 	},
 })
 
+const noSourceResponse = (): Response =>
+	errorResponse(
+		404,
+		analyticsError('unknown_source', 'analytics: no source is available for this request')
+	)
+
 /**
- * Authenticated GET over the surfacing engine: the public read primitive the admin view
- * and consumers' own dashboards are built on. Gating runs in a fixed order so a caller
- * learns nothing from the answer it is not already entitled to: authentication, then
- * `access.read`, then scope and source resolution (shared with the sources endpoint, so a
- * tenant can select no source that endpoint does not list), then capability validation of
- * every parameter against the selected source. Being listed is not sufficient: a shared
- * source that cannot narrow to the caller's scope answers 403 with `param: 'source'`.
- * Errors carry a code and the parameter at fault; adapter configuration and upstream error
- * text never reach the response.
+ * Authenticated GET over the surfacing engine, gated in order (auth, `access.read`, scope, source,
+ * capabilities) so no answer leaks past the caller's entitlement. Upstream error text never leaks.
  */
 export const makeQueryHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
-		return errorResponse(401, analyticsError('unauthorized', 'analytics: authentication required'))
+		return unauthorizedResponse()
 	}
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
-		// Both `unavailable` answers are retryable, so both carry the same delay: a client
-		// backs off identically whether the plugin is still booting or a provider is down.
-		return errorResponse(
-			503,
-			analyticsError('unavailable', 'analytics: not available'),
-			RETRY_AFTER
-		)
+		return notAvailableResponse()
 	}
 	let adapterId = 'unresolved'
 	try {
-		if (!(await readAccessFor(runtime, req))) {
-			return errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
+		if (!(await readGate(runtime, req))) {
+			return readDeniedResponse()
 		}
-		const params = new URL(req.url ?? '', 'http://localhost').searchParams
-		const platformRead = platformReadGate(runtime, req)
+		const params = queryParams(req)
+		const gates = scopeGates(runtime, req)
 		const requested = await resolveRequestedScope({
 			runtime,
 			req,
 			raw: params.get('scope'),
-			platformRead,
+			gates,
 		})
 		if (!requested.ok) {
 			// A request whose own scope will not resolve answers like a scope with no sources.
-			// Only a scope the caller itself named is ever named back to it.
-			return requested.reason === 'named'
-				? errorResponse(
-						400,
-						analyticsError(
-							'untrusted_scope',
-							'analytics: scope is not permitted for this request',
-							'scope'
-						)
-					)
-				: errorResponse(
-						404,
-						analyticsError('unknown_source', 'analytics: no source is available for this request')
-					)
+			// A scope the caller named, or one its user does not belong to, is refused as such.
+			return requested.reason === 'named' || requested.reason === 'not-member'
+				? untrustedScopeResponse('scope')
+				: noSourceResponse()
 		}
-		const context = await resolveSourcesForRequest(req, { platformRead, scope: requested.scope })
+		const context = await resolveSourcesForRequest(req, { gates, scope: requested.gated })
 		if (context.adapters.size === 0) {
-			return errorResponse(
-				404,
-				analyticsError('unknown_source', 'analytics: no source is available for this request')
-			)
+			return noSourceResponse()
 		}
 		const requestedSource = readParam(params, 'source')
 		const adapter = context.adapters.get(requestedSource ?? context.defaultId ?? '')
@@ -108,7 +101,7 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			req,
 			scope: context.scope,
 			adapter,
-			platformRead,
+			gates,
 		})
 		if (!queryScope.ok) {
 			return errorResponse(
@@ -121,26 +114,23 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			)
 		}
 		const capabilities = serializeCapabilities(adapter.capabilities)
-		const timezone = await resolveTimezoneFor(
-			runtime,
-			req,
-			context.scope === PLATFORM_SCOPE ? null : context.scope
-		)
+		const ownScope = resolvableScope(context.scope)
+		const timezone = await resolveTimezoneFor(runtime, req, ownScope)
 		const parsed = parseQueryParams(params, { capabilities, timezone })
 		if (!parsed.ok) {
 			return errorResponse(400, parsed.error)
 		}
-		const goalSlugs = await goalSlugsFor({
+		const hint = await goalHintFor({
 			runtime,
 			req,
-			scope: context.scope === PLATFORM_SCOPE ? null : context.scope,
+			scope: ownScope,
 			metrics: parsed.value.query.metrics,
 			dimensions: parsed.value.query.dimensions,
 		})
 		const query: AnalyticsQuery = {
 			...parsed.value.query,
 			...(queryScope.queryScope === undefined ? {} : { scope: queryScope.queryScope }),
-			...(goalSlugs === undefined ? {} : { goalSlugs }),
+			...(hint === undefined ? {} : { goalSlugs: hint.slugs }),
 		}
 		let comparisonRange: DateRange | null = null
 		if (parsed.value.compare === 'previous') {
@@ -160,35 +150,58 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			if (
 				!withinLookback(comparisonRange, adapter.capabilities.maxLookbackDays, {
 					tz: query.timezone,
+					now: currentDate(),
 				})
 			) {
 				comparisonRange = null
 			}
 		}
+		// The view names the preset its days came from, so the engine can store the read for the warm
+		// task when those days are the preset's today; any other window stores nothing.
+		const readOptions: ReadOptions = {
+			whenBusy: 'refuse',
+			priority: 'interactive',
+			...(parsed.value.timeframe === null ? {} : { timeframe: parsed.value.timeframe }),
+		}
+		// Read under the source's own names and answered under the caller's: `visits` from native.
+		const aliased = aliasMetrics(query.metrics, adapter.capabilities.metrics)
+		const served = servedQuery(query, aliased)
 		let result: AnalyticsResult
 		let comparison: AnalyticsResult | undefined
 		try {
-			;[result, comparison] = await Promise.all([
-				runtime.engine.read(adapter, query),
+			const [read, previous] = await Promise.all([
+				runtime.engine.read(adapter, served, readOptions),
 				comparisonRange
-					? runtime.engine.read(adapter, { ...query, dateRange: comparisonRange })
+					? runtime.engine.read(adapter, { ...served, dateRange: comparisonRange }, readOptions)
 					: undefined,
 			])
+			result = askedResult(read, aliased)
+			comparison = previous && askedResult(previous, aliased)
 		} catch (err) {
-			// Neither a fresh nor a stale entry survived the read: the source is down, not the
-			// request wrong, so the client is told to retry rather than to change anything.
 			req.payload.logger?.warn(
-				`analytics: query read failed for adapter "${adapter.id}": ${String(err)}`
+				`analytics: query read failed for adapter "${adapter.id}": ${describeWithCauses(err)}`
 			)
-			return errorResponse(
-				503,
-				analyticsError('unavailable', 'analytics: source is temporarily unavailable'),
-				RETRY_AFTER
-			)
+			return readFailureResponse(err)
 		}
+		// A shallow copy, since the cached entry is shared between requests and reporting currency
+		// resolves per scope. A source naming its own revenue currency keeps it.
+		const reporting = revenueCurrencyOf(
+			query.filters,
+			await resolveCurrencyFor(runtime, req, ownScope)
+		)
+		const withCurrency = (read: AnalyticsResult): AnalyticsResult =>
+			reporting && read.meta.currency === undefined
+				? { ...read, meta: { ...read.meta, currency: reporting } }
+				: read
+		const currency = result.meta.currency ?? reporting
+		// Resolved per request rather than cached with the read: a title is whatever this reader
+		// may see of the document, and the cached rows are shared by every reader of the scope.
+		const refs = itemRefsOf(query, [result, comparison])
+		const itemLabels = refs.length > 0 ? await resolveItemLabels(req, refs) : undefined
 		const body: QueryResponse = {
-			result,
-			...(comparison ? { comparison } : {}),
+			result: withCurrency(result),
+			...(comparison ? { comparison: withCurrency(comparison) } : {}),
+			...(currency ? { currency } : {}),
 			source: {
 				id: adapter.id,
 				label: adapter.label,
@@ -196,6 +209,8 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			},
 			capabilities,
 			query: serializeQuery(query),
+			...(hint && hint.builtin.length > 0 ? { builtinGoalSlugs: hint.builtin } : {}),
+			...(itemLabels ? { itemLabels } : {}),
 		}
 		return Response.json(body, { headers: NO_STORE })
 	} catch (err) {

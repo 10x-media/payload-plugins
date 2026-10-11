@@ -1,33 +1,46 @@
 import type { PayloadHandler, PayloadRequest } from 'payload'
+import { readGate } from '../access/readGate'
 import { readCappedBody } from '../capture/requestBody'
-import { PLATFORM_SCOPE } from '../core/contract'
+import { isCollectionSlug } from '../core/collectionSlug'
+import { monotonicMs } from '../core/monotonic'
 import { resolveRequestedScope } from '../core/scopedRead'
+import { resolveScopeList } from '../core/scopeList'
+import { isRecord } from '../core/values'
 import type { RefreshResponse } from '../query/fetchQuery'
 import { epochKeyFor, INITIAL_EPOCH } from '../surfacing/epoch'
-import { analyticsError, errorResponse, NO_STORE, RETRY_AFTER } from './errors'
-import { REFRESH_PATH } from './paths'
-import { cacheEpochFor, getRuntime, platformReadGate, readAccessFor } from './runtime'
-
-export { REFRESH_PATH }
+import {
+	analyticsError,
+	errorResponse,
+	NO_STORE,
+	notAvailableResponse,
+	RETRY_AFTER,
+	readDeniedResponse,
+	unauthorizedResponse,
+	untrustedScopeResponse,
+} from './errors'
+import {
+	type AnalyticsRuntime,
+	cacheEpochFor,
+	getRuntime,
+	resolvableScope,
+	scopeGates,
+} from './runtime'
 
 /** The body carries one optional scope string; anything larger is not this request. */
 export const MAX_REFRESH_BODY_BYTES = 4 * 1024
 
 /**
- * How long one scope stays refreshed after this instance bumps it for a request. This is a
- * debounce of invalidation, not request rate limiting: a looped POST would otherwise retire
- * every cached read of a scope over and over and turn each of them into a provider call. It
- * bounds only what the endpoint does, never how often a caller may ask, which is the edge's
- * job. Collection hooks are not debounced: a save has to be visible on the next read.
+ * Per-scope invalidation debounce, so a looped POST cannot turn every cached read into a provider
+ * call; rate limiting is the edge's job. Hooks skip it, since a save must show on the next read.
  */
 export const REFRESH_DEBOUNCE_MS = 5_000
 
-export interface RefreshHandlerOptions {
-	/** Clock behind the debounce window; `Date.now` unless a test injects one. */
+interface RefreshHandlerOptions {
+	/** Clock behind the debounce window; `monotonicMs` unless a test injects one. */
 	now?: () => number
 }
 
-export interface RefreshDebounce {
+interface RefreshDebounce {
 	/** Whether this scope may be bumped now; recording a bump is `record`'s job. */
 	allows(key: string): boolean
 	/** Marks the scope bumped, dropping every entry the window has already left. */
@@ -37,8 +50,7 @@ export interface RefreshDebounce {
 }
 
 /**
- * Per-scope debounce state. Entries are pruned on every write rather than kept, so an
- * instance that refreshes thousands of scopes over its life holds only the ones a bump
+ * Per-scope debounce state, pruned on every write so a long-lived instance holds only scopes a bump
  * could still be debounced against.
  */
 export const createRefreshDebounce = (
@@ -66,12 +78,40 @@ export const createRefreshDebounce = (
 	}
 }
 
+/**
+ * Whether a named scope has anything to refresh: in `scope.list`, else owning a cached read,
+ * provider or epoch. With no list or cache collection to ask, every name passes.
+ */
+const knownScope = async (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest,
+	scope: string
+): Promise<boolean> => {
+	if (runtime.scopeList) {
+		return (await resolveScopeList(runtime.scopeList, req.payload)).includes(scope)
+	}
+	const cacheSlug = runtime.cacheCollectionSlug
+	if (cacheSlug === undefined || !isCollectionSlug(req.payload, cacheSlug)) {
+		return true
+	}
+	const owned = (collection: string, field: string) =>
+		isCollectionSlug(req.payload, collection)
+			? req.payload.db.findOne({ collection, where: { [field]: { equals: scope } }, req })
+			: Promise.resolve(null)
+	const providers = runtime.providersCollection
+	const [cached, provider, epoch] = await Promise.all([
+		owned(cacheSlug, 'owner'),
+		providers ? owned(providers.slug, providers.scopeField) : Promise.resolve(null),
+		req.payload.kv.get(epochKeyFor(scope)),
+	])
+	return cached !== null || provider !== null || epoch !== null
+}
+
 type ParsedBody = { ok: true; scope?: string } | { ok: false }
 
 /**
- * The optional `{ scope }` body. An empty body, a body that is not an object and a body
- * with no `scope` all mean "my own scope": a refresh is a button, and callers that send
- * nothing at all are the common case. Only a `scope` of the wrong type is a refusal.
+ * The optional `{ scope }` body. Empty, non-object and scope-less bodies mean the caller's own
+ * scope, the common button case; only a wrongly typed `scope` is refused.
  */
 const parseBody = (bytes: ArrayBuffer): ParsedBody => {
 	if (bytes.byteLength === 0) {
@@ -83,94 +123,96 @@ const parseBody = (bytes: ArrayBuffer): ParsedBody => {
 	} catch {
 		return { ok: true }
 	}
-	if (typeof parsed !== 'object' || parsed === null) {
-		return { ok: true }
-	}
-	if (!('scope' in parsed)) {
-		return { ok: true }
-	}
-	const scope: unknown = parsed.scope
+	const scope = isRecord(parsed) ? parsed.scope : undefined
 	if (scope === undefined || scope === null) {
 		return { ok: true }
 	}
 	return typeof scope === 'string' ? { ok: true, scope } : { ok: false }
 }
 
+interface RefreshTarget {
+	/** The scope whose epoch to raise, null for the install-wide one. */
+	scope: string | null
+	/** The body named the scope rather than leaving it to the request's own. */
+	named: boolean
+}
+
+/** The scope a refresh may raise, or the refusal that answers instead. */
+const refreshTargetOf = async (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest
+): Promise<RefreshTarget | Response> => {
+	if (!(await readGate(runtime, req))) {
+		return readDeniedResponse()
+	}
+	const read = await readCappedBody(req, MAX_REFRESH_BODY_BYTES)
+	if (!read.ok) {
+		return read.reason === 'too-large'
+			? errorResponse(
+					413,
+					analyticsError('payload_too_large', 'analytics: the refresh body is too large')
+				)
+			: errorResponse(
+					400,
+					analyticsError('invalid_param', 'analytics: the refresh body could not be read', 'scope')
+				)
+	}
+	const body = parseBody(read.body)
+	if (!body.ok) {
+		return errorResponse(
+			400,
+			analyticsError('invalid_param', 'analytics: scope must be a string', 'scope')
+		)
+	}
+	const requested = await resolveRequestedScope({
+		runtime,
+		req,
+		raw: body.scope ?? null,
+		gates: scopeGates(runtime, req),
+	})
+	if (!requested.ok) {
+		return untrustedScopeResponse('scope')
+	}
+	return {
+		scope: resolvableScope(requested.scope),
+		named: body.scope !== undefined,
+	}
+}
+
 /**
- * Authenticated POST raising one scope's cache epoch, which retires every cached read
- * keyed on the old one across every instance. Gated exactly like the read endpoints:
- * authentication, then `access.read`, then scope.
- *
- * Scope goes through `resolveRequestedScope`, the same decision the query endpoint reads
- * with, so this endpoint refuses every request that endpoint refuses: a named scope needs
- * `platformRead`, and so does a request whose own scope will not resolve on a scoped
- * install. Both answer `400 untrusted_scope`. The wildcard bumps the install-wide token,
- * because a cross-scope read stamps no scope on its query and its entries key on exactly
- * that token.
+ * Authenticated POST raising one scope's cache epoch, retiring its cached reads on every instance.
+ * Gated like the query endpoint; the wildcard bumps the install-wide token cross-scope reads use.
  */
 export const makeRefreshHandler = (opts: RefreshHandlerOptions = {}): PayloadHandler => {
-	const now = opts.now ?? Date.now
+	const now = opts.now ?? monotonicMs
 	const debounce = createRefreshDebounce(now)
 
 	return async (req: PayloadRequest) => {
 		if (!req.user) {
-			return errorResponse(
-				401,
-				analyticsError('unauthorized', 'analytics: authentication required')
-			)
+			return unauthorizedResponse()
 		}
 		const runtime = getRuntime(req.payload)
 		if (!runtime) {
-			return errorResponse(
-				503,
-				analyticsError('unavailable', 'analytics: not available'),
-				RETRY_AFTER
-			)
+			return notAvailableResponse()
 		}
+		let target: RefreshTarget | Response
 		try {
-			if (!(await readAccessFor(runtime, req))) {
-				return errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
+			target = await refreshTargetOf(runtime, req)
+		} catch (err) {
+			// A throwing `access.read` or scope resolver is a config bug, which a retry repeats.
+			req.payload.logger?.error(`analytics: refresh request failed: ${String(err)}`)
+			return errorResponse(500, analyticsError('internal', 'analytics: refresh failed'))
+		}
+		if (target instanceof Response) {
+			return target
+		}
+		const { scope, named } = target
+		try {
+			// A name nothing belongs to has nothing cached to retire, and must not leave a row behind.
+			if (named && scope !== null && !(await knownScope(runtime, req, scope))) {
+				const untouched: RefreshResponse = { epoch: INITIAL_EPOCH }
+				return Response.json(untouched, { headers: NO_STORE })
 			}
-			const read = await readCappedBody(req, MAX_REFRESH_BODY_BYTES)
-			if (!read.ok) {
-				return read.reason === 'too-large'
-					? errorResponse(
-							413,
-							analyticsError('payload_too_large', 'analytics: the refresh body is too large')
-						)
-					: errorResponse(
-							400,
-							analyticsError(
-								'invalid_param',
-								'analytics: the refresh body could not be read',
-								'scope'
-							)
-						)
-			}
-			const body = parseBody(read.body)
-			if (!body.ok) {
-				return errorResponse(
-					400,
-					analyticsError('invalid_param', 'analytics: scope must be a string', 'scope')
-				)
-			}
-			const requested = await resolveRequestedScope({
-				runtime,
-				req,
-				raw: body.scope ?? null,
-				platformRead: platformReadGate(runtime, req),
-			})
-			if (!requested.ok) {
-				return errorResponse(
-					400,
-					analyticsError(
-						'untrusted_scope',
-						'analytics: scope is not permitted for this request',
-						'scope'
-					)
-				)
-			}
-			const scope = requested.scope === PLATFORM_SCOPE ? null : requested.scope
 			const key = epochKeyFor(scope)
 			if (!debounce.allows(key)) {
 				const debounced: RefreshResponse = { epoch: await cacheEpochFor(runtime, scope) }

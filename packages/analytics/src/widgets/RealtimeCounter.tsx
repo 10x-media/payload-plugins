@@ -1,106 +1,173 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useMemo } from 'react'
 import { TrendChart } from '../charts/TrendChart'
+import { formatMinutes } from '../fields/format'
+import { numberFormat } from '../translations/intl'
+import type { PluralName } from '../translations/keys'
+import { type PluralPhrase, plural, pluralParts } from '../translations/plural'
+import { useTranslation } from '../translations/useTranslation'
+import { LiveAnnouncement } from '../ui/components/LiveAnnouncement'
+import { useRealtimePoll } from '../ui/hooks/useRealtimePoll'
 import type { RealtimePoint } from './readForWidgetRealtime'
-import { buildPollPath, isPollRefusalFinal, toRealtimePoints } from './realtimePoll'
+import { buildPollPath, type RealtimeReading, toRealtimePoints } from './realtimePoll'
+import { WidgetBody, WidgetNote, WidgetValue } from './WidgetCard'
 
+/** @beta */
 export interface RealtimeCounterProps {
 	endpoint: string
 	intervalMs: number
 	metric: string
 	windowMinutes: number
 	dataSource?: string
+	/** Read another scope; the endpoint refuses any caller that may not. */
+	scope?: string
 	initialActiveNow: number
 	initialSeries: RealtimePoint[]
-	/** Whether the reading it mounts with hit the source's event scan cap. */
+	/** Whether the reading it mounts with was counted from a sample. */
 	initialSampled?: boolean
 	locale: string
-	caption: string
+	/** Reporting timezone the minute labels read in, so server and browser agree. */
+	timezone: string
+	/** Names the sparkline for assistive tech, as the metric's own name does. */
+	label: string
+	/**
+	 * Words beside the number, the same for every count. Left out, the plugin's own phrase for
+	 * `metric`, worded for the count in the admin's language.
+	 */
+	caption?: string
 	pausedLabel: string
 	/** Notice for a sampled reading; without it the counter renders none. */
 	sampledLabel?: string
+	/** Heads the minutes column of the sparkline's data table, which only assistive tech sees. */
+	periodLabel?: string
+	/** Let the sparkline take the height its card has to spare, as a dashboard widget's does. */
+	fill?: boolean
 }
 
-export function RealtimeCounter(props: RealtimeCounterProps) {
-	const {
-		endpoint,
-		intervalMs,
-		metric,
-		windowMinutes,
-		dataSource,
-		locale,
-		caption,
-		pausedLabel,
-		sampledLabel,
-	} = props
-	const [activeNow, setActiveNow] = useState(props.initialActiveNow)
-	const [series, setSeries] = useState(props.initialSeries)
-	const [sampled, setSampled] = useState(props.initialSampled === true)
-	const [paused, setPaused] = useState(false)
+export interface RealtimeReadoutProps {
+	reading: RealtimeReading
+	paused: boolean
+	locale: string
+	timezone: string
+	/** The phrase the count is worded in, chosen per count in the admin's language. */
+	phrase: PluralName
+	/** The minutes the count covers, which a phrase names as its `{{duration}}`. */
+	windowMinutes?: number
+	/** Names the sparkline for assistive tech. */
+	label: string
+	/** A fixed caption in place of the phrase, as a host's own counter may pass. */
+	caption?: string
+	pausedLabel: string
+	sampledLabel?: string
+	periodLabel?: string
+	fill?: boolean
+}
 
-	useEffect(() => {
-		let cancelled = false
-		let timer: ReturnType<typeof setInterval> | undefined
-		const stop = () => {
-			if (timer !== undefined) clearInterval(timer)
-		}
-		const path = buildPollPath(endpoint, { metric, windowMinutes, dataSource })
-		const tick = async () => {
-			try {
-				const res = await fetch(path, { credentials: 'same-origin' })
-				if (!res.ok) {
-					// A refusal aimed at this reader never becomes an allowance, so repeating it
-					// every few seconds only burns requests; the counter pauses on it either way.
-					if (await isPollRefusalFinal(res)) stop()
-					if (!cancelled) setPaused(true)
-					return
-				}
-				const data = (await res.json()) as {
-					status: string
-					activeNow: number
-					series: RealtimePoint[]
-					sampled?: boolean
-				}
-				if (cancelled || data.status !== 'ok') return
-				setActiveNow(data.activeNow)
-				setSeries(data.series)
-				setSampled(data.sampled === true)
-				setPaused(false)
-			} catch {
-				if (!cancelled) setPaused(true)
-			}
-		}
-		timer = setInterval(tick, intervalMs)
-		return () => {
-			cancelled = true
-			stop()
-		}
-	}, [endpoint, intervalMs, metric, windowMinutes, dataSource])
+/**
+ * Three minutes on the axis, the window's first, middle and last: a counter sits in a narrow card,
+ * and a 12-hour clock's labels with the zone beside the last are wide.
+ */
+const REALTIME_TICKS = 3
 
-	const nf = new Intl.NumberFormat(locale)
-	const points = toRealtimePoints(series, locale)
+const captionSpan = (text: string) =>
+	text === '' ? null : <span className="analytics-widget__value-caption">{text}</span>
+
+/**
+ * A live reading: the number, large inside its phrase wherever the language places it, then a
+ * sparkline of its last minutes.
+ */
+export function RealtimeReadout({
+	reading,
+	paused,
+	locale,
+	timezone,
+	phrase,
+	windowMinutes,
+	label,
+	caption,
+	pausedLabel,
+	sampledLabel,
+	periodLabel,
+	fill = false,
+}: RealtimeReadoutProps) {
+	const translation = useTranslation()
+	const points = toRealtimePoints(reading.series, locale, timezone)
+	const counted: PluralPhrase =
+		windowMinutes === undefined
+			? phrase
+			: { name: phrase, vars: { duration: formatMinutes(windowMinutes, locale) } }
+	const parts =
+		caption === undefined
+			? pluralParts(translation, counted, reading.activeNow)
+			: {
+					before: '',
+					count: numberFormat(locale).format(reading.activeNow),
+					after: caption,
+				}
+	const spoken =
+		caption === undefined
+			? plural(translation, counted, reading.activeNow)
+			: `${parts.count} ${caption}`
 	return (
 		<>
-			<span
-				style={{
-					fontSize: '2rem',
-					fontWeight: 700,
-					lineHeight: 1.1,
-					color: 'var(--theme-elevation-800)',
-				}}
-			>
-				{nf.format(activeNow)}
-			</span>
-			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>
-				{paused ? pausedLabel : caption}
-			</span>
-			{sampled && sampledLabel ? (
-				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
-					{sampledLabel}
-				</span>
-			) : null}
-			<TrendChart buckets={points} ariaLabel={caption} minHeight={120} />
+			<WidgetValue before={paused ? null : captionSpan(parts.before.trim())} value={parts.count}>
+				{captionSpan(paused ? pausedLabel : parts.after.trim())}
+			</WidgetValue>
+			<WidgetBody>
+				<TrendChart
+					ariaLabel={label}
+					buckets={points}
+					fill={fill}
+					maxTicks={REALTIME_TICKS}
+					minHeight={fill ? 100 : 120}
+					{...(periodLabel === undefined ? {} : { periodLabel })}
+				/>
+			</WidgetBody>
+			{reading.sampled && sampledLabel ? <WidgetNote>{sampledLabel}</WidgetNote> : null}
+			<LiveAnnouncement message={paused ? pausedLabel : spoken} />
 		</>
+	)
+}
+
+/**
+ * A live count that mounts with a server-rendered reading and polls it fresh. A new server
+ * reading (widget re-rendered) replaces the polled one rather than being stranded behind it.
+ *
+ * @beta
+ */
+export function RealtimeCounter(props: RealtimeCounterProps) {
+	const { endpoint, intervalMs, metric, windowMinutes, dataSource, scope } = props
+	const { initialActiveNow, initialSeries, initialSampled } = props
+	const initial = useMemo<RealtimeReading>(
+		() => ({
+			activeNow: initialActiveNow,
+			series: initialSeries,
+			sampled: initialSampled === true,
+		}),
+		[initialActiveNow, initialSeries, initialSampled]
+	)
+	const url = buildPollPath(endpoint, {
+		metric,
+		windowMinutes,
+		...(dataSource === undefined ? {} : { dataSource }),
+		...(scope === undefined ? {} : { scope }),
+	})
+	const poll = useRealtimePoll({ url, intervalMs, initial })
+	return (
+		<RealtimeReadout
+			{...(props.caption === undefined ? {} : { caption: props.caption })}
+			{...(props.fill === undefined ? {} : { fill: props.fill })}
+			label={props.label}
+			locale={props.locale}
+			phrase={metric === 'pageviews' ? 'livePageviews' : 'liveVisitors'}
+			windowMinutes={windowMinutes}
+			paused={poll.paused}
+			pausedLabel={props.pausedLabel}
+			reading={poll.reading ?? initial}
+			{...(props.sampledLabel === undefined ? {} : { sampledLabel: props.sampledLabel })}
+			{...(props.periodLabel === undefined ? {} : { periodLabel: props.periodLabel })}
+			timezone={props.timezone}
+		/>
 	)
 }

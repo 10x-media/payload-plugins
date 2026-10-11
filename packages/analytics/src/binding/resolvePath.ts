@@ -1,22 +1,11 @@
+import { valueAt } from '../core/values'
 import { normalizeHostname } from '../native/ingest/requestHost'
 import type { AnalyticsBinding, BindingContext, BindingDoc } from './types'
-
-const getByPath = (doc: BindingDoc, dotPath: string): unknown =>
-	dotPath.split('.').reduce<unknown>((value, key) => {
-		if (value && typeof value === 'object') {
-			return (value as Record<string, unknown>)[key]
-		}
-		return undefined
-	}, doc)
 
 const nonEmptyString = (value: unknown): value is string =>
 	typeof value === 'string' && value.length > 0
 
-/**
- * Resolve a document's analytics path. The `path` resolver wins; the `pathField`
- * value is the fallback. Returns null when neither yields a non-empty string (for
- * example an unsaved document with no slug yet).
- */
+/** A document's tracked pathname: `path` first, then `pathField`; null when neither names one. */
 export const resolvePath = async (
 	binding: AnalyticsBinding,
 	doc: BindingDoc,
@@ -27,7 +16,7 @@ export const resolvePath = async (
 		if (nonEmptyString(resolved)) return resolved
 	}
 	if (binding.pathField) {
-		const value = getByPath(doc, binding.pathField)
+		const value = valueAt(doc, binding.pathField)
 		if (nonEmptyString(value)) return value
 	}
 	return null
@@ -35,28 +24,32 @@ export const resolvePath = async (
 
 const CACHE_KEY = '__analyticsPathCache'
 
+type PathCache = WeakMap<BindingDoc, Promise<string | null>>
+
+const pathCacheOf = (context: Record<string, unknown>): PathCache => {
+	const existing = context[CACHE_KEY]
+	if (existing instanceof WeakMap) {
+		return existing
+	}
+	const created: PathCache = new WeakMap()
+	context[CACHE_KEY] = created
+	return created
+}
+
 /**
- * Resolve the path once per (doc, request): the same `doc` reference is handed to
- * every analytics field on a document, so caching the in-flight Promise on
- * `req.context` collapses an async (possibly ancestor-walking) resolver from once per
- * field to once per document, and shares it across concurrent field renders. When the
- * request carries no context bag (incomplete reqs in tests or unusual call sites), it
- * degrades to a direct, un-memoized resolve so the result stays correct.
+ * Memoizes the in-flight resolve per document per request on `req.context`, since every analytics
+ * field on a document shares one `doc`; a request without context resolves directly.
  */
 export const resolvePathCached = (
 	binding: AnalyticsBinding,
 	doc: BindingDoc,
 	ctx: BindingContext
 ): Promise<string | null> => {
-	const context = ctx.req.context as Record<string, unknown> | undefined
+	const context: Record<string, unknown> | undefined = ctx.req.context
 	if (!context) {
 		return resolvePath(binding, doc, ctx)
 	}
-	let cache = context[CACHE_KEY] as WeakMap<BindingDoc, Promise<string | null>> | undefined
-	if (!cache) {
-		cache = new WeakMap()
-		context[CACHE_KEY] = cache
-	}
+	const cache = pathCacheOf(context)
 	let cached = cache.get(doc)
 	if (!cached) {
 		cached = resolvePath(binding, doc, ctx)
@@ -66,10 +59,8 @@ export const resolvePathCached = (
 }
 
 /**
- * A binding's hostname as the stored events spell it, since a tenant's domain field often
- * carries a scheme, a port or mixed case and the native engine compares hostnames exactly.
- * A value that is no hostname at all is passed through untouched, so a provider that filters
- * on something else keeps whatever the binding gave it.
+ * Normalized as stored events spell it, since a domain field often carries a scheme, port or mixed
+ * case and the native engine compares exactly. A non-hostname passes through untouched.
  */
 export const hostnameFromBinding = (raw: string): string => {
 	let candidate = raw
@@ -83,11 +74,7 @@ export const hostnameFromBinding = (raw: string): string => {
 	return normalizeHostname(candidate) ?? raw
 }
 
-/**
- * Resolve a binding's hostname filter for one document. A function hostname is
- * awaited with the same `(doc, ctx)` a path resolver receives; a nullish or empty
- * result means no hostname filter is applied to the adapter query.
- */
+/** The hostname a binding names for a document, normalized; undefined when it names none. */
 export const resolveHostname = async (
 	binding: AnalyticsBinding,
 	doc: BindingDoc,

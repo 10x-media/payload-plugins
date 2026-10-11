@@ -1,13 +1,13 @@
 import type { Payload, PayloadRequest, WidgetServerProps } from 'payload'
-import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter } from '../core/contract'
 import { type AnalyticsRuntime, setRuntime } from '../plugin/runtime'
-import { en } from '../translations/en'
+import { renderSettled } from '../testing/renderSettled'
 import { keys } from '../translations/keys'
 import AnalyticsMetricWidget from './AnalyticsMetricWidget'
 import type { MetricWidgetData } from './types'
 import type { WidgetView } from './viewLink'
+import { captionT, hrefIn, TEST_VIEW as view } from './widgetTestKit'
 
 const unconfigured = {
 	id: 'test',
@@ -16,23 +16,7 @@ const unconfigured = {
 	isConfigured: () => false,
 } as unknown as AnalyticsAdapter
 
-/** The two caption templates, which carry the `{{vars}}` the assertions read. */
-const TEMPLATES: Record<string, string> = {
-	[keys.widgetFilterCaption]: en[keys.widgetFilterCaption],
-	[keys.widgetCaptionWithFilter]: en[keys.widgetCaptionWithFilter],
-}
-
-/**
- * Every key stands in for itself, except the caption templates, which come from the real
- * bundle so the assertion sees the same one-pass `{{vars}}` fill Payload's own `t` makes.
- */
-const fakeT = (key: string, vars?: Record<string, string | number>): string =>
-	(TEMPLATES[key] ?? key).replace(/\{\{(.*?)\}\}/g, (match, name: string) => {
-		const value = vars?.[name.trim()]
-		return value === undefined ? match : String(value)
-	})
-
-const bootFakeRuntime = (adapter: AnalyticsAdapter = unconfigured) => {
+const bootFakeRuntime = (adapter: AnalyticsAdapter = unconfigured, comparison = false) => {
 	const resolveScope = vi.fn(() => Promise.resolve(null))
 	const resolveTimezone = vi.fn(() => Promise.resolve('Europe/Berlin'))
 	const payload = {
@@ -43,15 +27,16 @@ const bootFakeRuntime = (adapter: AnalyticsAdapter = unconfigured) => {
 		registry: { default: () => adapter, get: () => adapter },
 		configAdapterIds: new Set<string>(),
 		bindings: {},
+		readAccess: () => true,
 		engine: { read: (a: AnalyticsAdapter, query: unknown) => a.query(query as never, {}) },
 		ttl: {},
-		comparison: false,
+		comparison,
 		resolveScope,
 		resolveTimezone,
 	} as unknown as AnalyticsRuntime)
 	const req = {
 		payload,
-		i18n: { t: fakeT, language: 'en' },
+		i18n: { t: captionT, language: 'en' },
 	} as unknown as PayloadRequest
 	return { req, resolveScope, resolveTimezone }
 }
@@ -64,8 +49,7 @@ const filterableAdapter = (filters: string[], operators: string[] = ['eq']): Ana
 		capabilities: {
 			metrics: new Set(['pageviews', 'visitors']),
 			dimensions: new Set(['country', 'page']),
-			filters: new Set(filters),
-			filterOperators: new Set(operators),
+			filters: Object.fromEntries(filters.map((dimension) => [dimension, operators])),
 			comparison: false,
 			minGranularity: 'day',
 			maxLookbackDays: null,
@@ -86,34 +70,25 @@ const renderHtml = async (
 	req: PayloadRequest,
 	widgetData: MetricWidgetData,
 	view?: WidgetView
-): Promise<string> => renderToStaticMarkup(await render(req, widgetData, view))
-
-const hrefIn = (html: string): string | undefined =>
-	html.match(/<a[^>]+href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&')
-
-const view = {
-	path: '/analytics',
-	defaultRange: 'last30days',
-	defaultMetric: 'pageviews',
-} as const
+): Promise<string> => renderSettled(render(req, widgetData, view))
 
 describe('AnalyticsMetricWidget', () => {
 	it('resolves the reporting timezone once, inside the read, for a preset timeframe', async () => {
 		const { req, resolveScope, resolveTimezone } = bootFakeRuntime()
-		await render(req, { metric: 'pageviews', timeframe: 'last30days' })
+		await renderHtml(req, { metric: 'pageviews', timeframe: 'last30days' })
 		expect(resolveScope).toHaveBeenCalledTimes(1)
 		expect(resolveTimezone).toHaveBeenCalledTimes(1)
 	})
 
 	it('resolves it up front for a custom range, so the window is read in it', async () => {
 		const { req, resolveScope, resolveTimezone } = bootFakeRuntime()
-		await render(req, {
+		await renderHtml(req, {
 			metric: 'pageviews',
 			timeframe: 'custom',
 			range: { from: '2026-05-31T22:00:00.000Z', to: '2026-06-22T22:00:00.000Z' },
 		})
-		// Once for the range and caption, once for the read's own scope resolution.
-		expect(resolveScope).toHaveBeenCalledTimes(2)
+		// The range, the caption and the read's own scope all share the request's one resolution.
+		expect(resolveScope).toHaveBeenCalledTimes(1)
 		expect(resolveTimezone).toHaveBeenCalledTimes(1)
 	})
 
@@ -177,8 +152,34 @@ describe('AnalyticsMetricWidget', () => {
 			},
 			view
 		)
+		// The value isolated, so it keeps its own direction inside a right-to-left caption.
 		expect(html).toContain(
-			'analytics:timeframeLast7Days where analytics:viewDimensionCountry analytics:filterOperatorEq DE'
+			'analytics:timeframeLast7Days where analytics:viewDimensionCountry analytics:filterOperatorEq ⁨Germany⁩'
+		)
+	})
+
+	// A read filtered to one currency counts its amounts as they were sent, in that currency.
+	it('writes revenue in the currency its filter keeps', async () => {
+		const base = filterableAdapter(['currency'])
+		const money = {
+			...base,
+			capabilities: { ...base.capabilities, metrics: new Set(['revenue']) },
+			query: () =>
+				Promise.resolve({
+					rows: [],
+					totals: { revenue: 12 },
+					meta: { provider: 'test', fetchedAt: '2026-06-01T00:00:00.000Z' },
+				}),
+		} as unknown as AnalyticsAdapter
+		const { req } = bootFakeRuntime(money)
+		const filtered = await renderHtml(req, {
+			metric: 'revenue',
+			timeframe: 'last7days',
+			filter: { dimension: 'currency', operator: 'eq', value: 'USD' },
+		})
+		expect(filtered).toContain('$12.00')
+		expect(await renderHtml(req, { metric: 'revenue', timeframe: 'last7days' })).not.toContain(
+			'$12.00'
 		)
 	})
 
@@ -221,7 +222,7 @@ describe('AnalyticsMetricWidget', () => {
 		expect(html).not.toContain('analytics:viewDimensionCountry')
 	})
 
-	it('says the number is approximate when the read hit the source event scan cap', async () => {
+	it('says the number is approximate when the source counted from a sample', async () => {
 		const sampling = {
 			...filterableAdapter(['country']),
 			query: () =>
@@ -234,6 +235,35 @@ describe('AnalyticsMetricWidget', () => {
 		const { req } = bootFakeRuntime(sampling)
 		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
 		expect(html).toContain('analytics:stateSampled')
+	})
+
+	it('says days are still being counted, values grouped, the zone missing and when it was updated', async () => {
+		const degraded = {
+			...filterableAdapter(['country']),
+			query: () =>
+				Promise.resolve({
+					rows: [],
+					totals: { pageviews: 7 },
+					meta: {
+						provider: 'test',
+						fetchedAt: '2026-06-01T00:00:00.000Z',
+						partial: { missingDays: 1 },
+						capped: { days: 2 },
+						timezoneUnresolved: true,
+						asOf: new Date(Date.now() - 120_000).toISOString(),
+					},
+				}),
+		} as unknown as AnalyticsAdapter
+		const { req } = bootFakeRuntime(degraded)
+		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
+		for (const key of [
+			keys.statePartial,
+			keys.stateCapped,
+			keys.stateTimezoneUnresolved,
+			keys.stateUpdated,
+		]) {
+			expect(html).toContain(key)
+		}
 	})
 
 	it('says a conversions total stands on goals the source could not read', async () => {
@@ -295,5 +325,72 @@ describe('AnalyticsMetricWidget', () => {
 		expect(filters && JSON.parse(filters)).toEqual([
 			{ dimension: 'country', operator: 'eq', value: 'DE' },
 		])
+	})
+
+	it('states the window on the title line, not under the number', async () => {
+		const { req } = bootFakeRuntime(filterableAdapter(['country']))
+		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
+		const header = /<div class="analytics-widget__header"[^>]*>(.*?)<\/div>/.exec(html)?.[1] ?? ''
+		expect(header).toContain('analytics:metricPageviews')
+		expect(header).toContain('analytics:timeframeLast7Days')
+		expect(html.split('>analytics:timeframeLast7Days<')).toHaveLength(2)
+	})
+
+	it('puts the delta and its words beside the number', async () => {
+		const base = filterableAdapter(['country'])
+		const comparing = {
+			...base,
+			capabilities: { ...base.capabilities, comparison: true },
+		} as unknown as AnalyticsAdapter
+		const { req } = bootFakeRuntime(comparing, true)
+		const html = await renderHtml(req, { metric: 'pageviews', timeframe: 'last7days' }, view)
+		const row = html.slice(
+			html.indexOf('analytics-widget__value-row'),
+			html.indexOf('analytics-widget__footer')
+		)
+		expect(row).toContain('>7<')
+		expect(row).toContain('aria-label="analytics:comparisonDirectionLabel"')
+		expect(row).toContain('analytics-delta__caption">analytics:comparisonVsPrevious<')
+	})
+
+	// "0s" reads as a measured zero-second visit; an average with no pageviews is no data.
+	it('writes a dash and draws no delta for an average with no samples', async () => {
+		const base = filterableAdapter(['country'])
+		const averaging = {
+			...base,
+			capabilities: {
+				...base.capabilities,
+				metrics: new Set(['pageviews', 'avgDuration']),
+				comparison: true,
+			},
+			query: () =>
+				Promise.resolve({
+					rows: [],
+					totals: { avgDuration: null },
+					meta: { provider: 'test', fetchedAt: '2026-06-01T00:00:00.000Z' },
+				}),
+		} as unknown as AnalyticsAdapter
+		const { req } = bootFakeRuntime(averaging, true)
+		const html = await renderHtml(req, { metric: 'avgDuration', timeframe: 'last7days' }, view)
+		expect(html).toMatch(
+			/class="analytics-widget__value"><span aria-hidden="true">-<\/span><span class="analytics-sr-only">analytics:stateNoValue</
+		)
+		expect(html).not.toContain('analytics:comparisonVsPrevious')
+		expect(html).not.toContain('0s')
+	})
+})
+
+describe('AnalyticsMetricWidget custom range', () => {
+	it('says a range before 1970 is invalid instead of reading the last 30 days', async () => {
+		const query = vi.fn()
+		const { req } = bootFakeRuntime({ ...filterableAdapter([]), query })
+		const html = await renderHtml(
+			req,
+			{ metric: 'pageviews', timeframe: 'custom', range: { from: '1969-12-01', to: '1970-01-05' } },
+			view
+		)
+		expect(html).toContain(keys.viewErrorInvalid)
+		expect(html).not.toContain(keys.timeframeLast30Days)
+		expect(query).not.toHaveBeenCalled()
 	})
 })

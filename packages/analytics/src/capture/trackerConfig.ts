@@ -1,51 +1,89 @@
-import type { PayloadRequest } from 'payload'
-import type { CaptureClientKind, CaptureSnippet, CaptureSupport } from '../core/capture'
-import { DEFAULT_AUTO_CAPTURE, defaultConsentFor, type ResolvedAutoCapture } from '../core/options'
-import type { Goal, TrackerGoal } from '../goals/types'
-import { INGEST_PATH, PROXY_PATH } from '../plugin/paths'
-import { type AnalyticsRuntime, resolveGoalsFor, resolveScopeFor } from '../plugin/runtime'
+import type { Payload, PayloadRequest, SanitizedConfig } from 'payload'
+import { formatAdminURL } from 'payload/shared'
+import type { ResolvedGoal } from '../goals/resolver'
+import { apiPath, appPath } from '../plugin/apiPath'
+import { analyticsRoutes } from '../plugin/routes'
+import {
+	type AnalyticsRuntime,
+	resolveCaptureScopeFor,
+	resolveGoalsDetailedFor,
+} from '../plugin/runtime'
+import {
+	type AdminDigest,
+	type CaptureClientKind,
+	type CaptureSlot,
+	DEFAULT_AUTO_CAPTURE,
+	type TrackerConfig,
+	type TrackerExclusion,
+	type TrackerGoal,
+	type TrackerSlotConfig,
+} from '../tracker/config'
+import { DEFAULT_TRACKER_SKIP } from '../tracker/skip'
+import { captureRequest } from './captureRequest'
+import { withExclusionPrelude } from './exclusionPrelude'
+import { exclusionToken, exclusionTokenHash, publicDigest } from './exclusionToken'
 import { normalizeMountPath } from './mountPath'
-import { CAPTURE_SLOTS, type CaptureSlot, resolveSlotAdapterFor } from './slots'
-
-export interface TrackerSlotConfig {
-	slot: CaptureSlot
-	kind: CaptureClientKind
-	adapterId: string
-	/** Mount the snippet and the sink talk to: the runtime proxy, or a `capture.paths` override. */
-	path: string
-	snippet: CaptureSnippet
-	client: CaptureSupport['client']
-	requiresConsent: boolean
-}
+import { CAPTURE_SLOTS, gateHolds, resolveSlotAdapterFor } from './slots'
 
 /**
- * Everything the browser tracker needs, and nothing else. Serialized to any visitor by the
- * public tracker endpoint, so it carries only what an adapter puts in `capture.client` and
- * `capture.snippet`: never a query credential, never a goal's admin-facing name.
+ * The admin's address as a page reaches it, behind the Next basePath, as digests: its origin only
+ * when `serverURL` puts it on one, its path without a trailing slash.
  */
-export interface TrackerConfig {
-	slots: TrackerSlotConfig[]
-	autoCapture: ResolvedAutoCapture
-	/** The request scope's goals, config merged with the goals collection. */
-	goals: TrackerGoal[]
-	/** Where the native sink posts events, derived from the app's own `routes.api`. */
-	ingestPath: string
+const adminDigest = (config: Partial<SanitizedConfig>): AdminDigest => {
+	const address = formatAdminURL({
+		adminRoute: config.routes?.admin ?? '/admin',
+		path: '',
+		serverURL: config.serverURL,
+		includeBasePath: true,
+	})
+	let origin: string | undefined
+	let path = address
+	if (/^https?:\/\//i.test(address)) {
+		try {
+			const url = new URL(address)
+			origin = url.origin
+			path = url.pathname
+		} catch {
+			// A serverURL that does not parse: its digest matches no window, so no page reads as a preview.
+		}
+	}
+	return {
+		...(origin === undefined ? {} : { origin: publicDigest(origin) }),
+		path: publicDigest(path.replace(/\/+$/, '') || '/'),
+	}
 }
 
-const apiRoute = (req: PayloadRequest): string => req.payload?.config?.routes?.api ?? '/api'
+/** What the config says about skipping: the install's choice when not the default, and the admin. */
+const skipFields = (
+	runtime: AnalyticsRuntime,
+	config: Partial<SanitizedConfig>,
+	draft: boolean
+): Pick<TrackerConfig, 'skip' | 'draft' | 'admin'> => {
+	const skip = runtime.captureSkip ?? DEFAULT_TRACKER_SKIP
+	const changed =
+		skip.automation !== DEFAULT_TRACKER_SKIP.automation ||
+		skip.previews !== DEFAULT_TRACKER_SKIP.previews
+	return {
+		...(changed ? { skip: { ...skip } } : {}),
+		...(draft ? { draft: true } : {}),
+		...(skip.previews ? { admin: adminDigest(config) } : {}),
+	}
+}
 
-const trackerGoals = (goals: Goal[] | undefined): TrackerGoal[] =>
-	(goals ?? []).map(({ slug, match, value, currency }) => ({
-		slug,
-		match,
-		...(value ? { value } : {}),
-		...(currency ? { currency } : {}),
-	}))
+const trackerGoals = (goals: ResolvedGoal[]): TrackerGoal[] =>
+	goals
+		.filter((entry) => entry.source !== 'builtin')
+		.map(({ goal: { slug, match, value, currency } }) => ({
+			slug,
+			match,
+			...(value ? { value } : {}),
+			...(currency ? { currency } : {}),
+		}))
 
-/** The request's scope, or null when the host's resolver has none or throws. */
+/** The visit's scope, or null when the host's resolver has none or throws. */
 const scopeFor = async (runtime: AnalyticsRuntime, req: PayloadRequest): Promise<string | null> => {
 	try {
-		return await resolveScopeFor(runtime, req)
+		return await resolveCaptureScopeFor(runtime, req)
 	} catch (err) {
 		req.payload?.logger?.warn(`analytics: tracker config scope resolution failed: ${String(err)}`)
 		return null
@@ -57,68 +95,102 @@ const goalsFor = async (
 	runtime: AnalyticsRuntime,
 	req: PayloadRequest,
 	scope: string | null
-): Promise<Goal[]> => {
+): Promise<ResolvedGoal[]> => {
 	try {
-		return await resolveGoalsFor(runtime, req, scope)
+		return await resolveGoalsDetailedFor(runtime, req, scope)
 	} catch (err) {
 		req.payload?.logger?.warn(
 			`analytics: tracker config goals resolution failed, falling back to config goals: ${String(err)}`
 		)
-		return runtime.goals ?? []
+		return (runtime.goals ?? []).map((goal) => ({ goal, source: 'config' as const }))
 	}
 }
 
-/** The config for an install with no runtime yet: no slots, but still a usable ingest path. */
-export const emptyTrackerConfig = (req: PayloadRequest): TrackerConfig => ({
-	slots: [],
-	autoCapture: DEFAULT_AUTO_CAPTURE,
-	goals: [],
-	ingestPath: `${apiRoute(req)}${INGEST_PATH}`,
-})
+/** The scope's exclusion link as the tracker sees it: the token's hash, never the token. */
+const exclusionFor = (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest,
+	scope: string | null
+): TrackerExclusion | undefined => {
+	const secret = req.payload?.secret
+	if (!runtime.exclusion || typeof secret !== 'string' || secret === '') {
+		return undefined
+	}
+	return {
+		param: runtime.exclusion.param,
+		tokenHash: exclusionTokenHash(exclusionToken(secret, scope)),
+	}
+}
+
+/** The Payload instances that already logged a vendor filling both slots, so a busy site hears it once. */
+const warnedSharedVendor = new WeakSet<Payload>()
+
+/** Why the second slot of one vendor kind is left out, logged once per instance. */
+const warnSharedVendor = (
+	payload: Payload | undefined,
+	args: { slot: CaptureSlot; adapterId: string; kind: CaptureClientKind; first: TrackerSlotConfig }
+): void => {
+	if (!payload || warnedSharedVendor.has(payload)) {
+		return
+	}
+	warnedSharedVendor.add(payload)
+	payload.logger?.warn(
+		`analytics: the ${args.slot} slot resolved to "${args.adapterId}", a second ${args.kind} slot beside "${args.first.adapterId}" on the ${args.first.slot} slot. Two slots of one vendor share its one client in the browser, so neither slot's gate could be answered alone and the ${args.slot} slot's events could land in the other slot's project: the ${args.slot} slot is left out of the tracker config. Logged once.`
+	)
+}
 
 /**
- * The per-request tracker config: one entry per capture slot that resolves to an adapter
- * declaring `capture`, in slot order. A slot whose adapter does not resolve (no scope, an
- * unknown id, a throwing scope resolver) is simply absent, as is one whose snippet throws;
- * this runs on a public, unauthenticated path, so every failure degrades a slot away
- * rather than surfacing an error.
- *
- * One adapter fills at most one slot. A scoped install whose tenant registry defaults to
- * the same adapter the global slot names would otherwise hand the tracker two sinks for
- * it and send every event twice; the native adapter in particular resolves its scope from
- * the request, so one sink already covers both. The global slot iterates first and keeps
- * the entry.
+ * The per-request tracker config, one entry per capturing slot in slot order. Public and anonymous
+ * (the visitor's request, no user or cookies), so any failure drops a slot instead of erroring.
  */
 export const resolveTrackerConfig = async (args: {
 	runtime: AnalyticsRuntime
 	req: PayloadRequest
+	/** The page is rendered in draft mode, which `capture.skip.previews` leaves uncounted. */
+	draft?: boolean
 }): Promise<TrackerConfig> => {
-	const { runtime, req } = args
-	const base = apiRoute(req)
+	const { runtime } = args
+	const req = captureRequest(args.req)
+	const config = req.payload?.config ?? {}
+	const routes = analyticsRoutes(req.payload?.config)
 	// One scope resolution for the whole config: the slots and the goals must agree on it,
 	// and the host's resolver can be as expensive as a database read.
 	const scope = await scopeFor(runtime, req)
+	const exclusion = exclusionFor(runtime, req, scope)
 	const slots: TrackerSlotConfig[] = []
 	const filled = new Set<string>()
 	for (const slot of CAPTURE_SLOTS) {
 		const adapter = await resolveSlotAdapterFor({ runtime, req, slot, scope })
 		const capture = adapter?.capture
+		// One adapter fills one slot: two sinks for it would send every event twice.
 		if (!adapter || !capture || filled.has(adapter.id)) {
 			continue
 		}
-		const override = runtime.capturePaths?.[slot]
-		const path = override ? normalizeMountPath(override) : `${base}${PROXY_PATH}/${slot}`
 		const kind = capture.client.kind
+		// Two slots of one vendor share its one browser global, so neither gate could be answered alone.
+		const first = slots.find((entry) => entry.kind === kind)
+		if (first) {
+			warnSharedVendor(req.payload, { slot, adapterId: adapter.id, kind, first })
+			continue
+		}
+		const override = runtime.capturePaths?.[slot]
+		const path = override
+			? appPath(normalizeMountPath(override))
+			: apiPath(config, `${routes.proxy}/${slot}`)
+		const gated = gateHolds(runtime, { slot, adapterId: adapter.id, kind }, (err) =>
+			req.payload?.logger?.warn(
+				`analytics: capture.gate threw for the ${slot} slot, which waits: ${String(err)}`
+			)
+		)
 		try {
 			slots.push({
 				slot,
 				kind,
 				adapterId: adapter.id,
 				path,
-				snippet: capture.snippet({ path }),
+				snippet: withExclusionPrelude(capture.snippet({ path, scope }), exclusion?.param),
 				client: capture.client,
-				requiresConsent:
-					(runtime.consentFor?.(slot, adapter.id, kind) ?? defaultConsentFor(kind)) === 'required',
+				gated,
 			})
 			filled.add(adapter.id)
 		} catch (err) {
@@ -131,6 +203,8 @@ export const resolveTrackerConfig = async (args: {
 		slots,
 		autoCapture: runtime.autoCapture ?? DEFAULT_AUTO_CAPTURE,
 		goals: trackerGoals(await goalsFor(runtime, req, scope)),
-		ingestPath: `${base}${runtime.ingestPath ?? INGEST_PATH}`,
+		ingestPath: apiPath(config, runtime.ingestPath ?? routes.ingest),
+		...(exclusion ? { exclusion } : {}),
+		...skipFields(runtime, config, args.draft === true),
 	}
 }

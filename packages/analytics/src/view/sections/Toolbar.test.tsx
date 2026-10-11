@@ -4,15 +4,47 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SerializedCapabilities } from '../../core/capabilities'
 import { DIMENSION_KEYS, FILTER_OPERATORS } from '../../core/contract'
 import type { WireSource } from '../../fields/config/fetchSources'
+import { viewContextValue } from '../../testing/viewContext'
 import { keys } from '../../translations/keys'
 import { TIMEFRAME_KEYS } from '../../translations/metricKeys'
+import type { ReadNotices } from '../../widgets/readMeta'
 import { dayRangeDays } from '../dayRange'
-import { gate, VIEW_METRIC_ORDER } from '../gating'
+import { VIEW_METRIC_ORDER } from '../gating'
 import type { ViewState } from '../state'
+import { ViewProvider } from '../viewContext'
+import type { ViewScopes } from '../viewProps'
 import { Toolbar } from './Toolbar'
 
-vi.mock('@payloadcms/ui', () => ({
+vi.mock('@payloadcms/ui', async () => ({
+	...(await import('../../testing/selectMocks')).selectMocks,
 	Banner: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+	DatePicker: ({
+		onChange,
+		overrides,
+	}: {
+		onChange?: (picked: [Date | null, Date | null]) => void
+		overrides?: { id?: string; startDate?: Date | null; endDate?: Date | null; maxDate?: Date }
+	}) => {
+		const day = (date: Date | null | undefined): string =>
+			date
+				? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+				: ''
+		const date = (value: string | undefined): Date | null => {
+			const [year, month, dayOfMonth] = (value ?? '').split('-').map(Number)
+			return year && month && dayOfMonth ? new Date(year, month - 1, dayOfMonth) : null
+		}
+		return (
+			<input
+				data-max={day(overrides?.maxDate)}
+				id={overrides?.id}
+				onChange={(event) => {
+					const [from, to] = event.target.value.split('..')
+					onChange?.([date(from), date(to)])
+				}}
+				value={`${day(overrides?.startDate)}..${day(overrides?.endDate)}`}
+			/>
+		)
+	},
 	Button: ({
 		children,
 		onClick,
@@ -28,41 +60,27 @@ vi.mock('@payloadcms/ui', () => ({
 			{children}
 		</button>
 	),
-	Pill: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
-	SelectInput: ({
-		label,
-		options,
-		value,
-		onChange,
-	}: {
-		label?: string
-		options?: { value: string; label: string }[]
-		value?: string
-		onChange?: (option: { value: string; label: string }) => void
-	}) => (
-		<select
-			aria-label={String(label)}
-			onChange={(event) => onChange?.({ value: event.target.value, label: event.target.value })}
-			value={value}
-		>
-			{(options ?? []).map((option) => (
-				<option key={option.value} value={option.value}>
-					{option.label}
-				</option>
-			))}
-		</select>
+	Pill: ({ children, pillStyle }: { children?: ReactNode; pillStyle?: string }) => (
+		<span data-pill-style={pillStyle}>{children}</span>
 	),
-	useTranslation: () => ({ i18n: { language: 'en' }, t: (key: string) => key }),
+	useConfig: () => ({
+		config: { routes: { admin: '/admin', api: '/api' }, serverURL: 'https://cms.test' },
+	}),
+	useTranslation: () => ({
+		i18n: { language: 'en' },
+		t: (key: string, vars?: Record<string, string>) =>
+			vars ? `${key} ${JSON.stringify(vars)}` : key,
+	}),
 	XIcon: () => <span aria-hidden="true" />,
 }))
 
 const nativeCaps: SerializedCapabilities = {
 	metrics: [...VIEW_METRIC_ORDER],
 	dimensions: [...DIMENSION_KEYS],
-	filters: [...DIMENSION_KEYS],
-	filterOperators: [...FILTER_OPERATORS],
+	filters: Object.fromEntries(
+		DIMENSION_KEYS.map((dimension) => [dimension, [...FILTER_OPERATORS]])
+	),
 	realtime: true,
-	perPageQuery: true,
 	comparison: true,
 	minGranularity: 'hour',
 	maxLookbackDays: null,
@@ -71,10 +89,8 @@ const nativeCaps: SerializedCapabilities = {
 const narrowCaps: SerializedCapabilities = {
 	metrics: ['pageviews', 'visitors'],
 	dimensions: ['page'],
-	filters: [],
-	filterOperators: [],
+	filters: {},
 	realtime: false,
-	perPageQuery: false,
 	comparison: false,
 	minGranularity: 'day',
 	maxLookbackDays: 90,
@@ -98,55 +114,123 @@ const baseState: ViewState = {
 
 const NOW = new Date('2026-09-14T09:00:00.000Z')
 
-const renderToolbar = (
-	overrides: {
-		caps?: SerializedCapabilities
-		sources?: WireSource[]
-		state?: ViewState
-		stale?: boolean
-		clamped?: boolean
-		filtersUnapplied?: boolean
-		sampled?: boolean
-		provider?: string
-		onChange?: (next: ViewState) => void
-		onChangeDeferred?: (next: ViewState) => void
-		onRefresh?: () => void
-		refreshing?: boolean
-		refreshFailed?: boolean
-	} = {}
-) => {
+interface ToolbarOverrides {
+	caps?: SerializedCapabilities
+	sources?: WireSource[]
+	state?: ViewState
+	notices?: Partial<ReadNotices>
+	provider?: string
+	onChange?: (next: ViewState) => void
+	onRefresh?: () => void
+	refreshing?: boolean
+	refreshFailed?: boolean
+	refreshDone?: boolean
+	countryFlags?: boolean
+	scopes?: ViewScopes
+	range?: { from: string; to: string }
+}
+
+/** The toolbar as the view renders it: everything it shows comes from the view's context. */
+const inView = (overrides: ToolbarOverrides = {}) => {
 	const caps = overrides.caps ?? nativeCaps
-	const state = overrides.state ?? baseState
-	return render(
-		<Toolbar
-			clamped={overrides.clamped ?? false}
-			filtersUnapplied={overrides.filtersUnapplied ?? false}
-			gate={gate(caps)}
-			locale="en"
-			now={NOW}
-			onChange={overrides.onChange ?? (() => {})}
-			onChangeDeferred={overrides.onChangeDeferred ?? (() => {})}
-			onRefresh={overrides.onRefresh ?? (() => {})}
-			provider={overrides.provider ?? 'native'}
-			range={{ from: '2026-08-16', to: '2026-09-14' }}
-			refreshFailed={overrides.refreshFailed ?? false}
-			refreshing={overrides.refreshing ?? false}
-			sampled={overrides.sampled ?? false}
-			sourceId="native"
-			sources={overrides.sources ?? [source('native', caps)]}
-			stale={overrides.stale ?? false}
-			state={state}
-			stateKey={JSON.stringify(state)}
-			timezone="Europe/Berlin"
-		/>
+	return (
+		<ViewProvider
+			value={viewContextValue({
+				caps,
+				sources: overrides.sources ?? [source('native', caps)],
+				state: overrides.state ?? baseState,
+				...(overrides.notices ? { notices: overrides.notices } : {}),
+				provider: overrides.provider ?? 'native',
+				write: overrides.onChange ?? (() => {}),
+				refresh: {
+					run: overrides.onRefresh ?? (() => {}),
+					pending: overrides.refreshing ?? false,
+					failed: overrides.refreshFailed ?? false,
+					done: overrides.refreshDone ?? false,
+				},
+				countryFlags: overrides.countryFlags ?? true,
+				...(overrides.scopes ? { scopes: overrides.scopes } : {}),
+				range: overrides.range ?? { from: '2026-08-16', to: '2026-09-14' },
+				now: NOW,
+			})}
+		>
+			<Toolbar />
+		</ViewProvider>
 	)
 }
+
+const renderToolbar = (overrides: ToolbarOverrides = {}) => render(inView(overrides))
 
 const rangeSelect = (): HTMLSelectElement =>
 	screen.getByLabelText(keys.widgetFieldRange) as HTMLSelectElement
 
+const datesInput = (): HTMLInputElement => screen.getByLabelText(keys.viewDates) as HTMLInputElement
+
 afterEach(() => {
 	cleanup()
+})
+
+describe('Toolbar site select', () => {
+	const alpha: ViewScopes = {
+		current: 'alpha',
+		own: 'alpha',
+		ownLabel: 'Alpha',
+		canAggregate: true,
+	}
+	const siteSelect = (): HTMLSelectElement =>
+		screen.getByLabelText(keys.viewScopeSite) as HTMLSelectElement
+	const controlLabels = (container: HTMLElement): Array<string | null> =>
+		[...container.querySelectorAll<HTMLSelectElement>('.analytics-view__controls select')].map(
+			(select) => select.labels?.[0]?.textContent ?? null
+		)
+
+	it('is a select named Site, first in the toolbar, offering the tenant and every site', () => {
+		const { container } = renderToolbar({
+			scopes: alpha,
+			sources: [source('native', nativeCaps), source('plausible', nativeCaps)],
+		})
+		expect(controlLabels(container)).toEqual([
+			keys.viewScopeSite,
+			keys.viewSourceLabel,
+			keys.widgetFieldRange,
+		])
+		expect([...siteSelect().options].map((option) => [option.value, option.text])).toEqual([
+			['alpha', 'Alpha'],
+			['*', keys.viewScopeAll],
+		])
+		expect(siteSelect().value).toBe('alpha')
+		expect(screen.queryByRole('button', { name: keys.viewScopeAll })).toBeNull()
+	})
+
+	it('writes the tagged aggregate token for All sites, and nothing for the tenant', () => {
+		const onChange = vi.fn()
+		renderToolbar({ onChange, scopes: alpha })
+		fireEvent.change(siteSelect(), { target: { value: '*' } })
+		expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ scope: '*:alpha' }))
+		cleanup()
+		const back = vi.fn()
+		renderToolbar({
+			onChange: back,
+			scopes: { ...alpha, current: '*' },
+			state: { ...baseState, scope: '*:alpha' },
+		})
+		expect(siteSelect().value).toBe('*')
+		fireEvent.change(siteSelect(), { target: { value: 'alpha' } })
+		expect(back).toHaveBeenLastCalledWith(expect.objectContaining({ scope: undefined }))
+	})
+
+	it('falls back to the scope id where the host names no label', () => {
+		renderToolbar({ scopes: { current: 'alpha', own: 'alpha', canAggregate: true } })
+		expect(siteSelect().options[0]?.text).toBe('alpha')
+	})
+
+	it('is not drawn for a reader who may not read across sites, or who has no site', () => {
+		renderToolbar({ scopes: { ...alpha, canAggregate: false } })
+		expect(screen.queryByLabelText(keys.viewScopeSite)).toBeNull()
+		cleanup()
+		renderToolbar({ scopes: { current: '', own: '', canAggregate: true } })
+		expect(screen.queryByLabelText(keys.viewScopeSite)).toBeNull()
+	})
 })
 
 describe('Toolbar controls', () => {
@@ -188,15 +272,14 @@ describe('Toolbar controls', () => {
 		expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ compare: false }))
 	})
 
-	it('shows the custom day inputs only on a custom range', () => {
+	it('shows the range picker only on a custom range, opened on the committed days', () => {
 		renderToolbar()
-		expect(screen.queryByLabelText(keys.viewFrom)).toBeNull()
+		expect(screen.queryByLabelText(keys.viewDates)).toBeNull()
 		cleanup()
 		renderToolbar({
 			state: { ...baseState, range: 'custom', from: '2026-06-01', to: '2026-06-10' },
 		})
-		expect((screen.getByLabelText(keys.viewFrom) as HTMLInputElement).value).toBe('2026-06-01')
-		expect((screen.getByLabelText(keys.viewTo) as HTMLInputElement).value).toBe('2026-06-10')
+		expect(datesInput().value).toBe('2026-06-01..2026-06-10')
 	})
 
 	it('carries the resolved days into a switch to a custom range', () => {
@@ -208,36 +291,51 @@ describe('Toolbar controls', () => {
 		)
 	})
 
-	it('clamps a picked window to the days the source can look back', () => {
-		const onChangeDeferred = vi.fn()
+	it('clamps a picked window to the days the source can look back, keeping the second pick', () => {
+		const onChange = vi.fn()
 		renderToolbar({
 			caps: narrowCaps,
-			onChangeDeferred,
+			onChange,
 			state: { ...baseState, range: 'custom', from: '2026-06-01', to: '2026-06-10' },
 		})
-		fireEvent.change(screen.getByLabelText(keys.viewTo), { target: { value: '2026-12-31' } })
-		const next = onChangeDeferred.mock.calls[0]?.[0] as ViewState
+		fireEvent.change(datesInput(), { target: { value: '2026-01-01..2026-12-31' } })
+		const next = onChange.mock.calls[0]?.[0] as ViewState
 		expect(next.to).toBe('2026-12-31')
 		expect(dayRangeDays({ from: String(next.from), to: String(next.to) })).toBe(90)
 	})
 
-	it('merges a second day edit into the first when both land inside the debounce', () => {
-		const onChangeDeferred = vi.fn()
+	it('commits a picked range once, when its second day is picked', () => {
+		const onChange = vi.fn()
 		renderToolbar({
-			onChangeDeferred,
+			onChange,
 			state: { ...baseState, range: 'custom', from: '2026-06-01', to: '2026-06-10' },
 		})
-		fireEvent.change(screen.getByLabelText(keys.viewFrom), { target: { value: '2026-05-01' } })
-		fireEvent.change(screen.getByLabelText(keys.viewTo), { target: { value: '2026-05-20' } })
-		expect(onChangeDeferred).toHaveBeenLastCalledWith(
+		fireEvent.change(datesInput(), { target: { value: '2026-05-01..' } })
+		expect(onChange).not.toHaveBeenCalled()
+		expect(datesInput().value).toBe('2026-05-01..')
+		fireEvent.change(datesInput(), { target: { value: '2026-05-01..2026-05-20' } })
+		expect(onChange).toHaveBeenCalledTimes(1)
+		expect(onChange).toHaveBeenCalledWith(
 			expect.objectContaining({ range: 'custom', from: '2026-05-01', to: '2026-05-20' })
 		)
 	})
 
+	it('drops a half-picked range once anything else commits', () => {
+		const state: ViewState = { ...baseState, range: 'custom', from: '2026-06-01', to: '2026-06-10' }
+		const { rerender } = renderToolbar({ state })
+		fireEvent.change(datesInput(), { target: { value: '2026-05-01..' } })
+		const next: ViewState = { ...state, compare: true }
+		rerender(inView({ state: next, range: { from: '2026-06-01', to: '2026-06-10' } }))
+		expect(datesInput().value).toBe('2026-06-01..2026-06-10')
+	})
+
+	// One span as the language writes one, its shared year said once.
 	it('captions the window and the reporting timezone', () => {
-		renderToolbar()
-		expect(screen.getByText('Aug 16, 2026 - Sep 14, 2026')).toBeDefined()
-		expect(screen.getByText(/Europe\/Berlin/)).toBeDefined()
+		const { container } = renderToolbar()
+		const days = container.querySelector('.analytics-view__captions > span')
+		expect(days?.textContent).toBe('Aug 16 \u2013 Sep 14, 2026')
+		const zone = screen.getByText(/Europe\/Berlin/)
+		expect(zone.closest('[title]')?.getAttribute('title')).toBe(keys.viewTimezoneHelp)
 	})
 
 	it('labels the presets with their translated names', () => {
@@ -248,9 +346,30 @@ describe('Toolbar controls', () => {
 	})
 
 	it('badges a cached read and notes a clamped window', () => {
-		renderToolbar({ clamped: true, stale: true })
+		renderToolbar({ notices: { clamped: true, stale: true } })
 		expect(screen.getByText(keys.viewStale)).toBeDefined()
 		expect(screen.getByText(keys.stateClamped)).toBeDefined()
+	})
+
+	// Saved data is how most reads arrive, which is nothing to warn about.
+	it('badges a cached read in a neutral pill, not a warning', () => {
+		renderToolbar({ notices: { stale: true } })
+		expect(screen.getByText(keys.viewStale).getAttribute('data-pill-style')).toBe('light-gray')
+	})
+
+	it('offers no day after today, in the reporting timezone', () => {
+		renderToolbar({
+			state: { ...baseState, range: 'custom', from: '2026-06-01', to: '2026-06-10' },
+		})
+		expect(datesInput().getAttribute('data-max')).toBe('2026-09-14')
+	})
+
+	// A zone like America/New_York keeps its own direction on a right-to-left page.
+	it('isolates the reporting timezone in its caption', () => {
+		const { container } = renderToolbar()
+		expect(container.querySelector('.analytics-view__captions bdi')?.textContent).toBe(
+			'Europe/Berlin'
+		)
 	})
 
 	it('says nothing about caching or clamping on a fresh full read', () => {
@@ -262,13 +381,46 @@ describe('Toolbar controls', () => {
 	})
 
 	it('notes a read the source answered without one of its filters', () => {
-		renderToolbar({ filtersUnapplied: true })
+		renderToolbar({ notices: { filtersUnapplied: true } })
 		expect(screen.getByText(keys.stateFiltersUnapplied)).toBeDefined()
 	})
 
-	it('notes a read that hit its source event scan cap', () => {
-		renderToolbar({ sampled: true })
+	it('notes a read its source counted from a sample', () => {
+		renderToolbar({ notices: { sampled: true } })
 		expect(screen.getByText(keys.stateSampled)).toBeDefined()
+	})
+
+	it('says when revenue adds amounts in several currencies, naming them', () => {
+		renderToolbar({ notices: { mixedCurrencies: ['EUR', 'USD'] } })
+		expect(
+			screen.getByText(
+				`${keys.stateMixedCurrencies} ${JSON.stringify({ currencies: 'EUR and USD' })}`
+			)
+		).toBeDefined()
+	})
+
+	it('says nothing about currencies while revenue is in one', () => {
+		renderToolbar({ notices: { mixedCurrencies: ['EUR'] } })
+		expect(screen.queryByText(new RegExp(keys.stateMixedCurrencies))).toBeNull()
+	})
+
+	it('notes days still being counted, values grouped together and a zone it could not find', () => {
+		renderToolbar({ notices: { partial: true, capped: true, timezoneUnresolved: true } })
+		expect(screen.getByText(keys.statePartial)).toBeDefined()
+		expect(screen.getByText(keys.stateCapped)).toBeDefined()
+		expect(screen.getByText(keys.stateTimezoneUnresolved)).toBeDefined()
+	})
+
+	it('says how long ago a snapshot brought the numbers up to date', () => {
+		renderToolbar({ notices: { asOf: new Date(NOW.getTime() - 3 * 60_000).toISOString() } })
+		expect(
+			screen.getByText(`${keys.stateUpdated} ${JSON.stringify({ ago: '3 minutes ago' })}`)
+		).toBeDefined()
+	})
+
+	it('leaves the goal states to the goal sections', () => {
+		renderToolbar({ notices: { goalsUnresolved: true } })
+		expect(screen.queryByText(keys.stateGoalsUnresolved)).toBeNull()
 	})
 
 	it('removes a filter chip through its own button', () => {
@@ -296,6 +448,19 @@ describe('Toolbar controls', () => {
 		renderToolbar({ state, provider: 'plausible' })
 		expect(screen.queryByText(new RegExp(keys.channelOrganicSearch))).toBeNull()
 		expect(screen.getByText(/organic-search/)).toBeDefined()
+	})
+
+	it('draws a flag beside a country chip, and drops it when the install said false', () => {
+		const state: ViewState = {
+			...baseState,
+			filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }],
+		}
+		renderToolbar({ state })
+		expect(document.querySelector('img')?.getAttribute('src')).toBe('/api/_x/flags/de.svg')
+		cleanup()
+		renderToolbar({ state, countryFlags: false })
+		expect(document.querySelector('img')).toBeNull()
+		expect(screen.getByText(/Germany/)).toBeDefined()
 	})
 })
 
@@ -339,5 +504,16 @@ describe('Toolbar refresh', () => {
 		cleanup()
 		renderToolbar({ refreshFailed: true })
 		expect(screen.getByRole('status').textContent).toContain(keys.viewRefreshFailed)
+	})
+
+	// A refresh that worked changes the numbers in place; the status region says so, once.
+	it('says a refresh succeeded in the live region, without showing it', () => {
+		const { rerender } = renderToolbar()
+		const region = screen.getByRole('status')
+		rerender(inView({ refreshDone: true }))
+		expect(region.textContent).toBe(keys.viewRefreshed)
+		expect(region.querySelector('.analytics-sr-only')).not.toBeNull()
+		rerender(inView({ refreshing: true }))
+		expect(region.textContent).toBe('')
 	})
 })

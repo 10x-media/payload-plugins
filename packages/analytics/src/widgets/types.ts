@@ -7,9 +7,10 @@ export interface WidgetRange {
 }
 
 /**
- * The optional one-filter group a widget stores. Every part is optional because the group
- * is only ever partly filled while it is being configured; a filter counts as set once it
- * has a dimension and a value.
+ * Optional one-filter group a widget stores, partly filled while being configured; it counts as
+ * a filter once it has a dimension and a value.
+ *
+ * @beta
  */
 export interface WidgetFilter {
 	dimension?: DimensionKey
@@ -53,8 +54,10 @@ export const resolveGoalRowLimit = (value: unknown): GoalRowLimit => {
 export const WIDGET_METRICS: MetricKey[] = [
 	'pageviews',
 	'visitors',
+	'visits',
 	'sessions',
 	'avgDuration',
+	'visitDuration',
 	'bounceRate',
 	'events',
 	'conversions',

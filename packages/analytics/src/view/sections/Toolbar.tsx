@@ -1,97 +1,57 @@
 'use client'
 
-import { Banner, Button, Pill, SelectInput } from '@payloadcms/ui'
-import { useEffect, useRef } from 'react'
-import type { WireSource } from '../../fields/config/fetchSources'
-import type { TimeframePreset } from '../../timeframe/presets'
+import { Banner, Button, FieldLabel, Pill } from '@payloadcms/ui'
+import { useId, useState } from 'react'
+import { PLATFORM_SCOPE } from '../../core/contract'
+import { zonedCalendarDay } from '../../timeframe/tz'
 import { keys } from '../../translations/keys'
 import { TIMEFRAME_KEYS } from '../../translations/metricKeys'
 import { useTranslation } from '../../translations/useTranslation'
+import { calendarDay, pickerDate } from '../../ui/calendarDays'
+import { LabeledSelect, type LabeledSelectOption } from '../../ui/components/LabeledSelect'
+import { RangePicker } from '../../ui/RangePicker'
+import { noticeTexts } from '../../widgets/notices'
 import { clampDayRange, dayRangeCaption, dayRangeDays } from '../dayRange'
-import { canCompareRange, type DayRange, type ViewGate } from '../gating'
-import { rangeFor, VIEW_RANGE_PRESETS, type ViewState } from '../state'
+import { canCompareRange } from '../gating'
+import { canToggleAggregate } from '../scopeLabel'
+import {
+	aggregateToken,
+	isAggregateToken,
+	rangeFor,
+	VIEW_RANGE_PRESETS,
+	type ViewState,
+	withoutFilter,
+} from '../state'
+import { useViewFrame } from '../viewContext'
 import { FilterChips } from './FilterChips'
-
-export interface ToolbarProps {
-	sources: WireSource[]
-	/** The source the reads actually resolved to, which may not be `state.source`. */
-	sourceId: string | null
-	gate: ViewGate
-	state: ViewState
-	range: DayRange
-	timezone: string
-	locale: string
-	/** Any section was served from an expired cache. */
-	stale: boolean
-	/** Any section read a shorter window than the one that was asked for. */
-	clamped: boolean
-	/** Any section was answered without one of the filters it carried. */
-	filtersUnapplied: boolean
-	/** Any section hit its source's event scan cap, so its numbers are a floor. */
-	sampled: boolean
-	/** The source that answered, which decides whether a `source` chip names a channel. */
-	provider: string
-	now: Date
-	/**
-	 * The committed state as one string. Any change to it, not just to the days, drops a
-	 * pending day edit: a click elsewhere cancels that edit, so the next one must start
-	 * from what was committed rather than from the state the cancelled edit was built on.
-	 */
-	stateKey: string
-	onChange: (next: ViewState) => void
-	/** Committed after a pause: the day inputs fire on every keystroke. */
-	onChangeDeferred: (next: ViewState) => void
-	/** Retires the scope's cached reads; the view owns the call and the refetch. */
-	onRefresh: () => void
-	refreshing: boolean
-	refreshFailed: boolean
-}
 
 const CUSTOM = 'custom'
 
-const single = (selected: unknown): string | undefined => {
-	const option = Array.isArray(selected) ? selected[0] : selected
-	const value = (option as { value?: unknown } | null)?.value
-	return typeof value === 'string' ? value : undefined
-}
+/** The Site select's every-site option. A tenant id is never the wildcard, so they cannot clash. */
+const ALL_SITES = PLATFORM_SCOPE
 
 /**
- * The view's one control surface: which source, which window, whether to compare, and the
- * filters the reads carry. Every control is gated by what the selected source serves, so a
- * provider that cannot compare or cannot look back a year never offers the control that
- * would fail at the endpoint.
+ * The view's one control surface: site, source, window, comparison and filters. Each control is
+ * gated by what the selected source serves, so none offers what the endpoint would reject.
+ *
+ * @beta
  */
-export function Toolbar({
-	sources,
-	sourceId,
-	gate,
-	state,
-	range,
-	timezone,
-	locale,
-	stale,
-	clamped,
-	filtersUnapplied,
-	sampled,
-	provider,
-	now,
-	stateKey,
-	onChange,
-	onChangeDeferred,
-	onRefresh,
-	refreshing,
-	refreshFailed,
-}: ToolbarProps) {
+export function Toolbar() {
+	const view = useViewFrame()
+	const { gate, state, range, now, stateKey, write: onChange } = view
+	const { timezone, locale, goals, scopes, countryFlags } = view.props
+	const sources = view.props.sources.sources
+	const sourceId = view.source.id
+	const { notices, provider, itemLabels } = view.answers
+	const { run: onRefresh, pending: refreshing, failed: refreshFailed, done } = view.refresh
 	const { t } = useTranslation()
-	const uncommitted = useRef<ViewState | null>(null)
-
-	// The URL has caught up with the pending edit, or the reader committed anything else at
-	// all (a card, a tab, a row, which also cancels the pending edit), so the next edit
-	// starts from the committed state again.
-	// biome-ignore lint/correctness/useExhaustiveDependencies: the reset keys on the committed state, not the callback
-	useEffect(() => {
-		uncommitted.current = null
-	}, [stateKey])
+	const datesId = useId()
+	const [draft, setDraft] = useState<{ start: Date; key: string } | null>(null)
+	// Goal states are the goal sections' own empty states, and a stale read gets the badge.
+	const captions = noticeTexts(
+		{ ...notices, stale: false, goalsUnresolved: false },
+		{ t, locale, now, timeZone: timezone }
+	)
 
 	const presets = VIEW_RANGE_PRESETS.filter((preset) => {
 		if (gate.maxRangeDays === null) {
@@ -100,101 +60,104 @@ export function Toolbar({
 		return dayRangeDays(rangeFor({ ...state, range: preset }, timezone, now)) <= gate.maxRangeDays
 	})
 
-	const rangeOptions = [
+	const rangeOptions: Array<LabeledSelectOption<ViewState['range']>> = [
 		...presets.map((preset) => ({ value: preset, label: t(TIMEFRAME_KEYS[preset]) })),
 		{ value: CUSTOM, label: t(keys.widgetTimeframeCustom) },
 	]
 
-	const pickRange = (value: string | undefined): void => {
-		if (value === undefined) {
-			return
-		}
+	const pickRange = (value: ViewState['range']): void => {
 		if (value === CUSTOM) {
 			onChange({ ...state, range: CUSTOM, from: range.from, to: range.to })
 			return
 		}
-		onChange({ ...state, range: value as TimeframePreset, from: undefined, to: undefined })
+		onChange({ ...state, range: value, from: undefined, to: undefined })
 	}
 
-	const pickDay = (edited: 'from' | 'to', value: string): void => {
-		if (value === '') {
+	// A start picked before anything else committed; any other commit retires it.
+	const pendingStart = draft?.key === stateKey ? draft.start : null
+	const today = pickerDate(zonedCalendarDay(now, timezone))
+
+	/**
+	 * A range commits once both ends are picked, as one step the reader can go Back over. The
+	 * second pick is the bound kept when the window is longer than the source can serve.
+	 */
+	const pickDays = (start: Date | null, end: Date | null): void => {
+		if (start === null) {
+			setDraft(null)
 			return
 		}
-		// Both inputs share one debounce, so a second edit inside the window merges into the
-		// first rather than rebuilding from a URL that has not caught up with it yet.
-		const base = uncommitted.current ?? state
+		if (end === null) {
+			setDraft({ start, key: stateKey })
+			return
+		}
+		setDraft(null)
 		const picked = clampDayRange(
-			{
-				from: edited === 'from' ? value : (base.from ?? range.from),
-				to: edited === 'to' ? value : (base.to ?? range.to),
-			},
-			edited,
+			{ from: calendarDay(start), to: calendarDay(end) },
+			'to',
 			gate.maxRangeDays
 		)
-		const next: ViewState = { ...base, range: CUSTOM, from: picked.from, to: picked.to }
-		uncommitted.current = next
-		onChangeDeferred(next)
+		onChange({ ...state, range: CUSTOM, from: picked.from, to: picked.to })
 	}
 
+	// The host owns the tenant; the view only chooses whether to aggregate. All sites is tagged
+	// with the tenant it was picked from, so the server drops it once the host's selector moves.
+	const aggregating = isAggregateToken(state.scope)
 	return (
 		<div className="analytics-view__toolbar">
 			<div className="analytics-view__controls">
+				{scopes && canToggleAggregate(scopes) ? (
+					<div className="analytics-view__control">
+						<LabeledSelect
+							label={t(keys.viewScopeSite)}
+							onChange={(value) => {
+								if ((value === ALL_SITES) === aggregating) {
+									return
+								}
+								onChange({
+									...state,
+									scope: value === ALL_SITES ? aggregateToken(scopes.own) : undefined,
+								})
+							}}
+							options={[
+								{ value: scopes.own, label: scopes.ownLabel ?? scopes.own },
+								{ value: ALL_SITES, label: t(keys.viewScopeAll) },
+							]}
+							value={aggregating ? ALL_SITES : scopes.own}
+						/>
+					</div>
+				) : null}
 				{sources.length > 1 ? (
 					<div className="analytics-view__control">
-						<SelectInput
-							isClearable={false}
+						<LabeledSelect
 							label={t(keys.viewSourceLabel)}
-							name="analytics-source"
-							onChange={(selected) => {
-								const value = single(selected)
-								if (value !== undefined) {
-									onChange({ ...state, source: value })
-								}
-							}}
+							onChange={(value) => onChange({ ...state, source: value })}
 							options={sources.map((source) => ({ value: source.id, label: source.label }))}
-							path="analytics-source"
-							value={sourceId ?? undefined}
+							value={sourceId}
 						/>
 					</div>
 				) : null}
 				<div className="analytics-view__control">
-					<SelectInput
-						isClearable={false}
+					<LabeledSelect
 						label={t(keys.widgetFieldRange)}
-						name="analytics-range"
-						onChange={(selected) => pickRange(single(selected))}
+						onChange={pickRange}
 						options={rangeOptions}
-						path="analytics-range"
 						value={state.range}
 					/>
 				</div>
 				{state.range === CUSTOM ? (
-					<>
-						<div className="analytics-view__control">
-							<label className="analytics-view__field-label">
-								{t(keys.viewFrom)}
-								<input
-									aria-label={t(keys.viewFrom)}
-									className="analytics-view__date"
-									onChange={(event) => pickDay('from', event.target.value)}
-									type="date"
-									value={state.from ?? range.from}
-								/>
-							</label>
+					<div className="analytics-view__control analytics-view__control--dates">
+						<div className="field-type date-time-field analytics-date-range">
+							<FieldLabel htmlFor={datesId} label={t(keys.viewDates)} />
+							<RangePicker
+								end={pendingStart ? null : pickerDate(state.to ?? range.to)}
+								inputId={datesId}
+								{...(today === null ? {} : { maxDate: today })}
+								onCalendarClose={() => setDraft(null)}
+								onChange={pickDays}
+								start={pendingStart ?? pickerDate(state.from ?? range.from)}
+							/>
 						</div>
-						<div className="analytics-view__control">
-							<label className="analytics-view__field-label">
-								{t(keys.viewTo)}
-								<input
-									aria-label={t(keys.viewTo)}
-									className="analytics-view__date"
-									onChange={(event) => pickDay('to', event.target.value)}
-									type="date"
-									value={state.to ?? range.to}
-								/>
-							</label>
-						</div>
-					</>
+					</div>
 				) : null}
 				{canCompareRange(gate, range, { timezone, now }) ? (
 					<Button
@@ -225,28 +188,38 @@ export function Toolbar({
 				</Button>
 				<div className="analytics-view__captions">
 					<span>{dayRangeCaption(range, locale, timezone)}</span>
-					<span title={t(keys.viewTimezone)}>{timezone}</span>
-					{stale ? (
-						<Pill pillStyle="warning" size="small">
+					{/* The zone is not a display preference: it is the one each day is counted in,
+					    which the title spells out. */}
+					<span title={t(keys.viewTimezoneHelp)}>
+						<bdi>{timezone}</bdi>
+					</span>
+					{/* A cached read is the normal case, so it is told in a neutral pill, not a warning. */}
+					{notices.stale ? (
+						<Pill pillStyle="light-gray" size="small">
 							{t(keys.viewStale)}
 						</Pill>
 					) : null}
-					{clamped ? <span>{t(keys.stateClamped)}</span> : null}
-					{filtersUnapplied ? <span>{t(keys.stateFiltersUnapplied)}</span> : null}
-					{sampled ? <span>{t(keys.stateSampled)}</span> : null}
+					{captions.map((caption) => (
+						<span key={caption}>{caption}</span>
+					))}
 				</div>
 			</div>
 			{/* Mounted whether or not it has anything to say: a live region added at the same
-			    moment as its text is not announced. */}
+			    moment as its text is not announced. A success is said once and never shown. */}
 			<div role="status">
 				{refreshFailed ? <Banner type="error">{t(keys.viewRefreshFailed)}</Banner> : null}
+				{done === true && !refreshFailed ? (
+					<span className="analytics-sr-only">{t(keys.viewRefreshed)}</span>
+				) : null}
 			</div>
 			<FilterChips
+				countryFlags={countryFlags}
 				filters={state.filters}
+				goals={goals}
+				itemLabels={itemLabels}
+				locale={locale}
 				provider={provider}
-				onRemove={(index) =>
-					onChange({ ...state, filters: state.filters.filter((_, at) => at !== index) })
-				}
+				onRemove={(index) => onChange(withoutFilter(state, index))}
 			/>
 		</div>
 	)

@@ -1,18 +1,36 @@
-import { APIError, type CollectionSlug, type PayloadHandler } from 'payload'
-import type { BindingDoc } from '../binding/types'
+import type { PayloadHandler, PayloadRequest } from 'payload'
+import { readGate } from '../access/readGate'
+import { readReportMode, reportModes } from '../binding/report'
+import { currentDate } from '../core/clock'
 import type { DateRange, MetricKey } from '../core/contract'
-import { readForField } from '../fields/readForDocument'
+import { isMetricKey } from '../core/guards'
+import { describeWithCauses } from '../core/sourceErrors'
+import { wholeNumberParam } from '../core/values'
+import { ITEM_PANEL_METRICS, ITEM_PANEL_OPTIONAL_METRICS } from '../fields/itemReport'
+import { engineReads, readFieldWith } from '../fields/readForDocument'
 import { parseDayOrInstant } from '../query/dates'
-import { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
-import { METRIC_KEYS } from '../translations/metricKeys'
-import { analyticsError, errorResponse, NO_STORE, RETRY_AFTER } from './errors'
-import { DOCUMENT_PATH } from './paths'
-import { getRuntime, readAccessFor, requestTimezone } from './runtime'
+import { exceedsRangeCap, MAX_QUERY_RANGE_DAYS } from '../query/limits'
+import { readDimensionList } from '../query/parse'
+import { isTimeframePreset, type TimeframePreset } from '../timeframe/presets'
+import { resolveBoundDocument, unloadedDocumentResponse } from './boundDocument'
+import {
+	analyticsError,
+	errorResponse,
+	NO_STORE,
+	notAvailableResponse,
+	readDeniedResponse,
+	unauthorizedResponse,
+	untrustedScopeResponse,
+} from './errors'
+import { queryParams } from './queryParams'
+import { type AnalyticsRuntime, getRuntime, requestTimezone } from './runtime'
 
-export { DOCUMENT_PATH }
-
-const KNOWN_METRICS = new Set(Object.keys(METRIC_KEYS) as MetricKey[])
 const MAX_METRICS = 8
+/** A panel row holds three small lists; more would stop being a panel. */
+const MAX_PANEL_DIMENSIONS = 3
+const MAX_PANEL_ROWS = 25
+/** A source with no time per pageview (most vendors) leaves that card out without a warning. */
+const PAGE_PANEL_OPTIONAL_METRICS: MetricKey[] = ['avgDuration']
 
 const parseMetrics = (raw: string | null): MetricKey[] | null => {
 	if (!raw) {
@@ -21,20 +39,17 @@ const parseMetrics = (raw: string | null): MetricKey[] | null => {
 	const metrics = raw
 		.split(',')
 		.map((m) => m.trim())
-		.filter((m): m is MetricKey => KNOWN_METRICS.has(m as MetricKey))
+		.filter(isMetricKey)
 	return metrics.length > 0 ? metrics.slice(0, MAX_METRICS) : null
 }
 
-type RangeResult = { ok: true; range: DateRange } | { ok: false; param: 'from' | 'to' }
+type RangeResult =
+	| { ok: true; range: DateRange }
+	| { ok: false; param: 'from' | 'to'; tooLong?: true }
 
 /**
- * A custom window from the query string, read exactly like the query endpoint's: a
- * `YYYY-MM-DD` day is the whole calendar day in the reporting timezone (`to` inclusive of
- * its final instant), a datetime must carry `Z` or a `±HH:MM` offset, and anything else,
- * including an offset-less datetime, is rejected. `from` equal to `to` is one whole day for
- * day strings and a zero-width window for two instants, so only the latter is rejected. A
- * rejection names the bound at fault, and an inverted window blames `to`: `from` is the one
- * the reader picked first.
+ * A custom window read like the query endpoint's, capped at `MAX_QUERY_RANGE_DAYS`; a `YYYY-MM-DD`
+ * day spans the whole day in the reporting timezone. An inverted window blames `to`, picked second.
  */
 const parseRange = (from: string | null, to: string | null, timezone: string): RangeResult => {
 	if (!from) {
@@ -51,101 +66,121 @@ const parseRange = (from: string | null, to: string | null, timezone: string): R
 	if (!end || end.getTime() <= start.getTime()) {
 		return { ok: false, param: 'to' }
 	}
+	if (exceedsRangeCap({ start, end })) {
+		return { ok: false, param: 'to', tooLong: true }
+	}
 	return { ok: true, range: { start, end } }
 }
 
 /**
- * Authenticated GET handler behind the interactive document analytics panel, gated
- * by `access.read` like every other read endpoint. The caller must also be able to
- * read the target document (enforced through `findByID`
- * without `overrideAccess`), so analytics never leak for content the user cannot
- * see; an unreadable or missing document is a uniform 404, while a read that fails for
- * any other reason is a logged 500 rather than a 404 that hides a broken install.
- * Timeframe, metrics, and data source are whitelist-validated; `timeframe=custom`
- * requires a parseable `from`/`to` pair.
+ * Authenticated GET behind the document panel, in the document's own scope (no parameter names
+ * one). Unreadable and missing are one 404; other failures are a logged 500, never a masking 404.
  */
 export const makeDocumentHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
-		return errorResponse(401, analyticsError('unauthorized', 'analytics: authentication required'))
+		return unauthorizedResponse()
 	}
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
-		return errorResponse(
-			503,
-			analyticsError('unavailable', 'analytics: not available'),
-			RETRY_AFTER
-		)
+		return notAvailableResponse()
 	}
-	if (!(await readAccessFor(runtime, req))) {
-		return errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
+	try {
+		return await answerDocument(req, runtime)
+	} catch (err) {
+		req.payload.logger?.error(`analytics: document read failed: ${describeWithCauses(err)}`)
+		return errorResponse(500, analyticsError('internal', 'analytics: document read failed'))
 	}
-	const params = new URL(req.url ?? '', 'http://localhost').searchParams
+}
+
+const answerDocument = async (
+	req: PayloadRequest,
+	runtime: AnalyticsRuntime
+): Promise<Response> => {
+	if (!(await readGate(runtime, req))) {
+		return readDeniedResponse()
+	}
+	const params = queryParams(req)
 	const collection = params.get('collection') ?? ''
 	const id = params.get('id') ?? ''
 	if (!runtime.bindings[collection] || !id) {
-		return errorResponse(404, analyticsError('not_found', 'analytics: no such document'))
+		return unloadedDocumentResponse(404)
 	}
 	const rawTimeframe = params.get('timeframe') ?? 'last30days'
 	let timezone: string | undefined
 	let range: DateRange | undefined
 	if (rawTimeframe === 'custom') {
-		// Custom bounds name calendar days, so the reporting timezone has to be resolved before
-		// they can be read; a preset resolves its window inside `readForField` as before.
+		// Custom bounds name calendar days, so the reporting timezone must resolve before they are
+		// read; a preset resolves its window inside `readForField`.
 		timezone = await requestTimezone(req)
 		const parsed = parseRange(params.get('from'), params.get('to'), timezone)
 		if (!parsed.ok) {
 			return errorResponse(
 				400,
-				analyticsError(
-					'invalid_param',
-					'analytics: the custom range could not be read',
-					parsed.param
-				)
+				parsed.tooLong
+					? analyticsError(
+							'range_too_long',
+							`analytics: the range must not exceed ${MAX_QUERY_RANGE_DAYS} days`,
+							parsed.param
+						)
+					: analyticsError(
+							'invalid_param',
+							'analytics: the custom range could not be read',
+							parsed.param
+						)
 			)
 		}
 		range = parsed.range
 	}
-	const timeframe: TimeframePreset = TIMEFRAME_PRESETS.includes(rawTimeframe as TimeframePreset)
-		? (rawTimeframe as TimeframePreset)
-		: 'last30days'
-	const metrics = parseMetrics(params.get('metrics')) ?? [
-		'pageviews',
-		'visitors',
-		'sessions',
-		'avgDuration',
-	]
-	let data: BindingDoc
-	try {
-		data = (await req.payload.findByID({
-			collection: collection as CollectionSlug,
-			id,
-			depth: 0,
-			overrideAccess: false,
-			user: req.user,
-			req,
-		})) as BindingDoc
-	} catch (err) {
-		// `findByID` raises a `NotFound` for a missing row and a `Forbidden` for one this
-		// caller may not read; both stay a uniform 404 so analytics never confirm a document
-		// exists. Anything else is this install failing rather than the request being wrong.
-		if (err instanceof APIError && (err.status === 404 || err.status === 403)) {
-			return errorResponse(404, analyticsError('not_found', 'analytics: no such document'))
-		}
-		req.payload.logger?.error(`analytics: document read failed for "${collection}": ${String(err)}`)
-		return errorResponse(500, analyticsError('internal', 'analytics: document read failed'))
+	const timeframe: TimeframePreset = isTimeframePreset(rawTimeframe) ? rawTimeframe : 'last30days'
+	const report =
+		readReportMode(params.get('report')) ?? reportModes(runtime.bindings[collection])[0] ?? 'page'
+	const requested = parseMetrics(params.get('metrics'))
+	const metrics =
+		requested ??
+		(report === 'item' ? ITEM_PANEL_METRICS : ['pageviews', 'visitors', 'sessions', 'avgDuration'])
+	// Metrics the panel asked for on spec, so a source serving none of them warns nobody.
+	const optionalMetrics =
+		parseMetrics(params.get('optional')) ??
+		(requested === null
+			? report === 'item'
+				? ITEM_PANEL_OPTIONAL_METRICS
+				: PAGE_PANEL_OPTIONAL_METRICS
+			: [])
+	const dimensions = readDimensionList(params.get('dimensions'), MAX_PANEL_DIMENSIONS)
+	const rawLimit = wholeNumberParam(params.get('limit'))
+	const limit = rawLimit === undefined ? undefined : Math.min(Math.max(rawLimit, 1), MAX_PANEL_ROWS)
+	const bound = await resolveBoundDocument({ req, collection, id })
+	if (!bound.ok) {
+		return unloadedDocumentResponse(bound.status)
 	}
-	const result = await readForField({
-		req,
-		collectionSlug: collection,
-		data,
-		metrics,
-		timeframe,
-		range,
-		...(timezone !== undefined ? { timezone } : {}),
-		adapterId: params.get('dataSource') ?? undefined,
-		now: new Date(),
-		compare: params.get('compare') === '1',
-		series: params.get('series') === '1',
+	// `fresh=1` waits for the source rather than answering with an expired entry: the panel asks it
+	// when its first render could only show saved numbers, and falls back to them if the source fails.
+	const reads = engineReads({
+		priority: 'interactive',
+		...(params.get('fresh') === '1' ? { allowStale: false } : {}),
 	})
+	const result = await readFieldWith(
+		{
+			req,
+			collectionSlug: collection,
+			data: bound.data,
+			metrics,
+			optionalMetrics,
+			timeframe,
+			range,
+			...(timezone !== undefined ? { timezone } : {}),
+			...(dimensions.length > 0 ? { dimensions } : {}),
+			...(limit === undefined ? {} : { limit }),
+			adapterId: params.get('dataSource') ?? undefined,
+			now: currentDate(),
+			compare: params.get('compare') === '1',
+			series: params.get('series') === '1',
+			report,
+		},
+		reads
+	)
+	if (result.untrustedScope) {
+		return untrustedScopeResponse()
+	}
 	return Response.json(result, { headers: NO_STORE })
 }

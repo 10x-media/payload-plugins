@@ -1,4 +1,7 @@
-import type { SnippetScript } from '../../core/capture'
+import { monotonicMs } from '../../core/monotonic'
+import { bareItemRef } from '../../items/ref'
+import type { SnippetScript } from '../config'
+import { writeStorage } from '../storage'
 import type { LoadScript, Sink, TrackerEvent, TrackerWindow } from '../types'
 
 /** How often the sink re-checks for a vendor global that has not appeared yet. */
@@ -24,22 +27,13 @@ export interface VendorTarget {
 }
 
 /**
- * A vendor's `exclude` for the vendors whose opt-out is a `localStorage` key: it writes the
- * key their script checks, or removes it. Blocked storage is not a failure, because that
- * script reads the same storage and finds the same nothing.
+ * `exclude` for vendors whose opt-out is a `localStorage` key. Blocked storage is not a failure:
+ * the vendor's script reads the same storage and finds the same nothing.
  */
 export const vendorStorageExclusion =
 	(win: TrackerWindow, key: string, value: string) =>
 	(excluded: boolean): void => {
-		try {
-			if (excluded) {
-				win.localStorage?.setItem(key, value)
-				return
-			}
-			win.localStorage?.removeItem(key)
-		} catch {
-			// Storage disabled; the vendor cannot read a flag that could not be written.
-		}
+		writeStorage(win, key, excluded ? value : null)
 	}
 
 const whenPresent = (win: TrackerWindow, target: VendorTarget): Promise<boolean> => {
@@ -47,13 +41,13 @@ const whenPresent = (win: TrackerWindow, target: VendorTarget): Promise<boolean>
 		return Promise.resolve(true)
 	}
 	return new Promise((resolve) => {
-		const deadline = Date.now() + VENDOR_GLOBAL_TIMEOUT_MS
+		const deadline = monotonicMs() + VENDOR_GLOBAL_TIMEOUT_MS
 		const check = () => {
 			if (target.has()) {
 				resolve(true)
 				return
 			}
-			if (Date.now() >= deadline) {
+			if (monotonicMs() >= deadline) {
 				resolve(false)
 				return
 			}
@@ -64,17 +58,8 @@ const whenPresent = (win: TrackerWindow, target: VendorTarget): Promise<boolean>
 }
 
 /**
- * Shared body of every vendor sink: load the slot's snippet scripts once, in order, then
- * hand each event to the vendor global. Pageviews are dropped, because every supported
- * vendor script tracks its own and a forwarded one would double-count.
- *
- * Dispatch waits for the global to exist rather than for the load to resolve. PostHog and
- * Plausible publish a queueing stub the moment their inline snippet runs, so an event sent
- * before the SDK lands is queued and replayed by the SDK itself; Umami has no stub and its
- * `umami` appears only once the script has run, which is why this polls instead of assuming
- * the load promise is enough. An event whose global never turns up (an ad blocker, a CSP
- * rule, a 404 on the proxy) is dropped in silence after the timeout: never surfaced to the
- * visitor, never retried into a loop.
+ * Loads the slot's snippets once, in order, and dispatches when the vendor global exists, since Umami
+ * has no stub. Pageviews and engagements are dropped: every vendor measures its own.
  */
 export const createVendorSink = (args: VendorSinkArgs, target: VendorTarget): Sink => {
 	let loading: Promise<void> | null = null
@@ -92,7 +77,7 @@ export const createVendorSink = (args: VendorSinkArgs, target: VendorTarget): Si
 		ready,
 		...(target.exclude ? { exclude: target.exclude } : {}),
 		send(event) {
-			if (event.type === 'pageview') {
+			if (event.type === 'pageview' || event.type === 'engagement') {
 				return
 			}
 			if (target.has()) {
@@ -111,12 +96,35 @@ export const createVendorSink = (args: VendorSinkArgs, target: VendorTarget): Si
 	}
 }
 
+/**
+ * A vendor's global, typed as its sink calls it. Unchecked: the sink's `has()` confirms it is
+ * callable before a dispatch, and every call still goes through `?.`.
+ */
+export const vendorGlobal = <T>(win: TrackerWindow, name: string): T | undefined => {
+	const value: unknown = Reflect.get(win, name)
+	return value as T | undefined
+}
+
 /** Event name on the wire: a goal travels under its slug. */
 export const vendorEventName = (event: TrackerEvent): string => event.name ?? ''
 
-/** `props` merged with the revenue fields, each key present only when it has a value. */
+/** The item as every vendor receives it: `item` (the ref without its signature) and `item_name`. */
+export const itemProps = (event: TrackerEvent): Record<string, string> => ({
+	...(event.item === undefined ? {} : { item: bareItemRef(event.item) }),
+	...(event.item === undefined || event.itemName === undefined
+		? {}
+		: { item_name: event.itemName }),
+})
+
+/** A sale's order id as the prop the vendors without a field of their own for it receive. */
+export const orderProps = (event: TrackerEvent): Record<string, string> =>
+	event.orderId === undefined ? {} : { orderId: event.orderId }
+
+/** `props` merged with the order, revenue and item fields, each key present only with a value. */
 export const flatProps = (event: TrackerEvent): Record<string, unknown> => ({
 	...event.props,
+	...orderProps(event),
 	...(event.value === undefined ? {} : { value: event.value }),
 	...(event.currency === undefined ? {} : { currency: event.currency }),
+	...itemProps(event),
 })

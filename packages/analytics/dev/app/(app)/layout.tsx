@@ -1,14 +1,20 @@
-import { AnalyticsScripts, getTrackerConfig } from '@10x-media/analytics/rsc'
+import { AnalyticsScripts, getTrackerConfig } from '@10x-media/analytics/site'
 import config from '@payload-config'
-import { headers } from 'next/headers'
+import { draftMode, headers } from 'next/headers'
 import { getPayload } from 'payload'
 import type { ReactNode } from 'react'
+import { ConsentToggle } from '../../components/ConsentToggle'
+import { PrerenderReady } from '../../components/PrerenderReady'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
 	const payload = await getPayload({ config })
-	// The incoming headers go in so the install's scopeResolver sees the same request it
+	// The incoming headers go in so the install's `scope.resolve` sees the same request it
 	// would over the public tracker endpoint; the dev app sets no CSP, so there is no nonce.
-	const tracker = await getTrackerConfig(payload, { headers: await headers() })
+	// Draft mode as Next itself verified it, rather than the bare cookie.
+	const tracker = await getTrackerConfig(payload, {
+		headers: await headers(),
+		draft: (await draftMode()).isEnabled,
+	})
 	return (
 		// Canvas/CanvasText follow the declared color-scheme, so the demo stays legible
 		// in a dark-mode browser without a media query.
@@ -25,7 +31,9 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 				}}
 			>
 				{children}
+				<ConsentToggle />
 				<AnalyticsScripts config={tracker} />
+				<PrerenderReady />
 			</body>
 		</html>
 	)

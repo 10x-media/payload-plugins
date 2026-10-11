@@ -6,9 +6,8 @@ import {
 } from '@10x-media/payload-test-harness/db/postgres-container'
 
 /**
- * The int suite boots Payload ~100 times, so a Postgres container per boot would cost far more
- * than the tests themselves. The Postgres lane starts one server here and every boot takes its
- * own database on it. The Mongo lane and the unit tests load this file and do nothing.
+ * One Postgres server for the run, a database per boot: the int suite boots Payload ~100 times.
+ * Mongo lane and unit tests load this file and do nothing.
  */
 let server: SharedPostgresServer | undefined
 

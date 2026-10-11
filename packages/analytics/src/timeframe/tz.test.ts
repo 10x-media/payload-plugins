@@ -7,7 +7,6 @@ import {
 	startOfWeekInTz,
 	startOfYearInTz,
 	zonedCalendarDay,
-	zonedDayIso,
 } from './tz'
 
 describe('startOfDayInTz', () => {
@@ -69,7 +68,7 @@ describe('addDaysInTz', () => {
 		// CEST begins 2026-03-29 in Berlin. Stepping from the 28th lands on local midnight the 29th.
 		const d = new Date('2026-03-28T12:00:00.000Z')
 		const next = addDaysInTz(d, 1, 'Europe/Berlin')
-		expect(zonedDayIso(next, 'Europe/Berlin')).toBe(next.toISOString())
+		expect(startOfDayInTz(next, 'Europe/Berlin').toISOString()).toBe(next.toISOString())
 	})
 })
 

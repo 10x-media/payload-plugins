@@ -134,3 +134,25 @@ describe('label overrides', () => {
 		expect('description' in tab).toBe(false)
 	})
 })
+
+describe('report option', () => {
+	it('hands the panel the report it was pinned to, and nothing when left on auto', () => {
+		const pinned = fieldComponent(analyticsTab({ report: 'item' }).fields[0] as UIField)
+		expect(pinned.serverProps?.report).toBe('item')
+		const auto = fieldComponent(analyticsTab().fields[0] as UIField)
+		expect(auto.serverProps).not.toHaveProperty('report')
+	})
+
+	it('hands the stat fields the report too', () => {
+		const stat = fieldComponent(analyticsStat({ metric: 'impressions', report: 'item' }) as UIField)
+		expect(stat.serverProps?.report).toBe('item')
+	})
+
+	// An item report swaps in its own counts for a row left on its defaults, and only for one.
+	it('marks a stat row left on its default metrics, and only that row', () => {
+		expect(fieldComponent(analyticsStatRow() as UIField).serverProps?.defaultMetrics).toBe(true)
+		expect(
+			fieldComponent(analyticsStatRow({ metrics: ['visitors'] }) as UIField).serverProps
+		).not.toHaveProperty('defaultMetrics')
+	})
+})

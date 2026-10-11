@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { SnippetScript } from '../../core/capture'
+import type { SnippetScript } from '../config'
 import type { TrackerEvent, TrackerWindow } from '../types'
 import { createGa4Sink } from './ga4'
 import { createPlausibleSink } from './plausible'
@@ -8,7 +8,7 @@ import { createUmamiSink } from './umami'
 import { VENDOR_GLOBAL_TIMEOUT_MS } from './vendor'
 
 const SCRIPTS: SnippetScript[] = [
-	{ src: '/api/analytics/p/global/static/array.js', async: true },
+	{ src: '/api/_x/p/global/static/array.js', async: true },
 	{ inline: 'window.__vendorInit()' },
 ]
 
@@ -157,6 +157,28 @@ describe('vendor sink loading', () => {
 		expect(track).not.toHaveBeenCalled()
 		expect(gtag).not.toHaveBeenCalled()
 	})
+
+	it('never forwards an engagement: the vendor measures time and scroll itself', async () => {
+		const { win, capture, plausible, track, gtag, install } = vendorWindow()
+		install()
+		const loadScript = vi.fn((_script: SnippetScript) => Promise.resolve())
+		const args = { slot: 'tenant', win, scripts: SCRIPTS, loadScript } as const
+		const sinks = [
+			createPosthogSink(args),
+			createPlausibleSink(args),
+			createUmamiSink(args),
+			createGa4Sink(args),
+		]
+		await Promise.all(sinks.map((sink) => sink.ready()))
+		for (const sink of sinks) {
+			sink.send({ ...pageview, type: 'engagement', durationMs: 4000, scrollDepth: 30 })
+		}
+
+		expect(capture).not.toHaveBeenCalled()
+		expect(plausible).not.toHaveBeenCalled()
+		expect(track).not.toHaveBeenCalled()
+		expect(gtag).not.toHaveBeenCalled()
+	})
 })
 
 describe('vendor call shapes', () => {
@@ -222,6 +244,28 @@ describe('vendor call shapes', () => {
 		expect(gtag).toHaveBeenNthCalledWith(2, 'event', 'signup', {})
 	})
 
+	it('hands every vendor the order id of a sale, GA4 as its transaction_id', async () => {
+		const { win, capture, plausible, track, gtag, install } = vendorWindow()
+		install()
+		const sale: TrackerEvent = { ...purchase, orderId: 'ord_1' }
+		for (const factory of [
+			createPosthogSink,
+			createPlausibleSink,
+			createUmamiSink,
+			createGa4Sink,
+		]) {
+			;(await ready(factory, win)).send(sale)
+		}
+		const flat = { plan: 'pro', orderId: 'ord_1', value: 49, currency: 'EUR' }
+		expect(capture).toHaveBeenCalledWith('checkout', flat)
+		expect(plausible).toHaveBeenCalledWith('checkout', {
+			props: { plan: 'pro', orderId: 'ord_1' },
+			revenue: { amount: 49, currency: 'EUR' },
+		})
+		expect(track).toHaveBeenCalledWith('checkout', flat)
+		expect(gtag).toHaveBeenCalledWith('event', 'checkout', { ...flat, transaction_id: 'ord_1' })
+	})
+
 	// GA4 refuses a hyphen in an event name, so a kebab-case goal slug has to be normalized;
 	// the other vendors take the slug as authored.
 	it('ga4: sends a hyphenated goal slug under its GA4 event name', async () => {
@@ -239,5 +283,117 @@ describe('vendor call shapes', () => {
 			currency: 'EUR',
 		})
 		expect(plausible).toHaveBeenCalledWith('checkout-complete', expect.anything())
+	})
+})
+
+describe('content items at the vendors', () => {
+	const click: TrackerEvent = {
+		type: 'event',
+		name: 'item_click',
+		path: '/pricing',
+		hostname: 'shop.test',
+		item: 'offers:7',
+		itemName: 'Spring sale',
+	}
+	const booked: TrackerEvent = { ...purchase, item: 'offers:7', itemName: 'Spring sale' }
+
+	const ready = async (factory: typeof createPosthogSink, win: TrackerWindow) => {
+		const sink = factory({ slot: 'global', win, scripts: [], loadScript: () => Promise.resolve() })
+		await sink.ready()
+		return sink
+	}
+
+	it('ga4: a click on an item is a select_promotion, in its promotion vocabulary', async () => {
+		const { win, gtag, install } = vendorWindow()
+		install()
+		const sink = await ready(createGa4Sink, win)
+		sink.send(click)
+
+		expect(gtag).toHaveBeenCalledWith('event', 'select_promotion', {
+			promotion_id: 'offers:7',
+			promotion_name: 'Spring sale',
+			items: [{ item_id: 'offers:7', item_name: 'Spring sale' }],
+		})
+	})
+
+	it('sends every vendor the bare ref, without the signature only native checks', async () => {
+		const signed: TrackerEvent = { ...click, item: 'offers:7@AbCdEf-_1234' }
+		const ga = vendorWindow()
+		ga.install()
+		;(await ready(createGa4Sink, ga.win)).send(signed)
+		expect(ga.gtag).toHaveBeenCalledWith('event', 'select_promotion', {
+			promotion_id: 'offers:7',
+			promotion_name: 'Spring sale',
+			items: [{ item_id: 'offers:7', item_name: 'Spring sale' }],
+		})
+
+		const ph = vendorWindow()
+		ph.install()
+		;(await ready(createPosthogSink, ph.win)).send(signed)
+		expect(ph.capture).toHaveBeenCalledWith('item_click', {
+			item: 'offers:7',
+			item_name: 'Spring sale',
+		})
+	})
+
+	it('ga4: a goal on an item carries it as two parameters', async () => {
+		const { win, gtag, install } = vendorWindow()
+		install()
+		const sink = await ready(createGa4Sink, win)
+		sink.send(booked)
+
+		expect(gtag).toHaveBeenCalledWith('event', 'checkout', {
+			plan: 'pro',
+			value: 49,
+			currency: 'EUR',
+			item: 'offers:7',
+			item_name: 'Spring sale',
+		})
+	})
+
+	it('plausible, umami and posthog: item_click with the item and its name as props', async () => {
+		const { win, capture, plausible, track, install } = vendorWindow()
+		install()
+		const posthog = await ready(createPosthogSink, win)
+		const umami = await ready(createUmamiSink, win)
+		const plausibleSink = await ready(createPlausibleSink, win)
+		posthog.send(click)
+		umami.send(click)
+		plausibleSink.send(click)
+
+		const props = { item: 'offers:7', item_name: 'Spring sale' }
+		expect(capture).toHaveBeenCalledWith('item_click', props)
+		expect(track).toHaveBeenCalledWith('item_click', props)
+		expect(plausible).toHaveBeenCalledWith('item_click', { props })
+	})
+
+	it('plausible: a goal on an item keeps its revenue and adds the item to its props', async () => {
+		const { win, plausible, install } = vendorWindow()
+		install()
+		const sink = await ready(createPlausibleSink, win)
+		sink.send(booked)
+
+		expect(plausible).toHaveBeenCalledWith('checkout', {
+			props: { plan: 'pro', item: 'offers:7', item_name: 'Spring sale' },
+			revenue: { amount: 49, currency: 'EUR' },
+		})
+	})
+
+	it('never forwards the items an engagement saw', async () => {
+		const { win, capture, gtag, install } = vendorWindow()
+		install()
+		const posthog = await ready(createPosthogSink, win)
+		const ga4 = await ready(createGa4Sink, win)
+		const seen: TrackerEvent = {
+			type: 'engagement',
+			path: '/pricing',
+			hostname: 'shop.test',
+			impressions: ['offers:7'],
+		}
+		posthog.send(seen)
+		ga4.send(seen)
+
+		expect(capture).not.toHaveBeenCalled()
+		expect(gtag).not.toHaveBeenCalled()
 	})
 })

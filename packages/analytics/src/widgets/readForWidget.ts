@@ -1,46 +1,62 @@
 import type { PayloadRequest } from 'payload'
-import { comparisonOf } from '../core/capabilities'
-import type { AnalyticsFilter, AnalyticsResult, DateRange, MetricKey } from '../core/contract'
+import { type ReadPrincipal, readPrincipalOf } from '../access/principal'
+import type {
+	AnalyticsFilter,
+	AnalyticsResult,
+	DateRange,
+	MetricKey,
+	MetricValues,
+} from '../core/contract'
+import { hasNoDeclaredGoals } from '../goals/latent'
+import { readFailureOf } from '../surfacing/classifyError'
 import type { TimeframePreset } from '../timeframe/presets'
-import { previousWindow, withinLookback } from './comparison'
-import { prepareWidgetRead, type WidgetReadStatus } from './prepareWidgetRead'
-import { readMeta } from './readMeta'
+import {
+	comparisonWindow,
+	engineRead,
+	pinnedScope,
+	prepareWidgetRead,
+	type WidgetReadStatus,
+} from './prepareWidgetRead'
+import { type ReadNotices, readMeta } from './readMeta'
 
 export type { WidgetReadStatus } from './prepareWidgetRead'
 
-export interface WidgetReadResult {
+export interface WidgetReadResult extends Partial<ReadNotices> {
 	status: WidgetReadStatus
+	/** How long until a `busy` read can succeed, when the source or the plugin knows. */
+	retryAfterMs?: number
 	adapterId: string
+	/** The reporting timezone the read resolved in, which names its days. */
+	timezone?: string
+	/**
+	 * Scope a link to this read must name, set only when the viewer would not resolve it alone:
+	 * a needless `scope` refuses every reader without `access.crossScope`.
+	 */
+	scope?: string
 	dateRange: DateRange
-	metrics: Partial<Record<MetricKey, number>>
+	/** An average with nothing to average over reads `null`; render it as no data, not zero. */
+	metrics: MetricValues
 	/** The source that answered, absent on a read that never reached one. */
 	provider?: string
-	clamped?: boolean
-	/** True when the engine served a stale cache entry after a failed provider read. */
-	stale?: boolean
-	/** True when the source answered without one of the filters the read carried. */
-	filtersUnapplied?: boolean
-	/** True when the read hit the source's event scan cap, so the numbers are a floor. */
-	sampled?: boolean
-	/** True when the source could not read the scope's goals, so a conversions total means nothing. */
-	goalsUnresolved?: boolean
-	/** The read asked about goals and the scope has none configured. */
+	/** The read asked about goals and the scope declared none of its own. */
 	noGoals?: boolean
 	/** Previous-window totals, present only when the adapter supports comparison. */
-	previousMetrics?: Partial<Record<MetricKey, number>>
+	previousMetrics?: MetricValues
 	/** The previous comparable window, present only when comparison ran. */
 	comparisonRange?: DateRange
 }
 
-export interface ReadForWidgetArgs {
+/**
+ * Without `scope` the read is the request's own, behind `access.read`. A `scope` must be one
+ * already cleared for this request, or a job's own with `principal: SYSTEM`.
+ */
+export type ReadForWidgetArgs = ReadPrincipal & {
 	req: PayloadRequest
 	metrics: MetricKey[]
 	timeframe: TimeframePreset
 	adapterId?: string
 	now: Date
 	range?: DateRange
-	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
-	scope?: string | null
 	/**
 	 * Reporting timezone the caller already resolved, reused rather than resolved again so
 	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
@@ -54,16 +70,18 @@ export interface ReadForWidgetArgs {
 	comparison?: boolean
 }
 
+/**
+ * Totals of `metrics` over a widget's window, beside the previous window's where the install and
+ * the source compare. A source that fails answers with a status rather than a throw.
+ */
 export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetReadResult> => {
 	const { req, metrics, timeframe, adapterId, now, range, filters } = args
-	const emptyMetrics = {} as Partial<Record<MetricKey, number>>
-
 	const prepared = await prepareWidgetRead({
 		req,
 		now,
 		timeframe,
 		adapterId,
-		scope: args.scope,
+		...readPrincipalOf(args),
 		timezone: args.timezone,
 		range,
 		filters,
@@ -75,21 +93,11 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 			status: prepared.status,
 			adapterId: prepared.adapterId,
 			dateRange: prepared.dateRange,
-			metrics: emptyMetrics,
+			metrics: {},
 		}
 	}
-	const { runtime, adapter, tz, dateRange } = prepared
-	const base = { dateRange, metrics: emptyMetrics }
-
-	const previousRange =
-		args.comparison !== false && runtime.comparison && comparisonOf(adapter.capabilities)
-			? previousWindow(dateRange, tz)
-			: null
-	const comparisonRange =
-		previousRange &&
-		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
-			? previousRange
-			: undefined
+	const { adapter, tz, dateRange } = prepared
+	const comparisonRange = args.comparison === false ? undefined : comparisonWindow(prepared, now)
 	const readBase = {
 		metrics,
 		filters,
@@ -97,29 +105,32 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		scope: prepared.queryScope,
 		...(prepared.goalSlugs === undefined ? {} : { goalSlugs: prepared.goalSlugs }),
 	}
+	const read = engineRead(prepared, timeframe)
+	// The number first: a comparison that fails drops the delta, never the number itself.
+	const main = read({ ...readBase, dateRange })
+	const comparing = comparisonRange
+		? read({ ...readBase, dateRange: comparisonRange }).catch(() => undefined)
+		: undefined
 	let result: AnalyticsResult
-	let previous: AnalyticsResult | undefined
 	try {
-		;[result, previous] = await Promise.all([
-			runtime.engine.read(adapter, { ...readBase, dateRange }),
-			comparisonRange
-				? runtime.engine.read(adapter, { ...readBase, dateRange: comparisonRange })
-				: undefined,
-		])
-	} catch {
-		// No cache entry (fresh or stale) survived the failed read; degrade like an
-		// unsupported capability instead of throwing through the widget render tree.
-		return { status: 'unavailable', adapterId: adapter.id, ...base }
+		result = await main
+	} catch (err) {
+		return { ...readFailureOf(err), adapterId: adapter.id, dateRange, metrics: {} }
 	}
+	const previous = await comparing
 	const previousMetrics = previous ? (previous.totals ?? {}) : undefined
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
+		...pinnedScope(args, prepared.queryScope),
 		dateRange,
+		timezone: tz,
 		metrics: result.totals ?? {},
 		...readMeta(result),
-		noGoals: Array.isArray(prepared.goalSlugs) && prepared.goalSlugs.length === 0,
+		noGoals:
+			Array.isArray(prepared.goalSlugs) &&
+			hasNoDeclaredGoals(prepared.goalSlugs, prepared.builtinGoalSlugs),
 		previousMetrics,
-		comparisonRange,
+		comparisonRange: previous ? comparisonRange : undefined,
 	}
 }

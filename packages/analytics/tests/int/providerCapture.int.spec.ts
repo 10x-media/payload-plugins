@@ -6,16 +6,21 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { ga4ExcludeGuard } from '../../src/adapters/ga4/disableKey'
-import type { TrackerConfig } from '../../src/capture/trackerConfig'
+import type { FetchLike } from '../../src/core/fetch'
+import type { ProvidersResolveArgs } from '../../src/core/options'
+import { HostRefusedError } from '../../src/core/sourceErrors'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
 import { adapterFromProviderDoc } from '../../src/providers/factory'
-import { AnalyticsScripts } from '../../src/rsc/AnalyticsScripts'
+import { resolveHostPolicy } from '../../src/providers/hosts'
+import { AnalyticsScripts } from '../../src/site/AnalyticsScripts'
+import type { TrackerConfig } from '../../src/tracker/config'
 
 const SECRET = 'phx_private_query_key'
 const TOKEN = 'phc_tenant_public'
 const EU_ASSETS = 'https://eu-assets.i.posthog.com'
 const MEASUREMENT_ID = 'G-AB12CD34'
+const SELF_HOSTED = 'https://posthog.example.com'
 
 const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -32,24 +37,36 @@ const tenantDoc = {
 	posthog: { projectId: '42', apiKey: SECRET, projectToken: TOKEN, region: 'eu' },
 }
 
+/**
+ * msw intercepts the global fetch, which the guarded one is not: these specs hand the document's
+ * adapter the global fetch so the vendor answers from the stubs, and check the guarded one apart.
+ */
+const viaStubs: FetchLike = (input, init) => fetch(input, init)
+
 // A document's adapter carries its instance id (provider:docId), which is what the tenant
 // slot names; the config adapter stays the default, so the slot has to be explicit.
 describeForDb('analytics capture from a provider document', {}, (db) => {
 	let booted: BootedPayload
+	const handed: ProvidersResolveArgs[] = []
 
 	beforeAll(async () => {
 		booted = await bootPayload({
 			db,
 			plugin: analytics({
 				adapters: [native()],
-				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+				scope: { member: () => true, resolve: ({ req }) => req.headers.get('x-tenant') },
 				providers: {
-					resolve: ({ scope }) => {
-						const adapter = scope === 'tenant-a' ? adapterFromProviderDoc(tenantDoc) : null
+					hosts: { allow: [SELF_HOSTED] },
+					resolve: (args) => {
+						handed.push(args)
+						const adapter =
+							args.scope === 'tenant-a'
+								? adapterFromProviderDoc(tenantDoc, { ...args, fetch: viaStubs })
+								: null
 						return adapter ? [adapter] : []
 					},
 				},
-				capture: { slots: { tenant: 'posthog:tenant-a' } },
+				capture: { gate: ({ kind }) => kind !== 'native', slots: { tenant: 'posthog:tenant-a' } },
 			}),
 		})
 	}, 240_000)
@@ -66,7 +83,7 @@ describeForDb('analytics capture from a provider document', {}, (db) => {
 		})
 
 	it('fills the tenant slot from the document public capture fields', async () => {
-		const res = await request('/analytics/tracker', { 'x-tenant': 'tenant-a' })
+		const res = await request('/_x/config', { 'x-tenant': 'tenant-a' })
 		expect(res.status).toBe(200)
 		const body = await res.text()
 		const config = JSON.parse(body) as TrackerConfig
@@ -74,7 +91,7 @@ describeForDb('analytics capture from a provider document', {}, (db) => {
 		expect(tenant).toMatchObject({
 			adapterId: 'posthog:tenant-a',
 			kind: 'posthog',
-			path: '/api/analytics/p/tenant',
+			path: '/api/_x/p/tenant',
 		})
 		expect(tenant?.client).toEqual({ kind: 'posthog', token: TOKEN })
 		expect(tenant?.snippet.scripts[0]?.inline).toContain(`posthog.init("${TOKEN}"`)
@@ -82,8 +99,16 @@ describeForDb('analytics capture from a provider document', {}, (db) => {
 		expect(body).not.toContain(SECRET)
 	})
 
+	it("hands providers.resolve the runtime's guarded fetch and the install's providers.hosts", async () => {
+		await request('/_x/config', { 'x-tenant': 'tenant-a' })
+		const args = handed.at(-1)
+		expect(args?.hosts).toEqual(resolveHostPolicy({ allow: [SELF_HOSTED] }))
+		expect(args?.sdks).toEqual({})
+		await expect(args?.fetch('https://127.0.0.1/collect')).rejects.toBeInstanceOf(HostRefusedError)
+	})
+
 	it('omits the tenant slot for a scope with no provider document', async () => {
-		const res = await request('/analytics/tracker', { 'x-tenant': 'tenant-b' })
+		const res = await request('/_x/config', { 'x-tenant': 'tenant-b' })
 		const config = (await res.json()) as TrackerConfig
 		expect(config.slots.map((s) => s.slot)).toEqual(['global'])
 	})
@@ -99,7 +124,7 @@ describeForDb('analytics capture from a provider document', {}, (db) => {
 				})
 			})
 		)
-		const res = await request('/analytics/p/tenant/static/array.js', { 'x-tenant': 'tenant-a' })
+		const res = await request('/_x/p/tenant/static/array.js', { 'x-tenant': 'tenant-a' })
 		expect(res.status).toBe(200)
 		expect(await res.text()).toBe('window.posthog=1')
 		expect(fetched).toEqual([`${EU_ASSETS}/static/array.js`])
@@ -129,14 +154,14 @@ describeForDb('analytics ga4 capture from a provider document', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [native()],
-				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+				scope: { member: () => true, resolve: ({ req }) => req.headers.get('x-tenant') },
 				providers: {
-					resolve: ({ scope }) => {
-						const adapter = scope === 'tenant-g' ? adapterFromProviderDoc(ga4Doc) : null
+					resolve: (args) => {
+						const adapter = args.scope === 'tenant-g' ? adapterFromProviderDoc(ga4Doc, args) : null
 						return adapter ? [adapter] : []
 					},
 				},
-				capture: { slots: { tenant: 'ga4:tenant-g' } },
+				capture: { gate: ({ kind }) => kind !== 'native', slots: { tenant: 'ga4:tenant-g' } },
 			}),
 		})
 	}, 240_000)
@@ -155,7 +180,7 @@ describeForDb('analytics ga4 capture from a provider document', {}, (db) => {
 		})
 
 	const tenantSlot = async () => {
-		const res = await request('/analytics/tracker')
+		const res = await request('/_x/config')
 		expect(res.status).toBe(200)
 		const config = (await res.json()) as TrackerConfig
 		const slot = config.slots.find((s) => s.slot === 'tenant')
@@ -163,10 +188,10 @@ describeForDb('analytics ga4 capture from a provider document', {}, (db) => {
 		return slot as TrackerConfig['slots'][number]
 	}
 
-	it('serves a consent-gated ga4 slot carrying the gtag tag and its inline boot', async () => {
+	it('serves a gated ga4 slot carrying the gtag tag and its inline boot', async () => {
 		const slot = await tenantSlot()
 		expect(slot.kind).toBe('ga4')
-		expect(slot.requiresConsent).toBe(true)
+		expect(slot.gated).toBe(true)
 		expect(slot.client).toEqual({ kind: 'ga4', measurementId: MEASUREMENT_ID })
 		expect(slot.snippet.scripts).toEqual([
 			{
@@ -177,11 +202,11 @@ describeForDb('analytics ga4 capture from a provider document', {}, (db) => {
 	})
 
 	it('404s the slot proxy mount: the tag is loaded from Google, not through us', async () => {
-		expect((await request('/analytics/p/tenant/gtag/js')).status).toBe(404)
-		expect((await request('/analytics/p/tenant/g/collect')).status).toBe(404)
+		expect((await request('/_x/p/tenant/gtag/js')).status).toBe(404)
+		expect((await request('/_x/p/tenant/g/collect')).status).toBe(404)
 	})
 
-	it('renders the tag and the boot only once the slot is no longer gated', async () => {
+	it('renders the tag and the boot only for a slot ungated or opened on the server', async () => {
 		const slot = await tenantSlot()
 		const config: TrackerConfig = {
 			slots: [slot],
@@ -191,20 +216,26 @@ describeForDb('analytics ga4 capture from a provider document', {}, (db) => {
 				fileDownloads: true,
 				goalAttribute: true,
 				query: true,
+				items: { impressions: true, clicks: true, pages: true },
 			},
 			goals: [],
-			ingestPath: '/api/analytics/ingest',
+			ingestPath: '/api/_x/e',
 		}
 		const gated = renderToStaticMarkup(createElement(AnalyticsScripts, { config }))
 		expect(gated).not.toContain('googletagmanager.com')
 
 		const granted = renderToStaticMarkup(
 			createElement(AnalyticsScripts, {
-				config: { ...config, slots: [{ ...slot, requiresConsent: false }] },
+				config: { ...config, slots: [{ ...slot, gated: false }] },
 			})
 		)
 		expect(granted).toContain(`src="https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}"`)
 		expect(granted).toContain(`gtag("config","${MEASUREMENT_ID}")`)
 		expect(granted.indexOf('ga-disable-')).toBeLessThan(granted.indexOf('gtag('))
+
+		const opened = renderToStaticMarkup(
+			createElement(AnalyticsScripts, { config, gate: { tenant: true } })
+		)
+		expect(opened).toContain(`src="https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}"`)
 	})
 })

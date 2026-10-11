@@ -1,4 +1,6 @@
-export interface UtmParams {
+import { MAX_CAMPAIGN_VALUE_LENGTH } from '../../tracker/campaign'
+
+interface UtmParams {
 	utmSource?: string
 	utmMedium?: string
 	utmCampaign?: string
@@ -6,15 +8,14 @@ export interface UtmParams {
 	utmTerm?: string
 }
 
-/** Each extracted value is a rollup bucket key, so it is capped like every other one. */
-export const MAX_UTM_LENGTH = 128
+/** Each extracted value is one a breakdown groups by, so it is capped like every other one. */
+export const MAX_UTM_LENGTH = MAX_CAMPAIGN_VALUE_LENGTH
 
 /**
- * A `Map` rather than an object literal: the lookup is keyed by a query key an attacker
- * writes, and an object literal answers its inherited members, so `?constructor=x` would
- * otherwise reach storage under a key `UtmParams` does not declare.
+ * A `Map`, not an object literal: keys come from the query, and an object literal would answer
+ * inherited members, so `?constructor=x` would reach storage.
  */
-const UTM_KEYS: ReadonlyMap<string, keyof UtmParams> = new Map<string, keyof UtmParams>([
+export const UTM_KEYS: ReadonlyMap<string, keyof UtmParams> = new Map<string, keyof UtmParams>([
 	['utm_source', 'utmSource'],
 	['utm_medium', 'utmMedium'],
 	['utm_campaign', 'utmCampaign'],
@@ -23,10 +24,8 @@ const UTM_KEYS: ReadonlyMap<string, keyof UtmParams> = new Map<string, keyof Utm
 ])
 
 /**
- * The five utm keys carried by a page's query string, decoded and capped. Keys are matched
- * case-insensitively and a repeated key keeps its first value, matching what
- * `URLSearchParams.get` would have answered. Everything else in the query is discarded here
- * and never reaches storage.
+ * The five utm keys of a query, decoded and capped; a repeated key keeps its first value, as
+ * `URLSearchParams.get` would. The rest of the query never reaches storage.
  */
 export const extractUtm = (query: string | undefined): UtmParams => {
 	if (!query) {

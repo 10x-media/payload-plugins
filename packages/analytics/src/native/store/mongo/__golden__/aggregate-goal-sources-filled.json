@@ -1,0 +1,218 @@
+[
+	{
+		"$match": {
+			"dim": "goal",
+			"dim2": "source",
+			"value": "purchase",
+			"value2": {
+				"$in": ["google", "bing"]
+			},
+			"day": {
+				"$gte": 20261001,
+				"$lte": 20261030
+			},
+			"gen": {
+				"$in": ["G1", "G2", "G3"]
+			},
+			"$and": [
+				{
+					"value2": {
+						"$ne": ""
+					}
+				}
+			]
+		}
+	},
+	{
+		"$group": {
+			"_id": "$value2",
+			"pageviews": {
+				"$sum": "$pageviews"
+			},
+			"events": {
+				"$sum": "$events"
+			},
+			"visitors": {
+				"$sum": "$visitors"
+			},
+			"sessions": {
+				"$sum": "$sessions"
+			},
+			"entries": {
+				"$sum": "$entries"
+			},
+			"bounces": {
+				"$sum": "$bounces"
+			},
+			"sessionMs": {
+				"$sum": "$sessionMs"
+			},
+			"durationMs": {
+				"$sum": "$durationMs"
+			},
+			"scrollSum": {
+				"$sum": "$scrollSum"
+			},
+			"scrollSamples": {
+				"$sum": "$scrollSamples"
+			},
+			"conversions": {
+				"$sum": "$conversions"
+			},
+			"revenue": {
+				"$sum": "$revenue"
+			},
+			"interactions": {
+				"$sum": "$interactions"
+			},
+			"visitors_n": {
+				"$sum": {
+					"$cond": [
+						{
+							"$isNumber": "$visitors"
+						},
+						1,
+						0
+					]
+				}
+			},
+			"sessions_n": {
+				"$sum": {
+					"$cond": [
+						{
+							"$isNumber": "$sessions"
+						},
+						1,
+						0
+					]
+				}
+			},
+			"sessionMs_n": {
+				"$sum": {
+					"$cond": [
+						{
+							"$isNumber": "$sessionMs"
+						},
+						1,
+						0
+					]
+				}
+			}
+		}
+	},
+	{
+		"$set": {
+			"visitors": {
+				"$cond": [
+					{
+						"$gt": ["$visitors_n", 0]
+					},
+					"$visitors",
+					null
+				]
+			},
+			"sessions": {
+				"$cond": [
+					{
+						"$gt": ["$sessions_n", 0]
+					},
+					"$sessions",
+					null
+				]
+			},
+			"sessionMs": {
+				"$cond": [
+					{
+						"$gt": ["$sessionMs_n", 0]
+					},
+					"$sessionMs",
+					null
+				]
+			},
+			"impressions": null
+		}
+	},
+	{
+		"$unset": ["visitors_n", "sessions_n", "sessionMs_n"]
+	},
+	{
+		"$match": {
+			"$expr": {
+				"$gt": [
+					{
+						"$add": [
+							{
+								"$ifNull": ["$pageviews", 0]
+							},
+							{
+								"$ifNull": ["$events", 0]
+							},
+							{
+								"$ifNull": ["$impressions", 0]
+							}
+						]
+					},
+					0
+				]
+			}
+		}
+	},
+	{
+		"$set": {
+			"rank": {
+				"$cond": [
+					{
+						"$or": [
+							{
+								"$eq": ["$conversions", 0]
+							},
+							{
+								"$eq": ["$conversions", null]
+							}
+						]
+					},
+					null,
+					{
+						"$divide": ["$revenue", "$conversions"]
+					}
+				]
+			},
+			"unranked": {
+				"$cond": [
+					{
+						"$eq": [
+							{
+								"$cond": [
+									{
+										"$or": [
+											{
+												"$eq": ["$conversions", 0]
+											},
+											{
+												"$eq": ["$conversions", null]
+											}
+										]
+									},
+									null,
+									{
+										"$divide": ["$revenue", "$conversions"]
+									}
+								]
+							},
+							null
+						]
+					},
+					1,
+					0
+				]
+			}
+		}
+	},
+	{
+		"$sort": {
+			"unranked": 1,
+			"rank": -1,
+			"_id": 1
+		}
+	}
+]

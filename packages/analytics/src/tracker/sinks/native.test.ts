@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TrackerEvent } from '../types'
-import { createNativeSink, PAGEVIEW_BUFFER_MS } from './native'
+import { createNativeSink } from './native'
 
 const fetchMock = vi.fn(() => Promise.resolve(new Response(null, { status: 202 })))
 
@@ -12,8 +12,7 @@ const sent = (): TrackerEvent[] =>
 
 const pageview: TrackerEvent = { type: 'pageview', path: '/pricing', hostname: 'shop.test' }
 
-const sink = (scrollDepth?: () => number | undefined) =>
-	createNativeSink({ slot: 'global', win: window, url: '/api/analytics/ingest', scrollDepth })
+const sink = () => createNativeSink({ slot: 'global', win: window, url: '/api/_x/e' })
 
 beforeEach(() => {
 	fetchMock.mockClear()
@@ -63,67 +62,60 @@ describe('createNativeSink', () => {
 		expect(sent()[0]).toMatchObject({ type: 'goal', name: 'checkout', value: 49, currency: 'EUR' })
 	})
 
-	it('buffers a pageview until flush, then adds duration and scroll depth', () => {
-		const native = sink(() => 75)
-		native.send(pageview)
-		expect(fetchMock).not.toHaveBeenCalled()
-
-		vi.advanceTimersByTime(4000)
-		native.flush?.()
+	it('posts a pageview the moment it is sent, holding nothing back for its duration', () => {
+		sink().send({ ...pageview, query: 'utm_source=newsletter', scrollDepth: 0 })
 
 		expect(sent()).toEqual([
 			{
 				type: 'pageview',
 				path: '/pricing',
 				hostname: 'shop.test',
-				durationMs: 4000,
-				scrollDepth: 75,
+				query: 'utm_source=newsletter',
+				scrollDepth: 0,
+			},
+		])
+		vi.advanceTimersByTime(60_000)
+		expect(sent()).toHaveLength(1)
+	})
+
+	it('posts an engagement verbatim', () => {
+		sink().send({ type: 'engagement', path: '/pricing', hostname: 'shop.test', durationMs: 4000 })
+
+		expect(sent()).toEqual([
+			{ type: 'engagement', path: '/pricing', hostname: 'shop.test', durationMs: 4000 },
+		])
+	})
+
+	it('posts the item an event belongs to, and leaves its name for the vendors', () => {
+		sink().send({
+			type: 'event',
+			name: 'item_click',
+			path: '/pricing',
+			hostname: 'shop.test',
+			item: 'offers:1',
+			itemName: 'Spring sale',
+		})
+
+		expect(sent()).toEqual([
+			{
+				type: 'event',
+				name: 'item_click',
+				path: '/pricing',
+				hostname: 'shop.test',
+				item: 'offers:1',
 			},
 		])
 	})
 
-	it('carries the pageview query through the buffer window', () => {
-		const native = sink()
-		native.send({ ...pageview, query: 'utm_source=newsletter' })
-		native.flush?.()
+	it('posts the items an engagement saw', () => {
+		sink().send({
+			type: 'engagement',
+			path: '/pricing',
+			hostname: 'shop.test',
+			impressions: ['offers:1', 'offers:2'],
+		})
 
-		expect(sent()[0]).toMatchObject({ type: 'pageview', query: 'utm_source=newsletter' })
-	})
-
-	it('omits scrollDepth when the scroll listener is off', () => {
-		const native = sink(() => undefined)
-		native.send(pageview)
-		native.flush?.()
-
-		expect(sent()[0]).not.toHaveProperty('scrollDepth')
-	})
-
-	it('flushes a buffered pageview after the buffer window', () => {
-		sink().send(pageview)
-		vi.advanceTimersByTime(PAGEVIEW_BUFFER_MS)
-
-		expect(sent()).toHaveLength(1)
-		expect(sent()[0]?.durationMs).toBe(PAGEVIEW_BUFFER_MS)
-	})
-
-	it('flushes the previous pageview when the next navigation arrives', () => {
-		const native = sink()
-		native.send(pageview)
-		vi.advanceTimersByTime(1500)
-		native.send({ ...pageview, path: '/checkout' })
-
-		expect(sent()).toHaveLength(1)
-		expect(sent()[0]).toMatchObject({ path: '/pricing', durationMs: 1500 })
-	})
-
-	it('sends a buffered pageview exactly once', () => {
-		const native = sink()
-		native.send(pageview)
-		native.flush?.()
-		native.flush?.()
-		vi.advanceTimersByTime(PAGEVIEW_BUFFER_MS)
-
-		expect(sent()).toHaveLength(1)
+		expect(sent()[0]?.impressions).toEqual(['offers:1', 'offers:2'])
 	})
 
 	it('is ready without loading anything', async () => {

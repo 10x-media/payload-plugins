@@ -1,37 +1,49 @@
-import type { Sink, TrackerWindow } from '../types'
-import { createVendorSink, flatProps, type VendorSinkArgs, vendorEventName } from './vendor'
+import type { Sink } from '../types'
+import {
+	createVendorSink,
+	flatProps,
+	type VendorSinkArgs,
+	vendorEventName,
+	vendorGlobal,
+} from './vendor'
 
 interface PosthogGlobal {
 	capture(name: string, properties?: Record<string, unknown>): void
 	/** https://posthog.com/docs/privacy/data-collection, and both are in the snippet's stub. */
 	opt_out_capturing?(): void
-	opt_in_capturing?(): void
+	/** `captureEventName: false` skips the `$opt_in` event it would otherwise capture. */
+	opt_in_capturing?(options?: { captureEventName?: string | false }): void
 }
 
-type PosthogWindow = TrackerWindow & { posthog?: PosthogGlobal }
-
 /**
- * Forwards events and goals to `posthog.capture`. Revenue rides along as the `value` and
- * `currency` properties, which is what PostHog's own revenue analytics reads. The adapter's
- * snippet publishes PostHog's queueing stub, so `capture` is callable (and replayed) from
- * the moment the snippet runs, well before `array.js` lands.
- *
- * Exclusion goes through PostHog's own opt-out, which the stub queues like any other call.
- * A slot whose snippet has not run has no global to opt out of, and none is loaded while
- * the tracker is excluded.
+ * Forwards events and goals to `posthog.capture`, revenue as `value` and `currency`. Exclusion is
+ * PostHog's opt-out; lifting it captures no `$opt_in`, since an open gate lifts it every load.
  */
-export const createPosthogSink = (args: VendorSinkArgs): Sink =>
-	createVendorSink(args, {
+export const createPosthogSink = (args: VendorSinkArgs): Sink => {
+	const posthog = () => vendorGlobal<PosthogGlobal>(args.win, 'posthog')
+	let lifted: PosthogGlobal | null = null
+	return createVendorSink(args, {
 		exclude: (excluded) => {
-			const { posthog } = args.win as PosthogWindow
+			const sdk = posthog()
 			if (excluded) {
-				posthog?.opt_out_capturing?.()
+				lifted = null
+				sdk?.opt_out_capturing?.()
 				return
 			}
-			posthog?.opt_in_capturing?.()
+			// The tracker lifts again once the snippet ran, which reaches only a global the first lift missed.
+			if (sdk === undefined || sdk === lifted) {
+				return
+			}
+			lifted = sdk
+			sdk.opt_in_capturing?.({ captureEventName: false })
 		},
-		has: () => typeof (args.win as PosthogWindow).posthog?.capture === 'function',
+		has: () => typeof posthog()?.capture === 'function',
 		dispatch: (event) => {
-			;(args.win as PosthogWindow).posthog?.capture(vendorEventName(event), flatProps(event))
+			posthog()?.capture(vendorEventName(event), {
+				...flatProps(event),
+				// PostHog properties are arbitrary JSON, so the lines of a sale travel whole.
+				...(event.items === undefined ? {} : { items: event.items }),
+			})
 		},
 	})
+}
