@@ -52,4 +52,12 @@ export const en: Record<TranslationKey, string> = {
 	[keys.selectUnit]: 'Select unit',
 	[keys.measurementBelowMin]: 'Must be at least {{min}}',
 	[keys.measurementAboveMax]: 'Must be no more than {{max}}',
+	[keys.selectCountry]: 'Select country',
+	[keys.searchCountries]: 'Search countries',
+	[keys.noCountriesFound]: 'No countries found',
+	[keys.phoneRequired]: 'This field is required.',
+	[keys.invalidPhoneNumber]: 'Enter a valid phone number.',
+	[keys.phoneNotMobile]: 'Enter a mobile phone number.',
+	[keys.clearPhoneNumber]: 'Clear phone number',
+	[keys.phoneCountryFor]: 'Country: {{country}}',
 }

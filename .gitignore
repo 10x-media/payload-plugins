@@ -36,6 +36,11 @@ packages/*/dev/.sqlite/
 # the analytics upgrade test's migrations while it runs (scripts/upgrade.sh removes them)
 packages/analytics/tests/upgrade/.work/
 
+# document-preview int test uploads (staticDir resolves against the package dir)
+packages/document-preview/media/
+# document-preview dev seed downloads (extend and MDN sample files)
+packages/document-preview/dev/.seed-cache/
+
 # admin-wiki wiki media uploads
 packages/admin-wiki/dev/wiki-media/
 
@@ -62,3 +67,6 @@ docs/superpowers/
 # misc
 note.md
 *.log
+
+# Collected from packages/*/registry/r by apps/docs/scripts/collect-registry.ts
+apps/docs/public/r/

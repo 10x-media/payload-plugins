@@ -31,6 +31,13 @@ import { IconCell as IconCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-medi
 import { IconFieldServer as IconFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { MeasurementCellServer as MeasurementCellServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { MeasurementFieldServer as MeasurementFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
+import { PhoneNumberCellServer as PhoneNumberCellServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
+import { PhoneNumberFieldServer as PhoneNumberFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
+import { PhoneShowcaseError as PhoneShowcaseError_c7aad2540de198ec058d3310920738ea } from '../../../components/phoneShowcase'
+import { PhoneShowcaseAfterInput as PhoneShowcaseAfterInput_c7aad2540de198ec058d3310920738ea } from '../../../components/phoneShowcase'
+import { PhoneShowcaseBeforeInput as PhoneShowcaseBeforeInput_c7aad2540de198ec058d3310920738ea } from '../../../components/phoneShowcase'
+import { PhoneShowcaseLabel as PhoneShowcaseLabel_c7aad2540de198ec058d3310920738ea } from '../../../components/phoneShowcase'
+import { PhoneShowcaseDescription as PhoneShowcaseDescription_c7aad2540de198ec058d3310920738ea } from '../../../components/phoneShowcase'
 import { IconLibrarySelectServer as IconLibrarySelectServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { MeasurementUnitsProvider as MeasurementUnitsProvider_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
@@ -82,6 +89,13 @@ export const importMap = {
   "@10x-media/fields/rsc#IconFieldServer": IconFieldServer_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#MeasurementCellServer": MeasurementCellServer_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#MeasurementFieldServer": MeasurementFieldServer_cf1583332d9c5fb967cd4249af29ce12,
+  "@10x-media/fields/rsc#PhoneNumberCellServer": PhoneNumberCellServer_cf1583332d9c5fb967cd4249af29ce12,
+  "@10x-media/fields/rsc#PhoneNumberFieldServer": PhoneNumberFieldServer_cf1583332d9c5fb967cd4249af29ce12,
+  "/components/phoneShowcase#PhoneShowcaseError": PhoneShowcaseError_c7aad2540de198ec058d3310920738ea,
+  "/components/phoneShowcase#PhoneShowcaseAfterInput": PhoneShowcaseAfterInput_c7aad2540de198ec058d3310920738ea,
+  "/components/phoneShowcase#PhoneShowcaseBeforeInput": PhoneShowcaseBeforeInput_c7aad2540de198ec058d3310920738ea,
+  "/components/phoneShowcase#PhoneShowcaseLabel": PhoneShowcaseLabel_c7aad2540de198ec058d3310920738ea,
+  "/components/phoneShowcase#PhoneShowcaseDescription": PhoneShowcaseDescription_c7aad2540de198ec058d3310920738ea,
   "@10x-media/fields/rsc#IconLibrarySelectServer": IconLibrarySelectServer_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/client#MeasurementUnitsProvider": MeasurementUnitsProvider_02043ee4f38853ef8c4ef9fd50352514,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,

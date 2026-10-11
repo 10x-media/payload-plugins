@@ -1,9 +1,9 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { aggregateFieldResponses } from '../../aggregation/aggregateResponses'
-import { FORMS_SLUG } from '../../collections/forms'
 import { pollConfigOf } from '../../form/pollState'
+import { pluginSlugsOf } from '../../plugin/collectionSlugs'
 import { bumpPollVote } from './bumpPollVote'
-import { POLL_VOTES_SLUG, RESPONDENTS_VALUE } from './votesCollection'
+import { RESPONDENTS_VALUE } from './votesCollection'
 import { transactionIDOf } from './voteTallyHook'
 
 const RECOUNT_MAX_SUBMISSIONS = 100_000
@@ -24,7 +24,13 @@ export const recountPollVotes = async (args: {
 }): Promise<void> => {
 	const { payload, formId, req } = args
 	const form = await payload
-		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
+		.findByID({
+			collection: pluginSlugsOf(payload).forms,
+			id: formId,
+			depth: 0,
+			overrideAccess: true,
+			req,
+		})
 		.catch(() => null)
 	const poll = form ? pollConfigOf(form.poll) : undefined
 	const resultsField =
@@ -52,7 +58,7 @@ export const recountPollVotes = async (args: {
 		)
 	}
 	await payload.delete({
-		collection: POLL_VOTES_SLUG,
+		collection: pluginSlugsOf(payload).pollVotes,
 		where: {
 			and: [{ form: { equals: String(formId) } }, { field: { equals: resultsField } }],
 		},

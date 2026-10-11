@@ -12,6 +12,13 @@ const globalForMongo = globalThis as typeof globalThis & {
 }
 
 /**
+ * WiredTiger preallocates 3x100 MB of journal on start, and on Windows the dbPath is never
+ * removed because `next dev` force-kills this process before the signal handler below runs.
+ * Capping the log keeps each orphaned dir around 11 MB instead of 300 MB.
+ */
+const JOURNAL_ARGS = ['--wiredTigerEngineConfigString', 'log=(file_max=10MB,prealloc=false)']
+
+/**
  * Start a throwaway in-memory MongoDB replica set for local dev when no external
  * `DATABASE_URI_MONGO` is provided, so `pnpm dev` needs no Docker or installed Mongo. A
  * replica set (not a standalone) matches how the test harness and Payload's own suite run
@@ -26,7 +33,9 @@ export const startMemoryMongo = async (): Promise<string> => {
 	}
 
 	if (!globalForMongo.__10xMediaDevMemoryMongo) {
-		globalForMongo.__10xMediaDevMemoryMongo = MongoMemoryReplSet.create({ replSet: { count: 1 } })
+		globalForMongo.__10xMediaDevMemoryMongo = MongoMemoryReplSet.create({
+			replSet: { args: JOURNAL_ARGS, count: 1 },
+		})
 
 		/**
 		 * Signals only: an `exit` listener cannot await, so stopping from there never gets past

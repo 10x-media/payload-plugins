@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { signFormContext } from '../context/formContext'
+import { DEFAULT_COLLECTION_SLUGS, stashCollectionSlugs } from '../plugin/collectionSlugs'
 import {
 	hasVotedCookie,
 	signVotedCookieValue,
@@ -9,12 +10,31 @@ import {
 } from './votedCookie'
 
 const SECRET = 'test-secret'
-const fakePayload = { secret: SECRET } as Payload
+const fakePayload = { secret: SECRET, config: {} } as unknown as Payload
+
+const configuredPayload = (options: { submissions?: string; prefix?: string }) =>
+	({
+		secret: SECRET,
+		config: {
+			custom: stashCollectionSlugs(
+				undefined,
+				{
+					...DEFAULT_COLLECTION_SLUGS,
+					...(options.submissions ? { formSubmissions: options.submissions } : {}),
+				},
+				options.prefix
+			),
+		},
+	}) as unknown as Payload
 
 describe('votedCookieName', () => {
 	it('prefixes the form id', () => {
 		expect(votedCookieName(7)).toBe('fb-voted-7')
 		expect(votedCookieName('abc123')).toBe('fb-voted-abc123')
+	})
+
+	it('uses the configured prefix when handed the payload', () => {
+		expect(votedCookieName(7, configuredPayload({ prefix: 'acme-voted-' }))).toBe('acme-voted-7')
 	})
 })
 
@@ -51,38 +71,47 @@ describe('hasVotedCookie', () => {
 		const token = signVotedCookieValue(fakePayload, 'sub-1')
 		expect(hasVotedCookie(`fb-voted-3=${token}`, 3)).toBe(true)
 	})
+
+	it('reads the configured cookie name, not the default one', () => {
+		const payload = configuredPayload({ prefix: 'acme-voted-' })
+		expect(hasVotedCookie('acme-voted-3=1', 3, payload)).toBe(true)
+		expect(hasVotedCookie('fb-voted-3=1', 3, payload)).toBe(false)
+	})
 })
 
 describe('votedSubmissionIdFromCookie', () => {
 	it('round-trips a signed submission id', () => {
 		const token = signVotedCookieValue(fakePayload, 'sub-42')
 		const header = `session=xyz; ${votedCookieName(7)}=${token}`
-		expect(votedSubmissionIdFromCookie(header, 7, SECRET)).toBe('sub-42')
+		expect(votedSubmissionIdFromCookie(header, 7, fakePayload)).toBe('sub-42')
 	})
 
 	it('preserves numeric ids as strings', () => {
 		const token = signVotedCookieValue(fakePayload, 42)
-		expect(votedSubmissionIdFromCookie(`${votedCookieName(1)}=${token}`, 1, SECRET)).toBe('42')
+		expect(votedSubmissionIdFromCookie(`${votedCookieName(1)}=${token}`, 1, fakePayload)).toBe('42')
 	})
 
 	it('returns null for the legacy boolean marker', () => {
-		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=1`, 7, SECRET)).toBeNull()
+		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=1`, 7, fakePayload)).toBeNull()
 	})
 
 	it('returns null for a missing header or cookie', () => {
-		expect(votedSubmissionIdFromCookie(null, 7, SECRET)).toBeNull()
-		expect(votedSubmissionIdFromCookie('other=1', 7, SECRET)).toBeNull()
+		expect(votedSubmissionIdFromCookie(null, 7, fakePayload)).toBeNull()
+		expect(votedSubmissionIdFromCookie('other=1', 7, fakePayload)).toBeNull()
 	})
 
 	it('rejects a tampered token', () => {
 		const token = signVotedCookieValue(fakePayload, 'sub-42')
 		const forged = `${token.slice(0, -2)}ff`
-		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=${forged}`, 7, SECRET)).toBeNull()
+		expect(
+			votedSubmissionIdFromCookie(`${votedCookieName(7)}=${forged}`, 7, fakePayload)
+		).toBeNull()
 	})
 
 	it('rejects a token signed with a different secret', () => {
-		const token = signVotedCookieValue({ secret: 'other-secret' } as Payload, 'sub-42')
-		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=${token}`, 7, SECRET)).toBeNull()
+		const other = { secret: 'other-secret', config: {} } as unknown as Payload
+		const token = signVotedCookieValue(other, 'sub-42')
+		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=${token}`, 7, fakePayload)).toBeNull()
 	})
 
 	it('rejects a validly signed token for a different relation', () => {
@@ -92,6 +121,19 @@ describe('votedSubmissionIdFromCookie', () => {
 			relationTo: 'pages',
 			value: 'sub-42',
 		})
-		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=${token}`, 7, SECRET)).toBeNull()
+		expect(votedSubmissionIdFromCookie(`${votedCookieName(7)}=${token}`, 7, fakePayload)).toBeNull()
+	})
+
+	it('binds the token to the configured submissions collection', () => {
+		const renamed = configuredPayload({ submissions: 'responses', prefix: 'acme-voted-' })
+		const token = signVotedCookieValue(renamed, 'sub-42')
+		const header = `${votedCookieName(7, renamed)}=${token}`
+		expect(votedSubmissionIdFromCookie(header, 7, renamed)).toBe('sub-42')
+		// A token issued for the default collection names a different relation, so it cannot
+		// address a row in the renamed one (ids may collide across collections).
+		const legacy = signVotedCookieValue(fakePayload, 'sub-42')
+		expect(
+			votedSubmissionIdFromCookie(`${votedCookieName(7, renamed)}=${legacy}`, 7, renamed)
+		).toBeNull()
 	})
 })

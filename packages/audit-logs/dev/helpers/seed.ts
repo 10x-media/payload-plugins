@@ -1,4 +1,7 @@
 import type { Payload } from 'payload'
+import { createLocalReq } from 'payload'
+
+import { createAuditEvent } from '../../src/index'
 
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
@@ -24,6 +27,26 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		data: { email: DEV_EMAIL, password: DEV_PASSWORD, name: 'Dev Admin' },
 	})
 	payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
+
+	// Two tenants. The dev admin reaches both through `userHasAccessToAllTenants`.
+	const alpha = await payload.create({
+		collection: 'tenants',
+		data: { name: 'Alpha', slug: 'alpha' },
+	})
+	const beta = await payload.create({ collection: 'tenants', data: { name: 'Beta', slug: 'beta' } })
+
+	// Someone to impersonate, and a member of Alpha only, so impersonating them also
+	// narrows the tenant picker. The seed writes a few entries as them under
+	// impersonation, near the end.
+	const editor = await payload.create({
+		collection: 'users',
+		data: {
+			email: 'editor@10xmedia.de',
+			password: DEV_PASSWORD,
+			name: 'Dev Editor',
+			tenants: [{ tenant: alpha.id }],
+		},
+	})
 
 	// Everything below runs as the seeded admin, so the log shows a real user
 	// rather than an empty `user` column.
@@ -79,6 +102,33 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		collection: 'posts',
 		id: post.id,
 		data: { internalNotes: 'Edited, and still invisible.', apiKey: 'sk-seed-0002' },
+		req,
+	})
+
+	// update: localized fields edited in German. The entry carries `locale: 'de'`, and
+	// only the German values are in its diff.
+	await payload.update({
+		collection: 'posts',
+		id: post.id,
+		data: {
+			summary: 'Bearbeite dieses Dokument und sieh zu, wie Einträge erscheinen.',
+			seo: { description: 'Beispielbeitrag' },
+		},
+		locale: 'de',
+		req,
+	})
+
+	// update: fields nested in a named tab and two groups, so the paths run four
+	// segments deep (`distribution.social.image.alt`) next to a two-segment one.
+	await payload.update({
+		collection: 'posts',
+		id: post.id,
+		data: {
+			distribution: {
+				channel: 'social',
+				social: { headline: 'Read the playground', image: { alt: 'Screenshot of the log' } },
+			},
+		},
 		req,
 	})
 
@@ -156,6 +206,128 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		id: tagIds[1] ?? '',
 		data: { color: '#ef4444' },
 		req: groupedReq,
+	})
+
+	// A second auth collection makes `user` polymorphic. The customer places an order,
+	// so their entries sit next to the admin's in the list with their own pill.
+	const customer = await payload.create({
+		collection: 'customers',
+		data: { email: 'customer@10xmedia.de', password: DEV_PASSWORD, name: 'Dev Customer' },
+	})
+	const customerReq = await createLocalReq(
+		{ user: { ...customer, collection: 'customers' } as never },
+		payload
+	)
+	const order = await payload.create({
+		collection: 'orders',
+		data: {
+			reference: 'ord-1001',
+			lines: [
+				{ sku: 'TEE-M', price: 25 },
+				{ sku: 'CAP', price: 15 },
+			],
+		},
+		req: customerReq,
+	})
+	await createAuditEvent(customerReq, {
+		collection: 'orders',
+		documentId: order.id,
+		eventType: 'checkout_started',
+		metadata: { cartItems: 2, channel: 'web' },
+	})
+
+	// The admin takes it from there: marking it paid fires the `order_paid` event
+	// from the orders hook, then a refund is recorded by hand.
+	const adminReq = await createLocalReq(
+		{ user: { ...user, collection: 'users' } as never },
+		payload
+	)
+	await payload.update({
+		collection: 'orders',
+		id: order.id,
+		data: { status: 'paid' },
+		req: adminReq,
+	})
+	await createAuditEvent(adminReq, {
+		collection: 'orders',
+		documentId: order.id,
+		eventType: 'order_refunded',
+		metadata: { amount: 15, reason: 'Item out of stock', sku: 'CAP' },
+	})
+
+	// Collection-level, no document: nothing to link to, the row only names the collection.
+	await createAuditEvent(adminReq, {
+		collection: 'posts',
+		eventType: 'export_downloaded',
+		metadata: { format: 'csv', rows: 2 },
+	})
+
+	// A custom event can join a group like any write.
+	await createAuditEvent(adminReq, {
+		collection: 'tags',
+		eventType: 'bulk_recolor',
+		group: 'seed-import',
+		metadata: { tags: 2 },
+	})
+
+	// Tenant-scoped writes: each entry takes its note's tenant, so the tenant view
+	// shows two entries for Alpha and one for Beta.
+	for (const [tenant, title] of [
+		[alpha.id, 'Alpha kickoff'],
+		[alpha.id, 'Alpha retro'],
+		[beta.id, 'Beta kickoff'],
+	] as const) {
+		await payload.create({ collection: 'notes', data: { tenant, title }, req })
+	}
+
+	// The per-tenant singleton: one settings document each.
+	for (const [tenant, siteName] of [
+		[alpha.id, 'Alpha site'],
+		[beta.id, 'Beta site'],
+	] as const) {
+		await payload.create({ collection: 'tenant-settings', data: { siteName, tenant }, req })
+	}
+
+	// Writes through an MCP server: `@payloadcms/plugin-mcp` sets `payloadAPI` to
+	// 'MCP', which `logs.payloadAPIs` labels and the API filter offers.
+	const mcpReq = await createLocalReq({ user: { ...user, collection: 'users' } as never }, payload)
+	;(mcpReq as { payloadAPI: string }).payloadAPI = 'MCP'
+	await payload.update({
+		collection: 'posts',
+		id: post.id,
+		data: { status: 'published' },
+		req: mcpReq,
+	})
+	await payload.create({ collection: 'tags', data: { name: 'agent-added' }, req: mcpReq })
+
+	// Writes under impersonation: the dev admin acting as the editor, the way
+	// `@10x-media/impersonation` stamps `_impersonation` on the request's user.
+	const impersonatedReq = await createLocalReq(
+		{
+			user: {
+				...editor,
+				collection: 'users',
+				_impersonation: { impersonator: { collection: 'users', id: user.id } },
+			} as never,
+		},
+		payload
+	)
+	await payload.update({
+		collection: 'posts',
+		id: post.id,
+		data: { title: 'Audit logs playground (edited as the editor)' },
+		req: impersonatedReq,
+	})
+	await payload.create({
+		collection: 'notes',
+		data: { tenant: alpha.id, title: 'Written while impersonating' },
+		req: impersonatedReq,
+	})
+	await createAuditEvent(impersonatedReq, {
+		collection: 'orders',
+		documentId: order.id,
+		eventType: 'order_refunded',
+		metadata: { amount: 5, reason: 'Goodwill credit', sku: 'TEE-M' },
 	})
 
 	const logs = await payload.count({ collection: 'audit-logs' })

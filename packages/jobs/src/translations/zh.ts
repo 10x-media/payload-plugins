@@ -28,6 +28,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.fieldId]: 'ID',
 	[keys.fieldStarted]: '开始时间',
 	[keys.fieldLeaseExpires]: '租约到期',
+	[keys.fieldDeferredBy]: '推迟方',
 	[keys.fieldScheduledFor]: '计划执行时间',
 
 	[keys.outcome]: '结果',

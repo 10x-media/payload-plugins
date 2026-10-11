@@ -1,0 +1,60 @@
+---
+title: Quick start
+description: Install document-preview, enable it on an upload collection, and open your first preview.
+---
+
+## Install
+
+```bash
+pnpm add @10x-media/document-preview@beta
+```
+
+The office renderers, the CSV parser and the Markdown renderer are regular dependencies, so there is nothing else to install. They only reach the browser when a file of their kind is opened.
+
+## Configure
+
+List the upload collections that get previews. `true` takes the defaults: a **Preview** button beside the document controls that opens a drawer, file-type icons for non-image thumbnails, and a readable file size in the list.
+
+```ts title="payload.config.ts"
+import { buildConfig } from 'payload'
+import { documentPreview } from '@10x-media/document-preview'
+
+export default buildConfig({
+  collections: [
+    {
+      slug: 'media',
+      upload: true,
+      fields: [{ name: 'alt', type: 'text' }],
+    },
+  ],
+  plugins: [
+    documentPreview({
+      collections: {
+        media: {
+          display: 'both', // the drawer button and an inline preview above the fields
+          listView: true, // a Preview column in the list view
+        },
+      },
+    }),
+  ],
+})
+```
+
+A collection that does not exist, or is not an upload collection, is a config error at startup.
+
+The plugin adds admin components, so regenerate the import map:
+
+```bash
+pnpm payload generate:importmap
+```
+
+The plugin adds no database fields: the inline preview and the list column are UI fields, so there is nothing to migrate.
+
+## Open a preview
+
+Open any document of the collection and press **Preview** beside **Save**, or, with `listView`, press **Preview** in a row of the list. The drawer shows the saved file; a replacement you have picked but not saved yet has no URL to preview.
+
+## Next
+
+- [Surfaces](/document-preview/surfaces): the drawer, the inline preview, the list column, and embedding the preview in your own components.
+- [Production](/document-preview/production): the CSP directives the viewers need, and what your file storage must send.

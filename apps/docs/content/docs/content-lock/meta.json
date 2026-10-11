@@ -1,0 +1,14 @@
+{
+	"title": "Content Lock",
+	"pages": [
+		"index",
+		"quick-start",
+		"windows",
+		"scope",
+		"enforcement",
+		"banner",
+		"jobs",
+		"configuration",
+		"i18n"
+	]
+}

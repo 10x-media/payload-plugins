@@ -8,6 +8,7 @@
 		"workers",
 		"topologies",
 		"queue-control",
+		"interruptions",
 		"testing",
 		"i18n"
 	]

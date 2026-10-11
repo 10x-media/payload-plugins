@@ -1,0 +1,23 @@
+---
+title: i18n
+description: Override or localize the document-preview admin strings.
+---
+
+Every admin-facing string (the Preview button and column, toolbar labels, page and slide positions, the info card's messages) is a typed translation under the `documentPreview:` namespace. Arabic, Chinese, English, French, German, Indonesian, Korean, Portuguese, Russian, Spanish and Ukrainian ship built in. Override or extend through the `translations` option:
+
+```ts title="payload.config.ts"
+import { documentPreview } from '@10x-media/document-preview'
+import { keys } from '@10x-media/document-preview/i18n'
+
+documentPreview({
+  collections: { media: true },
+  translations: {
+    en: { [keys.preview]: 'Open' },
+    de: { [keys.unsupported]: 'Für diesen Dateityp gibt es keine Vorschau.' },
+  },
+})
+```
+
+The list column's label is fixed per locale when the config loads, from the same translations, so an override of `keys.column` applies there too.
+
+For merge order, adding locales, and app-level overrides, see [Translations](/concepts/translations); the pattern is identical in every plugin.

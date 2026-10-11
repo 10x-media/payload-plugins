@@ -1,0 +1,59 @@
+---
+title: Production
+description: The CSP the viewers need, what file storage must send, and what the plugin costs the admin bundle.
+---
+
+## Content-Security-Policy
+
+Without a CSP there is nothing to do. With one, the admin's policy needs:
+
+| Directive | Value | For |
+|---|---|---|
+| `script-src` | `'wasm-unsafe-eval'` | The Word, Excel and PowerPoint renderers are WebAssembly. |
+| `worker-src` | `'self' blob:` | Office files are parsed in web workers. |
+| `script-src`, `style-src`, `font-src` | `https://cdn.jsdelivr.net` | Payload's code editor (Monaco) loads from jsDelivr. Payload's JSON and code fields need the same, so an admin that already shows them is set. |
+| `frame-src` | your file host | PDFs render in a frame. Same-origin uploads are covered by `'self'`. |
+
+## File headers
+
+The viewers read the URL Payload serves for the file (`doc.url`), so whatever serves it, Payload itself or a storage adapter's bucket or CDN, has to cooperate:
+
+- **`Content-Type`** must be the file's real type. A PDF served as `application/octet-stream` downloads instead of showing.
+- **`Content-Disposition`** must be `inline` (or absent) for PDFs. `attachment` makes the browser download the file instead of framing it.
+- **Framing**: a PDF on another origin must not be served with `X-Frame-Options: DENY` or a `frame-ancestors` that excludes the admin.
+
+### CORS for files on another origin
+
+Images, video, audio and PDF load through the element itself and need no CORS. CSV, text, Markdown, Word, Excel and PowerPoint are fetched into the browser, so a bucket or CDN on another origin must allow the admin's origin:
+
+```json title="S3 CORS configuration"
+[
+  {
+    "AllowedOrigins": ["https://admin.example.com"],
+    "AllowedMethods": ["GET"],
+    "AllowedHeaders": ["*"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Requests use the fetch default for credentials: a same-origin Payload route sees the session cookie, and a public bucket answering `Access-Control-Allow-Origin: *` works without credentials. A blocked request shows the info card, and the browser console names the CORS error.
+
+## Bundle
+
+Measured on a production build with Playwright, recording every script and WebAssembly request:
+
+| Page | Loaded |
+|---|---|
+| Any admin page | 18 KB gzip for the plugin's core: the provider, the buttons, the drawer, the info card. No viewer. |
+| First Word file opened | 308 KB JavaScript, 441 KB WebAssembly |
+| First Excel file opened | 727 KB JavaScript, 1.6 MB WebAssembly |
+| First PowerPoint file opened | 204 KB JavaScript, 223 KB WebAssembly |
+| First CSV opened | 15 KB |
+| First Markdown file opened | 43 KB |
+
+Each viewer is its own chunk, and its WebAssembly is a separate hashed asset served from your app's `_next/static`, not a CDN; browsers cache both. Opening the same kind of file again loads nothing.
+
+## File icons
+
+The [file icon](/document-preview/file-icons) endpoint answers signed-in users only and is privately cached for a year, with a content hash in its URL. A REST client without a session sees `thumbnailURL` values it cannot load; turn icons off with `fileIcons: false` if a public consumer relies on `thumbnailURL`.

@@ -10,13 +10,11 @@ import {
 	ESSENTIAL_ACTION_UNCERTAIN_CONTEXT_KEY,
 } from '../actions/dispatchContext'
 import { pollConfigOf } from '../form/pollState'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { formIdOf } from './formIdOf'
 import { VOTE_CHANGE_CONTEXT_KEY, votedSubmissionIdFromCookie } from './votedCookie'
-
-const FORM_SUBMISSIONS_SLUG = 'form-submissions'
-const FORMS_SLUG = 'forms'
 
 /** Marks the vote-submit endpoint in the sanitized endpoint list (`custom.formBuilder`). */
 export const VOTE_SUBMIT_ENDPOINT_TAG = 'vote-submit'
@@ -40,23 +38,20 @@ export const resolveVoteChangeTarget = async (args: {
 	if (formId == null) {
 		return null
 	}
-	const submissionId = votedSubmissionIdFromCookie(
-		req.headers?.get('cookie'),
-		formId,
-		req.payload.secret
-	)
+	const submissionId = votedSubmissionIdFromCookie(req.headers?.get('cookie'), formId, req.payload)
 	if (submissionId == null) {
 		return null
 	}
+	const slugs = pluginSlugsOf(req.payload)
 	const form = await req.payload
-		.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
+		.findByID({ collection: slugs.forms, id: formId, depth: 0, overrideAccess: true, req })
 		.catch(() => null)
 	if (form?.pollEnabled !== true || pollConfigOf(form.poll)?.allowChange !== true) {
 		return null
 	}
 	const submission = await req.payload
 		.findByID({
-			collection: FORM_SUBMISSIONS_SLUG,
+			collection: slugs.formSubmissions,
 			id: submissionId,
 			depth: 0,
 			overrideAccess: true,
@@ -74,8 +69,8 @@ export const resolveVoteChangeTarget = async (args: {
 }
 
 /**
- * Custom root `POST /form-submissions` endpoint. Payload matches a collection's custom endpoints
- * ahead of its built-in REST routes, so this handler sees every REST create first: when the posted
+ * Custom root `POST` endpoint on the submissions collection (`/form-submissions` by default).
+ * Payload matches a collection's custom endpoints ahead of its built-in REST routes, so this handler sees every REST create first: when the posted
  * form is an `allowChange` poll and the voted cookie identifies the caller's submission, it turns
  * the request into an in-place update (create-grade hooks opt in via the context flag); otherwise
  * it delegates to the stock create handler found in the same sanitized endpoint list, keeping the
@@ -91,9 +86,10 @@ export const buildVoteSubmitEndpoint = (): Endpoint => {
 			form?: number | string
 			values?: unknown
 		}
+		const submissionsSlug = pluginSlugsOf(req.payload).formSubmissions
 		const target = await resolveVoteChangeTarget({ req, formId: data.form })
 		if (!target) {
-			const endpoints = req.payload.collections[FORM_SUBMISSIONS_SLUG]?.config.endpoints
+			const endpoints = req.payload.collections[submissionsSlug]?.config.endpoints
 			const registered: Endpoint[] = Array.isArray(endpoints) ? endpoints : []
 			// Next root-POST match excluding our own tag (never handler identity: a host-wrapped
 			// handler would find itself and recurse). First-match mirrors handleEndpoints routing,
@@ -148,7 +144,7 @@ export const buildVoteSubmitEndpoint = (): Endpoint => {
 			req?: PayloadRequest
 		}) => Promise<unknown>
 		const doc = await update({
-			collection: FORM_SUBMISSIONS_SLUG,
+			collection: submissionsSlug,
 			id: target.submissionId,
 			data: { form: data.form, values: data.values },
 			depth: 0,

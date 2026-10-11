@@ -1,0 +1,22 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "conversation-channel-tabs",
+  "title": "Conversation channel tabs",
+  "author": "10x Media GmbH <https://github.com/10x-media>",
+  "description": "One tab per readable channel, with unread counts.",
+  "dependencies": [
+    "@10x-media/conversations"
+  ],
+  "registryDependencies": [
+    "https://docs.10xmedia.de/r/conversations/conversation-ui.json"
+  ],
+  "files": [
+    {
+      "path": "conversations/conversation-channel-tabs.tsx",
+      "content": "'use client'\n\nimport { type ChannelView, resolveLabel } from '@10x-media/conversations/react'\nimport { GlobeIcon, LockIcon } from 'lucide-react'\n\nimport { cn } from '@/lib/utils'\n\nimport { useConversationUI } from './conversation-ui'\n\nexport type ConversationChannelTabsProps = {\n\tactive: string\n\tchannels: ChannelView[]\n\tclassName?: string\n\tonChange: (slug: string) => void\n\t/** False with `reads: false` on the server: no unread counts. */\n\treads?: boolean\n}\n\n/** The readable channels as tabs, each with its unread count. Nothing with one channel. */\nexport function ConversationChannelTabs({\n\tactive,\n\tchannels,\n\tclassName,\n\tonChange,\n\treads = true,\n}: ConversationChannelTabsProps) {\n\tconst { locale } = useConversationUI()\n\tif (channels.length < 2) return null\n\treturn (\n\t\t<div className={cn('flex gap-1 border-b px-3', className)} role=\"tablist\">\n\t\t\t{channels.map((channel) => {\n\t\t\t\tconst selected = channel.slug === active\n\t\t\t\tconst Icon = channel.cue?.tone === 'warning' ? GlobeIcon : LockIcon\n\t\t\t\treturn (\n\t\t\t\t\t<button\n\t\t\t\t\t\taria-selected={selected}\n\t\t\t\t\t\tclassName={cn(\n\t\t\t\t\t\t\t'-mb-px flex items-center gap-1.5 border-b-2 border-transparent px-2 py-2 text-muted-foreground text-sm hover:text-foreground',\n\t\t\t\t\t\t\tselected && 'border-primary text-foreground'\n\t\t\t\t\t\t)}\n\t\t\t\t\t\tkey={channel.slug}\n\t\t\t\t\t\tonClick={() => onChange(channel.slug)}\n\t\t\t\t\t\trole=\"tab\"\n\t\t\t\t\t\ttype=\"button\"\n\t\t\t\t\t>\n\t\t\t\t\t\t{channel.cue ? <Icon className=\"size-3.5\" /> : null}\n\t\t\t\t\t\t{resolveLabel(channel.label, locale)}\n\t\t\t\t\t\t{reads && channel.unread > 0 && !selected ? (\n\t\t\t\t\t\t\t<span className=\"rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground\">\n\t\t\t\t\t\t\t\t{channel.unread > 99 ? '99+' : channel.unread}\n\t\t\t\t\t\t\t</span>\n\t\t\t\t\t\t) : null}\n\t\t\t\t\t</button>\n\t\t\t\t)\n\t\t\t})}\n\t\t</div>\n\t)\n}\n",
+      "type": "registry:component",
+      "target": "components/conversations/conversation-channel-tabs.tsx"
+    }
+  ],
+  "type": "registry:component"
+}

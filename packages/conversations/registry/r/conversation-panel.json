@@ -1,0 +1,27 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "conversation-panel",
+  "title": "Conversation panel",
+  "author": "10x Media GmbH <https://github.com/10x-media>",
+  "description": "A whole conversation: channel tabs, feed, composer, and threads opening in place with a back button.",
+  "dependencies": [
+    "@10x-media/conversations"
+  ],
+  "registryDependencies": [
+    "button",
+    "https://docs.10xmedia.de/r/conversations/conversation-ui.json",
+    "https://docs.10xmedia.de/r/conversations/conversation-channel-tabs.json",
+    "https://docs.10xmedia.de/r/conversations/conversation-feed.json",
+    "https://docs.10xmedia.de/r/conversations/conversation-composer.json",
+    "https://docs.10xmedia.de/r/conversations/conversation-thread.json"
+  ],
+  "files": [
+    {
+      "path": "conversations/conversation-panel.tsx",
+      "content": "'use client'\n\nimport { resolveLabel, useChatPanel } from '@10x-media/conversations/react'\nimport { ArrowLeftIcon } from 'lucide-react'\nimport type { ReactNode } from 'react'\n\nimport { Button } from '@/components/ui/button'\nimport { cn } from '@/lib/utils'\n\nimport { ConversationChannelTabs } from './conversation-channel-tabs'\nimport { ConversationComposer } from './conversation-composer'\nimport { ConversationFeed } from './conversation-feed'\nimport { ConversationThread } from './conversation-thread'\nimport { useConversationUI } from './conversation-ui'\n\nexport type ConversationPanelProps = {\n\tclassName?: string\n\t/** The conversation key, e.g. `collectionKey('tickets', id)`. */\n\tconversationKey: string\n\t/** Above the tabs, e.g. the ticket's subject. */\n\theader?: ReactNode\n}\n\n/**\n * One conversation, complete: channel tabs, the feed, the composer with the\n * channel's cue, and threads opening in place with a way back. Give it a\n * height; the feed scrolls inside. Needs a `ChatProvider` above it.\n */\nexport function ConversationPanel({ className, conversationKey, header }: ConversationPanelProps) {\n\tconst { labels, locale } = useConversationUI()\n\tconst panel = useChatPanel({ conversationKey })\n\tconst { current, thread } = panel\n\n\treturn (\n\t\t<div\n\t\t\tclassName={cn('flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card', className)}\n\t\t>\n\t\t\t{header ? <div className=\"border-b px-4 py-3\">{header}</div> : null}\n\t\t\t{thread && current ? (\n\t\t\t\t<>\n\t\t\t\t\t<div className=\"flex items-center gap-2 border-b px-2 py-1.5\">\n\t\t\t\t\t\t<Button onClick={panel.closeThread} size=\"icon-sm\" variant=\"ghost\">\n\t\t\t\t\t\t\t<ArrowLeftIcon />\n\t\t\t\t\t\t</Button>\n\t\t\t\t\t\t<span className=\"font-medium text-sm\">{labels.thread}</span>\n\t\t\t\t\t\t<span className=\"text-muted-foreground text-xs\">\n\t\t\t\t\t\t\t{resolveLabel(current.label, locale)}\n\t\t\t\t\t\t</span>\n\t\t\t\t\t</div>\n\t\t\t\t\t<ConversationThread\n\t\t\t\t\t\tauthors={panel.conversation.authors}\n\t\t\t\t\t\tchannel={current}\n\t\t\t\t\t\troot={thread}\n\t\t\t\t\t\tviewer={panel.viewer}\n\t\t\t\t\t/>\n\t\t\t\t</>\n\t\t\t) : (\n\t\t\t\t<>\n\t\t\t\t\t<ConversationChannelTabs\n\t\t\t\t\t\tactive={current?.slug ?? ''}\n\t\t\t\t\t\tchannels={panel.channels}\n\t\t\t\t\t\tonChange={panel.setChannel}\n\t\t\t\t\t\treads={panel.reads}\n\t\t\t\t\t/>\n\t\t\t\t\t{current ? (\n\t\t\t\t\t\t<>\n\t\t\t\t\t\t\t<ConversationFeed\n\t\t\t\t\t\t\t\tconversation={panel.conversation}\n\t\t\t\t\t\t\t\tkey={`feed:${current.slug}`}\n\t\t\t\t\t\t\t\tonOpenThread={panel.openThread}\n\t\t\t\t\t\t\t\treadOnly={!current.canCreate}\n\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t\t<div className=\"p-3 pt-0\">\n\t\t\t\t\t\t\t\t<ConversationComposer\n\t\t\t\t\t\t\t\t\tchannel={current.slug}\n\t\t\t\t\t\t\t\t\tconversationKey={conversationKey}\n\t\t\t\t\t\t\t\t\tcue={\n\t\t\t\t\t\t\t\t\t\tcurrent.cue\n\t\t\t\t\t\t\t\t\t\t\t? { label: resolveLabel(current.cue.label, locale), tone: current.cue.tone }\n\t\t\t\t\t\t\t\t\t\t\t: null\n\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\tcueAction={\n\t\t\t\t\t\t\t\t\t\tpanel.other\n\t\t\t\t\t\t\t\t\t\t\t? {\n\t\t\t\t\t\t\t\t\t\t\t\t\tlabel: labels.switchTo(resolveLabel(panel.other.label, locale)),\n\t\t\t\t\t\t\t\t\t\t\t\t\tonClick: () => panel.setChannel(panel.other?.slug ?? ''),\n\t\t\t\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\t\t\t: null\n\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\tdisabledReason={current.canCreate ? undefined : labels.readOnly}\n\t\t\t\t\t\t\t\t\tkey={`composer:${current.slug}`}\n\t\t\t\t\t\t\t\t/>\n\t\t\t\t\t\t\t</div>\n\t\t\t\t\t\t</>\n\t\t\t\t\t) : panel.loading ? (\n\t\t\t\t\t\t<div className=\"flex-1 animate-pulse bg-muted/40\" />\n\t\t\t\t\t) : null}\n\t\t\t\t</>\n\t\t\t)}\n\t\t</div>\n\t)\n}\n",
+      "type": "registry:component",
+      "target": "components/conversations/conversation-panel.tsx"
+    }
+  ],
+  "type": "registry:block"
+}

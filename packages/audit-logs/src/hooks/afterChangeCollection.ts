@@ -5,6 +5,7 @@ import { REDACTED } from '../types'
 import { anonymizeDoc } from '../utilities/anonymize'
 import type { FieldMap } from '../utilities/buildFieldMap'
 import { computeDiff, normalizeSnapshot } from '../utilities/diff'
+import { impersonatorRelationship } from '../utilities/impersonator'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { extractTenantId } from '../utilities/tenant'
 import { writeAuditLog } from '../utilities/writeAuditLog'
@@ -20,6 +21,8 @@ export type AuditLogAfterChangeOptions = {
 	fieldMap?: FieldMap
 	groupContextKey?: string
 	isUserPolymorphic: boolean
+	/** False when the log collection has no `impersonator` field. */
+	recordImpersonator: boolean
 	isSelfTenant?: boolean
 	operations: Array<'create' | 'delete' | 'update'>
 	shouldLog?: ShouldLogFunction
@@ -76,6 +79,9 @@ export const afterChangeCollectionAuditLog =
 			? options.isUserPolymorphic
 				? { relationTo: req.user.collection, value: req.user.id }
 				: req.user.id
+			: undefined
+		const impersonator = options.recordImpersonator
+			? impersonatorRelationship(req.user, options.isUserPolymorphic)
 			: undefined
 		const ipAddress = options.collectIpAddress ? getClientIP(req) : undefined
 		const userAgent = options.collectUserAgent ? getUserAgent(req) : undefined
@@ -148,6 +154,7 @@ export const afterChangeCollectionAuditLog =
 					relationTo: options.collectionSlug,
 					documentId,
 					...(userValue !== undefined && { user: userValue }),
+					...(impersonator !== undefined && { impersonator }),
 					...(req.locale && { locale: req.locale }),
 					payloadAPI: req.payloadAPI,
 					...(ipAddress && { ipAddress }),
@@ -194,6 +201,7 @@ export const afterChangeCollectionAuditLog =
 				relationTo: options.collectionSlug,
 				documentId,
 				...(userValue !== undefined && { user: userValue }),
+				...(impersonator !== undefined && { impersonator }),
 				...(req.locale && { locale: req.locale }),
 				payloadAPI: req.payloadAPI,
 				...(ipAddress && { ipAddress }),

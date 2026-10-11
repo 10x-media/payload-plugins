@@ -16,11 +16,17 @@ export interface MongoTestDb {
 const PORT_IN_USE = /already in use/i
 const MAX_START_ATTEMPTS = 5
 
+/**
+ * WiredTiger preallocates 3x100 MB of journal per mongod, so every dbPath left behind by an
+ * interrupted run or a failed start costs 300 MB. Capping the log brings that to about 11 MB.
+ */
+const JOURNAL_ARGS = ['--wiredTigerEngineConfigString', 'log=(file_max=10MB,prealloc=false)']
+
 const createReplSet = async (dbName: string): Promise<MongoMemoryReplSet> => {
 	let lastError: unknown
 	for (let attempt = 1; attempt <= MAX_START_ATTEMPTS; attempt++) {
 		try {
-			return await MongoMemoryReplSet.create({ replSet: { count: 1, dbName } })
+			return await MongoMemoryReplSet.create({ replSet: { args: JOURNAL_ARGS, count: 1, dbName } })
 		} catch (error) {
 			lastError = error
 			if (!(error instanceof Error) || !PORT_IN_USE.test(error.message)) {

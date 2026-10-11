@@ -256,7 +256,45 @@ The plugin's built-in redirect handling reads `redirect.url` and `redirect.refer
 
 ## Collection overrides
 
-The plugin manages two Payload collections, `forms` and `form-submissions`. Both accept an `overrides` option that lets you extend them in a way that is explicit and predictable, without using a deep-merge utility that can silently drop plugin-critical config. (The [uploads collection](/form-builder/uploads) needs no override seam: it is yours to begin with.)
+The plugin manages two Payload collections, `forms` and `form-submissions` (plus the hidden `form-poll-votes` tally, overridden through `poll.votes.overrides`). Both accept an `overrides` option that lets you extend them in a way that is explicit and predictable, without using a deep-merge utility that can silently drop plugin-critical config. (The [uploads collection](/form-builder/uploads) needs no override seam: it is yours to begin with.)
+
+## Renaming collections
+
+Every collection the plugin registers takes its slug from its override. Use this when a host already has a `forms` collection, or when the admin should say "Surveys" and the API should match:
+
+```ts title="payload.config.ts"
+formBuilder({
+  overrides: {
+    forms: { slug: 'surveys' },
+    formSubmissions: { slug: 'responses' },
+  },
+  poll: {
+    votes: { overrides: { slug: 'survey-tallies' } },
+    cookiePrefix: 'acme-voted-',
+  },
+})
+```
+
+The plugin resolves the slugs once at boot and uses them everywhere it touches its own collections: the submissions' relationship to their form, the post-submit actions job, pruning, the vote tally (including its raw Mongo and Postgres writes), poll results and outcomes, the `notAlreadySubmitted` rule, and the signed voted cookie. Two plugin collections resolving to the same slug is a boot error. `poll.cookiePrefix` is separate from the slugs: it renames the `fb-voted-{formId}` cookie, for hosts whose cookie names follow a convention or feed a consent tool.
+
+The browser components cannot see your server config, so give `<Form>` the same slugs. The prop also reaches `<Poll>` and the shadcn registry form, which pass their props through:
+
+```tsx
+<Form form={form} collections={{ forms: 'surveys', formSubmissions: 'responses' }} />
+```
+
+A custom `onSubmit` receives the submissions slug as `input.collection`, so a handler that forwards its input to `submitForm` keeps working unchanged. The admin components already derive the slug from the document they are mounted in and need nothing.
+
+Server code of your own reads the live slugs with `collectionSlugsOf(payload)` instead of hardcoding them. It returns the defaults when the plugin is not installed:
+
+```ts
+import { collectionSlugsOf } from '@10x-media/form-builder'
+
+const { formSubmissions } = collectionSlugsOf(payload)
+const recent = await payload.find({ collection: formSubmissions, limit: 10 })
+```
+
+Renaming on a live database is a migration, not a config tweak. Existing rows stay under the old collection, and voted cookies issued before the change stop matching: a renamed cookie prefix is a different cookie, and a signed allow-change cookie names the collection it was issued for, so a re-vote after the rename counts as a new voter.
 
 ## The spread convention
 
@@ -351,6 +389,6 @@ formBuilder({
 })
 ```
 
-`CollectionOverrides` is `{ fields?: FieldsOverride } & Partial<Omit<CollectionConfig, 'fields'>>`.
+`CollectionOverrides` is `{ fields?: FieldsOverride } & Partial<Omit<CollectionConfig, 'fields'>>`. Its `slug` renames the collection (see [Renaming collections](#renaming-collections)).
 
 `FieldsOverride` is `(args: { defaultFields: Field[] }) => Field[]`.

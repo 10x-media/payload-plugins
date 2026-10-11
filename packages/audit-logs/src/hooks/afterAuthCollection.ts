@@ -7,6 +7,7 @@ import type {
 import { AuthenticationError, LockedAuth, UnverifiedEmail } from 'payload'
 
 import type { FailedLoginOptions, FailedLoginReason } from '../types'
+import { impersonatorRelationship } from '../utilities/impersonator'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { writeAuditLog } from '../utilities/writeAuditLog'
 
@@ -17,6 +18,8 @@ export type AuthAuditOptions = {
 	collectUserAgent: boolean
 	groupContextKey?: string
 	isUserPolymorphic: boolean
+	/** False when the log collection has no `impersonator` field. */
+	recordImpersonator: boolean
 }
 
 /** Nothing an anonymous caller submits reaches a row at full length. */
@@ -64,6 +67,9 @@ export const afterLoginAuditLog =
 		const userValue = options.isUserPolymorphic
 			? { relationTo: options.collectionSlug, value: user.id }
 			: user.id
+		const impersonator = options.recordImpersonator
+			? impersonatorRelationship(user, options.isUserPolymorphic)
+			: undefined
 
 		const ipAddress = options.collectIpAddress ? getClientIP(req) : undefined
 		const userAgent = options.collectUserAgent ? getUserAgent(req) : undefined
@@ -80,7 +86,7 @@ export const afterLoginAuditLog =
 				relationTo: options.collectionSlug,
 				documentId: String(user.id),
 				user: userValue,
-				...(req.locale && { locale: req.locale }),
+				...(impersonator !== undefined && { impersonator }),
 				payloadAPI: req.payloadAPI,
 				...(ipAddress && { ipAddress }),
 				...(userAgent && { userAgent }),
@@ -112,7 +118,6 @@ export const afterForgotPasswordAuditLog =
 				operation: 'auth',
 				eventType: 'forgot_password',
 				relationTo: options.collectionSlug,
-				...(req.locale && { locale: req.locale }),
 				payloadAPI: req.payloadAPI,
 				...(ipAddress && { ipAddress }),
 				...(userAgent && { userAgent }),
@@ -161,7 +166,6 @@ export const afterErrorFailedLoginAuditLog =
 				operation: 'auth',
 				eventType: 'failed_login',
 				relationTo: options.collectionSlug,
-				...(req.locale && { locale: req.locale }),
 				payloadAPI: req.payloadAPI,
 				...(ipAddress && { ipAddress }),
 				...(userAgent && { userAgent }),

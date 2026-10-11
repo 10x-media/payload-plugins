@@ -253,6 +253,63 @@ describe('Terminal Submit routes to the first invalid step', () => {
 	})
 })
 
+describe('Focus requests across back-to-back commits', () => {
+	// React flushes a commit's effects in a later task, or just before the next render if one is
+	// scheduled first. Clicking Submit from a MutationObserver callback lands between the advance's
+	// commit and its effect flush, so the advance's late effect runs after Submit already asked for
+	// the first invalid field: it must leave that request for the render it belongs to.
+	it('focuses the routed-back invalid field when Submit is clicked before the advance effect flushed', async () => {
+		const fields: FormFieldInstance[] = [
+			{
+				blockType: 'text',
+				name: 'first',
+				label: 'First',
+				required: true,
+				validateWhen: { plan: { equals: 'pro' } },
+			},
+			{
+				blockType: 'select',
+				name: 'plan',
+				label: 'Plan',
+				options: [
+					{ label: 'Free', value: 'free' },
+					{ label: 'Pro', value: 'pro' },
+				],
+			},
+			{ blockType: 'text', name: 'notes', label: 'Notes' },
+		]
+		const flow: FormFlow = {
+			steps: [
+				{ id: 's1', fields: ['first'], next: 's2' },
+				{ id: 's2', fields: ['plan'], next: 's3' },
+				{ id: 's3', fields: ['notes'] },
+			],
+		}
+		const onSubmit = ok()
+		render(<Form form={doc(fields, flow)} onSubmit={onSubmit} />)
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+		fireEvent.change(await findByLabel('Plan'), { target: { value: 'pro' } })
+		const form = document.querySelector('form')
+		if (!form) throw new Error('form not rendered')
+		const clicked = new Promise<void>((resolve) => {
+			const observer = new MutationObserver(() => {
+				const submit = screen.queryByRole('button', { name: 'Submit' })
+				if (submit) {
+					observer.disconnect()
+					submit.click()
+					resolve()
+				}
+			})
+			observer.observe(form, { childList: true, subtree: true })
+		})
+		fireEvent.click(screen.getByRole('button', { name: 'Next' }))
+		await clicked
+		const first = await findByLabel('First')
+		await waitFor(() => expect(document.activeElement).toBe(first))
+		expect(onSubmit).not.toHaveBeenCalled()
+	})
+})
+
 describe('Focus and accessibility on step transitions', () => {
 	it('moves focus into the new step region on advance and on back', async () => {
 		render(<Form form={doc(twoStepFields, twoStepFlow)} onSubmit={ok()} />)

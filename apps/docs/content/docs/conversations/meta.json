@@ -1,0 +1,19 @@
+{
+	"title": "Conversations",
+	"pages": [
+		"index",
+		"quick-start",
+		"concepts",
+		"access",
+		"messages",
+		"rich-text",
+		"extensions",
+		"admin-ui",
+		"website",
+		"transport",
+		"recipes",
+		"configuration",
+		"production",
+		"i18n"
+	]
+}

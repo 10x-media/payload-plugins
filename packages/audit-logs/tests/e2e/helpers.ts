@@ -45,6 +45,8 @@ export const gotoLogs = async (page: Page, query = ''): Promise<void> => {
 export const rows = (page: Page): Locator => page.locator('.al-row')
 
 /** The clickable summary line of a log row; expands to reveal the diff. */
-export const rowSummary = (row: Locator): Locator => row.locator('.al-row__summary')
+// The toggle is a button stretched over the summary, so the row's links stay clickable.
+export const rowSummary = (row: Locator): Locator => row.locator('.al-row__hit')
 
-export const filterPills = (page: Page): Locator => page.locator('.al-filterpill')
+// A filter pill that narrows the list, as opposed to one still reading All.
+export const filterPills = (page: Page): Locator => page.locator('.al-choice--active')

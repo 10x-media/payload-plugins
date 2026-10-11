@@ -28,6 +28,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.fieldId]: 'المعرّف',
 	[keys.fieldStarted]: 'تم البدء',
 	[keys.fieldLeaseExpires]: 'انتهاء صلاحية الحجز',
+	[keys.fieldDeferredBy]: 'مؤجَّل بواسطة',
 	[keys.fieldScheduledFor]: 'مجدولة في',
 
 	[keys.outcome]: 'النتيجة',

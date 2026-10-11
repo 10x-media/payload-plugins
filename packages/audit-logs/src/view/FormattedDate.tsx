@@ -1,20 +1,30 @@
 'use client'
 
-import { ShimmerEffect } from '@payloadcms/ui'
-import { useEffect, useState } from 'react'
+import { useConfig } from '@payloadcms/ui'
+import { formatDate } from '@payloadcms/ui/shared'
+import { useTranslation } from '../translations/useTranslation'
 
-import { formatDate } from './utils'
-
+/**
+ * The entry's time as Payload's list cells show dates: `admin.dateFormat`, in the
+ * admin's language. The exact time to the second is on hover. Rendered straight
+ * away like those cells; the server's time zone may differ from the browser's for
+ * the first paint, which is what the hydration warning is silenced for.
+ */
 export function FormattedDate({ iso }: { iso: string }) {
-	const [label, setLabel] = useState<string | null>(null)
+	const { i18n } = useTranslation()
+	const {
+		config: {
+			admin: { dateFormat },
+		},
+	} = useConfig()
 
-	useEffect(() => {
-		setLabel(formatDate(iso))
-	}, [iso])
-
-	if (label === null) {
-		return <ShimmerEffect height={12} width={120} />
-	}
-
-	return <span className="al-row__time">{label}</span>
+	return (
+		<span
+			className="al-row__time"
+			suppressHydrationWarning
+			title={formatDate({ date: iso, i18n, pattern: 'PPpp' })}
+		>
+			{formatDate({ date: iso, i18n, pattern: dateFormat })}
+		</span>
+	)
 }

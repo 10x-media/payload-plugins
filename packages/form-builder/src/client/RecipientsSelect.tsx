@@ -29,7 +29,12 @@ import { toStaticLabel } from './toStaticLabel'
 
 export type RecipientsSelectProps = {
 	path?: string
-	field?: { label?: unknown; required?: boolean; admin?: { description?: unknown; width?: string } }
+	field?: {
+		label?: unknown
+		localized?: boolean
+		required?: boolean
+		admin?: { description?: unknown; width?: string }
+	}
 	label?: unknown
 	readOnly?: boolean
 	/** Endpoint subpath supplying preset address options (e.g. `'departments'`); omit for none. */
@@ -221,7 +226,14 @@ export const RecipientsSelect = (props: RecipientsSelectProps) => {
 		>
 			<RenderCustomComponent
 				CustomComponent={Label}
-				Fallback={<FieldLabel label={label} path={path} required={props.field?.required} />}
+				Fallback={
+					<FieldLabel
+						label={label}
+						localized={props.field?.localized}
+						path={path}
+						required={props.field?.required}
+					/>
+				}
 			/>
 			<div className="field-type__wrap">
 				<RenderCustomComponent

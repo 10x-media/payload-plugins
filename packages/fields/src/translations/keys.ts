@@ -50,6 +50,14 @@ export const keys = {
 	selectUnit: 'fields:selectUnit',
 	measurementBelowMin: 'fields:measurementBelowMin',
 	measurementAboveMax: 'fields:measurementAboveMax',
+	selectCountry: 'fields:selectCountry',
+	searchCountries: 'fields:searchCountries',
+	noCountriesFound: 'fields:noCountriesFound',
+	phoneRequired: 'fields:phoneRequired',
+	invalidPhoneNumber: 'fields:invalidPhoneNumber',
+	phoneNotMobile: 'fields:phoneNotMobile',
+	clearPhoneNumber: 'fields:clearPhoneNumber',
+	phoneCountryFor: 'fields:phoneCountryFor',
 } as const
 
 export type TranslationKey = (typeof keys)[keyof typeof keys]

@@ -1,0 +1,84 @@
+---
+title: Viewers
+description: The built-in viewer for every format, what each loads, and its limits.
+---
+
+| Format | Mime types | Viewer | Loaded on first open (gzip) |
+|---|---|---|---|
+| Images | `image/jpeg`, `png`, `gif`, `webp`, `avif`, `svg+xml`, `bmp`, icons | Zoom and pan | 1 KB |
+| Video, audio | `video/*`, `audio/*` | The browser's player | 1 KB |
+| PDF | `application/pdf` | The browser's PDF viewer | 1 KB |
+| CSV, TSV | `text/csv`, `text/tab-separated-values` | Virtualized table | 15 KB |
+| Text and code | `text/*`, JSON, XML, YAML, JavaScript, SQL | Payload's code editor | 1 KB, plus the editor |
+| Markdown | `text/markdown` | Rendered, with GFM tables | 43 KB |
+| Word | `.docx` | extend, read-only | about 750 KB |
+| Excel | `.xlsx`, `.xlsm`, `.xls` | extend, read-only | about 2.3 MB |
+| PowerPoint | `.pptx`, `.ppt` | extend, read-only | about 430 KB |
+
+The sizes were measured on a production build of the dev app, JavaScript and WebAssembly together; opening a second file of the same kind loads nothing. Anything else gets the [info card](#info-card). To change the viewer for a mime type, see [custom viewers](/document-preview/custom-viewers).
+
+## Images
+
+Fits the image to the preview, then zooms around the pointer with the mouse wheel or the toolbar, and pans by dragging. **Fit to view** and **Actual size** (100%, centered) are one click away, and a double click toggles between them. Zooming out stops a little below the fitted size. Raster images never upscale past 100% when fitted; SVG fills the preview. SVG renders as an image, so scripts inside it never run.
+
+<Screenshot src="/images/document-preview/image.webp" width={720} alt="An image fitted in the preview drawer over a checkerboard background, with zoom, Fit to view and Actual size in the toolbar." />
+
+## Video and audio
+
+The browser's native players, so playback streams with range requests and needs no extra download. Video fills the preview on black. Formats the browser cannot decode show the info card.
+
+## PDF
+
+The browser's built-in PDF viewer in a frame, with its own search, print and zoom, for no bundle cost. Browsers without one (Android Chrome) show a card with **Open in new tab** instead of an empty frame. Your storage must serve PDFs `inline`; see [production](/document-preview/production#file-headers).
+
+## CSV and TSV
+
+A table virtualized on both axes, so 120,000 rows or 600 columns scroll smoothly. The first row is the header and stays in view, row numbers stay on the left, and columns size to their content. The delimiter is detected; `.tsv` uses tabs. Files up to 20 MB are parsed.
+
+<Screenshot src="/images/document-preview/csv.webp" width={720} alt="A CSV in a virtualized table: a sticky header, row numbers, long notes truncated, Cyrillic and Chinese names, and a footer reading 2,000 rows and 30 columns." />
+
+## Text and code
+
+Payload's own code editor (Monaco, the one behind JSON fields), read-only: syntax highlighting by file extension, line numbers, folding and search with <kbd>Ctrl</kbd>+<kbd>F</kbd>. JSON is re-indented for reading. Files up to 2 MB.
+
+<Screenshot src="/images/document-preview/code.webp" width={720} alt="A YAML file in the code editor with line numbers and syntax highlighting." />
+
+## Markdown
+
+Rendered the way it reads, with GitHub-flavored tables, task lists and strikethrough, in the admin's typography. Links open in a new tab. Raw HTML in the file is not rendered and `javascript:` links are dropped, so an uploaded file cannot run script in the admin. Files up to 2 MB.
+
+<Screenshot src="/images/document-preview/markdown.webp" width={720} alt="A Markdown file rendered with a heading, a table of viewers, a task list, a quote and a code block." />
+
+## Word
+
+Pages laid out as Word lays them out: embedded fonts, lists, tables, page breaks, headers and footers. The toolbar shows the current page and zoom (**Fit width**, **Whole page**, or a percentage; <kbd>Ctrl</kbd>+wheel or a pinch also zooms). The page rail on the left jumps to any page.
+
+<Screenshot src="/images/document-preview/docx-pages.webp" width={720} alt="A Word document with the page rail open: page thumbnails on the left, the current one outlined, and the page beside them." />
+
+## Excel
+
+The workbook as Excel shows it, formulas computed, with charts and images. A formula bar shows the selected cell's address and its formula or value, sheet tabs sit along the bottom, and zoom is beside them. Legacy `.xls` works too.
+
+<Screenshot src="/images/document-preview/xlsx.webp" width={720} alt="An Excel workbook with styled header rows, a formula bar on top and sheet tabs along the bottom." />
+
+## PowerPoint
+
+Every slide in one scrolling column, with a slide rail, previous and next, and the same zoom as Word.
+
+<Screenshot src="/images/document-preview/pptx.webp" width={720} alt="A presentation with the slide rail on the left and the first slide, a title over a mountain photo, beside it." />
+
+## Info card
+
+Shown for a file with no viewer, a file over its viewer's size limit, and a file its viewer could not open. It carries the file's type icon, name, size and mime, and why there is no preview.
+
+<Screenshot src="/images/document-preview/info-card.webp" width={720} alt="The info card for archive.zip: a ZIP file icon, the name, 22 bytes, application/zip, and the message that there is no preview for this file type." />
+
+## Limits
+
+| Viewer | Largest file |
+|---|---|
+| Text, code, Markdown | 2 MB |
+| CSV, TSV | 20 MB |
+| Word, Excel, PowerPoint | 50 MB |
+
+Past the limit the info card says the file is too large, without downloading it when the stored size already tells. Images, video, audio and PDF have no limit: the browser streams them.

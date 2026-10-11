@@ -1,0 +1,22 @@
+:where(.impersonation-frontend-banner--default) {
+	align-items: center;
+	background: #f4f1ea;
+	color: #1c1915;
+	display: flex;
+	font:
+		14px / 1.4 system-ui,
+		sans-serif;
+	gap: 12px;
+	justify-content: space-between;
+	padding: 0.6rem 1rem;
+}
+
+:where(.impersonation-frontend-banner--default .impersonation-frontend-banner__exit) {
+	background: transparent;
+	border: 1px solid currentColor;
+	border-radius: 4px;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	padding: 0.35rem 0.75rem;
+}

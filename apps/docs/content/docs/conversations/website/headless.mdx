@@ -1,0 +1,363 @@
+---
+title: Headless
+description: Build your own conversation UI on the /react hooks and the /composer editor. The behaviour is the package's, the markup is yours.
+---
+
+Everything the admin and the registry draw comes from hooks in `@10x-media/conversations/react`. They import nothing from `@payloadcms/ui`. The hooks own the hard parts: a bidirectional message window, opening at the first unread, keeping the reader's place, optimistic sends with retry, drafts, read cursors and realtime. You decide what it looks like.
+
+Every hook needs a [`ChatProvider`](/conversations/website#the-provider) above it.
+
+## Data hooks
+
+### useChannels
+
+```ts
+const { channels, count, unread, reads, status, viewer } = useChannels(key, { count: true })
+```
+
+Subscribes the key and returns its readable channels. Mounts in one tick share one `subscribe` request, so a list with 25 rows sends one.
+
+| Field | |
+|---|---|
+| `channels` | `ChannelView[]`: `slug`, `label`, `cue` (resolved for this viewer), `canCreate`, `unread`. Empty: the viewer cannot read anything here, render nothing |
+| `count` | Visible root messages across the readable channels. `{ count: false }` skips the query when you do not show it |
+| `unread` | Unread root messages across the readable channels |
+| `reads` | `false` when the instance has `reads: false`: hide unread UI |
+| `status` | `'loading' \| 'ready' \| 'error'` |
+| `viewer` | The signed-in user's key, `<collection>:<id>` |
+
+Labels and cues may be per-locale records; `resolveLabel(label, locale)` picks one.
+
+### useUnread
+
+```ts
+const unread = useUnread(keys) // { [key]: { [channel]: number } }
+```
+
+Unread counts for many keys at once, for a room list or an inbox. Retains every key it is given.
+
+### useConversation
+
+```ts
+const conversation = useConversation({ key, channel, parent, limit })
+```
+
+One feed or thread as a window. Pass `channel`, or `channels` for several in one feed; `parent` (a root id) gives that root's thread. `limit` is the page size, 30 by default.
+
+| Field | |
+|---|---|
+| `messages` | `WindowMessage[]`, oldest first. A local message has `sendStatus: 'sending' \| 'failed'`; a message gone from feeds has `removed` |
+| `authors` | `{ [userKey]: { name, avatar?, deleted? } }` for every author and mention in the window |
+| `status`, `error` | `'idle' \| 'loading' \| 'ready' \| 'error'` |
+| `hasOlder`, `hasNewer`, `loadOlder()`, `loadNewer()` | Keyset paging in both directions |
+| `jumpToLatest()` | Resets the window to the newest page |
+| `dividerBefore` | Id of the first unread message: draw "New messages" above it |
+| `markSeen()` | Call when the feed is visible and scrolled to its end. Raises the read cursor, never lowers it |
+| `threadReads` | `{ [rootId]: lastReadAt }`, for "3 replies, new" |
+| `viewer` | As above |
+
+It opens at the latest page, or around the first unread message when there are more unread than a page. While `hasNewer` is true, new messages do not append (the reader is somewhere in the past); `jumpToLatest` brings them in. Change signals from the transport, and this tab's own sends, edits and deletes, merge into every window showing the message.
+
+### useSend
+
+```ts
+const { send, retry } = useSend({ key, channel, parent })
+await send({ text: 'Hello' }) // or send({ body: lexicalJSON })
+```
+
+Each send gets a `clientId`, shows up at once as a `sending` message in every window of that channel, and is replaced by the server's message on success. A failed send throws an error that carries `clientId`; `retry(clientId)` sends it again under the same id, so the server never stores it twice.
+
+`{ text }` needs no editor: the server wraps it into a one-paragraph body. A website that wants a plain `<textarea>` can stop here.
+
+`send` also takes `ext`, data for extensions keyed by name (`{ text, ext: { attachments: [id] } }`), and `prepare({ clientId })`, an async step that runs once the message shows as sending and returns more `ext` (uploads, for one). A retry reuses what `prepare` returned. `useComposer` builds both from its [addons](#composer-addons).
+
+### useMessageActions
+
+```ts
+const { edit, remove } = useMessageActions()
+await edit(message, { text: 'Fixed' })
+await remove(message)
+```
+
+The results merge into every window. The server decides who may: by default the author, in a channel that still takes writes.
+
+### useMentionSearch
+
+```ts
+const { users, loading } = useMentionSearch({ key, channel, query })
+```
+
+Mention candidates for `query`, debounced (150 ms by default, `debounce` to change), stale answers dropped. `query: null` means "not searching". Candidates are only people who can read the channel. The composer's mention feature uses it; call it yourself for a mention picker of your own.
+
+### Extensions
+
+```ts
+const data = useExtension<ReactionsClientData>('reactions')
+const { request, merge } = useExtensionApi('reactions')
+const result = await request<{ message: WindowMessage }>('/add', { body: { message: id, emoji } })
+merge([result.message])
+```
+
+`useExtension(name)` is an extension's public `client` data. `useExtensionApi(name)` calls its endpoints under `/api/conversations/<instance>/<name>` and merges messages they return into every window. Per-message extension data arrives on `message.ext[name]`. See [Writing your own](/conversations/extensions/writing-your-own). Reactions ship a hook of their own, `useReactions`, from `@10x-media/conversations/reactions/react`; attachments theirs from `/attachments/react`.
+
+### useChatStore
+
+The provider's store, for what the hooks do not cover: `store.meta` (the instance's channels, extensions, `viewer`, `reads`), `store.entry(key)` (the subscribe answer for a key), `store.api` (the endpoint client). Most projects never need it.
+
+## Behaviour hooks
+
+These carry the behaviour of the admin's and the registry's components. Use them to draw the same thing with your markup.
+
+### useFeed
+
+```ts
+const feed = useFeed({ conversation, items })
+```
+
+A scrolling feed around a `useConversation` result. Put `scrollerRef` and `onScroll` on the scrolling element, an empty `topRef` element first inside it and an empty `bottomRef` element last, and give your "New messages" divider the attribute `data-feed-divider` (`FEED_DIVIDER_ATTRIBUTE`).
+
+| Field | |
+|---|---|
+| `rows` | `FeedRow[]`: messages and foreign items in time order, each with `day` (a separator starts here), and for messages `compact` (a follow-up from the same author) and `divider` |
+| `hasOlder`, `loadOlder()` | Loads the previous page, keeping the reader's place |
+| `showJump`, `unseen`, `toBottom()` | "N new" or "Jump to latest", and the action |
+| `skeleton` | A slow first load: show a placeholder. Never true for a quick one |
+| `status` | From the conversation |
+
+It opens at the divider or the bottom, follows the bottom while the reader is there, counts what arrives below otherwise, loads pages as the top or bottom comes into view, and calls `markSeen` at the end.
+
+`items` interleaves rows from elsewhere by time: `{ id, at, node }`, for example audit entries in a ticket's history. `buildFeedRows({ messages, dividerBefore, items, isBare })` is the pure function underneath, for a list that does not scroll; `useFeed` passes `isBare` from the instance's type layouts, so bare rows are never grouped.
+
+### useMessage
+
+```ts
+const state = useMessage({ message, viewer, readOnly, threadReadAt })
+```
+
+What the viewer may do with one message, and how to draw it: `bare` (its type has `layout: 'bare'`: draw the type's component as the whole row, no avatar or name), `own`, `deleted`, `canEdit` (own text message, writable channel), `canDelete`, `editing` and `setEditing`, `save(body)`, `remove()`, and the thread summary's `replies` and `hasNewReplies`. Pass `readOnly` when the channel's `canCreate` is false.
+
+### useComposer
+
+```ts
+const composer = useComposer({ key, channel, parent })
+```
+
+The behaviour around the `Composer` editor: `editorRef`, `onChange` (keeps a draft per conversation, channel and thread while the provider lives), `initialBody` (the draft, or the message being edited), `submit()`, `busy`, and `failed` (the text stays in the editor and `submit` retries it). With `onSave` and `initialBody` it edits a message instead of sending.
+
+`addons` and `onFiles` connect extensions to it; see [Composer addons](#composer-addons). Both are absent while editing.
+
+### useChatPanel
+
+```ts
+const panel = useChatPanel({ conversationKey })
+```
+
+A whole conversation's state: `channels`, the `current` one and `setChannel`, its `conversation`, `other` (with exactly two channels, the other one, for a "Switch to" link instead of tabs), `thread` with `openThread` and `closeThread`, `loading`, `reads`, `viewer`.
+
+### useThread
+
+```ts
+const conversation = useThread({ root, authors })
+```
+
+A thread's replies as their own window, with the root feed's `authors` merged in so the root and every reply resolve their names.
+
+## Rendering a body
+
+```tsx
+import { MessageBody } from '@10x-media/conversations/react'
+
+<MessageBody message={message} authors={conversation.authors} className="prose" />
+```
+
+Renders the stored Lexical JSON through Payload's JSX converters (`@payloadcms/richtext-lexical/react`). Mentions take their name from the live `authors`, so a renamed user shows the new name. A message without a body renders its `text`. Pass `converters` for nodes your own [composer features](/conversations/rich-text) store.
+
+Custom message types (`message.type !== 'text'`) carry `data` instead of a body; draw them yourself.
+
+## Helpers
+
+- `relativeTime(iso, locale)`: "just now", "5 min ago", "2 h ago", then a date, through `Intl`. `absoluteTime(iso, locale)` for a tooltip.
+- `collectionKey(slug, id)`, `globalKey(slug)`, `customKey(value)`, `parseKey(key)`: conversation keys.
+- `createApi({ instance, apiRoute, serverURL, fetch })`: the endpoint client the provider uses, for scripts or tests. Throws `ConversationsRequestError` with a `status`.
+
+## The composer
+
+`@10x-media/conversations/composer` is the Lexical editor the admin uses, without `@payloadcms/ui`: formatting, lists, links, `/` commands, `@` mentions, markdown shortcuts, Enter to send.
+
+```tsx
+import { Composer, defaultComposerFeatures, englishComposerLabels } from '@10x-media/conversations/composer'
+import { useComposer } from '@10x-media/conversations/react'
+import { useState } from 'react'
+
+function MessageInput({ conversationKey, channel }: { conversationKey: string; channel: string }) {
+  const composer = useComposer({ key: conversationKey, channel })
+  // Resolve features once: the editor registers its nodes on mount.
+  const [features] = useState(() => defaultComposerFeatures())
+  return (
+    <Composer
+      editorRef={composer.editorRef}
+      features={features}
+      initialBody={composer.initialBody}
+      labels={englishComposerLabels}
+      mentions={{ channel, conversationKey }}
+      onChange={composer.onChange}
+      onSubmit={() => void composer.submit()}
+      placeholder="Write a message…"
+      footer={<button onClick={() => void composer.submit()} disabled={composer.busy}>Send</button>}
+    />
+  )
+}
+```
+
+| Prop | |
+|---|---|
+| `features` | `defaultComposerFeatures()` (bold, italic, link, lists, mention) or your own list. See [Rich text](/conversations/rich-text) |
+| `labels` | The editor's strings. `englishComposerLabels` in English; translate a copy for other languages |
+| `onSubmit`, `submitOn` | Enter sends by default, Shift+Enter breaks the line; `'mod+enter'` sends only on Ctrl/Cmd+Enter |
+| `mentions` | `{ channel, conversationKey }` for `@`; `null` turns mentions off |
+| `toolbar` | `'bottom'` (default), `'top'`, `'none'`, or `{ placement, items }` to keep and order groups |
+| `footer` | The right side of the bottom row: your buttons |
+| `below` | Inside the box, between the text and the bottom row: e.g. picked files |
+| `onFiles` | Files dropped on the composer or pasted into it. Absent, it takes neither. The root has `data-dragging` while files are over it |
+| `editorRef`, `initialBody`, `onChange`, `onFiles` | From `useComposer` |
+| `autoFocus`, `placeholder`, `className`, `t` | |
+| `classNames`, `unstyled` | Skinning, below |
+
+The server validates the body against the instance's editor. A feature that stores new nodes must be registered there too, or the server refuses the message; see [Rich text](/conversations/rich-text).
+
+### Composer addons
+
+Extensions add to a send through addons registered inside the composer ([attachments](/conversations/extensions/attachments) uploads its files this way). Provide `useComposer`'s `addons` around the composer's markup and pass `onFiles` on:
+
+```tsx
+import { ComposerAddonsContext, useComposer } from '@10x-media/conversations/react'
+import { AttachButton, PickedFiles } from './attachments'
+
+const composer = useComposer({ key: conversationKey, channel })
+const editor = (
+  <Composer
+    // ...as above
+    below={<PickedFiles channel={channel} conversationKey={conversationKey} />}
+    footer={<><AttachButton /><button onClick={() => void composer.submit()}>Send</button></>}
+    onFiles={composer.onFiles}
+  />
+)
+return composer.addons ? (
+  <ComposerAddonsContext.Provider value={composer.addons}>{editor}</ComposerAddonsContext.Provider>
+) : (
+  editor
+)
+```
+
+Components inside it call `useComposerAddon(name, { prepare, reset, onFiles })` or `useComposerFiles()`; see [Adding to the composer](/conversations/extensions#adding-to-the-composer). The registry's `ConversationComposer` already does this and renders the `composerBelow` and `composerActions` slots of `ConversationUIProvider`.
+
+### Skinning
+
+Out of the box the composer carries the admin's look, on Payload's CSS variables. On a website you style its parts yourself:
+
+- `classNames` adds classes to named parts. `COMPOSER_CLASSES` lists every part with its default class: `root`, `toolbar`, `toolbarGroup`, `toolbarDivider`, `tool`, `toolActive`, `toolDropdown`, `input`, `content`, `placeholder`, `footer`, `footerEnd`, the menus (`menu`, `menuDropdown`, `menuItem`, `menuItemSelected`, `menuIcon`, `menuLabel`, `menuAvatar`, `menuGroup`, `menuEmpty`), the link field (`linkEditor`, `linkPreview`, `linkRow`, `linkInput`, `linkUrl`, `linkButton`, `linkError`) and the text (`bold`, `italic`, `link`, `paragraph`, `ul`, `ol`, `listItem`, `nestedListItem`).
+- `unstyled` drops the default classes, so only yours apply.
+
+```tsx
+<Composer
+  unstyled
+  classNames={{
+    root: 'flex flex-col rounded-lg border',
+    content: 'min-h-6 px-3 py-2 outline-none',
+    menu: 'z-50 rounded-lg bg-popover p-1 shadow-md',
+    menuItem: 'flex items-center gap-2 rounded-md px-2 py-1.5',
+    menuItemSelected: 'bg-accent',
+    // ...
+  }}
+  // ...
+/>
+```
+
+The registry's `conversation-composer.tsx` is a complete Tailwind skin to copy from.
+
+Floating parts (the `/` and `@` menus, toolbar dropdowns, the link field) render in a portal: into the nearest `dialog` or `[role="dialog"]` around the editor, so a modal's focus trap keeps working, else into `body`. Style them through `classNames`, not through a parent selector, and give `menu` and `linkEditor` a `z-index` above your dialogs.
+
+## A complete small chat
+
+A single-channel conversation with a plain feed and the rich composer:
+
+```tsx title="components/team-chat.tsx"
+'use client'
+
+import { Composer, defaultComposerFeatures, englishComposerLabels } from '@10x-media/conversations/composer'
+import {
+  ChatProvider,
+  MessageBody,
+  collectionKey,
+  relativeTime,
+  useChannels,
+  useComposer,
+  useConversation,
+  useFeed,
+} from '@10x-media/conversations/react'
+import { useState } from 'react'
+
+const CHANNEL = 'messages'
+
+export function TeamChat({ roomId }: { roomId: string }) {
+  return (
+    <ChatProvider instance="chat">
+      <Room conversationKey={collectionKey('rooms', roomId)} />
+    </ChatProvider>
+  )
+}
+
+function Room({ conversationKey }: { conversationKey: string }) {
+  const { channels } = useChannels(conversationKey, { count: false })
+  const channel = channels.find((entry) => entry.slug === CHANNEL)
+  const conversation = useConversation({ key: conversationKey, channel: CHANNEL })
+  const feed = useFeed({ conversation })
+  if (!channel) return null
+
+  return (
+    <div className="flex h-[600px] flex-col">
+      <div className="flex-1 overflow-y-auto" ref={feed.scrollerRef} onScroll={feed.onScroll}>
+        <div ref={feed.topRef} />
+        {feed.rows.map((row) =>
+          row.kind === 'message' ? (
+            <div key={row.key}>
+              {row.divider ? <div data-feed-divider="">New messages</div> : null}
+              {row.compact ? null : (
+                <strong>
+                  {conversation.authors[row.message.authorKey]?.name}{' '}
+                  <small>{relativeTime(row.message.createdAt, 'en')}</small>
+                </strong>
+              )}
+              <MessageBody message={row.message} authors={conversation.authors} />
+            </div>
+          ) : (
+            <div key={row.key}>{row.item.node}</div>
+          )
+        )}
+        <div ref={feed.bottomRef} />
+      </div>
+      {feed.showJump ? <button onClick={() => void feed.toBottom()}>{feed.unseen} new</button> : null}
+      {channel.canCreate ? <Input conversationKey={conversationKey} /> : <p>Read only.</p>}
+    </div>
+  )
+}
+
+function Input({ conversationKey }: { conversationKey: string }) {
+  const composer = useComposer({ key: conversationKey, channel: CHANNEL })
+  const [features] = useState(() => defaultComposerFeatures())
+  return (
+    <Composer
+      editorRef={composer.editorRef}
+      features={features}
+      initialBody={composer.initialBody}
+      labels={englishComposerLabels}
+      mentions={{ channel: CHANNEL, conversationKey }}
+      onChange={composer.onChange}
+      onSubmit={() => void composer.submit()}
+      footer={<button onClick={() => void composer.submit()}>Send</button>}
+    />
+  )
+}
+```
+
+From here, threads are `useThread` plus a second feed, edits and deletes are `useMessage`, and channel tabs are `useChatPanel`. The registry's files are the worked version of each.

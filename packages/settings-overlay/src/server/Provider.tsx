@@ -3,6 +3,7 @@ import type { ServerProps } from 'payload'
 import type React from 'react'
 
 import { SettingsOverlayClient } from '../client/OverlayProvider'
+import { readerKey } from '../client/readerKey'
 import type { OverlaySlots } from '../client/slots'
 import { getRegistry } from '../plugin/registry'
 import type { ClientOverlay, LocalizedLabel, Manifest } from '../types'
@@ -28,7 +29,8 @@ export type SettingsOverlayServerProps = {
  *
  * Providers render once per full page load, not per client navigation, which is why anything
  * that reads changing data (lists, documents, `lazy` components, views) is fetched on open
- * instead of pre-rendered here.
+ * instead of pre-rendered here. Signing in or out is the one navigation that changes what this
+ * computes, so the client half refreshes the layout when the reader it was rendered for is gone.
  */
 export const SettingsOverlayServer = async (
 	props: SettingsOverlayServerProps
@@ -37,9 +39,26 @@ export const SettingsOverlayServer = async (
 
 	const registry = payload?.config ? getRegistry(payload.config) : undefined
 
-	// The provider wraps the login screen too, where there is no reader to compute a rail for.
-	if (!registry || !payload || !user || !permissions) {
+	if (!registry || !payload) {
 		return children
+	}
+
+	// The provider wraps the login screen too, where there is no reader to compute a rail for. The
+	// context is mounted anyway: the login form reaches the admin with a client navigation, which
+	// does not re-render this layout, so the admin's first render gets whatever the login screen got.
+	if (!user || !permissions) {
+		return (
+			<SettingsOverlayClient
+				icons={{}}
+				lazyTransport={registry.lazyTransport}
+				manifests={{}}
+				overlays={[]}
+				reader={null}
+				rendered={{}}
+			>
+				{children}
+			</SettingsOverlayClient>
+		)
 	}
 
 	const req = await buildProviderReq({ i18n, payload, user })
@@ -124,6 +143,7 @@ export const SettingsOverlayServer = async (
 			lazyTransport={registry.lazyTransport}
 			manifests={manifests}
 			overlays={clientOverlays}
+			reader={readerKey(user)}
 			rendered={rendered}
 			slots={slots}
 		>

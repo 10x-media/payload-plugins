@@ -3,11 +3,11 @@ import { getFromImportMap } from 'payload/shared'
 import type { ReactNode } from 'react'
 import { getFieldsRegistry } from '../../../plugin/registry'
 import type { IconAdapter, IconAvailabilityResolver } from '../../../types'
+import { resolveStaticLabel } from '../../../utils/resolveStaticLabel'
 import { IconField } from '../client/IconFieldClient'
 import { resolveAvailableLibraries, unionAlwaysAvailable } from '../server/availability'
 import { resolveIconMeta } from '../server/resolveIconMeta'
 import type { AdapterComponentsEntry } from '../shared/adapterComponents'
-import { resolveStaticLabel } from '../shared/resolveStaticLabel'
 import { resolveIconValue } from '../shared/value'
 
 type IconFieldServerExtraProps = {

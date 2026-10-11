@@ -19,7 +19,11 @@ import { toStaticLabel } from './toStaticLabel'
 /** Props: standard JSON/text field client props plus the `types` allow-list we pass via clientProps. */
 export type FieldNameSelectProps = {
 	path?: string
-	field?: { label?: unknown; admin?: { description?: unknown; width?: string } }
+	field?: {
+		label?: unknown
+		localized?: boolean
+		admin?: { description?: unknown; width?: string }
+	}
 	label?: unknown
 	/**
 	 * Sibling `fields` blocks whose `blockType` is in this list populate the select's options. Omit to
@@ -89,7 +93,7 @@ export const FieldNameSelect = (props: FieldNameSelectProps) => {
 
 	return (
 		<div className="field-type" style={{ marginBlockEnd: '1rem', ...fieldStyle }}>
-			<FieldLabel label={label} path={path} />
+			<FieldLabel label={label} localized={props.field?.localized} path={path} />
 			<ReactSelect
 				options={allOptions}
 				value={allOptions.find((option) => option.value === value) ?? undefined}

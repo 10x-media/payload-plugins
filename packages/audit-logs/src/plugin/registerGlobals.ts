@@ -55,6 +55,7 @@ const registerGlobal = (
 				globalSlug: slug,
 				groupContextKey: ctx.groupContextKey,
 				isUserPolymorphic: ctx.isUserPolymorphic,
+				recordImpersonator: ctx.recordImpersonator,
 				shouldLog: auditLogConfig.shouldLog,
 				tenantFieldName,
 			}),

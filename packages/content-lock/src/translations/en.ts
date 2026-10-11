@@ -1,0 +1,95 @@
+import { keys, type TranslationKey } from './keys'
+
+/**
+ * English values, keyed by the typed constants in `keys.ts` so the two stay in
+ * lockstep. The `Record<TranslationKey, string>` annotation makes a missing or
+ * unknown key a type error. `translations/index.ts` nests these for Payload.
+ */
+export const en: Record<TranslationKey, string> = {
+	[keys.pluginName]: 'Content Lock',
+	[keys.collectionSingular]: 'Content lock',
+	[keys.collectionPlural]: 'Content locks',
+
+	[keys.fieldTitle]: 'Title',
+	[keys.fieldAnnounce]: 'Announce in advance',
+	[keys.fieldAnnounceAt]: 'Announce from',
+	[keys.fieldAnnounceAtDescription]: 'When the banner starts announcing this lock.',
+	[keys.fieldStartsAt]: 'Starts at',
+	[keys.fieldStartsAtDescription]: 'Leave empty to lock when published.',
+	[keys.fieldEndAtTime]: 'End at a set time',
+	[keys.fieldEndsAt]: 'Ends at',
+	[keys.fieldEndedAt]: 'Ended at',
+	[keys.fieldLockEverything]: 'Lock everything',
+	[keys.fieldLockEverythingDescription]: 'Turn off to lock only selected content.',
+	[keys.fieldGroups]: 'Groups',
+	[keys.fieldCustomTargets]: 'Custom targets',
+	[keys.fieldCollections]: 'Collections',
+	[keys.fieldGlobals]: 'Globals',
+	[keys.fieldAdvanced]: 'Advanced',
+	[keys.fieldMessage]: 'Message',
+	[keys.fieldAnnouncementMessageDescription]:
+		'Shown while the lock is announced. Leave empty for the default notice.',
+	[keys.fieldActiveMessageDescription]:
+		'Shown while the lock is active. Leave empty for the default notice.',
+	[keys.tabAnnouncement]: 'Announcement',
+	[keys.tabActive]: 'During the lock',
+	[keys.fieldStatus]: 'Lock status',
+	[keys.statusDraft]: 'Draft',
+	[keys.statusPending]: 'Pending',
+	[keys.statusAnnounced]: 'Announced',
+	[keys.statusActive]: 'Active',
+	[keys.statusEnded]: 'Ended',
+	[keys.filterAll]: 'All',
+
+	[keys.tokenPickDate]: 'Date and time',
+	[keys.tokenFormat]: 'Format',
+	[keys.tokenGroupLabel]: 'Lock details',
+	[keys.tokenRemove]: 'Remove',
+	[keys.tokenStartsOnPublish]: 'when published',
+	[keys.tokenNoEnd]: 'This lock ends manually, so it has no end to show.',
+	[keys.tokenNoAnnouncement]: 'This lock has no announcement time.',
+	[keys.tokenNoScope]: 'This lock covers everything, so there is no scope to list.',
+	[keys.tokenNoDate]: 'Pick a date.',
+	[keys.tokenStartsAt]: 'Lock start',
+	[keys.tokenEndsAt]: 'Lock end',
+	[keys.tokenAnnounceAt]: 'Announcement start',
+	[keys.tokenDate]: 'Custom date',
+	[keys.tokenScope]: 'Locked content',
+	[keys.formatDatetime]: 'Date and time',
+	[keys.formatDate]: 'Date',
+	[keys.formatTime]: 'Time',
+	[keys.formatRelative]: 'Relative',
+
+	[keys.errorAnnounceAfterStart]: 'The announcement must start before the lock does.',
+	[keys.errorEndBeforeStart]: 'The lock must end after it starts.',
+	[keys.errorEndsAtRequired]: 'Set when the lock ends.',
+	[keys.errorAnnounceAtRequired]: 'Set when the announcement starts.',
+	[keys.errorTargetsRequired]: 'Pick at least one item to lock.',
+	[keys.errorEndedReadOnly]: 'An ended lock can no longer be changed.',
+	[keys.errorActiveStartMoved]:
+		'An active lock cannot be moved to the future. End it and schedule a new one.',
+	[keys.errorLocked]: 'Content is locked for maintenance. Please try again later.',
+
+	[keys.bannerAnnouncedTitle]: 'Planned maintenance',
+	[keys.bannerActiveTitle]: 'Maintenance in progress',
+	[keys.bannerAnnouncedEverything]: 'Content will be read-only.',
+	[keys.bannerActiveEverything]: 'Content is read-only.',
+	[keys.bannerAnnouncedPartial]: 'Will be read-only: {{what}}.',
+	[keys.bannerActivePartial]: 'Read-only: {{what}}.',
+	[keys.bannerFrom]: 'From',
+	[keys.bannerUntil]: 'Until',
+	[keys.bannerDismiss]: 'Dismiss',
+	[keys.bannerPrevious]: 'Previous notice',
+	[keys.bannerNext]: 'Next notice',
+	[keys.bannerPosition]: 'Notice {{current}} of {{total}}',
+
+	[keys.actionLockNow]: 'Lock now',
+	[keys.actionLockNowTitle]: 'Unplanned lock',
+	[keys.actionEndNow]: 'End now',
+	[keys.actionFailed]: 'Could not update the lock.',
+	[keys.confirmLockNowHeading]: 'Lock all content now?',
+	[keys.confirmLockNowBody]:
+		'Everyone loses write access immediately, until someone ends this lock.',
+	[keys.confirmEndNowHeading]: 'End this lock now?',
+	[keys.confirmEndNowBody]: 'Content covered by this lock becomes editable again right away.',
+}

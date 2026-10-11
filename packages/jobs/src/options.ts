@@ -1,4 +1,5 @@
 import type { CollectionConfig, Field, PayloadComponent } from 'payload'
+import type { InterruptOptions } from './interruption/register'
 import type { JobInputComponents } from './jobs/inputComponents'
 import type { JobInputExamples } from './jobs/inputPlaceholders'
 import type { JobLogEntryComponents } from './jobs/logSlotComponents'
@@ -103,6 +104,13 @@ export type JobsPluginOptions = JobsOptions & {
 	 * Off by default; pass `true` for defaults or an object to tune it.
 	 */
 	queueControl?: boolean | QueueControlOptions
+	/**
+	 * How running jobs react when another plugin interrupts them (a run gate
+	 * pauses their queue, or a handler throws an error a registered classifier
+	 * recognises). Interrupted jobs fail for good unless listed in `defer` or
+	 * wrapped in `deferOnInterrupt`.
+	 */
+	interrupt?: InterruptOptions
 	/**
 	 * Collection-level override for the enhanced `payload-jobs` collection,
 	 * applied as the outermost layer (after reliability fields). `fields`

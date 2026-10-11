@@ -1,0 +1,100 @@
+---
+title: Styling
+description: The admin's class names and theme variables, and how to place the composer's toolbar.
+---
+
+The admin components use Payload's own building blocks (`Button`, `Drawer`, `Popup`, `ConfirmationModal`) and Payload's theme variables, so they follow the admin's light and dark themes and any theme you already set there. Adjust them with CSS on stable class names; the composer's toolbar is configured through props.
+
+## Where the CSS comes from
+
+The components import their own stylesheets (`conversations.css`, and `composer.css` for the editor), so Next bundles them with the admin. There is nothing to import. Your own admin CSS (for example through `admin.components` or a custom SCSS file in your Payload app) can override any rule.
+
+## Theme variables
+
+Colours, spacing and radii come from Payload's variables:
+
+| Variable | Used for |
+|---|---|
+| `--base` | Spacing throughout |
+| `--theme-elevation-*` | Text shades, borders, hover and placeholder backgrounds |
+| `--theme-text`, `--theme-input-bg`, `--font-body` | Message text, the editor |
+| `--theme-warning-*` | Cues of `warning` channels, the composer border under such a cue |
+| `--theme-error-*` | The send-failed banner, the unread dot |
+| `--theme-success-*` | Links in message bodies, the thread summary |
+| `--style-radius-s`, `--style-radius-m` | Corners |
+
+Change a variable on a class to restyle one part without touching the rest of the admin:
+
+```css
+.conversations-drawer {
+  --theme-elevation-100: #f4f1ea;
+}
+```
+
+`Avatar` sets `--conversations-avatar-hue` (0 to 360) per user; the default style turns it into the initials' background.
+
+## Class names
+
+Every element carries a `conversations-*` class in BEM style. The main ones:
+
+| Part | Classes |
+|---|---|
+| Trigger | `conversations-trigger`, `__count`, `__dot` |
+| Drawer | `conversations-drawer-shell` (Payload's drawer), `conversations-drawer`, `__header`, `__heading`, `__title`, `__subtitle` |
+| Tabs | `conversations-tabs`, `__tab`, `__tab--active`, `__count` |
+| Feed | `conversations-feed`, `--jump`, `__scroller`, `__older`, `__day`, `__divider`, `__empty`, `__skeleton`, `__jump` |
+| Message | `conversations-message`, `--compact`, `--deleted`, `--sending`, `--failed`, `__gutter`, `__main`, `__header`, `__author`, `__time`, `__edited`, `__body`, `__placeholder`, `__status`, `__side` |
+| Thread summary | `conversations-message__thread`, `__thread-count`, `__thread-new`, `__thread-last` |
+| Message menu | `conversations-message__menu`, `__menu--open`, `__menu-button`, `conversations-message-menu__quick` |
+| Thread | `conversations-thread`, `__root` |
+| Composer | `conversations-composer`, `--warning`, `--failed`, `__banner`, `__banner--warning`, `__banner--error`, `__cue-icon`, `__cue-label`, `__cue-action`, `__disabled`, `__hint`, `__send` |
+| Avatar | `conversations-avatar` |
+
+The feed's divider also carries `data-feed-divider` and each message `data-message-id`, which are safer hooks for scripts than class names.
+
+```css title="custom.scss"
+/* Tighter feed with a quieter day separator. */
+.conversations-message:not(.conversations-message--compact) {
+  padding-top: calc(var(--base) * 0.25);
+}
+.conversations-feed__day {
+  color: var(--theme-elevation-400);
+  font-size: 11px;
+}
+```
+
+For changes CSS cannot make, [replace a component](/conversations/admin-ui/replacing-components) or [compose your own view](/conversations/admin-ui/custom-views).
+
+## The composer
+
+`ChatComposer` wraps the plugin's Lexical composer (classes `conversations-editor*` for the box, toolbar, input and footer, and `conversations-menu*` and `conversations-link-editor*` for the floating `/` and `@` menus, dropdowns and link field). Its behaviour is set through props.
+
+### Toolbar
+
+```tsx
+<ChatComposer toolbar="top" {...props} />
+<ChatComposer toolbar="none" {...props} />
+<ChatComposer toolbar={{ placement: 'bottom', items: ['format', 'link'] }} {...props} />
+```
+
+- `bottom` (default) puts the formatting buttons in the footer row next to Send; `top` gives them a row above the text.
+- `none` removes the toolbar. The `/` menu and markdown shortcuts still insert lists and links.
+- `{ placement, items }` keeps and orders buttons by key. A group key (`format`, `insert`, `lists`) keeps the whole group; an item key (`bold`, `italic`, `link`, `mention`) keeps that button.
+
+The toolbar never pushes the Send button out. It takes the width the other buttons leave, and whatever does not fit (a button, or a whole dropdown group) moves from the end into a "⋯" menu. It refits when the drawer is resized.
+
+Which buttons exist at all is decided by the composer's features, see [Rich text](/conversations/rich-text).
+
+### Sending
+
+`submitOn: 'enter'` (default) sends on Enter and breaks the line on Shift+Enter; inside a list Enter adds an item. `submitOn: 'mod+enter'` sends only on Ctrl/Cmd+Enter. The hint under the editor says which applies. A composer narrower than 26rem hides that hint to keep Send on the same row.
+
+The send button reads "Send", or "Save" while editing. `submitLabel` changes it.
+
+### Cue and state
+
+The line above the editor (`conversations-composer__banner`) shows the channel's cue with a lock for `neutral` and a globe for `warning`; with `warning` the editor border takes the warning colour (`conversations-composer--warning`). A failed send turns the banner into an error with Retry (`--failed`). `disabledReason` replaces the editor with a line of text (`__disabled`).
+
+### Class names on the composer itself
+
+The underlying `Composer` from `@10x-media/conversations/composer` names about 35 parts (`COMPOSER_CLASSES`) and takes `classNames` and `unstyled`, which is how the website skin restyles it with Tailwind. `ChatComposer` does not forward those props: in the admin, style the `conversations-editor*` classes with CSS. The skinning API is described in [Headless](/conversations/website/headless).

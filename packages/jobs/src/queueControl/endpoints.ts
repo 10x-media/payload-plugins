@@ -1,5 +1,8 @@
 import type { Endpoint, PayloadRequest } from 'payload'
 
+import { evaluateRunGates, withGates } from '../interruption/gates'
+import { applyJobInterruptions } from '../interruption/records'
+import { wrapJobHandlers } from '../interruption/wrap'
 import { createJobLeaseStore } from '../reliability/jobLeaseStore'
 import type { ResolvedReliabilityOptions } from '../reliability/options'
 import { runSweep } from '../reliability/sweeper'
@@ -56,10 +59,14 @@ export const runControlEndpoint = (deps: QueueEndpointDeps): Endpoint => ({
 			return Response.json({ message: 'Invalid limit parameter' }, { status: 400 })
 		}
 		const silent = query.silent === 'true'
-		const state = await createPauseStore(req.payload).getState()
+		wrapJobHandlers(req.payload)
+		const state = withGates(
+			await createPauseStore(req.payload).getState(),
+			await evaluateRunGates(req.payload)
+		)
 		// Mirror the native run scope: `allQueues` runs every queue, otherwise a single
-		// queue (defaulting to `default`, as the native endpoint does). Pause is honored
-		// either way via runTargetsForPause.
+		// queue (defaulting to `default`, as the native endpoint does). Pause, widened by
+		// the run gates, is honored either way via runTargetsForPause.
 		const requested = query.allQueues === 'true' ? undefined : [query.queue ?? 'default']
 		const targets = runTargetsForPause(requested, state)
 
@@ -75,6 +82,7 @@ export const runControlEndpoint = (deps: QueueEndpointDeps): Endpoint => ({
 					silent,
 				})
 			)
+			await applyJobInterruptions(req.payload)
 		}
 		return Response.json({ paused: state, ran: targets.length, results }, { status: 200 })
 	},

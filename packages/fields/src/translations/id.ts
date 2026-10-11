@@ -47,4 +47,12 @@ export const id: Record<TranslationKey, string> = {
 	[keys.selectUnit]: 'Pilih satuan',
 	[keys.measurementBelowMin]: 'Harus minimal {{min}}',
 	[keys.measurementAboveMax]: 'Tidak boleh melebihi {{max}}',
+	[keys.selectCountry]: 'Pilih negara',
+	[keys.searchCountries]: 'Cari negara',
+	[keys.noCountriesFound]: 'Negara tidak ditemukan',
+	[keys.phoneRequired]: 'Kolom ini wajib diisi.',
+	[keys.invalidPhoneNumber]: 'Masukkan nomor telepon yang valid.',
+	[keys.phoneNotMobile]: 'Masukkan nomor ponsel.',
+	[keys.clearPhoneNumber]: 'Hapus nomor telepon',
+	[keys.phoneCountryFor]: 'Negara: {{country}}',
 }

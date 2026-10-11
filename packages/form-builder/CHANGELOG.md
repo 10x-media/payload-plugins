@@ -1,5 +1,51 @@
 # @10x-media/form-builder
 
+## 0.1.0-beta.27
+
+### Minor Changes
+
+- Collection slugs are now overridable. `overrides.forms.slug`, `overrides.formSubmissions.slug`, and `poll.votes.overrides.slug` rename the plugin's collections, and every internal path follows: the submissions relationship, the actions job and pruning, the vote tally's raw Mongo and Postgres writes, results and outcomes, `notAlreadySubmitted`, and the signed voted cookie. Two plugin collections sharing a slug is a boot error.
+
+  - `poll.cookiePrefix` renames the `fb-voted-{formId}` cookie (validated as a cookie-name token at boot). `hasVotedCookie` and `votedCookieName` take an optional `payload` to read it.
+  - `<Form collections={{ forms, formSubmissions }}>` points the browser transports at renamed collections; it reaches `<Poll>` and the registry form, and a custom `onSubmit` receives it as `input.collection`. `submitForm` and `fetchFormResults` accept `collection`.
+  - `collectionSlugsOf(payload)` returns the live slugs for host server code; `DEFAULT_COLLECTION_SLUGS` and the `FormBuilderCollectionSlugs` / `FormCollections` types are exported.
+
+  Behavioral change: a `slug` set on any of those overrides was previously accepted by the type and silently ignored. It is now honored, so a config that already carries one renames the collection on upgrade. Remove it to keep the default slug.
+
+### Patch Changes
+
+- Fix a multi-step focus race: submitting right after a step change could leave focus on the previous step's region, or nowhere, instead of on the first invalid field the form routed back to. React can run a render's effect late, just before the next render, and the late effect was acting on the newer request against DOM that did not contain its target. Each focus request is now handled only by the render it triggered.
+
+## 0.1.0-beta.26
+
+### Minor Changes
+
+- A per-form fallback locale, shared recipient lists by default, and no more blank emails.
+
+  - **Breaking: the email recipient lists are no longer localized by default.** `to`, `cc`, `bcc`, and `replyTo` on `emailTeam` and `confirmation` used to hold a separate list per locale, so a locale the editor never filled in had no recipient and failed `emailTeam` outright. They are now shared across locales. To keep per-locale routing, set `email.localizeRecipients: true` and nothing changes. To adopt the shared default, migrate the stored lists to a single value (typically the default locale's) the way you would for any Payload field that stops being localized.
+  - **`fallbackLocale`** chooses the fallback locale per form for every server-side read of it (validating a submission, running its actions, serving poll results), e.g. a tenant's own default locale instead of the config-wide one, or a forced fallback on a host with `localization.fallback: false`. Without it those reads fall back exactly like any Payload read, as your config says. It receives the form as already read, so a non-localized owner such as `form.tenant` needs no read of your own, and the form is read again only when the result differs from the fallback already applied.
+  - An email whose subject and body are both empty now fails its action with `empty subject and body` instead of being sent blank.
+  - The recipient fields, and the plugin's other custom selects, show Payload's localized badge when they are localized.
+
+- Send-time hooks receive the whole form document. Recipient sources, from sources, `richText.serialize`, `email.render`, and a custom action's `run` used to get `form` as `{ id, title }` only, so a host needing any other field (a multi-tenant host's `tenant`) read the same form again in every hook. `form` is now the document the plugin already loaded for the run, at depth 0 (relationships are ids) and in the submission's locale, typed as the exported `SubmissionForm` (`{ id, title? } & Record<string, unknown>`). `id` and `title` are unchanged, so existing hooks keep working; drop the re-reads and read the field off `form` instead.
+
+- The submission locale gets its own `submissionLocale` prop.
+
+  - **Breaking (behavioral): `<Form>`'s `locale` prop is no longer sent with the submission.** The previous beta sent it as `?locale=`, so every host passing `locale` (as the i18n docs teach) had its submissions and emails switch to the visitor's language on upgrade, and a formatting tag like `en-US` silently fell back to the default locale because it is not a content locale code. `locale` is back to formatting and renderer strings only. To store the submission in the visitor's content locale and render its emails in it, pass `submissionLocale` (one of your `localization` codes); a custom `onSubmit` receives it as `locale`. `<Poll>` also sends it with the results request, so option labels in the results match the form.
+  - **`createSubmission` takes `locale`**, the server-side counterpart of `submissionLocale`, clamped the same way.
+  - **`fetchFormResults` takes `locale`**, and the results endpoint serves option labels in the clamped `?locale=`.
+  - Fixed: without localization, a visitor-supplied `?locale=zh_Hant` was stored as is, and `Intl` throws on the underscore, so a field type's `format` could break the submission's admin view. The locale is now stored as a canonical tag (`zh-Hant`), and anything that is not a valid tag becomes `en`.
+  - Fixed: creating a submission with your own `req` (`payload.create` or `createSubmission`) no longer rewrites that request's `locale` or `fallbackLocale`. Without localization it stays unset rather than becoming `en`.
+  - `email.render`'s `EmailRenderArgs` and a recipient source's `RecipientResolveArgs` now both extend a shared, exported `SubmissionContextArgs`, so a field added for one hook no longer joins the other's API.
+
+## 0.1.0-beta.25
+
+### Minor Changes
+
+- Emails follow the visitor's locale. `<Form>` now sends an explicit `locale` prop with the submission as `?locale=` (and hands it to a custom `onSubmit` as `locale`), so the submission stores the visitor's locale instead of the host's default, and the post-submit actions, the confirmation email included, render its subject and body in it. Without the prop nothing changes. The server clamps the visitor-controlled locale before anything reads it: a localized host keeps only its configured locale codes (`all`, `*`, and unknown codes become the default locale), a host without localization keeps any plain language tag and otherwise stores `en`. A custom `richText.serialize` also receives that `locale` and the `actionType` rendering the body (`emailTeam`, `confirmation`, or a custom action's type), so an email wrapper can localize its own strings and give the visitor's confirmation a different layout than the team notification.
+
+- Add `email.render`, a hook producing the final html of every `emailTeam` and `confirmation` email from the already serialized body, so a host can wrap emails in a branded, localized layout without re-implementing the rich text pipeline. It receives the serialized `html`, the raw `body`, the interpolated `subject`, the `actionType`, and the submission context (`locale`, `form`, `submissionId`, `values`, `descriptors`, `context`, `payload`, `req`). It runs after `richText.serialize`, so the two compose.
+
 ## 0.1.0-beta.24
 
 ### Patch Changes

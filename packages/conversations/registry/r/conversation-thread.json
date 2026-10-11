@@ -1,0 +1,25 @@
+{
+  "$schema": "https://ui.shadcn.com/schema/registry-item.json",
+  "name": "conversation-thread",
+  "title": "Conversation thread",
+  "author": "10x Media GmbH <https://github.com/10x-media>",
+  "description": "A root message, its replies and a reply composer.",
+  "dependencies": [
+    "@10x-media/conversations"
+  ],
+  "registryDependencies": [
+    "https://docs.10xmedia.de/r/conversations/conversation-ui.json",
+    "https://docs.10xmedia.de/r/conversations/conversation-message.json",
+    "https://docs.10xmedia.de/r/conversations/conversation-feed.json",
+    "https://docs.10xmedia.de/r/conversations/conversation-composer.json"
+  ],
+  "files": [
+    {
+      "path": "conversations/conversation-thread.tsx",
+      "content": "'use client'\n\nimport {\n\ttype AuthorsMap,\n\ttype ChannelView,\n\tuseThread,\n\ttype WindowMessage,\n} from '@10x-media/conversations/react'\n\nimport { ConversationComposer } from './conversation-composer'\nimport { ConversationFeed } from './conversation-feed'\nimport { ConversationMessage } from './conversation-message'\nimport { useConversationUI } from './conversation-ui'\n\nexport type ConversationThreadProps = {\n\t/** The authors the root's feed already knows. */\n\tauthors: AuthorsMap\n\tchannel: ChannelView\n\troot: WindowMessage\n\tviewer: null | string\n}\n\n/** A thread: its root message, the replies as their own feed, and a reply composer. */\nexport function ConversationThread({ authors, channel, root, viewer }: ConversationThreadProps) {\n\tconst { labels } = useConversationUI()\n\tconst conversation = useThread({ authors, root })\n\treturn (\n\t\t<div className=\"flex min-h-0 flex-1 flex-col\">\n\t\t\t<div className=\"border-b pb-2\">\n\t\t\t\t<ConversationMessage\n\t\t\t\t\tauthors={conversation.authors}\n\t\t\t\t\tmessage={root}\n\t\t\t\t\treadOnly={!channel.canCreate}\n\t\t\t\t\tviewer={viewer}\n\t\t\t\t/>\n\t\t\t</div>\n\t\t\t<ConversationFeed conversation={conversation} readOnly={!channel.canCreate} />\n\t\t\t<div className=\"p-3 pt-0\">\n\t\t\t\t<ConversationComposer\n\t\t\t\t\tchannel={root.channel}\n\t\t\t\t\tconversationKey={root.key}\n\t\t\t\t\tdisabledReason={channel.canCreate ? undefined : labels.readOnly}\n\t\t\t\t\tparent={String(root.id)}\n\t\t\t\t\tplaceholder={labels.replyPlaceholder}\n\t\t\t\t/>\n\t\t\t</div>\n\t\t</div>\n\t)\n}\n",
+      "type": "registry:component",
+      "target": "components/conversations/conversation-thread.tsx"
+    }
+  ],
+  "type": "registry:component"
+}

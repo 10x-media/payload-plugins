@@ -2,10 +2,12 @@ import type { Field, Payload, PayloadRequest } from 'payload'
 import type { FormContextReference } from '../context/formContext'
 import type { Translate } from '../fields/types'
 import type { SubmissionDescriptor, SubmissionValue } from '../submissions/types'
+import type { SubmissionForm } from './submissionContext'
 
 /** Context passed to an action's `run` when a submission completes. */
 export type ActionRunArgs<TConfig extends Record<string, unknown> = Record<string, unknown>> = {
-	form: { id: number | string; title?: string }
+	/** The whole form document at depth 0, in the submission's locale; see `SubmissionForm`. */
+	form: SubmissionForm
 	submissionId: number | string
 	values: SubmissionValue[]
 	descriptors: SubmissionDescriptor[]

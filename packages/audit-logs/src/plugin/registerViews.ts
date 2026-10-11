@@ -1,6 +1,7 @@
 import type { Config } from 'payload'
 
 import type { AuditPluginConfig } from '../types'
+import { collectCustomEventDependencies } from '../utilities/customEventComponents'
 import type { PluginContext } from './context'
 
 /** Resolved through the package export map, not a file path, so the import map can find it. */
@@ -36,6 +37,10 @@ export const registerViews = (
 						path: viewConfig?.path ?? '/audit-logs',
 					},
 				},
+			},
+			dependencies: {
+				...config.admin?.dependencies,
+				...collectCustomEventDependencies(viewConfig?.components?.customEvents),
 			},
 		}
 	}

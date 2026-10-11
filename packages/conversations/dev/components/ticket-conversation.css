@@ -1,0 +1,18 @@
+/* A ticket's conversation in its form: the drawer's column, in a bordered box. */
+.conversations-inline {
+	display: flex;
+	flex-direction: column;
+	height: min(70vh, 40rem);
+	min-height: 0;
+	margin-bottom: var(--spacing-field, var(--base));
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-m);
+	padding: 0 calc(var(--base) * 0.75) calc(var(--base) * 0.5);
+	overflow: hidden;
+}
+
+.ticket-conversation__empty {
+	height: auto;
+	padding: var(--base);
+	color: var(--theme-elevation-500);
+}

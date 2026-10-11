@@ -1,0 +1,5 @@
+{
+	"name": "document-preview",
+	"formats": ["pdf", "csv", "docx", "xlsx", "pptx"],
+	"nested": { "lazy": true, "limits": { "textMb": 2, "csvMb": 20 } }
+}

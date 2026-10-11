@@ -68,6 +68,53 @@ Passing `req` matters for more than the user: Payload's local API carries `req.c
 A custom event called from an `afterChange` hook on an audited collection lands next to the automatic entry for the same save, not instead of it. Reach for this when the automatic diff cannot express the event, not to annotate one.
 </Callout>
 
+## Rendering them in the view
+
+Expanded, a custom event shows its type, collection and document, then `metadata` as JSON. That is enough to debug and not much to read. Give an event type its own renderer and it replaces that block:
+
+```ts title="payload.config.ts"
+auditLogs({
+  logs: {
+    view: {
+      components: {
+        customEvents: {
+          order_refunded: '/components/RefundEvent#RefundEvent',
+          '*': '/components/AnyEvent#AnyEvent',
+          export_downloaded: false,
+        },
+      },
+    },
+  },
+})
+```
+
+Keys are `eventType` values. `'*'` covers every type without its own entry, and `false` keeps the default block, wildcard included. Paths are ordinary Payload component paths; the plugin registers them in the import map, so `generate:importmap` picks them up.
+
+The component receives `CustomEventComponentProps` from `@10x-media/audit-logs/types`: `eventType`, `collection`, `documentId`, `metadata`, `createdAt`, and the whole `entry`. A server component also gets `payload` and `req`, so it can read what the event points at instead of copying it into `metadata`:
+
+```tsx title="components/RefundEvent.tsx"
+import type { CustomEventComponentProps } from '@10x-media/audit-logs/types'
+import type { Payload } from 'payload'
+
+export async function RefundEvent({
+  documentId,
+  metadata,
+  payload,
+}: CustomEventComponentProps & { payload: Payload }) {
+  const order = documentId
+    ? await payload.findByID({ collection: 'orders', id: documentId, depth: 0 })
+    : null
+
+  return (
+    <p>
+      Refunded {String(metadata?.amount)} on {order?.reference ?? documentId}
+    </p>
+  )
+}
+```
+
+Renderers run on the server for the entries on the current page only. The rest of the row, its header and metadata line, stays the plugin's.
+
 ## Querying
 
 Custom events live in the same collection, so the same queries work. Narrow by `eventType`:

@@ -1,6 +1,6 @@
 import { type CollectionBeforeChangeHook, ValidationError } from 'payload'
-import { FORMS_SLUG } from '../collections/forms'
 import { pollConfigOf } from '../form/pollState'
+import { pluginSlugsOf } from '../plugin/collectionSlugs'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import type { PollOption } from './definePollOptionSource'
@@ -74,7 +74,10 @@ export const pollOutcomeBeforeChange: CollectionBeforeChangeHook = async ({
 	const t = asTranslate(req.t)
 	const fail = (message: string): never => {
 		throw new ValidationError(
-			{ collection: FORMS_SLUG, errors: [{ path: WINNING_VALUES_PATH, message }] },
+			{
+				collection: pluginSlugsOf(req.payload).forms,
+				errors: [{ path: WINNING_VALUES_PATH, message }],
+			},
 			req.t
 		)
 	}

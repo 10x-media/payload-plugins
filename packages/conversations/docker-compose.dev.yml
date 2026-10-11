@@ -1,0 +1,12 @@
+# Dev only: a Pusher-compatible server (Soketi) for the `tickets` instance.
+#   docker compose -f docker-compose.dev.yml up -d
+# Without it the tickets drawer still works: it falls back to polling.
+services:
+  soketi:
+    image: quay.io/soketi/soketi:1.6-16-debian
+    environment:
+      SOKETI_DEFAULT_APP_ID: app-id
+      SOKETI_DEFAULT_APP_KEY: app-key
+      SOKETI_DEFAULT_APP_SECRET: app-secret
+    ports:
+      - '6001:6001'

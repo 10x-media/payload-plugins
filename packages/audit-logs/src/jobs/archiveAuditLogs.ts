@@ -18,6 +18,7 @@ const PLUGIN_COLUMNS = [
 	'relationTo',
 	'documentId',
 	'user',
+	'impersonator',
 	'locale',
 	'payloadAPI',
 	'changedPaths',

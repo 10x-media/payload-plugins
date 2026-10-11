@@ -1,0 +1,67 @@
+---
+title: Configuration
+description: Every document-preview option.
+---
+
+```ts
+documentPreview({
+  collections: {
+    [uploadSlug]: true | {
+      display?: 'drawer' | 'inline' | 'both' // default 'drawer'
+      listView?: boolean                     // default false
+      fileIcons?: boolean                    // default: the global fileIcons
+      filesizeCell?: boolean                 // default true
+      viewers?: { [mimePattern: string]: string }
+    },
+  },
+  viewers?: { [mimePattern: string]: string }
+  fileIcons?: boolean | {                    // default true
+    types?: { [mimePattern: string]: { label: string; color: string } | { svg: string } }
+  }
+  disabled?: boolean
+  translations?: TranslationsOption
+})
+```
+
+## Plugin
+
+| Option | Default | |
+|---|---|---|
+| `collections` | required | The upload collections that get previews. `true` takes the defaults; an object customizes. A slug that does not exist, or is not an upload collection, is a config error. |
+| `viewers` | `{}` | Viewer components for every enabled collection, by mime pattern. See [custom viewers](/document-preview/custom-viewers). |
+| `fileIcons` | `true` | The default for every collection's `fileIcons`. An object turns icons on and adds your own `types`. See [file icons](/document-preview/file-icons). |
+| `disabled` | `false` | Return the config untouched, for opting out per environment. |
+| `translations` | `{}` | Per-locale overrides for the admin strings. See [i18n](/document-preview/i18n). |
+
+## Per collection
+
+| Option | Default | |
+|---|---|---|
+| `display` | `'drawer'` | `'drawer'`: a **Preview** button beside the document controls. `'inline'`: the preview above the fields. `'both'`. See [surfaces](/document-preview/surfaces). |
+| `listView` | `false` | A **Preview** column in the list view. |
+| `fileIcons` | the global `fileIcons` | File-type icons for this collection's non-image thumbnails. |
+| `filesizeCell` | `true` | Show `filesize` as `1.2 MB` in the list view. A `Cell` the collection sets on `filesize` itself is kept. |
+| `viewers` | `{}` | Viewer components for this collection only, checked before the global `viewers`. |
+
+Mime patterns are lowercase: an exact mime (`video/mp4`) or a type wildcard (`video/*`). A malformed pattern is a config error.
+
+## Fields the plugin adds
+
+| Field | When | |
+|---|---|---|
+| `documentPreview` | `display` is `'inline'` or `'both'` | UI field, first in the collection. Stores nothing. |
+| `documentPreviewColumn` | `listView` | UI field, last in the collection, carrying the list cell. Stores nothing. |
+| `filesize` | `filesizeCell` | Only an admin `Cell`, merged into Payload's upload field. |
+| `thumbnailURL` | `fileIcons` | Only an `afterRead` hook, merged into Payload's upload field. |
+
+None of them adds a column to the database. A collection that already has a field named `documentPreview` or `documentPreviewColumn` is a config error.
+
+## Exports
+
+| Path | |
+|---|---|
+| `@10x-media/document-preview` | `documentPreview` and the option types |
+| `@10x-media/document-preview/client` | `DocumentPreview`, `PreviewDrawer`, `DocumentPreviewProvider`, the admin components the plugin registers |
+| `@10x-media/document-preview/rsc` | `DocumentPreviewProviderServer`, the admin-wide provider the plugin registers |
+| `@10x-media/document-preview/types` | `DocumentPreviewViewerProps`, `DocumentPreviewViewer`, the option and icon types |
+| `@10x-media/document-preview/i18n` | `keys`, `translations` |

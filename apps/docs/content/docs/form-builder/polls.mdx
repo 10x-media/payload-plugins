@@ -37,8 +37,10 @@ Semantics worth knowing:
 Anonymous voters cannot read raw submissions, so public results are served as aggregate counts through a gated endpoint:
 
 ```
-GET /api/forms/:id/results?field=<name>   ->   { results: FieldAggregation[] }
+GET /api/forms/:id/results?field=<name>[&locale=<code>]   ->   { results: FieldAggregation[] }
 ```
+
+`locale` selects the language of the option labels, clamped like a [submission locale](/form-builder/rendering#submission-locale); absent, labels come back in your default locale.
 
 Authenticated callers may aggregate any field, or all enumerable fields with `field` omitted; for a poll-enabled form the results field's effective options (source-resolved, `resolveOptions`-backed, or authored) are injected too, so a sourced poll renders labels in the admin rather than raw stored values (best-effort: a resolve failure there degrades to raw values rather than blocking the trusted read). Anonymous callers are served only when the form's `pollEnabled` toggle is on, only when `poll.resultsVisibility` permits (`afterVote`, the default, serves any time; `afterClose` serves only once `poll.closesAt` has passed), only for the configured `poll.resultsField`, and only if that field is enumerable; the enumerable check refuses to expose a free-text field publicly even when `resultsField` is misconfigured. A poll with an [option source](#option-sources) is enumerable through its resolved options instead: the endpoint resolves the source server-side, seeds buckets in resolved order with the source's labels, forbids results while resolution is empty, and fails closed with a 503 when resolution fails.
 
@@ -58,7 +60,7 @@ formBuilder({
 
 ## Vote store
 
-By default, a poll's results are not read by scanning submissions. Every submission that reaches `complete` for a poll-enabled form bumps a row in a hidden `form-poll-votes` collection: one counter per `(form, field, value)`, plus a shared respondents counter per `(form, field)`. Results reads then sum those counters directly, an `O(options)` lookup instead of a submission scan, so a poll's results never truncate and never slow down as submissions pile up.
+By default, a poll's results are not read by scanning submissions. Every submission that reaches `complete` for a poll-enabled form bumps a row in a hidden `form-poll-votes` collection (renamable through `poll.votes.overrides.slug`, see [Renaming collections](/form-builder/customization#renaming-collections)): one counter per `(form, field, value)`, plus a shared respondents counter per `(form, field)`. Results reads then sum those counters directly, an `O(options)` lookup instead of a submission scan, so a poll's results never truncate and never slow down as submissions pile up.
 
 **Privacy.** A tally row carries no per-voter data, only a value and a running count. Pair `poll.votes` (on by default) with the form's `persistSubmissions: false` and a poll can count votes while storing zero per-visitor information: nothing links a count back to who cast it, because nothing about the voter was ever kept.
 
@@ -72,7 +74,7 @@ That scan-and-replace shape would be unsafe on a `persistSubmissions: false` pol
 
 **Survey reads still scan.** The tally only backs a *poll's own* results field, read on its own: the authenticated all-fields survey aggregation (`aggregateFormResponses` with no `field`, or an admin reading every enumerable field at once) always scans submissions, tally or not, since it has no notion of "the poll field" to special-case. For a `persistSubmissions: false` poll this means the two views diverge on purpose: the survey-style aggregation shows fewer submissions, or none, once pruning has run, while [`<Poll>`](#poll) and the [results endpoint](#the-results-endpoint) reading that field by name show the true, permanent tally. Read poll results through the poll's own results read, not the general survey aggregation, when submissions are not persisted.
 
-**Reading the store directly.** A vote's count is spread across up to `VOTE_SHARDS` (8) rows per `(form, field, value)`, so that concurrent votes for the same popular option do not serialize on one document. A reader going straight to the `form-poll-votes` collection (rather than through `aggregateFromVotes`, which already does this) must sum `count` across every row sharing a `(form, field, value)`, not just read one row. The reserved `value: ''` (exported as `RESPONDENTS_VALUE`) holds the field's total respondent count, also sharded, and is never a real answer since an empty value is never counted as a vote. `POLL_VOTES_SLUG`, `RESPONDENTS_VALUE`, `VOTE_SHARDS`, `aggregateFromVotes`, and `recountPollVotes` are all exported from the root.
+**Reading the store directly.** A vote's count is spread across up to `VOTE_SHARDS` (8) rows per `(form, field, value)`, so that concurrent votes for the same popular option do not serialize on one document. A reader going straight to the `form-poll-votes` collection (rather than through `aggregateFromVotes`, which already does this) must sum `count` across every row sharing a `(form, field, value)`, not just read one row. The reserved `value: ''` (exported as `RESPONDENTS_VALUE`) holds the field's total respondent count, also sharded, and is never a real answer since an empty value is never counted as a vote. `POLL_VOTES_SLUG`, `RESPONDENTS_VALUE`, `VOTE_SHARDS`, `aggregateFromVotes`, and `recountPollVotes` are all exported from the root. `POLL_VOTES_SLUG` is the default slug; on a host that renamed the store, read `collectionSlugsOf(payload).pollVotes` instead.
 
 ```ts
 import { aggregateFromVotes, recountPollVotes, resolveEffectivePollOptions } from '@10x-media/form-builder'
@@ -271,7 +273,7 @@ An authenticated `POST /api/forms/:id/close` endpoint backs the identical close 
 
 ## Rendering results
 
-`<FormResults>` is presentational and never fetches; resolve data and pass it in. Labels, counts, and percentages are real text; the bar fill is decorative. Import `./styles.css` for the `fb-results*` styling or style it yourself (a shadcn parity component is in the registry):
+`<FormResults>` is presentational and never fetches; resolve data and pass it in. Labels, counts, and percentages are real text; the bar fill is decorative. Import `./styles.css` for the `fb-results*` styling or style it yourself (a shadcn parity component is in the registry: `npx shadcn@latest add https://docs.10xmedia.de/r/form-builder/form-results.json`):
 
 ```tsx
 import { FormResults } from '@10x-media/form-builder/react'
@@ -279,7 +281,7 @@ import { FormResults } from '@10x-media/form-builder/react'
 <FormResults results={results} />   // one field or an array
 ```
 
-`fetchFormResults({ formId, field })` is the client helper for the endpoint.
+`fetchFormResults({ formId, field, locale })` is the client helper for the endpoint.
 
 ## `<Poll>`
 
@@ -290,6 +292,8 @@ import { Poll } from '@10x-media/form-builder/react'
 
 <Poll form={form} resultsField="colour" />
 ```
+
+`<Poll>` takes every `<Form>` prop. Its `submissionLocale` is also sent with the results request, so a German voter sees German option labels in the results as well as in the form.
 
 The localStorage guard is UX, not integrity: it stops the same browser re-seeing the form and nothing more. Server-enforced one-per-identity composes from what already ships: gate on `req.user` for authenticated forms, use the `notAlreadySubmitted` [validation rule](/form-builder/validation) to dedupe by a field value (such as email), and [rate limiting](/form-builder/spam) caps anonymous repeat voting per identity.
 
@@ -357,6 +361,8 @@ export default async function PollPage({ params }) {
   return <Poll form={toFormDocument(form)} resultsField="colour" hasVoted={voted} />
 }
 ```
+
+`poll.cookiePrefix` renames the cookie (for example `acme-voted-` gives `acme-voted-{formId}`). The helpers cannot see the plugin config on their own, so pass `payload` whenever the prefix is set: `hasVotedCookie(cookieHeader, form.id, payload)` and `votedCookieName(form.id, payload)`. Without it they read the default name. `resolveVotedSubmission` already takes `payload` and needs nothing extra.
 
 The cookie is `HttpOnly; SameSite=Lax` with a one-year `Max-Age`. The `1` marker is deliberately not `Secure`: it is a UX marker only (skip re-showing a form the visitor already answered), never an integrity or auth signal, and omitting `Secure` keeps it working on plain-HTTP local development. Do not build any server-side trust on its presence; one-per-identity enforcement is the previous section's territory.
 

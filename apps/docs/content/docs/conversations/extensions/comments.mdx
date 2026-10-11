@@ -1,0 +1,77 @@
+---
+title: Comments
+description: comments() adds a Comments button to the edit view of any collection or global, opening the conversation drawer.
+---
+
+`comments()` turns an instance into document comments. It is pure composition: it adds the targets you name and puts the core's `ChatTrigger` into their document controls. It has no components, collections or endpoints of its own.
+
+```ts title="payload.config.ts"
+import { conversations, perTarget } from '@10x-media/conversations'
+import { comments } from '@10x-media/conversations/comments'
+
+conversations({
+  slug: 'comments',
+  access: perTarget(({ req }) => Boolean(req.user)),
+  channels: [internal, shared],
+  extensions: [
+    comments({
+      collections: { persons: ['internal', 'shared'], media: true },
+      globals: { settings: ['internal'] },
+    }),
+  ],
+})
+```
+
+Run `pnpm payload generate:importmap` after adding it: the button is a component path the import map has to know.
+
+## Options
+
+| Option | Type | |
+|---|---|---|
+| `collections` | `Record<string, string[] \| true>` | Collections that get comments, with the channels each offers |
+| `globals` | `Record<string, string[] \| true>` | The same for globals |
+
+`true` offers every channel of the instance. A list offers those channels only, in instance order. Unknown collections or globals throw at startup, as they do in `targets`.
+
+Channels offered are an upper bound. Who reads and writes which of them is still decided by [access](/conversations/access): conversation access per document, then each channel's rules per user.
+
+## What it adds
+
+<Screenshot src="/images/conversations/comments-button.webp" width={162} alt="The Comments button in the document controls, with a count" />
+
+- **Targets.** In `before`, each collection and global goes into the instance's `targets` with its channels. If the host or another extension already lists the same target with different channels, startup throws and names both.
+- **The button.** In `after`, `ChatTrigger` is appended to `admin.components.edit.beforeDocumentControls` of each collection and to `admin.components.elements.beforeDocumentControls` of each global, with `clientProps: { instance }`. Existing components there stay.
+
+The button shows a count of messages and an unread dot. It renders nothing:
+
+- on a create view, where the document has no id and so no conversation yet;
+- when the user can read no channel of this document, so users without access never see an empty button.
+
+It opens `ChatDrawer`: a Payload drawer with the document's title under the heading, a tab per readable channel, the feed and the composer. A thread opens as a second drawer stacked on top. See [Admin UI](/conversations/admin-ui) for what the drawer does and how to extend it.
+
+## Behaviour to know
+
+- **Drafts and versions share one conversation.** The key is `collection:<slug>:<id>` (or `global:<slug>`), so the draft, the published version and every restored version show the same comments.
+- **Not localized.** One conversation per document, whatever locale the editor is in.
+- **Duplicate does not copy them.** The copy has a new id and so a new, empty conversation.
+- **Deleting a document deletes its comments** with the default `deleteWithTarget: true`. See [Production notes](/conversations/production) for what the cascade skips.
+
+## Comments outside the document controls
+
+`ChatTrigger` is exported from `/client` and takes an explicit key, so the same button works in a custom view, a list cell, or a field of your own. It needs the admin provider the plugin registers, which is present on every admin page:
+
+```tsx title="components/ProjectComments.tsx"
+'use client'
+import { ChatTrigger } from '@10x-media/conversations/client'
+import { customKey } from '@10x-media/conversations/react'
+
+export const ProjectComments = ({ projectId }: { projectId: string }) => (
+  <ChatTrigger conversationKey={customKey(`project:${projectId}`)} instance="comments" />
+)
+```
+
+A custom key needs its prefix (`project` here) listed in the instance's `targets.custom` with its channels, since `comments()` only adds collections and globals: `targets: { custom: { project: { channels: ['internal'] } } }`. To show the conversation inline instead of behind a button, use `ChatPanel`; see [Custom views](/conversations/admin-ui/custom-views).
+
+## Several instances
+
+Each `conversations()` call can have its own `comments()`. Two instances on one collection give two buttons, each opening its own conversation with its own access and channels. That is how a project keeps staff notes and customer-facing messages fully apart, rather than as two channels of one instance.

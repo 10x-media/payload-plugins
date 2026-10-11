@@ -1,0 +1,244 @@
+---
+title: Extensions
+description: What an extension can do to an instance, in what order it runs, and the helpers it gets on the server and in the browser.
+---
+
+An extension is a plain object passed in an instance's `extensions` array. It can shape the instance's options, change the Payload config, store fields on messages, attach data to every message a response carries, serve endpoints, and add components to the UI. It can also take part in a send: read its part of the request and store fields with the new message, and add to the composer in the browser. `comments()`, `reactions()` and `attachments()` are extensions built on exactly this surface, nothing private.
+
+```ts title="payload.config.ts"
+import { conversations } from '@10x-media/conversations'
+import { comments } from '@10x-media/conversations/comments'
+import { reactions } from '@10x-media/conversations/reactions'
+
+conversations({
+  slug: 'comments',
+  // ...
+  extensions: [comments({ collections: { posts: true } }), reactions()],
+})
+```
+
+<Cards>
+  <Card title="Comments" href="/conversations/extensions/comments" description="A Comments button in the document controls of any collection or global, opening the conversation drawer." />
+  <Card title="Reactions" href="/conversations/extensions/reactions" description="Emoji reactions with a per-person limit, stored in their own collection or on the message." />
+  <Card title="Attachments" href="/conversations/extensions/attachments" description="Files on messages, uploaded into an upload collection of the extension's or your own, under its access." />
+  <Card title="Writing your own" href="/conversations/extensions/writing-your-own" description="A step-by-step extension: stored fields, per-message data, an endpoint, and UI in the admin and on a website." />
+</Cards>
+
+## The surface
+
+```ts
+import { defineExtension } from '@10x-media/conversations'
+
+export const myExtension = (options: MyOptions) =>
+  defineExtension<MyOptions>({
+    name: 'my-extension',
+    options,
+    before: (instanceOptions, { extensions }) => instanceOptions,
+    after: ({ config, instance, extensions }) => config,
+    messageFields: [],
+    send: async ({ req, instance, key, channel, parent, input, source, fail }) => ({}),
+    decorate: async ({ req, instance, messages, viewer }) => ({}),
+    endpoints: [],
+    client: {},
+    slots: {},
+    onMessageDelete: async ({ req, instance, message }) => {},
+    onTargetDelete: async ({ req, instance, key }) => {},
+  })
+```
+
+`defineExtension` is the identity at runtime; it types `options` for you. Every field except `name` is optional.
+
+| Field | Runs | Does |
+|---|---|---|
+| `name` | config build | Identifies the extension: its endpoint path, its key in `message.ext`, `useExtension(name)` |
+| `options` | | Anything; other extensions see it through the extension map |
+| `before` | config build, before the instance is resolved | Returns new instance options: add targets, message types, channels, slots |
+| `after` | config build, after the instance is resolved | Returns a new Payload config: add collections, inject components |
+| `messageFields` | config build | Payload fields stored on every message of the instance |
+| `send` | every new message | Reads the extension's part of the send (`ext[name]`) and returns values for its `messageFields` |
+| `decorate` | every response that carries messages | Per-message data for a batch, placed at `message.ext[name]` |
+| `endpoints` | request | Handlers under `/api/conversations/<instance>/<name>` |
+| `client` | every `subscribe` | Public, serializable settings, read in the browser with `useExtension(name)` |
+| `slots` | admin render | Components added to the instance's slots, after the host's own |
+| `onMessageDelete` | message deleted | Removes what the extension keeps for that message |
+| `onTargetDelete` | target deleted | Removes the extension's own rows for that conversation |
+
+## Lifecycle
+
+At config build, for each `conversations()` call:
+
+1. Every `before` runs in array order. Each gets the options the previous one returned, plus `{ extensions }`.
+2. The instance is resolved: slugs, channels, targets, types, users, slots.
+3. The core adds its collections (with every extension's `messageFields`), endpoints (with every extension's `endpoints`) and admin provider.
+4. Every `after` runs in array order, each getting the config the previous one returned, the resolved `instance`, and `{ extensions }`.
+
+`before` receives options that may already contain what the host or an earlier extension added, so spread what you change:
+
+```ts
+before: (current) => ({
+  ...current,
+  targets: {
+    ...current.targets,
+    collections: { ...current.targets?.collections, posts: { channels: ['internal'] } },
+  },
+}),
+```
+
+`after` runs once the messages collection is in the config, so it can reference `instance.messagesSlug`. It must return a complete config; spread `config` and its arrays.
+
+### The extension map
+
+`extensions` is a `ReadonlyMap<string, { options?: unknown }>` of every extension on the instance, by name, with its `options`. It lets extensions cooperate: an extension can check whether another is present and read its settings, whatever the array order. In the browser, the `subscribe` response lists the instance's extension names.
+
+### Conflicts
+
+Mistakes throw at startup, naming both parties:
+
+- two extensions with the same `name`;
+- a `name` that collides with a core or transport endpoint: `messages`, `read`, `poll`, `mentions`, `subscribe`, `events`, `pusher-auth`;
+- one message type slug registered twice (by the host and an extension, or two extensions);
+- one target given different channel lists by two parties;
+- a `messageFields` field whose name is taken by the core or another extension, or has no name.
+
+## Stored fields
+
+`messageFields` are Payload fields added to `<instance>-messages`. They belong to the extension:
+
+- The core never sends them to the browser. `decorate` reads them off the message and returns what clients may see.
+- Soft delete leaves them as they are, so data can outlive a message's text (reactions on a placeholder).
+- They go with the message rows, so the cascade needs nothing extra for them.
+
+To fill them when a message is created, use [`send`](#part-of-the-send). To change them later, write the message row from an endpoint (and move `updatedAt`, see below).
+
+Prefer `messageFields` when the data is small and bounded per message: it costs no extra collection and no extra query. Use a collection of your own (added in `after`) when rows are unbounded or need their own unique index. [Reactions](/conversations/extensions/reactions) offers both.
+
+## Part of the send
+
+A send can carry data for extensions: `ext`, keyed by extension name, next to the body.
+
+```ts
+// POST /api/conversations/<instance>/messages
+{ key, channel, clientId, body, ext: { polls: { question: 'Lunch?', options: ['Pizza', 'Sushi'] } } }
+```
+
+Before the message is created, the core calls every extension's `send` with its own part as `input` (`undefined` when none came) and stores what it returns, as long as the names are the extension's own `messageFields`; other keys are ignored. Throw with `fail(message, status)` to refuse the whole send.
+
+```ts
+send: async ({ input, fail, req, source }) => {
+  if (input === undefined) return undefined
+  if (!isPoll(input)) fail('Invalid poll', 400)
+  return { poll: { question: input.question, options: input.options, votes: [] } }
+},
+```
+
+It runs after the core's own checks (conversation and channel access, the message type), for sends from the endpoints (`source: 'client'`, as `req.user`) and for `postMessage` (`source: 'server'`, trusted: skip access checks there). A send retried under the same `clientId` returns the stored message without calling it again. [Attachments](/conversations/extensions/attachments) uses it to check and store file ids.
+
+## Per-message data
+
+`decorate` gets a batch of messages and returns a record keyed by message id. The core calls it for every response that carries messages: feed pages, change sync, send, edit, delete, and extension endpoints. Each entry lands at `message.ext[name]`; an id left out gets nothing.
+
+```ts
+decorate: async ({ req, instance, messages, viewer }) => {
+  const ids = messages.map((message) => String(message.id))
+  const rows = await req.payload.find({
+    collection: `${instance.slug}-bookmarks`,
+    where: { and: [{ message: { in: ids } }, { userKey: { equals: viewer } }] },
+    depth: 0,
+    pagination: false,
+    overrideAccess: true,
+    req,
+  })
+  return Object.fromEntries(rows.docs.map((row) => [row.message, { bookmarked: true }]))
+},
+```
+
+Keep it to one query per batch, not one per message: it runs on every page. `viewer` is the requesting user's key, so the data can be personal (`mine: true`).
+
+To name people in your data, `projectUsers(req, instance, userKeys)` returns the same `{ [userKey]: { name, avatar?, deleted? } }` projection the core uses for authors, one query per users collection.
+
+## Endpoints
+
+```ts
+endpoints: [
+  {
+    method: 'post',
+    path: '/toggle', // `toggle` works too; an empty path is the extension's root
+    handler: async ({ ctx, instance, req }) => {
+      const body = await ctx.body()
+      const message = await ctx.readableMessage(String(body.message), { write: true })
+      // ... write
+      await ctx.touch(message.id)
+      const { authors, messages } = await ctx.respond([message])
+      return Response.json({ authors, message: messages[0] })
+    },
+  },
+],
+```
+
+The path is `/api/conversations/<instance>/<name>/toggle`. The collections are closed, so an endpoint is the only door to an extension's data, and `ctx` carries the core's access rules:
+
+| Helper | Does |
+|---|---|
+| `ctx.viewer()` | The signed-in user's key (`<collection>:<id>`), or a 401 |
+| `ctx.body()` | The JSON body, or `{}`; a malformed body is a 400 |
+| `ctx.readableMessage(id, { deleted?, write? })` | The message if the viewer may read it (conversation and channel access), else a 404. Deleted messages are a 404 unless `deleted: true`. With `write: true` the viewer must also be able to post in its channel, else a 403, so a read-only conversation takes no changes. No extra query for either check |
+| `ctx.touch(id)` | Moves the message's `updatedAt` and publishes the change on the instance's transport |
+| `ctx.respond(messages)` | The messages as the core returns them: decorated by every extension, with the `authors` projection |
+| `ctx.fail(message, status)` | Throws a 4xx or 5xx answered like the core's own errors |
+
+The core checks nothing before your handler runs. Start with `ctx.viewer()` (a 401 for anonymous requests) or `ctx.readableMessage()`, which does both the sign-in and the access check.
+
+## Keeping feeds fresh
+
+Every transport, polling included, only signals "this key changed", and the signal is the newest `updatedAt` under the key. So anything a feed shows must move its message's `updatedAt`, or other viewers never see it:
+
+- inside an endpoint, `ctx.touch(id)`;
+- anywhere else on the server (a hook, a job), `touchMessage(req, { instance, id })` from the main entry.
+
+Both also publish on a realtime transport. An extension that writes to the message row itself can set `updatedAt` in the same write and call `instance.transport?.publish(...)` instead of a second write; that is what reactions do in `storage: 'message'`.
+
+## Browser side
+
+```ts
+import { useExtension, useExtensionApi } from '@10x-media/conversations/react'
+```
+
+- `useExtension<T>(name)` returns the extension's `client` data, or `undefined` before the first subscribe or when the extension is not on the instance.
+- `useExtensionApi(name)` returns `request` and `merge`:
+  - `request<T>(path, { body?, method? })` calls the extension's endpoint with the viewer's auth. `'toggle'` and `'/toggle'` are the same. A `body` makes it a POST unless `method` says otherwise, and no body a GET.
+  - `merge(messages)` puts messages an endpoint returned into every open window showing them, and tells the other tabs, as an edit does.
+
+Both need a `ChatProvider` (the admin registers one per instance; a website adds its own) and work in admin and website components alike.
+
+### Adding to the composer
+
+The data a send carries (`ext`) comes from composer addons. A component rendered inside a composer (a `composerBelow` or `composerActions` slot, or your own markup inside the website composer) registers one:
+
+```ts
+import { useComposerAddon } from '@10x-media/conversations/react'
+
+useComposerAddon('polls', {
+  // At Send, once the message shows as sending: this extension's part of `ext`.
+  prepare: async ({ clientId }) => (draft ? { question: draft.question, options: draft.options } : undefined),
+  // The send went through and the editor cleared.
+  reset: () => setDraft(null),
+  // Optional: files dropped on or pasted into the composer.
+  onFiles: (files) => {},
+})
+```
+
+- `prepare` reads the addon's state as it is at Send and may take its time (uploads): the message already shows as sending. Its result is kept, so Retry after a failed send does not run it again. Return `undefined` to send nothing.
+- With any addon taking `onFiles`, the composer accepts drops (its root gets `data-dragging` while files are over it) and pastes of files. `useComposerFiles()` returns `{ acceptsFiles, addFiles }` for a picker button elsewhere in the composer.
+- Addons are off while a message is edited: an edit changes the text only.
+
+Name the addon after the extension: its result lands at `ext[name]`, where the server `send` hook of that extension reads it.
+
+## Slots
+
+`slots` adds components to the instance's slots after the host's own: `composerAbove`, `composerActions`, `composerBelow`, `drawerHeader`, `messageActions`, `messageQuickActions`, `messageFooter`. Values are Payload component paths, one or an array. How slots render, and what props they get, is on [Slots](/conversations/admin-ui/slots). On a website there is no import map: the registry's `ConversationUIProvider` takes React components in `slots` instead.
+
+## Cleaning up
+
+With `deleteWithTarget: true` (the default), deleting a target document calls every extension's `onTargetDelete({ req, instance, key })` so it can remove its own rows, then removes the conversation's messages and reads. The messages are still there when it runs, so it can read its `messageFields` off them. Use one `deleteMany` on `key` where you can, like the core. A custom `deleteWithTarget` function replaces the whole cascade, `onTargetDelete` included.
+
+When one message is deleted through the endpoints (a soft delete: the row stays as a placeholder), every extension's `onMessageDelete({ req, instance, message })` runs after it, with the message and its fields.

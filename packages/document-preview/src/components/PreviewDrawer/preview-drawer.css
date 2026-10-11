@@ -1,0 +1,11 @@
+/* The drawer content scrolls by default; the preview fills the space under the
+   header instead and scrolls inside its own viewer. */
+.document-preview-drawer .drawer__content-children {
+	display: flex;
+	flex-direction: column;
+}
+
+.document-preview-drawer__preview {
+	height: calc(100dvh - var(--base) * 7);
+	margin-bottom: var(--base);
+}

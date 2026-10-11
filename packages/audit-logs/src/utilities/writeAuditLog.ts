@@ -7,6 +7,7 @@ export type AuditLogData = {
 	documentId?: string
 	eventType?: string
 	user?: unknown
+	impersonator?: unknown
 	locale?: string
 	payloadAPI?: string
 	ipAddress?: string

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+	customEventTypeOptions,
 	DEFAULT_AUDIT_LOG_OPERATIONS,
 	isPolymorphicRelationTo,
 	mergeWithDefaults,
@@ -238,5 +239,28 @@ describe('payloadAPILabels', () => {
 			local: 'Local',
 			MCP: 'MCP',
 		})
+	})
+})
+
+describe('customEventTypeOptions', () => {
+	it('offers renderer keys without the wildcard, then listed types', () => {
+		expect(
+			customEventTypeOptions(['order_paid'], { '*': '/any#Any', order_refunded: '/refund#Refund' })
+		).toEqual([
+			{ label: 'order_refunded', value: 'order_refunded' },
+			{ label: 'order_paid', value: 'order_paid' },
+		])
+	})
+
+	it('lets a listed label override a renderer key', () => {
+		expect(
+			customEventTypeOptions([{ label: 'Refund', value: 'order_refunded' }], {
+				order_refunded: false,
+			})
+		).toEqual([{ label: 'Refund', value: 'order_refunded' }])
+	})
+
+	it('returns nothing without config', () => {
+		expect(customEventTypeOptions()).toEqual([])
 	})
 })

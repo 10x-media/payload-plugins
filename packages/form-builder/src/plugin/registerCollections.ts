@@ -24,6 +24,7 @@ import { buildPollVotesCollection } from '../poll/votes/votesCollection'
 import type { ResolvedSpamConfig } from '../spam/types'
 import type { ValidationRuleRegistry } from '../validation/registry'
 import type { CollectionOverrides } from './collectionOverrides'
+import type { FormBuilderCollectionSlugs } from './collectionSlugs'
 import { attachUploadsCollection, type UploadsOption } from './uploadsCollection'
 
 type RegisterCollectionsArgs = {
@@ -64,6 +65,8 @@ type RegisterCollectionsArgs = {
 	fromSources?: FromAddressSourceRegistry
 	departments?: DepartmentEmailsResolver
 	redirectRelationships?: CollectionSlug[]
+	/** Resolved plugin collection slugs; see `resolveCollectionSlugs`. */
+	slugs: FormBuilderCollectionSlugs
 	overrides?: {
 		forms?: CollectionOverrides
 		formSubmissions?: CollectionOverrides
@@ -102,6 +105,7 @@ export const registerCollections = ({
 	fromSources,
 	departments,
 	redirectRelationships,
+	slugs,
 	overrides,
 }: RegisterCollectionsArgs): void => {
 	const pollVotesEnabled = pollVotes !== false
@@ -142,6 +146,7 @@ export const registerCollections = ({
 			fromSources,
 			departments,
 			redirectRelationships,
+			slugs,
 			overrides: overrides?.forms,
 		}),
 		buildSubmissionsCollection({
@@ -162,8 +167,11 @@ export const registerCollections = ({
 			pollSourceRegistry,
 			pollVotes,
 			showRawFields: showSubmissionRawFields,
+			slugs,
 			overrides: overrides?.formSubmissions,
 		}),
-		...(pollVotes === false ? [] : [buildPollVotesCollection({ overrides: pollVotes.overrides })]),
+		...(pollVotes === false
+			? []
+			: [buildPollVotesCollection({ overrides: pollVotes.overrides, slug: slugs.pollVotes })]),
 	]
 }

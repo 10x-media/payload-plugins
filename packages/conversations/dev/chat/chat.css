@@ -1,0 +1,224 @@
+/* A Slack-like layout filling the admin's content area under its header. */
+.chat-app {
+	display: flex;
+	height: calc(100dvh - var(--app-header-height, calc(var(--base) * 2.8)));
+	min-height: 28rem;
+	border-top: 1px solid var(--theme-elevation-100);
+	background: var(--theme-bg);
+}
+
+.chat-app__sidebar {
+	display: flex;
+	flex: none;
+	flex-direction: column;
+	width: 16rem;
+	padding: 0.923rem 0.615rem;
+	border-right: 1px solid var(--theme-elevation-100);
+	background: var(--theme-elevation-50);
+	overflow-y: auto;
+}
+
+.chat-app__workspace {
+	padding: 0.308rem 0.615rem 0.923rem;
+	font-size: 1.231rem;
+	font-weight: 700;
+}
+
+.chat-app__section {
+	padding: 0.308rem 0.615rem;
+	color: var(--theme-elevation-500);
+	font-size: 0.923rem;
+	font-weight: 600;
+}
+
+.chat-app__rooms {
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+
+.chat-app__room,
+.chat-app__add {
+	display: flex;
+	align-items: center;
+	gap: 0.462rem;
+	width: 100%;
+	padding: 0.385rem 0.615rem;
+	border: 0;
+	border-radius: var(--style-radius-s, 4px);
+	background: transparent;
+	color: var(--theme-elevation-650, var(--theme-elevation-600));
+	cursor: pointer;
+	font: inherit;
+	font-size: 1.077rem;
+	text-align: left;
+}
+
+.chat-app__room:hover,
+.chat-app__add:hover {
+	background: var(--theme-elevation-100);
+	color: var(--theme-text);
+}
+
+.chat-app__room--unread {
+	color: var(--theme-text);
+	font-weight: 700;
+}
+
+.chat-app__room--active,
+.chat-app__room--active:hover {
+	background: var(--theme-elevation-150);
+	color: var(--theme-text);
+}
+
+.chat-app__room-name {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+
+.chat-app__hash {
+	color: var(--theme-elevation-450, var(--theme-elevation-500));
+	font-weight: 400;
+}
+
+.chat-app__badge {
+	min-width: 1.538rem;
+	padding: 0 0.385rem;
+	border-radius: 999px;
+	background: var(--theme-error-500, #e5484d);
+	color: #fff;
+	font-size: 0.846rem;
+	font-weight: 700;
+	line-height: 1.538rem;
+	text-align: center;
+}
+
+.chat-app__add {
+	margin-top: 0.462rem;
+	color: var(--theme-elevation-500);
+}
+
+.chat-app__new {
+	margin-top: 0.462rem;
+	padding: 0.385rem 0.615rem;
+	border: 1px solid var(--theme-elevation-250, var(--theme-elevation-200));
+	border-radius: var(--style-radius-s, 4px);
+	background: var(--theme-input-bg, var(--theme-elevation-0));
+	color: var(--theme-text);
+	font: inherit;
+	font-size: 1.077rem;
+	outline: none;
+}
+
+.chat-app__main,
+.chat-app__thread {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+}
+
+.chat-app__main {
+	flex: 1;
+}
+
+.chat-app__thread {
+	flex: none;
+	width: min(28rem, 40%);
+	padding: 0 1.231rem 1.231rem;
+	border-left: 1px solid var(--theme-elevation-100);
+}
+
+.chat-app__header {
+	display: flex;
+	flex: none;
+	flex-direction: column;
+	gap: 0.154rem;
+	padding: 0.923rem 1.231rem;
+	border-bottom: 1px solid var(--theme-elevation-100);
+}
+
+.chat-app__header--thread {
+	flex-direction: row;
+	align-items: flex-start;
+	justify-content: space-between;
+	margin: 0 -1.231rem 0.615rem;
+}
+
+.chat-app__title {
+	display: flex;
+	align-items: center;
+	gap: 0.308rem;
+	margin: 0;
+	font-size: 1.231rem;
+	line-height: 1.3;
+}
+
+.chat-app__topic {
+	color: var(--theme-elevation-500);
+	font-size: 0.923rem;
+}
+
+.chat-app__close {
+	display: inline-flex;
+	padding: 0.308rem;
+	border: 0;
+	border-radius: var(--style-radius-s, 4px);
+	background: transparent;
+	color: var(--theme-elevation-600);
+	cursor: pointer;
+}
+
+.chat-app__close:hover {
+	background: var(--theme-elevation-100);
+	color: var(--theme-text);
+}
+
+/* The feed scrolls between the header and the composer. */
+.chat-app__main > .conversations-feed {
+	padding: 0 0.615rem;
+}
+
+.chat-app__composer {
+	flex: none;
+	padding: 0 1.231rem 1.231rem;
+}
+
+.chat-app__composer .conversations-composer {
+	padding-top: 0;
+	border-top: 0;
+}
+
+.chat-app__start {
+	display: flex;
+	flex-direction: column;
+	gap: 0.308rem;
+	text-align: left;
+}
+
+.chat-app__empty {
+	margin: auto;
+	color: var(--theme-elevation-500);
+}
+
+@media (max-width: 900px) {
+	.chat-app__sidebar {
+		width: 12rem;
+	}
+
+	.chat-app__thread {
+		position: absolute;
+		inset: 0 0 0 auto;
+		width: min(28rem, 100%);
+		background: var(--theme-bg);
+	}
+}
+
+.chat-app__archived {
+	margin-left: auto;
+	font-size: calc(var(--base) * 0.55);
+	color: var(--theme-elevation-500);
+}

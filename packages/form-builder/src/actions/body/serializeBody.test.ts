@@ -17,6 +17,8 @@ const ctx = { values, descriptors }
 
 const form = { id: 'form-1', title: 'Contact' }
 
+const renderCtx = { values, descriptors, form, locale: 'en', actionType: 'emailTeam' }
+
 const lexical = (children: unknown[]) => ({ root: { type: 'root', children } })
 const paragraph = (text: string, extra: Record<string, unknown> = {}) => ({
 	type: 'paragraph',
@@ -87,7 +89,7 @@ describe('serializeBody', () => {
 
 describe('makeRenderBody', () => {
 	it('renders through the default pipeline', async () => {
-		const renderBody = makeRenderBody({ values, descriptors, form })
+		const renderBody = makeRenderBody(renderCtx)
 		await expect(renderBody(lexical([paragraph('Hello {{name}}')]))).resolves.toBe(
 			'<p>Hello A &amp; B</p>'
 		)
@@ -95,9 +97,7 @@ describe('makeRenderBody', () => {
 
 	it('passes converter overrides through', async () => {
 		const renderBody = makeRenderBody({
-			values,
-			descriptors,
-			form,
+			...renderCtx,
 			richText: { converters: { paragraph: ({ children }) => `<section>${children}</section>` } },
 		})
 		await expect(renderBody(lexical([paragraph('x')]))).resolves.toBe('<section>x</section>')
@@ -105,9 +105,7 @@ describe('makeRenderBody', () => {
 
 	it('lets a custom serialize replace the pipeline entirely', async () => {
 		const renderBody = makeRenderBody({
-			values,
-			descriptors,
-			form,
+			...renderCtx,
 			richText: {
 				serialize: ({ body, values: v }) => `custom:${typeof body}:${v.length}`,
 			},
@@ -118,14 +116,23 @@ describe('makeRenderBody', () => {
 	it('passes form and req through to a custom serialize', async () => {
 		const req = { locale: 'en' } as unknown as PayloadRequest
 		const renderBody = makeRenderBody({
-			values,
-			descriptors,
-			form,
+			...renderCtx,
 			req,
 			richText: {
 				serialize: ({ form: f, req: r }) => `${String(f.id)}:${f.title}:${r === req}`,
 			},
 		})
 		await expect(renderBody(lexical([]))).resolves.toBe('form-1:Contact:true')
+	})
+
+	it('passes the submission locale and the rendering action type to a custom serialize', async () => {
+		const renderBody = makeRenderBody({
+			...renderCtx,
+			req: { locale: 'en' } as unknown as PayloadRequest,
+			locale: 'de',
+			actionType: 'confirmation',
+			richText: { serialize: ({ locale, actionType }) => `${locale}:${actionType}` },
+		})
+		await expect(renderBody(lexical([]))).resolves.toBe('de:confirmation')
 	})
 })

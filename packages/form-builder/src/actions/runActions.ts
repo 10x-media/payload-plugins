@@ -26,19 +26,21 @@ export type RunActionsArgs = Omit<ActionRunArgs, 'config' | 'renderBody'> & {
  */
 export const runActions = async (args: RunActionsArgs): Promise<ActionResult[]> => {
 	const { actions, registry, richText, ...ctx } = args
-	const renderBody = makeRenderBody({
-		values: ctx.values,
-		descriptors: ctx.descriptors,
-		form: ctx.form,
-		req: ctx.req,
-		richText,
-	})
 	const results: ActionResult[] = []
 	for (const instance of actions) {
 		const definition = registry.get(instance.blockType)
 		if (!definition) {
 			continue
 		}
+		const renderBody = makeRenderBody({
+			values: ctx.values,
+			descriptors: ctx.descriptors,
+			form: ctx.form,
+			req: ctx.req,
+			locale: ctx.locale,
+			actionType: instance.blockType,
+			richText,
+		})
 		try {
 			await definition.run({ ...ctx, renderBody, config: instance })
 			results.push({ type: instance.blockType, ok: true })

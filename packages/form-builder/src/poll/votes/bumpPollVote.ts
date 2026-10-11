@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
-import { POLL_VOTES_SLUG, VOTE_SHARDS } from './votesCollection'
-
-const PG_TABLE_KEY = 'form_poll_votes'
+import toSnakeCase from 'to-snake-case'
+import { pluginSlugsOf } from '../../plugin/collectionSlugs'
+import { VOTE_SHARDS } from './votesCollection'
 
 type PostgresSqlModule = { sql: typeof import('@payloadcms/db-postgres')['sql'] }
 
@@ -67,10 +67,11 @@ export async function bumpPollVote(
 	by: number,
 	transactionID?: number | string
 ): Promise<void> {
+	const slug = pluginSlugsOf(payload).pollVotes
 	if (payload.db.name === 'mongoose') {
 		const db = payload.db as unknown as MongoDb
-		const model = db.collections[POLL_VOTES_SLUG]
-		if (!model) throw new Error(`form-builder: mongoose collection "${POLL_VOTES_SLUG}" not found`)
+		const model = db.collections[slug]
+		if (!model) throw new Error(`form-builder: mongoose collection "${slug}" not found`)
 		const session = transactionID !== undefined ? db.sessions?.[transactionID] : undefined
 		const shard = session ? Math.floor(Math.random() * VOTE_SHARDS) : 0
 		const shardedKey = { ...key, shard }
@@ -90,8 +91,10 @@ export async function bumpPollVote(
 	}
 	const { sql } = await importPostgresSql()
 	const db = payload.db as unknown as PgDb
-	const tableName = db.tableNameMap.get(PG_TABLE_KEY)
-	if (!tableName) throw new Error(`form-builder: drizzle table "${PG_TABLE_KEY}" not found`)
+	// Payload keys every collection's table by its snake-cased slug, whatever `dbName` renames it to.
+	const tableKey = toSnakeCase(slug)
+	const tableName = db.tableNameMap.get(tableKey)
+	if (!tableName) throw new Error(`form-builder: drizzle table "${tableKey}" not found`)
 	const table = db.tables[tableName]
 	if (!table) throw new Error(`form-builder: drizzle table object for "${tableName}" not found`)
 	const txn = transactionID !== undefined ? db.sessions?.[transactionID]?.db : undefined

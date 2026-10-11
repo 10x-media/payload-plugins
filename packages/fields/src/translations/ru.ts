@@ -47,4 +47,12 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.selectUnit]: 'Выбрать единицу',
 	[keys.measurementBelowMin]: 'Должно быть не менее {{min}}',
 	[keys.measurementAboveMax]: 'Должно быть не более {{max}}',
+	[keys.selectCountry]: 'Выбрать страну',
+	[keys.searchCountries]: 'Поиск стран',
+	[keys.noCountriesFound]: 'Страны не найдены',
+	[keys.phoneRequired]: 'Это поле обязательно.',
+	[keys.invalidPhoneNumber]: 'Введите корректный номер телефона.',
+	[keys.phoneNotMobile]: 'Введите номер мобильного телефона.',
+	[keys.clearPhoneNumber]: 'Убрать номер телефона',
+	[keys.phoneCountryFor]: 'Страна: {{country}}',
 }

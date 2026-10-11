@@ -1,0 +1,718 @@
+.document-preview {
+	background: var(--theme-elevation-50);
+	border: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-m);
+	display: flex;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+	position: relative;
+}
+
+.document-preview > * {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+/* Covers an inert preview: wheel events land here and scroll the page, a click activates. */
+.document-preview__activate {
+	align-items: flex-end;
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	display: flex;
+	inset: 0;
+	justify-content: center;
+	padding: 0 0 calc(var(--base) * 2.5);
+	position: absolute;
+	z-index: 2;
+}
+
+.document-preview__activate-hint {
+	background: var(--theme-elevation-800);
+	border-radius: var(--style-radius-s);
+	color: var(--theme-elevation-0);
+	font-size: 0.923rem;
+	opacity: 0;
+	padding: calc(var(--base) / 4) calc(var(--base) / 2);
+	transition: opacity 150ms ease;
+}
+
+.document-preview__activate:hover .document-preview__activate-hint,
+.document-preview__activate:focus-visible .document-preview__activate-hint {
+	opacity: 1;
+}
+
+.document-preview-loading {
+	align-items: center;
+	color: var(--theme-elevation-500);
+	display: flex;
+	gap: calc(var(--base) / 2);
+	justify-content: center;
+}
+
+.document-preview-loading__spinner {
+	animation: document-preview-spin 0.8s linear infinite;
+	border: 2px solid var(--theme-elevation-150);
+	border-radius: 50%;
+	border-top-color: var(--theme-elevation-600);
+	height: calc(var(--base) * 0.8);
+	width: calc(var(--base) * 0.8);
+}
+
+@keyframes document-preview-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+.document-preview-card {
+	align-items: center;
+	display: flex;
+	flex-direction: column;
+	gap: calc(var(--base) / 4);
+	justify-content: center;
+	padding: calc(var(--base) * 2) var(--base);
+	text-align: center;
+}
+
+.document-preview-card p {
+	margin: 0;
+}
+
+.document-preview-card__icon {
+	border-radius: var(--style-radius-m);
+	display: block;
+	height: calc(var(--base) * 4.8);
+	margin-bottom: calc(var(--base) / 2);
+	width: calc(var(--base) * 4.8);
+}
+
+.document-preview-card__name {
+	font-weight: 600;
+	overflow-wrap: anywhere;
+}
+
+.document-preview-card__meta {
+	color: var(--theme-elevation-500);
+	font-size: 0.923rem;
+}
+
+.document-preview-card .document-preview-card__message {
+	color: var(--theme-elevation-650);
+	margin-top: calc(var(--base) / 4);
+}
+
+.document-preview-card__link {
+	color: var(--theme-text);
+	margin-top: calc(var(--base) / 2);
+	text-decoration: underline;
+}
+
+/* Wraps onto a second row in a narrow preview rather than squeezing its buttons
+   into each other; the groups inside keep their own items on one line. */
+.document-preview-toolbar {
+	align-items: center;
+	background: var(--theme-elevation-0);
+	border-top: 1px solid var(--theme-elevation-100);
+	display: flex;
+	flex-wrap: wrap;
+	gap: calc(var(--base) / 4);
+	justify-content: center;
+	padding: calc(var(--base) / 4) calc(var(--base) / 2);
+}
+
+.document-preview-toolbar__button {
+	align-items: center;
+	flex: 0 0 auto;
+	white-space: nowrap;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: var(--style-radius-s);
+	color: var(--theme-elevation-800);
+	cursor: pointer;
+	display: inline-flex;
+	font: inherit;
+	height: calc(var(--base) * 1.2);
+	justify-content: center;
+	min-width: calc(var(--base) * 1.2);
+	padding: 0 calc(var(--base) / 4);
+}
+
+.document-preview-toolbar__button:hover {
+	background: var(--theme-elevation-100);
+}
+
+.document-preview-toolbar__button:focus-visible {
+	outline: 2px solid var(--theme-elevation-400);
+	outline-offset: 1px;
+}
+
+.document-preview-toolbar__button[aria-pressed="true"] {
+	border-color: var(--theme-elevation-150);
+}
+
+.document-preview-toolbar__button--text {
+	padding: 0 calc(var(--base) / 2);
+}
+
+.document-preview-toolbar__value {
+	color: var(--theme-elevation-500);
+	flex: 0 0 auto;
+	white-space: nowrap;
+	font-size: 0.923rem;
+	font-variant-numeric: tabular-nums;
+	min-width: calc(var(--base) * 2.5);
+	text-align: center;
+}
+
+.document-preview-image {
+	display: flex;
+	flex-direction: column;
+}
+
+.document-preview-image__stage {
+	background-color: var(--theme-elevation-50);
+	background-image:
+		linear-gradient(45deg, var(--theme-elevation-100) 25%, transparent 25%),
+		linear-gradient(-45deg, var(--theme-elevation-100) 25%, transparent 25%),
+		linear-gradient(45deg, transparent 75%, var(--theme-elevation-100) 75%),
+		linear-gradient(-45deg, transparent 75%, var(--theme-elevation-100) 75%);
+	background-position:
+		0 0,
+		0 8px,
+		8px -8px,
+		-8px 0;
+	background-size: 16px 16px;
+	cursor: grab;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: hidden;
+	position: relative;
+	touch-action: none;
+	user-select: none;
+}
+
+.document-preview-image__stage[data-dragging="true"] {
+	cursor: grabbing;
+}
+
+.document-preview-image__img {
+	left: 0;
+	max-width: none;
+	position: absolute;
+	top: 0;
+	transform-origin: 0 0;
+}
+
+.document-preview-video {
+	background: #000;
+	display: flex;
+}
+
+.document-preview-video__player {
+	display: block;
+	height: 100%;
+	object-fit: contain;
+	width: 100%;
+}
+
+.document-preview-audio {
+	align-items: center;
+	display: flex;
+	justify-content: center;
+	min-width: 0;
+	padding: var(--base);
+}
+
+.document-preview-audio__control {
+	display: block;
+	max-width: 100%;
+	width: 40rem;
+}
+
+.document-preview-frame {
+	background: var(--theme-elevation-0);
+	border: 0;
+	display: block;
+	height: 100%;
+	width: 100%;
+}
+
+/* Payload's code editor sizes itself to its content; here it fills the preview
+   and scrolls inside, so its wrapper takes the full height. */
+.document-preview-code {
+	background: var(--theme-elevation-0);
+	display: flex;
+	flex-direction: column;
+}
+
+.document-preview-code > * {
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+/* Prose typography after admin-wiki's guide article: a reading size above
+   Payload's 13px form scale, headings in em off it, a capped measure. */
+.document-preview-markdown {
+	background: var(--theme-elevation-0);
+	overflow: auto;
+}
+
+.document-preview-markdown__article {
+	box-sizing: border-box;
+	color: var(--theme-text);
+	font-size: 1.15rem;
+	line-height: 1.7;
+	margin: 0 auto;
+	max-width: 52em;
+	padding: calc(var(--base) * 1.5) calc(var(--base) * 1.25);
+}
+
+.document-preview-markdown__article h1,
+.document-preview-markdown__article h2,
+.document-preview-markdown__article h3,
+.document-preview-markdown__article h4,
+.document-preview-markdown__article h5,
+.document-preview-markdown__article h6 {
+	line-height: 1.3;
+	margin: 1.5em 0 0.5em;
+}
+
+.document-preview-markdown__article h1 {
+	font-size: 2em;
+}
+
+.document-preview-markdown__article h2 {
+	font-size: 1.6em;
+}
+
+.document-preview-markdown__article h3 {
+	font-size: 1.3em;
+}
+
+.document-preview-markdown__article h4 {
+	font-size: 1.1em;
+}
+
+.document-preview-markdown__article h5,
+.document-preview-markdown__article h6 {
+	font-size: 1em;
+}
+
+.document-preview-markdown__article > :first-child {
+	margin-top: 0;
+}
+
+.document-preview-markdown__article p {
+	margin: 1em 0;
+}
+
+.document-preview-markdown__article ul,
+.document-preview-markdown__article ol {
+	margin: 1em 0;
+	padding-inline-start: 1.5em;
+}
+
+.document-preview-markdown__article li {
+	margin: 0.25em 0;
+}
+
+/* GFM task lists: the checkbox replaces the bullet. */
+.document-preview-markdown__article li:has(> input[type="checkbox"]) {
+	list-style: none;
+	margin-inline-start: -1.4em;
+}
+
+.document-preview-markdown__article input[type="checkbox"] {
+	margin: 0 0.5em 0 0;
+	vertical-align: middle;
+}
+
+.document-preview-markdown__article a {
+	color: var(--theme-text);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.document-preview-markdown__article blockquote {
+	border-inline-start: 3px solid var(--theme-elevation-200);
+	color: var(--theme-elevation-650);
+	margin: 1em 0;
+	padding: 0.25em 0 0.25em 1em;
+}
+
+.document-preview-markdown__article hr {
+	border: 0;
+	border-top: 1px solid var(--theme-elevation-150);
+	margin: 1.5em 0;
+}
+
+.document-preview-markdown__article code {
+	background: var(--theme-elevation-100);
+	border-radius: 4px;
+	font-family: var(--font-mono, monospace);
+	font-size: 0.875em;
+	padding: 0.1em 0.35em;
+}
+
+.document-preview-markdown__article pre {
+	background: var(--theme-elevation-50);
+	border: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-m);
+	line-height: 1.5;
+	margin: 1em 0;
+	overflow-x: auto;
+	padding: 0.75em 1em;
+}
+
+.document-preview-markdown__article pre code {
+	background: none;
+	padding: 0;
+}
+
+.document-preview-markdown__article img {
+	border-radius: 4px;
+	height: auto;
+	max-width: 100%;
+}
+
+/* GFM tables scroll sideways on their own instead of widening the article. */
+.document-preview-markdown__article table {
+	border-collapse: collapse;
+	display: block;
+	font-size: 0.9em;
+	margin: 1em 0;
+	max-width: 100%;
+	overflow-x: auto;
+}
+
+.document-preview-markdown__article th,
+.document-preview-markdown__article td {
+	border: 1px solid var(--theme-elevation-150);
+	padding: 0.4em 0.75em;
+	text-align: start;
+}
+
+.document-preview-markdown__article th {
+	background: var(--theme-elevation-50);
+	font-weight: 600;
+}
+
+.document-preview-markdown__article tr:nth-child(2n) td {
+	background: var(--theme-elevation-50);
+}
+
+.document-preview-csv {
+	display: flex;
+	flex-direction: column;
+}
+
+.document-preview-csv__scroll {
+	background: var(--theme-elevation-0);
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+}
+
+/* Both axes are virtualized: rows sit at absolute offsets in a canvas sized to the
+   whole table, and cells sit at absolute offsets within their row. */
+.document-preview-csv__canvas {
+	position: relative;
+}
+
+.document-preview-csv__row {
+	left: 0;
+	position: absolute;
+}
+
+.document-preview-csv__row--header {
+	background: var(--theme-elevation-50);
+	font-weight: 600;
+	position: sticky;
+	top: 0;
+	z-index: 2;
+}
+
+.document-preview-csv__cell,
+.document-preview-csv__gutter {
+	align-items: center;
+	border-bottom: 1px solid var(--theme-elevation-100);
+	border-right: 1px solid var(--theme-elevation-100);
+	box-sizing: border-box;
+	display: flex;
+	font-size: 12px;
+	height: 100%;
+	overflow: hidden;
+	padding: 0 8px;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.document-preview-csv__cell {
+	position: absolute;
+	top: 0;
+}
+
+.document-preview-csv__gutter {
+	background: var(--theme-elevation-50);
+	color: var(--theme-elevation-450);
+	font-variant-numeric: tabular-nums;
+	justify-content: flex-end;
+	left: 0;
+	position: sticky;
+	z-index: 1;
+}
+
+.document-preview-pptx {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.document-preview-pptx__body {
+	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+/* The scroll container extend virtualizes against; its own stage and workspace
+   surfaces are made transparent so the admin backdrop shows around the slides. */
+.document-preview-pptx__scroll {
+	background: var(--theme-elevation-100);
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+}
+
+.document-preview-pptx .document-preview-pptx__viewer,
+.document-preview-pptx__viewer .rpv-stage,
+.document-preview-pptx__viewer .rpv-workspace,
+.document-preview-pptx__viewer .rpv-status {
+	background: transparent;
+	border: 0;
+	min-height: 100%;
+}
+
+.document-preview-pptx__viewport {
+	min-height: 100%;
+	padding: var(--base) calc(var(--base) / 2);
+}
+
+.document-preview-rail__page--slide {
+	overflow: hidden;
+	width: 112px;
+}
+
+.document-preview-docx {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+/* extend's DOCX view lays out every page at full height and leaves scrolling to its
+   container; it finds this element as its nearest scrollable ancestor for zoom and
+   page tracking. */
+.document-preview-docx__scroll {
+	background: var(--theme-elevation-100);
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+	padding: var(--base) 0;
+}
+
+.document-preview-office__toolbar {
+	justify-content: space-between;
+}
+
+.document-preview-docx__body {
+	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.document-preview-office__position {
+	align-items: center;
+	display: flex;
+	flex: 0 0 auto;
+	gap: calc(var(--base) / 4);
+}
+
+.document-preview-office__position > .document-preview-toolbar__value {
+	text-align: start;
+}
+
+.document-preview-rail {
+	background: var(--theme-elevation-50);
+	border-right: 1px solid var(--theme-elevation-100);
+	flex: 0 0 auto;
+	overflow-y: auto;
+	width: 140px;
+}
+
+.document-preview-rail__list {
+	position: relative;
+}
+
+.document-preview-rail__item {
+	align-items: center;
+	background: transparent;
+	border: 0;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	left: 0;
+	padding: 10px 0;
+	position: absolute;
+	right: 0;
+	top: 0;
+}
+
+.document-preview-rail__page {
+	background: #fff;
+	border-radius: 2px;
+	box-shadow: 0 0 0 1px var(--theme-elevation-150);
+	display: block;
+	width: 92px;
+}
+
+.document-preview-rail__item:hover .document-preview-rail__page {
+	box-shadow: 0 0 0 1px var(--theme-elevation-400);
+}
+
+.document-preview-rail__item[aria-current="page"] .document-preview-rail__page {
+	box-shadow: 0 0 0 2px var(--theme-success-500);
+}
+
+.document-preview-rail__item:focus-visible {
+	outline: 2px solid var(--theme-elevation-400);
+	outline-offset: -2px;
+}
+
+.document-preview-rail__number {
+	color: var(--theme-elevation-500);
+	font-size: 0.846rem;
+	font-variant-numeric: tabular-nums;
+}
+
+.document-preview-rail__item[aria-current="page"] .document-preview-rail__number {
+	color: var(--theme-text);
+	font-weight: 600;
+}
+
+.document-preview-office__zoom {
+	align-items: center;
+	display: flex;
+	flex: 0 0 auto;
+	gap: calc(var(--base) / 5);
+}
+
+.document-preview-xlsx {
+	display: flex;
+	flex-direction: column;
+	overflow: hidden;
+}
+
+.document-preview-xlsx__grid {
+	display: flex;
+	flex: 1 1 auto;
+	min-height: 0;
+}
+
+.document-preview-xlsx__formula-bar {
+	align-items: stretch;
+	background: var(--theme-elevation-0);
+	border-bottom: 1px solid var(--theme-elevation-100);
+	display: flex;
+	flex: 0 0 auto;
+	font-size: 0.923rem;
+	min-height: calc(var(--base) * 1.5);
+}
+
+.document-preview-xlsx__address {
+	align-items: center;
+	border-right: 1px solid var(--theme-elevation-100);
+	color: var(--theme-elevation-650);
+	display: flex;
+	flex: 0 0 auto;
+	font-variant-numeric: tabular-nums;
+	min-width: calc(var(--base) * 4.5);
+	padding: 0 calc(var(--base) / 2);
+}
+
+.document-preview-xlsx__formula {
+	align-self: center;
+	color: var(--theme-elevation-800);
+	flex: 1 1 auto;
+	min-width: 0;
+	overflow: hidden;
+	padding: 0 calc(var(--base) / 2);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.document-preview-xlsx__formula[data-formula="true"] {
+	font-family: var(--font-mono, monospace);
+}
+
+.document-preview-xlsx__sheet-bar {
+	justify-content: space-between;
+}
+
+.document-preview-xlsx__tabs {
+	display: flex;
+	flex: 1 1 12rem;
+	gap: calc(var(--base) / 5);
+	min-width: 0;
+	overflow-x: auto;
+	scrollbar-width: thin;
+}
+
+/* Mirrors Payload's document tabs (Edit / API / Versions): quiet until active. */
+.document-preview-xlsx__tab {
+	background: transparent;
+	border: 0;
+	border-radius: var(--style-radius-s);
+	color: var(--theme-elevation-500);
+	cursor: pointer;
+	flex: 0 0 auto;
+	font: inherit;
+	max-width: calc(var(--base) * 10);
+	overflow: hidden;
+	padding: calc(var(--base) / 5) calc(var(--base) / 2);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.document-preview-xlsx__tab:hover {
+	background: var(--theme-elevation-100);
+	color: var(--theme-elevation-800);
+}
+
+.document-preview-xlsx__tab[aria-selected="true"] {
+	background: var(--theme-elevation-150);
+	color: var(--theme-text);
+}
+
+.document-preview-xlsx__tab:focus-visible {
+	outline: 2px solid var(--theme-elevation-400);
+	outline-offset: 1px;
+}
+
+.document-preview-xlsx__zoom {
+	align-items: center;
+	display: flex;
+	flex: 0 0 auto;
+	margin-inline-start: auto;
+	gap: calc(var(--base) / 5);
+}
+
+.document-preview-toolbar__button:disabled {
+	color: var(--theme-elevation-300);
+	cursor: default;
+}
+
+.document-preview-toolbar__button:disabled:hover {
+	background: transparent;
+}

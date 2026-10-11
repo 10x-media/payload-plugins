@@ -1,0 +1,99 @@
+.conversations-reactions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.308rem;
+	margin-top: 0.385rem;
+}
+
+.conversations-reactions__pill,
+.conversations-reactions__add {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.308rem;
+	height: 1.846rem;
+	padding: 0 0.538rem;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: 999px;
+	background: var(--theme-elevation-50);
+	color: var(--theme-elevation-700);
+	cursor: pointer;
+	font: inherit;
+	font-size: 0.923rem;
+	line-height: 1;
+}
+
+.conversations-reactions__pill:hover,
+.conversations-reactions__add:hover {
+	border-color: var(--theme-elevation-300);
+}
+
+.conversations-reactions__pill:disabled {
+	cursor: default;
+	opacity: 0.7;
+}
+
+.conversations-reactions__pill--mine {
+	border-color: color-mix(in srgb, var(--theme-success-500, #3e63dd) 60%, transparent);
+	background: color-mix(in srgb, var(--theme-success-500, #3e63dd) 14%, transparent);
+	color: var(--theme-text);
+}
+
+.conversations-reactions__emoji {
+	font-size: 1.077rem;
+}
+
+.conversations-reactions__count {
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+}
+
+/* The add button only shows while the message is hovered, as the action row does. */
+.conversations-reactions__add {
+	padding: 0 0.462rem;
+	color: var(--theme-elevation-500);
+	opacity: 0;
+}
+
+.conversations-message:hover .conversations-reactions__add,
+.conversations-reactions__add:focus-visible {
+	opacity: 1;
+}
+
+@media (hover: none) {
+	.conversations-reactions__add {
+		opacity: 1;
+	}
+}
+
+/* The emoji row: at the top of a message's menu, and in the add button's popup. */
+.conversations-reaction-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.154rem;
+}
+
+.conversations-reaction-row__emoji {
+	width: 2.308rem;
+	height: 2.308rem;
+	padding: 0;
+	border: 0;
+	border-radius: var(--style-radius-s, 4px);
+	background: transparent;
+	cursor: pointer;
+	font-size: 1.385rem;
+	line-height: 1;
+}
+
+.conversations-reaction-row__emoji:hover:not(:disabled) {
+	background: var(--theme-elevation-150);
+}
+
+.conversations-reaction-row__emoji--mine {
+	background: var(--theme-elevation-150);
+}
+
+.conversations-reaction-row__emoji:disabled {
+	cursor: default;
+	opacity: 0.35;
+}

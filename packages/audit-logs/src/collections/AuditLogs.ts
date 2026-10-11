@@ -1,13 +1,14 @@
 import type { Access, CollectionConfig, CollectionSlug, RelationshipField } from 'payload'
 
-// biome-ignore lint/complexity/useMaxParams: the collection shape is driven by six independent plugin options; an options object is queued as a port follow-up
+// biome-ignore lint/complexity/useMaxParams: the collection shape is driven by seven independent plugin options; an options object is queued as a port follow-up
 export const buildAuditLogsCollection = (
 	hidden = true,
 	userRelationTo: CollectionSlug | CollectionSlug[] = 'users',
 	access?: { create?: Access; delete?: Access; read?: Access; update?: Access },
 	tenantsSlug?: string,
 	archiveEnabled = false,
-	groupEnabled = false
+	groupEnabled = false,
+	impersonatorEnabled = false
 ): CollectionConfig => {
 	return {
 		slug: 'audit-logs',
@@ -88,6 +89,24 @@ export const buildAuditLogsCollection = (
 				},
 				index: true,
 			} as RelationshipField,
+			...(impersonatorEnabled
+				? [
+						{
+							/**
+							 * Set when the acting user was reached through impersonation.
+							 * Copied from `req.user._impersonation` at write time.
+							 */
+							name: 'impersonator',
+							type: 'relationship',
+							relationTo: userRelationTo,
+							hasMany: false,
+							admin: {
+								position: 'sidebar',
+							},
+							index: true,
+						} as RelationshipField,
+					]
+				: []),
 			{
 				name: 'locale',
 				type: 'text',

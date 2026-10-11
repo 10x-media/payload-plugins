@@ -12,6 +12,11 @@ import type { FieldTypeRegistry } from '../fields/registry'
 import { pollConfigOf } from '../form/pollState'
 import { isLoggedIn } from '../plugin/access'
 import type { CollectionOverrides } from '../plugin/collectionOverrides'
+import {
+	DEFAULT_COLLECTION_SLUGS,
+	type FormBuilderCollectionSlugs,
+	pluginSlugsOf,
+} from '../plugin/collectionSlugs'
 import type { PollOptionSourceRegistry } from '../poll/registry'
 import { makeVoteTallyHook } from '../poll/votes/voteTallyHook'
 import { buildSpamGuard } from '../spam/spamGuard'
@@ -31,9 +36,6 @@ import {
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import type { ValidationRuleRegistry } from '../validation/registry'
-import { FORMS_SLUG } from './forms'
-
-export const FORM_SUBMISSIONS_SLUG = 'form-submissions'
 
 type BuildSubmissionsCollectionArgs = {
 	registry: FieldTypeRegistry
@@ -73,6 +75,8 @@ type BuildSubmissionsCollectionArgs = {
 	 * represents them fully (locale and meta are folded into its Submission-details section).
 	 */
 	showRawFields?: boolean
+	/** Resolved plugin collection slugs (after host `overrides.*.slug`); defaults when omitted. */
+	slugs?: FormBuilderCollectionSlugs
 	overrides?: CollectionOverrides
 }
 
@@ -103,7 +107,13 @@ const makeAfterChange =
 				return doc
 			}
 			const form = await payload
-				.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
+				.findByID({
+					collection: pluginSlugsOf(req.payload).forms,
+					id: formId,
+					depth: 0,
+					overrideAccess: true,
+					req,
+				})
 				.catch(() => null)
 
 			// Field access blocks every API writer, so this slug-agnostic override write is the only
@@ -122,7 +132,7 @@ const makeAfterChange =
 					req?: PayloadRequest
 				}) => Promise<unknown>
 				await update({
-					collection: FORM_SUBMISSIONS_SLUG,
+					collection: pluginSlugsOf(req.payload).formSubmissions,
 					id: doc.id as number | string,
 					data,
 					depth: 0,
@@ -227,7 +237,13 @@ const makeVotedCookieHook = (args: { votedCookie: boolean }): CollectionAfterCha
 		let state = isPollContextState(stashed) ? stashed : undefined
 		if (state === undefined) {
 			const form = await req.payload
-				.findByID({ collection: FORMS_SLUG, id: formId, depth: 0, overrideAccess: true, req })
+				.findByID({
+					collection: pluginSlugsOf(req.payload).forms,
+					id: formId,
+					depth: 0,
+					overrideAccess: true,
+					req,
+				})
 				.catch(() => null)
 			state = {
 				pollEnabled: form?.pollEnabled === true,
@@ -255,7 +271,7 @@ const makeVotedCookieHook = (args: { votedCookie: boolean }): CollectionAfterCha
 		req.responseHeaders ??= new Headers()
 		req.responseHeaders.append(
 			'Set-Cookie',
-			`${votedCookieName(formId)}=${value}; Path=/; Max-Age=${VOTED_COOKIE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax${secure}`
+			`${votedCookieName(formId, req.payload)}=${value}; Path=/; Max-Age=${VOTED_COOKIE_MAX_AGE_SECONDS}; HttpOnly; SameSite=Lax${secure}`
 		)
 		return doc
 	}
@@ -279,10 +295,11 @@ export const buildSubmissionsCollection = ({
 	pollSourceRegistry,
 	pollVotes = false,
 	showRawFields = false,
+	slugs = DEFAULT_COLLECTION_SLUGS,
 	overrides,
 }: BuildSubmissionsCollectionArgs): CollectionConfig => {
 	const defaultFields: Field[] = [
-		{ name: 'form', type: 'relationship', relationTo: FORMS_SLUG, required: true },
+		{ name: 'form', type: 'relationship', relationTo: slugs.forms, required: true },
 		{
 			name: 'status',
 			type: 'select',
@@ -352,7 +369,7 @@ export const buildSubmissionsCollection = ({
 
 	return {
 		...(overrides ?? {}),
-		slug: FORM_SUBMISSIONS_SLUG,
+		slug: slugs.formSubmissions,
 		labels: {
 			singular: labelForKey(keys.collectionSubmissionSingular),
 			plural: labelForKey(keys.collectionSubmissionPlural),

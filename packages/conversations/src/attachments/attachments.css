@@ -1,0 +1,290 @@
+.conversations-attach-button {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.846rem;
+	height: 1.846rem;
+	padding: 0;
+	border: 0;
+	border-radius: var(--style-radius-s, 3px);
+	background: none;
+	color: var(--theme-elevation-600);
+	cursor: pointer;
+}
+
+.conversations-attach-button:hover {
+	background: var(--theme-elevation-100);
+	color: var(--theme-text);
+}
+
+.conversations-attach-picked {
+	padding: 0 1.077rem 0.385rem;
+}
+
+.conversations-attach-picked__list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.385rem;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.conversations-attach-picked__error {
+	margin: 0.308rem 0 0;
+	color: var(--theme-error-500);
+	font-size: 0.846rem;
+}
+
+.conversations-attach-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.385rem;
+	max-width: 16rem;
+	height: 2.154rem;
+	padding: 0 0.308rem 0 0.231rem;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s, 3px);
+	background: var(--theme-elevation-50);
+	font-size: 0.846rem;
+}
+
+.conversations-attach-chip__thumb {
+	width: 1.692rem;
+	height: 1.692rem;
+	border-radius: 2px;
+	object-fit: cover;
+}
+
+.conversations-attach-chip__icon {
+	display: inline-flex;
+	color: var(--theme-elevation-500);
+}
+
+.conversations-attach-chip__name {
+	overflow: hidden;
+	min-width: 0;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.conversations-attach-chip__size {
+	color: var(--theme-elevation-500);
+	white-space: nowrap;
+}
+
+.conversations-attach-chip__remove {
+	display: inline-flex;
+	padding: 0.154rem;
+	border: 0;
+	border-radius: 2px;
+	background: none;
+	color: var(--theme-elevation-500);
+	cursor: pointer;
+}
+
+.conversations-attach-chip__remove:hover {
+	background: var(--theme-elevation-150);
+	color: var(--theme-text);
+}
+
+.conversations-attachments {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0.308rem;
+	margin-top: 0.385rem;
+}
+
+.conversations-attachments__images {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.385rem;
+}
+
+.conversations-attachments__image {
+	overflow: hidden;
+	width: 7.692rem;
+	height: 7.692rem;
+	padding: 0;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s, 3px);
+	background: var(--theme-elevation-50);
+	cursor: zoom-in;
+}
+
+.conversations-attachments__image img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+}
+
+.conversations-attachments__file {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.462rem;
+	max-width: 100%;
+	padding: 0.308rem 0.462rem;
+	border: 1px solid var(--theme-elevation-150);
+	border-radius: var(--style-radius-s, 3px);
+	background: var(--theme-elevation-50);
+	font-size: 0.923rem;
+}
+
+.conversations-attachments__icon {
+	display: inline-flex;
+	color: var(--theme-elevation-500);
+}
+
+.conversations-attachments__name {
+	overflow: hidden;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	color: var(--theme-text);
+	cursor: pointer;
+	font: inherit;
+	text-align: left;
+	text-decoration: none;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.conversations-attachments__name:hover {
+	text-decoration: underline;
+}
+
+.conversations-attachments__size {
+	color: var(--theme-elevation-500);
+	font-size: 0.846rem;
+	white-space: nowrap;
+}
+
+.conversations-attachments__download {
+	display: inline-flex;
+	padding: 0.154rem;
+	border-radius: 2px;
+	color: var(--theme-elevation-600);
+}
+
+.conversations-attachments__download:hover {
+	background: var(--theme-elevation-150);
+	color: var(--theme-text);
+}
+
+.conversations-attachments__upload {
+	margin: 0;
+	color: var(--theme-elevation-500);
+	font-size: 0.846rem;
+}
+
+.conversations-attachments__upload--failed {
+	color: var(--theme-error-500);
+}
+
+.conversations-attach-viewer {
+	position: fixed;
+	z-index: 10000;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 3.5rem 4rem 2rem;
+	background: rgb(0 0 0 / 0.85);
+}
+
+.conversations-attach-viewer__backdrop {
+	position: absolute;
+	inset: 0;
+	padding: 0;
+	border: 0;
+	background: none;
+	cursor: zoom-out;
+}
+
+/* Above the backdrop, which closes the viewer on a click beside them. */
+.conversations-attach-viewer__image,
+.conversations-attach-viewer__frame {
+	position: relative;
+}
+
+.conversations-attach-viewer__bar {
+	position: absolute;
+	top: 0;
+	right: 0;
+	left: 0;
+	display: flex;
+	align-items: center;
+	gap: 0.615rem;
+	padding: 0.769rem 1.077rem;
+	color: #fff;
+}
+
+.conversations-attach-viewer__name {
+	overflow: hidden;
+	flex: 1;
+	min-width: 0;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.conversations-attach-viewer__count {
+	opacity: 0.7;
+	font-size: 0.923rem;
+}
+
+.conversations-attach-viewer__action {
+	display: inline-flex;
+	padding: 0.385rem;
+	border: 0;
+	border-radius: var(--style-radius-s, 3px);
+	background: none;
+	color: #fff;
+	cursor: pointer;
+}
+
+.conversations-attach-viewer__action:hover {
+	background: rgb(255 255 255 / 0.15);
+}
+
+.conversations-attach-viewer__image {
+	max-width: 100%;
+	max-height: 100%;
+	object-fit: contain;
+}
+
+.conversations-attach-viewer__frame {
+	width: min(60rem, 100%);
+	height: 100%;
+	border: 0;
+	background: #fff;
+}
+
+.conversations-attach-viewer__step {
+	position: absolute;
+	top: 50%;
+	width: 2.5rem;
+	height: 2.5rem;
+	border: 0;
+	border-radius: 50%;
+	background: rgb(255 255 255 / 0.12);
+	color: #fff;
+	cursor: pointer;
+	font-size: 1.5rem;
+	line-height: 1;
+	transform: translateY(-50%);
+}
+
+.conversations-attach-viewer__step:hover {
+	background: rgb(255 255 255 / 0.25);
+}
+
+.conversations-attach-viewer__step--prev {
+	left: 0.769rem;
+}
+
+.conversations-attach-viewer__step--next {
+	right: 0.769rem;
+}

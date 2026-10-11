@@ -15,6 +15,10 @@
 		"automations",
 		"dual-session",
 		"settings-overlay",
-		"form-variants"
+		"form-variants",
+		"content-lock",
+		"conversations",
+		"impersonation",
+		"document-preview"
 	]
 }

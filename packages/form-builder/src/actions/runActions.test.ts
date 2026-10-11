@@ -133,4 +133,25 @@ describe('runActions', () => {
 			expect.objectContaining({ config: { blockType: 'withConfig', to: 'team@x.com' } })
 		)
 	})
+
+	it('renders each action body with the submission locale and that action type', async () => {
+		const seen: string[] = []
+		const serialize = ({ locale, actionType }: { locale: string; actionType: string }) =>
+			`${locale}:${actionType}`
+		const render = vi.fn(async (args: { renderBody: (body: unknown) => Promise<string> }) => {
+			seen.push(await args.renderBody(''))
+		})
+		const registry: ActionRegistry = new Map([
+			['first', { type: 'first', label: 'First', run: render }],
+			['second', { type: 'second', label: 'Second', run: render }],
+		])
+		await runActions({
+			...makeMockCtx(),
+			locale: 'de',
+			actions: [{ blockType: 'first' }, { blockType: 'second' }],
+			registry,
+			richText: { serialize },
+		})
+		expect(seen).toEqual(['de:first', 'de:second'])
+	})
 })

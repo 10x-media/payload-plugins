@@ -1,5 +1,44 @@
 # @10x-media/audit-logs
 
+## 0.1.0-beta.4
+
+### Minor Changes
+
+- The view filters by the API an entry came through. More filters offers `REST`, `GraphQL`, `local` and every `logs.payloadAPIs` entry under its label, takes several at once, and accepts any other value typed in.
+
+- `logs.view.components.customEvents` renders custom events with your own components instead of the default table and JSON block. Keys are `eventType` values, `'*'` is the fallback and `false` keeps the default. Renderers run on the server with `payload` and `req`, receive `CustomEventComponentProps` (exported from `@10x-media/audit-logs/types`), and are registered in the import map by the plugin.
+
+- The view's filters are rebuilt. One row of pills (Event, Collection, User, Date, More filters) opens each editor in a panel below it, the way the list view opens columns and filters, and changes are applied together.
+
+  - Event folds operation and event type into one filter, with several values at once; custom types come from the new `logs.eventTypes` option and the renderer keys, and the label also shows on the row badge.
+  - Documents and users are picked from the list drawer, or typed as an id for something deleted, and the pills show their titles instead of ids.
+  - Collections and globals are labelled from their config, and Payload's own bookkeeping collections are no longer offered.
+  - Date presets fill the From date; documents, groups and changed fields take several values each.
+
+  Filter URLs changed: repeated `eventType`, `documentId`, `userId` and `group` keys, `slug:id` references, and no `userCollection`.
+
+- Record the impersonator on an audit entry when the acting user was reached through impersonation. The list names the acting user and shows who was impersonating them.
+
+  The `impersonator` field is added only when `@10x-media/impersonation` is installed. `impersonation: false` keeps it out, `impersonation: true` adds it without the plugin.
+
+- `multiTenancy.collections` names the tenant-scoped collections in the multi-tenant plugin's own shape, so one object configures both plugins. When set, only those collections and the tenants collection record a tenant, instead of any collection with a field named `tenantFieldName`. The tenant view's filters follow it: they offer only collections that can carry a tenant, no real globals, and `isGlobal` collections as globals.
+
+- The user column is now a pill that links to the user's document. An entry written under impersonation carries an `impersonated` mark in the same pill, which opens who was impersonating. A user who no longer exists shows as deleted instead of a raw id, and an unpopulated polymorphic user no longer renders as `[object Object]`. The row toggle moved to an overlay so the pill can hold a link, and the row is sized in admin units (`rem`, `--base`) instead of pixels.
+
+### Patch Changes
+
+- Auth events and deletes no longer record `locale`: a login has no document, and a delete removes every locale, so the request's locale said nothing about either. The view hides it on such entries written before.
+
+## 0.1.0-beta.3
+
+### Patch Changes
+
+- The `audit-logs` collection exempts itself from `@10x-media/content-lock`, so a lock can no longer reject an entry and fail the write that produced it.
+
+  - Fixed: during a lock on everything, the lock rejected every entry written through `payload.create` with a 503, and the operation that triggered the entry failed with it. Entries take that path once `logs.override` attaches hooks, so a login to a collection with `auth` events failed, and so did an audited write to a collection the lock leaves open. `createAuditEvent` always takes it, so custom events failed without any override. The retention jobs could not delete entries or stamp `archivedAt` either.
+  - The collection now carries `custom: { contentLock: { exempt: true } }`, applied after `logs.override` the same way the slug is, so an override cannot drop it. Since no lock can freeze it, a content-lock group that names `audit-logs` now fails the build.
+  - The archive job still uploads into `archive.uploadCollection`, which a lock freezes unless you exempt it. A run during the lock then fails before stamping anything, and the first run after the lock ends archives the same entries.
+
 ## 0.1.0-beta.2
 
 ### Patch Changes

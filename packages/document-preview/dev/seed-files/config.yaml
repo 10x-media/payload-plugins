@@ -1,0 +1,18 @@
+# Example deployment config, previewed in the code editor
+service:
+  name: document-preview
+  replicas: 2
+  env:
+    - name: PAYLOAD_SECRET
+      valueFrom: secret
+    - name: DATABASE_URI
+      valueFrom: secret
+limits:
+  textMb: 2
+  csvMb: 20
+  officeMb: 50
+viewers:
+  pdf: iframe
+  docx: extend
+  xlsx: extend
+  pptx: extend

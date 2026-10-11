@@ -1,0 +1,153 @@
+{
+	"name": "@10x-media/content-lock",
+	"version": "0.1.0-beta.2",
+	"description": "Planned and unplanned maintenance windows that freeze Payload content: 503 on every write channel, read-only admin, localized banners.",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/10x-media/payload-plugins.git",
+		"directory": "packages/content-lock"
+	},
+	"homepage": "https://github.com/10x-media/payload-plugins/tree/main/packages/content-lock",
+	"bugs": "https://github.com/10x-media/payload-plugins/issues",
+	"keywords": [
+		"payload",
+		"payloadcms",
+		"plugin",
+		"maintenance",
+		"content-freeze",
+		"read-only"
+	],
+	"author": "10x-media",
+	"engines": {
+		"node": ">=22.18.0"
+	},
+	"type": "module",
+	"sideEffects": false,
+	"exports": {
+		".": {
+			"development": "./src/index.ts",
+			"types": "./src/index.ts",
+			"default": "./dist/index.js"
+		},
+		"./types": {
+			"development": "./src/exports/types.ts",
+			"types": "./src/exports/types.ts",
+			"default": "./dist/exports/types.js"
+		},
+		"./client": {
+			"development": "./src/exports/client.ts",
+			"types": "./src/exports/client.ts",
+			"default": "./dist/exports/client.js"
+		},
+		"./i18n": {
+			"development": "./src/exports/i18n.ts",
+			"types": "./src/exports/i18n.ts",
+			"default": "./dist/exports/i18n.js"
+		},
+		"./rsc": {
+			"development": "./src/exports/rsc.ts",
+			"types": "./src/exports/rsc.ts",
+			"default": "./dist/exports/rsc.js"
+		}
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"CHANGELOG.md",
+		"LICENSE"
+	],
+	"scripts": {
+		"build": "tsdown",
+		"lint": "biome check src tests dev videos",
+		"lint:fix": "biome check --write src tests dev videos",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"videos": "clipwright videos",
+		"test": "vitest run",
+		"test:unit": "vitest run src",
+		"test:int": "vitest run tests/int",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts",
+		"test:e2e": "bash scripts/e2e.sh",
+		"dev": "pnpm --filter @10x-media/content-lock-dev dev",
+		"start": "pnpm --filter @10x-media/content-lock-dev start",
+		"generate": "pnpm --filter @10x-media/content-lock-dev generate",
+		"generate:types": "pnpm --filter @10x-media/content-lock-dev generate:types",
+		"generate:importmap": "pnpm --filter @10x-media/content-lock-dev generate:importmap",
+		"migrate": "pnpm --filter @10x-media/content-lock-dev migrate",
+		"migrate:create": "pnpm --filter @10x-media/content-lock-dev migrate:create",
+		"migrate:down": "pnpm --filter @10x-media/content-lock-dev migrate:down",
+		"migrate:refresh": "pnpm --filter @10x-media/content-lock-dev migrate:refresh",
+		"migrate:reset": "pnpm --filter @10x-media/content-lock-dev migrate:reset",
+		"migrate:status": "pnpm --filter @10x-media/content-lock-dev migrate:status",
+		"migrate:fresh": "pnpm --filter @10x-media/content-lock-dev migrate:fresh",
+		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
+	},
+	"peerDependencies": {
+		"@payloadcms/richtext-lexical": "^3.83.0",
+		"@payloadcms/translations": "^3.83.0",
+		"@payloadcms/ui": "^3.83.0",
+		"next": "^15.2.9 || ^16.2.6",
+		"payload": "^3.83.0",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	},
+	"dependencies": {
+		"qs-esm": "8.0.1"
+	},
+	"devDependencies": {
+		"@10x-media/jobs": "workspace:*",
+		"@10x-media/payload-test-harness": "workspace:*",
+		"@10x-media/tsconfig": "workspace:*",
+		"@10x-media/tsdown-config": "workspace:*",
+		"@10x-media/vitest-config": "workspace:*",
+		"@payloadcms/db-mongodb": "catalog:",
+		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/richtext-lexical": "catalog:",
+		"@payloadcms/translations": "catalog:",
+		"@payloadcms/ui": "catalog:",
+		"@playwright/test": "catalog:",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"next": "catalog:",
+		"payload": "catalog:",
+		"clipwright": "catalog:",
+		"playwright": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:",
+		"tsdown": "catalog:",
+		"typescript": "catalog:",
+		"vitest": "catalog:"
+	},
+	"publishConfig": {
+		"access": "public",
+		"exports": {
+			".": {
+				"types": "./dist/index.d.ts",
+				"import": "./dist/index.js",
+				"default": "./dist/index.js"
+			},
+			"./types": {
+				"types": "./dist/exports/types.d.ts",
+				"import": "./dist/exports/types.js",
+				"default": "./dist/exports/types.js"
+			},
+			"./client": {
+				"types": "./dist/exports/client.d.ts",
+				"import": "./dist/exports/client.js",
+				"default": "./dist/exports/client.js"
+			},
+			"./i18n": {
+				"types": "./dist/exports/i18n.d.ts",
+				"import": "./dist/exports/i18n.js",
+				"default": "./dist/exports/i18n.js"
+			},
+			"./rsc": {
+				"types": "./dist/exports/rsc.d.ts",
+				"import": "./dist/exports/rsc.js",
+				"default": "./dist/exports/rsc.js"
+			}
+		}
+	}
+}

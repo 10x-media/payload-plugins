@@ -48,4 +48,12 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.selectUnit]: "Sélectionner l'unité",
 	[keys.measurementBelowMin]: 'Doit être au moins {{min}}',
 	[keys.measurementAboveMax]: 'Ne doit pas dépasser {{max}}',
+	[keys.selectCountry]: 'Sélectionner le pays',
+	[keys.searchCountries]: 'Rechercher des pays',
+	[keys.noCountriesFound]: 'Aucun pays trouvé',
+	[keys.phoneRequired]: 'Ce champ est obligatoire.',
+	[keys.invalidPhoneNumber]: 'Saisissez un numéro de téléphone valide.',
+	[keys.phoneNotMobile]: 'Saisissez un numéro de téléphone mobile.',
+	[keys.clearPhoneNumber]: 'Retirer le numéro de téléphone',
+	[keys.phoneCountryFor]: 'Pays : {{country}}',
 }

@@ -10,6 +10,7 @@ import { afterDeleteCollectionAuditLog } from '../hooks/afterDeleteCollection'
 import { beforeChangeCollectionAuditField } from '../hooks/beforeChangeCollection'
 import type { AuditOptions, AuditPluginConfig } from '../types'
 import { buildFieldMap } from '../utilities/buildFieldMap'
+import { isTenantScoped } from '../utilities/tenantScope'
 import { buildAuditConfig } from './auditFields'
 import type { PluginContext } from './context'
 import { resolveAuditLogConfig, resolveAuthConfig } from './resolveOptions'
@@ -38,6 +39,7 @@ const withAuthHooks = ({
 		collectUserAgent: ctx.collectUserAgent,
 		groupContextKey: ctx.groupContextKey,
 		isUserPolymorphic: ctx.isUserPolymorphic,
+		recordImpersonator: ctx.recordImpersonator,
 	}
 
 	const next: CollectionHooks = { ...hooks }
@@ -97,8 +99,13 @@ const registerCollection = (
 	if (!pluginOptions.disabled && auditLogConfig !== false) {
 		const anonymize = pluginOptions.anonymize?.[slug]
 		const isSelfTenant = Boolean(ctx.multiTenancy && ctx.tenantsSlug && slug === ctx.tenantsSlug)
+		// Without an explicit list every collection reads the field, and one that lacks
+		// it simply records no tenant.
 		const tenantFieldName =
-			!isSelfTenant && ctx.tenantFieldName && !ctx.multiTenancy?.excludeCollections?.includes(slug)
+			!isSelfTenant &&
+			ctx.tenantFieldName &&
+			ctx.multiTenancy &&
+			isTenantScoped(slug, ctx.multiTenancy, true)
 				? ctx.tenantFieldName
 				: undefined
 		const fieldMap =
@@ -121,6 +128,7 @@ const registerCollection = (
 				fieldMap,
 				groupContextKey: ctx.groupContextKey,
 				isUserPolymorphic: ctx.isUserPolymorphic,
+				recordImpersonator: ctx.recordImpersonator,
 				isSelfTenant,
 				operations: auditLogConfig.operations,
 				shouldLog: auditLogConfig.shouldLog,
@@ -143,6 +151,7 @@ const registerCollection = (
 					fieldMap,
 					groupContextKey: ctx.groupContextKey,
 					isUserPolymorphic: ctx.isUserPolymorphic,
+					recordImpersonator: ctx.recordImpersonator,
 					isSelfTenant,
 					shouldLog: auditLogConfig.shouldLog,
 					snapshotOnDelete: auditLogConfig.snapshotOnDelete,

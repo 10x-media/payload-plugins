@@ -5,6 +5,8 @@ import type {
 	AuditFieldOptions,
 	AuditOptions,
 	CollectionAuditLogConfig,
+	CustomEventComponents,
+	EventTypeOption,
 	FailedLoginOptions,
 	GlobalAuditOptions,
 	PayloadAPIOption,
@@ -174,3 +176,22 @@ export const resolvePayloadAPIOptions = (
  */
 export const payloadAPILabels = (extra: PayloadAPIOption[] = []): Record<string, string> =>
 	Object.fromEntries(resolvePayloadAPIOptions(extra).map(({ label, value }) => [value, label]))
+
+/**
+ * Custom event types for the view's Event filter: every type with a renderer, then
+ * `logs.eventTypes`, whose labels win for a type named in both.
+ */
+export const customEventTypeOptions = (
+	eventTypes: EventTypeOption[] = [],
+	components: CustomEventComponents = {}
+): { label: string; value: string }[] => {
+	const byValue = new Map<string, { label: string; value: string }>()
+	for (const value of Object.keys(components)) {
+		if (value !== '*') byValue.set(value, { label: value, value })
+	}
+	for (const option of eventTypes) {
+		const resolved = typeof option === 'string' ? { label: option, value: option } : option
+		byValue.set(resolved.value, resolved)
+	}
+	return [...byValue.values()]
+}

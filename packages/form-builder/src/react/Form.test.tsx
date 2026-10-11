@@ -62,6 +62,70 @@ describe('Form', () => {
 			values: [{ field: 'name', value: 'Ada' }],
 		})
 		expect(onSuccess).toHaveBeenCalledWith('1', expect.anything())
+		expect(onSubmit.mock.calls[0]?.[0]).not.toHaveProperty('locale')
+	})
+
+	it('hands a renamed submissions collection to a custom transport', async () => {
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '1' })
+		const fields: FormFieldInstance[] = [{ blockType: 'text', name: 'name', label: 'Name' }]
+		render(
+			<Form
+				form={doc(fields, 7)}
+				onSubmit={onSubmit}
+				collections={{ formSubmissions: 'responses' }}
+			/>
+		)
+		fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Ada' } })
+		fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+		await screen.findByRole('status')
+		expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ collection: 'responses' }))
+	})
+
+	it('POSTs to the renamed submissions collection with the default transport', async () => {
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(new Response(JSON.stringify({ doc: { id: '1' } }), { status: 201 }))
+		try {
+			const fields: FormFieldInstance[] = [{ blockType: 'text', name: 'name', label: 'Name' }]
+			render(
+				<Form
+					form={doc(fields, 7)}
+					apiRoute="/cms"
+					collections={{ formSubmissions: 'responses' }}
+				/>
+			)
+			fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Ada' } })
+			fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+			await screen.findByRole('status')
+			expect(fetchSpy.mock.calls[0]?.[0]).toBe('/cms/responses')
+		} finally {
+			fetchSpy.mockRestore()
+		}
+	})
+
+	it('hands submissionLocale, never the formatting locale, to the transport', async () => {
+		const onSubmit = vi.fn().mockResolvedValue({ ok: true, submissionId: '1' })
+		const fields: FormFieldInstance[] = [{ blockType: 'text', name: 'name', label: 'Name' }]
+		const { unmount } = render(
+			<Form form={doc(fields, 7)} onSubmit={onSubmit} locale="de-DE" submissionLocale="de" />
+		)
+
+		fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Ada' } })
+		fireEvent.click(screen.getByRole('button', { name: /submit|absenden/i }))
+
+		await screen.findByRole('status')
+		expect(onSubmit).toHaveBeenCalledWith({
+			formId: 7,
+			values: [{ field: 'name', value: 'Ada' }],
+			locale: 'de',
+		})
+		unmount()
+
+		render(<Form form={doc(fields, 7)} onSubmit={onSubmit} locale="de" />)
+		fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Ada' } })
+		fireEvent.click(screen.getByRole('button', { name: /submit|absenden/i }))
+		await screen.findByRole('status')
+		expect(onSubmit.mock.calls[1]?.[0]).not.toHaveProperty('locale')
 	})
 
 	const responseMessageForm = (fields: FormFieldInstance[]): FormDocument => ({

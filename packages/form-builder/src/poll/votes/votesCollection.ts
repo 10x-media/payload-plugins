@@ -1,10 +1,15 @@
 import type { CollectionConfig } from 'payload'
 import { isLoggedIn } from '../../plugin/access'
 import type { CollectionOverrides } from '../../plugin/collectionOverrides'
+import { DEFAULT_COLLECTION_SLUGS } from '../../plugin/collectionSlugs'
 import { keys } from '../../translations/keys'
 import { labelForKey } from '../../translations/server'
 
-export const POLL_VOTES_SLUG = 'form-poll-votes'
+/**
+ * Default slug of the tally collection. A host may rename it via `poll.votes.overrides.slug`;
+ * read the live slug with `collectionSlugsOf(payload).pollVotes`.
+ */
+export const POLL_VOTES_SLUG = DEFAULT_COLLECTION_SLUGS.pollVotes
 
 /** Reserved tally `value` marking the per-field respondents counter (empty answers are never counted, so '' is free). */
 export const RESPONDENTS_VALUE = ''
@@ -32,6 +37,8 @@ export const VOTE_SHARDS = 8
  */
 export const buildPollVotesCollection = (args: {
 	overrides?: CollectionOverrides
+	/** The resolved tally slug (`poll.votes.overrides.slug`); the default when omitted. */
+	slug?: string
 }): CollectionConfig => {
 	const defaultFields: CollectionConfig['fields'] = [
 		{ name: 'form', type: 'text', required: true, index: true },
@@ -43,7 +50,7 @@ export const buildPollVotesCollection = (args: {
 
 	return {
 		...(args.overrides ?? {}),
-		slug: POLL_VOTES_SLUG,
+		slug: args.slug ?? POLL_VOTES_SLUG,
 		labels: {
 			singular: labelForKey(keys.collectionPollVoteSingular),
 			plural: labelForKey(keys.collectionPollVotePlural),

@@ -35,7 +35,8 @@ auditLogs({
 |---|---|---|
 | `tenantsSlug` | `tenants` | The tenants collection. |
 | `tenantFieldName` | `tenant` | The tenant relationship field on audited documents. |
-| `excludeCollections` | `[]` | Collections to skip tenant capture for. |
+| `collections` | unset | The tenant-scoped collections, in the multi-tenant plugin's own shape. See [naming the tenant collections](#naming-the-tenant-collections). |
+| `excludeCollections` | `[]` | Collections to skip tenant capture for. Not consulted when `collections` is set. |
 | `excludeGlobals` | `[]` | Globals to skip tenant capture for. |
 | `tenantView` | mounted | `false` to skip the second view, or an object for its path and access. |
 
@@ -80,6 +81,25 @@ multiTenancy: { excludeCollections: ['payments', 'internal-reports'] }
 ```
 
 Those collections are still audited normally. Only the tenant value is skipped, so the entries stay in the global view. `excludeGlobals` does the same for globals.
+
+## Naming the tenant collections
+
+Reading the field by name is a guess. `multiTenancy.collections` replaces it with the list itself, in the shape `@payloadcms/plugin-multi-tenant` takes, so one object configures both plugins:
+
+```ts title="payload.config.ts"
+const collections = { notes: {}, 'tenant-settings': { isGlobal: true } }
+
+export default buildConfig({
+  plugins: [
+    multiTenantPlugin({ collections, tenantsSlug: 'tenants' }),
+    auditLogs({ multiTenancy: { collections } }),
+  ],
+})
+```
+
+With it set, only the listed collections (and the tenants collection) record a tenant, and `excludeCollections` is no longer consulted.
+
+It also shapes the tenant view's filters. The Collection filter offers only what can carry a tenant: the listed collections and the tenants collection. Real globals are left out, since they never have a tenant. A collection with `isGlobal: true`, one document per tenant, is offered under Globals instead, the way the multi-tenant plugin presents it in the nav, and the Document filter skips it, since there is only the one. Without `collections`, the tenant view offers every collection with a field named `tenantFieldName`.
 
 ## Embedding the tenant view
 

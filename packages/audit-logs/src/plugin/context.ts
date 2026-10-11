@@ -23,6 +23,8 @@ export type PluginContext = {
 	/** True when more than one auth collection exists, so `user` stores `{ relationTo, value }`. */
 	isUserPolymorphic: boolean
 	multiTenancy: MultiTenancyConfig | undefined
+	/** Whether entries carry an `impersonator` field. See `AuditPluginConfig.impersonation`. */
+	recordImpersonator: boolean
 	retention: DataRetentionConfig | undefined
 	tenantFieldName: string | undefined
 	tenantsSlug: string | undefined
@@ -30,7 +32,9 @@ export type PluginContext = {
 
 export const buildPluginContext = (
 	config: Config,
-	pluginOptions: AuditPluginConfig
+	pluginOptions: AuditPluginConfig,
+	/** The `definePlugin` slug map, built from every entry of `config.plugins`. */
+	plugins: Record<string, unknown> = {}
 ): PluginContext => {
 	const authCollectionsSlugs = (config.collections ?? [])
 		.filter((collection) => collection.auth)
@@ -64,6 +68,7 @@ export const buildPluginContext = (
 		groupEnabled,
 		isUserPolymorphic: Array.isArray(defaultRelationTo),
 		multiTenancy,
+		recordImpersonator: pluginOptions.impersonation ?? Boolean(plugins['@10x-media/impersonation']),
 		retention: pluginOptions.retention,
 		tenantFieldName: multiTenancy?.tenantFieldName ?? (multiTenancy ? 'tenant' : undefined),
 		tenantsSlug: multiTenancy?.tenantsSlug ?? (multiTenancy ? 'tenants' : undefined),

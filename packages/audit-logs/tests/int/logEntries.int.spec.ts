@@ -1,8 +1,16 @@
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
-import type { PayloadRequest } from 'payload'
+import type { Config, PayloadRequest, Plugin } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { auditLogs } from '../../src/index'
 import { type AuditLogDoc, posts, readLogs, seedUser, siteSettings, tags, users } from './fixtures'
+
+/**
+ * Stands in for `@10x-media/impersonation`: detection only looks at the slug. Listed
+ * after the audit plugin, so the spec also covers the order not mattering.
+ */
+const impersonationStub: Plugin = Object.assign((config: Config) => config, {
+	slug: '@10x-media/impersonation',
+})
 
 describe('audit log entries', () => {
 	let booted: BootedPayload
@@ -20,7 +28,7 @@ describe('audit log entries', () => {
 			}),
 			db: 'mongo',
 			collections: [posts, tags, users],
-			configOverrides: { globals: [siteSettings] },
+			configOverrides: { globals: [siteSettings], plugins: [impersonationStub] },
 			seed: async (payload) => {
 				const user = await seedUser(payload)
 				req = { user: { ...user, collection: 'users' } } as unknown as PayloadRequest
@@ -50,6 +58,28 @@ describe('audit log entries', () => {
 		const [log] = await readLogs(booted.payload, { documentId: { equals: String(doc.id) } })
 
 		expect(log?.user).toBeTruthy()
+		expect(log?.impersonator ?? null).toBeNull()
+	})
+
+	it('records the impersonator stamped on the acting user', async () => {
+		const admin = await booted.payload.create({
+			collection: 'users',
+			data: { email: 'impersonator@example.com', password: 'password', name: 'Impersonator' },
+		})
+		const doc = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'While impersonating' },
+			req: {
+				user: {
+					...req.user,
+					_impersonation: { impersonator: { collection: 'users', id: admin.id } },
+				},
+			} as unknown as PayloadRequest,
+		})
+		const [log] = await readLogs(booted.payload, { documentId: { equals: String(doc.id) } })
+
+		expect(String(log?.user)).toBe(String(req.user?.id))
+		expect(String(log?.impersonator)).toBe(String(admin.id))
 	})
 
 	it('diffs only the fields that changed on update', async () => {
@@ -183,5 +213,46 @@ describe('audit log entries', () => {
 
 		expect(after.filter((l) => l.relationTo === 'audit-logs')).toHaveLength(0)
 		expect(after).toHaveLength(before.length)
+	})
+})
+
+describe('audit log entries without the impersonation plugin', () => {
+	let booted: BootedPayload
+	let req: PayloadRequest
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: auditLogs({ collections: { posts: true } }),
+			db: 'mongo',
+			collections: [posts, tags, users],
+			seed: async (payload) => {
+				const user = await seedUser(payload)
+				req = { user: { ...user, collection: 'users' } } as unknown as PayloadRequest
+			},
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('adds no impersonator field and still logs an impersonated write', async () => {
+		const fields = booted.payload.collections['audit-logs']?.config.flattenedFields ?? []
+		expect(fields.map((f) => f.name)).not.toContain('impersonator')
+
+		const doc = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'Impersonated, unrecorded' },
+			req: {
+				user: {
+					...req.user,
+					_impersonation: { impersonator: { collection: 'users', id: req.user?.id } },
+				},
+			} as unknown as PayloadRequest,
+		})
+		const [log] = await readLogs(booted.payload, { documentId: { equals: String(doc.id) } })
+
+		expect(String(log?.user)).toBe(String(req.user?.id))
+		expect(log).not.toHaveProperty('impersonator')
 	})
 })

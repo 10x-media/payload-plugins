@@ -4,6 +4,7 @@ import type { AnonymizeFunction, ShouldLogFunction } from '../types'
 import { REDACTED } from '../types'
 import type { FieldMap } from '../utilities/buildFieldMap'
 import { computeDiff } from '../utilities/diff'
+import { impersonatorRelationship } from '../utilities/impersonator'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { extractTenantId } from '../utilities/tenant'
 import { writeAuditLog } from '../utilities/writeAuditLog'
@@ -19,6 +20,8 @@ export type AuditLogGlobalAfterChangeOptions = {
 	globalSlug: GlobalSlug
 	groupContextKey?: string
 	isUserPolymorphic: boolean
+	/** False when the log collection has no `impersonator` field. */
+	recordImpersonator: boolean
 	shouldLog?: ShouldLogFunction
 	tenantFieldName?: string
 }
@@ -85,6 +88,9 @@ export const afterChangeGlobalAuditLog =
 				? { relationTo: req.user.collection, value: req.user.id }
 				: req.user.id
 			: undefined
+		const impersonator = options.recordImpersonator
+			? impersonatorRelationship(req.user, options.isUserPolymorphic)
+			: undefined
 		const ipAddress = options.collectIpAddress ? getClientIP(req) : undefined
 		const userAgent = options.collectUserAgent ? getUserAgent(req) : undefined
 		const group = options.groupContextKey
@@ -126,6 +132,7 @@ export const afterChangeGlobalAuditLog =
 				relationTo: '__global__',
 				documentId: options.globalSlug,
 				...(userValue !== undefined && { user: userValue }),
+				...(impersonator !== undefined && { impersonator }),
 				...(req.locale && { locale: req.locale }),
 				payloadAPI: req.payloadAPI,
 				...(ipAddress && { ipAddress }),

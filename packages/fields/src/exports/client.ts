@@ -18,3 +18,13 @@ export {
 	MeasurementUnitsProvider,
 	useMeasurementUnits,
 } from '../fields/measurement/client/MeasurementUnitsProvider'
+export { CountryFlag, type CountryFlagProps } from '../fields/phoneNumber/client/CountryFlag'
+export {
+	type CountryOptionGroups,
+	CountryPicker,
+	type CountryPickerProps,
+} from '../fields/phoneNumber/client/CountryPicker'
+export {
+	PhoneNumberField,
+	type PhoneNumberFieldProps,
+} from '../fields/phoneNumber/client/PhoneNumberField'

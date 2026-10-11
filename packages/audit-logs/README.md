@@ -19,7 +19,9 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Snapshots** on create and delete, which is what makes a deleted document recoverable from its log entry.
 - **Retention** through Payload's jobs queue: archive to gzipped CSV in an upload collection, then delete what was archived.
 - **Multi-tenant aware**, with a tenant-scoped view alongside the global one, matching `@payloadcms/plugin-multi-tenant` defaults.
-- **A browsable admin view** with filters on collection, global, operation, user, changed path, event type and date range, all held in the URL.
+- **A browsable admin view**: one row per entry with the user, links to the document, and the diff on expand; filters on event, collection or global, user, date, document, changed field, group and API, all held in the URL.
+- **Impersonation aware**: entries written through `@10x-media/impersonation` record who was impersonating, and the view marks them.
+- **Custom event renderers**: your own component for a custom event's details, per event type.
 - **Typed reads**: `typedDiff<T>` and `typedSnapshot<T>` restore precise types to Payload's wide JSON fields.
 - **Typed translations** with per-key overrides via `@10x-media/audit-logs/i18n`.
 

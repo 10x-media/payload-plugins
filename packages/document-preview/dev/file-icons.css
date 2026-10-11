@@ -1,0 +1,48 @@
+.file-icons {
+	padding-bottom: calc(var(--base) * 3);
+	padding-top: calc(var(--base) * 2);
+}
+
+.file-icons__lead {
+	color: var(--theme-elevation-500);
+	margin-bottom: calc(var(--base) * 1.5);
+}
+
+.file-icons__grid {
+	display: grid;
+	gap: var(--base);
+	grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
+}
+
+.file-icons__item {
+	background: var(--theme-elevation-50);
+	border: 1px solid var(--theme-elevation-100);
+	border-radius: var(--style-radius-m);
+	margin: 0;
+	padding: var(--base);
+}
+
+.file-icons__sizes {
+	align-items: flex-end;
+	display: flex;
+	gap: calc(var(--base) / 2);
+}
+
+.file-icons__sizes img,
+.file-icons__payload {
+	border-radius: var(--style-radius-s);
+	display: block;
+	overflow: hidden;
+}
+
+.file-icons__payload svg {
+	display: block;
+	height: 100%;
+	width: 100%;
+}
+
+.file-icons__item figcaption {
+	color: var(--theme-elevation-650);
+	font-family: var(--font-mono, monospace);
+	margin-top: calc(var(--base) / 2);
+}

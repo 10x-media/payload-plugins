@@ -1,0 +1,176 @@
+{
+	"$schema": "https://ui.shadcn.com/schema/registry.json",
+	"name": "conversations",
+	"homepage": "https://docs.10xmedia.de/conversations/website/shadcn-registry",
+	"items": [
+		{
+			"name": "conversation-ui",
+			"type": "registry:component",
+			"title": "Conversation UI provider",
+			"description": "Labels, slots, locale, a renderer for custom message types, and the rich text pair (composer features and JSX converters) for every conversation component below it.",
+			"author": "10x Media GmbH <https://github.com/10x-media>",
+			"dependencies": ["@10x-media/conversations", "@payloadcms/richtext-lexical"],
+			"registryDependencies": [],
+			"files": [
+				{
+					"path": "conversations/conversation-ui.tsx",
+					"type": "registry:component",
+					"target": "components/conversations/conversation-ui.tsx"
+				}
+			]
+		},
+		{
+			"name": "conversation-composer",
+			"type": "registry:component",
+			"title": "Conversation composer",
+			"description": "The Lexical composer skinned with shadcn tokens: toolbar, / and @ menus, links, send and edit.",
+			"author": "10x Media GmbH <https://github.com/10x-media>",
+			"dependencies": ["@10x-media/conversations"],
+			"registryDependencies": [
+				"button",
+				"https://docs.10xmedia.de/r/conversations/conversation-ui.json"
+			],
+			"files": [
+				{
+					"path": "conversations/conversation-composer.tsx",
+					"type": "registry:component",
+					"target": "components/conversations/conversation-composer.tsx"
+				}
+			]
+		},
+		{
+			"name": "conversation-message",
+			"type": "registry:component",
+			"title": "Conversation message",
+			"description": "One message: avatar, name, time, body, thread summary, a menu with reply, edit and delete, and inline editing.",
+			"author": "10x Media GmbH <https://github.com/10x-media>",
+			"dependencies": ["@10x-media/conversations"],
+			"registryDependencies": [
+				"button",
+				"dropdown-menu",
+				"alert-dialog",
+				"https://docs.10xmedia.de/r/conversations/conversation-ui.json",
+				"https://docs.10xmedia.de/r/conversations/conversation-composer.json"
+			],
+			"files": [
+				{
+					"path": "conversations/conversation-message.tsx",
+					"type": "registry:component",
+					"target": "components/conversations/conversation-message.tsx"
+				}
+			]
+		},
+		{
+			"name": "conversation-feed",
+			"type": "registry:component",
+			"title": "Conversation feed",
+			"description": "The scrolling feed: day separators, grouping, the New messages divider, older pages and Jump to latest.",
+			"author": "10x Media GmbH <https://github.com/10x-media>",
+			"dependencies": ["@10x-media/conversations"],
+			"registryDependencies": [
+				"button",
+				"https://docs.10xmedia.de/r/conversations/conversation-ui.json",
+				"https://docs.10xmedia.de/r/conversations/conversation-message.json"
+			],
+			"files": [
+				{
+					"path": "conversations/conversation-feed.tsx",
+					"type": "registry:component",
+					"target": "components/conversations/conversation-feed.tsx"
+				}
+			]
+		},
+		{
+			"name": "conversation-channel-tabs",
+			"type": "registry:component",
+			"title": "Conversation channel tabs",
+			"description": "One tab per readable channel, with unread counts.",
+			"author": "10x Media GmbH <https://github.com/10x-media>",
+			"dependencies": ["@10x-media/conversations"],
+			"registryDependencies": ["https://docs.10xmedia.de/r/conversations/conversation-ui.json"],
+			"files": [
+				{
+					"path": "conversations/conversation-channel-tabs.tsx",
+					"type": "registry:component",
+					"target": "components/conversations/conversation-channel-tabs.tsx"
+				}
+			]
+		},
+		{
+			"name": "conversation-thread",
+			"type": "registry:component",
+			"title": "Conversation thread",
+			"description": "A root message, its replies and a reply composer.",
+			"author": "10x Media GmbH <https://github.com/10x-media>",
+			"dependencies": ["@10x-media/conversations"],
+			"registryDependencies": [
+				"https://docs.10xmedia.de/r/conversations/conversation-ui.json",
+				"https://docs.10xmedia.de/r/conversations/conversation-message.json",
+				"https://docs.10xmedia.de/r/conversations/conversation-feed.json",
+				"https://docs.10xmedia.de/r/conversations/conversation-composer.json"
+			],
+			"files": [
+				{
+					"path": "conversations/conversation-thread.tsx",
+					"type": "registry:component",
+					"target": "components/conversations/conversation-thread.tsx"
+				}
+			]
+		},
+		{
+			"name": "conversation-panel",
+			"type": "registry:block",
+			"title": "Conversation panel",
+			"description": "A whole conversation: channel tabs, feed, composer, and threads opening in place with a back button.",
+			"author": "10x Media GmbH <https://github.com/10x-media>",
+			"dependencies": ["@10x-media/conversations"],
+			"registryDependencies": [
+				"button",
+				"https://docs.10xmedia.de/r/conversations/conversation-ui.json",
+				"https://docs.10xmedia.de/r/conversations/conversation-channel-tabs.json",
+				"https://docs.10xmedia.de/r/conversations/conversation-feed.json",
+				"https://docs.10xmedia.de/r/conversations/conversation-composer.json",
+				"https://docs.10xmedia.de/r/conversations/conversation-thread.json"
+			],
+			"files": [
+				{
+					"path": "conversations/conversation-panel.tsx",
+					"type": "registry:component",
+					"target": "components/conversations/conversation-panel.tsx"
+				}
+			]
+		},
+		{
+			"name": "conversation-reactions",
+			"type": "registry:component",
+			"title": "Conversation reactions",
+			"description": "Reaction pills with an add button, the quick reactions row for the message menu, and reactionSlots for ConversationUIProvider.",
+			"author": "10x Media GmbH <https://github.com/10x-media>",
+			"dependencies": ["@10x-media/conversations"],
+			"registryDependencies": ["popover"],
+			"files": [
+				{
+					"path": "reactions/conversation-reactions.tsx",
+					"type": "registry:component",
+					"target": "components/conversations/conversation-reactions.tsx"
+				}
+			]
+		},
+		{
+			"name": "conversation-attachments",
+			"type": "registry:component",
+			"title": "Conversation attachments",
+			"description": "The attach button, picked files inside the composer (drop and paste too), a message's files with an image and PDF viewer, and attachmentSlots for ConversationUIProvider.",
+			"author": "10x Media GmbH <https://github.com/10x-media>",
+			"dependencies": ["@10x-media/conversations"],
+			"registryDependencies": ["button", "dialog"],
+			"files": [
+				{
+					"path": "attachments/conversation-attachments.tsx",
+					"type": "registry:component",
+					"target": "components/conversations/conversation-attachments.tsx"
+				}
+			]
+		}
+	]
+}
