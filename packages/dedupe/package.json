@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/dedupe",
-	"version": "0.1.0-beta.0",
+	"version": "0.1.0-beta.1",
 	"description": "Find duplicate documents in any collection and merge them, with pluggable search adapters",
 	"license": "MIT",
 	"repository": {

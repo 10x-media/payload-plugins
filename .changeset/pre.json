@@ -145,6 +145,7 @@
 		"conversations-initial-beta",
 		"conversations-locales",
 		"conversations-server-function",
+		"dedupe-access-and-scans",
 		"dedupe-initial",
 		"dedupe-merge-sections",
 		"document-preview-initial-beta",
