@@ -8,13 +8,14 @@ import type { CaptureSupport } from '../../src/core/capture'
 import type { AnalyticsAdapter } from '../../src/core/contract'
 import { analytics } from '../../src/index'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import { strictUnhandled } from './msw'
 
 const ORIGIN = 'http://localhost:3000'
 const ASSETS = 'https://assets.vendor.test'
 const INGEST = 'https://ingest.vendor.test'
 
 const server = setupServer()
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+beforeAll(() => server.listen({ onUnhandledRequest: strictUnhandled }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 

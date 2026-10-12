@@ -210,8 +210,8 @@ describe('FilterOperatorSelectField', () => {
 
 		render(<FilterOperatorSelectField {...props()} />)
 
-		expect(await screen.findByRole('option', { name: keys.filterOperatorEq })).toBeDefined()
-		expect(screen.getByRole('option', { name: keys.filterOperatorMatches })).toBeDefined()
+		expect(await screen.findByRole('option', { name: keys.filterOperatorMatches })).toBeDefined()
+		expect(screen.getByRole('option', { name: keys.filterOperatorEq })).toBeDefined()
 		expect(screen.queryByRole('option', { name: keys.filterOperatorContains })).toBeNull()
 	})
 

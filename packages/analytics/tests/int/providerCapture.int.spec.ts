@@ -15,6 +15,7 @@ import { adapterFromProviderDoc } from '../../src/providers/factory'
 import { resolveHostPolicy } from '../../src/providers/hosts'
 import { AnalyticsScripts } from '../../src/site/AnalyticsScripts'
 import type { TrackerConfig } from '../../src/tracker/config'
+import { strictUnhandled } from './msw'
 
 const SECRET = 'phx_private_query_key'
 const TOKEN = 'phc_tenant_public'
@@ -23,7 +24,7 @@ const MEASUREMENT_ID = 'G-AB12CD34'
 const SELF_HOSTED = 'https://posthog.example.com'
 
 const server = setupServer()
-beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+beforeAll(() => server.listen({ onUnhandledRequest: strictUnhandled }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
