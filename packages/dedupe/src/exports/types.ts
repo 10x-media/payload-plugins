@@ -11,6 +11,8 @@ export type {
 	DedupeAccess,
 	DedupeHooks,
 	DedupePluginOptions,
+	DocTitle,
+	DocTitleArgs,
 	MatchConfig,
 	MatchFieldConfig,
 	MergeSection,

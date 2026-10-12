@@ -567,10 +567,20 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		const limited = await reqFor(fixture.booted, 'limited-titles@example.com')
 		expect(
 			(await buildPlanResponse(group(limited, AGENTS, ids))).docs.map((doc) => doc.title)
-		).toEqual(ids.map(String))
+		).toEqual([`${keep.id} (North)`, `${gone.id} (South)`])
 		expect(
 			(await buildPlanResponse(group(fixture.req, AGENTS, ids))).docs.map((doc) => doc.title)
-		).toEqual(['Falcon', 'Falcon'])
+		).toEqual(['Falcon (North)', 'Falcon (South)'])
+	})
+
+	it("keeps the useAsTitle title where the collection's title answers none", async () => {
+		const keep = await create(AGENTS, { codename: 'Heron' })
+		const gone = await create(AGENTS, { codename: 'Heron' })
+		expect(
+			(await buildPlanResponse(group(fixture.req, AGENTS, [keep.id, gone.id]))).docs.map(
+				(doc) => doc.title
+			)
+		).toEqual(['Heron', 'Heron'])
 	})
 
 	it('keeps the survivor value of a field the reviewer may not change, whatever they pick', async () => {

@@ -42,8 +42,26 @@ description: Every option of the plugin and its default.
 | `writeLocale` | the default locale, or the first the primary is complete in | The locale the values every locale shares are written in: a code, or `({ req, survivor }) => code`. See [Merging](./merging#localized-fields). |
 | `checkOnSave` | `true` with a match | Look for duplicates of the document on every save and queue the pairs. The document is indexed on every save either way, so `findDuplicates` finds it before the next scan. |
 | `sections` | none | Parts of the merge screen you draw, whose values reach `hooks.beforeRemove`: `{ key, Component, validate? }` each, see [Sections](./merging#sections). |
+| `title` | `useAsTitle` | How a document is named on the merge screen, in the queue and in the duplicate check: `({ req, doc, title }) => string`, see [Titles](#titles). |
 
 An invalid match config stops the app at startup with an error naming the field.
+
+### Titles
+
+A document is named by its `useAsTitle` field. Where duplicates share that title, `title` names them apart, for instance by an id kept in a field hidden in the admin:
+
+```ts title="payload.config.ts"
+dedupe({
+  collections: {
+    customers: {
+      match: { fields: [{ path: 'email', weight: 45 }] },
+      title: ({ doc, title }) => (doc.externalId ? `${title} (${doc.externalId})` : title),
+    },
+  },
+})
+```
+
+`title` is the `useAsTitle` value in the reader's locale, or the document's id where it has none or the reader may not read that field. `doc` is the document as the plugin read it, so check any field you show: the merge screen reads documents past field access, and a value the reviewer may not read still reaches the function there. An empty answer keeps `title`.
 
 ## Multi-tenancy
 

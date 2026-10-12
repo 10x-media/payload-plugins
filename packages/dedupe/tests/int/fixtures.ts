@@ -92,7 +92,10 @@ export const pluginOptions: DedupePluginOptions = {
 				derived.map((spec) => (spec.path === 'secret' ? { ...spec, policy: 'manual' } : spec)),
 		},
 		vaults: { absorbed: 'delete' },
-		agents: { absorbed: 'delete' },
+		agents: {
+			absorbed: 'delete',
+			title: ({ doc, title }) => (doc.desk ? `${title} (${String(doc.desk)})` : null),
+		},
 		fragile: {},
 		teams: {},
 		posts: { match: { fields: [{ path: 'title', weight: 1 }] } },
@@ -310,7 +313,7 @@ const agents: CollectionConfig = {
 			type: 'text',
 			access: { read: ({ req }) => !emailOf(req).startsWith('limited') },
 		},
-		{ name: 'desk', type: 'text' },
+		{ name: 'desk', type: 'text', admin: { hidden: true } },
 	],
 }
 
