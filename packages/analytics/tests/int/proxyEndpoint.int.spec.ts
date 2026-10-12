@@ -1,6 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { delay, HttpResponse, http } from 'msw'
-import { setupServer } from 'msw/node'
 import { handleEndpoints } from 'payload'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { posthog } from '../../src/adapters/posthog/posthog'
@@ -8,14 +7,14 @@ import type { CaptureSupport } from '../../src/core/capture'
 import type { AnalyticsAdapter } from '../../src/core/contract'
 import { analytics } from '../../src/index'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
-import { strictUnhandled } from './msw'
+import { setupServer } from './msw'
 
 const ORIGIN = 'http://localhost:3000'
 const ASSETS = 'https://assets.vendor.test'
 const INGEST = 'https://ingest.vendor.test'
 
 const server = setupServer()
-beforeAll(() => server.listen({ onUnhandledRequest: strictUnhandled }))
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 

@@ -1,6 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { HttpResponse, http } from 'msw'
-import { setupServer } from 'msw/node'
 import { handleEndpoints } from 'payload'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -15,7 +14,7 @@ import { adapterFromProviderDoc } from '../../src/providers/factory'
 import { resolveHostPolicy } from '../../src/providers/hosts'
 import { AnalyticsScripts } from '../../src/site/AnalyticsScripts'
 import type { TrackerConfig } from '../../src/tracker/config'
-import { strictUnhandled } from './msw'
+import { setupServer } from './msw'
 
 const SECRET = 'phx_private_query_key'
 const TOKEN = 'phc_tenant_public'
@@ -24,7 +23,7 @@ const MEASUREMENT_ID = 'G-AB12CD34'
 const SELF_HOSTED = 'https://posthog.example.com'
 
 const server = setupServer()
-beforeAll(() => server.listen({ onUnhandledRequest: strictUnhandled }))
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 

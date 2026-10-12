@@ -1,9 +1,6 @@
 /**
- * Fails on any unmocked request except testcontainers' calls to the Docker API, which reach the
- * daemon's socket as `localhost` requests when `TEST_DB=container`.
+ * msw over the global fetch alone, which is all these specs stub. `msw/node` also patches
+ * `http.request`, and on Linux its passthrough breaks testcontainers' Docker API calls (write EPIPE)
+ * when `TEST_DB=container` boots a database while it listens.
  */
-export const strictUnhandled = (request: Request, print: { error: () => void }): void => {
-	if (new URL(request.url).hostname !== 'localhost') {
-		print.error()
-	}
-}
+export { setupServer } from 'msw/native'

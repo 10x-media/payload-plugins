@@ -159,6 +159,8 @@ describeForDb('analytics money and order privacy', {}, (db) => {
 		})
 		await sale(EUR, { orderId: `${SECRET}eur-2`, value: 15, path, timestamp: noonOf(day) })
 		const raw = await byCurrency(EUR, { path, dateRange: dayRange(day) })
+		// Maintenance the sales started in the background may hold the day's lease until it settles.
+		await engine.idle()
 		expect(await engine.aggregate({ scope: EUR, day, tz: 'UTC' })).toMatchObject({
 			outcome: 'completed',
 		})

@@ -71,11 +71,15 @@ describe('pgDriver', () => {
 			},
 			{ timeoutMs: 100, lockTimeoutMs: 200 }
 		)
-		expect(log).toEqual([
-			'BEGIN; SET LOCAL statement_timeout = 100; SET LOCAL lock_timeout = 200',
-			'UPDATE 1',
-			'COMMIT',
-		])
+		// The statement gets what is left of 100 ms after the pool wait.
+		const [begin, ...rest] = log
+		const left = Number(/statement_timeout = (\d+);/.exec(begin ?? '')?.[1])
+		expect(left).toBeGreaterThan(0)
+		expect(left).toBeLessThanOrEqual(100)
+		expect(begin).toMatch(
+			/^BEGIN; SET LOCAL statement_timeout = \d+; SET LOCAL lock_timeout = 200$/
+		)
+		expect(rest).toEqual(['UPDATE 1', 'COMMIT'])
 	})
 
 	it('rolls back what failed, hands the client back and throws the work’s own error', async () => {

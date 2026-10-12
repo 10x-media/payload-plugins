@@ -1,6 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { HttpResponse, http } from 'msw'
-import { setupServer } from 'msw/node'
 import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { CaptureSupport } from '../../src/core/capture'
@@ -9,7 +8,7 @@ import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import type { TrackerConfig } from '../../src/tracker/config'
-import { strictUnhandled } from './msw'
+import { setupServer } from './msw'
 
 const INGEST = 'https://ingest.vendor.test'
 
@@ -72,7 +71,7 @@ describeForDb('analytics capture slots - disabled with false', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
-		server.listen({ onUnhandledRequest: strictUnhandled })
+		server.listen({ onUnhandledRequest: 'error' })
 		booted = await bootPayload({
 			db,
 			plugin: analytics({

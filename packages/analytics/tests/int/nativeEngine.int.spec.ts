@@ -240,6 +240,12 @@ const battery = (scope: string, from: CalendarDay): Array<[string, AnalyticsQuer
 	]
 }
 
+/**
+ * A read stops counting closed days once its lazy budget (3 s by default) is spent, which a slow CI
+ * runner does before the last one; reads compared with raw ones must count every day.
+ */
+const UNHURRIED: EngineOptions = { lazy: { budgetMs: 120_000 } }
+
 describeForDb('native engine reads', {}, (db) => {
 	let first: BootedPayload
 	let second: BootedPayload
@@ -282,7 +288,7 @@ describeForDb('native engine reads', {}, (db) => {
 	})
 
 	it('answers alpha in Berlin as raw reads do: days aggregated before, a stale zone, lazy days and today', async () => {
-		const engine = engineOn(first)
+		const engine = engineOn(first, UNHURRIED)
 		for (const day of [20260928, 20260929, 20260930, 20261001]) {
 			expect(await engine.aggregate({ scope: 'alpha', day, tz: 'Europe/Berlin' })).toMatchObject({
 				outcome: 'completed',
@@ -316,7 +322,7 @@ describeForDb('native engine reads', {}, (db) => {
 	}, 180_000)
 
 	it('answers beta in New York as raw reads do, every closed day aggregated during the reads', async () => {
-		const engine = engineOn(first)
+		const engine = engineOn(first, UNHURRIED)
 		for (const [name, query] of battery('beta', 20260930)) {
 			await compare(engine, name, query)
 		}
@@ -398,7 +404,7 @@ describeForDb('native engine reads', {}, (db) => {
 	)
 
 	it('fills a page in exactly when today lifts it past the candidates the closed days offered', async () => {
-		const engine = engineOn(first)
+		const engine = engineOn(first, UNHURRIED)
 		const query: AnalyticsQuery = {
 			scope: 'zeta',
 			timezone: 'UTC',
