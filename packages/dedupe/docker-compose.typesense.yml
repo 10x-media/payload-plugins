@@ -1,0 +1,8 @@
+# Typesense for the dev app's `DEDUPE_ADAPTER=typesense`. `pnpm dev:typesense` recreates it
+# with the app, as empty as the app's in-memory database; "Scan now" indexes a kept database.
+services:
+  typesense:
+    image: typesense/typesense:28.0
+    command: ['--data-dir', '/tmp', '--api-key', 'dedupe-dev', '--enable-cors']
+    ports:
+      - '${TYPESENSE_PORT:-8108}:8108'
