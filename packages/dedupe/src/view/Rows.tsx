@@ -30,6 +30,7 @@ import { createContext, type ReactNode, use, useEffect, useMemo, useRef, useStat
 
 import { isEmpty, writePath } from '../merge/compare'
 import type { DecisionView, DocRef } from '../merge/planResponse'
+import { DEDUPE_FIELD_KEY, type DedupeFieldConfig } from '../schema/fieldConfig'
 import { blockOf, fieldAt } from './Value'
 
 const baseClass = 'dedupe-merge'
@@ -183,36 +184,54 @@ const RowPick = ({ own }: { own?: ReactNode }) => {
 	)
 }
 
-/** The state of one field and what it holds, its rows closed and labelled with a check. */
-const withPicks = (state: FormState, path: string): FormState =>
+/**
+ * The state of one field and what it holds. With `native`, the field leaves its own `Field`
+ * component out, and Payload draws its type instead.
+ */
+const onlyField = (state: FormState, path: string, native: boolean): FormState =>
 	Object.fromEntries(
 		Object.entries(state)
 			.filter(([key]) => key === path || key.startsWith(`${path}.`))
 			.map(([key, field]) =>
-				key === path && field.rows
-					? [
-							key,
-							{
-								...field,
-								rows: field.rows.map((row) => ({
-									...row,
-									collapsed: true,
-									customComponents: {
-										...row.customComponents,
-										RowLabel: <RowPick own={row.customComponents?.RowLabel} />,
-									},
-								})),
-							},
-						]
+				key === path && native && field.customComponents?.Field !== undefined
+					? [key, { ...field, customComponents: { ...field.customComponents, Field: undefined } }]
 					: [key, field]
 			)
 	)
 
-/** The state of one field and what it holds, as the form keeps it. */
-const onlyField = (state: FormState, path: string): FormState =>
+/** The state of one field and what it holds, its rows closed and labelled with a check. */
+const withPicks = (state: FormState, path: string, native: boolean): FormState =>
 	Object.fromEntries(
-		Object.entries(state).filter(([key]) => key === path || key.startsWith(`${path}.`))
+		Object.entries(onlyField(state, path, native)).map(([key, field]) =>
+			key === path && field.rows
+				? [
+						key,
+						{
+							...field,
+							rows: field.rows.map((row) => ({
+								...row,
+								collapsed: true,
+								customComponents: {
+									...row.customComponents,
+									RowLabel: <RowPick own={row.customComponents?.RowLabel} />,
+								},
+							})),
+						},
+					]
+				: [key, field]
+		)
 	)
+
+/** Whether the field asks to be drawn on the merge screen without its own `Field` component. */
+const useNative = (collection: string, path: string): boolean => {
+	const { getEntityConfig } = useConfig()
+	const field = fieldAt(
+		getEntityConfig({ collectionSlug: collection })?.fields ?? [],
+		path.split('.')
+	)
+	const custom = field && 'admin' in field ? field.admin?.custom : undefined
+	return (custom?.[DEDUPE_FIELD_KEY] as DedupeFieldConfig | undefined)?.mergeView === 'native'
+}
 
 /** One field of a document as its own edit view draws it, read-only, from the state built for it. */
 const FieldForm = ({
@@ -296,10 +315,11 @@ export const Rows = ({
 	state: FormStates[string] | undefined
 }) => {
 	const form = state && 'state' in state ? state.state : undefined
+	const native = useNative(collection, decision.path)
 	// A new object makes the form start over, so it only changes with the state it is made from.
 	const initialState = useMemo(
-		() => (form ? withPicks(form, decision.path) : undefined),
-		[form, decision.path]
+		() => (form ? withPicks(form, decision.path, native) : undefined),
+		[form, decision.path, native]
 	)
 	return (
 		<div className={`${baseClass}__cell ${baseClass}__rows`}>
@@ -330,9 +350,10 @@ export const Drawn = ({
 	state: FormStates[string] | undefined
 }) => {
 	const form = state && 'state' in state ? state.state : undefined
+	const native = useNative(collection, decision.path)
 	const initialState = useMemo(
-		() => (form ? onlyField(form, decision.path) : undefined),
-		[form, decision.path]
+		() => (form ? onlyField(form, decision.path, native) : undefined),
+		[form, decision.path, native]
 	)
 	return (
 		<div className={`${baseClass}__drawn`} inert>

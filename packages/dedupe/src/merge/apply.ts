@@ -17,11 +17,12 @@ import {
 	userRef,
 } from '../plugin/context'
 import { emitEvent } from '../plugin/events'
+import { MERGING_UNAVAILABLE, transactionsMessage } from '../plugin/transactions'
 import { checkDocument } from '../queue/live'
 import { closePairsFor } from '../queue/pairs'
 import { AUTH_FIELDS, fullLabel } from '../schema/deriveSpec'
 import type { MergeChoice, MergePlan } from '../schema/types'
-import { mergeableSpec } from './access'
+import { mergeableSpec, releaseRefusal, writeRefusal } from './access'
 import {
 	fieldsWithin,
 	freshWithin,
@@ -421,8 +422,68 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 	const ids = absorbed.map((doc) => String(doc.id))
 	const early = ids.filter(leavesFirst)
 	const late = ids.filter((id) => !leavesFirst(id))
-	const removing = await removalRefusal({ req, col, absorbedIds, deleted: early })
+	const removing =
+		(await removalRefusal({ req, col, absorbedIds, deleted: early })) ??
+		(await releaseRefusal({
+			req,
+			col,
+			absorbed,
+			released: Object.fromEntries([...releases].map(([id, { release }]) => [id, release])),
+		}))
 	if (removing) throw forbidden(removing)
+
+	const writes: Array<{ locale?: string; data: Record<string, unknown> }> = []
+	if (ctx.localeCodes && writeLocale) {
+		const shared = mergeData(plan.base, plan.byLocale[writeLocale] ?? {})
+		if (Object.keys(shared).length > 0) writes.push({ locale: writeLocale, data: shared })
+		for (const [locale, data] of Object.entries(plan.byLocale)) {
+			if (locale === writeLocale) continue
+			if (Object.keys(data).length > 0) writes.push({ locale, data })
+		}
+	} else if (Object.keys(plan.base).length > 0) {
+		writes.push({ data: plan.base })
+	}
+	for (const write of writes) {
+		withFreshRows({
+			col,
+			survivor,
+			data: write.data,
+			locale: write.locale,
+			blocks: payload.config.blocks,
+			hidden,
+		})
+	}
+	// A list whose rows hold values per locale is written into every locale, the same rows
+	// each time, so each locale's values land on the rows the first write made.
+	const first = writes.find((write) => write.locale === writeLocale)
+	const listsPerLocale = first && ctx.localeCodes ? col.spec : []
+	for (const spec of listsPerLocale) {
+		if (spec.localized || (spec.type !== 'array' && spec.type !== 'blocks')) continue
+		const value = readPath(first?.data ?? {}, spec.path)
+		const field = getFieldByPath({ fields: col.config.flattenedFields, path: spec.path })?.field
+		if (value === undefined || !field) continue
+		const known = payload.config.blocks
+		if (!fieldsWithin(field, known).some((sub) => perLocale(sub, false))) continue
+		for (const locale of ctx.localeCodes ?? []) {
+			// A language the rows hold nothing in is left alone: Payload would check every
+			// required field of it, and the survivor may have none there.
+			// Read before the hidden fields went back into the rows, as the plan reads it.
+			const planned = readPath(plan.base, spec.path)
+			if (locale !== writeLocale && !heldIn(planned, field, { locale, known })) continue
+			let write = writes.find((entry) => entry.locale === locale)
+			if (!write) {
+				write = { locale, data: {} }
+				writes.push(write)
+			}
+			writePath(write.data, spec.path, inLocale(value, field, { locale, known }))
+		}
+	}
+	// Payload drops a value its field access refuses without a word; refused here, before
+	// anything is written, the merge never reports a value it did not write.
+	for (const entry of writes) {
+		const refusal = await writeRefusal({ req, col, doc: survivor, data: entry.data })
+		if (refusal) throw forbidden(refusal)
+	}
 
 	const transactional = await initTransaction(req)
 	// Ours, or one the caller opened around the merge.
@@ -435,12 +496,8 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		if (refusal) throw new APIError(refusal, 409, undefined, true)
 	}
 	if (!inTransaction && ctx.options.requireTransactions) {
-		throw new APIError(
-			'The database did not open a transaction and `requireTransactions` is on.',
-			503,
-			undefined,
-			true
-		)
+		payload.logger.error(transactionsMessage(true))
+		throw new APIError(MERGING_UNAVAILABLE, 503, undefined, true)
 	}
 
 	const draft = col.hasDrafts && col.options.draft
@@ -450,12 +507,14 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 	const undo: Array<{ id: string; values: Record<string, unknown>; run: () => Promise<unknown> }> =
 		[]
 	let written = false
+	// Every write the reviewer chose goes through Payload as the reviewer, so the collection's
+	// and the fields' own access hold; the checks above only explain a refusal beforehand.
 	const remove = (id: string) =>
 		payload.delete({
 			collection: col.slug,
 			id,
 			depth: 0,
-			overrideAccess: true,
+			overrideAccess: false,
 			overrideLock: true,
 			context: dedupeContext(),
 			req: localRequest(req),
@@ -480,7 +539,8 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		for (const id of early) await remove(id)
 		for (const id of late) {
 			// Through the database layer, so the host's hooks never see the placeholder as an
-			// edit; the values it replaces are in the snapshot above.
+			// edit; the values it replaces are in the snapshot above. The one write that passes
+			// Payload's access: `releaseRefusal` above asked the field's update access for it.
 			const update = releases.get(id)?.update
 			if (!update) continue
 			// Laid over the stored document, as Payload's own save lays its data: MongoDB sets every
@@ -543,52 +603,6 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 			}
 		}
 
-		const writes: Array<{ locale?: string; data: Record<string, unknown> }> = []
-		if (ctx.localeCodes && writeLocale) {
-			const shared = mergeData(plan.base, plan.byLocale[writeLocale] ?? {})
-			if (Object.keys(shared).length > 0) writes.push({ locale: writeLocale, data: shared })
-			for (const [locale, data] of Object.entries(plan.byLocale)) {
-				if (locale === writeLocale) continue
-				if (Object.keys(data).length > 0) writes.push({ locale, data })
-			}
-		} else if (Object.keys(plan.base).length > 0) {
-			writes.push({ data: plan.base })
-		}
-		for (const write of writes) {
-			withFreshRows({
-				col,
-				survivor,
-				data: write.data,
-				locale: write.locale,
-				blocks: payload.config.blocks,
-				hidden,
-			})
-		}
-		// A list whose rows hold values per locale is written into every locale, the same rows
-		// each time, so each locale's values land on the rows the first write made.
-		const first = writes.find((write) => write.locale === writeLocale)
-		const listsPerLocale = first && ctx.localeCodes ? col.spec : []
-		for (const spec of listsPerLocale) {
-			if (spec.localized || (spec.type !== 'array' && spec.type !== 'blocks')) continue
-			const value = readPath(first?.data ?? {}, spec.path)
-			const field = getFieldByPath({ fields: col.config.flattenedFields, path: spec.path })?.field
-			if (value === undefined || !field) continue
-			const known = payload.config.blocks
-			if (!fieldsWithin(field, known).some((sub) => perLocale(sub, false))) continue
-			for (const locale of ctx.localeCodes ?? []) {
-				// A language the rows hold nothing in is left alone: Payload would check every
-				// required field of it, and the survivor may have none there.
-				// Read before the hidden fields went back into the rows, as the plan reads it.
-				const planned = readPath(plan.base, spec.path)
-				if (locale !== writeLocale && !heldIn(planned, field, { locale, known })) continue
-				let write = writes.find((entry) => entry.locale === locale)
-				if (!write) {
-					write = { locale, data: {} }
-					writes.push(write)
-				}
-				writePath(write.data, spec.path, inLocale(value, field, { locale, known }))
-			}
-		}
 		const write = (locale: string | undefined, data: Record<string, unknown>, asDraft: boolean) =>
 			payload.update({
 				collection: col.slug,
@@ -597,7 +611,7 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 				...(locale ? { locale } : {}),
 				depth: 0,
 				draft: asDraft,
-				overrideAccess: true,
+				overrideAccess: false,
 				overrideLock: true,
 				context: dedupeContext(),
 				req: localRequest(req),
@@ -622,7 +636,7 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 					id,
 					data: { deletedAt: new Date().toISOString() },
 					depth: 0,
-					overrideAccess: true,
+					overrideAccess: false,
 					overrideLock: true,
 					context: dedupeContext(),
 					req: localRequest(req),

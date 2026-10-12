@@ -387,3 +387,18 @@ export const userRef = (req: PayloadRequest): string | null =>
 export const dedupeContext = (): { dedupe: { operation: 'merge' } } => ({
 	dedupe: { operation: 'merge' },
 })
+
+/**
+ * The `req.context` key a host sets to keep a save from the plugin, for a bulk write such as an
+ * import or a seed: `'check'` still indexes the document but queues no check, `'all'` neither
+ * indexes nor checks it. A delete, a move to the trash or off publication still leaves the
+ * index and closes its pairs. A scan, or `findDuplicates`, catches up afterwards.
+ */
+export const DEDUPE_SKIP = 'dedupeSkip'
+
+export type DedupeSkip = 'all' | 'check'
+
+export const skipOf = (context: Record<string, unknown> | undefined): DedupeSkip | null => {
+	const mode = context?.[DEDUPE_SKIP]
+	return mode === 'all' || mode === 'check' ? mode : null
+}

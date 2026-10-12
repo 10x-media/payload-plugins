@@ -13,16 +13,16 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.mergeInto]: 'Fusionner dans {{title}}',
 	[keys.runScan]: 'Analyser maintenant',
 	[keys.scanQueued]: "Analyse mise en file d'attente.",
+	[keys.scanAlreadyQueued]: "Une analyse est déjà en file d'attente.",
+	[keys.scanPending]: 'Analyse en attente',
+	[keys.scanRunning]: 'Analyse en cours…',
 	[keys.scanDone]: 'Analyse terminée : {{pairs}} paires ouvertes sur {{compared}} comparaisons.',
 	[keys.needsChoice]: 'Décision requise',
 	[keys.applied]: 'Fusionné dans le document principal.',
 	[keys.empty]: 'vide',
 	[keys.selectTwo]: 'Sélectionnez de 2 à {{max}} documents à fusionner.',
 	[keys.mergeSelected]: 'Fusionner la sélection',
-	[keys.noTransactions]:
-		"Cette base de données n'ouvre pas de transactions. Si la fusion échoue avant l'écriture du document principal, les documents fusionnés retrouvent leurs valeurs. Si elle échoue après, le document principal garde ce qui a été écrit et les documents fusionnés restent en place, avec des valeurs provisoires à la place des valeurs uniques cédées. Les références que l'application a déplacées vers le document principal avant l'échec y restent. Une fusion qui devrait d'abord supprimer un document est refusée.",
-	[keys.transactionsRequired]:
-		"La fusion est désactivée : cette base de données n'ouvre pas de transactions et le plugin en exige une.",
+	[keys.transactionsRequired]: "La fusion n'est pas disponible. Contactez votre administrateur.",
 	[keys.takenFrom]: 'Repris de {{title}}',
 	[keys.error]: "Quelque chose s'est mal passé.",
 	[keys.missingParams]:

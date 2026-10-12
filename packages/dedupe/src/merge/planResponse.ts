@@ -9,10 +9,11 @@ import {
 import { PAIRS_SLUG } from '../collections/slugs'
 import { pairKeyFor } from '../match/keys'
 import type { CollectionContext, PluginContext } from '../plugin/context'
+import { transactionsOn } from '../plugin/transactions'
 import { countLeftOut } from '../queue/pairs'
 import { fullLabel } from '../schema/deriveSpec'
 import type { MergeChoice, MergeDecision } from '../schema/types'
-import { mergeableSpec, withoutUnreadable } from './access'
+import { mergeableSpec, releaseRefusal, withoutUnreadable } from './access'
 import {
 	accessRefusal,
 	deletionRefusal,
@@ -375,7 +376,7 @@ export const buildPlanResponse = async (args: {
 		locale,
 	})
 
-	const available = await transactionsOn(req)
+	const available = await transactionsOn(req.payload)
 	const transactions = available ? 'on' : ctx.options.requireTransactions ? 'refused' : 'off'
 	const survivorDraft = !col.options.draft && (await hasNewerDraft({ req, col, id: survivor.id }))
 	// What each merged-in document gives up, as the apply works it out in either mode; shown only
@@ -432,7 +433,8 @@ export const buildPlanResponse = async (args: {
 			deleted: Object.entries(released)
 				.filter(([, given]) => given.deletes.length > 0)
 				.map(([id]) => id),
-		}))
+		})) ??
+		(await releaseRefusal({ req, col, absorbed, released }))
 	// Not the reviewer's access: an editor holds a document open, or a language would be left
 	// without a value Payload requires there.
 	const blocked =
@@ -517,15 +519,4 @@ export const buildPlanResponse = async (args: {
 		blocked,
 		filled: plan.filled,
 	}
-}
-
-/**
- * Whether the database opens a transaction, as `initTransaction` asks it: a MongoDB without a
- * replica set, or an adapter given `transactionOptions: false`, answers with none.
- */
-const transactionsOn = async (req: PayloadRequest): Promise<boolean> => {
-	const id = await req.payload.db.beginTransaction()
-	if (!id) return false
-	await req.payload.db.rollbackTransaction(id)
-	return true
 }

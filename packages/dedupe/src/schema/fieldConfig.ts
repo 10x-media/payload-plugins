@@ -16,6 +16,12 @@ export type DedupeFieldConfig = {
 	 * shows it. `true` merges it field by field or row by row instead, as one without.
 	 */
 	split?: boolean
+	/**
+	 * `'native'` draws the field on the merge screen as Payload draws its type, without the
+	 * field's own `Field` component, which the edit view keeps. For a split list whose component
+	 * draws no row labels, where the row checks go. Fields inside the rows keep theirs.
+	 */
+	mergeView?: 'native'
 }
 
 /**
@@ -41,7 +47,11 @@ export const readFieldConfig = (field: {
 }): DedupeFieldConfig | undefined => {
 	const raw = field.admin?.custom?.[DEDUPE_FIELD_KEY]
 	if (!raw || typeof raw !== 'object') return undefined
-	const { policy, split } = raw as { policy?: unknown; split?: unknown }
+	const { policy, split, mergeView } = raw as {
+		policy?: unknown
+		split?: unknown
+		mergeView?: unknown
+	}
 	if (policy !== undefined && (typeof policy !== 'string' || !POLICIES.has(policy))) {
 		throw new Error(
 			`dedupe: field "${field.name}" declares an unknown merge policy "${String(policy)}"`
@@ -50,8 +60,12 @@ export const readFieldConfig = (field: {
 	if (split !== undefined && typeof split !== 'boolean') {
 		throw new Error(`dedupe: field "${field.name}" declares \`split\` other than true or false`)
 	}
+	if (mergeView !== undefined && mergeView !== 'native') {
+		throw new Error(`dedupe: field "${field.name}" declares \`mergeView\` other than 'native'`)
+	}
 	return {
 		...(policy === undefined ? {} : { policy: policy as MergePolicy }),
 		...(split === undefined ? {} : { split }),
+		...(mergeView === undefined ? {} : { mergeView }),
 	}
 }

@@ -509,6 +509,48 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		await expect(applyMerge(args)).rejects.toMatchObject({ status: 403 })
 	})
 
+	it("refuses to merge into a survivor the collection's update access does not reach", async () => {
+		const keep = await create(STAFF, { name: 'Keeper survivor', grade: 'theirs' })
+		const other = await create(STAFF, { name: 'Keeper survivor', grade: 'mine' })
+		const keeper = await reqFor(fixture.booted, 'keeper-survivor@example.com')
+		const args = group(keeper, STAFF, [keep.id, other.id])
+		expect((await buildPlanResponse(args)).refusal).toBe(
+			'You may not update the surviving document.'
+		)
+		await expect(applyMerge(args)).rejects.toMatchObject({ status: 403 })
+	})
+
+	it("refuses a value the field's update access refuses in the write, which Payload would drop", async () => {
+		const keep = await create(STAFF, { name: 'Ranked', rank: 'officer' })
+		const other = await create(STAFF, { name: 'Ranked', rank: 'chief' })
+		const args = {
+			...group(fixture.req, STAFF, [keep.id, other.id]),
+			choices: { rank: { doc: String(other.id) } },
+		}
+		await expect(applyMerge(args)).rejects.toMatchObject({
+			status: 403,
+			message: 'You may not change "Rank".',
+		})
+		const after = (await fixture.booted.payload.findByID({
+			collection: STAFF,
+			id: keep.id,
+			depth: 0,
+		})) as Doc
+		expect(after.rank).toBe('officer')
+	})
+
+	it('refuses to free a unique value on a merged-in document the reviewer may not change there', async () => {
+		const keep = await create(STAFF, { name: 'Badged' })
+		const other = await create(STAFF, { name: 'Badged', badge: 'B-7', sealed: true })
+		const args = {
+			...group(fixture.req, STAFF, [keep.id, other.id]),
+			choices: { badge: { doc: String(other.id) } },
+		}
+		const refusal = `You may not change "Badge" on document ${other.id}, which it gives up for the primary to take.`
+		expect((await buildPlanResponse(args)).refusal).toBe(refusal)
+		await expect(applyMerge(args)).rejects.toMatchObject({ status: 403, message: refusal })
+	})
+
 	it('refuses to merge a document the reviewer may not read', async () => {
 		const keep = await create(VAULTS, { name: 'Own vault', owner: 'owner-apply@example.com' })
 		const other = await create(VAULTS, { name: 'Other vault', owner: 'someone@example.com' })

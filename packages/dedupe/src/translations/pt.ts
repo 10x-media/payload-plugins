@@ -13,16 +13,16 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.mergeInto]: 'Mesclar em {{title}}',
 	[keys.runScan]: 'Verificar agora',
 	[keys.scanQueued]: 'Verificação enfileirada.',
+	[keys.scanAlreadyQueued]: 'Já existe uma análise na fila.',
+	[keys.scanPending]: 'Análise na fila',
+	[keys.scanRunning]: 'A analisar…',
 	[keys.scanDone]: 'Verificação concluída: {{pairs}} pares abertos de {{compared}} comparações.',
 	[keys.needsChoice]: 'Precisa de uma escolha',
 	[keys.applied]: 'Mesclado no documento principal.',
 	[keys.empty]: 'vazio',
 	[keys.selectTwo]: 'Selecione de 2 a {{max}} documentos para mesclar.',
 	[keys.mergeSelected]: 'Mesclar selecionados',
-	[keys.noTransactions]:
-		'Este banco de dados não abre transações. Se a mesclagem falhar antes de gravar o principal, os documentos mesclados recuperam seus valores. Se falhar depois, o principal mantém o que foi gravado e os documentos mesclados permanecem, com marcadores no lugar dos valores únicos que cederam. As referências que a aplicação moveu para o principal antes da falha permanecem lá. Uma mesclagem que teria de excluir um documento antes é recusada.',
-	[keys.transactionsRequired]:
-		'Mesclar está desativado: este banco de dados não abre transações e o plugin exige uma.',
+	[keys.transactionsRequired]: 'A fusão não está disponível. Contacte o seu administrador.',
 	[keys.takenFrom]: 'Obtido de {{title}}',
 	[keys.error]: 'Algo deu errado.',
 	[keys.missingParams]:

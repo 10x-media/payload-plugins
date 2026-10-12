@@ -43,7 +43,24 @@ A matching field adds its `weight`, a near match part of it, a differing one `on
 
 Every save indexes the document and, unless `checkOnSave: false`, queues a `dedupe-check` job that compares it with its look-alikes and opens or refreshes their pairs; a pair that no longer qualifies is deleted. The scan compares a whole collection: run it with "Scan now" in the queue, or schedule it with `scan.cron`.
 
-Both need a job worker for the `dedupe` queue, for example `jobs.autoRun: [{ cron: '* * * * *', queue: 'dedupe' }]`. Without one, set `disableJobsQueue: true` and both run inside the request. The check then runs inside the save's transaction: a check that fails, such as on an adapter that is down, is logged and the save goes through. Across servers, set `jobs.enableConcurrencyControl`.
+A scan is one `dedupe-scan` job per collection. "Scan now" and the schedule queue one only for a collection that has none waiting or running, and answer with the pending one otherwise; the queue shows the button as queued or running meanwhile. Pending scans are found by concurrency key with `jobs.enableConcurrencyControl` on, and by the job's input without it.
+
+Both need a job worker for the `dedupe` queue (and for `scanQueue`, when set), for example `jobs.autoRun: [{ cron: '* * * * *', queue: 'dedupe' }]`. Without one, set `disableJobsQueue: true` and both run inside the request. The check then runs inside the save's transaction: a check that fails, such as on an adapter that is down, is logged and the save goes through. Across servers, set `jobs.enableConcurrencyControl`.
+
+### Bulk writes
+
+An import or a seed through the Local API would queue a check per document. Mark its writes to skip the plugin, and scan once it is done:
+
+```ts
+import { DEDUPE_SKIP } from '@10x-media/dedupe'
+
+await payload.create({ collection: 'customers', data, context: { [DEDUPE_SKIP]: 'check' } })
+```
+
+- `'check'` indexes the document but queues no check.
+- `'all'` neither indexes nor checks it. With an adapter of your own, reindex after the run.
+
+A delete, a move to the trash or off publication still leaves the index and closes the document's pairs.
 
 A pair marked "Not duplicates" stays marked however often it is found again. Unless `draft` is set, unpublished documents are not searched. Taking a document off publication or moving it to the trash closes its open pairs; its "Not duplicates" marks stay. While a document is in the trash, its groups are not listed under "Not duplicates"; restored, they are back.
 

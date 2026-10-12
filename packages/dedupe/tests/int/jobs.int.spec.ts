@@ -4,8 +4,9 @@ import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 
 import { PAIRS_SLUG } from '../../src/collections/slugs'
 import { pairKeyFor } from '../../src/match/keys'
-import { getCollectionContext, getContext } from '../../src/plugin/context'
+import { DEDUPE_SKIP, getCollectionContext, getContext } from '../../src/plugin/context'
 import { findPairByKey, upsertPair } from '../../src/queue/pairs'
+import { queueScans } from '../../src/queue/scanJobs'
 import { bootDedupe, CUSTOMERS, type Doc, emitted } from './fixtures'
 
 /** The check on save as a job: it runs after the save commits, apart from the save. */
@@ -105,5 +106,56 @@ describeForDb('dedupe check on the jobs queue', {}, (db) => {
 		expect(row?.score).toBe(0.99)
 		const stored = await findPairByKey(req, pairKeyFor(CUSTOMERS, first.id, second.id))
 		expect(stored?.id).toBe(row?.id)
+	})
+
+	it('indexes but does not check a save marked to skip the check', async () => {
+		n++
+		await fixture.customer(twin('a'))
+		await runJobs()
+		const skipped = (await fixture.booted.payload.create({
+			collection: CUSTOMERS,
+			data: twin('b') as never,
+			depth: 0,
+			context: { [DEDUPE_SKIP]: 'check' },
+		})) as Doc
+		await runJobs()
+		expect((await fixture.keysFor(skipped.id, CUSTOMERS)).length).toBeGreaterThan(0)
+		expect(await fixture.pairsFor(skipped.id)).toEqual([])
+	})
+
+	it('neither indexes nor checks a save marked to skip it all', async () => {
+		n++
+		await fixture.customer(twin('a'))
+		await runJobs()
+		const skipped = (await fixture.booted.payload.create({
+			collection: CUSTOMERS,
+			data: twin('b') as never,
+			depth: 0,
+			context: { [DEDUPE_SKIP]: 'all' },
+		})) as Doc
+		await runJobs()
+		expect(await fixture.keysFor(skipped.id, CUSTOMERS)).toEqual([])
+		expect(await fixture.pairsFor(skipped.id)).toEqual([])
+	})
+
+	it('answers a scan already pending with its job instead of queuing another', async () => {
+		const ctx = getContext(fixture.booted.payload)
+		const req = await createLocalReq({}, fixture.booted.payload)
+		const matched = [...ctx.collections.values()].filter((col) => col.options.match)
+		const customers = getCollectionContext(fixture.booted.payload, CUSTOMERS)
+		const [first] = await queueScans({ req, ctx, cols: [customers] })
+		expect(first?.alreadyQueued).toBe(false)
+		const [again] = await queueScans({ req, ctx, cols: [customers] })
+		expect(again).toEqual({ ...first, alreadyQueued: true })
+		// A scan of every collection covers the pending one and queues the rest.
+		const all = await queueScans({ req, ctx, cols: matched })
+		expect(all.find((scan) => scan.collection === CUSTOMERS)).toEqual(again)
+		expect(
+			all.filter((scan) => scan.collection !== CUSTOMERS).every((scan) => !scan.alreadyQueued)
+		).toBe(true)
+		await runJobs()
+		const [after] = await queueScans({ req, ctx, cols: [customers] })
+		expect(after?.alreadyQueued).toBe(false)
+		await runJobs()
 	})
 })

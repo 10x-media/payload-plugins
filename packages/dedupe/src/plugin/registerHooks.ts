@@ -8,7 +8,7 @@ import { isLive, type LoadedDoc, loadDoc, localRequest } from '../merge/load'
 import type { ResolvedOptions } from '../options'
 import { checkDocument } from '../queue/live'
 import { closePairsFor } from '../queue/pairs'
-import { type CollectionContext, getContext, type PluginContext } from './context'
+import { type CollectionContext, getContext, type PluginContext, skipOf } from './context'
 import { CHECK_TASK_SLUG } from './registerJobs'
 
 const isDedupeWrite = (context: Record<string, unknown> | undefined): boolean =>
@@ -26,10 +26,11 @@ const fileDocument = async (args: {
 	ctx: PluginContext
 	col: CollectionContext
 	doc: LoadedDoc
+	check: boolean
 }): Promise<void> => {
-	const { req, ctx, col, doc } = args
+	const { req, ctx, col, doc, check } = args
 	await col.adapter.index?.({ req, collection: col.slug, doc })
-	if (!col.options.checkOnSave) return
+	if (!check || !col.options.checkOnSave) return
 	if (ctx.options.disableJobsQueue) {
 		try {
 			await checkDocument({ req, ctx, col, doc })
@@ -53,7 +54,7 @@ const fileDocument = async (args: {
  * Keeps the index current on every save, and with `checkOnSave` the queue too. The index is
  * written inside the save's transaction through `req`, and the check is queued there as a
  * job, or run there under `disableJobsQueue`. A save the plugin makes itself is skipped by
- * context.
+ * context, and so is one the host marks with `DEDUPE_SKIP`.
  */
 const afterChange: CollectionAfterChangeHook = async ({ collection, doc, req }) => {
 	if (isDedupeWrite(req.context)) return doc
@@ -89,10 +90,12 @@ const afterChange: CollectionAfterChangeHook = async ({ collection, doc, req }) 
 		return doc
 	}
 
+	const skip = skipOf(req.context)
+	if (skip === 'all') return doc
 	// The hook receives the document as its saver may read it, in one locale; the index and the
 	// scorer need every field in every locale.
 	const full = await loadDoc({ req, ctx, col, id: saved.id })
-	if (full) await fileDocument({ req, ctx, col, doc: full })
+	if (full) await fileDocument({ req, ctx, col, doc: full, check: skip !== 'check' })
 	return doc
 }
 
