@@ -11,6 +11,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **A merge screen**: pick the primary and a value per field for up to `maxGroupSize` documents.
 - **A merge spec from the schema**, adjustable per field with `dedupeCustom` or per collection with `fields`.
 - **Unique values** are freed on the merged-in documents, so the primary can take them.
+- **Sections** of the merge screen you draw, for records of other collections the merge decides.
 - **Multi-tenancy, drafts, locales and access** respected.
 - **A pluggable candidate source**: swap the built-in keys for a search engine.
 

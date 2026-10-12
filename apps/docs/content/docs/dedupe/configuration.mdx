@@ -39,6 +39,7 @@ description: Every option of the plugin and its default.
 | `draft` | `false` | On a collection with drafts, merge the latest drafts and save the result as a draft. By default the published documents are merged and the result is published. |
 | `writeLocale` | the default locale, or the first the primary is complete in | The locale the values every locale shares are written in: a code, or `({ req, survivor }) => code`. See [Merging](./merging#localized-fields). |
 | `checkOnSave` | `true` with a match | Look for duplicates of the document on every save and queue the pairs. The document is indexed on every save either way, so `findDuplicates` finds it before the next scan. |
+| `sections` | none | Parts of the merge screen you draw, whose values reach `hooks.beforeRemove`: `{ key, Component, validate? }` each, see [Sections](./merging#sections). |
 
 An invalid match config stops the app at startup with an error naming the field.
 

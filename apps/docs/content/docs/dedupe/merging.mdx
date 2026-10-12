@@ -169,6 +169,98 @@ dedupe({
 
 Move every other field that points at the collection the same way, rich text and JSON included. The dev app runs this example: `packages/dedupe/dev/helpers/repointCustomers.ts`.
 
+## Sections
+
+The merge spec covers the document's own fields. What else a merge has to decide, such as the records of another collection that point at the documents (a person's roles, a customer's club memberships), is yours to draw: a section is a component on the merge screen, under the fields and in the same columns, that hands a value to `hooks.beforeRemove`. The plugin writes nothing for it.
+
+```ts title="payload.config.ts"
+dedupe({
+  collections: {
+    customers: {
+      sections: [
+        {
+          key: 'memberships',
+          Component: '/components/MembershipsSection#MembershipsSection',
+          // Optional: why the merge may not apply with this value, shown to the reviewer.
+          validate: async ({ req, survivorId, absorbedIds, value }) => null,
+        },
+      ],
+    },
+  },
+  hooks: {
+    beforeRemove: async ({ req, survivorId, absorbedIds, sections }) => {
+      const memberships = sections.memberships // what the component set, or null
+    },
+  },
+})
+```
+
+The component is registered for the import map by the plugin; run `payload generate:importmap` after adding one. It reads the merge and answers through `useMergeSection` from `@10x-media/dedupe/client`:
+
+| | |
+| --- | --- |
+| `docs` | Every document of the merge, in column order: `{ id, title, survivor, ... }`. |
+| `survivorId`, `absorbedIds` | The primary and the merged-in documents. |
+| `value`, `setValue(next)` | The section's value, `null` until set. `next` may be a function of the current value. It travels as JSON. |
+| `setReady(ready)` | `false` keeps the merge from applying until the section says `true`, as a field waiting for a choice does. A section that never calls it is ready. |
+
+Another primary, or a document taken out of the merge, is another merge: the section is drawn again from nothing and its value is gone.
+
+The rows look like the field rows with these, all from `@10x-media/dedupe/client`:
+
+- `MergeRow`: a label across the columns, then `cell(doc)` for every document; `needsChoice` adds the badge a field waiting for a choice has.
+- `MergePick`: a cell picked by radio, cells of one row sharing a `name`. `readOnly` draws an outcome the reviewer has no say in, such as a record that moves to the primary because nothing competes with it.
+- `MergeChecks`: a cell of lines checked one by one, as a `hasMany` field.
+- `MergeCell`: a read-only value, or with no children an empty cell that keeps the column.
+
+```tsx title="components/MembershipsSection.tsx"
+'use client'
+import { MergeCell, MergePick, MergeRow, useMergeSection } from '@10x-media/dedupe/client'
+import { useEffect } from 'react'
+
+export const MembershipsSection = () => {
+  const { docs, value, setValue, setReady } = useMergeSection<Record<string, string>>()
+  // Your own fetch of the documents' memberships, by club: null while it loads.
+  const clubs = useMembershipsByClub(docs)
+  // A club two customers are in waits for a pick.
+  const open = clubs ? [...clubs].filter(([club, members]) => members.length > 1 && !value?.[club]) : null
+  useEffect(() => setReady(open !== null && open.length === 0), [open?.length, setReady])
+
+  return [...(clubs ?? [])].map(([club, members]) => (
+    <MergeRow
+      key={club}
+      label={`Membership: ${club}`}
+      needsChoice={open?.some(([waiting]) => waiting === club)}
+      cell={(doc) => {
+        const member = members.find((entry) => entry.customer === doc.id)
+        if (!member) return <MergeCell />
+        // Alone in its club, it moves to the primary: shown kept, nothing to pick.
+        const alone = members.length === 1
+        return (
+          <MergePick
+            checked={alone || value?.[club] === member.id}
+            id={`${club}-${doc.id}`}
+            label={doc.title}
+            name={club}
+            readOnly={alone}
+            onChange={() => setValue((current) => ({ ...current, [club]: member.id }))}
+          >
+            {member.title}
+          </MergePick>
+        )
+      }}
+    />
+  ))
+}
+```
+
+Two things the screen does not do for you:
+
+- A section that loads its data calls `setReady(false)` before it has it. Ready by default, it would let the merge apply before the reviewer saw anything.
+- The value comes from the browser, and `validate` runs before the merge's transaction. Check it again in `beforeRemove`, against the database, inside the transaction: the plugin compares the documents' `updatedAt` with what the reviewer saw, not the records your section shows.
+
+The dev app runs a full one, with a pick per club two customers share: `packages/dedupe/dev/components/MembershipsSection.tsx`, and `dev/helpers/memberships.ts` for its `validate` and `beforeRemove`.
+
 ## Recording a merge
 
 The plugin keeps no record of a merge and no copy of the merged-in documents: once they are deleted, or emptied from the trash, only what you kept brings them back. `hooks.beforeRemove` also receives:
