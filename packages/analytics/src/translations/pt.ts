@@ -227,17 +227,17 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.viewExclusionTitle]: 'Suas próprias visitas',
 	[keys.viewExclusionIntro]:
 		'Deixe suas próprias visitas fora destes números. Funciona por navegador, então faça isso em cada navegador que você usa.',
-	[keys.viewExclusionShow]: 'Obter link de exclusão',
 	[keys.viewExclusionLinkLabel]: 'Link de exclusão',
 	[keys.viewExclusionQueryHelp]:
 		'Adicione isto ao final do endereço do seu site e abra esse endereço uma vez em cada navegador que você quer deixar de fora.',
-	[keys.viewExclusionToggle]: 'Deixar este navegador de fora',
-	[keys.viewExclusionToggleCaveat]: 'Isso só funciona se o seu site estiver neste mesmo endereço.',
+	[keys.viewExclusionUndoLabel]: 'Para voltar a contar um navegador, adicione isto no lugar',
 	[keys.viewExclusionFailed]: 'Não foi possível carregar o link de exclusão.',
-	[keys.viewExclusionLinkFor]: 'Link para {{site}}',
-	[keys.viewExclusionOpen]: 'Abrir',
+	[keys.viewExclusionExclude]: 'Parar de contar este navegador',
+	[keys.viewExclusionInclude]: 'Voltar a contar este navegador',
+	[keys.viewExclusionShare]: 'Copiar link para outro navegador',
+	[keys.viewExclusionCopy]: 'Copiar link',
 	[keys.viewExclusionSitesHelp]:
-		'Abra o link uma vez em cada navegador que você quer deixar de fora.',
+		'O link abre seu site em uma nova aba e deixa este navegador de fora lá. Faça isso em cada navegador que você usa.',
 	[keys.viewFilterBy]: 'Filtrar por {{dimension}}',
 	[keys.chartSoFar]: '{{period}} (até agora)',
 	[keys.chartKeyboardHint]: 'Use as setas do teclado para ir de um ponto a outro.',
@@ -398,8 +398,6 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.itemClicksByCountry]: 'Cliques por país',
 	[keys.itemClicksByDevice]: 'Cliques por dispositivo',
 	[keys.metricVisitorsSummed]: 'Visitantes, contados por dia',
-	[keys.stateVisitorsSummed]:
-		'Os visitantes são contados uma vez por dia, então quem volta em outro dia é contado de novo.',
 	[keys.stateNoScope]: 'Escolha um site para ver os números dele.',
 	[keys.panelNewPage]: 'Os números vão aparecer aqui assim que alguém visitar esta página.',
 	[keys.panelNewItem]: 'Os números vão aparecer aqui assim que alguém vir este item.',

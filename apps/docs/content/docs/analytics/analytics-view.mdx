@@ -181,11 +181,10 @@ Notes appear beside the range caption:
 - "Times are shown in UTC": the site's [reporting timezone](/analytics/timezone) could not be found, so the days were cut in UTC for now.
 - "Revenue adds up amounts in different currencies": the revenue figures add amounts nothing converted, and the note names the currencies.
 - "Updated 3 minutes ago": today's numbers come from a snapshot taken that long ago, which a busy day is read from.
-- "Visitors are counted once per day": see below.
 
 Each note is said once, however many sections carry it.
 
-One caveat is said by the number's own name as well as by a note. The native engine counts each day's visitors on their own, so over more than one day its visitors are those daily counts added up: a person who came on two days counts twice. Wherever a read says so (`meta.visitorsAre: 'sumOfDaily'`), the card, the column and the widget call the number **Visitors, counted per day** instead of **Visitors**, and the note beside it says what that means: someone who comes back on another day is counted again. A trend by day or by hour charts each day's or hour's own visitors and keeps the plain name; by week or month it takes the counted-per-day one. A source that counts each person once over the range keeps **Visitors** throughout.
+The number's own name carries one caveat. The native engine counts each day's visitors on their own, so over more than one day its visitors are those daily counts added up: a person who came on two days counts twice. Wherever a read says so (`meta.visitorsAre: 'sumOfDaily'`), the card, the column and the widget call the number **Visitors, counted per day** instead of **Visitors**, so someone who comes back on another day is plainly counted again. A trend by day or by hour charts each day's or hour's own visitors and keeps the plain name; by week or month it takes the counted-per-day one. A source that counts each person once over the range keeps **Visitors** throughout.
 
 A section that fails on its own keeps whatever it was showing and adds a retry: a transient `503` dims a panel rather than blanking the page, and a source that cannot answer one section at all leaves that section empty while the rest of the view carries on. Switching to another data source is different: every section clears at once and waits for the new source's answer, so its failure is never shown beside the previous source's numbers.
 
@@ -204,14 +203,19 @@ Nothing is fetched by the refresh itself. It invalidates, and the reissued secti
 
 ## Your own visits
 
-With [`capture.exclusion`](/analytics/capture#excluding-your-own-visits) on, the view ends with a **Your own visits** panel, and without it the panel is not there at all. **Get exclusion link** asks [`GET /api/_x/exclusion`](/analytics/reference/endpoints#exclusion-endpoint) for the reader's own scope's token, and only then shows it.
+With [`capture.exclusion`](/analytics/capture#excluding-your-own-visits) on, the view ends with a **Your own visits** panel, and without it the panel is not there at all. It asks [`GET /api/_x/exclusion`](/analytics/reference/endpoints#exclusion-endpoint) for the reader's own scope's token when it loads. On a multi-tenant install's all-sites view, a reader who may name every tenant gets every tenant's sites, each with its own token.
 
-Where [`capture.exclusion.sites`](/analytics/capture#excluding-your-own-visits) names the scope's site addresses, the panel hands out one whole link per site, `https://example.com/?analytics_exclude=<token>`, each with a button to copy it and one to open it in a new tab, and one instruction: open the link once in each browser to leave out. Without `sites` it hands out the part to add to the end of the website's address, `?analytics_exclude=<token>`, with the instruction to add it to the site's address first. It never builds a link from the admin's own address, because the website may run somewhere else, a separate frontend for instance. The first link takes focus once it replaces the button that asked for it.
+Where the admin knows a site's address, from [`capture.exclusion.sites`](/analytics/capture#excluding-your-own-visits) or, on a scoped install, because the site runs on the admin's own origin, the panel shows one row per site:
 
-**Leave this browser out** sets the same flag in this browser directly, no link needed. It only helps when the website runs at the admin's own address, since the flag is kept per site:
+- **Stop counting this browser** opens the site's signed link in a new tab, where the site's own tracker stores the flag in that site's storage.
+- **Count this browser again** opens the site's `=0` link the same way, which clears it.
+- **Copy link for another browser** copies the signed link, to open in another browser or send to a colleague.
 
-- **A scoped install** shows it when the admin's own address resolves to the reader's scope the way a visit would, and hides it otherwise.
-- **An unscoped install** cannot tell where its website runs, so it shows the switch with a note that it only works if the website runs at this same address.
+Both are plain links, and the admin never reads or writes the site's storage: a site on another origin keeps its flag where only its own pages can see it. Do it once in each browser you use.
+
+Otherwise the panel hands out the part to add to the site's address, `?analytics_exclude=<token>`, with **Copy link**, and below it `?analytics_exclude=0`, which counts a browser again. Add it to the end of your website's address and open that once in each browser you want to leave out.
+
+Safari may delete storage a script wrote after 7 days without a visit to that site, so a browser that has not opened the site for a week may need the link again. Staff who visit their own site keep the flag.
 
 The endpoint is gated like every read, and by `access.view` on top: authentication, `access.read`, `access.view`, then the scope. It never answers another scope's token unless `access.crossScope.named` grants the reader that scope, refuses `scope=*` because a link belongs to one site, and answers `Cache-Control: private, no-store`.
 

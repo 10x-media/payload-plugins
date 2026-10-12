@@ -389,8 +389,8 @@ export type AnalyticsGoalsOptions = {
 }
 
 /**
- * A scope's own site addresses where its exclusion link opens, each an `http(s)` origin with an
- * optional path. Scope is null on an unscoped install.
+ * The website addresses where the scope's tracker runs, one per site, each an `http(s)` origin with
+ * an optional path. May be async; scope is null on an unscoped install.
  */
 export type ExclusionSitesResolver = (args: {
 	req: PayloadRequest
@@ -405,8 +405,8 @@ export type AnalyticsExclusionOptions = {
 	 */
 	param?: string
 	/**
-	 * Where the scope's sites run, so the view hands out each site's whole link: a list, or a
-	 * function per scope. Unset, the view hands out only the part to add to a site's address.
+	 * Website addresses where the tracker runs, one per site, for the view to link to: a list, or
+	 * a per-scope function (async allowed). Unset, the view hands out only the query to append.
 	 */
 	sites?: string[] | ExclusionSitesResolver
 }

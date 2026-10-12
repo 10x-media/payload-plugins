@@ -137,7 +137,7 @@ The tenant super-property a PostHog snippet registers on a [multi-tenant install
 
 A site's own staff are in its numbers unless they take themselves out. Two things do that, each for one browser:
 
-- **The exclusion link**, off by default. `capture.exclusion: true` turns it on, and staff copy their link from the [analytics view](/analytics/analytics-view#your-own-visits).
+- **The exclusion link**, off by default. `capture.exclusion: true` turns it on, and staff exclude their browser, or copy the link for another one, from the [analytics view](/analytics/analytics-view#your-own-visits).
 - **Your own code**, which needs no option at all: `tracker.exclude(true)`, or `setExcluded(true)` from `useAnalytics()`. Code is trusted; a link anyone could type is not.
 
 ```ts
@@ -170,7 +170,7 @@ export const perTenant: AnalyticsCaptureOptions = {
 }
 ```
 
-The admin cannot know where a site runs, a separate frontend's included, so it only builds whole links for the addresses `sites` names: each an `http(s)` origin with an optional path, such as `https://example.com` or `https://example.com/de`. A list fits an install with one set of sites; a function receives the request and the scope the link is for (`null` on an unscoped install) and answers that scope's own. A list is checked when Payload boots and refuses an address that is not an `http(s)` URL; a function's answer is checked on each request, and an address that is not one is left out. Without `sites`, the view hands out the part to add to the site's address instead.
+The admin cannot know where a site runs, a separate frontend's included, so it only builds whole links for the addresses `sites` names: each an `http(s)` origin with an optional path, such as `https://example.com` or `https://example.com/de`. A list fits an install with one set of sites; a function receives the request and the scope the link is for (`null` on an unscoped install) and answers that scope's own. A list is checked when Payload boots and refuses an address that is not an `http(s)` URL; a function's answer is checked on each request, and an address that is not one is left out. `sites` names the website addresses where the tracker runs, one per site; a function may be async, and each tenant gets its own. Without `sites`, the view links to the admin's own address when a scoped install knows the site runs there, and otherwise hands out the part to add to the site's address.
 
 ### The exclusion link
 
@@ -182,7 +182,7 @@ https://example.com/?analytics_exclude=<token>
 
 The token is `HMAC-SHA256` of `analytics:exclusion:` followed by the site's scope, keyed by the Payload secret and written as base64url. The [tracker config](#plain-html-and-other-frameworks) carries only the parameter's name and the token's SHA-256 as lowercase hex, `exclusion: { param, tokenHash }`, never the token itself. On boot the tracker hashes the parameter's value with the browser's own `crypto.subtle` and excludes the browser only when the two match. Nothing is sent while it checks, so the page the link is opened on is not counted either.
 
-- `=0` and `=false` put the browser back, with no token, once a slot opens and the tracker reads the flag. They clear the flag, and the vendor switches of the slots that are open, only when the browser was excluded; otherwise they write nothing.
+- `=0` and `=false` put the browser back, with no token, as soon as the page loads, open slot or not: the reader asked for it. They clear the flag, and the vendor switches of the slots that are open, only when the browser was excluded; otherwise they write nothing.
 - A wrong or missing token is ignored, and so is every value while `capture.exclusion` is off.
 - `crypto.subtle` exists only in a secure context, so a token works over https and on localhost and is ignored on plain http. `=0` needs no hash and works anywhere.
 - On a page that is [not counted](#pages-that-are-not-counted) because of draft mode or an automated browser, the parameter is taken out of the address and its token is not checked, so the browser is not excluded there.
@@ -195,9 +195,9 @@ Each scope signs its own token: on a [multi-tenant install](/analytics/multi-ten
 
 ### The flag
 
-Either way the result is one flag in `localStorage` under `analytics:exclude`, which makes it per browser and per origin: repeat it in each browser and profile that should be excluded, and on each origin of the site (`www.example.com` and `shop.example.com` keep a flag each), and expect it to go when that browser's site data is cleared. A browser with storage blocked is excluded for the page the link was opened on and no further.
+Either way the result is one flag in `localStorage` under `analytics:exclude`, which makes it per browser and per origin: repeat it in each browser and profile that should be excluded, and on each origin of the site (`www.example.com` and `shop.example.com` keep a flag each), and expect it to go when that browser's site data is cleared. Safari may also delete it after 7 days without a visit to the site; staff who visit their own site keep it. A browser with storage blocked is excluded for the page the link was opened on and no further.
 
-The tracker reads the flag once a slot is open: at boot when a slot does not wait, otherwise when your consent manager opens the first one, so nothing is read from a waiting browser's storage before an answer ([what still is](/analytics/consent#storage-before-an-answer)). Until then `tracker.excluded` and `useAnalytics().excluded` read `false`, and events wait in a pending slot's queue as on any page; if the flag turns out to be set, what waited is dropped.
+The tracker reads the flag once a slot is open (or at once for a `=0` link): at boot when a slot does not wait, otherwise when your consent manager opens the first one, so nothing is read from a waiting browser's storage before an answer ([what still is](/analytics/consent#storage-before-an-answer)). Until then `tracker.excluded` and `useAnalytics().excluded` read `false`, and events wait in a pending slot's queue as on any page; if the flag turns out to be set, what waited is dropped.
 
 While the flag is set the tracker delivers nothing: no native beacon, no event to any vendor, and no vendor script injected even once a gate opens. Clearing resumes from that point rather than replaying what was skipped.
 

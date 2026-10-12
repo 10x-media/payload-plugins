@@ -231,17 +231,17 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.viewExclusionTitle]: 'Vos propres visites',
 	[keys.viewExclusionIntro]:
 		'Excluez vos propres visites de ces chiffres. Cela fonctionne par navigateur : faites-le dans chaque navigateur que vous utilisez.',
-	[keys.viewExclusionShow]: "Obtenir le lien d'exclusion",
 	[keys.viewExclusionLinkLabel]: "Lien d'exclusion",
 	[keys.viewExclusionQueryHelp]:
 		"Ajoutez ceci à la fin de l'adresse de votre site, puis ouvrez cette adresse une fois dans chaque navigateur à exclure.",
-	[keys.viewExclusionToggle]: 'Exclure ce navigateur',
-	[keys.viewExclusionToggleCaveat]:
-		'Cela ne fonctionne que si votre site est à cette même adresse.',
+	[keys.viewExclusionUndoLabel]: 'Pour compter à nouveau un navigateur, ajoutez plutôt ceci',
 	[keys.viewExclusionFailed]: "Le lien d'exclusion n'a pas pu être chargé.",
-	[keys.viewExclusionLinkFor]: 'Lien pour {{site}}',
-	[keys.viewExclusionOpen]: 'Ouvrir',
-	[keys.viewExclusionSitesHelp]: 'Ouvrez le lien une fois dans chaque navigateur à exclure.',
+	[keys.viewExclusionExclude]: 'Ne plus compter ce navigateur',
+	[keys.viewExclusionInclude]: 'Compter à nouveau ce navigateur',
+	[keys.viewExclusionShare]: 'Copier le lien pour un autre navigateur',
+	[keys.viewExclusionCopy]: 'Copier le lien',
+	[keys.viewExclusionSitesHelp]:
+		'Le lien ouvre votre site dans un nouvel onglet et y exclut ce navigateur. Faites-le dans chaque navigateur que vous utilisez.',
 	[keys.viewFilterBy]: 'Filtrer par {{dimension}}',
 	[keys.chartSoFar]: "{{period}} (jusqu'à présent)",
 	[keys.chartKeyboardHint]: "Utilisez les flèches du clavier pour passer d'un point à l'autre.",
@@ -402,8 +402,6 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.itemClicksByCountry]: 'Clics par pays',
 	[keys.itemClicksByDevice]: 'Clics par appareil',
 	[keys.metricVisitorsSummed]: 'Visiteurs, comptés par jour',
-	[keys.stateVisitorsSummed]:
-		'Les visiteurs sont comptés une fois par jour : une personne qui revient un autre jour est donc comptée de nouveau.',
 	[keys.stateNoScope]: 'Choisissez un site pour voir ses chiffres.',
 	[keys.panelNewPage]: 'Les chiffres apparaîtront ici dès que des personnes visiteront cette page.',
 	[keys.panelNewItem]: 'Les chiffres apparaîtront ici dès que des personnes verront cet élément.',

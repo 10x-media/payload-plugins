@@ -58,7 +58,7 @@ describe('revenue with no user-defined goals', () => {
 	})
 
 	it('counts nothing once the install opts out with goals.purchase: false', async () => {
-		// The sale is still stored; it just completes nothing.
+		// The sale is still stored; it completes nothing.
 		const goals = await configGoalsResolver([], false).resolve(req)
 		expect(serverCompletions(sale, goals)).toEqual([])
 

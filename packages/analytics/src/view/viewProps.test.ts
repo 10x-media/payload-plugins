@@ -51,7 +51,7 @@ describe('resolveViewProps scope authority', () => {
 		expect(result.props.scopeKey).toBe('alpha')
 		expect(result.props.scopes?.own).toBe('alpha')
 		expect(result.props.scopes?.ownLabel).toBe('Alpha GmbH')
-		// Nothing for the client to write back: a named scope is simply not part of the address.
+		// Nothing for the client to write back: a named scope is not part of the address.
 		expect(result.props.scopeParam).toBeUndefined()
 	})
 

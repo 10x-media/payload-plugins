@@ -2,6 +2,7 @@ import type { PayloadHandler, PayloadRequest } from 'payload'
 import { readGate } from '../access/readGate'
 import { PLATFORM_SCOPE } from '../core/contract'
 import { resolveRequestedScope } from '../core/scopedRead'
+import { resolveScopeList } from '../core/scopeList'
 import { siteAddress } from '../core/siteAddress'
 import { analyticsError, errorResponse, NO_STORE } from '../plugin/errors'
 import {
@@ -10,7 +11,7 @@ import {
 	resolveCaptureScopeFor,
 	scopeGates,
 } from '../plugin/runtime'
-import type { ExclusionResponse } from '../view/exclusionLink'
+import type { ExclusionResponse, ExclusionSite } from '../view/exclusionLink'
 import { exclusionToken } from './exclusionToken'
 
 const viewAllowed = async (runtime: AnalyticsRuntime, req: PayloadRequest): Promise<boolean> =>
@@ -65,9 +66,34 @@ const sitesOf = async (
 	return [...new Set(sites)]
 }
 
+const siteEntries = async (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest,
+	scope: string | null
+): Promise<ExclusionSite[]> => {
+	const token = exclusionToken(req.payload.secret, scope)
+	return (await sitesOf(runtime, req, scope)).map((address) => ({ address, token }))
+}
+
+/** The install-wide sites, then each listed scope's, each with its own token; an address once. */
+const everyScopeSites = async (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest
+): Promise<ExclusionSite[]> => {
+	const scopes = await resolveScopeList(runtime.scopeList, req.payload)
+	const lists = await Promise.all(scopes.map((scope) => siteEntries(runtime, req, scope)))
+	const byAddress = new Map<string, ExclusionSite>()
+	for (const site of lists.flat()) {
+		if (!byAddress.has(site.address)) {
+			byAddress.set(site.address, site)
+		}
+	}
+	return [...byAddress.values()]
+}
+
 /**
- * Authenticated GET handing out one scope's exclusion token and site addresses, gated like every
- * read plus `access.view`. Never cached: whoever holds the token can drop a browser from the numbers.
+ * A scope's exclusion token and sites, gated like a read plus `access.view` (all sites: every
+ * scope's, for a reader who may name each). Never cached: a token drops a browser from numbers.
  */
 export const makeExclusionHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
@@ -82,12 +108,8 @@ export const makeExclusionHandler = (): PayloadHandler => async (req) => {
 			return errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
 		}
 		const raw = new URL(req.url ?? '', 'http://localhost').searchParams.get('scope')
-		const requested = await resolveRequestedScope({
-			runtime,
-			req,
-			raw,
-			gates: scopeGates(runtime, req),
-		})
+		const gates = scopeGates(runtime, req)
+		const requested = await resolveRequestedScope({ runtime, req, raw, gates })
 		if (!requested.ok) {
 			return errorResponse(
 				400,
@@ -108,11 +130,15 @@ export const makeExclusionHandler = (): PayloadHandler => async (req) => {
 				)
 			)
 		}
+		// A scoped install's null passed the aggregate gate; another scope's token also takes `named`.
+		const everyScope = runtime.scoped === true && requested.scope === null && (await gates.named())
 		const answer: ExclusionResponse = {
 			param: runtime.exclusion.param,
 			token: exclusionToken(req.payload.secret, requested.scope),
 			sameOrigin: await servesScope(runtime, req, requested.scope),
-			sites: await sitesOf(runtime, req, requested.scope),
+			sites: everyScope
+				? await everyScopeSites(runtime, req)
+				: await siteEntries(runtime, req, requested.scope),
 		}
 		return Response.json(answer, { headers: NO_STORE })
 	} catch (err) {

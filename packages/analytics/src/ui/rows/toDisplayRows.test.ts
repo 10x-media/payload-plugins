@@ -56,7 +56,7 @@ describe('toDisplayRows', () => {
 				(row) => row.value
 			)
 		).toEqual(['purchase'])
-		// Only a goal breakdown has latent rows: a page called `purchase` is just a page.
+		// Only a goal breakdown has latent rows: a page called `purchase` is a plain page.
 		expect(
 			toDisplayRows([{ value: 'purchase', metrics: { conversions: 0 } }], {
 				...context(),

@@ -10,7 +10,7 @@
 2. Set `capture.gate` ([consent](https://docs.10xmedia.de/analytics/consent#which-slots-wait)) and, on a scoped install, `scope.member` ([multi-tenancy](https://docs.10xmedia.de/analytics/multi-tenancy)).
 3. Set `revenue: true` or `revenue: { currency }` if the install reports revenue.
 4. In `widgets.register`, replace `requires: { perPageQuery: true }` with `requires: { path: true }`, and `filterOperators` with `filters` naming each operator with its dimension.
-5. Fix whatever else the boot refuses: the message names the option.
+5. Fix whatever else the boot refuses: the message names the option. With several invalid options, the one named first may differ from earlier releases.
 
 **Breaking:** these 1.0.0-beta.11 options are removed, not deprecated, and fail the boot with an error naming the replacement and linking [Removed options](https://docs.10xmedia.de/analytics/upgrading#removed-options):
 
@@ -36,7 +36,7 @@
 
 **Breaking:** `disabled: true` checks every option and keeps the plugin's database schema, rather than returning the config untouched. A switched-off install therefore gains the plugin's collections: generate its migration as for a running one ([Switching it off](https://docs.10xmedia.de/analytics/reference/options#switching-it-off)).
 
-**Breaking:** what 1.0.0-beta.11 let through now fails the boot: a key no option takes, at any level of the options (a misspelled `cache.tll` included); two adapters with the same `id`; a `cache.ttl` value that is not a whole number of seconds, 0 or more (`'300'` included); a `cache.timeoutMs`, `sync.lookbackDays`, `capture.proxy.timeoutMs` or `capture.proxy.maxBodyBytes` value that is not a whole number of at least 1; a `widgets.disabled` slug that names no widget of the install, and a `widgets.register` entry without its `slug`, `component` and `label`; a `translations` key that is not one of the plugin's own, a key this release removed among them ([Translations](https://docs.10xmedia.de/analytics/reference/translations)).
+**Breaking:** what 1.0.0-beta.11 let through now fails the boot: a key no option takes, at any level of the options (a misspelled `cache.tll` included); two adapters with the same `id`; a `cache.ttl` value that is not a whole number of seconds, 0 or more (`'300'` included); a `cache.timeoutMs`, `sync.lookbackDays`, `capture.proxy.timeoutMs` or `capture.proxy.maxBodyBytes` value that is not a whole number of at least 1; a `widgets.disabled` slug that names no widget of the install, and a `widgets.register` entry without its `slug`, `component` and `label`; `goals.collection` set to `null`, `0` or `''` (it takes `true`, `false` or an object); a `translations` key that is not one of the plugin's own, a key this release removed among them ([Translations](https://docs.10xmedia.de/analytics/reference/translations)).
 
 **Breaking:** a `widgets.register` entry's `requires` takes only `metrics`, `dimensions`, `filters`, `realtime`, `perItemQuery` and `path`. The two 1.0.0-beta.11 keys that are gone fail the boot, naming their replacement, rather than being ignored and offering the widget where it was left out: `perPageQuery` is `path: true`, and `filterOperators` is `filters` naming each operator with its dimension, such as `filters: [{ dimension: 'page', operator: 'contains' }]` ([Custom widgets](https://docs.10xmedia.de/analytics/widgets#custom-widgets)).
 

@@ -136,8 +136,6 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 	/** Whether the stored flag was read, or made moot by an explicit exclusion on this page. */
 	let flagKnown = false
 	let legacyForgotten = false
-	/** The page was opened with the link's `=0`: the browser is put back once the flag is read. */
-	let putBack = false
 	/**
 	 * Events sent while the boot checks an exclusion token or the live preview, null otherwise:
 	 * delivered once both checks pass, dropped when either fails.
@@ -431,7 +429,7 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 
 	/**
 	 * Reads the exclusion flag and deletes beta.11's consent key, once a slot is open and never
-	 * before. The link's `=0` clears the flag, and the vendors' switches, only when it was set.
+	 * before, unless the link's `=0` already settled the flag.
 	 */
 	const touchStorage = () => {
 		if (!legacyForgotten) {
@@ -442,15 +440,7 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 			return
 		}
 		flagKnown = true
-		const stored = readExclusion(win)
-		if (putBack) {
-			if (stored) {
-				writeExclusion(win, false)
-				syncVendors(false)
-			}
-			return
-		}
-		if (!stored) {
+		if (!readExclusion(win)) {
 			return
 		}
 		excluded = true
@@ -586,7 +576,14 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 	if (link) {
 		forgetExclusionParam(win, link.param)
 	}
-	putBack = asked === 'include'
+	// As explicit as a signed link, `=0` needs no open slot; only an excluded browser has switches to lift.
+	if (asked === 'include') {
+		flagKnown = true
+		if (readExclusion(win)) {
+			writeExclusion(win, false)
+			syncVendors(false)
+		}
+	}
 	const token = link && asked !== null && asked !== 'include' ? asked.token : null
 	const shown = inLivePreview(config, win)
 	// Nothing leaves the page until both are settled, so the first page a staff member opens the

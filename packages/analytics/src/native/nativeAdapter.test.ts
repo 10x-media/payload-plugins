@@ -86,7 +86,7 @@ describe('native adapter', () => {
 		expect(caps.filterLookbackDays).toBe(90)
 	})
 
-	// Goals are filterable now that completions are rows a read can match.
+	// Goals are filterable: completions are rows a read can match.
 	it('serves and filters every dimension the tracker can know, goals included', () => {
 		const caps = native().capabilities
 		for (const dimension of [

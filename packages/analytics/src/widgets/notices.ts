@@ -89,8 +89,6 @@ export const noticeTexts = (flags: WidgetNoticeFlags, context: NoticeContext): s
 	// caption would read as "nobody converted".
 	if (flags.goalsUnresolved) texts.push(t(keys.stateGoalsUnresolved))
 	else if (flags.noGoals) texts.push(t(keys.stateNoGoals))
-	// The metric's name says "counted per day"; this says what that does to the number.
-	if (flags.visitorsSummed) texts.push(t(keys.stateVisitorsSummed))
 	if (flags.asOf) {
 		texts.push(t(keys.stateUpdated, { ago: timeAgo(flags.asOf, context.now, context.locale) }))
 	}

@@ -159,7 +159,7 @@ export {
 	type TranslationKey,
 } from '../translations/keys'
 export type { CountryFlagProps, CountryFlags, HostCountryFlag } from '../view/CountryFlag'
-export type { ExclusionResponse } from '../view/exclusionLink'
+export type { ExclusionResponse, ExclusionSite } from '../view/exclusionLink'
 export type {
 	AnalyticsViewClientProps,
 	ViewEndpoints,

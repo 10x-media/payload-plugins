@@ -223,18 +223,17 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.viewExclusionTitle]: 'Ваші власні відвідування',
 	[keys.viewExclusionIntro]:
 		'Виключіть власні відвідування з цих даних. Це діє для кожного браузера окремо, тож зробіть це в кожному браузері, яким користуєтеся.',
-	[keys.viewExclusionShow]: 'Отримати посилання для виключення',
 	[keys.viewExclusionLinkLabel]: 'Посилання для виключення',
 	[keys.viewExclusionQueryHelp]:
 		'Додайте це в кінець адреси вашого сайту й відкрийте цю адресу один раз у кожному браузері, який потрібно виключити.',
-	[keys.viewExclusionToggle]: 'Виключити цей браузер',
-	[keys.viewExclusionToggleCaveat]:
-		'Це працює, лише якщо ваш сайт відкривається за цією ж адресою.',
+	[keys.viewExclusionUndoLabel]: 'Щоб знову враховувати браузер, додайте натомість це',
 	[keys.viewExclusionFailed]: 'Не вдалося завантажити посилання для виключення.',
-	[keys.viewExclusionLinkFor]: 'Посилання для {{site}}',
-	[keys.viewExclusionOpen]: 'Відкрити',
+	[keys.viewExclusionExclude]: 'Не враховувати цей браузер',
+	[keys.viewExclusionInclude]: 'Знову враховувати цей браузер',
+	[keys.viewExclusionShare]: 'Скопіювати посилання для іншого браузера',
+	[keys.viewExclusionCopy]: 'Копіювати посилання',
 	[keys.viewExclusionSitesHelp]:
-		'Відкрийте посилання один раз у кожному браузері, який потрібно виключити.',
+		'Посилання відкриє ваш сайт у новій вкладці й виключить там цей браузер. Зробіть це в кожному браузері, яким користуєтеся.',
 	[keys.viewFilterBy]: 'Фільтрувати за: {{dimension}}',
 	[keys.chartSoFar]: '{{period}} (на цей момент)',
 	[keys.chartKeyboardHint]: 'Використовуйте клавіші зі стрілками, щоб переходити між точками.',
@@ -395,8 +394,6 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.itemClicksByCountry]: 'Кліки за країнами',
 	[keys.itemClicksByDevice]: 'Кліки за пристроями',
 	[keys.metricVisitorsSummed]: 'Відвідувачі, підрахунок за днями',
-	[keys.stateVisitorsSummed]:
-		'Відвідувачів рахують один раз на день, тож той, хто повернувся іншого дня, враховується знову.',
 	[keys.stateNoScope]: 'Виберіть сайт, щоб побачити його показники.',
 	[keys.panelNewPage]: 'Цифри зʼявляться тут, щойно цю сторінку хтось відвідає.',
 	[keys.panelNewItem]: 'Цифри зʼявляться тут, щойно цей елемент хтось побачить.',

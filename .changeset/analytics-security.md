@@ -12,7 +12,7 @@
 4. On Vercel or behind Cloudflare, set `trustedPlatform: 'vercel'` or `'cloudflare'` in place of `trustedProxyHops`, which it excludes, or visitor countries stop being read ([Which headers to trust](https://docs.10xmedia.de/analytics/geo#which-headers-to-trust)).
 5. List your other sites whose pages post beacons in `capture.allowedOrigins`.
 6. List the self-hosted vendor hosts of your provider documents in `providers.hosts.allow`, and set `providers.hosts.allowPrivateNetwork: true` for a host on `http://` ([Where a document may connect](https://docs.10xmedia.de/analytics/providers#where-a-document-may-connect)).
-7. Turn the exclusion link on with `capture.exclusion: true` and hand staff the link the analytics view gives them ([Excluding your own visits](https://docs.10xmedia.de/analytics/capture#excluding-your-own-visits)).
+7. Turn the exclusion link on with `capture.exclusion: true`, and list your websites' addresses in `capture.exclusion.sites` so the analytics view links staff straight to each ([Excluding your own visits](https://docs.10xmedia.de/analytics/capture#excluding-your-own-visits)).
 8. Where `next.config` calls `captureRewrites` or `posthogProxyRewrites`, relay the vendor through `captureRoute` in a route handler instead, or leave `capture.paths` unset to use the plugin's own proxy ([First-party proxy](https://docs.10xmedia.de/analytics/proxy)).
 
 **Breaking:** every endpoint moved under one base, `routes.base`, default `/_x`, with no alias at the old paths:
@@ -40,6 +40,8 @@
 
 **Breaking:** the exclusion link is off by default and signed: `?analytics_exclude=1` no longer excludes a browser, and the tracker's `exclusionParam` option and `readExclusionParam` are gone. With `capture.exclusion: true` the parameter carries an HMAC of the scope keyed by the Payload secret, the tracker config carries only its hash, and `capture.exclusion.param` renames it. A browser already excluded stays excluded.
 
+**Behavioral:** `?analytics_exclude=0` still counts a browser again, with no token, as soon as the page loads. It reads the flag and removes it only when the browser was excluded, where 1.0.0-beta.11 wrote `0` to storage.
+
 **Breaking:** on Vercel and Cloudflare the visitor's country, region and city come from the platform's headers only with `trustedPlatform` set; without it no platform header is read. `trustedPlatform` and `trustedProxyHops` exclude each other.
 
 **Breaking:** the capture proxy decides each answer's content type from its route's `kind`, sends `X-Content-Type-Options: nosniff` and sandboxes data answers; a custom adapter declares `kind` on every proxy route.
@@ -52,4 +54,6 @@
 
 **Behavioral:** nothing a vendor snippet embeds can end its `<script>` element: every value every adapter writes into an inline script goes through one escaper, `</script>` and the JavaScript line separators included.
 
-**Additive:** `captureRoute` and `CaptureRouteOptions` from `@10x-media/analytics/next`, a route handler that relays one adapter's vendor by the capture proxy's rules: no cookie or credential upstream, and no `set-cookie` back; `routes.base`, `analyticsRoutes`, `routePaths` and `DEFAULT_ROUTE_BASE`; `isAdminUser`; `trustedPlatform`; `capture.allowedOrigins`; `capture.exclusion` with `param` and `sites`, and `GET /api/_x/exclusion` behind the view's **Your own visits** panel; `providers.hosts`; `createGuardedFetch`, `resolveHostPolicy` and `CONNECTION_PATHS`, all `@beta`; `providers.collection.connectionAccess` and `sourceAccess`; item refs and order ids signed by the server (`signItemRef`, `itemAttributesFor`, `signOrderId`).
+**Additive:** the analytics view's **Your own visits** panel ([Your own visits](https://docs.10xmedia.de/analytics/analytics-view#your-own-visits)). By default it shows `?analytics_exclude=<token>` to copy and add to a site's address. With `capture.exclusion.sites`, a list of website addresses or a function per scope that may be async, it shows one row per site: **Stop counting this browser** and **Count this browser again** open the website in a new tab, and **Copy link for another browser** copies the signed link. On a multi-tenant install the platform's **All sites** view lists every tenant's sites, each with that tenant's token, for a reader `access.crossScope.named` admits. `GET /api/_x/exclusion` serves the panel and answers `sites: Array<{ address, token }>` (`ExclusionResponse`, `ExclusionSite`).
+
+**Additive:** `captureRoute` and `CaptureRouteOptions` from `@10x-media/analytics/next`, a route handler that relays one adapter's vendor by the capture proxy's rules: no cookie or credential upstream, and no `set-cookie` back; `routes.base`, `analyticsRoutes`, `routePaths` and `DEFAULT_ROUTE_BASE`; `isAdminUser`; `trustedPlatform`; `capture.allowedOrigins`; `capture.exclusion` with `param` and `sites`; `providers.hosts`; `createGuardedFetch`, `resolveHostPolicy` and `CONNECTION_PATHS`, all `@beta`; `providers.collection.connectionAccess` and `sourceAccess`; item refs and order ids signed by the server (`signItemRef`, `itemAttributesFor`, `signOrderId`).

@@ -206,6 +206,10 @@ describeForDb('analytics capture security: exclusion endpoint', {}, (db) => {
 					member: tenantMembership({
 						userHasAccessToAllTenants: (user) => user.platform === true,
 					}),
+					list: async ({ payload }) =>
+						(await payload.find({ collection: 'tenants', depth: 0, pagination: false })).docs.map(
+							(tenant) => String(tenant.id)
+						),
 				},
 				access: { crossScope: ({ req }) => req.user?.platform === true },
 			}),
@@ -287,7 +291,12 @@ describeForDb('analytics capture security: exclusion endpoint', {}, (db) => {
 			param: 'analytics_exclude',
 			token: exclusionToken(booted.payload.secret, alphaId),
 			sameOrigin: false,
-			sites: ['https://alpha.test/'],
+			sites: [
+				{
+					address: 'https://alpha.test/',
+					token: exclusionToken(booted.payload.secret, alphaId),
+				},
+			],
 		})
 
 		const alphaConfig = (await (
@@ -322,6 +331,20 @@ describeForDb('analytics capture security: exclusion endpoint', {}, (db) => {
 		const body = (await res.json()) as ExclusionResponse
 		expect(body.token).toBe(exclusionToken(booted.payload.secret, betaId))
 		// The sites are the named scope's, never the reader's own selection.
-		expect(body.sites).toEqual(['https://beta.test/'])
+		expect(body.sites).toEqual([{ address: 'https://beta.test/', token: body.token }])
+	})
+
+	it(`answers every tenant's sites with its own token on the all-sites view on ${db}`, async () => {
+		const res = await call(routes.exclusion, { token: platform.token })
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as ExclusionResponse
+		expect(body.token).toBe(exclusionToken(booted.payload.secret, null))
+		expect(body.sites).toEqual(
+			expect.arrayContaining([
+				{ address: 'https://alpha.test/', token: exclusionToken(booted.payload.secret, alphaId) },
+				{ address: 'https://beta.test/', token: exclusionToken(booted.payload.secret, betaId) },
+			])
+		)
+		expect(body.sites).toHaveLength(2)
 	})
 })

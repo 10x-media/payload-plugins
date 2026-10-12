@@ -41,7 +41,7 @@ export const createPageTracking = (win: TrackerWindow, onChange: () => void): Pa
 	return {
 		destroy() {
 			active = false
-			// Only unwind our own wrapper: another library may have patched on top of it,
+			// Only unwind the tracker's own wrapper: another library may have patched on top of it,
 			// and restoring the original underneath it would silently unhook that library.
 			if (history.pushState === patchedPush) {
 				history.pushState = pushState

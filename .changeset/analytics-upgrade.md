@@ -21,7 +21,7 @@
 10. Run Payload's job runner for `analytics-maintain`, and let your scheduler call it through `jobs.access.run`.
 11. On Vercel or behind Cloudflare, set `trustedPlatform` in place of `trustedProxyHops`, which it excludes, to keep visitor countries.
 12. List the origins of other sites whose pages post beacons in `capture.allowedOrigins`.
-13. Turn on `capture.exclusion` and hand staff the new signed exclusion link from the analytics view.
+13. Turn on `capture.exclusion`, list your websites in `capture.exclusion.sites`, and have staff leave their browsers out from the analytics view's **Your own visits** panel.
 14. List the self-hosted vendor hosts of your provider documents in `providers.hosts.allow`, and set `providers.hosts.allowPrivateNetwork: true` for one on `http://`.
 15. On SQLite, open the database with `sqliteAdapter({ wal: true, busyTimeout: 5000 })` and leave `transactionOptions` unset; native runs on a database file, not an in-memory database or an embedded replica.
 

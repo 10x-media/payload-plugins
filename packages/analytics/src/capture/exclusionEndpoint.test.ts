@@ -82,9 +82,66 @@ describe('makeExclusionHandler', () => {
 			})
 		)
 		expect(sites).toHaveBeenCalledWith(expect.objectContaining({ scope: 'tenant-a' }))
+		const token = exclusionToken(SECRET, 'tenant-a')
 		expect(((await res.json()) as ExclusionResponse).sites).toEqual([
-			'https://tenant-a.example.com/',
-			'https://shop.example.com/de',
+			{ address: 'https://tenant-a.example.com/', token },
+			{ address: 'https://shop.example.com/de', token },
+		])
+	})
+
+	it("answers every listed scope's sites with its own token on the all-sites view", async () => {
+		const sites = async ({ scope }: { scope: string | null }) =>
+			scope === null
+				? ['https://platform.example.com', 'https://tenant-a.example.com']
+				: [`https://${scope}.example.com`]
+		const runtime = scopedRuntime({
+			exclusion: { param: 'analytics_exclude', sites },
+			scopeList: async () => ['tenant-a', 'tenant-b'],
+			crossScope: allCrossScope(() => true),
+		})
+		const res = await handler(reqWith(runtime))
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as ExclusionResponse
+		expect(body.token).toBe(exclusionToken(SECRET, null))
+		expect(body.sites).toEqual([
+			{ address: 'https://platform.example.com/', token: exclusionToken(SECRET, null) },
+			{ address: 'https://tenant-a.example.com/', token: exclusionToken(SECRET, null) },
+			{ address: 'https://tenant-b.example.com/', token: exclusionToken(SECRET, 'tenant-b') },
+		])
+	})
+
+	it("keeps other scopes' tokens from an all-sites reader who may not name a scope", async () => {
+		const runtime = scopedRuntime({
+			exclusion: {
+				param: 'analytics_exclude',
+				sites: ({ scope }) => [`https://${scope ?? 'platform'}.example.com`],
+			},
+			scopeList: async () => ['tenant-a'],
+			crossScope: {
+				aggregate: () => true,
+				named: () => false,
+				unscopedSource: () => true,
+			},
+		})
+		const body = (await (await handler(reqWith(runtime))).json()) as ExclusionResponse
+		expect(body.sites).toEqual([
+			{ address: 'https://platform.example.com/', token: exclusionToken(SECRET, null) },
+		])
+	})
+
+	it('answers a tenant only its own sites on the same install', async () => {
+		const runtime = scopedRuntime({
+			exclusion: {
+				param: 'analytics_exclude',
+				sites: ({ scope }) => [`https://${scope ?? 'platform'}.example.com`],
+			},
+			scopeList: async () => ['tenant-a', 'tenant-c'],
+		})
+		const body = (await (
+			await handler(reqWith(runtime, { headers: { 'x-tenant': 'tenant-a' } }))
+		).json()) as ExclusionResponse
+		expect(body.sites).toEqual([
+			{ address: 'https://tenant-a.example.com/', token: exclusionToken(SECRET, 'tenant-a') },
 		])
 	})
 

@@ -50,7 +50,7 @@ The gate is not stored. The next page load starts pending again, and your consen
 
 While every slot that fills waits for an answer, the tracker reads and writes no browser storage. It reads the [exclusion flag](/analytics/capture#the-flag) once a slot opens, at boot for a slot that does not wait, so `tracker.excluded` and `useAnalytics().excluded` read `false` until then. Three things touch `localStorage` before any answer all the same:
 
-- **The exclusion link.** A page opened with a valid [exclusion link](/analytics/capture#the-exclusion-link) writes the flag at once, open slot or not. Only staff are handed the link.
+- **The exclusion link.** A page opened with a valid [exclusion link](/analytics/capture#the-exclusion-link) writes the flag at once, open slot or not, and one opened with `=0` reads it and clears it if set. Only staff are handed the signed link.
 - **A GA4 snippet the server rendered**, for a slot that does not wait, reads the flag itself ahead of its first `gtag()` call, the only place GA4 honours its switch.
 - **A refusal under `snippets={false}`.** The site loads the vendor scripts itself, so closing a slot sets that vendor's opt-out even when the slot never opened: Plausible's and Umami's `localStorage` key, and PostHog's own stored opt-out when its SDK is on the page.
 

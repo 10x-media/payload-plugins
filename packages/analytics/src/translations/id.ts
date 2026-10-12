@@ -227,18 +227,17 @@ export const id: LocaleBundle<'other'> = {
 	[keys.viewExclusionTitle]: 'Kunjungan Anda sendiri',
 	[keys.viewExclusionIntro]:
 		'Keluarkan kunjungan Anda sendiri dari angka ini. Ini berlaku per peramban, jadi lakukan di setiap peramban yang Anda pakai.',
-	[keys.viewExclusionShow]: 'Dapatkan tautan pengecualian',
 	[keys.viewExclusionLinkLabel]: 'Tautan pengecualian',
 	[keys.viewExclusionQueryHelp]:
 		'Tambahkan ini di akhir alamat situs Anda, lalu buka alamat itu sekali di setiap peramban yang ingin Anda kecualikan.',
-	[keys.viewExclusionToggle]: 'Kecualikan peramban ini',
-	[keys.viewExclusionToggleCaveat]:
-		'Ini hanya berfungsi jika situs web Anda berjalan di alamat yang sama ini.',
+	[keys.viewExclusionUndoLabel]: 'Untuk menghitung browser lagi, tambahkan ini sebagai gantinya',
 	[keys.viewExclusionFailed]: 'Tautan pengecualian tidak dapat dimuat.',
-	[keys.viewExclusionLinkFor]: 'Tautan untuk {{site}}',
-	[keys.viewExclusionOpen]: 'Buka',
+	[keys.viewExclusionExclude]: 'Berhenti menghitung browser ini',
+	[keys.viewExclusionInclude]: 'Hitung browser ini lagi',
+	[keys.viewExclusionShare]: 'Salin tautan untuk browser lain',
+	[keys.viewExclusionCopy]: 'Salin tautan',
 	[keys.viewExclusionSitesHelp]:
-		'Buka tautan ini sekali di setiap peramban yang ingin Anda kecualikan.',
+		'Tautan ini membuka situs web Anda di tab baru dan mengecualikan browser ini di sana. Lakukan di setiap browser yang Anda gunakan.',
 	[keys.viewFilterBy]: 'Filter menurut {{dimension}}',
 	[keys.chartSoFar]: '{{period}} (sejauh ini)',
 	[keys.chartKeyboardHint]: 'Gunakan tombol panah untuk berpindah dari titik ke titik.',
@@ -396,8 +395,6 @@ export const id: LocaleBundle<'other'> = {
 	[keys.itemClicksByCountry]: 'Klik per negara',
 	[keys.itemClicksByDevice]: 'Klik per perangkat',
 	[keys.metricVisitorsSummed]: 'Pengunjung, dihitung per hari',
-	[keys.stateVisitorsSummed]:
-		'Pengunjung dihitung sekali per hari, jadi orang yang kembali di hari lain dihitung lagi.',
 	[keys.stateNoScope]: 'Pilih situs untuk melihat angkanya.',
 	[keys.panelNewPage]: 'Angka akan muncul di sini setelah ada yang mengunjungi halaman ini.',
 	[keys.panelNewItem]: 'Angka akan muncul di sini setelah ada yang melihat item ini.',

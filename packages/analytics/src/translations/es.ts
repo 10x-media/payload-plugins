@@ -227,17 +227,17 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.viewExclusionTitle]: 'Tus propias visitas',
 	[keys.viewExclusionIntro]:
 		'Deja tus propias visitas fuera de estas cifras. Funciona por navegador, así que hazlo en cada navegador que uses.',
-	[keys.viewExclusionShow]: 'Obtener enlace de exclusión',
 	[keys.viewExclusionLinkLabel]: 'Enlace de exclusión',
 	[keys.viewExclusionQueryHelp]:
 		'Añade esto al final de la dirección de tu sitio y abre esa dirección una vez en cada navegador que quieras dejar fuera.',
-	[keys.viewExclusionToggle]: 'Dejar fuera este navegador',
-	[keys.viewExclusionToggleCaveat]: 'Solo funciona si tu sitio web está en esta misma dirección.',
+	[keys.viewExclusionUndoLabel]: 'Para volver a contar un navegador, añade esto en su lugar',
 	[keys.viewExclusionFailed]: 'No se pudo cargar el enlace de exclusión.',
-	[keys.viewExclusionLinkFor]: 'Enlace para {{site}}',
-	[keys.viewExclusionOpen]: 'Abrir',
+	[keys.viewExclusionExclude]: 'Dejar de contar este navegador',
+	[keys.viewExclusionInclude]: 'Volver a contar este navegador',
+	[keys.viewExclusionShare]: 'Copiar enlace para otro navegador',
+	[keys.viewExclusionCopy]: 'Copiar enlace',
 	[keys.viewExclusionSitesHelp]:
-		'Abre el enlace una vez en cada navegador que quieras dejar fuera.',
+		'El enlace abre tu sitio web en una pestaña nueva y deja fuera este navegador allí. Hazlo en cada navegador que uses.',
 	[keys.viewFilterBy]: 'Filtrar por {{dimension}}',
 	[keys.chartSoFar]: '{{period}} (hasta ahora)',
 	[keys.chartKeyboardHint]: 'Usa las flechas del teclado para ir de un punto a otro.',
@@ -398,8 +398,6 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.itemClicksByCountry]: 'Clics por país',
 	[keys.itemClicksByDevice]: 'Clics por dispositivo',
 	[keys.metricVisitorsSummed]: 'Visitantes, contados por día',
-	[keys.stateVisitorsSummed]:
-		'Los visitantes se cuentan una vez al día, así que quien vuelve otro día se cuenta de nuevo.',
 	[keys.stateNoScope]: 'Elige un sitio para ver sus cifras.',
 	[keys.panelNewPage]: 'Las cifras aparecerán aquí cuando alguien visite esta página.',
 	[keys.panelNewItem]: 'Las cifras aparecerán aquí cuando alguien vea este elemento.',

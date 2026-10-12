@@ -101,12 +101,9 @@ describe('noticeTexts', () => {
 		])
 	})
 
-	// The metric's name says "counted per day"; the notice says what that does to the number.
-	it('explains visitors counted per day', () => {
-		expect(noticeTexts({ visitorsSummed: true }, context)).toEqual([
-			`t(${keys.stateVisitorsSummed})`,
-		])
-		expect(noticeTexts({ visitorsSummed: false }, context)).toEqual([])
+	// The metric's own name, "Visitors, counted per day", says it; no note repeats it.
+	it('adds no note for visitors counted per day', () => {
+		expect(noticeTexts({ visitorsSummed: true }, context)).toEqual([])
 	})
 
 	it('says last how long ago a snapshot brought the numbers up to date', () => {

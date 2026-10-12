@@ -219,16 +219,17 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.viewExclusionTitle]: '내 방문',
 	[keys.viewExclusionIntro]:
 		'내 방문을 이 수치에서 제외합니다. 브라우저마다 적용되므로 사용하는 브라우저마다 각각 설정하세요.',
-	[keys.viewExclusionShow]: '제외 링크 받기',
 	[keys.viewExclusionLinkLabel]: '제외 링크',
 	[keys.viewExclusionQueryHelp]:
 		'사이트 주소 끝에 이 내용을 붙인 뒤, 제외할 각 브라우저에서 그 주소를 한 번 여세요.',
-	[keys.viewExclusionToggle]: '이 브라우저 제외',
-	[keys.viewExclusionToggleCaveat]: '웹사이트가 바로 이 주소에서 운영될 때만 작동합니다.',
+	[keys.viewExclusionUndoLabel]: '브라우저를 다시 집계하려면 대신 이것을 추가하세요',
 	[keys.viewExclusionFailed]: '제외 링크를 불러오지 못했습니다.',
-	[keys.viewExclusionLinkFor]: '{{site}} 링크',
-	[keys.viewExclusionOpen]: '열기',
-	[keys.viewExclusionSitesHelp]: '제외할 각 브라우저에서 이 링크를 한 번 여세요.',
+	[keys.viewExclusionExclude]: '이 브라우저 집계 중지',
+	[keys.viewExclusionInclude]: '이 브라우저 다시 집계',
+	[keys.viewExclusionShare]: '다른 브라우저용 링크 복사',
+	[keys.viewExclusionCopy]: '링크 복사',
+	[keys.viewExclusionSitesHelp]:
+		'링크를 열면 새 탭에서 웹사이트가 열리고 그곳에서 이 브라우저가 제외됩니다. 사용하는 브라우저마다 한 번씩 하세요.',
 	[keys.viewFilterBy]: '{{dimension}} 기준으로 필터링',
 	[keys.chartSoFar]: '{{period}} (현재까지)',
 	[keys.chartKeyboardHint]: '화살표 키로 각 지점 사이를 이동할 수 있습니다.',
@@ -387,8 +388,6 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.itemClicksByCountry]: '국가별 클릭 수',
 	[keys.itemClicksByDevice]: '기기별 클릭 수',
 	[keys.metricVisitorsSummed]: '방문자(일별 집계)',
-	[keys.stateVisitorsSummed]:
-		'방문자는 하루에 한 번씩 집계되므로, 다른 날 다시 방문한 사람은 다시 집계됩니다.',
 	[keys.stateNoScope]: '사이트를 선택하면 해당 사이트의 수치를 볼 수 있습니다.',
 	[keys.panelNewPage]: '누군가 이 페이지를 방문하면 여기에 수치가 표시됩니다.',
 	[keys.panelNewItem]: '누군가 이 항목을 보면 여기에 수치가 표시됩니다.',

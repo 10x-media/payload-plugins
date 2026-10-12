@@ -53,7 +53,11 @@ describe('siteAddress', () => {
 describe('readExclusionResponse', () => {
 	it('reads the endpoint answer, an undecided origin included', () => {
 		for (const sameOrigin of [true, false, null]) {
-			const body = { ...link, sameOrigin, sites: ['https://shop.example.com/'] }
+			const body = {
+				...link,
+				sameOrigin,
+				sites: [{ address: 'https://shop.example.com/', token: 'xyz' }],
+			}
 			expect(readExclusionResponse(body)).toEqual(body)
 		}
 	})
@@ -64,6 +68,16 @@ describe('readExclusionResponse', () => {
 		expect(readExclusionResponse({ ...link, sameOrigin: 'yes', sites: [] })).toBeNull()
 		expect(readExclusionResponse({ ...link, sameOrigin: null })).toBeNull()
 		expect(readExclusionResponse({ ...link, sameOrigin: null, sites: [1] })).toBeNull()
+		expect(
+			readExclusionResponse({ ...link, sameOrigin: null, sites: ['https://shop.example.com/'] })
+		).toBeNull()
+		expect(
+			readExclusionResponse({
+				...link,
+				sameOrigin: null,
+				sites: [{ address: 'https://shop.example.com/' }],
+			})
+		).toBeNull()
 		expect(readExclusionResponse(null)).toBeNull()
 		expect(readExclusionResponse('token')).toBeNull()
 	})

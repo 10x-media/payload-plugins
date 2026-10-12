@@ -108,9 +108,9 @@ export function PanelContent(props: PanelContentProps) {
 	const timeZone = data.timezone ?? 'UTC'
 
 	if (isEmptyDocumentRead(data)) {
-		// No cards or lists, so no visitor card name, revenue sum or grouped row needs explaining.
+		// No cards or lists, so no revenue sum or grouped row needs explaining.
 		const emptyNotice = widgetNotice(
-			{ ...mergeNotices(data.notices), visitorsSummed: false, mixedCurrencies: [], capped: false },
+			{ ...mergeNotices(data.notices), mixedCurrencies: [], capped: false },
 			{ t, locale, now: viewerNow(), timeZone }
 		)
 		return (

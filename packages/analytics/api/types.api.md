@@ -770,7 +770,13 @@ export type DimensionKey = (typeof DIMENSION_KEYS)[number];
 export interface ExclusionResponse {
     param: string;
     sameOrigin: boolean | null;
-    sites: string[];
+    sites: ExclusionSite[];
+    token: string;
+}
+
+// @public
+export interface ExclusionSite {
+    address: string;
     token: string;
 }
 
@@ -1201,14 +1207,14 @@ export const keys: {
     readonly viewRefreshed: "analytics:viewRefreshed";
     readonly viewExclusionTitle: "analytics:viewExclusionTitle";
     readonly viewExclusionIntro: "analytics:viewExclusionIntro";
-    readonly viewExclusionShow: "analytics:viewExclusionShow";
     readonly viewExclusionLinkLabel: "analytics:viewExclusionLinkLabel";
     readonly viewExclusionQueryHelp: "analytics:viewExclusionQueryHelp";
-    readonly viewExclusionToggle: "analytics:viewExclusionToggle";
-    readonly viewExclusionToggleCaveat: "analytics:viewExclusionToggleCaveat";
+    readonly viewExclusionUndoLabel: "analytics:viewExclusionUndoLabel";
     readonly viewExclusionFailed: "analytics:viewExclusionFailed";
-    readonly viewExclusionLinkFor: "analytics:viewExclusionLinkFor";
-    readonly viewExclusionOpen: "analytics:viewExclusionOpen";
+    readonly viewExclusionExclude: "analytics:viewExclusionExclude";
+    readonly viewExclusionInclude: "analytics:viewExclusionInclude";
+    readonly viewExclusionShare: "analytics:viewExclusionShare";
+    readonly viewExclusionCopy: "analytics:viewExclusionCopy";
     readonly viewExclusionSitesHelp: "analytics:viewExclusionSitesHelp";
     readonly viewFilterBy: "analytics:viewFilterBy";
     readonly chartSoFar: "analytics:chartSoFar";
@@ -1351,7 +1357,6 @@ export const keys: {
     readonly itemClicksByCountry: "analytics:itemClicksByCountry";
     readonly itemClicksByDevice: "analytics:itemClicksByDevice";
     readonly metricVisitorsSummed: "analytics:metricVisitorsSummed";
-    readonly stateVisitorsSummed: "analytics:stateVisitorsSummed";
     readonly stateNoScope: "analytics:stateNoScope";
     readonly panelNewPage: "analytics:panelNewPage";
     readonly panelNewItem: "analytics:panelNewItem";

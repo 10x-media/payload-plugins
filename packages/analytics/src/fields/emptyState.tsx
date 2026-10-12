@@ -36,7 +36,7 @@ export const isEmptyDocumentRead = (read: DocumentRead): boolean =>
 
 /**
  * New: no path resolved (unsaved or unbound), or nothing counted and created after the window
- * opened. Without `createdAt` an empty read simply had no data; any other status is never new.
+ * opened. Without `createdAt` an empty read had no data; any other status is never new.
  */
 export const isNewDocumentAnalytics = (
 	read: DocumentRead,

@@ -193,7 +193,7 @@ describe('resolveBotFilter', () => {
 	})
 
 	// The handler catches it, keeps the event and warns once; swallowing it here would make a
-	// broken predicate indistinguishable from one that simply keeps everything.
+	// broken predicate indistinguishable from one that keeps everything.
 	it('lets a host filter throw through', () => {
 		const filter = resolveBotFilter(() => {
 			throw new Error('boom')

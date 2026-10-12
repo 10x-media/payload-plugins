@@ -226,18 +226,17 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.viewExclusionTitle]: 'Deine eigenen Besuche',
 	[keys.viewExclusionIntro]:
 		'Halte deine eigenen Besuche aus diesen Zahlen heraus. Das gilt pro Browser, also wiederhole es in jedem Browser, den du nutzt.',
-	[keys.viewExclusionShow]: 'Ausschluss-Link anzeigen',
 	[keys.viewExclusionLinkLabel]: 'Ausschluss-Link',
 	[keys.viewExclusionQueryHelp]:
 		'Hänge dies an die Adresse deiner Website an und öffne diese Adresse einmal in jedem Browser, der nicht mitgezählt werden soll.',
-	[keys.viewExclusionToggle]: 'Diesen Browser nicht mitzählen',
-	[keys.viewExclusionToggleCaveat]:
-		'Das funktioniert nur, wenn deine Website unter genau dieser Adresse läuft.',
+	[keys.viewExclusionUndoLabel]: 'Um einen Browser wieder zu zählen, hänge stattdessen dies an',
 	[keys.viewExclusionFailed]: 'Der Ausschluss-Link konnte nicht geladen werden.',
-	[keys.viewExclusionLinkFor]: 'Link für {{site}}',
-	[keys.viewExclusionOpen]: 'Öffnen',
+	[keys.viewExclusionExclude]: 'Diesen Browser nicht mehr zählen',
+	[keys.viewExclusionInclude]: 'Diesen Browser wieder zählen',
+	[keys.viewExclusionShare]: 'Link für einen anderen Browser kopieren',
+	[keys.viewExclusionCopy]: 'Link kopieren',
 	[keys.viewExclusionSitesHelp]:
-		'Öffne den Link einmal in jedem Browser, der nicht mitgezählt werden soll.',
+		'Der Link öffnet deine Website in einem neuen Tab und schließt diesen Browser dort aus. Mach das in jedem Browser, den du nutzt.',
 	[keys.viewFilterBy]: 'Nach {{dimension}} filtern',
 	[keys.chartSoFar]: '{{period}} (bisher)',
 	[keys.chartKeyboardHint]: 'Mit den Pfeiltasten gehst du von Punkt zu Punkt.',
@@ -398,8 +397,6 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.itemClicksByCountry]: 'Klicks nach Land',
 	[keys.itemClicksByDevice]: 'Klicks nach Gerät',
 	[keys.metricVisitorsSummed]: 'Besucher, pro Tag gezählt',
-	[keys.stateVisitorsSummed]:
-		'Besucher werden einmal pro Tag gezählt. Wer an einem anderen Tag wiederkommt, wird also erneut gezählt.',
 	[keys.stateNoScope]: 'Wähle eine Website, um ihre Zahlen zu sehen.',
 	[keys.panelNewPage]: 'Sobald jemand diese Seite besucht, erscheinen hier die Zahlen.',
 	[keys.panelNewItem]: 'Sobald jemand diesen Inhalt sieht, erscheinen hier die Zahlen.',

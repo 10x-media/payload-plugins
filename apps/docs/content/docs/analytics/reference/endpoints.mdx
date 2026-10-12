@@ -419,11 +419,15 @@ It answers `{ status, adapterId, activeNow, series: [{ date, value }], provider?
   "param": "analytics_exclude", // the query parameter the tracker reads
   "token": "kq3...",            // its value for this scope, base64url
   "sameOrigin": null,           // see below
-  "sites": ["https://example.com/"] // the scope's site addresses, from capture.exclusion.sites
+  "sites": [                    // from capture.exclusion.sites, each with its scope's token
+    { "address": "https://example.com/", "token": "kq3..." }
+  ]
 }
 ```
 
-`sameOrigin` says whether a switch in this browser can stand in for the link. It is `true` when the admin's own address resolves to the scope the way a visit would, `false` when it resolves to another, and `null` on an unscoped install, which cannot tell whether its website runs at the admin's address. `sites` lists the scope's site addresses as [`capture.exclusion.sites`](/analytics/capture#excluding-your-own-visits) names them, each trimmed to its origin and path, without repeats, and leaving out anything that is not an `http(s)` URL. It is empty when the install names none, and when the function naming them throws, which is logged: the token is answered either way. `ExclusionResponse` from `@10x-media/analytics/types` types the answer.
+`sameOrigin` says whether the scope's website runs at the admin's own address, which the view then links to when `sites` is empty. It is `true` when the admin's own address resolves to the scope the way a visit would, `false` when it resolves to another, and `null` on an unscoped install, which cannot tell whether its website runs at the admin's address. `sites` lists the scope's site addresses as [`capture.exclusion.sites`](/analytics/capture#excluding-your-own-visits) names them, each trimmed to its origin and path, without repeats, and leaving out anything that is not an `http(s)` URL, each with the token that works there. It is empty when the install names none, and when the function naming them throws, which is logged: the token is answered either way. `ExclusionResponse` and `ExclusionSite` from `@10x-media/analytics/types` type the answer.
+
+On a scoped install, a request that resolves no tenant (the all-sites view) from a reader both `access.crossScope.aggregate` and `access.crossScope.named` admit answers the install-wide sites and then every scope [`scope.list`](/analytics/multi-tenancy) lists, each site with its own scope's token; an address two scopes name is answered once, for the first. `token` stays the install-wide one. Without `named` it answers the install-wide sites alone, so no tenant user ever gets another tenant's token.
 
 The endpoint is gated like every read and by `access.view` on top. It takes an optional `scope`, checked as on every read endpoint, so `scope=*` from a reader `access.crossScope.aggregate` denies answers `400 untrusted_scope`; from one it admits, `400 invalid_param`, because a link belongs to one site. Whoever holds a token can leave any browser out of that scope's numbers, which is why it is never cached. A token that could not be made, and an `access.read` or `access.view` check that throws, answer `500 internal`.
 

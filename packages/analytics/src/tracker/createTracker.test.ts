@@ -2073,7 +2073,7 @@ describe('storage before a slot opens', () => {
 	it('touches no storage while every slot is pending, whatever the page does', async () => {
 		window.localStorage.setItem(EXCLUSION_STORAGE_KEY, '1')
 		window.localStorage.setItem('analytics:consent', 'granted')
-		window.history.replaceState(null, '', '/pricing?analytics_exclude=0&utm_source=x')
+		window.history.replaceState(null, '', '/pricing?utm_source=x')
 		const storage = watchStorage()
 
 		const tracker = boot(
@@ -2121,18 +2121,32 @@ describe('storage before a slot opens', () => {
 		storage.restore()
 	})
 
-	it('puts a browser back through =0 only once a slot opens', () => {
+	it('puts a browser back through =0 at once, and sends nothing before a slot opens', () => {
 		window.localStorage.setItem(EXCLUSION_STORAGE_KEY, '1')
 		window.history.replaceState(null, '', '/pricing?analytics_exclude=0')
 		const tracker = boot(configWith([gatedNative], { exclusion: LINK }))
 		tracker.track('signup')
-		expect(window.localStorage.getItem(EXCLUSION_STORAGE_KEY)).toBe('1')
+
+		expect(window.localStorage.getItem(EXCLUSION_STORAGE_KEY)).toBeNull()
+		expect(tracker.excluded).toBe(false)
+		expect(window.location.search).toBe('')
+		expect(fetchMock).not.toHaveBeenCalled()
 
 		tracker.setGate(true)
 
 		expect(window.localStorage.getItem(EXCLUSION_STORAGE_KEY)).toBeNull()
-		expect(tracker.excluded).toBe(false)
 		expect(posted().map((event) => event.name ?? event.type)).toEqual(['pageview', 'signup'])
+	})
+
+	it('writes nothing through =0 on a browser that was not excluded', () => {
+		window.history.replaceState(null, '', '/pricing?analytics_exclude=0')
+		const storage = watchStorage()
+		boot(configWith([gatedNative], { exclusion: LINK }))
+
+		expect(window.localStorage.getItem(EXCLUSION_STORAGE_KEY)).toBeNull()
+		expect(Storage.prototype.setItem).not.toHaveBeenCalled()
+		expect(Storage.prototype.removeItem).not.toHaveBeenCalled()
+		storage.restore()
 	})
 
 	// Anyone can link to `?analytics_exclude=0`; only a browser that was excluded has switches to lift.

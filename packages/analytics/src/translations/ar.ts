@@ -220,16 +220,17 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.viewExclusionTitle]: 'زياراتك الخاصة',
 	[keys.viewExclusionIntro]:
 		'استبعد زياراتك الخاصة من هذه الأرقام. يعمل ذلك لكل متصفح على حدة، لذا كرره في كل متصفح تستخدمه.',
-	[keys.viewExclusionShow]: 'الحصول على رابط الاستبعاد',
 	[keys.viewExclusionLinkLabel]: 'رابط الاستبعاد',
 	[keys.viewExclusionQueryHelp]:
 		'أضف هذا إلى نهاية عنوان موقعك، ثم افتح ذلك العنوان مرة واحدة في كل متصفح تريد استبعاده.',
-	[keys.viewExclusionToggle]: 'استبعاد هذا المتصفح',
-	[keys.viewExclusionToggleCaveat]: 'يعمل هذا فقط إذا كان موقعك يعمل على هذا العنوان نفسه.',
+	[keys.viewExclusionUndoLabel]: 'لاحتساب متصفح مجددًا، أضف هذا بدلًا من ذلك',
 	[keys.viewExclusionFailed]: 'تعذّر تحميل رابط الاستبعاد.',
-	[keys.viewExclusionLinkFor]: 'رابط {{site}}',
-	[keys.viewExclusionOpen]: 'فتح',
-	[keys.viewExclusionSitesHelp]: 'افتح الرابط مرة واحدة في كل متصفح تريد استبعاده.',
+	[keys.viewExclusionExclude]: 'إيقاف احتساب هذا المتصفح',
+	[keys.viewExclusionInclude]: 'احتساب هذا المتصفح مجددًا',
+	[keys.viewExclusionShare]: 'نسخ الرابط لمتصفح آخر',
+	[keys.viewExclusionCopy]: 'نسخ الرابط',
+	[keys.viewExclusionSitesHelp]:
+		'يفتح الرابط موقعك في علامة تبويب جديدة ويستبعد هذا المتصفح هناك. كرّر ذلك في كل متصفح تستخدمه.',
 	[keys.viewFilterBy]: 'التصفية حسب {{dimension}}',
 	[keys.chartSoFar]: '{{period}} (حتى الآن)',
 	[keys.chartKeyboardHint]: 'استخدم مفاتيح الأسهم للتنقل بين النقاط.',
@@ -384,8 +385,6 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.itemClicksByCountry]: 'النقرات حسب الدولة',
 	[keys.itemClicksByDevice]: 'النقرات حسب الجهاز',
 	[keys.metricVisitorsSummed]: 'الزوار، محسوبون يوميًا',
-	[keys.stateVisitorsSummed]:
-		'يُحسب الزوار مرة واحدة في اليوم، لذا يُحسب من يعود في يوم آخر مرة أخرى.',
 	[keys.stateNoScope]: 'اختر موقعًا لرؤية أرقامه.',
 	[keys.panelNewPage]: 'ستظهر الأرقام هنا بمجرد أن يزور أحد هذه الصفحة.',
 	[keys.panelNewItem]: 'ستظهر الأرقام هنا بمجرد أن يرى أحد هذا العنصر.',

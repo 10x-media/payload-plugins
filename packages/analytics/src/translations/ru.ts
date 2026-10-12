@@ -226,18 +226,17 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.viewExclusionTitle]: 'Ваши собственные визиты',
 	[keys.viewExclusionIntro]:
 		'Исключите собственные визиты из этих данных. Это действует для каждого браузера отдельно, поэтому сделайте это в каждом браузере, которым пользуетесь.',
-	[keys.viewExclusionShow]: 'Получить ссылку для исключения',
 	[keys.viewExclusionLinkLabel]: 'Ссылка для исключения',
 	[keys.viewExclusionQueryHelp]:
 		'Добавьте это в конец адреса вашего сайта и откройте этот адрес один раз в каждом браузере, который нужно исключить.',
-	[keys.viewExclusionToggle]: 'Исключить этот браузер',
-	[keys.viewExclusionToggleCaveat]:
-		'Это работает, только если ваш сайт открывается по этому же адресу.',
+	[keys.viewExclusionUndoLabel]: 'Чтобы снова учитывать браузер, добавьте вместо этого',
 	[keys.viewExclusionFailed]: 'Не удалось загрузить ссылку для исключения.',
-	[keys.viewExclusionLinkFor]: 'Ссылка для {{site}}',
-	[keys.viewExclusionOpen]: 'Открыть',
+	[keys.viewExclusionExclude]: 'Не учитывать этот браузер',
+	[keys.viewExclusionInclude]: 'Снова учитывать этот браузер',
+	[keys.viewExclusionShare]: 'Скопировать ссылку для другого браузера',
+	[keys.viewExclusionCopy]: 'Копировать ссылку',
 	[keys.viewExclusionSitesHelp]:
-		'Откройте ссылку один раз в каждом браузере, который нужно исключить.',
+		'Ссылка откроет ваш сайт в новой вкладке и исключит там этот браузер. Сделайте это в каждом браузере, которым пользуетесь.',
 	[keys.viewFilterBy]: 'Фильтровать по: {{dimension}}',
 	[keys.chartSoFar]: '{{period}} (на данный момент)',
 	[keys.chartKeyboardHint]: 'Используйте клавиши со стрелками, чтобы переходить между точками.',
@@ -396,8 +395,6 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.itemClicksByCountry]: 'Клики по странам',
 	[keys.itemClicksByDevice]: 'Клики по устройствам',
 	[keys.metricVisitorsSummed]: 'Посетители, подсчёт по дням',
-	[keys.stateVisitorsSummed]:
-		'Посетители считаются один раз в день, поэтому тот, кто вернулся в другой день, учитывается снова.',
 	[keys.stateNoScope]: 'Выберите сайт, чтобы увидеть его показатели.',
 	[keys.panelNewPage]: 'Цифры появятся здесь, как только эту страницу кто-нибудь посетит.',
 	[keys.panelNewItem]: 'Цифры появятся здесь, как только этот элемент кто-нибудь увидит.',

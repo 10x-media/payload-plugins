@@ -1210,16 +1210,59 @@
 	.analytics-view__exclusion-sites {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
 		padding: 0;
 		margin: 0;
 		list-style: none;
+		border-block: 1px solid var(--theme-elevation-100);
+	}
+
+	.analytics-view__exclusion-site {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		gap: 0.5rem 1rem;
+		align-items: center;
+		padding-block: 0.625rem;
+	}
+
+	.analytics-view__exclusion-site + .analytics-view__exclusion-site {
+		border-block-start: 1px solid var(--theme-elevation-100);
+	}
+
+	.analytics-view__exclusion-name {
+		overflow: hidden;
+		font-weight: 600;
+		color: var(--theme-elevation-800);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.analytics-view__exclusion-actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		align-items: center;
+		justify-content: flex-end;
+	}
+
+	.analytics-view__exclusion-actions > .btn {
+		margin: 0;
+	}
+
+	.analytics-view__exclusion-alt {
+		font-size: 0.8125rem;
+		color: var(--theme-elevation-650);
+		text-decoration: underline;
+		text-underline-offset: 2px;
+	}
+
+	.analytics-view__exclusion-alt:hover {
+		color: var(--theme-elevation-800);
 	}
 
 	.analytics-view__exclusion-link {
 		display: flex;
 		gap: 0.5rem;
-		align-items: center;
+		align-items: stretch;
 	}
 
 	.analytics-view__exclusion-link > .btn {
@@ -1227,11 +1270,11 @@
 		margin: 0;
 	}
 
+	/* Stretched to the Copy button beside it, so both are one height at any size. */
 	.analytics-view__exclusion-input {
 		box-sizing: border-box;
 		flex: 1;
 		min-width: 0;
-		height: 40px;
 		padding-block: 0;
 		padding-inline: 0.625rem;
 		font-family: var(--font-mono, monospace);
@@ -1248,6 +1291,14 @@
 	}
 
 	@media (max-width: 768px) {
+		.analytics-view__exclusion-site {
+			grid-template-columns: minmax(0, 1fr);
+		}
+
+		.analytics-view__exclusion-actions {
+			justify-content: flex-start;
+		}
+
 		.analytics-view__captions {
 			margin-inline-start: 0;
 		}

@@ -1,9 +1,9 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { a11yViolations } from '../../testing/a11y'
-import { EXCLUSION_STORAGE_KEY } from '../../tracker/exclusion'
 import { keys } from '../../translations/keys'
+import type { ExclusionSite } from '../exclusionLink'
 import { ExcludeBrowser } from './ExcludeBrowser'
 
 vi.mock('@payloadcms/ui', () => ({
@@ -20,13 +20,19 @@ vi.mock('@payloadcms/ui', () => ({
 		children?: ReactNode
 		onClick?: () => void
 		disabled?: boolean
-		el?: string
+		el?: 'anchor'
 		url?: string
 		newTab?: boolean
 		extraButtonProps?: Record<string, unknown>
 	}) =>
 		el === 'anchor' ? (
-			<a href={url} {...(newTab ? { target: '_blank' } : {})} {...extraButtonProps}>
+			<a
+				className="btn"
+				href={url}
+				rel={newTab ? 'noopener noreferrer' : undefined}
+				target={newTab ? '_blank' : undefined}
+				{...extraButtonProps}
+			>
 				{children}
 			</a>
 		) : (
@@ -34,24 +40,9 @@ vi.mock('@payloadcms/ui', () => ({
 				{children}
 			</button>
 		),
-	CheckboxInput: ({
-		checked,
-		label,
-		onToggle,
-	}: {
-		checked?: boolean
-		label?: string
-		onToggle: () => void
-	}) => (
-		<label>
-			<input checked={checked === true} onChange={onToggle} type="checkbox" />
-			{label}
-		</label>
-	),
 	useTranslation: () => ({
 		i18n: { language: 'en' },
-		t: (key: string, vars?: Record<string, string>) =>
-			vars ? `${key} ${JSON.stringify(vars)}` : key,
+		t: (key: string) => key,
 	}),
 }))
 
@@ -59,30 +50,48 @@ const answer = (body: unknown, ok = true): Response =>
 	({ ok, json: () => Promise.resolve(body) }) as Response
 
 const TOKEN = 'abc_DEF-123'
+const ALPHA = 'https://alpha.example.com'
 
-const linkFor = (sameOrigin: boolean | null, sites: string[] = []) => ({
+const site = (address: string, token = TOKEN): ExclusionSite => ({ address, token })
+
+const linkFor = (sameOrigin: boolean | null, sites: ExclusionSite[] = []) => ({
 	param: 'analytics_exclude',
 	token: TOKEN,
 	sameOrigin,
 	sites,
 })
 
-const open = async (body: unknown, ok = true) => {
+const mount = async (body: unknown, ok = true) => {
 	const fetchMock = vi.fn(() => Promise.resolve(answer(body, ok)))
 	vi.stubGlobal('fetch', fetchMock)
-	const view = render(<ExcludeBrowser endpoint="/api/_x/exclusion" />)
-	expect(fetchMock).not.toHaveBeenCalled()
+	let view: ReturnType<typeof render> | undefined
 	await act(async () => {
-		fireEvent.click(screen.getByText(keys.viewExclusionShow))
+		view = render(<ExcludeBrowser endpoint="/api/_x/exclusion" />)
 	})
+	if (!view) {
+		throw new Error('not rendered')
+	}
 	return { fetchMock, ...view }
 }
 
-const linkField = (): HTMLInputElement => screen.getByLabelText(keys.viewExclusionLinkLabel)
+const button = (name: string) => screen.getByRole('button', { name })
+const links = (name: string) => screen.getAllByRole('link', { name })
+const describedBy = (element: HTMLElement): string =>
+	document.getElementById(element.getAttribute('aria-describedby') ?? '')?.textContent ?? ''
 
-beforeEach(() => {
-	window.localStorage.clear()
-})
+const nth = (list: HTMLElement[], index: number): HTMLElement => {
+	const element = list[index]
+	if (!element) {
+		throw new Error(`no element ${index}`)
+	}
+	return element
+}
+
+const opensInNewTab = (element: HTMLElement) => {
+	expect(element.tagName).toBe('A')
+	expect(element.getAttribute('target')).toBe('_blank')
+	expect(element.getAttribute('rel')).toBe('noopener noreferrer')
+}
 
 afterEach(() => {
 	cleanup()
@@ -90,124 +99,111 @@ afterEach(() => {
 })
 
 describe('ExcludeBrowser', () => {
-	it("asks for the link only when the reader wants it, then shows the part to add to the site's address", async () => {
-		const { fetchMock } = await open(linkFor(null))
-		expect(fetchMock).toHaveBeenCalledWith(
-			'/api/_x/exclusion',
-			expect.objectContaining({ credentials: 'same-origin' })
-		)
-		expect(linkField().value).toBe(`?analytics_exclude=${TOKEN}`)
-		expect(screen.getByText(keys.viewExclusionQueryHelp)).toBeDefined()
-	})
-
-	it('hands out the same part whatever the origin, never the admin address', async () => {
-		for (const sameOrigin of [true, false, null]) {
-			await open(linkFor(sameOrigin))
-			expect(linkField().value).toBe(`?analytics_exclude=${TOKEN}`)
-			expect(linkField().value).not.toContain(window.location.origin)
+	it("hands out the part to add to the site's address, and the part that undoes it, where no site is known", async () => {
+		for (const sameOrigin of [false, null]) {
+			const { fetchMock } = await mount(linkFor(sameOrigin))
+			expect(fetchMock).toHaveBeenCalledWith(
+				'/api/_x/exclusion',
+				expect.objectContaining({ credentials: 'same-origin' })
+			)
+			const field: HTMLInputElement = screen.getByLabelText(keys.viewExclusionLinkLabel)
+			expect(field.value).toBe(`?analytics_exclude=${TOKEN}`)
+			expect(screen.getByText(keys.viewExclusionQueryHelp)).toBeDefined()
+			const undo: HTMLInputElement = screen.getByLabelText(keys.viewExclusionUndoLabel)
+			expect(undo.value).toBe('?analytics_exclude=0')
+			expect(screen.getAllByRole('button', { name: keys.viewExclusionCopy })).toHaveLength(2)
+			expect(screen.queryByRole('link')).toBeNull()
 			cleanup()
 		}
 	})
 
-	it('hands out a whole link per site the install names, to copy or to open', async () => {
-		await open(linkFor(false, ['https://alpha.example.com/', 'https://shop.example.com/de']))
-		const first = screen.getByLabelText(
-			`${keys.viewExclusionLinkFor} ${JSON.stringify({ site: 'alpha.example.com' })}`
+	it("takes the admin's own address as the site when the server knows the site runs there", async () => {
+		await mount(linkFor(true))
+		const stop = links(keys.viewExclusionExclude)
+		expect(stop).toHaveLength(1)
+		expect(stop[0]?.getAttribute('href')).toBe(
+			`${window.location.origin}/?analytics_exclude=${TOKEN}`
 		)
-		const second = screen.getByLabelText(
-			`${keys.viewExclusionLinkFor} ${JSON.stringify({ site: 'shop.example.com/de' })}`
-		)
-		expect((first as HTMLInputElement).value).toBe(
-			`https://alpha.example.com/?analytics_exclude=${TOKEN}`
-		)
-		expect((second as HTMLInputElement).value).toBe(
-			`https://shop.example.com/de?analytics_exclude=${TOKEN}`
-		)
-		const opens = screen.getAllByRole('link', { name: keys.viewExclusionOpen })
-		expect(opens.map((link) => link.getAttribute('href'))).toEqual([
-			`https://alpha.example.com/?analytics_exclude=${TOKEN}`,
-			`https://shop.example.com/de?analytics_exclude=${TOKEN}`,
-		])
-		expect(opens[0]?.getAttribute('target')).toBe('_blank')
-		// Each button says which link it acts on, through the label of that link.
-		const copies = screen.getAllByRole('button', { name: 'general:copy' })
-		expect(copies).toHaveLength(2)
-		expect(
-			document.getElementById(copies[1]?.getAttribute('aria-describedby') ?? '')?.textContent
-		).toBe(`${keys.viewExclusionLinkFor} ${JSON.stringify({ site: 'shop.example.com/de' })}`)
-		expect(screen.getByText(keys.viewExclusionSitesHelp)).toBeDefined()
-		expect(screen.queryByText(keys.viewExclusionQueryHelp)).toBeNull()
+		expect(screen.queryByRole('textbox')).toBeNull()
 	})
 
-	it('copies a link and says so, in a button named by its text', async () => {
+	it("gives each named site a row with its own token's link and its =0 link, both in a new tab", async () => {
+		await mount(linkFor(false, [site(`${ALPHA}/`), site('https://shop.example.com/de', 'other')]))
+		const stop = links(keys.viewExclusionExclude)
+		const resume = links(keys.viewExclusionInclude)
+		expect(stop.map((link) => link.getAttribute('href'))).toEqual([
+			`${ALPHA}/?analytics_exclude=${TOKEN}`,
+			'https://shop.example.com/de?analytics_exclude=other',
+		])
+		expect(resume.map((link) => link.getAttribute('href'))).toEqual([
+			`${ALPHA}/?analytics_exclude=0`,
+			'https://shop.example.com/de?analytics_exclude=0',
+		])
+		for (const link of [...stop, ...resume]) {
+			opensInNewTab(link)
+		}
+		expect(describedBy(nth(stop, 1))).toBe('shop.example.com/de')
+		expect(describedBy(nth(resume, 0))).toBe('alpha.example.com')
+		expect(screen.getByText(keys.viewExclusionSitesHelp)).toBeDefined()
+		expect(screen.queryByRole('textbox')).toBeNull()
+	})
+
+	it("copies a site's signed link for another browser and says so", async () => {
 		const writeText = vi.fn(() => Promise.resolve())
 		vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
-		await open(linkFor(false, ['https://alpha.example.com/']))
+		await mount(linkFor(false, [site(`${ALPHA}/`)]))
+		const share = button(keys.viewExclusionShare)
+		expect(describedBy(share)).toBe('alpha.example.com')
 		await act(async () => {
-			fireEvent.click(screen.getByRole('button', { name: 'general:copy' }))
+			fireEvent.click(share)
 		})
-		expect(writeText).toHaveBeenCalledWith(`https://alpha.example.com/?analytics_exclude=${TOKEN}`)
-		expect(screen.getByRole('button', { name: 'general:copied' })).toBeDefined()
+		expect(writeText).toHaveBeenCalledWith(`${ALPHA}/?analytics_exclude=${TOKEN}`)
+		expect(button('general:copied')).toBeDefined()
+	})
+
+	it('copies the part to add, and the part that undoes it', async () => {
+		const writeText = vi.fn(() => Promise.resolve())
+		vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } })
+		await mount(linkFor(false))
+		const copies = screen.getAllByRole('button', { name: keys.viewExclusionCopy })
+		expect(describedBy(nth(copies, 1))).toBe(keys.viewExclusionUndoLabel)
+		await act(async () => {
+			fireEvent.click(nth(copies, 0))
+			fireEvent.click(nth(copies, 1))
+		})
+		expect(writeText.mock.calls).toEqual([
+			[`?analytics_exclude=${TOKEN}`],
+			['?analytics_exclude=0'],
+		])
 	})
 
 	// A link reads left to right on a right-to-left page too.
-	it('keeps every link field left to right', async () => {
-		await open(linkFor(false, ['https://alpha.example.com/']))
+	it('keeps every link field and site name left to right', async () => {
+		await mount(linkFor(false))
 		for (const field of screen.getAllByRole('textbox')) {
 			expect(field.getAttribute('dir')).toBe('ltr')
 		}
+		cleanup()
+		await mount(linkFor(false, [site(`${ALPHA}/`)]))
+		expect(screen.getByText('alpha.example.com').getAttribute('dir')).toBe('ltr')
 	})
 
-	it('moves focus to the first link once it replaces the button that asked for it', async () => {
-		await open(linkFor(false, ['https://alpha.example.com/', 'https://shop.example.com/']))
-		expect(document.activeElement).toBe(screen.getAllByRole('textbox')[0])
-	})
-
-	it('titles itself with a heading and has no structural violations', async () => {
-		const { container } = await open(linkFor(null, ['https://alpha.example.com/']))
-		expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(keys.viewExclusionTitle)
-		expect(screen.getByRole('region', { name: keys.viewExclusionTitle })).toBeDefined()
-		expect(a11yViolations(container)).toEqual([])
-	})
-
-	it('offers the switch plainly where the admin is confirmed as the site', async () => {
-		await open(linkFor(true))
-		expect(screen.getByRole('checkbox')).toBeDefined()
-		expect(screen.queryByText(keys.viewExclusionToggleCaveat)).toBeNull()
-	})
-
-	it('says the switch only works at this address where the install cannot tell', async () => {
-		await open(linkFor(null))
-		expect(screen.getByRole('checkbox')).toBeDefined()
-		expect(screen.getByText(keys.viewExclusionToggleCaveat)).toBeDefined()
-	})
-
-	it('hides the switch where the admin runs elsewhere than the site', async () => {
-		await open(linkFor(false))
-		expect(screen.queryByText(keys.viewExclusionToggle)).toBeNull()
-		expect(screen.queryByRole('checkbox')).toBeNull()
-	})
-
-	it('sets and clears the flag in this browser from the switch', async () => {
-		await open(linkFor(true))
-		const toggle = screen.getByRole('checkbox')
-		expect((toggle as HTMLInputElement).checked).toBe(false)
-
-		await act(async () => {
-			fireEvent.click(toggle)
-		})
-		expect(window.localStorage.getItem(EXCLUSION_STORAGE_KEY)).toBe('1')
-		expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true)
-
-		await act(async () => {
-			fireEvent.click(screen.getByRole('checkbox'))
-		})
-		expect(window.localStorage.getItem(EXCLUSION_STORAGE_KEY)).toBeNull()
+	it('titles itself with a heading and has no structural violations in either layout', async () => {
+		for (const body of [linkFor(null), linkFor(null, [site(`${ALPHA}/`)])]) {
+			const { container } = await mount(body)
+			expect(screen.getByRole('heading', { level: 2 }).textContent).toBe(keys.viewExclusionTitle)
+			expect(screen.getByRole('region', { name: keys.viewExclusionTitle })).toBeDefined()
+			expect(a11yViolations(container)).toEqual([])
+			cleanup()
+		}
 	})
 
 	it('says so when the link cannot be loaded, and lets the reader ask again', async () => {
-		await open({ error: { code: 'forbidden' } }, false)
+		const { fetchMock } = await mount({ error: { code: 'forbidden' } }, false)
 		expect(screen.getByRole('alert').textContent).toBe(keys.viewExclusionFailed)
-		expect(screen.getByText(keys.viewExclusionShow)).toBeDefined()
+		await act(async () => {
+			fireEvent.click(button(keys.viewRetry))
+		})
+		expect(fetchMock).toHaveBeenCalledTimes(2)
 	})
 })
