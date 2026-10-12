@@ -148,6 +148,7 @@
 		"dedupe-access-and-scans",
 		"dedupe-initial",
 		"dedupe-merge-sections",
+		"dedupe-title",
 		"document-preview-initial-beta",
 		"dual-session-initial-beta",
 		"dual-session-locales",

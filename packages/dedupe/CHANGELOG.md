@@ -1,5 +1,11 @@
 # @10x-media/dedupe
 
+## 0.1.0-beta.2
+
+### Minor Changes
+
+- `title` on a collection names its documents on the merge screen, in the queue and in the duplicate check: `({ req, doc, title }) => string`, given the `useAsTitle` title and the document with its hidden fields.
+
 ## 0.1.0-beta.1
 
 ### Minor Changes
