@@ -1,3 +1,5 @@
+![Banner](./assets/banner.jpg)
+
 # @10x-media/dedupe
 
 Find duplicate documents in any Payload collection and merge a group of them into one from the admin.
