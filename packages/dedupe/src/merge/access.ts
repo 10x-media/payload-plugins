@@ -1,6 +1,7 @@
 import { type FieldAccess, type FlattenedField, getFieldByPath, type PayloadRequest } from 'payload'
 
 import type { CollectionContext } from '../plugin/context'
+import { fullLabel } from '../schema/deriveSpec'
 import type { MergeDecision, ReviewedFieldSpec } from '../schema/types'
 import {
 	fieldsWithin,
@@ -12,6 +13,7 @@ import {
 	readPath,
 } from './compare'
 import type { LoadedDoc } from './load'
+import type { UniqueRelease } from './unique'
 
 /** A field's access check, with the object the field sits in. */
 type Check = { field: FlattenedField; siblingData: unknown }
@@ -35,22 +37,24 @@ const guarded = (fields: FlattenedField[], operation: 'read' | 'update') =>
 	fields.some((field) => 'access' in field && field.access?.[operation])
 
 /**
- * The fields' own access, asked as Payload asks it: with the document, and the object each
- * field sits in as `siblingData`. A check that throws, such as one that reads a document the
- * record no longer has, counts as a refusal.
+ * The fields' own access, asked as Payload asks it: with the document, the data of the write
+ * (the document itself before one is known), and the object each field sits in as
+ * `siblingData`. A check that throws, such as one that reads a document the record no longer
+ * has, counts as a refusal.
  */
 const allowed = async (
 	checks: Check[],
 	operation: 'read' | 'update',
-	args: { req: PayloadRequest; doc: LoadedDoc | undefined }
+	args: { req: PayloadRequest; doc: LoadedDoc | undefined; data?: Row }
 ): Promise<boolean> => {
 	const { req, doc } = args
+	const data = args.data ?? doc
 	for (const { field, siblingData } of checks) {
 		const check =
 			'access' in field ? (field.access?.[operation] as FieldAccess | undefined) : undefined
 		if (!check) continue
 		try {
-			if (!(await check({ req, id: doc?.id, doc, data: doc, siblingData: siblingData as Row })))
+			if (!(await check({ req, id: doc?.id, doc, data, siblingData: siblingData as Row })))
 				return false
 		} catch {
 			return false
@@ -249,4 +253,96 @@ export const withoutUnreadable = async <T extends MergeDecision>(args: {
 			return { ...decision, values, proposed: await shown(survivor, decision.proposed) }
 		})
 	)
+}
+
+/** The label of the merged field a path sits in, for a refusal the reviewer reads. */
+const labelOf = (col: CollectionContext, path: string, req: PayloadRequest): string => {
+	const parts = path.split('.')
+	for (let end = parts.length; end > 0; end--) {
+		const at = parts.slice(0, end).join('.')
+		if (col.specByPath.has(at)) return fullLabel(at, col, req.i18n)
+	}
+	return path
+}
+
+/**
+ * Why Payload would drop part of a write to `doc`, or null: a field in `data` its own update
+ * access refuses, asked as Payload asks it on an update, with the write as `data` and the object
+ * the field sits in within it as `siblingData`. Payload drops such a value without a word, so
+ * the merge refuses before writing rather than report a value it never wrote. Payload, writing
+ * as the reviewer, still has the last word.
+ */
+export const writeRefusal = async (args: {
+	req: PayloadRequest
+	col: CollectionContext
+	doc: LoadedDoc
+	data: Row
+}): Promise<string | null> => {
+	const { req, col, doc, data } = args
+	const known = req.payload.config.blocks
+	const walk = async (
+		fields: FlattenedField[],
+		sibling: Row,
+		path: string
+	): Promise<string | null> => {
+		for (const field of fields) {
+			if (!(field.name in sibling)) continue
+			const at = path ? `${path}.${field.name}` : field.name
+			if (!(await allowed([{ field, siblingData: sibling }], 'update', { req, doc, data }))) {
+				return at
+			}
+			for (const part of partsWithin(field, sibling[field.name], known)) {
+				const inner = await walk(part.fields, part.row, at)
+				if (inner) return inner
+			}
+		}
+		return null
+	}
+	const refused = await walk(col.config.flattenedFields, data, '')
+	return refused ? `You may not change "${labelOf(col, refused, req)}".` : null
+}
+
+/**
+ * Why the reviewer may not free the unique values the survivor takes, or null: a merged-in
+ * document gives each up for a placeholder or an empty value, a change to a field of theirs
+ * like any other, so it needs the field's update access on that document. A document deleted
+ * instead needs only its `delete`, which `removalRefusal` asks.
+ */
+export const releaseRefusal = async (args: {
+	req: PayloadRequest
+	col: CollectionContext
+	absorbed: LoadedDoc[]
+	released: Record<string, Pick<UniqueRelease, 'emptied' | 'marked'>>
+}): Promise<string | null> => {
+	const { req, col, absorbed, released } = args
+	for (const doc of absorbed) {
+		const given = released[String(doc.id)]
+		if (!given) continue
+		for (const path of new Set(
+			[...given.marked, ...given.emptied].map((key) => key.split('@')[0] as string)
+		)) {
+			const along = checksAlong(col, path, doc)
+			const field = along[along.length - 1]?.field
+			const localized = col.specByPath.get(path)?.localized === true
+			const value = readPath(doc, path)
+			const values = localized && isPlainObject(value) ? Object.values(value) : [value]
+			let changeable = await allowed(along, 'update', { req, doc })
+			for (const one of field && changeable ? values : []) {
+				if (
+					!(await changeableWithin(field as FlattenedField, one, {
+						req,
+						doc,
+						insideLocale: localized,
+					}))
+				) {
+					changeable = false
+					break
+				}
+			}
+			if (!changeable) {
+				return `You may not change "${labelOf(col, path, req)}" on document ${String(doc.id)}, which it gives up for the primary to take.`
+			}
+		}
+	}
+	return null
 }

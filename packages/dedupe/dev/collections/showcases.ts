@@ -1,3 +1,4 @@
+import { dedupeCustom } from '@10x-media/dedupe'
 import type { CollectionConfig } from 'payload'
 
 const COMPONENTS = '/components/Showcase'
@@ -6,7 +7,7 @@ const COMPONENTS = '/components/Showcase'
  * Dev stand only: fields that do not look like Payload's own, to see how the merge screen
  * draws them. A custom input on a text and a number, a custom description, groups drawn as
  * one input, an array with its own row label, one drawn by a custom component as a whole,
- * and blocks with their own row label.
+ * the same one picked row by row, and blocks with their own row label.
  */
 export const showcases: CollectionConfig = {
 	slug: 'showcases',
@@ -71,6 +72,19 @@ export const showcases: CollectionConfig = {
 			name: 'labels',
 			type: 'array',
 			admin: { components: { Field: `${COMPONENTS}#ChipsArrayField` } },
+			fields: [
+				{ name: 'text', type: 'text' },
+				{ name: 'tone', type: 'select', options: ['neutral', 'warning', 'success'] },
+			],
+		},
+		// The same component, split: the merge screen draws Payload's rows for the row checks.
+		{
+			name: 'tags',
+			type: 'array',
+			admin: {
+				components: { Field: `${COMPONENTS}#ChipsArrayField` },
+				custom: dedupeCustom({ split: true, mergeView: 'native' }),
+			},
 			fields: [
 				{ name: 'text', type: 'text' },
 				{ name: 'tone', type: 'select', options: ['neutral', 'warning', 'success'] },

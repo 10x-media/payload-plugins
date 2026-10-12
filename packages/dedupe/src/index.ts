@@ -8,13 +8,14 @@ import { registerHooks } from './plugin/registerHooks'
 import { registerJobs } from './plugin/registerJobs'
 import { registerTranslations } from './plugin/registerTranslations'
 import { registerViews } from './plugin/registerViews'
+import { reportTransactions } from './plugin/transactions'
 import type { DedupeAdapter } from './search/contract'
 import { keysAdapter } from './search/keysAdapter'
 
 export { presets as comparePresets } from './match/presets'
 export { readPath } from './merge/compare'
 export type { DedupePluginOptions } from './options'
-export { matchFields, tenantOf } from './plugin/context'
+export { DEDUPE_SKIP, type DedupeSkip, matchFields, tenantOf } from './plugin/context'
 export type { DedupeEvent, DedupeEventSink } from './plugin/events'
 export type { Duplicate } from './queue/live'
 export { findDuplicates } from './queue/live'
@@ -63,9 +64,13 @@ export const dedupe = definePlugin<DedupePluginOptions>({
 		const adapters = resolveAdapters(resolved, keys)
 
 		registerCollections(config, resolved)
-		// An adapter spread from another shares its `register`, which must add its collection once.
+		// Only an adapter some matched collection searches with registers, and one spread from
+		// another shares its `register`, which must add its collection once.
+		const used = resolved.collections
+			.filter((entry) => entry.match)
+			.map((entry) => adapters.own.get(entry.slug) ?? adapters.plugin)
 		const registered = new Set<DedupeAdapter['register']>()
-		for (const adapter of [adapters.plugin, ...adapters.own.values()]) {
+		for (const adapter of used) {
 			if (!adapter.register || registered.has(adapter.register)) continue
 			registered.add(adapter.register)
 			adapter.register(config)
@@ -86,6 +91,7 @@ export const dedupe = definePlugin<DedupePluginOptions>({
 		const previousOnInit = config.onInit
 		config.onInit = async (payload) => {
 			buildContext(payload, resolved, adapters)
+			await reportTransactions(payload, resolved)
 			if (previousOnInit) await previousOnInit(payload)
 		}
 		return config

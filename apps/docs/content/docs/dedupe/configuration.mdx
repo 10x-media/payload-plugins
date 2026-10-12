@@ -11,12 +11,14 @@ description: Every option of the plugin and its default.
 | `translations` | unset | Overrides for the plugin's strings, per locale. |
 | `collections` | `{}` | Per collection: `true` for the merge screen alone, the object below, or `false`. |
 | `access.review` | logged in | Who opens the queue and the merge screen. The collection's `read` access on the documents applies too: the queue lists no group with a document the reader may not read. |
-| `access.merge` | logged in | Who applies a merge. The collection's `read`, `update` and `delete` access apply too. |
-| `requireTransactions` | `false` | Refuse every merge without a database transaction. Without it, only a merge that would delete a merged-in document first is refused. |
+| `access.scan` | `access.review` | Who starts a scan with "Scan now". |
+| `access.merge` | logged in | Who applies a merge. The merge writes as the reviewer, so the collection's and the fields' own access apply too. |
+| `requireTransactions` | `false` | Refuse every merge without a database transaction. Without it, only a merge that would delete a merged-in document first is refused. The merge screen then says merging is not available, and the reason is logged at startup. |
 | `maxGroupSize` | `5` | Most documents in one merge, 2 or more. A larger queue group opens its most alike documents; the merge screen counts the rest, which stay in the queue. |
 | `adapter` | keys | Where candidates come from in every collection without its own, see [Adapters](./searching#adapters). |
 | `disableJobsQueue` | `false` | Run the save check and the scan inside the request, for a deployment without a job worker. |
-| `queue` | `dedupe` | Jobs queue of the `dedupe-check` and `dedupe-scan` tasks. |
+| `queue` | `dedupe` | Jobs queue of the `dedupe-check` task. |
+| `scanQueue` | `queue` | Jobs queue of the `dedupe-scan` task, the scheduled scan included. |
 | `scan.cron` | unset | Scan every matched collection on a schedule. Needs a job runner. |
 | `view` | `{ path: '/dedupe' }` | Admin path of the queue and the merge screen; `false` removes the views. |
 | `overrides` | `{}` | `keys`, `pairs`: a function over the plugin's collection. Hooks are refused. |

@@ -230,13 +230,16 @@ export type DedupePluginOptions = {
 	 */
 	collections?: Partial<Record<CollectionSlug, CollectionDedupeOptions | boolean>>
 	/**
-	 * Who may open the queue and the merge screen, and who may apply a merge. Both default
-	 * to any logged-in user. Applying additionally requires the collection's own `read`
+	 * Who may open the queue and the merge screen, who may start a scan, and who may apply a
+	 * merge. `review` and `merge` default to any logged-in user, `scan` to `review`. Applying
+	 * additionally requires the collection's own `read`
 	 * access on every document of the group, `update` on the survivor, and `delete` on the
 	 * absorbed ones (and `update`, when they go to the trash).
 	 */
 	access?: {
 		review?: DedupeAccess
+		/** Starting a scan of a whole collection, far heavier than reviewing. Default: `review`. */
+		scan?: DedupeAccess
 		merge?: DedupeAccess
 	}
 	/**
@@ -261,8 +264,13 @@ export type DedupePluginOptions = {
 	 * request open for minutes. Default `false`.
 	 */
 	disableJobsQueue?: boolean
-	/** Jobs queue the check and scan tasks run on. Default `dedupe`. */
+	/** Jobs queue the check on save runs on. Default `dedupe`. */
 	queue?: string
+	/**
+	 * Jobs queue the scans run on, the scheduled one included. Default: `queue`. Apart from it,
+	 * a scan does not wait behind the checks a bulk write queued.
+	 */
+	scanQueue?: string
 	/**
 	 * `cron` schedules the scan task through Payload's job scheduler; without it the task
 	 * is only queued from the admin or by hand.
@@ -276,8 +284,8 @@ export type DedupePluginOptions = {
 	/**
 	 * Adjust the plugin's own collections (labels, admin, access, extra fields). Hooks
 	 * are refused: the plugin writes these collections through the database layer.
-	 * `keys` is the built-in adapter's collection, absent when the adapter in use does not
-	 * spread `keys`.
+	 * `keys` is the built-in adapter's collection, absent when no collection with a `match`
+	 * config searches with an adapter that spreads `keys`.
 	 */
 	overrides?: {
 		keys?: CollectionOverride
@@ -311,12 +319,13 @@ export type ResolvedCollectionOptions = {
 
 export type ResolvedOptions = {
 	collections: ResolvedCollectionOptions[]
-	access: { review: DedupeAccess; merge: DedupeAccess }
+	access: { review: DedupeAccess; scan: DedupeAccess; merge: DedupeAccess }
 	requireTransactions: boolean
 	maxGroupSize: number
 	adapter: DedupeAdapterFactory | null
 	disableJobsQueue: boolean
 	queue: string
+	scanQueue: string
 	scanCron: string | null
 	view: { path: `/${string}` } | false
 	overrides: NonNullable<DedupePluginOptions['overrides']>
@@ -469,6 +478,7 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 		collections,
 		access: {
 			review: options.access?.review ?? loggedIn,
+			scan: options.access?.scan ?? options.access?.review ?? loggedIn,
 			merge: options.access?.merge ?? loggedIn,
 		},
 		requireTransactions: options.requireTransactions ?? false,
@@ -476,6 +486,7 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 		adapter: options.adapter ?? null,
 		disableJobsQueue: options.disableJobsQueue ?? false,
 		queue: options.queue ?? 'dedupe',
+		scanQueue: options.scanQueue ?? options.queue ?? 'dedupe',
 		scanCron: options.scan?.cron ?? null,
 		view: options.view === false ? false : { path: viewPath(options.view?.path) },
 		overrides: options.overrides ?? {},

@@ -480,7 +480,6 @@ export function MergeClient({
 					})}
 				</Banner>
 			))}
-			{plan.transactions === 'off' ? <Banner>{t(keys.noTransactions)}</Banner> : null}
 			{plan.transactions === 'refused' ? (
 				<Banner type="error">{t(keys.transactionsRequired)}</Banner>
 			) : null}

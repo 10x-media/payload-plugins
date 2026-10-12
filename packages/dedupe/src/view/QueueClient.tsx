@@ -18,8 +18,8 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import './index.css'
 
 import { PAGE_SIZE, PAIR_STATUSES, type PairStatus } from '../collections/slugs'
+import type { ScanResponse } from '../plugin/registerEndpoints'
 import type { QueueGroup, QueueResponse } from '../queue/pairs'
-import type { ScanSummary } from '../queue/scan'
 import { keys, type TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { callApi, mergeUrl } from './api'
@@ -50,9 +50,13 @@ type QueueClientProps = {
 	limit: number
 	/** The most documents the merge screen takes: a larger group opens with its most alike. */
 	maxGroupSize: number
+	/** Whether `access.scan` lets the user start a scan. */
+	mayScan: boolean
 	mergePath: string
 	/** An error the page arrived with, shown above the table as the list view shows one. */
 	notice: null | string
+	/** A scan of what the button scans is waiting or running on the queue. */
+	scanState: 'queued' | 'running' | null
 	search: string
 	status: PairStatus
 }
@@ -67,8 +71,10 @@ export function QueueClient({
 	data,
 	limit,
 	maxGroupSize,
+	mayScan,
 	mergePath,
 	notice,
+	scanState,
 	search,
 	status,
 }: QueueClientProps) {
@@ -121,18 +127,18 @@ export function QueueClient({
 	const scan = useCallback(async () => {
 		setBusy(true)
 		try {
-			const result = await callApi<{ inline: boolean; summaries?: ScanSummary[] }>({
+			const result = await callApi<ScanResponse>({
 				apiRoute,
 				path: '/dedupe/scan',
 				method: 'POST',
 				body: collection ? { collection } : {},
 			})
-			if (result.inline && result.summaries) {
+			if (result.inline) {
 				const total = (key: 'compared' | 'pairs') =>
-					String(result.summaries?.reduce((sum, summary) => sum + summary[key], 0) ?? 0)
+					String(result.summaries.reduce((sum, summary) => sum + summary[key], 0))
 				toast.success(t(keys.scanDone, { pairs: total('pairs'), compared: total('compared') }))
 			} else {
-				toast.success(t(keys.scanQueued))
+				toast.success(t(result.alreadyQueued ? keys.scanAlreadyQueued : keys.scanQueued))
 			}
 			startTransition(() => router.refresh())
 		} catch (err) {
@@ -154,9 +160,11 @@ export function QueueClient({
 		[collection, collections, getEntityConfig, payloadI18n]
 	)
 
-	const canScan = collection
-		? Boolean(collections.find((entry) => entry.slug === collection)?.hasMatch)
-		: collections.some((entry) => entry.hasMatch)
+	const canScan =
+		mayScan &&
+		(collection
+			? Boolean(collections.find((entry) => entry.slug === collection)?.hasMatch)
+			: collections.some((entry) => entry.hasMatch))
 
 	const columns = useMemo<Column[]>(() => {
 		const rows = data.docs
@@ -268,12 +276,18 @@ export function QueueClient({
 					canScan ? (
 						<Button
 							buttonStyle="pill"
-							disabled={busy || navigating}
+							disabled={busy || navigating || scanState !== null}
 							margin={false}
 							onClick={() => void scan()}
 							size="small"
 						>
-							{t(keys.runScan)}
+							{t(
+								scanState === 'running'
+									? keys.scanRunning
+									: scanState === 'queued'
+										? keys.scanPending
+										: keys.runScan
+							)}
 						</Button>
 					) : null
 				}

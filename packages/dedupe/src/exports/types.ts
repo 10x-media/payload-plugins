@@ -18,10 +18,12 @@ export type {
 	MultiTenancyOptions,
 	WriteLocale,
 } from '../options'
+export type { DedupeSkip } from '../plugin/context'
 export type { DedupeEvent, DedupeEventSink } from '../plugin/events'
-export type { CheckResponse } from '../plugin/registerEndpoints'
+export type { CheckResponse, ScanResponse } from '../plugin/registerEndpoints'
 export type { Duplicate } from '../queue/live'
 export type { ScanSummary } from '../queue/scan'
+export type { QueuedScan } from '../queue/scanJobs'
 export type { DedupeFieldConfig } from '../schema/fieldConfig'
 export type {
 	DecisionSource,

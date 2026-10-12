@@ -13,16 +13,16 @@ export const es: Record<TranslationKey, string> = {
 	[keys.mergeInto]: 'Fusionar en {{title}}',
 	[keys.runScan]: 'Analizar ahora',
 	[keys.scanQueued]: 'Análisis en cola.',
+	[keys.scanAlreadyQueued]: 'Ya hay un análisis en cola.',
+	[keys.scanPending]: 'Análisis en cola',
+	[keys.scanRunning]: 'Analizando…',
 	[keys.scanDone]: 'Análisis terminado: {{pairs}} pares abiertos de {{compared}} comparaciones.',
 	[keys.needsChoice]: 'Requiere una decisión',
 	[keys.applied]: 'Fusionado en el documento principal.',
 	[keys.empty]: 'vacío',
 	[keys.selectTwo]: 'Selecciona de 2 a {{max}} documentos para fusionar.',
 	[keys.mergeSelected]: 'Fusionar seleccionados',
-	[keys.noTransactions]:
-		'Esta base de datos no abre transacciones. Si la fusión falla antes de escribir el principal, los documentos fusionados recuperan sus valores. Si falla después, el principal conserva lo escrito y los documentos fusionados se quedan, con marcadores en lugar de los valores únicos que cedieron. Las referencias que la aplicación movió al principal antes del fallo se quedan allí. Una fusión que tendría que borrar primero un documento se rechaza.',
-	[keys.transactionsRequired]:
-		'Fusionar está desactivado: esta base de datos no abre transacciones y el plugin exige una.',
+	[keys.transactionsRequired]: 'La fusión no está disponible. Contacta con tu administrador.',
 	[keys.takenFrom]: 'Tomado de {{title}}',
 	[keys.error]: 'Algo salió mal.',
 	[keys.missingParams]:

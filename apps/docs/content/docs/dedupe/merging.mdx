@@ -51,6 +51,12 @@ A component that is fine with being merged part by part declares it:
 }
 ```
 
+For a split list drawn by a component without row labels, `mergeView: 'native'` draws it on the merge screen as Payload draws its type, each row with its label and check. The edit view and the fields inside the rows keep their components:
+
+```ts
+admin: { components: { Field: '/components/CompactRows' }, custom: dedupeCustom({ split: true, mergeView: 'native' }) },
+```
+
 The screen draws no diff inside a component: a cell whose value differs from the primary's is marked instead.
 
 ## The screen
@@ -96,12 +102,17 @@ In every locale the merge writes, a required value the primary lacks comes from 
 4. The merged-in documents are trashed, or deleted with `absorbed: 'delete'`.
 5. The pairs of the merged-in documents are deleted, and the primary is checked for new look-alikes.
 
-A failure is logged and sent as `merge.failed`. Without a transaction (MongoDB without a replica set), a failure before the primary is written puts the merged-in documents' values back and logs any it cannot; one after keeps what was written, and the merged-in documents keep their placeholders. A merge that would delete a merged-in document before the primary is written is refused; `requireTransactions: true` refuses every merge.
+A failure is logged and sent as `merge.failed`. Without a transaction (MongoDB without a replica set), a failure before the primary is written puts the merged-in documents' values back and logs any it cannot; one after keeps what was written, and the merged-in documents keep their placeholders. A warning is logged at startup. A merge that would delete a merged-in document before the primary is written is refused; `requireTransactions: true` refuses every merge, and the merge screen says merging is not available.
+
+The merge writes as the reviewer, with `overrideAccess: false`: Payload applies the collection's and the fields' access to the primary and to the merged-in documents. The placeholder or empty value that frees a unique value on a merged-in document is written through the database layer, without the collection's hooks, and only when the reviewer may update that field on that document.
+
+Payload validates the write as the reviewer: a rule across fields that the picked values break refuses the merge with its message.
 
 The merge is refused when:
 
 - a document changed since the screen opened;
 - the collection's access denies the reviewer `read` on a document, `update` on the primary, `delete` on a merged-in one, or `update` on one that goes to the trash;
+- a field's `update` access refuses a value the merge writes, asked with the write as `data`, or refuses the reviewer the change of a unique value a merged-in document gives up;
 - a `manual` conflict is open;
 - unless `draft` is set, the primary has an unpublished draft or a document was never published;
 - another editor has a document of the group open.

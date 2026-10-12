@@ -20,9 +20,9 @@ import type { ResolvedOptions } from '../options'
 import { findDuplicates } from '../queue/live'
 import { decideGroup, labelSignals, type SignalView } from '../queue/pairs'
 import { runScan, type ScanSummary } from '../queue/scan'
+import { type QueuedScan, queueScans } from '../queue/scanJobs'
 import type { MergeChoice } from '../schema/types'
 import { getCollectionContext, getContext, selectedTenant, tenantOf } from './context'
-import { SCAN_TASK_SLUG } from './registerJobs'
 
 const json = (body: unknown, status = 200): Response => Response.json(body, { status })
 
@@ -78,7 +78,7 @@ const asChoices = (value: unknown): Record<string, MergeChoice> => {
 /** 401 for nobody, 403 for somebody the option turns away, as the admin's own routes do. */
 const guard = async (
 	req: PayloadRequest,
-	kind: 'merge' | 'review',
+	kind: 'merge' | 'review' | 'scan',
 	options: ResolvedOptions
 ): Promise<Response | null> => {
 	if (!req.user) return json({ message: 'Unauthorized' }, 401)
@@ -205,16 +205,20 @@ const applyEndpoint = (options: ResolvedOptions): Endpoint => ({
 	},
 })
 
+export type ScanResponse =
+	| { inline: true; summaries: ScanSummary[] }
+	| { inline: false; jobs: QueuedScan[]; alreadyQueued: boolean }
+
 /**
- * Queues the scan task, or runs it in the request under `disableJobsQueue`. The choice is
- * the host's, not the caller's: a whole-collection scan inside a request is only for a
- * deployment without a worker.
+ * Queues a scan of each collection asked for, or runs them in the request under
+ * `disableJobsQueue`. The choice is the host's, not the caller's: a whole-collection scan
+ * inside a request is only for a deployment without a worker.
  */
 const scanEndpoint = (options: ResolvedOptions): Endpoint => ({
 	method: 'post',
 	path: '/dedupe/scan',
 	handler: async (req) => {
-		const denied = await guard(req, 'review', options)
+		const denied = await guard(req, 'scan', options)
 		if (denied) return denied
 		try {
 			const body = await readBody(req)
@@ -229,15 +233,15 @@ const scanEndpoint = (options: ResolvedOptions): Endpoint => ({
 			if (options.disableJobsQueue) {
 				const summaries: ScanSummary[] = []
 				for (const col of targets) summaries.push(await runScan({ req, ctx, col }))
-				return json({ inline: true, summaries })
+				return json({ inline: true, summaries } satisfies ScanResponse)
 			}
-			// Without a collection the task scans every one that has a match config.
-			const job = (await req.payload.jobs.queue({
-				task: SCAN_TASK_SLUG as never,
-				input: (slug ? { collection: slug } : {}) as never,
-				queue: options.queue,
-			})) as { id: number | string }
-			return json({ inline: false, jobId: String(job.id) })
+			// One job per collection; a collection with a scan pending answers with that one.
+			const jobs = await queueScans({ req, ctx, cols: targets })
+			return json({
+				inline: false,
+				jobs,
+				alreadyQueued: jobs.every((job) => job.alreadyQueued),
+			} satisfies ScanResponse)
 		} catch (error) {
 			return errorResponse(error)
 		}

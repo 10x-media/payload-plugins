@@ -180,7 +180,8 @@ const emailOf = (req: PayloadRequest): string =>
  * Field access: readers whose email starts with `limited` may not see `salary` or a bonus's
  * `amount`, nor change `grade` or who approved a bonus. A private bonus hides its `note`
  * and a locked one keeps its `reviewer`, from everyone, by the row's own flags. An audit's
- * `secret` is read by no one and its `frozen` changed by no one.
+ * `secret` is read by no one and its `frozen` changed by no one. No one may set `rank` to
+ * `chief`, nor change the `badge` of a sealed document.
  */
 const staff: CollectionConfig = {
 	slug: 'staff',
@@ -205,8 +206,21 @@ const staff: CollectionConfig = {
 			type: 'text',
 			access: { update: ({ req }) => !emailOf(req).startsWith('limited') },
 		},
+		// No one may make anyone `chief`: the check reads the write, not the document.
+		{
+			name: 'rank',
+			type: 'text',
+			access: { update: ({ data }) => (data as { rank?: unknown } | undefined)?.rank !== 'chief' },
+		},
 		// Read only where the document is not sealed.
 		{ name: 'sealed', type: 'checkbox' },
+		// Changed only where the document is not sealed.
+		{
+			name: 'badge',
+			type: 'text',
+			unique: true,
+			access: { update: ({ doc }) => !(doc as { sealed?: boolean } | undefined)?.sealed },
+		},
 		{
 			name: 'homePhone',
 			type: 'text',

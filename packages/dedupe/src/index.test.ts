@@ -15,7 +15,10 @@ describe('dedupe factory', () => {
 	})
 
 	it('keeps its collections but registers nothing else when disabled', () => {
-		const out = dedupe({ disabled: true, collections: { customers: true } })(fakeConfig()) as Config
+		const out = dedupe({
+			disabled: true,
+			collections: { customers: { match: { fields: [{ path: 'email', weight: 1 }] } } },
+		})(fakeConfig()) as Config
 		expect(out.collections?.map((collection) => collection.slug)).toEqual([
 			'customers',
 			PAIRS_SLUG,
@@ -39,6 +42,24 @@ describe('dedupe factory', () => {
 			},
 		})(fakeConfig()) as Config
 		expect(out.collections?.filter((collection) => collection.slug === KEYS_SLUG)).toHaveLength(1)
+	})
+
+	it('registers no keys collection when no matched collection searches with the keys adapter', () => {
+		const register = (config: Config) => {
+			config.collections = [...(config.collections ?? []), { slug: 'own-index', fields: [] }]
+		}
+		const slugs = (options: Parameters<typeof dedupe>[0]) =>
+			(dedupe(options)(fakeConfig()) as Config).collections?.map((collection) => collection.slug)
+		const match = { fields: [{ path: 'email', weight: 1 }] }
+
+		expect(slugs({ collections: { customers: true } })).not.toContain(KEYS_SLUG)
+		const own = slugs({
+			collections: {
+				customers: { match, adapter: () => ({ findCandidates: async () => [], register }) },
+			},
+		})
+		expect(own).toContain('own-index')
+		expect(own).not.toContain(KEYS_SLUG)
 	})
 
 	it('refuses an adapter without findCandidates, the one method the search calls', () => {

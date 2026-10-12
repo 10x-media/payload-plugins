@@ -7,6 +7,7 @@ import { formatAdminURL } from 'payload/shared'
 import { isStatus, pageSize } from '../collections/slugs'
 import { getContext, listCollections } from '../plugin/context'
 import { readQueue } from '../queue/pairs'
+import { pendingScans } from '../queue/scanJobs'
 import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { authRedirectUrl } from './authRedirect'
@@ -45,6 +46,21 @@ export async function DedupeQueueView({
 		page: Number(param('page')) || 1,
 		limit,
 	})
+	const mayScan = await ctx.options.access.scan({ req })
+	const scanned = collection
+		? [collection]
+		: collections.filter((entry) => entry.hasMatch).map((entry) => entry.slug)
+	const pending =
+		mayScan && !ctx.options.disableJobsQueue
+			? await pendingScans({ req, collections: scanned })
+			: new Map()
+	// Pending only once every collection the button scans has a scan waiting or running.
+	const scanState =
+		scanned.length > 0 && scanned.every((slug) => pending.has(slug))
+			? [...pending.values()].some((scan) => scan.running)
+				? 'running'
+				: 'queued'
+			: null
 	const adminRoute = req.payload.config.routes.admin
 	const notFound = param('notFound')
 	const notice = notFound
@@ -74,6 +90,8 @@ export async function DedupeQueueView({
 						data={data}
 						limit={limit}
 						maxGroupSize={ctx.options.maxGroupSize}
+						mayScan={Boolean(mayScan)}
+						scanState={scanState}
 						mergePath={formatAdminURL({ adminRoute, path: `${basePath}/merge` })}
 						notice={notice}
 						search={search}

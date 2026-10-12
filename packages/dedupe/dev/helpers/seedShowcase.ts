@@ -32,6 +32,7 @@ export const seedShowcase = async (payload: Payload): Promise<void> => {
 				{ person: 'Max Weber', role: 'billing', city: 'Berlin' },
 			],
 			labels: [{ text: 'Partner', tone: 'success' }],
+			tags: [{ text: 'Lighting', tone: 'neutral' }],
 			sections: [
 				{ blockType: 'heading', text: 'About us' },
 				{ blockType: 'callout', title: 'Shipping', body: 'Ships within the EU only.' },
@@ -54,6 +55,10 @@ export const seedShowcase = async (payload: Payload): Promise<void> => {
 			labels: [
 				{ text: 'Partner', tone: 'success' },
 				{ text: 'Late payer', tone: 'warning' },
+			],
+			tags: [
+				{ text: 'Lighting', tone: 'neutral' },
+				{ text: 'Export', tone: 'success' },
 			],
 			sections: [{ blockType: 'heading', text: 'About Aurora' }],
 		},
