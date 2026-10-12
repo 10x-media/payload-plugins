@@ -107,7 +107,24 @@ export type CollectionDedupeOptions = {
 	 * Each hands its value to `hooks.beforeRemove`, which does what it says.
 	 */
 	sections?: MergeSection[]
+	/**
+	 * How the plugin names a document: on the merge screen, in the queue and in the duplicate
+	 * check's answer. Given the title from `useAsTitle` and the document as the plugin read it,
+	 * fields hidden in the admin included; an empty answer keeps that title.
+	 */
+	title?: DocTitle
 }
+
+/** What a collection's `title` receives. */
+export type DocTitleArgs = {
+	req: PayloadRequest
+	/** The document, as the plugin read it: possibly without fields the reviewer may not read. */
+	doc: Record<string, unknown>
+	/** The title from `useAsTitle`, or the id where the document has none. */
+	title: string
+}
+
+export type DocTitle = (args: DocTitleArgs) => null | string | undefined
 
 /** What a merge section's `validate` receives. */
 export type MergeSectionArgs = {
@@ -315,6 +332,7 @@ export type ResolvedCollectionOptions = {
 	draft: boolean
 	checkOnSave: boolean
 	sections: MergeSection[]
+	title?: DocTitle
 }
 
 export type ResolvedOptions = {
@@ -460,6 +478,7 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 			draft: opts.draft ?? false,
 			checkOnSave: opts.checkOnSave ?? match !== null,
 			sections: resolveSections(slug, opts.sections),
+			title: opts.title,
 		})
 	}
 	const multiTenancy = options.multiTenancy === true ? {} : options.multiTenancy

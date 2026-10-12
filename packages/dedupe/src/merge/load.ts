@@ -9,7 +9,7 @@ import {
 
 import { PAIRS_SLUG } from '../collections/slugs'
 import { pairKeyFor } from '../match/keys'
-import { type CollectionContext, type PluginContext, tenantOf } from '../plugin/context'
+import { type CollectionContext, getContext, type PluginContext, tenantOf } from '../plugin/context'
 import { fieldReadable } from './access'
 import { isEmpty } from './compare'
 
@@ -24,14 +24,10 @@ const titleField = (req: PayloadRequest, slug: string): string => {
 }
 
 /**
- * A readable title for a document, from the collection's `useAsTitle`: in the reader's
- * locale, or the default one where the reader's has none.
+ * The title from the collection's `useAsTitle`: in the reader's locale, or the default one
+ * where the reader's has none.
  */
-export const docTitle = (
-	req: PayloadRequest,
-	slug: string,
-	doc: Record<string, unknown>
-): string => {
+const fieldTitle = (req: PayloadRequest, slug: string, doc: Record<string, unknown>): string => {
 	const value = doc[titleField(req, slug)]
 	const { localization } = req.payload.config
 	if (value !== null && typeof value === 'object' && !Array.isArray(value) && localization) {
@@ -47,9 +43,29 @@ export const docTitle = (
 	return isEmpty(value) ? String(doc.id) : String(value)
 }
 
+/** The collection's own `title` over `title`, where it is configured and answers one. */
+const ownTitle = (
+	req: PayloadRequest,
+	slug: string,
+	{ doc, title }: { doc: Record<string, unknown>; title: string }
+): string => {
+	const own = getContext(req.payload).collections.get(slug)?.options.title
+	if (!own) return title
+	const answer = own({ req, doc, title })
+	return typeof answer === 'string' && answer !== '' ? answer : title
+}
+
 /**
- * `docTitle` of a document read past access control: its id to a reader who may not read the
- * title field of this document, as Payload leaves that field out for them.
+ * A readable title for a document: the collection's `title` where it is configured, else
+ * from its `useAsTitle`.
+ */
+export const docTitle = (req: PayloadRequest, slug: string, doc: Record<string, unknown>): string =>
+	ownTitle(req, slug, { doc, title: fieldTitle(req, slug, doc) })
+
+/**
+ * `docTitle` of a document read past access control: the `useAsTitle` part is its id to a
+ * reader who may not read the title field of this document, as Payload leaves that field out
+ * for them.
  */
 export const readableTitle = async (
 	req: PayloadRequest,
@@ -58,7 +74,7 @@ export const readableTitle = async (
 ): Promise<string> => {
 	const field = titleField(req, col.slug)
 	if (field !== 'id' && !(await fieldReadable(req, { col, path: field, doc })))
-		return String(doc.id)
+		return ownTitle(req, col.slug, { doc, title: String(doc.id) })
 	return docTitle(req, col.slug, doc)
 }
 
