@@ -1,4 +1,4 @@
-import type { Config } from 'payload'
+import type { Config, PayloadComponent } from 'payload'
 
 import type { ResolvedOptions } from '../options'
 
@@ -6,6 +6,26 @@ import type { ResolvedOptions } from '../options'
 const QUEUE_VIEW = '@10x-media/dedupe/rsc#DedupeQueueView'
 const MERGE_VIEW = '@10x-media/dedupe/rsc#DedupeMergeView'
 const MERGE_MENU_ITEM = '@10x-media/dedupe/client#MergeSelectedMenuItem'
+
+type Dependencies = NonNullable<NonNullable<Config['admin']>['dependencies']>
+
+const pathOf = (component: PayloadComponent): string | undefined =>
+	typeof component === 'string' ? component : component ? component.path : undefined
+
+/**
+ * The merge sections' components, in `admin.dependencies`: the import map generator does not
+ * look in the plugin's options, so it is told where they are.
+ */
+const sectionDependencies = (options: ResolvedOptions): Dependencies => {
+	const out: Dependencies = {}
+	for (const entry of options.collections) {
+		for (const section of entry.sections) {
+			const path = pathOf(section.Component)
+			if (path) out[`dedupe-section-${entry.slug}-${section.key}`] = { path, type: 'component' }
+		}
+	}
+	return out
+}
 
 /**
  * Mounts the queue and the merge screen as admin views, and a "Merge selected" entry in the
@@ -33,6 +53,7 @@ export const registerViews = (config: Config, options: ResolvedOptions): void =>
 				},
 			},
 		},
+		dependencies: { ...config.admin?.dependencies, ...sectionDependencies(options) },
 	}
 
 	const targets = new Set(options.collections.map((entry) => entry.slug as string))

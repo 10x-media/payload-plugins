@@ -67,6 +67,8 @@ type ApplyMergeArgs = {
 	 * moved since.
 	 */
 	expected?: Record<string, string>
+	/** The values the collection's `sections` handed over, by key; others are dropped. */
+	sections?: Record<string, unknown>
 }
 
 export type ApplyMergeResult = {
@@ -362,6 +364,20 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 	const locked = await lockRefusal({ req, col, docs: [survivor, ...absorbed] })
 	if (locked) throw new APIError(locked, 409, undefined, true)
 
+	const sections = Object.fromEntries(
+		col.options.sections.map((section) => [section.key, args.sections?.[section.key] ?? null])
+	)
+	for (const section of col.options.sections) {
+		const refusal = await section.validate?.({
+			req,
+			collection: col.slug,
+			survivorId: survivor.id,
+			absorbedIds: absorbed.map((doc) => doc.id),
+			value: sections[section.key],
+		})
+		if (refusal) throw new APIError(refusal, 409, undefined, true)
+	}
+
 	// The fields hidden from the API, which the documents as loaded lack: the rows the survivor
 	// takes keep theirs, a unique one frees its value too, and the snapshots `beforeRemove`
 	// receives hold them, since nothing else keeps them once a document is deleted. Not an
@@ -459,6 +475,7 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 			absorbedIds: absorbed.map((doc) => doc.id),
 			snapshots: Object.fromEntries(snapshots.map((doc) => [String(doc.id), doc])),
 			decisions: plan.decisions,
+			sections,
 		})
 		for (const id of early) await remove(id)
 		for (const id of late) {

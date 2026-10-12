@@ -1,4 +1,10 @@
-import type { Access, CollectionConfig, CollectionSlug, PayloadRequest } from 'payload'
+import type {
+	Access,
+	CollectionConfig,
+	CollectionSlug,
+	PayloadComponent,
+	PayloadRequest,
+} from 'payload'
 
 import type { DedupeEventSink } from './plugin/events'
 import type { MergeDecision, MergeFieldSpec } from './schema/types'
@@ -95,6 +101,47 @@ export type CollectionDedupeOptions = {
 	 * is indexed on every save either way. Default `true` when `match` is set.
 	 */
 	checkOnSave?: boolean
+	/**
+	 * Parts of the merge screen the host draws itself, under the fields: what the merge has to
+	 * decide beyond the document, such as the records of another collection that point at it.
+	 * Each hands its value to `hooks.beforeRemove`, which does what it says.
+	 */
+	sections?: MergeSection[]
+}
+
+/** What a merge section's `validate` receives. */
+export type MergeSectionArgs = {
+	req: PayloadRequest
+	collection: CollectionSlug
+	/** The primary, which the other documents merge into. */
+	survivorId: number | string
+	/** The merged-in documents. */
+	absorbedIds: (number | string)[]
+	/**
+	 * What the section's component set with `setValue`, `null` when it set none. It comes from
+	 * the browser, so it names only what the reviewer was shown if the check here says so.
+	 */
+	value: unknown
+}
+
+/**
+ * A part of the merge screen the host draws: a client component under the fields, in the
+ * screen's columns, that reads the group and hands a value back through `useMergeSection`
+ * from `@10x-media/dedupe/client`. The plugin writes nothing for it: `hooks.beforeRemove`
+ * gets the value under `sections[key]`.
+ */
+export type MergeSection = {
+	/** Names the value in `sections`; unique within the collection. */
+	key: string
+	/** The component, by its import map path, such as `'/components/Roles#RolesSection'`. */
+	Component: PayloadComponent
+	/**
+	 * Why the merge may not apply with this value, or nothing. Runs on apply before anything is
+	 * written; the answer is shown to the reviewer as the refusal.
+	 */
+	validate?: (
+		args: MergeSectionArgs
+	) => Promise<string | null | undefined> | string | null | undefined
 }
 
 export type WriteLocale =
@@ -123,6 +170,11 @@ export type BeforeRemoveArgs = {
 	snapshots: Record<string, Record<string, unknown>>
 	/** What the merge writes, field by field, with every document's value. */
 	decisions: MergeDecision[]
+	/**
+	 * What each of the collection's `sections` handed over, by its key, `null` for one that set
+	 * no value. Checked by the section's `validate`, if it has one.
+	 */
+	sections: Record<string, unknown>
 }
 
 export type DedupeHooks = {
@@ -254,6 +306,7 @@ export type ResolvedCollectionOptions = {
 	absorbed?: 'delete' | 'trash'
 	draft: boolean
 	checkOnSave: boolean
+	sections: MergeSection[]
 }
 
 export type ResolvedOptions = {
@@ -356,6 +409,21 @@ const resolveMatch = (match: MatchConfig | undefined): Required<MatchConfig> | n
 	}
 }
 
+const resolveSections = (slug: string, sections: MergeSection[] | undefined): MergeSection[] => {
+	const seen = new Set<string>()
+	for (const section of sections ?? []) {
+		if (!section.key) throw new Error(`dedupe: a section of "${slug}" has an empty \`key\``)
+		if (seen.has(section.key)) {
+			throw new Error(`dedupe: "${slug}" lists the section "${section.key}" twice`)
+		}
+		seen.add(section.key)
+		if (!section.Component) {
+			throw new Error(`dedupe: the section "${section.key}" of "${slug}" has no \`Component\``)
+		}
+	}
+	return sections ?? []
+}
+
 const viewPath = (path: `/${string}` | undefined): `/${string}` => {
 	if (path !== undefined && !path.startsWith('/')) {
 		throw new Error('dedupe: `view.path` must start with a slash')
@@ -382,6 +450,7 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 			absorbed: opts.absorbed,
 			draft: opts.draft ?? false,
 			checkOnSave: opts.checkOnSave ?? match !== null,
+			sections: resolveSections(slug, opts.sections),
 		})
 	}
 	const multiTenancy = options.multiTenancy === true ? {} : options.multiTenancy

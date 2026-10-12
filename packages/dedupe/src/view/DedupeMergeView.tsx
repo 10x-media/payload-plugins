@@ -1,5 +1,6 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
+import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerComponent'
 import { redirect } from 'next/navigation'
 import type { AdminViewServerProps, CollectionSlug, Params } from 'payload'
 import { formatAdminURL } from 'payload/shared'
@@ -61,6 +62,18 @@ export async function DedupeMergeView({
 		redirect(formatAdminURL({ adminRoute, path: `${basePath}?${query}` }))
 	}
 
+	// Drawn here, so a section may be a server component, as any admin component may; what it
+	// needs of the screen reaches it through `useMergeSection`.
+	const sections = (ctx.collections.get(collection)?.options.sections ?? []).map((section) => ({
+		key: section.key,
+		node: RenderServerComponent({
+			Component: section.Component,
+			clientProps: { collection, sectionKey: section.key },
+			importMap: req.payload.importMap,
+			serverProps: { collection, payload: req.payload, req, sectionKey: section.key },
+		}),
+	}))
+
 	return (
 		<DefaultTemplate
 			i18n={req.i18n}
@@ -80,6 +93,7 @@ export async function DedupeMergeView({
 					key={`${collection}:${docs.join(',')}`}
 					docs={docs as string[]}
 					queuePath={formatAdminURL({ adminRoute, path: basePath })}
+					sections={sections}
 					survivor={survivor ?? (docs[0] as string)}
 				/>
 			</Gutter>

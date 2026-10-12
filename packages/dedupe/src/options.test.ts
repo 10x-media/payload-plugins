@@ -17,8 +17,19 @@ describe('resolveOptions', () => {
 				absorbed: undefined,
 				draft: false,
 				checkOnSave: false,
+				sections: [],
 			},
 		])
+	})
+
+	it('refuses a merge section without a key or a component, or listed twice', () => {
+		const section = { key: 'roles', Component: '/components/Roles#Roles' }
+		const sections = (list: unknown[]) =>
+			resolveOptions({ collections: { customers: { sections: list as never } } })
+		expect(sections([section]).collections[0]?.sections).toEqual([section])
+		expect(() => sections([{ ...section, key: '' }])).toThrow(/empty `key`/)
+		expect(() => sections([section, section])).toThrow(/"roles" twice/)
+		expect(() => sections([{ key: 'roles' }])).toThrow(/no `Component`/)
 	})
 
 	it('refuses a collection the multi-tenant plugin keeps one document of per tenant', () => {

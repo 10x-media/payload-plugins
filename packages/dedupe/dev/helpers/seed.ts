@@ -562,7 +562,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	const customer = (email: string) => byEmail.get(email) as number | string
 
 	// Documents pointing at customers, moved to the survivor on a merge. Kyiv's Ivan pair
-	// also shares a club membership, which blocks that merge until one is removed.
+	// also shares a club membership, which the merge screen's section asks to pick one of.
 	const ORDERS = 'orders' as CollectionSlug
 	const MEMBERSHIPS = 'memberships' as CollectionSlug
 	const TRIPS = 'trips' as CollectionSlug

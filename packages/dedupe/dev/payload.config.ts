@@ -39,6 +39,7 @@ import {
 } from './collections'
 import { site } from './globals/site'
 import { auditMerge } from './helpers/auditMerge'
+import { moveMemberships, validateMemberships } from './helpers/memberships'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { recentAdapter } from './helpers/recentAdapter'
 import { repointCustomers } from './helpers/repointCustomers'
@@ -140,6 +141,14 @@ export default buildConfig({
 						),
 					// The values every language shares are written in the language of the office.
 					writeLocale: tenantLocale('customers'),
+					// Which club memberships the survivor keeps, decided on the merge screen.
+					sections: [
+						{
+							key: 'memberships',
+							Component: '/components/MembershipsSection#MembershipsSection',
+							validate: validateMemberships,
+						},
+					],
 				},
 				leads: { absorbed: 'delete' },
 				specimens: {
@@ -208,7 +217,10 @@ export default buildConfig({
 			// merge; the host does both, as here.
 			hooks: {
 				beforeRemove: async (args) => {
-					if (args.collection === 'customers') await repointCustomers(args)
+					if (args.collection === 'customers') {
+						await repointCustomers(args)
+						await moveMemberships(args)
+					}
 					await auditMerge(args)
 				},
 			},

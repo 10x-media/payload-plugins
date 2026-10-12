@@ -1,7 +1,7 @@
 'use client'
 
 import { CheckboxInput, Pill, useConfig } from '@payloadcms/ui'
-import { type CSSProperties, memo, useRef } from 'react'
+import { type CSSProperties, memo, type ReactNode, useRef } from 'react'
 
 import { isEmpty, listOf, normalize, sameValue } from '../merge/compare'
 import { choosable, pickedItems, withChoice } from '../merge/plan'
@@ -272,6 +272,7 @@ const Row = memo(FieldRow)
  * column per document. The field labels stay in view while the columns scroll sideways.
  */
 export const Matrix = ({
+	children,
 	choices,
 	collection,
 	decisions,
@@ -285,6 +286,8 @@ export const Matrix = ({
 	showDiff,
 	survivor,
 }: {
+	/** The host's sections, in the same columns after the fields. */
+	children?: ReactNode
 	choices: Record<string, MergeChoice>
 	collection: string
 	decisions: DecisionView[]
@@ -352,6 +355,7 @@ export const Matrix = ({
 						survivor={survivor}
 					/>
 				))}
+				{children}
 			</div>
 		</div>
 	)

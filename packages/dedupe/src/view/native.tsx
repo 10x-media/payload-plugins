@@ -224,6 +224,8 @@ type RadioProps = {
 	checked: boolean
 	children: React.ReactNode
 	className?: string
+	/** Shown as it is, not changed by a click. */
+	disabled?: boolean
 	id: string
 	/** Read out by assistive tech; the visible label is whatever the children draw. */
 	label: string
@@ -235,7 +237,16 @@ type RadioProps = {
  * One option as `RadioGroupField` draws it. The label slot takes any content rather than a
  * string, because here it holds the value the option stands for.
  */
-export const Radio = ({ checked, children, className, id, label, name, onChange }: RadioProps) => (
+export const Radio = ({
+	checked,
+	children,
+	className,
+	disabled,
+	id,
+	label,
+	name,
+	onChange,
+}: RadioProps) => (
 	<label className={className} htmlFor={id}>
 		<div
 			className={['radio-input', checked && 'radio-input--is-selected'].filter(Boolean).join(' ')}
@@ -243,6 +254,7 @@ export const Radio = ({ checked, children, className, id, label, name, onChange 
 			<input
 				aria-label={label}
 				checked={checked}
+				disabled={disabled}
 				id={id}
 				name={name}
 				onChange={onChange}

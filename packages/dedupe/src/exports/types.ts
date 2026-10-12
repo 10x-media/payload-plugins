@@ -13,6 +13,8 @@ export type {
 	DedupePluginOptions,
 	MatchConfig,
 	MatchFieldConfig,
+	MergeSection,
+	MergeSectionArgs,
 	MultiTenancyOptions,
 	WriteLocale,
 } from '../options'

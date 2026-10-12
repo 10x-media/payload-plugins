@@ -184,6 +184,10 @@ const applyEndpoint = (options: ResolvedOptions): Endpoint => ({
 							)
 						)
 					: undefined
+			const sections =
+				body.sections && typeof body.sections === 'object' && !Array.isArray(body.sections)
+					? (body.sections as Record<string, unknown>)
+					: undefined
 			const result = await applyMerge({
 				req,
 				ctx,
@@ -192,6 +196,7 @@ const applyEndpoint = (options: ResolvedOptions): Endpoint => ({
 				absorbedIds,
 				choices: asChoices(body.choices),
 				expected,
+				sections,
 			})
 			return json(result)
 		} catch (error) {

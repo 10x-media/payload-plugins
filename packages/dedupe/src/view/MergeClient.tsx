@@ -17,7 +17,7 @@ import {
 import { formatDate } from '@payloadcms/ui/shared'
 import { useRouter } from 'next/navigation'
 import { formatAdminURL } from 'payload/shared'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import './index.css'
 
@@ -29,6 +29,7 @@ import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { callApi, mergeUrl } from './api'
 import { Matrix } from './Matrix'
+import { type MergeSectionDoc, type MergeSectionState, SectionContext } from './sections'
 import { fieldList, SHORT_DATE } from './Value'
 
 const baseClass = 'dedupe-merge'
@@ -36,11 +37,63 @@ const baseClass = 'dedupe-merge'
 const CONFIRM_MODAL = 'dedupe-merge-confirm'
 const REMOVE_MODAL = 'dedupe-remove-confirm'
 
+/** What the sections set for one primary and one set of documents. */
+type SectionValues = {
+	round: string
+	values: Record<string, unknown>
+	/** Keys of the sections that keep the merge from applying. */
+	waiting: string[]
+}
+
+type SetValue = MergeSectionState['setValue'] extends (next: infer N) => void ? N : never
+
+/** One host section in the screen's columns, with the context its component reads. */
+const SectionHost = ({
+	collection,
+	docs,
+	node,
+	onReady,
+	onValue,
+	sectionKey,
+	survivor,
+	value,
+}: {
+	collection: string
+	docs: MergeSectionDoc[]
+	node: ReactNode
+	onReady: (key: string, ready: boolean) => void
+	onValue: (key: string, next: SetValue) => void
+	sectionKey: string
+	survivor: string
+	value: unknown
+}) => {
+	const state = useMemo<MergeSectionState>(
+		() => ({
+			collection,
+			sectionKey,
+			survivorId: survivor,
+			absorbedIds: docs.filter((doc) => !doc.survivor).map((doc) => doc.id),
+			docs,
+			value: value ?? null,
+			setValue: (next) => onValue(sectionKey, next),
+			setReady: (ready) => onReady(sectionKey, ready),
+		}),
+		[collection, sectionKey, survivor, docs, value, onValue, onReady]
+	)
+	return (
+		<div className={`${baseClass}__section`}>
+			<SectionContext.Provider value={state}>{node}</SectionContext.Provider>
+		</div>
+	)
+}
+
 type MergeClientProps = {
 	collection: string
 	/** The documents in the order their columns stand. */
 	docs: string[]
 	queuePath: string
+	/** The host's sections, drawn on the server. */
+	sections: { key: string; node: ReactNode }[]
 	survivor: string
 }
 
@@ -48,6 +101,7 @@ export function MergeClient({
 	collection,
 	docs: initialDocs,
 	queuePath,
+	sections,
 	survivor: initialSurvivor,
 }: MergeClientProps) {
 	const { i18n, t } = useTranslation()
@@ -74,6 +128,36 @@ export function MergeClient({
 		'blocked' | 'cleared' | 'decisions' | 'filled' | 'readyToApply' | 'refusal' | 'release'
 	> | null>(null)
 	const absorbed = useMemo(() => docs.filter((id) => id !== survivor), [docs, survivor])
+	// Another primary or another set of documents is another merge: the sections start over.
+	const round = `${survivor}|${docs.join(',')}`
+	const [sectionValues, setSectionValues] = useState<SectionValues>({
+		round,
+		values: {},
+		waiting: [],
+	})
+	const currentSections =
+		sectionValues.round === round ? sectionValues : { round, values: {}, waiting: [] }
+	const setSectionValue = useCallback(
+		(key: string, next: SetValue) =>
+			setSectionValues((state) => {
+				const base = state.round === round ? state : { round, values: {}, waiting: [] }
+				const value = typeof next === 'function' ? next(base.values[key] ?? null) : next
+				return { ...base, values: { ...base.values, [key]: value } }
+			}),
+		[round]
+	)
+	const setSectionReady = useCallback(
+		(key: string, ready: boolean) =>
+			setSectionValues((state) => {
+				const base = state.round === round ? state : { round, values: {}, waiting: [] }
+				if (ready !== base.waiting.includes(key)) return base
+				const waiting = ready
+					? base.waiting.filter((entry) => entry !== key)
+					: [...base.waiting, key]
+				return { ...base, waiting }
+			}),
+		[round]
+	)
 	const requests = useRef(0)
 	const titleOf = useCallback(
 		(id: string) => plan?.docs.find((doc) => doc.id === id)?.title ?? id,
@@ -324,6 +408,7 @@ export function MergeClient({
 					absorbed,
 					choices,
 					expected: Object.fromEntries(plan.docs.map((doc) => [doc.id, doc.updatedAt])),
+					sections: currentSections.values,
 				},
 			})
 			toast.success(t(keys.applied))
@@ -334,7 +419,22 @@ export function MergeClient({
 			toast.error(err instanceof Error ? err.message : t(keys.error))
 			setBusy(false)
 		}
-	}, [plan, apiRoute, collection, survivor, absorbed, choices, t, router, adminRoute])
+	}, [
+		plan,
+		apiRoute,
+		collection,
+		survivor,
+		absorbed,
+		choices,
+		currentSections.values,
+		t,
+		router,
+		adminRoute,
+	])
+	const sectionDocs = useMemo<MergeSectionDoc[]>(
+		() => ordered.map((doc) => ({ ...doc, survivor: doc.id === survivor })),
+		[ordered, survivor]
+	)
 
 	if (error) {
 		return (
@@ -402,7 +502,21 @@ export function MergeClient({
 					onlyDifferences={onlyDifferences}
 					showDiff={showDiff}
 					survivor={survivor}
-				/>
+				>
+					{sections.map((section) => (
+						<SectionHost
+							collection={collection}
+							docs={sectionDocs}
+							key={`${section.key}:${round}`}
+							node={section.node}
+							onReady={setSectionReady}
+							onValue={setSectionValue}
+							sectionKey={section.key}
+							survivor={survivor}
+							value={currentSections.values[section.key]}
+						/>
+					))}
+				</Matrix>
 
 				{(answer ?? plan).refusal ? (
 					<div className={`${baseClass}__releases`}>
@@ -505,7 +619,7 @@ export function MergeClient({
 						</Button>
 						<Button
 							buttonStyle="primary"
-							disabled={busy || !answer?.readyToApply}
+							disabled={busy || !answer?.readyToApply || currentSections.waiting.length > 0}
 							margin={false}
 							onClick={() => openModal(CONFIRM_MODAL)}
 							size="large"

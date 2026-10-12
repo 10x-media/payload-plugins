@@ -183,6 +183,11 @@
 	margin: 0;
 }
 
+/* A host's section adds rows to the grid, in its columns, rather than a box of its own. */
+.dedupe-merge__section {
+	display: contents;
+}
+
 /* A field's label, as the version view heads a field's two sides. */
 .dedupe-merge__label {
 	z-index: 1;
@@ -254,6 +259,15 @@
 
 label.dedupe-merge__field:hover {
 	border-color: var(--theme-elevation-250);
+}
+
+/* A section's outcome the reviewer has no say in: drawn picked, and nothing to click. */
+label.dedupe-merge__field--fixed {
+	cursor: default;
+}
+
+label.dedupe-merge__field--fixed.dedupe-merge__cell--picked:hover {
+	border-color: var(--theme-elevation-700);
 }
 
 .dedupe-merge__field.dedupe-merge__cell--picked,

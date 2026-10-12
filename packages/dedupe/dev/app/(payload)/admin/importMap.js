@@ -45,6 +45,7 @@ import { AuditLogsView as AuditLogsView_d109efa364f92f646cad8031879d6db3 } from 
 import { DedupeQueueView as DedupeQueueView_70ef83bda0633d1fe4fba91d94f29124 } from '@10x-media/dedupe/rsc'
 import { DedupeMergeView as DedupeMergeView_70ef83bda0633d1fe4fba91d94f29124 } from '@10x-media/dedupe/rsc'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
+import { MembershipsSection as MembershipsSection_373a85c26942b02e9287ea02011c0269 } from '../../../components/MembershipsSection'
 import { DuplicateCheckStep as DuplicateCheckStep_f00521c9797d130da1438d242599c957 } from '../../../components/DuplicateCheckStep'
 
 /** @type import('payload').ImportMap */
@@ -96,5 +97,6 @@ export const importMap = {
   "@10x-media/dedupe/rsc#DedupeQueueView": DedupeQueueView_70ef83bda0633d1fe4fba91d94f29124,
   "@10x-media/dedupe/rsc#DedupeMergeView": DedupeMergeView_70ef83bda0633d1fe4fba91d94f29124,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
+  "/components/MembershipsSection#MembershipsSection": MembershipsSection_373a85c26942b02e9287ea02011c0269,
   "/components/DuplicateCheckStep#DuplicateCheckStep": DuplicateCheckStep_f00521c9797d130da1438d242599c957
 }
