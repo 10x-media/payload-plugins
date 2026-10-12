@@ -12,6 +12,7 @@
 		"admin-wiki",
 		"undo-redo",
 		"audit-logs",
+		"dedupe",
 		"automations",
 		"dual-session",
 		"settings-overlay",

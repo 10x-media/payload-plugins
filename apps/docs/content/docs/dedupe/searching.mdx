@@ -1,0 +1,234 @@
+---
+title: Searching
+description: How look-alikes are found, scored and queued, and the adapter seam.
+---
+
+## Match fields
+
+Each match field compares by its `compare`:
+
+| `compare` | Matches |
+| --- | --- |
+| `exact` (default) | The same value, ignoring case, accents and extra spaces. |
+| `text` | The same words in any order, also a name written as one word or two. A word on one side only makes it a near match. With `typos: true`, words of four letters or more also meet with one letter wrong, missing or extra, at a blocking key per letter. |
+| `phone` | The same last nine digits. |
+| `number` | The same number. With `tolerance`, close numbers too: `toleranceType: 'value'` by size, `'quantity'` by differing digits. |
+| `date` | The same day, or day and month swapped. |
+| `{ keys, similarity }` | Your own: `keys(value)` lists the keys of a value, `similarity(a, b)` returns 0 to 1. |
+
+Only documents that share a key are compared. `key: false` scores a field without making keys from it, for one too common to narrow the search, such as a city; at least one match field keeps its keys.
+
+A compare of your own can build on the built-in ones, exported as `comparePresets`. Rules of one language go there, for example ü as ue:
+
+```ts
+import { comparePresets } from '@10x-media/dedupe'
+
+const umlauts = (value: unknown) => String(value ?? '').replace(/ü/g, 'ue')
+
+const name = {
+  path: 'name',
+  weight: 40,
+  compare: {
+    keys: (value: unknown) => comparePresets.text.keys(umlauts(value)),
+    similarity: (a: unknown, b: unknown) => comparePresets.text.similarity(umlauts(a), umlauts(b)),
+  },
+}
+```
+
+## Score
+
+A matching field adds its `weight`, a near match part of it, a differing one `onDiffer` (a quarter of the weight off by default), and `onDiffer: 'veto'` rules the pair out. The score is their sum over the sum of every match field's weight, fields empty on either side included, from 0 to 1. Pairs from `minScore` up go to the queue, with the fields that match and differ.
+
+## Save check and scan
+
+Every save indexes the document and, unless `checkOnSave: false`, queues a `dedupe-check` job that compares it with its look-alikes and opens or refreshes their pairs; a pair that no longer qualifies is deleted. The scan compares a whole collection: run it with "Scan now" in the queue, or schedule it with `scan.cron`.
+
+Both need a job worker for the `dedupe` queue, for example `jobs.autoRun: [{ cron: '* * * * *', queue: 'dedupe' }]`. Without one, set `disableJobsQueue: true` and both run inside the request. The check then runs inside the save's transaction: a check that fails, such as on an adapter that is down, is logged and the save goes through. Across servers, set `jobs.enableConcurrencyControl`.
+
+A pair marked "Not duplicates" stays marked however often it is found again. Unless `draft` is set, unpublished documents are not searched. Taking a document off publication or moving it to the trash closes its open pairs; its "Not duplicates" marks stay. While a document is in the trash, its groups are not listed under "Not duplicates"; restored, they are back.
+
+## Finding duplicates from code
+
+`findDuplicates`, the check endpoint and `useDuplicateCheck` run this search on values not saved yet: see [Checking before saving](/dedupe/checking).
+
+## Adapters
+
+The adapter decides which documents are compared; the score stays the plugin's. The plugin ships one, the keys adapter, which compares documents that share a blocking key. Extend it:
+
+```ts
+dedupe({
+  adapter: (keys) => ({
+    ...keys,
+    findCandidates: async (args) => [
+      ...(await keys.findCandidates(args)),
+      ...(await fromCrm(args.doc)),
+    ],
+  }),
+})
+```
+
+Or replace it with your own: `adapter: () => myAdapter`.
+
+A collection can have an adapter of its own. Its factory receives the plugin's adapter, and the adapter it returns is used whole for that collection: a method it lacks is not taken from the plugin's.
+
+```ts
+dedupe({
+  collections: {
+    customers: { match, adapter: () => typesense },
+    products: { match }, // the plugin's adapter, here the keys adapter
+  },
+})
+```
+
+To change one method of the plugin's adapter for a collection, spread it: `adapter: (base) => ({ ...base, findCandidates })`. Keep the methods that read and write one index together, or `findCandidates` searches an index nobody writes.
+
+## Writing an adapter
+
+Implement `DedupeAdapter` from `@10x-media/dedupe/types`. Only `findCandidates` is required:
+
+- `findCandidates({ req, collection, doc, limit })`: up to `limit` documents to compare with `doc`, as `{ id }`. `doc` has no `id` when its values are not saved yet.
+- `index({ req, collection, doc })`: on a save, a merge and the scan.
+- `remove({ req, collection, id })`: when a document is deleted, trashed, unpublished or merged.
+- `scanBuckets({ req, collection, cursor, limit })`: key buckets for the scan. Without it, the scan calls `findCandidates` per document.
+- `register(config)`: adds collections or endpoints at config time.
+
+Over an index the project already keeps current, such as its site search, `findCandidates` is enough. An adapter with an index of its own also writes it in `index` and `remove`.
+
+`index` and `remove` run inside the transaction of the save, delete or merge that calls them, and one that throws fails it. A write to an outside service stays when that transaction rolls back. An adapter with an outside index writes it one of two ways:
+
+- **From a job.** `index` and `remove` queue it with `payload.jobs.queue({ ..., req })`; a rolled-back save takes the job with it. The index follows the database once a worker runs the job.
+- **At once, then checked.** They write at once and queue a job without `req`, which survives a rollback; the job reads the document and writes or deletes it to match. A document is found at once, and a rollback is put right once a worker runs the job.
+
+Only documents in the index are ever found. An index that leaves some out, such as a public search index without blocked users, never finds their duplicates.
+
+`@10x-media/dedupe` exports what an adapter reads:
+
+| Export | Returns |
+| --- | --- |
+| `matchFields(payload, collection)` | The collection's match fields, as its `match` config lists them. |
+| `tenantOf(payload, collection, doc)` | The document's tenant id, or `null` without `multiTenancy` and in a collection it does not scope. |
+| `readPath(doc, path)` | The value at a dot path, such as `profile.name`. |
+
+### Example: Typesense
+
+An adapter with its own Typesense index, written at once and checked after a write inside a transaction, the second way above. Each Payload collection has a Typesense collection of the same name, with a `string[]` field per match field and a `tenant` field; one search per value tolerates typos.
+
+```ts
+import { matchFields, readPath, tenantOf } from '@10x-media/dedupe'
+import type { AdapterDoc, DedupeAdapter } from '@10x-media/dedupe/types'
+import type { CollectionSlug, PayloadRequest } from 'payload'
+
+// Typesense reads a dot in a field name as a nested object.
+const fieldName = (path: string) => `f_${path.replaceAll('.', '__')}`
+
+// Every locale and every item of a list.
+const texts = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.flatMap(texts)
+    : value !== null && typeof value === 'object'
+      ? Object.values(value).flatMap(texts)
+      : value === null || value === undefined || value === ''
+        ? []
+        : [String(value).toLowerCase()]
+
+export const typesenseAdapter = ({ url, apiKey }: { url: string; apiKey: string }): DedupeAdapter => {
+  const call = (path: string, init: RequestInit = {}) =>
+    fetch(`${url}${path}`, {
+      ...init,
+      headers: { 'X-TYPESENSE-API-KEY': apiKey, 'Content-Type': 'application/json' },
+    })
+
+  const upsert = async (req: PayloadRequest, collection: string, doc: AdapterDoc) => {
+    const tenant = tenantOf(req.payload, collection, doc)
+    const fields = matchFields(req.payload, collection).map(({ path }) => [
+      fieldName(path),
+      texts(readPath(doc, path)),
+    ])
+    await call(`/collections/${collection}/documents?action=upsert`, {
+      method: 'POST',
+      body: JSON.stringify({
+        id: String(doc.id),
+        ...Object.fromEntries(fields),
+        ...(tenant ? { tenant } : {}),
+      }),
+    })
+  }
+
+  const drop = (collection: string, id: string) =>
+    call(`/collections/${collection}/documents/${encodeURIComponent(id)}`, { method: 'DELETE' })
+
+  // Queued without `req`, so a rolled-back save does not take the check with it.
+  const checkLater = async (req: PayloadRequest, collection: string, id: string) => {
+    if (await req.transactionID) {
+      await req.payload.jobs.queue({ task: 'typesense-check', input: { collection, id }, queue: 'dedupe' })
+    }
+  }
+
+  return {
+    register: (config) => {
+      config.jobs = {
+        ...config.jobs,
+        tasks: [
+          ...(config.jobs?.tasks ?? []),
+          {
+            slug: 'typesense-check',
+            inputSchema: [
+              { name: 'collection', type: 'text', required: true },
+              { name: 'id', type: 'text', required: true },
+            ],
+            handler: async ({ input, req }) => {
+              const { collection, id } = input as { collection: CollectionSlug; id: string }
+              const doc = await req.payload.findByID({
+                collection,
+                id,
+                depth: 0,
+                locale: 'all',
+                overrideAccess: true,
+                disableErrors: true,
+              })
+              if (doc && doc._status !== 'draft') await upsert(req, collection, doc)
+              else await drop(collection, id)
+              return { output: {} }
+            },
+          },
+        ],
+      }
+    },
+
+    index: async ({ req, collection, doc }) => {
+      await upsert(req, collection, doc)
+      await checkLater(req, collection, String(doc.id))
+    },
+
+    remove: async ({ req, collection, id }) => {
+      await drop(collection, id)
+      await checkLater(req, collection, id)
+    },
+
+    findCandidates: async ({ req, collection, doc, limit }) => {
+      const tenant = tenantOf(req.payload, collection, doc)
+      const searches = matchFields(req.payload, collection).flatMap(({ path }) =>
+        texts(readPath(doc, path)).map((q) => ({
+          collection,
+          q,
+          query_by: fieldName(path),
+          num_typos: 2,
+          per_page: Math.min(limit, 250),
+          ...(tenant ? { filter_by: `tenant:=${tenant}` } : {}),
+        }))
+      )
+      if (searches.length === 0) return []
+      const response = await call('/multi_search', {
+        method: 'POST',
+        body: JSON.stringify({ searches }),
+      })
+      const { results } = (await response.json()) as {
+        results: { hits?: { document: { id: string } }[] }[]
+      }
+      return results.flatMap((result) => result.hits ?? []).map((hit) => ({ id: hit.document.id }))
+    },
+  }
+}
+```
+
+The plugin drops the document itself, repeated ids and anything past `limit`. The full adapter, which also creates the Typesense collection and compares phone numbers by their digits, is in the dev app: `packages/dedupe/dev/helpers/typesenseAdapter.ts`.

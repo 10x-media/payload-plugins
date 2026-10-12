@@ -1,0 +1,294 @@
+---
+title: Merging
+description: "How a group of documents becomes one: the spec, the screen, the apply, unique values and references."
+---
+
+The document a merge keeps is the **primary** (`survivor` in the API); the others are merged in.
+
+## The merge spec
+
+The plugin derives from the schema which fields are merged and how. Named groups and tabs become paths (`profile.bio`); arrays, blocks and `hasMany` fields are lists. System, auth, upload, join and virtual fields are not merged, nor fields hidden from the API.
+
+| Policy | Result |
+| --- | --- |
+| `nonEmpty` | The primary's value, or the newest non-empty one when it is empty. Default. |
+| `union` | For a list: every document's items, the primary's first. |
+| `manual` | Like `nonEmpty`, but a conflict has to be decided before merging. |
+| `survivor` | Always the primary's value. Default for fields hidden in the admin. |
+| `skip` | Not merged. |
+
+Set a policy on the field:
+
+```ts
+import { dedupeCustom } from '@10x-media/dedupe'
+
+{ name: 'tags', type: 'text', hasMany: true, admin: { custom: dedupeCustom({ policy: 'union' }) } }
+```
+
+Or in the plugin config:
+
+```ts title="payload.config.ts"
+customers: {
+  fields: (derived) =>
+    derived.map((spec) => (spec.path === 'taxId' ? { ...spec, policy: 'manual' } : spec)),
+}
+```
+
+A path that is not among `derived` fails at startup.
+
+### Fields with a component of their own
+
+A field with its own `admin.components.Field` is shown on the merge screen with that component, read-only, as the document's form shows it, and picked as one value. A group or list drawn by such a component is merged whole, never field by field or row by row: a phone stays one phone, and the fields the component keeps inside are never offered alone. A match field may still read a field inside such a group, such as `phone.number`.
+
+A component that is fine with being merged part by part declares it:
+
+```ts
+{
+  name: 'address',
+  type: 'group',
+  admin: { components: { Field: '/components/Address' }, custom: dedupeCustom({ split: true }) },
+  fields: [/* ... */],
+}
+```
+
+The screen draws no diff inside a component: a cell whose value differs from the primary's is marked instead.
+
+## The screen
+
+Documents are columns and fields are rows. Pick the primary in a column head and a value per field; a list is picked item by item. "Only differences" hides the fields all documents agree on. A document's title opens it in a new tab, its edit button in a drawer.
+
+"Not duplicates" marks the group so the queue leaves it alone; a marked group can be reopened.
+
+## Localized fields
+
+A localized field is decided per locale. Payload saves one locale at a time and checks the required values of that locale only.
+
+The values every locale shares, such as a price, are written in the write locale. Without `writeLocale` it is the default locale when the primary holds every value Payload requires there, else the first locale it does: a primary written in German only is not refused for an empty English. `writeLocale` names the locale, as a code or as a function of the primary, such as the language of its tenant:
+
+```ts
+import { tenantOf } from '@10x-media/dedupe'
+
+dedupe({
+  collections: {
+    customers: {
+      match,
+      writeLocale: async ({ req, survivor }) => {
+        const tenant = tenantOf(req.payload, 'customers', survivor)
+        const office = tenant
+          ? await req.payload.findByID({ collection: 'tenants', id: tenant, depth: 0, req })
+          : null
+        return office?.locale
+      },
+    },
+  },
+})
+```
+
+An answer the config has no locale for is ignored, and a code the config does not have stops the app at startup.
+
+In every locale the merge writes, a required value the primary lacks comes from the most similar document of the group that has it. Where none has it, the merge is refused, naming the field and the locale, with one exception: on a collection with drafts, a locale whose missing values the primary lacked before the merge is written as a draft and published with the write locale, which Payload checks alone, as it publishes any draft. The merge leaves that locale as incomplete as it found it. Drafts merged with `draft: true` are not checked.
+
+## Applying
+
+1. `hooks.beforeRemove` runs.
+2. The merged-in documents give up the unique values the primary takes.
+3. The primary is written.
+4. The merged-in documents are trashed, or deleted with `absorbed: 'delete'`.
+5. The pairs of the merged-in documents are deleted, and the primary is checked for new look-alikes.
+
+A failure is logged and sent as `merge.failed`. Without a transaction (MongoDB without a replica set), a failure before the primary is written puts the merged-in documents' values back and logs any it cannot; one after keeps what was written, and the merged-in documents keep their placeholders. A merge that would delete a merged-in document before the primary is written is refused; `requireTransactions: true` refuses every merge.
+
+The merge is refused when:
+
+- a document changed since the screen opened;
+- the collection's access denies the reviewer `read` on a document, `update` on the primary, `delete` on a merged-in one, or `update` on one that goes to the trash;
+- a `manual` conflict is open;
+- unless `draft` is set, the primary has an unpublished draft or a document was never published;
+- another editor has a document of the group open.
+
+A merged-in document with unpublished changes is marked `Changed`, as Payload marks it. The merge takes its published values; the changes go to the trash with it, as Payload's own trash takes them, or are deleted with it.
+
+A field the reviewer may not update keeps the primary's value. A field they may not read is not shown and is merged by its policy. A merge never brings into view a value that a field's `read` access hides.
+
+## Unique values
+
+When the primary takes a unique value, the merged-in document gives it up first, at the top level, inside rows and inside a localized group alike:
+
+| Field | The merged-in document holds |
+| --- | --- |
+| `text`, `textarea`, `code`, `email` | A placeholder with the value it held: `merged-<id> Anna Kowalska`, or for an email `merged-<id>.anna@mail.com.invalid`. Where the field's validation refuses that, `merged-<id>` (`merged-<id>@dedupe.invalid`). |
+| Any other type, not `required`, on SQL | An empty value. |
+| Any other type on MongoDB or `required` | Nothing: the merged-in document is deleted instead of trashed, before the primary is written. Without a transaction, such a merge is refused. |
+
+The screen shows this before the merge. On Postgres, a merged-in document deleted for good cannot leave while a document points at it in a `required` field.
+
+## References
+
+The merge does not move references to the merged-in documents. Documents elsewhere that point at one keep pointing at it:
+
+- with `absorbed: 'trash'`, at a document in the trash, which comes back with them when it is restored;
+- with `absorbed: 'delete'`, on MongoDB at a document that no longer exists. On Postgres the delete clears an optional reference, and fails the merge while a `required` one points at it.
+
+A pointer at a document of the same merge, the primary itself or a merged-in one, is removed from the primary's optional fields the reviewer may update.
+
+To move references, use `hooks.beforeRemove`. It runs once per merge, while the merged-in documents still exist, with the merge's `req`: writes through it are part of the merge's transaction, and throwing rolls the merge back where the database opens one.
+
+```ts title="payload.config.ts"
+dedupe({
+  hooks: {
+    beforeRemove: async ({ req, collection, survivorId, absorbedIds }) => {
+      if (collection !== 'customers') return
+      // One relationship.
+      await req.payload.update({
+        collection: 'orders',
+        where: { customer: { in: absorbedIds } },
+        data: { customer: survivorId },
+        req,
+      })
+      // A `hasMany` list: the merged-in customers give way to the primary, named once.
+      const gone = new Set(absorbedIds.map(String))
+      const { docs } = await req.payload.find({
+        collection: 'trips',
+        where: { participants: { in: absorbedIds } },
+        depth: 0,
+        pagination: false,
+        req,
+      })
+      for (const trip of docs) {
+        const participants = []
+        for (const id of trip.participants ?? []) {
+          const next = gone.has(String(id)) ? survivorId : id
+          if (!participants.some((kept) => String(kept) === String(next))) participants.push(next)
+        }
+        await req.payload.update({ collection: 'trips', id: trip.id, data: { participants }, req })
+      }
+    },
+  },
+})
+```
+
+Move every other field that points at the collection the same way, rich text and JSON included. The dev app runs this example: `packages/dedupe/dev/helpers/repointCustomers.ts`.
+
+## Sections
+
+The merge spec covers the document's own fields. What else a merge has to decide, such as the records of another collection that point at the documents (a person's roles, a customer's club memberships), is yours to draw: a section is a component on the merge screen, under the fields and in the same columns, that hands a value to `hooks.beforeRemove`. The plugin writes nothing for it.
+
+```ts title="payload.config.ts"
+dedupe({
+  collections: {
+    customers: {
+      sections: [
+        {
+          key: 'memberships',
+          Component: '/components/MembershipsSection#MembershipsSection',
+          // Optional: why the merge may not apply with this value, shown to the reviewer.
+          validate: async ({ req, survivorId, absorbedIds, value }) => null,
+        },
+      ],
+    },
+  },
+  hooks: {
+    beforeRemove: async ({ req, survivorId, absorbedIds, sections }) => {
+      const memberships = sections.memberships // what the component set, or null
+    },
+  },
+})
+```
+
+The component is registered for the import map by the plugin; run `payload generate:importmap` after adding one. It reads the merge and answers through `useMergeSection` from `@10x-media/dedupe/client`:
+
+| | |
+| --- | --- |
+| `docs` | Every document of the merge, in column order: `{ id, title, survivor, ... }`. |
+| `survivorId`, `absorbedIds` | The primary and the merged-in documents. |
+| `value`, `setValue(next)` | The section's value, `null` until set. `next` may be a function of the current value. It travels as JSON. |
+| `setReady(ready)` | `false` keeps the merge from applying until the section says `true`, as a field waiting for a choice does. A section that never calls it is ready. |
+
+Another primary, or a document taken out of the merge, is another merge: the section is drawn again from nothing and its value is gone.
+
+The rows look like the field rows with these, all from `@10x-media/dedupe/client`:
+
+- `MergeRow`: a label across the columns, then `cell(doc)` for every document; `needsChoice` adds the badge a field waiting for a choice has.
+- `MergePick`: a cell picked by radio, cells of one row sharing a `name`. `readOnly` draws an outcome the reviewer has no say in, such as a record that moves to the primary because nothing competes with it.
+- `MergeChecks`: a cell of lines checked one by one, as a `hasMany` field.
+- `MergeCell`: a read-only value, or with no children an empty cell that keeps the column.
+
+```tsx title="components/MembershipsSection.tsx"
+'use client'
+import { MergeCell, MergePick, MergeRow, useMergeSection } from '@10x-media/dedupe/client'
+import { useEffect } from 'react'
+
+export const MembershipsSection = () => {
+  const { docs, value, setValue, setReady } = useMergeSection<Record<string, string>>()
+  // Your own fetch of the documents' memberships, by club: null while it loads.
+  const clubs = useMembershipsByClub(docs)
+  // A club two customers are in waits for a pick.
+  const open = clubs ? [...clubs].filter(([club, members]) => members.length > 1 && !value?.[club]) : null
+  useEffect(() => setReady(open !== null && open.length === 0), [open?.length, setReady])
+
+  return [...(clubs ?? [])].map(([club, members]) => (
+    <MergeRow
+      key={club}
+      label={`Membership: ${club}`}
+      needsChoice={open?.some(([waiting]) => waiting === club)}
+      cell={(doc) => {
+        const member = members.find((entry) => entry.customer === doc.id)
+        if (!member) return <MergeCell />
+        // Alone in its club, it moves to the primary: shown kept, nothing to pick.
+        const alone = members.length === 1
+        return (
+          <MergePick
+            checked={alone || value?.[club] === member.id}
+            id={`${club}-${doc.id}`}
+            label={doc.title}
+            name={club}
+            readOnly={alone}
+            onChange={() => setValue((current) => ({ ...current, [club]: member.id }))}
+          >
+            {member.title}
+          </MergePick>
+        )
+      }}
+    />
+  ))
+}
+```
+
+Two things the screen does not do for you:
+
+- A section that loads its data calls `setReady(false)` before it has it. Ready by default, it would let the merge apply before the reviewer saw anything.
+- The value comes from the browser, and `validate` runs before the merge's transaction. Check it again in `beforeRemove`, against the database, inside the transaction: the plugin compares the documents' `updatedAt` with what the reviewer saw, not the records your section shows.
+
+The dev app runs a full one, with a pick per club two customers share: `packages/dedupe/dev/components/MembershipsSection.tsx`, and `dev/helpers/memberships.ts` for its `validate` and `beforeRemove`.
+
+## Recording a merge
+
+The plugin keeps no record of a merge and no copy of the merged-in documents: once they are deleted, or emptied from the trash, only what you kept brings them back. `hooks.beforeRemove` also receives:
+
+- `snapshots`: each merged-in document by id, as it was before the merge gave up its unique values, fields hidden from the API included and an auth collection's credentials left out;
+- `decisions`: what the merge writes, field by field, with every document's value.
+
+With `@10x-media/audit-logs`, one entry per merge on the primary:
+
+```ts title="payload.config.ts"
+import { createAuditEvent } from '@10x-media/audit-logs'
+
+dedupe({
+  hooks: {
+    beforeRemove: async ({ req, collection, survivorId, absorbedIds, snapshots, decisions }) => {
+      await createAuditEvent(req, {
+        collection,
+        documentId: survivorId,
+        eventType: 'dedupe.merge',
+        metadata: {
+          absorbedIds,
+          snapshots,
+          decisions: decisions.filter((decision) => decision.changed),
+        },
+      })
+    },
+  },
+})
+```
+
+The entry is written through the merge's `req`, so it rolls back with a merge that fails. It stores `snapshots` whole, fields hidden from the API included: whoever may read the audit log reads them. The dev app runs this example: `packages/dedupe/dev/helpers/auditMerge.ts`.
