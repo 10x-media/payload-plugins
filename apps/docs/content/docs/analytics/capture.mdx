@@ -1,16 +1,16 @@
 ---
 title: Capture
-description: Boot the browser tracker, fill capture slots, gate on consent, and send custom events.
+description: Boot the browser tracker, fill capture slots, keep staff out of the numbers, and send custom events.
 ---
 
 The plugin ships its own browser tracker. It sends pageviews and events to whichever adapter fills each [capture slot](#capture-slots): the [native engine](/analytics/native) by default, or a vendor's real SDK loaded through your own origin via the [first-party proxy](/analytics/proxy).
 
 ## Next.js
 
-Resolve the config on the server and render it in the root layout. That is the whole setup:
+Resolve the config on the server and render it in the site's root layout: in a Payload app, the layout of the `(frontend)` route group, since Payload's `app/(payload)/layout.tsx` renders the admin. That is the whole setup:
 
-```tsx title="app/layout.tsx"
-import { AnalyticsScripts, getTrackerConfig } from '@10x-media/analytics/rsc'
+```tsx title="app/(frontend)/layout.tsx"
+import { AnalyticsScripts, getTrackerConfig } from '@10x-media/analytics/site'
 import config from '@payload-config'
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
@@ -29,7 +29,38 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 }
 ```
 
-`AnalyticsScripts` renders each slot's vendor snippet and then boots the tracker over it. Pass the incoming `headers()` so a scoped install's `scopeResolver` sees the same request it would over HTTP; the `host` header is what a hostname-scoped resolver reads (see [Multi-tenancy](/analytics/multi-tenancy#capture-slots-per-tenant)).
+`AnalyticsScripts` renders the vendor snippet of each slot that does not wait for your [consent manager](/analytics/consent), then boots the tracker over them. `@10x-media/analytics/site` loads no admin UI, so a site page can import it freely. Pass the incoming `headers()` so a scoped install's `scope.resolve` sees the same request it would over HTTP; the `host` header is what a hostname-scoped resolver reads (see [Multi-tenancy](/analytics/multi-tenancy#capture-slots-per-tenant)). It is asked at the `capture` call site, so the cookie and authorization headers are removed before the resolver sees them.
+
+`getTrackerConfig` also says whether the page is rendered in [draft mode](#pages-that-are-not-counted), which is never counted. Pass `draft: (await draftMode()).isEnabled`, from `next/headers`: Next checks the draft mode cookie against the build's preview id before it says yes. Left out, `getTrackerConfig` falls back to finding Next's draft mode cookie (`__prerender_bypass`, which Payload's preview route sets through `draftMode().enable()`) among the headers you passed, without handing it to any resolver. That fallback cannot verify the cookie, so a stale or forged one reads as draft, and a CDN that caches the page's HTML whatever its cookies would hand that draft page to every visitor.
+
+### Statically rendered pages
+
+Reading `headers()` renders the layout per request, which is what a per-visitor config needs and what a statically rendered page cannot do. Leave `getTrackerConfig` and `AnalyticsScripts` out of a static layout and boot from the browser instead: `initTracker` fetches the same config from the public tracker endpoint, per visitor, once the page is shown.
+
+```tsx title="components/static-analytics.tsx"
+'use client'
+
+import { initTracker } from '@10x-media/analytics/tracker'
+import { useEffect } from 'react'
+
+export const StaticAnalytics = () => {
+  useEffect(() => {
+    const booting = initTracker()
+    return () => {
+      void booting.then((tracker) => tracker.destroy())
+    }
+  }, [])
+  return null
+}
+```
+
+Render `<StaticAnalytics />` once in the root layout, which stays static. The tracker it boots is the window's one tracker, so `useAnalytics()` in any client component reaches it with no provider, `setGate` from a consent manager's bridge works before or after it boots, and React StrictMode's double mount boots it once: `destroy` gives this hold back rather than ending a tracker another holder shares.
+
+What changes against the server render:
+
+- **No vendor snippet is in the HTML.** Each filled slot's snippet travels in the config, and the tracker injects it once its gate is open, so a vendor's first pageview is counted from the moment the config arrives rather than with the page.
+- **The config is per visitor, never per build.** `GET /api/_x/config` answers `Cache-Control: private, max-age=60` and `Vary: Host, Cookie`, so no CDN shares one visitor's config with another and a browser reuses its own for a minute. Its scope, goals and exclusion hash are resolved from the request the browser sends, exactly as a server render would resolve them.
+- **Draft mode is read off the request.** The endpoint says `draft` when the request carries Next's draft mode cookie, read before the cookies are removed for the resolvers, so a preview that boots through `initTracker` is not counted either. Like `getTrackerConfig`'s fallback it cannot verify the cookie; the worst a forged one does is leave that one browser uncounted. Payload's [live preview](#pages-that-are-not-counted) is told in the browser either way.
 
 ## Plain HTML and other frameworks
 
@@ -41,9 +72,11 @@ import { initTracker } from '@10x-media/analytics/tracker'
 await initTracker()
 ```
 
-The package ships ES modules, so bundle that entry into your site (or serve it from a CDN and import it in a `<script type="module">`). `initTracker` defaults to `GET /api/analytics/tracker`; pass `endpoint` when the app moved Payload's `routes.api`. A failed fetch or a non-ok response yields a tracker whose calls do nothing, so a missing analytics config never breaks the page that awaited it. The `/tracker` subpath has zero runtime dependencies: no React, no Payload, no Node built-ins.
+The package ships ES modules, so bundle that entry into your site (or serve it from a CDN and import it in a `<script type="module">`). `initTracker` defaults to `GET /api/_x/config`; pass `endpoint` when the app moved Payload's `routes.api` or the plugin's [`routes.base`](/analytics/reference/endpoints#where-the-endpoints-answer), or serves under a Next `basePath`. The config it fetches already carries every path behind that base path. A failed fetch or a non-ok response yields a tracker whose calls do nothing, so a missing analytics config never breaks the page that awaited it. The `/tracker` subpath has zero runtime dependencies: no React, no Payload, no Node built-ins.
 
-`GET /api/analytics/tracker` is public, answers `Cache-Control: private, max-age=60` with `Vary: Host, Cookie`, sets no cookie, and carries only what an adapter declared as public (`capture.client` and `capture.snippet`), never a query credential and never a goal's admin-facing name. Its payload is resolved per request, so a scoped install serves each scope its own slots and its own [goals](/analytics/goals#5-let-editors-manage-goals); both `Vary` keys are load-bearing for exactly that reason.
+The tracker `initTracker` resolves is the window's one tracker, the same one `AnalyticsScripts` and `AnalyticsProvider` hold, so calling it beside them never double counts; the first holder's config wins. Its `destroy` gives this call's hold back, and the tracker ends once nothing holds it.
+
+`GET /api/_x/config` is mounted once an adapter declares capture (native always does) or the install runs provider documents. It is public, answers `Cache-Control: private, max-age=60` with `Vary: Host, Cookie`, sets no cookie, and carries only what an adapter declared as public (`capture.client` and `capture.snippet`), never a query credential and never a goal's admin-facing name. Its payload is resolved per request, so a scoped install serves each scope its own slots and its own [goals](/analytics/goals#5-let-editors-manage-goals); the `Vary` key is load-bearing for exactly that reason, and `Cookie` is in it because Next's draft mode cookie sets `draft`. While [`capture.exclusion`](#the-exclusion-link) is on it also carries the scope's exclusion parameter and the hash of its token, never the token. While previews are [skipped](#pages-that-are-not-counted) it carries the admin's address the same way, as digests alone. The scope is resolved at the `capture` call site, without the signed-in user, their cookies or their authorization header, so an editor browsing a tenant's site while signed in gets that site's config, never the config of the tenant they selected in the admin.
 
 ## Capture slots
 
@@ -52,30 +85,39 @@ An install fills at most two slots, in this order:
 | Slot | Filled by |
 |---|---|
 | `global` | `capture.slots.global`, else the designated `platformAdapter`, else the single config adapter when only one is configured. |
-| `tenant` | `capture.slots.tenant`, else the resolved scope's default adapter. Empty whenever no scope resolves. |
+| `tenant` | `capture.slots.tenant`, else the scope's default source when it declares capture, else its first source that does. On an install running provider documents, only a source the scope's documents grant fills it. Empty whenever no scope resolves. |
 
-One slot, one adapter, and one adapter fills at most one slot: when both slots resolve to the same adapter the global entry keeps it, so a scoped native install never posts every event twice. An adapter that declares no `capture`, because the public config it needs is unset, fills nothing.
+One slot, one adapter, and one adapter fills at most one slot: when both slots resolve to the same adapter the global entry keeps it, so a scoped native install never posts every event twice. One vendor fills at most one slot as well. A page runs one copy of a vendor's script, with one global (`posthog`, `gtag`, `plausible`, `umami`), so a tenant slot of the same kind as the global one would init onto the platform's SDK, send into the platform's project and share its gate: it is left out of the config, and the log says so once. An adapter that declares no `capture`, because the public config it needs is unset, fills nothing.
 
 A native-only install renders no snippet at all: the tracker itself is the client, posting to the ingest endpoint.
 
 ```ts
 analytics({
-  adapters: [native(), posthog({ projectId, apiKey, projectToken: 'phc_...', region: 'eu' })],
+  adapters: [
+    native(),
+    posthog({
+      projectId: process.env.POSTHOG_PROJECT_ID ?? '',
+      apiKey: process.env.POSTHOG_API_KEY ?? '',
+      projectToken: 'phc_...',
+      region: 'eu',
+    }),
+  ],
   capture: {
+    gate: 'all',
     slots: { global: 'posthog', tenant: false },
   },
 })
 ```
 
-`false` disables a slot outright: nothing fills it, its proxy mount 404s (bodyless, like every [proxy](/analytics/proxy) refusal, which is the one answer the plugin sends with no [error envelope](/analytics/data-sources#errors)), and the tracker config omits it. An unknown `global` id throws at config time; a `tenant` id may also name a runtime provider instance, so it is resolved per request instead.
+`false` disables a slot outright: nothing fills it, its proxy mount 404s (bodyless, like every [proxy](/analytics/proxy) refusal, which is the one answer the plugin sends with no [error envelope](/analytics/reference/endpoints#errors)), and the tracker config omits it. An unknown `global` id throws at config time; a `tenant` id may also name a runtime provider instance, so it is resolved per request instead.
 
-`capture.paths` moves a slot's mount off the runtime proxy, for installs serving it through Next rewrites instead. Pass the same path [`captureRewrites`](/analytics/proxy#next-rewrites) was mounted at.
+`capture.paths` moves a slot's mount off the runtime proxy, for installs relaying the vendor from a route handler of their own with [`captureRoute`](/analytics/proxy#a-route-handler-of-your-own). Pass the path the route is mounted at, without the Next `basePath`: Next serves the route under the base path, and the tracker config puts it in front of every path it hands out, the runtime proxy's and the ingest path included. Next rewrites are not offered: `captureRewrites` and `posthogProxyRewrites` [throw](/analytics/proxy#next-rewrites), since a rewrite forwards the visitor's cookies to the vendor.
 
 ### GA4
 
 GA4 fills a slot as soon as `measurementId` (the public `G-XXXXXXX`) is set, on the adapter or on the [provider document](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant). It is the one vendor that is not proxied: the tag is served from `googletagmanager.com` with the id in the query string, so the adapter declares no proxy routes and the slot's proxy mount answers 404.
 
-The snippet is Google's own, inline first: `window.dataLayer`, the `gtag` function, `gtag('js', ...)` and `gtag('config', '<measurementId>')`, then the async tag. Inline first is Google's ordering for consent mode, and it leaves the queue defined even when the tag itself is blocked, so nothing sent before the tag lands is lost. Consent is `required` by default like every other vendor, so neither script is in the server-rendered HTML until consent is granted.
+The snippet is Google's own, inline first: `window.dataLayer`, the `gtag` function, `gtag('js', ...)` and `gtag('config', '<measurementId>')`, then the async tag. Inline first is Google's ordering for consent mode, and it leaves the queue defined even when the tag itself is blocked, so nothing sent before the tag lands is lost. Whether the slot waits is [`capture.gate`](/analytics/consent)'s answer, as for every vendor: a slot that waits keeps both scripts out of the server-rendered HTML until your consent manager opens it, and one that does not renders them with the page.
 
 The sink forwards events and goals as `gtag('event', name, params)` and **no pageviews at all**: `gtag('config')` sends the first page view itself, and page views on history changes come from the web data stream's [enhanced measurement](https://support.google.com/analytics/answer/9216061), which is on by default. An install that turned that stream option off should turn it back on, since the sink will not make up the difference.
 
@@ -87,110 +129,188 @@ The id must match `^[A-Za-z0-9-]+$`, because it lands in both the inline script 
 
 ## Consent
 
-Native capture is cookieless and needs no gate, so it defaults to `none`. Every vendor defaults to `required`: its snippet is withheld from the server-rendered HTML and its events wait in a bounded in-memory queue until a decision arrives.
+The plugin stores no consent state and has no default. `capture.gate`, required whenever a slot can fill, says which slots wait for your consent manager, and the manager opens or closes them in the browser with `setGate`. A slot that waits renders no snippet and queues its events until it opens. [Consent](/analytics/consent) has the options, the server render, revoking, [what the gate does not cover](/analytics/consent#what-the-gate-does-not-cover) (server code among it), `snippets={false}` and recipes for c15t and any other manager.
 
-```ts
-import { useAnalytics } from '@10x-media/analytics/react'
-
-const { consent } = useAnalytics()
-consent('granted') // loads the gated vendor scripts, then drains the queue in order
-consent('denied')  // clears the queue; the vendor script is never loaded
-```
-
-The decision persists in `localStorage` under `analytics:consent` and is read back on the next boot, so a returning visitor who already granted is not asked again by the tracker. Pass `persistConsent: false` to `createTracker`/`initTracker` to keep the decision to the current page: storage is then neither read nor written. A browser with storage disabled reads as "no decision" rather than throwing.
-
-Override the defaults per slot, per adapter id, or with a resolver:
-
-```ts
-capture: {
-  consent: 'required',                                  // every slot waits
-  // consent: { slots: { tenant: 'none' }, adapters: { posthog: 'required' } },
-  // consent: ({ slot, adapterId }) => (slot === 'global' ? 'none' : 'required'),
-}
-```
-
-An adapter entry wins over a slot entry, and both win over the per-family default. A bare adapter id must name a config adapter; a runtime provider instance id (`<provider>:<instance>`) is taken on trust, since those only exist once a scope resolves.
+The tenant super-property a PostHog snippet registers on a [multi-tenant install](/analytics/multi-tenancy) is not consent state: it says which scope the events belong to, and opening or closing the gate does not change it.
 
 ## Excluding your own visits
 
-A site's own staff are in its numbers unless they take themselves out. Any page with `?analytics_exclude=1` does that for the browser it is opened in, and `?analytics_exclude=0` puts it back (`true` and `false` work too):
+A site's own staff are in its numbers unless they take themselves out. Two things do that, each for one browser:
 
-```
-https://example.com/?analytics_exclude=1
-```
-
-The tracker reads the parameter on boot and leaves the URL alone: nothing is rewritten, so the link stays shareable and the address bar reads as the visitor typed it. The flag is stored in `localStorage` under `analytics:exclude`, which makes it per browser and per site: repeat it in each browser and profile that should be excluded, and expect it to go when that browser's site data is cleared. A browser with storage blocked is excluded for the page the link was opened on and no further.
-
-While the flag is set the tracker delivers nothing: no native beacon, no event to any vendor, nothing queued for a pending consent decision, and no vendor script injected even once consent is granted. Clearing resumes from that point rather than replaying what was skipped.
-
-Exclusion applies to events from the moment it is switched on. A page view already open when it is switched on at runtime (`exclude(true)` or `setExcluded(true)`) still completes with its duration, because that view was dispatched before the flag; a boot with `?analytics_exclude=1` has nothing open, so nothing is sent at all. A flip in one tab reaches another open tab on its next load, not live: the flag is read when a tracker boots, and there is no cross-tab broadcast.
+- **The exclusion link**, off by default. `capture.exclusion: true` turns it on, and staff exclude their browser, or copy the link for another one, from the [analytics view](/analytics/analytics-view#your-own-visits).
+- **Your own code**, which needs no option at all: `tracker.exclude(true)`, or `setExcluded(true)` from `useAnalytics()`. Code is trusted; a link anyone could type is not.
 
 ```ts
+import type { AnalyticsCaptureOptions } from '@10x-media/analytics'
+
+// The link reads ?analytics_exclude=<token>
+export const on: AnalyticsCaptureOptions = { gate: 'off', exclusion: true }
+
+// The same, with the parameter renamed: ?staff=<token>
+export const renamed: AnalyticsCaptureOptions = { gate: 'off', exclusion: { param: 'staff' } }
+
+// Where the site runs, so the view hands out the whole link, ready to copy or open
+export const oneSite: AnalyticsCaptureOptions = {
+  gate: 'off',
+  exclusion: { sites: ['https://example.com'] },
+}
+
+// One list per scope on a multi-tenant install: each tenant's own domain
+export const perTenant: AnalyticsCaptureOptions = {
+  gate: 'off',
+  exclusion: {
+    sites: async ({ req, scope }) => {
+      if (scope === null) {
+        return []
+      }
+      const tenant = await req.payload.findByID({ collection: 'tenants', id: scope, depth: 0 })
+      return typeof tenant.domain === 'string' ? [`https://${tenant.domain}`] : []
+    },
+  },
+}
+```
+
+The admin cannot know where a site runs, a separate frontend's included, so it only builds whole links for the addresses `sites` names: each an `http(s)` origin with an optional path, such as `https://example.com` or `https://example.com/de`. A list fits an install with one set of sites; a function receives the request and the scope the link is for (`null` on an unscoped install) and answers that scope's own. A list is checked when Payload boots and refuses an address that is not an `http(s)` URL; a function's answer is checked on each request, and an address that is not one is left out. `sites` names the website addresses where the tracker runs, one per site; a function may be async, and each tenant gets its own. Without `sites`, the view links to the admin's own address when a scoped install knows the site runs there, and otherwise hands out the part to add to the site's address.
+
+### The exclusion link
+
+The link carries a token the server signs, so a third party cannot drop real visitors from the numbers by sending them a link of their own making:
+
+```
+https://example.com/?analytics_exclude=<token>
+```
+
+The token is `HMAC-SHA256` of `analytics:exclusion:` followed by the site's scope, keyed by the Payload secret and written as base64url. The [tracker config](#plain-html-and-other-frameworks) carries only the parameter's name and the token's SHA-256 as lowercase hex, `exclusion: { param, tokenHash }`, never the token itself. On boot the tracker hashes the parameter's value with the browser's own `crypto.subtle` and excludes the browser only when the two match. Nothing is sent while it checks, so the page the link is opened on is not counted either.
+
+- `=0` and `=false` put the browser back, with no token, as soon as the page loads, open slot or not: the reader asked for it. They clear the flag, and the vendor switches of the slots that are open, only when the browser was excluded; otherwise they write nothing.
+- A wrong or missing token is ignored, and so is every value while `capture.exclusion` is off.
+- `crypto.subtle` exists only in a secure context, so a token works over https and on localhost and is ignored on plain http. `=0` needs no hash and works anywhere.
+- On a page that is [not counted](#pages-that-are-not-counted) because of draft mode or an automated browser, the parameter is taken out of the address and its token is not checked, so the browser is not excluded there.
+
+The tracker takes the parameter out of the address bar with `history.replaceState` as soon as it reads it, whatever it holds and before the token is checked, and keeps the rest of the address as it was. The token is checked from memory, so neither the pageview, nor a link copied or a screenshot taken afterwards, passes it on.
+
+A vendor snippet the server rendered runs before the tracker boots, and every vendor reads the address as it loads: GA4's `gtag('config')` sends it as `page_location`, and Plausible, Umami and PostHog send it as their first pageview's URL. So while the link is on, each slot's snippet starts with one more inline script that does the same thing first: it takes the parameter out of the address, keeps the rest as written, and leaves the value on the window for the tracker to check. No vendor ever sees the token, and the tracker checks it exactly as it would have read it from the address.
+
+Each scope signs its own token: on a [multi-tenant install](/analytics/multi-tenancy) a tenant's link works on that tenant's sites only. Changing the Payload secret changes every token, and a browser already excluded stays excluded, because the flag it stored needs no token.
+
+### The flag
+
+Either way the result is one flag in `localStorage` under `analytics:exclude`, which makes it per browser and per origin: repeat it in each browser and profile that should be excluded, and on each origin of the site (`www.example.com` and `shop.example.com` keep a flag each), and expect it to go when that browser's site data is cleared. Safari may also delete it after 7 days without a visit to the site; staff who visit their own site keep it. A browser with storage blocked is excluded for the page the link was opened on and no further.
+
+The tracker reads the flag once a slot is open (or at once for a `=0` link): at boot when a slot does not wait, otherwise when your consent manager opens the first one, so nothing is read from a waiting browser's storage before an answer ([what still is](/analytics/consent#storage-before-an-answer)). Until then `tracker.excluded` and `useAnalytics().excluded` read `false`, and events wait in a pending slot's queue as on any page; if the flag turns out to be set, what waited is dropped.
+
+While the flag is set the tracker delivers nothing: no native beacon, no event to any vendor, and no vendor script injected even once a gate opens. Clearing resumes from that point rather than replaying what was skipped.
+
+Exclusion applies to events from the moment it is switched on. A pageview already sent when it is switched on at runtime (`exclude(true)` or `setExcluded(true)`) stays counted, but its time on page and scroll stop being measured there; a boot with a valid exclusion link sends nothing at all, and its page is not measured even if the flag is cleared before the visitor leaves. A flip in one tab reaches another open tab on its next load, not live: the flag is read once per page, and there is no cross-tab broadcast.
+
+```ts
+import { initTracker } from '@10x-media/analytics/tracker'
+
 const tracker = await initTracker()
-tracker.exclude(true)   // same flag, set from your own code
-tracker.excluded        // true
-
-// React
-const { excluded, setExcluded } = useAnalytics()
+tracker.exclude(true) // same flag, set from your own code
+export const excluded = tracker.excluded // true; from React, useAnalytics() has excluded and setExcluded
 ```
 
-`EXCLUSION_STORAGE_KEY`, `DEFAULT_EXCLUSION_PARAM`, `readExclusion`, `writeExclusion`, `readExclusionParam` and `subscribeExclusion` are exported from `@10x-media/analytics/tracker` for a host that wants to render its own switch. Flip the flag through `tracker.exclude()` or `setExcluded` whenever a tracker is live: that is what stops the current page and sets the vendor switches. `writeExclusion` only persists the flag, which takes effect on the next boot. Rename the parameter or turn it off with `exclusionParam`, which sits beside `persistConsent`:
-
-```ts
-createTracker(config, { exclusionParam: 'no_stats' })
-createTracker(config, { exclusionParam: false }) // the parameter is ignored; an existing flag still holds
-```
+`EXCLUSION_STORAGE_KEY` and `DEFAULT_EXCLUSION_PARAM` are exported from `@10x-media/analytics/tracker`. A switch of your own reads the flag from `tracker.excluded` or `excluded` and flips it through `tracker.exclude()` or `setExcluded`: that is what stops the current page and sets the vendor switches.
 
 ### The vendor slots
 
-A vendor snippet for a slot that does not require consent is server-rendered into the HTML, so it runs before the tracker boots and would count its own page view. The tracker's own gate cannot reach that, so setting or clearing the flag also sets or clears each vendor's own opt-out switch, for the slots the config actually has:
+A vendor snippet for a slot that does not wait for the gate (or one the server opened) is server-rendered into the HTML, so it runs before the tracker boots and would count its own page view. The tracker's own gate cannot reach that, so setting or clearing the flag also sets or clears each vendor's own opt-out switch, for the slots the config actually has:
 
 | Vendor | Switch |
 |---|---|
 | Plausible | `localStorage.plausible_ignore = 'true'` |
 | Umami | `localStorage['umami.disabled'] = '1'` |
 | PostHog | `posthog.opt_out_capturing()`, queued by the snippet's stub |
-| GA4 | `window['ga-disable-<measurementId>'] = true`, and the rendered snippet sets it from the flag itself |
+| GA4 | `window['ga-disable-<measurementId>'] = true`, and the rendered snippet sets it from the flag itself; a tag that already ran on the page is also told through consent mode that every storage type is denied |
 
 What an ungated slot can still record, because its snippet ran before the tracker booted:
 
 - **Plausible and Umami** read their key before each event, so their automatic page view for the page the link was opened on may already have been sent. Their key is in `localStorage`, so it is there before their script runs on every later page and they are silent from then on.
 - **PostHog**'s stub queues the opt-out, so its own page view for that first page may be captured before the opt-out is replayed. PostHog persists the opt-out itself, so later loads start opted out.
-- **GA4**'s switch is a window property rather than stored state, so it has to be set on every load, before the first `gtag()` call, which is the only place GA4 honours it. The rendered snippet therefore reads `analytics:exclude` itself, ahead of its own `gtag('config', ...)`, rather than waiting for the tracker. The page the link is opened on may still be measured, because that page's snippet ran before the flag existed; from the next page load on the snippet sets the switch itself and nothing is measured. GA4 defaults to consent `required`, and a gated slot is never loaded while the browser is excluded.
+- **GA4**'s switch is a window property rather than stored state, so it has to be set on every load, before the first `gtag()` call, which is the only place GA4 honours it. The rendered snippet therefore reads `analytics:exclude` itself, ahead of its own `gtag('config', ...)`, rather than waiting for the tracker. The page the link is opened on may still be measured, because that page's snippet ran before the flag existed; from the next page load on the snippet sets the switch itself and nothing is measured. The tracker never injects a GA4 slot `capture.gate` holds while the browser is excluded; one the server opens with the `gate` prop is rendered with the page, and its snippet sets the switch itself.
 
-A vendor key the tracker did not set is never cleared on its own, so a key a staff member set by hand through the vendor's own instructions survives an ordinary visit. An explicit `?analytics_exclude=0` or `exclude(false)` clears the vendor keys even if one was set by hand, which is the cost of off meaning off.
+A page load alone does not clear a vendor key the tracker did not set, so a key a staff member set by hand through the vendor's own instructions survives a visit to a page whose slots do not open. An explicit `exclude(false)` clears the vendor keys of the slots whose [gate](/analytics/consent#the-gate-in-the-browser) is open, even a key set by hand, which is the cost of off meaning off; `?analytics_exclude=0`, which needs no token, does the same only in a browser that was excluded, so a link cannot lift a vendor's opt-out anywhere else. A slot still pending or closed keeps its key either way, since putting a browser back must never opt a vendor in that the consent manager has not opened. Opening a slot's gate clears that vendor's key too, unless the browser is excluded: a refusal on an earlier page may have set it, and nothing else would lift it.
 
 <Callout type="warn">
-**Anyone who knows the link can use it,** so a third party can send `?analytics_exclude=1` to real visitors and drop them from the numbers, one browser at a time. There is no server-side record of who was excluded, so there is nothing to audit either. Rename the parameter, or set `exclusionParam: false` and flip the flag from your own UI, if that matters for your site.
+**Whoever holds a scope's token can exclude any browser that opens the link,** one browser at a time. That is why only readers `access.view` admits get it from the [analytics view](/analytics/analytics-view#your-own-visits), and why the tracker removes it from the address once read. There is no server-side record of who was excluded, so there is nothing to audit either: the flag lives in each browser.
 </Callout>
+
+## Pages that are not counted
+
+Three kinds of page are left out by default, because none of them is a visitor:
+
+| Page | How the tracker knows |
+|---|---|
+| A browser driven by automation: a test runner, a headless crawler | It says so itself, in `navigator.webdriver`. |
+| A page rendered in Next's draft mode, which is how Payload previews a draft | The server says so in the config: `getTrackerConfig`'s `draft`, read from Next's draft mode cookie unless you pass it (see [Next.js](#nextjs)). |
+| A page shown in Payload's live preview | It is shown by a page of the admin: in the admin's frame, or in the window the admin opened, which is where [`@payloadcms/live-preview`](https://payloadcms.com/docs/live-preview/overview) reports to (`window.opener \|\| window.parent`). On the same origin the tracker reads that page's address; across origins it reads the origin the browser names for it (`location.ancestorOrigins` in a frame, the referrer otherwise) and compares it with the admin's. The config names the admin by SHA-256 digests alone, so the comparison takes the browser's `crypto.subtle`; a page shown by another window holds what it would send until that answer is in, a moment at most, and a page without `crypto.subtle` (plain http outside localhost) is counted. |
+
+Such a page sends nothing to any slot and injects no vendor script; a draft page also renders no vendor snippet at all, since the server knows before the page is sent. Its gate still takes the consent manager's answers, so `useAnalytics().gate` reads them as on any other page. A vendor snippet the server rendered for an automated browser or a live preview has already run by then and counts by that vendor's own rules (Plausible, for one, ignores `navigator.webdriver` itself). The [exclusion link](#the-exclusion-link) still leaves the address of a page that is not counted.
+
+`capture.skip` counts any of them again:
+
+```ts
+analytics({
+  adapters: [native()],
+  capture: {
+    gate: 'off',
+    // An end-to-end suite that asserts on what the tracker sends: Playwright, Puppeteer and
+    // Selenium all set navigator.webdriver.
+    skip: { automation: process.env.E2E !== '1' },
+  },
+})
+```
+
+Unknown keys under `capture.skip` fail the boot.
+
+| Key | Default | Counts again when `false` |
+|---|---|---|
+| `automation` | `true` | Browsers that report `navigator.webdriver`. |
+| `previews` | `true` | Draft mode pages and the live preview. |
+
+While `previews` is on the config carries the admin's address (`routes.admin`, on `serverURL`'s origin when that is set), since that is what the live preview is told by, as SHA-256 digests of the origin and the path a page can check its embedder against but never read: no page names the CMS host or its route. That is the config's `admin`, typed `AdminDigest` (`{ origin?, path }`, lowercase hex, exported from `@10x-media/analytics/site` and `/tracker`), and it is absent while `previews` is off. It carries `skip` itself only when one of them is off.
 
 ## Auto-capture
 
 | Toggle | Default | Sends |
 |---|---|---|
-| `goalAttribute` | on | `data-analytics-goal` on click and form submit (see [Goals](/analytics/goals)). |
+| `goalAttribute` | on | `data-analytics-goal`, and `data-analytics-event` with its `data-analytics-prop-*` props, on click and form submit (see [Goals](/analytics/goals) and [Attach goals to your own components](/analytics/integrations)). |
 | `outboundLinks` | on | `outbound_link` with `props.url` for a click on a link to another origin. |
 | `fileDownloads` | on | `file_download` with `props.url` for a link whose extension is a known file type. |
-| `scrollDepth` | **off** | `scroll_depth` with `props.depth` at 25/50/75/100, and the page's deepest position on the pageview. |
-| `query` | on | The page's query string on each pageview, which is where campaign attribution comes from. |
+| `scrollDepth` | **off** | `scroll_depth` with `props.depth` at 25/50/75/100, and how far down each page was scrolled, with its [engagement](/analytics/native#time-on-page-and-scroll-depth). |
+| `query` | on | The campaign keys of the page's query string on each pageview, which is where campaign attribution comes from. |
+| `items` | on | The views of and clicks on [content items](/analytics/items): `item_click` for the first click inside a marked element, and its views with the page's engagement. Only on an install that binds a collection as items, and inert until a page marks an element. |
 
 ```ts
-capture: { autoCapture: { scrollDepth: true, fileDownloads: false } }
+analytics({
+  adapters: [native()],
+  capture: { gate: 'off', autoCapture: { scrollDepth: true, fileDownloads: false } },
+})
 ```
 
-`query` carries `location.search` without its leading `?`, capped at 512 characters, on pageviews only: an event fired later in the page's life would attribute the same visit twice. The [native ingest](/analytics/native#dimensions) reads the five `utm_*` keys and the ad click ids out of it and discards the rest, so the raw query is never stored. Set it false when your URLs carry identifiers you would rather not put on the wire at all:
+`items` takes `false`, or `{ impressions?, clicks?, pages? }` to turn one part off: `impressions` watches marked elements for views, `clicks` sends `item_click`, and `pages` counts an item per page it appeared on beside its total, which is decided at ingest rather than in the browser. A goal or a custom event fired inside a marked element is credited to its item while any of the three is on. [Content items](/analytics/items#turning-it-off) has what each one changes in the reports.
+
+An install that binds no collection with `item: true` hands the tracker `items` off whatever this says, since ingest would drop every ref a page sent: no page then watches for items or looks for one on a click. With items bound, a page watches the document for marked elements as it changes, and the `IntersectionObserver` that measures views, with its scroll, resize and visibility listeners, exists only while the page holds at least one.
+
+`query` carries the campaign keys of `location.search` and nothing else, on a pageview and on the engagement that follows it, never on an event: an event fired later in the page's life would attribute the same visit twice, while an engagement counts no visit and only has to land under the same campaign as its pageview. The tracker picks them out in the browser, matching key names without regard to case: the five `utm_*` keys, each with its first non-empty value trimmed and capped at 128 characters, and the ad click ids (`gclid`, `gbraid`, `wbraid`, `msclkid`, `ttclid`, `fbclid`) by name alone, with `1` in place of the id. The result is written as a query string without a leading `?`, at most 512 characters, and absent when the address holds none of them. The rest of the address never leaves the page, and the [native ingest](/analytics/native#dimensions) stores the values it reads rather than the string. Set it false to send no campaign keys at all:
 
 ```ts
-capture: { autoCapture: { query: false } }
+analytics({
+  adapters: [native()],
+  capture: { gate: 'off', autoCapture: { query: false } },
+})
 ```
 
-That costs the install its `utmSource`, `utmMedium`, `utmCampaign`, `utmContent` and `utmTerm` breakdowns, since nothing else carries them, and leaves the [channel](/analytics/native#traffic-channels) classifier with the referrer alone: no campaign medium, no `utm_source`, no click ids, so a paid visit is classified from its referring host alone: a Google Ads click arriving from `google.com` reads as organic search. The tracker treats an absent key as on, so a config snapshot rendered before this option existed keeps the documented default.
+That costs the install its `utmSource`, `utmMedium`, `utmCampaign`, `utmContent` and `utmTerm` breakdowns, since nothing else carries them, and leaves the [channel](/analytics/native#traffic-channels) classifier with the referrer alone: no campaign medium, no `utm_source`, no click ids, so a paid visit is classified from its referring host alone: a Google Ads click arriving from `google.com` reads as organic search. The tracker treats an absent key as on, so a config snapshot that does not carry the option keeps the documented default.
 
 Listeners are delegated: one `click` and one `submit` handler on `document`, both in the capture phase, so a handler that stops propagation (or a link that navigates away) cannot swallow them first, and the listener set never grows with the DOM. A link that is both outbound and a download reports both.
 
-Scroll thresholds are evaluated on scroll only, never on load or on a route change, so a fresh page cannot inherit the previous one's depth. With `scrollDepth` off, no scroll listener is attached and the pageview carries no `scrollDepth` key at all.
+`props.url` on an outbound or download event is where the link leads, its origin (scheme, host and port) and path, and nothing more: its query string, its fragment and any `user:password@` are left off before the event leaves the page. Signed download links, password reset tokens and session ids travel there, and a destination is still told apart by its path.
 
-Page tracking follows SPA navigation: `history.pushState`/`replaceState` are wrapped and `popstate` is listened for, and a pageview fires only when `location.pathname` actually changed, so a hash change or a same-path replace sends nothing.
+Scroll depth is measured while the page is the one on screen: on scroll, through a passive listener measuring at most once per animation frame, and once the page's first screen has had a second to render, so a page too short to scroll still has a depth. The engagement carries the deepest point measured, never the position when it is sent, which on a single-page app's navigation can already be the next page's layout. Thresholds fire on scroll only, so a page nobody scrolls sends no `scroll_depth` event and a fresh page cannot inherit the previous one's. With `scrollDepth` on, the pageview carries `scrollDepth: 0` to say its depth is being measured, and the depth itself arrives with its engagement; with it off, no scroll listener is attached and neither carries a `scrollDepth` key at all.
+
+Page tracking follows SPA navigation: `history.pushState`/`replaceState` are wrapped and `popstate` is listened for, and a pageview fires only when `location.pathname` actually changed, so a hash change or a same-path replace sends nothing. A page the browser prerenders (`document.prerendering`, Chrome's speculation rules) sends nothing while it is only prerendered: its pageview waits for `prerenderingchange`, then goes out once, for wherever the page is when it is shown, and its time and scroll are measured from that moment. No vendor script is injected and no vendor is called until then either: what a vendor slot is sent meanwhile waits in its queue.
 
 ## React
 
@@ -206,42 +326,49 @@ export const SignupButton = () => {
 }
 ```
 
-The tracker is resolved per call, not per render, so a component that renders before the boot effect runs still works. A call that finds neither a provider nor a booted tracker throws, because a silently dead `track` is worse than a build-time mistake.
+The tracker is resolved per call, not per render, so a component that renders before the boot effect runs still works. A `track`, `trackGoal`, `purchase`, `refund` or `setExcluded` call that finds neither a provider nor a booted tracker throws, because a silently dead `track` is worse than a build-time mistake. `setGate` never throws: before the tracker boots, the answer is kept for it.
 
 Wrap the tree in `<AnalyticsProvider config={tracker}>` when you want the api to come from context instead. Both take a lease on the same per-window tracker, so rendering `AnalyticsScripts` and `AnalyticsProvider` together never double counts, and neither does React StrictMode's double mount.
 
 <Callout type="warn">
-That single tracker is created by whichever component boots first, and only its options stick. `AnalyticsScripts` renders `TrackerBoot` inside itself, and React runs effects bottom-up, so it wins over any provider above it: the provider becomes a later holder of a tracker that already exists, and its `loadScript` is never called.
+That single tracker is created by whichever component boots first, and only its options stick. `AnalyticsScripts` boots it from inside itself, and React runs effects bottom-up, so it wins over any provider above it: the provider becomes a later holder of a tracker that already exists, and its `loadScript` is never called.
 
-`AnalyticsScripts` takes no `loadScript` (it is a server component, and a function prop cannot cross that boundary), so the seam and the RSC path are mutually exclusive. If you need a custom loader, render `<AnalyticsProvider config={tracker} loadScript={...}>` and do not render `AnalyticsScripts`; pass the same server-resolved config, and the provider's tracker injects the slot snippets itself. `nonce` is the exception: both accept it, so the RSC path stays fine under a nonce CSP.
+`AnalyticsScripts` takes no `loadScript` (it is a server component, and a function prop cannot cross that boundary), so a custom loader and `AnalyticsScripts` are mutually exclusive. If you need one, render `<AnalyticsProvider config={tracker} loadScript={...}>` from a client component of your own and do not render `AnalyticsScripts`; pass the same server-resolved config, and the provider's tracker injects the slot snippets itself ([a custom script loader](/analytics/consent#a-custom-script-loader)). `nonce`, `gate` and `snippets` are accepted by both.
 </Callout>
-
-`<TrackerBoot config nonce />` is the bare boot component `AnalyticsScripts` renders after the snippets. Render it directly when your app already emits the vendor snippets itself.
 
 ## Custom events
 
 ```ts
-track('signup', { plan: 'pro' })              // named event with flat props
-trackGoal('book-demo', { value: 500, currency: 'EUR' })
+import { initTracker } from '@10x-media/analytics/tracker'
+
+/** A content item's ref as the server signed it, rendered into the page. */
+declare const offerRef: string
+
+const tracker = await initTracker()
+tracker.track('signup', { plan: 'pro' }) // named event with flat props
+tracker.trackGoal('book-demo', { value: 500, currency: 'EUR' })
+tracker.track('video-play', undefined, { item: offerRef }) // filed under a content item too
 ```
 
-`props` are sanitized at native ingest: flat scalars only (string, finite number, boolean), at most 20 entries, keys up to 64 characters, string values truncated to 256. Anything else is dropped key by key and the event is still stored. Event names are capped at 128 characters, because the name is the `event` dimension's bucket key.
+`useAnalytics()` carries the same calls in React. `track`, `trackGoal` and `purchase` take an `item`, the [content item](/analytics/items) the event belongs to, as the server signed it with `signItemRef` (`offers:12@Xk3Pq9LmZ1aB`). A ref the tracker could not send whole is left off, and native ingest keeps one only for a collection bound as items and only with a valid signature (see [signed refs](/analytics/items#signed-refs)).
+
+`props` are sanitized at native ingest: flat scalars only (string, finite number, boolean), at most 20 entries, keys up to 64 characters, string values truncated to 256. Anything else is dropped key by key and the event is still stored. Event names are capped at 128 characters, because the name is what the `event` dimension groups by.
 
 Both calls fan out to every filled slot. Vendor sinks drop pageviews, because each vendor's own script tracks them.
 
 ## Server-side tracking
 
-Not every event has a browser behind it. `trackServerEvent(payload, event, { req })` records a pageview, an event, or a goal completion from server code (a webhook, a job, a server action) through the native engine's own ingest pipeline, with no HTTP round trip and the same sanitizers this page describes. Pass the request it belongs to and the event inherits that request's attribution, scope, and reporting timezone. See [Track from server code](/analytics/goals#4-track-from-server-code) for the signature and what changes when there is no request.
+Not every event has a browser behind it. `trackServerEvent(payload, event, { req })` records a pageview, an event, or a goal completion from server code (a webhook, a job, a server action) through the native engine's own ingest pipeline, with no HTTP round trip and the same sanitizers this page describes. Pass the request it belongs to and the event inherits that request's scope and reporting timezone. Whose event it is follows `identity`: while `capture.gate` holds a slot the native beacon could fill, the default is `'none'`, no visitor's, since the server cannot know the visitor's answer to your consent manager; with `gate: 'off'` it is `'request'`, the visitor behind the request. Pass `identity: 'request'` where your own code knows the visitor consented ([what the gate does not cover](/analytics/consent#what-the-gate-does-not-cover)). See [Track from server code](/analytics/goals#4-track-from-server-code) for the signature and what changes when there is no request. The event is stored outside any transaction the request holds, so it stays when that transaction rolls back; see [server events and host transactions](/analytics/native#server-events-and-host-transactions).
 
 ## Content Security Policy
 
 Pass your request nonce and every script the tracker renders or injects carries it:
 
-```tsx
+```tsx partial
 <AnalyticsScripts config={tracker} nonce={nonce} />
 ```
 
-PostHog's stub injects `array.js` itself, so it copies the running inline's nonce onto that tag before inserting it; without that, a nonce CSP without `strict-dynamic` would pass the inline and block the bundle. Replace injection entirely (a consent manager, a framework script loader) with the `loadScript` seam on `AnalyticsProvider` or `createTracker`.
+PostHog's stub injects `array.js` itself, so it copies the running inline's nonce onto that tag before inserting it; without that, a nonce CSP without `strict-dynamic` would pass the inline and block the bundle. Replace injection with a framework script loader through `loadScript` on `AnalyticsProvider` or `createTracker`, or leave every vendor script to a consent manager that loads them itself with [`snippets={false}`](/analytics/consent#when-the-manager-loads-the-vendor-scripts-itself).
 
 ## What the tracker sends to native
 
@@ -249,30 +376,97 @@ One JSON object per event, `content-type: application/json`, `POST`ed to the con
 
 ```jsonc
 {
-  "type": "pageview" | "event" | "goal",  // required
-  "name": "signup",        // event name, or the goal slug; absent on a pageview
+  "type": "pageview" | "event" | "goal" | "engagement",  // required
+  "name": "signup",        // event name, or the goal slug; absent on a pageview and an engagement
   "path": "/pricing",      // required
   "hostname": "shop.test", // optional; ingest stores the request's own host, not this
-  "referrer": "https://google.com/",  // absent when empty
-  "query": "utm_source=newsletter",   // pageviews only, no leading '?', capped at 512
+  "referrer": "https://google.com",   // the referrer's origin alone; absent when there is none
+  "query": "utm_source=newsletter",   // a pageview and its engagement: its campaign keys alone, no leading '?', capped at 512
   "props": { "plan": "pro" },
-  "value": 49,             // goals only today
-  "currency": "EUR",       // goals only today
-  "durationMs": 4000,      // pageviews only, added at flush time
-  "scrollDepth": 75        // pageviews only, 0-100, only when scroll capture is on
+  "value": 49,             // a goal or a sale
+  "currency": "EUR",       // a goal or a sale
+  "orderId": "ord_123",    // a sale from purchase(): what keeps it counting once
+  "items": [{ "id": "sku-1", "quantity": 1, "price": 49 }], // a sale's lines
+  "durationMs": 4000,      // engagement only: visible time since the previous one, at most 30 minutes
+  "sinceMs": 95000,        // engagement only: milliseconds since its pageview was sent, at most a day
+  "ageMs": 3000,           // how long the event waited in the page before it was sent, at most a day; absent when it did not wait
+  "nav": 1,                // a pageview a single-page app made in place; absent on the page's first
+  "scrollDepth": 25,       // only with scroll capture on: 0 on a pageview, the increase on an engagement
+  "item": "offers:12@Xk3Pq9LmZ1aB", // an event or a goal: the content item it belongs to, signed
+  "impressions": ["offers:12@Xk3Pq9LmZ1aB"] // engagement only: the items seen since the previous one, at most 50
 }
 ```
 
-Events and goals post immediately. A pageview is buffered so it can carry `durationMs` and the page's deepest scroll, and is sent on the first of: the next navigation, `pagehide`, or 10 seconds. A tab killed without firing `pagehide` loses that one pageview rather than only its duration.
+A pageview posts as the page is tracked, and an event or a goal as it fires; nothing is held back to wait for a duration. Time on the page, scroll and the [content items](/analytics/items#what-counts-as-a-view) seen come afterwards, as an `engagement` repeating its pageview's path, referrer and query: one is sent when the tab is hidden, when the page is left (`pagehide`), and before the next pageview of a single-page app, carrying what was added since the previous one, and none is sent when nothing is new (under a second of visible time, no deeper scroll and no item seen). One is also sent early once 50 items are waiting, which is all one message carries. A page restored from the back/forward cache carries on measuring the same pageview. Every engagement carries `sinceMs`, how long ago its pageview was sent by the page's own steady clock rather than its date, so ingest files its time on that pageview's day even when it is sent after midnight or the visitor's clock is wrong, and none carries more than 30 minutes of time: a tab left in front longer than that between two messages counts 30 minutes for that stretch.
 
-The tracker still sends `hostname`, and native ingest still ignores it: the stored value is the host the request carried, so a hand-rolled body cannot open a hostname bucket of its own. A [`hostname` resolver](/analytics/native#a-resolver) receives what the body sent as `claimed`, which is the one place it is readable. [Where the hostname comes from](/analytics/native#where-the-hostname-comes-from) has the rule and the two options that change it.
+A message that could not be sent at once carries `ageMs`: how long it waited in the page, by the same steady clock, capped at a day. It waits in a pending [gate](/analytics/consent)'s queue, on a page that is only prerendered, or while the boot checks an exclusion link or the live preview. Ingest dates the event that much earlier, an engagement by its `sinceMs` as well. It ignores either value past a day and moves no event back more than a day in all, so a pageview held until the consent manager answered is dated when it was viewed rather than when consent came, and its engagement is filed at its start. [Time on page and scroll depth](/analytics/native#time-on-page-and-scroll-depth) has how ingest counts them.
+
+Every pageview after the tracker's first on a page carries `nav: 1`: a single-page app moves between pages without loading one, so the `referrer` of its later pageviews is still the one the page was loaded with, and the mark says so. A page loaded again, by a link or a reload, starts over without it.
+
+An engagement goes through the same [gate](/analytics/consent) and exclusion as every other message, and only to native: a vendor slot never receives one, because each vendor measures time on page itself. For the same reason an engagement waits in a pending slot's queue only on a native slot: a vendor slot would drop it on delivery, and held in the bounded queue it would only take the place of an event that vendor counts. The items seen on a page are never queued: items are watched only while a native slot's gate is open, and an engagement held for another native slot leaves them behind. The item's display name, `data-analytics-item-name`, goes to the vendor slots and never on the native wire. `tracker.flush()` sends the open page's engagement right away, and `destroy()` sends it before detaching.
+
+The tracker still sends `hostname`, and native ingest still ignores it: the stored value is the host the request carried, so a hand-rolled body cannot add a hostname of its own. A [`hostname` resolver](/analytics/native#a-resolver) receives what the body sent as `claimed`, which is the one place it is readable. [Where the hostname comes from](/analytics/native#where-the-hostname-comes-from) has the rule and the two options that change it.
+
+## Taking beacons in a route of your own
+
+Payload's REST routing signs every request in before its handler runs, so each beacon to the [ingest endpoint](/analytics/native#the-ingest-endpoint) pays for auth strategies a visitor never needs. `ingestRoute` from `@10x-media/analytics/next` takes the same beacons in a Next.js route handler of your own, outside that routing:
+
+```ts title="app/(analytics)/api/collect/route.ts"
+import config from '@payload-config'
+import { ingestRoute } from '@10x-media/analytics/next'
+
+export const POST = ingestRoute(config)
+```
+
+```ts title="payload.config.ts"
+analytics({ adapters: [native({ ingestPath: '/collect' })], capture: { gate: 'all' } })
+```
+
+`ingestPath` moves the endpoint, and the tracker config with it, so the browser posts to `/api/collect`, where this route answers before Payload's catch-all route does. The default path, `/api/_x/e`, cannot be mounted as it is: Next treats a folder whose name starts with `_` as private and routes nothing under it. Mount that one as `app/(analytics)/api/%5Fx/e/route.ts`, or move the path as above.
+
+Every rule of the endpoint holds: bot filtering, the cross-site check, validation, the hostname and scope rules, grants, goals and money, and the rows it stores are the ones the endpoint stores for the same beacon. The install's resolvers see the request as they see any capture, without a signed-in user, cookies or an authorization header. The Payload instance comes from `getPayload`, built once per process. An install without the native adapter answers `404`. Pass `key` when the app keeps its instance under a `getPayload` cache key of its own:
+
+```ts
+export const POST = ingestRoute(config, { key: 'site' })
+```
+
+A beacon the route could not take answers `500`, and the log says so at most once a minute, with how many failed since. This is the option for a site taking many beacons a second; a site that is not has nothing to gain from it.
+
+A page on another site that [`capture.allowedOrigins`](#beacons-from-other-sites) lists posts JSON, so its browser asks first with an `OPTIONS` request. Answer it from the same route with `ingestPreflight`, which allows exactly the listed origins:
+
+```ts title="app/(analytics)/api/collect/route.ts"
+import config from '@payload-config'
+import { ingestPreflight, ingestRoute } from '@10x-media/analytics/next'
+
+export const POST = ingestRoute(config)
+export const OPTIONS = ingestPreflight(config)
+```
 
 ## Trusted proxies
 
 The client address behind a beacon (the visitor hash, [geo](/analytics/geo), and the address the [capture proxy](/analytics/proxy#runtime-endpoint) forwards upstream) comes from `x-forwarded-for`, and `trustedProxyHops` on `analytics()` decides which entry:
 
 ```ts
-analytics({ adapters: [native()], trustedProxyHops: 1 })
+analytics({ adapters: [native()], capture: { gate: 'all' }, trustedProxyHops: 1 })
 ```
 
 Unset reads the leftmost entry, which honest traffic gets right and a client can otherwise write. `n` reads the entry `n` from the right, the address the outermost trusted proxy saw, and a chain shorter than `n` yields no address rather than falling back to the client-writable `x-real-ip`. It also lets native ingest read `x-forwarded-host` for the event's hostname. `1` is not the default: an install behind a CDN plus a proxy would then read the CDN's address for every visitor. Details in [Trusted proxies](/analytics/proxy#trusted-proxies).
+
+On Vercel or behind Cloudflare, set [`trustedPlatform`](/analytics/geo#which-headers-to-trust) instead: the address and the location then come from the headers the platform's edge writes, and no platform header is read without it. The two options cannot be set together.
+
+## Beacons from other sites
+
+The ingest endpoint and the capture proxy's `POST` routes refuse what a page on another site makes a visitor's browser send. A browser marks every request with `Sec-Fetch-Site`, and one sent from another site's page says `cross-site`; such a request is dropped unless its `Origin` is listed in `capture.allowedOrigins`:
+
+```ts
+analytics({
+  adapters: [native()],
+  capture: { gate: 'off', allowedOrigins: ['https://shop.example.com'] },
+})
+```
+
+Each entry is one exact origin: a scheme and a host with an optional port, no path and no wildcard, compared the way a browser writes `Origin`. The boot fails on anything else. `same-origin` and `none` pass, and so does a request without the header, which is what an older browser or anything that is not a browser sends. `same-site`, a sibling subdomain of the same site, passes too, except on a scoped install where `scope.resolve` maps its `Origin` host to another scope than the request's: a tenant's pages cannot count into a sibling tenant, so ingest drops such a beacon and the capture proxy's `tenant` slot refuses it. An `Origin` no scope answers for passes.
+
+A listed site's pages post JSON to another origin, so their browser asks first with an `OPTIONS` request. At Payload's own ingest endpoint, Payload answers it from its [`cors`](https://payloadcms.com/docs/configuration/overview#cors) option, which therefore lists the same origins; a route of your own answers it with [`ingestPreflight`](#taking-beacons-in-a-route-of-your-own).
+
+A refused beacon still answers `202`, as every beacon ingest drops does, and the first one of each kind logs a single warning (naming `capture.allowedOrigins` for another site's). The proxy answers `403` without a body, like its other refusals. This stops another site from counting its visitors as yours or relaying them through your vendor accounts. A script that writes its own requests sets these headers itself, so it is not what this check stops.

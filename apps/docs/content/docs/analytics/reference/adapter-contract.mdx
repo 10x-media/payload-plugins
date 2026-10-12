@@ -1,0 +1,247 @@
+---
+title: Adapter contract
+description: What every adapter declares and answers, which is what the built-in ones do and what an adapter of your own implements.
+---
+
+Everything in the plugin reads through one interface, `AnalyticsAdapter` from `@10x-media/analytics/types`. An adapter answers queries (pageviews for `/blog/post-1` over the last 30 days) and declares what it can answer; the plugin never asks it for more. The [native engine](/analytics/native) and the [vendor adapters](/analytics/providers) implement the same contract, which is why every surface works with any of them.
+
+## The adapter
+
+| Member | What it is |
+|---|---|
+| `id` | A stable id fields and widgets name it by: `native`, `plausible`, `umami`, `ga4`, `posthog` for the built-ins. An adapter built from a [provider document](/analytics/providers#provider-documents) takes `<provider>:<docId>`. |
+| `label` | The name the data source pickers show. |
+| `capabilities` | What it serves: [below](#the-capabilities-model). |
+| `capture` | Optional. What the browser needs to capture through it: [capture support](#capture-support). Declared only when the public capture config it needs is set. |
+| `ingest` | Optional, server side only. Where an adapter's own ingest endpoint listens, relative to `routes.api`, and how server code reaches the same pipeline. The native engine sets it; it is never sent to a browser. |
+| `isConfigured()` | False when its credentials are missing. An unconfigured source answers every read with empty rows and makes no network call. |
+| `query(query, ctx)` | Answers a read: rows, totals and `meta`. |
+| `realtime(query, ctx)` | Optional. Answers the live reads the realtime widget, the view's realtime strip and the document panel's counter poll. |
+| `register(config, context)` | Optional. Runs once while the plugin builds the Payload config: [lifecycle](#lifecycle). |
+| `registerSchema(config, context)` | Optional. Runs in place of `register` while the plugin is [switched off](/analytics/reference/options#switching-it-off). |
+| `attach(payload)` | Optional. Binds the adapter to each Payload instance a runtime is built for. |
+| `close(payload)` | Optional. Releases what the adapter holds for one instance. |
+
+## The capabilities model
+
+Each adapter declares an `AnalyticsCapabilities` object. The plugin trusts it: a surface offers only what the selected source declares, and the [query endpoint](/analytics/reference/endpoints#query-endpoint) refuses the rest before the adapter sees it.
+
+| Field | What it declares |
+|---|---|
+| `metrics` | The [metric keys](#metrics) it serves. |
+| `dimensions` | The [dimension keys](#dimensions) it can break down by. |
+| `metricReach` | Where a metric is read when it cannot be read under every dimension: [below](#metric-reach). |
+| `filters` | The `AnalyticsQuery.filters` it applies: a map from each filterable dimension to the operators it takes (`eq`, `contains`, `matches`). Absent: no filter at all. |
+| `realtime`, `realtimeWindowMinutes` | Whether it answers `realtime()`, and over how many minutes. |
+| `minGranularity` | The finest series bucket it returns: `minute`, `hour`, `day`, `week` or `month`. |
+| `calendarBuckets` | It answers `week` and `month` series itself. Without it the engine reads days and folds them. |
+| `maxLookbackDays` | How far back it reads, `null` for no limit. A longer range is narrowed to it and the read says so. |
+| `filterLookbackDays` | How far back a filtered read reaches, when that is shorter than `maxLookbackDays`. |
+| `comparison` | Optional, `true` unless set. The previous-window read is the engine's own and works against any source; `false` opts a source out. |
+| `perItemQuery` | It answers `AnalyticsQuery.item`, one [content item](/analytics/items)'s numbers. |
+| `semantics` | What its numbers mean where sources differ: `visitors` is `distinct` (each person once over a range) or `sumOfDaily` (each day's visitors added up), and `sessions` is `inactivity30m` (the plugin's 30-minute rule) or `provider` (the vendor's own). |
+| `rateLimit` | The vendor's limits, which the source's [lane](/analytics/cache#reaching-the-sources) keeps to: `requestsPerMinute`, `requestsPerHour`, `maxConcurrent`, `readsCountAsUsage`. `null` for none. |
+| `recommendedTtl` | Seconds a cached answer stays fresh, `{ realtime, aggregate }`, unless [`cache.ttl`](/analytics/cache#ttls) says otherwise. An optional `today` caps an answer whose window reaches into the current day whatever `cache.ttl` says, and such an answer is read again rather than served stale: for a source cheap to read again, as native is (10 seconds). |
+| `scopedQueries` | It applies `AnalyticsQuery.scope` itself (native's scope column, PostHog's `scopeProperty`). Without it a tenant read through a shared adapter is install-wide, so it is gated by [`access.crossScope.unscopedSource`](/analytics/multi-tenancy#4-who-sees-what). |
+| `upstreamAware` | It sends every vendor request through `ctx.upstream`: [requests to the vendor](#requests-to-the-vendor). |
+
+The sources endpoint serializes a subset of these for the browser, `SerializedCapabilities`: `metrics`, `dimensions`, `filters`, `metricReach`, `realtime`, `realtimeWindowMinutes`, `perItemQuery`, `comparison`, `minGranularity` and `maxLookbackDays`. Credentials, rate limits and TTLs never leave the server.
+
+### Metric reach
+
+`metricReach` says where a metric is read when a source cannot read it under every dimension it declares. Each entry is `{ dimensions?, requires? }`: `dimensions` lists the breakdowns the metric is read under (an empty list means whole-site numbers and series only), and `requires` names a dimension the read must break down or filter by for the metric to have a value at all, where a read of one page (`AnalyticsQuery.path`) counts as filtering by `page`. A metric left out is read under every dimension.
+
+```ts
+import type { AnalyticsCapabilities } from '@10x-media/analytics/types'
+
+export const reach: AnalyticsCapabilities['metricReach'] = {
+  bounceRate: { dimensions: ['page', 'country', 'device'] }, // not under `event` or `goal`
+  scrollDepth: { requires: 'page' }, // by page, filtered by page, or for one page
+}
+```
+
+The query endpoint refuses a read outside a metric's reach with `unsupported_metric`, and the view, the widget pickers and the display fields leave the metric out there instead of showing an empty column. A saved widget asking for it shows that it is not available for its data source.
+
+### Weeks and months
+
+A source answers series by `minute`, `hour` or `day`. A read by `week` or `month` is read by day and folded by the engine in the read's reporting timezone: counts add up, and each average is weighted by its row's `samples` or, without them, by its matching count in the row (pageviews for `avgDuration` and `scrollDepth`, visits for `bounceRate` and `visitDuration`). Visitors add up too, so such a read carries `meta.visitorsAre: 'sumOfDaily'`. A source that answers weeks and months itself declares `calendarBuckets: true`.
+
+### What the capabilities gate
+
+- A [dashboard widget](/analytics/widgets) whose metric or dimension no configured adapter supports is not registered at all. An install with runtime providers registers every widget and degrades per request instead.
+- A [display field](/analytics/display-fields) drops unsupported metrics from its request and renders the rest.
+- A metric outside its `metricReach` for a breakdown is left out of that breakdown's columns and pickers.
+- A filter whose dimension and operator the source does not list is refused before the read; a widget shows that the source cannot apply the filter.
+- A custom range that exceeds `maxLookbackDays` is narrowed to it, visibly.
+
+## Metrics
+
+`MetricKey` is `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate`, `avgDuration`, `visitDuration`, `scrollDepth`, `events`, `conversions`, `revenue`, `impressions` and `interactions`. Each means one thing on every source, and a source that cannot measure it does not declare it:
+
+- `avgDuration` is time on page: engaged time per pageview, an average in milliseconds over the pageviews read.
+- `visitDuration` is time per visit: engaged time per visit, an average in milliseconds over the visits read.
+- `visits` and `sessions` are one count. A source serving both answers the same number for each, and the admin shows it once, as **Visits**; an adapter of your own that answers them as two different numbers loses `visits` there.
+- `bounceRate` is a percentage of visits; `scrollDepth` a percentage of the page's height.
+- `conversions` and `revenue` count this install's [goals](/analytics/goals), never whatever the vendor counts install-wide.
+- `impressions` and `interactions` are a [content item](/analytics/items)'s views and clicks.
+
+[Concepts](/analytics/concepts#what-the-numbers-mean) says what each one means to a reader.
+
+A row's `metrics` map each key to a `MetricValue`, `number | null`. `null` is an average or a share with nothing to average over: `avgDuration` with no pageviews, `visitDuration` with no visits, `scrollDepth` that no pageview reported, `bounceRate` with no sessions. That is no data, which every surface shows as a dash and never compares, where a `0` would read as a measured zero-second visit. The vendor adapters keep a vendor's own `null`, or a value it left out, apart from `0` the same way: an average stays `null`, and only a count with no value reads `0`. An adapter of your own answers those the same way; a count is never `null`.
+
+A row may carry `samples`, how many observations each average was taken over (sessions behind a bounce rate, pageviews behind an average time), which is what folds days into weeks exactly.
+
+## Dimensions
+
+`DIMENSION_KEYS` lists every dimension the contract defines: `page`, `referrer`, `source`, `channel`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event`, `goal`, `currency` and `item`. No adapter serves all of them; the capabilities exist so that never matters. `source` is the visit's named origin and `channel` its acquisition channel on every adapter that serves them ([`source` and `channel`](/analytics/providers#source-and-channel)).
+
+A read asking for the `goal` dimension or the `conversions` metric also carries `query.goalSlugs`, the scope's goal slugs, which is `'unresolved'` when resolving them failed. A provider adapter restricts its goal rows to them, sets `meta.goalsUnresolved` when it was given no slugs to restrict by, and answers empty rows unflagged when the scope configured no goals.
+
+## Filters
+
+`AnalyticsQuery.filters` narrows a read to rows matching one or more `{ dimension, operator, value }` entries. List in `capabilities.filters` only the dimension and operator pairs you apply: the engine refuses a read carrying any other pair before your adapter sees it, rather than letting it answer unfiltered numbers that would read as filtered. Leave `filters` out for an adapter that applies none. `FILTER_OPERATORS` lists the three operators; each source's own semantics for them are on [Providers](/analytics/providers#filters).
+
+A source that cannot carry a filter it declared (an API taking one value per parameter) lists what it dropped in `meta.unappliedFilters`, so a surface can say the rows are wider than it asked for.
+
+## Results
+
+`query()` answers an `AnalyticsResult`: `rows` (each with `dimensions`, `metrics`, an optional `timestamp` for a series bucket and optional `samples`), optional `totals`, and `meta`. `meta.provider` and `meta.fetchedAt` are required.
+
+`meta.fetchedAt` is when the source was read, as an ISO instant: stamp it from `ctx.now()`, the plugin's clock, falling back to `new Date()` outside the engine. It is never the range's end. The engine replaces a `fetchedAt` later than the moment it got the answer, or one it cannot read, with that moment, and a cached answer keeps the stamp it was stored with. An adapter sets these when they apply:
+
+| `meta` | When |
+|---|---|
+| `currency` | The vendor says what its revenue is in. The endpoints fill in the install's reporting currency only when an adapter names none. |
+| `sampled` | The vendor counted from a sample, so the numbers are estimates. |
+| `clamped`, `dataFrom`, `dataTo` | The read covers less than the range asked for: it starts later (`dataFrom`, the instant it starts at) or ends earlier (`dataTo`, the instant it ends at). |
+| `visitorsAre` | How `visitors` were counted: `distinct` or `sumOfDaily`. |
+| `unappliedFilters` | Filters it could not carry. |
+| `goalsUnresolved` | The goal numbers are absent because resolving them failed. |
+
+The read engine sets `stale`, `asOf` and `sourceError` on a cached answer; the native engine sets `partial`, `capped`, `failed`, `timezoneUnresolved` and `mixedCurrencies`, and `asOf` when a snapshot answered. [The query endpoint](/analytics/reference/endpoints#response) says what each means. `failed` counts the days whose counting failed again and again until the engine gave up: each is read from an earlier count when it had one, and left out otherwise. The read engine also sets `clamped` and `dataFrom` itself when it narrows a range to the source's `maxLookbackDays`, and narrows a source with no lookback to 1970. The native engine sets `clamped` at either end for a day the range cuts partway once retention has deleted its raw hits: a cut day with no hits is left out silently, and one with hits is left out with `dataFrom` or `dataTo` ([Dates and the reporting timezone](/analytics/reference/endpoints#dates-and-the-reporting-timezone)).
+
+A breakdown may ignore `limit` and `order`: the engine ranks and cuts what an adapter answers before caching it. A breakdown read with a `limit` and no `order` reaches the adapter with `order` set to its first metric, descending, so an adapter that honors `limit` hands over the top rows the engine ranks by.
+
+## Writing your own adapter
+
+Implement `AnalyticsAdapter` from `@10x-media/analytics/types`: an `id`, a `label`, honest `capabilities`, `isConfigured()`, and `query(query, ctx)` returning rows and totals. Optional extras are `realtime(query, ctx)` and the lifecycle hooks below. Declare only capabilities you actually serve.
+
+`ctx` is an `AdapterContext`:
+
+| Field | What it is |
+|---|---|
+| `signal` | Aborts a read past its deadline. Pass it to every request. |
+| `payload` | The Payload instance the read is for, for an adapter that keeps its data in Payload's database. |
+| `upstream` | Sends one vendor request through the source's lane: [below](#requests-to-the-vendor). Absent outside the engine. |
+| `remainingMs` | The milliseconds the read has left, for an SDK that takes a deadline rather than a signal. Absent outside the engine. |
+| `now` | What time it is by the plugin's clock (Payload's), which `meta.fetchedAt` is stamped from. Absent outside the engine. |
+
+### Lifecycle
+
+| Hook | When it runs | What it is for |
+|---|---|---|
+| `register(config, context)` | once, while the plugin builds the Payload config | adding collections, endpoints or jobs (the native engine uses it) |
+| `registerSchema(config, context)` | once, in place of `register`, while a plugin [switched off](/analytics/reference/options#switching-it-off) with `disabled: true` builds the config | adding exactly the collections, fields, indexes and task names `register` adds, and nothing that runs (no endpoint, hook or task work), so a switched-off install keeps the adapter's tables and rows. `context.jobs` says whether a task's name belongs in the jobs enum. An adapter that adds collections in `register` and leaves this out loses them while the plugin is off: a push or a generated migration drops them |
+| `attach(payload)` | each time a runtime is built for a Payload instance, with or without `onInit`, again after every config reload | binding to that instance; it must be safe to call twice for the same one |
+| `close(payload)` | once per instance it was attached to (its [lane](/analytics/cache#reaching-the-sources) and breakers go with the adapter object, so a rebuilt adapter starts fresh): when a replaced runtime is retired, after a short grace period, unless the new runtime still uses the adapter, and at once when `payload.destroy()` is called, before Payload closes its database. An adapter built from a [provider document](/analytics/providers#how-a-document-becomes-an-adapter) is also closed once that document changes, goes away or sits unused for five minutes, after any read through it has finished | releasing what the adapter holds for that instance: buffers, clients, timers. It may still write, since the database is open; a failure is logged and the shutdown goes on |
+
+### The register context
+
+`register` receives an `AdapterRegisterContext`, the plugin's own settings for an adapter to follow rather than read twice:
+
+| Field | What it is |
+|---|---|
+| `scoped` | Whether the install sets `scope.resolve`. |
+| `resolveScope(req)` | The install's scope resolver at the `capture` call site, for stamping a hit. |
+| `resolveTimezone(req, scope?)` | The reporting timezone, `'UTC'` when none is set or the resolver fails. |
+| `resolveTimezoneStrict(req, scope?)` | The same, thrown rather than read in UTC on failure, for an adapter that stores days counted in it. |
+| `revenue` | `{ enabled, dimension, currency(req, scope?), convert?, browserAmounts?, orderSignature? }`: whether the install measures money, and how. `currency` answers `revenue.currency`, `undefined` when none is set; `convert` is `revenue.convert`, for an adapter that reconciles revenue at ingest. |
+| `resolveGoals(req, scope?)` | The install's goals for a scope, the collection merged in. |
+| `adapterGrantedForScope(req, scope, adapterId)` | Present only on a scoped install running the providers collection: whether one scope's provider documents grant it this adapter. |
+| `trustedProxyHops`, `trustedPlatform` | How to read a request's client address. |
+| `allowedOrigins` | `capture.allowedOrigins`, for an adapter that registers a public `POST` endpoint. |
+| `items` | The collections bound as content items, and whether items count per page. |
+| `routes` | The plugin's mounts under `routes.api` (`ingest`, `proxy`, `config` and the rest, under [`routes.base`](/analytics/reference/endpoints#where-the-endpoints-answer)), so an endpoint an adapter registers can sit beside them. |
+| `sdks` | The packages the host passed as [`sdks`](/analytics/providers#ga4), for an adapter that would otherwise load one by name and miss it in a standalone build. |
+| `jobs`, `jobsConcurrency` | The queue and schedule of a task the adapter registers, or `false` when the install registers none; and whether a task may carry a concurrency key. |
+| `notice(message)` | Says something at init, once the instance can log. |
+
+`registerSchema` receives an `AdapterSchemaContext`, `{ jobs, notice? }`.
+
+### Requests to the vendor
+
+The engine sends each read through the source's [lane](/analytics/cache#reaching-the-sources), which keeps to `capabilities.rateLimit`, bounds how many requests are out at once, retries outages, and stops asking a source that keeps failing for a while, through a [circuit breaker](/analytics/cache#circuit-breaker) per scope. By default a whole `query` call counts as one request. An adapter that makes several vendor requests per read declares `capabilities.upstreamAware: true` and sends each one through `ctx.upstream`, so each spends its own token and slot and a failed one is retried alone:
+
+```ts
+import type { AdapterContext, AnalyticsQuery, AnalyticsResult } from '@10x-media/analytics/types'
+
+declare function fetchTotals(query: AnalyticsQuery, signal?: AbortSignal): Promise<AnalyticsResult>
+declare function fetchSeries(query: AnalyticsQuery, signal?: AbortSignal): Promise<AnalyticsResult>
+
+export async function query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
+  const send = <T,>(fn: (signal?: AbortSignal) => Promise<T>) =>
+    ctx.upstream ? ctx.upstream(fn) : fn(ctx.signal)
+  const [totals, series] = await Promise.all([
+    send((signal) => fetchTotals(query, signal)),
+    send((signal) => fetchSeries(query, signal)),
+  ])
+  return { rows: series.rows, totals: totals.totals, meta: totals.meta }
+}
+```
+
+`ctx.upstream` is absent when something other than the engine calls the adapter (a test, a script), hence the fallback. Pass the `signal` it hands you to the request, so a read that gives up stops it. An SDK that takes a deadline instead of a signal reads `ctx.remainingMs()`.
+
+A request that ignores its `signal` and never settles would hold its lane slot for good, so five seconds after its read gave up its slot goes back, it counts against the breaker as a timeout, and the log says so once per source. Pass the signal to every request you send.
+
+### Errors
+
+What an adapter throws decides how the read fails, so throw what the vendor said:
+
+| Throw | Read as |
+|---|---|
+| an error with a numeric `status` (an HTTP status) | `400`, `413`, `414`, `422` and `431`: `invalid_param`, the query refused as asked. `408`, `429` and `5xx`: `unavailable`, retried. Any other `4xx`: `source_misconfigured`, which opens the source's breaker for that scope at once, so it is not asked again for a while |
+| the same with `retryAfterMs`, the vendor's `Retry-After` in milliseconds | pauses the source's lane that long (at most ten minutes) |
+| an error with a numeric gRPC `code` | `3` (invalid argument): `invalid_param`. `5`, `7`, `16` (not found, permission denied, unauthenticated): `source_misconfigured`. `1` and `4` (cancelled, deadline exceeded): `unavailable` as a timeout, not retried. `8` (resource exhausted): `unavailable` as a spent quota, not retried. Anything else: `unavailable`, retried |
+| an error named `AbortError`, `TimeoutError` or `ReadTimeoutError` | `unavailable` as a timeout, not retried |
+| a MongoDB, node-postgres or libsql driver error | read by its own code: a regular expression the database refuses, `invalid_param` naming `filters`; a statement it refuses as written, `invalid_param`; a statement timeout, `unavailable` as a timeout; a missing table or column, or a refused privilege, `source_misconfigured`; anything else, `unavailable`, retried |
+| anything else | `unavailable`, retried |
+
+`ProviderHttpError` and `parseRetryAfter`, both from `@10x-media/analytics`, are what the built-in adapters throw with: `new ProviderHttpError(status, adapterId, { message, retryAfterMs })` carries a status and the vendor's wait, and `parseRetryAfter(response.headers.get('retry-after'))` reads a `Retry-After` in seconds or as an HTTP date into milliseconds, capped at ten minutes.
+
+[The error codes](/analytics/reference/endpoints#the-codes) say what each one answers.
+
+### Capture support
+
+An adapter that can capture declares `capture`, a `CaptureSupport`: `client` (what the browser tracker boots for it, with its `kind`), `snippet({ path, scope })` (the scripts the page renders or injects, pointed at the slot's mount), and `proxy` (the routes the [first-party proxy](/analytics/proxy) forwards). Read credentials are never part of it; only what the browser is allowed to see.
+
+`proxy.routes` lists each forwarded route as `{ source, upstream, kind }`. `kind` is required and decides how the [runtime proxy](/analytics/proxy#runtime-endpoint) serves the answer: `'script'` for anything the browser runs, always served as JavaScript, and `'data'` for everything else, kept as JSON or plain text, sandboxed and never cached. `proxy.forwardHeaders` names extra request headers to pass on (never cookies or authorization), `proxy.trailingSlashes` keeps a request's trailing slash upstream, and `proxy.fetch` is what the proxy reaches the vendor with.
+
+Declare `capture` only when the public capture config it needs is present: an adapter configured for reads alone declares none, fills no [capture slot](/analytics/capture#capture-slots) and contributes no proxy route.
+
+## Testing: memoryAdapter
+
+```ts
+import { memoryAdapter } from '@10x-media/analytics/testing'
+
+const adapter = memoryAdapter()
+adapter.record({ path: '/a', timestamp: new Date(), visitor: 'v1' })
+// ...assert against widgets and fields; adapter.reset() between tests
+```
+
+A deterministic in-memory adapter for tests and local development. It serves `pageviews`, `visitors`, `visits`, `sessions`, `bounceRate` and `avgDuration` by `page`, `referrer`, `country` and `device`, realtime over five minutes, and filters `page` with `eq`. `@10x-media/analytics/testing` also exports the contract types, so a test of your own adapter imports everything from one entry.
+
+### Waiting for background work
+
+The plugin does some of its work after a call has answered: it stores cached reads, runs the native engine's upkeep, and buffers hits when [write batching](/analytics/native#write-batching-opt-in) is on. A test that reads back what it just tracked, or destroys Payload, waits for that first with `settleAnalytics`, which flushes the write buffer too:
+
+```ts
+import { trackServerEvent } from '@10x-media/analytics'
+import { settleAnalytics } from '@10x-media/analytics/testing'
+import type { Payload } from 'payload'
+
+export const trackThenRead = async (payload: Payload) => {
+  await trackServerEvent(payload, { type: 'pageview', path: '/pricing', hostname: 'example.com' })
+  await settleAnalytics(payload)
+  return payload.count({ collection: 'analytics-hits' })
+}
+```

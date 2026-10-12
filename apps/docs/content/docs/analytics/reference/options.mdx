@@ -1,0 +1,330 @@
+---
+title: Options
+description: Every option of analytics(), with its type, its default and what it does.
+---
+
+`analytics()` takes one object, `AnalyticsPluginOptions` (also exported as `PluginOptions`). Every path below is checked when the plugin builds the Payload config: a value of the wrong shape, a key no table lists at any level, an id that names no adapter, or a combination the plugin cannot honor fails the boot with a message naming the path. An option an earlier release took and this one no longer does fails the boot too, naming its replacement ([Removed options](/analytics/upgrading#removed-options)).
+
+The [native engine](/analytics/native#options) and each [provider](/analytics/providers) take options of their own, as arguments of `native()`, `plausible()` and the rest.
+
+```ts title="payload.config.ts"
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+export const plugin = analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  collections: { pages: { path: (doc) => (typeof doc.slug === 'string' ? `/${doc.slug}` : null) } },
+  revenue: { currency: 'EUR' },
+  trustedPlatform: 'vercel',
+})
+```
+
+## Top level
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `adapters` | `AnalyticsAdapter[]` | required | The [config adapters](/analytics/concepts#sources-and-adapters). At least one, unless `disabled` is set, and no two with the same `id`. |
+| `defaultAdapter` | `string` | the first adapter | The source a read uses when it names none. Must be an id in `adapters`. |
+| `platformAdapter` | `string` | none | The id of one config adapter shared by every scope: the platform's own analytics. It fills the [global capture slot](/analytics/capture#capture-slots) unless `capture.slots.global` says otherwise. Must be an id in `adapters`. |
+| `disabled` | `boolean` | `false` | Switches the plugin off and keeps its database schema: [below](#switching-it-off). |
+| `translations` | `TranslationsOption` | none | Per-language overrides of the admin strings, keyed by the typed keys of `@10x-media/analytics/i18n` ([Translations](/analytics/reference/translations)). A key that is not one of the plugin's own fails the boot. |
+| `reportingTimezone` | `string \| TimezoneResolver` | `'UTC'` | The zone days are cut in ([Reporting timezone](/analytics/timezone)). A string `Intl.DateTimeFormat` does not accept as a time zone fails the boot. A resolver answers per scope, also at ingest, and `null` means UTC. |
+| `trustedProxyHops` | `number` | none: the leftmost `x-forwarded-for` entry | How many proxies in front of the app to trust, counted from the right of `x-forwarded-for`, when reading a visitor's address; also lets native ingest read `x-forwarded-host` ([Trusted proxies](/analytics/proxy#trusted-proxies)). A non-negative whole number. Cannot be set with `trustedPlatform`. |
+| `trustedPlatform` | `'vercel' \| 'cloudflare'` | none: no platform header is read | The platform whose edge headers carry the visitor's address and location ([Geo](/analytics/geo#which-headers-to-trust)). Cannot be set with `trustedProxyHops`. |
+| `sdks` | `AnalyticsSdks` | `{}` | Optional packages handed in, so a standalone or serverless build ships them. A production boot warns about one it would load by name. |
+| `sdks.ga4` | `{ BetaAnalyticsDataClient }` from `@google-analytics/data` | none | The GA4 Data API client for every GA4 source ([GA4](/analytics/providers#ga4)). |
+| `sdks.maxmind` | `{ open }` from `maxmind` | none | The MaxMind reader for `native({ geoDbPath })` and `maxmindResolver` ([Geo](/analytics/geo#maxmind-optional)). |
+| `routes` | `{ base? }` | | Where the endpoints answer. |
+| `routes.base` | `` `/${string}` `` | `'/_x'` | The path every endpoint the plugin registers hangs off, under Payload's `routes.api` ([Where the endpoints answer](/analytics/reference/endpoints#where-the-endpoints-answer)). |
+| `hooks` | `{ afterRead? }` | | Hooks into what the plugin does. |
+| `hooks.afterRead` | `AfterReadHook` | none | Runs once for every read answered to a reader, after it is cached, with `{ adapterId, query, result, from, durationMs, payload }`; return a result to answer that one read differently ([Observing reads](/analytics/cache#observing-reads)). |
+
+## `scope`
+
+Tenancy: how a request maps to its [scope](/analytics/concepts#scope). Unset, the install is one scope. [Multi-tenancy](/analytics/multi-tenancy) has the recipe.
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `scope.resolve` | `({ req, callSite }) => string \| null` | required in `scope` | Which scope a request is for. `callSite` is `'capture'` (a visitor's hit, asked without the user, cookies or authorization header) or `'admin'`. `null` is the whole install; answering `'*'` is refused. |
+| `scope.member` | `({ req, scope }) => boolean` | required with `resolve` | Whether the request's user belongs to the scope it selected. `tenantMembership()` reads `@payloadcms/plugin-multi-tenant`'s tenants array; `() => true` opts out. |
+| `scope.list` | `({ payload }) => string[]` | none | The tenant scopes the sync task runs over, besides the install-wide pass. |
+| `scope.label` | `({ req, scope }) => string \| undefined` | the scope id | What the view's caption and Site select call a scope. |
+
+Each may also return a promise. These options only mean something on a scoped install, so each fails the boot without `scope.resolve`: `scope.list`, `scope.label`, `scope.member`, `access.crossScope`, an adapter id in `capture.slots.tenant`, `capture.paths.tenant`, a `collections.<slug>.scopeField` other than `false`, and `goals.collection.scopeField` or `providers.collection.scopeField` when set at all.
+
+## `access`
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `access.read` | `({ req }) => boolean` | `isAdminUser`: users of the admin collection (`admin.user`) | Gates every read: the read endpoints, the widgets, the display fields and the read helpers. It never widens which scope a user reads. |
+| `access.view` | `({ req }) => boolean` | `access.read` | Gates the [analytics view](/analytics/analytics-view) and the exclusion endpoint. The view shows goal and site names only to a reader `access.read` admits as well. |
+| `access.crossScope` | `CrossScopeAccess \| { named?, aggregate?, unscopedSource? }` | scoped: every gate denies; unscoped: every gate is `isAdminUser` and the option cannot be set | Reads past the request's own scope. A function grants all three gates; the object form decides each one, and a gate it leaves out denies. |
+| `access.crossScope.named` | `CrossScopeAccess` | as above | Reading a scope the request does not resolve to, by naming it; also who manages another tenant's provider, goal and sync documents. |
+| `access.crossScope.aggregate` | `CrossScopeAccess` | as above | Reading every scope at once: `scope=*`, the view's **All sites**, and a scoped request that resolves no tenant. |
+| `access.crossScope.unscopedSource` | `CrossScopeAccess` | as above | Reading a tenant through a config adapter rather than its own provider documents ([Who sees what](/analytics/multi-tenancy#4-who-sees-what)). |
+
+Each function may also return a promise.
+
+## `capture`
+
+What the browser tracker captures and where it sends it ([Capture](/analytics/capture)).
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `capture.gate` | `'all' \| 'off' \| CaptureSlot[] \| ({ slot, adapterId, kind }) => boolean` | none: required whenever a capture slot can fill | Which slots wait for your consent manager ([Consent](/analytics/consent)). A function answers per slot, `true` for one that waits; any answer other than `false`, or a throw, holds the slot. |
+| `capture.slots` | `{ global?, tenant? }` | | Which adapter fills each [capture slot](/analytics/capture#capture-slots). |
+| `capture.slots.global` | `string \| false` | `platformAdapter`, else the only config adapter | A config adapter's id, which must be in `adapters`, or `false` to leave the slot empty. |
+| `capture.slots.tenant` | `string \| false` | the scope's default source when it captures, else its first source that captures | An adapter id, a runtime provider's included, resolved per request, or `false`. |
+| `capture.paths` | `{ global?, tenant? }` | | Where each slot's snippet points, for a slot relayed by a route handler of your own ([A route handler of your own](/analytics/proxy#a-route-handler-of-your-own)). |
+| `capture.paths.global`, `capture.paths.tenant` | `string` | the runtime proxy, `<routes.api><routes.base>/p/<slot>` | The path a `captureRoute` handler from `@10x-media/analytics/next` is mounted at, without the Next `basePath`. |
+| `capture.autoCapture` | `AutoCaptureOptions` | | The tracker's listeners ([Auto-capture](/analytics/capture#auto-capture)). |
+| `capture.autoCapture.goalAttribute` | `boolean` | `true` | `data-analytics-goal` and `data-analytics-event` on click and form submit. |
+| `capture.autoCapture.outboundLinks` | `boolean` | `true` | `outbound_link` for a link to another origin. |
+| `capture.autoCapture.fileDownloads` | `boolean` | `true` | `file_download` for a link to a known file type. |
+| `capture.autoCapture.scrollDepth` | `boolean` | `false` | Scroll depth, and `scroll_depth` events at 25, 50, 75 and 100 percent. |
+| `capture.autoCapture.query` | `boolean` | `true` | The page's query string on each pageview, which campaign attribution reads. |
+| `capture.autoCapture.items` | `false \| { impressions?, clicks?, pages? }` | each `true` | [Content item](/analytics/items) capture. Off whatever this says while no collection is bound with `item: true`. |
+| `capture.autoCapture.items.impressions` | `boolean` | `true` | Views of marked elements. |
+| `capture.autoCapture.items.clicks` | `boolean` | `true` | `item_click` for the first click inside a marked element. |
+| `capture.autoCapture.items.pages` | `boolean` | `true` | An item counted per page it appeared on, beside its total. |
+| `capture.skip` | `{ automation?, previews? }` | | Pages left uncounted ([Pages that are not counted](/analytics/capture#pages-that-are-not-counted)). |
+| `capture.skip.automation` | `boolean` | `true` | Leaves out a browser that reports `navigator.webdriver`. |
+| `capture.skip.previews` | `boolean` | `true` | Leaves out draft mode pages and Payload's live preview. |
+| `capture.exclusion` | `boolean \| { param?, sites? }` | `false` | The signed link staff open to leave their own browser out of the numbers ([Excluding your own visits](/analytics/capture#excluding-your-own-visits)). `true` turns it on. |
+| `capture.exclusion.param` | `string` | `'analytics_exclude'` | The query parameter the tracker reads: letters, digits, `.`, `_`, `~` and `-`, at most 64. |
+| `capture.exclusion.sites` | `string[] \| ({ req, scope }) => string[]` | none | Where each scope's sites run, so the view hands out whole links. A list is checked at boot; a function's answer per request. |
+| `capture.allowedOrigins` | `string[]` | `[]` | Other sites whose pages may send to the ingest endpoint and the capture proxy, each one exact `http(s)` origin ([Beacons from other sites](/analytics/capture#beacons-from-other-sites)). |
+| `capture.proxy` | `{ timeoutMs?, maxBodyBytes? }` | | Limits of the [runtime capture proxy](/analytics/proxy#runtime-endpoint). |
+| `capture.proxy.timeoutMs` | `number` | `10000` | Milliseconds to wait for the vendor's response headers. A whole number of at least 1. |
+| `capture.proxy.maxBodyBytes` | `number` | `1048576` (1 MiB) | The largest request body forwarded; a larger one answers `413`. A whole number of at least 1. |
+
+## `goals`
+
+The [goals](/analytics/goals) an install counts conversions against: a list, which is `goals.defaults` with the collection off, or the object below.
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `goals` | `Goal[] \| { defaults?, collection?, purchase? }` | none | Config goals, and the collection editors manage goals in. |
+| `goals.defaults` | `Goal[]` | `[]` | The config goals: each `{ slug, name, match, value?, currency?, browser? }`. Slugs are kebab-case and unique; a path pattern holds at most 32 segments and 4 `**`. |
+| `goals.purchase` | `boolean` | `true` | The built-in latent `purchase` goal a sale books against; `false` removes it. |
+| `goals.collection` | `boolean \| { slug?, scopeField?, fields?, overrides?, access? }` | `false` | The goals collection ([Let editors manage goals](/analytics/goals#5-let-editors-manage-goals)). `true` uses the defaults. |
+| `goals.collection.slug` | `string` | `'analytics-goals'` | The collection's slug. |
+| `goals.collection.scopeField` | `string` | `'scope'` | The top-level field matched against the scope. `'scope'` registers a hidden text field; another name registers none and must exist on the collection. Scoped installs only. |
+| `goals.collection.fields` | `{ [field]: ({ field }) => Field }` | none | Replaces one default field at a time, before `overrides` ([Replacing a field](/analytics/goals#replacing-a-field)). |
+| `goals.collection.fields.name`, `goals.collection.fields.slug`, `goals.collection.fields.enabled`, `goals.collection.fields.browser`, `goals.collection.fields.match`, `goals.collection.fields.value`, `goals.collection.fields.currency` | `({ field }) => Field` | none | One field each. A `slug` replacement must keep a field named `slug` inside what it returns. |
+| `goals.collection.overrides` | `(collection) => CollectionConfig` | none | Reshapes the collection last. It may not rename it or turn off its timestamps. |
+| `goals.collection.access` | `Partial<CollectionConfig['access']>` | admin collection only, narrowed to the scopes the user belongs to | Replaces the default for each operation it sets. |
+
+## `revenue`
+
+Money as a capability ([Revenue](/analytics/revenue)). `false` or unset measures none; `true` turns it on with the defaults; an object turns it on.
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `revenue` | `boolean \| AnalyticsRevenueOptions` | `false` | Off, the `revenue` metric is gone from every source and every amount field is hidden; stored amounts are kept. |
+| `revenue.currency` | `string \| ({ req, scope }) => string \| undefined` | none: revenue is a plain number | The ISO 4217 reporting currency, or one per scope. A string must be three capital letters. |
+| `revenue.convert` | `CurrencyConverter` | none | Converts an amount sent in another currency at ingest; without it such an amount stays out of revenue. |
+| `revenue.dimension` | `boolean` | `true` without `convert`, `false` with it | Declares the `currency` dimension: [gross per currency](/analytics/revenue#gross-per-currency). |
+| `revenue.browserAmounts` | `'none' \| 'fixed' \| 'trust'` | `'fixed'` | How far an amount a browser sends is believed ([Amounts from the browser](/analytics/revenue#amounts-from-the-browser)). |
+| `revenue.orderSignature` | `'optional' \| 'required'` | `'optional'` | Whether a page's order id needs the server's signature ([Recorded in the browser and by the webhook](/analytics/revenue#recorded-in-the-browser-and-by-the-webhook)). |
+
+## `collections`
+
+Bindings, keyed by collection slug: how a document's [display fields](/analytics/display-fields#bindings) find its numbers. A binding needs `path`, `pathField` or `item: true`.
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `collections` | `{ [slug]?: AnalyticsBinding }` | `{}` | One binding per collection. |
+| `collections.<slug>.path` | `(doc, { req, locale? }) => string \| null` | none | The URL path a document's numbers were recorded under. |
+| `collections.<slug>.pathField` | `string` | none | A field holding the path, read when `path` is unset or answers nothing. Its value is used as written, so it has to start with `/`; a dotted name reads a nested field. |
+| `collections.<slug>.hostname` | `string \| (doc, context) => string \| null` | none: every hostname | Narrows a document's reads to one hostname. |
+| `collections.<slug>.item` | `boolean` | `false` | Binds the collection's documents as [content items](/analytics/items). |
+| `collections.<slug>.scopeField` | `string \| false` | `'tenant'` on a scoped install, `false` otherwise | The top-level field a document's own scope is read from, so its numbers are its tenant's ([Whose numbers a document shows](/analytics/display-fields#whose-numbers-a-document-shows)). A named field must exist on the collection. |
+
+## `providers`
+
+[Provider documents](/analytics/providers#provider-documents): vendor sources configured from the admin, per scope. `collection` and `resolve` cannot both be set, and `hosts` needs one of them.
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `providers.collection` | `boolean \| ProvidersCollectionOptions` | `false` | The `analytics-providers` collection. `true` uses the defaults. |
+| `providers.collection.slug` | `string` | `'analytics-providers'` | The collection's slug. |
+| `providers.collection.scopeField` | `string` | `'scope'` | The field matched against the scope, such as a tenant plugin's `'tenant'`. Scoped installs only. |
+| `providers.collection.fields` | `{ name?, provider?, enabled? }` | none | Replaces one default field at a time, before `overrides` ([Replacing a field](/analytics/providers#replacing-a-field)). |
+| `providers.collection.fields.name`, `providers.collection.fields.provider`, `providers.collection.fields.enabled` | `({ field }) => Field` | none | One field each. |
+| `providers.collection.overrides` | `(collection) => CollectionConfig` | none | Reshapes the collection last. It may not rename it or turn off its timestamps. |
+| `providers.collection.access` | `Partial<CollectionConfig['access']>` | admin collection only, narrowed to the scopes the user belongs to | Replaces the default for each operation it sets. |
+| `providers.collection.encryption` | `{ keys? }` | | How stored credentials are sealed. |
+| `providers.collection.encryption.keys` | `KeysConfig` from `@10x-media/fields` | the fields plugin's `encrypted.keys`, else a ring derived from the Payload secret | A dedicated key ring for the credentials. |
+| `providers.collection.connectionAccess` | `FieldAccess \| { create?, update? }` | creators set it; changing it takes `access.crossScope.named` on a scoped install, the collection's update access otherwise | Who may set or change where a document connects ([Who may change a connection](/analytics/providers#who-may-change-a-connection)). |
+| `providers.collection.connectionAccess.create`, `providers.collection.connectionAccess.update` | `FieldAccess` | as above | One operation each. |
+| `providers.collection.sourceAccess` | `Access` | the collection's read access | Which of a scope's documents a reader reads analytics through ([Who reads through a document](/analytics/providers#who-reads-through-a-document)). |
+| `providers.resolve` | `({ payload, req?, scope, fetch, hosts, sdks }) => AnalyticsAdapter[]` | none | Replaces the collection: a scope's adapters from a store of your own ([Keeping the settings somewhere else](/analytics/providers#keeping-the-settings-somewhere-else)). |
+| `providers.hosts` | `{ allow?, allowPrivateNetwork? }` | | Where provider documents may connect ([Where a document may connect](/analytics/providers#where-a-document-may-connect)). |
+| `providers.hosts.allow` | `string[]` | `[]`: each vendor's own cloud only | Further origins a document's host may name; `https://*.example.com` covers every subdomain. |
+| `providers.hosts.allowPrivateNetwork` | `boolean` | `false` | Lets document adapters reach private addresses, over http too. |
+
+## `view`
+
+The [analytics view](/analytics/analytics-view). `false` registers neither the view nor its nav link; the read endpoints stay.
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `view` | `false \| AnalyticsViewOptions` | on | The view and its nav link. |
+| `view.path` | `` `/${string}` `` | `'/analytics'` | The admin path, under `routes.admin`. |
+| `view.defaultRange` | `TimeframePreset` | `'last30days'` | The window the view opens on; `allTime` opens on `last30days`. |
+| `view.defaultMetric` | `MetricKey` | `'pageviews'` | The metric the cards and the trend open on. |
+| `view.navLabel` | `string \| Record<string, string>` | the translated `viewNavLabel` | The nav link and breadcrumb label; a map is keyed by admin language. |
+| `view.Component` | `AnalyticsComponent` | none | A client component in place of the view's body (`@beta`, [Customizing](/analytics/customizing#the-analytics-views-body)). |
+
+## `widgets`
+
+The [dashboard widgets](/analytics/widgets) (`@beta`, since Payload's Modular Dashboard is experimental). `false` registers none.
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `widgets` | `boolean \| AnalyticsWidgetsOptions` | `true` | The widget layer. |
+| `widgets.disabled` | `string[]` | `[]` | Widget slugs left out, built-in or your own. A slug that names no widget of the install fails the boot. |
+| `widgets.register` | `CustomWidgetDef[]` | `[]` | Widgets of your own ([Custom widgets](/analytics/widgets#custom-widgets)), each with a `slug`, a `component` path and a `label`. Slugs may not start with `analytics-`. |
+| `widgets.localizeText` | `boolean` | `false` | Marks each widget's Title field `localized`. |
+| `widgets.comparison` | `boolean` | `true` | `false` skips the previous-window read and removes the compare checkboxes. |
+| `widgets.overrides` | `{ [slug in BuiltInWidgetSlug]?: AnalyticsWidgetOverride }` | `{}` | Changes a built-in widget by slug ([Customizing](/analytics/customizing#a-built-in-widget)). |
+| `widgets.overrides.<slug>.Component` | `AnalyticsComponent` | none | A server component in place of the widget's. |
+| `widgets.overrides.<slug>.label` | a string, a map by language, or a label function | none | The widget's name in the widget list. |
+| `widgets.overrides.<slug>.fields` | `({ defaultFields }) => Field[]` | none | The widget's settings form. |
+
+## `countryFlags`
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `countryFlags` | `boolean \| { Component }` | `true` | Flags beside country names in the view, the widgets and the document panel. `false` draws none; `{ Component }` draws your own (`@beta`, [Country flags](/analytics/customizing#country-flags)). The flag route is mounted only for `true`. |
+| `countryFlags.Component` | `AnalyticsComponent` | | A client component receiving `{ code }`. |
+
+## `cache`
+
+How reads are cached and how much they ask of their sources ([Caching](/analytics/cache)).
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `cache.ttl` | `{ aggregate?, realtime? }` | | Seconds an answer stays fresh, each a whole number of 0 or more. A native read reaching into today stays fresh 10 seconds at most whatever they say ([TTLs](/analytics/cache#ttls)). |
+| `cache.ttl.aggregate` | `number` | each adapter's `recommendedTtl.aggregate` | For historical reads. |
+| `cache.ttl.realtime` | `number` | each adapter's `recommendedTtl.realtime` | For live counts and reads of days still counting. |
+| `cache.timeoutMs` | `number` | `15000` | How long a read with nothing cached waits for its source, every retry included. A whole number of at least 1. |
+| `cache.concurrency` | `{ global?, perSource?, perScope? }` | | How much reads ask of their sources at once ([Reaching the sources](/analytics/cache#reaching-the-sources)). |
+| `cache.concurrency.global` | `number` | `16` | Requests in flight across every vendor source of one instance. |
+| `cache.concurrency.perSource` | `number` | `4` | Requests in flight per vendor source that declares no `rateLimit.maxConcurrent`. |
+| `cache.concurrency.perScope` | `number` | `8` | Reads with nothing cached one scope may have waiting; past it the query endpoint answers `429`. |
+| `cache.warm` | `boolean \| { windowHours?, maxReads? }` | `false` | Turns on the `analytics-warm` task, which reads recent reads again before they expire ([Warming](/analytics/cache#warming)). |
+| `cache.warm.windowHours` | `number` | `24` | A read asked for this recently counts as recent. |
+| `cache.warm.maxReads` | `number` | `200` | The most reads one run refreshes. |
+| `cache.store` | `CacheStore` | the `analytics-cache` collection | A store of your own, such as Redis ([Your own store](/analytics/cache#your-own-store)); the collection is then not registered. |
+| `cache.collection` | `{ slug?, overrides? }` | | The default store's collection. Refused beside `store`. |
+| `cache.collection.slug` | `string` | `'analytics-cache'` | Its slug. |
+| `cache.collection.overrides` | `(collection) => CollectionConfig` | none | Reshapes it, within what the plugin reads and writes. |
+
+## `sync`
+
+The opt-in [sync tier](/analytics/sync): the `analytics-sync` task copies each vendor source's daily metrics into a collection. An object turns it on.
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `sync` | `boolean \| AnalyticsSyncOptions` | `false` | The sync tier. |
+| `sync.lookbackDays` | `number` | `3` | Days each run reads back, today counted. A whole number of at least 1. |
+| `sync.adapters` | `string[]` | every vendor source | The sources it copies: a config adapter's id, or a provider type for every document of that type. |
+| `sync.collection` | `{ slug?, overrides?, hidden? }` | | The collection it writes. |
+| `sync.collection.slug` | `string` | `'analytics-daily'` | Its slug. |
+| `sync.collection.overrides` | `(collection) => CollectionConfig` | none | Reshapes it, within what the plugin writes. |
+| `sync.collection.hidden` | `boolean` | `true` | Keeps it out of the admin nav. |
+
+## `jobs`
+
+The plugin's tasks on Payload's jobs queue: `analytics-maintain` with `native()`, `analytics-sync` with `sync`, `analytics-warm` with `cache.warm` ([The `jobs` option](/analytics/native#the-jobs-option)).
+
+| Option | Type | Default | What it does |
+|---|---|---|---|
+| `jobs` | `false \| AnalyticsJobsOptions` | every registered task on `'default'`, on its default schedule | `false` registers no task: native's upkeep then happens on requests, and `sync` or `cache.warm` beside it fails the boot. |
+| `jobs.queue` | `string` | `'default'` | The queue every task is scheduled on unless its own entry names another. |
+| `jobs.tasks` | `{ maintain?, sync?, warm? }` | | One entry per task; an entry for a task the install does not register fails the boot. |
+| `jobs.tasks.maintain` | `{ queue?, cron? }` | | `analytics-maintain`. |
+| `jobs.tasks.maintain.queue` | `string` | `jobs.queue` | Its queue. |
+| `jobs.tasks.maintain.cron` | `string \| false` | `'*/15 * * * *'` | Its schedule: five fields, six with seconds first, or a nickname such as `'@hourly'`. `false` registers it unscheduled. |
+| `jobs.tasks.sync` | `{ queue?, cron? }` | | `analytics-sync`. |
+| `jobs.tasks.sync.queue` | `string` | `jobs.queue` | Its queue. |
+| `jobs.tasks.sync.cron` | `string \| false` | `'0 */6 * * *'` | Its schedule. |
+| `jobs.tasks.warm` | `{ queue?, cron? }` | | `analytics-warm`. |
+| `jobs.tasks.warm.queue` | `string` | `jobs.queue` | Its queue. |
+| `jobs.tasks.warm.cron` | `string \| false` | `'*/30 * * * *'` | Its schedule. |
+| `jobs.state` | `{ slug?, overrides? }` | | On an install without `native()`, the collection sync and warming keep their leases and heartbeats in. Refused beside `native()` and on an install running neither. |
+| `jobs.state.slug` | `string` | `'analytics-state'` | Its slug. |
+| `jobs.state.overrides` | `(collection) => CollectionConfig` | none | Reshapes it, within what the plugin reads and writes. |
+
+## Switching it off
+
+`disabled: true` switches the plugin off and keeps its database schema:
+
+```ts
+analytics({
+  disabled: process.env.ANALYTICS_OFF === '1',
+  adapters: [native()],
+  capture: { gate: 'off' },
+})
+```
+
+A switched-off install registers the same collections with the same fields and indexes (providers, goals, sync, cache, the native engine's three when `native()` is listed, and `analytics-state` for sync or warming) and the same task names in Payload's jobs, so a development push or a generated migration drops nothing, and every row is still there when the plugin comes back. An adapter's own collections are kept by its `registerSchema`, which every built-in adapter has; a [custom adapter](/analytics/reference/adapter-contract#writing-your-own-adapter) that adds collections in `register` without one loses them while the plugin is off, and a push or a migration then drops them.
+
+Nothing that runs is registered: no endpoint, view or widget. Each task does nothing, and its schedule, kept so Payload keeps the `payload-jobs-stats` global it adds for scheduled tasks, has a hook that never queues a run. What belongs to the collections stays as it is: the providers and goals collections keep their access and their hooks, so editors still manage them in the admin. Payload's job controls stay [restricted to the admin collection](/analytics/native#who-may-run-jobs) as when the plugin runs, which is the one `onInit` a switched-off install adds, and only when it keeps a task. Translations are registered only for the labels of the collections the admin lists. The options are checked as when the plugin runs, except that `adapters` may be empty, which keeps no adapter's collections. The [collection checks](#renaming-the-plugins-collections) run too, and only their warnings go unsaid; their second pass over the assembled config runs only while the plugin is on.
+
+## Renaming the plugin's collections
+
+Every collection the plugin registers takes a `slug` and an `overrides` function, under the option of the feature it belongs to:
+
+| Collection | Default slug | Registered with | Option |
+|---|---|---|---|
+| Raw [hits](/analytics/native#storage) | `analytics-hits` | `native()` | `native({ collections: { hits } })` |
+| [Daily totals](/analytics/native#storage) | `analytics-aggregates` | `native()` | `native({ collections: { aggregates } })` |
+| Salts, day markers, leases and heartbeats | `analytics-state` | `native()`, else [sync](/analytics/sync) or [warming](/analytics/cache#warming) | `native({ collections: { state } })`; without `native()`, `jobs.state` |
+| [Read cache](/analytics/cache#the-analytics-cache-collection) | `analytics-cache` | every install without `cache.store` | `cache.collection` |
+| [Synced daily metrics](/analytics/sync) | `analytics-daily` | `sync` | `sync.collection`, which also takes `hidden` |
+| [Provider settings](/analytics/providers#provider-documents) | `analytics-providers` | `providers.collection` | `providers.collection`, which also takes `fields`, `access` and more |
+| [Goals](/analytics/goals#5-let-editors-manage-goals) | `analytics-goals` | `goals.collection` | `goals.collection`, which also takes `fields`, `access` and more |
+
+The default slugs are exported for code that queries these collections: `CACHE_SLUG`, `GOALS_SLUG`, `PROVIDERS_SLUG`, `STATE_SLUG` and `SYNC_SLUG` from `@10x-media/analytics`, and `HITS_SLUG` and `AGGREGATES_SLUG` from `@10x-media/analytics/adapters/native`. On an install that renames a collection, use the slug it set.
+
+```ts
+analytics({
+  adapters: [
+    native({
+      collections: {
+        hits: { slug: 'site-hits', overrides: (collection) => ({ ...collection, dbName: 'raw_hits' }) },
+        aggregates: { slug: 'site-totals' },
+        state: { slug: 'site-state' },
+      },
+    }),
+  ],
+  capture: { gate: 'all' },
+  cache: { collection: { slug: 'site-cache' } },
+  sync: { collection: { slug: 'site-daily' } },
+})
+```
+
+`analytics-state` belongs to the native engine wherever `native()` is listed; `jobs.state` names it only on an install without it, where sync or warming registers it for their leases, and the boot refuses `jobs.state` anywhere else. It takes the key `native()` gives the same collection rather than `collection`, which under `jobs` would read as Payload's own `payload-jobs`.
+
+`slug` is the only way to rename a collection, since every part of the plugin reads it under that slug: an `overrides` that returns another slug fails the boot, naming the option to set instead. `overrides` must be a function. It receives the collection as the plugin built it and returns the one to register, so spread what it keeps.
+
+What an override may change: labels and admin settings, a `dbName` for the collection (its table on Postgres and SQLite, its collection on MongoDB), fields and indexes of your own, hooks, and access. Hooks never run on the rows the plugin writes, which go through `payload.db` or the engine's own SQL rather than the Local API.
+
+What fails the boot, with a message naming the collection and the field:
+
+- on the hits, daily totals, state, cache and sync collections, which the plugin writes itself: removing a field the plugin defines, renaming it, changing its type, or moving it into a named `group` or a named tab (a `row` or `collapsible` around it is fine), and making one `localized` or `hasMany`;
+- on the same collections, dropping an index or a unique constraint the plugin declares;
+- on the same collections, making one of the plugin's optional fields required, or adding a required field without a fixed `defaultValue`: the plugin writes rows without it, and only a value becomes the column's default, while a function runs in Payload's hooks, which the plugin's writes skip;
+- on the hits, daily totals and state collections, a `dbName` on any of the plugin's fields: the engine's SQL names each column after its field;
+- on the providers and goals collections, `timestamps: false`: every instance notices a saved document by its `updatedAt`, so an edit on one server would never reach the others. Their fields are the editors' to shape, so the boot holds these two to their slug, their timestamps and the name limit below, and nothing else;
+- on Postgres, a table name, or an index name Payload builds from it (`<table>_<column>_idx`), over 63 characters, Postgres' limit. Choose a shorter slug, or a shorter `dbName`.
+
+The same checks run again at init, and when a worker booted without `onInit` builds what it needs, against the config every plugin has assembled. A plugin that runs after analytics and changes one of these collections the way an override may not fails there, naming the collection; so does one that removes or renames one, or that replaces the `custom` the plugin marks its collections in (`custom['@10x-media/analytics']`) rather than spreading it, since the plugin finds its collections by that mark.
+
+What the boot warns about, once at init: on the hits, daily totals, state, cache and sync collections, an override that replaces one of the plugin's access functions, or that turns on REST endpoints or GraphQL where the plugin keeps them off. The plugin reads and writes these rows below access control, so the warning is about who else can now reach them.
+
+A new slug or `dbName` names a new table (on MongoDB, a new collection) and moves no rows: on an install that already has data, write a migration that moves them, or keep the names it has.

@@ -1,19 +1,19 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { HttpResponse, http } from 'msw'
-import { setupServer } from 'msw/node'
 import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import type { TrackerConfig } from '../../src/capture/trackerConfig'
 import type { CaptureSupport } from '../../src/core/capture'
 import type { AnalyticsAdapter } from '../../src/core/contract'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import type { TrackerConfig } from '../../src/tracker/config'
+import { setupServer } from './msw'
 
 const INGEST = 'https://ingest.vendor.test'
 
 const vendorCapture: CaptureSupport = {
-	proxy: { routes: [{ source: '/:p*', upstream: `${INGEST}/:p*` }] },
+	proxy: { routes: [{ source: '/:p*', upstream: `${INGEST}/:p*`, kind: 'data' }] },
 	snippet: () => ({ scripts: [] }),
 	client: { kind: 'posthog' },
 }
@@ -32,7 +32,7 @@ const trackerConfig = async (booted: BootedPayload): Promise<TrackerConfig> => {
 	const res = await handleEndpoints({
 		config: booted.payload.config,
 		payloadInstanceCacheKey: booted.cacheKey,
-		request: new Request('http://localhost:3000/api/analytics/tracker'),
+		request: new Request('http://localhost:3000/api/_x/config'),
 	})
 	expect(res.status).toBe(200)
 	return (await res.json()) as TrackerConfig
@@ -46,10 +46,10 @@ describeForDb('analytics capture slots - one adapter, one slot', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [native()],
-				scopeResolver: alwaysScoped,
+				scope: { member: () => true, resolve: alwaysScoped },
 				// Both slots land on native: the global one by this override, the tenant one
 				// because native is the scope registry's only (so default) adapter.
-				capture: { slots: { global: 'native' } },
+				capture: { gate: 'off', slots: { global: 'native' } },
 			}),
 		})
 	}, 240_000)
@@ -76,8 +76,8 @@ describeForDb('analytics capture slots - disabled with false', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [vendorAdapter()],
-				scopeResolver: alwaysScoped,
-				capture: { slots: { global: false, tenant: 'vendor' } },
+				scope: { member: () => true, resolve: alwaysScoped },
+				capture: { gate: 'off', slots: { global: false, tenant: 'vendor' } },
 			}),
 		})
 	}, 240_000)
@@ -91,7 +91,7 @@ describeForDb('analytics capture slots - disabled with false', {}, (db) => {
 		handleEndpoints({
 			config: booted.payload.config,
 			payloadInstanceCacheKey: booted.cacheKey,
-			request: new Request(`http://localhost:3000/api/analytics/p/${slot}/e`),
+			request: new Request(`http://localhost:3000/api/_x/p/${slot}/e`),
 		})
 
 	it('omits the disabled slot from the tracker config', async () => {

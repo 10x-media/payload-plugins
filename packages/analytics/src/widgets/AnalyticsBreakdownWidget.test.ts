@@ -1,12 +1,13 @@
 import type { PayloadRequest, WidgetServerProps } from 'payload'
-import { renderToStaticMarkup } from 'react-dom/server'
+import { createElement } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { en } from '../translations/en'
+import { renderSettled } from '../testing/renderSettled'
 import { keys } from '../translations/keys'
 import AnalyticsBreakdownWidget from './AnalyticsBreakdownWidget'
 import type { BreakdownWidgetData } from './breakdownTypes'
 import { readForWidgetBreakdown, type WidgetBreakdownResult } from './readForWidgetBreakdown'
 import type { WidgetView } from './viewLink'
+import { captionT, hrefIn, TEST_VIEW as view } from './widgetTestKit'
 
 vi.mock('./readForWidgetBreakdown', () => ({ readForWidgetBreakdown: vi.fn() }))
 
@@ -16,29 +17,11 @@ const result = (over: Partial<WidgetBreakdownResult> = {}): WidgetBreakdownResul
 	status: 'ok',
 	adapterId: 'native',
 	dateRange: { start: new Date('2026-05-04T00:00:00.000Z'), end: NOW },
-	rows: [{ label: 'google.com', value: 12 }],
+	rows: [{ label: 'google.com', dimensionValue: 'google.com', value: 12 }],
 	...over,
 })
 
-const view = { path: '/analytics', defaultRange: 'last30days', defaultMetric: 'pageviews' } as const
-
-/** The two caption templates, which carry the `{{vars}}` the assertions read. */
-const TEMPLATES: Record<string, string> = {
-	[keys.widgetFilterCaption]: en[keys.widgetFilterCaption],
-	[keys.widgetCaptionWithFilter]: en[keys.widgetCaptionWithFilter],
-}
-
-/**
- * Every key stands in for itself, except the caption templates, which come from the real
- * bundle so the assertion sees the same one-pass `{{vars}}` fill Payload's own `t` makes.
- */
-const fakeT = (key: string, vars?: Record<string, string | number>): string =>
-	(TEMPLATES[key] ?? key).replace(/\{\{(.*?)\}\}/g, (match, name: string) => {
-		const value = vars?.[name.trim()]
-		return value === undefined ? match : String(value)
-	})
-
-const req = (t: typeof fakeT = fakeT): PayloadRequest =>
+const req = (t: typeof captionT = captionT): PayloadRequest =>
 	({
 		payload: { config: { routes: { admin: '/admin' } } } as unknown as PayloadRequest['payload'],
 		i18n: { t, language: 'en' },
@@ -49,17 +32,14 @@ const render = async (
 	widgetData: BreakdownWidgetData = {},
 	view?: WidgetView
 ): Promise<string> =>
-	renderToStaticMarkup(
-		await AnalyticsBreakdownWidget({
+	renderSettled(
+		AnalyticsBreakdownWidget({
 			req: req(),
 			widgetSlug,
 			widgetData,
 			view,
 		} as unknown as WidgetServerProps)
 	)
-
-const hrefIn = (html: string): string | undefined =>
-	html.match(/<a[^>]+href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&')
 
 describe('AnalyticsBreakdownWidget view link', () => {
 	beforeEach(() => {
@@ -96,7 +76,7 @@ describe('AnalyticsBreakdownWidget view link', () => {
 		expect(tabs).toEqual([
 			'/admin/analytics?source=native&tab=technology&dim=browser',
 			'/admin/analytics?source=native&tab=technology&dim=os',
-			// `country` leads the geography tab, so the link is the one it always was.
+			// `country` leads the geography tab, so the link carries no `dim`.
 			'/admin/analytics?source=native&tab=geography',
 		])
 	})
@@ -146,7 +126,7 @@ describe('AnalyticsBreakdownWidget filter', () => {
 			{ dimension: 'country', operator: 'eq', value: 'DE' },
 		])
 		expect(html).toContain(
-			'analytics:timeframeLast7Days where analytics:viewDimensionCountry analytics:filterOperatorEq DE'
+			'analytics:timeframeLast7Days where analytics:viewDimensionCountry analytics:filterOperatorEq \u2068Germany\u2069'
 		)
 	})
 
@@ -156,7 +136,7 @@ describe('AnalyticsBreakdownWidget filter', () => {
 			filter: { dimension: 'country', operator: 'eq', value: 'DE' },
 		})
 		expect(html).toContain(
-			'analytics:timeframeLast7Days where analytics:viewDimensionCountry analytics:filterOperatorEq DE'
+			'analytics:timeframeLast7Days where analytics:viewDimensionCountry analytics:filterOperatorEq \u2068Germany\u2069'
 		)
 	})
 
@@ -164,9 +144,9 @@ describe('AnalyticsBreakdownWidget filter', () => {
 		const tight = (key: string, vars?: Record<string, string | number>): string =>
 			key === keys.widgetCaptionWithFilter
 				? `${String(vars?.window)}${String(vars?.filter)}`
-				: fakeT(key, vars)
-		const html = renderToStaticMarkup(
-			await AnalyticsBreakdownWidget({
+				: captionT(key, vars)
+		const html = await renderSettled(
+			AnalyticsBreakdownWidget({
 				req: req(tight),
 				widgetSlug: 'analytics-breakdown-pages',
 				widgetData: {
@@ -176,7 +156,7 @@ describe('AnalyticsBreakdownWidget filter', () => {
 			} as unknown as WidgetServerProps)
 		)
 		expect(html).toContain(
-			'analytics:timeframeLast7Dayswhere analytics:viewDimensionCountry analytics:filterOperatorEq DE'
+			'analytics:timeframeLast7Dayswhere analytics:viewDimensionCountry analytics:filterOperatorEq \u2068Germany\u2069'
 		)
 	})
 
@@ -189,6 +169,30 @@ describe('AnalyticsBreakdownWidget filter', () => {
 		})
 		expect(html).toContain('analytics:stateFilterUnsupported')
 		expect(html).not.toContain('analytics:stateUnavailable')
+	})
+
+	it('centers the empty list message in the body', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(result({ rows: [] }))
+		const html = await render('analytics-breakdown-pages')
+		expect(html).toMatch(/class="analytics-widget__empty"[^>]*>analytics:stateNoBreakdown</)
+		expect(html).not.toContain('analytics-bars')
+	})
+
+	// A row ranked by an average it has no samples for reads as no data, not as a zero.
+	it('writes a dash for a row with no reading', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({
+				rows: [
+					{ label: '/pricing', dimensionValue: '/pricing', value: 4000 },
+					{ label: '/thanks', dimensionValue: '/thanks', value: null },
+				],
+			})
+		)
+		const html = await render('analytics-breakdown-pages', { metric: 'avgDuration' })
+		expect(html).toMatch(
+			/class="analytics-bars__value"><span aria-hidden="true">-<\/span><span class="analytics-sr-only">analytics:stateNoValue</
+		)
+		expect(html).not.toContain('>0s<')
 	})
 
 	it('holds the caption back when there are no rows to caption', async () => {
@@ -228,7 +232,10 @@ describe('AnalyticsBreakdownWidget filter', () => {
 
 	it('names the native direct source, which is the one origin that is not a name', async () => {
 		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
-			result({ provider: 'native', rows: [{ label: 'direct', value: 9 }] })
+			result({
+				provider: 'native',
+				rows: [{ label: 'direct', dimensionValue: 'direct', value: 9 }],
+			})
 		)
 		const html = await render('analytics-breakdown-sources')
 		expect(html).toContain('analytics:channelDirect')
@@ -236,7 +243,7 @@ describe('AnalyticsBreakdownWidget filter', () => {
 
 	it('leaves a native source row that is a utm_source tag as it was stored', async () => {
 		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
-			result({ provider: 'native', rows: [{ label: 'email', value: 9 }] })
+			result({ provider: 'native', rows: [{ label: 'email', dimensionValue: 'email', value: 9 }] })
 		)
 		const html = await render('analytics-breakdown-sources')
 		expect(html).not.toContain('analytics:channelEmail')
@@ -245,7 +252,10 @@ describe('AnalyticsBreakdownWidget filter', () => {
 
 	it('leaves a provider source row as the raw value it is', async () => {
 		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
-			result({ provider: 'plausible', rows: [{ label: 'direct', value: 9 }] })
+			result({
+				provider: 'plausible',
+				rows: [{ label: 'direct', dimensionValue: 'direct', value: 9 }],
+			})
 		)
 		const html = await render('analytics-breakdown-sources')
 		expect(html).not.toContain('analytics:channelDirect')
@@ -254,7 +264,10 @@ describe('AnalyticsBreakdownWidget filter', () => {
 
 	it('names a native channel row in the reader language', async () => {
 		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
-			result({ provider: 'native', rows: [{ label: 'paid-search', value: 9 }] })
+			result({
+				provider: 'native',
+				rows: [{ label: 'paid-search', dimensionValue: 'paid-search', value: 9 }],
+			})
 		)
 		const html = await render('analytics-breakdown-channels')
 		expect(html).toContain('analytics:channelPaidSearch')
@@ -263,19 +276,48 @@ describe('AnalyticsBreakdownWidget filter', () => {
 
 	it("leaves a provider channel row in the provider's own vocabulary", async () => {
 		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
-			result({ provider: 'ga4', rows: [{ label: 'Paid Search', value: 9 }] })
+			result({
+				provider: 'ga4',
+				rows: [{ label: 'Paid Search', dimensionValue: 'Paid Search', value: 9 }],
+			})
 		)
 		const html = await render('analytics-breakdown-channels')
 		expect(html).not.toContain('analytics:channelPaidSearch')
 		expect(html).toContain('Paid Search')
 	})
 
+	// A light label over a partly filled bar would turn colour mid-letter; a soft bar keeps it dark.
+	it('draws its bars soft, as the view does, so every label reads dark', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({ rows: [{ label: '/pricing', dimensionValue: '/pricing', value: 9 }] })
+		)
+		const html = await render('analytics-breakdown-pages')
+		expect(html).toContain('analytics-table analytics-bars analytics-bars--soft')
+	})
+
 	it('names a row the source answered with no value', async () => {
 		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
-			result({ provider: 'posthog', rows: [{ label: '', value: 9 }] })
+			result({ provider: 'posthog', rows: [{ label: '', dimensionValue: '', value: 9 }] })
 		)
 		const html = await render('analytics-breakdown-channels')
 		expect(html).toContain('analytics:valueNotSet')
+	})
+
+	it('lists a goal by its name rather than its slug', async () => {
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(
+			result({
+				rows: [
+					{ label: 'signup', dimensionValue: 'signup', value: 7 },
+					{ label: 'retired', dimensionValue: 'retired', value: 1 },
+				],
+				goals: [{ slug: 'signup', name: 'Newsletter signup' }],
+			})
+		)
+		const html = await render('analytics-breakdown-goals')
+		expect(html).toContain('Newsletter signup')
+		expect(html).not.toContain('>signup<')
+		// A slug no configured goal claims still reads as itself.
+		expect(html).toContain('retired')
 	})
 
 	it('says the goals could not be read instead of showing an empty goal table', async () => {
@@ -304,5 +346,70 @@ describe('AnalyticsBreakdownWidget filter', () => {
 		const html = await render('analytics-breakdown-pages')
 		expect(html).toContain('analytics:stateNoBreakdown')
 		expect(html).not.toContain('analytics:stateNoGoals')
+	})
+})
+
+describe('AnalyticsBreakdownWidget country flags', () => {
+	const HostFlag = ({ code }: { code: string }) =>
+		createElement('i', { className: 'host-flag', 'data-code': code })
+
+	const countries = (): WidgetBreakdownResult =>
+		result({
+			rows: [
+				{ label: 'DE', dimensionValue: 'DE', value: 9 },
+				{ label: 'FR', dimensionValue: 'FR', value: 4 },
+			],
+		})
+
+	const renderCountries = (countryFlags: unknown): Promise<string> =>
+		renderSettled(
+			AnalyticsBreakdownWidget({
+				req: {
+					payload: {
+						config: { routes: { admin: '/admin', api: '/api' } },
+						importMap: { '/components/HostFlag#HostFlag': HostFlag },
+					},
+					i18n: { t: captionT, language: 'en' },
+				},
+				widgetSlug: 'analytics-breakdown-countries',
+				widgetData: {},
+				countryFlags,
+			} as unknown as WidgetServerProps)
+		)
+
+	beforeEach(() => {
+		vi.mocked(readForWidgetBreakdown).mockReset()
+		vi.mocked(readForWidgetBreakdown).mockResolvedValue(countries())
+	})
+
+	it("renders the host's flag component once per row, given that row's code", async () => {
+		const html = await renderCountries({ Component: '/components/HostFlag#HostFlag' })
+		expect([...html.matchAll(/class="host-flag" data-code="([A-Z]+)"/g)].map((m) => m[1])).toEqual([
+			'DE',
+			'FR',
+		])
+		expect(html).not.toContain('/_x/flags/')
+	})
+
+	it("draws the plugin's own flag from its route by default, and none when switched off", async () => {
+		expect(await renderCountries(true)).toContain('/api/_x/flags/de.svg')
+		const off = await renderCountries(false)
+		expect(off).not.toContain('<img')
+		expect(off).not.toContain('host-flag')
+	})
+})
+
+describe('AnalyticsBreakdownWidget custom range', () => {
+	beforeEach(() => {
+		vi.mocked(readForWidgetBreakdown).mockReset()
+	})
+
+	it('says a range before 1970 is invalid instead of ranking the last 30 days', async () => {
+		const html = await render('analytics-breakdown-pages', {
+			timeframe: 'custom',
+			range: { from: '1969-12-01', to: '1970-01-05' },
+		})
+		expect(html).toContain(keys.viewErrorInvalid)
+		expect(readForWidgetBreakdown).not.toHaveBeenCalled()
 	})
 })

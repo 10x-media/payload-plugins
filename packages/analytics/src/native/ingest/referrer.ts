@@ -1,19 +1,22 @@
 import { MAX_QUERY_HOSTNAME_LENGTH, MAX_REFERRER_LENGTH } from '../../query/limits'
 
-/** A hostname as it is compared: lowercased, without a leading `www.`. */
-const bareHost = (host: string): string => host.toLowerCase().replace(/^www\./, '')
+/** A host lowercased and without `www.`, the form every referrer comparison uses. */
+export const bareHost = (host: string): string => host.toLowerCase().replace(/^www\./, '')
+
+const parsedHost = (raw: unknown): string | undefined => {
+	if (typeof raw !== 'string' || !raw) {
+		return undefined
+	}
+	try {
+		return bareHost(new URL(raw).hostname) || undefined
+	} catch {
+		return undefined
+	}
+}
 
 /**
- * The referrer as it is stored: everything from the first `#` or `?` onwards removed, then
- * capped. A same-origin navigation puts the previous page's whole URL in `document.referrer`,
- * so the query string routinely carries a reset token, a session id or an email address that
- * has no business in an analytics row. Origin and path are kept verbatim, case included,
- * because they are what makes a referrer readable. The fragment goes first: a `?` after a
- * `#` belongs to the fragment, not to a query.
- *
- * An unparseable referrer is stripped on the same terms rather than trusted, and a value that
- * is not a string at all is dropped: the wire field is public and unvalidated, so a body
- * carrying `"referrer": {}` must cost the event its referrer, not the request its response.
+ * Referrer cut at the first `#` or `?`, then capped: a same-origin referrer's query can carry a
+ * reset token or an email address. A non-string is dropped, since the wire field is unvalidated.
  */
 export const storedReferrer = (raw: unknown): string | undefined => {
 	if (typeof raw !== 'string') {
@@ -24,30 +27,36 @@ export const storedReferrer = (raw: unknown): string | undefined => {
 }
 
 /**
- * The referrer's bare host, which is what the `referrer` dimension buckets and reads by:
- * lowercased, without scheme, port, path, query or a leading `www.`. Nothing is reported for
- * a missing, non-string, hostless or unparseable referrer, so the event contributes no
- * referrer bucket.
- *
- * A self-referral reports nothing either: internal navigation is the bulk of any site's
- * traffic, and counting it would put the site's own domain at the top of its referrers
- * breakdown forever. `selfHostname` is the event's own hostname, compared on the same terms
- * (case-insensitively, `www.` stripped). The `source` dimension reads the same absence as its
- * `direct` channel.
+ * Whether a referrer is a page of the event's own site: its own hostname, or another one its
+ * scope records hits under (`siblings`, bare hosts), compared the way {@link referrerHost} does.
  */
-export const referrerHost = (raw: unknown, selfHostname: string): string | undefined => {
-	if (typeof raw !== 'string' || !raw) {
-		return undefined
-	}
-	let host: string
-	try {
-		host = new URL(raw).hostname
-	} catch {
-		return undefined
-	}
-	const bare = bareHost(host)
-	if (!bare || bare === bareHost(selfHostname)) {
+export const isSiteReferral = (
+	raw: unknown,
+	selfHostname: string,
+	siblings?: ReadonlySet<string>
+): boolean => {
+	const bare = parsedHost(raw)
+	return bare !== undefined && (bare === bareHost(selfHostname) || (siblings?.has(bare) ?? false))
+}
+
+/**
+ * Bare host the `referrer` dimension groups by; undefined when unparseable or for the site itself
+ * (`selfHostname` and `siblings`), which `source` then reads as direct.
+ */
+export const referrerHost = (
+	raw: unknown,
+	selfHostname: string,
+	siblings?: ReadonlySet<string>
+): string | undefined => {
+	const bare = parsedHost(raw)
+	if (!bare || isSiteReferral(raw, selfHostname, siblings)) {
 		return undefined
 	}
 	return bare.slice(0, MAX_QUERY_HOSTNAME_LENGTH)
+}
+
+/** A link inside the hit's own site moves a visit along rather than opening one. */
+export const isSelfReferral = (raw: unknown, selfHostname: string): boolean => {
+	const bare = parsedHost(raw)
+	return bare !== undefined && bare === bareHost(selfHostname)
 }

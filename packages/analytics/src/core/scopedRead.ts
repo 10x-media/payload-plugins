@@ -1,12 +1,25 @@
 import type { PayloadRequest } from 'payload'
+import { isScopeMember } from '../access/membership'
+import {
+	type GatedScope,
+	isGatedScope,
+	mintGatedScope,
+	type ReadPrincipal,
+	SYSTEM,
+} from '../access/principal'
+import { readGate } from '../access/readGate'
+import { readableProviderDocIds } from '../plugin/readableProviders'
 import {
 	type AnalyticsRuntime,
-	type PlatformReadGate,
-	platformReadGate,
+	resolvableScope,
 	resolveRegistryFor,
 	resolveScopeFor,
+	type ScopeGates,
+	scopeGates,
 } from '../plugin/runtime'
+import { MAX_SCOPE_LENGTH } from '../query/limits'
 import { type AnalyticsAdapter, PLATFORM_SCOPE } from './contract'
+import { type AdapterRegistry, filterRegistry, type ScopeRegistry } from './registry'
 
 export type ReadContext =
 	| {
@@ -15,156 +28,321 @@ export type ReadContext =
 			scope: string | null
 			/** The scope to stamp on the adapter query; undefined for install-wide reads. */
 			queryScope?: string
+			/**
+			 * The read's principal and scope, for the reads it makes on its behalf: handing this on
+			 * keeps every one of them on exactly this scope without deciding it again.
+			 */
+			pin: ReadPrincipal
 	  }
-	| { ok: false }
+	| {
+			ok: false
+			/**
+			 * Why the read was refused: `no-sources` (nothing this reader may read), `no-access`,
+			 * `not-member`, or `no-scope` (no single scope resolved, no cross-scope read).
+			 */
+			reason?: 'no-sources' | 'no-access' | 'not-member' | 'no-scope'
+	  }
 
-export interface ResolveReadContextArgs {
+type ResolveReadContextArgs = {
 	runtime: AnalyticsRuntime
 	req: PayloadRequest
 	adapterId?: string
-	/** Explicit scope override; undefined resolves via the plugin's scopeResolver. */
-	scope?: string | null
-}
+	/**
+	 * Without an `adapterId`, the source to read through is the scope's default when this accepts
+	 * it, else the first visible source it accepts, else the default all the same.
+	 */
+	prefer?: (adapter: AnalyticsAdapter) => boolean
+} & ReadPrincipal
 
-export interface QueryScopeArgs {
+interface QueryScopeArgs {
 	runtime: AnalyticsRuntime
 	req: PayloadRequest
 	/** The read's resolved scope; `'*'` is the explicit cross-scope marker. */
 	scope: string | null
 	adapter: AnalyticsAdapter
-	/** Shared `platformRead` decision; one is created per call when omitted. */
-	platformRead?: PlatformReadGate
+	/** Shared cross-scope decisions; one set is created per call when omitted. */
+	gates?: ScopeGates
 }
 
 /**
- * A scope a request may act on, or why it may not. `named` is a scope the caller asked for
- * and `platformRead` denies; `unresolved` is a request whose own scope is cross-scope, or
- * ambiguous on a scoped install, behind the same gate; `failed` is a `scopeResolver` that
- * threw, which callers that can serve something degraded tell apart from a refusal.
+ * A scope a request may act on, or why not: `named` and `unresolved` are denied cross-scope gates,
+ * `failed` a throwing `scope.resolve`, `not-member` a scope its user does not belong to.
  */
 export type RequestedScope =
-	| { ok: true; scope: string | null }
-	| { ok: false; reason: 'named' | 'unresolved' | 'failed' }
+	| {
+			ok: true
+			scope: string | null
+			/** The same scope as a token the reads below accept without deciding it again. */
+			gated: GatedScope
+	  }
+	| { ok: false; reason: 'named' | 'unresolved' | 'failed' | 'not-member' }
 
-export interface RequestedScopeArgs {
+interface RequestedScopeArgs {
 	runtime: AnalyticsRuntime
 	req: PayloadRequest
 	/** The `scope` the request carried, untrimmed; null or undefined when it carried none. */
 	raw?: string | null
-	/** Shared `platformRead` decision; one is created per call when omitted. */
-	platformRead?: PlatformReadGate
+	/** Shared cross-scope decisions; one set is created per call when omitted. */
+	gates?: ScopeGates
 }
 
+const cleared = (scope: string | null): RequestedScope => ({
+	ok: true,
+	scope,
+	gated: mintGatedScope(scope),
+})
+
 /**
- * The scope one request may act on, decided in one place for every endpoint that takes a
- * `scope` from a caller, so a read gate and a state-changing gate cannot drift apart.
- *
- * The raw value is trimmed and a blank one counts as absent, exactly as `readParam` reads a
- * query string. Naming a scope, the platform wildcard included, is the cross-scope decision
- * and requires `platformRead`. Absent means the request's own resolved scope, which is
- * itself cross-scope when the resolver answers the wildcard or, on a scoped install, null:
- * null usually means "no tenant selected" rather than "everything", so it fails closed
- * behind the same gate. A resolver that throws answers no scope either, separately, so a
- * caller with a degraded answer to give can tell it from a refusal. Per-adapter narrowing
- * is a later decision, in `resolveQueryScope`.
+ * The scope one request may act on, for every endpoint taking a caller's `scope`, and the only
+ * place a {@link GatedScope} is minted. A scoped install's null, no tenant selected, fails closed.
  */
 export const resolveRequestedScope = async (args: RequestedScopeArgs): Promise<RequestedScope> => {
 	const { runtime, req } = args
-	const allowed = args.platformRead ?? platformReadGate(runtime, req)
+	const gates = args.gates ?? scopeGates(runtime, req)
 	const named = typeof args.raw === 'string' ? args.raw.trim() : ''
 	if (named !== '') {
-		return (await allowed()) ? { ok: true, scope: named } : { ok: false, reason: 'named' }
+		// The wildcard is never the request's own scope in this sense: it names every scope,
+		// whatever the resolver answered, and stays behind the aggregate gate.
+		if (named === PLATFORM_SCOPE) {
+			return (await gates.aggregate()) ? cleared(named) : { ok: false, reason: 'named' }
+		}
+		// An install without tenants has no scope to name, and no tenant id runs this long.
+		if (runtime.scoped !== true || named.length > MAX_SCOPE_LENGTH) {
+			return { ok: false, reason: 'named' }
+		}
+		if (await gates.named()) {
+			return cleared(named)
+		}
+		// Only after the gate has said no, so a platform reader still costs one resolution.
+		const own = await resolveScopeFor(runtime, req).catch(() => null)
+		if (own === null || own === PLATFORM_SCOPE || own !== named) {
+			return { ok: false, reason: 'named' }
+		}
+		return (await isScopeMember(runtime.member, req, own))
+			? cleared(own)
+			: { ok: false, reason: 'not-member' }
 	}
 	let scope: string | null
 	try {
 		scope = await resolveScopeFor(runtime, req)
-	} catch (err) {
-		req.payload.logger?.warn(`analytics: scope resolution failed: ${String(err)}`)
+	} catch {
 		return { ok: false, reason: 'failed' }
 	}
-	const crossScope = scope === PLATFORM_SCOPE || (runtime.scoped === true && scope === null)
-	if (crossScope && !(await allowed())) {
-		return { ok: false, reason: 'unresolved' }
+	if (scope === PLATFORM_SCOPE || scope === null) {
+		const crossScope = scope === PLATFORM_SCOPE || runtime.scoped === true
+		return crossScope && !(await gates.aggregate())
+			? { ok: false, reason: 'unresolved' }
+			: cleared(scope)
 	}
-	return { ok: true, scope }
+	if ((await isScopeMember(runtime.member, req, scope)) || (await gates.named())) {
+		return cleared(scope)
+	}
+	return { ok: false, reason: 'not-member' }
 }
 
 /**
- * The scope to stamp on one adapter query, or a refusal. Cross-scope reads fail closed
- * behind `platformRead`: the `'*'` marker, and any scoped read through a shared config
- * adapter that cannot narrow the query to one scope (whether or not it is the designated
- * platform adapter), which would otherwise answer with every scope's data. A tenant's own
- * runtime adapters are never gated. Every read path decides this here, so the widgets and
- * the query endpoint cannot drift apart on what counts as cross-scope.
+ * True for a shared config adapter that cannot narrow its query, read under a tenant scope: it
+ * would answer with every scope's data, so reading or listing it takes `unscopedSource`.
+ */
+export const needsUnscopedSourceAccess = (
+	runtime: AnalyticsRuntime,
+	adapter: AnalyticsAdapter,
+	scope: string | null
+): boolean =>
+	scope !== null &&
+	scope !== PLATFORM_SCOPE &&
+	runtime.configAdapterIds.has(adapter.id) &&
+	!adapter.capabilities.scopedQueries
+
+/**
+ * {@link SYSTEM} reads any scope, but never a tenant through a shared adapter that cannot narrow
+ * to it: a job would store that adapter's install-wide numbers as the tenant's own.
+ */
+const SYSTEM_GATES: ScopeGates = {
+	named: () => Promise.resolve(true),
+	aggregate: () => Promise.resolve(true),
+	unscopedSource: () => Promise.resolve(false),
+}
+
+/**
+ * The adapters a request may read through in one tenant scope, or null for none: the scope's own
+ * sources follow the providers' read access (`sourceAccess`), a config adapter `unscopedSource`.
+ */
+export const visibleRegistryFor = async (args: {
+	runtime: AnalyticsRuntime
+	req: PayloadRequest
+	resolved: ScopeRegistry
+	scope: string | null
+	gates?: ScopeGates
+	principal?: typeof SYSTEM
+}): Promise<AdapterRegistry | null> => {
+	const { runtime, req, resolved, scope } = args
+	const { registry, grants } = resolved
+	if (runtime.scoped !== true || scope === null || scope === PLATFORM_SCOPE) {
+		return registry
+	}
+	if (args.principal === SYSTEM) {
+		return filterRegistry(
+			registry,
+			(adapter) => grants.has(adapter.id) || !needsUnscopedSourceAccess(runtime, adapter, scope)
+		)
+	}
+	const gates = args.gates ?? scopeGates(runtime, req)
+	const readable = await readableProviderDocIds(runtime, req, scope)
+	const keep = new Set<string>()
+	for (const adapter of registry.all()) {
+		const docId = grants.get(adapter.id)
+		if (docId !== undefined) {
+			if (readable === null || readable.has(docId)) {
+				keep.add(adapter.id)
+			}
+			continue
+		}
+		if (!runtime.providersCollection && adapter.capabilities.scopedQueries) {
+			keep.add(adapter.id)
+			continue
+		}
+		if (await gates.unscopedSource()) {
+			keep.add(adapter.id)
+		}
+	}
+	return filterRegistry(registry, (adapter) => keep.has(adapter.id))
+}
+
+/**
+ * The sources a job reads one scope through as {@link SYSTEM}, or null when the scope holds
+ * none: exactly what `resolveReadContext` lets a system read choose from.
+ */
+export const systemRegistryFor = async (
+	runtime: AnalyticsRuntime,
+	req: PayloadRequest,
+	scope: string | null
+): Promise<AdapterRegistry | null> => {
+	const resolved = await resolveRegistryFor(runtime, {
+		payload: req.payload,
+		req,
+		scope: resolvableScope(scope),
+	})
+	return visibleRegistryFor({ runtime, req, resolved, scope, principal: SYSTEM })
+}
+
+/**
+ * The scope to stamp on one adapter query, or a refusal. Every read path decides it here, so
+ * widgets and the query endpoint cannot drift on what counts as cross-scope.
  */
 export const resolveQueryScope = async (
 	args: QueryScopeArgs
 ): Promise<{ ok: true; queryScope?: string } | { ok: false }> => {
 	const { runtime, req, scope, adapter } = args
-	const allowed = args.platformRead ?? platformReadGate(runtime, req)
+	const gates = args.gates ?? scopeGates(runtime, req)
 	if (scope === PLATFORM_SCOPE) {
-		return (await allowed()) ? { ok: true } : { ok: false }
+		return (await gates.aggregate()) ? { ok: true } : { ok: false }
 	}
 	if (scope === null) {
 		return { ok: true }
 	}
-	if (runtime.configAdapterIds.has(adapter.id) && !adapter.capabilities.scopedQueries) {
-		return (await allowed()) ? { ok: true } : { ok: false }
+	if (needsUnscopedSourceAccess(runtime, adapter, scope)) {
+		return (await gates.unscopedSource()) ? { ok: true } : { ok: false }
 	}
 	return { ok: true, queryScope: scope }
 }
 
+type PrincipalScope =
+	| { ok: true; scope: string | null; pin: ReadPrincipal }
+	| Extract<ReadContext, { ok: false }>
+
 /**
- * Resolve one read's scope and adapter: explicit scope wins over the request's
- * resolved scope, the registry is resolved per scope, then the adapter is picked
- * by id (or the registry default). A request's own scope goes through
- * `resolveRequestedScope`, the same decision every endpoint that takes a scope
- * reads with, so the widgets cannot drift from them on what a scope may be.
- * Cross-scope reads fail closed behind `platformRead`: an explicit `'*'` scope
- * always, any scoped read through a shared config adapter that cannot narrow the
- * query to one scope (whether or not it is the designated platform adapter), and,
- * on a scoped install, a request that resolves no scope at all. That last case is
- * ambiguous rather than intentionally install-wide (a tenant's scopeResolver
- * returning null usually means "no tenant selected", not "read everything"), so it
- * fails closed the same way. An explicit `scope: null` override bypasses that gate:
- * it is the trusted server-side caller's path (cron passes, tests), never a
- * request's own resolution. A tenant's own runtime adapters are never gated.
- * Any resolution failure (unknown adapter id, a throwing scopeResolver or
- * provider lookup) degrades to `{ ok: false }` so read paths render their
- * unavailable state instead of throwing.
+ * The read's scope: the system's own, one already cleared, or the one the request asks for. Checked
+ * at runtime, since a JavaScript caller or a cast can pass anything; anything else is refused.
+ */
+const principalScope = async (
+	args: ResolveReadContextArgs,
+	gates: ScopeGates
+): Promise<PrincipalScope> => {
+	const { scope } = args
+	if (args.principal === SYSTEM) {
+		return typeof scope === 'string' || scope === null
+			? { ok: true, scope, pin: { principal: SYSTEM, scope } }
+			: { ok: false }
+	}
+	if (isGatedScope(scope)) {
+		return { ok: true, scope: scope.value, pin: { scope } }
+	}
+	if (scope !== undefined && scope !== null && typeof scope !== 'string') {
+		return { ok: false }
+	}
+	const requested = await resolveRequestedScope({
+		runtime: args.runtime,
+		req: args.req,
+		gates,
+		raw: scope,
+	})
+	if (!requested.ok) {
+		switch (requested.reason) {
+			case 'not-member':
+				return { ok: false, reason: 'not-member' }
+			case 'named':
+				return { ok: false, reason: 'no-access' }
+			case 'unresolved':
+				return { ok: false, reason: 'no-scope' }
+			case 'failed':
+				return { ok: false }
+		}
+	}
+	return { ok: true, scope: requested.scope, pin: { scope: requested.gated } }
+}
+
+/**
+ * One read's scope and adapter, behind `access.read` and `resolveRequestedScope` unless the
+ * principal is {@link SYSTEM}. Any failure answers `{ ok: false }`, so a surface never throws.
  */
 export const resolveReadContext = async (args: ResolveReadContextArgs): Promise<ReadContext> => {
 	const { runtime, req, adapterId } = args
-	const allowed = platformReadGate(runtime, req)
+	const system = args.principal === SYSTEM
+	const gates = system ? SYSTEM_GATES : scopeGates(runtime, req)
 	try {
-		let scope: string | null
-		if (args.scope !== undefined) {
-			scope = args.scope
-		} else {
-			const requested = await resolveRequestedScope({ runtime, req, platformRead: allowed })
-			if (!requested.ok) {
-				return { ok: false }
-			}
-			scope = requested.scope
+		if (!system && !(await readGate(runtime, req))) {
+			return { ok: false, reason: 'no-access' }
 		}
-		const registryScope = scope === PLATFORM_SCOPE ? null : scope
-		const registry = await resolveRegistryFor(runtime, {
+		const decided = await principalScope(args, gates)
+		if (!decided.ok) {
+			return decided
+		}
+		const { scope, pin } = decided
+		const registryScope = resolvableScope(scope)
+		const resolved = await resolveRegistryFor(runtime, {
 			payload: req.payload,
 			req,
 			scope: registryScope,
 		})
-		const adapter = adapterId ? registry.get(adapterId) : registry.default()
+		// The default is picked out of what this reader may actually read, so a scope whose
+		// leading source is the platform's own shared one still serves a tenant admin.
+		const registry = await visibleRegistryFor({
+			runtime,
+			req,
+			resolved,
+			scope,
+			gates,
+			...(system ? { principal: SYSTEM } : {}),
+		})
+		if (!registry) {
+			return { ok: false, reason: 'no-sources' }
+		}
+		const fallback = registry.default()
+		const preferred =
+			args.prefer && !args.prefer(fallback) ? registry.all().find(args.prefer) : undefined
+		const adapter = adapterId ? registry.get(adapterId) : (preferred ?? fallback)
 		const decision = await resolveQueryScope({
 			runtime,
 			req,
 			scope,
 			adapter,
-			platformRead: allowed,
+			gates,
 		})
 		if (!decision.ok) {
 			return { ok: false }
 		}
-		return { ok: true, adapter, scope: registryScope, queryScope: decision.queryScope }
+		return { ok: true, adapter, scope: registryScope, queryScope: decision.queryScope, pin }
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: read context resolution failed: ${String(err)}`)
 		return { ok: false }

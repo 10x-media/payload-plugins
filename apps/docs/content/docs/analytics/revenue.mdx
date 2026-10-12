@@ -1,0 +1,444 @@
+---
+title: Revenue
+description: Money is a capability. Turn it on, pick a reporting currency, and record sales and refunds with purchase and refund.
+---
+
+Money is off until an install says otherwise. Nothing asks an editor what a signup is worth, no picker offers a revenue metric, and no report carries a currency column. Say that the install sells something and all of it appears at once.
+
+That split matters because the alternative is worse in both directions: a content site whose goals collection asks for an order total it will never have, and a shop whose dashboard reports conversions with no money beside them.
+
+## Turning money on
+
+```ts title="payload.config.ts"
+analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  revenue: { currency: 'EUR' },
+})
+```
+
+`revenue: true` turns money on with the defaults, an object turns it on and customizes it, and `false` or no `revenue` at all leaves it off. Nothing else turns it on: a config goal carrying a `value` on an install with money off reports nothing for that value, and the boot logs one warning naming those goals.
+
+| Key | What it does |
+|---|---|
+| `currency` | ISO 4217 code revenue is reported in. A literal, or a resolver for one currency per tenant. Unset, revenue is a plain number summed exactly as each event sent it. |
+| `convert` | Host FX hook, read at native ingest whenever an event's currency differs from the resolved one. |
+| `dimension` | The `currency` breakdown, which counts each amount in the currency it was sent in. Defaults to on while no `convert` hook is configured, and is off whenever money is off. |
+| `browserAmounts` | How far native ingest believes an amount a browser sends: `'fixed'` (the default), `'none'` or `'trust'`. See [amounts from the browser](#amounts-from-the-browser). |
+| `orderSignature` | Whether native ingest takes an order id a page sends without the server's signature: `'optional'` (the default) or `'required'`. See [recorded in the browser and by the webhook](#recorded-in-the-browser-and-by-the-webhook). |
+
+## What disappears when money is off
+
+| Surface | With money off |
+|---|---|
+| The `revenue` metric | Gone from every source. One rule over each scope's registry removes it from the config adapters and from a tenant's own runtime providers alike, so the view's cards, the trend, the breakdown columns, the goals table, the widgets, the per-document panel and the query endpoint all lose it together. |
+| The widget metric picker | Offers no revenue option, including on an install running the providers collection, where the picker offers the whole contract rather than a config-adapter union. |
+| The `currency` dimension | Never declared. |
+| The goals collection | The Amount, with its currency, and the amount inside the action are hidden. |
+| `analyticsLinkFields({ value: true })` | The per-link value input is hidden. |
+| The form-builder goal action | Its Amount, with its currency, and Amount from a field inputs are hidden. |
+
+Every one of those is a display decision. The fields stay in the schema and nothing already stored is touched, so a goal that carries an amount keeps it and turning money back on shows the history that was already there.
+
+The last two are fields your own config literal built, before this plugin ran. They are marked rather than gated, and the plugin hides every marked field it finds in the config it was given, which is this config and no other: two Payload instances in one process each answer for themselves. Two places are out of its reach, and both take the answer as an option instead:
+
+```ts
+analyticsLinkFields({ value: true, revenue: false }) // inside a Lexical LinkFeature
+trackGoalAction({ revenue: false }) // form-builder registered after this plugin
+```
+
+Both default to on, so an install that measures money sets neither.
+
+## One reporting currency per tenant
+
+`revenue.currency` takes a literal, or a resolver:
+
+```ts
+analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  revenue: {
+    currency: async ({ scope }) => (scope === 'us' ? 'USD' : 'EUR'),
+  },
+})
+```
+
+The resolver receives the request and its already-resolved scope, exactly like [`reportingTimezone`](/analytics/timezone). Return `undefined` to report revenue as a plain number for that request.
+
+With one resolved, three things change, all of them display or ingest, none of them a rewrite of history:
+
+1. Revenue renders through `Intl.NumberFormat(locale, { style: 'currency', currency })` everywhere.
+2. The query response carries `currency`, and each result's `meta.currency` beside it, so a custom surface formats the same way. A vendor source that names its own currency (Plausible's `revenueCurrency`, the currency a GA4 property reports in) keeps it: the reporting currency fills in only where a source names none, since nothing converts a vendor's numbers.
+3. Native ingest reconciles an event whose currency differs, below.
+
+Nothing is ever converted between tenants, because nothing is ever summed across them.
+
+### An amount in another currency
+
+At ingest, when a reporting currency is resolved and an amount's currency differs:
+
+| Setup | What happens |
+|---|---|
+| `convert` returns an amount | That amount is stored as the event's value and summed. The original amount and currency are kept in `originalValue` and `originalCurrency`. An answer that is not a finite number, is larger than 10<sup>12</sup>, or has the other sign from the amount sent counts as no answer. |
+| No hook, or it returns `undefined`, or it throws | The conversion still counts. Its amount is stored as `0`, so it stays out of the revenue sum, and the original is kept in the same two columns. One warning is logged per process. |
+| Event carries no currency | It is taken to already be in the reporting currency. |
+
+Each goal an event completes is converted on its own, from the currency its amount is in: a goal's fixed value from the goal's `currency`, the amount the event sent and a value property from the event's. That holds in every [`revenue.browserAmounts`](#amounts-from-the-browser) mode, so a goal priced in another currency counts the same whichever mode the install runs, and without a `convert` hook it counts `0` in each. An event's row keeps the amount and currencies of its first goal worth something; one completing goals priced in different currencies is grouped under that first currency in the [currency breakdown](#gross-per-currency).
+
+```ts
+/** Your own rate table: how many `to` one `from` bought on a day. */
+declare const rates: { on(at: Date, from: string, to: string): Promise<number | undefined> }
+
+analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  revenue: {
+    currency: 'EUR',
+    convert: async ({ amount, from, to, at }) => {
+      const rate = await rates.on(at, from, to)
+      return rate === undefined ? undefined : amount * rate
+    },
+  },
+})
+```
+
+`at` is the event's own timestamp, so a rate table can answer for the day the money moved rather than for today. Returning `undefined` is a supported answer, not a failure: the conversion is still counted, and the two `original` columns hold everything needed to settle it later.
+
+Conversion happens once, at ingest, and the converted amount is what is stored and summed. Changing the rate afterwards does not change history: a hit keeps the amount it was converted to.
+
+### Gross per currency
+
+`currency` is a breakdown dimension on the [native engine](/analytics/native), grouped under the Goals tab beside `goal`. It groups every amount by the currency it was sent in and counts it as it was sent. A sale of 100 USD on an install reporting in EUR is a `USD` row of 100, whether `convert` turned it into 92 EUR or no hook answered and it adds 0 to the euro total. That is the one question a single summed figure cannot answer: an install taking euros and dollars without an FX hook sums only the euros, and this breakdown says how much sat outside that sum. The admin writes each row in its own currency, and a refund counts as a negative amount in the currency it was sent in.
+
+A read filtered to one currency (`currency` equal to `USD`) counts the same way: all its revenue is in that currency, as sent, and the query endpoint's `currency` and `meta.currency` name it, so the view, a widget or your own client write it in that currency too.
+
+It is on by default while no `convert` hook is configured, which is exactly the install whose revenue total leaves amounts out. With a hook, every amount reaches the total in the reporting currency, and the breakdown only adds how the money arrived, so it defaults off; `revenue: { dimension: true }` keeps it.
+
+Only hits carrying an amount, or completing a goal, are grouped by it: a goal worth nothing, such as a signup, lands in its currency's row with no revenue. A reporting currency is stamped on every event, money or not, and a pageview grouped by currency would answer nothing.
+
+### Several currencies without a reporting currency
+
+Without `revenue.currency`, every amount is summed as it was sent, so 10 EUR and 20 USD add up to 30, which is no amount of money at all. The native engine notices: a read whose revenue adds amounts in more than one currency lists them in `meta.mixedCurrencies`, and the analytics view says so in its toolbar. It decides from what the period recorded in each currency in the scope, not only from the hits a read's other filters keep. A read of one currency never mixes.
+
+Set a reporting currency to get one total, with a `convert` hook if the rates are known, or read the money one currency at a time with the `currency` breakdown or filter.
+
+## Recording a sale
+
+`purchase` and `refund` are the vocabulary, on the tracker, on `useAnalytics()` and on the server. They are the same two words GA4 uses, so an integration reads the same wherever it is written.
+
+```tsx title="components/checkout-success.tsx"
+'use client'
+
+import { useAnalytics } from '@10x-media/analytics/react'
+import { useEffect } from 'react'
+
+export const CheckoutSuccess = ({ order }: { order: { id: string; total: number } }) => {
+  const { purchase } = useAnalytics()
+
+  useEffect(() => {
+    purchase({ orderId: order.id, value: order.total, currency: 'EUR' })
+  }, [order, purchase])
+
+  return <p>Thank you.</p>
+}
+```
+
+| Field | What it does |
+|---|---|
+| `value` | The money that moved, and never less than zero. In the browser a negative amount is dropped, with a console warning in development; the server `purchase` throws on one, since a negative amount is a refund. |
+| `currency` | ISO 4217. Omitted, the amount is taken to already be in the reporting currency. |
+| `orderId` | Stored only as a digest, never as itself. It keeps a success page that renders twice from booking the sale twice, and lets the webhook's record of the same order hand this one its amount. Trimmed, then up to 255 characters; a beacon carrying one that is not an order id is dropped. A value `signOrderId` wrote is taken as the id it signed ([signed order ids](#recorded-in-the-browser-and-by-the-webhook)). Required on the server call, because a webhook retries. |
+| `items` | The lines of the sale: `{ id, name?, quantity?, price? }`, the first 20, strings capped at 128 characters. Stored under the event's props, forwarded to GA4 as `items`. |
+| `goal` | Slug the sale is booked against. Defaults to `purchase`, exported as `PURCHASE_GOAL_SLUG`, and defined by the plugin unless you define it yourself. |
+| `props` | Event properties, sanitized exactly like any other event's. |
+
+`purchase` is on the tracker itself too (`@10x-media/analytics/tracker`), for a host that boots it without React.
+
+There is no `purchase` goal in the config above because the plugin defines one itself. It matches a goal call, carries no fixed value, and exists precisely so a sale counts before anyone has declared anything: a goal event matching nothing completes nothing. It is latent, so a site that sells nothing never sees it. Declare a `purchase` goal in your config or add one in the goals collection and yours replaces it, same as any other slug collision. [Goals](/analytics/goals#the-built-in-purchase-goal) has the details, including `goals: { purchase: false }`.
+
+The browser is a convenient place to record a sale, and a bad place to trust one. A page the customer never reached books nothing, an ad blocker books nothing, and the amount is whatever the page said it was. Ingest treats it accordingly: a browser beacon may send a sale, and only server code may send a refund or an amount below zero. A body carrying either is refused with a `400`.
+
+Use the browser call when approximate is fine, and read on when it is not.
+
+### Amounts from the browser
+
+The ingest endpoint is public: anyone can POST it a goal completion carrying any amount up to 10<sup>12</sup>, as often as they like, with no page and no customer behind it. `revenue.browserAmounts` decides how far native ingest believes such an amount:
+
+| `browserAmounts` | A goal with a fixed value | A goal without one (a browser `purchase()`) |
+|---|---|---|
+| `'fixed'` (default) | Counts the goal's fixed value, in the goal's currency, whatever the browser sent. | Counts the amount the browser sent. |
+| `'none'` | Counts the goal's fixed value, in the goal's currency. | Counts the conversion and no money. |
+| `'trust'` | Counts the amount the browser sent over the fixed value, as before the option existed. | Counts the amount the browser sent. |
+
+This is decided goal by goal. An event that completes several goals counts each at its own worth: a pageview matching two path goals worth 5 and 50 adds 55, and a `signup` event completing a goal worth a fixed 10 and another read from its `amount` property adds 10 and that amount (10 and nothing under `'none'`).
+
+```ts
+analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  revenue: { currency: 'EUR', browserAmounts: 'none' },
+})
+```
+
+`'fixed'` is the default because it closes the forgery that costs nothing to try: a goal's worth is set by whoever configured it, so a request can no longer turn a 500 EUR demo booking into a million, or into zero, and a `data-analytics-value` or `trackGoal(slug, { value })` from the page changes nothing either. It still believes a browser `purchase()`, since a shop without a webhook has no other source for its sales, and a sale the [webhook records too](#recorded-in-the-browser-and-by-the-webhook) is counted with the webhook's amount whatever the browser sent.
+
+Choose `'none'` once your server records every sale: browser purchases then count as conversions with no money until the webhook credits them, so nothing a request sends can add revenue at all. Choose `'trust'` only for a site whose goal values are meant to come from the page, and know that anyone can then write your revenue.
+
+A goal's value read from an event property (`value: { prop }`) is an amount the browser sent too: `'none'` ignores it, `'fixed'` and `'trust'` take it for a goal without a fixed value, after an amount the event itself carries. Server code (`purchase`, `refund`, `trackServerEvent`, the goal action) is always believed. The option is native ingest's alone: a vendor slot receives what the page sends and keeps its own rules.
+
+### Goals only the server completes
+
+No mode stops a request from completing a goal that has no fixed value with an amount of its choosing: that is what a browser `purchase()` is. A goal only your server should ever complete, such as a paid subscription, says so with `browser: false`, and native ingest then ignores a browser's completion of it, whatever it carries:
+
+```ts
+analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  revenue: { currency: 'EUR' },
+  goals: [{ slug: 'subscription', name: 'Subscription', match: { kind: 'goal' }, browser: false }],
+})
+```
+
+Server code completes it as usual. In the goals collection the same switch is **Counted from the browser**, on by default.
+
+## From a payment webhook
+
+A webhook is the source of truth: it fires whether or not the browser got there, it carries the amount the processor actually captured, and it can be verified.
+
+```ts title="app/api/stripe/route.ts"
+import { purchase } from '@10x-media/analytics'
+import config from '@payload-config'
+import { getPayload } from 'payload'
+
+/** Your own signature check over Stripe's event, answering the event once it holds. */
+declare function verifiedEvent(request: Request): Promise<{
+  type: string
+  data: {
+    object: {
+      id: string
+      amount_total: number
+      currency: string
+      created: number
+      metadata?: Record<string, string>
+    }
+  }
+}>
+
+export const POST = async (request: Request) => {
+  const event = await verifiedEvent(request)
+  if (event.type !== 'checkout.session.completed') return new Response(null, { status: 204 })
+
+  const session = event.data.object
+  const payload = await getPayload({ config })
+
+  await purchase(payload, {
+    orderId: session.id,
+    value: session.amount_total / 100,
+    currency: session.currency.toUpperCase(),
+    hostname: 'shop.example.com',
+    // On a scoped install, the tenant the sale belongs to: a webhook has no request to resolve one.
+    scope: session.metadata?.tenant,
+    // When the customer paid, so a delivery retried hours later still meets the browser's record.
+    timestamp: new Date(session.created * 1000),
+    props: { plan: session.metadata?.plan ?? '' },
+  })
+
+  return new Response(null, { status: 204 })
+}
+```
+
+`orderId` is required on the server call, because a webhook is retried. A digest of it becomes the stored hit's own primary key, so the database itself refuses a second row for the same order however many times the processor delivers it, two retries racing included. A retry stores nothing, and nothing is counted twice: a day's totals are counted from the hits, once per hit.
+
+**The sale is stored outside the host's transaction.** `purchase`, `refund` and `trackServerEvent` never join a transaction `req` holds: the hit is written on the native engine's own connection, so a sale stays recorded when the host's own work around it rolls back, the processor having taken the money either way. On SQLite, which has one writer at a time, a call made inside an open transaction resolves at once and the sale is stored once that transaction has ended. [Server events and host transactions](/analytics/native#server-events-and-host-transactions) has the details.
+
+<Callout type="info">
+The key is `s.` followed by an HMAC-SHA256 digest of the tenant, the refund flag, the goal slug and the order id, with the refund id added on a refund, and the hit's id is `o` followed by the key. The digest is keyed from the Payload secret (an HMAC of `analytics:order-digest:v1` under it), so every instance sharing the secret keys an order alike, and nobody without the secret can test a guessed order number against a stored id. Hashing a list rather than joining the parts with a separator keeps them unambiguous, so `goal: 'a'` with order `b:c` cannot collide with `goal: 'a:b'` and order `c`. Two tenants can retry the same order id without colliding, and a second sale under a genuinely new order id is a genuinely new row.
+
+A browser beacon carrying an `orderId` builds the same digest under a `w.` prefix, so the two origins never share a key: a visitor who guesses an order id cannot pre-register it and make the payment webhook's own write look like a duplicate. What such a record can still do, and what closes it, is under [recorded in the browser and by the webhook](#recorded-in-the-browser-and-by-the-webhook).
+</Callout>
+
+Besides the money fields (`value`, `currency`, `orderId`, and `items` for its lines), the server call takes `goal` (the slug to book against, `purchase` by default), `item` (the [content item](/analytics/items) the sale belongs to), `path` (file the sale under a page rather than under `/orders`, the one path every order without one shares), `hostname` (defaults to the host of the install's `serverURL`, and `localhost` without one), `scope` (name the tenant when there is no request to resolve one from), `props`, and `timestamp` for a charge that settled earlier. A third argument carries `req`, `identity` and `flush`, exactly as `trackServerEvent` takes them ([what the gate does not cover](/analytics/consent#what-the-gate-does-not-cover) has `identity`). The order id never becomes part of a path or a prop: a path is a value of the daily totals, which outlive the raw hits.
+
+`timestamp` may lie in the past as far as the raw hits reach: a sale dated on a day that has already been counted is stored and that day is counted again, so its numbers move to include it. A date on or before the oldest day whose raw hits [retention](/analytics/native#retention) surely keeps (`retention.rawDays` days back, today counted, in the scope's reporting timezone) is refused with an `AnalyticsTrackError`, since that day may already be pruned and would never count it; so is one more than five minutes ahead of the server's clock. With `retention.rawDays: null` any past date is taken. On SQLite, inside a transaction `req` holds open, the call resolves before the retention check runs, and a date it refuses is logged instead; a date too far ahead still throws.
+
+An order id is taken as the provider writes it, in any charset, up to 255 characters and free of control characters; a Stripe checkout session's id is 66. Only its digest is stored, so the length costs nothing. Anything else is refused rather than truncated or dropped, since two ids sharing a prefix would become one key and a sale stored without one would count again on every retry: the server call throws an `AnalyticsTrackError` and stores nothing, and a beacon is dropped, answered `202` like every beacon ingest drops so that the answer does not say whether the tenant takes beacons, with one warning in the log.
+
+On a scoped install, a sale recorded with neither `scope` nor `req` is filed under no tenant: no tenant's report shows it, and the browser's record of the order never meets it. The server logs one warning when that happens; name the tenant with `scope`, as above.
+
+Like every server-side record, it needs the native adapter.
+
+### Recorded in the browser and by the webhook
+
+A sale both sides record counts once, in the visit the customer bought in, with the webhook's amount. The browser's `purchase` and the webhook's call for the same order (the same `orderId`, goal and tenant) share one digest. While both are stored, and lie within a day of each other, the browser's record carries the webhook's sale in place of its own (its conversion, goal completions, amount and currency, and the item when the webhook names one), and the webhook's record counts nothing at all: no event, no conversion, no revenue.
+
+So the sale lands where the customer was. The browser's record keeps its place in its visit: the landing it came from, its source, channel and campaign, its country and device. A visit that landed from a newsletter and then bought is one visit, not a bounce, with one conversion worth what the processor captured, credited to the newsletter. The webhook needs no `req` for any of that.
+
+Until the webhook arrives, the browser's record counts on its own, with the amount [`revenue.browserAmounts`](#amounts-from-the-browser) lets it carry. A webhook alone, with no browser record of its order (an ad blocker, a closed tab, a visitor who never consented), counts on its own: with the visit of the `req` it was given under `identity: 'request'`, or with none (see [the identity a server call defaults to](/analytics/consent#what-the-gate-does-not-cover)). Either record arriving after the other's day was already counted gets that day counted again, wherever that day's count was cut, while its raw hits are whole: a webhook moves its amount into the browser's day, and a browser record that arrives after midnight takes the sale out of the webhook's day and into its own. Each check is one primary key lookup, made only for an order the write actually stored (a repeated beacon or a retried webhook stores nothing and changes nothing), and is made off the beacon's response; [maintenance](/analytics/native#maintenance) looks at every order stored since its last run again, so a check that failed is made up. Past the raw retention both records stay as [tombstones](/analytics/native#retention), so the sale keeps counting once.
+
+**The day's window.** Anyone can send a beacon, and an order id is often guessable, so the two records are taken as one sale only when they lie within 24 hours of each other: a checkout succeeds within minutes of the payment, and a Stripe checkout session expires after a day. Further apart, the webhook's record counts its own sale, attributed as its own call says, and the browser's record counts as an event without one: the webhook's amount always replaces the browser's. A webhook that may be delivered late should pass the charge's own time as `timestamp`, as the Stripe example above does. Within the window a record planted ahead of a guessed order id can still take a sale's attribution, which only the next option closes.
+
+**Signed order ids.** For a site whose success page is rendered by its server, `signOrderId` signs the order id for the tenant the page belongs to, and the page passes that value as the browser's `orderId`:
+
+```ts title="app/checkout/success/order-ref.ts"
+import { signOrderId } from '@10x-media/analytics'
+import type { Payload } from 'payload'
+
+/** What the success page hands the browser's purchase({ orderId }), rendered on the server. */
+export const orderRefFor = (payload: Payload, orderId: string, tenant: string | null) =>
+  signOrderId(payload, orderId, { scope: tenant }) ?? orderId
+```
+
+`signOrderId` answers `undefined` for a value that is not an order id. Ingest keeps the order id out of a reference it signed and checks the signature against the scope the beacon resolves to. With `revenue: { orderSignature: 'required' }` a beacon carrying an unsigned order id, or one signed for another tenant, is dropped (answered `202`, with one warning in the log): no request can claim an order it was not given, so the two records of an order are taken as one sale however far apart they lie. With the default, `'optional'`, a correctly signed id is taken as the order id it signs, which lets a site sign its pages before it requires signatures; one signed for another tenant, or with a wrong signature, is taken whole, signature included, as an order id of its own that no webhook's record ever meets. A vendor slot receives the signed value as the order id. The server call takes the plain order id.
+
+Refunds are keyed apart from their sale, and never take a sale's place. A refund server code records with no visitor of its own is stored with the attribution of the visit its sale counts in (the browser's record within the window, else the webhook's), so it lands in its sale's channel, campaign and country rows, which would otherwise keep the sale and miss the money that came back. A sale with no attribution at all, a webhook's with no request and no browser record, lands in none of those rows, and neither does its refund.
+
+### A goal slug that matches nothing
+
+Naming a `goal` no configured goal matches is the one way a sale still loses money, and it is worth knowing exactly what happens. The event is recorded: a `goal`-type row, with its amount in `value`, its currency, its order key as its id and its full attribution, so it counts as an event, lands on its page and its country, and stays available to a raw read. What it does not do is complete a goal, so it adds nothing to `conversions` and nothing to `revenue`, and it appears in no goal row of the view, the goals widget or the goals table.
+
+That is quiet enough to look like a working integration, so the server logs one line per slug per process saying so. The default `purchase` goal cannot hit this, because the plugin defines it; a custom `goal` can, if the slug is a typo or the goal was renamed.
+
+## Headless storefronts
+
+Both examples below call Payload's Local API (`getPayload`), so they run in a process that has the Payload config: a Medusa module or a route of the Payload app. A storefront running elsewhere posts its order to an endpoint of your own in the Payload app, which makes the same call. Give the call a `hostname`, since there is no request to derive one from, and a `scope` on a scoped install.
+
+### Medusa v2
+
+Medusa emits `order.placed` with the order id alone, so the subscriber re-queries the order for the fields the sale needs. `total` is a `BigNumberValue`, so it is read through `Number`.
+
+```ts title="src/subscribers/order-placed.ts" partial
+import type { SubscriberArgs, SubscriberConfig } from '@medusajs/framework'
+import { Modules } from '@medusajs/framework/utils'
+import { purchase } from '@10x-media/analytics'
+import payloadConfig from '@payload-config'
+import { getPayload } from 'payload'
+
+export default async function orderPlaced({ event, container }: SubscriberArgs<{ id: string }>) {
+  const orders = container.resolve(Modules.ORDER)
+  const order = await orders.retrieveOrder(event.data.id, {
+    relations: ['items'],
+  })
+
+  const payload = await getPayload({ config: payloadConfig })
+
+  await purchase(payload, {
+    orderId: order.id,
+    value: Number(order.total),
+    currency: order.currency_code.toUpperCase(),
+    hostname: 'shop.example.com',
+    items: order.items?.map((line) => ({
+      id: line.variant_id ?? line.id,
+      name: line.title,
+      quantity: Number(line.quantity),
+      price: Number(line.unit_price),
+    })),
+  })
+}
+
+export const config: SubscriberConfig = { event: 'order.placed' }
+```
+
+Medusa currency codes are lowercase (`eur`), which is why the call upper-cases one: the plugin takes ISO 4217 as three uppercase letters and drops anything else as a malformed attribute.
+
+### Shopify
+
+Shopify's `orders/paid` webhook carries both a shop-currency and a presentment-currency total. Book the shop money, which is what the merchant is paid in and what the store's own reports sum, and keep the presentment pair as props so a later question about what the customer saw can still be answered.
+
+```ts title="app/api/shopify/route.ts"
+import { purchase } from '@10x-media/analytics'
+import config from '@payload-config'
+import { getPayload } from 'payload'
+
+type Money = { amount: string; currency_code: string }
+
+/** Your own HMAC check over Shopify's webhook, answering the order once it holds. */
+declare function verifiedOrder(request: Request): Promise<{
+  id: number
+  total_price_set: { shop_money: Money; presentment_money: Money }
+  line_items: { id: number; variant_id: number | null; title: string; quantity: number; price: string }[]
+}>
+
+export const POST = async (request: Request) => {
+  const order = await verifiedOrder(request)
+  const shop = order.total_price_set.shop_money
+  const presentment = order.total_price_set.presentment_money
+  const payload = await getPayload({ config })
+
+  await purchase(payload, {
+    orderId: String(order.id),
+    value: Number(shop.amount),
+    currency: shop.currency_code,
+    hostname: 'shop.example.com',
+    props: {
+      presentmentAmount: Number(presentment.amount),
+      presentmentCurrency: presentment.currency_code,
+    },
+    items: order.line_items.map((line) => ({
+      id: String(line.variant_id ?? line.id),
+      name: line.title,
+      quantity: line.quantity,
+      price: Number(line.price),
+    })),
+  })
+
+  return new Response(null, { status: 200 })
+}
+```
+
+Shopify retries a webhook it did not get a `2xx` for, which the order id already makes free.
+
+## Refunds
+
+**Refunds are server-side.** A public beacon that could subtract from a revenue total would let anyone forge a refund with `curl`, permanently. The browser `refund` does nothing at all, with a development console warning, and the wire refuses a negative amount with a `400`.
+
+```ts
+import { refund } from '@10x-media/analytics'
+import type { Payload } from 'payload'
+
+export const recordRefund = async (payload: Payload, orderId: string, refundId: string) => {
+  await refund(payload, {
+    orderId, // the id the sale was booked under
+    refundId, // the refund's own id, such as Stripe's re_...
+    value: 49,
+    currency: 'EUR',
+    hostname: 'shop.example.com',
+  })
+}
+```
+
+The amount is passed as the positive it is: the sign belongs to the call, so a payment provider that reports refunds as positives and one that reports them as negatives both mean the same thing.
+
+It books a completion carrying a negative value, so the goal's revenue falls by the refunded amount and its conversions stay as they were: a refund counts no conversion. That is deliberate: the sale happened, and a report that erased it would make a refund look like a customer who never converted.
+
+`refundId` is required: the refund's own id, as the payment provider names it, taken on the same terms as an order id. The refund flag and the refund id are hashed into the dedupe key beside the order id, so two partial refunds of one order are two rows and both count, and a retried refund webhook lands on the key it was stored under and counts once. A refund without a valid `refundId` is refused with an `AnalyticsTrackError`, and nothing is stored.
+
+**A negative amount is allowed only on the server `refund`.** A goal's `value.fixed`, a value property, a `data-analytics-value` attribute and every wire event all stay non-negative, so nothing else can subtract from a total it never added to. Amounts are capped in absolute terms as well, at 10^12 in whatever currency they arrived in; anything larger is a broken integration rather than money and is dropped.
+
+## What each vendor receives
+
+A goal reaches a vendor as an event named by its slug. Vendors are not told about the reporting currency and do not convert: a PostHog project receives the amount the browser sent, in the currency the browser sent.
+
+| Adapter | A sale arrives as |
+|---|---|
+| GA4 | `gtag('event', 'purchase', { value, currency, orderId, transaction_id, items, ...props })`. The order id as `transaction_id` is GA4's own idempotency handle, and `items` is its ecommerce array. |
+| PostHog | `posthog.capture(slug, { value, currency, orderId, items, ...props })`. Properties are arbitrary JSON, so the lines travel whole. |
+| Plausible | `plausible(slug, { props, revenue: { amount, currency } })`, its documented ecommerce shape, with the order id as the `orderId` prop. Props are scalars, so no `items`. |
+| Umami | `umami.track(slug, { value, currency, orderId, ...props })`. Umami has no revenue field, and event data is scalars, so no `items`. |
+
+A refund reaches no vendor at all, because it is never sent from the browser.
+
+## What to do in your case
+
+**A content site.** Nothing. Money stays off, and the goals collection never asks for an amount.
+
+**A lead is worth a known amount.** Turn money on, put the amount on the goal as `value.fixed`, and set `currency` beside it if the install has no reporting currency. No sale call at all.
+
+**A SaaS signup whose money arrives later.** Two goals. `signup` counts the conversion when the visitor signs up. Then a `purchase` from your billing webhook, when the first invoice is paid, booking the money against a `subscription` goal with the invoice id as `orderId`. Declare that goal with `browser: false` ([goals only the server completes](#goals-only-the-server-completes)): it has no fixed value, so without it anyone could post a `subscription` completion worth any amount. Recording the amount on the signup would credit revenue you have not been paid.
+
+**A shop checkout.** The payment webhook, which is the source of truth. The browser call may sit beside it as a fast approximation: a sale both record counts once, in the visit the customer bought in, with the webhook's amount, and the browser's record counts until the webhook arrives. Set `revenue: { browserAmounts: 'none' }` once the webhook records every sale, and sign the success page's order ids with `signOrderId` and `revenue: { orderSignature: 'required' }` so no request can claim an order.
+
+**Refunds.** The server `refund`, from the refund webhook, with the refund's own id. There is no browser equivalent, by design.
+
+**Tenants with different currencies.** A `revenue.currency` resolver, one currency per tenant.
+
+**One tenant taking several currencies.** A `convert` hook if the rates are known, and the `currency` dimension if they are not. Without a reporting currency at all, the view says when a revenue figure adds several currencies.

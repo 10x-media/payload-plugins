@@ -1,188 +1,166 @@
-import type { WidgetServerProps } from 'payload'
-import type { CSSProperties } from 'react'
-import { formatMetricValue } from '../fields/format'
-import { requestTimezone } from '../plugin/runtime'
-import type { TimeframePreset } from '../timeframe/presets'
-import { DEFAULT_TIMEZONE } from '../timeframe/tz'
-import { keys, type TranslationKey } from '../translations/keys'
-import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
-import { asTranslate } from '../translations/server'
+import { currentDate } from '../core/clock'
+import { formatMetricValue, formatRate } from '../fields/format'
+import { requestCurrency } from '../plugin/runtime'
+import { computeDelta } from '../timeframe/comparison'
+import { intlLocale } from '../translations/intl'
+import { keys } from '../translations/keys'
+import { METRIC_KEYS } from '../translations/metricKeys'
+import { asTranslate, type Translate } from '../translations/server'
+import { DataTable } from '../ui/components/DataTable'
 import { ComparisonDelta } from './ComparisonDelta'
-import { cardStyle, labelStyle } from './cardChrome'
-import { formatRangeCaption, resolveCustomRange } from './range'
-import type { WidgetReadStatus } from './readForWidget'
+import { widgetNotice } from './notices'
 import { readForWidgetGoals } from './readForWidgetGoals'
+import { emptyGoalsKey } from './stateKeys'
 import { type GoalsWidgetData, resolveGoalRowLimit } from './types'
-import { type WidgetViewProps, widgetViewHref } from './viewLink'
-import { WidgetViewLink } from './WidgetViewLink'
+import { type AnalyticsWidgetProps, widgetLink } from './viewLink'
+import { WidgetBody, WidgetCard, WidgetEmpty, WidgetNote } from './WidgetCard'
+import { WidgetFrame, WidgetStateCard } from './WidgetFrame'
+import { storedWidgetData } from './widgetData'
+import { resolveWidgetWindow, windowCaption, windowReadArgs } from './widgetWindow'
 
-// The goals widget carries no filter, so `filter-unsupported` is unreachable here; the map
-// stays total so the status union cannot grow without every widget answering for it.
-const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
-	'not-configured': keys.stateNotConfigured,
-	unavailable: keys.stateUnavailable,
-	'filter-unsupported': keys.stateFilterUnsupported,
-}
+const CLASS_NAME = 'analytics-goals-widget'
 
-const tableStyle: CSSProperties = {
-	width: '100%',
-	borderCollapse: 'collapse',
-	fontSize: '0.8125rem',
-	color: 'var(--theme-elevation-800)',
-}
+/** A scope configures a handful of goals far more often than its row limit's worth. */
+const SHIMMER_ROWS = 5
 
-const headStyle: CSSProperties = {
-	...labelStyle,
-	textAlign: 'left',
-	padding: '0 0 0.25rem',
-	borderBottom: '1px solid var(--theme-elevation-150)',
-}
+const dataOf = (props: AnalyticsWidgetProps): GoalsWidgetData => storedWidgetData(props.widgetData)
 
-const cellStyle: CSSProperties = {
-	padding: '0.375rem 0',
-	borderBottom: '1px solid var(--theme-elevation-100)',
-	textAlign: 'left',
-}
-
-const numericStyle: CSSProperties = { ...cellStyle, textAlign: 'right' }
-const numericHeadStyle: CSSProperties = { ...headStyle, textAlign: 'right' }
-/** Stands in for a cell the source served no number for, in a column other rows fill. */
-const MISSING = '-'
-
-const captionStyle: CSSProperties = { fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }
-const noteStyle: CSSProperties = { fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }
+const titleOf = (data: GoalsWidgetData, t: Translate): string =>
+	data.title?.trim() || t(keys.widgetGoals)
 
 /**
- * Conversions per goal over the widget's window, with the period-over-period delta, the
- * share of the site's visitors each goal converted, and revenue as a bare number: a goal's
- * currency is its own, so one formatted column would state a currency the rows do not
- * share. Columns the source cannot fill are left out rather than rendered empty.
+ * Conversions per goal over the widget's window, with delta, conversion rate and revenue.
+ * Columns the source cannot fill are left out rather than rendered empty.
+ *
+ * @beta
  */
-export default async function AnalyticsGoalsWidget(props: WidgetServerProps & WidgetViewProps) {
+export default function AnalyticsGoalsWidget(props: AnalyticsWidgetProps) {
 	const t = asTranslate(props.req.i18n.t)
-	const data = (props.widgetData ?? {}) as GoalsWidgetData
-	const rawTimeframe = data.timeframe ?? 'last30days'
-	// Only a custom range needs the reporting timezone before the read; a preset window
-	// resolves inside the read path, which resolves the timezone there as it always has.
-	const timezone = rawTimeframe === 'custom' ? await requestTimezone(props.req) : undefined
-	const customRange = timezone ? resolveCustomRange(rawTimeframe, data.range, timezone) : undefined
-	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
-	const title = data.title?.trim() || t(keys.widgetGoals)
+	return (
+		<WidgetFrame
+			className={CLASS_NAME}
+			kind="goals"
+			rows={SHIMMER_ROWS}
+			title={titleOf(dataOf(props), t)}
+			widget={props}
+		>
+			<GoalsWidgetBody {...props} />
+		</WidgetFrame>
+	)
+}
+
+async function GoalsWidgetBody(props: AnalyticsWidgetProps) {
+	const t = asTranslate(props.req.i18n.t)
+	const locale = intlLocale(props.req.i18n.language)
+	const data = dataOf(props)
+	const title = titleOf(data, t)
+	const window = await resolveWidgetWindow(props.req, data)
+	if (window.unreadable) {
+		return (
+			<WidgetStateCard
+				className={CLASS_NAME}
+				locale={locale}
+				status="invalid"
+				t={t}
+				title={title}
+			/>
+		)
+	}
+	const reporting = await requestCurrency(props.req)
 	const compare = data.compare === true
+	const now = currentDate()
 	const result = await readForWidgetGoals({
 		req: props.req,
-		timeframe,
 		limit: resolveGoalRowLimit(data.limit),
 		compare,
 		adapterId: data.dataSource,
-		now: new Date(),
-		range: customRange,
-		...(timezone ? { timezone } : {}),
+		now,
+		...windowReadArgs(window),
 	})
-	// The adapter that answered, which on a scoped or runtime-provider install is not the
-	// id the widget asked for. The metric rides along because the view's goals tab ranks by
-	// it: without it the tab opens ranked by the view's default rather than by conversions.
-	const href = widgetViewHref(props.view, props.req, {
-		timeframe: rawTimeframe,
-		timezone: timezone ?? DEFAULT_TIMEZONE,
-		...(customRange ? { range: customRange } : {}),
-		...(result.adapterId ? { source: result.adapterId } : {}),
+	// The metric rides along so the view's goals tab opens ranked by conversions, not its default.
+	const link = widgetLink(props, t, {
+		window,
+		adapterId: result.adapterId,
 		metric: 'conversions',
 		compare,
 		tab: 'goals',
 	})
+	if (result.status !== 'ok') {
+		return (
+			<WidgetStateCard
+				className={CLASS_NAME}
+				link={link}
+				locale={locale}
+				retryAfterMs={result.retryAfterMs}
+				status={result.status}
+				t={t}
+				title={title}
+			/>
+		)
+	}
 
-	const locale = props.req.i18n.language ?? 'en-US'
-	const caption =
-		customRange && timezone
-			? formatRangeCaption(customRange, locale, timezone)
-			: t(TIMEFRAME_KEYS[timeframe])
-	const percent = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 })
+	// The goal-resolution states are the table's own empty states here, so the line below it
+	// carries only what the read says about its numbers.
+	const notice = widgetNotice(
+		{ ...result, goalsUnresolved: false, noGoals: false },
+		{ t, locale, now, timeZone: result.timezone }
+	)
 	const showsRate = result.rows.some((row) => row.rate !== undefined)
 	const showsRevenue = result.rows.some((row) => row.revenue !== undefined)
-
+	const showsDelta = result.rows.some(
+		(row) => computeDelta(row.conversions, row.previousConversions) !== null
+	)
+	const currency = result.currency ?? reporting
 	return (
-		<div className="analytics-goals-widget" style={cardStyle}>
-			<span style={labelStyle}>{title}</span>
-			{result.status !== 'ok' ? (
-				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
-			) : result.goalsUnresolved ? (
-				// The source never answered about the goals, which the plain empty state would
-				// read as "nobody converted".
-				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(keys.stateGoalsUnresolved)}</span>
-			) : result.rows.length === 0 ? (
-				// A scope that configures no goals has nothing to convert on, which is a setup
-				// step rather than a window in which nobody converted.
-				<span style={{ color: 'var(--theme-elevation-400)' }}>
-					{t(result.noGoals ? keys.stateNoGoals : keys.stateNoBreakdown)}
-				</span>
+		<WidgetCard
+			className={CLASS_NAME}
+			caption={windowCaption(window, locale, t)}
+			link={link}
+			title={title}
+		>
+			{/* Rows counted against goals the source could not resolve mean nothing, so none show. */}
+			{result.goalsUnresolved || result.rows.length === 0 ? (
+				<WidgetEmpty>{t(emptyGoalsKey(result))}</WidgetEmpty>
 			) : (
-				<table style={tableStyle}>
-					<thead>
-						<tr>
-							<th scope="col" style={headStyle}>
-								{t(keys.fieldGoalLabel)}
-							</th>
-							<th scope="col" style={numericHeadStyle}>
-								{t(METRIC_KEYS.conversions)}
-							</th>
-							{showsRevenue ? (
-								<th scope="col" style={numericHeadStyle}>
-									{t(METRIC_KEYS.revenue)}
-								</th>
-							) : null}
-							{showsRate ? (
-								<th scope="col" style={numericHeadStyle}>
-									{t(keys.viewConversionRate)}
-								</th>
-							) : null}
-						</tr>
-					</thead>
-					<tbody>
-						{result.rows.map((row) => (
-							<tr key={row.slug}>
-								<td style={cellStyle}>{row.name}</td>
-								<td style={numericStyle}>
-									<span
-										style={{
-											display: 'inline-flex',
-											alignItems: 'center',
-											gap: '0.5rem',
-											justifyContent: 'flex-end',
-										}}
-									>
-										{formatMetricValue('conversions', row.conversions, locale)}
-										<ComparisonDelta
-											current={row.conversions}
-											previous={row.previousConversions}
-											metric="conversions"
-											locale={locale}
-											t={t}
-										/>
-									</span>
-								</td>
-								{showsRevenue ? (
-									<td style={numericStyle}>
-										{row.revenue === undefined
-											? MISSING
-											: formatMetricValue('revenue', row.revenue, locale)}
-									</td>
-								) : null}
-								{showsRate ? (
-									<td style={numericStyle}>
-										{row.rate === undefined ? MISSING : percent.format(row.rate)}
-									</td>
-								) : null}
-							</tr>
-						))}
-					</tbody>
-				</table>
+				<WidgetBody>
+					<DataTable
+						className="analytics-goals-widget__table"
+						columns={[
+							{ key: 'conversions', header: t(METRIC_KEYS.conversions) },
+							...(showsRevenue ? [{ key: 'revenue', header: t(METRIC_KEYS.revenue) }] : []),
+							...(showsRate ? [{ key: 'rate', header: t(keys.viewConversionRate) }] : []),
+						]}
+						label={title}
+						labelHeader={t(keys.fieldGoalLabel)}
+						noValueLabel={t(keys.stateNoValue)}
+						rows={result.rows.map((row) => ({
+							key: row.slug,
+							label: row.name,
+							cells: [
+								<span className="analytics-table__value" key="conversions">
+									{formatMetricValue('conversions', row.conversions, locale)}
+									<ComparisonDelta
+										caption={false}
+										current={row.conversions}
+										previous={row.previousConversions}
+										metric="conversions"
+										locale={locale}
+										t={t}
+									/>
+								</span>,
+								...(showsRevenue
+									? [formatMetricValue('revenue', row.revenue, { locale, currency })]
+									: []),
+								...(showsRate ? [formatRate(row.rate, locale)] : []),
+							],
+						}))}
+					/>
+					{showsDelta ? (
+						<span className="analytics-delta__caption">{t(keys.comparisonVsPrevious)}</span>
+					) : null}
+				</WidgetBody>
 			)}
-			<span style={captionStyle}>{caption}</span>
-			{result.stale ? <span style={noteStyle}>{t(keys.viewStale)}</span> : null}
-			{result.clamped ? <span style={noteStyle}>{t(keys.stateClamped)}</span> : null}
-			{result.sampled ? <span style={noteStyle}>{t(keys.stateSampled)}</span> : null}
-			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
-		</div>
+			<WidgetNote>{notice}</WidgetNote>
+		</WidgetCard>
 	)
 }

@@ -33,12 +33,15 @@ describeForDb('analytics providers collection: scoped access', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [memoryAdapter()],
-				scopeResolver: ({ req }) =>
-					scopeByEmail[(req.user as { email?: string })?.email ?? ''] ?? null,
+				scope: {
+					member: () => true,
+					resolve: ({ req }) => scopeByEmail[(req.user as { email?: string })?.email ?? ''] ?? null,
+				},
 				access: {
-					platformRead: ({ req }) => (req.user as { email?: string })?.email === 'root@t.dev',
+					crossScope: ({ req }) => (req.user as { email?: string })?.email === 'root@t.dev',
 				},
 				providers: { collection: true },
+				capture: { gate: 'off' },
 			}),
 		})
 		userA = await login(booted.payload, 'a@t.dev')
@@ -153,7 +156,7 @@ describeForDb('analytics providers collection: unscoped access', {}, (db) => {
 		await booted.stop()
 	})
 
-	it('any authenticated user can create and read providers (historic behavior)', async () => {
+	it('any user of the admin collection can create and read providers', async () => {
 		const created = await booted.payload.create({
 			collection: SLUG as never,
 			data: { name: 'Unscoped plausible', provider: 'plausible', enabled: true } as never,

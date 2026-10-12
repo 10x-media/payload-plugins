@@ -1,0 +1,101 @@
+---
+title: Concepts
+description: The ideas the rest of these pages build on, from sources, adapters and the native engine to scope and what each number means.
+---
+
+## Sources and adapters
+
+An **adapter** is one implementation of the [adapter contract](/analytics/reference/adapter-contract): the [native engine](/analytics/native), or a [provider](/analytics/providers) such as Plausible, Umami, GA4 or PostHog. It answers queries and declares what it can answer, its **capabilities**.
+
+A **source** is one readable adapter for one request. Sources come from two places, and they behave identically once resolved:
+
+- **Config adapters**, whatever `adapters` lists. Their ids are the adapter ids (`native`, `plausible`, `umami`, `ga4`, `posthog`), and their `kind` is `config`. An install without tenancy, and every install-wide or aggregate read, sees all of them; a tenant sees only some ([below](#scope)).
+- **Runtime providers**, the [provider documents](/analytics/providers#provider-documents) a scope holds, or whatever `providers.resolve` returns for it. Each carries a per-document instance id, `<provider>:<docId>` (`posthog:68f3a1...`), so one scope can run two projects of the same provider type, and its label is the document's name. Their `kind` is `runtime`.
+
+Both layers are merged into one registry per scope: the config adapters in config order, then that scope's runtime providers. The registry names a **default source**, which a read that names none uses: `defaultAdapter` when set, otherwise the first adapter configured. When a tenant's reader may not read that one, the default is the first source left in the tenant's listing, which can be one of its own provider documents. The [sources endpoint](/analytics/reference/endpoints#sources-endpoint) lists a request's sources and names its default, and every picker in the admin is built from it.
+
+On a scoped install a tenant reads its own provider documents, filtered to the documents its reader may read. A config adapter that cannot narrow its query to one tenant is never among a tenant's sources. One that can (native, PostHog with a `scopeProperty`) is among them without the providers collection; with it, only through a document the tenant holds (a `native` document grants native) or for a reader `access.crossScope.unscopedSource` admits ([Which sources a request sees](/analytics/multi-tenancy#which-sources-a-request-sees)).
+
+Every surface reads the selected source's capabilities rather than the contract, so a source that serves less gets a smaller view, fewer widget options and fewer columns instead of controls that fail. Validation is always against the selected source, never against the union of the configured adapters.
+
+## Capture and reads
+
+The plugin does two separate jobs, and an install may use either one alone.
+
+**Capture** gets events in. A dependency-free browser [tracker](/analytics/capture) sends pageviews and events to whichever adapter fills each **capture slot**: at most two per page, `global` for the platform and `tenant` for the request's scope. Native posts to its own ingest endpoint; a vendor gets its own SDK, loaded through your origin by the [first-party proxy](/analytics/proxy), except GA4, whose tag loads from Google. Server code records events too ([`trackServerEvent`](/analytics/goals#4-track-from-server-code), `purchase`, `refund`), through the native engine alone. Which slots wait for your consent manager is [`capture.gate`](/analytics/consent), and the plugin has no default for it.
+
+**Reads** get numbers out. Every read surface (the [analytics view](/analytics/analytics-view), the [dashboard widgets](/analytics/widgets), the [display fields](/analytics/display-fields), the [query endpoint](/analytics/reference/endpoints#query-endpoint) and the read helpers) goes through one engine that checks access and scope, validates against the source's capabilities, and serves from a [cache](/analytics/cache) in front of the source.
+
+The two meet only where they share an adapter. A vendor the plugin reads need not be one it captures for: a GA4 property tagged by your own tag manager reads the same way. A vendor adapter declares capture support only when its public capture settings are present.
+
+## The native engine
+
+`native()` stores analytics in your own database, on MongoDB, Postgres or SQLite. Every beacon is one row of raw **hits**; a day is counted into **daily totals** once it closes in its scope's reporting timezone, and reads take closed days from the totals and today from the hits, or on a busy day from a snapshot of them a few minutes old at most. A maintenance task, `analytics-maintain`, counts days and deletes what retention lets go, on a jobs runner or, without one, on the requests the site already gets. It sets no cookie: a visitor is a hash of the address, the user agent and the hostname under a salt that changes every day and is deleted within days. [Native engine](/analytics/native) has the whole of it, and [Privacy](/analytics/privacy) what a stored hit holds.
+
+## Scope
+
+A **scope** is a string naming one analytics boundary: a tenant id, a site key. `null` is the whole install, which is what an install without tenancy reads with. Two options decide a request's scope:
+
+- **Selection**, `scope.resolve`: which scope is this request for? The site a visit landed on, or the tenant an admin picked in a tenant selector. It is told its **call site**: `capture` for a visitor's hit (asked without the signed-in user, cookies or authorization header) and `admin` for everything a signed-in reader does.
+- **Membership**, `scope.member`: does the request's user belong to the scope it selected? A selection proves nothing, since a tenant selector is set in the browser.
+
+On a scoped install, ingest stamps every hit with the scope its request resolved and drops a hit whose request resolves none; every read is for the request's own scope; the providers, goals and sync collections hold rows per scope; and the cache, the reporting timezone and the currency are kept per scope. `access.crossScope` decides who reads past their own scope: by naming another tenant (`named`), across every tenant at once (`aggregate`), or through a shared source that cannot narrow its query to one tenant (`unscopedSource`). [Multi-tenancy](/analytics/multi-tenancy) has the recipe.
+
+### What scope does and does not guarantee
+
+Scope is the boundary the plugin's own surfaces enforce, not one the database enforces:
+
+- **The plugin's reads are gated.** Every endpoint, widget, display field and read helper asks `access.read`, then the scope, then membership, before it reads. A tenant cannot read another tenant's numbers by asking for them.
+- **A source narrows to a scope only if it can.** Native filters on its scope column. A vendor adapter narrows only when it declares `capabilities.scopedQueries` (PostHog with `scopeProperty`); any other shared source answers with install-wide numbers, so reading a tenant through it takes `access.crossScope.unscopedSource`, and the echoed query then carries no `scope`. A tenant's own provider documents are that tenant's numbers by construction.
+- **Every scope's rows share one set of collections.** Your own server code reads across scopes through the Local API like any other collection. The engine's and the cache's collections (hits, daily totals, state, cache) have no REST or GraphQL endpoints; the goals, providers and sync collections do, behind their own access, which on a scoped install filters each request to the scopes its user may read; the sync collection's also asks `access.read` first. The read gate covers only the plugin's surfaces.
+- **Capture is public.** A hit is filed under whatever scope `scope.resolve` answers at the `capture` call site, so attribution is exactly as trustworthy as that resolver. Resolve from the request's host, matched against domains you own, behind an edge that refuses unknown hosts ([capture slots per tenant](/analytics/multi-tenancy#capture-slots-per-tenant)).
+
+## Visits and visitors
+
+A **visitor** is whoever a source counts as one person. On native it is a visitor id: a keyed hash of the client address, the user agent and the hostname under the day's salt. A new salt each day means a new id each day, so native counts distinct visitors exactly within one day and, across a range of days, adds each day's count up: someone who came on two days counts twice. A read says which it did in `meta.visitorsAre`, `distinct` or `sumOfDaily`, and the admin then calls the number **Visitors, counted per day**. A vendor counts with its own identifiers, usually distinct over the whole range. On native the hostname is part of the id, so someone on two hostnames of one scope on the same day is one visitor on each.
+
+A **visit** is one visitor's activity with no gap longer than its source's rule: 30 minutes without a hit on native, the vendor's own session rule elsewhere. `visits` and `sessions` are one count under two names: a source serving both answers the same number, and the admin shows it once, as **Visits**. A **bounce** is a visit with exactly one pageview and no event or goal.
+
+## What the numbers mean
+
+Each metric means one thing on every source, and a source that cannot measure it does not offer it:
+
+| Metric | Shown as | Means |
+|---|---|---|
+| `pageviews` | Pageviews | Pages viewed, a single-page app's in-place navigations included. |
+| `visitors` | Visitors | People, as their source counts them: [above](#visits-and-visitors). |
+| `visits`, `sessions` | Visits | Visits: one count under two names. |
+| `bounceRate` | Bounce rate | The share of visits with one pageview and no event or goal, in percent. |
+| `avgDuration` | Time on page | Engaged time per pageview: the time pages were visible, averaged over the pageviews read. |
+| `visitDuration` | Time per visit | Engaged time per visit: the same time, averaged over the visits read. |
+| `scrollDepth` | Scroll depth | How far down the page visitors got, in percent of its height, averaged over the pageviews that measured it. |
+| `events` | Events | Custom events and goal completions. |
+| `conversions` | Conversions | Completions of this install's [goals](/analytics/goals). |
+| `revenue` | Revenue | What those completions were worth, on an install that [measures money](/analytics/revenue). |
+| `impressions`, `interactions` | Views, Clicks | A [content item](/analytics/items)'s views and clicks. |
+
+**Time on page and time per visit are different numbers.** A visit of three pages, visible for 20, 40 and 60 seconds, adds 120 seconds of time: its time per visit is 120 seconds, and its time on page is 40 seconds, the 120 seconds over its three pageviews. Where a vendor reports only one of them, the plugin offers only that one ([Providers](/analytics/providers#time-on-page-and-time-per-visit)).
+
+An average with nothing to average over (time on page with no pageviews, a scroll depth nobody reported, a bounce rate with no visits) is no data rather than zero: every surface shows a dash, draws no comparison and leaves a gap in a trend line.
+
+Where a visit came from is three related dimensions. **`referrer`** is the host of the page that opened it. **`source`** is its named origin: the `utm_source` tag when there is one, else the referrer, else `direct`. **`channel`** is that origin classified into an acquisition channel, such as paid search or email ([traffic channels](/analytics/native#traffic-channels)).
+
+## Days and caching
+
+Days are cut in the [reporting timezone](/analytics/timezone), per install or per scope, so "yesterday" is the same day for every reader and in every number. Reads are [cached](/analytics/cache): an answer is served from memory or the `analytics-cache` collection, and an expired one is served at once while it refreshes, so a slow vendor holds back no page.
+
+## The plugin's collections
+
+What the plugin registers in your Payload config, each only with the feature it serves:
+
+| Collection | Default slug | Registered with |
+|---|---|---|
+| Raw [hits](/analytics/native#storage) | `analytics-hits` | `native()` |
+| [Daily totals](/analytics/native#storage) | `analytics-aggregates` | `native()` |
+| Salts, day markers, leases and heartbeats | `analytics-state` | `native()`, else [sync](/analytics/sync) or [warming](/analytics/cache#warming) |
+| [Read cache](/analytics/cache#the-analytics-cache-collection) | `analytics-cache` | every install without `cache.store` |
+| [Synced daily metrics](/analytics/sync) | `analytics-daily` | `sync` |
+| [Provider settings](/analytics/providers#provider-documents) | `analytics-providers` | `providers.collection` |
+| [Goals](/analytics/goals#5-let-editors-manage-goals) | `analytics-goals` | `goals.collection` |
+
+Registering a task (`analytics-maintain` with `native()`, `analytics-sync` with `sync`, `analytics-warm` with `cache.warm`) also turns Payload's jobs on. Every collection can be renamed and reshaped: [Renaming the plugin's collections](/analytics/reference/options#renaming-the-plugins-collections).

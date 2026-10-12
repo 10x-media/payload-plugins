@@ -1,63 +1,71 @@
 import type { PayloadRequest } from 'payload'
-import { comparisonOf } from '../core/capabilities'
+import { type ReadPrincipal, readPrincipalOf } from '../access/principal'
+import {
+	alignSeries,
+	fillSeries,
+	type SeriesGranularity,
+	type SeriesPoint,
+	seriesGranularityFor,
+} from '../charts/series'
 import type {
 	AnalyticsFilter,
 	AnalyticsResult,
-	AnalyticsRow,
 	DateRange,
 	MetricKey,
+	MetricValue,
 } from '../core/contract'
+import { emptyReading } from '../core/metricValues'
+import { readFailureOf } from '../surfacing/classifyError'
 import type { TimeframePreset } from '../timeframe/presets'
-import { addDaysInTz, DEFAULT_TIMEZONE, startOfDayInTz, zonedDayIso } from '../timeframe/tz'
-import { previousWindow, withinLookback } from './comparison'
-import { prepareWidgetRead, type WidgetReadStatus } from './prepareWidgetRead'
-import { readMeta } from './readMeta'
+import {
+	comparisonWindow,
+	engineRead,
+	prepareWidgetRead,
+	type WidgetReadStatus,
+} from './prepareWidgetRead'
+import { type ReadNotices, readMeta } from './readMeta'
 
-export interface SeriesPoint {
-	date: string
-	value: number
-}
+export type { SeriesGranularity, SeriesPoint } from '../charts/series'
 
-export interface WidgetSeriesResult {
+export interface WidgetSeriesResult extends Partial<ReadNotices> {
 	status: WidgetReadStatus
+	/** How long until a `busy` read can succeed, when the source or the plugin knows. */
+	retryAfterMs?: number
 	adapterId: string
+	/** The scope the read narrowed to, absent for an install-wide one. */
+	scope?: string
 	dateRange: DateRange
 	/** Reporting timezone the read resolved in; the trend axis buckets in it. */
 	timezone: string
 	points: SeriesPoint[]
-	total: number
+	/**
+	 * The bucket the points actually carry. A window of a day or two is charted by hour, so
+	 * `day` there says the source serves no hourly rows and the series is a single point.
+	 */
+	seriesGranularity?: SeriesGranularity
+	/** The window's headline reading; `null` for an average with no samples in it. */
+	total: MetricValue
 	/** The source that answered, absent on a read that never reached one. */
 	provider?: string
-	clamped?: boolean
-	/** True when the engine served a stale cache entry after a failed provider read. */
-	stale?: boolean
-	/** True when the source answered without one of the filters the read carried. */
-	filtersUnapplied?: boolean
-	/** True when the read hit the source's event scan cap, so the numbers are a floor. */
-	sampled?: boolean
-	/** True when the source could not read the scope's goals, so a conversions series means nothing. */
-	goalsUnresolved?: boolean
 	/** Previous-window headline total, present only when the adapter supports comparison. */
-	previousTotal?: number
+	previousTotal?: MetricValue
 	/** The previous comparable window, present only when comparison ran. */
 	comparisonRange?: DateRange
 	/**
-	 * The previous window's daily series, present only when `compare` was asked for and the
-	 * adapter supports comparison. Zero-filled to the same length as `points`, so the
-	 * previous window's day i overlays `points[i]`.
+	 * Previous window's series at the same granularity, when `compare` ran. Zero-filled to the
+	 * length of `points`, so its bucket i overlays `points[i]`.
 	 */
 	comparisonPoints?: SeriesPoint[]
 }
 
-export interface ReadForWidgetSeriesArgs {
+/** Scoped like `ReadForWidgetArgs`: the request's own scope unless one is pinned. */
+export type ReadForWidgetSeriesArgs = ReadPrincipal & {
 	req: PayloadRequest
 	metric: MetricKey
 	timeframe: TimeframePreset
 	adapterId?: string
 	now: Date
 	range?: DateRange
-	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
-	scope?: string | null
 	/**
 	 * Reporting timezone the caller already resolved, reused rather than resolved again so
 	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
@@ -68,60 +76,9 @@ export interface ReadForWidgetSeriesArgs {
 	compare?: boolean
 }
 
-const MAX_SERIES_DAYS = 366
-
 /**
- * Project time-series rows onto a contiguous daily axis, zero-filling gaps. Days are
- * counted in `tz` (defaulting to UTC), so a reporting-timezone read aligns each bucket
- * to that zone's midnight. The axis is capped at the most recent `MAX_SERIES_DAYS` so
- * an unbounded range (all time) stays a bounded, drawable sparkline; the headline total
- * still reflects the full range.
- */
-export const fillDailySeries = (args: {
-	rows: AnalyticsRow[]
-	dateRange: DateRange
-	metric: MetricKey
-	tz?: string
-}): SeriesPoint[] => {
-	const { rows, dateRange, metric } = args
-	const tz = args.tz ?? DEFAULT_TIMEZONE
-	const lastDay = startOfDayInTz(dateRange.end, tz)
-	const requestedStart = startOfDayInTz(dateRange.start, tz)
-	const byDay = new Map<string, number>()
-	for (const row of rows) {
-		if (!row.timestamp) {
-			continue
-		}
-		const day = zonedDayIso(new Date(row.timestamp), tz)
-		byDay.set(day, (byDay.get(day) ?? 0) + (row.metrics[metric] ?? 0))
-	}
-	// Walk calendar days back from the last day so DST-length days never mis-step, capping
-	// the axis at MAX_SERIES_DAYS or the requested start, whichever is more recent.
-	const isoDays: string[] = []
-	let cursor = lastDay
-	for (let i = 0; i < MAX_SERIES_DAYS && cursor.getTime() >= requestedStart.getTime(); i += 1) {
-		isoDays.push(cursor.toISOString())
-		cursor = addDaysInTz(cursor, -1, tz)
-	}
-	return isoDays.reverse().map((date) => ({ date, value: byDay.get(date) ?? 0 }))
-}
-
-/**
- * Project a comparison series onto the primary axis: day i of the previous window overlays
- * day i of the current one. Both windows span the same day count by construction, so this
- * only guards a DST-shifted or clamped edge, silently truncating or zero-filling; a filled
- * bucket borrows the axis day so every point still carries a real date.
- */
-const alignSeries = (points: SeriesPoint[], axis: SeriesPoint[]): SeriesPoint[] =>
-	points.length === axis.length
-		? points
-		: axis.map((day, i) => points[i] ?? { date: day.date, value: 0 })
-
-/**
- * Site-wide time-series read for a trend widget: resolve the timeframe, pick the
- * adapter, gate on the metric and day-granularity support, read through the engine,
- * then return a zero-filled daily series plus the headline total. Mirrors
- * `readForWidget` but yields points instead of a single value.
+ * Trend read: a zero-filled series plus headline total. A window of a day or two reads by hour
+ * where served (a daily axis there is one point); see {@link seriesGranularityFor}.
  */
 export const readForWidgetSeries = async (
 	args: ReadForWidgetSeriesArgs
@@ -133,7 +90,7 @@ export const readForWidgetSeries = async (
 		now,
 		timeframe,
 		adapterId,
-		scope: args.scope,
+		...readPrincipalOf(args),
 		timezone: args.timezone,
 		range,
 		filters,
@@ -151,15 +108,9 @@ export const readForWidgetSeries = async (
 			total: 0,
 		}
 	}
-	const { runtime, adapter, tz, dateRange, goalSlugs } = prepared
-	const base = { dateRange, timezone: tz, points: [] as SeriesPoint[], total: 0 }
-	const previousRange =
-		runtime.comparison && comparisonOf(adapter.capabilities) ? previousWindow(dateRange, tz) : null
-	const comparisonRange =
-		previousRange &&
-		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
-			? previousRange
-			: undefined
+	const { adapter, tz, dateRange, goalSlugs } = prepared
+	const granularity = seriesGranularityFor(dateRange, adapter.capabilities)
+	const comparisonRange = comparisonWindow(prepared, now)
 	const readBase = {
 		metrics: [metric],
 		filters,
@@ -167,43 +118,58 @@ export const readForWidgetSeries = async (
 		scope: prepared.queryScope,
 		...(goalSlugs === undefined ? {} : { goalSlugs }),
 	}
+	const read = engineRead(prepared, timeframe)
+	const main = read({ ...readBase, dateRange, granularity })
+	// The overlay needs the previous window bucketed like the primary; the delta only its total.
+	// One that fails drops the overlay and the delta, never the series itself.
+	const comparing = comparisonRange
+		? read({
+				...readBase,
+				dateRange: comparisonRange,
+				...(compare ? { granularity } : {}),
+			}).catch(() => undefined)
+		: undefined
 	let result: AnalyticsResult
-	let previous: AnalyticsResult | undefined
 	try {
-		;[result, previous] = await Promise.all([
-			runtime.engine.read(adapter, { ...readBase, dateRange, granularity: 'day' }),
-			comparisonRange
-				? runtime.engine.read(adapter, {
-						...readBase,
-						dateRange: comparisonRange,
-						// The overlay needs the previous window bucketed like the primary; the delta
-						// alone only needs its total, so the read stays as it was without `compare`.
-						...(compare ? { granularity: 'day' as const } : {}),
-					})
-				: undefined,
-		])
-	} catch {
-		// No cache entry (fresh or stale) survived the failed read; degrade like an
-		// unsupported capability instead of throwing through the widget render tree.
-		return { status: 'unavailable', adapterId: adapter.id, ...base }
+		result = await main
+	} catch (err) {
+		return {
+			...readFailureOf(err),
+			adapterId: adapter.id,
+			dateRange,
+			timezone: tz,
+			points: [],
+			total: 0,
+		}
 	}
+	const previous = await comparing
 	const previousTotal = previous ? previous.totals?.[metric] : undefined
-	const points = fillDailySeries({ rows: result.rows, dateRange, metric, tz })
+	const points = fillSeries({ rows: result.rows, dateRange, metric, tz, granularity })
+	const total = result.totals?.[metric]
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
+		...(prepared.queryScope === undefined ? {} : { scope: prepared.queryScope }),
 		dateRange,
 		timezone: tz,
 		points,
-		total: result.totals?.[metric] ?? 0,
+		seriesGranularity: granularity,
+		total: total === undefined ? emptyReading(metric) : total,
 		...readMeta(result),
 		previousTotal,
-		comparisonRange,
+		comparisonRange: previous ? comparisonRange : undefined,
 		...(compare && previous && comparisonRange
 			? {
 					comparisonPoints: alignSeries(
-						fillDailySeries({ rows: previous.rows, dateRange: comparisonRange, metric, tz }),
-						points
+						fillSeries({
+							rows: previous.rows,
+							dateRange: comparisonRange,
+							metric,
+							tz,
+							granularity,
+						}),
+						points,
+						metric
 					),
 				}
 			: {}),

@@ -1,160 +1,177 @@
-import type { WidgetServerProps } from 'payload'
-import { bucketByRange, bucketSeries, onPrimaryAxis } from '../charts/bucket'
-import { TrendChart } from '../charts/TrendChart'
-import type { MetricKey } from '../core/contract'
+import { labelSeries, unitForRange } from '../charts/bucket'
+import { markInProgress } from '../charts/inProgress'
+import { TrendChart, type TrendPoint } from '../charts/TrendChart'
+import { currentDate } from '../core/clock'
 import { formatMetricValue } from '../fields/format'
-import { requestTimezone } from '../plugin/runtime'
-import type { TimeframePreset } from '../timeframe/presets'
-import { DEFAULT_TIMEZONE } from '../timeframe/tz'
-import { keys, type TranslationKey } from '../translations/keys'
-import { METRIC_KEYS, TIMEFRAME_KEYS } from '../translations/metricKeys'
+import { revenueCurrencyOf } from '../goals/currency'
+import { requestCurrency } from '../plugin/runtime'
+import { intlLocale } from '../translations/intl'
+import { keys } from '../translations/keys'
 import { asTranslate } from '../translations/server'
 import { ComparisonDelta } from './ComparisonDelta'
-import { cardStyle, labelStyle } from './cardChrome'
-import { captionWithFilter } from './filterCaption'
 import { widgetFilters } from './filterField'
-import { formatRangeCaption, resolveCustomRange } from './range'
-import type { WidgetReadStatus } from './readForWidget'
+import { widgetNotice } from './notices'
+import { formatRangeCaption } from './range'
 import { readForWidgetSeries } from './readForWidgetSeries'
+import { metricWidgetTitle, placeholderTitle } from './titleForecast'
 import type { MetricWidgetData } from './types'
-import { type WidgetViewProps, widgetViewHref } from './viewLink'
-import { WidgetViewLink } from './WidgetViewLink'
+import { type AnalyticsWidgetProps, widgetLink } from './viewLink'
+import { WidgetBody, WidgetCard, WidgetNote, WidgetValue } from './WidgetCard'
+import { WidgetFrame, WidgetStateCard } from './WidgetFrame'
+import { storedWidgetData } from './widgetData'
+import { resolveWidgetWindow, widgetCaption, windowReadArgs } from './widgetWindow'
 
-const STATE_KEY: Record<Exclude<WidgetReadStatus, 'ok'>, TranslationKey> = {
-	'not-configured': keys.stateNotConfigured,
-	unavailable: keys.stateUnavailable,
-	'filter-unsupported': keys.stateFilterUnsupported,
+const CLASS_NAME = 'analytics-trend-widget'
+
+const CHART_MIN_HEIGHT = 140
+
+const dataOf = (props: AnalyticsWidgetProps): MetricWidgetData => storedWidgetData(props.widgetData)
+
+/**
+ * The card's frame paints at once; its total and chart stream in when the read answers.
+ *
+ * @beta
+ */
+export default function AnalyticsTrendWidget(props: AnalyticsWidgetProps) {
+	return (
+		<WidgetFrame
+			className={CLASS_NAME}
+			kind="trend"
+			widget={props}
+			{...placeholderTitle(props.req, dataOf(props), { series: true })}
+		>
+			<TrendWidgetBody {...props} />
+		</WidgetFrame>
+	)
 }
 
-export default async function AnalyticsTrendWidget(props: WidgetServerProps & WidgetViewProps) {
-	const data = (props.widgetData ?? {}) as MetricWidgetData
-	const metric: MetricKey = data.metric ?? 'pageviews'
-	const rawTimeframe = data.timeframe ?? 'last30days'
-	// Only a custom range needs the reporting timezone before the read; a preset window
-	// resolves inside the read path, which resolves the timezone there as it always has.
-	const timezone = rawTimeframe === 'custom' ? await requestTimezone(props.req) : undefined
-	const customRange = timezone ? resolveCustomRange(rawTimeframe, data.range, timezone) : undefined
-	const timeframe: TimeframePreset = rawTimeframe === 'custom' ? 'last30days' : rawTimeframe
+async function TrendWidgetBody(props: AnalyticsWidgetProps) {
+	const data = dataOf(props)
+	const metric = data.metric ?? 'pageviews'
 	const t = asTranslate(props.req.i18n.t)
-	const locale = props.req.i18n.language ?? 'en-US'
-	const title = data.title?.trim() || t(METRIC_KEYS[metric])
-
+	const locale = intlLocale(props.req.i18n.language)
+	const title = metricWidgetTitle(data, t)
+	const window = await resolveWidgetWindow(props.req, data)
+	if (window.unreadable) {
+		return (
+			<WidgetStateCard
+				className={CLASS_NAME}
+				locale={locale}
+				status="invalid"
+				t={t}
+				title={title}
+			/>
+		)
+	}
+	const reporting = await requestCurrency(props.req)
 	const compare = data.compare === true
 	const filters = widgetFilters(data)
+	const now = currentDate()
 	const result = await readForWidgetSeries({
 		req: props.req,
 		metric,
-		timeframe,
 		adapterId: data.dataSource,
-		now: new Date(),
-		range: customRange,
+		now,
 		compare,
 		filters,
-		...(timezone ? { timezone } : {}),
+		...windowReadArgs(window),
 	})
-	// The adapter that answered, which on a scoped or runtime-provider install is not the
-	// id the widget asked for.
-	const href = widgetViewHref(props.view, props.req, {
-		timeframe: rawTimeframe,
-		timezone: timezone ?? DEFAULT_TIMEZONE,
-		...(customRange ? { range: customRange } : {}),
-		...(result.adapterId ? { source: result.adapterId } : {}),
+	const link = widgetLink(props, t, {
+		window,
+		adapterId: result.adapterId,
 		metric,
 		compare,
 		filters,
 	})
-
 	if (result.status !== 'ok') {
 		return (
-			<div className="analytics-trend-widget" style={cardStyle}>
-				<span style={labelStyle}>{title}</span>
-				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
-				<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
-			</div>
+			<WidgetStateCard
+				className={CLASS_NAME}
+				link={link}
+				locale={locale}
+				retryAfterMs={result.retryAfterMs}
+				status={result.status}
+				t={t}
+				title={title}
+			/>
 		)
 	}
 
-	const windowCaption =
-		customRange && timezone
-			? formatRangeCaption(customRange, locale, timezone)
-			: t(TIMEFRAME_KEYS[timeframe])
-	const caption = captionWithFilter(windowCaption, filters[0], t)
-	const buckets = customRange
-		? bucketByRange(result.points, customRange, result.timezone)
-		: bucketSeries(result.points, timeframe, result.timezone)
-	const toPoints = (source: typeof buckets) =>
-		source.map((b) => ({ ...b, display: formatMetricValue(metric, b.value, locale) }))
-	const trendPoints = toPoints(buckets)
-	// The comparison is re-dated onto the primary axis before bucketing: at week and month
-	// units its own dates would fall on different boundaries.
-	const previousSeries =
+	const currency = result.currency ?? revenueCurrencyOf(filters, reporting)
+	const caption = await widgetCaption(props.req, { window, filters, read: result, locale, t })
+	const notice = widgetNotice(result, { t, locale, now, timeZone: result.timezone })
+	// A window charted by hour needs hourly rows; without them the headline total above is the
+	// whole answer, and a one-point line under it would only look like a broken chart.
+	const chartable = unitForRange(result.dateRange) !== 'hour' || result.seriesGranularity === 'hour'
+	const format = (value: TrendPoint['value']): string =>
+		formatMetricValue(metric, value, { locale, currency })
+	const trendPoints: TrendPoint[] = markInProgress(
+		labelSeries(result.points, {
+			granularity: result.seriesGranularity ?? 'day',
+			tz: result.timezone,
+			locale,
+			weekday: !window.range && window.timeframe === 'last7days',
+			from: result.dateRange.start,
+		}).map((bucket) => ({ ...bucket, display: format(bucket.value) })),
+		{ now, end: result.dateRange.end, soFar: (period) => t(keys.chartSoFar, { period }) }
+	)
+	// The read aligned the previous window to these buckets by index, so it borrows their labels.
+	const comparisonPoints: TrendPoint[] | undefined =
 		compare && result.comparisonPoints
-			? onPrimaryAxis(result.comparisonPoints, result.points)
+			? trendPoints.map((bucket, i) => {
+					const value = result.comparisonPoints?.[i]?.value ?? null
+					return { ...bucket, value, display: format(value) }
+				})
 			: undefined
-	const comparisonPoints = previousSeries
-		? toPoints(
-				customRange
-					? bucketByRange(previousSeries, customRange, result.timezone)
-					: bucketSeries(previousSeries, timeframe, result.timezone)
-			)
-		: undefined
+	// An average with no reading on any day has no line to draw; the dash above says so.
+	const drawable = trendPoints.some((point) => point.value !== null)
 	return (
-		<div className="analytics-trend-widget" style={cardStyle}>
-			<span style={labelStyle}>{title}</span>
-			<span
-				style={{
-					fontSize: '1.75rem',
-					fontWeight: 700,
-					lineHeight: 1.1,
-					color: 'var(--theme-elevation-800)',
-				}}
+		<WidgetCard
+			className={CLASS_NAME}
+			caption={caption}
+			link={link}
+			title={metricWidgetTitle(data, t, result.visitorsSummed)}
+		>
+			<WidgetValue
+				noValueLabel={t(keys.stateNoValue)}
+				value={formatMetricValue(metric, result.total, { locale, currency })}
 			>
-				{formatMetricValue(metric, result.total, locale)}
-			</span>
-			<TrendChart
-				buckets={trendPoints}
-				{...(comparisonPoints && result.comparisonRange
-					? {
-							comparison: comparisonPoints,
-							comparisonLabel: t(keys.viewTrendPrevious),
-							comparisonRange: formatRangeCaption(result.comparisonRange, locale, result.timezone),
-							label: title,
-						}
-					: {})}
-				ariaLabel={`${title} ${caption}`}
-				minHeight={180}
-			/>
-			<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-400)' }}>{caption}</span>
-			{result.comparisonRange ? (
-				<ComparisonDelta
-					current={result.total}
-					previous={result.previousTotal}
-					metric={metric}
-					locale={locale}
-					t={t}
-				/>
+				{result.comparisonRange ? (
+					<ComparisonDelta
+						current={result.total}
+						previous={result.previousTotal}
+						metric={metric}
+						locale={locale}
+						t={t}
+					/>
+				) : null}
+			</WidgetValue>
+			{chartable && drawable ? (
+				<WidgetBody>
+					<TrendChart
+						buckets={trendPoints}
+						{...(comparisonPoints && result.comparisonRange
+							? {
+									comparison: comparisonPoints,
+									comparisonLabel: t(keys.viewTrendPrevious),
+									comparisonRange: formatRangeCaption(
+										result.comparisonRange,
+										locale,
+										result.timezone
+									),
+								}
+							: {})}
+						ariaLabel={`${title} ${caption}`}
+						fill
+						keyboardHint={t(keys.chartKeyboardHint)}
+						label={title}
+						minHeight={CHART_MIN_HEIGHT}
+						noValueLabel={t(keys.stateNoValue)}
+						periodLabel={t(keys.viewTrendPeriod)}
+					/>
+				</WidgetBody>
 			) : null}
-			{result.stale ? (
-				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
-					{t(keys.viewStale)}
-				</span>
-			) : null}
-			{result.clamped ? (
-				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
-					{t(keys.stateClamped)}
-				</span>
-			) : null}
-			{result.filtersUnapplied ? (
-				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
-					{t(keys.stateFiltersUnapplied)}
-				</span>
-			) : null}
-			{result.sampled ? (
-				<span style={{ fontSize: '0.6875rem', color: 'var(--theme-elevation-400)' }}>
-					{t(keys.stateSampled)}
-				</span>
-			) : null}
-			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
-		</div>
+			<WidgetNote>{notice}</WidgetNote>
+		</WidgetCard>
 	)
 }

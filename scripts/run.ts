@@ -5,7 +5,7 @@
  *
  * Cacheable, dependency-aware tasks (build, lint, typecheck, test*) run through
  * turbo so they gain caching and dependency-aware ordering. Interactive or
- * side-effecting tasks (dev, start, generate*, migrate*, test:e2e, lint:fix) run
+ * side-effecting tasks (dev, start, generate*, migrate*, test:e2e, test:upgrade, lint:fix) run
  * through pnpm filters.
  *
  * A target can be a plugin under `packages/` (e.g. automations) or an app
@@ -31,7 +31,11 @@ const PACKAGES_DIR = join(REPO_ROOT, 'packages')
 const APPS_DIR = join(REPO_ROOT, 'apps')
 const SCOPE = '@10x-media'
 
-const MIGRATE_TASKS = [
+// Tasks that only make sense for plugins (they rely on the `-dev` companion app).
+const PLUGIN_ONLY_TASKS = new Set([
+	'generate',
+	'generate:types',
+	'generate:importmap',
 	'migrate',
 	'migrate:create',
 	'migrate:down',
@@ -39,31 +43,15 @@ const MIGRATE_TASKS = [
 	'migrate:reset',
 	'migrate:status',
 	'migrate:fresh',
-]
-const DEV_PACKAGE_TASKS = new Set([
-	'dev',
-	'start',
-	'generate',
-	'generate:types',
-	'generate:importmap',
-	...MIGRATE_TASKS,
 ])
-// Tasks that only make sense for plugins (they rely on the `-dev` companion app).
-const PLUGIN_ONLY_TASKS = new Set([
-	'generate',
-	'generate:types',
-	'generate:importmap',
-	...MIGRATE_TASKS,
-])
+const SERVER_TASKS = ['dev', 'start']
+const DEV_PACKAGE_TASKS = new Set([...SERVER_TASKS, ...PLUGIN_ONLY_TASKS])
 const REQUIRE_TARGET = new Set([
-	'dev',
-	'start',
-	'generate',
-	'generate:types',
-	'generate:importmap',
+	...SERVER_TASKS,
+	...PLUGIN_ONLY_TASKS,
 	'test:e2e',
+	'test:upgrade',
 	'videos',
-	...MIGRATE_TASKS,
 ])
 const TURBO_TASKS = new Set([
 	'build',
@@ -211,7 +199,7 @@ const main = (): void => {
 	// Plugins route dev/start/generate*/migrate* to their `-dev` companion; apps run on themselves.
 	const useDevPackage = isPlugin && DEV_PACKAGE_TASKS.has(task)
 	const filter = useDevPackage ? `${SCOPE}/${bare}-dev` : `${SCOPE}/${bare}`
-	const env = task === 'dev' || task === 'start' ? serverEnv(bare) : undefined
+	const env = SERVER_TASKS.includes(task) ? serverEnv(bare) : undefined
 	run('pnpm', ['--filter', filter, 'run', task, ...passThrough], env)
 }
 

@@ -19,10 +19,8 @@ import { type ParsedQuery, parseQueryParams } from './parse'
 const caps: SerializedCapabilities = {
 	metrics: ['pageviews', 'visitors', 'sessions', 'conversions'],
 	dimensions: ['page', 'referrer', 'country'],
-	filters: ['page', 'country'],
-	filterOperators: ['eq', 'contains'],
+	filters: { page: ['eq', 'contains'], country: ['eq', 'contains'] },
 	realtime: true,
-	perPageQuery: true,
 	comparison: true,
 	minGranularity: 'hour',
 	maxLookbackDays: null,
@@ -32,8 +30,7 @@ const narrowCaps: SerializedCapabilities = {
 	...caps,
 	metrics: ['pageviews'],
 	dimensions: ['page'],
-	filters: [],
-	filterOperators: [],
+	filters: {},
 	comparison: false,
 	minGranularity: 'day',
 }
@@ -188,6 +185,21 @@ describe('parseQueryParams, valid requests', () => {
 	it('accepts the finest granularity the source supports', () => {
 		expect(ok(`${BASE}&granularity=hour`).query.granularity).toBe('hour')
 		expect(ok(`${BASE}&granularity=month`).query.granularity).toBe('month')
+	})
+})
+
+describe('parseQueryParams, one count under two names', () => {
+	// The source serves `sessions` (as native does): `visits` is the same count, asked by its name.
+	it('takes visits from a source serving sessions, and keeps the name asked for', () => {
+		const parsed = ok('metrics=visits,pageviews&order=visits:desc&from=2026-09-01&to=2026-09-07')
+		expect(parsed.query.metrics).toEqual(['visits', 'pageviews'])
+		expect(parsed.query.order).toEqual({ metric: 'visits', direction: 'desc' })
+	})
+
+	it('still refuses visits from a source serving neither name', () => {
+		expect(
+			err('metrics=visits&from=2026-09-01&to=2026-09-07', { capabilities: narrowCaps })
+		).toMatchObject({ code: 'unsupported_metric', param: 'metrics' })
 	})
 })
 
@@ -538,11 +550,40 @@ describe('parseQueryParams, filters', () => {
 		})
 	})
 
-	it('rejects a known operator the source lacks', () => {
+	it('rejects a known operator the source lacks, naming the dimension and the operator', () => {
 		expect(err(filters([{ dimension: 'page', operator: 'matches', value: 'x' }]))).toMatchObject({
 			code: 'unsupported_operator',
 			param: 'filters',
+			message: 'source cannot filter page with matches',
 		})
+	})
+
+	it('judges each dimension by its own operators', () => {
+		const perDimension: SerializedCapabilities = {
+			...caps,
+			filters: { page: ['eq', 'contains'], country: ['eq'] },
+		}
+		expect(
+			ok(filters([{ dimension: 'page', operator: 'contains', value: '/a' }]), {
+				capabilities: perDimension,
+			}).query.filters
+		).toEqual([{ dimension: 'page', operator: 'contains', value: '/a' }])
+		expect(
+			err(filters([{ dimension: 'country', operator: 'contains', value: 'D' }]), {
+				capabilities: perDimension,
+			})
+		).toMatchObject({
+			code: 'unsupported_operator',
+			message: 'source cannot filter country with contains',
+		})
+	})
+
+	it('reads a dimension listed with no operator as one the source cannot filter on', () => {
+		expect(
+			err(filters([{ dimension: 'page', operator: 'eq', value: '/a' }]), {
+				capabilities: { ...caps, filters: { page: [] } },
+			})
+		).toMatchObject({ code: 'unsupported_filter', message: 'source cannot filter on page' })
 	})
 
 	it('rejects a non-string value', () => {
@@ -638,15 +679,12 @@ describe('parseQueryParams, evaluation order', () => {
 
 	it('accepts compare=previous for a source whose adapter never declared the capability', () => {
 		const provider: AnalyticsCapabilities = {
-			perPageQuery: false,
 			realtime: false,
 			minGranularity: 'day',
 			maxLookbackDays: 90,
 			metrics: new Set(['pageviews']),
 			dimensions: new Set(['page']),
-			filters: new Set(),
-			filterOperators: new Set(),
-			batchPageReport: false,
+			filters: {},
 			rateLimit: null,
 			recommendedTtl: { realtime: 300, aggregate: 3600 },
 		}
@@ -683,5 +721,94 @@ describe('parseQueryParams, blank params', () => {
 		expect(parsed.query.timezone).toBe('UTC')
 		expect(parsed.compare).toBeNull()
 		expect(parsed.query.dimensions).toBeUndefined()
+	})
+})
+
+describe('parseQueryParams, one item', () => {
+	const itemCaps: SerializedCapabilities = {
+		...caps,
+		metrics: [...caps.metrics, 'impressions', 'interactions'],
+		perItemQuery: true,
+	}
+
+	it('carries an item ref through for a source that reads items', () => {
+		const parsed = ok(`${BASE}&item=offers%3A12`, { capabilities: itemCaps })
+		expect(parsed.query.item).toBe('offers:12')
+	})
+
+	it('refuses something that is not a ref', () => {
+		const result = run(`${BASE}&item=offers`, { capabilities: itemCaps })
+		expect(result.ok ? null : result.error).toMatchObject({ code: 'invalid_param', param: 'item' })
+	})
+
+	it('refuses an item for a source that cannot read one', () => {
+		const result = run(`${BASE}&item=offers%3A12`)
+		expect(result.ok ? null : result.error).toMatchObject({ code: 'invalid_param', param: 'item' })
+	})
+
+	it('reads no item when none is asked for', () => {
+		expect(ok(BASE, { capabilities: itemCaps }).query.item).toBeUndefined()
+	})
+})
+
+describe('parseQueryParams, timeframe', () => {
+	it('carries the preset the window came from, and none when the caller names none', () => {
+		expect(ok(`${BASE}&timeframe=last7days`).timeframe).toBe('last7days')
+		expect(ok(BASE).timeframe).toBeNull()
+		expect(Object.keys(ok(`${BASE}&timeframe=last7days`).query)).not.toContain('timeframe')
+	})
+
+	it('refuses a timeframe that is no preset, after every other parameter', () => {
+		expect(err(`${BASE}&timeframe=fortnight`)).toMatchObject({
+			code: 'invalid_param',
+			param: 'timeframe',
+		})
+		expect(err(`${BASE}&timeframe=fortnight&item=offers`)).toMatchObject({ param: 'item' })
+	})
+})
+
+describe('parseQueryParams, metric reach', () => {
+	const reaching: SerializedCapabilities = {
+		...caps,
+		metrics: ['pageviews', 'avgDuration', 'scrollDepth'],
+		dimensions: ['page', 'country', 'event'],
+		metricReach: {
+			avgDuration: { dimensions: ['page', 'country'] },
+			scrollDepth: { requires: 'page' },
+		},
+	}
+	const span = 'from=2026-09-01&to=2026-09-07'
+
+	it('refuses a metric under a breakdown the source does not read it by, naming both', () => {
+		expect(
+			err(`metrics=avgDuration&dimensions=event&${span}`, { capabilities: reaching })
+		).toMatchObject({
+			code: 'unsupported_metric',
+			param: 'metrics',
+			message: 'source does not serve avgDuration by event',
+		})
+		expect(
+			ok(`metrics=avgDuration&dimensions=country&${span}`, { capabilities: reaching }).query
+				.dimensions
+		).toEqual(['country'])
+	})
+
+	it('refuses a metric needing a page on a whole-site read, and serves it for a page', () => {
+		expect(err(`metrics=scrollDepth&${span}`, { capabilities: reaching })).toMatchObject({
+			code: 'unsupported_metric',
+			message: 'source serves scrollDepth only by page or filtered by it',
+		})
+		expect(ok(`metrics=scrollDepth&path=/a&${span}`, { capabilities: reaching }).query.path).toBe(
+			'/a'
+		)
+		expect(
+			ok(`metrics=scrollDepth&dimensions=page&${span}`, { capabilities: reaching }).query.metrics
+		).toEqual(['scrollDepth'])
+		const byPage = encodeURIComponent(
+			JSON.stringify([{ dimension: 'page', operator: 'eq', value: '/a' }])
+		)
+		expect(
+			ok(`metrics=scrollDepth&filters=${byPage}&${span}`, { capabilities: reaching }).query.filters
+		).toHaveLength(1)
 	})
 })

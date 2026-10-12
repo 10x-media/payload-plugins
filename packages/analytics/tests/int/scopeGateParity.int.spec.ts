@@ -1,30 +1,26 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { Endpoint, PayloadRequest } from 'payload'
+import type { PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { AnalyticsAdapter, AnalyticsCapabilities } from '../../src/core/contract'
 import { analytics } from '../../src/index'
-import { QUERY_PATH, REFRESH_PATH } from '../../src/plugin/paths'
+import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
 import { createEpochStore } from '../../src/surfacing/epoch'
+import { handlerAt } from './endpointHelpers'
 
-/**
- * The query endpoint and the refresh endpoint decide scope through one helper
- * (`resolveRequestedScope`), so every request either endpoint refuses is refused by the
- * other. A refresh that refuses must also leave every token exactly as it found it: the
- * install-wide one is what cross-scope reads key on, so bumping it for a request that
- * resolved nothing would let any authenticated reader retire the platform's cache.
- */
+// Query and refresh endpoints share `resolveRequestedScope`, so each refuses what the other does.
+// A refused refresh must bump no token, or any reader could retire the install-wide cache.
+
+const routes = routePaths(DEFAULT_ROUTE_BASE)
+
 const RANGE = 'from=2026-01-10&to=2026-01-16'
 
 const capabilities: AnalyticsCapabilities = {
-	perPageQuery: true,
 	realtime: false,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews']),
 	dimensions: new Set(['page']),
-	filters: new Set(['page']),
-	filterOperators: new Set(['eq']),
-	batchPageReport: false,
+	filters: { page: ['eq'] },
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 3600 },
 	scopedQueries: true,
@@ -48,17 +44,11 @@ const scopeByEmail: Record<string, string> = {
 	'a@t.dev': 'tenant-a',
 	'b@t.dev': 'tenant-b',
 	'platform@t.dev': 'tenant-a',
+	'stranger@t.dev': 'tenant-b',
 }
 
-const handlerFor = (booted: BootedPayload, path: string) => {
-	const endpoint = (booted.payload.config.endpoints ?? []).find(
-		(e): e is Endpoint => typeof e === 'object' && e.path === path
-	)
-	if (!endpoint || typeof endpoint.handler !== 'function') {
-		throw new Error(`endpoint ${path} not registered`)
-	}
-	return endpoint.handler
-}
+/** The one reader whose selection names a tenant they do not belong to. */
+const STRANGER = 'stranger@t.dev'
 
 interface Probe {
 	/** What the caller sent as `scope`; undefined is a request that named none at all. */
@@ -71,13 +61,13 @@ const queryVerdict = async (booted: BootedPayload, probe: Probe): Promise<Verdic
 	if (probe.scope !== undefined) {
 		search.set('scope', probe.scope)
 	}
-	const res = await handlerFor(
-		booted,
-		QUERY_PATH
+	const res = await handlerAt(
+		booted.payload,
+		routes.query
 	)({
 		payload: booted.payload,
-		user: { id: 1, email: probe.email },
-		url: `http://localhost/api${QUERY_PATH}?${search.toString()}`,
+		user: { id: 1, email: probe.email, collection: 'users' },
+		url: `http://localhost/api${routes.query}?${search.toString()}`,
 		headers: new Headers(),
 	} as unknown as PayloadRequest)
 	return res.status === 200 ? 'allowed' : 'refused'
@@ -85,13 +75,13 @@ const queryVerdict = async (booted: BootedPayload, probe: Probe): Promise<Verdic
 
 const refreshVerdict = async (booted: BootedPayload, probe: Probe): Promise<Verdict> => {
 	const body = probe.scope === undefined ? {} : { scope: probe.scope }
-	const res = await handlerFor(
-		booted,
-		REFRESH_PATH
+	const res = await handlerAt(
+		booted.payload,
+		routes.refresh
 	)({
 		payload: booted.payload,
-		user: { id: 1, email: probe.email },
-		url: `http://localhost/api${REFRESH_PATH}`,
+		user: { id: 1, email: probe.email, collection: 'users' },
+		url: `http://localhost/api${routes.refresh}`,
 		headers: new Headers(),
 		arrayBuffer: async () => new TextEncoder().encode(JSON.stringify(body)).buffer as ArrayBuffer,
 	} as unknown as PayloadRequest)
@@ -106,10 +96,13 @@ describeForDb('analytics scope gate parity - scoped install', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [stub('tenanted')],
-				scopeResolver: ({ req }) =>
-					scopeByEmail[(req.user as { email?: string } | null)?.email ?? ''] ?? null,
+				scope: {
+					member: ({ req }) => (req.user as { email?: string } | null)?.email !== STRANGER,
+					resolve: ({ req }) =>
+						scopeByEmail[(req.user as { email?: string } | null)?.email ?? ''] ?? null,
+				},
 				access: {
-					platformRead: ({ req }) =>
+					crossScope: ({ req }) =>
 						((req.user as { email?: string } | null)?.email ?? '').startsWith('platform'),
 				},
 			}),
@@ -149,10 +142,12 @@ describeForDb('analytics scope gate parity - scoped install', {}, (db) => {
 			probe: { email: 'a@t.dev', scope: 'tenant-b' },
 			expected: 'refused',
 		},
+		// The widget links carry the scope their read resolved to, so a tenant admin following
+		// one names their own tenant back at the endpoint and has to land on the view.
 		{
 			name: 'own scope named explicitly, tenant',
 			probe: { email: 'a@t.dev', scope: 'tenant-a' },
-			expected: 'refused',
+			expected: 'allowed',
 		},
 		{
 			name: 'no scope resolves, tenant',
@@ -163,6 +158,16 @@ describeForDb('analytics scope gate parity - scoped install', {}, (db) => {
 			name: 'no scope resolves, platform reader',
 			probe: { email: 'platform-none@t.dev' },
 			expected: 'allowed',
+		},
+		{
+			name: 'a selected tenant the reader does not belong to',
+			probe: { email: STRANGER },
+			expected: 'refused',
+		},
+		{
+			name: 'that tenant named explicitly',
+			probe: { email: STRANGER, scope: 'tenant-b' },
+			expected: 'refused',
 		},
 	]
 

@@ -1,0 +1,101 @@
+[
+	{
+		"$match": {
+			"scope": "tenant-a",
+			"dim": "item",
+			"dim2": "",
+			"day": {
+				"$gte": 20261001,
+				"$lte": 20261003
+			},
+			"gen": {
+				"$in": ["G1", "G2", "G3"]
+			}
+		}
+	},
+	{
+		"$group": {
+			"_id": "$day",
+			"events": {
+				"$sum": "$events"
+			},
+			"visitors": {
+				"$sum": "$visitors"
+			},
+			"conversions": {
+				"$sum": "$conversions"
+			},
+			"revenue": {
+				"$sum": "$revenue"
+			},
+			"impressions": {
+				"$sum": "$impressions"
+			},
+			"interactions": {
+				"$sum": "$interactions"
+			},
+			"visitors_n": {
+				"$sum": {
+					"$cond": [
+						{
+							"$isNumber": "$visitors"
+						},
+						1,
+						0
+					]
+				}
+			}
+		}
+	},
+	{
+		"$set": {
+			"visitors": {
+				"$cond": [
+					{
+						"$gt": ["$visitors_n", 0]
+					},
+					"$visitors",
+					null
+				]
+			},
+			"pageviews": null,
+			"sessions": null,
+			"entries": null,
+			"bounces": null,
+			"sessionMs": null,
+			"durationMs": null,
+			"scrollSum": null,
+			"scrollSamples": null
+		}
+	},
+	{
+		"$unset": ["visitors_n"]
+	},
+	{
+		"$match": {
+			"$expr": {
+				"$gt": [
+					{
+						"$add": [
+							{
+								"$ifNull": ["$pageviews", 0]
+							},
+							{
+								"$ifNull": ["$events", 0]
+							},
+							{
+								"$ifNull": ["$impressions", 0]
+							}
+						]
+					},
+					0
+				]
+			}
+		}
+	},
+	{
+		"$sort": {
+			"_id": 1
+		}
+	}
+]

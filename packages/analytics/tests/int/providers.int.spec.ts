@@ -4,6 +4,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
 import { getRuntime, resolveRegistryFor } from '../../src/plugin/runtime'
+import { classifyError } from '../../src/surfacing/classifyError'
 import { SYNC_TASK_SLUG } from '../../src/sync/syncTask'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
@@ -30,7 +31,7 @@ describeForDb('analytics providers collection', {}, (db) => {
 	const registryFor = async (scope: string | null) => {
 		const runtime = getRuntime(booted.payload)
 		if (!runtime) throw new Error('runtime missing')
-		return resolveRegistryFor(runtime, { payload: booted.payload, scope })
+		return (await resolveRegistryFor(runtime, { payload: booted.payload, scope })).registry
 	}
 
 	it('registers the providers collection', () => {
@@ -157,7 +158,7 @@ describeForDb('analytics providers collection', {}, (db) => {
 		}
 	})
 
-	it("resolves the scope's healthy providers when another document's ciphertext is corrupted", async () => {
+	it("resolves the scope's healthy providers when another document's ciphertext is corrupted, which stands in as a failing source", async () => {
 		const scope = 'corrupt-test'
 		const healthy = await booted.payload.create({
 			collection: SLUG as never,
@@ -212,7 +213,27 @@ describeForDb('analytics providers collection', {}, (db) => {
 
 		try {
 			const registry = await registryFor(scope)
-			expect(registry.all().map((a) => a.id)).toEqual(['memory', `plausible:${healthyId}`])
+			expect(
+				registry
+					.all()
+					.map((a) => a.id)
+					.sort()
+			).toEqual(['memory', `plausible:${healthyId}`, `posthog:${poisonedId}`].sort())
+			const standIn = registry.get(`posthog:${poisonedId}`)
+			expect(standIn.capture).toBeUndefined()
+			const failure = await standIn
+				.query(
+					{
+						metrics: ['pageviews'],
+						dateRange: { start: new Date('2026-01-01'), end: new Date('2026-01-02') },
+					},
+					{}
+				)
+				.then(
+					() => null,
+					(err: unknown) => classifyError(err)
+				)
+			expect(failure).toEqual({ kind: 'source_misconfigured' })
 		} finally {
 			// clears both fixtures so later tests' scope/registry assertions stay
 			// exact, even if the assertion above fails
@@ -325,10 +346,8 @@ describeForDb('analytics providers collection', {}, (db) => {
 	})
 
 	it('validates encryption keys at boot', async () => {
-		// Wiring coverage: all healthy boots in this describe block execute onInit with
-		// providers.collection enabled, so onInit failure here would reject the entire
-		// boot in this describe block's beforeAll. This test verifies the failure path
-		// leak-free by calling validateEncryptedBoot directly against the booted payload.
+		// A failing onInit would reject this block's whole boot in beforeAll, so the failure path
+		// is driven by calling `validateEncryptedBoot` against the booted payload directly.
 		const { validateEncryptedBoot } = await import('@10x-media/fields/encrypted')
 		await expect(
 			validateEncryptedBoot(booted.payload, {
@@ -373,9 +392,9 @@ describeForDb('analytics providers.resolve escape hatch', {}, (db) => {
 		const runtime = getRuntime(booted.payload)
 		if (!runtime) throw new Error('runtime missing')
 		const t1 = await resolveRegistryFor(runtime, { payload: booted.payload, scope: 't1' })
-		expect(t1.all().map((a) => a.id)).toEqual(['memory', 'custom'])
+		expect(t1.registry.all().map((a) => a.id)).toEqual(['memory', 'custom'])
 		const nullScope = await resolveRegistryFor(runtime, { payload: booted.payload, scope: null })
-		expect(nullScope.all().map((a) => a.id)).toEqual(['memory'])
+		expect(nullScope.registry.all().map((a) => a.id)).toEqual(['memory'])
 		expect(scopesSeen).toEqual(['t1', null])
 	})
 })
@@ -399,6 +418,7 @@ describeForDb('analytics sync tier: runtime provider instance ids', {}, (db) => 
 		booted = await bootPayload({
 			plugin: analytics({
 				adapters: [native()],
+				capture: { gate: 'off' },
 				sync: true,
 				providers: { resolve: async () => [instanceAdapter] },
 			}),

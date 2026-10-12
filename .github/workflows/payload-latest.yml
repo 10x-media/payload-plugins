@@ -1,0 +1,82 @@
+name: Latest Payload
+
+# The analytics unit tests and its Mongo integration lane against Payload versions the catalog does
+# not pin: the newest 3.x, so an upstream break shows up before the next bump does, and the floor
+# its peerDependencies admit, so that promise is tested rather than assumed. Weekly and on demand,
+# never on a pull request: a red run here is news about Payload, or about the floor.
+on:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: payload-latest-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PAYLOAD_SKIP_AUTOGEN: '1'
+  NODE_VERSION: '22'
+
+jobs:
+  analytics:
+    name: analytics (${{ matrix.payload }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        payload: [newest, floor]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - id: latest
+        name: Resolve the Payload version under test
+        # The floor is the lowest version the payload peer range admits, read from the manifest so a
+        # raised floor is tested without editing this file. npm lists the newest 3.x matches in
+        # publish order, where a backported patch of an older minor can come last, so they are
+        # sorted as versions (`^3` already leaves prereleases out).
+        env:
+          CHANNEL: ${{ matrix.payload }}
+        run: |
+          if [ "${CHANNEL}" = floor ]; then
+            version=$(jq -r '.peerDependencies.payload' packages/analytics/package.json |
+              sed -E 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*$/\1/')
+          else
+            version=$(npm view 'payload@^3' version --json |
+              jq -r 'if type == "array" then . else [.] end | sort_by(split(".") | map(tonumber)) | last')
+          fi
+          echo "Payload ${version} (${CHANNEL})"
+          echo "version=${version}" >>"$GITHUB_OUTPUT"
+      # Payload releases payload and every @payloadcms/* package in lockstep. The overrides pin
+      # each one the lockfile names, transitive ones included; the runner's copy of the lockfile
+      # is rewritten by the install and never committed.
+      - name: Override payload and @payloadcms/* with that version
+        env:
+          PAYLOAD_VERSION: ${{ steps.latest.outputs.version }}
+        run: |
+          {
+            echo 'overrides:'
+            echo "  payload: ${PAYLOAD_VERSION}"
+            grep -oE "^  '@payloadcms/[a-z0-9-]+@" pnpm-lock.yaml |
+              sed -E "s/^  '(@payloadcms\/[a-z0-9-]+)@/\1/" |
+              sort -u |
+              while read -r name; do echo "  '${name}': ${PAYLOAD_VERSION}"; done
+          } >>pnpm-workspace.yaml
+          sed -n '/^overrides:/,$p' pnpm-workspace.yaml
+      - run: pnpm install --no-frozen-lockfile
+      - name: Installed Payload versions
+        run: pnpm --filter @10x-media/analytics list payload '@payloadcms/*'
+      - name: Pre-cache the Mongo binary (avoid a parallel-download lockfile race)
+        run: >-
+          pnpm --filter @10x-media/payload-test-harness exec node -e
+          "import('mongodb-memory-server').then((m) => m.MongoMemoryServer.create()).then((s) => s.stop()).then(() => process.exit(0))"
+      - name: Analytics unit tests
+        run: pnpm --filter @10x-media/analytics exec vitest run src
+      - name: Analytics integration tests (Mongo)
+        run: pnpm --filter @10x-media/analytics exec vitest run tests/int --maxWorkers=3
+        env:
+          DB_MATRIX: mongo

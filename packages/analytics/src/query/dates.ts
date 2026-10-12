@@ -1,9 +1,9 @@
 import { addDaysInTz, startOfCalendarDayInTz } from '../timeframe/tz'
+import { MIN_QUERY_YEAR } from './limits'
 
 /**
- * Range-bound parsing, shared by every surface that takes `from`/`to` from outside: the
- * query endpoint's parser, the document panel endpoint, and the widgets' stored custom
- * range. A leaf module so those cannot drift apart on what a calendar day means.
+ * Range-bound parsing shared by the query parser, document panel endpoint and stored widget ranges,
+ * so none drifts on what a calendar day means.
  */
 
 /** The only offset-free bound form: a `YYYY-MM-DD` calendar day. */
@@ -17,12 +17,15 @@ const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 const isLeapYear = (year: number): boolean =>
 	(year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
 
-/** Calendar parts of a `YYYY-MM-DD` string, or null when it names no real day. */
+/**
+ * Calendar parts of a `YYYY-MM-DD` string, or null when it names no real day or one before 1970,
+ * which `Date.UTC` would also misread for years 0 to 99.
+ */
 const calendarParts = (raw: string): { year: number; month: number; day: number } | null => {
 	const year = Number(raw.slice(0, 4))
 	const month = Number(raw.slice(5, 7))
 	const day = Number(raw.slice(8, 10))
-	if (month < 1 || month > 12) {
+	if (year < MIN_QUERY_YEAR || month < 1 || month > 12) {
 		return null
 	}
 	const lastDay = month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1]
@@ -32,21 +35,15 @@ const calendarParts = (raw: string): { year: number; month: number; day: number 
 	return { year, month, day }
 }
 
-export interface BoundArgs {
+interface BoundArgs {
 	/** Reporting timezone a day string is read in; ignored for an instant. */
 	timezone: string
-	/** Which end of the window this value bounds. */
 	edge: 'start' | 'end'
 }
 
 /**
- * A range bound. `YYYY-MM-DD` is the whole calendar day in `timezone`: the start edge is
- * its first instant, the end edge its last, matching the inclusive `end` every adapter
- * reads (`less_than_equal`, `timestamp <=`, GA4's inclusive `endDate`). The only other
- * accepted form is a full datetime carrying `Z` or a `±HH:MM` offset, taken as the instant
- * it names. A datetime without an offset is rejected rather than silently read in the
- * server's own zone, and so are the loose forms `Date` would otherwise accept (`2026`,
- * `Sep 1 2026`).
+ * A `YYYY-MM-DD` bound spans the whole day in `timezone` (end edge is its last instant, as adapters
+ * read `end` inclusively); otherwise only a datetime with `Z` or `±HH:MM` passes.
  */
 export const parseDayOrInstant = (raw: string, args: BoundArgs): Date | null => {
 	if (DATE_ONLY.test(raw)) {

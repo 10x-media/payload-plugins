@@ -1,19 +1,21 @@
 import { createHmac } from 'node:crypto'
 
-export interface VisitorHashInput {
+interface VisitorHashInput {
 	ip: string
 	ua: string
 	site: string
 	salt: string
 }
 
-// The salt rotates daily so a visitor's hash auto-expires every 24h, giving
-// cookieless uniqueness without storing PII (the raw IP is hashed immediately
-// and never persisted).
-export function dailyVisitorHash({ ip, ua, site, salt }: VisitorHashInput): string {
-	return createHmac('sha256', salt).update(`${ip}|${ua}|${site}`).digest('hex')
-}
+/** Characters in a visitor id: 96 bits of the day's HMAC, base64url. */
+export const VISITOR_ID_LENGTH = 16
 
-export function deriveSessionId(visitorHash: string, hourBucket: string): string {
-	return createHmac('sha256', visitorHash).update(hourBucket).digest('hex').slice(0, 32)
-}
+/**
+ * Visitor id a hit row stores (`v`). The address is never stored and the salt rotates daily, so
+ * the id names a visitor for one day only.
+ */
+export const dailyVisitorId = ({ ip, ua, site, salt }: VisitorHashInput): string =>
+	createHmac('sha256', salt)
+		.update(`${ip}|${ua}|${site}`)
+		.digest('base64url')
+		.slice(0, VISITOR_ID_LENGTH)

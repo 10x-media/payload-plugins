@@ -1,16 +1,29 @@
-import type {
-	CollectionAfterChangeHook,
-	CollectionAfterDeleteHook,
-	Field,
-	TextField,
+import {
+	type CollectionAfterChangeHook,
+	type CollectionAfterDeleteHook,
+	createClientField,
+	type Field,
+	type FieldAccess,
+	type TextField,
 } from 'payload'
 import { describe, expect, it } from 'vitest'
+import { keys } from '../translations/keys'
+import { createStaticLabels } from '../translations/staticLabel'
 import type { BuildProvidersCollectionArgs, BuildSecretField } from './collection'
-import { buildProvidersCollection } from './collection'
-import { SECRET_PATHS } from './secrets'
+import { analyticsProviderFields, buildProvidersCollection } from './collection'
+import { CONNECTION_PATHS, SECRET_PATHS } from './secrets'
 
 const named = (fields: Field[] | undefined, name: string): Field | undefined =>
 	fields?.find((f) => 'name' in f && f.name === name)
+
+/** Admin metadata as the tests read it; the Field union hides it behind each field type. */
+const adminOf = (
+	field: Field | undefined
+): { position?: string; description?: unknown; width?: string } =>
+	(field?.admin ?? {}) as { position?: string; description?: unknown; width?: string }
+
+const labelOf = (field: Field | undefined): unknown =>
+	(field as { label?: unknown } | undefined)?.label
 
 /** Echoes the source field back with a marker so tests can assert delegation. */
 const fakeBuildSecret: BuildSecretField = (source) => [{ ...source, custom: { fake: source.type } }]
@@ -29,14 +42,45 @@ const collectTaggedPaths = (fields: Field[] | undefined, prefix: string[] = []):
 
 const unscopedArgs: Pick<
 	BuildProvidersCollectionArgs,
-	'scoped' | 'scopeField' | 'resolveScope' | 'platformRead' | 'buildSecret'
+	'scoped' | 'scopeField' | 'resolveScope' | 'crossScope' | 'buildSecret' | 'isSealed'
 > = {
 	scoped: false,
 	scopeField: 'scope',
 	resolveScope: async () => null,
-	platformRead: async () => false,
+	crossScope: async () => false,
 	buildSecret: fakeBuildSecret,
+	isSealed: () => false,
 }
+
+/** A request from a user of `collection`, on an install whose admin collection is `users`. */
+const requestFrom = (collection: string | null) =>
+	({
+		req: {
+			user: collection === null ? null : { id: 1, collection },
+			payload: { config: { admin: { user: 'users' } } },
+		},
+	}) as never
+
+/** Every field carrying `marker` as its update access, as `<group>.<field>` paths. */
+const pathsWithAccess = (
+	fields: Field[] | undefined,
+	marker: FieldAccess,
+	prefix: string[] = []
+): string[] =>
+	(fields ?? []).flatMap((field) => {
+		const path = 'name' in field && field.name ? [...prefix, field.name] : prefix
+		const access = 'access' in field ? field.access : undefined
+		const own = access?.update === marker ? [path.join('.')] : []
+		const nested = 'fields' in field ? pathsWithAccess(field.fields, marker, path) : []
+		return [...own, ...nested]
+	})
+
+/** Every `host` field in the built tree, wherever it sits. */
+const hostFields = (fields: Field[] | undefined): TextField[] =>
+	(fields ?? []).flatMap((field) => {
+		const own = field.type === 'text' && field.name === 'host' ? [field] : []
+		return [...own, ...('fields' in field ? hostFields(field.fields) : [])]
+	})
 
 describe('buildProvidersCollection', () => {
 	const collection = buildProvidersCollection({
@@ -49,8 +93,86 @@ describe('buildProvidersCollection', () => {
 		expect(collection.slug).toBe('analytics-providers')
 		const read = collection.access?.read
 		expect(typeof read).toBe('function')
-		expect(await read?.({ req: { user: null } } as never)).toBe(false)
-		expect(await read?.({ req: { user: { id: 1 } } } as never)).toBe(true)
+		expect(await read?.(requestFrom(null))).toBe(false)
+		expect(await read?.(requestFrom('users'))).toBe(true)
+	})
+
+	it('admits no user of a second auth collection to any row or create', async () => {
+		for (const operation of ['read', 'create', 'update', 'delete'] as const) {
+			expect(await collection.access?.[operation]?.(requestFrom('customers'))).toBe(false)
+		}
+	})
+
+	it('validates every host field as an https address, translated', () => {
+		const hosts = hostFields(collection.fields)
+		expect(hosts).toHaveLength(3)
+		const req = { req: { t: (key: string) => key } } as never
+		for (const host of hosts) {
+			const validate = host.validate as (value: unknown, options: unknown) => true | string
+			expect(validate('https://analytics.example.com', req)).toBe(true)
+			expect(validate('https://example.com/analytics', req)).toBe(true)
+			expect(validate('', req)).toBe(true)
+			expect(validate('http://analytics.example.com', req)).toBe(
+				'analytics:providerErrorHostInsecure'
+			)
+			expect(validate('https://analytics.example.com/?a=1', req)).toBe(
+				'analytics:providerErrorHostFormat'
+			)
+		}
+	})
+
+	it('accepts http hosts only where private networks are allowed', () => {
+		const open = buildProvidersCollection({
+			slug: 'analytics-providers',
+			onChange: () => {},
+			...unscopedArgs,
+			allowPrivateNetwork: true,
+		})
+		const req = { req: { t: (key: string) => key } } as never
+		for (const host of hostFields(open.fields)) {
+			const validate = host.validate as (value: unknown, options: unknown) => true | string
+			expect(validate('http://umami:3000', req)).toBe(true)
+		}
+	})
+
+	it('puts the connection access on exactly the CONNECTION_PATHS fields', () => {
+		const update: FieldAccess = () => false
+		const gated = buildProvidersCollection({
+			slug: 'analytics-providers',
+			onChange: () => {},
+			...unscopedArgs,
+			connectionAccess: { update },
+		})
+		expect(new Set(pathsWithAccess(gated.fields, update))).toEqual(
+			new Set(CONNECTION_PATHS.map((entry) => entry.path))
+		)
+		expect(pathsWithAccess(collection.fields, update)).toEqual([])
+	})
+
+	it('clears secrets on retarget in a hook that runs after the scope stamp', async () => {
+		const sealed = 'sealed-ciphertext'
+		const withSeal = buildProvidersCollection({
+			slug: 'analytics-providers',
+			onChange: () => {},
+			...unscopedArgs,
+			isSealed: (value) => value === sealed,
+		})
+		const [stamp, retarget] = withSeal.hooks?.beforeChange ?? []
+		expect(withSeal.hooks?.beforeChange).toHaveLength(2)
+		const data = {
+			provider: 'plausible',
+			plausible: { host: 'https://b.example.com', siteId: 's', apiKey: sealed },
+		}
+		const originalDoc = {
+			provider: 'plausible',
+			plausible: { host: 'https://a.example.com', siteId: 's' },
+		}
+		const args = { data, originalDoc, operation: 'update', req: {} } as never
+		expect(await stamp?.(args)).toBe(data)
+		expect(await retarget?.(args)).toEqual({
+			provider: 'plausible',
+			plausible: { host: 'https://b.example.com', siteId: 's', apiKey: null },
+		})
 	})
 
 	it('has one conditional config group per provider', () => {
@@ -61,6 +183,18 @@ describe('buildProvidersCollection', () => {
 			expect(condition?.({ provider }, { provider }, {} as never)).toBe(true)
 			expect(condition?.({ provider: 'other' }, { provider: 'other' }, {} as never)).toBe(false)
 		}
+	})
+
+	it('explains the native choice with a note that stores nothing', () => {
+		const note = collection.fields.find(
+			(field) => field.type === 'group' && !('name' in field && field.name)
+		)
+		expect(note).toBeDefined()
+		expect(note && 'fields' in note ? note.fields : undefined).toEqual([])
+		expect(adminOf(note).description).toBeDefined()
+		const condition = note?.admin?.condition
+		expect(condition?.({ provider: 'native' }, { provider: 'native' }, {} as never)).toBe(true)
+		expect(condition?.({ provider: 'ga4' }, { provider: 'ga4' }, {} as never)).toBe(false)
 	})
 
 	it('disables duplicate (a duplicate could never carry the write-only credentials)', () => {
@@ -105,6 +239,60 @@ describe('buildProvidersCollection', () => {
 		})
 	})
 
+	// Payload drops a function description from the client field, and the write-only editor reads
+	// the client field's own: a credential's help has to reach the browser as strings.
+	it("keeps each credential's help on the client field, in every language, install strings first", () => {
+		const relabeled = buildProvidersCollection({
+			slug: 'analytics-providers',
+			onChange: () => {},
+			...unscopedArgs,
+			staticLabel: createStaticLabels({
+				plugin: { de: { [keys.providerFieldTokenHelp]: 'Eigener Hilfetext' } },
+				unbundled: ['nl'],
+			}),
+		})
+		const secrets = collectTaggedPaths(relabeled.fields)
+		expect(secrets.length).toBeGreaterThan(0)
+		const fieldAt = (path: string): Field | undefined =>
+			path.split('.').reduce<Field | undefined>((found, name) => {
+				const within =
+					found === undefined ? relabeled.fields : 'fields' in found ? found.fields : []
+				const direct = named(within, name)
+				if (direct) {
+					return direct
+				}
+				// A row holds its fields without a name of its own.
+				for (const field of within) {
+					const nested =
+						'fields' in field && !('name' in field) ? named(field.fields, name) : undefined
+					if (nested) {
+						return nested
+					}
+				}
+				return undefined
+			}, undefined)
+		const i18n = { language: 'en', fallbackLanguage: 'en', t: (key: string) => key }
+		for (const path of secrets) {
+			const field = fieldAt(path)
+			if (!field) {
+				throw new Error(`no field at ${path}`)
+			}
+			const client = createClientField({
+				defaultIDType: 'text',
+				field,
+				i18n: i18n as never,
+				importMap: {},
+			})
+			const description = (client as { admin?: { description?: unknown } }).admin?.description
+			expect(description, path).toMatchObject({ en: expect.any(String), zh: expect.any(String) })
+			expect((description as Record<string, string>).nl, path).toBe(
+				(description as Record<string, string>).en
+			)
+		}
+		const token = fieldAt('umami.token')
+		expect(adminOf(token).description).toMatchObject({ de: 'Eigener Hilfetext' })
+	})
+
 	// Public capture config, not credentials: they reach the browser in the snippet, so they
 	// must stay plain text (a sealed field would be unreadable to the tracker config).
 	it('carries the public capture fields as plain text on posthog, plausible and ga4', () => {
@@ -140,6 +328,13 @@ describe('buildProvidersCollection', () => {
 			expect(field?.type).toBe('text')
 			expect((field as TaggedField | undefined)?.custom?.fake).toBeUndefined()
 		}
+		// Two ways to turn Plausible's tracking on, so each says what it takes and which one wins.
+		const helpKey = (name: string): unknown => {
+			const description = adminOf(inGroup('plausible', name)).description
+			return typeof description === 'function' ? description({ t: (key: string) => key }) : null
+		}
+		expect(helpKey('domain')).toBe('analytics:providerFieldDomainHelp')
+		expect(helpKey('scriptId')).toBe('analytics:providerFieldScriptIdHelp')
 
 		const measurementId = inGroup('ga4', 'measurementId')
 		expect(measurementId?.type).toBe('text')
@@ -175,6 +370,27 @@ describe('buildProvidersCollection', () => {
 		expect(validate?.('G AB12', req)).toBe('analytics:providerErrorMeasurementId')
 	})
 
+	it('validates the plausible script id as a bare token, which no path can be', () => {
+		const group = named(collection.fields, 'plausible')
+		const fields = group && 'fields' in group ? group.fields : []
+		const row = fields.find((field) => 'fields' in field && named(field.fields, 'scriptId'))
+		const scriptId = row && 'fields' in row ? named(row.fields, 'scriptId') : undefined
+		const validate = (scriptId as TextField | undefined)?.validate as
+			| ((value: unknown, options: unknown) => true | string)
+			| undefined
+		const req = { req: { t: (key: string) => key } } as never
+		expect(validate?.('RsZm6Pd9-dz_Rp', req)).toBe(true)
+		expect(validate?.('', req)).toBe(true)
+		for (const value of [
+			'x/../../../../../../api/media/file/evil',
+			'x?callback=',
+			'a.b',
+			'x'.repeat(65),
+		]) {
+			expect(validate?.(value, req)).toBe('analytics:providerErrorScriptId')
+		}
+	})
+
 	it('keeps SECRET_PATHS in parity with the collection secret fields', () => {
 		const taggedPaths = collectTaggedPaths(collection.fields)
 		expect(new Set(taggedPaths)).toEqual(new Set(SECRET_PATHS.map((s) => s.path)))
@@ -207,6 +423,41 @@ describe('buildProvidersCollection', () => {
 		expect(await custom.access?.create?.({ req: { user: null } } as never)).toBe(false)
 	})
 
+	// Both decide what the rest of the document even means, so they belong beside the save
+	// button rather than in a row above fields that are conditional on them.
+	it('puts provider and enabled in the sidebar, each with a description', () => {
+		for (const name of ['provider', 'enabled']) {
+			const admin = adminOf(named(collection.fields, name))
+			expect(admin.position).toBe('sidebar')
+			expect(admin.description).toBeDefined()
+			expect(admin.width).toBeUndefined()
+		}
+	})
+
+	it('describes the collection and every field a reader would have to guess at', () => {
+		expect(collection.admin?.description).toBeDefined()
+		expect(adminOf(named(collection.fields, 'name')).description).toBeDefined()
+		const posthog = named(collection.fields, 'posthog')
+		const fields = posthog && 'fields' in posthog ? posthog.fields : []
+		const scopeProperty = named(fields, 'scopeProperty')
+		expect(scopeProperty?.type).toBe('text')
+		expect(adminOf(scopeProperty).description).toBeDefined()
+	})
+
+	it('replaces one default field at a time through fields, before overrides', () => {
+		const custom = buildProvidersCollection({
+			slug: 'analytics-providers',
+			fields: {
+				enabled: ({ field }) => ({ ...field, label: 'Live' }),
+				name: () => ({ name: 'name', type: 'text', label: 'Label' }),
+			},
+			onChange: () => {},
+			...unscopedArgs,
+		})
+		expect(labelOf(named(custom.fields, 'enabled'))).toBe('Live')
+		expect(labelOf(named(custom.fields, 'name'))).toBe('Label')
+	})
+
 	it('applies overrides last so anything can be reshaped', () => {
 		const custom = buildProvidersCollection({
 			slug: 'analytics-providers',
@@ -215,5 +466,64 @@ describe('buildProvidersCollection', () => {
 			...unscopedArgs,
 		})
 		expect(custom.admin?.hidden).toBe(true)
+	})
+})
+
+describe('analyticsProviderFields', () => {
+	it('matches the collection field list, so a host store cannot drift from it', () => {
+		const fields = analyticsProviderFields({ buildSecret: fakeBuildSecret, scopeField: true })
+		const collection = buildProvidersCollection({
+			slug: 'analytics-providers',
+			onChange: () => {},
+			...unscopedArgs,
+		})
+		expect(fields.map((f) => ('name' in f ? f.name : f.type))).toEqual(
+			collection.fields.map((f) => ('name' in f ? f.name : f.type))
+		)
+	})
+
+	it('leaves the credentials plain text and the scope field out by default', () => {
+		const fields = analyticsProviderFields()
+		expect(named(fields, 'scope')).toBeUndefined()
+		const plausible = named(fields, 'plausible')
+		const rows = plausible && 'fields' in plausible ? plausible.fields : []
+		const row = rows[0]
+		const apiKey = row && 'fields' in row ? named(row.fields, 'apiKey') : undefined
+		expect(apiKey?.type).toBe('text')
+		expect((apiKey as TaggedField | undefined)?.custom?.fake).toBeUndefined()
+	})
+
+	it('takes connectionAccess as one function or as { create, update }, like the plugin option', () => {
+		const access: FieldAccess = () => false
+		const connection = new Set(CONNECTION_PATHS.map((entry) => entry.path))
+		expect(
+			new Set(pathsWithAccess(analyticsProviderFields({ connectionAccess: access }), access))
+		).toEqual(connection)
+		expect(
+			new Set(
+				pathsWithAccess(analyticsProviderFields({ connectionAccess: { update: access } }), access)
+			)
+		).toEqual(connection)
+		expect(
+			pathsWithAccess(analyticsProviderFields({ connectionAccess: { create: access } }), access)
+		).toEqual([])
+		expect(() =>
+			analyticsProviderFields({ connectionAccess: { delete: access } as never })
+		).toThrow(
+			/analyticsProviderFields\(\{ connectionAccess \}\)\.delete is not an option; analyticsProviderFields\(\{ connectionAccess \}\) takes create and update/
+		)
+	})
+
+	it('accepts http hosts once allowPrivateNetwork is set', () => {
+		const req = { req: { t: (key: string) => key } } as never
+		for (const [allowPrivateNetwork, expected] of [
+			[true, true],
+			[false, 'analytics:providerErrorHostInsecure'],
+		] as const) {
+			for (const host of hostFields(analyticsProviderFields({ allowPrivateNetwork }))) {
+				const validate = host.validate as (value: unknown, options: unknown) => true | string
+				expect(validate('http://umami:3000', req)).toBe(expected)
+			}
+		}
 	})
 })

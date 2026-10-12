@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatRangeCaption, resolveCustomRange } from './range'
+import { formatRangeCaption, isUnreadableCustomRange, resolveCustomRange } from './range'
 
 // The dayOnly picker stores the picked day at the admin browser's local midnight, so the
 // same two days come back as different instants depending on where the admin sat.
@@ -79,8 +79,59 @@ describe('formatRangeCaption', () => {
 				if (!range) {
 					throw new Error('range did not resolve')
 				}
-				expect(formatRangeCaption(range, 'en', tz)).toBe('Jun 1, 2026 - Jun 23, 2026')
+				expect(formatRangeCaption(range, 'en', tz)).toBe('Jun 1 \u2013 23, 2026')
 			}
 		}
+	})
+
+	// What both ends share is said once, in the language's own order, and one day is one date.
+	it('writes the span as the language writes one', () => {
+		const range = (from: string, to: string) => ({ start: new Date(from), end: new Date(to) })
+		expect(
+			formatRangeCaption(range('2026-06-01T12:00:00Z', '2026-07-03T12:00:00Z'), 'en', 'UTC')
+		).toBe('Jun 1 \u2013 Jul 3, 2026')
+		expect(
+			formatRangeCaption(range('2026-06-01T12:00:00Z', '2026-06-23T12:00:00Z'), 'de', 'UTC')
+		).toBe('1.\u201323. Juni 2026')
+		expect(
+			formatRangeCaption(range('2026-06-01T12:00:00Z', '2026-06-01T20:00:00Z'), 'en', 'UTC')
+		).toBe('Jun 1, 2026')
+	})
+
+	// The view's toolbar renders it on the server and again in the browser, which must agree.
+	it('spaces the span as browsers do, never with the thin spaces Node writes', () => {
+		const caption = formatRangeCaption(
+			{ start: new Date('2025-10-09T12:00:00Z'), end: new Date('2026-10-08T12:00:00Z') },
+			'en',
+			'UTC'
+		)
+		expect(caption).toBe('Oct 9, 2025 \u2013 Oct 8, 2026')
+		expect(caption).not.toMatch(/[\u2009\u202f]/)
+	})
+})
+
+describe('isUnreadableCustomRange', () => {
+	it('flags a range that reaches before 1970, as a day or as a picked midnight', () => {
+		expect(isUnreadableCustomRange('custom', { from: '1969-12-01', to: '1970-01-05' })).toBe(true)
+		expect(
+			isUnreadableCustomRange('custom', {
+				from: '1969-11-30T23:00:00.000Z',
+				to: '1970-01-04T23:00:00.000Z',
+			})
+		).toBe(true)
+	})
+
+	it('flags a bound that names no real day', () => {
+		expect(isUnreadableCustomRange('custom', { from: '2026-02-30', to: '2026-06-23' })).toBe(true)
+		expect(isUnreadableCustomRange('custom', { from: '2026-06-01', to: 'garbage' })).toBe(true)
+	})
+
+	it('leaves a readable, incomplete or preset range alone', () => {
+		expect(isUnreadableCustomRange('custom', { from: '1970-01-01', to: '1970-01-05' })).toBe(false)
+		expect(isUnreadableCustomRange('custom', { from: '1969-12-01' })).toBe(false)
+		expect(isUnreadableCustomRange('custom', undefined)).toBe(false)
+		expect(isUnreadableCustomRange('last30days', { from: '1969-12-01', to: '1970-01-05' })).toBe(
+			false
+		)
 	})
 })

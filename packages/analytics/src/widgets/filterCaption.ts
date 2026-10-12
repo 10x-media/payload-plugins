@@ -1,29 +1,31 @@
 import type { AnalyticsFilter } from '../core/contract'
 import { keys } from '../translations/keys'
 import { FILTER_OPERATOR_KEYS } from '../translations/metricKeys'
+import { isolate } from '../translations/parts'
 import type { Translate } from '../translations/server'
 import { DIMENSION_LABELS } from '../view/labels'
 
+/** A filter with the value as a reader knows it (see `filterValueLabel`), when it was looked up. */
+export type CaptionFilter = AnalyticsFilter & { shown?: string }
+
 /**
- * One filter as a sentence a caption can end on ("where Country is DE"). Both parts are
- * translated before they reach the sentence, which is itself a translated template, so a
- * locale can reorder them. The value is the editor's own text and is never translated.
+ * One filter as a caption sentence ("where Country is Germany"), worded like the view's chip.
+ * The value (`shown`, else stored) is bidi-isolated so a path keeps its direction in RTL text.
  */
-export const filterCaption = (filter: AnalyticsFilter, t: Translate): string =>
+export const filterCaption = (filter: CaptionFilter, t: Translate): string =>
 	t(keys.widgetFilterCaption, {
 		dimension: t(DIMENSION_LABELS[filter.dimension]),
 		operator: t(FILTER_OPERATOR_KEYS[filter.operator]),
-		value: filter.value,
+		value: isolate(filter.shown ?? filter.value),
 	})
 
 /**
- * A widget's caption: its window, and the filter sentence after it when there is one. The
- * join is a translated template too, so a locale that does not separate the two with a
- * space (zh) does not get one.
+ * A widget's caption: its window, then the filter sentence when there is one. The join is a
+ * translated template too, since some locales (zh) put no space between them.
  */
 export const captionWithFilter = (
 	windowCaption: string,
-	filter: AnalyticsFilter | undefined,
+	filter: CaptionFilter | undefined,
 	t: Translate
 ): string =>
 	filter

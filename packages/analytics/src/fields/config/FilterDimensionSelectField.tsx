@@ -1,21 +1,15 @@
 'use client'
 
-import {
-	FieldDescription,
-	type ReactSelectOption,
-	SelectInput,
-	useField,
-	withCondition,
-} from '@payloadcms/ui'
-import { mergeFieldStyles } from '@payloadcms/ui/shared'
+import { useField, withCondition } from '@payloadcms/ui'
 import type { TextFieldClientProps } from 'payload'
 import { useMemo } from 'react'
-import { DIMENSION_KEYS, type DimensionKey } from '../../core/contract'
-import { keys } from '../../translations/keys'
+import { isDimensionKey } from '../../core/guards'
 import { useTranslation } from '../../translations/useTranslation'
 import { DIMENSION_LABELS } from '../../view/labels'
+import { FilterKeySelect, filterNotice, keyOptions } from './FilterKeySelect'
 import { useFilterCapabilities } from './useFilterCapabilities'
 
+/** @beta */
 export type FilterDimensionSelectFieldProps = TextFieldClientProps & {
 	/**
 	 * Path of the sibling source select this picker narrows against, for custom widgets
@@ -24,77 +18,38 @@ export type FilterDimensionSelectFieldProps = TextFieldClientProps & {
 	sourceFieldPath?: string
 }
 
-const asDimension = (value: string): DimensionKey | undefined =>
-	DIMENSION_KEYS.find((key) => key === value)
-
 /**
- * Dimension picker for a widget's filter group: offers only the dimensions the widget's
- * chosen source can filter by, unioned over the request's sources while none is chosen.
- * A stored dimension the source dropped stays in the list so it reads as the filter it is
- * and can be cleared; the read path renders the unsupported state for it either way.
- * While the source list is in flight the picker offers nothing rather than a wrong list,
- * and says so once it settles empty or failed.
+ * Offers only dimensions the chosen source can filter by (union over sources while none is
+ * chosen). A stored dimension the source dropped stays listed so it can be cleared.
  */
 const FilterDimensionSelectFieldComponent = (props: FilterDimensionSelectFieldProps) => {
 	const { field, path: pathFromProps, readOnly, sourceFieldPath } = props
 	const { t } = useTranslation()
 	const { dimensions, error, resolved } = useFilterCapabilities(sourceFieldPath)
-	const {
-		customComponents: { AfterInput, BeforeInput, Description, Error: ErrorComponent, Label } = {},
-		disabled,
-		path,
-		setValue,
-		showError,
-		value,
-	} = useField<string>({ potentiallyStalePath: pathFromProps })
-
-	const options = useMemo(() => {
-		const offered = dimensions.map((key) => ({ label: t(DIMENSION_LABELS[key]), value: key }))
-		if (!value || dimensions.some((key) => key === value)) return offered
-		const known = asDimension(value)
-		return [{ label: known ? t(DIMENSION_LABELS[known]) : value, value }, ...offered]
-	}, [dimensions, t, value])
-	const style = useMemo(() => mergeFieldStyles(field), [field])
-
-	const notice = error
-		? t(keys.fieldFilterError)
-		: resolved && dimensions.length === 0
-			? t(keys.fieldFilterEmpty)
-			: null
+	const fieldState = useField<string>({ potentiallyStalePath: pathFromProps })
+	const stored = fieldState.value
+	const options = useMemo(
+		() =>
+			keyOptions({
+				offered: dimensions,
+				stored,
+				isKey: isDimensionKey,
+				labelOf: (key) => t(DIMENSION_LABELS[key]),
+			}),
+		[dimensions, t, stored]
+	)
 
 	return (
-		<SelectInput
-			AfterInput={AfterInput}
-			BeforeInput={BeforeInput}
-			className={field.admin?.className}
-			Description={
-				notice ? (
-					<>
-						{Description ?? <FieldDescription description={field.admin?.description} path={path} />}
-						<div className="field-description">{notice}</div>
-					</>
-				) : (
-					Description
-				)
-			}
-			description={field.admin?.description}
-			Error={ErrorComponent}
+		<FilterKeySelect
+			field={field}
+			fieldState={fieldState}
 			isClearable
-			Label={Label}
-			label={field.label}
-			name={field.name}
-			onChange={(selected: ReactSelectOption | ReactSelectOption[]) => {
-				const option = Array.isArray(selected) ? selected[0] : selected
-				setValue(option?.value ? String(option.value) : null)
-			}}
+			notice={filterNotice(t, { error, resolved, offered: dimensions.length })}
 			options={options}
-			path={path}
-			readOnly={readOnly || disabled || field.admin?.readOnly}
-			showError={showError}
-			style={style}
-			value={value}
+			readOnly={readOnly}
 		/>
 	)
 }
 
+/** @beta */
 export const FilterDimensionSelectField = withCondition(FilterDimensionSelectFieldComponent)

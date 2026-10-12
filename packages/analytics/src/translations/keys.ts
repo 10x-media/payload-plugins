@@ -1,10 +1,12 @@
+import { isRecord } from '../core/values'
+
 /**
- * Typed translation keys. Lookups must go through these constants, not string
- * literals (enforced by requireI18nKeysTyped.grit). Every key here must have a
- * value in every locale (`en.ts`), or it is a type error.
+ * Lookups go through these constants, never string literals (enforced by
+ * requireI18nKeysTyped.grit); a key missing a value in any locale is a type error.
  */
 export const keys = {
 	pluginName: 'analytics:pluginName',
+	adminGroup: 'analytics:adminGroup',
 	tabAnalytics: 'analytics:tabAnalytics',
 	metricPageviews: 'analytics:metricPageviews',
 	metricVisitors: 'analytics:metricVisitors',
@@ -12,6 +14,7 @@ export const keys = {
 	metricSessions: 'analytics:metricSessions',
 	metricEvents: 'analytics:metricEvents',
 	metricAvgDuration: 'analytics:metricAvgDuration',
+	metricVisitDuration: 'analytics:metricVisitDuration',
 	metricBounceRate: 'analytics:metricBounceRate',
 	metricScrollDepth: 'analytics:metricScrollDepth',
 	metricConversions: 'analytics:metricConversions',
@@ -20,7 +23,9 @@ export const keys = {
 	stateNew: 'analytics:stateNew',
 	stateNotBound: 'analytics:stateNotBound',
 	stateNotConfigured: 'analytics:stateNotConfigured',
+	stateNoAccess: 'analytics:stateNoAccess',
 	stateUnavailable: 'analytics:stateUnavailable',
+	stateRefreshing: 'analytics:stateRefreshing',
 	timeframeToday: 'analytics:timeframeToday',
 	timeframeLast7Days: 'analytics:timeframeLast7Days',
 	timeframeLast30Days: 'analytics:timeframeLast30Days',
@@ -46,10 +51,21 @@ export const keys = {
 	widgetFieldLimit: 'analytics:widgetFieldLimit',
 	stateNoBreakdown: 'analytics:stateNoBreakdown',
 	stateClamped: 'analytics:stateClamped',
+	stateRangeTooLong: 'analytics:stateRangeTooLong',
+	stateFailed: 'analytics:stateFailed',
+	stateClampedFrom: 'analytics:stateClampedFrom',
+	stateClampedTo: 'analytics:stateClampedTo',
+	stateClampedBetween: 'analytics:stateClampedBetween',
+	statePartsFailed: 'analytics:statePartsFailed',
 	stateFiltersUnapplied: 'analytics:stateFiltersUnapplied',
 	stateGoalsUnresolved: 'analytics:stateGoalsUnresolved',
 	stateNoGoals: 'analytics:stateNoGoals',
 	stateSampled: 'analytics:stateSampled',
+	stateMixedCurrencies: 'analytics:stateMixedCurrencies',
+	statePartial: 'analytics:statePartial',
+	stateCapped: 'analytics:stateCapped',
+	stateTimezoneUnresolved: 'analytics:stateTimezoneUnresolved',
+	stateUpdated: 'analytics:stateUpdated',
 	widgetFieldTitle: 'analytics:widgetFieldTitle',
 	widgetFieldMetric: 'analytics:widgetFieldMetric',
 	widgetFieldTimeframe: 'analytics:widgetFieldTimeframe',
@@ -59,6 +75,15 @@ export const keys = {
 	widgetTimeframeCustom: 'analytics:widgetTimeframeCustom',
 	widgetFieldRange: 'analytics:widgetFieldRange',
 	dateRangePlaceholder: 'analytics:dateRangePlaceholder',
+	dateRangeNextMonth: 'analytics:dateRangeNextMonth',
+	dateRangePreviousMonth: 'analytics:dateRangePreviousMonth',
+	dateRangeNextYear: 'analytics:dateRangeNextYear',
+	dateRangePreviousYear: 'analytics:dateRangePreviousYear',
+	dateRangeCalendar: 'analytics:dateRangeCalendar',
+	dateRangeChooseDay: 'analytics:dateRangeChooseDay',
+	dateRangeDayUnavailable: 'analytics:dateRangeDayUnavailable',
+	dateRangeMonth: 'analytics:dateRangeMonth',
+	dateRangeWeek: 'analytics:dateRangeWeek',
 	widgetFieldWindow: 'analytics:widgetFieldWindow',
 	widgetFieldFilter: 'analytics:widgetFieldFilter',
 	widgetFieldFilterDescription: 'analytics:widgetFieldFilterDescription',
@@ -76,13 +101,15 @@ export const keys = {
 	fieldFilterEmpty: 'analytics:fieldFilterEmpty',
 	fieldFilterError: 'analytics:fieldFilterError',
 	widgetRealtimeLabel: 'analytics:widgetRealtimeLabel',
-	widgetRealtimeCaption: 'analytics:widgetRealtimeCaption',
 	widgetRealtimePaused: 'analytics:widgetRealtimePaused',
+	widgetRealtimeWindow: 'analytics:widgetRealtimeWindow',
 	widgetOpenInView: 'analytics:widgetOpenInView',
 	comparisonVsPrevious: 'analytics:comparisonVsPrevious',
 	comparisonIncrease: 'analytics:comparisonIncrease',
 	comparisonDecrease: 'analytics:comparisonDecrease',
 	comparisonNoChange: 'analytics:comparisonNoChange',
+	comparisonChangeLabel: 'analytics:comparisonChangeLabel',
+	comparisonDirectionLabel: 'analytics:comparisonDirectionLabel',
 	providersCollectionSingular: 'analytics:providersCollectionSingular',
 	providersCollectionPlural: 'analytics:providersCollectionPlural',
 	providerFieldName: 'analytics:providerFieldName',
@@ -106,7 +133,14 @@ export const keys = {
 	providerFieldRevenueCurrency: 'analytics:providerFieldRevenueCurrency',
 	providerFieldMeasurementId: 'analytics:providerFieldMeasurementId',
 	providerFieldCaptureHelp: 'analytics:providerFieldCaptureHelp',
+	providerFieldDomainHelp: 'analytics:providerFieldDomainHelp',
+	providerFieldScriptIdHelp: 'analytics:providerFieldScriptIdHelp',
 	providerErrorMeasurementId: 'analytics:providerErrorMeasurementId',
+	providerErrorScriptId: 'analytics:providerErrorScriptId',
+	providerErrorHostFormat: 'analytics:providerErrorHostFormat',
+	providerErrorHostInsecure: 'analytics:providerErrorHostInsecure',
+	providerNameNative: 'analytics:providerNameNative',
+	providerNameNativeHelp: 'analytics:providerNameNativeHelp',
 	providerNamePlausible: 'analytics:providerNamePlausible',
 	providerNameUmami: 'analytics:providerNameUmami',
 	providerNameGa4: 'analytics:providerNameGa4',
@@ -114,26 +148,39 @@ export const keys = {
 	goalsCollectionSingular: 'analytics:goalsCollectionSingular',
 	goalsCollectionPlural: 'analytics:goalsCollectionPlural',
 	goalFieldName: 'analytics:goalFieldName',
+	goalFieldNameHelp: 'analytics:goalFieldNameHelp',
 	goalFieldSlug: 'analytics:goalFieldSlug',
 	goalFieldSlugHelp: 'analytics:goalFieldSlugHelp',
 	goalFieldEnabled: 'analytics:goalFieldEnabled',
+	goalFieldEnabledHelp: 'analytics:goalFieldEnabledHelp',
+	goalFieldBrowser: 'analytics:goalFieldBrowser',
+	goalFieldBrowserHelp: 'analytics:goalFieldBrowserHelp',
 	goalFieldMatch: 'analytics:goalFieldMatch',
 	goalFieldMatchKind: 'analytics:goalFieldMatchKind',
+	goalFieldMatchKindHelp: 'analytics:goalFieldMatchKindHelp',
 	goalFieldMatchEventName: 'analytics:goalFieldMatchEventName',
+	goalFieldMatchEventNameHelp: 'analytics:goalFieldMatchEventNameHelp',
 	goalFieldMatchPathPattern: 'analytics:goalFieldMatchPathPattern',
 	goalFieldMatchPathPatternHelp: 'analytics:goalFieldMatchPathPatternHelp',
-	goalFieldValue: 'analytics:goalFieldValue',
-	goalFieldValueFixed: 'analytics:goalFieldValueFixed',
-	goalFieldValueProp: 'analytics:goalFieldValueProp',
-	goalFieldValuePropHelp: 'analytics:goalFieldValuePropHelp',
+	goalFieldAmount: 'analytics:goalFieldAmount',
+	goalFieldAmountHelp: 'analytics:goalFieldAmountHelp',
+	goalFieldAmountProp: 'analytics:goalFieldAmountProp',
+	goalFieldAmountPropHelp: 'analytics:goalFieldAmountPropHelp',
 	goalFieldCurrency: 'analytics:goalFieldCurrency',
 	goalKindGoal: 'analytics:goalKindGoal',
 	goalKindEvent: 'analytics:goalKindEvent',
 	goalKindPath: 'analytics:goalKindPath',
+	goalSourceCollection: 'analytics:goalSourceCollection',
+	goalSourceBuiltin: 'analytics:goalSourceBuiltin',
+	goalBuiltinPurchase: 'analytics:goalBuiltinPurchase',
 	goalErrorSlug: 'analytics:goalErrorSlug',
 	goalErrorSlugTaken: 'analytics:goalErrorSlugTaken',
+	goalErrorPatternLimits: 'analytics:goalErrorPatternLimits',
 	goalErrorCurrency: 'analytics:goalErrorCurrency',
+	goalErrorCurrencyRequired: 'analytics:goalErrorCurrencyRequired',
 	fieldGoalLabel: 'analytics:fieldGoalLabel',
+	fieldGoalValueLabel: 'analytics:fieldGoalValueLabel',
+	fieldGoalValueHelp: 'analytics:fieldGoalValueHelp',
 	fieldGoalEmpty: 'analytics:fieldGoalEmpty',
 	fieldGoalManage: 'analytics:fieldGoalManage',
 	fieldGoalInvalid: 'analytics:fieldGoalInvalid',
@@ -147,32 +194,52 @@ export const keys = {
 	viewLoading: 'analytics:viewLoading',
 	viewSourceLabel: 'analytics:viewSourceLabel',
 	viewTimezone: 'analytics:viewTimezone',
-	viewFrom: 'analytics:viewFrom',
-	viewTo: 'analytics:viewTo',
+	viewDates: 'analytics:viewDates',
 	viewCompare: 'analytics:viewCompare',
 	viewStale: 'analytics:viewStale',
 	viewFilters: 'analytics:viewFilters',
 	viewFilterRemove: 'analytics:viewFilterRemove',
+	viewFilterChip: 'analytics:viewFilterChip',
 	viewRefresh: 'analytics:viewRefresh',
 	viewRefreshing: 'analytics:viewRefreshing',
 	viewRefreshFailed: 'analytics:viewRefreshFailed',
+	viewRefreshed: 'analytics:viewRefreshed',
+	viewExclusionTitle: 'analytics:viewExclusionTitle',
+	viewExclusionIntro: 'analytics:viewExclusionIntro',
+	viewExclusionLinkLabel: 'analytics:viewExclusionLinkLabel',
+	viewExclusionQueryHelp: 'analytics:viewExclusionQueryHelp',
+	viewExclusionUndoLabel: 'analytics:viewExclusionUndoLabel',
+	viewExclusionFailed: 'analytics:viewExclusionFailed',
+	viewExclusionExclude: 'analytics:viewExclusionExclude',
+	viewExclusionInclude: 'analytics:viewExclusionInclude',
+	viewExclusionShare: 'analytics:viewExclusionShare',
+	viewExclusionCopy: 'analytics:viewExclusionCopy',
+	viewExclusionSitesHelp: 'analytics:viewExclusionSitesHelp',
+	viewFilterBy: 'analytics:viewFilterBy',
+	chartSoFar: 'analytics:chartSoFar',
+	chartKeyboardHint: 'analytics:chartKeyboardHint',
+	chartLabel: 'analytics:chartLabel',
+	stateNoValue: 'analytics:stateNoValue',
 	viewRetry: 'analytics:viewRetry',
 	viewErrorForbidden: 'analytics:viewErrorForbidden',
 	viewErrorNotFound: 'analytics:viewErrorNotFound',
 	viewErrorBusy: 'analytics:viewErrorBusy',
+	viewErrorMisconfigured: 'analytics:viewErrorMisconfigured',
+	viewErrorHostRefused: 'analytics:viewErrorHostRefused',
+	viewErrorTooManyReads: 'analytics:viewErrorTooManyReads',
 	viewErrorRetryAfter: 'analytics:viewErrorRetryAfter',
 	viewErrorGeneric: 'analytics:viewErrorGeneric',
+	viewErrorInvalid: 'analytics:viewErrorInvalid',
 	viewSectionUnavailable: 'analytics:viewSectionUnavailable',
 	viewNoSources: 'analytics:viewNoSources',
 	viewNoSourcesHelp: 'analytics:viewNoSourcesHelp',
 	viewDocsLink: 'analytics:viewDocsLink',
 	viewOverview: 'analytics:viewOverview',
 	viewTrendPrevious: 'analytics:viewTrendPrevious',
+	viewTrendPeriod: 'analytics:viewTrendPeriod',
 	viewBreakdowns: 'analytics:viewBreakdowns',
 	viewFiltersUnsupported: 'analytics:viewFiltersUnsupported',
 	viewGroupBy: 'analytics:viewGroupBy',
-	viewSortAscending: 'analytics:viewSortAscending',
-	viewSortDescending: 'analytics:viewSortDescending',
 	viewConversionRate: 'analytics:viewConversionRate',
 	viewTabPages: 'analytics:viewTabPages',
 	viewTabSources: 'analytics:viewTabSources',
@@ -204,6 +271,7 @@ export const keys = {
 	viewDimensionLanguage: 'analytics:viewDimensionLanguage',
 	viewDimensionEvent: 'analytics:viewDimensionEvent',
 	viewDimensionGoal: 'analytics:viewDimensionGoal',
+	viewDimensionCurrency: 'analytics:viewDimensionCurrency',
 	channelDirect: 'analytics:channelDirect',
 	channelOrganicSearch: 'analytics:channelOrganicSearch',
 	channelPaidSearch: 'analytics:channelPaidSearch',
@@ -217,6 +285,137 @@ export const keys = {
 	channelReferral: 'analytics:channelReferral',
 	channelPaidOther: 'analytics:channelPaidOther',
 	valueNotSet: 'analytics:valueNotSet',
+	valueOther: 'analytics:valueOther',
+	valueDeviceDesktop: 'analytics:valueDeviceDesktop',
+	valueDeviceMobile: 'analytics:valueDeviceMobile',
+	valueDeviceTablet: 'analytics:valueDeviceTablet',
+	valueBrowserChrome: 'analytics:valueBrowserChrome',
+	valueBrowserSafari: 'analytics:valueBrowserSafari',
+	valueBrowserFirefox: 'analytics:valueBrowserFirefox',
+	valueBrowserEdge: 'analytics:valueBrowserEdge',
+	valueBrowserOpera: 'analytics:valueBrowserOpera',
+	valueBrowserSamsung: 'analytics:valueBrowserSamsung',
+	valueOsIos: 'analytics:valueOsIos',
+	valueOsAndroid: 'analytics:valueOsAndroid',
+	valueOsWindows: 'analytics:valueOsWindows',
+	valueOsMacos: 'analytics:valueOsMacos',
+	valueOsLinux: 'analytics:valueOsLinux',
+	valueOsChromeos: 'analytics:valueOsChromeos',
+	syncCollectionSingular: 'analytics:syncCollectionSingular',
+	syncCollectionPlural: 'analytics:syncCollectionPlural',
+	filterHintPage: 'analytics:filterHintPage',
+	filterHintReferrer: 'analytics:filterHintReferrer',
+	filterHintSource: 'analytics:filterHintSource',
+	filterHintChannel: 'analytics:filterHintChannel',
+	filterHintUtm: 'analytics:filterHintUtm',
+	filterHintDevice: 'analytics:filterHintDevice',
+	filterHintBrowser: 'analytics:filterHintBrowser',
+	filterHintOs: 'analytics:filterHintOs',
+	filterHintCountry: 'analytics:filterHintCountry',
+	filterHintPlace: 'analytics:filterHintPlace',
+	filterHintLanguage: 'analytics:filterHintLanguage',
+	filterHintEvent: 'analytics:filterHintEvent',
+	filterHintGoal: 'analytics:filterHintGoal',
+	filterHintCurrency: 'analytics:filterHintCurrency',
+	providersCollectionDescription: 'analytics:providersCollectionDescription',
+	providerFieldNameHelp: 'analytics:providerFieldNameHelp',
+	providerFieldProviderHelp: 'analytics:providerFieldProviderHelp',
+	providerFieldEnabledHelp: 'analytics:providerFieldEnabledHelp',
+	providerFieldSiteIdHelp: 'analytics:providerFieldSiteIdHelp',
+	providerFieldApiKeyHelp: 'analytics:providerFieldApiKeyHelp',
+	providerFieldWebsiteIdHelp: 'analytics:providerFieldWebsiteIdHelp',
+	providerFieldTokenHelp: 'analytics:providerFieldTokenHelp',
+	providerFieldPropertyIdHelp: 'analytics:providerFieldPropertyIdHelp',
+	providerFieldClientEmailHelp: 'analytics:providerFieldClientEmailHelp',
+	providerFieldPrivateKeyHelp: 'analytics:providerFieldPrivateKeyHelp',
+	providerFieldProjectIdHelp: 'analytics:providerFieldProjectIdHelp',
+	providerFieldRegionHelp: 'analytics:providerFieldRegionHelp',
+	providerFieldRevenueCurrencyHelp: 'analytics:providerFieldRevenueCurrencyHelp',
+	providerFieldGa4CurrencyHelp: 'analytics:providerFieldGa4CurrencyHelp',
+	providerFieldScopeProperty: 'analytics:providerFieldScopeProperty',
+	providerFieldScopePropertyHelp: 'analytics:providerFieldScopePropertyHelp',
+	viewScopeSite: 'analytics:viewScopeSite',
+	viewScopeAll: 'analytics:viewScopeAll',
+	viewScopeShowing: 'analytics:viewScopeShowing',
+	viewTimezoneHelp: 'analytics:viewTimezoneHelp',
+	metricImpressions: 'analytics:metricImpressions',
+	metricInteractions: 'analytics:metricInteractions',
+	metricClickRate: 'analytics:metricClickRate',
+	viewDimensionItem: 'analytics:viewDimensionItem',
+	viewTabContent: 'analytics:viewTabContent',
+	filterHintItem: 'analytics:filterHintItem',
+	itemRemoved: 'analytics:itemRemoved',
+	valueLoading: 'analytics:valueLoading',
+	panelReportLabel: 'analytics:panelReportLabel',
+	panelReportPage: 'analytics:panelReportPage',
+	panelReportItem: 'analytics:panelReportItem',
+	itemViewers: 'analytics:itemViewers',
+	itemPagesSeenOn: 'analytics:itemPagesSeenOn',
+	itemClickCountries: 'analytics:itemClickCountries',
+	itemClickDevices: 'analytics:itemClickDevices',
+	itemClicksByCountry: 'analytics:itemClicksByCountry',
+	itemClicksByDevice: 'analytics:itemClicksByDevice',
+	metricVisitorsSummed: 'analytics:metricVisitorsSummed',
+	stateNoScope: 'analytics:stateNoScope',
+	panelNewPage: 'analytics:panelNewPage',
+	panelNewItem: 'analytics:panelNewItem',
+	panelNoVisits: 'analytics:panelNoVisits',
+	panelNoViews: 'analytics:panelNoViews',
 } as const
 
-export type TranslationKey = (typeof keys)[keyof typeof keys]
+/** A key with one string whatever the numbers around it. */
+export type SingularKey = (typeof keys)[keyof typeof keys]
+
+/** CLDR's plural categories: the forms a language can write a counted phrase in. */
+export type PluralCategory = Intl.LDMLPluralRule
+
+const pluralForms = <K extends string>(
+	key: K
+): { readonly [C in PluralCategory]: `${K}_${C}` } => ({
+	zero: `${key}_zero`,
+	one: `${key}_one`,
+	two: `${key}_two`,
+	few: `${key}_few`,
+	many: `${key}_many`,
+	other: `${key}_other`,
+})
+
+/**
+ * Phrases written around a count, one key per plural form (`<key>_<category>`). A locale defines
+ * exactly its language's `Intl.PluralRules` forms; `plural.ts` picks one.
+ */
+export const pluralKeys = {
+	/** Visitors on the site or the page within the last minutes. */
+	liveVisitors: pluralForms('analytics:liveVisitors'),
+	/** Pageviews within the last minutes. */
+	livePageviews: pluralForms('analytics:livePageviews'),
+}
+
+export type PluralName = keyof typeof pluralKeys
+
+/** One form of a counted phrase; `C` narrows it to the forms one language has. */
+export type PluralVariant<C extends PluralCategory = PluralCategory> =
+	(typeof pluralKeys)[PluralName][C]
+
+export type TranslationKey = SingularKey | PluralVariant
+
+/**
+ * One locale's strings: every singular key, and each counted phrase in exactly the forms `C`
+ * its language has. A missing form or one the language lacks is a type error.
+ */
+export type LocaleBundle<C extends PluralCategory> = Record<SingularKey, string> &
+	Record<PluralVariant<C>, string>
+
+/** A key's namespace and name: `analytics:foo` is `foo` under `analytics`, as Payload nests it. */
+export const splitKey = (key: string): { namespace: string; name: string } => {
+	const separator = key.indexOf(':')
+	return { namespace: key.slice(0, separator), name: key.slice(separator + 1) }
+}
+
+/** The string `key` names in translations nested as Payload keeps them, or undefined. */
+export const nestedString = (translations: unknown, key: string): string | undefined => {
+	const { namespace, name } = splitKey(key)
+	const strings = isRecord(translations) ? translations[namespace] : undefined
+	const value = isRecord(strings) ? strings[name] : undefined
+	return typeof value === 'string' ? value : undefined
+}

@@ -1,0 +1,12 @@
+{
+	"title": "Reference",
+	"pages": [
+		"options",
+		"endpoints",
+		"entry-points",
+		"tracker",
+		"adapter-contract",
+		"translations",
+		"stability"
+	]
+}

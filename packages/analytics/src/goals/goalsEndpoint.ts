@@ -1,30 +1,26 @@
 import type { PayloadHandler } from 'payload'
+import { readGate } from '../access/readGate'
+import { PLATFORM_SCOPE } from '../core/contract'
+import { resolveRequestedScope } from '../core/scopedRead'
 import { analyticsError, errorResponse, NO_STORE } from '../plugin/errors'
-import { GOALS_PATH } from '../plugin/paths'
-import {
-	getRuntime,
-	platformReadFor,
-	readAccessFor,
-	resolveGoalsDetailedFor,
-	resolveScopeFor,
-} from '../plugin/runtime'
+import { getRuntime, resolveGoalsDetailedFor } from '../plugin/runtime'
 import type { GoalsResponse, WireGoal } from './fetchGoals'
+import type { ResolvedGoal } from './resolver'
 
 export type { GoalsResponse, WireGoal }
-export { GOALS_PATH }
+
+const wireGoal = ({ goal, source }: ResolvedGoal): WireGoal => ({
+	slug: goal.slug,
+	name: goal.name,
+	source,
+})
+
+const listing = (goals: WireGoal[], collection: GoalsResponse['collection']): Response =>
+	Response.json({ goals, collection } satisfies GoalsResponse, { headers: NO_STORE })
 
 /**
- * Authenticated GET listing the goals visible to the requesting scope, gated by
- * `access.read` like every other read endpoint: the config goals
- * merged with the goals collection, each tagged with where it came from. Scope gating
- * mirrors the sources endpoint exactly, because the reasoning is the same: there is no
- * scope parameter, so a tenant can never enumerate another tenant's goals; on a scoped
- * install a request that resolves no scope is ambiguous rather than install-wide and
- * answers empty unless `platformRead` grants it; and a failed resolution on a scoped
- * install is indistinguishable from a forged one, so it answers empty too, while an
- * unscoped install falls back to the static config goals.
- *
- * Every answer is `no-store`: which goals a caller sees depends on its own scope.
+ * Authenticated GET listing the requested scope's goals, gated by `access.read`, never cached. There
+ * is no scope parameter, so no tenant can enumerate another's goals by naming one.
  */
 export const makeGoalsHandler = (): PayloadHandler => async (req) => {
 	if (!req.user) {
@@ -32,40 +28,52 @@ export const makeGoalsHandler = (): PayloadHandler => async (req) => {
 	}
 	const runtime = getRuntime(req.payload)
 	if (!runtime) {
-		return Response.json({ goals: [], collection: null } satisfies GoalsResponse, {
-			headers: NO_STORE,
-		})
+		return listing([], null)
 	}
-	if (!(await readAccessFor(runtime, req))) {
+	let allowed: boolean
+	try {
+		allowed = await readGate(runtime, req)
+	} catch (err) {
+		// A gate that fails must not fall through to the degraded listing below, which answers 200.
+		req.payload.logger?.error(`analytics: goals read access check failed: ${String(err)}`)
+		return errorResponse(500, analyticsError('internal', 'analytics: goals listing failed'))
+	}
+	if (!allowed) {
 		return errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
 	}
 	const collection = runtime.goalsCollectionSlug ? { slug: runtime.goalsCollectionSlug } : null
-	const configGoals = (): WireGoal[] =>
-		(runtime.goals ?? []).map((goal) => ({
-			slug: goal.slug,
-			name: goal.name,
-			source: 'config' as const,
-		}))
+	const params = new URL(req.url ?? '', 'http://localhost').searchParams
+	// Built-in `purchase` is latent: a picker offering it would offer a goal nobody declared.
+	const includeBuiltin = params.get('include') === 'builtin'
+	// A failed scoped resolution looks like a forged one, so only an unscoped install lists config goals.
+	const degraded = (): Response =>
+		listing(
+			runtime.scoped
+				? []
+				: (runtime.goals ?? []).map((goal) => wireGoal({ goal, source: 'config' })),
+			collection
+		)
 	try {
-		const scope = await resolveScopeFor(runtime, req)
-		if (runtime.scoped && scope === null && !(await platformReadFor(runtime, req))) {
-			return Response.json({ goals: [], collection } satisfies GoalsResponse, { headers: NO_STORE })
+		const requested = await resolveRequestedScope({ runtime, req })
+		if (!requested.ok) {
+			if (requested.reason === 'not-member') {
+				return errorResponse(
+					400,
+					analyticsError('untrusted_scope', 'analytics: scope is not permitted for this request')
+				)
+			}
+			return requested.reason === 'failed' ? degraded() : listing([], collection)
 		}
-		const resolved = await resolveGoalsDetailedFor(runtime, req, scope)
-		const goals = resolved.map(({ goal, source }) => ({
-			slug: goal.slug,
-			name: goal.name,
-			source,
-		}))
-		return Response.json({ goals, collection } satisfies GoalsResponse, { headers: NO_STORE })
+		const scope = requested.scope === PLATFORM_SCOPE ? null : requested.scope
+		const resolved = runtime.listGoals
+			? await runtime.listGoals(req, scope)
+			: await resolveGoalsDetailedFor(runtime, req, scope)
+		return listing(
+			resolved.filter((entry) => includeBuiltin || entry.source !== 'builtin').map(wireGoal),
+			collection
+		)
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: goals listing failed: ${String(err)}`)
-		return Response.json(
-			{
-				goals: runtime.scoped ? [] : configGoals(),
-				collection,
-			} satisfies GoalsResponse,
-			{ headers: NO_STORE }
-		)
+		return degraded()
 	}
 }

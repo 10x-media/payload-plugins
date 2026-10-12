@@ -2,10 +2,10 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import type { Config, PayloadHandler } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
-import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { trackServerEvent } from '../../src/native/ingest/serverTrack'
 import { type NativeOptions, native } from '../../src/native/nativeAdapter'
 import { ingestRequest } from './ingestRequest'
+import { countHits } from './nativeHelpers'
 
 const GOOGLEBOT = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
 const CHROME =
@@ -18,7 +18,7 @@ const CHROME =
 const endpointFor = (options: NativeOptions): PayloadHandler => {
 	const config = {} as Config
 	native(options).register?.(config)
-	const endpoint = config.endpoints?.find((e) => e.path === '/analytics/ingest')
+	const endpoint = config.endpoints?.find((e) => e.path === '/_x/e')
 	if (!endpoint) {
 		throw new Error('ingest endpoint not registered')
 	}
@@ -29,7 +29,10 @@ describeForDb('native bot filtering', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native()], capture: { gate: 'off' } }),
+			db,
+		})
 	})
 
 	afterAll(async () => {
@@ -41,13 +44,8 @@ describeForDb('native bot filtering', {}, (db) => {
 			ingestRequest(booted.payload, { type: 'pageview', path, hostname: 'h' }, { 'user-agent': ua })
 		)
 
-	const stored = async (path: string): Promise<number> => {
-		const { totalDocs } = await booted.payload.count({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: path } },
-		})
-		return totalDocs
-	}
+	const stored = (path: string): Promise<number> =>
+		countHits(booted.payload, { path: { equals: path } })
 
 	it('answers a crawler exactly like a visitor and stores nothing', async () => {
 		const handler = endpointFor({})

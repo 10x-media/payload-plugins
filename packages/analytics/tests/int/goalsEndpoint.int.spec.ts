@@ -3,6 +3,7 @@ import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { makeGoalsHandler } from '../../src/goals/goalsEndpoint'
 import { analytics } from '../../src/index'
+import { getRuntime, resolveGoalsFor } from '../../src/plugin/runtime'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
 const GOALS = 'analytics-goals'
@@ -24,7 +25,7 @@ const login = async (payload: Payload, email: string) => {
 }
 
 type GoalsBody = {
-	goals: Array<{ slug: string; name: string; source: 'collection' | 'config' }>
+	goals: Array<{ slug: string; name: string; source: 'builtin' | 'collection' | 'config' }>
 	collection: { slug: string } | null
 }
 
@@ -46,13 +47,16 @@ describeForDb('analytics goals endpoint', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [memoryAdapter()],
-				scopeResolver: ({ req }) => {
-					const email = (req.user as { email?: string })?.email ?? ''
-					if (email === BROKEN_EMAIL) throw new Error('scope resolution boom')
-					return scopeByEmail[email] ?? null
+				scope: {
+					member: () => true,
+					resolve: ({ req }) => {
+						const email = (req.user as { email?: string })?.email ?? ''
+						if (email === BROKEN_EMAIL) throw new Error('scope resolution boom')
+						return scopeByEmail[email] ?? null
+					},
 				},
 				access: {
-					platformRead: ({ req }) =>
+					crossScope: ({ req }) =>
 						(req.user as { email?: string } | null)?.email === 'platform@t.dev',
 				},
 				goals: { defaults: configGoals, collection: true },
@@ -72,8 +76,11 @@ describeForDb('analytics goals endpoint', {}, (db) => {
 	const reqFor = (user: unknown): PayloadRequest =>
 		({ user, payload: booted.payload }) as unknown as PayloadRequest
 
-	const bodyFor = async (user: unknown): Promise<GoalsBody> => {
-		const res = await handler(reqFor(user))
+	const bodyFor = async (user: unknown, query = ''): Promise<GoalsBody> => {
+		const res = await handler({
+			...reqFor(user),
+			url: `http://localhost/api/_x/goals${query}`,
+		})
 		expect(res.status).toBe(200)
 		return (await res.json()) as GoalsBody
 	}
@@ -92,7 +99,7 @@ describeForDb('analytics goals endpoint', {}, (db) => {
 
 	it('registers the endpoint under the api route', () => {
 		const endpoint = booted.payload.config.endpoints.find(
-			(candidate) => candidate.path === '/analytics/goals'
+			(candidate) => candidate.path === '/_x/goals'
 		)
 
 		expect(endpoint?.method).toBe('get')
@@ -186,7 +193,17 @@ describeForDb('analytics goals endpoint', {}, (db) => {
 		expect(body.collection).toEqual({ slug: GOALS })
 	})
 
-	it('answers the install-wide goals for a platformRead-granted user', async () => {
+	// The built-in purchase goal is latent: it matches at ingest so a sale counts, but it is
+	// not a goal the install has, and every caller here is a picker.
+	it('leaves the built-in goal out unless the caller asks for it', async () => {
+		const plain = await bodyFor(userA)
+		const asked = await bodyFor(userA, '?include=builtin')
+
+		expect(plain.goals.map((entry) => entry.slug)).not.toContain('purchase')
+		expect(asked.goals).toContainEqual({ slug: 'purchase', name: 'Purchase', source: 'builtin' })
+	})
+
+	it('answers the install-wide goals for a reader crossScope grants', async () => {
 		const body = await bodyFor(platformUser)
 
 		expect(body.goals.map((entry) => entry.slug)).toEqual(['book-demo', 'signup'])
@@ -227,5 +244,61 @@ describeForDb('analytics goals endpoint - no collection', {}, (db) => {
 			{ slug: 'book-demo', name: 'Book a demo', source: 'config' },
 			{ slug: 'signup', name: 'Signup', source: 'config' },
 		])
+	})
+})
+
+describeForDb('analytics goals endpoint - narrowed collection read access', {}, (db) => {
+	let booted: BootedPayload
+	let user: Awaited<ReturnType<typeof login>>
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			collections: [accessUsers],
+			db,
+			plugin: analytics({
+				adapters: [memoryAdapter()],
+				goals: {
+					defaults: configGoals,
+					collection: {
+						access: {
+							read: ({ req }) => (req.user ? { name: { not_equals: 'Board only' } } : false),
+						},
+					},
+				},
+			}),
+		})
+		user = await login(booted.payload, 'editor@t.dev')
+		for (const data of [
+			{ name: 'Newsletter', slug: 'newsletter', match: { kind: 'goal' } },
+			{ name: 'Board only', slug: 'board-target', match: { kind: 'goal' } },
+		]) {
+			await booted.payload.create({ collection: GOALS as never, data: data as never })
+		}
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	it('lists only the collection goals its read access shows the reader, beside the config ones', async () => {
+		const res = await makeGoalsHandler()({
+			user,
+			payload: booted.payload,
+			url: 'http://localhost/api/_x/goals',
+		} as unknown as PayloadRequest)
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as GoalsBody
+		expect(body.goals).toEqual([
+			{ slug: 'book-demo', name: 'Book a demo', source: 'config' },
+			{ slug: 'signup', name: 'Signup', source: 'config' },
+			{ slug: 'newsletter', name: 'Newsletter', source: 'collection' },
+		])
+	})
+
+	it('still matches the goal it hides from the reader', async () => {
+		const runtime = getRuntime(booted.payload)
+		const req = { user, payload: booted.payload } as unknown as PayloadRequest
+		const matched = runtime ? await resolveGoalsFor(runtime, req, null) : []
+		expect(matched.map((goal) => goal.slug)).toContain('board-target')
 	})
 })

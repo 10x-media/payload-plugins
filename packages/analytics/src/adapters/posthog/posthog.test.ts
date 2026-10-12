@@ -1,8 +1,12 @@
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { LINE_SEPARATOR } from '../../capture/jsLiteral'
+import { matchProxyRoute } from '../../capture/proxyRoutes'
+import { filterOperatorsFor } from '../../core/capabilities'
 import type { AnalyticsQuery } from '../../core/contract'
-import { posthog } from './posthog'
+import type { FetchLike } from '../../core/fetch'
+import { POSTHOG_SELF_HOSTED_CAPTURE_PATHS, posthog } from './posthog'
 
 const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -148,7 +152,7 @@ describe('posthog adapter', () => {
 			const value = { eq: 'Paid Search', contains: 'Paid', matches: 'Paid .*' }[operator]
 			const caps = posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities
 			expect(caps.dimensions.has('channel')).toBe(true)
-			expect(caps.filters.has('channel')).toBe(true)
+			expect(filterOperatorsFor(caps, 'channel')).toContain(operator)
 			await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
 				q({ metrics: ['pageviews'], filters: [{ dimension: 'channel', operator, value }] }),
 				{}
@@ -269,7 +273,7 @@ describe('posthog adapter', () => {
 			const caps = posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities
 			expect(caps.dimensions.has('goal')).toBe(true)
 			expect(caps.metrics.has('conversions')).toBe(true)
-			expect(caps.filters.has('goal')).toBe(false)
+			expect(filterOperatorsFor(caps, 'goal')).toEqual([])
 		})
 
 		it('groups by event, restricted to the hint, counting occurrences as conversions', async () => {
@@ -516,8 +520,11 @@ describe('posthog adapter', () => {
 
 	it('declares filters as the DIMENSION_SQL key set and hour as minGranularity', () => {
 		const caps = posthog({ projectId: '123', apiKey: 'phx_k' }).capabilities
-		expect(caps.filters).toEqual(new Set(['page', 'channel', 'event']))
-		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
+		expect(caps.filters).toEqual({
+			page: ['eq', 'contains', 'matches'],
+			channel: ['eq', 'contains', 'matches'],
+			event: ['eq', 'contains', 'matches'],
+		})
 		expect(caps.minGranularity).toBe('hour')
 	})
 
@@ -754,14 +761,40 @@ describe('posthog scopeProperty', () => {
 	})
 })
 
+describe('posthog fetch', () => {
+	it('reads and proxies through the fetch it is given, the global one otherwise', async () => {
+		const urls: string[] = []
+		const fetch: FetchLike = async (input) => {
+			urls.push(String(input))
+			return Response.json({ columns: [], types: [], results: [[11, 6, 7]] })
+		}
+		const adapter = posthog({ projectId: '1', apiKey: 'phx_k', projectToken: 'phc_t', fetch })
+		const result = await adapter.query(q(), {})
+		expect(result.totals?.pageviews).toBe(11)
+		expect(urls).toEqual(['https://us.posthog.com/api/projects/1/query/'])
+		expect(adapter.capture?.proxy.fetch).toBe(fetch)
+		expect(
+			posthog({ projectId: '1', apiKey: 'phx_k', projectToken: 'phc_t' }).capture?.proxy.fetch
+		).toBeUndefined()
+	})
+})
+
 describe('posthog capture', () => {
 	it('derives region us from the default host and builds the three proxy routes', () => {
 		const capture = posthog({ projectId: '123', apiKey: 'phx_k', projectToken: 'phc_abc' }).capture
 		expect(capture?.proxy.trailingSlashes).toBe(true)
 		expect(capture?.proxy.routes).toEqual([
-			{ source: '/static/:p*', upstream: 'https://us-assets.i.posthog.com/static/:p*' },
-			{ source: '/array/:p*', upstream: 'https://us-assets.i.posthog.com/array/:p*' },
-			{ source: '/:p*', upstream: 'https://us.i.posthog.com/:p*' },
+			{
+				source: '/static/:p*',
+				upstream: 'https://us-assets.i.posthog.com/static/:p*',
+				kind: 'script',
+			},
+			{
+				source: '/array/:p*',
+				upstream: 'https://us-assets.i.posthog.com/array/:p*',
+				kind: 'script',
+			},
+			{ source: '/:p*', upstream: 'https://us.i.posthog.com/:p*', kind: 'data' },
 		])
 	})
 
@@ -773,9 +806,17 @@ describe('posthog capture', () => {
 			projectToken: 'phc_abc',
 		}).capture
 		expect(capture?.proxy.routes).toEqual([
-			{ source: '/static/:p*', upstream: 'https://eu-assets.i.posthog.com/static/:p*' },
-			{ source: '/array/:p*', upstream: 'https://eu-assets.i.posthog.com/array/:p*' },
-			{ source: '/:p*', upstream: 'https://eu.i.posthog.com/:p*' },
+			{
+				source: '/static/:p*',
+				upstream: 'https://eu-assets.i.posthog.com/static/:p*',
+				kind: 'script',
+			},
+			{
+				source: '/array/:p*',
+				upstream: 'https://eu-assets.i.posthog.com/array/:p*',
+				kind: 'script',
+			},
+			{ source: '/:p*', upstream: 'https://eu.i.posthog.com/:p*', kind: 'data' },
 		])
 	})
 
@@ -787,6 +828,115 @@ describe('posthog capture', () => {
 			projectToken: 'phc_abc',
 		}).capture
 		expect(capture?.proxy.routes[0]?.upstream).toBe('https://eu-assets.i.posthog.com/static/:p*')
+	})
+
+	// A self-hosted instance serves its bundle and takes its events itself, as posthog-js expects,
+	// and is the whole app besides: only its assets and public capture paths are relayed.
+	it('sends capture to a self-hosted host, base path included, on its capture paths alone', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			host: 'https://analytics.example.com/ph/',
+			region: 'us',
+			projectToken: 'phc_abc',
+		}).capture
+		expect(capture?.proxy.routes).toEqual([
+			{
+				source: '/static/:p*',
+				upstream: 'https://analytics.example.com/ph/static/:p*',
+				kind: 'script',
+			},
+			{
+				source: '/array/:p*',
+				upstream: 'https://analytics.example.com/ph/array/:p*',
+				kind: 'script',
+			},
+			...POSTHOG_SELF_HOSTED_CAPTURE_PATHS.map((path) => ({
+				source: path,
+				upstream: `https://analytics.example.com/ph${path}`,
+				kind: 'data',
+			})),
+		])
+		expect(POSTHOG_SELF_HOSTED_CAPTURE_PATHS).toEqual([
+			'/e',
+			'/i/v0/e',
+			'/batch',
+			'/capture',
+			'/track',
+			'/engage',
+			'/decide',
+			'/flags',
+			'/s',
+		])
+	})
+
+	it('relays a self-hosted capture path and nothing of the app beside it', () => {
+		const routes =
+			posthog({
+				projectId: '123',
+				apiKey: 'phx_k',
+				host: 'https://analytics.example.com',
+				projectToken: 'phc_abc',
+			}).capture?.proxy.routes ?? []
+		const relayed = (path: string) =>
+			matchProxyRoute(routes, path, { trailingSlashes: true })?.upstreamUrl.href ?? null
+
+		expect(relayed('/e/')).toBe('https://analytics.example.com/e/')
+		expect(relayed('/i/v0/e/')).toBe('https://analytics.example.com/i/v0/e/')
+		expect(relayed('/flags/')).toBe('https://analytics.example.com/flags/')
+		expect(relayed('/s/')).toBe('https://analytics.example.com/s/')
+		expect(relayed('/static/array.js')).toBe('https://analytics.example.com/static/array.js')
+		for (const path of [
+			'/',
+			'/api/login/',
+			'/api/signup/',
+			'/api/reset/',
+			'/api/projects/1/query/',
+			'/admin/',
+			'/login',
+			'/e/x',
+			'/i/v0/other/',
+		]) {
+			expect(relayed(path)).toBeNull()
+		}
+	})
+
+	it('keeps a self-hosted instance address out of the page unless uiHost names it', () => {
+		const snippetOf = (uiHost?: string) =>
+			posthog({
+				projectId: '123',
+				apiKey: 'phx_k',
+				host: 'https://analytics.internal.example.com',
+				projectToken: 'phc_abc',
+				...(uiHost === undefined ? {} : { uiHost }),
+			}).capture?.snippet({ path: '/ph' }).scripts[0]?.inline ?? ''
+
+		expect(snippetOf()).not.toContain('ui_host')
+		expect(snippetOf()).not.toContain('analytics.internal.example.com')
+		expect(snippetOf('https://posthog.example.com/')).toContain(
+			'ui_host:"https://posthog.example.com"'
+		)
+	})
+
+	it('lets uiHost replace the region app on PostHog Cloud', () => {
+		const inline =
+			posthog({
+				projectId: '123',
+				apiKey: 'phx_k',
+				projectToken: 'phc_abc',
+				uiHost: 'https://eu.posthog.com',
+			}).capture?.snippet({ path: '/ph' }).scripts[0]?.inline ?? ''
+		expect(inline).toContain('ui_host:"https://eu.posthog.com"')
+	})
+
+	it('keeps PostHog Cloud on its regional hosts, its older US address included', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			host: 'https://app.posthog.com',
+			projectToken: 'phc_abc',
+		}).capture
+		expect(capture?.proxy.routes[2]?.upstream).toBe('https://us.i.posthog.com/:p*')
 	})
 
 	it('renders one self-sequencing inline snippet: the stub, then init', () => {
@@ -810,9 +960,60 @@ describe('posthog capture', () => {
 		expect(inline).toContain(
 			'(c=t.currentScript&&(t.currentScript.nonce||t.currentScript.getAttribute("nonce")))&&(p.nonce=c,p.setAttribute("nonce",c))'
 		)
+		// history_change: posthog-js captures each SPA navigation, not only the first page load.
+		// opt_out_persistence_by_default: an opt-out deletes PostHog's own storage, distinct id included.
 		expect(
-			inline.endsWith('posthog.init("phc_abc",{api_host:"/ph",ui_host:"https://us.posthog.com"})')
+			inline.endsWith(
+				'posthog.init("phc_abc",{api_host:"/ph",ui_host:"https://us.posthog.com",capture_pageview:"history_change",opt_out_persistence_by_default:true})'
+			)
 		).toBe(true)
+	})
+
+	// Embedded exactly the way the key and the host are: the property name and the scope are
+	// host-controlled strings that end up inside an inline script.
+	it('stamps the scope as a super-property, JSON-embedded, after init', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			projectToken: 'phc_abc',
+			scopeProperty: 'ten"ant',
+		}).capture
+		const inline = capture?.snippet({ path: '/ph', scope: 'a"lpha' }).scripts[0]?.inline ?? ''
+		expect(inline.endsWith(String.raw`;posthog.register({["ten\"ant"]:"a\"lpha"})`)).toBe(true)
+	})
+
+	it('stamps nothing without both a scope property and a scope', () => {
+		const capture = posthog({
+			projectId: '123',
+			apiKey: 'phx_k',
+			projectToken: 'phc_abc',
+			scopeProperty: 'tenant',
+		}).capture
+		expect(capture?.snippet({ path: '/ph' }).scripts[0]?.inline).not.toContain('register({')
+		expect(
+			posthog({ projectId: '1', apiKey: 'k', projectToken: 'phc_abc' }).capture?.snippet({
+				path: '/ph',
+				scope: 'alpha',
+			}).scripts[0]?.inline
+		).not.toContain('register({')
+	})
+
+	it('escapes every embedded value so nothing can break out of the inline script', () => {
+		const hostile = '</script><script>alert(1)</script>'
+		const inline =
+			posthog({
+				projectId: '123',
+				apiKey: 'phx_k',
+				projectToken: `phc_${hostile}`,
+				scopeProperty: `prop${hostile}`,
+			}).capture?.snippet({
+				path: `/ph${hostile}`,
+				scope: `alpha${LINE_SEPARATOR}${hostile}`,
+			}).scripts[0]?.inline ?? ''
+
+		expect(inline).not.toContain('</script>')
+		expect(inline).not.toContain(LINE_SEPARATOR)
+		expect(inline).toContain('\\u003c')
 	})
 
 	it('renders the eu ui_host in the init snippet', () => {

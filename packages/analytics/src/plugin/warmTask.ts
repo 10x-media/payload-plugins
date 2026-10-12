@@ -1,288 +1,234 @@
-import type { PayloadRequest, TaskConfig, WidgetInstance } from 'payload'
-import type { DimensionKey, MetricKey } from '../core/contract'
-import type { ScopesResolver } from '../core/options'
-import { resolveScopeList } from '../core/scopeList'
-import { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
-import { DEFAULT_TIMEZONE } from '../timeframe/tz'
-import { breakdownSpecBySlug } from '../widgets/breakdownTypes'
-import { resolveCustomRange } from '../widgets/range'
-import { readForWidget, type WidgetReadStatus } from '../widgets/readForWidget'
-import { readForWidgetBreakdown } from '../widgets/readForWidgetBreakdown'
-import { readForWidgetSeries } from '../widgets/readForWidgetSeries'
-import { WIDGET_METRICS, type WidgetRange } from '../widgets/types'
-import { getRuntime, resolveTimezoneFor } from './runtime'
+import type { PayloadRequest, TaskConfig } from 'payload'
+import { currentDate } from '../core/clock'
+import { type ScheduledTask, TASK_SLUGS } from '../core/jobs'
+import { monotonicMs } from '../core/monotonic'
+import type { AdapterRegistry } from '../core/registry'
+import { systemRegistryFor } from '../core/scopedRead'
+import {
+	type LeaseHold,
+	leaseHeld,
+	stateLease,
+	stateStoreOf,
+	TASK_LEASE_MS,
+	underLease,
+} from '../maintenance/lease'
+import {
+	concurrencyFor,
+	scheduleFor,
+	stuckJobGuard,
+	TASK_BUDGET_MS,
+	TASK_DEAD_AFTER_MS,
+} from '../maintenance/taskSchedule'
+import type { CacheStore, ReadRecipe } from '../surfacing/cacheStore'
+import { recipeWindow } from '../surfacing/recipe'
+import { HOUR_MS } from '../timeframe/tz'
+import { type AnalyticsRuntime, getRuntime, resolveTimezoneFor } from './runtime'
 
-/** Minimal shape of a dashboard widget instance the warm job reads. */
-export interface WarmWidgetInstance {
-	widgetSlug?: string
-	data?: Record<string, unknown>
-}
+export const WARM_TASK_SLUG = TASK_SLUGS.warm
 
-export type WarmTarget =
-	| {
-			kind: 'metric'
-			metric: MetricKey
-			timeframe: TimeframePreset
-			range?: WidgetRange
-			adapterId?: string
-	  }
-	| {
-			kind: 'series'
-			metric: MetricKey
-			timeframe: TimeframePreset
-			range?: WidgetRange
-			adapterId?: string
-	  }
-	| {
-			kind: 'breakdown'
-			metric: MetricKey
-			dimension: DimensionKey
-			timeframe: TimeframePreset
-			limit: number
-			range?: WidgetRange
-			adapterId?: string
-	  }
-
-const asString = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
-
-const asMetric = (v: unknown): MetricKey =>
-	typeof v === 'string' && (WIDGET_METRICS as readonly string[]).includes(v)
-		? (v as MetricKey)
-		: 'pageviews'
-
-const asTimeframe = (v: unknown): TimeframePreset | 'custom' => {
-	if (v === 'custom') {
-		return 'custom'
-	}
-	if (typeof v === 'string' && (TIMEFRAME_PRESETS as readonly string[]).includes(v)) {
-		return v as TimeframePreset
-	}
-	return 'last30days'
-}
-
-const asLimit = (v: unknown): number => (typeof v === 'number' && v > 0 ? v : 5)
-
-const asRange = (v: unknown): WidgetRange | undefined => {
-	if (!v || typeof v !== 'object') {
-		return undefined
-	}
-	const r = v as { from?: unknown; to?: unknown }
-	return { from: asString(r.from), to: asString(r.to) }
-}
-
-const targetKey = (t: WarmTarget): string => {
-	const range = t.range ? `${t.range.from ?? ''}:${t.range.to ?? ''}` : ''
-	const dimension = t.kind === 'breakdown' ? t.dimension : ''
-	const limit = t.kind === 'breakdown' ? String(t.limit) : ''
-	return `${t.kind}:${t.metric}:${dimension}:${t.timeframe}:${limit}:${t.adapterId ?? ''}:${range}`
+export interface WarmTaskOptions {
+	schedule: ScheduledTask
+	/** `cache.warm.windowHours`: a read asked for this recently is kept warm. */
+	windowHours: number
+	/** `cache.warm.maxReads`: the most reads one run refreshes. */
+	maxReads: number
+	/** The host's `jobs.enableConcurrencyControl`, without which Payload refuses a concurrency key. */
+	concurrency?: boolean
+	/** How long one run works before it leaves the rest to the next; {@link TASK_BUDGET_MS}. */
+	budgetMs?: number
+	/** Milliseconds the budget is spent in; `monotonicMs` unless a test hands one in. */
+	clock?: () => number
 }
 
 /**
- * Map a dashboard's widget layout to the set of reads that warm its cache. Built-in
- * metric, trend, and breakdown widgets become targets; the realtime widget is skipped
- * (its short-TTL key is kept warm by the live poller) and any other slug is a custom app
- * widget whose read shape the plugin does not know. A `custom` timeframe is kept only when
- * its range resolves (the read takes an explicit range; `timeframe` is then unused), and
- * the stored bounds travel with the target rather than concrete instants: which instants
- * two picked days span depends on the reporting timezone, which is per scope and so only
- * known inside the warm loop. Identical targets are de-duplicated so a repeated widget
- * warms its tuple once.
+ * What one run did with recent reads: `fresh` outlives the next run, `skipped` lost its source or
+ * window. `ran` is false when another run held the lease, `finished` when the budget ran out.
  */
-export const deriveWarmTargets = (widgets: readonly WarmWidgetInstance[]): WarmTarget[] => {
-	const out: WarmTarget[] = []
-	const seen = new Set<string>()
-	for (const widget of widgets) {
-		const slug = widget.widgetSlug
-		if (!slug || slug === 'analytics-realtime') {
-			continue
-		}
-		const data = widget.data ?? {}
-		const metric = asMetric(data.metric)
-		const adapterId = asString(data.dataSource)
-		const timeframeRaw = asTimeframe(data.timeframe)
-		let timeframe: TimeframePreset = 'last30days'
-		let range: WidgetRange | undefined
-		if (timeframeRaw === 'custom') {
-			const stored = asRange(data.range)
-			// Whether the bounds name real days is timezone-independent, so the skip decision
-			// can be taken here even though the window itself cannot.
-			if (!resolveCustomRange('custom', stored, DEFAULT_TIMEZONE)) {
-				continue
-			}
-			range = stored
-		} else {
-			timeframe = timeframeRaw
-		}
+export interface WarmTaskOutput {
+	ran: boolean
+	finished: boolean
+	refreshed: number
+	fresh: number
+	skipped: number
+	failed: number
+}
 
-		let target: WarmTarget | undefined
-		if (slug === 'analytics-metric') {
-			target = { kind: 'metric', metric, timeframe, range, adapterId }
-		} else if (slug === 'analytics-trend') {
-			target = { kind: 'series', metric, timeframe, range, adapterId }
+const NOTHING: Omit<WarmTaskOutput, 'ran' | 'finished'> = {
+	refreshed: 0,
+	fresh: 0,
+	skipped: 0,
+	failed: 0,
+}
+
+const notRun = (): { output: WarmTaskOutput } => ({
+	output: { ran: false, finished: false, ...NOTHING },
+})
+
+/** Recent recipes read per recipe a run warms, so the scopes behind the busiest one are seen too. */
+const RECIPES_READ_PER_WARM = 4
+
+/**
+ * At most `limit` recipes taken in turn from each scope, the most recently read first within a
+ * scope and among the scopes, so one busy scope's reads never take every place of a run.
+ */
+export const takeInTurn = (recipes: readonly ReadRecipe[], limit: number): ReadRecipe[] => {
+	const queues = new Map<string | null, ReadRecipe[]>()
+	for (const recipe of recipes) {
+		const queue = queues.get(recipe.scope)
+		if (queue) {
+			queue.push(recipe)
 		} else {
-			const spec = breakdownSpecBySlug(slug)
-			if (spec) {
-				target = {
-					kind: 'breakdown',
-					metric,
-					dimension: spec.dimension,
-					timeframe,
-					limit: asLimit(data.limit),
-					range,
-					adapterId,
-				}
+			queues.set(recipe.scope, [recipe])
+		}
+	}
+	const taken: ReadRecipe[] = []
+	for (let round = 0; taken.length < limit; round++) {
+		let any = false
+		for (const queue of queues.values()) {
+			const recipe = queue[round]
+			if (recipe !== undefined && taken.length < limit) {
+				taken.push(recipe)
+				any = true
 			}
 		}
-		if (!target) {
-			continue
+		if (!any) {
+			break
 		}
-		const key = targetKey(target)
-		if (seen.has(key)) {
-			continue
-		}
-		seen.add(key)
-		out.push(target)
 	}
-	return out
+	return taken
 }
 
-export const WARM_TASK_SLUG = 'analytics-warm-cache'
+/** A scope's sources and timezone, resolved once per run, or why they could not be. */
+type ScopeSources = { ok: true; registry: AdapterRegistry | null; tz: string } | { ok: false }
 
-/** A dashboard `defaultLayout`: an array, or a function resolving one per request. */
-export type WarmLayout =
-	| ((args: { req: PayloadRequest }) => WidgetInstance[] | Promise<WidgetInstance[]>)
-	| WidgetInstance[]
-	| undefined
+/** Each scope's sources, resolved as SYSTEM on first ask and shared by the rest of the run. */
+const scopeSourcesFor = (runtime: AnalyticsRuntime, req: PayloadRequest) => {
+	const resolved = new Map<string | null, Promise<ScopeSources>>()
+	const resolve = async (scope: string | null): Promise<ScopeSources> => {
+		try {
+			const registry = await systemRegistryFor(runtime, req, scope)
+			const tz = await resolveTimezoneFor(runtime, req, scope)
+			return { ok: true, registry, tz }
+		} catch (err) {
+			req.payload.logger.warn(
+				`analytics warm: the sources of scope "${scope ?? 'install-wide'}" could not be resolved: ${String(err)}`
+			)
+			return { ok: false }
+		}
+	}
+	return (scope: string | null): Promise<ScopeSources> => {
+		const known = resolved.get(scope)
+		if (known) {
+			return known
+		}
+		const resolving = resolve(scope)
+		resolved.set(scope, resolving)
+		return resolving
+	}
+}
 
-const resolveLayout = async (
-	layout: WarmLayout,
+interface WarmPass {
+	runtime: AnalyticsRuntime
+	store: CacheStore
 	req: PayloadRequest
-): Promise<WarmWidgetInstance[]> => {
-	try {
-		const list = typeof layout === 'function' ? await layout({ req }) : (layout ?? [])
-		return list.map((w) => ({ widgetSlug: w.widgetSlug, data: w.data }))
-	} catch (err) {
-		req.payload.logger.warn(
-			`analytics warm-cache: could not resolve the dashboard layout: ${String(err)}`
-		)
-		return []
-	}
-}
-
-interface TargetRunResult {
-	status: WidgetReadStatus
-	adapterId: string
+	opts: WarmTaskOptions
+	hold: LeaseHold
 }
 
 /**
- * Run one target's read for one scope; the caller decides how to count/log the status. The
- * stored custom bounds resolve here, in that scope's reporting timezone, so the warmed key
- * is the one the rendered widget will ask for.
+ * Rereads recent recipes, in turn per scope, whose today-window entry is missing or expires before
+ * the next run: as SYSTEM via the scope's own sources, at background priority, within budget.
  */
-const runTarget = async (args: {
-	target: WarmTarget
-	req: PayloadRequest
-	now: Date
-	scope: string | null
-	timezone: string
-}): Promise<TargetRunResult> => {
-	const { target, req, now, scope, timezone } = args
-	const range = resolveCustomRange('custom', target.range, timezone)
-	if (target.kind === 'metric') {
-		const result = await readForWidget({
-			req,
-			metrics: [target.metric],
-			timeframe: target.timeframe,
-			adapterId: target.adapterId,
-			now,
-			range,
-			scope,
-			timezone,
-		})
-		return { status: result.status, adapterId: result.adapterId }
+const warmRecent = async ({ runtime, store, req, opts, hold }: WarmPass) => {
+	const now = currentDate()
+	const clock = opts.clock ?? monotonicMs
+	const deadline = clock() + (opts.budgetMs ?? TASK_BUDGET_MS)
+	const counts = { ...NOTHING }
+	const recipes = takeInTurn(
+		await store.recentRecipes(
+			new Date(now.getTime() - opts.windowHours * HOUR_MS),
+			opts.maxReads * RECIPES_READ_PER_WARM
+		),
+		opts.maxReads
+	)
+	const sourcesOf = scopeSourcesFor(runtime, req)
+	const warned = new Set<string>()
+	let finished = true
+	for (const recipe of recipes) {
+		if (hold.lost() || clock() >= deadline) {
+			finished = false
+			break
+		}
+		const { scope } = recipe
+		const sources = await sourcesOf(scope)
+		if (!sources.ok) {
+			counts.failed++
+			continue
+		}
+		const adapter = sources.registry?.all().find((each) => each.id === recipe.adapterRef)
+		const dateRange = recipeWindow(recipe, now, sources.tz)
+		if (!adapter || !dateRange || !runtime.engine.refresh) {
+			counts.skipped++
+			continue
+		}
+		try {
+			const outcome = await runtime.engine.refresh(
+				adapter,
+				{ ...recipe.query, timezone: sources.tz, dateRange },
+				{ freshForMs: opts.schedule.intervalMs, priority: 'background' }
+			)
+			counts[outcome]++
+		} catch (err) {
+			counts.failed++
+			const source = `${scope ?? ''} ${adapter.id}`
+			if (!warned.has(source)) {
+				warned.add(source)
+				req.payload.logger.warn(
+					`analytics warm: a read from "${adapter.id}" (scope "${scope ?? ''}") failed: ${String(err)}`
+				)
+			}
+		}
 	}
-	if (target.kind === 'series') {
-		const result = await readForWidgetSeries({
-			req,
-			metric: target.metric,
-			timeframe: target.timeframe,
-			adapterId: target.adapterId,
-			now,
-			range,
-			scope,
-			timezone,
-		})
-		return { status: result.status, adapterId: result.adapterId }
-	}
-	const result = await readForWidgetBreakdown({
-		req,
-		metric: target.metric,
-		dimension: target.dimension,
-		timeframe: target.timeframe,
-		limit: target.limit,
-		adapterId: target.adapterId,
-		now,
-		range,
-		scope,
-		timezone,
-	})
-	return { status: result.status, adapterId: result.adapterId }
+	return { ...counts, finished }
 }
 
 /**
- * Opt-in Payload task that pre-runs the dashboard's widget reads through the surfacing
- * engine so `payload.kv` is warm before a user opens the dashboard. Targets are derived
- * from `layout` (the app's `defaultLayout`, captured at registration and resolved here);
- * each read is isolated so one failing provider does not abort the rest. Most valuable
- * for slow or rate-limited provider adapters; native reads are cheap and harmless to warm.
- * With `scopes` configured, every target runs once per tenant scope (plus the install-wide
- * scope) so a multi-tenant install warms every tenant's dashboard, not just the null one.
+ * `analytics-warm`: keeps reads from the last `windowHours` warm, one run at a time under the task
+ * lease. A missed read is still served stale and refreshed, so nothing replaces a skipped run.
  */
 export const warmTask = (
-	cron: string,
-	layout: WarmLayout,
-	scopes?: ScopesResolver
-): TaskConfig<{ input: Record<string, never>; output: { warmed: number; failed: number } }> => ({
+	opts: WarmTaskOptions
+): TaskConfig<{ input: Record<string, never>; output: WarmTaskOutput }> => ({
 	slug: WARM_TASK_SLUG,
+	retries: 0,
 	handler: async ({ req }) => {
-		const targets = deriveWarmTargets(await resolveLayout(layout, req))
-		if (targets.length === 0) {
-			return { output: { warmed: 0, failed: 0 } }
-		}
-		const scopeList = await resolveScopeList(scopes, req.payload)
-		const now = new Date()
-		let warmed = 0
-		let failed = 0
-		// A tenant-pass target that degrades (e.g. a shared config adapter gated for
-		// that scope) is not a failure, but a silent one leaves `warmed` unexplainably
-		// short of `scopes x targets`; warn once per (scope, adapter) so it is visible.
-		const warnedGated = new Set<string>()
 		const runtime = getRuntime(req.payload)
-		for (const scope of scopeList) {
-			const timezone = runtime ? await resolveTimezoneFor(runtime, req, scope) : DEFAULT_TIMEZONE
-			for (const target of targets) {
-				try {
-					const result = await runTarget({ target, req, now, scope, timezone })
-					if (result.status === 'ok') {
-						warmed++
-					} else if (scope !== null) {
-						const key = `${scope} ${result.adapterId}`
-						if (!warnedGated.has(key)) {
-							warnedGated.add(key)
-							req.payload.logger.warn(
-								`analytics warm-cache: scope "${scope}" adapter "${result.adapterId}" returned "${result.status}", skipping`
-							)
-						}
-					}
-				} catch (err) {
-					failed++
-					req.payload.logger.warn(
-						`analytics warm-cache: ${target.kind} read for "${target.metric}" (scope "${scope ?? ''}") failed: ${String(err)}`
-					)
-				}
-			}
+		const store = runtime?.cache?.store
+		if (!runtime || !store) {
+			return notRun()
 		}
-		return { output: { warmed, failed } }
+		const warn = (message: string) => req.payload.logger.warn(message)
+		const outcome = await underLease(
+			{ lease: stateLease(req.payload, WARM_TASK_SLUG, TASK_LEASE_MS), ttlMs: TASK_LEASE_MS, warn },
+			(hold) => warmRecent({ runtime, store, req, opts, hold })
+		)
+		if (!outcome.ran) {
+			return notRun()
+		}
+		await stateStoreOf(req.payload)
+			?.beat(WARM_TASK_SLUG)
+			.catch((err: unknown) =>
+				warn(`analytics warm: stamping its heartbeat failed: ${String(err)}`)
+			)
+		return { output: { ran: true, ...outcome.value } }
 	},
-	schedule: [{ cron, queue: 'default' }],
+	...scheduleFor(
+		opts.schedule,
+		stuckJobGuard({
+			slug: WARM_TASK_SLUG,
+			deadAfterMs: TASK_DEAD_AFTER_MS,
+			alive: (req) => leaseHeld(req.payload, WARM_TASK_SLUG),
+		})
+	),
+	...concurrencyFor('warm', opts.concurrency === true),
 })

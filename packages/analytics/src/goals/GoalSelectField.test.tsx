@@ -19,61 +19,63 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@payloadcms/ui/shared', () => ({ mergeFieldStyles: mocks.mergeFieldStyles }))
 
 vi.mock('@payloadcms/ui', () => {
+	type MockOption = { label: string; value: string }
+	type MockGroup = { label: string; options: MockOption[] }
 	type MockSelectProps = {
-		AfterInput?: ReactNode
-		Description?: ReactNode
-		description?: string
-		label?: string
-		name: string
-		onChange?: (option: { label: string; value: string }) => void
-		options?: Array<{ label: string; value: string }>
-		path: string
+		disabled?: boolean
+		onChange?: (option: MockOption) => void
+		options: Array<MockOption | MockGroup>
 		placeholder?: string
-		readOnly?: boolean
-		style?: Record<string, string>
-		value?: string
+		value?: MockOption | MockOption[]
 	}
+	const renderOption = (option: MockOption) => (
+		<option key={option.value} value={option.value}>
+			{option.label}
+		</option>
+	)
 	return {
 		FieldDescription: ({ description }: { description?: string }) => (
 			<span data-testid="description">{description ?? ''}</span>
 		),
-		SelectInput: ({
-			AfterInput,
-			Description,
-			description,
-			label,
-			name,
-			onChange,
-			options = [],
-			path,
-			placeholder,
-			readOnly,
-			style,
-			value,
-		}: MockSelectProps) => (
-			<div data-testid="wrap" data-width={style?.width ?? ''}>
-				<span data-testid="label">{label ?? ''}</span>
-				<span data-testid="static-description">{description ?? ''}</span>
-				<span data-testid="path">{path}</span>
-				<span data-testid="placeholder">{placeholder ?? ''}</span>
-				<select
-					aria-label="goal"
-					disabled={readOnly}
-					name={name}
-					onChange={(event) => onChange?.({ label: event.target.value, value: event.target.value })}
-					value={value ?? ''}
-				>
-					<option value="">none</option>
-					{options.map((option) => (
-						<option key={option.value} value={option.value}>
-							{option.label}
-						</option>
-					))}
-				</select>
-				{AfterInput}
-				{Description}
-			</div>
-		),
+		FieldError: () => null,
+		FieldLabel: ({ label }: { label?: string }) => <span data-testid="label">{label ?? ''}</span>,
+		fieldBaseClass: 'field-type',
+		RenderCustomComponent: ({
+			CustomComponent,
+			Fallback,
+		}: {
+			CustomComponent?: ReactNode
+			Fallback?: ReactNode
+		}) => <>{CustomComponent ?? Fallback}</>,
+		// A native select draws a group the way react-select does: a heading that is no option.
+		ReactSelect: ({ disabled, onChange, options, placeholder, value }: MockSelectProps) => {
+			const picked = Array.isArray(value) ? undefined : value
+			return (
+				<>
+					<span data-testid="placeholder">{placeholder ?? ''}</span>
+					<span data-testid="picked">{picked?.label ?? ''}</span>
+					<select
+						aria-label="goal"
+						disabled={disabled}
+						onChange={(event) =>
+							onChange?.({ label: event.target.value, value: event.target.value })
+						}
+						value={picked?.value ?? ''}
+					>
+						<option value="">none</option>
+						{options.map((entry) =>
+							'options' in entry ? (
+								<optgroup key={entry.label} label={entry.label}>
+									{entry.options.map(renderOption)}
+								</optgroup>
+							) : (
+								renderOption(entry)
+							)
+						)}
+					</select>
+				</>
+			)
+		},
 		useAuth: () => ({ user: { id: mocks.userId } }),
 		useConfig: () => ({
 			config: { routes: { admin: '/admin', api: '/api' }, serverURL: 'https://cms.test' },
@@ -147,14 +149,14 @@ describe('GoalSelectField', () => {
 		expect(screen.getByRole('option', { name: 'Newsletter' })).toBeDefined()
 	})
 
-	it('fetches the goals endpoint under the configured api route with credentials', async () => {
+	it('fetches the goals endpoint relative to the page, under the configured api route, with credentials', async () => {
 		answer({ collection: null, goals: [{ name: 'Signup', slug: 'signup', source: 'config' }] })
 
 		render(<GoalSelectField {...props()} />)
 
 		await screen.findByRole('option', { name: 'Signup' })
-		expect(fetchMock.mock.calls[0]?.[0]).toBe('https://cms.test/api/analytics/goals')
-		expect((fetchMock.mock.calls[0]?.[1] as RequestInit)?.credentials).toBe('include')
+		expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/_x/goals')
+		expect((fetchMock.mock.calls[0]?.[1] as RequestInit)?.credentials).toBe('same-origin')
 	})
 
 	it('stores the slug when a goal is picked', async () => {
@@ -175,21 +177,30 @@ describe('GoalSelectField', () => {
 		answer({ collection: null, goals: [] })
 		mocks.path = 'blocks.0.goal'
 
-		render(<GoalSelectField {...props()} />)
+		const { container } = render(<GoalSelectField {...props()} />)
 
 		expect(mocks.useFieldArgs[0]).toEqual({ potentiallyStalePath: 'goal' })
-		expect(screen.getByTestId('path').textContent).toBe('blocks.0.goal')
+		expect(container.querySelector('#field-blocks__0__goal')).not.toBeNull()
 	})
 
 	it('derives its style through mergeFieldStyles', () => {
 		answer({ collection: null, goals: [] })
 
-		render(<GoalSelectField {...props()} />)
+		const { container } = render(<GoalSelectField {...props()} />)
 
 		expect(mocks.mergeFieldStyles).toHaveBeenCalledWith(
 			expect.objectContaining({ name: 'goal', type: 'text' })
 		)
-		expect(screen.getByTestId('wrap').getAttribute('data-width')).toBe('50%')
+		expect(container.querySelector<HTMLElement>('.field-type')?.style.width).toBe('50%')
+	})
+
+	it('carries the field label and the select field classes', () => {
+		answer({ collection: null, goals: [] })
+
+		const { container } = render(<GoalSelectField {...props()} />)
+
+		expect(screen.getByTestId('label').textContent).toBe('Goal')
+		expect(container.querySelector('.field-type.select.analytics-goal-select')).not.toBeNull()
 	})
 
 	it('forwards the admin placeholder', () => {
@@ -297,7 +308,111 @@ describe('GoalSelectField', () => {
 			/>
 		)
 
-		expect(screen.getByTestId('static-description').textContent).toBe('Pick one')
+		expect(screen.getByTestId('description').textContent).toBe('Pick one')
 		expect(screen.queryByText(keys.fieldGoalEmpty)).toBeNull()
+	})
+})
+
+describe('grouping by source', () => {
+	/** Each heading with the goals under it; options outside any group sit under ''. */
+	const listed = () =>
+		Array.from(screen.getByLabelText('goal').querySelectorAll('optgroup, select > option')).map(
+			(node) =>
+				node instanceof HTMLOptGroupElement
+					? [node.label, Array.from(node.querySelectorAll('option')).map((o) => o.textContent)]
+					: ['', [node.textContent]]
+		)
+
+	it('heads the built-in goals and the ones added in the admin when both are present', async () => {
+		answer({
+			collection: { slug: 'analytics-goals' },
+			goals: [
+				{ name: 'Newsletter', slug: 'newsletter', source: 'collection' },
+				{ name: 'Book a demo', slug: 'book-demo', source: 'config' },
+			],
+		})
+		render(<GoalSelectField {...props()} />)
+		await screen.findByRole('option', { name: 'Book a demo' })
+		expect(listed()).toEqual([
+			['', ['none']],
+			[keys.goalSourceBuiltin, ['Book a demo']],
+			[keys.goalSourceCollection, ['Newsletter']],
+		])
+	})
+
+	// A heading that were an option would take the keyboard's focus and a hover highlight.
+	it('makes no option of a heading', async () => {
+		answer({
+			collection: { slug: 'analytics-goals' },
+			goals: [
+				{ name: 'Newsletter', slug: 'newsletter', source: 'collection' },
+				{ name: 'Book a demo', slug: 'book-demo', source: 'config' },
+			],
+		})
+		render(<GoalSelectField {...props()} />)
+		await screen.findByRole('option', { name: 'Book a demo' })
+		expect(screen.queryByRole('option', { name: keys.goalSourceBuiltin })).toBeNull()
+		expect(screen.queryByRole('option', { name: keys.goalSourceCollection })).toBeNull()
+	})
+
+	// Goals from the plugin's settings and the plugin's own purchase goal are both built in,
+	// so they share one heading rather than splitting the list three ways.
+	it('lists config goals and the built-in purchase goal under one Built-in heading', async () => {
+		answer({
+			collection: { slug: 'analytics-goals' },
+			goals: [
+				{ name: 'Book a demo', slug: 'book-demo', source: 'config' },
+				{ name: 'Purchase', slug: 'purchase', source: 'builtin' },
+				{ name: 'Newsletter', slug: 'newsletter', source: 'collection' },
+			],
+		})
+		render(<GoalSelectField {...props()} />)
+		await screen.findByRole('option', { name: 'Purchase' })
+		expect(listed()).toEqual([
+			['', ['none']],
+			[keys.goalSourceBuiltin, ['Book a demo', 'Purchase']],
+			[keys.goalSourceCollection, ['Newsletter']],
+		])
+	})
+
+	it('leaves a single-source install as one plain list', async () => {
+		answer({
+			collection: null,
+			goals: [
+				{ name: 'Book a demo', slug: 'book-demo', source: 'config' },
+				{ name: 'Signup', slug: 'signup', source: 'config' },
+			],
+		})
+		render(<GoalSelectField {...props()} />)
+		await screen.findByRole('option', { name: 'Signup' })
+		expect(listed()).toEqual([
+			['', ['none']],
+			['', ['Book a demo']],
+			['', ['Signup']],
+		])
+	})
+
+	it('shows a stored goal by its name, whichever heading it sits under', async () => {
+		answer({
+			collection: { slug: 'analytics-goals' },
+			goals: [
+				{ name: 'Book a demo', slug: 'book-demo', source: 'config' },
+				{ name: 'Newsletter', slug: 'newsletter', source: 'collection' },
+			],
+		})
+		mocks.value = 'newsletter'
+		render(<GoalSelectField {...props()} />)
+
+		await waitFor(() => expect(screen.getByTestId('picked').textContent).toBe('Newsletter'))
+		expect((screen.getByLabelText('goal') as HTMLSelectElement).value).toBe('newsletter')
+	})
+
+	it('shows a stored slug no goal answers for as the slug itself, so it can be cleared', async () => {
+		answer({ collection: null, goals: [{ name: 'Signup', slug: 'signup', source: 'config' }] })
+		mocks.value = 'retired-goal'
+		render(<GoalSelectField {...props()} />)
+
+		await screen.findByRole('option', { name: 'Signup' })
+		expect(screen.getByTestId('picked').textContent).toBe('retired-goal')
 	})
 })

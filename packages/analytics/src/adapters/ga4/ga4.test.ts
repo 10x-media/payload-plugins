@@ -1,6 +1,10 @@
 import type { protos } from '@google-analytics/data'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AnalyticsQuery } from '../../core/contract'
+import type { Config, Payload } from 'payload'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { filterableDimensions, filterOperatorsFor, metricReaches } from '../../core/capabilities'
+import type { AdapterRegisterContext, AnalyticsQuery } from '../../core/contract'
+import type { Ga4Sdk } from '../../core/sdks'
+import { GA4_SDK_WARNING } from '../../plugin/peers'
 import { EXCLUSION_STORAGE_KEY } from '../../tracker/exclusion'
 import { GA4_DISABLE_PREFIX } from './disableKey'
 
@@ -22,7 +26,7 @@ const config = {
 }
 
 const q = (over: Partial<AnalyticsQuery> = {}): AnalyticsQuery => ({
-	metrics: ['pageviews', 'visitors', 'avgDuration'],
+	metrics: ['pageviews', 'visitors', 'visitDuration'],
 	dateRange: { start: new Date('2026-01-01T00:00:00Z'), end: new Date('2026-01-31T23:59:59Z') },
 	...over,
 })
@@ -79,7 +83,7 @@ describe('ga4 adapter', () => {
 				stringFilter: { matchType: 'EXACT', value: '/pricing', caseSensitive: true },
 			},
 		})
-		expect(result.totals).toEqual({ pageviews: 48312, visitors: 19847, avgDuration: 143821 })
+		expect(result.totals).toEqual({ pageviews: 48312, visitors: 19847, visitDuration: 143821 })
 		expect(result.meta.provider).toBe('ga4')
 	})
 
@@ -130,12 +134,14 @@ describe('ga4 adapter', () => {
 		})
 	})
 
-	it('declares filters as the mapped dimensions except goal, with every contract operator', () => {
+	it('declares filters as the mapped dimensions except goal, each with every contract operator', () => {
 		const caps = ga4(config).capabilities
-		expect(caps.filters).toEqual(
-			new Set([...caps.dimensions].filter((dimension) => dimension !== 'goal'))
+		expect(filterableDimensions(caps).sort()).toEqual(
+			[...caps.dimensions].filter((dimension) => dimension !== 'goal').sort()
 		)
-		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
+		for (const dimension of filterableDimensions(caps)) {
+			expect(filterOperatorsFor(caps, dimension)).toEqual(['eq', 'contains', 'matches'])
+		}
 	})
 
 	it.each([
@@ -309,7 +315,7 @@ describe('ga4 adapter', () => {
 		])
 		const caps = ga4(config).capabilities
 		expect(caps.dimensions.has('channel')).toBe(true)
-		expect(caps.filters.has('channel')).toBe(true)
+		expect(filterOperatorsFor(caps, 'channel')).toContain('eq')
 		await ga4(config).query(
 			q({
 				metrics: ['pageviews'],
@@ -404,7 +410,7 @@ describe('ga4 adapter', () => {
 			const caps = ga4(config).capabilities
 			expect(caps.dimensions.has('goal')).toBe(true)
 			expect(caps.metrics.has('conversions')).toBe(true)
-			expect(caps.filters.has('goal')).toBe(false)
+			expect(filterOperatorsFor(caps, 'goal')).toEqual([])
 		})
 
 		it('breaks eventName down, in-list filtered to the hint, reading keyEvents as conversions', async () => {
@@ -665,7 +671,7 @@ describe('ga4 capture', () => {
 		const capture = ga4({ ...config, measurementId: 'G-AB12CD34' }).capture
 		expect(capture?.proxy.routes).toEqual([])
 		expect(capture?.client).toEqual({ kind: 'ga4', measurementId: 'G-AB12CD34' })
-		const scripts = capture?.snippet({ path: '/api/analytics/p/global' }).scripts ?? []
+		const scripts = capture?.snippet({ path: '/api/_x/p/global' }).scripts ?? []
 		// Inline first: `gtag` and its queue exist before the tag lands, and survive a tag that
 		// never lands at all.
 		expect(scripts[0]?.inline).toBe(
@@ -680,7 +686,7 @@ describe('ga4 capture', () => {
 	it('sets GA4 own disable switch from the stored flag before the first gtag call', () => {
 		const inline =
 			ga4({ ...config, measurementId: 'G-AB12CD34' }).capture?.snippet({
-				path: '/api/analytics/p/global',
+				path: '/api/_x/p/global',
 			}).scripts[0]?.inline ?? ''
 
 		const guardEnd = inline.indexOf('}catch(e){}')
@@ -696,5 +702,283 @@ describe('ga4 capture', () => {
 		for (const measurementId of ['G-AB"12', 'G AB12', 'G-AB12</script>', 'G-AB12&x=1']) {
 			expect(ga4({ ...config, measurementId }).capture).toBeUndefined()
 		}
+	})
+})
+
+describe('ga4 sdk', () => {
+	afterEach(() => {
+		vi.unstubAllEnvs()
+	})
+
+	/** A client class of the shape `@google-analytics/data` exports, recording what it is asked. */
+	const sdkWith = () => {
+		const reports = vi.fn(async () => [{ rows: [], totals: [] }])
+		const built = vi.fn()
+		class BetaAnalyticsDataClient {
+			constructor(options: unknown) {
+				built(options)
+			}
+			runReport = reports
+		}
+		return { sdk: { BetaAnalyticsDataClient } as unknown as Ga4Sdk, built, reports }
+	}
+
+	const registerWith = (sdks: AdapterRegisterContext['sdks']): AdapterRegisterContext => ({
+		scoped: false,
+		resolveScope: async () => null,
+		resolveTimezone: async () => 'UTC',
+		resolveTimezoneStrict: async () => 'UTC',
+		revenue: { enabled: true, dimension: true, currency: async () => undefined },
+		resolveGoals: async () => [],
+		sdks,
+	})
+
+	const payloadWith = (warn: (message: string) => void) =>
+		({ logger: { warn } }) as unknown as Payload
+
+	it('reads through the sdk it was handed rather than loading the package', async () => {
+		const own = sdkWith()
+		await ga4({ ...config, sdk: own.sdk }).query(q(), {})
+		expect(own.built).toHaveBeenCalledWith({ credentials: config.credentials })
+		expect(own.reports).toHaveBeenCalled()
+		expect(runReport).not.toHaveBeenCalled()
+	})
+
+	it("reads through the plugin's sdks.ga4 when it has none of its own, and prefers its own", async () => {
+		const plugin = sdkWith()
+		const pluginOnly = ga4(config)
+		pluginOnly.register?.({} as Config, registerWith({ ga4: plugin.sdk }))
+		await pluginOnly.query(q(), {})
+		expect(plugin.reports).toHaveBeenCalledTimes(1)
+
+		const own = sdkWith()
+		const both = ga4({ ...config, sdk: own.sdk })
+		both.register?.({} as Config, registerWith({ ga4: plugin.sdk }))
+		await both.query(q(), {})
+		expect(own.reports).toHaveBeenCalledTimes(1)
+		expect(plugin.reports).toHaveBeenCalledTimes(1)
+		expect(runReport).not.toHaveBeenCalled()
+	})
+
+	it('warns once at a production boot when it would load the package at runtime', () => {
+		vi.stubEnv('NODE_ENV', 'production')
+		const warn = vi.fn()
+		const bare = ga4(config)
+		bare.register?.({} as Config, registerWith({}))
+		bare.attach?.(payloadWith(warn))
+		bare.attach?.(payloadWith(warn))
+		expect(warn).toHaveBeenCalledTimes(1)
+		expect(warn).toHaveBeenCalledWith(GA4_SDK_WARNING)
+
+		const handed = ga4(config)
+		handed.register?.({} as Config, registerWith({ ga4: sdkWith().sdk }))
+		handed.attach?.(payloadWith(warn))
+		ga4({ ...config, sdk: sdkWith().sdk }).attach?.(payloadWith(warn))
+		expect(warn).toHaveBeenCalledTimes(1)
+	})
+
+	it('keeps one client per instance and closes only the closing instance’s', async () => {
+		const closes = vi.fn(async () => {})
+		const built = vi.fn()
+		class BetaAnalyticsDataClient {
+			constructor(options: unknown) {
+				built(options)
+			}
+			runReport = vi.fn(async () => [{ rows: [], totals: [] }])
+			close = closes
+		}
+		const adapter = ga4({ ...config, sdk: { BetaAnalyticsDataClient } as unknown as Ga4Sdk })
+		const first = payloadWith(vi.fn())
+		const second = payloadWith(vi.fn())
+		await adapter.query(q(), { payload: first })
+		await adapter.query(q(), { payload: first })
+		await adapter.query(q(), { payload: second })
+		expect(built).toHaveBeenCalledTimes(2)
+		await adapter.close?.(first)
+		expect(closes).toHaveBeenCalledTimes(1)
+		await adapter.close?.(first)
+		expect(closes).toHaveBeenCalledTimes(1)
+		await adapter.close?.(payloadWith(vi.fn()))
+		expect(closes).toHaveBeenCalledTimes(1)
+	})
+
+	it('opens no client for an instance it was closed for, until it is attached again', async () => {
+		const built = vi.fn()
+		class BetaAnalyticsDataClient {
+			constructor(options: unknown) {
+				built(options)
+			}
+			runReport = vi.fn(async () => [{ rows: [], totals: [] }])
+			close = vi.fn(async () => {})
+		}
+		const adapter = ga4({ ...config, sdk: { BetaAnalyticsDataClient } as unknown as Ga4Sdk })
+		const retired = payloadWith(vi.fn())
+		await adapter.query(q(), { payload: retired })
+		await adapter.close?.(retired)
+		await expect(adapter.query(q(), { payload: retired })).rejects.toThrow('closed')
+		expect(built).toHaveBeenCalledTimes(1)
+		await adapter.query(q(), { payload: payloadWith(vi.fn()) })
+		expect(built).toHaveBeenCalledTimes(2)
+		adapter.attach?.(retired)
+		await adapter.query(q(), { payload: retired })
+		expect(built).toHaveBeenCalledTimes(3)
+	})
+
+	it('stays quiet outside production', () => {
+		vi.stubEnv('NODE_ENV', 'development')
+		const warn = vi.fn()
+		ga4(config).attach?.(payloadWith(warn))
+		expect(warn).not.toHaveBeenCalled()
+	})
+})
+
+describe('ga4 reads through the engine', () => {
+	const report = (metadata: protos.google.analytics.data.v1beta.IResponseMetaData = {}) => [
+		{
+			rows: [{ dimensionValues: [], metricValues: [{ value: '500' }] }],
+			metadata,
+		},
+	]
+
+	it('runs each report with no retry of its own and the time the read has left', async () => {
+		runReport.mockResolvedValue(report())
+		await ga4(config).query(q({ metrics: ['pageviews'] }), { remainingMs: () => 4321.7 })
+		expect(runReport.mock.calls[0]?.[1]).toEqual({ timeout: 4321, retry: null })
+	})
+
+	it('gives a report a minute outside the engine, which sets no deadline', async () => {
+		runReport.mockResolvedValue(report())
+		await ga4(config).query(q({ metrics: ['pageviews'] }), {})
+		expect(runReport.mock.calls[0]?.[1]).toEqual({ timeout: 60_000, retry: null })
+	})
+
+	it('sends each report of a paired read through upstream, one request each', async () => {
+		runReport.mockResolvedValue(report())
+		let sent = 0
+		const upstream = <T>(fn: (signal?: AbortSignal) => Promise<T>): Promise<T> => {
+			sent++
+			return fn()
+		}
+		await ga4(config).query(q({ metrics: ['pageviews', 'conversions'], goalSlugs: ['signup'] }), {
+			upstream,
+		})
+		expect(sent).toBe(2)
+		expect(runReport).toHaveBeenCalledTimes(2)
+		expect(ga4(config).capabilities.upstreamAware).toBe(true)
+	})
+
+	it('marks a read sampled when any of its reports was', async () => {
+		runReport
+			.mockResolvedValueOnce(report())
+			.mockResolvedValueOnce(
+				report({ samplingMetadatas: [{ samplesReadCount: '1000', samplingSpaceSize: '50000' }] })
+			)
+		const result = await ga4(config).query(
+			q({ metrics: ['pageviews', 'conversions'], goalSlugs: ['signup'] }),
+			{}
+		)
+		expect(result.meta.sampled).toBe(true)
+		runReport.mockResolvedValue(report({ samplingMetadatas: [] }))
+		const whole = await ga4(config).query(q({ metrics: ['pageviews'] }), {})
+		expect(whole.meta.sampled).toBeUndefined()
+	})
+
+	it("reports revenue in the property's currency, the configured one only when GA4 names none", async () => {
+		runReport.mockResolvedValue(report({ currencyCode: 'jpy' }))
+		const named = await ga4({ ...config, currency: 'EUR' }).query(q({ metrics: ['revenue'] }), {})
+		expect(named.meta.currency).toBe('JPY')
+		runReport.mockResolvedValue(report())
+		const configured = await ga4({ ...config, currency: 'eur' }).query(
+			q({ metrics: ['revenue'] }),
+			{}
+		)
+		expect(configured.meta.currency).toBe('EUR')
+		const unknown = await ga4(config).query(q({ metrics: ['revenue'] }), {})
+		expect(unknown.meta.currency).toBeUndefined()
+	})
+
+	it('refuses a configured currency that is not an ISO 4217 code, naming the option', () => {
+		expect(() => ga4({ ...config, currency: 'euro' })).toThrow(
+			'analytics: ga4({ currency }) must be an ISO 4217 currency code such as "EUR", got "euro"'
+		)
+		expect(() => ga4({ ...config, currency: '  ' })).not.toThrow()
+	})
+
+	it('keeps an average GA4 left out as no data rather than 0', async () => {
+		runReport.mockResolvedValue([
+			{ rows: [{ dimensionValues: [], metricValues: [{ value: '12' }] }], metadata: {} },
+		])
+		const result = await ga4(config).query(
+			q({ metrics: ['pageviews', 'visitDuration', 'avgDuration'] }),
+			{}
+		)
+		expect(result.totals).toEqual({ pageviews: 12, visitDuration: null, avgDuration: null })
+	})
+
+	it('reads time on page as engaged seconds over views, per row and for the totals', async () => {
+		runReport.mockResolvedValue([
+			{
+				rows: [
+					{
+						dimensionValues: [{ value: '/a' }],
+						metricValues: [{ value: '30' }, { value: '3' }, { value: '2' }],
+					},
+					{
+						dimensionValues: [{ value: '/b' }],
+						metricValues: [{ value: '10' }, { value: '5' }, { value: '0' }],
+					},
+				],
+				metadata: {},
+			},
+		])
+		const result = await ga4(config).query(
+			q({ metrics: ['avgDuration', 'pageviews', 'visitors'], dimensions: ['page'] }),
+			{}
+		)
+		expect(sentRequest().metrics).toEqual([
+			{ name: 'userEngagementDuration' },
+			{ name: 'screenPageViews' },
+			{ name: 'totalUsers' },
+		])
+		expect(result.rows).toEqual([
+			{
+				dimensions: { page: '/a' },
+				metrics: { avgDuration: 10000, pageviews: 3, visitors: 2 },
+				samples: { avgDuration: 3 },
+			},
+			{
+				dimensions: { page: '/b' },
+				metrics: { avgDuration: 2000, pageviews: 5, visitors: 0 },
+				samples: { avgDuration: 5 },
+			},
+		])
+		runReport.mockReset()
+		runReport.mockResolvedValue([
+			{ rows: [{ dimensionValues: [], metricValues: [{ value: '40' }, { value: '8' }] }] },
+		])
+		const whole = await ga4(config).query(q({ metrics: ['avgDuration'] }), {})
+		expect(whole.totals).toEqual({ avgDuration: 5000 })
+	})
+
+	it('declares time on page under every breakdown but an event, and time per visit as its own metric', () => {
+		const { capabilities } = ga4(config)
+		expect(capabilities.metrics.has('avgDuration')).toBe(true)
+		expect(capabilities.metrics.has('visitDuration')).toBe(true)
+		expect(metricReaches(capabilities, 'avgDuration', { dimensions: ['page'] })).toBe(true)
+		expect(metricReaches(capabilities, 'avgDuration', { dimensions: ['country'] })).toBe(true)
+		expect(metricReaches(capabilities, 'avgDuration', { dimensions: ['event'] })).toBe(false)
+		expect(metricReaches(capabilities, 'avgDuration', { dimensions: ['goal'] })).toBe(false)
+		expect(metricReaches(capabilities, 'visitDuration', { dimensions: ['event'] })).toBe(true)
+	})
+
+	it('cancels a call the read gave up on, when the client hands back a cancellable promise', async () => {
+		const cancel = vi.fn()
+		runReport.mockImplementation(() => Object.assign(new Promise(() => {}), { cancel }))
+		const controller = new AbortController()
+		void ga4(config).query(q({ metrics: ['pageviews'] }), { signal: controller.signal })
+		await vi.waitFor(() => expect(runReport).toHaveBeenCalled())
+		expect(cancel).not.toHaveBeenCalled()
+		controller.abort(new Error('timed out'))
+		expect(cancel).toHaveBeenCalledTimes(1)
 	})
 })

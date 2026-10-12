@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { docScope } from './scopeChange'
+import { changedScopes, docScope } from './scopeChange'
 
 describe('docScope', () => {
 	it('reads a plain string scope', () => {
@@ -32,5 +32,14 @@ describe('docScope', () => {
 
 	it('reads the configured field name rather than a fixed one', () => {
 		expect(docScope({ tenant: 'tenant-a', scope: 'other' }, 'tenant')).toBe('tenant-a')
+	})
+})
+
+describe('changedScopes', () => {
+	it('names the scope a document is in, and the one it left when it moved', () => {
+		expect(changedScopes({ scope: 'a' })).toEqual(['a'])
+		expect(changedScopes({ scope: 'a', previousScope: 'a' })).toEqual(['a'])
+		expect(changedScopes({ scope: 'b', previousScope: 'a' })).toEqual(['b', 'a'])
+		expect(changedScopes({ scope: null, previousScope: 'a' })).toEqual([null, 'a'])
 	})
 })

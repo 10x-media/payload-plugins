@@ -1,7 +1,8 @@
 import { act, cleanup, render } from '@testing-library/react'
 import { StrictMode, useEffect } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TrackerConfig, TrackerSlotConfig } from '../capture/trackerConfig'
+import type { TrackerConfig, TrackerSlotConfig } from '../tracker/config'
+import { liveTracker } from '../tracker/registry'
 import type { TrackerEvent } from '../tracker/types'
 import { TrackerBoot } from './TrackerBoot'
 
@@ -17,10 +18,10 @@ const nativeSlot: TrackerSlotConfig = {
 	slot: 'global',
 	kind: 'native',
 	adapterId: 'native',
-	path: '/api/analytics/p/global',
+	path: '/api/_x/p/global',
 	snippet: { scripts: [] },
 	client: { kind: 'native' },
-	requiresConsent: false,
+	gated: false,
 }
 
 const config: TrackerConfig = {
@@ -31,9 +32,10 @@ const config: TrackerConfig = {
 		fileDownloads: false,
 		goalAttribute: false,
 		query: false,
+		items: { impressions: false, clicks: false, pages: false },
 	},
 	goals: [],
-	ingestPath: '/api/analytics/ingest',
+	ingestPath: '/api/_x/e',
 }
 
 /** Lets the registry's deferred teardown macrotask run. */
@@ -90,6 +92,61 @@ describe('TrackerBoot', () => {
 			window.dispatchEvent(new Event('pagehide'))
 		})
 		expect(posted().filter((event) => event.type === 'pageview')).toHaveLength(1)
+	})
+
+	describe('the gate and the snippets it is handed', () => {
+		const gated: TrackerConfig = {
+			...config,
+			slots: [
+				{
+					slot: 'tenant',
+					kind: 'plausible',
+					adapterId: 'plausible',
+					path: '/api/_x/p/tenant',
+					snippet: { scripts: [{ src: '/pl/script.js' }] },
+					client: { kind: 'plausible' },
+					gated: true,
+				},
+			],
+		}
+
+		const injected = () => document.head.querySelector('script[src="/pl/script.js"]')
+
+		afterEach(() => {
+			injected()?.remove()
+		})
+
+		it('opens a slot the server already had an answer for, and injects its snippet', async () => {
+			render(<TrackerBoot config={gated} gate={{ tenant: true }} />)
+
+			expect(liveTracker(window)?.gate.tenant).toBe('open')
+			await vi.waitFor(() => {
+				expect(injected()).not.toBeNull()
+			})
+		})
+
+		it('boots pending without an answer, and injects nothing until setGate opens it', async () => {
+			render(<TrackerBoot config={gated} />)
+			expect(liveTracker(window)?.gate.tenant).toBe('pending')
+			await settle()
+			expect(injected()).toBeNull()
+
+			act(() => {
+				liveTracker(window)?.setGate(true)
+			})
+
+			await vi.waitFor(() => {
+				expect(injected()).not.toBeNull()
+			})
+		})
+
+		it('injects nothing under snippets={false}, even once open', async () => {
+			render(<TrackerBoot config={gated} gate={true} snippets={false} />)
+
+			expect(liveTracker(window)?.gate.tenant).toBe('open')
+			await settle()
+			expect(injected()).toBeNull()
+		})
 	})
 
 	it('destroys its tracker on unmount', async () => {

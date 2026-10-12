@@ -1,20 +1,23 @@
-import type { WidgetServerProps } from 'payload'
-import type { MetricKey } from '../core/contract'
-import { DEFAULT_TIMEZONE } from '../timeframe/tz'
-import { keys, type TranslationKey } from '../translations/keys'
+import { currentDate } from '../core/clock'
+import { formatMinutes } from '../fields/format'
+import { requestTimezone } from '../plugin/runtime'
+import { intlLocale } from '../translations/intl'
+import { keys } from '../translations/keys'
 import { METRIC_KEYS } from '../translations/metricKeys'
-import { asTranslate } from '../translations/server'
-import { cardStyle, labelStyle } from './cardChrome'
+import { asTranslate, type Translate } from '../translations/server'
 import { RealtimeCounter } from './RealtimeCounter'
-import { readForWidgetRealtime, type WidgetRealtimeStatus } from './readForWidgetRealtime'
+import { readForWidgetRealtime } from './readForWidgetRealtime'
 import { buildRealtimeEndpoint } from './realtimePoll'
-import { type WidgetViewProps, widgetViewHref } from './viewLink'
-import { WidgetViewLink } from './WidgetViewLink'
+import { type AnalyticsWidgetProps, widgetLink } from './viewLink'
+import { WidgetCard } from './WidgetCard'
+import { WidgetFrame, WidgetStateCard } from './WidgetFrame'
+import { storedWidgetData } from './widgetData'
 
-const STATE_KEY: Record<Exclude<WidgetRealtimeStatus, 'ok'>, TranslationKey> = {
-	'not-configured': keys.stateNotConfigured,
-	unavailable: keys.stateUnavailable,
-}
+const CLASS_NAME = 'analytics-realtime-widget'
+
+const POLL_INTERVAL_MS = 15_000
+
+const DEFAULT_WINDOW_MINUTES = 30
 
 interface RealtimeWidgetData {
 	title?: string
@@ -23,48 +26,76 @@ interface RealtimeWidgetData {
 	dataSource?: string
 }
 
-const POLL_INTERVAL_MS = 15_000
+const dataOf = (props: AnalyticsWidgetProps): RealtimeWidgetData => {
+	const { metric, ...stored } = storedWidgetData(props.widgetData)
+	return { ...stored, ...(metric === 'visitors' || metric === 'pageviews' ? { metric } : {}) }
+}
 
-export default async function AnalyticsRealtimeWidget(props: WidgetServerProps & WidgetViewProps) {
-	const data = (props.widgetData ?? {}) as RealtimeWidgetData
-	const metric: MetricKey = data.metric ?? 'visitors'
-	const windowMinutes = Number(data.windowMinutes) || 30
+const titleOf = (data: RealtimeWidgetData, t: Translate): string =>
+	data.title?.trim() || t(keys.widgetRealtimeLabel)
+
+/**
+ * The card's frame paints at once; the live count streams in when the read answers.
+ *
+ * @beta
+ */
+export default function AnalyticsRealtimeWidget(props: AnalyticsWidgetProps) {
 	const t = asTranslate(props.req.i18n.t)
-	const locale = props.req.i18n.language ?? 'en-US'
-	const title = data.title?.trim() || t(keys.widgetRealtimeLabel)
+	return (
+		<WidgetFrame
+			className={CLASS_NAME}
+			kind="realtime"
+			title={titleOf(dataOf(props), t)}
+			widget={props}
+		>
+			<RealtimeWidgetBody {...props} />
+		</WidgetFrame>
+	)
+}
+
+async function RealtimeWidgetBody(props: AnalyticsWidgetProps) {
+	const data = dataOf(props)
+	const metric = data.metric ?? 'visitors'
+	const windowMinutes = Number(data.windowMinutes) || DEFAULT_WINDOW_MINUTES
+	const t = asTranslate(props.req.i18n.t)
+	const locale = intlLocale(props.req.i18n.language)
+	const title = titleOf(data, t)
+	// The counter's minute labels are server-rendered and rehydrated, so both sides have to
+	// read them in the install's reporting zone rather than in whatever zone they run in.
+	const timezone = await requestTimezone(props.req)
 	const result = await readForWidgetRealtime({
 		req: props.req,
 		metric,
 		windowMinutes,
 		adapterId: data.dataSource,
-		now: new Date(),
+		now: currentDate(),
 	})
-	// No timeframe: a rolling few minutes is no window the view can hold, so the link opens
-	// it on its configured range, naming the adapter that actually answered.
-	const href = widgetViewHref(props.view, props.req, {
-		timezone: DEFAULT_TIMEZONE,
-		...(result.adapterId ? { source: result.adapterId } : {}),
-	})
-
+	const link = widgetLink(props, t, { adapterId: result.adapterId })
 	if (result.status !== 'ok') {
 		return (
-			<div className="analytics-realtime-widget" style={cardStyle}>
-				<span style={labelStyle}>{title}</span>
-				<span style={{ color: 'var(--theme-elevation-400)' }}>{t(STATE_KEY[result.status])}</span>
-				<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
-			</div>
+			<WidgetStateCard
+				className={CLASS_NAME}
+				link={link}
+				locale={locale}
+				retryAfterMs={result.retryAfterMs}
+				status={result.status}
+				t={t}
+				title={title}
+			/>
 		)
 	}
 
-	const caption = `${t(METRIC_KEYS[metric])} ${t(keys.widgetRealtimeCaption)}`
+	// The number formats its own unit and plural, so the template only places it.
+	const duration = formatMinutes(windowMinutes, locale)
 	return (
-		<div className="analytics-realtime-widget" style={cardStyle}>
-			<span style={labelStyle}>{title}</span>
+		<WidgetCard
+			className={CLASS_NAME}
+			caption={t(keys.widgetRealtimeWindow, { duration })}
+			link={link}
+			title={title}
+		>
 			<RealtimeCounter
-				endpoint={buildRealtimeEndpoint(
-					props.req.payload.config.serverURL,
-					props.req.payload.config.routes.api
-				)}
+				endpoint={buildRealtimeEndpoint(props.req.payload.config)}
 				intervalMs={POLL_INTERVAL_MS}
 				metric={metric}
 				windowMinutes={windowMinutes}
@@ -73,11 +104,13 @@ export default async function AnalyticsRealtimeWidget(props: WidgetServerProps &
 				initialSeries={result.series}
 				initialSampled={result.sampled}
 				locale={locale}
-				caption={caption}
+				timezone={timezone}
+				label={t(METRIC_KEYS[metric])}
 				pausedLabel={t(keys.widgetRealtimePaused)}
+				periodLabel={t(keys.viewTrendPeriod)}
 				sampledLabel={t(keys.stateSampled)}
+				fill
 			/>
-			<WidgetViewLink href={href} label={t(keys.widgetOpenInView)} />
-		</div>
+		</WidgetCard>
 	)
 }

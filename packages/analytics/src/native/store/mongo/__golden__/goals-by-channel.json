@@ -1,0 +1,1074 @@
+[
+	{
+		"$match": {
+			"scope": "tenant-a",
+			"ts": {
+				"$gte": {
+					"$date": "2026-10-06T00:00:00.000Z"
+				},
+				"$lt": {
+					"$date": "2026-10-07T00:00:00.000Z"
+				}
+			},
+			"_id": {
+				"$not": {
+					"$gte": "o",
+					"$lt": "p"
+				}
+			}
+		}
+	},
+	{
+		"$unionWith": {
+			"coll": "analytics-hits",
+			"pipeline": [
+				{
+					"$match": {
+						"scope": "tenant-a",
+						"ts": {
+							"$gte": {
+								"$date": "2026-10-06T00:00:00.000Z"
+							},
+							"$lt": {
+								"$date": "2026-10-07T00:00:00.000Z"
+							}
+						},
+						"_id": {
+							"$gte": "o",
+							"$lt": "p"
+						}
+					}
+				},
+				{
+					"$set": {
+						"tid": {
+							"$cond": [
+								{
+									"$eq": [
+										{
+											"$substrBytes": ["$_id", 0, 3]
+										},
+										"ow."
+									]
+								},
+								{
+									"$concat": [
+										"os.",
+										{
+											"$substrBytes": [
+												"$_id",
+												3,
+												{
+													"$subtract": [
+														{
+															"$strLenBytes": "$_id"
+														},
+														3
+													]
+												}
+											]
+										}
+									]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": [
+												{
+													"$substrBytes": ["$_id", 0, 3]
+												},
+												"os."
+											]
+										},
+										{
+											"$concat": [
+												"ow.",
+												{
+													"$substrBytes": [
+														"$_id",
+														3,
+														{
+															"$subtract": [
+																{
+																	"$strLenBytes": "$_id"
+																},
+																3
+															]
+														}
+													]
+												}
+											]
+										},
+										null
+									]
+								}
+							]
+						}
+					}
+				},
+				{
+					"$lookup": {
+						"from": "analytics-hits",
+						"localField": "tid",
+						"foreignField": "_id",
+						"pipeline": [
+							{
+								"$project": {
+									"ts": 1,
+									"item": 1,
+									"conversions": 1,
+									"revenue": 1,
+									"goals": 1,
+									"value": 1,
+									"originalValue": 1,
+									"currency": 1,
+									"originalCurrency": 1
+								}
+							}
+						],
+						"as": "tw"
+					}
+				},
+				{
+					"$set": {
+						"tw": {
+							"$first": "$tw"
+						}
+					}
+				},
+				{
+					"$match": {
+						"$expr": {
+							"$not": [
+								{
+									"$and": [
+										{
+											"$eq": [
+												{
+													"$substrBytes": ["$_id", 0, 3]
+												},
+												"os."
+											]
+										},
+										{
+											"$eq": [
+												{
+													"$type": "$tw"
+												},
+												"object"
+											]
+										},
+										{
+											"$lte": [
+												{
+													"$abs": {
+														"$subtract": ["$tw.ts", "$ts"]
+													}
+												},
+												86400000
+											]
+										}
+									]
+								}
+							]
+						}
+					}
+				},
+				{
+					"$set": {
+						"cr": {
+							"$cond": [
+								{
+									"$and": [
+										{
+											"$eq": [
+												{
+													"$substrBytes": ["$_id", 0, 3]
+												},
+												"ow."
+											]
+										},
+										{
+											"$eq": [
+												{
+													"$type": "$tw"
+												},
+												"object"
+											]
+										}
+									]
+								},
+								{
+									"$cond": [
+										{
+											"$lte": [
+												{
+													"$abs": {
+														"$subtract": ["$tw.ts", "$ts"]
+													}
+												},
+												86400000
+											]
+										},
+										1,
+										0
+									]
+								},
+								null
+							]
+						}
+					}
+				},
+				{
+					"$set": {
+						"conversions": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.conversions", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$conversions"
+									]
+								}
+							]
+						},
+						"revenue": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.revenue", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$revenue"
+									]
+								}
+							]
+						},
+						"goals": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.goals", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$goals"
+									]
+								}
+							]
+						},
+						"value": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.value", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$value"
+									]
+								}
+							]
+						},
+						"originalValue": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.originalValue", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$originalValue"
+									]
+								}
+							]
+						},
+						"currency": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.currency", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$currency"
+									]
+								}
+							]
+						},
+						"originalCurrency": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.originalCurrency", null]
+								},
+								{
+									"$cond": [
+										{
+											"$eq": ["$cr", 0]
+										},
+										null,
+										"$originalCurrency"
+									]
+								}
+							]
+						},
+						"item": {
+							"$cond": [
+								{
+									"$eq": ["$cr", 1]
+								},
+								{
+									"$ifNull": ["$tw.item", "$item"]
+								},
+								"$item"
+							]
+						},
+						"server": {
+							"$cond": [
+								{
+									"$and": [
+										{
+											"$eq": ["$cr", 1]
+										},
+										{
+											"$eq": [
+												{
+													"$type": "$tw.item"
+												},
+												"string"
+											]
+										}
+									]
+								},
+								true,
+								"$server"
+							]
+						}
+					}
+				},
+				{
+					"$unset": ["tid", "tw", "cr"]
+				}
+			]
+		}
+	},
+	{
+		"$project": {
+			"_id": 1,
+			"scope": 1,
+			"ts": 1,
+			"hostname": 1,
+			"v": 1,
+			"type": 1,
+			"path": 1,
+			"server": {
+				"$ifNull": ["$server", false]
+			},
+			"name": {
+				"$ifNull": ["$name", null]
+			},
+			"item": {
+				"$ifNull": ["$item", null]
+			},
+			"durationMs": {
+				"$ifNull": ["$durationMs", null]
+			},
+			"scrollDepth": {
+				"$ifNull": ["$scrollDepth", null]
+			},
+			"conversions": {
+				"$ifNull": ["$conversions", null]
+			},
+			"revenue": {
+				"$ifNull": ["$revenue", null]
+			},
+			"eng": {
+				"$cond": [
+					{
+						"$eq": ["$type", "engagement"]
+					},
+					1,
+					0
+				]
+			},
+			"act": {
+				"$ifNull": ["$lastAt", "$ts"]
+			},
+			"landing": {
+				"$ifNull": ["$landing", false]
+			},
+			"a": {
+				"$cond": [
+					{
+						"$eq": ["$type", "engagement"]
+					},
+					"$$REMOVE",
+					{
+						"channel": "$channel"
+					}
+				]
+			},
+			"goals": {
+				"$ifNull": ["$goals", []]
+			}
+		}
+	},
+	{
+		"$setWindowFields": {
+			"partitionBy": {
+				"s": "$scope",
+				"h": "$hostname",
+				"v": "$v"
+			},
+			"sortBy": {
+				"ts": 1,
+				"_id": 1
+			},
+			"output": {
+				"prevAct": {
+					"$max": "$act",
+					"window": {
+						"documents": ["unbounded", -1]
+					}
+				}
+			}
+		}
+	},
+	{
+		"$set": {
+			"starts": {
+				"$cond": [
+					{
+						"$eq": ["$v", ""]
+					},
+					null,
+					{
+						"$cond": [
+							{
+								"$or": [
+									{
+										"$eq": ["$prevAct", null]
+									},
+									{
+										"$gt": [
+											"$ts",
+											{
+												"$add": ["$prevAct", 1800000]
+											}
+										]
+									}
+								]
+							},
+							1,
+							0
+						]
+					}
+				]
+			}
+		}
+	},
+	{
+		"$setWindowFields": {
+			"partitionBy": {
+				"s": "$scope",
+				"h": "$hostname",
+				"v": "$v"
+			},
+			"sortBy": {
+				"ts": 1,
+				"_id": 1
+			},
+			"output": {
+				"sn": {
+					"$sum": "$starts",
+					"window": {
+						"documents": ["unbounded", "current"]
+					}
+				}
+			}
+		}
+	},
+	{
+		"$set": {
+			"sn": {
+				"$cond": [
+					{
+						"$eq": ["$v", ""]
+					},
+					null,
+					"$sn"
+				]
+			}
+		}
+	},
+	{
+		"$unset": ["act", "prevAct", "starts"]
+	},
+	{
+		"$setWindowFields": {
+			"partitionBy": {
+				"s": "$scope",
+				"h": "$hostname",
+				"v": "$v",
+				"sn": "$sn"
+			},
+			"sortBy": {
+				"eng": 1,
+				"ts": 1,
+				"_id": 1
+			},
+			"output": {
+				"entryId": {
+					"$first": "$_id",
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"f": {
+					"$first": "$a",
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"s_pv": {
+					"$sum": {
+						"$cond": [
+							{
+								"$eq": ["$type", "pageview"]
+							},
+							1,
+							0
+						]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"s_int": {
+					"$sum": {
+						"$cond": [
+							{
+								"$in": ["$type", ["event", "goal"]]
+							},
+							1,
+							0
+						]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"s_ms": {
+					"$sum": {
+						"$ifNull": ["$durationMs", 0]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				}
+			}
+		}
+	},
+	{
+		"$set": {
+			"o": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					"$a",
+					"$$REMOVE"
+				]
+			}
+		}
+	},
+	{
+		"$unset": "a"
+	},
+	{
+		"$setWindowFields": {
+			"partitionBy": {
+				"s": "$scope",
+				"h": "$hostname",
+				"v": "$v"
+			},
+			"sortBy": {
+				"sn": 1,
+				"eng": 1,
+				"ts": 1,
+				"_id": 1
+			},
+			"output": {
+				"landed": {
+					"$max": {
+						"$cond": [
+							{
+								"$and": [
+									{
+										"$eq": ["$_id", "$entryId"]
+									},
+									{
+										"$eq": ["$eng", 0]
+									},
+									{
+										"$eq": ["$landing", true]
+									}
+								]
+							},
+							{
+								"n": "$sn",
+								"a": "$f"
+							},
+							null
+						]
+					},
+					"window": {
+						"documents": ["unbounded", "current"]
+					}
+				}
+			}
+		}
+	},
+	{
+		"$set": {
+			"e_channel": {
+				"$cond": [
+					{
+						"$eq": ["$sn", null]
+					},
+					{
+						"$ifNull": ["$o.channel", null]
+					},
+					{
+						"$cond": [
+							{
+								"$eq": ["$landed", null]
+							},
+							"$f.channel",
+							"$landed.a.channel"
+						]
+					}
+				]
+			},
+			"entry": {
+				"$cond": [
+					{
+						"$and": [
+							{
+								"$ne": ["$sn", null]
+							},
+							{
+								"$eq": ["$_id", "$entryId"]
+							},
+							{
+								"$eq": ["$eng", 0]
+							}
+						]
+					},
+					1,
+					0
+				]
+			},
+			"bounce": {
+				"$cond": [
+					{
+						"$and": [
+							{
+								"$ne": ["$sn", null]
+							},
+							{
+								"$eq": ["$_id", "$entryId"]
+							},
+							{
+								"$eq": ["$eng", 0]
+							},
+							{
+								"$eq": ["$s_pv", 1]
+							},
+							{
+								"$eq": ["$s_int", 0]
+							}
+						]
+					},
+					1,
+					0
+				]
+			}
+		}
+	},
+	{
+		"$unset": ["f", "o", "landed", "entryId", "landing", "s_pv", "s_int"]
+	},
+	{
+		"$unwind": "$goals"
+	},
+	{
+		"$set": {
+			"x": "$goals.slug",
+			"conv": {
+				"$cond": [
+					{
+						"$gt": [
+							{
+								"$ifNull": ["$conversions", 0]
+							},
+							0
+						]
+					},
+					1,
+					0
+				]
+			},
+			"rev": {
+				"$ifNull": ["$goals.value", 0]
+			},
+			"imp": 0
+		}
+	},
+	{
+		"$set": {
+			"d0": "$x",
+			"gv": "$e_channel"
+		}
+	},
+	{
+		"$match": {
+			"$and": [
+				{
+					"d0": "purchase"
+				},
+				{
+					"gv": {
+						"$nin": [null, ""]
+					}
+				}
+			]
+		}
+	},
+	{
+		"$project": {
+			"_id": 0,
+			"s": "$scope",
+			"h": "$hostname",
+			"v": "$v",
+			"n": "$sn",
+			"g": "$gv",
+			"pageviews": {
+				"$cond": [
+					{
+						"$eq": ["$type", "pageview"]
+					},
+					1,
+					0
+				]
+			},
+			"events": {
+				"$cond": [
+					{
+						"$in": ["$type", ["event", "goal"]]
+					},
+					1,
+					0
+				]
+			},
+			"visitors": {
+				"$cond": [
+					{
+						"$and": [
+							{
+								"$eq": ["$eng", 0]
+							},
+							{
+								"$ne": ["$v", ""]
+							}
+						]
+					},
+					1,
+					0
+				]
+			},
+			"sessions": {
+				"$cond": [
+					{
+						"$and": [
+							{
+								"$eq": ["$eng", 0]
+							},
+							{
+								"$ne": ["$sn", null]
+							}
+						]
+					},
+					1,
+					0
+				]
+			},
+			"entries": "$entry",
+			"bounces": "$bounce",
+			"sessionMs": "$s_ms",
+			"durationMs": {
+				"$ifNull": ["$durationMs", 0]
+			},
+			"scrollSum": {
+				"$ifNull": ["$scrollDepth", 0]
+			},
+			"scrollSamples": {
+				"$cond": [
+					{
+						"$and": [
+							{
+								"$eq": ["$type", "pageview"]
+							},
+							{
+								"$ne": ["$scrollDepth", null]
+							}
+						]
+					},
+					1,
+					0
+				]
+			},
+			"conversions": "$conv",
+			"revenue": "$rev",
+			"interactions": {
+				"$cond": [
+					{
+						"$and": [
+							{
+								"$eq": ["$type", "event"]
+							},
+							{
+								"$eq": ["$name", "item_click"]
+							},
+							{
+								"$eq": [
+									{
+										"$type": "$item"
+									},
+									"string"
+								]
+							},
+							{
+								"$ne": ["$item", ""]
+							}
+						]
+					},
+					1,
+					0
+				]
+			}
+		}
+	},
+	{
+		"$group": {
+			"_id": {
+				"g": "$g",
+				"s": "$s",
+				"h": "$h",
+				"v": "$v",
+				"n": "$n"
+			},
+			"pageviews": {
+				"$sum": "$pageviews"
+			},
+			"events": {
+				"$sum": "$events"
+			},
+			"visitors": {
+				"$max": "$visitors"
+			},
+			"sessions": {
+				"$max": "$sessions"
+			},
+			"entries": {
+				"$sum": "$entries"
+			},
+			"bounces": {
+				"$sum": "$bounces"
+			},
+			"sessionMs": {
+				"$max": "$sessionMs"
+			},
+			"durationMs": {
+				"$sum": "$durationMs"
+			},
+			"scrollSum": {
+				"$sum": "$scrollSum"
+			},
+			"scrollSamples": {
+				"$sum": "$scrollSamples"
+			},
+			"conversions": {
+				"$sum": "$conversions"
+			},
+			"revenue": {
+				"$sum": "$revenue"
+			},
+			"interactions": {
+				"$sum": "$interactions"
+			}
+		}
+	},
+	{
+		"$group": {
+			"_id": {
+				"g": "$_id.g",
+				"s": "$_id.s",
+				"h": "$_id.h",
+				"v": "$_id.v"
+			},
+			"pageviews": {
+				"$sum": "$pageviews"
+			},
+			"events": {
+				"$sum": "$events"
+			},
+			"visitors": {
+				"$max": "$visitors"
+			},
+			"sessions": {
+				"$sum": "$sessions"
+			},
+			"entries": {
+				"$sum": "$entries"
+			},
+			"bounces": {
+				"$sum": "$bounces"
+			},
+			"sessionMs": {
+				"$sum": {
+					"$cond": [
+						{
+							"$eq": ["$sessions", 1]
+						},
+						"$sessionMs",
+						0
+					]
+				}
+			},
+			"durationMs": {
+				"$sum": "$durationMs"
+			},
+			"scrollSum": {
+				"$sum": "$scrollSum"
+			},
+			"scrollSamples": {
+				"$sum": "$scrollSamples"
+			},
+			"conversions": {
+				"$sum": "$conversions"
+			},
+			"revenue": {
+				"$sum": "$revenue"
+			},
+			"interactions": {
+				"$sum": "$interactions"
+			}
+		}
+	},
+	{
+		"$group": {
+			"_id": {
+				"g": "$_id.g"
+			},
+			"pageviews": {
+				"$sum": "$pageviews"
+			},
+			"events": {
+				"$sum": "$events"
+			},
+			"visitors": {
+				"$sum": "$visitors"
+			},
+			"sessions": {
+				"$sum": "$sessions"
+			},
+			"entries": {
+				"$sum": "$entries"
+			},
+			"bounces": {
+				"$sum": "$bounces"
+			},
+			"sessionMs": {
+				"$sum": "$sessionMs"
+			},
+			"durationMs": {
+				"$sum": "$durationMs"
+			},
+			"scrollSum": {
+				"$sum": "$scrollSum"
+			},
+			"scrollSamples": {
+				"$sum": "$scrollSamples"
+			},
+			"conversions": {
+				"$sum": "$conversions"
+			},
+			"revenue": {
+				"$sum": "$revenue"
+			},
+			"interactions": {
+				"$sum": "$interactions"
+			}
+		}
+	},
+	{
+		"$match": {
+			"$expr": {
+				"$gt": [
+					{
+						"$add": ["$pageviews", "$events"]
+					},
+					0
+				]
+			}
+		}
+	},
+	{
+		"$sort": {
+			"_id.g": 1
+		}
+	}
+]

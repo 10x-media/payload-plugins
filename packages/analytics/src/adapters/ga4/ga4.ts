@@ -1,17 +1,24 @@
-import type { BetaAnalyticsDataClient, protos } from '@google-analytics/data'
+import type { Payload } from 'payload'
+import { jsLiteral } from '../../capture/jsLiteral'
 import type { CaptureSupport } from '../../core/capture'
-import type {
-	AdapterContext,
-	AnalyticsAdapter,
-	AnalyticsCapabilities,
-	AnalyticsQuery,
-	AnalyticsResult,
-	AnalyticsRow,
-	DimensionKey,
-	FilterOperator,
-	MetricKey,
+import {
+	type AdapterContext,
+	type AnalyticsAdapter,
+	type AnalyticsCapabilities,
+	type AnalyticsQuery,
+	type AnalyticsResult,
+	type AnalyticsRow,
+	DIMENSION_KEYS,
+	type DimensionKey,
+	type FilterOperator,
+	type MetricKey,
+	type MetricReach,
+	type MetricValues,
 } from '../../core/contract'
-import { DEFAULT_TIMEZONE, zonedCalendarDay } from '../../timeframe/tz'
+import { vendorReading } from '../../core/metricValues'
+import type { Ga4Client, Ga4ReportResponse, Ga4ReportRow, Ga4Sdk } from '../../core/sdks'
+import { CURRENCY_PATTERN, currencyOption } from '../../goals/currency'
+import { GA4_SDK_WARNING, isProductionBuild, loadGa4 } from '../../plugin/peers'
 import {
 	emptyGoalBreakdown,
 	type GoalKeyedRow,
@@ -19,11 +26,20 @@ import {
 	hintSlugs,
 	mergeGoalRows,
 	mergeGoalTotals,
-	providerMetricKeys,
 	readGoalPair,
 	splitGoalMetrics,
 } from '../goalRead'
-import { dayIso } from '../series'
+import {
+	calendarDays,
+	declaredFilters,
+	everyOperatorOn,
+	mappedKeys,
+	providerMetricKeys,
+	readableMetrics,
+} from '../mapping'
+import { readTime } from '../readTime'
+import { datedRows, dayIso } from '../series'
+import { upstream } from '../upstream'
 import { ga4ExcludeGuard } from './disableKey'
 import { ga4EventName } from './eventName'
 import { MEASUREMENT_ID_PATTERN } from './measurementId'
@@ -42,23 +58,50 @@ export interface Ga4Config {
 	 * from googletagmanager.com and booted with gtag.
 	 */
 	measurementId?: string
+	/**
+	 * `{ BetaAnalyticsDataClient }` from `@google-analytics/data`. Unset, the plugin's `sdks.ga4`
+	 * serves, and without either it is loaded at runtime, which a standalone build does not ship.
+	 */
+	sdk?: Ga4Sdk
+	/**
+	 * The property's ISO 4217 currency, used only when an answer names none; GA4's own wins. Anything
+	 * but such a code throws when the adapter is built.
+	 */
+	currency?: string
+}
+
+/** How long one report may take when the adapter is called outside the engine, which sets its own. */
+const DEFAULT_REPORT_TIMEOUT_MS = 60_000
+
+/**
+ * Cancels a Data API call when its read gives up, where `cancel` survives: `@google-analytics/data`
+ * 6.1 drops it, leaving the call's own gRPC `timeout` to bound it.
+ */
+const cancelWhenAborted = (call: Promise<unknown>, signal: AbortSignal | undefined): void => {
+	const cancel: unknown = Reflect.get(call, 'cancel')
+	if (!signal || typeof cancel !== 'function') {
+		return
+	}
+	const onAbort = (): void => {
+		Reflect.apply(cancel, call, [])
+	}
+	if (signal.aborted) {
+		onAbort()
+		return
+	}
+	signal.addEventListener('abort', onAbort, { once: true })
+	void call.then(
+		() => signal.removeEventListener('abort', onAbort),
+		() => signal.removeEventListener('abort', onAbort)
+	)
 }
 
 /**
- * Google's documented install snippet (https://developers.google.com/tag-platform/gtagjs/install):
- * the inline publishes `dataLayer` and `gtag` and configures the measurement id, then the tag
- * loads from googletagmanager.com. Inline first is Google's own ordering for consent mode, and
- * it leaves the queue defined even when the tag itself is blocked. The tag is served from
- * Google's CDN with the id in the query string, so there is nothing to proxy and `routes`
- * stays empty; the snippet is rendered from an absolute `src` and the slot's proxy mount
- * answers 404.
- *
- * The exclusion guard leads, ahead of the first `gtag()` call, because that is the only place
- * GA4's disable switch counts and the tracker boots too late to set it for a snippet the
- * server rendered.
+ * Google's install snippet, inline first as consent mode expects, led by the exclusion guard. The
+ * tag loads from Google's CDN, so `routes` stays empty and the slot's proxy mount answers 404.
  */
 function buildCapture(measurementId: string): CaptureSupport {
-	const id = JSON.stringify(measurementId)
+	const id = jsLiteral(measurementId)
 	return {
 		proxy: { routes: [] },
 		snippet: () => ({
@@ -82,10 +125,22 @@ const METRIC_MAP: Partial<Record<MetricKey, string>> = {
 	visits: 'sessions',
 	sessions: 'sessions',
 	bounceRate: 'bounceRate',
-	avgDuration: 'averageSessionDuration',
+	visitDuration: 'averageSessionDuration',
 	events: 'eventCount',
 	conversions: 'keyEvents',
 	revenue: 'totalRevenue',
+}
+
+const ENGAGED_SECONDS = 'userEngagementDuration'
+const VIEWS = 'screenPageViews'
+
+/**
+ * The GA4 metrics each contract metric is read from. Time on page is engaged seconds over views;
+ * both are sums, so the ratio holds per row and for the totals alike.
+ */
+const METRIC_SOURCES: Partial<Record<MetricKey, string | readonly string[]>> = {
+	...METRIC_MAP,
+	avgDuration: [ENGAGED_SECONDS, VIEWS],
 }
 
 const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
@@ -110,17 +165,14 @@ const DIMENSION_MAP: Partial<Record<DimensionKey, string>> = {
 }
 
 /**
- * Metrics GA4 answers only for a goal-restricted read. A goal matches the GA4 event named by
- * its normalized slug, since GA4 refuses the kebab-case slug itself. `keyEvents` counts
- * events the property itself marks as key events, so an event that is a goal here but not
- * marked there reports 0.
+ * Metrics GA4 answers only for a goal-restricted read. `keyEvents` counts only events the property
+ * marks as key events, so a goal here that GA4 does not mark reports 0.
  */
 const GOAL_METRICS: ReadonlySet<MetricKey> = new Set(['conversions'])
 
 /**
- * The hint's slugs keyed by the GA4 event name each one normalizes to, which is both the
- * `eventName` list the goal request sends and the way its rows map back. Two slugs can
- * normalize to one GA4 event, which GA4 counts once: the first hint slug owns those rows.
+ * The hint's slugs by the GA4 event name each normalizes to, for the request and mapping rows back.
+ * Two slugs normalizing alike are one GA4 event: the first slug owns its rows.
  */
 const goalSlugsByEventName = (slugs: string[]): Map<string, string> => {
 	const byName = new Map<string, string>()
@@ -145,39 +197,80 @@ const MATCH_TYPE_MAP: Record<FilterOperator, StringMatchType> = {
 	matches: 'FULL_REGEXP',
 }
 
-// caseSensitive is explicit on every string filter because the Data API defaults it to
-// false: `contains` stays insensitive, matching the native source and Umami's ilike, while
-// `eq` and `matches` compare literally.
+// The Data API defaults caseSensitive to false, so it is explicit: `contains` stays
+// insensitive like native and Umami's ilike, while `eq` and `matches` compare literally.
 const CASE_SENSITIVE: Record<StringMatchType, boolean> = {
 	EXACT: true,
 	CONTAINS: false,
 	FULL_REGEXP: true,
 }
 
+/**
+ * A filter expression as the Data API reads one (`FilterExpression` in its REST reference), written
+ * here so the adapter needs no type of the SDK.
+ */
+interface FilterExpression {
+	filter?: {
+		fieldName: string
+		stringFilter?: { matchType: StringMatchType; value: string; caseSensitive: boolean }
+		inListFilter?: { values: string[]; caseSensitive: boolean }
+	}
+	andGroup?: { expressions: FilterExpression[] }
+}
+
+/** The parts of a `RunReportRequest` a read adds to the property, the window and the metrics. */
+interface ReportShape {
+	dimensions?: Array<{ name: string }>
+	metricAggregations?: Array<'TOTAL'>
+	orderBys?: Array<{ dimension: { dimensionName: string } }>
+	limit?: number
+}
+
 const stringFilter = (
 	fieldName: string,
 	matchType: StringMatchType,
 	value: string
-): protos.google.analytics.data.v1beta.IFilterExpression => ({
+): FilterExpression => ({
 	filter: {
 		fieldName,
 		stringFilter: { matchType, value, caseSensitive: CASE_SENSITIVE[matchType] },
 	},
 })
 
-const ga4Metrics: ReadonlySet<MetricKey> = new Set(Object.keys(METRIC_MAP) as MetricKey[])
-const ga4Dimensions: ReadonlySet<DimensionKey> = new Set(
-	Object.keys(DIMENSION_MAP) as DimensionKey[]
-)
-// `goal` is a breakdown, not a filter: the read's own goal slugs own the eventName clause.
-const ga4Filters: ReadonlySet<DimensionKey> = new Set(
-	[...ga4Dimensions].filter((dimension) => dimension !== 'goal')
-)
+/** `exprs` as one dimension filter: none, the only one, or all of them and-ed. */
+const allOf = (exprs: FilterExpression[]): FilterExpression | undefined =>
+	exprs.length > 1 ? { andGroup: { expressions: exprs } } : exprs[0]
+
+const ga4Metrics: ReadonlySet<MetricKey> = new Set<MetricKey>([
+	'pageviews',
+	'visitors',
+	'visits',
+	'sessions',
+	'bounceRate',
+	'avgDuration',
+	'visitDuration',
+	'events',
+	'conversions',
+	'revenue',
+])
+const ga4Dimensions = mappedKeys(DIMENSION_KEYS, DIMENSION_MAP)
+/**
+ * Views are page_view and screen_view events only, so a time on page per event name divides the
+ * engagement of one event by the views of another: it is read under every other breakdown.
+ */
+const ga4Reach: Partial<Record<MetricKey, MetricReach>> = {
+	avgDuration: {
+		dimensions: [...ga4Dimensions].filter(
+			(dimension) => dimension !== 'event' && dimension !== 'goal'
+		),
+	},
+}
+const ga4Filters = everyOperatorOn(ga4Dimensions)
 
 // GA4 returns bounceRate as a 0..1 ratio and averageSessionDuration in seconds; the
 // contract uses a 0..100 percentage and milliseconds.
 const toContractValue = (metric: MetricKey, raw: number): number => {
-	if (metric === 'avgDuration') {
+	if (metric === 'visitDuration') {
 		return Math.round(raw * 1000)
 	}
 	if (metric === 'bounceRate') {
@@ -186,43 +279,105 @@ const toContractValue = (metric: MetricKey, raw: number): number => {
 	return raw
 }
 
+interface Ga4Reading {
+	metrics: MetricValues
+	/** The views each time on page was taken over, which folds days into weeks exactly. */
+	samples?: Partial<Record<MetricKey, number>>
+}
+
+/** One report row's contract metrics, each read back by GA4 name from the report's `names`. */
+const readRow = (metrics: MetricKey[], names: string[], row: Ga4ReportRow): Ga4Reading => {
+	const raw = (name: string): unknown => row.metricValues?.[names.indexOf(name)]?.value
+	const out: MetricValues = {}
+	let samples: Ga4Reading['samples']
+	for (const metric of metrics) {
+		if (metric === 'avgDuration') {
+			const views = vendorReading('pageviews', raw(VIEWS)) ?? 0
+			const engaged = vendorReading('avgDuration', raw(ENGAGED_SECONDS))
+			out.avgDuration = views > 0 && engaged !== null ? Math.round((engaged / views) * 1000) : null
+			samples = { avgDuration: views }
+			continue
+		}
+		const name = METRIC_MAP[metric]
+		const value = name === undefined ? null : vendorReading(metric, raw(name))
+		out[metric] = value === null ? null : toContractValue(metric, value)
+	}
+	return samples ? { metrics: out, samples } : { metrics: out }
+}
+
+/** A report's rows keyed by their dimension values; undefined when the report was never run. */
+const keyedRows = (
+	response: Ga4ReportResponse | undefined,
+	metrics: MetricKey[],
+	names: string[]
+): GoalKeyedRow[] | undefined =>
+	response?.rows?.map((row) => ({
+		keys: (row.dimensionValues ?? []).map((value) => value.value ?? ''),
+		...readRow(metrics, names, row),
+	})) ?? (response ? [] : undefined)
+
+const totalsOf = (
+	response: Ga4ReportResponse | undefined,
+	metrics: MetricKey[],
+	names: string[]
+): MetricValues | undefined => {
+	const row = response?.totals?.[0]
+	return row ? readRow(metrics, names, row).metrics : undefined
+}
+
+/** GA4's `date` dimension value (`YYYYMMDD`) as a UTC-day ISO string. */
+const ga4DayIso = (ymd: string): string | null =>
+	dayIso(`${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`)
+
 export function ga4(config: Ga4Config): AnalyticsAdapter {
 	const maxLookbackDays = config.maxLookbackDays !== undefined ? config.maxLookbackDays : 425
 
 	const capabilities: AnalyticsCapabilities = {
-		perPageQuery: true,
 		realtime: false,
 		minGranularity: 'day',
 		maxLookbackDays,
 		metrics: ga4Metrics,
 		dimensions: ga4Dimensions,
+		metricReach: ga4Reach,
 		filters: ga4Filters,
-		filterOperators: new Set(['eq', 'contains', 'matches']),
-		batchPageReport: true,
-		rateLimit: { maxConcurrent: 10, quotaModel: 'tokens', readsCountAsUsage: true },
+		semantics: { visitors: 'distinct', sessions: 'provider' },
+		rateLimit: { maxConcurrent: 10, readsCountAsUsage: true },
 		recommendedTtl: { realtime: 300, aggregate: 21600 },
+		upstreamAware: true,
 	}
+	const configCurrency = currencyOption('ga4({ currency })', config.currency)
 
-	let clientPromise: Promise<BetaAnalyticsDataClient> | undefined
+	/** One client per Payload instance, so closing one instance's leaves the others' open. */
+	const clients = new WeakMap<object, Promise<Ga4Client>>()
+	/** The instances this adapter was closed for, which get no client again until attached anew. */
+	const closed = new WeakSet<object>()
+	/** Whom a read with no instance in its context shares a client with. */
+	const unattached = {}
+	/** The plugin's `sdks.ga4`, handed over when the plugin registers this adapter. */
+	let pluginSdk: Ga4Sdk | undefined
+	let warned = false
+	const sdk = (): Ga4Sdk | undefined => config.sdk ?? pluginSdk
 
-	const getClient = (): Promise<BetaAnalyticsDataClient> => {
-		if (!clientPromise) {
-			clientPromise = (async () => {
-				let mod: typeof import('@google-analytics/data')
-				try {
-					mod = await import('@google-analytics/data')
-				} catch {
-					throw new Error(
-						'@10x-media/analytics: the GA4 adapter requires the optional peer dependency "@google-analytics/data". Install it with: pnpm add @google-analytics/data'
-					)
-				}
-				return new mod.BetaAnalyticsDataClient({
-					credentials: config.credentials,
-					projectId: config.projectId,
-				})
-			})()
+	const getClient = (payload: Payload | undefined): Promise<Ga4Client> => {
+		const owner = payload ?? unattached
+		const held = clients.get(owner)
+		if (held) {
+			return held
 		}
-		return clientPromise
+		// A read that reaches a closed adapter late (a retired runtime's refresh) would otherwise
+		// open a client nothing ever closes.
+		if (closed.has(owner)) {
+			return Promise.reject(new Error('analytics: this GA4 source was closed'))
+		}
+		const created = (async () => {
+			const mod = sdk() ?? (await loadGa4())
+			return new mod.BetaAnalyticsDataClient({
+				credentials: config.credentials,
+				...(config.projectId ? { projectId: config.projectId } : {}),
+			})
+		})()
+		clients.set(owner, created)
+		return created
 	}
 
 	const measurementId = config.measurementId
@@ -239,70 +394,72 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 			Boolean(
 				config.propertyId && config.credentials?.client_email && config.credentials?.private_key
 			),
-		// The gRPC SDK's gax CallOptions has no AbortSignal field, so ctx.signal cannot be
-		// forwarded; gax cancellation uses the call's own handle, not our signal.
-		async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
-			const fetchedAt = q.dateRange.end.toISOString()
+		register(_config, context) {
+			pluginSdk = context?.sdks?.ga4
+		},
+		// At boot, before the first read fails in front of an editor.
+		attach(payload: Payload) {
+			closed.delete(payload)
+			if (!warned && sdk() === undefined && isProductionBuild()) {
+				warned = true
+				payload.logger?.warn(GA4_SDK_WARNING)
+			}
+		},
+		async close(payload: Payload) {
+			closed.add(payload)
+			const held = clients.get(payload)
+			clients.delete(payload)
+			const client = await held?.catch(() => undefined)
+			await client?.close?.()
+		},
+		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
+			const fetchedAt = readTime(ctx)
 			const dims = (q.dimensions ?? []).filter((d) => DIMENSION_MAP[d])
 			const goalBreakdown = dims.includes('goal')
 			const hint = goalHint(q)
-			const slugs = hintSlugs(hint)
-			const empty = goalBreakdown ? emptyGoalBreakdown({ provider: 'ga4', q, hint }) : null
+			const empty = goalBreakdown ? emptyGoalBreakdown({ provider: 'ga4', fetchedAt, hint }) : null
 			if (empty) {
 				return empty
 			}
-			const wanted = q.metrics.filter((m) => METRIC_MAP[m])
 			const { siteMetrics, goalMetrics, unresolved } = splitGoalMetrics({
-				wanted,
+				wanted: readableMetrics(capabilities, q, dims),
 				goalOnly: GOAL_METRICS,
 				goalBreakdown,
 				hint,
 			})
-			const siteKeys = providerMetricKeys(siteMetrics, METRIC_MAP)
-			const goalKeys = providerMetricKeys(goalMetrics, METRIC_MAP)
-			const providerDims = [...new Set(dims.map((d) => DIMENSION_MAP[d] as string))]
+			const siteNames = providerMetricKeys(siteMetrics, METRIC_SOURCES)
+			const goalNames = providerMetricKeys(goalMetrics, METRIC_SOURCES)
+			const providerDims = [...new Set(dims.flatMap((d) => DIMENSION_MAP[d] ?? []))]
 			// Set when GA4 rejects a goal report the site report survived, so the rows keep their
 			// site metrics and lose only their conversions.
 			let goalsFailed = false
-			const meta = (): AnalyticsResult['meta'] => ({
-				provider: 'ga4',
-				fetchedAt,
-				...(unresolved || goalsFailed ? { goalsUnresolved: true as const } : {}),
-			})
-
-			const readMetrics = (
-				ms: MetricKey[],
-				keys: string[],
-				row: protos.google.analytics.data.v1beta.IRow
-			): Partial<Record<MetricKey, number>> => {
-				const out: Partial<Record<MetricKey, number>> = {}
-				for (const m of ms) {
-					const idx = keys.indexOf(METRIC_MAP[m] as string)
-					out[m] = toContractValue(m, Number(row.metricValues?.[idx]?.value ?? 0))
+			// What the answers said about themselves: a sampled report anywhere makes the read an estimate.
+			let sampled = false
+			let reportedCurrency: string | undefined
+			const meta = (): AnalyticsResult['meta'] => {
+				const currency = reportedCurrency ?? configCurrency
+				return {
+					provider: 'ga4',
+					fetchedAt,
+					...(currency ? { currency } : {}),
+					...(sampled ? { sampled: true } : {}),
+					...(unresolved || goalsFailed ? { goalsUnresolved: true as const } : {}),
 				}
-				return out
 			}
 
-			const filterExprs: protos.google.analytics.data.v1beta.IFilterExpression[] = []
+			const filterExprs: FilterExpression[] = []
 			if (q.path) {
 				filterExprs.push(stringFilter('pagePath', 'EXACT', q.path))
 			}
 			if (q.hostname) {
 				filterExprs.push(stringFilter('hostName', 'EXACT', q.hostname))
 			}
-			// Capability gating (filters/filterOperators) is the real contract upstream; an
-			// unsupported dimension is dropped here as the safety net.
-			for (const filter of q.filters ?? []) {
-				const fieldName = ga4Filters.has(filter.dimension)
-					? DIMENSION_MAP[filter.dimension]
-					: undefined
-				if (!fieldName) {
-					continue
-				}
-				filterExprs.push(stringFilter(fieldName, MATCH_TYPE_MAP[filter.operator], filter.value))
+			for (const { filter, field } of declaredFilters(capabilities, q.filters, DIMENSION_MAP)) {
+				filterExprs.push(stringFilter(field, MATCH_TYPE_MAP[filter.operator], filter.value))
 			}
+			const slugs = hintSlugs(hint)
 			const goalSlugs = slugs ? goalSlugsByEventName(slugs) : null
-			const goalExprs = goalSlugs
+			const goalExprs: FilterExpression[] = goalSlugs
 				? [
 						...filterExprs,
 						{
@@ -313,92 +470,66 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 						},
 					]
 				: filterExprs
-			const asFilter = (
-				exprs: protos.google.analytics.data.v1beta.IFilterExpression[]
-			): protos.google.analytics.data.v1beta.IFilterExpression | undefined =>
-				exprs.length === 0
-					? undefined
-					: exprs.length === 1
-						? exprs[0]
-						: { andGroup: { expressions: exprs } }
+			// A goal breakdown restricts its own rows, so its one report carries the hint too.
+			const siteExprs = goalBreakdown ? goalExprs : filterExprs
 
-			const request = (
-				metrics: string[],
-				exprs: protos.google.analytics.data.v1beta.IFilterExpression[],
-				extra: protos.google.analytics.data.v1beta.IRunReportRequest
-			): protos.google.analytics.data.v1beta.IRunReportRequest => {
-				const dimensionFilter = asFilter(exprs)
-				return {
-					property: `properties/${config.propertyId}`,
-					dateRanges: [
-						{
-							startDate: zonedCalendarDay(q.dateRange.start, q.timezone ?? DEFAULT_TIMEZONE),
-							endDate: zonedCalendarDay(q.dateRange.end, q.timezone ?? DEFAULT_TIMEZONE),
-						},
-					],
-					metrics: metrics.map((name) => ({ name })),
-					...(dimensionFilter ? { dimensionFilter } : {}),
-					...extra,
-				}
-			}
+			const [startDate, endDate] = calendarDays(q)
+			const client = await getClient(ctx.payload)
 
-			const client = await getClient()
-
-			interface PairedReport {
-				rows: GoalKeyedRow[]
-				totals: Partial<Record<MetricKey, number>> | undefined
-			}
-
-			const rowKeys = (row: protos.google.analytics.data.v1beta.IRow): string[] =>
-				(row.dimensionValues ?? []).map((value) => value.value ?? '')
+			// Each report is one upstream request with its own token, so a paired read spends two. It
+			// runs with no retry of the SDK's own (the lane retries) and a deadline of what the read has left.
+			const runReport = (
+				names: string[],
+				exprs: FilterExpression[],
+				shape: ReportShape
+			): Promise<Ga4ReportResponse> =>
+				upstream(ctx, async (signal) => {
+					const dimensionFilter = allOf(exprs)
+					const request = {
+						property: `properties/${config.propertyId}`,
+						dateRanges: [{ startDate, endDate }],
+						metrics: names.map((name) => ({ name })),
+						...(dimensionFilter ? { dimensionFilter } : {}),
+						...shape,
+					}
+					const timeout = Math.max(1, Math.floor(ctx.remainingMs?.() ?? DEFAULT_REPORT_TIMEOUT_MS))
+					const call = client.runReport(request, { timeout, retry: null })
+					cancelWhenAborted(call, signal)
+					const [response] = await call
+					if ((response.metadata?.samplingMetadatas?.length ?? 0) > 0) {
+						sampled = true
+					}
+					const code = response.metadata?.currencyCode?.toUpperCase()
+					if (code && CURRENCY_PATTERN.test(code)) {
+						reportedCurrency = code
+					}
+					return response
+				})
 
 			/**
-			 * One report shape run twice, plainly and goal-filtered, unioned per row. A row the
-			 * goal report has no counterpart for carries no conversions: no key event fired there.
-			 * `limit` is the site report's alone, since a goal ranked outside its top N would
-			 * otherwise be lost from the union.
+			 * One report shape run plainly and goal-filtered, unioned per row. `limit` is the site report's
+			 * alone, since a goal ranked outside its top N would otherwise drop out of the union.
 			 */
 			const runPair = async (
-				extra: protos.google.analytics.data.v1beta.IRunReportRequest,
+				shape: ReportShape,
 				limit?: number
-			): Promise<PairedReport> => {
-				const runReport = async (
-					metrics: string[],
-					exprs: protos.google.analytics.data.v1beta.IFilterExpression[],
-					reportExtra: protos.google.analytics.data.v1beta.IRunReportRequest
-				) => {
-					const [response] = await client.runReport(request(metrics, exprs, reportExtra))
-					return response
-				}
-				// A goal breakdown restricts its own rows, so its one report carries the hint too.
-				const siteExprs = goalBreakdown ? goalExprs : filterExprs
-				const siteExtra = limit ? { ...extra, limit } : extra
+			): Promise<{ rows: GoalKeyedRow[]; totals: MetricValues | undefined }> => {
+				const siteShape = limit ? { ...shape, limit } : shape
 				const pair = await readGoalPair({
-					site: siteKeys.length ? () => runReport(siteKeys, siteExprs, siteExtra) : undefined,
-					goals: goalKeys.length ? () => runReport(goalKeys, goalExprs, extra) : undefined,
+					site: siteNames.length ? () => runReport(siteNames, siteExprs, siteShape) : undefined,
+					goals: goalNames.length ? () => runReport(goalNames, goalExprs, shape) : undefined,
 				})
 				if (pair.failed) {
 					goalsFailed = true
 				}
-				const keyed = (
-					response: protos.google.analytics.data.v1beta.IRunReportResponse | undefined,
-					ms: MetricKey[],
-					keys: string[]
-				): GoalKeyedRow[] | undefined =>
-					response?.rows?.map((row) => ({
-						keys: rowKeys(row),
-						metrics: readMetrics(ms, keys, row),
-					})) ?? (response ? [] : undefined)
-				const siteTotals = pair.site?.totals?.[0]
-				const goalTotals = pair.goals?.totals?.[0]
 				return {
 					rows: mergeGoalRows(
-						keyed(pair.site, siteMetrics, siteKeys),
-						keyed(pair.goals, goalMetrics, goalKeys)
+						keyedRows(pair.site, siteMetrics, siteNames),
+						keyedRows(pair.goals, goalMetrics, goalNames)
 					),
 					totals: mergeGoalTotals(
-						siteTotals ? readMetrics(siteMetrics, siteKeys, siteTotals) : undefined,
-						goalTotals ? readMetrics(goalMetrics, goalKeys, goalTotals) : undefined
+						totalsOf(pair.site, siteMetrics, siteNames),
+						totalsOf(pair.goals, goalMetrics, goalNames)
 					),
 				}
 			}
@@ -406,20 +537,14 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 			if (q.granularity === 'day' && !dims.length) {
 				const report = await runPair({
 					dimensions: [{ name: 'date' }],
-					metricAggregations: [
-						'TOTAL',
-					] as unknown as protos.google.analytics.data.v1beta.MetricAggregation[],
+					metricAggregations: ['TOTAL'],
 					orderBys: [{ dimension: { dimensionName: 'date' } }],
 				})
-				const rows: AnalyticsRow[] = []
-				for (const row of report.rows) {
-					const ymd = row.keys[0] ?? ''
-					const ts = dayIso(`${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`)
-					if (ts) {
-						rows.push({ timestamp: ts, metrics: row.metrics })
-					}
+				return {
+					rows: datedRows(report.rows, ga4DayIso),
+					totals: report.totals ?? {},
+					meta: meta(),
 				}
-				return { rows, totals: report.totals ?? {}, meta: meta() }
 			}
 
 			const report = await runPair(
@@ -433,15 +558,20 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 			}
 
 			const rows: AnalyticsRow[] = report.rows.map((row) => {
-				const dimValues: Partial<Record<DimensionKey, string>> = {}
+				const dimensions: Partial<Record<DimensionKey, string>> = {}
 				for (const d of dims) {
-					const idx = providerDims.indexOf(DIMENSION_MAP[d] as string)
-					const value = row.keys[idx] ?? ''
+					const name = DIMENSION_MAP[d]
+					const value =
+						(name === undefined ? undefined : row.keys[providerDims.indexOf(name)]) ?? ''
 					// A `goal` row reports the slug it was asked for; an `event` row reports GA4's own
 					// event name, even though both read the same dimension.
-					dimValues[d] = d === 'goal' ? (goalSlugs?.get(value) ?? value) : value
+					dimensions[d] = d === 'goal' ? (goalSlugs?.get(value) ?? value) : value
 				}
-				return { dimensions: dimValues, metrics: row.metrics }
+				return {
+					dimensions,
+					metrics: row.metrics,
+					...(row.samples ? { samples: row.samples } : {}),
+				}
 			})
 			return { rows, totals: undefined, meta: meta() }
 		},

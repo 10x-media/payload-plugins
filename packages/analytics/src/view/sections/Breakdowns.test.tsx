@@ -2,54 +2,41 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SerializedCapabilities } from '../../core/capabilities'
-import type { AnalyticsRow, DimensionKey } from '../../core/contract'
+import type { AnalyticsFilter, AnalyticsRow, DimensionKey, MetricKey } from '../../core/contract'
 import type { QueryResponse } from '../../query/response'
+import { declarationsOf } from '../../testing/stylesheet'
 import { keys } from '../../translations/keys'
 import { METRIC_KEYS } from '../../translations/metricKeys'
+import type { CountryFlagProps, CountryFlags } from '../CountryFlag'
 import type { BreakdownTab } from '../gating'
 import { DIMENSION_LABELS, TAB_LABELS } from '../labels'
+import type { ViewLimit } from '../state'
 import type { QueryState } from '../useViewQueries'
 import { Breakdowns } from './Breakdowns'
 
-vi.mock('@payloadcms/ui', () => ({
+vi.mock('@payloadcms/ui', async () => ({
+	...(await import('../../testing/selectMocks')).selectMocks,
 	Banner: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
+	ShimmerEffect: ({ className }: { className?: string }) => (
+		<div aria-hidden="true" className={className} />
+	),
 	Button: ({ children, onClick }: { children?: ReactNode; onClick?: () => void }) => (
 		// biome-ignore lint/a11y/useButtonType: test double
 		<button onClick={onClick}>{children}</button>
 	),
-	SelectInput: ({
-		label,
-		options,
-		value,
-		onChange,
-	}: {
-		label?: string
-		options?: { value: string; label: string }[]
-		value?: string
-		onChange?: (option: { value: string; label: string }) => void
-	}) => (
-		<select
-			aria-label={String(label)}
-			onChange={(event) => onChange?.({ value: event.target.value, label: event.target.value })}
-			value={value}
-		>
-			{(options ?? []).map((option) => (
-				<option key={option.value} value={option.value}>
-					{option.label}
-				</option>
-			))}
-		</select>
-	),
+	Pill: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
+	XIcon: () => <span aria-hidden="true" />,
+	useConfig: () => ({
+		config: { routes: { admin: '/admin', api: '/api' }, serverURL: 'https://cms.test' },
+	}),
 	useTranslation: () => ({ i18n: { language: 'en' }, t: (key: string) => key }),
 }))
 
 const capabilities = {
 	metrics: ['pageviews', 'visitors'],
 	dimensions: ['page'],
-	filters: ['page'],
-	filterOperators: ['eq'],
+	filters: { page: ['eq'] },
 	realtime: false,
-	perPageQuery: false,
 	comparison: false,
 	minGranularity: 'day',
 	maxLookbackDays: null,
@@ -78,43 +65,66 @@ const state = (over: Partial<QueryState<QueryResponse>> = {}): QueryState<QueryR
 	...over,
 })
 
+/** A read that answered `rows`, as `provider` serves them. */
+const answering = (rows: AnalyticsRow[], provider = 'native'): QueryState<QueryResponse> =>
+	state({
+		data: {
+			...answer(),
+			result: { rows, meta: { provider, fetchedAt: '2026-09-14T00:00:00.000Z' } },
+		},
+	})
+
 const ALL_TABS: BreakdownTab[] = ['pages', 'sources', 'technology', 'geography', 'events', 'goals']
 
-const renderBreakdowns = (
-	over: {
-		tabs?: BreakdownTab[]
-		tab?: BreakdownTab
-		dimension?: DimensionKey
-		dimensions?: DimensionKey[]
-		canFilter?: boolean
-		query?: QueryState<QueryResponse>
-		order?: { metric: 'pageviews' | 'visitors'; direction: 'asc' | 'desc' }
-		onTabChange?: (tab: BreakdownTab) => void
-		onDimensionChange?: (dimension: DimensionKey) => void
-		onLimitChange?: (limit: number) => void
-		onSortChange?: (order: { metric: string; direction: 'asc' | 'desc' }) => void
-		onRowSelect?: (value: string) => void
-	} = {}
-) =>
-	render(
-		<Breakdowns
-			canFilter={over.canFilter ?? true}
-			dimension={over.dimension ?? 'page'}
-			dimensions={over.dimensions ?? ['page']}
-			limit={10}
-			locale="en"
-			metric="pageviews"
-			onDimensionChange={over.onDimensionChange ?? (() => {})}
-			onLimitChange={over.onLimitChange ?? (() => {})}
-			onRowSelect={over.onRowSelect ?? (() => {})}
-			onSortChange={over.onSortChange ?? (() => {})}
-			onTabChange={over.onTabChange ?? (() => {})}
-			{...(over.order ? { order: over.order } : {})}
-			query={over.query ?? state()}
-			tab={over.tab ?? 'pages'}
-			tabs={over.tabs ?? ALL_TABS}
-		/>
-	)
+interface BreakdownsOverrides {
+	tabs?: BreakdownTab[]
+	tab?: BreakdownTab
+	dimension?: DimensionKey
+	dimensions?: DimensionKey[]
+	columns?: MetricKey[]
+	countryFlags?: CountryFlags
+	canFilter?: boolean
+	query?: QueryState<QueryResponse>
+	limit?: ViewLimit
+	currency?: string
+	siteVisitors?: number
+	filters?: AnalyticsFilter[]
+	order?: { metric: 'pageviews' | 'visitors'; direction: 'asc' | 'desc' }
+	onTabChange?: (tab: BreakdownTab) => void
+	onDimensionChange?: (dimension: DimensionKey) => void
+	onLimitChange?: (limit: number) => void
+	onSortChange?: (order: { metric: string; direction: 'asc' | 'desc' }) => void
+	onRowSelect?: (value: string) => void
+	onFilterRemove?: (index: number) => void
+}
+
+const breakdowns = (over: BreakdownsOverrides = {}) => (
+	<Breakdowns
+		canFilter={over.canFilter ?? true}
+		dimension={over.dimension ?? 'page'}
+		dimensions={over.dimensions ?? ['page']}
+		limit={over.limit ?? 10}
+		locale="en"
+		columns={over.columns ?? ['pageviews', 'visitors']}
+		countryFlags={over.countryFlags ?? true}
+		currency={over.currency}
+		siteVisitors={over.siteVisitors}
+		filters={over.filters}
+		goals={[]}
+		onDimensionChange={over.onDimensionChange ?? (() => {})}
+		onFilterRemove={over.onFilterRemove}
+		onLimitChange={over.onLimitChange ?? (() => {})}
+		onRowSelect={over.onRowSelect ?? (() => {})}
+		onSortChange={over.onSortChange ?? (() => {})}
+		onTabChange={over.onTabChange ?? (() => {})}
+		order={over.order}
+		query={over.query ?? state()}
+		tab={over.tab ?? 'pages'}
+		tabs={over.tabs ?? ALL_TABS}
+	/>
+)
+
+const renderBreakdowns = (over: BreakdownsOverrides = {}) => render(breakdowns(over))
 
 const tabButtons = (): HTMLElement[] => screen.getAllByRole('tab')
 
@@ -144,24 +154,7 @@ describe('Breakdowns tabs', () => {
 		const { rerender } = renderBreakdowns({ onTabChange, tabs: ['pages', 'sources'] })
 		fireEvent.keyDown(tabButtons()[0] as HTMLElement, { key: 'ArrowRight' })
 		expect(onTabChange).toHaveBeenCalledWith('sources')
-		rerender(
-			<Breakdowns
-				canFilter={true}
-				dimension="page"
-				dimensions={['page']}
-				limit={10}
-				locale="en"
-				metric="pageviews"
-				onDimensionChange={() => {}}
-				onLimitChange={() => {}}
-				onRowSelect={() => {}}
-				onSortChange={() => {}}
-				onTabChange={onTabChange}
-				query={state()}
-				tab="sources"
-				tabs={['pages', 'sources']}
-			/>
-		)
+		rerender(breakdowns({ onTabChange, tab: 'sources', tabs: ['pages', 'sources'] }))
 		expect(tabButtons()[1]?.getAttribute('aria-selected')).toBe('true')
 		expect(tabButtons()[0]?.getAttribute('aria-selected')).toBe('false')
 	})
@@ -207,22 +200,53 @@ describe('Breakdowns group-by picker', () => {
 			dimension: 'browser',
 			dimensions: TECHNOLOGY,
 			onRowSelect,
-			query: state({
-				data: {
-					...answer(),
-					result: {
-						rows: browsers,
-						meta: { provider: 'native', fetchedAt: '2026-09-14T00:00:00.000Z' },
-					},
-				},
-			}),
+			query: answering(browsers),
 			tab: 'technology',
 		})
-		expect(document.querySelector('.analytics-view__bars-head-dimension')?.textContent).toBe(
-			DIMENSION_LABELS.browser
-		)
-		fireEvent.click(screen.getByRole('button', { name: /chrome/ }))
+		expect(screen.getAllByRole('columnheader')[0]?.textContent).toBe(DIMENSION_LABELS.browser)
+		// The row reads as the browser's name and still filters on the value as stored.
+		fireEvent.click(screen.getByRole('button', { name: new RegExp(keys.valueBrowserChrome) }))
 		expect(onRowSelect).toHaveBeenCalledWith('chrome')
+	})
+
+	it('names a country row and draws its flag, or drops the flag on request', () => {
+		const countries: AnalyticsRow[] = [{ dimensions: { country: 'DE' }, metrics: { pageviews: 9 } }]
+		const query = answering(countries)
+		renderBreakdowns({ dimension: 'country', dimensions: ['country'], query, tab: 'geography' })
+		expect(screen.getByText(/Germany/)).toBeDefined()
+		expect(document.querySelector('img')?.getAttribute('src')).toBe('/api/_x/flags/de.svg')
+
+		cleanup()
+		renderBreakdowns({
+			countryFlags: false,
+			dimension: 'country',
+			dimensions: ['country'],
+			query,
+			tab: 'geography',
+		})
+		expect(screen.getByText(/Germany/)).toBeDefined()
+		expect(document.querySelector('img')).toBeNull()
+	})
+
+	it("draws the host's flag on each country row, handing it the row's code", () => {
+		const HostFlag = ({ code }: CountryFlagProps) => <i className="host-flag" data-code={code} />
+		const countries: AnalyticsRow[] = [
+			{ dimensions: { country: 'DE' }, metrics: { pageviews: 9 } },
+			{ dimensions: { country: 'fr' }, metrics: { pageviews: 4 } },
+		]
+		const query = answering(countries)
+		renderBreakdowns({
+			countryFlags: { Component: HostFlag },
+			dimension: 'country',
+			dimensions: ['country'],
+			query,
+			tab: 'geography',
+		})
+		const drawn = [...document.querySelectorAll('.host-flag')].map((flag) =>
+			flag.getAttribute('data-code')
+		)
+		expect(drawn).toEqual(['DE', 'FR'])
+		expect(document.querySelector('img')).toBeNull()
 	})
 
 	it('waits rather than ranking the previous grouping under the new label', () => {
@@ -241,6 +265,24 @@ describe('Breakdowns group-by picker', () => {
 })
 
 describe('Breakdowns rows', () => {
+	// A page that only ever saw an event has no average time on it, which is no data, and its
+	// column says so with a dash rather than a zero-second visit.
+	it('writes a dash in an average column for a row with no samples', () => {
+		const averages: AnalyticsRow[] = [
+			{ dimensions: { page: '/pricing' }, metrics: { avgDuration: 4000, visitors: 9 } },
+			{ dimensions: { page: '/thanks' }, metrics: { avgDuration: null, visitors: 3 } },
+		]
+		const { container } = renderBreakdowns({
+			columns: ['avgDuration', 'visitors'],
+			query: answering(averages),
+		})
+		const values = [...container.querySelectorAll('.analytics-bars__value')]
+		// A dash on screen, "no value" to a screen reader rather than "minus".
+		expect(values[1]?.querySelector('[aria-hidden="true"]')?.textContent).toBe('-')
+		expect(values[1]?.querySelector('.analytics-sr-only')?.textContent).toBe(keys.stateNoValue)
+		expect(values.map((cell) => cell.textContent)).not.toContain('0s')
+	})
+
 	it('renders a filterable row as a button that reports its value', () => {
 		const onRowSelect = vi.fn()
 		renderBreakdowns({ onRowSelect })
@@ -270,15 +312,7 @@ describe('Breakdowns rows', () => {
 			dimension: 'channel',
 			dimensions: ['channel', 'referrer'],
 			onRowSelect,
-			query: state({
-				data: {
-					...answer(),
-					result: {
-						rows: channels,
-						meta: { provider: 'native', fetchedAt: '2026-09-14T00:00:00.000Z' },
-					},
-				},
-			}),
+			query: answering(channels),
 			tab: 'sources',
 		})
 		expect(screen.getByText(keys.channelOrganicSearch)).toBeDefined()
@@ -294,15 +328,7 @@ describe('Breakdowns rows', () => {
 		renderBreakdowns({
 			dimension: 'channel',
 			dimensions: ['channel', 'referrer'],
-			query: state({
-				data: {
-					...answer(),
-					result: {
-						rows: channels,
-						meta: { provider: 'ga4', fetchedAt: '2026-09-14T00:00:00.000Z' },
-					},
-				},
-			}),
+			query: answering(channels, 'ga4'),
 			tab: 'sources',
 		})
 		expect(screen.getByText('Paid Search')).toBeDefined()
@@ -319,20 +345,11 @@ describe('Breakdowns rows', () => {
 			dimension: 'channel',
 			dimensions: ['channel', 'referrer'],
 			onRowSelect,
-			query: state({
-				data: {
-					...answer(),
-					result: {
-						rows: channels,
-						meta: { provider: 'posthog', fetchedAt: '2026-09-14T00:00:00.000Z' },
-					},
-				},
-			}),
+			query: answering(channels, 'posthog'),
 			tab: 'sources',
 		})
 		expect(screen.getByText(keys.valueNotSet)).toBeDefined()
 		expect(screen.queryByRole('button', { name: new RegExp(keys.valueNotSet) })).toBeNull()
-		// The rows beside it keep the click the source can serve.
 		fireEvent.click(screen.getByRole('button', { name: /Paid Search/ }))
 		expect(onRowSelect).toHaveBeenCalledWith('Paid Search')
 	})
@@ -342,27 +359,34 @@ describe('Breakdowns rows', () => {
 		const { rerender } = renderBreakdowns({ onSortChange })
 		fireEvent.click(screen.getByRole('button', { name: new RegExp(METRIC_KEYS.visitors) }))
 		expect(onSortChange).toHaveBeenCalledWith({ metric: 'visitors', direction: 'desc' })
-		rerender(
-			<Breakdowns
-				canFilter={true}
-				dimension="page"
-				dimensions={['page']}
-				limit={10}
-				locale="en"
-				metric="pageviews"
-				onDimensionChange={() => {}}
-				onLimitChange={() => {}}
-				onRowSelect={() => {}}
-				onSortChange={onSortChange}
-				onTabChange={() => {}}
-				order={{ metric: 'visitors', direction: 'desc' }}
-				query={state()}
-				tab="pages"
-				tabs={ALL_TABS}
-			/>
-		)
+		rerender(breakdowns({ onSortChange, order: { metric: 'visitors', direction: 'desc' } }))
 		fireEvent.click(screen.getByRole('button', { name: new RegExp(METRIC_KEYS.visitors) }))
 		expect(onSortChange).toHaveBeenLastCalledWith({ metric: 'visitors', direction: 'asc' })
+	})
+
+	// A currency row counts its amounts as they were sent, so the reporting code would mislabel them.
+	it('writes each currency row in its own code, and any other row in the reporting one', () => {
+		const sent: AnalyticsRow[] = [
+			{ dimensions: { currency: 'USD' }, metrics: { revenue: 90, conversions: 2 } },
+			{ dimensions: { currency: 'JPY' }, metrics: { revenue: 1200, conversions: 1 } },
+		]
+		renderBreakdowns({
+			tab: 'goals',
+			dimension: 'currency',
+			dimensions: ['goal', 'currency'],
+			columns: ['revenue', 'conversions'],
+			currency: 'EUR',
+			query: answering(sent),
+		})
+		expect(screen.getByText('$90.00')).toBeDefined()
+		expect(screen.getByText('¥1,200')).toBeDefined()
+		cleanup()
+		renderBreakdowns({
+			columns: ['revenue'],
+			currency: 'EUR',
+			query: answering([{ dimensions: { page: '/checkout' }, metrics: { revenue: 20 } }]),
+		})
+		expect(screen.getByText('€20.00')).toBeDefined()
 	})
 
 	it('changes the row limit', () => {
@@ -380,33 +404,77 @@ describe('Breakdowns rows', () => {
 			{ dimensions: { page: '/about' }, metrics: { visitors: 40 } },
 		]
 		renderBreakdowns({
-			query: state({
-				data: {
-					...answer(),
-					result: {
-						rows: umamiRows,
-						meta: { provider: 'umami', fetchedAt: '2026-09-14T00:00:00.000Z' },
-					},
-				},
-			}),
+			query: answering(umamiRows, 'umami'),
 		})
-		expect(document.querySelector('.analytics-view__sort--metric')?.textContent).toBe(
-			METRIC_KEYS.visitors
-		)
-		expect(document.querySelector('.analytics-view__sort--secondary')).toBeNull()
+		expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+			DIMENSION_LABELS.page,
+			METRIC_KEYS.visitors,
+		])
 		expect(screen.getByText('90')).toBeDefined()
 		expect(screen.queryByText('0')).toBeNull()
 	})
 
 	it('shows the empty copy when the read came back with no rows', () => {
-		const empty = state({
-			data: {
-				...answer(),
-				result: { rows: [], meta: { provider: 'native', fetchedAt: '2026-09-14T00:00:00.000Z' } },
-			},
-		})
-		renderBreakdowns({ query: empty })
+		renderBreakdowns({ query: answering([]) })
 		expect(screen.getByText(keys.stateNoBreakdown)).toBeDefined()
+	})
+})
+
+describe('Breakdowns accessibility', () => {
+	it('is a table: the dimension and metrics as column headers, each label its row header', () => {
+		renderBreakdowns()
+		const table = screen.getByRole('table', { name: DIMENSION_LABELS.page })
+		expect(screen.getByRole('tabpanel').contains(table)).toBe(true)
+		expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual([
+			DIMENSION_LABELS.page,
+			METRIC_KEYS.pageviews,
+			METRIC_KEYS.visitors,
+		])
+		const rows = screen.getAllByRole('rowheader')
+		expect(rows.map((header) => header.textContent)).toEqual(['/pricing', '/about'])
+		// The filter is the row header's own button, named by the row it filters on.
+		expect(rows[0]?.querySelector('button')?.textContent).toBe('/pricing')
+	})
+
+	it('says which column orders the rows, the first by default', () => {
+		const { rerender } = renderBreakdowns()
+		const sortState = () =>
+			screen.getAllByRole('columnheader').map((header) => header.getAttribute('aria-sort'))
+		expect(sortState()).toEqual([null, 'descending', null])
+		rerender(breakdowns({ order: { metric: 'visitors', direction: 'asc' } }))
+		expect(sortState()).toEqual([null, null, 'ascending'])
+	})
+
+	it('flips the default order from the column it already sorts by', () => {
+		const onSortChange = vi.fn()
+		renderBreakdowns({ onSortChange })
+		fireEvent.click(screen.getByRole('button', { name: METRIC_KEYS.pageviews }))
+		expect(onSortChange).toHaveBeenCalledWith({ metric: 'pageviews', direction: 'asc' })
+	})
+
+	it('leaves the rate column a plain header: there is nothing to sort it by', () => {
+		const events: AnalyticsRow[] = [
+			{ dimensions: { event: 'signup' }, metrics: { events: 9, visitors: 3 } },
+		]
+		renderBreakdowns({
+			columns: ['events', 'visitors'],
+			dimension: 'event',
+			dimensions: ['event'],
+			query: answering(events),
+			siteVisitors: 30,
+			tab: 'events',
+		})
+		const rate = screen.getByRole('columnheader', { name: keys.viewConversionRate })
+		expect(rate.querySelector('button')).toBeNull()
+	})
+
+	it('steps the tabs with the arrow pointing along a right-to-left page', () => {
+		const onTabChange = vi.fn()
+		render(<div dir="rtl">{breakdowns({ onTabChange })}</div>)
+		fireEvent.keyDown(tabButtons()[0] as HTMLElement, { key: 'ArrowLeft' })
+		expect(onTabChange).toHaveBeenLastCalledWith('sources')
+		fireEvent.keyDown(tabButtons()[0] as HTMLElement, { key: 'ArrowRight' })
+		expect(onTabChange).toHaveBeenLastCalledWith('goals')
 	})
 })
 
@@ -448,5 +516,115 @@ describe('Breakdowns goal empty states', () => {
 	it('never reads a non-goal breakdown as a scope with no goals', () => {
 		renderBreakdowns({ query: emptyGoalRead([]) })
 		expect(screen.getByText(keys.stateNoBreakdown)).toBeDefined()
+	})
+})
+
+describe('Breakdowns header filter', () => {
+	const filtered = (onFilterRemove = vi.fn()) =>
+		renderBreakdowns({
+			filters: [
+				{ dimension: 'country', operator: 'eq', value: 'DE' },
+				{ dimension: 'page', operator: 'eq', value: '/pricing' },
+			],
+			onFilterRemove,
+		})
+
+	// Where the row was clicked, so a click that collapses the table to one row is explained there.
+	it('shows the filter a row click set on this dimension, and only that one', () => {
+		const { container } = filtered()
+		const head = container.querySelector('.analytics-view__breakdown-head')
+		expect(head?.textContent).toContain('/pricing')
+		expect(head?.textContent).not.toContain('DE')
+	})
+
+	it('clears it from its own button, naming the filter it removes', () => {
+		const onFilterRemove = vi.fn()
+		filtered(onFilterRemove)
+		fireEvent.click(screen.getByRole('button', { name: new RegExp(`^${keys.viewFilterRemove}`) }))
+		expect(onFilterRemove).toHaveBeenCalledWith(1)
+	})
+
+	it('shows nothing in the header without a filter on this dimension', () => {
+		const { container } = renderBreakdowns()
+		expect(
+			container.querySelector('.analytics-view__breakdown-head .analytics-view__chips')
+		).toBeNull()
+	})
+})
+
+describe('Breakdowns sorted column', () => {
+	const shares = (container: HTMLElement): string[] =>
+		[...container.querySelectorAll<HTMLElement>('tbody tr')].map((row) =>
+			row.style.getPropertyValue('--analytics-bar')
+		)
+	const emphasis = (container: HTMLElement): string[] =>
+		[...container.querySelectorAll('tbody tr:first-child td')].map((cell) => cell.className)
+
+	it('bars and bolds the first column while the rows are ranked by it', () => {
+		const { container } = renderBreakdowns()
+		expect(shares(container)).toEqual(['100%', '50%'])
+		expect(emphasis(container)).toEqual(['analytics-bars__value', 'analytics-bars__secondary'])
+	})
+
+	it('moves the bars and the bold figures to the column the rows are sorted by', () => {
+		const sortedRows: AnalyticsRow[] = [
+			{ dimensions: { page: '/pricing' }, metrics: { pageviews: 120, visitors: 20 } },
+			{ dimensions: { page: '/about' }, metrics: { pageviews: 60, visitors: 80 } },
+		]
+		const { container } = renderBreakdowns({
+			order: { metric: 'visitors', direction: 'desc' },
+			query: answering(sortedRows),
+		})
+		expect(shares(container)).toEqual(['25%', '100%'])
+		expect(emphasis(container)).toEqual(['analytics-bars__primary', 'analytics-bars__value'])
+	})
+})
+
+describe('Breakdowns names and ids', () => {
+	it('says what a row click does, for the dimension on screen', () => {
+		renderBreakdowns()
+		const [row] = screen.getAllByRole('button', { name: /\/pricing|\/about/ })
+		const hint = document.getElementById(row?.getAttribute('aria-describedby') ?? '')
+		expect(hint?.textContent).toBe(keys.viewFilterBy)
+	})
+
+	it('heads its region and keeps its ids its own when two are on a page', () => {
+		renderBreakdowns()
+		renderBreakdowns()
+		expect(screen.getAllByRole('region', { name: keys.viewBreakdowns })).toHaveLength(2)
+		const ids = [...document.querySelectorAll('[id]')].map((element) => element.id)
+		expect(new Set(ids).size).toBe(ids.length)
+		for (const tab of screen.getAllByRole('tab')) {
+			expect(document.getElementById(tab.getAttribute('aria-controls') ?? '')).not.toBeNull()
+		}
+	})
+})
+
+describe('Breakdowns before the first answer', () => {
+	const rem = (value: string | undefined): number => Number.parseFloat(value ?? '')
+	const placeholderRows = (limit: ViewLimit): number =>
+		renderBreakdowns({
+			limit,
+			query: state({ status: 'loading', data: undefined }),
+		}).container.querySelectorAll(
+			'.analytics-view__skeleton-table--bars > .analytics-view__skeleton'
+		).length
+
+	// The answer fills the rows the read asked for, so the placeholder stands that many.
+	it('holds a row for every row the read asks for', () => {
+		expect(placeholderRows(10)).toBe(10)
+		cleanup()
+		expect(placeholderRows(25)).toBe(25)
+	})
+
+	it('spaces its rows at the pitch of a ranked table, under a head as tall as its own', () => {
+		const skeleton = declarationsOf('.analytics-view__skeleton-table')
+		expect(skeleton['--analytics-skeleton-row']).toBe(
+			declarationsOf('.analytics-bars__track').height
+		)
+		const cell = declarationsOf('.analytics-table.analytics-bars tbody :is(th, td)')
+		expect(rem(skeleton['--analytics-skeleton-gap'])).toBeCloseTo(2 * rem(cell['padding-block']))
+		const head = declarationsOf('.analytics-table.analytics-bars thead th')['padding-block']
+		expect(skeleton['--analytics-skeleton-head']).toBe(`calc(1lh + ${head?.split(' ')[1]})`)
 	})
 })

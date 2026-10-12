@@ -1,6 +1,7 @@
 import type { DimensionKey, MetricKey } from '../core/contract'
+import type { BuiltInWidgetSlug } from '../core/widgetSlugs'
 import type { TimeframePreset } from '../timeframe/presets'
-import { keys, type TranslationKey } from '../translations/keys'
+import { keys, type SingularKey } from '../translations/keys'
 import type { WidgetFilter, WidgetRange } from './types'
 
 export interface BreakdownWidgetData {
@@ -14,10 +15,15 @@ export interface BreakdownWidgetData {
 }
 
 export interface BreakdownSpec {
-	slug: string
+	slug: BuiltInWidgetSlug
 	dimension: DimensionKey
-	label: TranslationKey
+	label: SingularKey
 	preferredDefault?: MetricKey
+	/**
+	 * Metrics the picker offers where the generic list holds one this dimension cannot answer:
+	 * an event or goal row has no pageviews of its own, so that column would be a structural zero.
+	 */
+	metrics?: MetricKey[]
 }
 
 export const BREAKDOWN_SPECS: BreakdownSpec[] = [
@@ -40,8 +46,9 @@ export const BREAKDOWN_SPECS: BreakdownSpec[] = [
 		slug: 'analytics-breakdown-goals',
 		dimension: 'goal',
 		label: keys.widgetBreakdownGoals,
-		// A goals breakdown is a conversion table: pageviews per goal is a stranger default.
+		// A goals breakdown is a conversion table, and a goal has no pageviews of its own.
 		preferredDefault: 'conversions',
+		metrics: ['conversions', 'revenue', 'visitors'],
 	},
 	{
 		slug: 'analytics-breakdown-referrers',
@@ -64,6 +71,7 @@ export const BREAKDOWN_SPECS: BreakdownSpec[] = [
 		dimension: 'event',
 		label: keys.widgetBreakdownEvents,
 		preferredDefault: 'events',
+		metrics: ['events', 'visitors', 'conversions'],
 	},
 ]
 

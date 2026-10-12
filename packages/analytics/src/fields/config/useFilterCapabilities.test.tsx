@@ -33,10 +33,8 @@ vi.mock('@payloadcms/ui', () => ({
 const caps = (over: Partial<SerializedCapabilities> = {}): SerializedCapabilities => ({
 	metrics: ['pageviews'],
 	dimensions: ['page'],
-	filters: ['page'],
-	filterOperators: ['eq'],
+	filters: { page: ['eq'] },
 	realtime: false,
-	perPageQuery: false,
 	comparison: true,
 	minGranularity: 'day',
 	maxLookbackDays: null,
@@ -60,8 +58,8 @@ const answer = (body: SourcesResponse) =>
 const twoSources: SourcesResponse = {
 	defaultId: 'alpha',
 	sources: [
-		source('alpha', { filters: ['page', 'country'], filterOperators: ['eq'] }),
-		source('beta', { filters: ['referrer'], filterOperators: ['eq', 'contains', 'matches'] }),
+		source('alpha', { filters: { page: ['eq'], country: ['eq'] } }),
+		source('beta', { filters: { referrer: ['eq', 'contains', 'matches'] } }),
 	],
 }
 
@@ -103,6 +101,31 @@ describe('useFilterCapabilities', () => {
 		expect(result.current.operators).toEqual(['eq', 'contains', 'matches'])
 	})
 
+	// A ref names nothing an editor would recognize; the view filters by an item from a row.
+	it('never offers the item filter, which no editor could fill in', async () => {
+		answer({
+			defaultId: 'native',
+			sources: [source('native', { filters: { page: ['eq'], item: ['eq'] } })],
+		})
+
+		const { result } = renderHook(() => useFilterCapabilities())
+
+		await waitFor(() => expect(result.current.loading).toBe(false))
+		expect(result.current.dimensions).toEqual(['page'])
+	})
+
+	it('answers per dimension, unioned over the sources while none is chosen', async () => {
+		answer(twoSources)
+
+		const { result } = renderHook(() => useFilterCapabilities())
+
+		await waitFor(() => expect(result.current.loading).toBe(false))
+		expect(result.current.operatorsFor('country')).toEqual(['eq'])
+		expect(result.current.operatorsFor('referrer')).toEqual(['eq', 'contains', 'matches'])
+		expect(result.current.operatorsFor('device')).toEqual([])
+		expect(result.current.operatorsFor('item')).toEqual([])
+	})
+
 	it('narrows to the chosen source', async () => {
 		answer(twoSources)
 		mocks.sourceId = 'beta'
@@ -117,7 +140,7 @@ describe('useFilterCapabilities', () => {
 	it('offers nothing for a source that cannot filter at all', async () => {
 		answer({
 			defaultId: 'flat',
-			sources: [source('flat', { filters: [], filterOperators: [] })],
+			sources: [source('flat', { filters: {} })],
 		})
 		mocks.sourceId = 'flat'
 
@@ -161,7 +184,7 @@ describe('useFilterCapabilities', () => {
 	it('is resolved for a source that answered with nothing to filter by', async () => {
 		answer({
 			defaultId: 'flat',
-			sources: [source('flat', { filters: [], filterOperators: [] })],
+			sources: [source('flat', { filters: {} })],
 		})
 		mocks.sourceId = 'flat'
 
@@ -194,7 +217,7 @@ describe('useFilterCapabilities', () => {
 	it('orders dimensions by the contract, not by source order', async () => {
 		answer({
 			defaultId: 'z',
-			sources: [source('z', { filters: ['country', 'page', 'browser'] })],
+			sources: [source('z', { filters: { country: ['eq'], page: ['eq'], browser: ['eq'] } })],
 		})
 		mocks.sourceId = 'z'
 

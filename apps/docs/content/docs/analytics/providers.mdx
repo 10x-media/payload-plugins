@@ -1,0 +1,630 @@
+---
+title: Providers
+description: The built-in vendor adapters (Plausible, Umami, GA4, PostHog), provider documents editors manage per scope, and running beside an analytics setup you already have.
+---
+
+A provider is a vendor whose numbers the plugin reads, and optionally captures for: Plausible, Umami, GA4 or PostHog. Configure one in code, as an adapter in `adapters`, or from the admin, as a [provider document](#provider-documents). Either way it implements the same [adapter contract](/analytics/reference/adapter-contract) as the native engine, so every widget, field and view works the same over it.
+
+```ts title="payload.config.ts"
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import { plausible } from '@10x-media/analytics/adapters/plausible'
+
+export const plugin = analytics({
+  adapters: [native(), plausible({ siteId: 'example.com', apiKey: process.env.PLAUSIBLE_API_KEY ?? '' })],
+  // With two config adapters no capture slot fills by itself: name the one that captures.
+  // 'all' waits for your consent manager's setGate (see Consent).
+  capture: { gate: 'all', slots: { global: 'native' } },
+  defaultAdapter: 'plausible', // used when a field or widget does not name one
+})
+```
+
+Which adapter captures is separate from which one reads: the [global capture slot](/analytics/capture#capture-slots) fills from `capture.slots.global`, else `platformAdapter`, else the only config adapter there is. Here Plausible is read for every widget and field that names no source, and native captures.
+
+Adapters ship as code-split subpaths, so a site bundles only what it imports. Each has a stable `id` (`native`, `plausible`, `umami`, `ga4`, `posthog`) that fields and widgets name as their data source.
+
+## What each provider serves
+
+### Time on page and time per visit
+
+`avgDuration` is time on page and `visitDuration` time per visit on every source ([what the numbers mean](/analytics/concepts#what-the-numbers-mean)), so a provider whose API reports only one of them declares only that one:
+
+| Adapter | Time on page (`avgDuration`) | Time per visit (`visitDuration`) |
+|---|---|---|
+| native | every pageview's visible time over the pageviews | every visit's visible time over the visits |
+| GA4 | `userEngagementDuration` over `screenPageViews`, under every breakdown but `event` and `goal` | `averageSessionDuration` |
+| Plausible | not offered: its `time_on_page` is time per visit to a page, not per pageview | `visit_duration`, under every breakdown but `goal` |
+| Umami | not offered: nothing it reports is per pageview | total visit time over visits, whole site only |
+| PostHog | not offered | not offered |
+
+### `source` and `channel`
+
+The two mean the same thing on every adapter. **`source`** is the visit's named origin: the `utm_source` tag when there is one, otherwise the referrer. **`channel`** is the classification of that origin into an acquisition channel, in each source's own vocabulary.
+
+| Adapter | `source` | `channel` | Filterable |
+|---|---|---|---|
+| native | `utm_source` lowercased, else the referrer host, else `direct` | the engine's own [twelve tokens](/analytics/native#traffic-channels), classified at ingest | both |
+| Plausible | `visit:source`, which Plausible fills from a `utm_source` / `source` / `ref` tag or the `Referer` header | `visit:channel`, Plausible's acquisition channel | both |
+| GA4 | `sessionSource` | `sessionDefaultChannelGroup` (`Direct`, `Organic Search`, `Paid Social`, ...) | both |
+| PostHog | not served | `session.$channel_type`, the sessions table's classification of the session's entry URL, honoring a project's custom channel rules | `channel` only |
+| Umami | not served | `/metrics?type=channel` (`direct`, `organicSearch`, `paidSocial`, ...) | neither: the route takes no channel filter parameter, so `channel` groups and never filters |
+
+Each source reports its own casing: native lowercases the `utm_source` it stores in `source`, so one tag spelled two ways is one row, where a provider answers whatever it holds. Only native's channel tokens are translated in the admin. A provider's values render exactly as that provider reports them, so a channel breakdown reads `Paid Search` on GA4 and `paidSearch` on Umami.
+
+An unconfigured adapter (missing credentials) degrades to an empty state and makes no network calls.
+
+### Capture support
+
+Reading and capturing are separate concerns. An adapter that declares `capture` can also fill a [capture slot](/analytics/capture#capture-slots): the browser tracker boots its snippet, and its tracker traffic is served through the [first-party proxy](/analytics/proxy) rather than the vendor domain, wherever the adapter declares proxy routes. Read credentials are never part of it; only what the browser is allowed to see.
+
+| Adapter | Capture | Extra config it needs |
+|---|---|---|
+| native | Yes | None. The plugin's tracker posts straight to the ingest endpoint; nothing is proxied or injected. |
+| PostHog | Yes | `projectToken` (the public `phc_...` browser key, distinct from the read `apiKey`), and on PostHog Cloud `region` (`us` / `eu`, derived from `host` when omitted); a self-hosted `host` takes capture itself and ignores `region`. |
+| Plausible | Yes | `domain` for the legacy `data-domain` tag, or `scriptId` for the per-site `pa-<id>.js` model: letters, digits, `_` and `-`, up to 64 characters. `domain` wins when both are set; with neither, or with a `scriptId` of anything else and no `domain`, no snippet is emitted. |
+| Umami | Yes | None beyond `websiteId`. `host` doubles as the app origin for capture: a trailing `/api` is stripped, so one value serves the Stats API and the tracker. |
+| GA4 | Yes | `measurementId` (the public `G-XXXXXXX`). The tag loads from googletagmanager.com rather than a first-party proxy, so this is the one capture slot that is not proxied. |
+
+Capture support is declared only when the public capture config it needs is actually present, so a PostHog adapter configured for reads alone (no `projectToken`), a Plausible one with neither `domain` nor `scriptId`, or a GA4 one without a `measurementId` declares no `capture` at all: no proxy route, no snippet, and it fills no slot. Reads are unaffected either way. The exact routes and snippets each one declares are on the [proxy page](/analytics/proxy#per-vendor-routes).
+
+### Filters
+
+A widget or field requesting a filter its source does not declare in `capabilities.filters` is gated the same way an unsupported metric or dimension is; the read helpers drop into an unavailable state rather than silently ignoring the filter.
+
+| Adapter | Filterable dimensions | Operators |
+|---|---|---|
+| native | every dimension it serves: `page`, `referrer`, `source`, `channel`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event`, `goal`, and `currency` and `item` where it serves them | `eq`, `contains`; `matches` too on MongoDB and Postgres |
+| PostHog | `page`, `channel`, `event` | `eq`, `contains`, `matches` |
+| Plausible | `page`, `source`, `channel`, `referrer`, `device`, `browser`, `os`, `country`, `region`, `city`, `utmSource`, `utmMedium`, `utmCampaign` | `eq`, `contains`, `matches` |
+| GA4 | `page`, `referrer`, `source`, `channel`, `medium`, `campaign`, `utmSource`, `utmMedium`, `utmCampaign`, `device`, `browser`, `os`, `country`, `region`, `city`, `language`, `event` | `eq`, `contains`, `matches` |
+| Umami | `page`, `referrer`, `browser`, `os`, `device`, `country`, `region`, `city`, `language`, `event`, `utmSource`, `utmMedium`, `utmCampaign`, `utmContent`, `utmTerm` | `eq`, `contains`, `matches` |
+| `memoryAdapter` (testing) | `page` | `eq` |
+
+On a provider, `goal` is a breakdown narrowed by the read's own goal slugs rather than by a filter a caller writes; see [goals on a provider](/analytics/goals#how-providers-report-them).
+
+`matches` is each source's own regular expression dialect: Plausible's `matches` is an re2 **full** match, GA4's `FULL_REGEXP` likewise (so a pattern must cover the whole value, `/docs/.*` rather than `^/docs`), Umami's `re.` is a case-insensitive **partial** match, and PostHog's is re2 through `match()`. Native's is a case-insensitive regular expression of at most 256 characters, on MongoDB and Postgres, in the syntax JavaScript, Postgres and MongoDB read alike, and with no repeated group that holds a quantifier or an alternative; a pattern outside that, or one the database refuses, answers `400 invalid_param` with `param: 'filters'`. SQLite has no regular expressions to run one, so native on SQLite declares no `matches`.
+
+`contains` is case-insensitive on native, Umami (`ilike`) and GA4 (`CONTAINS` with `caseSensitive: false`); Plausible's is case-sensitive, since the adapter does not send its case-insensitive modifier. GA4's `eq` and `matches` compare literally. Native's `contains` is literal on every database: `%` and `_` in the value match themselves, and on SQLite case is folded for ASCII letters only. PostHog's `contains` escapes wildcard characters in the value itself before building its `ILIKE` pattern, so a `%` or `_` matches literally.
+
+Umami takes **one value per query parameter**, so a read can carry filters it cannot send. Two `eq` filters on one dimension with different values are an AND that matches nothing, which the adapter answers as an empty result without calling the API; any other collision keeps the first filter, except that a per-page read's own path always wins the `path` parameter. Whatever was dropped comes back in `meta.unappliedFilters`, so a surface can say the rows are wider than it asked for.
+
+## Plausible
+
+```ts
+import { plausible } from '@10x-media/analytics/adapters/plausible'
+
+plausible({ siteId: 'example.com', apiKey: process.env.PLAUSIBLE_API_KEY! })
+```
+
+Uses the Stats API v2 (`POST /api/v2/query`). Pass `host` for a self-hosted Community Edition instance, with the base path when it runs under one, and `domain` or `scriptId` to capture through it. `scriptId` lands in the page's script address, so the adapter takes letters, digits, `_` and `-` alone, up to 64 characters, and drops any other value as if it were unset; a provider document refuses one on save ("Use letters, digits, hyphens and underscores only, as in pa-XXXX.js."). Metrics: pageviews, visitors, visits, sessions, bounceRate, visitDuration, events, scrollDepth, conversions, and revenue where `revenueCurrency` is set on an install that [measures money](/analytics/revenue#turning-money-on). Dimensions include `channel`, which maps to `visit:channel`, and `goal`, which maps to `event:goal`. Durations are normalized to milliseconds. Default `maxLookbackDays: 730` (set `null` to disable clamping).
+
+The adapter follows the Stats API's own rules ([metrics](https://plausible.io/docs/stats-api#metrics)), declared as `metricReach`: `bounceRate` and `visitDuration` are read under every breakdown but `goal`, since Plausible refuses a visit's numbers under an event dimension other than `event:page`, and `scrollDepth` is read only by page, filtered by page, or for one page, which is how Plausible answers it. The adapter offers no time on page: Plausible's `time_on_page` is the average time spent on a page per visit, which counts a page viewed twice in one visit once, so it is not the per-pageview number `avgDuration` means everywhere else.
+
+`revenueCurrency` is the ISO code of the site's revenue goals, and it is what turns this source's `revenue` metric on, on an install whose `revenue` option is on: Plausible serves `total_revenue` only inside a goal-filtered request on a site that has a revenue goal, and errors the request on a site that has none. Unset or blank, the adapter neither declares `revenue` nor asks for it. Set, every read names it as `meta.currency`, so revenue is written in the site's currency rather than the install's [`revenue.currency`](/analytics/revenue). Anything but an ISO 4217 code (in any case) throws when the adapter is built, naming the option, rather than turning revenue on with no currency to write it in.
+
+## Umami
+
+```ts
+import { umami } from '@10x-media/analytics/adapters/umami'
+
+// Umami Cloud
+umami({ websiteId: 'xxxx', apiKey: process.env.UMAMI_API_KEY! })
+
+// Self-hosted (token from POST /api/auth/login)
+umami({ websiteId: 'xxxx', token: process.env.UMAMI_TOKEN!, host: 'https://analytics.example.com' })
+```
+
+`host` is the address of the Umami app, the one its dashboard opens on, with the base path when Umami runs under one (`https://example.com/umami`). The adapter reads the API under `/api` and serves the tracker from the same address, and a `host` that already ends in `/api` is read the same way. Unset, or Umami Cloud's own address, it reads Umami Cloud. A provider document's `host` means the same.
+
+Targets Umami 3.x, cloud and self-hosted. Metrics: pageviews, visitors, visits, sessions, plus bounceRate and visitDuration derived from visit totals ([`totaltime`](https://docs.umami.is/docs/api-reference/get-website-stats) is the total visit duration), and conversions. It offers no time on page, since nothing Umami reports is per pageview. The `page` dimension maps to `/metrics?type=path` (`type=url` was the 2.x name and 3.x rejects it). Umami has no per-day source for visitors, bounce rate, or duration, so trend series on those metrics are empty while headlines stay correct.
+
+`/metrics` reports one number per row, and on every dimension but `goal` that number is the count of distinct sessions, so **a breakdown row carries `visitors`** and a `goal` row its conversions. The adapter declares exactly that as `metricReach`: pageviews, visits, sessions, bounce rate and time per visit are whole-site numbers, visitors are read under every breakdown but `goal`, and conversions under `goal` alone, so a breakdown never offers a column its rows cannot fill. `event` is filterable but not groupable, since the install-wide `events` metric has no source in `/stats`; `goal` and `channel` are the reverse, groups with no matching filter parameter. `channel` is `/metrics?type=channel`, Umami's own acquisition classification (`direct`, `organicSearch`, `paidSearch`, `paidSocial`, `email`, `affiliate`, ...), carrying the read's date range and filters like every sibling type.
+
+Filter values carry an operator prefix (`eq.`, `c.`, `re.`), and Umami reads any of its operator names followed by a dot as an operator, so the adapter always writes `eq.` explicitly and a value like `s.example.com` stays literal. Umami splits an `eq.` value on commas into a value list with no escape, so a goal slug containing a comma cannot be asked for and is reported in `meta.unappliedFilters`.
+
+## GA4
+
+```ts
+import { ga4 } from '@10x-media/analytics/adapters/ga4'
+
+ga4({
+  propertyId: '123456789',
+  credentials: {
+    client_email: process.env.GA4_CLIENT_EMAIL!,
+    private_key: process.env.GA4_PRIVATE_KEY!,
+  },
+})
+```
+
+Uses the GA4 Data API (`runReport`) through the official SDK, an optional peer dependency the app installs and passes in:
+
+```bash
+pnpm add @google-analytics/data
+```
+
+```ts title="payload.config.ts"
+import { BetaAnalyticsDataClient } from '@google-analytics/data'
+
+analytics({
+  adapters: [
+    ga4({
+      propertyId: '123456789',
+      credentials: {
+        client_email: process.env.GA4_CLIENT_EMAIL!,
+        private_key: process.env.GA4_PRIVATE_KEY!,
+      },
+    }),
+  ],
+  capture: { gate: 'all' },
+  sdks: { ga4: { BetaAnalyticsDataClient } },
+})
+```
+
+`sdks.ga4` serves every GA4 source of the install: the adapters in `adapters` and the ones built from [provider documents](#provider-documents). `ga4({ sdk })` hands one adapter its own instead. Passed in, the package is part of what the app imports, so a standalone or serverless build ships it. Without it the adapter loads the package by name the first time it reads, which works where the full `node_modules` is present (development, a plain `next start`) and fails in a build that only ships what the app imports. A production boot that would load it that way logs a warning naming `sdks.ga4`, and a read that cannot find it fails with the same advice.
+
+`sdks.ga4` is typed by its shape, `Ga4Sdk`, whose client is a `Ga4Client` answering `Ga4ReportResponse` rows: the package's own `BetaAnalyticsDataClient` fits it, and none of the plugin's types import `@google-analytics/data`, so an app that reads no GA4 type-checks without it installed, with `skipLibCheck` off too.
+
+Next does not opt `@google-analytics/data` out of server bundling on its own: it is not in Next's [built-in list](https://nextjs.org/docs/app/api-reference/config/next-config-js/serverExternalPackages), which does carry `firebase-admin`, whose Firestore client runs on the same google-gax and gRPC stack. List it in `serverExternalPackages` so Next loads it from `node_modules` with Node's own `require`, and the build's file tracing still copies it into a standalone output because the app imports it:
+
+```ts title="next.config.ts"
+import { withPayload } from '@payloadcms/next/withPayload'
+
+export default withPayload({ serverExternalPackages: ['@google-analytics/data'] })
+```
+
+Metrics: pageviews, visitors, visits, sessions, bounceRate, avgDuration, visitDuration, events, conversions, and revenue on an install that measures money. Dimensions include `channel`, which maps to `sessionDefaultChannelGroup`, and `goal`, which maps to `eventName` restricted to the read's own goals. Durations normalize to milliseconds, bounce rate to a percentage.
+
+Time on page is `userEngagementDuration` (the seconds the site was in the foreground) over `screenPageViews` (every view, repeats counted), both from the [Data API schema](https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema). The adapter reads the two sums and divides them itself, so the number is per pageview on every row and on the totals alike, and each row carries its views as `samples`, which folds days into weeks exactly. It is read under every breakdown but `event` and `goal`, whose rows hold the views of page events only. Time per visit is `averageSessionDuration`. GA4 bills a token quota, so the adapter recommends a long aggregate TTL (6 hours); [cache warming](/analytics/cache) pairs well with it. Default `maxLookbackDays: 425` (GA4's rolling window).
+
+Revenue is in the property's own currency, which GA4 names in every answer and the adapter passes on as `meta.currency`. `currency` (`ga4({ currency: 'EUR' })`, or the **Revenue currency** field of a [provider document](#provider-documents)) fills in when an answer names none; GA4's own wins. A `currency` that is not an ISO 4217 code throws when the adapter is built, naming the option. A report GA4 counted from a sample of the property's data, which it does on large properties, makes the read `meta.sampled`, and the admin says the numbers are estimates.
+
+Each report goes out with no retry of the SDK's own (the source's [lane](/analytics/cache#retries) retries it) and with what the read has left as its gRPC deadline, so a slow report ends with the read rather than holding its slot past it. `@google-analytics/data` 6.1 hands back a promise that cannot be cancelled, so that deadline is what ends it; a later version that returns google-gax's cancellable promise is cancelled the moment the read gives up. Every report is one request with its own rate token: a read paired with its goal report is two.
+
+`conversions` reads GA4's `keyEvents`, which counts only events the property itself marks as key events: an event that is a goal here but is not marked there reports 0. Set `measurementId` to capture through the same property; see [Capture](/analytics/capture#ga4).
+
+## PostHog
+
+```ts
+import { posthog } from '@10x-media/analytics/adapters/posthog'
+
+posthog({ projectId: '123', apiKey: process.env.POSTHOG_API_KEY! })
+```
+
+Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope and never reaches the browser; capture takes the public `projectToken` (`phc_...`) instead. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted, with the base path when a reverse proxy serves PostHog under one; US Cloud is the default. On PostHog Cloud, `region` pins the proxied capture hosts independently of `host`; a self-hosted `host` takes capture itself, through its capture paths alone, and ignores `region` (see [the proxy routes](/analytics/proxy#posthog)). `uiHost` is the PostHog app the capture snippet's `ui_host` names, for the links PostHog's toolbar shows: PostHog Cloud defaults to its region's app, and a self-hosted instance gets none unless you pass it, so no page publishes the instance's address on its own. Metrics: pageviews, visitors, visits, sessions, events. `events` counts every captured event (matching PostHog's own Events definition); requesting it (or the `event` dimension) switches the read off the `$pageview`-only filter, and the pageview-family metrics stay pageview-scoped through conditional aggregation. Dimensions: `page` (top-pages breakdown), `channel` (`session.$channel_type`, reached through the events table's own `session` join on `$session_id`), `event` (per-event-name breakdown) and `goal`, which is the event name restricted to the read's own goals. A `channel` read stays pageview-scoped, since a session property is not an event name; a pageview captured with no `$session_id` joins nothing and lands in an empty channel, which the admin shows as **Not set**. `conversions` counts those goal events; PostHog serves no revenue. A binding `hostname` filters on `properties.$host`.
+
+Time bounds are sent as `toDateTime('...', 'UTC')`. A bare HogQL date literal parses in the project's timezone, so a project set to anything but UTC used to read a window shifted by its offset; buckets are still cut in the reporting timezone.
+
+## The fetch a vendor adapter uses
+
+Plausible, Umami and PostHog take an optional `fetch`, which every read and the [capture proxy](/analytics/proxy#runtime-endpoint) use to reach the vendor. Unset, it is Node's own `fetch`. The plugin hands its guarded connection to the adapters it builds from [provider documents](#private-networks); an adapter declared in `adapters` is configured in code and needs none. Pass one to send a vendor's traffic through a proxy agent of your own, or to stub the vendor in a test.
+
+```ts
+import { posthog } from '@10x-media/analytics/adapters/posthog'
+
+/** Your own fetch: a proxy agent's, or a stub in a test. */
+declare const myFetch: typeof fetch
+
+export const adapter = posthog({ projectId: '123', apiKey: process.env.POSTHOG_API_KEY ?? '', fetch: myFetch })
+```
+
+## Provider documents
+
+A provider document is one analytics service, configured from the admin rather than from code. `providers: { collection: true }` registers the collection; every document in it becomes a data source for the scope it belongs to, layered onto the adapters declared in `adapters`.
+
+The collection is optional in both directions. An install that configures everything in code never enables it, and an install that keeps these settings in its own collection replaces the lookup with [`providers.resolve`](#keeping-the-settings-somewhere-else) and still gets the fields and the adapter factory from here.
+
+### What one document holds
+
+A few fields decide what the rest of the document means, and they sit in the sidebar beside the save button:
+
+| Field | What it does |
+|---|---|
+| **Name** | What the data source pickers throughout the admin call it. A generated label stands in when it is empty. |
+| **Provider** | Which service this document configures. The body of the form is conditional on it: picking PostHog shows PostHog's fields and nothing else. |
+| **Enabled** | Off keeps the document and its credentials but takes the provider out of every read and every [capture slot](/analytics/capture#capture-slots). |
+
+#### The Payload provider type
+
+`native` is a provider type like any other, listed as **Payload**, and the one a document defaults to. It configures nothing: no credentials, no public capture config, just a name and the **Enabled** checkbox. What it says is that this scope stores its visits in Payload and reads them back from there, through the `native()` adapter the install already registered. The document grants that adapter to the scope; it does not build a second engine, and the scope filtering is the same one native has always done.
+
+On a scoped install this is what makes native per-tenant rather than install-wide. A tenant with no enabled `native` document does not see native among its sources (a reader `access.crossScope.unscopedSource` admits still does), its tracker config carries no native beacon, and a beacon posted under its scope is dropped (answering the same `202` an accepted one does). Its stored history is untouched; only new beacons stop. An install without `scope.resolve`, or without this collection, is unaffected: the config adapters serve every scope as before.
+
+The body holds two kinds of field, and the difference is not cosmetic:
+
+- **Credentials** (`apiKey`, `token`, `privateKey`) are encrypted with [`@10x-media/fields`](/fields/encrypted) in write-only mode. They are never readable back through any API, the admin included. The internal adapter factory is the only reader that ever sees the plaintext. After a save a text credential shows its last four characters, so you can tell which key is stored and nothing else; the GA4 private key is a textarea and shows nothing at all, so telling two of those apart means the **Name** field.
+- **Public capture config** (`projectToken`, `domain`, `websiteId`, `scriptId`, `measurementId`, `region`) is plain text on purpose: the tracker serves it to the browser. A PostHog, Plausible or GA4 document holding only its read settings reads dashboards and captures nothing. Umami is the exception: its `websiteId` is what it reads by and all its capture needs, so an Umami document captures whenever it fills a [capture slot](/analytics/capture#capture-slots).
+
+Two more fields say what revenue is in. Plausible's **Revenue currency** (`revenueCurrency`) is the currency of the site's revenue goals and turns its `revenue` metric on. GA4's **Revenue currency** (`currency`) is the property's currency, used only when an answer from GA4 does not name it, which it normally does. Either way the reads report revenue in that currency (`meta.currency`) rather than the install's own.
+
+Every field carries a description saying what to paste into it and where to find it.
+
+### The PostHog scope property
+
+`scopeProperty` names the event property that carries the tenant, for example `tenant`. Set it when several tenants share one PostHog project.
+
+It does two things at once:
+
+- **Reads narrow.** The adapter declares `capabilities.scopedQueries`, and every query it makes adds `properties['<name>'] = '<scope>'`. Without it a shared project cannot answer one tenant's slice, so a read through it is install-wide however it was scoped.
+- **Capture stamps.** The snippet the plugin renders registers the request's resolved scope as a PostHog super-property (`posthog.register({ tenant: '<scope>' })`), so every event the SDK sends carries it, including the ones your own code captures. Both the property name and the scope are embedded as escaped JavaScript literals, the same way the project token and the host are, so neither can break out of the inline script.
+
+Nothing is stamped when either half is missing: no scope property configured, or a request whose scope did not resolve.
+
+### Where a document may connect
+
+A Plausible, Umami or PostHog document names where its adapter connects in its `host` field, left blank for the vendor's own cloud. An editor sets that host and the plugin then sends the document's stored key there, so the install decides which hosts a document may name.
+
+Each vendor's own cloud is always allowed:
+
+| Provider | Always allowed |
+|---|---|
+| Plausible | `https://plausible.io` |
+| Umami | `https://cloud.umami.is` and `https://api.umami.is` (Umami Cloud) |
+| PostHog | `https://us.posthog.com`, `https://eu.posthog.com`, and the older US address `https://app.posthog.com` |
+
+Any other host has to be listed in `providers.hosts.allow`:
+
+```ts
+analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  providers: {
+    collection: true,
+    hosts: {
+      allow: ['https://plausible.example.com', 'https://*.analytics.example.com'],
+    },
+  },
+})
+```
+
+`providers.hosts` sits beside `collection` rather than inside it because it serves [`providers.resolve`](#keeping-the-settings-somewhere-else) the same way. It needs one of the two, and the boot fails without either.
+
+An entry is an origin: a scheme, a host and an optional port, with no path. `https://*.analytics.example.com` matches every subdomain of analytics.example.com, but not analytics.example.com itself. An entry that is not an origin fails the boot. A document's host is matched on its origin alone, so an allowed origin covers every path on it.
+
+The `host` field accepts an https address: the origin, optionally followed by the base path of a vendor that runs under one, such as `https://example.com/umami`, with no query, fragment or credentials. A trailing slash is dropped. A self-hosted Umami document names the address of the Umami app, the one its dashboard opens on, such as `https://umami.example.com`, and the plugin reads its API under `/api`; an address that already ends in `/api` is read the same way. GA4 always talks to Google and has no host field.
+
+A document whose host is neither its vendor's cloud nor in `allow` still saves and still lists as a source, so the people who manage it can find it. Every read through it fails with `502 source_misconfigured` (see [the error codes](/analytics/reference/endpoints#the-codes)), and the analytics view says the source is not set up correctly. It also captures nothing: it fills no [capture slot](/analytics/capture#capture-slots), and its proxy mount answers 404. Adding its host to `allow` makes it work again on the next read.
+
+#### Private networks
+
+A document's adapter reaches its vendor through a guarded connection. Every address the host resolves to is checked as each connection opens, and only a public address is reached. A loopback, private, link-local or carrier-grade NAT address is refused, as is an IPv4 address written as IPv6 and every other reserved range. A host that answers with a public address first and a private one later is refused the second time. The adapter follows at most three redirects itself, checks each one the same way, stays on https, and sends no credential to a different origin. A refused connection fails the read as `source_misconfigured`. The [capture proxy](/analytics/proxy#runtime-endpoint) uses the same connection for a slot a provider document fills.
+
+`providers.hosts.allowPrivateNetwork: true` turns that check off, for a vendor that runs beside the app, such as Umami on the same Docker network. Document adapters then reach any address over http or https, and both `allow` and the `host` field accept http origins:
+
+```ts
+import type { ProvidersOptions } from '@10x-media/analytics'
+
+export const providers: ProvidersOptions = {
+  collection: true,
+  hosts: { allow: ['http://umami:3000'], allowPrivateNetwork: true },
+}
+```
+
+A development machine behind a local proxy in fake-IP mode, such as Clash or Surge, resolves every vendor into 198.18.0.0/15, so every read is refused there and the server log says why, at most once a minute; set `allowPrivateNetwork` in development to reach the vendors through the proxy.
+
+The allowlist applies either way. Adapters declared in `adapters` are configured in code rather than by editors, so none of this applies to them. A `providers.resolve` function gets the same policy and the same guarded connection as the `hosts` and `fetch` it receives, and applies them by building each document's adapter with both, [below](#keeping-the-settings-somewhere-else).
+
+### Changing where a document connects
+
+A saved document keeps its key through every save that leaves its connection alone. A save that changes where the key would go clears it, unless the same save sends the key again:
+
+- **Its own provider's connection**: the host, Plausible's site ID, Umami's website ID, GA4's property ID, project ID and service account email, and PostHog's host, region, project ID and scope property. Changing one of these clears that provider's key, and Umami's token too.
+- **The provider type or the scope**: changing either clears the keys of every provider on the document.
+
+A cleared key goes together with its hint, so the source reads as not configured until someone enters the key again. To move a document to another host and keep it working, enter the key in the same save. A bulk update follows the same rule for each document it changes. `CONNECTION_PATHS` lists these values, beside `SECRET_PATHS`.
+
+### Who may change a connection
+
+`providers.collection.connectionAccess` decides who may set or change those values. It is a Payload field access function, asked on create and on update, or an object with one for each:
+
+```ts
+import type { ProvidersOptions } from '@10x-media/analytics'
+
+export const providers: ProvidersOptions = {
+  collection: {
+    connectionAccess: ({ req }) => req.user?.role === 'admin',
+    // or: { create: isEditor, update: ({ req }) => req.user?.role === 'admin' }
+  },
+}
+```
+
+A value it denies is dropped and the rest of the save goes through. On an update the stored value stays, so a denied change can never clear a key either; on a create the field starts at its default, or empty. The admin shows denied fields as read-only.
+
+Left unset, whoever may create a document sets its connection. Changing it afterwards takes `access.crossScope.named` on a scoped install, so a tenant editor can rename a provider or switch it off, but not point its key at another site. On an unscoped install the collection's own update access decides. The object form keeps these defaults for a half it leaves out.
+
+### Who reads through a document
+
+The collection's access decides who may open and edit provider documents. Which documents a reader reads analytics through is a separate question, and `providers.collection.sourceAccess` answers it. It is a Payload collection access function, run with the request's user, returning `true`, `false`, or a `Where` that narrows the scope's enabled documents further:
+
+```ts
+import type { ProvidersOptions } from '@10x-media/analytics'
+
+export const providers: ProvidersOptions = {
+  collection: {
+    access: { read: ({ req }) => req.user?.role === 'admin' },
+    sourceAccess: ({ req }) => Boolean(req.user),
+  },
+}
+```
+
+That pair keeps the providers collection to admins while every reader still reads through the documents of their own scope. Left unset, the collection's read access decides, so restricting the collection also hides its sources from everyone it keeps out. The warm and sync jobs read as the system and skip it. An `access` override replaces the default for its operation, scope filtering included, so on a scoped install keep the scope in it.
+
+The collection's default access admits users of the admin collection (`admin.user`) only: a second auth collection, such as customers, can neither read nor write a provider document.
+
+### How a document becomes an adapter
+
+Each instance builds a document's adapter once per saved version of it. To learn which versions a scope holds, it reads the scope's documents without their credentials (ids, save times, `provider`, `enabled` and scope), at most once every ten seconds per scope, and the instance that handled a save reads again as soon as the save commits. Only a version it has not built yet is read in full and decrypted, on a request of its own and outside any transaction the reader holds; every unchanged document keeps the adapter it has. Taking a beacon reads nothing beyond that list, so ingest never decrypts a credential.
+
+A document whose credential will not decrypt (its key was rotated away, its ciphertext damaged) or whose settings fail to build an adapter does not take its scope's other sources down, and does not vanish from them either. It stands in as a source that keeps the document's name and, where its settings build without the credentials, its capabilities, captures nothing, and answers every read `502 source_misconfigured`, which the admin shows as a source to check. Each instance logs it and reads the document again a minute later, and at once when it is saved.
+
+An adapter is closed once its document is saved again, removed, switched off or moved to another scope, and once no read has used it for five minutes. A read already running through it finishes first. A GA4 document's adapter closes its Data API client then.
+
+The list relies on `updatedAt`, so an `overrides` that turns off the collection's `timestamps` fails the boot: every instance would otherwise stay on the first version it built of each document. The same goes for an override that renames the collection, which `providers.collection.slug` does (see [Renaming the plugin's collections](/analytics/reference/options#renaming-the-plugins-collections)).
+
+### Replacing a field
+
+`providers.collection.fields` replaces one default field at a time. Each entry receives the plugin's own field and returns whatever should stand in its place, so an override can spread the original rather than rebuild it:
+
+```ts
+analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  providers: {
+    collection: {
+      fields: {
+        name: ({ field }) => ({ ...field, label: 'Connection name' }),
+        // Out of the sidebar, into the form's body.
+        enabled: ({ field }) =>
+          field.type === 'checkbox' ? { ...field, admin: { ...field.admin, position: undefined } } : field,
+      },
+    },
+  },
+})
+```
+
+`name`, `provider` and `enabled` are overridable. A replacement may be any field type, a `row` or a `collapsible` included, as long as it still puts a field of the same name somewhere inside it.
+
+Order matters: per-field overrides run first, then `overrides` gets the whole config last. It is the same shape [`goals.collection.fields`](/analytics/goals#5-let-editors-manage-goals) uses, so one mental model covers both collections.
+
+### Keeping the settings somewhere else
+
+Some installs already have a per-tenant settings document and would rather not add a second collection for this. `providers.resolve` replaces the lookup entirely: return the adapters for a scope, from any store, in any shape. It cannot be set together with `providers.collection`, and the boot refuses the two together: the adapters `resolve` returns would be held to provider documents no reader holds, so nobody would see them. These exports make it a mapping rather than a rewrite.
+
+| Export | What it is |
+|---|---|
+| `analyticsProviderFields()` | The provider fields, without the collection. Drop them into your own document. |
+| `adapterFromProviderDoc` | Builds an adapter from a document of that shape, given the `fetch` and `hosts` it may connect with. Same constructors the collection uses, so behaviour cannot drift. |
+| `resolveHostPolicy` | Builds a host policy from the same `{ allow, allowPrivateNetwork }` shape `providers.hosts` takes, for code that builds adapters outside `providers.resolve`. |
+| `createGuardedFetch` | Builds a guarded connection of your own, `{ fetch, close }`, for a policy that reaches a private network. |
+| `SECRET_PATHS` | Every credential path, as `{ provider, path }`. What to seal, and what to decrypt before handing a document to the factory. |
+| `CONNECTION_PATHS` | Every value that decides where a document's credentials go, as `{ provider, path }`, with `provider: null` for the provider type. The plugin's own collection clears a stored key when one of these changes; a store of your own can do the same. |
+| `refreshProviders` | Retires one scope's cached reads on every instance, for a store the plugin cannot watch. See [When the settings change](#when-the-settings-change). |
+
+A worked example. The host keeps one analytics provider per tenant in its own settings collection and never enables the plugin’s own:
+
+```ts
+import { analyticsProviderFields, isAdminUser } from '@10x-media/analytics'
+import { encryptedField } from '@10x-media/fields/encrypted'
+import type { CollectionConfig } from 'payload'
+
+// The same fields the plugin's own collection uses, sealed the same way. Whoever can edit a row
+// decides where its key is sent, so only the admin collection's users may touch it.
+export const tenantSettings: CollectionConfig = {
+  slug: 'tenant-settings',
+  access: { read: isAdminUser, create: isAdminUser, update: isAdminUser, delete: isAdminUser },
+  fields: [
+    { name: 'tenant', type: 'relationship', relationTo: 'tenants', required: true },
+    {
+      // A group rather than an array: a sealed key is read back by its field path, and a field
+      // inside an array or blocks field has no path to read it by.
+      name: 'analytics',
+      type: 'group',
+      fields: analyticsProviderFields({
+        buildSecret: (source) =>
+          encryptedField(source, {
+            protection: 'writeOnly',
+            // Stands in for the collection's slug in every ciphertext's binding, so renaming the
+            // collection later leaves the stored keys readable. Choose it before any key is stored.
+            aadScope: 'tenant-settings-analytics',
+          }),
+      }),
+    },
+  ],
+}
+```
+
+`aadScope` is bound into every ciphertext as additional data in place of the collection's slug, so it has to stay byte for byte the same for as long as the stored values do: changing it later makes every stored key unreadable, as renaming the collection would have without it. Give it a name of your own rather than the `'10x-analytics:providers'` the plugin pins for its own collection, since two fields of one name under one scope share a binding, and a key copied from one to the other would still decrypt.
+
+```ts
+import {
+  type AnalyticsAdapter,
+  adapterFromProviderDoc,
+  analytics,
+  type ProviderDoc,
+  SECRET_PATHS,
+  type ScopeMemberAccess,
+  type ScopeResolver,
+} from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import { readEncryptedField } from '@10x-media/fields/encrypted'
+
+/** Your tenant resolver and membership check, see Multi-tenancy. */
+declare const resolveTenant: ScopeResolver
+declare const member: ScopeMemberAccess
+
+/** The document with one decrypted credential put back at its `SECRET_PATHS` path. */
+const withSecret = (doc: ProviderDoc, path: string, value: string): ProviderDoc => {
+  const [group = '', key = ''] = path.split('.')
+  const current: unknown = Reflect.get(doc, group)
+  const fields = current !== null && typeof current === 'object' ? current : {}
+  return { ...doc, [group]: { ...fields, [key]: value } }
+}
+
+export const plugin = analytics({
+  adapters: [native()],
+  scope: { resolve: resolveTenant, member },
+  capture: { gate: 'all' },
+  providers: {
+    hosts: { allow: ['https://umami.example.com'] }, // reaches resolve as `hosts`
+    resolve: async ({ payload, scope, fetch, hosts, sdks }) => {
+      if (!scope) {
+        return []
+      }
+      const { docs } = await payload.find({
+        collection: 'tenant-settings',
+        where: { tenant: { equals: scope } },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+      const settings = docs[0]
+      const stored: ProviderDoc | undefined = settings?.analytics
+      if (!settings || !stored || stored.enabled === false) {
+        return []
+      }
+      // The adapter's id is `<provider>:<id>`, here the settings document's.
+      let doc: ProviderDoc = { ...stored, id: settings.id }
+      // A write-only key never comes back through find: read each one deliberately.
+      for (const { provider, path } of SECRET_PATHS) {
+        if (provider !== doc.provider) {
+          continue
+        }
+        const secret = await readEncryptedField(payload, {
+          collection: 'tenant-settings',
+          id: settings.id,
+          path: `analytics.${path}`,
+        })
+        const value = await secret?.decrypt()
+        if (typeof value === 'string') {
+          doc = withSecret(doc, path, value)
+        }
+      }
+      const adapter: AnalyticsAdapter | null = adapterFromProviderDoc(doc, { fetch, hosts, sdks })
+      return adapter ? [adapter] : []
+    },
+  },
+})
+```
+
+Worth knowing about that shape:
+
+- **Credentials have to be plaintext by the time `adapterFromProviderDoc` sees them.** A write-only field is never readable back through `payload.find`, so the resolver reads each one with `readEncryptedField` from `@10x-media/fields/encrypted`, which reads the stored ciphertext on a request of its own and decrypts it on the server. `SECRET_PATHS` lists exactly which paths those are, as `{ provider, path }` pairs where `path` is dotted (`posthog.apiKey`, `ga4.privateKey`), so the reads stay in step with the fields the plugin seals. A key is read by its field path, which is why the fields sit in a `group`: inside an `array` or `blocks` field they would have none. Missing credentials are not an error: they make the adapter report `isConfigured() === false`.
+- **Results are not cached.** The resolver runs on every read, its key reads included. Memoize inside the function, and clear that memo when the settings change.
+- **Hosts follow a policy.** `hosts` is the install's [`providers.hosts`](#where-a-document-may-connect): each vendor's own cloud, plus what `allow` lists. A document naming any other host builds an adapter whose reads fail as `source_misconfigured` and which captures nothing. `fetch` is the runtime's guarded connection, which reaches public addresses only, or private ones too once `providers.hosts.allowPrivateNetwork` is set. `adapterFromProviderDoc` throws when either is missing, rather than letting a stored key go anywhere unchecked. `sdks` carries the plugin's own, which a GA4 document reads through.
+- **Give every document an `id`.** The adapter's id is `<provider>:<id>`, as a provider document's is. One without an id keeps the plain vendor id, and then stands in for a config adapter of the same id.
+- **A `native` document builds nothing here.** `adapterFromProviderDoc` answers `null` for it, which the resolver returns as no adapter: granting the native engine per scope is the providers collection's job, and on an install that resolves its providers itself, the `native()` in `adapters` serves every scope.
+- **Nothing else changes.** The adapters a resolver returns are layered onto the config adapters exactly like collection-resolved ones: same capture slots, same scope gating.
+
+`analyticsProviderFields()` takes five options, all optional: `buildSecret` (leave it out and the credentials are plain text fields, and storing them safely is your problem), `fields` (the same per-field overrides as the collection), `scopeField` (adds the plugin's own hidden `scope` text field, off by default because a host store usually has its own tenant column), `allowPrivateNetwork` (lets the `host` fields accept http addresses; set it together with `providers.hosts.allowPrivateNetwork`) and `connectionAccess` (field access on the fields `CONNECTION_PATHS` lists, as one function or as `{ create, update }`, the same shapes the plugin option takes).
+
+#### When the settings change
+
+The plugin sees a save to its own collection by itself. A store of your own it cannot watch, so once a scope's settings changed there, call `refreshProviders` with the scope you changed (leave the scope out for the install-wide one):
+
+```ts
+import { type ProviderDoc, refreshProviders } from '@10x-media/analytics'
+import type { Payload } from 'payload'
+
+export const saveSettings = async (payload: Payload, id: string, tenantId: string, rows: ProviderDoc[]) => {
+  await payload.update({ collection: 'tenant-settings', id, data: { analytics: rows } })
+  await refreshProviders(payload, tenantId)
+}
+```
+
+It retires that scope's cached reads on every instance: at once on the instance that called it, and within ten seconds everywhere else. It writes one small token, to the `analytics-state` collection when the [native engine](/analytics/native) runs and to `payload.kv` otherwise, so it rejects when that write fails. Clear your resolver's own memo for the scope at the same point. On an install running the providers collection it is never needed.
+
+Call it once the change has committed, as above. A hook of the same save runs inside the save's transaction, and a token written then would commit first: another instance reading the settings before they commit would cache the old ones under the new token until their TTL, and on SQLite the write would wait on the save's own lock. From a hook, pass the save's request instead:
+
+```ts
+import { refreshProviders } from '@10x-media/analytics'
+import type { CollectionAfterChangeHook } from 'payload'
+
+/** The settings collection's `afterChange` hook. */
+export const refreshOnSave: CollectionAfterChangeHook = async ({ doc, req }) => {
+  await refreshProviders(req.payload, String(doc.tenant), { req })
+  return doc
+}
+```
+
+With `req` inside an open transaction the call resolves at once and writes the token once that transaction ends, committed or rolled back; a failure is then logged rather than thrown. Without a transaction it behaves as above.
+
+### Per tenant
+
+Scoping, access, and registering the collection with a tenant plugin are covered in [Multi-tenancy](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant).
+
+## Running beside an existing setup
+
+Most sites that want this plugin already have something. Usually it is a consent manager that owns a list of vendor ids, loads each vendor's script when its category is granted, and a Content Security Policy whose allowlist is derived from that same list. That setup works. The plugin does not need it replaced, and replacing it in one step is the way to get double-counted pageviews and a compliance regression at the same time.
+
+The safe shape is: **install the plugin with native capture only, leave the existing manager as the only loader of vendor scripts, and migrate vendors one at a time later, or never.**
+
+### Why native slots in beside anything
+
+The native engine is the reason this works. It is cookieless and first-party: events go to your own app's ingest endpoint, visitors are counted with a rotating hash rather than an identifier stored on the device, and nothing is fetched from a third-party origin.
+
+What that means for a site that already has a consent layer:
+
+- **No new vendor.** Native loads no third-party script and sends nothing to a third party, so the manager's vendor list gains no entry. Which capture slots wait for your banner is `capture.gate`, and the plugin has no default for it: `({ kind }) => kind !== 'native'` captures native at once and holds every vendor, and `'all'` puts native behind the gate too. Whether any slot needs consent on your site, and under which category, is your decision, not the plugin's. [Privacy](/analytics/privacy) lists what native stores, and [Consent](/analytics/consent) wires the gate to your manager.
+- **No new CSP origin.** The beacon goes to a path on your own domain, which `connect-src 'self'` already covers. Nothing to add to the allowlist, nothing to invalidate a cached policy for. A policy that enumerates `connect-src` sources rather than using `'self'` is the exception: it has to list the site's own origin, or the beacon is blocked like any other cross-origin request.
+- **No interaction with the existing loader.** Native has no global to collide with, no script id to clash on, and no consent-mode signal to flip.
+
+### The install
+
+```ts
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+analytics({
+  adapters: [native()],
+  capture: {
+    // Every slot waits for your consent manager: wire it to setGate, or native counts nothing.
+    gate: 'all',
+    // Native keeps the platform slot, now and when a vendor is added later for reads.
+    slots: { global: 'native' },
+  },
+})
+```
+
+`gate: 'all'` holds native behind the banner too, so this install counts only once your manager answers through [`setGate`](/analytics/consent#setgate): add the [bridge](/analytics/consent#recipe-any-consent-manager) for your manager. `({ kind }) => kind !== 'native'` captures native at once and holds every vendor added later; which of the two your site needs is your decision.
+
+`slots.global: 'native'` is the load-bearing line. Without it the platform slot goes to the only configured adapter, so adding a vendor adapter later for **reads** would hand the slot to `platformAdapter`, or to nothing, and native would stop capturing. Pinned, native keeps the slot, and a vendor configured with its read credentials reads dashboards and captures nothing.
+
+On a scoped install whose tenants capture through their own slot, `slots.global: false` keeps the platform slot empty instead: nothing fills it, its proxy mount 404s, and it is left out of the tracker config, so no platform vendor reaches a tenant's site. On an unscoped install there is no tenant slot, so `false` there turns capture off.
+
+Then render the tracker as usual. On a native-only install `<AnalyticsScripts />` renders no vendor snippet at all: the tracker is the client.
+
+### The one rule while both exist
+
+**Never configure the same vendor id on both sides.**
+
+If your consent manager loads GA4 under `G-XXXX` and you also give the plugin a provider document with `measurementId: G-XXXX` and a capture slot, that page has two initialised GA4 tags. Every pageview is counted twice, every event is sent twice, and the numbers in your own dashboard and the numbers in the vendor's no longer agree with each other or with reality. The same holds for a PostHog project token, a Plausible domain, a Meta pixel id.
+
+It is not only duplication. Where a vendor's own loader is consent-aware (Google's Consent Mode, PostHog's opt-out), two initialisations can hand the vendor contradictory signals, and the last one to run wins. And a consent manager that gates a vendor on a category the visitor rejected is doing that gating in **its own** store; a second loader that does not read that store will load the tag anyway.
+
+So while a vendor is on the old side, it stays entirely on the old side: not in `capture.slots`, and either absent from the plugin or present only as a read-only provider document with no public capture fields set. Umami has no such document, since its `websiteId` both reads and captures: keep an Umami document out of the tenant slot with `capture.slots.tenant` naming another adapter, or `false`.
+
+### Migrating one vendor
+
+When you do want the plugin to own a vendor, move it in this order, one vendor at a time. Nothing here is reversible in a hurry, so leave a few days between vendors.
+
+1. **Put the CSP in report-only first.** Most of these setups derive the script and connect allowlist from the consent manager's own vendor registry and cache it, so the policy will not know about the plugin's mount until you tell it. A report-only pass surfaces every blocked request as a violation report instead of a broken page. Keep it there for the whole move.
+
+2. **Remove the vendor from the old loader.** Its entry comes out of the manager's list, which is also what takes its origins out of the derived CSP allowlist and its category out of the banner. Deploy this on its own and confirm the tag has actually stopped firing before continuing. The page now has zero of that vendor, which is correct and temporary.
+
+3. **Create the provider document.** Add the vendor in the plugin's [providers collection](#provider-documents) (or through `providers.resolve`): its read credentials, and its **public capture fields**, which are what make the adapter declare capture support at all. Still nothing loads: no slot points at it yet.
+
+4. **Hand the plugin the capture slot.** On a scoped install, `capture.slots.tenant` names the document's adapter, or `capture.slots.global` a config adapter when this is the platform's own vendor. On an unscoped install provider documents fill no slot: declare the vendor in `adapters` with its public capture options and name it in `capture.slots.global`. A slot holds one adapter, so the vendor takes that slot from native. The plugin now renders that vendor's snippet, pointed at its own first-party [proxy mount](/analytics/proxy).
+
+5. **Fix the CSP, then re-enforce.** The mount is a path on your own origin, so `'self'` covers it in `connect-src` and `script-src` for most policies; a policy that enumerates paths, or one stricter than `'self'`, needs the mount added. The vendor's own origins can come out at the same time, because nothing fetches them directly any more. Read the report-only violations before you enforce: that is what they are for.
+
+6. **Decide the consent gate.** `capture.gate` says whether the vendor's slot waits, and a slot that waits is not delivered to until your manager opens it with [`setGate`](/analytics/consent#setgate). Wire the gate to your manager's answer, or keep the manager as the gate by leaving the slot behind it. Whichever you choose, **one thing decides**; two independent gates for one vendor is the same class of bug as two loaders.
+
+### What stays with the consent manager
+
+Even after every vendor has moved, the manager keeps two jobs the plugin does not want:
+
+- **It is the consent authority.** It owns the banner, the categories, the visitor's stored answer and the record of it. The plugin is told a decision through `setGate`; it neither makes one nor stores one.
+- **It loads anything the plugin does not know about.** Support widgets, session replay, A/B tooling, a tag manager. The plugin has adapters for four analytics vendors and no ambitions beyond them.
+
+<Callout type="warn">
+A tag manager is the case to think hardest about. Once a container is loading, what it loads is decided inside the container rather than in your codebase, so neither your consent manager nor this plugin can see or gate it. Migrating the container itself into the plugin does not change that; it only moves which snippet boots it. If a container is in play, keep it on the manager's side and treat what it loads as out of scope for both.
+</Callout>

@@ -3,11 +3,13 @@ import {
 	DIMENSION_KEYS,
 	type DimensionKey,
 	FILTER_OPERATORS,
-	type FilterOperator,
 	type Granularity,
 	type MetricKey,
+	PLATFORM_SCOPE,
 } from '../core/contract'
 import { GRANULARITY_ORDER } from '../core/granularity'
+import { servedName } from '../core/metricAliases'
+import { isRecord, wholeNumberParam } from '../core/values'
 import {
 	MAX_QUERY_FILTER_VALUE_LENGTH,
 	MAX_QUERY_FILTERS,
@@ -15,6 +17,7 @@ import {
 } from '../query/limits'
 import { resolveTimeframe, TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 import { zonedCalendarDay } from '../timeframe/tz'
+import { dayRangeDays } from './dayRange'
 import {
 	BREAKDOWN_TABS,
 	type BreakdownTab,
@@ -37,15 +40,21 @@ export const VIEW_RANGE_PRESETS: TimeframePreset[] = [
 
 export const DEFAULT_VIEW_RANGE: TimeframePreset = 'last30days'
 
+/** @beta */
 export const VIEW_LIMITS = [10, 25, 50, 100] as const
 
+/** @beta */
 export type ViewLimit = (typeof VIEW_LIMITS)[number]
 
 export const DEFAULT_VIEW_LIMIT: ViewLimit = 10
 
 export const DEFAULT_VIEW_TAB: BreakdownTab = 'pages'
 
-/** Everything the view reads from the URL. A view is its state, so a link is a view. */
+/**
+ * Everything the view reads from the URL. A view is its state, so a link is a view.
+ *
+ * @beta
+ */
 export interface ViewState {
 	range: TimeframePreset | 'custom'
 	/** Set only on a custom range: an inclusive `YYYY-MM-DD` day in the reporting timezone. */
@@ -53,6 +62,11 @@ export interface ViewState {
 	to?: string
 	compare: boolean
 	source?: string
+	/**
+	 * An {@link aggregateToken} when aggregating across every scope, absent for the request's own.
+	 * No other value survives a render: the host owns which scope a request resolves to.
+	 */
+	scope?: string
 	metric: MetricKey
 	/** Absent means automatic; {@link autoGranularity} picks one from the range. */
 	granularity?: Granularity
@@ -70,16 +84,37 @@ export interface ViewDefaults {
 	metric: MetricKey
 }
 
-const KNOWN_METRICS = new Set<string>(VIEW_METRIC_ORDER)
-const KNOWN_DIMENSIONS = new Set<string>(DIMENSION_KEYS)
-const KNOWN_OPERATORS = new Set<string>(FILTER_OPERATORS)
-const KNOWN_GRANULARITIES = new Set<string>(GRANULARITY_ORDER)
-const KNOWN_PRESETS = new Set<string>(TIMEFRAME_PRESETS)
-const DAY_MS = 86_400_000
-const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+const AGGREGATE_TAG = `${PLATFORM_SCOPE}:`
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === 'object' && value !== null && !Array.isArray(value)
+/**
+ * Aggregate marker tagged with the tenant it was chosen from: the host's selector can move while
+ * the address stays open, and an untagged marker would aggregate under a tenant nobody asked for.
+ */
+export const aggregateToken = (from: string): string =>
+	from === '' ? PLATFORM_SCOPE : `${AGGREGATE_TAG}${from}`
+
+/** Whether `value` asks to aggregate: the bare wildcard or an {@link aggregateToken}. */
+export const isAggregateToken = (value: string | null | undefined): boolean =>
+	value === PLATFORM_SCOPE || (typeof value === 'string' && value.startsWith(AGGREGATE_TAG))
+
+/** The tenant an aggregate token was chosen from; `''` when it names none. */
+export const aggregateFrom = (token: string): string =>
+	token.startsWith(AGGREGATE_TAG) ? token.slice(AGGREGATE_TAG.length) : ''
+
+/** A filter's identity, which its chip keys on. */
+export const filterKey = ({ dimension, operator, value }: AnalyticsFilter): string =>
+	`${dimension}:${operator}:${value}`
+
+/** `state` with its filter at `index` removed. */
+export const withoutFilter = (state: ViewState, index: number): ViewState => ({
+	...state,
+	filters: state.filters.filter((_, at) => at !== index),
+})
+
+const known = <T extends string>(list: readonly T[], value: unknown): T | undefined =>
+	list.find((entry) => entry === value)
+
+const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 const read = (search: URLSearchParams, name: string): string | null => {
 	const raw = search.get(name)?.trim()
@@ -87,18 +122,15 @@ const read = (search: URLSearchParams, name: string): string | null => {
 }
 
 /**
- * Epoch ms of a `YYYY-MM-DD` day, or null when it names no real calendar day. The
- * round trip is the validation: `Date.parse` rolls February 30 forward instead of failing.
+ * Whether `raw` is a `YYYY-MM-DD` day naming a real calendar day. The round trip is the
+ * validation: `Date.parse` rolls February 30 forward instead of failing.
  */
-const dayValue = (raw: string | null): number | null => {
+const isCalendarDay = (raw: string | null): raw is string => {
 	if (raw === null || !DAY_PATTERN.test(raw)) {
-		return null
+		return false
 	}
 	const ms = Date.parse(`${raw}T00:00:00.000Z`)
-	if (Number.isNaN(ms) || new Date(ms).toISOString().slice(0, 10) !== raw) {
-		return null
-	}
-	return ms
+	return !Number.isNaN(ms) && new Date(ms).toISOString().slice(0, 10) === raw
 }
 
 /** A configured default the view cannot serve falls back to the built-in range. */
@@ -115,31 +147,28 @@ const parseRange = (
 		return fallback
 	}
 	if (raw === 'custom') {
-		const from = dayValue(read(search, 'from'))
-		const to = dayValue(read(search, 'to'))
-		if (from === null || to === null || to < from) {
+		const from = read(search, 'from')
+		const to = read(search, 'to')
+		// Same-length ISO days order as strings do.
+		if (!isCalendarDay(from) || !isCalendarDay(to) || to < from) {
 			return fallback
 		}
 		// Beyond the endpoint's own cap the read would only ever answer `range_too_long`.
-		if (Math.round((to - from) / DAY_MS) + 1 > MAX_QUERY_RANGE_DAYS) {
+		if (dayRangeDays({ from, to }) > MAX_QUERY_RANGE_DAYS) {
 			return fallback
 		}
-		return {
-			range: 'custom',
-			from: new Date(from).toISOString().slice(0, 10),
-			to: new Date(to).toISOString().slice(0, 10),
-		}
+		return { range: 'custom', from, to }
 	}
-	if (!KNOWN_PRESETS.has(raw) || raw === 'allTime') {
+	const preset = known(TIMEFRAME_PRESETS, raw)
+	if (preset === undefined || preset === 'allTime') {
 		return fallback
 	}
-	return { range: raw as TimeframePreset }
+	return { range: preset }
 }
 
 /**
- * Filters as the endpoint's own parser would accept them, minus its errors: an entry
- * naming a dimension, operator or value outside the contract is dropped rather than
- * failing the whole URL, since a hand-edited link should still open a working view.
+ * Filters as the endpoint parser accepts them; invalid entries drop so a hand-edited link still
+ * opens. Repeats drop too: chips key on {@link filterKey}, so duplicates would collide in React.
  */
 const parseFilters = (search: URLSearchParams): AnalyticsFilter[] => {
 	const raw = read(search, 'filters')
@@ -156,18 +185,18 @@ const parseFilters = (search: URLSearchParams): AnalyticsFilter[] => {
 		return []
 	}
 	const filters: AnalyticsFilter[] = []
+	const seen = new Set<string>()
 	for (const item of decoded) {
 		if (filters.length === MAX_QUERY_FILTERS) {
 			break
 		}
-		if (!isRecord(item)) {
+		if (!isRecord(item) || Array.isArray(item)) {
 			continue
 		}
-		const { dimension, operator, value } = item
-		if (typeof dimension !== 'string' || !KNOWN_DIMENSIONS.has(dimension)) {
-			continue
-		}
-		if (typeof operator !== 'string' || !KNOWN_OPERATORS.has(operator)) {
+		const dimension = known(DIMENSION_KEYS, item.dimension)
+		const operator = known(FILTER_OPERATORS, item.operator)
+		const { value } = item
+		if (dimension === undefined || operator === undefined) {
 			continue
 		}
 		if (typeof value !== 'string') {
@@ -177,11 +206,13 @@ const parseFilters = (search: URLSearchParams): AnalyticsFilter[] => {
 		if (trimmed.length < 1 || trimmed.length > MAX_QUERY_FILTER_VALUE_LENGTH) {
 			continue
 		}
-		filters.push({
-			dimension: dimension as DimensionKey,
-			operator: operator as FilterOperator,
-			value: trimmed,
-		})
+		const filter = { dimension, operator, value: trimmed }
+		const key = filterKey(filter)
+		if (seen.has(key)) {
+			continue
+		}
+		seen.add(key)
+		filters.push(filter)
 	}
 	return filters
 }
@@ -192,15 +223,15 @@ const parseOrder = (search: URLSearchParams): ViewState['order'] => {
 		return undefined
 	}
 	const parts = raw.split(':')
-	const metric = parts[0] ?? ''
+	const metric = known(VIEW_METRIC_ORDER, parts[0])
 	const direction = parts[1] ?? ''
-	if (parts.length !== 2 || !KNOWN_METRICS.has(metric)) {
+	if (parts.length !== 2 || metric === undefined) {
 		return undefined
 	}
 	if (direction !== 'asc' && direction !== 'desc') {
 		return undefined
 	}
-	return { metric: metric as MetricKey, direction }
+	return { metric, direction }
 }
 
 /**
@@ -208,29 +239,28 @@ const parseOrder = (search: URLSearchParams): ViewState['order'] => {
  * default, so a truncated, stale or hand-edited link always opens a working view.
  */
 export const parseViewState = (search: URLSearchParams, defaults: ViewDefaults): ViewState => {
-	const metric = read(search, 'metric')
-	const granularity = read(search, 'granularity')
-	const tab = read(search, 'tab')
-	const dim = read(search, 'dim')
+	const metric = known(VIEW_METRIC_ORDER, read(search, 'metric'))
+	const granularity = known(GRANULARITY_ORDER, read(search, 'granularity'))
+	const tab = known(BREAKDOWN_TABS, read(search, 'tab'))
+	const dim = known(DIMENSION_KEYS, read(search, 'dim'))
 	const source = read(search, 'source')
-	const limit = Number(read(search, 'limit'))
+	const scope = read(search, 'scope')
+	const limit = wholeNumberParam(read(search, 'limit'))
 	const compare = read(search, 'compare')
 	const order = parseOrder(search)
 	return {
 		...parseRange(search, defaults),
 		compare: compare === '1' || compare === 'true',
 		...(source === null ? {} : { source }),
-		metric: metric !== null && KNOWN_METRICS.has(metric) ? (metric as MetricKey) : defaults.metric,
-		...(granularity !== null && KNOWN_GRANULARITIES.has(granularity)
-			? { granularity: granularity as Granularity }
-			: {}),
-		tab:
-			tab !== null && BREAKDOWN_TABS.includes(tab as BreakdownTab)
-				? (tab as BreakdownTab)
-				: DEFAULT_VIEW_TAB,
-		...(dim !== null && KNOWN_DIMENSIONS.has(dim) ? { dim: dim as DimensionKey } : {}),
+		// The aggregate marker is the only scope a URL may name: every other one is the host's
+		// own answer for the request, which an address cannot override.
+		...(scope !== null && isAggregateToken(scope) ? { scope } : {}),
+		metric: metric ?? defaults.metric,
+		...(granularity === undefined ? {} : { granularity }),
+		tab: tab ?? DEFAULT_VIEW_TAB,
+		...(dim === undefined ? {} : { dim }),
 		filters: parseFilters(search),
-		limit: VIEW_LIMITS.includes(limit as ViewLimit) ? (limit as ViewLimit) : DEFAULT_VIEW_LIMIT,
+		limit: VIEW_LIMITS.find((each) => each === limit) ?? DEFAULT_VIEW_LIMIT,
 		...(order === undefined ? {} : { order }),
 	}
 }
@@ -253,6 +283,9 @@ export const serializeViewState = (state: ViewState, defaults: ViewDefaults): UR
 	}
 	if (state.source !== undefined) {
 		params.set('source', state.source)
+	}
+	if (state.scope !== undefined) {
+		params.set('scope', state.scope)
 	}
 	if (state.metric !== defaults.metric) {
 		params.set('metric', state.metric)
@@ -279,28 +312,25 @@ export const serializeViewState = (state: ViewState, defaults: ViewDefaults): UR
 }
 
 /**
- * The nearest state the selected source can actually serve. The URL outlives a source
- * switch, so a metric, tab, grouping, filter, comparison, bucket or sort the new source lacks is
- * replaced or dropped here rather than sent to the endpoint to be rejected. Returns the
- * same object when the gate forbids nothing, so a render can compare by identity.
+ * Nearest state the selected source serves: the URL outlives a source switch, so what it lacks is
+ * replaced or dropped here. Same object when the gate forbids nothing, for identity checks.
  */
 export const coerceState = (state: ViewState, gate: ViewGate): ViewState => {
-	const metric = gate.metrics.includes(state.metric)
-		? state.metric
-		: (gate.metrics[0] ?? state.metric)
+	const named = servedName(state.metric, gate.metrics)
+	const metric = gate.metrics.includes(named) ? named : (gate.metrics[0] ?? state.metric)
 	const tab = gate.tabs.includes(state.tab) ? state.tab : (gate.tabs[0] ?? state.tab)
 	const dim =
 		state.dim !== undefined && gate.dimensionsFor(tab).includes(state.dim) ? state.dim : undefined
 	const compare = state.compare && gate.canCompare
-	const filters = state.filters.filter(
-		(filter) => gate.canFilter(filter.dimension) && gate.operators.includes(filter.operator)
+	const filters = state.filters.filter((filter) =>
+		gate.operatorsFor(filter.dimension).includes(filter.operator)
 	)
 	const granularity =
 		state.granularity !== undefined && gate.granularities.includes(state.granularity)
 			? state.granularity
 			: undefined
 	const order =
-		state.order !== undefined && gate.metrics.includes(state.order.metric) ? state.order : undefined
+		state.order !== undefined && gate.columns.includes(state.order.metric) ? state.order : undefined
 	const unchanged =
 		metric === state.metric &&
 		tab === state.tab &&
@@ -318,6 +348,7 @@ export const coerceState = (state: ViewState, gate: ViewGate): ViewState => {
 		...(state.to === undefined ? {} : { to: state.to }),
 		compare,
 		...(state.source === undefined ? {} : { source: state.source }),
+		...(state.scope === undefined ? {} : { scope: state.scope }),
 		metric,
 		...(granularity === undefined ? {} : { granularity }),
 		tab,
@@ -329,9 +360,31 @@ export const coerceState = (state: ViewState, gate: ViewGate): ViewState => {
 }
 
 /**
- * The inclusive day window a state reads, in the reporting timezone. The endpoint reads
- * `from`/`to` in that same timezone, so the toolbar caption and every request share one
- * answer. `now` is injected to keep callers deterministic.
+ * State as the server read it: an unserved `source` drops and `scope` becomes the resolved one.
+ * Same object when nothing needed correcting, so the URL is rewritten only on a change.
+ */
+export const normalizeViewState = (
+	state: ViewState,
+	served: { sourceIds: string[]; scope?: string }
+): ViewState => {
+	const source =
+		state.source !== undefined && !served.sourceIds.includes(state.source)
+			? undefined
+			: state.source
+	if (source === state.source && served.scope === state.scope) {
+		return state
+	}
+	const { source: _source, scope: _scope, ...rest } = state
+	return {
+		...rest,
+		...(source === undefined ? {} : { source }),
+		...(served.scope === undefined ? {} : { scope: served.scope }),
+	}
+}
+
+/**
+ * Inclusive day window a state reads, in the reporting timezone the endpoint reads `from`/`to`
+ * in, so toolbar caption and every request agree.
  */
 export const rangeFor = (state: ViewState, timezone: string, now: Date): DayRange => {
 	if (state.range === 'custom' && state.from !== undefined && state.to !== undefined) {

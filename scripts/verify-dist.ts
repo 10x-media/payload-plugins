@@ -9,10 +9,14 @@
  * 2. Directive parity: every `src` module carrying 'use client' / 'use server'
  *    must exist in dist with the directive as its first line, otherwise
  *    Next.js loses the RSC boundary and admin components crash at runtime.
- * 3. No undirected hook callers: any dist file calling React hooks must start
- *    with 'use client'.
+ * 3. No undirected hook callers: any dist file calling a client-only React hook must
+ *    start with 'use client'.
  * 4. Every package.json `exports` target must exist on disk.
  * 5. publint must report no errors.
+ * 6. Every relative `.css` import a dist module keeps must resolve inside dist: the build
+ *    leaves stylesheet imports in place, so a stylesheet missing from the build's `copy`
+ *    breaks the consumer's bundle. A package whose dist imports stylesheets while
+ *    `sideEffects` is `false` gets a warning, since a production bundler may drop them.
  *
  * Run standalone via `pnpm check:dist` (after a build) or in CI. Pass `--only-built` to
  * skip packages that have no `dist/` at all, which is what an affected-scoped CI build
@@ -21,7 +25,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { publint } from 'publint'
 import { formatMessage } from 'publint/utils'
 
@@ -29,8 +33,11 @@ const REPO_ROOT = process.cwd()
 const PACKAGES_DIR = join(REPO_ROOT, 'packages')
 
 const DIRECTIVE_RE = /^(['"])use (client|server)\1/
+// useId, useMemo and useCallback are left out: React's server build exports them, so a server
+// component may call them.
 const HOOK_CALL_RE =
-	/\buse(State|Ref|Effect|LayoutEffect|Id|Callback|Memo|Transition|Reducer|Context|SyncExternalStore)\(/
+	/\buse(State|Ref|Effect|LayoutEffect|Transition|Reducer|Context|SyncExternalStore)\(/
+const CSS_IMPORT_RE = /^\s*import\s+['"]([^'"]+\.css)['"];?\s*$/gm
 
 const walk = (dir: string, matches: (path: string) => boolean): string[] => {
 	if (!existsSync(dir)) return []
@@ -56,6 +63,7 @@ const verifyPackage = async (pkgDir: string): Promise<string[]> => {
 		exports?: unknown
 		name: string
 		private?: boolean
+		sideEffects?: unknown
 	}
 	if (pkg.private) return errors
 
@@ -88,6 +96,7 @@ const verifyPackage = async (pkgDir: string): Promise<string[]> => {
 		}
 	}
 
+	let stylesheetImports = 0
 	for (const distFile of walk(distDir, (p) => p.endsWith('.js'))) {
 		const content = readFileSync(distFile, 'utf8')
 		if (HOOK_CALL_RE.test(content) && !DIRECTIVE_RE.test(content.trimStart())) {
@@ -95,6 +104,20 @@ const verifyPackage = async (pkgDir: string): Promise<string[]> => {
 				`${relative(pkgDir, distFile)} calls React hooks but does not start with 'use client'`
 			)
 		}
+		for (const [, specifier = ''] of content.matchAll(CSS_IMPORT_RE)) {
+			if (!specifier.startsWith('.')) continue
+			stylesheetImports++
+			if (!existsSync(join(dirname(distFile), specifier))) {
+				errors.push(
+					`${relative(pkgDir, distFile)} imports ${specifier}, which is not in dist (add it to the build's \`copy\`)`
+				)
+			}
+		}
+	}
+	if (stylesheetImports > 0 && pkg.sideEffects === false) {
+		console.warn(
+			`  warn ${pkg.name}: dist imports stylesheets but package.json sets "sideEffects": false, so a production bundler may drop them`
+		)
 	}
 
 	for (const target of exportTargets(pkg.exports ?? {})) {
@@ -103,12 +126,10 @@ const verifyPackage = async (pkgDir: string): Promise<string[]> => {
 		}
 	}
 
-	const { messages } = await publint({ pkgDir, strict: true })
+	const { messages, pkg: manifest } = await publint({ pkgDir, strict: true })
 	for (const message of messages) {
 		if (message.type === 'error' || message.type === 'warning') {
-			errors.push(
-				`publint: ${formatMessage(message, JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8')))}`
-			)
+			errors.push(`publint: ${formatMessage(message, manifest)}`)
 		}
 	}
 

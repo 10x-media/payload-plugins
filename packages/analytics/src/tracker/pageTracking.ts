@@ -5,21 +5,20 @@ export interface PageTracking {
 }
 
 /**
- * Turns SPA navigations into page changes. `history.pushState`/`replaceState` fire no event
- * of their own, so both are wrapped; `popstate` covers back and forward. Only a changed
- * `location.pathname` counts, so a query or hash rewrite (a filter panel, an anchor link)
- * does not report a second pageview. The originals are restored on destroy, which keeps a
- * hot-reloaded or unmounted app from stacking wrappers.
+ * Turns SPA navigations into page changes: wraps `pushState`/`replaceState` and hears `popstate`.
+ * Only a changed pathname counts, so a query or hash rewrite sends no second pageview.
  */
 export const createPageTracking = (win: TrackerWindow, onChange: () => void): PageTracking => {
 	const history = win.history
 	const pushState = history.pushState
 	const replaceState = history.replaceState
 	let lastPath = win.location.pathname
+	/** A wrapper buried under another library's stays in the chain after destroy, so it goes quiet. */
+	let active = true
 
 	const check = () => {
 		const path = win.location.pathname
-		if (path === lastPath) {
+		if (!active || path === lastPath) {
 			return
 		}
 		lastPath = path
@@ -41,7 +40,8 @@ export const createPageTracking = (win: TrackerWindow, onChange: () => void): Pa
 
 	return {
 		destroy() {
-			// Only unwind our own wrapper: another library may have patched on top of it,
+			active = false
+			// Only unwind the tracker's own wrapper: another library may have patched on top of it,
 			// and restoring the original underneath it would silently unhook that library.
 			if (history.pushState === patchedPush) {
 				history.pushState = pushState

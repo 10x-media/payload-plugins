@@ -74,7 +74,12 @@ describe('readErrorCode', () => {
 	})
 
 	it('reads every code the package declares', () => {
-		const codes: AnalyticsErrorCode[] = ['not_found', 'payload_too_large', 'internal']
+		const codes: AnalyticsErrorCode[] = [
+			'not_found',
+			'payload_too_large',
+			'source_misconfigured',
+			'internal',
+		]
 		for (const code of codes) {
 			expect(readErrorCode({ error: { code, message: 'x' } })).toBe(code)
 		}

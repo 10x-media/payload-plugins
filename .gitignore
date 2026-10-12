@@ -30,6 +30,12 @@ packages/*/videos/out/
 # dev app upload storage
 packages/*/dev/uploads/
 
+# dev app SQLite files (DEV_DB=sqlite), with their WAL files
+packages/*/dev/.sqlite/
+
+# the analytics upgrade test's migrations while it runs (scripts/upgrade.sh removes them)
+packages/analytics/tests/upgrade/.work/
+
 # document-preview int test uploads (staticDir resolves against the package dir)
 packages/document-preview/media/
 # document-preview dev seed downloads (extend and MDN sample files)

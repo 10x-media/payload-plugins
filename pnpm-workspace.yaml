@@ -15,8 +15,10 @@ onlyBuiltDependencies:
 
 catalog:
   '@axe-core/playwright': ^4.11.3
+  '@microsoft/api-extractor': 7.59.4
   '@payloadcms/db-mongodb': 3.85.0
   '@payloadcms/db-postgres': 3.85.0
+  '@payloadcms/db-sqlite': 3.85.0
   '@payloadcms/next': 3.85.0
   '@payloadcms/plugin-multi-tenant': 3.85.0
   '@payloadcms/richtext-lexical': 3.85.0

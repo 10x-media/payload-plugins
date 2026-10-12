@@ -8,27 +8,24 @@ import type {
 	AnalyticsResult,
 	MetricKey,
 } from '../core/contract'
-import { createRegistry } from '../core/registry'
+import { allCrossScope } from '../core/options'
 import type { Goal } from '../goals/types'
 import type { AnalyticsRuntime } from '../plugin/runtime'
-import { setRuntime } from '../plugin/runtime'
 import { resolveTimeframe } from '../timeframe/presets'
 import { readForWidgetGoals } from './readForWidgetGoals'
+import { requestWith } from './widgetTestKit'
 
 const NOW = new Date('2026-06-03T12:00:00.000Z')
 const RANGE = resolveTimeframe('last30days', NOW, 'UTC')
 
 const caps = (over: Partial<AnalyticsCapabilities> = {}): AnalyticsCapabilities => ({
-	perPageQuery: true,
 	realtime: false,
 	comparison: true,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics: new Set<MetricKey>(['conversions', 'revenue', 'visitors']),
 	dimensions: new Set(['goal']),
-	filters: new Set(),
-	filterOperators: new Set(['eq']),
-	batchPageReport: false,
+	filters: {},
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 300 },
 	...over,
@@ -99,23 +96,8 @@ const goalsAdapter = (opts: AdapterOptions = {}): AnalyticsAdapter => ({
 	},
 })
 
-const reqWith = (
-	adapter: AnalyticsAdapter,
-	over: Partial<AnalyticsRuntime> = {}
-): PayloadRequest => {
-	const payload = {} as PayloadRequest['payload']
-	setRuntime(payload, {
-		registry: createRegistry([adapter]),
-		configAdapterIds: new Set([adapter.id]),
-		bindings: {},
-		engine: { read: async (a, query) => a.query(query, {}) },
-		ttl: { aggregate: 3600, realtime: 300 },
-		comparison: true,
-		goals,
-		...over,
-	})
-	return { payload } as PayloadRequest
-}
+const reqWith = (adapter: AnalyticsAdapter, over: Partial<AnalyticsRuntime> = {}): PayloadRequest =>
+	requestWith([adapter], { goals, ...over })
 
 const read = (req: PayloadRequest, over: { limit?: number; compare?: boolean } = {}) =>
 	readForWidgetGoals({
@@ -223,6 +205,7 @@ describe('readForWidgetGoals', () => {
 			goals: [],
 			scoped: true,
 			resolveScope: async () => 'alpha',
+			member: () => true,
 			resolveGoalsDetailed: async (_req, scope) => {
 				seen.push(scope)
 				return [
@@ -236,6 +219,27 @@ describe('readForWidgetGoals', () => {
 		const result = await read(req)
 		expect(seen).toEqual(['alpha'])
 		expect(result.rows.find((r) => r.slug === 'purchase')?.name).toBe('Alpha purchase')
+	})
+
+	// A platform reader with no tenant selected reads every tenant: a tenant's goal is named.
+	it('names another scope’s goals on a read across every scope', async () => {
+		const req = reqWith(goalsAdapter(), {
+			goals: [],
+			scoped: true,
+			resolveScope: async () => null,
+			member: () => true,
+			crossScope: allCrossScope(() => true),
+			resolveGoalsDetailed: async () => [],
+			listGoalsAcross: async () => [
+				{
+					goal: { slug: 'newsletter', name: 'Beta newsletter', match: { kind: 'goal' } },
+					source: 'collection',
+				},
+			],
+		})
+		const result = await read(req)
+		expect(result.rows.find((r) => r.slug === 'newsletter')?.name).toBe('Beta newsletter')
+		expect(result.rows.find((r) => r.slug === 'thanks')?.name).toBe('thanks')
 	})
 
 	it('falls back to slugs when the goals resolution throws', async () => {

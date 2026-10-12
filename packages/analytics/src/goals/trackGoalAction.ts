@@ -1,20 +1,23 @@
 import type { Field, Payload, PayloadRequest } from 'payload'
-import { AnalyticsTrackError } from '../core/serverEvent'
+import { AnalyticsTrackError, type ServerTrackIdentity } from '../core/serverEvent'
+import { valueAt } from '../core/values'
 import { normalizeHostname, requestHostname } from '../native/ingest/requestHost'
 import { ingestAdapter, trackServerEvent } from '../native/ingest/serverTrack'
 import { getRuntime } from '../plugin/runtime'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
-import { validateCurrency } from './currency'
+import { amountField } from './amountField'
+import { GOAL_ACTION_TYPE } from './constants'
+import { type AmountOf, amountCurrencyField, CURRENCY_PATTERN } from './currency'
 import { goalField, goalSlug } from './goalField'
+import { finiteNumber } from './match'
+import { applyRevenueVisibility, moneyField } from './moneyFields'
 
-/** The action type form-builder stores as the block slug on a form's `actions` array. */
-export const GOAL_ACTION_TYPE = 'analyticsGoal'
+export { GOAL_ACTION_TYPE }
 
 /**
- * The run context form-builder hands a post-submit action, narrowed to what goal tracking
- * reads. A structural subset rather than an import: analytics never depends on form-builder
- * at runtime, so an install without it still resolves this module.
+ * Form-builder's post-submit run context as goal tracking reads it, structural so analytics never
+ * depends on form-builder at runtime.
  */
 export interface GoalActionRunArgs {
 	form: { id: number | string; title?: string }
@@ -43,55 +46,63 @@ export interface GoalActionDefinition {
 
 export interface TrackGoalActionOptions {
 	/**
-	 * Site the completion belongs to. Falls back to the submitting request's host as the
-	 * native adapter's `hostname` policy judges it, then to the host of `serverURL`. With none
-	 * of the three the completion is not recorded at all, and one warning names the install.
-	 * Set it whenever a jobs runner queues actions: the runner's request carries the CMS host
-	 * at best, and often no host at all.
+	 * Site the completion belongs to; falls back to the submitting host (per the hostname policy), then
+	 * `serverURL`, else nothing is recorded. Set it whenever a jobs runner queues actions.
 	 */
 	hostname?: string | ((args: GoalActionRunArgs) => string)
 	/** Page the completion is attributed to. Defaults to `/forms/<form id>`. */
 	path?: string | ((args: GoalActionRunArgs) => string)
 	/**
-	 * Analytics boundary to stamp; `null` is install-wide. Leave unset and the scope resolves
-	 * from the action's request, which on a queued dispatch is the runner's rather than the
-	 * submitter's and so usually lands install-wide. Set it on any scoped install whose
-	 * actions are queued, since the submitter's tenant cannot be recovered there.
+	 * Analytics boundary to stamp, `null` install-wide. Unset, it resolves from the action's request, so
+	 * set it on any scoped install whose actions are queued.
 	 */
 	scope?: string | null | ((args: GoalActionRunArgs) => string | null | Promise<string | null>)
+	/**
+	 * `'none'` records no visitor id, location, device or language; a function decides per submission
+	 * from the host's consent. Defaults as `trackServerEvent`'s `identity`.
+	 */
+	identity?:
+		| ServerTrackIdentity
+		| ((args: GoalActionRunArgs) => ServerTrackIdentity | Promise<ServerTrackIdentity>)
+	/**
+	 * Whether the action offers amount inputs. Set it to match your `revenue` option: form-builder often
+	 * registers its blocks too late for the plugin to hide them.
+	 */
+	revenue?: boolean
+	/**
+	 * Currency the Amount control fills in for an amount set without one, normally your
+	 * `revenue.currency`. Unset, the editor picks.
+	 */
+	defaultCurrency?: string
 }
 
-const configFields = (): Field[] => [
+/** The amount the action's currency belongs to: its fixed amount. */
+const fixedAmount: AmountOf = ({ siblingData }) => valueAt(siblingData, 'value')
+
+const configFields = (defaultCurrency: string | undefined): Field[] => [
 	goalField({ name: 'goal', required: true }),
-	{
-		name: 'value',
-		type: 'number',
-		min: 0,
-		label: labelForKey(keys.goalFieldValue),
-	},
-	{
+	moneyField(
+		amountField(
+			{ name: 'value', type: 'number', min: 0, label: labelForKey(keys.goalFieldAmount) },
+			{ currencyPath: 'currency', defaultCurrency }
+		)
+	),
+	moneyField({
 		name: 'valueFrom',
 		type: 'text',
 		label: labelForKey(keys.actionGoalFieldValueFrom),
 		admin: { description: labelForKey(keys.actionGoalFieldValueFromHelp) },
-	},
-	{
-		name: 'currency',
-		type: 'text',
-		label: labelForKey(keys.goalFieldCurrency),
-		validate: validateCurrency,
-	},
+	}),
+	moneyField(amountCurrencyField(fixedAmount)),
 ]
 
-const finiteNumber = (value: unknown): number | undefined => {
-	if (typeof value === 'number') {
-		return Number.isFinite(value) ? value : undefined
+const checkedCurrency = (code: string | undefined): string | undefined => {
+	if (code !== undefined && !CURRENCY_PATTERN.test(code)) {
+		throw new Error(
+			`analytics: trackGoalAction's defaultCurrency must be a three-letter ISO 4217 code, got "${code}"`
+		)
 	}
-	if (typeof value === 'string' && value.trim() !== '') {
-		const parsed = Number(value)
-		return Number.isFinite(parsed) ? parsed : undefined
-	}
-	return undefined
+	return code
 }
 
 const nonEmpty = (value: unknown): string | undefined => {
@@ -105,8 +116,7 @@ const nonEmpty = (value: unknown): string | undefined => {
 const fromOption = (
 	option: string | ((args: GoalActionRunArgs) => string) | undefined,
 	args: GoalActionRunArgs
-): string | undefined =>
-	nonEmpty(typeof option === 'function' ? option(args) : (option ?? undefined))
+): string | undefined => nonEmpty(typeof option === 'function' ? option(args) : option)
 
 const serverUrlHost = (payload: Payload): string | null => {
 	const serverURL = nonEmpty(payload.config?.serverURL)
@@ -121,10 +131,8 @@ const serverUrlHost = (payload: Payload): string | null => {
 }
 
 /**
- * The submitting request's host as the hostname policy of the very adapter the event is written
- * through judges it: a `Host` header is forgeable, and a conversion must not be able to mint a
- * hostname the ingest endpoint would have refused. Without that adapter exposing the seam the
- * request's own host stands in, which is the policy's default anyway.
+ * The submitting host as the writing adapter's hostname policy judges it: a `Host` header is
+ * forgeable, and a conversion must not mint a hostname ingest would refuse.
  */
 const policyHostname = async (
 	args: GoalActionRunArgs,
@@ -143,11 +151,8 @@ const policyHostname = async (
 }
 
 /**
- * The option, then the submitting request under the ingest hostname policy, then the install's
- * own `serverURL`. Every rung is normalized to the one hostname shape, and null means the
- * conversion cannot be attributed to any site at all. The queued dispatch path reaches the last
- * two with the runner's request, so an install that queues actions and serves more than one
- * site has to say which site in the option.
+ * The option, then the submitting request under the hostname policy, then `serverURL`; null means no
+ * site can be credited.
  */
 const hostnameFor = async (
 	options: TrackGoalActionOptions,
@@ -163,10 +168,7 @@ const hostnameFor = async (
 
 let warnedNoHostname = false
 
-/**
- * Once per process: a public form would otherwise let a repeated submission choose how much the
- * log grows, and a whole install misconfigured this way is one line's worth of news.
- */
+/** Once per process, so repeated public submissions cannot choose how much the log grows. */
 const warnNoHostname = (payload: Payload): void => {
 	if (warnedNoHostname) {
 		return
@@ -213,23 +215,16 @@ const scopeFor = async (
 }
 
 /**
- * A form-builder post-submit action that completes an analytics goal, authored per form in
- * the admin: pick the goal, optionally a revenue value (fixed, or read from a submission
- * field) and its currency. Register it through form-builder's `actions` option under
- * {@link GOAL_ACTION_TYPE}.
- *
- * Needs the native adapter, since it records through {@link trackServerEvent}. `essential`
- * is deliberately unset: a goal is a measurement, so a failed write is logged and the
- * submission still succeeds.
- *
- * On any install with a jobs runner, form-builder queues non-essential actions, and the
- * queued run carries the runner's request rather than the visitor's. Set `hostname` (and
- * `scope`, on a scoped install) there, since neither can be recovered from that request.
+ * A form-builder post-submit action completing an analytics goal, configured per form; needs the
+ * native adapter. Not essential: a failed write is logged and the submission still succeeds.
  */
 export const trackGoalAction = (options: TrackGoalActionOptions = {}): GoalActionDefinition => ({
 	type: GOAL_ACTION_TYPE,
 	label: keys.actionGoalLabel,
-	config: configFields(),
+	config: applyRevenueVisibility(
+		configFields(checkedCurrency(options.defaultCurrency)),
+		options.revenue ?? true
+	),
 	run: async (args) => {
 		const slug = goalSlug(args.config.goal)
 		if (!slug) {
@@ -241,6 +236,8 @@ export const trackGoalAction = (options: TrackGoalActionOptions = {}): GoalActio
 			warnNoHostname(args.payload)
 			return
 		}
+		const identity =
+			typeof options.identity === 'function' ? await options.identity(args) : options.identity
 		await trackServerEvent(
 			args.payload,
 			{
@@ -253,7 +250,7 @@ export const trackGoalAction = (options: TrackGoalActionOptions = {}): GoalActio
 				props: propsFor(args),
 				...scope,
 			},
-			{ req: args.req }
+			{ req: args.req, ...(identity === undefined ? {} : { identity }) }
 		)
 	},
 })

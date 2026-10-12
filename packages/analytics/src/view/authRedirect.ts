@@ -1,7 +1,6 @@
 import type { Params, SanitizedConfig } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 
-/** The admin path the reader asked for, with the state they had, ready to come back to. */
 const returnPath = (config: SanitizedConfig, params?: Params, searchParams?: Params): string => {
 	const segments = Array.isArray(params?.segments) ? params.segments : []
 	const path = formatAdminURL({
@@ -21,9 +20,8 @@ const returnPath = (config: SanitizedConfig, params?: Params, searchParams?: Par
 }
 
 /**
- * Where to send a reader who is not signed in. Custom admin views bypass the root router's
- * auth redirect, so the view enforces this itself. The view's whole state lives in the query
- * string, so it travels along and the reader lands back on the same dashboard.
+ * Login URL for a signed-out reader: custom admin views bypass root router's auth redirect. Query
+ * string carries the view's whole state, so the reader lands back on the same dashboard.
  */
 export const loginRedirectUrl = ({
 	config,

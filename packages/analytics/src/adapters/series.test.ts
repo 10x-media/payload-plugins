@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { dayIso, hourIso } from './series'
+import { datedRows, dayIso, hourIso } from './series'
 
 describe('dayIso', () => {
 	it('normalizes a YYYY-MM-DD date to a UTC day ISO string', () => {
@@ -32,5 +32,27 @@ describe('hourIso', () => {
 	})
 	it('returns null for an unparseable value', () => {
 		expect(hourIso('2026-13-45 99:99:99')).toBeNull()
+	})
+})
+
+describe('datedRows', () => {
+	it('dates each row by its first key, keeping samples and skipping a row it cannot date', () => {
+		expect(
+			datedRows(
+				[
+					{ keys: ['2026-06-23'], metrics: { pageviews: 4 } },
+					{ keys: ['soon'], metrics: { pageviews: 9 } },
+					{ keys: ['2026-06-24'], metrics: { avgDuration: 1200 }, samples: { avgDuration: 3 } },
+				],
+				dayIso
+			)
+		).toEqual([
+			{ timestamp: '2026-06-23T00:00:00.000Z', metrics: { pageviews: 4 } },
+			{
+				timestamp: '2026-06-24T00:00:00.000Z',
+				metrics: { avgDuration: 1200 },
+				samples: { avgDuration: 3 },
+			},
+		])
 	})
 })

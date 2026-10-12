@@ -5,167 +5,59 @@ description: Per-tenant analytics providers, a shared platform provider, and sco
 
 `@10x-media/analytics` is tenancy-agnostic: it has no dependency on any tenant plugin. The integration point is a single concept called **scope**, a string identifying an analytics boundary (a tenant id, a site key). `null` means the whole install, which is the default single-site behavior. This page walks through the full multi-tenant recipe with `@payloadcms/plugin-multi-tenant`, but the same options work for any multi-site setup.
 
-## The moving parts
+## 1. Resolve the tenant, and say who belongs to it
 
-| Option | What it does |
-|---|---|
-| `scopeResolver` | Maps each request to its scope (e.g. the tenant id). Reads, widget data, and native ingest all resolve through it, and native ingest drops an event whose request resolves none. |
-| `scopes` | Enumerates every tenant scope so the cache-warm and sync cron tiers fan out per tenant. See [Cron tiers](#5-cron-tiers). |
-| `providers.collection` | Opt-in admin collection where providers are configured at runtime (per scope). |
-| `platformAdapter` | Names one config adapter shared by every scope: the platform's own analytics. |
-| `access.read` | Gates every authenticated read endpoint (query, document panel, realtime, sources, goals). Defaults to any signed-in user, so it changes nothing until you set it. |
-| `access.platformRead` | Gates cross-scope reads. Defaults to deny once `scopeResolver` is set; defaults to any authenticated admin user without it. |
-| `posthog({ scopeProperty })` | Lets one PostHog project serve per-scope reads by filtering on an event property. |
-| `capture.slots` | Which adapter captures for the platform (`global`) and for the request's tenant (`tenant`). See [Capture slots per tenant](#capture-slots-per-tenant). |
-| `captureRewrites` | Next.js rewrites for a first-party vendor proxy, when you would rather not serve it from the app. |
-| `reportingTimezone` | Aligns daily boundaries to a timezone, per install or per tenant. See [Reporting timezone](/analytics/timezone). |
+A scoped install answers two questions about every request, with two options.
 
-## 1. Resolve the tenant as the scope
+- **Selection**, `scope.resolve`: which tenant is this request for? The site a visit landed on, or the tenant an admin picked in the tenant selector.
+- **Membership**, `scope.member`: does the request's user belong to that tenant?
 
-Tell the plugin how to find the current tenant. With `plugin-multi-tenant`, its cookie utility is the simplest source:
+They are different questions because a selection proves nothing. The tenant-selector cookie is set in the browser, so anyone can point it at any tenant. `@payloadcms/plugin-multi-tenant` makes the same split: its cookie only filters lists, and the user's own tenants decide access. The analytics plugin follows suit. Every read (the query, realtime, document, sources and goals endpoints, the dashboard widgets, the display fields and the analytics view) and every write to the providers, goals and sync collections refuses a tenant its user does not belong to, unless `access.crossScope.named` grants it. A refused endpoint answers `400 untrusted_scope`, a widget or a display field shows its no-access state, and a collection shows no rows and refuses the write.
+
+`scope.member` is therefore required whenever `scope.resolve` is set, and the boot fails without it.
+
+### `tenantMembership()`
+
+With `plugin-multi-tenant`, the membership check is one call. `tenantMembership()` reads the user's tenants array the way that plugin stores it: one row per tenant in `tenants`, each holding a `tenant` relationship, populated or not, compared as strings so numeric ids match. It has no dependency on the plugin.
+
+| Option | Default | What it does |
+|---|---|---|
+| `tenantsArrayFieldName` | `'tenants'` | The array field on a user listing their tenants. |
+| `tenantsArrayTenantFieldName` | `'tenant'` | The relationship to a tenant inside each row of that array. |
+| `userHasAccessToAllTenants` | none | Users who belong to every tenant. Pass the same function the multi-tenant plugin's own option is. |
+
+A user with no session belongs to nothing. `() => true` is the explicit opt-out, for a resolver that derives the scope from `req.user` itself, so a user can never select a tenant they do not belong to.
+
+### The call site
+
+`scope.resolve` receives `{ req, callSite }`, and the call site is one of two.
+
+- **`capture`**: a visitor's hit. The native ingest endpoint, the tracker config (the endpoint and `getTrackerConfig`), the capture proxy, and `trackServerEvent`, `purchase` and `refund` called with a request and no explicit scope.
+- **`admin`**: everything a signed-in reader or editor does.
+
+Payload signs in every API request it can, so a beacon from an editor's own browser arrives with their session. At the `capture` call site the plugin hands the resolver the request without its signed-in user, its cookies and its authorization header, so that visit is filed under the site it happened on, never under the tenant the editor selected. Resolve `capture` from something the visit itself carries, typically its hostname, matched against a domain the tenant owns.
+
+### A worked example
+
+A platform whose admins and moderators work across every tenant, and whose tenants each own a domain:
 
 ```ts
-import { getTenantFromCookie, getUserTenantIDs } from '@payloadcms/plugin-multi-tenant/utilities'
-import { analytics } from '@10x-media/analytics'
+import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
+import { getTenantFromCookie } from '@payloadcms/plugin-multi-tenant/utilities'
+import { analytics, type ScopeResolver, tenantMembership } from '@10x-media/analytics'
 import { native } from '@10x-media/analytics/adapters/native'
-import { posthog } from '@10x-media/analytics/adapters/posthog'
+import type { PayloadRequest, TypedUser } from 'payload'
 
-analytics({
-  adapters: [
-    native(),
-    posthog({
-      projectId: process.env.POSTHOG_PROJECT_ID ?? '',
-      apiKey: process.env.POSTHOG_API_KEY ?? '',
-      host: 'https://eu.posthog.com',
-      scopeProperty: 'tenant',
-    }),
-  ],
-  platformAdapter: 'posthog',
-  scopeResolver: ({ req }) => {
-    const tenant = getTenantFromCookie(req.headers, req.payload.db.defaultIDType)
-    if (!req.user || req.user.roles?.includes('platform-admin')) {
-      return tenant === null ? null : String(tenant)
-    }
-    const tenantIds = getUserTenantIDs(req.user).map(String)
-    if (tenant !== null && tenantIds.includes(String(tenant))) {
-      return String(tenant)
-    }
-    throw new Error('no valid tenant selected')
-  },
-  providers: { collection: { scopeField: 'tenant' } },
-})
-```
+/** Staff who belong to every tenant. The multi-tenant plugin gets the very same function. */
+const userHasAccessToAllTenants = (user: TypedUser): boolean =>
+  (user.roles ?? []).some((role: string) => role === 'admin' || role === 'moderator')
 
-With a `scopeResolver` configured, the native engine adds an indexed `scope` column to its events and rollups: ingest stamps every event with the resolved scope, and every read filters by the request's scope. Enabling this on an **existing** native install requires a migration for the new column (`pnpm payload migrate:create` in your app).
-
-The resolver does more than stamp. On a scoped install, a native event whose request resolves no scope is **dropped**, unless its hostname is one of the native adapter's [`platformHostnames`](/analytics/native#scoped-installs-and-platformhostnames). So the resolver decides which traffic is stored at all, and a tenant lookup that fails closed is what keeps an unknown host out of the events collection rather than parking it in the install-wide bucket.
-
-The tenant-selector cookie is set client-side, so a `scopeResolver` must never trust it alone: validate it against `req.user`'s own tenant assignments (`getUserTenantIDs`, shown above) before treating it as that request's scope, and throw when it names a tenant the user does not belong to, the same fail-closed handling every scopeResolver failure gets (reads degrade to unavailable, provider access denies, provider writes reject). A platform admin bypasses the check, since they are allowed to select any tenant.
-
-The same resolver also runs on the three public endpoints a visitor's browser calls with no admin session and no `plugin-multi-tenant` cookie at all: the native ingest endpoint, the tracker config endpoint, and the capture proxy. A real install must resolve those from something the request itself carries independent of any admin cookie, typically the request's hostname (one domain per tenant). The recipe above resolves from the tenant-selector cookie alone, which only works for admin-authenticated requests (dashboard reads, and seeding tenant-attributed data in development); it is not a pattern for a real install's capture path. The plugin's dev app resolves anonymous traffic by hostname and falls back to the selector only for `req.user`, which is the shape to copy (see [Dev app: TENANCY=on](#dev-app-tenancyon)). [Capture slots per tenant](#capture-slots-per-tenant) has the resolver, and what goes wrong with the alternatives.
-
-## 2. Register the provider collection per tenant
-
-`providers.collection` scaffolds an `analytics-providers` collection where providers (Plausible, Umami, GA4, PostHog) are configured from the admin UI. Beside the credentials and the public capture fields, two fields shape what a provider serves: Plausible's `revenueCurrency` (the ISO code of the site's revenue goals, which is what turns its `revenue` metric on) and GA4's `measurementId` (which turns capture on). Both are validated on the document, so a lowercase currency or a malformed measurement id is rejected at save rather than at read. Register the collection with `plugin-multi-tenant` as a per-tenant global:
-
-```ts
-multiTenantPlugin({
-  collections: {
-    'analytics-providers': { isGlobal: true },
-  },
-})
-```
-
-`isGlobal: true` turns the collection into a per-tenant "global": `plugin-multi-tenant` makes the tenant relationship unique, so at most one provider document can exist per tenant, and there is no list view for anyone, platform admins included. The nav entry and list route redirect straight to whichever tenant is currently selected, falling back to the user's first tenant when none is (no `plugin-multi-tenant` cookie yet), so a platform admin manages providers one tenant at a time through the tenant selector too, the same as a tenant user; reading or writing every tenant's document at once means going through the REST or local API directly, where `access.platformRead` returning `true` lifts the scope filter. The tenant plugin adds its `tenant` field and scoped access automatically; `scopeField: 'tenant'` (from step 1) points the plugin's provider lookup at that field, so each tenant's enabled providers resolve for exactly that tenant's scope.
-
-Set `isGlobal: false` instead (or omit the collection from `multiTenantPlugin`'s `collections` map) when a tenant needs more than one provider configured: without the global's unique-tenant constraint, a tenant can hold several provider documents at once. A tenant configuring their own Plausible there gets it layered onto the static config adapters for their scope only. Every runtime provider document gets its own instance id (`posthog:<docId>`) and appends to the scope's registry alongside the config adapters, so a tenant can run several projects of one provider type side by side. The provider document's `name` (a generated label stands in when unset) is the label shown in data-source pickers; a tenant preferring their own PostHog over the platform's selects it as the widget's data source. The data source and metric selects in dashboard widgets resolve their available options live through an authenticated `GET /api/analytics/sources` endpoint, cached per admin session, so a provider a tenant configures appears in their widget pickers without a redeploy, and only for their scope. Credentials are sealed with `@10x-media/fields` encryption (`writeOnly`: never readable back through any API, admin included; a 4-character hint identifies which key is currently stored); the internal adapter factory is the only reader that ever sees the decrypted value. `@10x-media/fields` is an optional peer of `@10x-media/analytics`, required once `providers.collection` is enabled; install it alongside. A dedicated key ring can be set with `providers: { collection: { encryption: { keys } } }`; left unset, the fields plugin's global `encrypted.keys` applies, and with neither configured the ring derives from the Payload secret. That derived ring is fine for a dev install; configure a dedicated key for anything beyond that.
-
-Without a tenant plugin, the same collection works standalone: the hidden `scope` text field binds a document to a scope (empty scope = the whole install), and `access` / `overrides` on `providers.collection` reshape anything.
-
-Default access is scope-aware: with a `scopeResolver` configured, a tenant can read, update, and delete only their own provider documents, and every create is stamped with the request's resolved scope server-side, so a tenant can neither create a document for another scope nor move one there. `access.platformRead` lifts both restrictions for platform admins, who see and manage every scope; scoped installs default it to deny, so configure it (for example a role check) or no one, including you, can see or manage another tenant's providers. Unscoped installs (no `scopeResolver`) keep the historical any-authenticated-admin-user behavior.
-
-The scope stamp runs as a `beforeChange` hook, so it applies to **every** write, including ones made with `overrideAccess: true`: hooks always run regardless of access control. A migration or seed script creating a provider document for another tenant needs a `req` for which `platformRead` resolves `true` (build one from a platform user, e.g. via `createLocalReq`), otherwise the stamp rejects the write.
-
-### Upgrading from plaintext credentials
-
-Rows saved before encryption was added keep working: decryption passes an already-plaintext value through untouched, and the document seals the next time it is saved from the admin UI. To seal everything in bulk without waiting on individual saves, run `encryptExistingData` once:
-
-```ts
-import { encryptExistingData } from '@10x-media/fields/encrypted'
-import { getPayload } from 'payload'
-import config from './payload.config'
-
-const payload = await getPayload({ config })
-await encryptExistingData(payload, { collections: ['analytics-providers'] })
-```
-
-## 3. Platform analytics through a first-party proxy
-
-The platform (host) project captures events from **all** tenant pages through the app's own domain, which also survives ad blockers. Wire PostHog's recommended reverse proxy with the exported helper:
-
-The plugin's [runtime proxy](/analytics/proxy#runtime-endpoint) already serves the platform's slot at `/api/analytics/p/global` with no config, and `<AnalyticsScripts />` renders PostHog's snippet pointed at it. Use Next rewrites instead when you would rather the beacons never touched your app server:
-
-```ts
-// next.config.ts
-import { captureRewrites } from '@10x-media/analytics/next'
-import { posthog } from '@10x-media/analytics/adapters/posthog'
-
-const nextConfig = {
-  skipTrailingSlashRedirect: true, // PostHog capture endpoints use trailing slashes
-  async rewrites() {
-    return captureRewrites([
-      // projectToken is what makes the adapter declare capture; the read
-      // credentials are unused here.
-      { path: '/ph', adapter: posthog({ projectId: '', apiKey: '', region: 'eu', projectToken: 'phc_...' }) },
-    ])
-  },
-}
-```
-
-Then point the slot at that path so its snippet stops using the runtime mount, and stamp every event with the tenant:
-
-```ts
-analytics({ capture: { paths: { global: '/ph' } } })
-
-// in the browser, once the SDK has loaded
-posthog.register({ tenant: currentTenantId })
-```
-
-`posthogProxyRewrites` still works and is now a deprecated wrapper over `captureRewrites`.
-
-The `scopeProperty: 'tenant'` on the platform adapter (step 1) closes the loop: a tenant admin's dashboard reads through the shared PostHog project, and the adapter filters `properties['tenant']` to their scope. Tenants see their slice; nobody needs per-tenant PostHog credentials.
-
-### Capture slots per tenant
-
-A scoped install fills two [capture slots](/analytics/capture#capture-slots) per request: `global` from the config registry (the `platformAdapter`, or `capture.slots.global`), and `tenant` from the request's own resolved scope's registry, which includes that scope's runtime providers. So one page can send to the platform's PostHog and to the tenant's own Plausible at once. When both slots resolve to the same adapter, only the global entry survives, so a scoped native install never posts every event twice.
-
-The `tenant` slot is empty whenever no scope resolves, and nothing is captured for it. A provider document fills it only once its **public** capture fields are set, since an adapter declares capture support from those alone: `projectToken` (plus the optional `region`) for PostHog, `domain` or `scriptId` for Plausible, `websiteId` for Umami, and `measurementId` for GA4, which is validated on save and fills no slot when it is anything but `^[A-Za-z0-9-]+$`. They sit beside the sealed credentials in the provider document, unencrypted because the tracker serves them to the browser; a document holding only query credentials reads dashboards and captures nothing.
-
-<Callout type="warn">
-The tracker endpoint and the capture proxy are **public and unauthenticated**: a visitor's browser calls them with no admin session. Your `scopeResolver` runs on those requests too.
-
-Two consequences. A resolver that derives the scope from something a client controls, a header or a query parameter, is attacker-reachable there: anyone can attribute traffic (and revenue) to any tenant. And a resolver that needs `req.user` resolves nothing for a visitor, so the tenant slot is simply always empty and the install captures nothing per tenant.
-
-**The hostname is a request header too.** `Host` is as forgeable as any other header, so hostname resolution is only trustworthy when something upstream guarantees it: the deployment rejects unknown hosts at the edge (a platform that routes by verified domain, or an explicit `server_name` allowlist), or the resolver itself matches the host against domains it already knows. Do both if you can. A resolver that looks a tenant up by whatever label the header happens to carry is the same spoof with extra steps.
-
-So: resolve public traffic from the hostname, match it against the tenant's own stored domain rather than parsing a label out of it, and fail closed to the null scope on no match. The admin-session path can still win where it applies, so an admin browsing a tenant's own domain is attributed by their selector rather than by the host.
-
-That resolver is also what keeps the events collection clean. The native engine stores an event under the host the request carried, never under the one the body claims, and on a scoped install it drops an event whose request resolves no scope. So a forged `Host` naming a domain no tenant owns writes nothing at all, rather than a hostname bucket in the install-wide scope. The two native options beside it are [`platformHostnames`](/analytics/native#scoped-installs-and-platformhostnames), for the platform's own domains, which resolve no tenant and should still be counted, and the [`hostname` resolver form](/analytics/native#a-resolver), for a split deployment whose page host is not the host the beacon lands on.
-</Callout>
-
-A worked resolver for a platform whose tenants bring their own domains. The tenant document holds the domain; nothing about it is listed in config:
-
-```ts
-import { getTenantFromCookie, getUserTenantIDs } from '@payloadcms/plugin-multi-tenant/utilities'
-import type { PayloadRequest } from 'payload'
-
+/** A visit's tenant: the one owning the domain it arrived on, matched rather than parsed. */
 const tenantByHost = async (req: PayloadRequest): Promise<string | null> => {
   const host = req.headers.get('host')?.split(':')[0]?.toLowerCase()
   if (!host) {
     return null
   }
-  // Matched against a stored domain, never a parsed label: an unknown Host finds
-  // no tenant and the request resolves no scope.
   const { docs } = await req.payload.find({
     collection: 'tenants',
     where: { domain: { equals: host } },
@@ -176,28 +68,239 @@ const tenantByHost = async (req: PayloadRequest): Promise<string | null> => {
   return docs[0] ? String(docs[0].id) : null
 }
 
-analytics({
-  // ...
-  scopeResolver: async ({ req }) => {
-    // Public traffic is attributed by the host it arrived on. An admin session is
-    // attributed by its own selector instead, so an admin browsing a tenant's domain
-    // still reads the tenant they selected.
-    if (!req.user) {
-      return await tenantByHost(req)
-    }
-    const tenant = getTenantFromCookie(req.headers, req.payload.db.defaultIDType)
-    if (req.user.roles?.includes('platform-admin')) {
-      return tenant === null ? null : String(tenant)
-    }
-    // Never the client-set cookie alone: it has to name a tenant this user belongs to.
-    const tenantIds = getUserTenantIDs(req.user).map(String)
-    if (tenant !== null && tenantIds.includes(String(tenant))) {
-      return String(tenant)
-    }
-    throw new Error('no valid tenant selected')
+type TenantRow = { tenant?: string | number | { id: string | number } | null }
+
+/** The tenants a user is assigned, read as the multi-tenant plugin stores them. */
+const assignedTenants = (user: TypedUser): string[] =>
+  ((user.tenants ?? []) as TenantRow[]).flatMap(({ tenant }) =>
+    tenant === null || tenant === undefined ? [] : [String(typeof tenant === 'object' ? tenant.id : tenant)]
+  )
+
+/** Selection: the site a visit landed on, or the tenant an admin selected. */
+const resolveTenant: ScopeResolver = async ({ req, callSite }) => {
+  if (callSite === 'capture') {
+    return tenantByHost(req)
+  }
+  const selected = getTenantFromCookie(req.headers, req.payload.db.defaultIDType)
+  if (selected !== null) {
+    return String(selected)
+  }
+  // No cookie yet: the user's only tenant, which the multi-tenant plugin's selector picks too.
+  const own = req.user && !userHasAccessToAllTenants(req.user) ? assignedTenants(req.user) : []
+  return own.length === 1 ? (own[0] ?? null) : null
+}
+
+/** Membership: whether the signed-in user belongs to the tenant they selected. */
+const member = tenantMembership({ userHasAccessToAllTenants })
+
+export const plugins = [
+  analytics({
+    adapters: [native()],
+    scope: { resolve: resolveTenant, member },
+    access: {
+      crossScope: ({ req }) => (req.user ? userHasAccessToAllTenants(req.user) : false),
+    },
+    providers: { collection: { scopeField: 'tenant' } },
+    capture: { gate: 'all' }, // which slots wait for your consent manager: see Consent
+  }),
+  multiTenantPlugin({
+    collections: { 'analytics-providers': {} },
+    userHasAccessToAllTenants,
+  }),
+]
+```
+
+An editor of one tenant who points the selector at another reads nothing there. Admins and moderators belong to every tenant through `userHasAccessToAllTenants`, and `access.crossScope` is what lets them aggregate across tenants or read the platform's own shared source as well.
+
+### What the scope does
+
+With `scope.resolve` configured, ingest stamps every hit with the resolved scope, and every read filters by the request's scope. The native engine's collections carry `scope` on every install, `''` where there is none, so turning scoping on needs no migration; hits stored before it stay under the install-wide scope.
+
+The resolver does more than stamp. On a scoped install, a native event whose request resolves no scope is **dropped**, unless its hostname is one of the native adapter's [`platformHostnames`](/analytics/native#scoped-installs-and-platformhostnames). So the resolver decides which traffic is stored at all, and a tenant lookup that fails closed is what keeps an unknown host out of the stored hits rather than parking it under the install-wide scope.
+
+A resolver that throws fails closed the same way everywhere: reads degrade to unavailable, provider access denies, provider writes reject. [Capture slots per tenant](#capture-slots-per-tenant) covers the capture side, and what goes wrong with the alternatives to a hostname.
+
+## The moving parts
+
+| Option | What it does |
+|---|---|
+| `scope.resolve` | Selects each request's scope (e.g. the tenant id), told whether it asks for a `capture` or an `admin` call site. Reads, widget data, and native ingest all resolve through it, and native ingest drops an event whose request resolves none. Answering `'*'` is refused: that marker is a reader's request for every scope. |
+| `scope.member` | Whether the request's user belongs to the scope it selected. Required with `scope.resolve`; `tenantMembership()` covers `plugin-multi-tenant`. |
+| `scope.list` | Enumerates every tenant scope so the sync task fans out per tenant ([Cron tiers](#5-cron-tiers)). |
+| `scope.label` | Names the resolved scope in the view's caption. |
+| `providers.collection` | Opt-in admin collection where providers are configured at runtime (per scope). |
+| `platformAdapter` | Names one config adapter shared by every scope: the platform's own analytics. |
+| `access.read` | Gates every read: the read endpoints (query, document panel, realtime, sources, goals, refresh), the dashboard widgets and the display fields. Defaults to `isAdminUser`, the users of the admin collection (`admin.user`), so a second auth collection (customers, members) reads nothing. |
+| `access.crossScope` | The three cross-scope decisions: `named` (read a tenant you are not), `aggregate` (read every tenant at once), `unscopedSource` (read a tenant through the platform's own shared source). A function grants all three at once. See [Who sees what](#4-who-sees-what). |
+| `collections.<slug>.scopeField` | The field a bound collection's documents carry their tenant in: `'tenant'` unless set, the field `plugin-multi-tenant` adds. The boot fails when a bound collection has no field of that name; `false` reads the request's own scope instead. See [Whose numbers a document shows](/analytics/display-fields#whose-numbers-a-document-shows). |
+| `posthog({ scopeProperty })` | Lets one PostHog project serve per-scope reads by filtering on an event property. |
+| `capture.slots` | Which adapter captures for the platform (`global`) and for the request's tenant (`tenant`). See [Capture slots per tenant](#capture-slots-per-tenant). |
+| `captureRoute()` | Not a plugin option: a route handler from `@10x-media/analytics/next` that relays one adapter's vendor tracker, when you would rather serve the platform's first-party proxy from a route of your own than through the runtime one. See [A route handler of your own](/analytics/proxy#a-route-handler-of-your-own). |
+| `reportingTimezone` | Aligns daily boundaries to a timezone, per install or per tenant. See [Reporting timezone](/analytics/timezone). |
+
+The options that only mean something on a scoped install fail the boot without `scope.resolve`: `scope.list`, `scope.label`, `scope.member`, `access.crossScope`, an adapter id in `capture.slots.tenant`, `capture.paths.tenant`, a `collections.<slug>.scopeField` other than `false`, and `goals.collection.scopeField` or `providers.collection.scopeField` when set at all. `scope.resolve` in turn fails the boot without `scope.member`.
+
+### What scope guarantees
+
+Scope is the boundary the plugin's own surfaces enforce: every endpoint, widget, display field and read helper asks `access.read`, then the scope, then membership, before it reads, so a tenant cannot read another tenant's numbers by asking for them. It is not a database boundary. Every scope's rows share one set of collections, which your own server code reads across through the Local API; a hit is filed under whatever `scope.resolve` answers at the `capture` call site, so attribution is as trustworthy as that resolver; and a shared source that cannot narrow its query to one tenant answers install-wide numbers to whoever may read it ([Concepts](/analytics/concepts#what-scope-does-and-does-not-guarantee)).
+
+## 2. Register the provider collection per tenant
+
+`providers.collection` scaffolds an `analytics-providers` collection where providers (Plausible, Umami, GA4, PostHog) are configured from the admin UI. Beside the credentials and the public capture fields, three fields shape what a provider serves: Plausible's `revenueCurrency` (the ISO code of the site's revenue goals, which is what turns its `revenue` metric on), GA4's `currency` (the property's currency, for an answer that does not name it) and GA4's `measurementId` (which turns capture on). All three are validated on the document, so a lowercase currency or a malformed measurement id is rejected at save rather than at read. A `host` is checked the same way, as an https address with an optional base path, and only hosts the install allows are ever reached: see [Where a document may connect](/analytics/providers#where-a-document-may-connect). Register the collection with `plugin-multi-tenant`:
+
+```ts
+import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
+
+export const tenants = multiTenantPlugin({
+  collections: {
+    'analytics-providers': {},
   },
 })
 ```
+
+A tenant normally holds more than one provider document, since its `native` one is what turns storing and reading its own visits on, so leave `isGlobal` off. `isGlobal: true` makes the tenant relationship unique, which caps a tenant at one provider and therefore forces a choice between native and a vendor.
+
+With `isGlobal: true`, which suits an install where each tenant genuinely runs one source, the collection becomes a per-tenant "global": `plugin-multi-tenant` makes the tenant relationship unique, so at most one provider document can exist per tenant, and there is no list view for anyone, platform admins included. The nav entry and list route redirect straight to whichever tenant is currently selected, falling back to the user's first tenant when none is (no `plugin-multi-tenant` cookie yet), so a platform admin manages providers one tenant at a time through the tenant selector too, the same as a tenant user; reading or writing every tenant's document at once means going through the REST or local API directly, where `access.crossScope.named` returning `true` lifts the scope filter. The tenant plugin adds its `tenant` field and scoped access automatically; `scopeField: 'tenant'` (from step 1) points the plugin's provider lookup at that field, so each tenant's enabled providers resolve for exactly that tenant's scope.
+
+Without that constraint a tenant holds as many provider documents as it needs. A tenant configuring their own Plausible there gets it layered onto the static config adapters for their scope only. Every runtime provider document gets its own instance id (`posthog:<docId>`) and appends to the scope's registry alongside the config adapters, so a tenant can run several projects of one provider type side by side. The provider document's `name` (a generated label stands in when unset) is the label shown in data-source pickers; a tenant preferring their own PostHog over the platform's selects it as the widget's data source. The data source and metric selects in dashboard widgets resolve their available options live through an authenticated `GET /api/_x/sources` endpoint, cached per user and per scope (a token for the scope the server resolved, so the host's selector may live in a cookie, a header or the user) for the admin session, so a provider a tenant configures appears in their widget pickers without a redeploy, and only for their scope. Credentials are sealed with `@10x-media/fields` encryption (`writeOnly`: never readable back through any API, admin included; a 4-character hint identifies which key is currently stored); the internal adapter factory is the only reader that ever sees the decrypted value. `@10x-media/fields` is a required peer of `@10x-media/analytics`, installed alongside it. A dedicated key ring can be set with `providers: { collection: { encryption: { keys } } }`; left unset, the fields plugin's global `encrypted.keys` applies, and with neither configured the ring derives from the Payload secret. That derived ring is fine for a dev install; configure a dedicated key for anything beyond that.
+
+Without a tenant plugin, the same collection works standalone: the hidden `scope` text field binds a document to a scope (empty scope = the whole install), and `access` / `overrides` on `providers.collection` reshape anything.
+
+### Native is a provider type
+
+One of the provider types is **Payload**: `provider: 'native'`, with no credentials to fill in. It says this scope stores its visits in Payload and reads them back from there. The adapter behind it is the `native()` you already registered in `adapters`, filtered to the scope exactly as before; the document does not build a second engine, it grants the one that exists.
+
+That makes native a per-tenant decision instead of an install-wide one, and it runs both ways:
+
+- **Reads.** A tenant with no enabled `native` document does not see the native source at all, in the view, the widget pickers, the per-document panel or `GET /api/_x/sources`.
+- **Capture and ingest.** The tenant capture slot fills from that tenant's own provider documents, so a tenant without a `native` document gets no native beacon in its tracker config, and a beacon posted to the ingest endpoint under that scope is dropped. A dropped beacon answers the same `202` a stored one does, and so does a beacon whose order id ingest refuses, so ingest's answer does not say which tenants store visits. The public tracker config does show which slots a host fills, by design.
+
+The ingest route stays mounted install-wide, and `native()` stays in `adapters`: the documents decide which scopes store through it, not whether it exists. A tenant whose `native` document is turned off keeps everything it already stored; only new beacons stop.
+
+Ingest decides from a small read of the scope's provider documents (ids, save times, `provider`, `enabled` and scope), which each instance repeats at most once every ten seconds per scope; it never reads or decrypts a credential to take a beacon. The instance that handled a save reads again as soon as the save commits, so a single instance stops storing immediately; wherever the app runs more than one, turning native off stops storage within ten seconds rather than on the very next beacon.
+
+None of this applies to an install without `scope.resolve`, or to one that never enabled `providers.collection`. There the config adapters serve every scope as they always have. A scoped install upgrading from 1.0.0-beta.11, which served native to every tenant, creates these documents in its upgrade migration ([Scoped installs](/analytics/upgrading/beta-12#scoped-installs)).
+
+### Which sources a request sees
+
+A request reading one tenant sees:
+
+- on an install running the providers collection, the sources that tenant's own provider documents grant it, **filtered to the documents this user can read**;
+- the config adapters (everything in `adapters`, including `platformAdapter`) that can narrow their query to one scope (`capabilities.scopedQueries`: native, and PostHog with a `scopeProperty`). Without the providers collection every reader sees them. With it, a config adapter the tenant's documents do not grant belongs to the platform rather than to the tenant, and only a reader `access.crossScope.unscopedSource` admits sees it.
+
+A config adapter that cannot narrow its query to one scope (no `capabilities.scopedQueries`) is left out of every tenant's listing, however privileged the reader. It would answer with every tenant's numbers under a caption naming one, which is not a source for that tenant at all; naming it under a tenant answers `404 unknown_source`. One rule covers the view, `GET /api/_x/sources`, the widget data-source picker and the per-document panel. Install-wide and aggregate listings keep every readable source: there is no tenant to answer about.
+
+A source a provider document granted is named by that document. A `native` document is called whatever the tenant called it, not the install-wide "Payload".
+
+The first half is Payload's own access control, not a second mechanism. By default the plugin asks `payload.find` for the scope's enabled provider documents with `overrideAccess: false` and the request's user, so the collection's `read` access decides, and a `Where` it returns narrows the result the same way it narrows a list view. Restricting who may open the providers collection therefore also hides analytics from everyone it keeps out. `providers.collection.sourceAccess` separates the two: set, it alone decides which of the scope's enabled documents a reader reads through, with the request's user, answering `true`, `false` or a `Where`. See [Who reads through a document](/analytics/providers#who-reads-through-a-document).
+
+The per-scope provider lookup keeps its short cache; the per-user filtering does not, and runs once per request per scope.
+
+Default access is scope-aware: with `scope.resolve` configured, a tenant can read, update, and delete only the provider documents of the scope they selected, and only while `scope.member` says they belong to it; every create is stamped with the request's resolved scope server-side, so a tenant can neither create a document for another scope nor move one there, and a create in a tenant the user does not belong to is refused. `access.crossScope.named` lifts all three restrictions for platform admins, who see and manage every scope; scoped installs default it to deny, so configure it (for example a role check) or no one, including you, can see or manage another tenant's providers. Unscoped installs (no `scope.resolve`) admit every user of the admin collection.
+
+Either way the default access is for users of the admin collection (`admin.user`) only, so a second auth collection, such as customers, can neither read nor write a provider document. An override in `providers.collection.access` replaces the default for its operation, this check included.
+
+A tenant may rename its own provider documents and switch them off, but not change where one connects once it is saved: the provider type, the host and the ids an adapter reads take `access.crossScope.named` on update, so a stored key cannot be pointed at another site. `providers.collection.connectionAccess` decides that instead when it answers for updates; see [Who may change a connection](/analytics/providers#who-may-change-a-connection). Whoever does change one, the save clears the stored key unless it sends the key again.
+
+The scope stamp runs as a `beforeChange` hook, so it applies to **every** write, including ones made with `overrideAccess: true`: hooks always run regardless of access control. A migration or seed script creating a provider document for another tenant needs a `req` for which `access.crossScope.named` resolves `true` (build one from a platform user, e.g. via `createLocalReq`), otherwise the stamp rejects the write.
+
+### Upgrading from plaintext credentials
+
+Rows saved before encryption was added keep working: decryption passes an already-plaintext value through untouched, and the document seals the next time it is saved from the admin UI. To seal everything in bulk without waiting on individual saves, run `encryptExistingData` once:
+
+```ts
+import { encryptExistingData } from '@10x-media/fields/encrypted'
+import { getPayload } from 'payload'
+import config from '@payload-config'
+
+const payload = await getPayload({ config })
+await encryptExistingData(payload, { collections: ['analytics-providers'] })
+```
+
+## 3. Platform analytics through a first-party proxy
+
+The platform (host) project captures events from **all** tenant pages through the app's own domain, which also survives ad blockers. The plugin's [runtime proxy](/analytics/proxy#runtime-endpoint) already serves the platform's slot at `/api/_x/p/global` with no config, and `<AnalyticsScripts />` renders PostHog's snippet pointed at it. Relay it from a route handler of your own instead when you would rather the beacons skipped Payload's routing:
+
+```ts title="app/ph/[...path]/route.ts"
+import { posthog } from '@10x-media/analytics/adapters/posthog'
+import { captureRoute } from '@10x-media/analytics/next'
+
+const relay = captureRoute({
+  path: '/ph',
+  // projectToken is what makes the adapter declare capture; the read credentials are unused here.
+  adapter: posthog({ projectId: '', apiKey: '', region: 'eu', projectToken: 'phc_...' }),
+})
+
+export { relay as GET, relay as POST, relay as OPTIONS }
+```
+
+PostHog's capture endpoints end in a slash, so add `skipTrailingSlashRedirect: true` to the object your `next.config` already passes to `withPayload`. Pass the route the plugin's own `trustedProxyHops` or `trustedPlatform` and `allowedOrigins` as well: it runs outside Payload and reads none of them ([A route handler of your own](/analytics/proxy#a-route-handler-of-your-own)).
+
+Then point the slot at that path so its snippet stops using the runtime mount:
+
+```ts
+analytics({
+  adapters: [
+    posthog({
+      projectId: process.env.POSTHOG_PROJECT_ID ?? '',
+      apiKey: process.env.POSTHOG_API_KEY ?? '',
+      projectToken: 'phc_...',
+      region: 'eu',
+      scopeProperty: 'tenant',
+    }),
+  ],
+  platformAdapter: 'posthog',
+  capture: { gate: 'all', paths: { global: '/ph' } },
+})
+```
+
+`scopeProperty: 'tenant'` closes the loop: the snippet the plugin renders registers the request's scope as a PostHog super-property, so every event carries its tenant, and reads through the shared project filter `properties['tenant']` to the reader's scope. Which readers read a tenant through it depends on the providers collection ([Which sources a request sees](#which-sources-a-request-sees)): without it, every reader of a tenant sees that tenant's slice; with it, the platform's PostHog is not one of the tenant's own sources, so only a reader `access.crossScope.unscopedSource` admits reads through it, and a tenant's own admins read through their own provider documents.
+
+### PostHog for a platform: one organization, a few projects
+
+PostHog's own boundaries decide most of this, so they are worth stating plainly. A **project** is the data boundary: projects share nothing, and events, people, insights and dashboards all live inside one. An **organization** owns projects and is the billing boundary: usage is billed per organization, across every project in it.
+
+That gives a platform three decisions.
+
+**One organization.** There is no reason to split. Billing aggregates either way, and separate organizations mean separate member lists to maintain for one team.
+
+**Separate projects for the platform's own two jobs.** The platform's product analytics (what admins do inside the app) and its marketing site (what visitors do on the public site) answer different questions with different event vocabularies and different retention needs. Mixing them makes every funnel in either one start with a filter to exclude the other. Two projects, and because projects share nothing, neither ever contaminates the other.
+
+**One project for all tenants, with a tenant property.** This is the one people get wrong. The instinct is a project per tenant; resist it. A project per tenant means provisioning a project on signup, a credential per tenant to store and rotate, a per-project rate limit to respect, and no way to answer a single question about the platform as a whole without querying every project and summing the results by hand.
+
+Instead: one project, every tenant's events captured into it, and a property on each event naming the tenant. `scopeProperty` is the plugin's half of that:
+
+```ts
+posthog({
+  projectId: process.env.POSTHOG_PROJECT_ID ?? '',
+  apiKey: process.env.POSTHOG_API_KEY ?? '',
+  scopeProperty: 'tenant',
+})
+```
+
+With it set, the adapter declares `capabilities.scopedQueries`, so a read of one tenant through the shared project is filtered to `properties['tenant']`, and the platform reads the whole project unfiltered. The capture snippet registers the same property as a super-property, so every event the SDK sends carries it without your own code passing it per call. Nobody needs per-tenant PostHog credentials. Who reads a tenant's slice is above; see also [Provider documents](/analytics/providers#the-posthog-scope-property).
+
+**The exception is a tenant that must own its data**, contractually or because they already have their own account. Give that one tenant a dedicated project, configured as a [provider document](/analytics/providers#provider-documents) under their own scope with their own credentials. It layers onto the shared adapters for that scope alone, so it is one row in a collection rather than a second architecture. Reserve it for tenants who actually need it: every tenant who has one is a tenant missing from the platform-wide numbers.
+
+### Capture slots per tenant
+
+A scoped install fills two [capture slots](/analytics/capture#capture-slots) per request: `global` from the config registry (the `platformAdapter`, or `capture.slots.global`), and `tenant` from the scope's own provider documents. The platform's slot goes onto every tenant's pages automatically; the tenant's slot is whatever that tenant configured, including the native beacon, which a `native` document is what turns on. So one page can send to the platform's PostHog and to the tenant's own Plausible at once. When both slots resolve to the same adapter, only the global entry survives, so a scoped native install never posts every event twice. A tenant's own provider of the same vendor as the platform's (its own PostHog beside the platform's PostHog) captures nothing: a page runs one copy of that vendor's script, so the tenant slot is left out of the tracker config with a warning in the log, and the tenant's document still serves its dashboard reads.
+
+The `tenant` slot is empty whenever no scope resolves, and, on an install running the providers collection, whenever the scope's own documents grant nothing that can capture. A provider document fills it only once its **public** capture fields are set, since an adapter declares capture support from those alone: `projectToken` (plus the optional `region`) for PostHog, `domain` or `scriptId` for Plausible, `websiteId` for Umami, and `measurementId` for GA4. The two ids that land in a script's address are validated on save and ignored when malformed: GA4's `measurementId` takes `^[A-Za-z0-9-]+$`, and Plausible's `scriptId` `^[A-Za-z0-9_-]{1,64}$`. They sit beside the sealed credentials in the provider document, unencrypted because the tracker serves them to the browser. A PostHog, Plausible or GA4 document holding only its read settings reads dashboards and captures nothing; an Umami document always captures, since its `websiteId` is both what it reads by and all its capture needs.
+
+<Callout type="warn">
+The tracker endpoint and the capture proxy are **public and unauthenticated**: a visitor's browser calls them, and your `scope.resolve` runs on those requests too, at the `capture` call site. It gets them without a signed-in user, cookies or an authorization header, even when the visitor is signed in to the admin.
+
+That has consequences. A resolver that derives the scope from something a client controls, a header or a query parameter, is attacker-reachable there: anyone can attribute traffic (and revenue) to any tenant. And a resolver that needs `req.user` resolves nothing at a capture call site, so the tenant slot is simply always empty and the install captures nothing per tenant.
+
+**The hostname is a request header too.** `Host` is as forgeable as any other header, so hostname resolution is only trustworthy when something upstream guarantees it: the deployment rejects unknown hosts at the edge (a platform that routes by verified domain, or an explicit `server_name` allowlist), or the resolver itself matches the host against domains it already knows. Do both if you can. A resolver that looks a tenant up by whatever label the header happens to carry is the same spoof with extra steps.
+
+So: resolve public traffic from the hostname, match it against the tenant's own stored domain rather than parsing a label out of it, and fail closed to the null scope on no match. The selector still decides at the `admin` call site, so an admin reading a tenant's numbers sees the tenant they selected, while their own visits to a tenant's site are filed under that site.
+
+That resolver is also what keeps the stored hits clean. The native engine stores a hit under the host the request carried, never under the one the body claims, and on a scoped install it drops an event whose request resolves no scope. So a forged `Host` naming a domain no tenant owns writes nothing at all, rather than a hostname of its own in the install-wide scope. A tenant's page cannot post into a sibling tenant either: a browser marks a post from a sibling subdomain `Sec-Fetch-Site: same-site`, and one whose `Origin` host `scope.resolve` maps to another scope than the request's is dropped by ingest (still answering `202`) and refused by the capture proxy's tenant slot with `403`. The two native options beside it are [`platformHostnames`](/analytics/native#scoped-installs-and-platformhostnames), for the platform's own domains, which resolve no tenant and should still be counted, and the [`hostname` resolver form](/analytics/native#a-resolver), for a split deployment whose page host is not the host the beacon lands on.
+</Callout>
+
+The `resolveTenant` of [the worked example](#a-worked-example) is that resolver, for a platform whose tenants bring their own domains: the tenant document holds the domain, a visit's host is matched against it rather than parsed, and nothing about it is listed in config. Its `admin` branch reads the selector cookie, else the user's only tenant, as the multi-tenant plugin's selector does before it writes that cookie, and decides nothing about belonging: `scope.member` is what keeps a user out of a tenant they selected without belonging to it.
 
 **A tenant's new custom domain is tracked the moment its document is saved.** There is no list to maintain and no redeploy: the rule is "the request resolved to a tenant", and the lookup that answers it is the install's own query against its own data. Whatever admin flow adds the domain is the whole integration.
 
@@ -207,124 +310,249 @@ Pair it with an edge that refuses hosts belonging to no tenant. Caddy's on-deman
 
 ## 4. Who sees what
 
-- A tenant request resolves its scope, so widgets, document stat fields, and the realtime endpoint read that tenant's data: native reads filter on the scope column, the platform PostHog filters on `scopeProperty`, and the tenant's own collection-configured providers are already tenant-specific.
-- The [sync tier](/analytics/sync)'s `analytics-daily` rows are scope-bound the same way `analytics-providers` documents are: each row is stamped with the resolved scope at sync time, and reads through `payload.find` are scope-filtered unless the requesting user has `access.platformRead`. Before this, every synced row was readable by any authenticated admin regardless of tenant; a scoped install upgrading from an unscoped `sync` config should treat that as closed rather than assume it always worked this way.
-- Cross-scope reads are explicit: pass `scope: '*'` to a read (e.g. from a custom platform dashboard widget). They are gated by `access.platformRead`, which defaults to deny once `scopeResolver` is set; configure it to your host role:
+- A tenant request resolves its scope, so widgets, document stat fields, and the realtime endpoint read that tenant's data: native reads filter on the scope column, a PostHog with `scopeProperty` filters on it, and the tenant's own collection-configured providers are already tenant-specific.
+- Only while its user belongs to that tenant. A request whose selector names a tenant `scope.member` refuses reads nothing there: endpoints answer `400 untrusted_scope`, the sources endpoint and the view list nothing, and widgets and display fields show their no-access state. `access.crossScope.named` is the one way past it.
+- `access.read` comes before any of that, on every read. It defaults to `isAdminUser`, the users of the admin collection, so the members of a second auth collection read nothing however their requests resolve.
+- The [sync tier](/analytics/sync)'s `analytics-daily` rows are scope-bound the same way `analytics-providers` documents are: each row is stamped with the resolved scope at sync time, and a read through `payload.find` needs `access.read` first, then is filtered to a scope the requesting user belongs to unless they have `access.crossScope.named`.
+- Cross-scope reads are explicit: a read that passes `scope: '*'` (a custom platform dashboard widget, say) asks for every scope at once, and it reads only for a reader `access.crossScope.aggregate` grants. Anyone else reads nothing.
 
-```ts
-analytics({
-  // ...
-  access: {
-    platformRead: ({ req }) => req.user?.roles?.includes('platform-admin') ?? false,
-  },
-})
-```
+`access.crossScope` is where all of that is decided, as three access functions. A function grants all three together; the object form decides each one, and a gate it leaves out denies. On a scoped install that sets nothing, all three deny.
 
-- A scoped read through any shared config adapter that cannot filter by scope, not only the one designated `platformAdapter`, would expose cross-scope data, so it fails closed behind the same `platformRead` gate. A tenant's own runtime providers (from `providers.collection` or `providers.resolve`) are never gated, since their credentials are the tenant's own. Give the platform adapter a `scopeProperty` (or use native) to serve tenants without the gate.
-- A platform admin's own request resolves no scope at all when no tenant is selected (`scopeResolver` returns `null`, the same value an unscoped install always reads with). The native adapter applies no `scope` filter for a `null`/`undefined` scope, so that read is a genuine cross-tenant total, every tenant's data summed, not an isolated "unscoped-only" bucket that happens to exclude tenant data.
-
-### Query endpoint
-
-The authenticated [query endpoint](/analytics/data-sources#query-endpoint) follows exactly these rules, and it is the one place they are visible as status codes. Scope comes from the request; an explicit `scope` parameter is honored only for platform readers (`400 untrusted_scope` for anyone else) and `scope=*` reads every scope behind the same `platformRead` gate; a scoped install whose request resolves no scope fails closed with `404 unknown_source`, as does a `scopeResolver` answering `*` for a caller `platformRead` denies; and a listed shared config adapter that cannot filter by scope answers `403` with `param: 'source'` rather than returning another tenant's totals.
-
-That last rule cuts both ways. A platform reader passing `scope=<tenant>` for a config adapter without `scopedQueries` is allowed through, since `platformRead` grants it, but the adapter still cannot narrow the query: the answer is install-wide totals, not that tenant's. The echoed `query` carries no `scope` key when that happens, which is how a client tells the two apart before captioning the numbers with a tenant's name.
-
-`access.read` is the gate in front of all of that. It covers every authenticated read endpoint (query, document panel, realtime, sources, goals) and defaults to allowing any signed-in user, so an install that does not set it behaves as before. Narrow it to a role check to keep analytics away from admins who should not see them. It is independent of scope: granting `read` never widens which scope a user reads.
-
-### Refresh endpoint
-
-The [refresh endpoint](/analytics/data-sources#refresh-endpoint) retires cached reads rather than serving them, and it decides scope through the same code the query endpoint reads with, so it refuses every request that endpoint refuses. `access.read` gates it first, then scope. A caller that names no scope refreshes its own resolved scope, which is what the **Refresh** button in the analytics view sends. Naming any scope in the body requires `access.platformRead`, and anyone else gets `400 untrusted_scope`, so a tenant can neither retire another tenant's cache nor learn that the scope exists.
-
-A request that resolves no scope at all on a scoped install is refused the same way, with `400 untrusted_scope`, unless the caller has `access.platformRead`. It is the rule the query endpoint applies when it answers `404 unknown_source`: `null` means no tenant is selected rather than "everything". Without it, any authenticated reader with no tenant selected could retire the install-wide cache on demand.
-
-`scope: '*'` bumps the install-wide [cache epoch](/analytics/cache#invalidation) and nothing else. That is the token a cross-scope read's entries key on, including a platform reader's scoped read through a shared config adapter that cannot narrow the query. A tenant's own reads key on that tenant's token, so the wildcard does not refresh them: retiring one tenant's entries means naming that tenant.
-
-Saving or deleting a provider or goal document bumps that document's scope on its own, with no request and no gate, so an editor correcting their own tenant's credentials never needs the endpoint.
-
-## 5. Cron tiers
-
-Reads happen per request, but the [cache-warm](/analytics/cache#scheduled-warming-opt-in) and [sync](/analytics/sync) tiers run on a cron with no request to resolve a scope from. `scopes` enumerates the tenant scopes those two tiers should fan out over, on top of the install-wide pass they already run:
-
-```ts
-analytics({
-  // ...
-  scopes: async ({ payload }) =>
-    (await payload.find({ collection: 'tenants', pagination: false })).docs.map((t) => String(t.id)),
-})
-```
-
-Without `scopes`, both tiers keep running exactly once, install-wide, same as before this option existed. With it configured, each tier runs once for `null` (install-wide) plus once per scope `scopes()` returns; each pass resolves that scope's own runtime providers (`providers.collection` or `providers.resolve`) independently, so a tenant's own Plausible key warms and syncs under their scope rather than the platform's, and each [sync](/analytics/sync) row is stamped with the scope it was synced under.
-
-A shared config adapter, one declared in `adapters` rather than resolved per tenant through `providers`, cannot narrow its own query to one tenant unless it declares `capabilities.scopedQueries` (native does, once the install is scoped). Reading it under a tenant scope would otherwise silently return install-wide totals and stamp them as that tenant's numbers, so both tiers skip it for every tenant pass; it still runs, and syncs, under the install-wide row.
-
-A tenant-pass warm target that degrades for this reason, or for any other non-`ok` read status, is not counted as a failure. It is logged once per scope-and-adapter pair so a warm count that looks short of `scopes × targets` is traceable back to which tenant and adapter were gated; an install-wide pass degrading stays silent, matching the tier's pre-`scopes` behavior.
-
-## Goals per tenant
-
-The [goals collection](/analytics/goals#5-let-editors-manage-goals) scopes on the same rules the provider collection does, through the same `scopeResolver`. Enable it alongside the providers wiring from [step 2](#2-register-the-provider-collection-per-tenant):
-
-```ts
-analytics({
-  // Editors manage their own goals per tenant; the plugin owns the scope column.
-  goals: { defaults: sharedGoals, collection: true },
-  // Providers ride the tenant plugin's own field.
-  providers: { collection: { scopeField: 'tenant' } },
-  scopeResolver, // the two-branch resolver from above
-})
-```
-
-What that buys, per tenant:
-
-- **Row access.** A tenant reads, updates and deletes only goals in their own scope. `access.platformRead` lifts that for platform admins, and defaults to deny once `scopeResolver` is set, exactly as it does for providers.
-- **The scope stamp.** Every create is stamped with the request's resolved scope server-side, and a body declaring another scope is refused rather than silently rewritten. A seed or migration writing another tenant's goal therefore needs a `req` whose `platformRead` resolves `true`, the same requirement provider documents have.
-- **Uniqueness per scope.** A slug may exist once per scope, checked on every write inside the request's own transaction. A database index backs that check where it can: `slug` alone on an unscoped install, `(slug, scope)` once a `scopeResolver` is configured and the plugin still owns the scope field. Two cases stay hook-guarded only. Postgres treats a NULL scope as distinct from every other, so install-wide rows on a scoped Postgres install are not covered by the index; and a `scopeField` another plugin owns gets no index from this plugin at all, since that column is not the plugin's to index.
-- **Resolution.** The goals picker and its `GET /api/analytics/goals` endpoint list the config goals merged with the requesting scope's own collection goals, and so does the public tracker config a visitor's browser boots from. There is no scope parameter on either, so a tenant can never enumerate another tenant's goals. Native ingest, [`trackServerEvent`](/analytics/goals#4-track-from-server-code) and the [form action](/analytics/goals#3-track-a-form-submission) all resolve goals under the scope the event is stamped with, so one tenant's traffic can only ever complete that tenant's goals. One read serves at most 500 enabled goals per scope.
-- **The scope field itself.** With `scopeField` left at `'scope'` the plugin registers its own hidden text field. Name another and the plugin registers nothing, since that field belongs to the plugin that owns it, and a boot-time check fails the install with a named error when nothing registered it. A relationship-typed scope field carries one more caveat: an install-wide lookup matches an empty string, which a relationship column cannot be compared against, so install-wide goals resolve to the config goals only.
-
-<Callout type="warn">
-Registering the goals collection with `@payloadcms/plugin-multi-tenant` is **not supported yet**: pointing `goals.collection.scopeField` at the plugin's `tenant` relationship and adding `'analytics-goals'` to `multiTenantPlugin`'s `collections` map hangs a tenant user's admin panel in the plugin's own dev app. The cause is not diagnosed. Providers are unaffected and stay registered as `{ isGlobal: true }`.
-
-Goals still scope correctly without that registration, through the plugin's own `scope` field and your `scopeResolver`: access, the stamp, per-scope uniqueness, the picker, the endpoint, and matching at ingest all follow the resolved scope. What a multi-tenant install gives up today is the admin tenant selector filtering the goals list view, so a platform admin browsing that collection sees every tenant's goals in one list. A fix is planned.
-</Callout>
-
-## Dev app: TENANCY=on
-
-The plugin's dev app (`packages/analytics/dev`) is the reference wiring for this whole page. `TENANCY=on pnpm dev analytics` boots it with a seeded `tenants` collection, `@payloadcms/plugin-multi-tenant`, and the tenancy config fragment in place of the default single-tenant one; `TENANCY` left unset boots the plain single-tenant playground, unchanged from before this mode existed.
-
-| Login | Sees |
+| Gate | Grants |
 |---|---|
-| `dev@10xmedia.de` / `password` | Platform admin. No tenant selected: the cross-tenant total described above. The tenant selector lists both seeded tenants; picking one re-scopes the dashboard to that tenant's own numbers, the same selector every tenant login uses. |
-| `alpha@10xmedia.de` / `password` | The `alpha` tenant's own dashboard only, plus its own seeded `Alpha Plausible` provider (dummy credentials, so its reads degrade) as an extra data source. Seeded at roughly 3x the traffic of `beta` so the isolation between tenants is visually obvious. |
-| `beta@10xmedia.de` / `password` | The `beta` tenant's own dashboard and its own `Beta Plausible` provider, at 1x scale. |
-
-The dev app's `platformAdapter` is the in-memory config adapter, which declares no `scopedQueries`, so alpha and beta cannot read it as a data source: it is gated behind `access.platformRead` like any other non-scope-filtering config adapter (see [Who sees what](#4-who-sees-what)), and only `dev@10xmedia.de` passes that gate. A real platform adapter needs a `scopeProperty` (PostHog) or to be `native` to serve tenants directly, the same requirement called out there.
-
-The dev app's tenancy resolver is the two-branch shape above: an admin session resolves through the tenant selector, and anonymous frontend traffic resolves from the first hostname label, so `alpha.localhost:<port>` fills the tenant slot with alpha's native adapter. Plain `localhost` matches no tenant and captures nothing, and that now holds for the ingest endpoint too: a beacon posted by hand to `localhost` resolves no scope and is dropped, answering the same `202` a kept one does. The global slot is always empty: the dev `platformAdapter` is the in-memory demo source, which declares no capture support. The label parsing is a playground shortcut, not the pattern to copy; a real install matches the host against a stored domain, as [above](#capture-slots-per-tenant).
-
-Both tenant admins' "Analytics providers" nav link redirects straight to their own tenant's document rather than a list, and so does the platform admin's, to whichever tenant is currently selected: the `isGlobal: true` behavior from [step 2](#2-register-the-provider-collection-per-tenant) applies uniformly.
-
-Both modes enable the goals collection and seed a CTA page whose block points at a collection goal: `/newsletter` single-tenant, and one per tenant (`/alpha-offer`, `/beta-offer`) under `TENANCY=on`. That makes the [goal picker](/analytics/goals#2-pick-a-goal-in-a-block) and the per-scope isolation clickable: alpha's admin lists alpha's goal and never beta's, and a click on either page books a conversion for that tenant alone.
-
-Contributors regenerating the dev app's own output should run both commands as `TENANCY=on pnpm generate:types analytics` and `TENANCY=on pnpm generate:importmap analytics`. The tenancy config is the superset, and the committed `dev/payload-types.ts` and `dev/app/(payload)/admin/importMap.js` are generated from it: a default-env run silently drops the multi-tenant import map entries and the `Tenant` type along with every `tenant` and `scope` field, which breaks the tenancy admin. A local `pnpm dev analytics` with auto-generation on rewrites both files the same way.
-
-The dev app boots Payload from `dev/instrumentation.ts` rather than waiting for the first request. Next's dev app-page runtime installs a process-wide `async_hooks` hook that builds and stack-parses an `Error` per promise, and a seed running from `onInit` after that hook loads pays the tax on every write: tenancy mode, at roughly five times single-tenant's volume, spent minutes pinned at 100% CPU answering nothing. `register` runs first, so the same seed is cheap. This is dev-app wiring, not plugin behavior.
-
-Switching `TENANCY` on a **persistent** database (a `DATABASE_URI_MONGO`/`DATABASE_URI_POSTGRES` you point at yourself, or `DEV_DB=postgres`) after it already booted once in the other mode needs a reseed and the `scope` column migration from the [native engine's upgrade note](/analytics/native#upgrading-an-existing-install): the rows and schema from the first boot don't retroactively match the new mode's shape. The default in-memory database is immune, since every boot starts from an empty one.
-
-## Custom provider stores
-
-If providers live somewhere other than the collection (an external control plane, a tenants table), replace the lookup entirely:
+| `named` | Reading a scope this request does not resolve to, by naming it. Provider and goal row access read the same gate, so it also decides who manages another tenant's documents. |
+| `aggregate` | Reading every scope at once: `scope=*`, the view's **All sites** choice in its **Site** select, and a scoped install's request that resolves no tenant. |
+| `unscopedSource` | Reading a tenant's numbers through a config adapter, which belongs to the platform rather than to any tenant. On an install running the providers collection it decides whether a config adapter the tenant's documents do not grant is listed at all; a server read naming a config adapter that cannot narrow its query (no `scopedQueries`) under a tenant reads install-wide numbers only with it. |
 
 ```ts
-analytics({
-  // ...
-  providers: {
-    resolve: async ({ payload, scope }) => {
-      const config = await loadTenantAnalyticsConfig(payload, scope)
-      return config ? [plausible(config)] : []
+import { analytics, type ScopeMemberAccess, type ScopeResolver } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import type { PayloadRequest } from 'payload'
+
+declare const resolveTenant: ScopeResolver
+declare const member: ScopeMemberAccess
+
+const isPlatformStaff = ({ req }: { req: PayloadRequest }) =>
+  req.user?.roles?.includes('platform-admin') ?? false
+
+export const plugin = analytics({
+  adapters: [native()],
+  scope: { resolve: resolveTenant, member },
+  capture: { gate: 'all' },
+  access: {
+    // Platform staff can single out a tenant, aggregate across them, and read the
+    // platform's own shared source. Everyone else reads through their own tenant's
+    // provider documents, and only those.
+    crossScope: {
+      named: isPlatformStaff,
+      aggregate: isPlatformStaff,
+      unscopedSource: isPlatformStaff,
     },
   },
 })
 ```
 
-The result is layered onto the static config adapters exactly like collection documents.
+Splitting them is worth it when the three stop being the same privilege: support staff who may aggregate but must not open one named customer, or an analyst who may read the platform's own PostHog but not any tenant's own account.
+
+- A tenant's own provider documents are never gated by `access.crossScope`; `providers.collection.sourceAccess` decides them per user, and the providers collection's own read access does when it is unset.
+- A platform admin's own request resolves no scope at all when no tenant is selected (`scope.resolve` returns `null`, the same value an unscoped install always reads with). For a reader `access.crossScope.aggregate` admits, that read is a genuine cross-tenant total: the native adapter applies no `scope` filter then, so every tenant's data is summed, not an isolated "unscoped-only" bucket that happens to exclude tenant data. Anyone else with no tenant selected reads nothing: the endpoints answer `404 unknown_source`, and the view, the widgets and the document panel ask them to choose a site.
+
+### The platform's own site is a tenant
+
+The platform runs a marketing site of its own, and the temptation is to treat it as something other than a tenant: a special scope, an install-wide bucket, a second install. Don't. **Give the platform's own site a tenant document like any other**, with its own domain, its own provider settings and its own goals. Every rule on this page then applies to it unchanged, and the platform's numbers sit in the scope selector beside everyone else's.
+
+What is genuinely not a tenant is infrastructure: the admin panel's own domain, a status page, a docs host. Those resolve no tenant, and [`platformHostnames`](/analytics/native#scoped-installs-and-platformhostnames) on the native adapter is the option for them: it counts traffic on those hosts rather than dropping it, under the install-wide scope. Use it for hosts, not for the platform's marketing site.
+
+`platformAdapter` is a third thing again, and easy to confuse with both: it names one **config** adapter shared by every scope, the platform's own analytics account. It is about where the data lives, not about whose site it is.
+
+### One scope authority
+
+The host owns which tenant a request is for. Whatever selector it already has (the multi-tenant plugin's cookie, a subdomain, a session field) feeds `scope.resolve`, and `scope.resolve`'s answer is the scope, everywhere. The analytics view has no scope picker of its own: two selectors for one decision meant a caption naming one tenant above another tenant's numbers.
+
+What the view does have is a caption or one select:
+
+- **The Site select** offers the reader's own site and **All sites**, first in the toolbar. It is drawn only for a reader whose own scope is a tenant and who passes `access.crossScope.aggregate`. **All sites** writes `scope=*:<tenant>`, the aggregate marker tagged with the tenant it was chosen from; the reader's own site writes no scope at all. The site is listed under its `scope.label` name; without it the scope id stands.
+- **The caption** reads `Showing: <tenant>` under the title for every other viewer on a scoped install, with the same name, and `Showing: All sites` for a reader who may aggregate and has no tenant selected. Where the Site select is drawn it already names the site, so the caption is left out.
+- **No site selected.** A reader whose request resolves no tenant and who may not read across tenants (a tenant admin signed in without picking one) is asked to choose a site: the view, the widgets and the document panel read **Choose a site to see its numbers.**
+
+```ts
+import { analytics, type ScopeMemberAccess, type ScopeResolver } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+declare const resolveTenant: ScopeResolver
+declare const member: ScopeMemberAccess
+
+export const plugin = analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  access: {
+    crossScope: { aggregate: ({ req }) => req.user?.roles?.includes('platform-admin') ?? false },
+  },
+  scope: {
+    resolve: resolveTenant,
+    member,
+    // The sync task's fan-out.
+    list: async ({ payload }) =>
+      (await payload.find({ collection: 'tenants', pagination: false })).docs.map((t) => String(t.id)),
+    // What the caption and the Site select call the resolved scope.
+    label: async ({ req, scope }) => {
+      const tenant = await req.payload
+        .findByID({ collection: 'tenants', id: scope, depth: 0, overrideAccess: true })
+        .catch(() => null)
+      return tenant?.name
+    },
+  },
+})
+```
+
+The URL rules follow from that. The tagged aggregate marker is the only scope a view address may carry; any other value is dropped on the server and the client rewrites the address to match what was actually read. The tag is what ties the choice to a tenant: the address outlives a tenant switch, so a marker chosen from alpha is dropped once the host's selector says beta, and the view falls back to beta's own numbers rather than aggregating under beta's name. A reader the aggregate gate denies who follows an aggregate link gets their own tenant's numbers and an address that says so, rather than a refusal. Widget **Open in Analytics** links carry no scope at all: the view resolves one for itself.
+
+What a tenant admin sees: their own scope's numbers, a caption naming their own tenant, and no Site select.
+
+### Query endpoint
+
+The authenticated [query endpoint](/analytics/reference/endpoints#query-endpoint) follows exactly these rules, and it is the one place they are visible as status codes. Scope comes from the request; an explicit `scope` parameter naming another scope is honored only for readers `access.crossScope.named` allows (`400 untrusted_scope` for anyone else), a tenant the user selected without belonging to it answers the same `400 untrusted_scope`, and `scope=*` reads every scope behind `access.crossScope.aggregate`; a scoped request that resolves no scope fails closed with `404 unknown_source` unless the reader may aggregate, as does any request whose `scope.resolve` answers `*`, which is refused; and a shared config adapter that cannot filter by scope is not among a tenant's sources, so naming it under a tenant answers `404 unknown_source` with `param: 'source'` rather than returning every tenant's totals.
+
+A server read is the one place such an adapter is read under a tenant: `readForWidget` and its siblings, or a widget whose stored data source names it, read install-wide totals through it for a reader `access.crossScope.unscopedSource` admits. The result then carries no scope, which is how code of your own tells the two apart before captioning the numbers with a tenant's name.
+
+`access.read` is the gate in front of all of that. It covers every read, the read endpoints (query, document panel, realtime, sources, goals, refresh) and the dashboard widgets and display fields alike, asked once per request however many of them read. It defaults to `isAdminUser`, the users of the admin collection (`admin.user`), so a customer or member signed in through a second auth collection reads nothing. Narrow it to a role check to keep analytics away from admins who should not see them. It is independent of scope: granting `read` never widens which scope a user reads.
+
+### Refresh endpoint
+
+The [refresh endpoint](/analytics/reference/endpoints#refresh-endpoint) retires cached reads rather than serving them, and it decides scope through the same code the query endpoint reads with, so it refuses every request that endpoint refuses. `access.read` gates it first, then scope. A caller that names no scope refreshes its own resolved scope, which is what the **Refresh** button in the analytics view sends. Naming another scope in the body requires `access.crossScope.named` (`access.crossScope.aggregate` for `*`), and anyone else gets `400 untrusted_scope`, so a tenant can neither retire another tenant's cache nor learn that the scope exists.
+
+A request that resolves no scope at all on a scoped install is refused the same way, with `400 untrusted_scope`, unless the caller has `access.crossScope.aggregate`. It is the rule the query endpoint applies when it answers `404 unknown_source`: `null` means no tenant is selected rather than "everything". Without it, any authenticated reader with no tenant selected could retire the install-wide cache on demand.
+
+`scope: '*'` bumps the install-wide [cache epoch](/analytics/cache#invalidation) and nothing else. That is the token a cross-scope read's entries key on, including a platform reader's scoped read through a shared config adapter that cannot narrow the query. A tenant's own reads key on that tenant's token, so the wildcard does not refresh them: retiring one tenant's entries means naming that tenant.
+
+Saving or deleting a provider or goal document retires that document's scope on its own, with no request and no gate, so an editor correcting their own tenant's credentials never needs the endpoint. See [Invalidation](/analytics/cache#invalidation).
+
+## 5. Cron tiers
+
+Reads happen per request, but the [sync](/analytics/sync) and [warm](/analytics/cache#warming) tasks run on a schedule with no request to resolve a scope from. Neither has a user to ask about, so neither asks `access.read` or `scope.member`: each reads as the plugin's `SYSTEM` principal, exported from the package root (and from `@10x-media/analytics/rsc`) for a host's own jobs (see [Who a custom read answers to](/analytics/widgets#who-a-custom-read-answers-to)), and reads a tenant through every source that tenant's own provider documents grant it, rather than only the documents some user may open.
+
+The sync task needs to know which tenants exist. `scope.list` enumerates them, on top of the install-wide pass it always runs:
+
+```ts partial
+analytics({
+  // ...
+  scope: {
+    resolve: resolveTenant,
+    member,
+    list: async ({ payload }) =>
+      (await payload.find({ collection: 'tenants', pagination: false })).docs.map((t) => String(t.id)),
+  },
+})
+```
+
+Without `scope.list`, sync runs exactly once, install-wide. With it, sync runs once for `null` (install-wide) plus once per scope `scope.list` returns; each pass resolves that scope's own runtime providers (`providers.collection` or `providers.resolve`) independently, so a tenant's own Plausible key syncs under their scope rather than the platform's, and each [sync](/analytics/sync) row is stamped with the scope it was synced under.
+
+The warm task needs no list: it repeats the reads each tenant's readers asked for, each in that tenant's scope and reporting timezone, so it warms exactly the tenants someone reads.
+
+A shared config adapter, one declared in `adapters` rather than resolved per tenant through `providers`, cannot narrow its own query to one tenant unless it declares `capabilities.scopedQueries` (native does, once the install is scoped). Reading it under a tenant scope would otherwise silently return install-wide totals and stamp them as that tenant's numbers, so sync skips it for every tenant pass and warming leaves a tenant's read through it alone; it still syncs under the install-wide row.
+
+## Goals per tenant
+
+The [goals collection](/analytics/goals#5-let-editors-manage-goals) scopes on the same rules the provider collection does, through the same `scope.resolve`. Enable it alongside the providers wiring from [step 2](#2-register-the-provider-collection-per-tenant):
+
+```ts partial
+analytics({
+  adapters: [native()],
+  // Editors manage their own goals per tenant; the plugin owns the scope column.
+  goals: { defaults: sharedGoals, collection: true },
+  // Providers ride the tenant plugin's own field.
+  providers: { collection: { scopeField: 'tenant' } },
+  scope: { resolve: resolveTenant, member }, // from the worked example above
+  capture: { gate: 'all' },
+})
+```
+
+What that buys, per tenant:
+
+- **Row access.** A tenant reads, updates and deletes only goals in the scope they selected, and only while they belong to it. `access.crossScope.named` lifts that for platform admins, and defaults to deny once `scope.resolve` is set, exactly as it does for providers.
+- **The scope stamp.** Every create is stamped with the request's resolved scope server-side, a body declaring another scope is refused rather than silently rewritten, and so is a create in a tenant the user does not belong to. A seed or migration writing another tenant's goal therefore needs a `req` whose `access.crossScope.named` resolves `true`, the same requirement provider documents have.
+- **Uniqueness per scope.** A slug may exist once per scope, checked on every write inside the request's own transaction. A database index backs that check where it can: `slug` alone on an unscoped install, `(slug, scope)` once `scope.resolve` is configured and the plugin still owns the scope field. Two cases stay hook-guarded only. Postgres treats a NULL scope as distinct from every other, so install-wide rows on a scoped Postgres install are not covered by the index; and a `scopeField` another plugin owns gets no index from this plugin at all, since that column is not the plugin's to index.
+- **Resolution.** The goals picker and its `GET /api/_x/goals` endpoint list the config goals merged with the requesting scope's own collection goals, and so does the public tracker config a visitor's browser boots from. There is no scope parameter on either, so a tenant can never enumerate another tenant's goals. Native ingest, [`trackServerEvent`](/analytics/goals#4-track-from-server-code) and the [form action](/analytics/goals#3-track-a-form-submission) all resolve goals under the scope the event is stamped with, so one tenant's traffic can only ever complete that tenant's goals. One read serves at most 500 enabled goals per scope.
+- **The scope field itself.** With `scopeField` left at `'scope'` the plugin registers its own hidden text field. Name another and the plugin registers nothing, since that field belongs to the plugin that owns it, and a boot-time check fails the install with a named error when nothing registered it.
+
+### Register goals with the tenant plugin
+
+On an install running `@payloadcms/plugin-multi-tenant`, the goals collection can be one of that plugin's tenant-owned collections, the way the provider collection is. Point `scopeField` at the plugin's `tenant` relationship and add `'analytics-goals'` to its `collections` map, with `analytics()` before `multiTenantPlugin()` in `plugins` so the collection exists when the tenant plugin looks for it:
+
+```ts partial
+plugins: [
+  analytics({
+    adapters: [native()],
+    goals: { defaults: sharedGoals, collection: { scopeField: 'tenant' } },
+    providers: { collection: { scopeField: 'tenant' } },
+    scope: { resolve: resolveTenant, member }, // from the worked example above
+    capture: { gate: 'all' },
+  }),
+  multiTenantPlugin({
+    collections: {
+      'analytics-providers': {},
+      'analytics-goals': {},
+    },
+    userHasAccessToAllTenants,
+  }),
+]
+```
+
+Leave `'analytics-goals'` a normal collection, not `isGlobal`: a tenant usually has several goals. What the registration adds on top of the rules above:
+
+- **The tenant field and the list.** The tenant plugin adds its required `tenant` relationship in the sidebar, filled from the tenant selector, and filters the goals list to the selected tenant, platform admins included.
+- **Access, twice.** The tenant plugin narrows every read and write to the user's own tenants, on top of the plugin's own row access, so a goal is reachable only where both agree.
+- **Every goal belongs to a tenant.** The tenant field is required, so there are no install-wide goal documents. Goals every tenant shares go in `goals.defaults`, which a read with no tenant selected (a platform admin's, say) also resolves to.
+- **Uniqueness.** The plugin does not index a field it does not own, so "one slug per tenant" is checked by the plugin's hook on every write, not by a database index.
+- **Seeds and migrations.** A write naming a tenant needs a `req` whose `access.crossScope.named` resolves `true` and the tenant's id as the database types it (a number on Postgres and SQLite), the same as a provider document.
+
+The plugin's dev app runs goals this way: see [Dev app: TENANCY=on](#dev-app-tenancyon).
+
+## Dev app: TENANCY=on
+
+The plugin's dev app (`packages/analytics/dev`) is the reference wiring for this whole page. `TENANCY=on pnpm dev analytics` boots it with a seeded `tenants` collection, `@payloadcms/plugin-multi-tenant`, and the tenancy config fragment in place of the default single-tenant one; `TENANCY` left unset boots the plain single-tenant playground.
+
+| Login | Sees |
+|---|---|
+| `dev@10xmedia.de` / `password` | Platform admin. No tenant selected: the cross-tenant total described above. The tenant selector lists both seeded tenants; picking one re-scopes the dashboard to that tenant's own numbers, the same selector every tenant login uses. |
+| `alpha@10xmedia.de` / `password` | The `alpha` tenant's own dashboard only, reading through its one seeded provider document, **Alpha site database** (`native`). One source, so no data-source picker. Seeded at roughly 3x the traffic of `beta` so the isolation between tenants is visually obvious. |
+| `beta@10xmedia.de` / `password` | The `beta` tenant's own dashboard, at 1x scale, with two provider documents: **Beta site database** (`native`) and **Beta Plausible** (dummy credentials, so its reads degrade). Two sources, so a data-source picker alpha does not get. |
+
+The dev app's `platformAdapter` is the in-memory config adapter. It declares no `scopedQueries`, so it is in no tenant's listing, for any login: `dev@10xmedia.de` reads it with no tenant selected, as the install-wide source it is. A real platform adapter needs a `scopeProperty` (PostHog) to serve one tenant's slice, and with the providers collection on, a reader `access.crossScope.unscopedSource` admits to read a tenant through it.
+
+The dev app's tenancy resolver branches on the call site like the worked example: an `admin` request resolves through the tenant selector cookie, else the user's only tenant, and a `capture` request resolves from the first hostname label, so `alpha.localhost:<port>` fills the tenant slot with the native adapter alpha's own `native` provider document grants it, whoever is signed in. Membership is `tenantMembership()` with the same `userHasAccessToAllTenants` the dev multi-tenant plugin gets, so `dev@10xmedia.de` belongs to both tenants and alpha's admin pointing the selector at beta reads nothing there. Plain `localhost` matches no tenant and captures nothing, and neither does the ingest endpoint: a beacon posted by hand to `localhost` resolves no scope and is dropped, answering the same `202` a kept one does. The global slot is always empty: the dev `platformAdapter` is the in-memory demo source, which declares no capture support. The label parsing is a playground shortcut, not the pattern to copy; a real install matches the host against a stored domain, as [above](#capture-slots-per-tenant).
+
+"Analytics providers" is a normal list for every login, filtered to the selected tenant by `plugin-multi-tenant`: the dev app deliberately does not register it as a per-tenant global, because beta holds two documents (see [step 2](#2-register-the-provider-collection-per-tenant)). "Goals" is registered the same way, as a normal tenant-owned collection on the plugin's `tenant` field, with one seeded goal per tenant (see [Register goals with the tenant plugin](#register-goals-with-the-tenant-plugin)).
+
+Both modes enable the goals collection and seed a CTA page whose block points at a collection goal: `/newsletter` single-tenant, and one per tenant (`/alpha-offer`, `/beta-offer`) under `TENANCY=on`. That makes the [goal picker](/analytics/goals#2-pick-a-goal-in-a-block) and the per-scope isolation clickable: alpha's admin lists alpha's goal and never beta's, and a click on either page books a conversion for that tenant alone.
+
+Under `TENANCY=on` the `offers` collection is bound as [content items](/analytics/items), and every frontend page on `alpha.localhost:<port>` or `beta.localhost:<port>` shows that tenant's own offer as a card with a **Claim this offer** button. Seeing the card for a second counts a view of the offer, a click on it counts a click, and the button completes the `book-demo` goal credited to it, so an offer's Analytics tab and the view's **Content** tab move live. The seed books a month of views, clicks and demo bookings for both offers on several pages, so both reports have numbers on a fresh boot.
+
+Contributors regenerating the dev app's own output should run both commands as `TENANCY=on pnpm generate:types analytics` and `TENANCY=on pnpm generate:importmap analytics`. The tenancy config is the superset, and the committed `dev/payload-types.ts` and `dev/app/(payload)/admin/importMap.js` are generated from it: a default-env run silently drops the multi-tenant import map entries and the `Tenant` type along with every `tenant` and `scope` field, which breaks the tenancy admin. A local `pnpm dev analytics` with auto-generation on rewrites both files the same way.
+
+The dev app boots Payload from `dev/instrumentation.ts` rather than waiting for the first request. Next's dev app-page runtime installs a process-wide `async_hooks` hook that builds and stack-parses an `Error` per promise, and a seed running from `onInit` after that hook loads pays the tax on every write: tenancy mode, at roughly five times single-tenant's volume, spent minutes pinned at 100% CPU answering nothing. `register` runs first, so the same seed is cheap. This is dev-app wiring, not plugin behavior.
+
+Switching `TENANCY` on a **persistent** database (a `DATABASE_URI_MONGO`/`DATABASE_URI_POSTGRES` you point at yourself, or `DEV_DB=postgres`) after it already booted once in the other mode needs a reseed: the rows from the first boot were stored under the other mode's scopes and do not move. The default in-memory database is immune, since every boot starts from an empty one.
+
+## Custom provider stores
+
+If providers live somewhere other than the collection (an external control plane, a tenants table), replace the lookup entirely:
+
+```ts partial
+import { adapterFromProviderDoc } from '@10x-media/analytics'
+
+analytics({
+  // ...
+  providers: {
+    resolve: async ({ payload, scope, fetch, hosts, sdks }) => {
+      // A row shaped like a provider document, its credentials decrypted:
+      // { id, provider: 'plausible', plausible: { siteId, apiKey } }
+      const row = await loadTenantAnalyticsConfig(payload, scope)
+      const adapter = row ? adapterFromProviderDoc(row, { fetch, hosts, sdks }) : null
+      return adapter ? [adapter] : []
+    },
+  },
+})
+```
+
+The result is layered onto the static config adapters exactly like collection documents. Build each adapter with `adapterFromProviderDoc` from a row that carries an `id`, as above, rather than calling `plausible()` yourself: the row's id becomes the adapter's (`plausible:<id>`), its host is checked against [`providers.hosts`](/analytics/providers#where-a-document-may-connect), and its requests go through the guarded `fetch`. Adapters the resolver builds keep one lane, rate budget and [circuit breaker](/analytics/cache#circuit-breaker) per scope and id, so one tenant's refused key never trips another tenant's source. [Keeping the settings somewhere else](/analytics/providers#keeping-the-settings-somewhere-else) has the full recipe.

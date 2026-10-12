@@ -1,24 +1,34 @@
-import { type AnalyticsErrorCode, readResponseError } from '../plugin/errors'
-import { REALTIME_PATH } from '../plugin/paths'
+import { isRecord } from '../core/values'
+import { type ApiPathConfigSource, apiPath } from '../plugin/apiPath'
+import { analyticsRoutes, type RoutesConfigSource } from '../plugin/routes'
+import { dateTimeFormat, numberFormat } from '../translations/intl'
+import { QueryFetchError } from '../ui/data/request'
 import type { RealtimePoint } from './readForWidgetRealtime'
 
 export interface PollConfig {
 	metric: string
 	windowMinutes: number
 	dataSource?: string
+	/** Read another scope; the endpoint refuses any caller that may not. */
+	scope?: string
+	/** False asks for the window's total alone, without its per-minute series. */
+	series?: boolean
 }
 
 export interface RealtimeChartPoint {
+	/** The minute's ISO instant; identity for the chart's React lists. */
+	at: string
 	label: string
+	/** The minute with its zone, as the tooltip and the data table read it. */
+	tooltipLabel: string
 	value: number
 	display: string
 }
 
-/** Build the realtime endpoint's base URL from the app's configured API route, not a hardcoded `/api`. */
-export const buildRealtimeEndpoint = (serverURL: string | undefined, apiRoute: string): string =>
-	`${serverURL ?? ''}${apiRoute}${REALTIME_PATH}`
+/** The live endpoint, relative and behind the Next basePath. */
+export const buildRealtimeEndpoint = (config: ApiPathConfigSource & RoutesConfigSource): string =>
+	apiPath(config, analyticsRoutes(config).live)
 
-/** Build the realtime endpoint path + query string for a poll. */
 export const buildPollPath = (endpoint: string, config: PollConfig): string => {
 	const params = new URLSearchParams({
 		metric: config.metric,
@@ -27,31 +37,74 @@ export const buildPollPath = (endpoint: string, config: PollConfig): string => {
 	if (config.dataSource) {
 		params.set('dataSource', config.dataSource)
 	}
+	if (config.scope) {
+		params.set('scope', config.scope)
+	}
+	if (config.series === false) {
+		params.set('series', '0')
+	}
 	return `${endpoint}?${params.toString()}`
 }
 
-/** Codes no later tick can talk its way out of, so the poller stops rather than repeats. */
-const TERMINAL: ReadonlySet<AnalyticsErrorCode> = new Set<AnalyticsErrorCode>([
-	'unauthorized',
-	'forbidden',
-])
-
 /**
- * Whether a refused poll is worth repeating. A provider outage, an unreadable answer and a
- * legacy body all keep polling, since the next tick may well succeed; only a refusal aimed
- * at this reader is final. The counter shows the same paused state either way.
+ * Whether a failed poll is worth repeating: only a refusal aimed at this reader (`401` or `403`)
+ * is final; outages, unreadable answers and network failures keep polling.
  */
-export const isPollRefusalFinal = async (res: Response): Promise<boolean> => {
-	const code = (await readResponseError(res))?.code
-	return code !== undefined && TERMINAL.has(code)
+export const isPollRefusalFinal = (err: unknown): boolean =>
+	err instanceof QueryFetchError && (err.status === 401 || err.status === 403)
+
+/** One live reading as the counters show it. */
+export interface RealtimeReading {
+	activeNow: number
+	series: RealtimePoint[]
+	sampled: boolean
 }
 
-/** Map a minute series to TrendChart points (HH:MM labels, locale-formatted values). */
-export const toRealtimePoints = (series: RealtimePoint[], locale: string): RealtimeChartPoint[] => {
-	const nf = new Intl.NumberFormat(locale)
-	return series.map((p) => ({
-		label: new Date(p.date).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' }),
-		value: p.value,
-		display: nf.format(p.value),
-	}))
+const isPoint = (value: unknown): value is RealtimePoint =>
+	isRecord(value) && typeof value.date === 'string' && typeof value.value === 'number'
+
+/**
+ * The reading in a live endpoint answer, or null for an answer that carries none: a status other
+ * than `ok` (no page to count on, a source that cannot count live) reads as a paused counter.
+ */
+export const readRealtimeReading = (body: unknown): RealtimeReading | null => {
+	if (!isRecord(body) || body.status !== 'ok' || typeof body.activeNow !== 'number') {
+		return null
+	}
+	return {
+		activeNow: body.activeNow,
+		series: Array.isArray(body.series) ? body.series.filter(isPoint) : [],
+		sampled: body.sampled === true,
+	}
+}
+
+/** The short name of `timeZone` at `at` in `locale`: `UTC`, `CEST`, `GMT+2`. */
+const zoneName = (at: Date, locale: string, timeZone: string): string =>
+	dateTimeFormat(locale, { timeZone, timeZoneName: 'short' })
+		.formatToParts(at)
+		.find((part) => part.type === 'timeZoneName')?.value ?? timeZone
+
+/**
+ * A minute series as TrendChart points, labelled in `timeZone` (the reporting zone) rather than
+ * the runtime's, so server render and browser hydration agree on every label.
+ */
+export const toRealtimePoints = (
+	series: RealtimePoint[],
+	locale: string,
+	timeZone: string
+): RealtimeChartPoint[] => {
+	const nf = numberFormat(locale)
+	const time = dateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', timeZone })
+	return series.map((p, i) => {
+		const at = new Date(p.date)
+		const minute = time.format(at)
+		const zoned = `${minute} ${zoneName(at, locale, timeZone)}`
+		return {
+			at: p.date,
+			label: i === series.length - 1 ? zoned : minute,
+			tooltipLabel: zoned,
+			value: p.value,
+			display: nf.format(p.value),
+		}
+	})
 }

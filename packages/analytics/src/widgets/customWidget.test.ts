@@ -3,16 +3,13 @@ import type { AnalyticsAdapter, AnalyticsCapabilities } from '../core/contract'
 import { buildCustomWidgets, type CustomWidgetDef } from './customWidget'
 
 const caps = (over: Partial<AnalyticsCapabilities> = {}): AnalyticsCapabilities => ({
-	perPageQuery: true,
 	realtime: false,
 	comparison: false,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews']),
 	dimensions: new Set(['source']),
-	filters: new Set(),
-	filterOperators: new Set(['eq']),
-	batchPageReport: true,
+	filters: {},
 	rateLimit: null,
 	recommendedTtl: { realtime: 10, aggregate: 300 },
 	...over,

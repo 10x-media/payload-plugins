@@ -14,6 +14,10 @@ const adapter = (id: string): AnalyticsAdapter =>
 		query: async () => ({ rows: [] }),
 	}) as unknown as AnalyticsAdapter
 
+/** An adapter declaring capture, which is what fills a slot. */
+const capturing = (id: string): AnalyticsAdapter =>
+	({ ...adapter(id), capture: { client: { kind: 'plausible' } } }) as unknown as AnalyticsAdapter
+
 const warn = vi.fn()
 
 const reqWith = (): PayloadRequest =>
@@ -96,13 +100,37 @@ describe('resolveSlotAdapter - tenant', () => {
 	})
 
 	it("resolves the scope registry's default when a scope resolves", async () => {
-		const scoped = createRegistry([adapter('plausible:1')])
+		const scoped = createRegistry([capturing('plausible:1')])
 		const runtime = runtimeWith({
 			scoped: true,
 			resolveScope: async () => 'tenant-a',
-			resolveRegistry: async () => scoped,
+			resolveRegistry: async () => ({ registry: scoped, grants: new Map() }),
 		})
 		expect((await resolveSlotAdapter(runtime, reqWith(), 'tenant'))?.id).toBe('plausible:1')
+	})
+
+	// A default that cannot capture would leave the slot empty, and the config would drop it.
+	it('passes over a default source that cannot capture for the first one that can', async () => {
+		const scoped = createRegistry([adapter('ga4:reads'), capturing('plausible:1')])
+		const runtime = runtimeWith({
+			scoped: true,
+			resolveScope: async () => 'tenant-a',
+			resolveRegistry: async () => ({ registry: scoped, grants: new Map() }),
+		})
+		expect(scoped.default().id).toBe('ga4:reads')
+		expect((await resolveSlotAdapter(runtime, reqWith(), 'tenant'))?.id).toBe('plausible:1')
+	})
+
+	it('resolves nothing when no source of the scope can capture', async () => {
+		const runtime = runtimeWith({
+			scoped: true,
+			resolveScope: async () => 'tenant-a',
+			resolveRegistry: async () => ({
+				registry: createRegistry([adapter('ga4:reads')]),
+				grants: new Map(),
+			}),
+		})
+		expect(await resolveSlotAdapter(runtime, reqWith(), 'tenant')).toBeNull()
 	})
 
 	it('passes the resolved scope to the registry resolver', async () => {
@@ -112,7 +140,7 @@ describe('resolveSlotAdapter - tenant', () => {
 			resolveScope: async () => 'tenant-a',
 			resolveRegistry: async ({ scope }) => {
 				seen.push(scope)
-				return createRegistry([adapter('plausible:1')])
+				return { registry: createRegistry([adapter('plausible:1')]), grants: new Map() }
 			},
 		})
 		await resolveSlotAdapter(runtime, reqWith(), 'tenant')
@@ -124,7 +152,7 @@ describe('resolveSlotAdapter - tenant', () => {
 		const runtime = runtimeWith({
 			scoped: true,
 			resolveScope: async () => 'tenant-a',
-			resolveRegistry: async () => scoped,
+			resolveRegistry: async () => ({ registry: scoped, grants: new Map() }),
 			captureSlots: { tenant: 'plausible:1' },
 		})
 		expect((await resolveSlotAdapter(runtime, reqWith(), 'tenant'))?.id).toBe('plausible:1')
@@ -135,7 +163,10 @@ describe('resolveSlotAdapter - tenant', () => {
 		const runtime = runtimeWith({
 			scoped: true,
 			resolveScope,
-			resolveRegistry: async () => createRegistry([adapter('native')]),
+			resolveRegistry: async () => ({
+				registry: createRegistry([adapter('native')]),
+				grants: new Map(),
+			}),
 			captureSlots: { tenant: false },
 		})
 		expect(await resolveSlotAdapter(runtime, reqWith(), 'tenant')).toBeNull()

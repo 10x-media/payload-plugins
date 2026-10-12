@@ -1,36 +1,57 @@
-import { analytics } from '../../src/index'
-import { native } from '../../src/native/nativeAdapter'
-import { devMemoryAdapter } from '../helpers/adapters'
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import { delayedAdapter, devMemoryAdapter } from '../helpers/adapters'
 import {
 	DEV_REPORTING_TIMEZONE,
 	type DevConfigFragment,
-	sharedBindings,
+	devSiteAddress,
+	pagesBinding,
+	sharedCustomizing,
 	sharedDashboardLayout,
+	sharedGate,
 	sharedGoals,
+	sharedRevenue,
+	sharedSkip,
 	sharedWidgets,
+	slowSourceDashboardLayout,
+	slowSourceMs,
 } from './shared'
 
 const nativeAdapter = native()
+const slowMs = slowSourceMs()
+const memorySource = slowMs ? delayedAdapter(devMemoryAdapter, slowMs) : devMemoryAdapter
 
-/** Today's single-site dev playground: one install, no tenancy plugin. */
+/** The single-site dev playground: one install, no tenancy plugin. */
 export const singleFragment: DevConfigFragment = {
 	collections: [],
 	plugins: [
 		analytics({
-			adapters: [nativeAdapter, devMemoryAdapter],
-			cache: { warm: true },
-			// Surface analytics-daily in the dev nav so the sync tier is inspectable
-			// (hidden by default in real installs).
-			sync: { hidden: false },
+			adapters: [nativeAdapter, memorySource],
+			...(slowMs ? { defaultAdapter: memorySource.id } : {}),
+			// Slowed, each opened page's sidebar stat read holds a slot for the whole delay: beside the
+			// panel's three headline reads they outgrow the default four, and one would time out queued.
+			cache: { warm: true, ...(slowMs ? { concurrency: { perSource: 8 } } : {}) },
+			sync: true,
 			reportingTimezone: DEV_REPORTING_TIMEZONE,
-			collections: sharedBindings,
+			revenue: sharedRevenue,
+			collections: { pages: pagesBinding },
 			// Two config adapters, so the global slot has to name one: the memory provider is a
 			// read-only demo source with nothing to capture.
-			capture: { slots: { global: nativeAdapter.id } },
+			capture: {
+				slots: { global: nativeAdapter.id },
+				gate: sharedGate,
+				// The site is this same app, served where the admin is.
+				exclusion: { sites: ({ req }) => [devSiteAddress(req)] },
+				skip: sharedSkip,
+			},
 			goals: { defaults: sharedGoals, collection: true },
 			providers: { collection: true },
 			widgets: sharedWidgets,
+			...sharedCustomizing,
 		}),
 	],
-	dashboard: { widgets: [], defaultLayout: sharedDashboardLayout },
+	dashboard: {
+		widgets: [],
+		defaultLayout: slowMs ? slowSourceDashboardLayout : sharedDashboardLayout,
+	},
 }

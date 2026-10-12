@@ -1,14 +1,19 @@
 import type { PayloadRequest } from 'payload'
-import { comparisonOf } from '../core/capabilities'
+import { type ReadPrincipal, readPrincipalOf } from '../access/principal'
 import type { DateRange } from '../core/contract'
-import { type AnalyticsRuntime, resolveGoalsDetailedFor } from '../plugin/runtime'
+import { type AnalyticsRuntime, goalNamesFor, resolveGoalsDetailedFor } from '../plugin/runtime'
 import { MAX_QUERY_LIMIT } from '../query/limits'
 import type { TimeframePreset } from '../timeframe/presets'
 import { conversionRate } from '../view/conversionRate'
-import { previousWindow, withinLookback } from './comparison'
-import { prepareWidgetRead, type WidgetReadStatus } from './prepareWidgetRead'
+import {
+	comparisonWindow,
+	pinnedScope,
+	prepareWidgetRead,
+	type WidgetReadStatus,
+} from './prepareWidgetRead'
 import { readForWidget } from './readForWidget'
 import { readForWidgetBreakdown } from './readForWidgetBreakdown'
+import { mergeNotices, type ReadNotices } from './readMeta'
 
 export interface GoalRow {
 	slug: string
@@ -21,9 +26,16 @@ export interface GoalRow {
 	previousConversions?: number
 }
 
-export interface WidgetGoalsResult {
+export interface WidgetGoalsResult extends Partial<ReadNotices> {
 	status: WidgetReadStatus
+	/** How long until a `busy` read can succeed, when the source or the plugin knows. */
+	retryAfterMs?: number
 	adapterId: string
+	/**
+	 * Scope a link to this read must name, set only when the viewer would not resolve it alone:
+	 * a needless `scope` refuses every reader without `access.crossScope`.
+	 */
+	scope?: string
 	dateRange: DateRange
 	timezone: string
 	rows: GoalRow[]
@@ -31,19 +43,12 @@ export interface WidgetGoalsResult {
 	siteVisitors?: number
 	/** The source that answered, absent on a read that never reached one. */
 	provider?: string
-	clamped?: boolean
-	stale?: boolean
-	/** True when the source answered without one of the filters a read carried. */
-	filtersUnapplied?: boolean
-	/** True when a read hit the source's event scan cap, so the numbers are a floor. */
-	sampled?: boolean
-	/** True when the source could not read the scope's goals, so the empty table means nothing. */
-	goalsUnresolved?: boolean
-	/** True when the scope configures no goals at all, which is an empty table, not a failure. */
+	/** True when the scope declares no goals of its own: an empty table, not a failure. */
 	noGoals?: boolean
 }
 
-export interface ReadForWidgetGoalsArgs {
+/** Scoped like `ReadForWidgetArgs`: the request's own scope unless one is pinned. */
+export type ReadForWidgetGoalsArgs = ReadPrincipal & {
 	req: PayloadRequest
 	timeframe: TimeframePreset
 	limit: number
@@ -52,8 +57,6 @@ export interface ReadForWidgetGoalsArgs {
 	adapterId?: string
 	now: Date
 	range?: DateRange
-	/** Explicit scope override; omitted resolves via the plugin's scopeResolver. */
-	scope?: string | null
 	/**
 	 * Reporting timezone the caller already resolved, reused rather than resolved again so
 	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
@@ -62,10 +65,8 @@ export interface ReadForWidgetGoalsArgs {
 }
 
 /**
- * How much wider than the table the previous window is read. Both windows rank by their own
- * conversions, so a goal in today's top rows may sit well below them in the previous window;
- * reading only as many rows as the table shows would drop exactly those deltas. Capped at
- * the bound every analytics query is held to.
+ * How much wider than the table the previous window is read: each window ranks by its own
+ * conversions, so a goal in today's top rows may rank too low there to keep its delta.
  */
 const PREVIOUS_LIMIT_FACTOR = 4
 
@@ -73,18 +74,22 @@ const previousLimit = (limit: number): number =>
 	Math.min(limit * PREVIOUS_LIMIT_FACTOR, MAX_QUERY_LIMIT)
 
 /**
- * Goal names for the read's own scope. A resolver that throws must not cost the widget its
- * table, so the rows fall back to their slugs; the failure travels on as the hint, which is
- * what tells the read apart from a scope that configured no goals at all.
+ * The scope's goal slugs and their display names. A throwing resolver must not cost the table:
+ * rows fall back to slugs and `'unresolved'` tells the read apart from a scope with no goals.
  */
 const goalNames = async (
 	runtime: AnalyticsRuntime,
 	req: PayloadRequest,
 	scope: string | null
-): Promise<Map<string, string> | 'unresolved'> => {
+): Promise<{ slugs: string[]; names: Map<string, string>; builtin: string[] } | 'unresolved'> => {
 	try {
 		const resolved = await resolveGoalsDetailedFor(runtime, req, scope)
-		return new Map(resolved.map(({ goal }) => [goal.slug, goal.name]))
+		const shown = await goalNamesFor({ runtime, req, scope, resolved })
+		return {
+			slugs: resolved.map(({ goal }) => goal.slug),
+			names: new Map(shown.map((goal) => [goal.slug, goal.name])),
+			builtin: resolved.filter((entry) => entry.source === 'builtin').map(({ goal }) => goal.slug),
+		}
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: widget goal names failed to resolve: ${String(err)}`)
 		return 'unresolved'
@@ -92,13 +97,8 @@ const goalNames = async (
 }
 
 /**
- * The goals table behind the goals widget: conversions per goal over the window, each with
- * its revenue, its share of the site's visitors, and (when comparing) the same goal's
- * conversions in the previous window. Rows come from one `goal` breakdown read and the site
- * total from one totals read, both through the existing widget helpers so capability
- * gating, scoping and caching stay in one place. Revenue and visitors ride along only where
- * the source serves them; the status is the breakdown's, since a table without its rows has
- * nothing to show.
+ * Goals table from a `goal` breakdown, a visitors total for the rate and, when comparing, the
+ * previous window's breakdown. Status is the breakdown's: a table without rows shows nothing.
  */
 export const readForWidgetGoals = async (
 	args: ReadForWidgetGoalsArgs
@@ -115,7 +115,7 @@ export const readForWidgetGoals = async (
 		now,
 		timeframe,
 		adapterId,
-		scope: args.scope,
+		...readPrincipalOf(args),
 		timezone: args.timezone,
 		range: args.range,
 	})
@@ -128,22 +128,15 @@ export const readForWidgetGoals = async (
 	const { runtime, adapter, tz, dateRange } = prepared
 	// The sub-reads resolve their own context; pinning the adapter, scope, timezone and
 	// window keeps all three answering about exactly the same read.
-	const shared = { req, timeframe, adapterId: adapter.id, scope: prepared.scope, timezone: tz, now }
-	const previousRange =
-		compare && runtime.comparison && comparisonOf(adapter.capabilities)
-			? previousWindow(dateRange, tz)
-			: null
-	const comparisonRange =
-		previousRange &&
-		withinLookback(previousRange, adapter.capabilities.maxLookbackDays, { tz, now })
-			? previousRange
-			: undefined
+	const shared = { req, timeframe, adapterId: adapter.id, ...prepared.pin, timezone: tz, now }
+	const comparisonRange = compare ? comparisonWindow(prepared, now) : undefined
 
 	// The names are resolved first: their slugs are the hint a provider source restricts its
 	// goal rows to, so both reads below need them before they run.
 	const resolved = await goalNames(runtime, req, prepared.scope)
-	const names = resolved === 'unresolved' ? new Map<string, string>() : resolved
-	const goalSlugs = resolved === 'unresolved' ? 'unresolved' : [...names.keys()]
+	const names = resolved === 'unresolved' ? new Map<string, string>() : resolved.names
+	const builtinGoalSlugs = resolved === 'unresolved' ? [] : resolved.builtin
+	const goalSlugs = resolved === 'unresolved' ? 'unresolved' : resolved.slugs
 	const [breakdown, totals, previous] = await Promise.all([
 		readForWidgetBreakdown({
 			...shared,
@@ -153,6 +146,7 @@ export const readForWidgetGoals = async (
 			limit,
 			extraMetrics: ['revenue', 'visitors'],
 			goalSlugs,
+			builtinGoalSlugs,
 		}),
 		adapter.capabilities.metrics.has('visitors')
 			? // The site total is a denominator, never a delta: its own previous window would
@@ -167,28 +161,34 @@ export const readForWidgetGoals = async (
 					dimension: 'goal',
 					limit: previousLimit(limit),
 					goalSlugs,
+					builtinGoalSlugs,
 				})
 			: undefined,
 	])
 	if (breakdown.status !== 'ok') {
-		return fallback(breakdown.status, breakdown.adapterId, { dateRange, timezone: tz })
+		return {
+			...fallback(breakdown.status, breakdown.adapterId, { dateRange, timezone: tz }),
+			...(breakdown.retryAfterMs === undefined ? {} : { retryAfterMs: breakdown.retryAfterMs }),
+		}
 	}
 
 	const previousBySlug = new Map(
-		(previous?.status === 'ok' ? previous.rows : []).map((row) => [row.label, row.value])
+		(previous?.status === 'ok' ? previous.rows : []).map((row) => [row.dimensionValue, row.value])
 	)
-	const siteVisitors = totals?.status === 'ok' ? totals.metrics.visitors : undefined
+	const visitorTotal = totals?.status === 'ok' ? totals.metrics.visitors : undefined
+	const siteVisitors = typeof visitorTotal === 'number' ? visitorTotal : undefined
 	const rows: GoalRow[] = breakdown.rows
 		.map((row) => {
 			const rate = conversionRate(row.metrics?.visitors, siteVisitors)
-			const previousConversions = previousBySlug.get(row.label)
+			const previousConversions = previousBySlug.get(row.dimensionValue)
+			const revenue = row.metrics?.revenue
 			return {
-				slug: row.label,
-				name: names.get(row.label) ?? row.label,
-				conversions: row.value,
-				...(row.metrics?.revenue !== undefined ? { revenue: row.metrics.revenue } : {}),
+				slug: row.dimensionValue,
+				name: names.get(row.dimensionValue) ?? row.dimensionValue,
+				conversions: row.value ?? 0,
+				...(typeof revenue === 'number' ? { revenue } : {}),
 				...(rate !== null ? { rate } : {}),
-				...(previousConversions !== undefined ? { previousConversions } : {}),
+				...(typeof previousConversions === 'number' ? { previousConversions } : {}),
 			}
 		})
 		// The adapter ranks and caps already; re-applying both keeps one that does not from
@@ -199,17 +199,15 @@ export const readForWidgetGoals = async (
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
+		// The caller's own scope, not the one this pinned onto its sub-reads: those are always
+		// explicitly scoped, so reading their answer back would name every viewer's own scope.
+		...pinnedScope(args, prepared.queryScope),
 		dateRange,
 		timezone: tz,
 		rows,
 		...(siteVisitors !== undefined ? { siteVisitors } : {}),
 		...(breakdown.provider === undefined ? {} : { provider: breakdown.provider }),
-		clamped: Boolean(breakdown.clamped || totals?.clamped || previous?.clamped),
-		stale: Boolean(breakdown.stale || totals?.stale || previous?.stale),
-		filtersUnapplied: Boolean(
-			breakdown.filtersUnapplied || totals?.filtersUnapplied || previous?.filtersUnapplied
-		),
-		sampled: Boolean(breakdown.sampled || totals?.sampled || previous?.sampled),
+		...mergeNotices(breakdown, totals, previous),
 		goalsUnresolved: breakdown.goalsUnresolved === true,
 		noGoals: breakdown.noGoals === true,
 	}

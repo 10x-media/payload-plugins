@@ -15,6 +15,10 @@ Each plugin's dev app owns its own migrations at `packages/<slug>/dev/migrations
 4. Apply: `pnpm migrate <slug>`.
 5. Status check: `pnpm migrate:status <slug>`.
 
+## Analytics: one chain per database and tenancy mode
+
+`packages/analytics/dev/migrations/` holds `mongo`, `postgres`, `postgres-tenancy`, `sqlite` and `sqlite-tenancy`; `DEV_DB` and `TENANCY=on` pick the chain, and `next start` (the e2e suite) applies the SQL chains at boot through `prodMigrations`. A schema change needs a migration in each SQL chain: `DEV_DB=postgres TENANCY=on pnpm migrate:create analytics <name>` and so on. Payload's template imports `MigrateUpArgs`/`MigrateDownArgs` as values, which this repo's `verbatimModuleSyntax` keeps, so run `pnpm exec biome check --write dev/migrations` from the package afterwards (it rewrites them as type imports) before anything loads the file. `pnpm migrate:create analytics check --skip-empty` with the same variables creates nothing while a chain is current.
+
 ## Rollback / reset (use with care)
 
 - `pnpm migrate:down <slug>` rolls back the last applied.

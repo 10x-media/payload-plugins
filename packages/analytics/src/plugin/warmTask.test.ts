@@ -1,250 +1,284 @@
-import type { PayloadRequest, WidgetInstance } from 'payload'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { Payload, PayloadRequest } from 'payload'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AnalyticsQuery } from '../core/contract'
+import { createRegistry } from '../core/registry'
+import type { ReadRecipe } from '../surfacing/cacheStore'
+import type { RefreshOptions, RefreshOutcome } from '../surfacing/engine'
+import { recipeWindow } from '../surfacing/recipe'
+import { memoryAdapter } from '../testing/memoryAdapter'
+import { memoryCacheStore } from '../testing/memoryCacheStore'
+import type { AnalyticsRuntime } from './runtime'
+import { setRuntime } from './runtime'
+import {
+	takeInTurn,
+	WARM_TASK_SLUG,
+	type WarmTaskOptions,
+	type WarmTaskOutput,
+	warmTask,
+} from './warmTask'
 
-const { readForWidget } = vi.hoisted(() => ({ readForWidget: vi.fn() }))
-const { readForWidgetSeries } = vi.hoisted(() => ({ readForWidgetSeries: vi.fn() }))
-const { readForWidgetBreakdown } = vi.hoisted(() => ({ readForWidgetBreakdown: vi.fn() }))
+const NOW = new Date('2026-10-07T23:30:00.000Z')
+const HOUR = 3_600_000
 
-vi.mock('../widgets/readForWidget', () => ({ readForWidget }))
-vi.mock('../widgets/readForWidgetSeries', () => ({ readForWidgetSeries }))
-vi.mock('../widgets/readForWidgetBreakdown', () => ({ readForWidgetBreakdown }))
+const recipe = (overrides: Partial<ReadRecipe> = {}): ReadRecipe => ({
+	adapterRef: 'memory',
+	scope: null,
+	timeframe: 'last7days',
+	window: 'live',
+	query: { metrics: ['pageviews'], timezone: 'UTC' },
+	...overrides,
+})
 
-import { deriveWarmTargets, type WarmWidgetInstance, warmTask } from './warmTask'
+interface Refresh {
+	adapterId: string
+	query: AnalyticsQuery
+	options: RefreshOptions
+}
 
-const layout = (widgets: WarmWidgetInstance[]): WarmWidgetInstance[] => widgets
-
-describe('deriveWarmTargets', () => {
-	it('maps metric, trend, and breakdown widgets to their read targets', () => {
-		const targets = deriveWarmTargets(
-			layout([
-				{ widgetSlug: 'analytics-metric', data: { metric: 'visitors', timeframe: 'last7days' } },
-				{ widgetSlug: 'analytics-trend', data: { metric: 'pageviews', timeframe: 'last30days' } },
-				{
-					widgetSlug: 'analytics-breakdown-pages',
-					data: { metric: 'pageviews', timeframe: 'last30days', limit: 8 },
-				},
-			])
-		)
-		expect(targets).toEqual([
-			{
-				kind: 'metric',
-				metric: 'visitors',
-				timeframe: 'last7days',
-				range: undefined,
-				adapterId: undefined,
+const setup = (
+	recipes: ReadRecipe[],
+	answer: (query: AnalyticsQuery) => RefreshOutcome,
+	extra: Partial<WarmTaskOptions> = {}
+) => {
+	const warn = vi.fn()
+	const payload = { config: {}, collections: {}, logger: { warn } } as unknown as Payload
+	const store = memoryCacheStore()
+	const recent = vi.spyOn(store, 'recentRecipes').mockResolvedValue(recipes)
+	const refreshes: Refresh[] = []
+	const tenantSource = { ...memoryAdapter(), id: 'plausible:doc-a' }
+	const runtime: AnalyticsRuntime = {
+		registry: createRegistry([memoryAdapter()]),
+		resolveRegistry: async ({ scope }) => ({
+			registry: createRegistry(scope === 'tenant-a' ? [tenantSource] : [memoryAdapter()]),
+			grants: new Map(),
+		}),
+		resolveTimezone: async (_req, scope) => (scope === 'tenant-a' ? 'Europe/Berlin' : 'UTC'),
+		configAdapterIds: new Set(['memory']),
+		bindings: {},
+		ttl: {},
+		comparison: true,
+		cache: {
+			store,
+			sweeper: {
+				maybeSweep: () => undefined,
+				sweep: async () => ({ ran: true, swept: 0 }),
+				idle: async () => undefined,
 			},
-			{
-				kind: 'series',
-				metric: 'pageviews',
-				timeframe: 'last30days',
-				range: undefined,
-				adapterId: undefined,
+		},
+		engine: {
+			read: async () => {
+				throw new Error('the warm task refreshes, it never reads')
 			},
-			{
-				kind: 'breakdown',
-				metric: 'pageviews',
-				dimension: 'page',
-				timeframe: 'last30days',
-				limit: 8,
-				range: undefined,
-				adapterId: undefined,
+			refresh: async (adapter, query, options) => {
+				refreshes.push({ adapterId: adapter.id, query, options })
+				const outcome = answer(query)
+				if (outcome === 'refreshed' && query.metrics.includes('visits')) {
+					throw new Error('vendor down')
+				}
+				return outcome
 			},
-		])
+		},
+	}
+	setRuntime(payload, runtime)
+	const task = warmTask({
+		schedule: { queue: 'analytics', cron: '*/30 * * * *', intervalMs: 30 * 60_000 },
+		windowHours: 6,
+		maxReads: 50,
+		...extra,
 	})
+	const run = async (): Promise<WarmTaskOutput> => {
+		const handler = task.handler
+		if (typeof handler !== 'function') {
+			throw new Error('the warm task runs a function')
+		}
+		const result = await handler({ req: { payload } as PayloadRequest } as never)
+		if (!('output' in result) || !result.output) {
+			throw new Error('the warm task answers an output')
+		}
+		return result.output
+	}
+	return { run, refreshes, recent, warn, payload }
+}
 
-	it('maps each breakdown slug to its dimension', () => {
-		const dims = deriveWarmTargets(
-			layout([
-				{ widgetSlug: 'analytics-breakdown-sources' },
-				{ widgetSlug: 'analytics-breakdown-devices' },
-				{ widgetSlug: 'analytics-breakdown-countries' },
-			])
-		).map((t) => (t.kind === 'breakdown' ? t.dimension : null))
-		expect(dims).toEqual(['source', 'device', 'country'])
-	})
-
-	it('skips the realtime widget and unknown / custom slugs', () => {
-		const targets = deriveWarmTargets(
-			layout([
-				{ widgetSlug: 'analytics-realtime', data: { metric: 'visitors' } },
-				{ widgetSlug: 'myapp-custom', data: { metric: 'pageviews' } },
-				{ widgetSlug: undefined },
-				{ widgetSlug: 'analytics-metric', data: { metric: 'pageviews', timeframe: 'today' } },
-			])
-		)
-		expect(targets).toEqual([
-			{
-				kind: 'metric',
-				metric: 'pageviews',
-				timeframe: 'today',
-				range: undefined,
-				adapterId: undefined,
-			},
-		])
-	})
-
-	it('applies defaults (pageviews / last30days / limit 5) when data is missing', () => {
-		const targets = deriveWarmTargets(
-			layout([{ widgetSlug: 'analytics-metric' }, { widgetSlug: 'analytics-breakdown-pages' }])
-		)
-		expect(targets[0]).toEqual({
-			kind: 'metric',
-			metric: 'pageviews',
-			timeframe: 'last30days',
-			range: undefined,
-			adapterId: undefined,
-		})
-		expect(targets[1]).toMatchObject({
-			kind: 'breakdown',
-			metric: 'pageviews',
-			timeframe: 'last30days',
-			limit: 5,
-		})
-	})
-
-	it('carries the data source through as the adapter id', () => {
-		const [target] = deriveWarmTargets(
-			layout([
-				{ widgetSlug: 'analytics-metric', data: { metric: 'pageviews', dataSource: 'plausible' } },
-			])
-		)
-		expect(target?.adapterId).toBe('plausible')
-	})
-
-	it('de-duplicates identical targets', () => {
-		const targets = deriveWarmTargets(
-			layout([
-				{ widgetSlug: 'analytics-metric', data: { metric: 'pageviews', timeframe: 'last30days' } },
-				{ widgetSlug: 'analytics-metric', data: { metric: 'pageviews', timeframe: 'last30days' } },
-			])
-		)
-		expect(targets).toHaveLength(1)
-	})
-
-	it('keeps a custom-range widget, carrying its stored days for the warm loop to resolve', () => {
-		const [target] = deriveWarmTargets(
-			layout([
-				{
-					widgetSlug: 'analytics-metric',
-					data: {
-						metric: 'pageviews',
-						timeframe: 'custom',
-						range: { from: '2026-01-01', to: '2026-01-31' },
-					},
-				},
-			])
-		)
-		expect(target?.range).toEqual({ from: '2026-01-01', to: '2026-01-31' })
-	})
-
-	it('skips a custom-timeframe widget whose range is incomplete', () => {
-		const targets = deriveWarmTargets(
-			layout([
-				{ widgetSlug: 'analytics-metric', data: { metric: 'pageviews', timeframe: 'custom' } },
-			])
-		)
-		expect(targets).toEqual([])
-	})
-
-	it('defaults an unknown metric string to pageviews', () => {
-		const [target] = deriveWarmTargets(
-			layout([{ widgetSlug: 'analytics-metric', data: { metric: 'not-a-real-metric' } }])
-		)
-		expect(target?.metric).toBe('pageviews')
+describe('takeInTurn', () => {
+	it('takes one recipe of each scope per round, most recently read first, up to the limit', () => {
+		const a1 = recipe({ scope: 'a', window: 'live' })
+		const a2 = recipe({ scope: 'a', window: 'days' })
+		const a3 = recipe({ scope: 'a', window: 'previous' })
+		const b1 = recipe({ scope: 'b' })
+		const none = recipe({ scope: null })
+		expect(takeInTurn([a1, a2, b1, a3, none], 10)).toEqual([a1, b1, none, a2, a3])
+		expect(takeInTurn([a1, a2, b1, a3, none], 2)).toEqual([a1, b1])
+		expect(takeInTurn([], 3)).toEqual([])
 	})
 })
 
-describe('warmTask handler scope fan-out', () => {
-	const warn = vi.fn()
-	const req = { payload: { logger: { warn } } } as unknown as PayloadRequest
-
+describe('warmTask', () => {
 	beforeEach(() => {
-		warn.mockReset()
-		readForWidget.mockReset().mockResolvedValue({ status: 'ok', adapterId: 'memory' })
-		readForWidgetSeries.mockReset().mockResolvedValue({ status: 'ok', adapterId: 'memory' })
-		readForWidgetBreakdown.mockReset().mockResolvedValue({ status: 'ok', adapterId: 'memory' })
+		vi.useFakeTimers({ now: NOW, toFake: ['Date'] })
 	})
 
-	const runHandler = async (scopes?: () => string[]) => {
-		const widgets = layout([
-			{ widgetSlug: 'analytics-metric', data: { metric: 'pageviews', timeframe: 'last30days' } },
+	afterEach(() => {
+		vi.useRealTimers()
+	})
+
+	it('is analytics-warm, on its queue, behind the stuck-job guard', () => {
+		const task = warmTask({
+			schedule: { queue: 'analytics', cron: '*/30 * * * *', intervalMs: 30 * 60_000 },
+			windowHours: 24,
+			maxReads: 200,
+		})
+		expect(task.slug).toBe(WARM_TASK_SLUG)
+		expect(task.slug).toBe('analytics-warm')
+		expect(task.schedule).toMatchObject([{ cron: '*/30 * * * *', queue: 'analytics' }])
+		expect(task.concurrency).toBeUndefined()
+	})
+
+	it('marks its own killed runs failed, unless a live run holds its lease', async () => {
+		const hook = warmTask({
+			schedule: { queue: 'analytics', cron: '*/30 * * * *', intervalMs: 30 * 60_000 },
+			windowHours: 24,
+			maxReads: 200,
+		}).schedule?.[0]?.hooks?.beforeSchedule
+		const updateJobs = vi.fn(async () => null)
+		const payload = { collections: {}, db: { updateJobs } } as unknown as Payload
+		await hook?.({
+			defaultBeforeSchedule: async () => ({ input: {}, shouldSchedule: true }),
+			jobStats: {},
+			queueable: { scheduleConfig: { cron: '*/30 * * * *', queue: 'analytics' } },
+			req: { payload } as PayloadRequest,
+		} as never)
+		const [update] = updateJobs.mock.calls[0] as unknown as [
+			{ where: { and: Array<Record<string, Record<string, unknown>>> } },
+		]
+		expect(update.where.and).toContainEqual({ taskSlug: { equals: 'analytics-warm' } })
+		expect(update.where.and).toContainEqual({ queue: { equals: 'analytics' } })
+	})
+
+	it('asks the store for four times maxReads of the last windowHours’ reads, to pick from', async () => {
+		const { run, recent } = setup([], () => 'fresh')
+		await run()
+		expect(recent).toHaveBeenCalledWith(new Date(NOW.getTime() - 6 * HOUR), 200)
+	})
+
+	it('takes maxReads recipes in turn from each scope, so a busy scope never takes every place', async () => {
+		const busy = Array.from({ length: 5 }, (_, i) =>
+			recipe({ query: { metrics: ['pageviews'], timezone: 'UTC', path: `/busy-${i}` } })
+		)
+		const quiet = recipe({
+			adapterRef: 'plausible:doc-a',
+			scope: 'tenant-a',
+			query: { metrics: ['pageviews'], timezone: 'Europe/Berlin', scope: 'tenant-a' },
+		})
+		const { run, refreshes } = setup([...busy, quiet], () => 'refreshed', { maxReads: 3 })
+		expect(await run()).toMatchObject({ ran: true, finished: true, refreshed: 3 })
+		expect(refreshes.map((each) => each.query.path ?? each.query.scope)).toEqual([
+			'/busy-0',
+			'tenant-a',
+			'/busy-1',
 		])
-		const task = warmTask('*/30 * * * *', widgets as unknown as WidgetInstance[], scopes)
-		const handler = task.handler
-		if (typeof handler !== 'function') {
-			throw new Error('warm handler must be a function')
-		}
-		const result = await handler({ req } as unknown as Parameters<typeof handler>[0])
-		return (result as { output: { warmed: number; failed: number } }).output
-	}
-
-	it('runs each target once for the install-wide scope when no scopes resolver is set', async () => {
-		const output = await runHandler()
-		expect(readForWidget).toHaveBeenCalledTimes(1)
-		expect(readForWidget.mock.calls[0]?.[0]).toMatchObject({ scope: null })
-		expect(output).toEqual({ warmed: 1, failed: 0 })
 	})
 
-	it('runs each target once per scope, passing scope through explicitly', async () => {
-		const output = await runHandler(() => ['t1', 't2'])
-		expect(readForWidget).toHaveBeenCalledTimes(3)
-		expect(readForWidget.mock.calls.map((call) => call[0]?.scope)).toEqual([null, 't1', 't2'])
-		expect(output).toEqual({ warmed: 3, failed: 0 })
+	it('stops between reads once its budget is spent, saying it did not finish', async () => {
+		let wall = 0
+		const { run, refreshes } = setup(
+			[recipe(), recipe({ window: 'days' }), recipe({ window: 'previous' })],
+			() => {
+				wall += 600
+				return 'refreshed'
+			},
+			{ budgetMs: 1_000, clock: () => wall }
+		)
+		expect(await run()).toMatchObject({ ran: true, finished: false, refreshed: 2 })
+		expect(refreshes).toHaveLength(2)
 	})
 
-	it('counts a failure independently per scope', async () => {
-		readForWidget
-			.mockResolvedValueOnce({ status: 'ok' })
-			.mockRejectedValueOnce(new Error('boom'))
-			.mockResolvedValueOnce({ status: 'ok' })
-		const output = await runHandler(() => ['t1', 't2'])
-		expect(output).toEqual({ warmed: 2, failed: 1 })
-	})
-
-	it('never calls scopes() when the layout derives no targets', async () => {
-		const scopes = vi.fn(() => ['t1', 't2'])
-		const task = warmTask('*/30 * * * *', [] as unknown as WidgetInstance[], scopes)
-		const handler = task.handler
-		if (typeof handler !== 'function') {
-			throw new Error('warm handler must be a function')
-		}
-		const result = await handler({ req } as unknown as Parameters<typeof handler>[0])
-		expect(scopes).not.toHaveBeenCalled()
-		expect((result as { output: { warmed: number; failed: number } }).output).toEqual({
-			warmed: 0,
+	it('works out each window now, in its own scope’s zone, through that scope’s sources', async () => {
+		const tenant = recipe({
+			adapterRef: 'plausible:doc-a',
+			scope: 'tenant-a',
+			window: 'days',
+			query: { metrics: ['pageviews'], timezone: 'Europe/Berlin', scope: 'tenant-a' },
+		})
+		const { run, refreshes } = setup([recipe(), tenant], () => 'refreshed')
+		expect(await run()).toEqual({
+			ran: true,
+			finished: true,
+			refreshed: 2,
+			fresh: 0,
+			skipped: 0,
 			failed: 0,
 		})
-	})
-
-	it('warns exactly once when a tenant-pass target degrades to a non-ok status', async () => {
-		readForWidget.mockResolvedValue({ status: 'unavailable', adapterId: 'plausible' })
-		const output = await runHandler(() => ['t1'])
-		expect(output).toEqual({ warmed: 0, failed: 0 })
-		expect(warn).toHaveBeenCalledTimes(1)
-		expect(warn.mock.calls[0]?.[0]).toContain('t1')
-		expect(warn.mock.calls[0]?.[0]).toContain('plausible')
-	})
-
-	it('does not warn for a null-scope (install-wide) pass that degrades', async () => {
-		readForWidget.mockResolvedValue({ status: 'unavailable', adapterId: 'plausible' })
-		const output = await runHandler()
-		expect(output).toEqual({ warmed: 0, failed: 0 })
-		expect(warn).not.toHaveBeenCalled()
-	})
-
-	it('throttles the degrade warning to once per (scope, adapter) pair', async () => {
-		readForWidget.mockResolvedValue({ status: 'unavailable', adapterId: 'plausible' })
-		readForWidgetSeries.mockResolvedValue({ status: 'unavailable', adapterId: 'plausible' })
-		const widgets = layout([
-			{ widgetSlug: 'analytics-metric', data: { metric: 'pageviews', timeframe: 'last30days' } },
-			{ widgetSlug: 'analytics-trend', data: { metric: 'pageviews', timeframe: 'last7days' } },
+		expect(refreshes).toEqual([
+			{
+				adapterId: 'memory',
+				query: {
+					metrics: ['pageviews'],
+					timezone: 'UTC',
+					dateRange: recipeWindow({ timeframe: 'last7days', window: 'live' }, NOW, 'UTC'),
+				},
+				options: { freshForMs: 30 * 60_000, priority: 'background' },
+			},
+			{
+				adapterId: 'plausible:doc-a',
+				query: {
+					metrics: ['pageviews'],
+					timezone: 'Europe/Berlin',
+					scope: 'tenant-a',
+					dateRange: recipeWindow({ timeframe: 'last7days', window: 'days' }, NOW, 'Europe/Berlin'),
+				},
+				options: { freshForMs: 30 * 60_000, priority: 'background' },
+			},
 		])
-		const task = warmTask('*/30 * * * *', widgets as unknown as WidgetInstance[], () => ['t1'])
-		const handler = task.handler
-		if (typeof handler !== 'function') {
-			throw new Error('warm handler must be a function')
-		}
-		await handler({ req } as unknown as Parameters<typeof handler>[0])
+		// 23:30 UTC is already the next day in Berlin, so the two windows end on different days.
+		expect(refreshes[1]?.query.dateRange.end.toISOString()).toBe('2026-10-08T21:59:59.999Z')
+	})
+
+	it('counts what it left fresh, what it passed over and what failed, warning once per source', async () => {
+		const { run, warn } = setup(
+			[
+				recipe(),
+				recipe({ query: { metrics: ['visits'], timezone: 'UTC' } }),
+				recipe({ query: { metrics: ['visits'], path: '/a', timezone: 'UTC' } }),
+				recipe({ adapterRef: 'gone' }),
+				recipe({ timeframe: 'allTime', window: 'previous' }),
+			],
+			(query) => (query.metrics.includes('visits') ? 'refreshed' : 'fresh')
+		)
+		expect(await run()).toEqual({
+			ran: true,
+			finished: true,
+			refreshed: 0,
+			fresh: 1,
+			skipped: 2,
+			failed: 2,
+		})
 		expect(warn).toHaveBeenCalledTimes(1)
+		expect(warn.mock.calls[0]?.[0]).toMatch(
+			/analytics warm: a read from "memory" .* failed: .*vendor down/
+		)
+	})
+
+	it('runs nothing on an instance whose runtime keeps no read cache', async () => {
+		const payload = { config: {}, collections: {}, logger: { warn: vi.fn() } } as unknown as Payload
+		setRuntime(payload, {
+			registry: createRegistry([memoryAdapter()]),
+			configAdapterIds: new Set(),
+			bindings: {},
+			ttl: {},
+			comparison: true,
+			engine: { read: async () => ({ rows: [], meta: { provider: 'memory', fetchedAt: '' } }) },
+		})
+		const handler = warmTask({
+			schedule: { queue: 'default', cron: null, intervalMs: 1 },
+			windowHours: 1,
+			maxReads: 1,
+		}).handler
+		if (typeof handler !== 'function') {
+			throw new Error('the warm task runs a function')
+		}
+		expect(await handler({ req: { payload } as PayloadRequest } as never)).toEqual({
+			output: { ran: false, finished: false, refreshed: 0, fresh: 0, skipped: 0, failed: 0 },
+		})
 	})
 })

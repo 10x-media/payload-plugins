@@ -1,28 +1,32 @@
-import type { EventType, RawEventInput } from './normalizeEvent'
+import { MAX_SINCE_MS } from '../../goals/constants'
+import type { HitType } from '../store/types'
+import type { RawEventInput } from './normalizeEvent'
 
-const TYPES: ReadonlySet<string> = new Set<EventType>(['pageview', 'event', 'goal'])
+const TYPES: ReadonlySet<string> = new Set<HitType>(['pageview', 'event', 'goal', 'engagement'])
+
+/** The types a `name` means something on; a pageview and an engagement carry none. */
+const NAMED: ReadonlySet<string> = new Set<HitType>(['event', 'goal'])
 
 const nonEmptyString = (value: unknown): boolean => typeof value === 'string' && value.length > 0
 
-export type RawEventField = 'type' | 'path' | 'hostname' | 'name'
+export type RawEventField = 'type' | 'path' | 'hostname' | 'name' | 'revenue' | 'value'
 
-export interface RawEventCheck {
+interface RawEventCheck {
 	/**
-	 * Demand a hostname. The wire body's is optional, because ingest attributes an event to the
-	 * request that carried it; server code supplies its own and there is no request to fall back
-	 * on, so that path still requires one.
+	 * Wire events may omit a hostname (ingest attributes them to the request); server code has no
+	 * request to fall back on, so it requires one.
 	 */
 	requireHostname?: boolean
+	/**
+	 * Only `trackServerEvent` sets this. On the wire a `revenue` flag or negative amount is refused,
+	 * not sanitized away, because it is a forgery attempt, not a typo.
+	 */
+	allowRevenue?: boolean
 }
 
 /**
- * The first required field an event fails on, or undefined when it is valid: a known `type`,
- * a `path`, and a `name` (the event name, or the goal slug on a `goal`) for everything but a
- * pageview. Optional fields are sanitized in `normalizeEvent` and dropped when malformed, so
- * one bad attribute costs an attribute rather than the whole event.
- *
- * Types are checked rather than truthiness: a non-string path would otherwise reach goal
- * matching and throw there rather than being refused here.
+ * First field an event fails on. Other optional fields are dropped later in `normalizeEvent` when
+ * malformed, but server-only revenue is refused here so a forged body is not quietly recorded.
  */
 export const rawEventError = (
 	raw: RawEventInput | undefined,
@@ -40,11 +44,28 @@ export const rawEventError = (
 	if (!hostname) {
 		return 'hostname'
 	}
-	if (raw.type !== 'pageview' && !nonEmptyString(raw.name)) {
+	if (NAMED.has(raw.type) && !nonEmptyString(raw.name)) {
 		return 'name'
+	}
+	if (!check.allowRevenue) {
+		if (raw.revenue !== undefined && raw.revenue !== false) {
+			return 'revenue'
+		}
+		if (typeof raw.value === 'number' && raw.value < 0) {
+			return 'value'
+		}
 	}
 	return undefined
 }
 
-export const validateRawEvent = (raw: RawEventInput | undefined): raw is RawEventInput =>
-	rawEventError(raw) === undefined
+/**
+ * An engagement's `sinceMs` as ingest believes it: whole milliseconds from 0 to a day, else
+ * undefined, and the engagement is then filed when it arrives. Never a reason to refuse one.
+ */
+export const boundedSinceMs = (value: unknown): number | undefined =>
+	typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_SINCE_MS
+		? Math.round(value)
+		: undefined
+
+/** Whether a pageview is a single-page app's navigation: `nav: 1`, and nothing else. */
+export const isNavigation = (value: unknown): boolean => value === 1

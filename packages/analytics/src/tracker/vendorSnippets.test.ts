@@ -1,8 +1,10 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { ga4 } from '../adapters/ga4/ga4'
 import { plausible } from '../adapters/plausible/plausible'
 import { posthog } from '../adapters/posthog/posthog'
-import type { CaptureSnippet } from '../core/capture'
+import { exclusionPrelude, withExclusionPrelude } from '../capture/exclusionPrelude'
+import type { CaptureSnippet } from './config'
+import { EXCLUSION_STASH_KEY } from './exclusion'
 import { createScriptLoader } from './loadScript'
 import { createGa4Sink } from './sinks/ga4'
 import { createPlausibleSink } from './sinks/plausible'
@@ -10,10 +12,8 @@ import { createPosthogSink } from './sinks/posthog'
 import type { TrackerWindow } from './types'
 
 /**
- * The seam between an adapter's snippet and its sink: a sink only dispatches once the
- * vendor global exists, so a snippet whose inline init runs before its loader lands would
- * throw and never publish one. Running the snippets for real in a DOM is the only way to
- * catch that.
+ * A sink dispatches only once the vendor global exists, so a snippet whose inline init throws
+ * before its loader lands publishes none: only running the snippets in a DOM catches that.
  */
 
 interface VendorRealm {
@@ -28,10 +28,8 @@ interface VendorRealm {
 }
 
 /**
- * Scripts run in jsdom's own realm, whose `window` is not the object this test file sees,
- * so the snippet hands its realm out through the shared document. That realm outlives a
- * single test, so its vendor globals are cleared before each one: a stub that finds itself
- * already installed does nothing at all.
+ * Snippets run in jsdom's own realm, handed out through the shared document. It outlives a test,
+ * so its vendor globals are cleared before each one: an already installed stub does nothing.
  */
 const bridgeRealm = (): VendorRealm => {
 	const bridge = document.createElement('script')
@@ -83,17 +81,22 @@ beforeEach(() => {
 describe('posthog snippet', () => {
 	const snippet = () =>
 		posthog({ projectId: '1', apiKey: 'phx_private', projectToken: 'phc_public' }).capture?.snippet(
-			{ path: '/api/analytics/p/tenant' }
+			{ path: '/api/_x/p/tenant' }
 		) ?? { scripts: [] }
 
 	it('publishes a callable stub and injects array.js off the proxy path', async () => {
 		await runSnippet(snippet())
 
 		expect(typeof realm.posthog?.capture).toBe('function')
-		expect(scriptSources()).toContain('/api/analytics/p/tenant/static/array.js')
+		expect(scriptSources()).toContain('/api/_x/p/tenant/static/array.js')
 		expect(realm.posthog?._i?.[0]).toEqual([
 			'phc_public',
-			{ api_host: '/api/analytics/p/tenant', ui_host: 'https://us.posthog.com' },
+			{
+				api_host: '/api/_x/p/tenant',
+				ui_host: 'https://us.posthog.com',
+				capture_pageview: 'history_change',
+				opt_out_persistence_by_default: true,
+			},
 			'posthog',
 		])
 	})
@@ -101,17 +104,13 @@ describe('posthog snippet', () => {
 	it('carries the CSP nonce of the inline onto the script it injects', async () => {
 		await runSnippet(snippet(), 'n0nce')
 
-		expect(scriptWithSrc('/api/analytics/p/tenant/static/array.js')?.getAttribute('nonce')).toBe(
-			'n0nce'
-		)
+		expect(scriptWithSrc('/api/_x/p/tenant/static/array.js')?.getAttribute('nonce')).toBe('n0nce')
 	})
 
 	it('injects no nonce when the inline carries none', async () => {
 		await runSnippet(snippet())
 
-		expect(scriptWithSrc('/api/analytics/p/tenant/static/array.js')?.hasAttribute('nonce')).toBe(
-			false
-		)
+		expect(scriptWithSrc('/api/_x/p/tenant/static/array.js')?.hasAttribute('nonce')).toBe(false)
 	})
 
 	it('queues a sink dispatch made before the SDK lands', async () => {
@@ -131,14 +130,14 @@ describe('posthog snippet', () => {
 describe('plausible per-site snippet', () => {
 	const snippet = () =>
 		plausible({ siteId: 'example.com', apiKey: 'k', scriptId: 'abc123' }).capture?.snippet({
-			path: '/api/analytics/p/tenant',
+			path: '/api/_x/p/tenant',
 		}) ?? { scripts: [] }
 
 	it('publishes the queue stub and parks the endpoint for the tracker', async () => {
 		await runSnippet(snippet())
 
 		expect(typeof realm.plausible).toBe('function')
-		expect(realm.plausible?.o).toEqual({ endpoint: '/api/analytics/p/tenant/api/event' })
+		expect(realm.plausible?.o).toEqual({ endpoint: '/api/_x/p/tenant/api/event' })
 	})
 
 	it('queues a sink dispatch made before the tracker lands', async () => {
@@ -166,10 +165,8 @@ describe('plausible per-site snippet', () => {
 
 		// Unlike PostHog's, this stub only publishes globals: the loader tag is the only
 		// script, and it was nonced where it was created.
-		expect(scriptSources().filter(Boolean)).toEqual(['/api/analytics/p/tenant/js/pa-abc123.js'])
-		expect(scriptWithSrc('/api/analytics/p/tenant/js/pa-abc123.js')?.getAttribute('nonce')).toBe(
-			'n0nce'
-		)
+		expect(scriptSources().filter(Boolean)).toEqual(['/api/_x/p/tenant/js/pa-abc123.js'])
+		expect(scriptWithSrc('/api/_x/p/tenant/js/pa-abc123.js')?.getAttribute('nonce')).toBe('n0nce')
 	})
 
 	it('leaves a tracker that won the race against the inline alone', async () => {
@@ -192,7 +189,7 @@ describe('ga4 snippet', () => {
 			propertyId: '1',
 			credentials: { client_email: 'sa@x.iam', private_key: 'pk' },
 			measurementId: 'G-AB12CD34',
-		}).capture?.snippet({ path: '/api/analytics/p/tenant' }) ?? { scripts: [] }
+		}).capture?.snippet({ path: '/api/_x/p/tenant' }) ?? { scripts: [] }
 
 	it('loads the tag from googletagmanager and publishes a callable gtag', async () => {
 		await runSnippet(snippet())
@@ -219,5 +216,83 @@ describe('ga4 snippet', () => {
 
 		const queued = [...(realm.dataLayer ?? [])].map((args) => [...(args as unknown[])])
 		expect(queued.at(-1)).toEqual(['event', 'checkout', { value: 49, currency: 'EUR' }])
+	})
+})
+
+/**
+ * Every vendor reads the address as it loads, and a snippet the server rendered runs before the
+ * tracker boots: the exclusion link has to be out of the address before the first vendor call.
+ */
+describe('the exclusion link ahead of a rendered snippet', () => {
+	const PARAM = 'analytics_exclude'
+	const realmStash = (): unknown => Reflect.get(realm, EXCLUSION_STASH_KEY)
+
+	beforeEach(() => {
+		Reflect.deleteProperty(realm, EXCLUSION_STASH_KEY)
+		window.history.replaceState(null, '', `/pricing?utm_source=news&${PARAM}=tok3n#top`)
+	})
+
+	afterEach(() => {
+		window.history.replaceState(null, '', '/')
+	})
+
+	it("leaves the address before GA4's config reads it as page_location, keeping the token for the tracker", async () => {
+		const seen: string[] = []
+		const layer: unknown[] = []
+		realm.dataLayer = Object.assign(layer, {
+			push: (...entries: unknown[]) => {
+				seen.push(document.location.href)
+				return Array.prototype.push.apply(layer, entries)
+			},
+		})
+		const ga = ga4({
+			propertyId: '1',
+			credentials: { client_email: 'sa@x.iam', private_key: 'pk' },
+			measurementId: 'G-AB12CD34',
+		}).capture?.snippet({ path: '/api/_x/p/global' }) ?? { scripts: [] }
+
+		await runSnippet(withExclusionPrelude(ga, PARAM))
+
+		const queued = layer.map((args) => [...(args as unknown[])])
+		expect(queued[1]).toEqual(['config', 'G-AB12CD34'])
+		expect(seen).toHaveLength(2)
+		for (const href of seen) {
+			expect(href).not.toContain(PARAM)
+			expect(href).toContain('/pricing?utm_source=news#top')
+		}
+		expect(realmStash()).toBe('tok3n')
+	})
+
+	it('leaves the address before PostHog and Plausible load, and before any later snippet', async () => {
+		const ph = posthog({
+			projectId: '1',
+			apiKey: 'phx_private',
+			projectToken: 'phc_public',
+		}).capture?.snippet({ path: '/api/_x/p/tenant' }) ?? { scripts: [] }
+		const pl = plausible({
+			siteId: 'example.com',
+			apiKey: 'k',
+			domain: 'example.com',
+		}).capture?.snippet({ path: '/api/_x/p/global' }) ?? { scripts: [] }
+
+		await runSnippet(withExclusionPrelude(pl, PARAM))
+		expect(document.location.search).toBe('?utm_source=news')
+		expect(document.location.hash).toBe('#top')
+		await runSnippet(withExclusionPrelude(ph, PARAM))
+
+		expect(realmStash()).toBe('tok3n')
+		expect(realm.posthog?._i?.[0]).toBeDefined()
+		const order = [...document.querySelectorAll('script')].map(
+			(el) => el.getAttribute('src') ?? (el.textContent?.includes(PARAM) ? 'prelude' : 'inline')
+		)
+		expect(order.indexOf('prelude')).toBeLessThan(order.indexOf('/api/_x/p/global/js/script.js'))
+	})
+
+	it('leaves an address without the parameter, and the stash, alone', async () => {
+		window.history.replaceState(null, '', '/pricing?utm_source=news')
+		await runSnippet({ scripts: [{ inline: exclusionPrelude(PARAM) }] })
+
+		expect(document.location.search).toBe('?utm_source=news')
+		expect(realmStash()).toBeUndefined()
 	})
 })

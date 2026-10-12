@@ -2,79 +2,72 @@
 
 # @10x-media/analytics
 
-Adapter-based analytics for Payload v3. One adapter contract covers a self-hosted native engine and the major providers (GA4, Plausible, Umami, PostHog), surfaced through an admin analytics view, dashboard widgets and per-document stat fields, with cached reads, an opt-in sync tier, and capability gating so unsupported surfaces never appear.
+Analytics for Payload v3 behind one adapter contract: a self-hosted native engine that stores hits in your own database, or GA4, Plausible, Umami and PostHog, read through an analytics view, dashboard widgets and per-document stat fields. Every surface hides what the active source cannot answer.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/analytics?style=flat-square)](https://www.npmjs.com/package/@10x-media/analytics)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
-## Features
+## What it does
 
-- **One adapter contract** with a capabilities model; adapters ship as code-split subpaths (`@10x-media/analytics/adapters/*`) plus a `memoryAdapter` for tests.
-- **Native engine**: self-hosted, cookieless analytics in your own database, with atomic rollups, exact daily uniques, geo resolution (platform headers or MaxMind), retention pruning of events, the seen ledger and the daily visitor salts, with rollups pruned only once you set a window of their own, and opt-in write batching. Crawlers, link-preview fetchers, monitors and headless clients are dropped at ingest by their user agent, on by default and replaceable with your own predicate. It classifies the visit's named origin (`utm_source`, else the referrer host, else `direct`), its acquisition channel (twelve tokens, paid split per platform), the referrer host, browser, OS, language and the five UTM keys at ingest, so it serves and filters every breakdown dimension the widgets offer except `goal`, which it groups but cannot filter. The view's `medium` and `campaign` groupings are the two it does not serve.
-- **Capture**: a dependency-free browser tracker (`@10x-media/analytics/tracker`) with SPA pageviews, consent gating, auto-capture, and goals, booted from React (`@10x-media/analytics/react`) or a server component; `?analytics_exclude=1` takes a staff browser out of capture (and sets each vendor's own opt-out), `=0` puts it back; capture-capable adapters are served through a first-party proxy so a vendor's SDK loads from your own origin, GA4 excepted, whose tag Google serves itself.
-- **Goals**: conversions and revenue, completed from a `data-analytics-goal` attribute, a `goalField()` picker in your own blocks, a `@10x-media/form-builder` action, or `trackServerEvent` from server code (webhooks, jobs), and declared in config or in an opt-in collection editors manage per scope.
-- **Analytics view** at `/admin/analytics`: overview cards, a trend, capability-gated breakdown tabs with click-to-filter, goals and realtime, with range, source, metric, tab and filters in the URL so a report is a shareable link.
-- **Dashboard widgets** for Payload's Modular Dashboard: metric, trend (with an optional previous-period overlay), goals, eleven breakdowns, and realtime, each capability-gated, each linking into the analytics view, plus a public API for custom widgets. Metric, trend and breakdown widgets take one optional filter, narrowed to what the chosen source can apply, stated in the caption and carried into the view.
-- **Display fields**: `analyticsStat`, `analyticsStatRow`, `analyticsFields`, `analyticsTab`, `analyticsTabsField` place per-document stats on your collections; typed per-collection bindings resolve each document's URL path.
-- **Query endpoint**: an authenticated `GET /api/analytics/query` over any configured source, capability-validated and scope-gated, with a `fetchQuery` helper for admin code. Every endpoint the plugin registers answers a refusal in one envelope, `{ error: { code, message, param? } }`, over one typed code vocabulary, with `readErrorCode` for clients that branch on it; the capture proxy is the deliberate exception and stays bodyless for the vendor SDK reading it.
-- **Caching** through `payload.kv` with request coalescing, plus an opt-in scheduled warm job.
-- **Sync tier**: persist provider daily metrics into a queryable Payload collection.
-- **Typed translations** with per-key overrides via `@10x-media/analytics/i18n`.
+- **Native engine**: cookieless analytics in your own MongoDB, Postgres or SQLite database, counted into exact daily totals, with visits, bounce rate, geo and bot filtering.
+- **Providers**: GA4, Plausible, Umami and PostHog as read sources, configured in code or per tenant in the admin, with their trackers served through a first-party proxy (GA4 excepted).
+- **Capture**: a small browser tracker, goals and revenue from markup, forms and server code, and a signed link that keeps staff out of the numbers.
+- **Admin**: an analytics view at `/admin/analytics`, widgets for Payload's dashboard, and stat fields on your own collections.
+- **Multi-tenancy**: one scope per tenant, from capture to every read.
 
-Optional peer dependencies, installed only if used: `@google-analytics/data` (GA4), `maxmind` (MaxMind geo).
+Consent is the site's decision, not the plugin's: it stores no consent state, and your consent manager opens and closes capture through `setGate`.
 
-## Quick start
+## Install
 
 ```bash
-pnpm add @10x-media/analytics
+pnpm add @10x-media/analytics @10x-media/fields
 ```
+
+It needs Payload `^3.83.0`, Next.js `^15.2.9` or `^16.2.6`, React 19 and Node.js 22.18 or later. `@10x-media/fields` is a required peer.
 
 ```ts
 // payload.config.ts
-import { buildConfig } from 'payload'
 import { analytics, analyticsDefaultWidgets } from '@10x-media/analytics'
 import { native } from '@10x-media/analytics/adapters/native'
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { buildConfig } from 'payload'
 
 export default buildConfig({
+  db: mongooseAdapter({ url: process.env.DATABASE_URL ?? '' }),
+  secret: process.env.PAYLOAD_SECRET ?? '',
   admin: {
-    dashboard: { defaultLayout: [...analyticsDefaultWidgets()] },
+    dashboard: { widgets: [], defaultLayout: [...analyticsDefaultWidgets()] },
   },
   plugins: [
     analytics({
       adapters: [native()],
+      // Required, and your decision: 'off' captures at once, 'all' holds every capture slot
+      // until your consent manager calls setGate (see Consent), so it counts nothing without one.
+      capture: { gate: 'off' },
       collections: {
-        pages: { path: (doc) => (doc.slug ? `/${doc.slug}` : null) },
+        pages: { path: (doc) => (typeof doc.slug === 'string' ? `/${doc.slug}` : null) },
       },
     }),
   ],
 })
 ```
 
-Run `payload generate:importmap`, render `<AnalyticsScripts config={await getTrackerConfig(payload, { headers: await headers() })} />` from `@10x-media/analytics/rsc` in your root layout, and the dashboard fills in.
+Then regenerate the types and the import map (`pnpm payload generate:types`, `pnpm payload generate:importmap`) and render `<AnalyticsScripts>` from `@10x-media/analytics/site` in your site's root layout, `app/(frontend)/layout.tsx` in a Payload app. The [quick start](https://docs.10xmedia.de/analytics/quick-start) walks through each step, and what the boot logs.
 
 ## Documentation
 
-Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/analytics):
+Full documentation at [docs.10xmedia.de/analytics](https://docs.10xmedia.de/analytics):
 
-- [Overview](https://docs.10xmedia.de/analytics)
 - [Quick start](https://docs.10xmedia.de/analytics/quick-start)
-- [Adapters](https://docs.10xmedia.de/analytics/adapters)
-- [Data sources and the query endpoint](https://docs.10xmedia.de/analytics/data-sources)
-- [Analytics view](https://docs.10xmedia.de/analytics/analytics-view)
-- [Native engine](https://docs.10xmedia.de/analytics/native)
-- [Capture](https://docs.10xmedia.de/analytics/capture)
-- [Goals](https://docs.10xmedia.de/analytics/goals)
-- [First-party proxy](https://docs.10xmedia.de/analytics/proxy)
-- [Geo resolution](https://docs.10xmedia.de/analytics/geo)
-- [Privacy](https://docs.10xmedia.de/analytics/privacy)
-- [Display fields](https://docs.10xmedia.de/analytics/display-fields)
-- [Dashboard widgets](https://docs.10xmedia.de/analytics/widgets)
-- [Caching and warming](https://docs.10xmedia.de/analytics/cache)
-- [Reporting timezone](https://docs.10xmedia.de/analytics/timezone)
-- [Sync tier](https://docs.10xmedia.de/analytics/sync)
+- [Concepts](https://docs.10xmedia.de/analytics/concepts)
+- [Consent](https://docs.10xmedia.de/analytics/consent)
+- [Providers](https://docs.10xmedia.de/analytics/providers)
 - [Multi-tenancy](https://docs.10xmedia.de/analytics/multi-tenancy)
-- [i18n](https://docs.10xmedia.de/analytics/i18n)
+- [Privacy](https://docs.10xmedia.de/analytics/privacy)
+- [Options reference](https://docs.10xmedia.de/analytics/reference/options)
+
+Upgrading from 1.0.0-beta.11 changes options, endpoints and storage: follow [From 1.0.0-beta.11](https://docs.10xmedia.de/analytics/upgrading/beta-12) before you deploy it.
 
 ## License
 

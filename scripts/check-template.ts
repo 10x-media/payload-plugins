@@ -1,11 +1,9 @@
 /**
  * Template parity check for the files every plugin is supposed to carry verbatim.
  *
- * `tooling/plugin-template` is copied once at `pnpm new` and then never looked at again,
- * so a fix applied to the generated packages does not reach it: the production-build guard
- * in `dev/helpers/memoryDb.ts` diverged that way for six weeks and every plugin scaffolded
- * in between spawned a mongod during `next build`. This turns that class of drift into a
- * failing check on the pull request that introduces it.
+ * `tooling/plugin-template` is copied once at `pnpm new` and then never looked at again, so a fix
+ * applied only to the generated packages never reaches it and every later scaffold ships the bug.
+ * This fails the pull request that introduces such drift.
  *
  * Only files listed in TRACKED are compared. Most of the template is a starting point that
  * each plugin is expected to rewrite (`src/index.ts`, translations, tests, package.json);

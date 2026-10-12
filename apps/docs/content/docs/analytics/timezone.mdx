@@ -3,9 +3,20 @@ title: Reporting timezone
 description: Align daily analytics boundaries to a reporting timezone, per install or per tenant, with @10x-media/analytics.
 ---
 
-By default every day boundary in the plugin is UTC: timeframe windows (`today`, `last30days`), the daily series axis, native rollup buckets, and the surfacing cache key all snap to UTC midnight. A team reporting from Europe or the Americas sees each "day" cut at their local 01:00 or 20:00, which is rarely what they want.
+By default every day boundary in the plugin is UTC: timeframe windows (`today`, `last30days`), the daily series axis, the native engine's days, and the surfacing cache key all snap to UTC midnight. A team reporting from Europe or the Americas sees each "day" cut at their local 01:00 or 20:00, which is rarely what they want.
 
 `reportingTimezone` aligns those boundaries to an [IANA timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) instead. It defaults to `'UTC'`, so an install that does not set it behaves exactly as before.
+
+## Precedence
+
+Four sources, first match wins:
+
+1. **The request's own `timezone` parameter.** The [query endpoint](/analytics/reference/endpoints#query-endpoint) reads it, and the analytics view sends the zone it resolved, so every section of one screen reads the same days.
+2. **`reportingTimezone` as a resolver**, called with the request and its already-resolved scope. This is the per-tenant case.
+3. **`reportingTimezone` as a string**, the install-wide default. A string `Intl.DateTimeFormat` does not accept as a time zone fails the boot with an error naming it. An accepted string is used as written, so write the canonical name (`'Europe/Berlin'`): `'europe/berlin'` passes too, but keys its cached reads apart from it.
+4. **UTC**, when none of the above answers, when the resolver throws, or when what it answers is not a zone `Intl.DateTimeFormat` accepts. A throw logs a warning each time; an invalid answer logs one warning per distinct value, for the first 100 such values. The native engine, which counts its days in the zone, keeps a scope's last good zone instead on a throw or an invalid answer; see [the native engine](#the-native-engine-counts-days-when-they-close).
+
+The zone the reads used is shown beside the range in the analytics view's toolbar, and its tooltip says what it means: each day's numbers are grouped in it.
 
 ## Setting it
 
@@ -21,58 +32,122 @@ import { native } from '@10x-media/analytics/adapters/native'
 
 analytics({
   adapters: [native()],
+  capture: { gate: 'all' },
   reportingTimezone: 'Europe/Berlin',
 })
 ```
 
-### A resolver (per tenant, per user, or a selector)
+### A resolver (per tenant)
 
-The resolver receives the request and its already-resolved `scope`, so it covers the common ways a consumer might derive the zone:
+The resolver receives the request and its already-resolved `scope`. Return `null` to use UTC. An answer `Intl.DateTimeFormat` does not accept as a zone falls back to UTC as well, with one warning per distinct value, so a bad value never breaks a read; the native engine keeps the scope's last good zone instead (see [below](#the-native-engine-counts-days-when-they-close)).
+
+**The resolver runs on every ingest request and every read**, so it cannot afford a database round trip each time. Cache it. A per-scope map with a short TTL is enough, and it is the whole of what the plugin expects a host to add:
 
 ```ts
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import type { Payload } from 'payload'
+
+const TTL_MS = 60_000
+const cache = new Map<string, { zone: string; readAt: number }>()
+
+const tenantTimezone = async (payload: Payload, tenant: string): Promise<string> => {
+  const hit = cache.get(tenant)
+  if (hit && Date.now() - hit.readAt < TTL_MS) {
+    return hit.zone
+  }
+  const doc = await payload.findByID({
+    collection: 'tenants',
+    id: tenant,
+    depth: 0,
+    overrideAccess: true,
+  })
+  const zone = typeof doc.timezone === 'string' && doc.timezone ? doc.timezone : 'UTC'
+  cache.set(tenant, { zone, readAt: Date.now() })
+  return zone
+}
+
+declare const resolveTenant: ScopeResolver // your tenant resolver, see Multi-tenancy
+declare const member: ScopeMemberAccess // and your membership check
+
 analytics({
   adapters: [native()],
-  scopeResolver: ({ req }) => getTenantFromCookie(req),
-  reportingTimezone: async ({ req, scope }) => {
-    // Per tenant: look the zone up by scope.
-    if (scope) return (await lookupTenantTimezone(req.payload, scope)) ?? 'UTC'
-    // Per user account preference.
-    if (req.user?.timezone) return req.user.timezone as string
-    // A selector stored in a cookie / preference.
-    return readTimezoneCookie(req) ?? 'UTC'
-  },
+  scope: { resolve: resolveTenant, member },
+  capture: { gate: 'all' },
+  reportingTimezone: async ({ req, scope }) =>
+    scope ? await tenantTimezone(req.payload, scope) : 'UTC',
 })
 ```
 
-Return `null` to fall back to UTC. An unresolvable zone string also falls back to UTC (with a warning), so a bad value never breaks a read.
+The field the tenant document holds is an ordinary select. Payload ships the list, so there is nothing to maintain:
 
-The resolver runs on every ingest request and widget read, so cache anything that hits the database (a per-scope in-memory map with a short TTL is enough); the plugin does not memoize it for you.
+```ts
+import type { CollectionConfig } from 'payload'
+import { defaultTimezones } from 'payload/shared'
+
+export const tenants: CollectionConfig = {
+  slug: 'tenants',
+  fields: [
+    {
+      name: 'timezone',
+      type: 'select',
+      defaultValue: 'UTC',
+      options: defaultTimezones,
+      admin: {
+        description:
+          'Reporting days are cut at midnight in this zone. Changing it later recounts recent days only.',
+      },
+    },
+  ],
+}
+```
+
+`defaultTimezones` is the same list Payload's own date fields offer when `timezone: true` is set on them, so a tenant's analytics zone and the zone an editor picks on a date field read from one vocabulary.
+
+A tenant's zone is best chosen when the tenant is created: see [the native engine](#the-native-engine-counts-days-when-they-close) for why changing it later moves only recent history.
+
+### Why there is no per-user or browser zone
+
+The plugin deliberately offers no "show me these numbers in my own timezone" control for native data, and a resolver that reads `req.user` or a cookie is a mistake on a native install rather than a supported strategy.
+
+Native days are counted once, in the scope's zone, when they close (below). A row of daily totals is already a day; it carries no instant to re-slice. Re-reading those rows under a second zone would hand back the same days under different labels, so a Berlin viewer and a New York viewer would see identical numbers attributed to different days, and neither would match the site's own daily totals. There is no partial-correctness here to offer: a per-user zone over pre-bucketed days is simply wrong arithmetic presented as a preference.
+
+Per-user zones do work for providers that recompute a window per read, but a reporting zone that changes with whoever is looking is a reporting hazard of its own: two people comparing screens see different numbers for "yesterday" and have no way to tell why. One zone per scope is the model the plugin supports.
 
 ## What it controls
 
 - Timeframe presets resolve their window in the timezone (`today` starts at that zone's midnight).
 - A custom range, whether picked in a [widget](/analytics/widgets) or in the [analytics view](/analytics/analytics-view), is the two calendar days the admin picked, read whole in this timezone: the `to` day is included in full, and the caption names the picked days. Where the admin's browser sits changes nothing.
-- The daily trend series buckets and labels each point by the zone's day.
+- A trend series buckets and labels each point by the zone's day, and its weeks (from Monday) and months by the zone's days too.
 - The surfacing cache key partitions by timezone, so a Berlin read and a UTC read never share a cached result.
-- Native rollups are bucketed into the zone's day **at ingest** (see below).
+- The native engine counts each closed day in the zone (see below).
 
-## Native rollups bucket at ingest
+## The native engine counts days when they close
 
-The native engine fixes each event's rollup day when the event is written, using the timezone resolved for that request. This keeps reads cheap (they read pre-bucketed daily rows) and correct for the tenant's own zone.
+A stored hit holds only the instant it happened. The native engine cuts days when it counts them: once a day is over in the scope's zone, its hits are counted into that day's totals, which record the zone they were counted in. A read of a closed day reads those totals back, which keeps it cheap and exact for the tenant's own zone; today and every raw read are cut in the zone as they run.
+
+A read across tenants (**All sites**) is in one reporting zone, its reader's, over tenants that count their days in their own. It counts every visit that happened inside its range, whichever tenant's day that was, so its total is the same in any zone. Its day series files each tenant's own day under that day's date: a tenant behind the reporting zone has already kept a few hours dated the day before the range starts, and one ahead of it a few hours dated the day after it ends, and those hours are filed under the range's first and last day. The chart therefore never shows a day outside the range, and its days always add up to the total beside it.
 
 The trade-offs:
 
-- Changing a tenant's `reportingTimezone` does **not** re-bucket history. Existing rollups keep the day boundary they were written with; only new events use the new zone.
-- A per-user selector or per-user-account timezone cannot re-slice already-written native days into a different zone. For the native engine, use a fixed or per-tenant timezone. Per-user and selector strategies apply cleanly to external providers (whose windows are recomputed per read) and to the read-side series labels, but not to native historical buckets.
+- Changing a tenant's `reportingTimezone` recounts the days whose raw hits are all still kept, roughly the last [`retention.rawDays`](/analytics/native#retention) of them (90 by default): a day counted in the old zone is counted again in the new one by the next [maintenance](/analytics/native#maintenance) run, or by the next read that needs it while no jobs runner keeps maintenance on time, and is read from its raw hits until then. Older days keep the totals they were counted with, so a tenant that moves from `UTC` to `America/New_York` has a history whose early days are cut at one boundary and whose recent ones at the other. The first day counted in the new zone starts where the last old one ended, so that one day runs a few hours longer or shorter and no visit is counted twice or lost between them. Between two zones more than 24 hours apart, such as UTC-12 and UTC+13 or UTC+14, the old zone's last day can still be running when the new zone's next day begins, so up to two hours of visits at that seam are counted in both days. Nothing warns about it at read time. Set the zone when the tenant is created and treat a later change as a reporting break worth noting.
+- The engine asks for a scope's zone strictly. When the resolver throws or answers a string that is not a zone, the scope keeps its last good zone rather than falling back to UTC, which would count its days again in another zone, and a warning says so: the zone it last resolved to in this process, else the zone its newest counted day was counted in, which a fresh process or a jobs worker reads back from the database. Ingest hashes visitors by that same zone's day. A `null` or empty answer is not a failure: it means UTC, and the engine counts the scope's days in UTC from then on, so a resolver that answers `null` while a lookup is down recounts that scope's recent days in UTC. Answer the zone, or throw, rather than `null` for a moment.
+- A scope that has never resolved a zone, and has no day counted, is read in UTC, the zone its visitors are hashed by until it does. Such a read counts and writes nothing for later reads, its days come from raw hits alone, and it sets `meta.timezoneUnresolved`. Maintenance counts none of its days, but still deletes its raw hits once they are older than `retention.rawDays` in every zone, warning each run.
+- A per-user selector or per-user-account timezone cannot re-slice counted native days into a different zone, which is why [none is offered](#why-there-is-no-per-user-or-browser-zone).
 
 ## External providers
 
-Providers that accept a timezone are told the resolved zone:
+Each source treats the zone differently, and the difference matters when two of them sit side by side in one dashboard.
 
-- **Umami** sends it as the `timezone` query parameter on the daily series.
-- **PostHog** buckets the daily series with `toStartOfDay(timestamp, '<zone>')` in HogQL. Its range bounds are sent as `toDateTime('...', 'UTC')`, absolute instants: a bare HogQL date literal parses in the **project's** timezone, so a project set to anything but UTC used to read a window shifted by its own offset. Buckets are unchanged; only the window moved.
+| Source | What the zone does |
+|---|---|
+| **native** | Counts each closed day in the scope's zone and reads those totals back; today and raw reads are cut in it as they run. The zone is fixed per scope, not per read. |
+| **Umami** | Sent as the `timezone` query parameter on the daily series, so Umami buckets per read. Changing the zone re-buckets history. |
+| **PostHog** | Buckets the daily series with `toStartOfDay(timestamp, '<zone>')` in HogQL, so it buckets per read too. Its range bounds are sent as `toDateTime('...', 'UTC')`, absolute instants: a bare HogQL date literal parses in the **project's** timezone, so a project set to anything but UTC used to read a window shifted by its own offset. Buckets are unchanged; only the window moved. |
+| **GA4** | Buckets in the property's own configured timezone, which the plugin cannot override per read. Only the window bounds honour the resolved zone. |
+| **Plausible** | Buckets in the site's own configured timezone, same as GA4. |
 
-**GA4** and **Plausible** bucket in their own property / site timezone; the plugin cannot override that per read, so align the provider's own configured timezone with `reportingTimezone` for consistent daily boundaries.
+So for GA4 and Plausible, align the provider's own configured timezone with `reportingTimezone`, or a daily comparison against native will be off by the difference between them.
 
 <Callout type="warn">
 **Their range bounds changed.** Both adapters ask for whole calendar days (`startDate` / `endDate`), and both used to name those days by the UTC spelling of the range's instants. They now name the calendar day in the resolved `reportingTimezone`, which corrects two off-by-a-day errors. Numbers move on any install reading GA4 or Plausible with a non-UTC `reportingTimezone`; `native`, PostHog and Umami are unaffected, since none of them projects a range onto a calendar day.

@@ -10,6 +10,7 @@ import {
 	autoGranularity,
 	BREAKDOWN_TABS,
 	gate,
+	ITEM_METRICS,
 	resolveSource,
 	TAB_DIMENSIONS,
 	VIEW_METRIC_ORDER,
@@ -19,10 +20,10 @@ import {
 const nativeCaps: SerializedCapabilities = {
 	metrics: [...VIEW_METRIC_ORDER],
 	dimensions: [...DIMENSION_KEYS],
-	filters: [...DIMENSION_KEYS],
-	filterOperators: [...FILTER_OPERATORS],
+	filters: Object.fromEntries(
+		DIMENSION_KEYS.map((dimension) => [dimension, [...FILTER_OPERATORS]])
+	),
 	realtime: true,
-	perPageQuery: true,
 	comparison: true,
 	minGranularity: 'hour',
 	maxLookbackDays: null,
@@ -44,10 +45,8 @@ const posthogCaps: SerializedCapabilities = {
 		'event',
 		'goal',
 	],
-	filters: ['page', 'country', 'device'],
-	filterOperators: ['eq', 'contains'],
+	filters: { page: ['eq', 'contains'], country: ['eq', 'contains'], device: ['eq', 'contains'] },
 	realtime: true,
-	perPageQuery: true,
 	comparison: true,
 	minGranularity: 'hour',
 	maxLookbackDays: 365,
@@ -57,18 +56,37 @@ const posthogCaps: SerializedCapabilities = {
 const narrowCaps: SerializedCapabilities = {
 	metrics: ['pageviews', 'visitors'],
 	dimensions: ['page', 'country'],
-	filters: [],
-	filterOperators: [],
+	filters: {},
 	realtime: false,
-	perPageQuery: false,
 	comparison: false,
 	minGranularity: 'day',
 	maxLookbackDays: 90,
 }
 
+/** Every adapter the package ships, with placeholder credentials. */
+const SHIPPED_ADAPTERS = [
+	['plausible', plausible({ siteId: 's', apiKey: 'k' })],
+	['ga4', ga4({ propertyId: '1', credentials: { client_email: 'a', private_key: 'b' } })],
+	['posthog', posthog({ projectId: '1', apiKey: 'phx_k' })],
+	['umami', umami({ websiteId: 'w', apiKey: 'k' })],
+] as const
+
 describe('gate', () => {
 	it('orders every metric the contract defines', () => {
 		expect([...VIEW_METRIC_ORDER].sort()).toEqual(Object.keys(METRIC_KEYS).sort())
+	})
+
+	it('offers the Content tab only to a source that lists items', () => {
+		expect(gate(posthogCaps).tabs).not.toContain('content')
+		expect(gate(nativeCaps).dimensionsFor('content')).toEqual(['item'])
+	})
+
+	it("reads an item's views, clicks and conversions as its columns", () => {
+		expect(gate(nativeCaps).metricsFor('item', 'pageviews')).toEqual([
+			'impressions',
+			'interactions',
+			'conversions',
+		])
 	})
 
 	it('files every dimension the contract defines under exactly one tab', () => {
@@ -81,6 +99,7 @@ describe('gate', () => {
 		// without a `dim` opens on. Reordering it would silently move everyone's saved views.
 		expect(BREAKDOWN_TABS.map((tab) => TAB_DIMENSIONS[tab][0])).toEqual([
 			'page',
+			'item',
 			'channel',
 			'device',
 			'country',
@@ -91,11 +110,22 @@ describe('gate', () => {
 
 	it('serves every control for the native engine', () => {
 		const g = gate(nativeCaps)
-		expect(g.metrics).toEqual(VIEW_METRIC_ORDER)
-		expect(g.tabs).toEqual(['pages', 'sources', 'technology', 'geography', 'events', 'goals'])
+		// The item counts are the Content tab's columns, never a card of the whole site, and
+		// visits are the one count sessions already show.
+		const shown = VIEW_METRIC_ORDER.filter((metric) => metric !== 'visits')
+		expect(g.metrics).toEqual(shown.filter((metric) => !ITEM_METRICS.has(metric)))
+		expect(g.columns).toEqual(shown)
+		expect(g.tabs).toEqual([
+			'pages',
+			'content',
+			'sources',
+			'technology',
+			'geography',
+			'events',
+			'goals',
+		])
 		expect(g.dimensionsFor('sources')).toEqual(TAB_DIMENSIONS.sources)
-		expect(g.canFilter('page')).toBe(true)
-		expect(g.operators).toEqual([...FILTER_OPERATORS])
+		expect(g.operatorsFor('page')).toEqual([...FILTER_OPERATORS])
 		expect(g.canCompare).toBe(true)
 		expect(g.canHour).toBe(true)
 		expect(g.realtime).toBe(true)
@@ -104,15 +134,12 @@ describe('gate', () => {
 
 	it('offers comparison to a source whose adapter never declared the capability', () => {
 		const provider: AnalyticsCapabilities = {
-			perPageQuery: false,
 			realtime: false,
 			minGranularity: 'day',
 			maxLookbackDays: 90,
 			metrics: new Set(['pageviews']),
 			dimensions: new Set(['page']),
-			filters: new Set(),
-			filterOperators: new Set(),
-			batchPageReport: false,
+			filters: {},
 			rateLimit: null,
 			recommendedTtl: { realtime: 300, aggregate: 3600 },
 		}
@@ -140,9 +167,8 @@ describe('gate', () => {
 			'utmCampaign',
 		])
 		expect(g.dimensionsFor('geography')).toEqual(['country'])
-		expect(g.canFilter('page')).toBe(true)
-		expect(g.canFilter('browser')).toBe(false)
-		expect(g.operators).toEqual(['eq', 'contains'])
+		expect(g.operatorsFor('page')).toEqual(['eq', 'contains'])
+		expect(g.operatorsFor('browser')).toEqual([])
 		expect(g.canHour).toBe(true)
 		expect(g.goals).toBe(true)
 	})
@@ -152,8 +178,7 @@ describe('gate', () => {
 		expect(g.metrics).toEqual(['pageviews', 'visitors'])
 		expect(g.tabs).toEqual(['pages', 'geography'])
 		expect(g.dimensionsFor('technology')).toEqual([])
-		expect(g.canFilter('page')).toBe(false)
-		expect(g.operators).toEqual([])
+		expect(g.operatorsFor('page')).toEqual([])
 		expect(g.canCompare).toBe(false)
 		expect(g.canHour).toBe(false)
 		expect(g.realtime).toBe(false)
@@ -180,12 +205,7 @@ describe('gate', () => {
 
 	// The capability objects the shipped adapters actually declare, not a stand-in: the goals
 	// tab appears for every source that can answer it.
-	it.each([
-		['plausible', plausible({ siteId: 's', apiKey: 'k' })],
-		['ga4', ga4({ propertyId: '1', credentials: { client_email: 'a', private_key: 'b' } })],
-		['posthog', posthog({ projectId: '1', apiKey: 'phx_k' })],
-		['umami', umami({ websiteId: 'w', apiKey: 'k' })],
-	])('opens the goals tab for %s', (_id, adapter) => {
+	it.each(SHIPPED_ADAPTERS)('opens the goals tab for %s', (_id, adapter) => {
 		const g = gate(serializeCapabilities(adapter.capabilities))
 		expect(g.goals).toBe(true)
 		expect(g.tabs).toContain('goals')
@@ -194,15 +214,90 @@ describe('gate', () => {
 
 	// Every provider maps `channel` onto its own acquisition-channel concept, so the sources
 	// tab offers it everywhere, PostHog included, where it is the tab's only dimension.
-	it.each([
-		['plausible', plausible({ siteId: 's', apiKey: 'k' })],
-		['ga4', ga4({ propertyId: '1', credentials: { client_email: 'a', private_key: 'b' } })],
-		['posthog', posthog({ projectId: '1', apiKey: 'phx_k' })],
-		['umami', umami({ websiteId: 'w', apiKey: 'k' })],
-	])('serves channel on the sources tab for %s', (_id, adapter) => {
+	it.each(SHIPPED_ADAPTERS)('serves channel on the sources tab for %s', (_id, adapter) => {
 		const g = gate(serializeCapabilities(adapter.capabilities))
 		expect(g.tabs).toContain('sources')
 		expect(g.dimensionsFor('sources')).toContain('channel')
+	})
+})
+
+describe('gate.metricsFor', () => {
+	it('reads an event row by its own events and visitors, never by pageviews', () => {
+		expect(gate(nativeCaps).metricsFor('event', 'pageviews')).toEqual(['events', 'visitors'])
+		// The metric the view is on does not leak in: an event has no pageviews of its own.
+		expect(gate(nativeCaps).metricsFor('event', 'bounceRate')).toEqual(['events', 'visitors'])
+	})
+
+	it('reads a goal row by conversions and revenue', () => {
+		expect(gate(nativeCaps).metricsFor('goal', 'pageviews')).toEqual(['conversions', 'revenue'])
+	})
+
+	it('leads every other dimension with the selected metric, then visitors', () => {
+		expect(gate(nativeCaps).metricsFor('page', 'pageviews')).toEqual(['pageviews', 'visitors'])
+		expect(gate(nativeCaps).metricsFor('country', 'bounceRate')).toEqual(['bounceRate', 'visitors'])
+	})
+
+	it('never repeats the selected metric as its own second column', () => {
+		expect(gate(nativeCaps).metricsFor('page', 'visitors')).toEqual(['visitors'])
+	})
+
+	it('drops a column the source does not serve', () => {
+		// PostHog serves no visits and no bounce rate, and Umami-shaped narrowCaps no events.
+		expect(gate(posthogCaps).metricsFor('event', 'pageviews')).toEqual(['events', 'visitors'])
+		expect(gate(narrowCaps).metricsFor('page', 'visitors')).toEqual(['visitors'])
+		expect(gate(narrowCaps).metricsFor('country', 'pageviews')).toEqual(['pageviews', 'visitors'])
+	})
+
+	it('falls back rather than asking for a column of zeros', () => {
+		const pageviewsOnly: SerializedCapabilities = { ...nativeCaps, metrics: ['pageviews'] }
+		// Neither of the event columns is served, so the read asks for what the view is on.
+		expect(gate(pageviewsOnly).metricsFor('event', 'pageviews')).toEqual(['pageviews'])
+		const visitorsOnly: SerializedCapabilities = { ...nativeCaps, metrics: ['visitors'] }
+		// Not even the selected metric: the first metric the source serves at all.
+		expect(gate(visitorsOnly).metricsFor('goal', 'pageviews')).toEqual(['visitors'])
+	})
+
+	it('answers nothing for a source that serves no metric at all', () => {
+		const none: SerializedCapabilities = { ...nativeCaps, metrics: [] }
+		expect(gate(none).metricsFor('page', 'pageviews')).toEqual([])
+	})
+
+	it('keeps a column out of a breakdown its metric is not read under', () => {
+		const g = gate(serializeCapabilities(umami({ websiteId: 'w', apiKey: 'k' }).capabilities))
+		// Umami counts visitors per row only: the pageviews column would stay empty.
+		expect(g.metricsFor('page', 'pageviews')).toEqual(['visitors'])
+		expect(g.metricsFor('country', 'visitDuration')).toEqual(['visitors'])
+		expect(g.metricsFor('goal', 'pageviews')).toEqual(['conversions'])
+	})
+})
+
+describe('one meaning per duration metric', () => {
+	const ga4Gate = gate(
+		serializeCapabilities(
+			ga4({ propertyId: '1', credentials: { client_email: 'a', private_key: 'b' } }).capabilities
+		)
+	)
+	const plausibleGate = gate(
+		serializeCapabilities(plausible({ siteId: 's', apiKey: 'k' }).capabilities)
+	)
+	const umamiGate = gate(serializeCapabilities(umami({ websiteId: 'w', apiKey: 'k' }).capabilities))
+
+	it('offers time on page only on a source with a time per pageview, and time per visit beside it', () => {
+		expect(ga4Gate.metrics).toEqual(expect.arrayContaining(['avgDuration', 'visitDuration']))
+		expect(plausibleGate.metrics).not.toContain('avgDuration')
+		expect(plausibleGate.metrics).toContain('visitDuration')
+		expect(umamiGate.metrics).not.toContain('avgDuration')
+		expect(umamiGate.metrics).toContain('visitDuration')
+	})
+
+	it('leaves a metric needing a page off the whole-site cards', () => {
+		expect(plausibleGate.metrics).not.toContain('scrollDepth')
+		expect(plausibleGate.metricsFor('page', 'scrollDepth')).toEqual(['scrollDepth', 'visitors'])
+	})
+
+	it('keeps time on page off GA4 event rows, which have no views of their own', () => {
+		expect(ga4Gate.metricsFor('country', 'avgDuration')).toEqual(['avgDuration', 'visitors'])
+		expect(ga4Gate.metricsFor('event', 'avgDuration')).toEqual(['events', 'visitors'])
 	})
 })
 

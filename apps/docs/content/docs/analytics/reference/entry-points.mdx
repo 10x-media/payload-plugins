@@ -1,0 +1,222 @@
+---
+title: Entry points
+description: Every import path the package exports, where each may be imported, and what it exports, by release tag.
+---
+
+The package splits its exports by where they run, so a page loads only what it needs and a server module never pulls the admin UI in. Import from the entry that matches where your code runs:
+
+| Entry | Import it from |
+|---|---|
+| [`@10x-media/analytics`](#10x-mediaanalytics) | Your Payload config and server code: route handlers, jobs, scripts, Payload's CLI. It loads Payload and no React, admin UI or stylesheet. |
+| [`@10x-media/analytics/types`](#10x-mediaanalyticstypes) | Anywhere. Its few runtime values (constants and `readErrorCode`) load no package, and its types erase. |
+| [`@10x-media/analytics/attributes`](#10x-mediaanalyticsattributes) | Anywhere, the browser and server components included. It loads no package and no stylesheet. |
+| [`@10x-media/analytics/tracker`](#10x-mediaanalyticstracker) | The browser. It loads no package and no stylesheet: no React, no Payload, no Node built-ins. |
+| [`@10x-media/analytics/react`](#10x-mediaanalyticsreact) | Client components of your site (`'use client'`). It loads React alone. |
+| [`@10x-media/analytics/site`](#10x-mediaanalyticssite) | Server components of your site, such as its root layout. It loads React and Payload, and no admin module. |
+| [`@10x-media/analytics/rsc`](#10x-mediaanalyticsrsc) | Server components of the admin. It loads Payload's admin UI and the stylesheet. |
+| [`@10x-media/analytics/client`](#10x-mediaanalyticsclient) | Client components of the admin (`'use client'`). It loads Payload's admin UI, Next's navigation and the stylesheet. |
+| [`@10x-media/analytics/i18n`](#10x-mediaanalyticsi18n) | Anywhere. It loads no package. |
+| [`@10x-media/analytics/geo`](#10x-mediaanalyticsgeo) | Server code, in your Payload config. It loads no package until a MaxMind lookup needs one. |
+| [`@10x-media/analytics/next`](#10x-mediaanalyticsnext) | Your Next.js route handlers. It loads Payload only when a route handler first runs. |
+| [`@10x-media/analytics/migrations`](#10x-mediaanalyticsmigrations) | Migration files, which Payload's CLI runs. It loads no package. |
+| [`@10x-media/analytics/migrations/drop-legacy-mongo`](#10x-mediaanalyticsmigrationsdrop-legacy-mongo) | Payload's CLI, as `payload migrate:create --file`. |
+| [`@10x-media/analytics/testing`](#10x-mediaanalyticstesting) | Tests. |
+| [`@10x-media/analytics/adapters/native`](#10x-mediaanalyticsadaptersnative) | Your Payload config and server code. It loads Payload and Node built-ins. |
+| [`@10x-media/analytics/adapters/plausible`](#10x-mediaanalyticsadaptersplausible) | Your Payload config. It loads no package. |
+| [`@10x-media/analytics/adapters/umami`](#10x-mediaanalyticsadaptersumami) | Your Payload config. It loads no package. |
+| [`@10x-media/analytics/adapters/ga4`](#10x-mediaanalyticsadaptersga4) | Your Payload config. It loads `@google-analytics/data` only when a read needs it and `sdks.ga4` does not hand it over. |
+| [`@10x-media/analytics/adapters/posthog`](#10x-mediaanalyticsadaptersposthog) | Your Payload config. It loads no package. |
+| `@10x-media/analytics/styles.css` | Anywhere that draws `BarList` or `TrendChart` outside the admin, where your bundler does not follow the package's own stylesheet imports ([Customizing](/analytics/customizing#outside-the-admin)). |
+
+Each list below is the entry's whole public surface, as the API reports in the package's repository record it. **Stable** exports keep their names within a major release; **beta** ones may change in a minor; **internal** ones are exported only because Payload's import map names them, so do not import them ([Stability](/analytics/reference/stability#release-tags)).
+
+## The adapter contract types
+
+The adapter entries, `/next` and `/testing` each also export the types an adapter is written against, the constants among them as types only, all of them stable and all also exported from `@10x-media/analytics/types`, which exports the constants as values: `AdapterContext`, `AdapterJobs`, `AdapterRegisterContext`, `AdapterSchemaContext`, `AnalyticsAdapter`, `AnalyticsCapabilities`, `AnalyticsFilter`, `AnalyticsQuery`, `AnalyticsResult`, `AnalyticsRow`, `AnalyticsSdks`, `AnalyticsTaskName`, `BrowserAmounts`, `CaptureClientKind`, `CaptureSlot`, `CaptureSnippet`, `CaptureSupport`, `CurrencyConverter`, `DateRange`, `DIMENSION_KEYS`, `DimensionKey`, `FetchInit`, `FetchLike`, `FILTER_OPERATORS`, `FilterOperator`, `FilterOperatorMap`, `Ga4Client`, `Ga4ClientOptions`, `Ga4ReportResponse`, `Ga4ReportRow`, `Ga4Sdk`, `Goal`, `GoalMatch`, `Granularity`, `HitType`, `IngestHostnameResolver`, `MaxmindReader`, `MaxmindSdk`, `MetricKey`, `MetricReach`, `MetricSemantics`, `MetricValue`, `MetricValues`, `OrderSignatureMode`, `ProxyDescriptor`, `ProxyRoute`, `ProxyRouteKind`, `RateLimitDescriptor`, `RawEventInput`, `RouteBase`, `RoutePaths`, `ScheduledTask`, `ServerEventInput`, `ServerTrack`, `ServerTrackIdentity`, `ServerTrackOptions`, `SnippetScript`, `SourceErrorKind`, `TASK_NAMES`, `TrackerGoal`, `TrackerSlotConfig`, `TrustedPlatform`, `VisitorCounting`.
+
+## `@10x-media/analytics`
+
+**Where:** Your Payload config and server code: route handlers, jobs, scripts, Payload's CLI. It loads Payload and no React, admin UI or stylesheet.
+
+The plugin, its options and their types, the field factories, `goalField` and `trackGoalAction`, server tracking (`trackServerEvent`, `purchase`, `refund`), the server reads and `SYSTEM`, the provider collection helpers, `rebuildDays`, the collection slugs and the error builders.
+
+- **Stable values:** `adapterFromProviderDoc`, `analytics`, `ANALYTICS_ERROR_CODES`, `analyticsError`, `analyticsFields`, `analyticsLinkFields`, `analyticsProviderFields`, `analyticsRoutes`, `analyticsStat`, `analyticsStatRow`, `analyticsTab`, `analyticsTabsField`, `AnalyticsTrackError`, `CACHE_SLUG`, `CURRENCY_ATTRIBUTE`, `DEFAULT_ROUTE_BASE`, `EVENT_ATTRIBUTE`, `EVENT_PROP_PREFIX`, `GOAL_ACTION_TYPE`, `GOAL_ATTRIBUTE`, `goalField`, `GOALS_SLUG`, `goalSlug`, `isAdminUser`, `ITEM_ATTRIBUTE`, `ITEM_CLICK_EVENT`, `ITEM_NAME_ATTRIBUTE`, `itemAttributesFor`, `keys`, `MAX_ITEMS_PER_BEACON`, `parseRetryAfter`, `PLATFORM_SCOPE`, `pluralKeys`, `PROVIDER_IDS`, `ProviderHttpError`, `PROVIDERS_SLUG`, `purchase`, `PURCHASE_GOAL_SLUG`, `readErrorCode`, `readForField`, `readForWidget`, `readForWidgetBreakdown`, `readForWidgetGoals`, `readForWidgetRealtime`, `readForWidgetSeries`, `rebuildDays`, `refreshProviders`, `refund`, `routePaths`, `signItemRef`, `signOrderId`, `STATE_SLUG`, `SYNC_SLUG`, `tenantMembership`, `TIMEFRAME_PRESETS`, `trackGoalAction`, `trackServerEvent`, `VALUE_ATTRIBUTE`
+- **Stable types:** `AfterReadAnswer`, `AfterReadArgs`, `AfterReadHook`, `AnalyticsAccessOptions`, `AnalyticsAttributes`, `AnalyticsBinding`, `AnalyticsCacheCollectionOptions`, `AnalyticsCacheOptions`, `AnalyticsCaptureOptions`, `AnalyticsCollectionOptions`, `AnalyticsConcurrencyOptions`, `AnalyticsCrossScopeOptions`, `AnalyticsError`, `AnalyticsErrorCode`, `AnalyticsExclusionOptions`, `AnalyticsFieldsOptions`, `AnalyticsGoalsCollectionOptions`, `AnalyticsGoalsOptions`, `AnalyticsHooksOptions`, `AnalyticsJobsOptions`, `AnalyticsLinkFieldsOptions`, `AnalyticsMetricLabel`, `AnalyticsMetricLabels`, `AnalyticsPluginOptions`, `AnalyticsReadAccess`, `AnalyticsRevenueOptions`, `AnalyticsRoutesOptions`, `AnalyticsScopeOptions`, `AnalyticsStatBaseOptions`, `AnalyticsStatOptions`, `AnalyticsStatRowOptions`, `AnalyticsSyncCollectionOptions`, `AnalyticsSyncOptions`, `AnalyticsTabOptions`, `AnalyticsTaskOptions`, `AnalyticsViewAccess`, `AnalyticsViewOptions`, `AnalyticsWarmOptions`, `AutoCaptureOptions`, `BindingContext`, `BindingDoc`, `BreakdownRow`, `BuildSecretField`, `CacheEntry`, `CacheSetOptions`, `CacheStore`, `CapabilityRequirement`, `CaptureGate`, `CaptureGateArgs`, `CaptureSlotOption`, `CollectionFieldOverride`, `CollectionOverrides`, `ConnectionAccess`, `ConnectionFieldAccess`, `CrossScopeAccess`, `CurrencyResolver`, `ExclusionSitesResolver`, `FieldBreakdown`, `FieldBreakdownRow`, `FieldReadResult`, `FieldReadStatus`, `FilterPair`, `GoalActionDefinition`, `GoalActionRunArgs`, `GoalCollectionFieldOverrides`, `GoalFieldOptions`, `GoalFieldOverride`, `GoalRow`, `GoalSource`, `HostnameResolver`, `HostPattern`, `ItemCaptureOptions`, `ItemLabels`, `ItemSignatureMode`, `PathResolver`, `PluginOptions`, `PluralCategory`, `PluralName`, `PluralVariant`, `ProviderCollectionFieldOverrides`, `ProviderDoc`, `ProviderFieldOverride`, `ProviderFieldsOptions`, `ProviderHostPolicy`, `ProviderHostsOptions`, `ProviderId`, `ProvidersCollectionOptions`, `ProvidersOptions`, `ProvidersResolve`, `ProvidersResolveArgs`, `QueryError`, `QueryErrorCode`, `QueryErrorResponse`, `QueryResponse`, `QuerySourceRef`, `ReadForFieldArgs`, `ReadForWidgetArgs`, `ReadForWidgetBreakdownArgs`, `ReadForWidgetGoalsArgs`, `ReadForWidgetRealtimeArgs`, `ReadForWidgetSeriesArgs`, `ReadNotices`, `ReadOrigin`, `ReadRecipe`, `RealtimePoint`, `RebuildDaysInput`, `RebuildDaysReport`, `RecipeWindow`, `RefreshProvidersOptions`, `ReportMode`, `ReportOption`, `RevenueItem`, `RoutesConfigSource`, `ScopeCallSite`, `ScopeLabelResolver`, `ScopeListResolver`, `ScopeMemberAccess`, `ScopeResolver`, `SerializedAnalyticsQuery`, `SerializedCapabilities`, `SeriesGranularity`, `SeriesPoint`, `ServerPurchaseInput`, `ServerRefundInput`, `SingularKey`, `TenantMembershipOptions`, `TimeframePreset`, `TimezoneResolver`, `TrackGoalActionOptions`, `TranslationKey`, `TranslationsOption`, `WidgetBreakdownResult`, `WidgetGoalsResult`, `WidgetReadResult`, `WidgetReadStatus`, `WidgetRealtimeResult`, `WidgetRealtimeStatus`, `WidgetSeriesResult`
+- **Beta:** `AnalyticsComponent`, `AnalyticsCountryFlags`, `analyticsDefaultWidgets`, `AnalyticsWidgetOverride`, `AnalyticsWidgetOverrides`, `AnalyticsWidgetsOptions`, `BUILT_IN_WIDGET_SLUGS`, `BuiltInWidgetSlug`, `CONNECTION_PATHS`, `createGuardedFetch`, `CustomWidgetDef`, `GatedScope`, `GoalsResponse`, `GuardedFetch`, `GuardedFetchOptions`, `ProviderFactoryContext`, `ReadPrincipal`, `resolveHostPolicy`, `SECRET_PATHS`, `SYSTEM`, `WidgetFilter`, `widgetFilters`, `WireGoal`
+- **Also:** [the adapter contract types](#the-adapter-contract-types).
+
+## `@10x-media/analytics/types`
+
+**Where:** Anywhere. Its few runtime values (constants and `readErrorCode`) load no package, and its types erase.
+
+The types of every public shape: the adapter contract, the options, the endpoints' requests and answers, the read results, plus the key lists the pickers are built from.
+
+- **Stable values:** `ANALYTICS_ERROR_CODES`, `GOAL_ACTION_TYPE`, `keys`, `PLATFORM_SCOPE`, `pluralKeys`, `readErrorCode`, `TIMEFRAME_PRESETS`, `TRAFFIC_CHANNELS`
+- **Stable types:** `AdminDigest`, `AfterReadAnswer`, `AfterReadArgs`, `AfterReadHook`, `AnalyticsAccessOptions`, `AnalyticsAdapterFactory`, `AnalyticsBinding`, `AnalyticsCacheCollectionOptions`, `AnalyticsCacheOptions`, `AnalyticsCaptureOptions`, `AnalyticsCollectionOptions`, `AnalyticsConcurrencyOptions`, `AnalyticsCrossScopeOptions`, `AnalyticsError`, `AnalyticsErrorCode`, `AnalyticsExclusionOptions`, `AnalyticsFieldsOptions`, `AnalyticsGoalsCollectionOptions`, `AnalyticsGoalsOptions`, `AnalyticsHooksOptions`, `AnalyticsJobsOptions`, `AnalyticsMetricLabel`, `AnalyticsMetricLabels`, `AnalyticsPluginOptions`, `AnalyticsReadAccess`, `AnalyticsRevenueOptions`, `AnalyticsRoutesOptions`, `AnalyticsScopeOptions`, `AnalyticsStatBaseOptions`, `AnalyticsStatOptions`, `AnalyticsStatRowOptions`, `AnalyticsSyncCollectionOptions`, `AnalyticsSyncOptions`, `AnalyticsTabOptions`, `AnalyticsTaskOptions`, `AnalyticsViewAccess`, `AnalyticsViewOptions`, `AnalyticsWarmOptions`, `AutoCaptureOptions`, `BindingContext`, `BindingDoc`, `CacheEntry`, `CacheSetOptions`, `CacheStore`, `CapabilityRequirement`, `CaptureGate`, `CaptureGateArgs`, `CaptureSlotOption`, `CollectionFieldOverride`, `CollectionOverrides`, `ConnectionAccess`, `ConnectionFieldAccess`, `CrossScopeAccess`, `CurrencyResolver`, `ExclusionResponse`, `ExclusionSite`, `ExclusionSitesResolver`, `FetchQueryInit`, `FilterPair`, `GoalActionDefinition`, `GoalActionRunArgs`, `GoalCollectionFieldOverrides`, `GoalFieldOptions`, `GoalFieldOverride`, `HostnameResolver`, `HostPattern`, `ItemCaptureOptions`, `ItemLabels`, `ParsedQuery`, `ParseResult`, `PathResolver`, `PluralCategory`, `PluralName`, `PluralVariant`, `ProviderCollectionFieldOverrides`, `ProviderFieldOverride`, `ProviderHostPolicy`, `ProviderHostsOptions`, `ProvidersCollectionOptions`, `ProvidersOptions`, `ProvidersResolve`, `ProvidersResolveArgs`, `QueryError`, `QueryErrorCode`, `QueryErrorResponse`, `QueryRequest`, `QueryResponse`, `QuerySourceRef`, `ReadOrigin`, `ReadRecipe`, `RecipeWindow`, `RefreshRequest`, `RefreshResponse`, `ReportMode`, `ReportOption`, `ResolvedAutoCapture`, `ResolvedItemCapture`, `ScopeCallSite`, `ScopeLabelResolver`, `ScopeListResolver`, `ScopeMemberAccess`, `ScopeResolver`, `SerializedAnalyticsQuery`, `SerializedCapabilities`, `SingularKey`, `SourcesResponse`, `TimeframePreset`, `TimezoneResolver`, `TrackerConfig`, `TrackerExclusion`, `TrackerSkip`, `TrackGoalActionOptions`, `TrafficChannel`, `TranslationKey`, `TranslationsOption`, `WireSource`
+- **Beta:** `AnalyticsComponent`, `AnalyticsCountryFlags`, `AnalyticsViewClientProps`, `AnalyticsWidgetOverride`, `AnalyticsWidgetOverrides`, `AnalyticsWidgetsOptions`, `BUILT_IN_WIDGET_SLUGS`, `BuiltInWidgetSlug`, `CountryFlagProps`, `CountryFlags`, `CustomWidgetDef`, `HostCountryFlag`, `ViewEndpoints`, `ViewGoal`, `ViewScopes`, `WidgetView`, `WidgetViewProps`
+- **Also:** [the adapter contract types](#the-adapter-contract-types).
+
+## `@10x-media/analytics/attributes`
+
+**Where:** Anywhere, the browser and server components included. It loads no package and no stylesheet.
+
+The `data-analytics-*` attribute names and the helpers that spread them into your markup: [goals](/analytics/integrations), [content items](/analytics/items).
+
+- **Stable values:** `CURRENCY_ATTRIBUTE`, `DOWNLOAD_EVENT`, `EVENT_ATTRIBUTE`, `EVENT_PROP_PREFIX`, `eventAttributes`, `GOAL_ATTRIBUTE`, `goalAttributes`, `ITEM_ATTRIBUTE`, `ITEM_CLICK_EVENT`, `ITEM_NAME_ATTRIBUTE`, `itemAttributes`, `itemRef`, `MAX_ITEM_REF_LENGTH`, `MAX_ITEMS_PER_BEACON`, `OUTBOUND_EVENT`, `PURCHASE_GOAL_SLUG`, `SCROLL_EVENT`, `VALUE_ATTRIBUTE`
+- **Stable types:** `AnalyticsAttributes`, `ItemByDocument`, `ItemBySignedRef`
+
+## `@10x-media/analytics/tracker`
+
+**Where:** The browser. It loads no package and no stylesheet: no React, no Payload, no Node built-ins.
+
+The [browser tracker](/analytics/reference/tracker) for a page that boots it without React.
+
+- **Stable values:** `createTracker`, `DEFAULT_EXCLUSION_PARAM`, `DEFAULT_TRACKER_ENDPOINT`, `EXCLUSION_STORAGE_KEY`, `initTracker`
+- **Stable types:** `AdminDigest`, `CaptureClientKind`, `CaptureSlot`, `CaptureSnippet`, `GateState`, `GateStatus`, `GoalMatch`, `InitTrackerArgs`, `ItemOptions`, `LoadScript`, `PurchaseInput`, `RefundInput`, `ResolvedAutoCapture`, `ResolvedItemCapture`, `RevenueItem`, `SnippetScript`, `Tracker`, `TrackerConfig`, `TrackerExclusion`, `TrackerGoal`, `TrackerOptions`, `TrackerSkip`, `TrackerSlotConfig`, `TrackerWindow`, `TrackGoalOptions`
+
+## `@10x-media/analytics/react`
+
+**Where:** Client components of your site (`'use client'`). It loads React alone.
+
+`AnalyticsProvider` and `useAnalytics`, the tracker from React ([Tracker](/analytics/reference/tracker#react)).
+
+- **Stable values:** `AnalyticsProvider`, `useAnalytics`
+- **Stable types:** `AdminDigest`, `AnalyticsApi`, `AnalyticsCommands`, `AnalyticsProviderProps`, `CaptureClientKind`, `CaptureSlot`, `CaptureSnippet`, `GateState`, `GateStatus`, `GoalMatch`, `ItemOptions`, `LoadScript`, `PurchaseInput`, `RefundInput`, `ResolvedAutoCapture`, `ResolvedItemCapture`, `RevenueItem`, `SnippetScript`, `Tracker`, `TrackerConfig`, `TrackerExclusion`, `TrackerGoal`, `TrackerSkip`, `TrackerSlotConfig`, `TrackGoalOptions`
+
+## `@10x-media/analytics/site`
+
+**Where:** Server components of your site, such as its root layout. It loads React and Payload, and no admin module.
+
+`AnalyticsScripts` and `getTrackerConfig`, which render the tracker with the request's config ([Tracker](/analytics/reference/tracker#server-render)).
+
+- **Stable values:** `AnalyticsScripts`, `getTrackerConfig`
+- **Stable types:** `AdminDigest`, `AnalyticsScriptsProps`, `CaptureClientKind`, `CaptureSlot`, `CaptureSnippet`, `GateState`, `GateStatus`, `GoalMatch`, `ResolvedAutoCapture`, `ResolvedItemCapture`, `SnippetScript`, `TrackerConfig`, `TrackerExclusion`, `TrackerGoal`, `TrackerSkip`, `TrackerSlotConfig`
+
+## `@10x-media/analytics/rsc`
+
+**Where:** Server components of the admin. It loads Payload's admin UI and the stylesheet.
+
+The view and widget server components, the widget card family, the server field wrappers, and the read helpers the package root also exports.
+
+- **Stable values:** `DIMENSION_KEYS`, `FILTER_OPERATORS`, `formatMetricValue`, `readForField`, `readForWidget`, `readForWidgetBreakdown`, `readForWidgetGoals`, `readForWidgetRealtime`, `readForWidgetSeries`, `TIMEFRAME_PRESETS`
+- **Stable types:** `AnalyticsFilter`, `AnalyticsMetricLabel`, `AnalyticsMetricLabels`, `BindingDoc`, `BreakdownRow`, `CapabilityRequirement`, `DateRange`, `DimensionKey`, `FieldBreakdown`, `FieldBreakdownRow`, `FieldReadResult`, `FieldReadStatus`, `FilterOperator`, `FilterPair`, `GoalRow`, `Granularity`, `MetricFormat`, `MetricKey`, `MetricValue`, `MetricValues`, `ReadForFieldArgs`, `ReadForWidgetArgs`, `ReadForWidgetBreakdownArgs`, `ReadForWidgetGoalsArgs`, `ReadForWidgetRealtimeArgs`, `ReadForWidgetSeriesArgs`, `ReadNotices`, `RealtimePoint`, `ReportMode`, `ReportOption`, `SerializedCapabilities`, `SeriesGranularity`, `SeriesPoint`, `SourcesResponse`, `TimeframePreset`, `WidgetBreakdownResult`, `WidgetGoalsResult`, `WidgetReadResult`, `WidgetReadStatus`, `WidgetRealtimeResult`, `WidgetRealtimeStatus`, `WidgetSeriesResult`, `WireSource`
+- **Beta:** `AnalyticsBreakdownWidget`, `AnalyticsComponent`, `AnalyticsCountryFlags`, `AnalyticsGoalsWidget`, `AnalyticsMetricWidget`, `AnalyticsRealtimeWidget`, `AnalyticsTrendWidget`, `AnalyticsViewClientProps`, `AnalyticsWidgetProps`, `CountryFlagProps`, `CountryFlags`, `FilterDimensionSelectFieldProps`, `FilterDimensionSelectFieldServer`, `FilterOperatorSelectFieldProps`, `FilterOperatorSelectFieldServer`, `FilterValueFieldProps`, `FilterValueFieldServer`, `GatedScope`, `HostCountryFlag`, `MetricSelectFieldProps`, `MetricSelectFieldServer`, `ReadPrincipal`, `SourceSelectFieldServer`, `SYSTEM`, `ViewEndpoints`, `ViewGoal`, `ViewScopes`, `WidgetBody`, `WidgetCard`, `WidgetCardProps`, `WidgetEmpty`, `WidgetNote`, `WidgetShimmer`, `WidgetShimmerKind`, `WidgetShimmerProps`, `WidgetSuspense`, `WidgetValue`, `WidgetView`, `WidgetViewProps`, `WithScopeToken`
+- **Internal:** `AnalyticsPanelField`, `AnalyticsPanelFieldProps`, `AnalyticsStatField`, `AnalyticsStatFieldProps`, `AnalyticsView`, `AnalyticsViewProps`, `FallbackLanguage`, `GoalSelectFieldServer`, `StatFieldI18n`
+
+## `@10x-media/analytics/client`
+
+**Where:** Client components of the admin (`'use client'`). It loads Payload's admin UI, Next's navigation and the stylesheet.
+
+The charts, the pickers, `fetchQuery` and `refreshCache`, the error readers, and the analytics view's sections for [`view.Component`](/analytics/customizing#the-analytics-views-body).
+
+- **Stable values:** `ANALYTICS_ERROR_CODES`, `analyticsRoutes`, `buildQueryUrl`, `DEFAULT_ROUTE_BASE`, `DIMENSION_KEYS`, `fetchQuery`, `FILTER_OPERATORS`, `formatMetricValue`, `QueryFetchError`, `readErrorCode`, `readResponseError`, `refreshCache`, `routePaths`, `TIMEFRAME_PRESETS`
+- **Stable types:** `AnalyticsError`, `AnalyticsErrorCode`, `AnalyticsFilter`, `AnalyticsQuery`, `AnalyticsResult`, `AnalyticsRow`, `CapabilityRequirement`, `DateRange`, `DimensionKey`, `FetchQueryInit`, `FilterOperator`, `FilterPair`, `GoalSource`, `Granularity`, `ItemLabels`, `MetricFormat`, `MetricKey`, `MetricValue`, `MetricValues`, `QueryRequest`, `QueryResponse`, `QuerySourceRef`, `ReadNotices`, `RealtimePoint`, `RefreshRequest`, `RefreshResponse`, `RouteBase`, `RoutePaths`, `RoutesConfigSource`, `SerializedAnalyticsQuery`, `SerializedCapabilities`, `SourceErrorKind`, `SourcesResponse`, `TimeframePreset`, `VisitorCounting`, `WireSource`
+- **Beta:** `AnalyticsGoals`, `AnalyticsSources`, `AnalyticsViewClient`, `AnalyticsViewClientProps`, `BarDatum`, `BarList`, `BarListHeaders`, `BarListProps`, `BreakdownTab`, `Card`, `CardProps`, `ChartDataRow`, `ChartDataTable`, `ChartDataTableProps`, `CountryFlagProps`, `CountryFlags`, `DataTable`, `DataTableColumn`, `DataTableProps`, `DataTableRow`, `DayRange`, `FilterCapabilities`, `FilterDimensionSelectFieldProps`, `FilterOperatorSelectFieldProps`, `FilterValueField`, `FilterValueFieldProps`, `GoalsResponse`, `HostCountryFlag`, `MetricCard`, `MetricCardProps`, `MetricSelectFieldProps`, `QueryState`, `ReadonlyViewGate`, `RealtimeCounter`, `RealtimeCounterProps`, `RequestFailure`, `RequestState`, `SortDirection`, `Toolbar`, `TrendChart`, `TrendChartProps`, `TrendPoint`, `useAnalyticsGoals`, `useAnalyticsSources`, `useFilterCapabilities`, `useView`, `VIEW_LIMITS`, `ViewAnswers`, `ViewBreakdowns`, `ViewContextValue`, `ViewEndpoints`, `ViewGoal`, `ViewGoals`, `ViewLimit`, `ViewOverview`, `ViewQueries`, `ViewRealtime`, `ViewRefresh`, `ViewRoot`, `ViewRootProps`, `ViewScopes`, `ViewState`, `ViewTrend`, `WireGoal`
+- **Deprecated:** `FilterDimensionSelectField`, `FilterOperatorSelectField`, `GoalSelectField`, `MetricSelectField`, `SourceSelectField`
+- **Internal:** `AnalyticsNavLink`, `AnalyticsNavLinkProps`, `DateRangeField`, `DateRangeFieldComponentProps`, `DateRangeFieldOptions`, `DateRangePickerAppearance`, `GoalAmountField`, `GoalAmountFieldOptions`, `GoalAmountFieldProps`
+
+## `@10x-media/analytics/i18n`
+
+**Where:** Anywhere. It loads no package.
+
+The translation keys and the built-in strings ([Translations](/analytics/reference/translations)).
+
+- **Stable values:** `keys`, `pluralKeys`, `translations`
+- **Stable types:** `AnalyticsTranslationKeys`, `PluralCategory`, `PluralName`, `PluralVariant`, `SingularKey`, `TranslationKey`, `TranslationsOption`
+
+## `@10x-media/analytics/geo`
+
+**Where:** Server code, in your Payload config. It loads no package until a MaxMind lookup needs one.
+
+The [geo resolvers](/analytics/geo#custom-pipelines) for a pipeline of your own.
+
+- **Stable values:** `composeGeoResolvers`, `maxmindResolver`, `noopResolver`, `platformHeaderResolver`
+- **Stable types:** `Geo`, `GeoResolver`, `GeoResolverOptions`, `MaxmindOptions`, `MaxmindReader`, `MaxmindSdk`, `TrustedPlatform`
+
+## `@10x-media/analytics/next`
+
+**Where:** Your Next.js route handlers. It loads Payload only when a route handler first runs.
+
+`captureRoute`, which relays a vendor through a [route handler of your own](/analytics/proxy#a-route-handler-of-your-own) by the first-party proxy's rules, and `ingestRoute` and `ingestPreflight` for [beacons in a route of your own](/analytics/capture#taking-beacons-in-a-route-of-your-own). `captureRewrites` and `posthogProxyRewrites` stay exported, deprecated, and throw when called: a Next rewrite forwards the visitor's cookies to the vendor.
+
+- **Stable values:** `captureRoute`, `ingestPreflight`, `ingestRoute`
+- **Stable types:** `CaptureRewrite`, `CaptureRewriteMount`, `CaptureRouteOptions`, `IngestRouteOptions`, `PosthogProxyRegion`, `PosthogProxyRewrite`, `PosthogProxyRewritesOptions`
+- **Deprecated:** `captureRewrites`, `posthogProxyRewrites`
+- **Also:** [the adapter contract types](#the-adapter-contract-types).
+
+## `@10x-media/analytics/migrations`
+
+**Where:** Migration files, which Payload's CLI runs. It loads no package.
+
+The helpers that remove what earlier releases stored ([Upgrading](/analytics/upgrading/beta-12)).
+
+- **Stable values:** `deleteLegacyCache`, `deleteLegacySalts`, `dropLegacyNative`, `LEGACY_MONGO_COLLECTIONS`, `LEGACY_PRUNE_TASK`, `LEGACY_SALT_PREFIX`, `LEGACY_WARM_TASK`
+- **Stable types:** `LegacyDropReport`
+
+## `@10x-media/analytics/migrations/drop-legacy-mongo`
+
+**Where:** Payload's CLI, as `payload migrate:create --file`.
+
+The predefined migration that removes the 1.0.0-beta.11 native storage on MongoDB.
+
+- **Stable values:** `downSQL`, `imports`, `upSQL`
+
+## `@10x-media/analytics/testing`
+
+**Where:** Tests.
+
+`memoryAdapter`, an in-memory adapter, and `settleAnalytics`, which waits for the plugin's background work ([Adapter contract](/analytics/reference/adapter-contract#testing-memoryadapter)).
+
+- **Stable values:** `memoryAdapter`, `settleAnalytics`
+- **Stable types:** `MemoryAnalyticsAdapter`, `MemoryEvent`
+- **Also:** [the adapter contract types](#the-adapter-contract-types).
+
+## `@10x-media/analytics/adapters/native`
+
+**Where:** Your Payload config and server code. It loads Payload and Node built-ins.
+
+The [native engine](/analytics/native): `native()` and its options, `isBot`, the slugs and the maintenance task's name and input.
+
+- **Stable values:** `AGGREGATES_SLUG`, `HITS_SLUG`, `isBot`, `MAINTAIN_TASK_SLUG`, `native`, `SESSION_DIMENSIONS`
+- **Stable types:** `AnalyticsCollectionOptions`, `BotFilter`, `CapKey`, `CapsOption`, `CardinalityCaps`, `CollectionOverrides`, `EventHostnameResolver`, `Geo`, `GeoResolver`, `GeoResolverOptions`, `HostnameOption`, `ItemSignatureMode`, `MaintainTaskInput`, `NativeAdapter`, `NativeCollections`, `NativeOptions`, `NativeRetention`, `NativeSqlite`, `NativeToday`, `RebuildDaysInput`, `RebuildDaysReport`, `SessionDimension`, `SqliteThread`, `WriteBufferLimits`, `WriteBufferOption`
+- **Also:** [the adapter contract types](#the-adapter-contract-types).
+
+## `@10x-media/analytics/adapters/plausible`
+
+**Where:** Your Payload config. It loads no package.
+
+[Plausible](/analytics/providers#plausible).
+
+- **Stable values:** `plausible`
+- **Stable types:** `PlausibleConfig`
+- **Also:** [the adapter contract types](#the-adapter-contract-types).
+
+## `@10x-media/analytics/adapters/umami`
+
+**Where:** Your Payload config. It loads no package.
+
+[Umami](/analytics/providers#umami).
+
+- **Stable values:** `umami`
+- **Stable types:** `UmamiConfig`
+- **Also:** [the adapter contract types](#the-adapter-contract-types).
+
+## `@10x-media/analytics/adapters/ga4`
+
+**Where:** Your Payload config. It loads `@google-analytics/data` only when a read needs it and `sdks.ga4` does not hand it over.
+
+[GA4](/analytics/providers#ga4).
+
+- **Stable values:** `ga4`, `ga4EventName`
+- **Stable types:** `Ga4Config`
+- **Also:** [the adapter contract types](#the-adapter-contract-types).
+
+## `@10x-media/analytics/adapters/posthog`
+
+**Where:** Your Payload config. It loads no package.
+
+[PostHog](/analytics/providers#posthog).
+
+- **Stable values:** `posthog`
+- **Stable types:** `PosthogConfig`
+- **Also:** [the adapter contract types](#the-adapter-contract-types).

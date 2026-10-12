@@ -1,0 +1,40 @@
+---
+title: Upgrading
+description: How to move an install to a newer release, and every option a release removed.
+---
+
+Until 1.0.0, `@10x-media/analytics` is published as betas under the `beta` dist-tag, and a beta may change what an install relies on. Each release that does has a page here listing every change against the release before it, with what to do about each. From 1.0.0 on, a change that breaks an install waits for the next major release ([Stability](/analytics/reference/stability)).
+
+| Upgrading from | Read |
+|---|---|
+| 1.0.0-beta.11 | [From 1.0.0-beta.11](/analytics/upgrading/beta-12) |
+
+## How to upgrade
+
+1. Read the release's page, and its checklist first.
+2. On a development database Payload pushes its schema to, do what the release's page says before the first boot: a push that cannot follow a storage change stops the app.
+3. Upgrade `@10x-media/analytics` and its peers together: `@10x-media/fields`, and Payload at the version [Stability](/analytics/reference/stability#supported-versions) lists.
+4. Load the config (start the dev server, or run any `payload` command). An option the release removed stops it with an error naming its replacement and linking [below](#removed-options): the `native()` options in one message, then the plugin's own in another, so renaming them can take two runs.
+5. Regenerate the import map (`pnpm payload generate:importmap`): a release may add or move a component the admin renders.
+6. On Postgres or SQLite in migrate mode, generate a migration (`pnpm payload migrate:create`), make the edits the release's page lists, review it and run it (`pnpm payload migrate`). MongoDB needs only what the release's page names.
+7. Check the browser: a page that captured before still captures, and the analytics view shows the numbers you expect.
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## Removed options
+
+Every option a release removed or renamed, and what replaces it. A config that still carries one fails the boot, naming it and its replacement.
+
+| Removed | Use instead | Removed in |
+|---|---|---|
+| `scopeResolver` | `scope.resolve` | 1.0.0-beta.12 |
+| `scopes` | `scope.list` for the scopes the cron jobs run over, `scope.label` for the view caption; an install without `scope.resolve` removes it | 1.0.0-beta.12 |
+| `access.platformRead` | `access.crossScope` (a function grants all three cross-scope gates); an install without `scope.resolve` removes it, since there every gate is `isAdminUser` | 1.0.0-beta.12 |
+| `capture.consent` | `capture.gate`: `'all'`, `'off'`, a list of slots, or `({ slot, adapterId, kind }) => boolean`; `({ kind }) => kind !== 'native'` reproduces the old default | 1.0.0-beta.12 |
+| `sync.collectionSlug` | `sync.collection.slug` | 1.0.0-beta.12 |
+| `sync.hidden` | `sync.collection.hidden` | 1.0.0-beta.12 |
+| `sync.cron` | `jobs.tasks.sync.cron`, beside the queue it runs on | 1.0.0-beta.12 |
+| `cache.warm.cron` | `jobs.tasks.warm.cron`, beside the queue it runs on; `cache.warm` keeps `windowHours` and `maxReads` | 1.0.0-beta.12 |
+| `goals.collection.enabled` | `goals.collection: false` to leave the collection off; an object turns it on | 1.0.0-beta.12 |
+| `native({ retentionDays })` | `native({ retention: { rawDays } })`, how many days of raw hits are kept and read | 1.0.0-beta.12 |
+| `native({ rollupRetentionDays })` | `native({ retention: { aggregateDays } })` for the daily totals that replaced rollups, which are kept for every day unless it is set | 1.0.0-beta.12 |

@@ -5,14 +5,14 @@ import { DIMENSION_KEYS, FILTER_OPERATORS } from '../core/contract'
 import type { QueryRequest } from '../query/fetchQuery'
 import { QueryFetchError } from '../query/fetchQuery'
 import type { QueryResponse } from '../query/response'
-import { VIEW_METRIC_ORDER } from './gating'
+import { ITEM_METRICS, VIEW_METRIC_ORDER } from './gating'
 import { DEFAULT_VIEW_LIMIT, rangeFor, type ViewState } from './state'
-import { SECTION_UNAVAILABLE, useViewQueries, type ViewQueries } from './useViewQueries'
+import { answerIdentity, useViewQueries, type ViewQueries } from './useViewQueries'
 import type { AnalyticsViewClientProps } from './viewProps'
 
 const { fetchQueryMock } = vi.hoisted(() => ({
 	fetchQueryMock:
-		vi.fn<(apiRoute: string, request: QueryRequest, init?: { signal?: AbortSignal }) => unknown>(),
+		vi.fn<(endpoint: string, request: QueryRequest, init?: { signal?: AbortSignal }) => unknown>(),
 }))
 
 vi.mock('../query/fetchQuery', async (importOriginal) => {
@@ -23,10 +23,10 @@ vi.mock('../query/fetchQuery', async (importOriginal) => {
 const nativeCaps: SerializedCapabilities = {
 	metrics: [...VIEW_METRIC_ORDER],
 	dimensions: [...DIMENSION_KEYS],
-	filters: [...DIMENSION_KEYS],
-	filterOperators: [...FILTER_OPERATORS],
+	filters: Object.fromEntries(
+		DIMENSION_KEYS.map((dimension) => [dimension, [...FILTER_OPERATORS]])
+	),
 	realtime: true,
-	perPageQuery: true,
 	comparison: true,
 	minGranularity: 'hour',
 	maxLookbackDays: null,
@@ -35,10 +35,8 @@ const nativeCaps: SerializedCapabilities = {
 const narrowCaps: SerializedCapabilities = {
 	metrics: ['pageviews', 'visitors'],
 	dimensions: ['page'],
-	filters: [],
-	filterOperators: [],
+	filters: {},
 	realtime: false,
-	perPageQuery: false,
 	comparison: false,
 	minGranularity: 'day',
 	maxLookbackDays: 90,
@@ -50,8 +48,9 @@ const propsFor = (capabilities: SerializedCapabilities): AnalyticsViewClientProp
 		sources: [{ id: 'native', label: 'Native', kind: 'config', capabilities }],
 	},
 	goals: [{ slug: 'signup', name: 'Signup' }],
+	countryFlags: true,
 	defaults: { range: 'last30days', metric: 'pageviews' },
-	apiRoute: '/api',
+	endpoints: { query: '/api/_x/query', refresh: '/api/_x/refresh', live: '/api/_x/live' },
 	adminRoute: '/admin',
 	timezone: 'Europe/Berlin',
 	locale: 'en',
@@ -69,8 +68,10 @@ const baseState: ViewState = {
 
 let latest: ViewQueries | null = null
 
+const NOW = new Date()
+
 const Probe = ({ props, state }: { props: AnalyticsViewClientProps; state: ViewState }) => {
-	latest = useViewQueries(props, state)
+	latest = useViewQueries(props, state, NOW)
 	return null
 }
 
@@ -93,7 +94,7 @@ const response = (): QueryResponse => ({
 	},
 })
 
-const dayWindow = (state: ViewState = baseState) => rangeFor(state, 'Europe/Berlin', new Date())
+const dayWindow = (state: ViewState = baseState) => rangeFor(state, 'Europe/Berlin', NOW)
 
 beforeEach(() => {
 	latest = null
@@ -105,13 +106,85 @@ afterEach(() => {
 	cleanup()
 })
 
+describe('useViewQueries breakdown columns', () => {
+	const breakdown = (): QueryRequest | undefined => requests()[2]
+
+	const renderAt = (state: Partial<ViewState>, caps: SerializedCapabilities = nativeCaps) =>
+		render(<Probe props={propsFor(caps)} state={{ ...baseState, ...state }} />)
+
+	it('asks an event breakdown for events and visitors, sorted by events', () => {
+		renderAt({ tab: 'events', dim: 'event' })
+		expect(breakdown()?.metrics).toEqual(['events', 'visitors'])
+		expect(breakdown()?.order).toEqual({ metric: 'events', direction: 'desc' })
+	})
+
+	it('asks a goal breakdown for conversions and revenue, sorted by conversions', () => {
+		renderAt({ tab: 'goals', dim: 'goal' })
+		expect(breakdown()?.metrics).toEqual(['conversions', 'revenue', 'visitors'])
+		expect(breakdown()?.order).toEqual({ metric: 'conversions', direction: 'desc' })
+	})
+
+	it('carries visitors for the rate column without making it a sort column', () => {
+		renderAt({ tab: 'goals', dim: 'goal' })
+		// Visitors rides along for the derived conversion rate; the columns shown are the
+		// dimension's own two, which is what the order follows.
+		expect(breakdown()?.metrics).toContain('visitors')
+		expect(breakdown()?.order?.metric).not.toBe('visitors')
+	})
+
+	const noVisitors: SerializedCapabilities = {
+		...nativeCaps,
+		metrics: ['pageviews', 'events', 'conversions', 'revenue'],
+	}
+
+	it('leaves visitors out of a goal read for a source that cannot serve them', () => {
+		renderAt({ tab: 'goals', dim: 'goal' }, noVisitors)
+		expect(breakdown()?.metrics).toEqual(['conversions', 'revenue'])
+	})
+
+	it('leaves visitors out of an event read for a source that cannot serve them', () => {
+		renderAt({ tab: 'events', dim: 'event' }, noVisitors)
+		expect(breakdown()?.metrics).toEqual(['events'])
+	})
+
+	it('leads any other dimension with the metric the view is on', () => {
+		renderAt({ tab: 'geography', dim: 'country', metric: 'bounceRate' })
+		expect(breakdown()?.metrics).toEqual(['bounceRate', 'visitors'])
+		expect(breakdown()?.order).toEqual({ metric: 'bounceRate', direction: 'desc' })
+	})
+
+	it('keeps a sort the reader chose on a column the read carries', () => {
+		renderAt({ tab: 'events', dim: 'event', order: { metric: 'visitors', direction: 'asc' } })
+		expect(breakdown()?.order).toEqual({ metric: 'visitors', direction: 'asc' })
+	})
+
+	it('drops a sort on a metric this breakdown does not read', () => {
+		// A sort survives a tab change in the URL, and the endpoint rejects an order on a
+		// metric the read never asked for.
+		renderAt({ tab: 'events', dim: 'event', order: { metric: 'pageviews', direction: 'asc' } })
+		expect(breakdown()?.order).toEqual({ metric: 'events', direction: 'desc' })
+	})
+})
+
 describe('useViewQueries', () => {
 	it('builds the four requests a full source serves', () => {
 		render(<Probe props={propsFor(nativeCaps)} state={baseState} />)
 		const { from, to } = dayWindow()
-		const shared = { from, to, source: 'native', timezone: 'Europe/Berlin' }
+		const shared = {
+			from,
+			to,
+			source: 'native',
+			timezone: 'Europe/Berlin',
+			timeframe: 'last30days',
+		}
 		expect(requests()).toEqual([
-			{ metrics: VIEW_METRIC_ORDER, ...shared },
+			{
+				// Visits are the count sessions already read, so the cards ask for it once.
+				metrics: VIEW_METRIC_ORDER.filter(
+					(metric) => !ITEM_METRICS.has(metric) && metric !== 'visits'
+				),
+				...shared,
+			},
 			{ metrics: ['pageviews'], ...shared, granularity: 'day' },
 			{
 				metrics: ['pageviews', 'visitors'],
@@ -123,6 +196,22 @@ describe('useViewQueries', () => {
 			{ metrics: ['conversions', 'revenue', 'visitors'], dimensions: ['goal'], ...shared },
 		])
 		expect(latest?.goals).not.toBeNull()
+	})
+
+	it('names the preset its days came from, so the reads can be kept warm, and none for picked days', () => {
+		render(<Probe props={propsFor(nativeCaps)} state={{ ...baseState, range: 'last7days' }} />)
+		expect(requests().every((request) => request.timeframe === 'last7days')).toBe(true)
+		cleanup()
+
+		fetchQueryMock.mockClear()
+		render(
+			<Probe
+				props={propsFor(nativeCaps)}
+				state={{ ...baseState, range: 'custom', from: '2026-06-01', to: '2026-06-23' }}
+			/>
+		)
+		expect(requests().length).toBeGreaterThan(0)
+		expect(requests().every((request) => request.timeframe === undefined)).toBe(true)
 	})
 
 	it('asks for the comparison window only when the state and the source both allow it', () => {
@@ -276,11 +365,7 @@ describe('useViewQueries', () => {
 		render(<Probe props={propsFor(nativeCaps)} state={baseState} />)
 		await act(async () => {})
 		expect(latest?.cards.status).toBe('error')
-		const error = latest?.cards.error
-		expect(error).toBeInstanceOf(QueryFetchError)
-		expect((error as QueryFetchError).status).toBe(503)
-		expect((error as QueryFetchError).error?.code).toBe('unavailable')
-		expect((error as QueryFetchError).retryAfter).toBe(30)
+		expect(latest?.cards.error).toEqual({ code: 'unavailable', retryAfter: 30 })
 
 		const payload = response()
 		fetchQueryMock.mockImplementation(() => Promise.resolve(payload))
@@ -326,6 +411,57 @@ describe('useViewQueries', () => {
 		expect(latest?.cards.isRefetching).toBe(false)
 	})
 
+	it("drops the last source's answer in the very render that switches to another", async () => {
+		const payload = response()
+		fetchQueryMock.mockImplementation(() => Promise.resolve(payload))
+		const twoSources: AnalyticsViewClientProps = {
+			...propsFor(nativeCaps),
+			sources: {
+				defaultId: 'native',
+				sources: [
+					{ id: 'native', label: 'Native', kind: 'config', capabilities: nativeCaps },
+					{ id: 'plausible', label: 'Plausible', kind: 'config', capabilities: nativeCaps },
+				],
+			},
+		}
+		const { rerender } = render(<Probe props={twoSources} state={baseState} />)
+		await act(async () => {})
+		expect(latest?.cards.data).toBe(payload)
+
+		fetchQueryMock.mockImplementation(() =>
+			Promise.reject(
+				new QueryFetchError(502, {
+					code: 'source_misconfigured',
+					message: 'refused',
+					param: 'host',
+				})
+			)
+		)
+		rerender(<Probe props={twoSources} state={{ ...baseState, source: 'plausible' }} />)
+		for (const section of [latest?.cards, latest?.trend, latest?.breakdown, latest?.goals]) {
+			expect(section?.status).toBe('loading')
+			expect(section?.data).toBeUndefined()
+			expect(section?.isRefetching).toBe(false)
+		}
+
+		await act(async () => {})
+		expect(latest?.cards.status).toBe('error')
+		expect(latest?.cards.data).toBeUndefined()
+		expect(latest?.cards.error).toEqual({ code: 'source_misconfigured', hostRefused: true })
+	})
+
+	it('names one identity per source and scope, whatever else the state says', () => {
+		const props = propsFor(nativeCaps)
+		const visitors: ViewState = { ...baseState, metric: 'visitors', range: 'last7days' }
+		expect(answerIdentity(props, visitors)).toBe(answerIdentity(props, baseState))
+		expect(answerIdentity(props, { ...baseState, scope: '*:alpha' })).not.toBe(
+			answerIdentity(props, baseState)
+		)
+		expect(answerIdentity({ ...props, scopeKey: 'beta' }, baseState)).not.toBe(
+			answerIdentity(props, baseState)
+		)
+	})
+
 	it('drops the rendered data when the section stops being servable', async () => {
 		const payload = response()
 		fetchQueryMock.mockImplementation(() => Promise.resolve(payload))
@@ -353,7 +489,7 @@ describe('useViewQueries', () => {
 		render(<Probe props={propsFor(noDimensions)} state={baseState} />)
 		expect(fetchQueryMock).toHaveBeenCalledTimes(2)
 		expect(latest?.breakdown.status).toBe('error')
-		expect(latest?.breakdown.error?.message).toBe(SECTION_UNAVAILABLE)
+		expect(latest?.breakdown.error).toEqual({ code: 'unsupported' })
 		expect(latest?.cards.status).toBe('loading')
 	})
 

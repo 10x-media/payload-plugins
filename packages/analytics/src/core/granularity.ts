@@ -1,10 +1,13 @@
 import type { AnalyticsCapabilities, Granularity } from './contract'
 
+/** Every bucket, finest first. */
 export const GRANULARITY_ORDER: Granularity[] = ['minute', 'hour', 'day', 'week', 'month']
 
 /**
- * Whether an adapter can bucket at granularity `g`. `minGranularity` is the finest
- * bucket a provider supports, so it also supports every coarser one.
+ * Whether a source buckets at `g`: `minGranularity` is the finest bucket it supports, so it supports
+ * every coarser one too.
  */
-export const supportsGranularity = (caps: AnalyticsCapabilities, g: Granularity): boolean =>
-	GRANULARITY_ORDER.indexOf(g) >= GRANULARITY_ORDER.indexOf(caps.minGranularity)
+export const supportsGranularity = (
+	caps: Pick<AnalyticsCapabilities, 'minGranularity'>,
+	g: Granularity
+): boolean => GRANULARITY_ORDER.indexOf(g) >= GRANULARITY_ORDER.indexOf(caps.minGranularity)

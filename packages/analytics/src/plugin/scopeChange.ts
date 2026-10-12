@@ -1,3 +1,5 @@
+import { isRecord } from '../core/values'
+
 /** What a providers or goals document change tells the plugin about the scopes it touched. */
 export interface ScopeChange {
 	scope: string | null
@@ -5,13 +7,15 @@ export interface ScopeChange {
 	previousScope?: string | null
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === 'object' && value !== null
+/** Every scope a change touched: the document's scope, and the one an update moved it out of. */
+export const changedScopes = (change: ScopeChange): Array<string | null> =>
+	change.previousScope === undefined || change.previousScope === change.scope
+		? [change.scope]
+		: [change.scope, change.previousScope]
 
 /**
- * A document's scope as the read paths spell it. An unscoped install has no scope field at
- * all, which reads as null, the same value its reads carry; a relationship-typed field can
- * arrive populated, so its id is taken rather than the object.
+ * A document's scope as read paths spell it: a missing scope field reads as null, like unscoped
+ * reads, and a populated relationship yields its id.
  */
 export const docScope = (doc: unknown, scopeField: string): string | null => {
 	if (!isRecord(doc)) {

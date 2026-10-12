@@ -30,32 +30,42 @@ const english: Translate = (key, vars) => fill(EN[key] ?? key, vars)
 describe('filterCaption', () => {
 	it('reads as a sentence for an eq filter', () => {
 		expect(filterCaption({ dimension: 'country', operator: 'eq', value: 'DE' }, english)).toBe(
-			'where Country is DE'
+			'where Country is \u2068DE\u2069'
 		)
 	})
 
 	it('reads as a sentence for a contains filter', () => {
 		expect(
 			filterCaption({ dimension: 'page', operator: 'contains', value: '/blog' }, english)
-		).toBe('where Page contains /blog')
+		).toBe('where Page contains \u2068/blog\u2069')
 	})
 
 	it('reads as a sentence for a matches filter', () => {
 		expect(
 			filterCaption({ dimension: 'page', operator: 'matches', value: '^/docs' }, english)
-		).toBe('where Page matches pattern ^/docs')
+		).toBe('where Page matches pattern \u2068^/docs\u2069')
 	})
 
 	it('names the dimension and the operator through their own label keys', () => {
 		expect(filterCaption({ dimension: 'country', operator: 'eq', value: 'DE' }, bare)).toBe(
-			`where ${keys.viewDimensionCountry} ${keys.filterOperatorEq} DE`
+			`where ${keys.viewDimensionCountry} ${keys.filterOperatorEq} \u2068DE\u2069`
 		)
+	})
+
+	// The same words the view's chip reads, so the dashboard and the view name a filter alike.
+	it('names the value as the reader knows it when given its label', () => {
+		expect(
+			filterCaption(
+				{ dimension: 'country', operator: 'eq', value: 'DE', shown: 'Germany' },
+				english
+			)
+		).toBe('where Country is ⁨Germany⁩')
 	})
 
 	it('passes the value through verbatim, so a placeholder in it is not refilled', () => {
 		expect(
 			filterCaption({ dimension: 'page', operator: 'matches', value: '^/a{{value}}' }, english)
-		).toBe('where Page matches pattern ^/a{{value}}')
+		).toBe('where Page matches pattern \u2068^/a{{value}}\u2069')
 	})
 })
 
@@ -67,7 +77,7 @@ describe('captionWithFilter', () => {
 				{ dimension: 'country', operator: 'eq', value: 'DE' },
 				english
 			)
-		).toBe('Last 30 days where Country is DE')
+		).toBe('Last 30 days where Country is \u2068DE\u2069')
 	})
 
 	it('lets a locale join them without a space', () => {
@@ -75,7 +85,7 @@ describe('captionWithFilter', () => {
 			fill(key === keys.widgetCaptionWithFilter ? '{{window}}{{filter}}' : (EN[key] ?? key), vars)
 		expect(
 			captionWithFilter('最近 30 天', { dimension: 'country', operator: 'eq', value: 'DE' }, zh)
-		).toBe('最近 30 天where Country is DE')
+		).toBe('最近 30 天where Country is \u2068DE\u2069')
 	})
 
 	it('leaves the window alone with no filter', () => {
@@ -89,6 +99,6 @@ describe('captionWithFilter', () => {
 				{ dimension: 'page', operator: 'matches', value: '^/a{{window}}' },
 				english
 			)
-		).toBe('Last 30 days where Page matches pattern ^/a{{window}}')
+		).toBe('Last 30 days where Page matches pattern \u2068^/a{{window}}\u2069')
 	})
 })

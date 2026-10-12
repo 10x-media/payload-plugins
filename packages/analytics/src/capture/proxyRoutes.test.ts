@@ -3,19 +3,27 @@ import type { ProxyRoute } from '../core/capture'
 import {
 	buildDownstreamHeaders,
 	buildUpstreamHeaders,
+	DATA_CACHE_CONTROL,
+	DATA_CONTENT_SECURITY_POLICY,
+	DATA_FALLBACK_CONTENT_TYPE,
 	FORWARDED_REQUEST_HEADERS,
 	matchProxyRoute,
+	SCRIPT_CONTENT_TYPE,
 } from './proxyRoutes'
 
 const posthogRoutes: ProxyRoute[] = [
-	{ source: '/static/:p*', upstream: 'https://us-assets.i.posthog.com/static/:p*' },
-	{ source: '/array/:p*', upstream: 'https://us-assets.i.posthog.com/array/:p*' },
-	{ source: '/:p*', upstream: 'https://us.i.posthog.com/:p*' },
+	{
+		source: '/static/:p*',
+		upstream: 'https://us-assets.i.posthog.com/static/:p*',
+		kind: 'script',
+	},
+	{ source: '/array/:p*', upstream: 'https://us-assets.i.posthog.com/array/:p*', kind: 'script' },
+	{ source: '/:p*', upstream: 'https://us.i.posthog.com/:p*', kind: 'data' },
 ]
 
 const plausibleRoutes: ProxyRoute[] = [
-	{ source: '/js/:script*', upstream: 'https://plausible.io/js/:script*' },
-	{ source: '/api/event', upstream: 'https://plausible.io/api/event' },
+	{ source: '/js/:script*', upstream: 'https://plausible.io/js/:script*', kind: 'script' },
+	{ source: '/api/event', upstream: 'https://plausible.io/api/event', kind: 'data' },
 ]
 
 const href = (routes: ProxyRoute[], path: string, trailingSlashes?: boolean) =>
@@ -39,6 +47,12 @@ describe('matchProxyRoute', () => {
 			'https://us-assets.i.posthog.com/array/tok/config.js'
 		)
 		expect(href(posthogRoutes, '/e')).toBe('https://us.i.posthog.com/e')
+	})
+
+	it('answers with the kind of the route that matched', () => {
+		expect(matchProxyRoute(posthogRoutes, '/static/array.js')?.kind).toBe('script')
+		expect(matchProxyRoute(posthogRoutes, '/e/')?.kind).toBe('data')
+		expect(matchProxyRoute(plausibleRoutes, '/api/event')?.kind).toBe('data')
 	})
 
 	it('preserves a trailing slash when the descriptor declares trailingSlashes', () => {
@@ -89,16 +103,17 @@ describe('matchProxyRoute', () => {
 		)
 	})
 
-	it('keeps a percent-encoded separator inside one segment', () => {
-		expect(href(posthogRoutes, '/static/a%2Fb.js')).toBe(
-			'https://us-assets.i.posthog.com/static/a%2Fb.js'
-		)
-	})
-
-	it('cannot be walked out of the upstream origin with traversal segments', () => {
-		const url = matchProxyRoute(posthogRoutes, '/static/..%2F..%2Fadmin')?.upstreamUrl
-		expect(url?.origin).toBe('https://us-assets.i.posthog.com')
-		expect(url?.pathname.startsWith('/static/')).toBe(true)
+	// An upstream that decodes `%2F` or `%5C` before routing reads either as a separator.
+	it('refuses an encoded slash or backslash inside a segment, which could leave the prefix', () => {
+		for (const path of [
+			'/static/a%2Fb.js',
+			'/static/..%2F..%2Fapi%2Fprojects',
+			'/static/..%5C..%5Capi%5Cprojects',
+			'/static/%2e%2e%2f%2e%2e%2fsignup',
+			'/js/pa-x%2F..%2F..%2Fapi.js',
+		]) {
+			expect(matchProxyRoute([...posthogRoutes, ...plausibleRoutes], path)).toBeNull()
+		}
 	})
 
 	it('refuses dot segments rather than letting the upstream path collapse', () => {
@@ -108,8 +123,8 @@ describe('matchProxyRoute', () => {
 
 	it('skips a route whose upstream names a param the source never produces', () => {
 		const routes: ProxyRoute[] = [
-			{ source: '/js/:script*', upstream: 'https://x.test/js/:missing' },
-			{ source: '/js/:script*', upstream: 'https://y.test/js/:script*' },
+			{ source: '/js/:script*', upstream: 'https://x.test/js/:missing', kind: 'script' },
+			{ source: '/js/:script*', upstream: 'https://y.test/js/:script*', kind: 'script' },
 		]
 		expect(href(routes, '/js/a.js')).toBe('https://y.test/js/a.js')
 	})
@@ -117,22 +132,26 @@ describe('matchProxyRoute', () => {
 	it('returns null rather than throwing when every route fails to compile', () => {
 		expect(
 			matchProxyRoute(
-				[{ source: '/js/:script*', upstream: 'https://x.test/js/:missing' }],
+				[{ source: '/js/:script*', upstream: 'https://x.test/js/:missing', kind: 'script' }],
 				'/js/a.js'
 			)
 		).toBeNull()
 	})
 
 	it('refuses a non-http upstream template', () => {
-		expect(matchProxyRoute([{ source: '/:p*', upstream: 'file:///etc/passwd' }], '/x')).toBeNull()
+		expect(
+			matchProxyRoute([{ source: '/:p*', upstream: 'file:///etc/passwd', kind: 'data' }], '/x')
+		).toBeNull()
 	})
 
 	it('refuses an upstream template that is not an absolute URL', () => {
-		expect(matchProxyRoute([{ source: '/:p*', upstream: '/relative/:p*' }], '/x')).toBeNull()
+		expect(
+			matchProxyRoute([{ source: '/:p*', upstream: '/relative/:p*', kind: 'data' }], '/x')
+		).toBeNull()
 	})
 
 	it('keeps a query string the upstream template declares', () => {
-		expect(href([{ source: '/s', upstream: 'https://x.test/s?v=2' }], '/s')).toBe(
+		expect(href([{ source: '/s', upstream: 'https://x.test/s?v=2', kind: 'data' }], '/s')).toBe(
 			'https://x.test/s?v=2'
 		)
 	})
@@ -179,6 +198,20 @@ describe('buildUpstreamHeaders', () => {
 	it('sends no X-Forwarded-For rather than a fabricated one', () => {
 		expect(buildUpstreamHeaders(incoming, null).has('x-forwarded-for')).toBe(false)
 		expect(buildUpstreamHeaders(incoming, '').has('x-forwarded-for')).toBe(false)
+	})
+
+	it('relays no platform header about the visitor, even one a descriptor asks for', () => {
+		const platform = new Headers({
+			'x-real-ip': '1.1.1.1',
+			'cf-connecting-ip': '2.2.2.2',
+			'cf-ipcountry': 'KP',
+			'x-vercel-ip-country': 'KP',
+			'x-vercel-forwarded-for': '3.3.3.3',
+			'true-client-ip': '4.4.4.4',
+		})
+		const out = buildUpstreamHeaders(platform, '9.9.9.9', [...platform.keys()])
+		expect([...out.keys()]).toEqual(['x-forwarded-for'])
+		expect(out.get('x-forwarded-for')).toBe('9.9.9.9')
 	})
 
 	it('never passes the incoming forwarding chain through', () => {
@@ -228,31 +261,83 @@ describe('buildDownstreamHeaders', () => {
 		'x-upstream-debug': 'leak',
 	})
 
-	it('keeps the cacheable content headers', () => {
-		const out = buildDownstreamHeaders(upstream)
-		expect(out.get('content-type')).toBe('application/javascript')
+	const typed = (contentType?: string) =>
+		new Headers(contentType === undefined ? {} : { 'content-type': contentType })
+
+	it('keeps the cacheable headers on a script route', () => {
+		const out = buildDownstreamHeaders(upstream, 'script')
 		expect(out.get('cache-control')).toBe('max-age=60')
 		expect(out.get('etag')).toBe('W/"abc"')
 		expect(out.get('last-modified')).toBe('Wed, 21 Oct 2015 07:28:00 GMT')
 		expect(out.get('vary')).toBe('accept-encoding')
 	})
 
-	it('strips set-cookie', () => {
-		expect(buildDownstreamHeaders(upstream).has('set-cookie')).toBe(false)
-		expect(buildDownstreamHeaders(upstream).getSetCookie()).toEqual([])
+	it('answers a data route private and uncacheable, with no validator, whatever the vendor sent', () => {
+		const out = buildDownstreamHeaders(upstream, 'data')
+		expect(out.get('cache-control')).toBe(DATA_CACHE_CONTROL)
+		expect(DATA_CACHE_CONTROL).toBe('private, no-store')
+		expect(out.has('etag')).toBe(false)
+		expect(out.has('last-modified')).toBe(false)
+		expect(buildDownstreamHeaders(new Headers(), 'data').get('cache-control')).toBe(
+			'private, no-store'
+		)
+	})
+
+	it('strips set-cookie on both kinds', () => {
+		for (const kind of ['script', 'data'] as const) {
+			expect(buildDownstreamHeaders(upstream, kind).has('set-cookie')).toBe(false)
+			expect(buildDownstreamHeaders(upstream, kind).getSetCookie()).toEqual([])
+		}
 	})
 
 	it('drops content-encoding and content-length, which no longer describe the decoded body', () => {
 		const out = buildDownstreamHeaders(
-			new Headers({ 'content-encoding': 'gzip', 'content-length': '31' })
+			new Headers({ 'content-encoding': 'gzip', 'content-length': '31' }),
+			'data'
 		)
 		expect(out.has('content-encoding')).toBe(false)
 		expect(out.has('content-length')).toBe(false)
 	})
 
 	it('drops everything else the upstream sends', () => {
-		const out = buildDownstreamHeaders(upstream)
+		const out = buildDownstreamHeaders(upstream, 'data')
 		expect(out.has('x-upstream-debug')).toBe(false)
 		expect(out.has('access-control-allow-origin')).toBe(false)
+	})
+
+	it('serves a script route as JavaScript whatever the vendor labelled it', () => {
+		for (const sent of ['application/javascript', 'text/html', 'image/svg+xml', undefined]) {
+			const out = buildDownstreamHeaders(typed(sent), 'script')
+			expect(out.get('content-type')).toBe(SCRIPT_CONTENT_TYPE)
+			expect(out.get('x-content-type-options')).toBe('nosniff')
+			expect(out.has('content-security-policy')).toBe(false)
+		}
+	})
+
+	it('passes JSON and plain text through on a data route', () => {
+		expect(
+			buildDownstreamHeaders(typed('application/json; charset=utf-8'), 'data').get('content-type')
+		).toBe('application/json; charset=utf-8')
+		expect(buildDownstreamHeaders(typed('Text/Plain'), 'data').get('content-type')).toBe(
+			'Text/Plain'
+		)
+	})
+
+	it('serves anything else a data route answers as sandboxed plain text, never sniffed', () => {
+		for (const sent of ['text/html', 'text/html; charset=utf-8', 'image/svg+xml', 'text/xml']) {
+			const out = buildDownstreamHeaders(typed(sent), 'data')
+			expect(out.get('content-type')).toBe(DATA_FALLBACK_CONTENT_TYPE)
+			expect(out.get('x-content-type-options')).toBe('nosniff')
+			expect(out.get('content-security-policy')).toBe(DATA_CONTENT_SECURITY_POLICY)
+		}
+		expect(buildDownstreamHeaders(typed(), 'data').get('content-type')).toBe(
+			DATA_FALLBACK_CONTENT_TYPE
+		)
+	})
+
+	it('sandboxes every data answer, a JSON one included', () => {
+		const out = buildDownstreamHeaders(typed('application/json'), 'data')
+		expect(out.get('content-security-policy')).toBe("sandbox; default-src 'none'")
+		expect(out.get('x-content-type-options')).toBe('nosniff')
 	})
 })
