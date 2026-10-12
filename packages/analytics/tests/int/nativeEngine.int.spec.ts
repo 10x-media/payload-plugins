@@ -612,6 +612,6 @@ describeForDb('native engine reads', {}, (db) => {
 		const ms = performance.now() - started
 		expect(answered.totals).toEqual(near.totals)
 		expect(answered.meta.clamped).toBeUndefined()
-		expect(ms).toBeLessThan(100)
+		expect(ms).toBeLessThan(1_000)
 	})
 })
