@@ -1,6 +1,8 @@
-import { defineConfig, devices } from '@playwright/test'
+// biome-ignore-all lint/plugin/noProcessEnv: e2e orchestration env boundary
+
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { defineConfig, devices } from '@playwright/test'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -29,9 +31,10 @@ export default defineConfig({
 			DEV_DB: process.env.DEV_DB ?? 'mongo',
 			DATABASE_URI_MONGO:
 				'mongodb://localhost:37017/webhooks_e2e?replicaSet=rs0&directConnection=true',
-			DATABASE_URI_POSTGRES:
-				'postgres://e2e:e2e@localhost:35432/webhooks_e2e',
-			PAYLOAD_SECRET: 'e2e-secret',
+			DATABASE_URI_POSTGRES: 'postgres://e2e:e2e@localhost:35432/webhooks_e2e',
+			// At least 16 bytes: the signing secrets are encrypted with a key derived from this, and
+			// `@10x-media/fields` refuses to derive one from less, which fails Payload's init.
+			PAYLOAD_SECRET: 'e2e-secret-material-32-bytes-minimum!!',
 		},
 	},
 })

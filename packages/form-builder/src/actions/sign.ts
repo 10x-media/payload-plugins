@@ -1,6 +1,6 @@
 import { createHmac } from 'node:crypto'
 
-// Distinct from @10x-media/webhooks' `X-Webhook-Signature` (which signs `timestamp.body`): this action signs the body alone, so a separate header prevents a consumer mistaking the two verification schemes.
+// Distinct from @10x-media/webhooks' Standard Webhooks signing (which signs `id.timestamp.body` under `webhook-signature`): this action signs the body alone, so a separate header prevents a consumer mistaking the two verification schemes.
 export const SIGNATURE_HEADER = 'X-Form-Signature'
 
 /** HMAC-SHA256 over `body`, hex-encoded, wrapped in the versioned header value (`v1=<hex>`). */

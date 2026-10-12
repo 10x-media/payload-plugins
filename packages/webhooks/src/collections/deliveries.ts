@@ -3,10 +3,9 @@ import type { CollectionConfig } from 'payload'
 import { ADMIN_GROUP } from '../constants'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
+import { adminUser } from './access'
 
 const STATUS_CELL = '@10x-media/webhooks/client#DeliveryStatusCell'
-
-const loggedIn = ({ req }: { req: { user?: unknown } }) => Boolean(req.user)
 
 /** Runner-written delivery audit log; read-only in admin, server writes use overrideAccess. */
 export const buildDeliveriesCollection = (args: {
@@ -24,9 +23,17 @@ export const buildDeliveriesCollection = (args: {
 		defaultColumns: ['event', 'endpoint', 'status', 'responseStatus', 'attempt', 'createdAt'],
 		hidden: args.hidden,
 	},
-	access: { read: loggedIn, create: () => false, update: () => false, delete: loggedIn },
+	access: { read: adminUser, create: () => false, update: () => false, delete: adminUser },
 	fields: [
 		{ name: 'subscriptionId', type: 'text', index: true },
+		/**
+		 * Which registry `subscriptionId` belongs to, `collection` or `code`. A code subscription's
+		 * id is whatever its author wrote and a collection row's is whatever the database issued, so
+		 * the two can coincide; without this a queued or replayed delivery could be resolved against
+		 * the wrong one. Rows written before the field existed carry none and resolve code first, as
+		 * they always did.
+		 */
+		{ name: 'subscriptionSource', type: 'text' },
 		{ name: 'endpoint', type: 'text' },
 		{ name: 'event', type: 'text', index: true },
 		{
@@ -43,10 +50,5 @@ export const buildDeliveriesCollection = (args: {
 		{ name: 'durationMs', type: 'number' },
 		{ name: 'jobId', type: 'text' },
 		{ name: 'payload', type: 'json' },
-		{
-			name: 'redeliver',
-			type: 'ui',
-			admin: { components: { Field: '@10x-media/webhooks/client#RedeliverButton' } },
-		},
 	],
 })
