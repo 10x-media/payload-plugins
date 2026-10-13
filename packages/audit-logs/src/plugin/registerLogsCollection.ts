@@ -32,7 +32,6 @@ export const registerLogsCollection = (
 ): void => {
 	const built = buildAuditLogsCollection(
 		pluginOptions.logs?.hidden !== false,
-		ctx.defaultRelationTo,
 		pluginOptions.logs?.access,
 		ctx.tenantsSlug,
 		Boolean(ctx.retention?.archive),

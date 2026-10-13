@@ -66,7 +66,27 @@ describeForDb('auditLogs cross-db', {}, (db) => {
 
 		expect(log?.operation).toBe('create')
 		expect(log?.snapshot?.title).toBe('Cross-db')
-		expect(log?.user).toBeTruthy()
+		expect(log?.user).toEqual({ relationTo: 'users', value: String(req.user?.id) })
+	})
+
+	// The reason `user` is text rather than a relationship: a foreign key would clear
+	// the entry (`set null`, or `cascade` on a `_rels` row) when the user is deleted.
+	it('keeps the user on the entry after the user is deleted', async () => {
+		const gone = await booted.payload.create({
+			collection: 'users',
+			data: { email: 'gone@example.com', password: 'password' },
+		})
+		const doc = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'Before leaving' },
+			req: { user: { ...gone, collection: 'users' } } as unknown as PayloadRequest,
+		})
+		await booted.payload.delete({ collection: 'users', id: gone.id })
+
+		const [log] = await readLogs(booted.payload, {
+			and: [{ documentId: { equals: String(doc.id) } }, { operation: { equals: 'create' } }],
+		})
+		expect(log?.user).toEqual({ relationTo: 'users', value: String(gone.id) })
 	})
 
 	// The reason `payloadAPI` is free text rather than a select. A third-party plugin sets

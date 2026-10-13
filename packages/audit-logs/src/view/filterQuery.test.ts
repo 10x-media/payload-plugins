@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { filterConditions, parseFilters, splitRef } from './filterQuery'
 
-const ctx = { userCollections: ['users'] }
+const ctx = {}
 
 describe('splitRef', () => {
 	it('splits a picked reference and keeps a typed id whole', () => {
@@ -49,14 +49,22 @@ describe('filterConditions', () => {
 		])
 	})
 
-	it('pairs users with their collection only when user is polymorphic', () => {
-		expect(filterConditions({ users: ['users:1', '2'] }, ctx)).toEqual([
-			{ user: { in: ['1', '2'] } },
-		])
-		expect(
-			filterConditions({ users: ['customers:1'] }, { userCollections: ['users', 'customers'] })
-		).toEqual([
+	it('pairs a picked user with its collection and matches a typed id in any', () => {
+		expect(filterConditions({ users: ['customers:1'] }, ctx)).toEqual([
 			{ and: [{ 'user.relationTo': { equals: 'customers' } }, { 'user.value': { equals: '1' } }] },
+		])
+		expect(filterConditions({ users: ['customers:1', '2'] }, ctx)).toEqual([
+			{
+				or: [
+					{
+						and: [
+							{ 'user.relationTo': { equals: 'customers' } },
+							{ 'user.value': { equals: '1' } },
+						],
+					},
+					{ 'user.value': { equals: '2' } },
+				],
+			},
 		])
 	})
 

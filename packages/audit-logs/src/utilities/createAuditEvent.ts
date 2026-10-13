@@ -1,7 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
 import type { AuditLogsCustom } from '../plugin/registerLogsCollection'
-import { impersonatorRelationship } from './impersonator'
+import { actingUserRef, impersonatorRef, userRef } from './userRef'
 import { writeAuditLog } from './writeAuditLog'
 
 export type CreateAuditEventOptions = {
@@ -47,7 +47,7 @@ export type CreateAuditEventOptions = {
 	 * Who the event is attributed to, when it is not `req.user`: work a person started that
 	 * runs in a job, on a request without a user. Replaces `req.user` for the `user` field
 	 * only; `impersonator` is still read from `req`. `collection` is the user's auth
-	 * collection, which the entry stores when the host has several.
+	 * collection.
 	 */
 	user?: { collection: string; id: number | string }
 }
@@ -80,13 +80,7 @@ export const createAuditEvent = async (
 	const auditLogsCollection = req.payload.config.collections.find((c) => c.slug === 'audit-logs')
 	const hasField = (name: string) =>
 		auditLogsCollection?.fields.some((f) => 'name' in f && f.name === name) ?? false
-	const userField = auditLogsCollection?.fields.find((f) => 'name' in f && f.name === 'user')
-	const isPolymorphic = Array.isArray(
-		userField && 'relationTo' in userField ? userField.relationTo : undefined
-	)
-	const impersonator = hasField('impersonator')
-		? impersonatorRelationship(req.user, isPolymorphic)
-		: undefined
+	const impersonator = hasField('impersonator') ? impersonatorRef(req.user) : undefined
 
 	// Group: explicit option wins; fall back to the configured context key, as the CRUD hooks do
 	const groupContextKey = (auditLogsCollection?.custom?.auditLogs as AuditLogsCustom | undefined)
@@ -104,8 +98,9 @@ export const createAuditEvent = async (
 		)
 	}
 
-	const attributed =
-		options.user ?? (req.user && { collection: req.user.collection, id: req.user.id })
+	const user = options.user
+		? userRef(options.user.collection, options.user.id)
+		: actingUserRef(req.user)
 
 	await writeAuditLog({
 		req,
@@ -117,11 +112,7 @@ export const createAuditEvent = async (
 			eventType: options.eventType,
 			relationTo: options.collection,
 			...(options.documentId != null && { documentId: String(options.documentId) }),
-			...(attributed && {
-				user: isPolymorphic
-					? { relationTo: attributed.collection, value: attributed.id }
-					: attributed.id,
-			}),
+			...(user && { user }),
 			...(impersonator !== undefined && { impersonator }),
 			...(req.locale && { locale: req.locale }),
 			payloadAPI: req.payloadAPI,

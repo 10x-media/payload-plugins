@@ -2,7 +2,7 @@ import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
 import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerComponent'
 import { redirect } from 'next/navigation'
-import type { AdminViewServerProps, CollectionSlug, Params, PopulateType, Where } from 'payload'
+import type { AdminViewServerProps, CollectionSlug, Params, Where } from 'payload'
 import { parseCookies } from 'payload'
 import { customEventTypeOptions, payloadAPILabels } from '../plugin/resolveOptions'
 import { keys } from '../translations'
@@ -174,22 +174,10 @@ export async function AuditLogsView({
 		}))
 	}
 
-	const whereConditions = filterConditions(filters, {
-		lockedTenantId,
-		userCollections: Object.keys(userTitleFields),
-	})
+	const whereConditions = filterConditions(filters, { lockedTenantId })
 	if (forceWhere) whereConditions.push(forceWhere)
 
 	const where: Where = whereConditions.length > 0 ? { and: whereConditions } : {}
-
-	// `depth: 1` alone returns every field of the related user, hashed password and
-	// sessions included, to render one label. Narrow it to the field actually shown.
-	// The tenant column populates too; the row only needs its id, the name comes from
-	// the tenant options already loaded for the filter.
-	const populate = Object.fromEntries([
-		...Object.entries(userTitleFields).map(([slug, titleField]) => [slug, { [titleField]: true }]),
-		...(multiTenancy ? [[tenantsSlug, { id: true }]] : []),
-	]) as PopulateType
 
 	// Names for the documents and users the filters name, so their pills read as
 	// names rather than ids. Bounded by what is selected, not by the log.
@@ -210,22 +198,28 @@ export async function AuditLogsView({
 		titleFieldOf
 	)
 
+	// `depth: 0`: the tenant column needs only its id, the name comes from the tenant
+	// options already loaded for the filter, and the users are resolved just below.
 	const result = await req.payload.find({
 		collection: 'audit-logs',
-		depth: 1,
+		depth: 0,
 		sort: '-createdAt',
 		limit,
 		page,
-		populate,
 		where,
 		overrideAccess: true,
 	})
+	const docs = await populateUsers(
+		req,
+		result.docs as unknown as Record<string, unknown>[],
+		userTitleFields
+	)
 
 	// Rendered here rather than in the row: a renderer may be a server component, and
 	// only this page can hand it `payload` and `req`.
 	const customEvents = viewConfig?.components?.customEvents
 	const renderedEvents: RenderedEvents = {}
-	for (const doc of result.docs as unknown as Record<string, unknown>[]) {
+	for (const doc of docs) {
 		if (doc.operation !== 'custom') continue
 		const eventType = typeof doc.eventType === 'string' ? doc.eventType : undefined
 		const Component = resolveCustomEventComponent(customEvents, eventType)
@@ -266,7 +260,7 @@ export async function AuditLogsView({
 					adminRoute={req.payload.config.routes?.admin ?? '/admin'}
 					apiRoute={req.payload.config.routes?.api ?? '/api'}
 					collectionOptions={collectionOptions}
-					docs={result.docs as unknown as Record<string, unknown>[]}
+					docs={docs}
 					filters={filters}
 					globalOptions={globalOptions}
 					tenantGlobalOptions={tenantGlobalOptions}
@@ -341,4 +335,74 @@ const resolveRefLabels = async (
 		})
 	)
 	return labels
+}
+
+const USER_REF_FIELDS = ['user', 'impersonator'] as const
+
+/**
+ * Puts each row's `user` and `impersonator` documents where a populated polymorphic
+ * relationship would have them, one query per auth collection on the page. They are
+ * stored as text, so Payload does not populate them. A user that no longer resolves
+ * keeps its id as `value`, which the row shows as deleted.
+ *
+ * Reads only the title field: a whole user document carries the hashed password and
+ * sessions, and the row renders one label.
+ */
+const populateUsers = async (
+	req: AdminViewServerProps['initPageResult']['req'],
+	docs: Record<string, unknown>[],
+	userTitleFields: Record<string, string>
+): Promise<Record<string, unknown>[]> => {
+	const idsBySlug = new Map<string, Set<string>>()
+	for (const doc of docs) {
+		for (const name of USER_REF_FIELDS) {
+			const ref = asUserRef(doc[name])
+			if (!ref || !Object.hasOwn(userTitleFields, ref.relationTo)) continue
+			idsBySlug.set(ref.relationTo, (idsBySlug.get(ref.relationTo) ?? new Set()).add(ref.value))
+		}
+	}
+
+	const found = new Map<string, Record<string, unknown>>()
+	await Promise.all(
+		[...idsBySlug].map(async ([slug, ids]) => {
+			const titleField = userTitleFields[slug] ?? 'id'
+			try {
+				const result = await req.payload.find({
+					collection: slug as CollectionSlug,
+					depth: 0,
+					limit: ids.size,
+					overrideAccess: true,
+					pagination: false,
+					select: titleField === 'id' ? {} : { [titleField]: true },
+					where: { id: { in: [...ids] } },
+				})
+				for (const user of result.docs as unknown as Record<string, unknown>[]) {
+					found.set(`${slug}:${String(user.id)}`, user)
+				}
+			} catch {
+				// An id of the wrong shape for this database; those users show as deleted.
+			}
+		})
+	)
+
+	return docs.map((doc) => {
+		const populated = { ...doc }
+		for (const name of USER_REF_FIELDS) {
+			const ref = asUserRef(doc[name])
+			if (!ref) continue
+			populated[name] = {
+				relationTo: ref.relationTo,
+				value: found.get(`${ref.relationTo}:${ref.value}`) ?? ref.value,
+			}
+		}
+		return populated
+	})
+}
+
+const asUserRef = (value: unknown): { relationTo: string; value: string } | undefined => {
+	if (!value || typeof value !== 'object') return undefined
+	const { relationTo, value: id } = value as Record<string, unknown>
+	return typeof relationTo === 'string' && typeof id === 'string' && id.length > 0
+		? { relationTo, value: id }
+		: undefined
 }

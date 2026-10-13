@@ -38,7 +38,6 @@ const withAuthHooks = ({
 		fastWrite: ctx.fastWrite,
 		collectUserAgent: ctx.collectUserAgent,
 		groupContextKey: ctx.groupContextKey,
-		isUserPolymorphic: ctx.isUserPolymorphic,
 		recordImpersonator: ctx.recordImpersonator,
 	}
 
@@ -127,7 +126,6 @@ const registerCollection = (
 				],
 				fieldMap,
 				groupContextKey: ctx.groupContextKey,
-				isUserPolymorphic: ctx.isUserPolymorphic,
 				recordImpersonator: ctx.recordImpersonator,
 				isSelfTenant,
 				operations: auditLogConfig.operations,
@@ -150,7 +148,6 @@ const registerCollection = (
 					collectUserAgent: ctx.collectUserAgent,
 					fieldMap,
 					groupContextKey: ctx.groupContextKey,
-					isUserPolymorphic: ctx.isUserPolymorphic,
 					recordImpersonator: ctx.recordImpersonator,
 					isSelfTenant,
 					shouldLog: auditLogConfig.shouldLog,

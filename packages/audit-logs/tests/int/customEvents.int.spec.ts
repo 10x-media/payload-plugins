@@ -47,10 +47,7 @@ describeForDb('createAuditEvent with multiTenancy', {}, (db) => {
 	/** The entries the tenant view lists for `tenant`, through the same conditions it builds. */
 	const tenantView = (tenant: number | string, eventType: string) =>
 		readLogs(booted.payload, {
-			and: filterConditions(
-				{ eventTypes: [eventType] },
-				{ lockedTenantId: String(tenant), userCollections: ['users'] }
-			),
+			and: filterConditions({ eventTypes: [eventType] }, { lockedTenantId: String(tenant) }),
 		})
 
 	it('lists an event with a tenant in that tenant view only', async () => {
@@ -75,7 +72,7 @@ describeForDb('createAuditEvent with multiTenancy', {}, (db) => {
 		})
 
 		const [entry] = await readLogs(booted.payload, { eventType: { equals: 'job_finished' } })
-		expect(entry?.user).toEqual(userId)
+		expect(entry?.user).toEqual({ relationTo: 'users', value: String(userId) })
 	})
 
 	it('reads the group from the configured context key', async () => {
@@ -124,7 +121,7 @@ describeForDb('createAuditEvent with several auth collections', {}, (db) => {
 		})
 
 		const [entry] = await readLogs(booted.payload, { eventType: { equals: 'job_finished' } })
-		expect(entry?.user).toEqual({ relationTo: 'admins', value: adminId })
+		expect(entry?.user).toEqual({ relationTo: 'admins', value: String(adminId) })
 	})
 
 	it('warns and drops a tenant when multiTenancy is off', async () => {

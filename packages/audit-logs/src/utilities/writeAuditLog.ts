@@ -1,13 +1,15 @@
 import type { PayloadRequest } from 'payload'
 
+import type { UserRef } from './userRef'
+
 /** The fields the plugin writes onto an `audit-logs` document. */
 export type AuditLogData = {
 	operation: 'auth' | 'create' | 'custom' | 'delete' | 'update'
 	relationTo: string
 	documentId?: string
 	eventType?: string
-	user?: unknown
-	impersonator?: unknown
+	user?: UserRef
+	impersonator?: UserRef
 	locale?: string
 	payloadAPI?: string
 	ipAddress?: string
@@ -31,9 +33,7 @@ export type AuditLogData = {
  * decides. The adapters still shape the data, default the timestamps, and fill the side
  * tables Postgres keeps for `changedPaths` and the user relationship.
  *
- * The cast is unavoidable. `user` is a polymorphic relationship when the host has several
- * auth collections and a plain one otherwise, so the generated `AuditLog` type only ever
- * matches one of the two shapes the plugin can write.
+ * The cast is unavoidable: the plugin cannot name the host's generated `AuditLog` type.
  */
 export const writeAuditLog = async ({
 	data,

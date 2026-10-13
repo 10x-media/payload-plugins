@@ -1,4 +1,4 @@
-import type { CollectionSlug, Field } from 'payload'
+import type { Field } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { buildAuditLogsCollection } from './AuditLogs'
@@ -25,18 +25,10 @@ describe('buildAuditLogsCollection', () => {
 
 	it('takes the access rules it was given', () => {
 		const allow = () => true
-		const access = buildAuditLogsCollection(true, 'users', { read: allow }).access ?? {}
+		const access = buildAuditLogsCollection(true, { read: allow }).access ?? {}
 		const args = {} as Parameters<NonNullable<typeof access.read>>[0]
 		expect(access.read).toBe(allow)
 		expect(access.create?.(args)).toBe(false)
-	})
-
-	it('pairs a plain user with the sort key, but not a polymorphic one', () => {
-		const pairs = (relationTo: CollectionSlug | CollectionSlug[]) =>
-			buildAuditLogsCollection(true, relationTo).indexes?.map((index) => index.fields.join(','))
-
-		expect(pairs('users')).toContain('user,createdAt')
-		expect(pairs(['users', 'admins'] as CollectionSlug[])).not.toContain('user,createdAt')
 	})
 
 	it('is hidden from the sidebar unless asked otherwise', () => {
@@ -66,63 +58,42 @@ describe('buildAuditLogsCollection', () => {
 		expect(api && 'options' in api).toBe(false)
 	})
 
-	it('points the user field wherever the host authenticates', () => {
-		const single = field(buildAuditLogsCollection(true, 'admins').fields, 'user')
-		expect(single && 'relationTo' in single && single.relationTo).toBe('admins')
-
-		const many = field(
-			buildAuditLogsCollection(true, ['users', 'admins'] as CollectionSlug[]).fields,
-			'user'
-		)
-		expect(many && 'relationTo' in many && many.relationTo).toEqual(['users', 'admins'])
-	})
-
-	it('points impersonator at the same auth collections as user', () => {
-		const relationTo = ['users', 'admins'] as CollectionSlug[]
-		const fields = buildAuditLogsCollection(
-			true,
-			relationTo,
-			undefined,
-			undefined,
-			false,
-			false,
-			true
-		).fields
-		const user = field(fields, 'user')
-		const impersonator = field(fields, 'impersonator')
-		expect(impersonator && 'relationTo' in impersonator && impersonator.relationTo).toEqual(
-			user && 'relationTo' in user ? user.relationTo : undefined
-		)
+	it('stores user and impersonator as text pairs, which outlive the user they name', () => {
+		const fields = buildAuditLogsCollection(true, undefined, undefined, false, false, true).fields
+		for (const name of ['user', 'impersonator']) {
+			const pair = field(fields, name)
+			expect(pair?.type).toBe('group')
+			expect(pair && 'fields' in pair && pair.fields.map((f) => [names([f])[0], f.type])).toEqual([
+				['relationTo', 'text'],
+				['value', 'text'],
+			])
+		}
 	})
 
 	describe('optional fields', () => {
 		it('adds a tenant field only with multi-tenancy on', () => {
 			expect(names(buildAuditLogsCollection().fields)).not.toContain('tenant')
-			expect(names(buildAuditLogsCollection(true, 'users', undefined, 'tenants').fields)).toContain(
-				'tenant'
-			)
+			expect(names(buildAuditLogsCollection(true, undefined, 'tenants').fields)).toContain('tenant')
 		})
 
 		it('adds an archive marker only when archiving is on', () => {
 			expect(names(buildAuditLogsCollection().fields)).not.toContain('archivedAt')
-			expect(
-				names(buildAuditLogsCollection(true, 'users', undefined, undefined, true).fields)
-			).toContain('archivedAt')
+			expect(names(buildAuditLogsCollection(true, undefined, undefined, true).fields)).toContain(
+				'archivedAt'
+			)
 		})
 
 		it('adds a group field only when grouping is on', () => {
 			expect(names(buildAuditLogsCollection().fields)).not.toContain('group')
 			expect(
-				names(buildAuditLogsCollection(true, 'users', undefined, undefined, false, true).fields)
+				names(buildAuditLogsCollection(true, undefined, undefined, false, true).fields)
 			).toContain('group')
 		})
 
 		it('adds an impersonator field only when impersonation is recorded', () => {
 			expect(names(buildAuditLogsCollection().fields)).not.toContain('impersonator')
 			expect(
-				names(
-					buildAuditLogsCollection(true, 'users', undefined, undefined, false, false, true).fields
-				)
+				names(buildAuditLogsCollection(true, undefined, undefined, false, false, true).fields)
 			).toContain('impersonator')
 		})
 	})
@@ -131,12 +102,12 @@ describe('buildAuditLogsCollection', () => {
 		it('pairs each filter the view offers with the sort it always applies', () => {
 			expect(buildAuditLogsCollection().indexes).toEqual([
 				{ fields: ['relationTo', 'documentId', 'createdAt'] },
-				{ fields: ['user', 'createdAt'] },
+				{ fields: ['user.value', 'user.relationTo', 'createdAt'] },
 			])
 		})
 
 		it('adds the tenant pair only when there are tenants to filter by', () => {
-			expect(buildAuditLogsCollection(true, 'users', undefined, 'tenants').indexes).toContainEqual({
+			expect(buildAuditLogsCollection(true, undefined, 'tenants').indexes).toContainEqual({
 				fields: ['tenant', 'createdAt'],
 			})
 		})

@@ -12,26 +12,17 @@ import {
 } from './utils'
 
 describe('resolveUser', () => {
-	const single = { users: 'email' }
-	const several = { admins: 'email', users: 'name' }
+	const titles = { admins: 'email', users: 'name' }
 
 	it('returns nothing when nobody is recorded', () => {
-		expect(resolveUser(null, single)).toBeUndefined()
-		expect(resolveUser(undefined, single)).toBeUndefined()
+		expect(resolveUser(null, titles)).toBeUndefined()
+		expect(resolveUser(undefined, titles)).toBeUndefined()
+		expect(resolveUser({ relationTo: null, value: null }, titles)).toBeUndefined()
 	})
 
-	it('reads the title field of a populated single-collection user', () => {
-		expect(resolveUser({ id: 1, email: 'a@b.c' }, single)).toEqual({
-			deleted: false,
-			id: '1',
-			label: 'a@b.c',
-			slug: 'users',
-		})
-	})
-
-	it('reads the title field of a populated polymorphic user', () => {
+	it('reads the title field of the user the view put in value', () => {
 		const user = { relationTo: 'admins', value: { id: 1, email: 'a@b.c' } }
-		expect(resolveUser(user, several)).toEqual({
+		expect(resolveUser(user, titles)).toEqual({
 			deleted: false,
 			id: '1',
 			label: 'a@b.c',
@@ -40,33 +31,15 @@ describe('resolveUser', () => {
 	})
 
 	it('falls back to the id when the title field is empty', () => {
-		expect(resolveUser({ relationTo: 'admins', value: { id: 1 } }, several)?.label).toBe('1')
+		expect(resolveUser({ relationTo: 'admins', value: { id: 1 } }, titles)?.label).toBe('1')
 	})
 
-	it('marks an unpopulated id as a deleted user', () => {
-		expect(resolveUser('abc123', single)).toEqual({
-			deleted: true,
-			id: 'abc123',
-			label: 'abc123',
-			slug: 'users',
-		})
-	})
-
-	it('marks an unpopulated polymorphic value as deleted instead of printing the object', () => {
-		expect(resolveUser({ relationTo: 'admins', value: 7 }, several)).toEqual({
+	it('marks a value still holding the id as a deleted user', () => {
+		expect(resolveUser({ relationTo: 'admins', value: '7' }, titles)).toEqual({
 			deleted: true,
 			id: '7',
 			label: '7',
 			slug: 'admins',
-		})
-	})
-
-	it('leaves the slug out when several collections make a bare value ambiguous', () => {
-		expect(resolveUser({ id: 1, email: 'a@b.c' }, several)).toEqual({
-			deleted: false,
-			id: '1',
-			label: '1',
-			slug: undefined,
 		})
 	})
 })
