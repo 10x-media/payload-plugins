@@ -1,0 +1,41 @@
+---
+title: Configuration
+description: Every option of the feedbackRecorder plugin.
+---
+
+```ts
+feedbackRecorder({
+  url: process.env.TENX_RECORDINGS_URL,
+  apiKey: process.env.TENX_RECORDINGS_KEY,
+  access: ({ user }) => user.collection === 'users',
+  appVersion: process.env.SOURCE_COMMIT,
+  captureConsole: false,
+  apiPath: '/feedback-recorder',
+  headerAction: true,
+  translations: { de: { 'feedbackRecorder:start': 'Los geht’s' } },
+})
+```
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `url` | none | Base URL of the 10x system. Without it, or without `apiKey`, the recorder stays hidden. |
+| `apiKey` | none | The site's recording key. Server-side only; it never reaches the browser. |
+| `access` | the admin's own auth collection | Who may record. Called with `{ payload, user }`. Users of other auth collections (customer accounts) never see the recorder by default. |
+| `appVersion` | none | Sent with each recording, e.g. a commit SHA, so the team knows which release it was made on. |
+| `captureConsole` | `false` | Also send up to 50 console errors and warnings from the recording. Console output can contain personal data, so it is opt-in. |
+| `apiPath` | `/feedback-recorder` | Where the plugin's endpoints live under the API route. Must not start with a collection or global slug. |
+| `headerAction` | `true` | Show the record button in the admin header. Turn it off to place `FeedbackRecorderButton` from `@10x-media/feedback-recorder/client` yourself. |
+| `translations` | | Per-locale overrides keyed by the typed keys from `@10x-media/feedback-recorder/i18n`. English and German ship. |
+| `disabled` | `false` | Returns the config untouched. |
+
+## Endpoints
+
+All under `/api` plus `apiPath`. Each needs a signed-in user the `access` option allows, refuses cross-site browser requests, and answers `503` when the site has no 10x connection.
+
+| Method and path | What it does |
+| --- | --- |
+| `GET /status` | Checks the key against the 10x system. |
+| `POST /clips` | Reserves a recording and answers with the Bunny upload target. Who sent it is taken from the session, never from the browser. |
+| `GET /clips` | The signed-in user's own recordings. |
+| `POST /clips/:id/complete` | Marks the upload finished. |
+| `PUT /clips/:id/audio` | Forwards the microphone-only track (at most 100 MB) for transcription. |
