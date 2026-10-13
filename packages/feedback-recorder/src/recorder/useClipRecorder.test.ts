@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { DEFAULT_BUBBLE } from './bubbleLayout'
 import type { ClipTransport, ReservedClip } from './transport'
+import type { UseClipRecorderResult } from './useClipRecorder'
 
 const uploads = vi.hoisted(() => ({
 	created: 0,
@@ -86,7 +87,7 @@ afterEach(() => {
 	vi.unstubAllGlobals()
 })
 
-const recordAndStop = async (result: { current: ReturnType<typeof useClipRecorder> }) => {
+const recordAndStop = async (result: { current: UseClipRecorderResult<{ title: string }> }) => {
 	act(() => result.current.start())
 	await waitFor(() => expect(result.current.state).toBe('recording'))
 	act(() => result.current.stop())

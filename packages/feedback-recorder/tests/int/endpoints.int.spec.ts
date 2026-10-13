@@ -70,6 +70,7 @@ describeForDb('feedbackRecorder endpoints', { dbs: ['mongo'] }, (db) => {
 			plugin: feedbackRecorder({ url: TENX, apiKey: KEY, appVersion: 'sha-123' }),
 			db,
 			collections: [
+				{ slug: 'users', auth: true, fields: [] },
 				{
 					slug: 'customers',
 					auth: true,
