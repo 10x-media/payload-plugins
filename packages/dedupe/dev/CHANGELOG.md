@@ -1,5 +1,12 @@
 # @10x-media/dedupe-dev
 
+## 0.0.1-beta.3
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/audit-logs@0.1.0-beta.5
+
 ## 0.0.1-beta.2
 
 ### Patch Changes
