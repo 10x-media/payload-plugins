@@ -1,5 +1,15 @@
 # @10x-media/audit-logs
 
+## 0.1.0-beta.5
+
+### Minor Changes
+
+- `createAuditEvent` takes a `tenant` and a `user`. `tenant` puts the entry in that tenant's view when `multiTenancy` is on, and is ignored with a warning when it is off. `user` attributes the event to someone other than `req.user`, for work a person started that runs in a job; `impersonator` is still read from `req`.
+
+  **Fixed: a custom event joins the group of the operation around it under a configured `logs.group.contextKey`.** Without an explicit `group` it read `req.context.auditGroup` whatever the key, while the automatic entries read the configured one.
+
+- **Breaking: `user` and `impersonator` are stored as text, `{ relationTo, value }`, whatever the number of auth collections.** They were relationships, and on Postgres and SQLite a relationship's foreign key cleared them from every entry once the user was deleted (`set null` on a column, `cascade` on a `_rels` row). The entry now keeps the user it names after the user is gone, adding a second auth collection no longer changes the schema, and the plugin boots on Postgres with several auth collections, which a `user, createdAt` index on a polymorphic relationship used to prevent. Query `user.value` and `user.relationTo` instead of `user`; `depth` no longer populates either field, so fetch the user yourself when you need more than the id. Existing entries need a one-off data edit on MongoDB and a migration on Postgres, both on the new [upgrading](https://docs.10xmedia.de/audit-logs/upgrading) page.
+
 ## 0.1.0-beta.4
 
 ### Minor Changes
