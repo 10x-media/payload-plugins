@@ -24,10 +24,13 @@ export const buildAuditLogsCollection = (
 		 *
 		 * Deliberately short. Each index is paid for on every write, and this collection is
 		 * almost all writes.
+		 *
+		 * A polymorphic `user` has no column of its own on Postgres and SQLite (it lives in
+		 * the `_rels` table), so it gets no pair and the adapters would refuse to boot.
 		 */
 		indexes: [
 			{ fields: ['relationTo', 'documentId', 'createdAt'] },
-			{ fields: ['user', 'createdAt'] },
+			...(Array.isArray(userRelationTo) ? [] : [{ fields: ['user', 'createdAt'] }]),
 			...(tenantsSlug ? [{ fields: ['tenant', 'createdAt'] }] : []),
 		],
 		access: {

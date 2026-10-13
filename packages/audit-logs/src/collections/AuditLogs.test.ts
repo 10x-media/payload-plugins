@@ -31,6 +31,14 @@ describe('buildAuditLogsCollection', () => {
 		expect(access.create?.(args)).toBe(false)
 	})
 
+	it('pairs a plain user with the sort key, but not a polymorphic one', () => {
+		const pairs = (relationTo: CollectionSlug | CollectionSlug[]) =>
+			buildAuditLogsCollection(true, relationTo).indexes?.map((index) => index.fields.join(','))
+
+		expect(pairs('users')).toContain('user,createdAt')
+		expect(pairs(['users', 'admins'] as CollectionSlug[])).not.toContain('user,createdAt')
+	})
+
 	it('is hidden from the sidebar unless asked otherwise', () => {
 		expect(buildAuditLogsCollection().admin?.hidden).toBe(true)
 		expect(buildAuditLogsCollection(false).admin?.hidden).toBe(false)
