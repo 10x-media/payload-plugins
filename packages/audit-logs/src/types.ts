@@ -618,9 +618,9 @@ export type AuditPluginConfig = {
 		/**
 		 * Override the generated `audit-logs` collection config.
 		 * Receives the fully built collection and should return the modified version.
-		 * The `slug` is always forced back to `'audit-logs'`, and `custom.contentLock` to
-		 * `{ exempt: true }` so `@10x-media/content-lock` never freezes the log. Everything
-		 * else is up to you.
+		 * The `slug` is always forced back to `'audit-logs'`, `custom.contentLock` to
+		 * `{ exempt: true }` so `@10x-media/content-lock` never freezes the log, and
+		 * `custom.auditLogs` to the plugin's own runtime settings. Everything else is up to you.
 		 *
 		 * Use this to add fields, attach hooks, customize access, etc.
 		 *

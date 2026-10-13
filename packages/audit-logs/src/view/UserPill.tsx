@@ -13,9 +13,9 @@ type Props = {
 	user: ResolvedUser
 }
 
-/** A deleted user has no page, and a bare id with no known collection has no route. */
+/** A deleted user has no page. */
 const userHref = (adminRoute: string, user: ResolvedUser): string | undefined =>
-	user.deleted || !user.slug
+	user.deleted
 		? undefined
 		: formatAdminURL({
 				adminRoute,

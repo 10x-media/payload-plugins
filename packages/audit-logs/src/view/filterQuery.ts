@@ -73,15 +73,13 @@ const anyOf = (parts: Where[]): Where | undefined => {
 type WhereContext = {
 	/** Locked by the tenant-scoped view; wins over the tenant filter. */
 	lockedTenantId?: string
-	/** Auth collections, which decide whether `user` is stored polymorphic. */
-	userCollections: string[]
 }
 
 /**
  * The conditions for `filters`, AND-ed by the caller. Values inside one filter
  * match any of them; collections and globals together also match either.
  */
-export const filterConditions = (filters: Filters, ctx: WhereContext): Where[] => {
+export const filterConditions = (filters: Filters, ctx: WhereContext = {}): Where[] => {
 	const conditions: Where[] = []
 	const push = (where: Where | undefined) => {
 		if (where) conditions.push(where)
@@ -120,26 +118,17 @@ export const filterConditions = (filters: Filters, ctx: WhereContext): Where[] =
 
 	if (filters.users?.length) {
 		const refs = filters.users.map(splitRef)
-		if (ctx.userCollections.length > 1) {
-			const bare = refs.filter((r) => !r.slug).map((r) => r.id)
-			push(
-				anyOf([
-					...refs.filter(hasSlug).map(
-						(r): Where => ({
-							and: [{ 'user.relationTo': { equals: r.slug } }, { 'user.value': { equals: r.id } }],
-						})
-					),
-					...(bare.length ? [inOrEquals('user.value', bare)] : []),
-				])
-			)
-		} else {
-			push(
-				inOrEquals(
-					'user',
-					refs.map((r) => r.id)
-				)
-			)
-		}
+		const bare = refs.filter((r) => !r.slug).map((r) => r.id)
+		push(
+			anyOf([
+				...refs.filter(hasSlug).map(
+					(r): Where => ({
+						and: [{ 'user.relationTo': { equals: r.slug } }, { 'user.value': { equals: r.id } }],
+					})
+				),
+				...(bare.length ? [inOrEquals('user.value', bare)] : []),
+			])
+		)
 	}
 
 	if (ctx.lockedTenantId) push({ tenant: { equals: ctx.lockedTenantId } })

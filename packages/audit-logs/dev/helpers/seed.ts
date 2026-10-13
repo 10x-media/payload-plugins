@@ -208,7 +208,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		req: groupedReq,
 	})
 
-	// A second auth collection makes `user` polymorphic. The customer places an order,
+	// A second auth collection, so the log names users of both. The customer places an order,
 	// so their entries sit next to the admin's in the list with their own pill.
 	const customer = await payload.create({
 		collection: 'customers',

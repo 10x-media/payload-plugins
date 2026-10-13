@@ -505,24 +505,14 @@ export interface AuditLog {
   eventType?: string | null;
   relationTo: string;
   documentId?: string | null;
-  user?:
-    | ({
-        relationTo: 'users';
-        value: string | User;
-      } | null)
-    | ({
-        relationTo: 'customers';
-        value: string | Customer;
-      } | null);
-  impersonator?:
-    | ({
-        relationTo: 'users';
-        value: string | User;
-      } | null)
-    | ({
-        relationTo: 'customers';
-        value: string | Customer;
-      } | null);
+  user?: {
+    relationTo?: string | null;
+    value?: string | null;
+  };
+  impersonator?: {
+    relationTo?: string | null;
+    value?: string | null;
+  };
   locale?: string | null;
   payloadAPI?: string | null;
   ipAddress?: string | null;
@@ -592,7 +582,6 @@ export interface ImpersonationSession {
   mode: 'swap' | 'parallel';
   targetSid: string;
   impersonatorSid: string;
-  impersonatorTenantCookie?: string | null;
   startedAt: string;
   endedAt?: string | null;
   endedBy?: ('exit' | 'logout' | 'terminated' | 'expired' | 'impersonatorGone' | 'targetGone' | 'failed') | null;
@@ -1073,8 +1062,18 @@ export interface AuditLogsSelect<T extends boolean = true> {
   eventType?: T;
   relationTo?: T;
   documentId?: T;
-  user?: T;
-  impersonator?: T;
+  user?:
+    | T
+    | {
+        relationTo?: T;
+        value?: T;
+      };
+  impersonator?:
+    | T
+    | {
+        relationTo?: T;
+        value?: T;
+      };
   locale?: T;
   payloadAPI?: T;
   ipAddress?: T;
@@ -1103,7 +1102,6 @@ export interface ImpersonationSessionsSelect<T extends boolean = true> {
   mode?: T;
   targetSid?: T;
   impersonatorSid?: T;
-  impersonatorTenantCookie?: T;
   startedAt?: T;
   endedAt?: T;
   endedBy?: T;

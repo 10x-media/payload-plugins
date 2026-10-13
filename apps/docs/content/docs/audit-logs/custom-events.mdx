@@ -21,7 +21,7 @@ await createAuditEvent(req, {
 })
 ```
 
-That writes an entry with `operation: 'custom'`. The user comes from `req.user`, and the group from `req.context` when [grouping](/audit-logs/configuration#group) is enabled.
+That writes an entry with `operation: 'custom'`. The user comes from `req.user`, and the group from `req.context[contextKey]`, the key you configured, when [grouping](/audit-logs/configuration#group) is enabled.
 
 ## Options
 
@@ -32,6 +32,8 @@ That writes an entry with `operation: 'custom'`. The user comes from `req.user`,
 | `eventType` | `string` | yes | Your identifier, for example `score_adjustment`. This is what you filter on. |
 | `metadata` | `Record<string, unknown>` | no | Anything you want to keep. The shape is yours. |
 | `group` | `string` | no | Overrides the value read from `req.context`. |
+| `tenant` | `string \| number` | no | The tenant the event belongs to, with `multiTenancy` on. Without it only the all-tenants view lists the entry. Ignored, with a warning, when `multiTenancy` is off. |
+| `user` | `{ collection: string; id: string \| number }` | no | Who the event is attributed to, in place of `req.user`. `impersonator` is still read from `req`. |
 
 ## Two timestamps
 
@@ -61,6 +63,22 @@ hooks: {
   ],
 }
 ```
+
+### From a job
+
+A queued job runs on a request without a user, and a multi-tenant host's job has no tenant on `req` either, even when a person started it for one tenant. Pass both from the job's input:
+
+```ts
+await createAuditEvent(req, {
+  collection: 'orders',
+  documentId: input.orderId,
+  eventType: 'export_finished',
+  tenant: input.tenantId,
+  user: { collection: 'users', id: input.requestedBy },
+})
+```
+
+`user` changes the entry only. Setting `req.user` on the job instead would change how every hook and validation of the job's own writes behaves.
 
 Passing `req` matters for more than the user: Payload's local API carries `req.context` down, which is what keeps the custom event in the same group as the write that triggered it.
 

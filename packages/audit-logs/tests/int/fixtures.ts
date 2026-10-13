@@ -84,8 +84,9 @@ export type AuditLogDoc = {
 	eventType?: string
 	relationTo: string
 	documentId?: string
-	user?: unknown
-	impersonator?: unknown
+	/** Empty (`{}` on Mongo) when nobody acted. */
+	user?: { relationTo?: string | null; value?: string | null }
+	impersonator?: { relationTo?: string | null; value?: string | null }
 	changedPaths?: string[]
 	diff?: Record<string, { after: unknown; before: unknown }>
 	snapshot?: Record<string, unknown>
