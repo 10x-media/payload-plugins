@@ -1,6 +1,6 @@
 'use client'
 
-import { Drawer, useModal } from '@payloadcms/ui'
+import { Drawer, useAuth, useModal } from '@payloadcms/ui'
 import {
 	createContext,
 	type ReactNode,
@@ -23,6 +23,7 @@ import type { ClientConfig } from '../types'
 import { CameraPlacement } from './CameraPlacement'
 import { RecorderDrawerBody } from './RecorderDrawerBody'
 import { RecordingBar } from './RecordingBar'
+import { userKey } from './userKey'
 import './feedbackRecorder.css'
 
 export const DRAWER_SLUG = 'feedback-recorder'
@@ -62,11 +63,42 @@ const SENDING_STATES = new Set(['uploading', 'processing'])
 export const RecorderProvider = ({
 	children,
 	config,
+	initiallyAllowed,
+	initialUserKey,
 }: {
 	children?: ReactNode
 	config: ClientConfig
+	/** The server's answer for the user of the first paint. */
+	initiallyAllowed: boolean
+	initialUserKey: string | null
 }) => {
 	const { t } = useTranslation()
+	const { user } = useAuth()
+	const currentUserKey = userKey(user)
+	const [access, setAccess] = useState({ key: initialUserKey, allowed: initiallyAllowed })
+
+	// The root layout this sits in keeps its first render across sign-in and sign-out, so the
+	// browser asks again whenever the signed-in user is not the one the server answered for.
+	useEffect(() => {
+		if (currentUserKey === access.key) return
+		if (!currentUserKey) {
+			setAccess({ key: null, allowed: false })
+			return
+		}
+		let cancelled = false
+		fetch(`${config.endpoint}/access`, { credentials: 'include' })
+			.then((response) => (response.ok ? response.json() : { allowed: false }))
+			.then((body: { allowed?: unknown }) => {
+				if (!cancelled) setAccess({ key: currentUserKey, allowed: body.allowed === true })
+			})
+			.catch(() => {
+				if (!cancelled) setAccess({ key: currentUserKey, allowed: false })
+			})
+		return () => {
+			cancelled = true
+		}
+	}, [currentUserKey, access.key, config.endpoint])
+	const allowed = access.allowed && access.key === currentUserKey
 	const { closeModal, openModal } = useModal()
 	const [kind, setKind] = useState<SubmissionKind>('bug')
 	const [withCamera, setWithCamera] = useState(false)
@@ -169,6 +201,8 @@ export const RecorderProvider = ({
 		}),
 		[recorder, config, elapsedSeconds, kind, withCamera, open, start, holdFile, send]
 	)
+
+	if (!allowed) return children
 
 	return (
 		<RecorderContext.Provider value={value}>

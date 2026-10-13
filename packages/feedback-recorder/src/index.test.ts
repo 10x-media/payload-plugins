@@ -29,7 +29,7 @@ describe('feedbackRecorder factory', () => {
 		expect(i18n.en?.feedbackRecorder?.pluginName).toBe('Feedback Recorder')
 	})
 
-	it('registers the provider, the header action and five endpoints', () => {
+	it('registers the provider, the header action and six endpoints', () => {
 		const out = feedbackRecorder(configured)(fakeConfig()) as Config
 		expect(out.admin?.components?.providers).toContain(
 			'@10x-media/feedback-recorder/rsc#FeedbackRecorderProvider'
@@ -38,6 +38,7 @@ describe('feedbackRecorder factory', () => {
 			'@10x-media/feedback-recorder/client#FeedbackRecorderButton'
 		)
 		expect(out.endpoints?.map((endpoint) => `${endpoint.method} ${endpoint.path}`)).toEqual([
+			'get /feedback-recorder/access',
 			'get /feedback-recorder/status',
 			'post /feedback-recorder/clips',
 			'get /feedback-recorder/clips',

@@ -1,5 +1,6 @@
 import type { Config } from 'payload'
 
+import { accessEndpoint } from '../endpoints/access'
 import { audioEndpoint } from '../endpoints/audio'
 import { completeEndpoint } from '../endpoints/complete'
 import { listEndpoint } from '../endpoints/list'
@@ -11,6 +12,7 @@ export const registerEndpoints = (config: Config, options: ResolvedOptions): voi
 	const base = options.apiPath
 	config.endpoints = [
 		...(config.endpoints ?? []),
+		accessEndpoint(`${base}/access`),
 		statusEndpoint(`${base}/status`),
 		reserveEndpoint(`${base}/clips`),
 		listEndpoint(`${base}/clips`),

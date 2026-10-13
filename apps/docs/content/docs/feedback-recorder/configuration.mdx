@@ -30,10 +30,11 @@ feedbackRecorder({
 
 ## Endpoints
 
-All under `/api` plus `apiPath`. Each needs a signed-in user the `access` option allows, refuses cross-site browser requests, and answers `503` when the site has no 10x connection.
+All under `/api` plus `apiPath`. Except `/access`, each needs a signed-in user the `access` option allows, refuses cross-site browser requests, and answers `503` when the site has no 10x connection.
 
 | Method and path | What it does |
 | --- | --- |
+| `GET /access` | Whether the signed-in user may record. Answered locally; the admin asks after every sign-in. |
 | `GET /status` | Checks the key against the 10x system. |
 | `POST /clips` | Reserves a recording and answers with the Bunny upload target. Who sent it is taken from the session, never from the browser. |
 | `GET /clips` | The signed-in user's own recordings. |

@@ -124,6 +124,22 @@ describeForDb('feedbackRecorder endpoints', { dbs: ['mongo'] }, (db) => {
 		expect(seen).toHaveLength(0)
 	})
 
+	it('answers access locally, per user, without calling out', async () => {
+		expect(await send({ method: 'GET', path: '/access' })).toEqual({
+			status: 200,
+			body: { allowed: false },
+		})
+		expect(await send({ method: 'GET', path: '/access', token: customerToken })).toEqual({
+			status: 200,
+			body: { allowed: false },
+		})
+		expect(await send({ method: 'GET', path: '/access', token: editorToken })).toEqual({
+			status: 200,
+			body: { allowed: true },
+		})
+		expect(seen).toHaveLength(0)
+	})
+
 	it('pings the 10x system with the key, never handing it to the browser', async () => {
 		answer = () => Response.json({ ok: true, project: { id: 'p1', name: 'Client CMS' } })
 		const result = await send({ method: 'GET', path: '/status', token: editorToken })
