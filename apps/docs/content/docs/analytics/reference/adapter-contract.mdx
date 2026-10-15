@@ -10,7 +10,8 @@ Everything in the plugin reads through one interface, `AnalyticsAdapter` from `@
 | Member | What it is |
 |---|---|
 | `id` | A stable id fields and widgets name it by: `native`, `plausible`, `umami`, `ga4`, `posthog` for the built-ins. An adapter built from a [provider document](/analytics/providers#provider-documents) takes `<provider>:<docId>`. |
-| `label` | The name the data source pickers show. |
+| `label` | The name the data source pickers show wherever no reader is known. |
+| `labelFor` | Optional. `({ req, scope }) => string`, which may return a promise: the name for one reader, where it differs by language or by who reads. A throw or a blank answer reads as `label`, with a warning. The built-in factories set it from their [`label` option](/analytics/providers#a-sources-name). |
 | `capabilities` | What it serves: [below](#the-capabilities-model). |
 | `capture` | Optional. What the browser needs to capture through it: [capture support](#capture-support). Declared only when the public capture config it needs is set. |
 | `ingest` | Optional, server side only. Where an adapter's own ingest endpoint listens, relative to `routes.api`, and how server code reaches the same pipeline. The native engine sets it; it is never sent to a browser. |
@@ -212,7 +213,7 @@ What an adapter throws decides how the read fails, so throw what the vendor said
 
 ### Capture support
 
-An adapter that can capture declares `capture`, a `CaptureSupport`: `client` (what the browser tracker boots for it, with its `kind`), `snippet({ path, scope })` (the scripts the page renders or injects, pointed at the slot's mount), and `proxy` (the routes the [first-party proxy](/analytics/proxy) forwards). Read credentials are never part of it; only what the browser is allowed to see.
+An adapter that can capture declares `capture`, a `CaptureSupport`: `client` (what the browser tracker boots for it, with its `kind`), `snippet({ path, scope, instance })` (the scripts the page renders or injects, pointed at the slot's mount; `instance` names the client to start, set only for a vendor that runs a [second client](/analytics/capture#two-posthog-projects-on-one-page) beside the other slot's, which only PostHog does), and `proxy` (the routes the [first-party proxy](/analytics/proxy) forwards). Read credentials are never part of it; only what the browser is allowed to see.
 
 `proxy.routes` lists each forwarded route as `{ source, upstream, kind }`. `kind` is required and decides how the [runtime proxy](/analytics/proxy#runtime-endpoint) serves the answer: `'script'` for anything the browser runs, always served as JavaScript, and `'data'` for everything else, kept as JSON or plain text, sandboxed and never cached. `proxy.forwardHeaders` names extra request headers to pass on (never cookies or authorization), `proxy.trailingSlashes` keeps a request's trailing slash upstream, and `proxy.fetch` is what the proxy reaches the vendor with.
 

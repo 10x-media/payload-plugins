@@ -194,6 +194,31 @@ Derives web metrics with HogQL through the Query API. `apiKey` is a personal API
 
 Time bounds are sent as `toDateTime('...', 'UTC')`. A bare HogQL date literal parses in the project's timezone, so a project set to anything but UTC used to read a window shifted by its offset; buckets are still cut in the reporting timezone.
 
+## A source's name
+
+Every factory takes `label`, the source's name in the admin's pickers and listings: `native()`, `plausible()`, `umami()`, `ga4()` and `posthog()`. Unset, it is the vendor's name (**Payload** for native). It takes three forms:
+
+- **A string**, the name everyone reads.
+- **A map by admin language**, such as `{ en: 'Traffic', de: 'Besucher' }`, read in the reader's language, then Payload's `i18n.fallbackLanguage`, then `en`, the rule `view.navLabel` follows.
+- **A function** `({ req, scope }) => string`, which may return a promise, naming the source per reader. `scope` is the tenant the sources are listed for, `null` install-wide and `'*'` across every scope.
+
+```ts
+import { posthog } from '@10x-media/analytics/adapters/posthog'
+import type { PayloadRequest } from 'payload'
+
+const isPlatformStaff = (req: PayloadRequest) => req.user?.roles?.includes('platform-admin') ?? false
+
+// Staff see whose account this is; a tenant sees analytics of its own site.
+export const adapter = posthog({
+  projectId: process.env.POSTHOG_PROJECT_ID ?? '',
+  apiKey: process.env.POSTHOG_API_KEY ?? '',
+  scopeProperty: 'tenant',
+  label: ({ req }) => (isPlatformStaff(req) ? 'Platform (PostHog)' : 'Site analytics'),
+})
+```
+
+Where no reader is known, at boot and in the log, the name is the string, else the map's `en` entry or its first, else the vendor's name. A function that throws or answers a blank name reads as that name, with a warning in the log. A source a provider document grants keeps the document's name, whatever the factory's `label` says.
+
 ## The fetch a vendor adapter uses
 
 Plausible, Umami and PostHog take an optional `fetch`, which every read and the [capture proxy](/analytics/proxy#runtime-endpoint) use to reach the vendor. Unset, it is Node's own `fetch`. The plugin hands its guarded connection to the adapters it builds from [provider documents](#private-networks); an adapter declared in `adapters` is configured in code and needs none. Pass one to send a vendor's traffic through a proxy agent of your own, or to stub the vendor in a test.
@@ -222,21 +247,51 @@ A few fields decide what the rest of the document means, and they sit in the sid
 | **Name** | What the data source pickers throughout the admin call it. A generated label stands in when it is empty. |
 | **Provider** | Which service this document configures. The body of the form is conditional on it: picking PostHog shows PostHog's fields and nothing else. |
 | **Enabled** | Off keeps the document and its credentials but takes the provider out of every read and every [capture slot](/analytics/capture#capture-slots). |
+| **Default for this site** | On a scoped install only: the source a reader of this scope opens on, when they may read it. At most one document per scope ([A tenant's default source](/analytics/multi-tenancy#a-tenants-default-source)). |
 
 #### The Payload provider type
 
-`native` is a provider type like any other, listed as **Payload**, and the one a document defaults to. It configures nothing: no credentials, no public capture config, just a name and the **Enabled** checkbox. What it says is that this scope stores its visits in Payload and reads them back from there, through the `native()` adapter the install already registered. The document grants that adapter to the scope; it does not build a second engine, and the scope filtering is the same one native has always done.
+`native` is a provider type like any other, listed as **Payload**. It is offered only on an install whose `adapters` holds `native()`, and there it is the one a document defaults to. It configures nothing: no credentials, no public capture config, just a name and the **Enabled** checkbox. What it says is that this scope stores its visits in Payload and reads them back from there, through the `native()` adapter the install already registered. The document grants that adapter to the scope; it does not build a second engine, and the scope filtering is the same one native has always done.
 
 On a scoped install this is what makes native per-tenant rather than install-wide. A tenant with no enabled `native` document does not see native among its sources (a reader `access.crossScope.unscopedSource` admits still does), its tracker config carries no native beacon, and a beacon posted under its scope is dropped (answering the same `202` an accepted one does). Its stored history is untouched; only new beacons stop. An install without `scope.resolve`, or without this collection, is unaffected: the config adapters serve every scope as before.
 
 The body holds two kinds of field, and the difference is not cosmetic:
 
 - **Credentials** (`apiKey`, `token`, `privateKey`) are encrypted with [`@10x-media/fields`](/fields/encrypted) in write-only mode. They are never readable back through any API, the admin included. The internal adapter factory is the only reader that ever sees the plaintext. After a save a text credential shows its last four characters, so you can tell which key is stored and nothing else; the GA4 private key is a textarea and shows nothing at all, so telling two of those apart means the **Name** field.
-- **Public capture config** (`projectToken`, `domain`, `websiteId`, `scriptId`, `measurementId`, `region`) is plain text on purpose: the tracker serves it to the browser. A PostHog, Plausible or GA4 document holding only its read settings reads dashboards and captures nothing. Umami is the exception: its `websiteId` is what it reads by and all its capture needs, so an Umami document captures whenever it fills a [capture slot](/analytics/capture#capture-slots).
+- **Public capture config** (`projectToken`, `domain`, `websiteId`, `scriptId`, `measurementId`, `region`) is plain text on purpose: the tracker serves it to the browser. A PostHog, Plausible or GA4 document holding only its read settings reads dashboards and captures nothing. Umami is the exception: its `websiteId` is what it reads by and all its capture needs, so an Umami document captures whenever it fills a [capture slot](/analytics/capture#capture-slots). The reverse does not hold: a document without its read credentials is [no source at all](#when-a-document-is-a-source), and captures nothing whatever capture fields it holds.
 
 Two more fields say what revenue is in. Plausible's **Revenue currency** (`revenueCurrency`) is the currency of the site's revenue goals and turns its `revenue` metric on. GA4's **Revenue currency** (`currency`) is the property's currency, used only when an answer from GA4 does not name it, which it normally does. Either way the reads report revenue in that currency (`meta.currency`) rather than the install's own.
 
 Every field carries a description saying what to paste into it and where to find it.
+
+### When a document is a source
+
+A provider document is a source only while all three hold:
+
+- it is **Enabled**;
+- its type is one the install [serves](#which-provider-types-a-document-may-have);
+- it holds the credentials its adapter reads with: `siteId` and `apiKey` for Plausible, `websiteId` and an `apiKey` or `token` for Umami, `propertyId` and the service account's email and private key for GA4, `projectId` and `apiKey` for PostHog. A `native` document needs none.
+
+A document missing a credential is not listed in any picker, is no [source of its own](/analytics/multi-tenancy#letting-tenants-read-a-shared-source) for a `fallback` policy, and fills no [capture slot](/analytics/capture#capture-slots), whatever capture fields it holds. 1.0.0-beta.12 listed it and showed an empty state. A document whose credential is stored but will not decrypt is still listed, as a source that fails ([How a document becomes an adapter](#how-a-document-becomes-an-adapter)), so a rotated key shows up as something to fix rather than vanishing.
+
+This is the providers collection's rule. An install that builds adapters with [`providers.resolve`](#keeping-the-settings-somewhere-else) decides for itself which ones it returns.
+
+### Which provider types a document may have
+
+The **Provider** select offers every type the install can serve: `native` only while `adapters` holds `native()`, since a `native` document grants that adapter and has nothing to grant without it. Its default is the first type it offers. `providers.collection.types` narrows the list and orders it:
+
+```ts
+import type { ProvidersOptions } from '@10x-media/analytics'
+
+// Tenants connect Plausible or Umami, in that order; Plausible is preselected.
+export const providers: ProvidersOptions = {
+  collection: { types: ['plausible', 'umami'] },
+}
+```
+
+A type the list names that is no provider id fails the boot, and so does a list that leaves no type the install serves (`['native']` without `native()`). Saving a document with a type the install does not serve is refused on the **Provider** field with **This website cannot use this analytics tool. Choose another one.**, so a document stored before the list narrowed keeps its type until someone saves it. Every type stays in the collection's schema whatever the list offers, its group of fields and the **Provider** column's values alike, so narrowing the list drops no stored settings and converts no column. When a type other than `native` comes first, the column only loses its `native` database default ([Upgrading](/analytics/upgrading/beta-13#the-provider-column)).
+
+`analyticsProviderFields({ types })` takes the same list for a store of your own; unset, it offers every type, `native` first.
 
 ### The PostHog scope property
 
@@ -352,7 +407,7 @@ The collection's default access admits users of the admin collection (`admin.use
 
 ### How a document becomes an adapter
 
-Each instance builds a document's adapter once per saved version of it. To learn which versions a scope holds, it reads the scope's documents without their credentials (ids, save times, `provider`, `enabled` and scope), at most once every ten seconds per scope, and the instance that handled a save reads again as soon as the save commits. Only a version it has not built yet is read in full and decrypted, on a request of its own and outside any transaction the reader holds; every unchanged document keeps the adapter it has. Taking a beacon reads nothing beyond that list, so ingest never decrypts a credential.
+Each instance builds a document's adapter once per saved version of it. To learn which versions a scope holds, it reads the scope's documents without their credentials (ids, save times, `provider`, `enabled`, `isDefault` and scope), at most once every ten seconds per scope, and the instance that handled a save reads again as soon as the save commits. Only a version it has not built yet is read in full and decrypted, on a request of its own and outside any transaction the reader holds; every unchanged document keeps the adapter it has. Taking a beacon reads nothing beyond that list, so ingest never decrypts a credential.
 
 A document whose credential will not decrypt (its key was rotated away, its ciphertext damaged) or whose settings fail to build an adapter does not take its scope's other sources down, and does not vanish from them either. It stands in as a source that keeps the document's name and, where its settings build without the credentials, its capabilities, captures nothing, and answers every read `502 source_misconfigured`, which the admin shows as a source to check. Each instance logs it and reads the document again a minute later, and at once when it is saved.
 
@@ -381,7 +436,7 @@ analytics({
 })
 ```
 
-`name`, `provider` and `enabled` are overridable. A replacement may be any field type, a `row` or a `collapsible` included, as long as it still puts a field of the same name somewhere inside it.
+`name`, `provider`, `enabled` and, on a scoped install, `isDefault` are overridable. A replacement may be any field type, a `row` or a `collapsible` included, as long as it still puts a field of the same name somewhere inside it.
 
 Order matters: per-field overrides run first, then `overrides` gets the whole config last. It is the same shape [`goals.collection.fields`](/analytics/goals#5-let-editors-manage-goals) uses, so one mental model covers both collections.
 
@@ -514,7 +569,7 @@ Worth knowing about that shape:
 - **A `native` document builds nothing here.** `adapterFromProviderDoc` answers `null` for it, which the resolver returns as no adapter: granting the native engine per scope is the providers collection's job, and on an install that resolves its providers itself, the `native()` in `adapters` serves every scope.
 - **Nothing else changes.** The adapters a resolver returns are layered onto the config adapters exactly like collection-resolved ones: same capture slots, same scope gating.
 
-`analyticsProviderFields()` takes five options, all optional: `buildSecret` (leave it out and the credentials are plain text fields, and storing them safely is your problem), `fields` (the same per-field overrides as the collection), `scopeField` (adds the plugin's own hidden `scope` text field, off by default because a host store usually has its own tenant column), `allowPrivateNetwork` (lets the `host` fields accept http addresses; set it together with `providers.hosts.allowPrivateNetwork`) and `connectionAccess` (field access on the fields `CONNECTION_PATHS` lists, as one function or as `{ create, update }`, the same shapes the plugin option takes).
+`analyticsProviderFields()` takes six options, all optional: `buildSecret` (leave it out and the credentials are plain text fields, and storing them safely is your problem), `fields` (the same per-field overrides as the collection), `scopeField` (adds the plugin's own hidden `scope` text field, off by default because a host store usually has its own tenant column), `allowPrivateNetwork` (lets the `host` fields accept http addresses; set it together with `providers.hosts.allowPrivateNetwork`) `connectionAccess` (field access on the fields `CONNECTION_PATHS` lists, as one function or as `{ create, update }`, the same shapes the plugin option takes) and `types` (the provider types the select offers, [as above](#which-provider-types-a-document-may-have)). It adds no **Default for this site** checkbox: picking a default among a store's own rows is the host's to decide.
 
 #### When the settings change
 

@@ -5,7 +5,7 @@ description: Every option of analytics(), with its type, its default and what it
 
 `analytics()` takes one object, `AnalyticsPluginOptions` (also exported as `PluginOptions`). Every path below is checked when the plugin builds the Payload config: a value of the wrong shape, a key no table lists at any level, an id that names no adapter, or a combination the plugin cannot honor fails the boot with a message naming the path. An option an earlier release took and this one no longer does fails the boot too, naming its replacement ([Removed options](/analytics/upgrading#removed-options)).
 
-The [native engine](/analytics/native#options) and each [provider](/analytics/providers) take options of their own, as arguments of `native()`, `plausible()` and the rest.
+The [native engine](/analytics/native#options) and each [provider](/analytics/providers) take options of their own, as arguments of `native()`, `plausible()` and the rest. Each of them takes `label`, the source's name in the admin: a string, a map by admin language, or a function per reader ([A source's name](/analytics/providers#a-sources-name)).
 
 ```ts title="payload.config.ts"
 import { analytics } from '@10x-media/analytics'
@@ -25,7 +25,7 @@ export const plugin = analytics({
 | Option | Type | Default | What it does |
 |---|---|---|---|
 | `adapters` | `AnalyticsAdapter[]` | required | The [config adapters](/analytics/concepts#sources-and-adapters). At least one, unless `disabled` is set, and no two with the same `id`. |
-| `defaultAdapter` | `string` | the first adapter | The source a read uses when it names none. Must be an id in `adapters`. |
+| `defaultAdapter` | `string` | the first adapter | The source a read uses when it names none. Must be an id in `adapters`. On a scoped install a tenant's default can differ: a provider document flagged **Default for this site**, then `defaultSource`, come first ([A tenant's default source](/analytics/multi-tenancy#a-tenants-default-source)). |
 | `platformAdapter` | `string` | none | The id of one config adapter shared by every scope: the platform's own analytics. It fills the [global capture slot](/analytics/capture#capture-slots) unless `capture.slots.global` says otherwise. Must be an id in `adapters`. |
 | `disabled` | `boolean` | `false` | Switches the plugin off and keeps its database schema: [below](#switching-it-off). |
 | `translations` | `TranslationsOption` | none | Per-language overrides of the admin strings, keyed by the typed keys of `@10x-media/analytics/i18n` ([Translations](/analytics/reference/translations)). A key that is not one of the plugin's own fails the boot. |
@@ -50,8 +50,11 @@ Tenancy: how a request maps to its [scope](/analytics/concepts#scope). Unset, th
 | `scope.member` | `({ req, scope }) => boolean` | required with `resolve` | Whether the request's user belongs to the scope it selected. `tenantMembership()` reads `@payloadcms/plugin-multi-tenant`'s tenants array; `() => true` opts out. |
 | `scope.list` | `({ payload }) => string[]` | none | The tenant scopes the sync task runs over, besides the install-wide pass. |
 | `scope.label` | `({ req, scope }) => string \| undefined` | the scope id | What the view's caption and Site select call a scope. |
+| `sources` | `{ [adapterId]: { tenants? } }` | `{}`: every config adapter is `'staff'` | Per shared config adapter, which of a tenant's own users read that tenant through it ([Letting tenants read a shared source](/analytics/multi-tenancy#letting-tenants-read-a-shared-source)). Each key must be an id in `adapters`. |
+| `sources.<id>.tenants` | `'staff' \| 'tenant' \| 'fallback' \| ({ req, scope, adapterId, ownSources }) => boolean` | `'staff'` | `'staff'`: only readers `access.crossScope.unscopedSource` admits. `'tenant'`: the scope's members too, narrowed to their tenant. `'fallback'`: its members until they read a source of their own. A function: its members when it answers `true`; a throw denies. Anything but `'staff'` needs an adapter with `capabilities.scopedQueries`, or the boot fails. |
+| `defaultSource` | `'tenantFirst' \| 'platformFirst' \| ({ req, scope, sources }) => string \| undefined` | none: `defaultAdapter`, else the first config adapter, else the first source the reader may read | A tenant scope's default source when none of its provider documents is flagged the default. `'tenantFirst'` picks the reader's first source from the tenant's own documents, `'platformFirst'` the `platformAdapter`, a function an id from `sources`; one the reader cannot read, or a throw, keeps the default. |
 
-Each may also return a promise. These options only mean something on a scoped install, so each fails the boot without `scope.resolve`: `scope.list`, `scope.label`, `scope.member`, `access.crossScope`, an adapter id in `capture.slots.tenant`, `capture.paths.tenant`, a `collections.<slug>.scopeField` other than `false`, and `goals.collection.scopeField` or `providers.collection.scopeField` when set at all.
+Each may also return a promise. These options only mean something on a scoped install, so each fails the boot without `scope.resolve`: `scope.list`, `scope.label`, `scope.member`, `sources`, `defaultSource`, `access.crossScope`, an adapter id in `capture.slots.tenant`, `capture.paths.tenant`, a `collections.<slug>.scopeField` other than `false`, and `goals.collection.scopeField` or `providers.collection.scopeField` when set at all.
 
 ## `access`
 
@@ -62,9 +65,9 @@ Each may also return a promise. These options only mean something on a scoped in
 | `access.crossScope` | `CrossScopeAccess \| { named?, aggregate?, unscopedSource? }` | scoped: every gate denies; unscoped: every gate is `isAdminUser` and the option cannot be set | Reads past the request's own scope. A function grants all three gates; the object form decides each one, and a gate it leaves out denies. |
 | `access.crossScope.named` | `CrossScopeAccess` | as above | Reading a scope the request does not resolve to, by naming it; also who manages another tenant's provider, goal and sync documents. |
 | `access.crossScope.aggregate` | `CrossScopeAccess` | as above | Reading every scope at once: `scope=*`, the view's **All sites**, and a scoped request that resolves no tenant. |
-| `access.crossScope.unscopedSource` | `CrossScopeAccess` | as above | Reading a tenant through a config adapter rather than its own provider documents ([Who sees what](/analytics/multi-tenancy#4-who-sees-what)). |
+| `access.crossScope.unscopedSource` | `CrossScopeAccess` | as above | Reading a tenant through a config adapter rather than its own provider documents ([Who sees what](/analytics/multi-tenancy#4-who-sees-what)). `sources` can let a tenant's own members in as well. |
 
-Each function may also return a promise.
+`CrossScopeAccess` is `({ req, scope?, adapterId? }) => boolean`, told what is asked where the read knows it: `named` the scope it names, `aggregate` `'*'` (or `null` for a scoped request that resolves no tenant), `unscopedSource` the tenant and the adapter. A gate may run once per scope and adapter in a request ([What a gate is told](/analytics/multi-tenancy#what-a-gate-is-told)). Each function may also return a promise.
 
 ## `capture`
 
@@ -151,14 +154,18 @@ Bindings, keyed by collection slug: how a document's [display fields](/analytics
 | `providers.collection` | `boolean \| ProvidersCollectionOptions` | `false` | The `analytics-providers` collection. `true` uses the defaults. |
 | `providers.collection.slug` | `string` | `'analytics-providers'` | The collection's slug. |
 | `providers.collection.scopeField` | `string` | `'scope'` | The field matched against the scope, such as a tenant plugin's `'tenant'`. Scoped installs only. |
-| `providers.collection.fields` | `{ name?, provider?, enabled? }` | none | Replaces one default field at a time, before `overrides` ([Replacing a field](/analytics/providers#replacing-a-field)). |
+| `providers.collection.fields` | `{ name?, provider?, enabled?, isDefault? }` | none | Replaces one default field at a time, before `overrides` ([Replacing a field](/analytics/providers#replacing-a-field)). |
 | `providers.collection.fields.name`, `providers.collection.fields.provider`, `providers.collection.fields.enabled` | `({ field }) => Field` | none | One field each. |
+| `providers.collection.fields.isDefault` | `({ field }) => Field` | none | The **Default for this site** checkbox, which only a scoped install's collection has. |
+| `providers.collection.types` | `ProviderId[]` | every type, `'native'` only while `adapters` holds `native()` | The provider types a document may have, in the order the **Provider** select offers them; the first is its default ([Which provider types a document may have](/analytics/providers#which-provider-types-a-document-may-have)). An unknown id fails the boot, and so does a list that leaves no type the install serves. |
 | `providers.collection.overrides` | `(collection) => CollectionConfig` | none | Reshapes the collection last. It may not rename it or turn off its timestamps. |
 | `providers.collection.access` | `Partial<CollectionConfig['access']>` | admin collection only, narrowed to the scopes the user belongs to | Replaces the default for each operation it sets. |
 | `providers.collection.encryption` | `{ keys? }` | | How stored credentials are sealed. |
 | `providers.collection.encryption.keys` | `KeysConfig` from `@10x-media/fields` | the fields plugin's `encrypted.keys`, else a ring derived from the Payload secret | A dedicated key ring for the credentials. |
 | `providers.collection.connectionAccess` | `FieldAccess \| { create?, update? }` | creators set it; changing it takes `access.crossScope.named` on a scoped install, the collection's update access otherwise | Who may set or change where a document connects ([Who may change a connection](/analytics/providers#who-may-change-a-connection)). |
 | `providers.collection.connectionAccess.create`, `providers.collection.connectionAccess.update` | `FieldAccess` | as above | One operation each. |
+| `providers.collection.defaultAccess` | `FieldAccess \| { create?, update? }` | `connectionAccess`, else its default | Who may set or change a document's **Default for this site** checkbox on a scoped install; a denied value is dropped ([A tenant's default source](/analytics/multi-tenancy#a-tenants-default-source)). |
+| `providers.collection.defaultAccess.create`, `providers.collection.defaultAccess.update` | `FieldAccess` | as above | One operation each. |
 | `providers.collection.sourceAccess` | `Access` | the collection's read access | Which of a scope's documents a reader reads analytics through ([Who reads through a document](/analytics/providers#who-reads-through-a-document)). |
 | `providers.resolve` | `({ payload, req?, scope, fetch, hosts, sdks }) => AnalyticsAdapter[]` | none | Replaces the collection: a scope's adapters from a store of your own ([Keeping the settings somewhere else](/analytics/providers#keeping-the-settings-somewhere-else)). |
 | `providers.hosts` | `{ allow?, allowPrivateNetwork? }` | | Where provider documents may connect ([Where a document may connect](/analytics/providers#where-a-document-may-connect)). |
@@ -176,6 +183,7 @@ The [analytics view](/analytics/analytics-view). `false` registers neither the v
 | `view.defaultRange` | `TimeframePreset` | `'last30days'` | The window the view opens on; `allTime` opens on `last30days`. |
 | `view.defaultMetric` | `MetricKey` | `'pageviews'` | The metric the cards and the trend open on. |
 | `view.navLabel` | `string \| Record<string, string>` | the translated `viewNavLabel` | The nav link and breadcrumb label; a map is keyed by admin language. |
+| `view.navLink` | `boolean` | `true` | `false` registers the view without its link in the admin nav, for a host that links it from navigation of its own. |
 | `view.Component` | `AnalyticsComponent` | none | A client component in place of the view's body (`@beta`, [Customizing](/analytics/customizing#the-analytics-views-body)). |
 
 ## `widgets`

@@ -75,7 +75,9 @@ Every answer of a read endpoint, success or failure, carries `Cache-Control: pri
 }
 ```
 
-`label` is the adapter's label (the native engine's is **Payload**), or a provider document's name; a `native` provider document keeps the id `native` and lends it the document's name. `defaultId` is the [default source](/analytics/concepts#sources-and-adapters): `defaultAdapter`, else the first config adapter, and the first source left when the scope's listing drops that one.
+`label` is the adapter's label for this reader (the native engine's is **Payload** unless its [`label` option](/analytics/providers#a-sources-name) says otherwise), or a provider document's name; a `native` provider document keeps the id `native` and lends it the document's name. `defaultId` is the [default source](/analytics/concepts#sources-and-adapters): in a tenant scope the document flagged **Default for this site**, then the `defaultSource` rule ([A tenant's default source](/analytics/multi-tenancy#a-tenants-default-source)); otherwise, and when neither picks one this reader may read, `defaultAdapter`, else the first config adapter, and the first source left when the scope's listing drops that one.
+
+`notice` is present only to say something about the listing. `'platformFallback'` means the listing holds a shared adapter a [`fallback` policy](/analytics/multi-tenancy#letting-tenants-read-a-shared-source) admitted because the reader has no source of their own: the numbers are the platform's until they add one.
 
 It takes **no scope parameter**, deliberately, so a tenant can never enumerate another tenant's sources. `collection` and `id` together list the sources of that document's own scope instead, for the document panel's source switcher: a document that is not bound, missing or not the caller's to read answers `404 not_found`, a failed document read `500 internal`, and a document in a scope the caller may not read `400 untrusted_scope`.
 
