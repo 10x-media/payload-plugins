@@ -296,6 +296,14 @@ const validateServed =
 			: validations.select(value, options)
 
 /**
+ * The values a narrowed select offers: the served types, and a stored type no longer served so its
+ * save is refused by name. Values only, since form state carries the result to the client, where
+ * a label function cannot cross; Payload's select reads nothing else from it.
+ */
+const offeredTypes = (types: readonly ProviderId[], stored: unknown): ProviderId[] =>
+	isOneOf(PROVIDER_IDS, stored) && !types.includes(stored) ? [...types, stored] : [...types]
+
+/**
  * Sits in the sidebar with `enabled`: every body field is conditional on the provider and
  * meaningless while `enabled` is off. The schema keeps every type (options, groups, a static
  * default while `native` leads), so narrowing the offer neither alters a column nor drops settings.
@@ -317,13 +325,7 @@ const providerField = (
 		...(narrowed
 			? {
 					validate: validateServed(types),
-					// A stored type no longer served stays listed, so its save is refused by name.
-					filterOptions: ({ data, options }) => {
-						const offered = [...types, ...(types.includes(data?.provider) ? [] : [data?.provider])]
-						return offered.flatMap((type) =>
-							options.filter((option) => typeof option !== 'string' && option.value === type)
-						)
-					},
+					filterOptions: ({ data }) => offeredTypes(types, data?.provider),
 				}
 			: {}),
 		options: PROVIDER_IDS.map((type) => ({
@@ -398,8 +400,8 @@ export interface ProviderFieldsOptions {
 	 */
 	connectionAccess?: ConnectionAccess
 	/**
-	 * The provider types the select offers, in this order, the first being the default; a document
-	 * saved with any other type is refused. Default: every type, `native` first.
+	 * The provider types the select offers, the first being its default; a document saved with any
+	 * other type is refused. Default: every type, `native` first.
 	 */
 	types?: ProviderId[]
 }

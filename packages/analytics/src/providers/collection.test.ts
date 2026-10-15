@@ -547,15 +547,14 @@ const providerSelect = (fields: Field[]) => {
 		})
 	return {
 		values: field.options.map((option) => (typeof option === 'string' ? option : option.value)),
+		/** What Payload stores in form state and hands the client, unmapped. */
 		offered: (stored?: string) =>
-			(
-				field.filterOptions?.({
-					data: { provider: stored },
-					options: field.options,
-					req: {} as PayloadRequest,
-					siblingData: {},
-				}) ?? field.options
-			).map((option) => (typeof option === 'string' ? option : option.value)),
+			field.filterOptions?.({
+				data: stored === undefined ? {} : { provider: stored },
+				options: field.options,
+				req: {} as PayloadRequest,
+				siblingData: {},
+			}),
 		defaultValue:
 			typeof field.defaultValue === 'function'
 				? field.defaultValue({} as never)
@@ -578,7 +577,7 @@ describe('servable provider types', () => {
 		}
 	})
 
-	it('offers only the served types in their order, the first as the default', () => {
+	it('offers only the served types, the first as the default, and a stored unserved one', () => {
 		const select = providerSelect(
 			buildProvidersCollection({
 				slug: 'p',
@@ -588,8 +587,20 @@ describe('servable provider types', () => {
 			}).fields
 		)
 		expect(select.offered()).toEqual(['umami', 'plausible'])
+		expect(select.offered('plausible')).toEqual(['umami', 'plausible'])
 		expect(select.offered('ga4')).toEqual(['umami', 'plausible', 'ga4'])
+		expect(select.offered('matomo')).toEqual(['umami', 'plausible'])
 		expect(select.defaultValue).toBe('umami')
+	})
+
+	// Form state reaches a client component, which React refuses a function in.
+	it('offers what survives serialization into client form state unchanged', () => {
+		const select = providerSelect(analyticsProviderFields({ types: ['posthog'] }))
+		for (const stored of [undefined, 'posthog', 'native']) {
+			const offered = select.offered(stored)
+			expect(offered).toBeDefined()
+			expect(JSON.parse(JSON.stringify(offered))).toEqual(offered)
+		}
 	})
 
 	it('keeps every type in the schema however few are offered, so no column changes', () => {
