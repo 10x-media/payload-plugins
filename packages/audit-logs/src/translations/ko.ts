@@ -93,6 +93,7 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.refPlaceholder]: '선택하거나 ID를 입력하세요',
 	[keys.impersonated]: '대리 접속',
 	[keys.impersonatedBy]: '대리 접속한 사용자',
+	[keys.aboutUser]: '사용자 정보',
 	[keys.deletedUser]: '삭제된 사용자',
 	[keys.toggleDetails]: '세부 정보 전환',
 	[keys.sectionSnapshot]: '스냅샷',

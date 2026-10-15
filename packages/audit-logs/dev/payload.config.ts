@@ -9,6 +9,7 @@ import { buildConfig } from 'payload'
 import { auditLogs } from '../src/index'
 import { articles } from './collections/articles'
 import { customers } from './collections/customers'
+import { departments } from './collections/departments'
 import { media } from './collections/media'
 import { orderEvents, orders } from './collections/orders'
 import { pages } from './collections/pages'
@@ -54,6 +55,7 @@ export default buildConfig({
 		media,
 		users,
 		customers,
+		departments,
 		tenants,
 		notes,
 		tenantSettings,
@@ -119,11 +121,61 @@ export default buildConfig({
 				group: true,
 				// The seed writes a few entries as an MCP server would.
 				payloadAPIs: ['MCP'],
+				// The view extension showcase: the acting user's departments are stored on
+				// every entry, shown as badges and in the user popover, and filterable.
+				override: (collection) => ({
+					...collection,
+					fields: [
+						...collection.fields,
+						{ name: 'actorDepartments', type: 'text', hasMany: true, admin: { readOnly: true } },
+					],
+					indexes: [...(collection.indexes ?? []), { fields: ['actorDepartments', 'createdAt'] }],
+				}),
+				extend: ({ req }) => {
+					const value = (req.user as { departments?: unknown } | null)?.departments
+					if (!Array.isArray(value) || value.length === 0) return undefined
+					return {
+						actorDepartments: value.map((d) =>
+							String(d && typeof d === 'object' ? (d as { id: unknown }).id : d)
+						),
+					}
+				},
 				view: {
 					defaultLimit: 25,
-					// The other seeded custom events keep the default table and JSON block.
+					filters: [
+						{
+							type: 'relationship',
+							name: 'department',
+							label: { en: 'Department', de: 'Abteilung' },
+							path: 'actorDepartments',
+							relationTo: 'departments',
+						},
+					],
+					loadContext: async ({ entries, req }) => {
+						const ids = [
+							...new Set(
+								entries.flatMap((e) =>
+									Array.isArray(e.actorDepartments) ? (e.actorDepartments as string[]) : []
+								)
+							),
+						]
+						if (ids.length === 0) return { departments: {} }
+						const { docs } = await req.payload.find({
+							collection: 'departments',
+							depth: 0,
+							overrideAccess: true,
+							pagination: false,
+							select: { name: true },
+							where: { id: { in: ids } },
+						})
+						return { departments: Object.fromEntries(docs.map((d) => [String(d.id), d.name])) }
+					},
 					components: {
+						// The other seeded custom events keep the default table and JSON block.
 						customEvents: { order_refunded: '/components/RefundEvent#RefundEvent' },
+						rowBadges: ['/components/audit/DepartmentBadges#DepartmentBadges'],
+						user: '/components/audit/ActorPopover#ActorPopover',
+						afterRowDetails: ['/components/audit/RowStateNote#RowStateNote'],
 					},
 				},
 			},

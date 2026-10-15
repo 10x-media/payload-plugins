@@ -2,6 +2,9 @@ import type { Filters } from './types'
 
 export const GLOBAL_SENTINEL = '__global__'
 
+/** Prefix that keeps declared filters apart from the built-in keys in the URL. */
+export const CUSTOM_FILTER_PREFIX = 'f.'
+
 type Label = Record<string, string> | string | ((args: { i18n: unknown; t: unknown }) => string)
 
 /** A configured label as text: plain, per language, or a function. `false` and unset give nothing. */
@@ -144,6 +147,9 @@ export const buildParams = (filters: Filters, page?: number, limit?: number): st
 	for (const ref of filters.users ?? []) params.append('userId', ref)
 	for (const group of filters.groups ?? []) params.append('group', group)
 	for (const api of filters.apis ?? []) params.append('api', api)
+	for (const [name, values] of Object.entries(filters.custom ?? {})) {
+		for (const value of values) params.append(`${CUSTOM_FILTER_PREFIX}${name}`, value)
+	}
 	if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
 	if (filters.dateTo) params.set('dateTo', filters.dateTo)
 	if (page && page > 1) params.set('page', String(page))

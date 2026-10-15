@@ -1,0 +1,181 @@
+---
+title: Extending
+description: Store your own context on every entry, render it in the view, and filter by it.
+---
+
+The view knows the fields the plugin writes. Anything your app means by "who acted", such as the department, organisation or team a user belonged to, it cannot know. Three options cover that, and they are meant to be used together:
+
+- [`logs.extend`](#storing-context-on-entries) writes your fields onto every entry.
+- [`view.components`](#slots) renders them: in the row, in the user's popover, in the expanded row, around the list.
+- [`view.filters`](#filters) filters by them, the way the User filter does.
+
+The running example records which departments the acting user belonged to.
+
+## Storing context on entries
+
+Look the context up when the entry is written, not when it is read. An audit log answers what was true at the time: a user moved to another department since would otherwise show under the new one, and a deleted user would show under none.
+
+Add the field with `logs.override`, fill it with `logs.extend`:
+
+```ts title="payload.config.ts"
+auditLogs({
+  logs: {
+    override: (collection) => ({
+      ...collection,
+      fields: [
+        ...collection.fields,
+        { name: 'actorDepartments', type: 'text', hasMany: true },
+      ],
+      indexes: [
+        ...(collection.indexes ?? []),
+        { fields: ['actorDepartments', 'createdAt'] },
+      ],
+    }),
+    extend: ({ req }) =>
+      req.user?.collection === 'users'
+        ? { actorDepartments: (req.user.departments ?? []).map(String) }
+        : undefined,
+  },
+})
+```
+
+`extend` runs for every entry, CRUD, auth and custom alike, and receives the entry as the plugin built it in `data`. What it returns is merged in; a key the plugin sets itself is ignored, so it cannot rewrite `user`, `diff` or the like. A refused login has no `req.user`, so return `undefined` there. An error it throws fails the write, and with it the audited operation, the same as a failing `shouldLog`.
+
+Prefer text over a relationship for anything that points at a document. A relationship's foreign key is cleared when the target is deleted on Postgres and SQLite, which is why the plugin stores `user` as text too. Store ids, and names as well if the view should still read well once the documents are gone.
+
+<Callout type="warn">
+Every field is paid for on every write, and this collection is almost all writes. Store what you will read or filter by, not the user document.
+</Callout>
+
+### Why not a hook
+
+A `beforeChange` hook attached in `override` works too, but any hook moves every write off the [direct database write](/audit-logs/admin-view#how-entries-are-written) and through `payload.create`, which costs up to three times as much per entry and holds far more memory. `extend` runs inside the plugin's own write and keeps the fast path.
+
+## Slots
+
+Every slot is a Payload component path. It may be a server component, which then also receives `payload`, `req` and [`filterHref`](#linking-to-a-filter).
+
+| Slot | Where | Props |
+|---|---|---|
+| `user` | The body of a popover the user pill opens. The pill and its link stay the plugin's. | `AuditLogsRowSlotProps` |
+| `rowBadges` | Each row, after the API, locale and tenant badges. | `AuditLogsRowSlotProps` |
+| `beforeRowDetails` | An expanded row, at the top, before the request details. | `AuditLogsRowSlotProps` |
+| `afterRowDetails` | An expanded row, at the bottom, after the diff, snapshot and event details. | `AuditLogsRowSlotProps` |
+| `beforeList`, `afterList` | Above and below the list. | `AuditLogsListSlotProps` |
+| `customEvents` | The body of a custom event. See [custom events](/audit-logs/custom-events#rendering-them-in-the-view). | `CustomEventComponentProps` |
+
+Row slots get the whole `entry`, including your fields, the resolved `user` and `impersonator` (`deleted` set when the account is gone), and the page's `context`. List slots get the page's `entries` and `context`.
+
+```ts title="payload.config.ts"
+auditLogs({
+  logs: {
+    view: {
+      components: {
+        user: '/components/audit/ActorPopover#ActorPopover',
+        rowBadges: ['/components/audit/DepartmentBadges#DepartmentBadges'],
+      },
+    },
+  },
+})
+```
+
+The `user` slot adds a chevron segment to the user pill that opens it. Under impersonation the chevron sits after the `impersonated` mark, and each opens its own popover. It renders for deleted users too. That is where stored context matters most: the account has no page to open, but the entry still says which departments it acted for.
+
+`beforeRowDetails` and `afterRowDetails` do not make a row expandable on their own. The view cannot know whether a server component will render anything until it has, so it shows them in rows that already expand.
+
+### Whether the row is open
+
+A client component in a row slot can read and change its row's state with `useAuditLogRow`:
+
+```tsx title="components/audit/LazyDetails.tsx"
+'use client'
+
+import { useAuditLogRow } from '@10x-media/audit-logs/client'
+
+export function LazyDetails() {
+  const { entry, expanded, setExpanded } = useAuditLogRow()
+  if (!expanded) return null
+  return <RelatedChanges documentId={entry.documentId as string} />
+}
+```
+
+Rows render collapsed, so this is how a slot defers work until someone opens the row: fetch on `expanded`, rather than for every row on the page. A server component has no row state; render a client component inside it when you need one. Outside a row slot the hook throws.
+
+### Loading data once per page
+
+A row slot that queries the database runs that query once per row. Load what the page needs once with `view.loadContext`, and every slot receives the result as `context`:
+
+```ts title="payload.config.ts"
+auditLogs({
+  logs: {
+    view: {
+      loadContext: async ({ entries, req }) => {
+        const ids = [...new Set(entries.flatMap((e) => (e.actorDepartments as string[]) ?? []))]
+        if (ids.length === 0) return { departments: {} }
+        const { docs } = await req.payload.find({
+          collection: 'departments',
+          depth: 0,
+          pagination: false,
+          select: { name: true },
+          where: { id: { in: ids } },
+        })
+        return { departments: Object.fromEntries(docs.map((d) => [String(d.id), d.name])) }
+      },
+    },
+  },
+})
+```
+
+A department deleted since is simply missing from the map, so fall back to the stored id (or a stored name). The context crosses into client components as props, so keep it serializable.
+
+### Linking to a filter
+
+`filterHref(name, value)` builds a link to the view with one more value added to a [declared filter](#filters), keeping the rest. It is how a badge narrows the list the way the tenant badge does:
+
+```tsx title="components/audit/DepartmentBadges.tsx"
+import type { AuditLogsRowSlotProps, AuditLogsSlotServerProps } from '@10x-media/audit-logs/types'
+
+export function DepartmentBadges({
+  context,
+  entry,
+  filterHref,
+}: AuditLogsRowSlotProps & AuditLogsSlotServerProps) {
+  const ids = (entry.actorDepartments as string[] | undefined) ?? []
+  const names = (context?.departments ?? {}) as Record<string, string>
+  return ids.map((id) => (
+    <span className="al-badge al-badge--context" key={id}>
+      <a className="al-badge__text" href={filterHref('department', id)}>
+        {names[id] ?? id}
+      </a>
+    </span>
+  ))
+}
+```
+
+`al-badge al-badge--context` gives a badge the tenant badge's look, and keeps it clickable above the row's own click target. Any other markup works too; only the badges themselves take clicks, the rest of the cell still opens the row.
+
+## Filters
+
+`view.filters` declares filters over your fields. They sit under More filters, live in the URL as `?f.<name>=<value>` beside the built-in ones, and combine with the rest with AND.
+
+```ts title="payload.config.ts"
+auditLogs({
+  logs: {
+    view: {
+      filters: [
+        {
+          type: 'relationship',
+          name: 'department',
+          label: { en: 'Department', de: 'Abteilung' },
+          path: 'actorDepartments',
+          relationTo: 'departments',
+        },
+      ],
+    },
+  },
+})
+```
+
+A `relationship` filter works like the User filter: pick documents of `relationTo` from the list drawer, or type an id for one that no longer exists. It matches entries whose `path` holds any of them, so the field may be text, hasMany text or a relationship. The pills take their titles from the collection's `useAsTitle`.
+
+`path` must name a field on the collection once `override` has run; the plugin refuses to start otherwise, rather than show a filter that never matches. Indexing it is up to you. The view always sorts by `-createdAt`, so a compound index with `createdAt`, as in the first example, serves both.

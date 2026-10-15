@@ -7,15 +7,21 @@ import { parseCookies } from 'payload'
 import { customEventTypeOptions, payloadAPILabels } from '../plugin/resolveOptions'
 import { keys } from '../translations'
 import { asTranslate } from '../translations/server'
-import type { AuditPluginConfig, CustomEventComponentProps } from '../types'
+import type {
+	AuditLogsListSlotProps,
+	AuditLogsRowSlotProps,
+	AuditLogsSlotServerProps,
+	AuditPluginConfig,
+	CustomEventComponentProps,
+} from '../types'
 import { resolveCustomEventComponent } from '../utilities/customEventComponents'
 import { isTenantGlobal, isTenantScoped } from '../utilities/tenantScope'
 import { AuditLogsClient } from './AuditLogsClient'
 import { authRedirectUrl } from './authRedirect'
 import { filterConditions, parseFilters, splitRef } from './filterQuery'
 import { PAYLOAD_INTERNAL_COLLECTIONS, PAYLOAD_INTERNAL_GLOBALS } from './internalEntities'
-import type { RenderedEvents, SelectOption } from './types'
-import { labelOf } from './utils'
+import type { RenderedEvents, RenderedRowSlots, SelectOption } from './types'
+import { CUSTOM_FILTER_PREFIX, labelOf, resolveUser } from './utils'
 
 export async function AuditLogsView({
 	initPageResult,
@@ -93,7 +99,11 @@ export async function AuditLogsView({
 
 	const page = Number(getString(sp.page)) || 1
 	const limit = Number(getString(sp.limit)) || configDefaultLimit
-	const filters = parseFilters(sp, { useTenant })
+	const customFilters = viewConfig?.filters ?? []
+	const filters = parseFilters(sp, {
+		customFilterNames: customFilters.map((f) => f.name),
+		useTenant,
+	})
 
 	const { collections: collectionConfigs, globals: globalConfigs = [] } = req.payload.config
 	const byLabel = (a: SelectOption, b: SelectOption) => a.label.localeCompare(b.label)
@@ -174,7 +184,7 @@ export async function AuditLogsView({
 		}))
 	}
 
-	const whereConditions = filterConditions(filters, { lockedTenantId })
+	const whereConditions = filterConditions(filters, { customFilters, lockedTenantId })
 	if (forceWhere) whereConditions.push(forceWhere)
 
 	const where: Where = whereConditions.length > 0 ? { and: whereConditions } : {}
@@ -194,6 +204,10 @@ export async function AuditLogsView({
 				fallbackSlug: authSlugs.length === 1 ? authSlugs[0] : undefined,
 				ref,
 			})),
+			// Keyed `slug:id`, the way the filter's picker shows them.
+			...customFilters.flatMap((f) =>
+				(filters.custom?.[f.name] ?? []).map((id) => ({ ref: `${f.relationTo}:${id}` }))
+			),
 		],
 		titleFieldOf
 	)
@@ -243,6 +257,59 @@ export async function AuditLogsView({
 		if (node != null) renderedEvents[String(doc.id)] = node
 	}
 
+	const context = viewConfig?.loadContext
+		? await viewConfig.loadContext({ entries: docs, req })
+		: undefined
+	// "Filter by this" for the slots: the current query plus one value, back on page one.
+	const filterHref = (name: string, value: string): string => {
+		const params = new URLSearchParams()
+		for (const [key, raw] of Object.entries(sp)) {
+			for (const v of Array.isArray(raw) ? raw : raw != null ? [raw] : []) params.append(key, v)
+		}
+		const key = `${CUSTOM_FILTER_PREFIX}${name}`
+		if (!params.getAll(key).includes(value)) params.append(key, value)
+		params.delete('page')
+		return `?${params.toString()}`
+	}
+	const slotServerProps: AuditLogsSlotServerProps = { filterHref, payload: req.payload, req }
+	const slots = viewConfig?.components
+	const renderSlot = (
+		Component: Parameters<typeof RenderServerComponent>[0]['Component'] | undefined,
+		clientProps: AuditLogsListSlotProps | AuditLogsRowSlotProps
+	) =>
+		Component
+			? RenderServerComponent({
+					clientProps,
+					Component,
+					importMap: req.payload.importMap,
+					serverProps: slotServerProps,
+				})
+			: undefined
+
+	// Only the configured slots are rendered, and nothing at all when there are none, so
+	// a view without slots pays for none of this.
+	const renderedRows: Record<string, RenderedRowSlots> = {}
+	if (slots?.user || slots?.rowBadges || slots?.beforeRowDetails || slots?.afterRowDetails) {
+		for (const doc of docs) {
+			const user = resolveUser(doc.user, userTitleFields)
+			const impersonator = resolveUser(doc.impersonator, userTitleFields)
+			const props: AuditLogsRowSlotProps = {
+				context,
+				entry: doc,
+				...(impersonator && { impersonator }),
+				...(user && { user }),
+			}
+			renderedRows[String(doc.id)] = {
+				afterDetails: renderSlot(slots.afterRowDetails, props),
+				badges: renderSlot(slots.rowBadges, props),
+				beforeDetails: renderSlot(slots.beforeRowDetails, props),
+				// A pill only exists for an entry with a user.
+				user: user ? renderSlot(slots.user, props) : undefined,
+			}
+		}
+	}
+	const listProps: AuditLogsListSlotProps = { context, entries: docs }
+
 	return (
 		<DefaultTemplate
 			i18n={req.i18n}
@@ -282,6 +349,14 @@ export async function AuditLogsView({
 					debugMode={pluginOptions.debug === true && Boolean(pluginOptions.retention)}
 					hasArchive={Boolean(pluginOptions.retention?.archive)}
 					renderedEvents={renderedEvents}
+					renderedRows={renderedRows}
+					beforeList={renderSlot(slots?.beforeList, listProps)}
+					afterList={renderSlot(slots?.afterList, listProps)}
+					customFilters={customFilters.map((f) => ({
+						label: labelOf(f.label, req.i18n) ?? f.name,
+						name: f.name,
+						relationTo: f.relationTo,
+					}))}
 					customEventTypes={customEventTypeOptions(
 						pluginOptions.logs?.eventTypes,
 						viewConfig?.components?.customEvents

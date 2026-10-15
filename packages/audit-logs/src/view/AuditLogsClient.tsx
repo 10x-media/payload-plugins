@@ -39,6 +39,10 @@ export function AuditLogsClient({
 	payloadAPILabels,
 	debugMode,
 	renderedEvents,
+	renderedRows,
+	beforeList,
+	afterList,
+	customFilters,
 	customEventTypes,
 	hasArchive,
 }: AuditLogsClientProps) {
@@ -173,6 +177,7 @@ export function AuditLogsClient({
 			<FilterBar
 				collectionOptions={collectionOptions}
 				customEventTypes={customEventTypes}
+				customFilters={customFilters}
 				eventTypeLabels={eventTypeLabels}
 				filters={filters}
 				globalOptions={globalOptions}
@@ -184,6 +189,8 @@ export function AuditLogsClient({
 				payloadAPILabels={payloadAPILabels}
 				tenantOptions={lockedTenantId ? undefined : tenantOptions}
 			/>
+
+			{beforeList}
 
 			<div className="al-list">
 				{docs.length === 0 ? (
@@ -199,6 +206,7 @@ export function AuditLogsClient({
 							eventTypeLabels={eventTypeLabels}
 							payloadAPILabels={payloadAPILabels}
 							renderedEvent={renderedEvents?.[String(doc.id)]}
+							slots={renderedRows?.[String(doc.id)]}
 							tenantLabels={tenantLabels}
 							tenantsSlug={tenantsSlug}
 							userTitleFields={userTitleFields}
@@ -206,6 +214,8 @@ export function AuditLogsClient({
 					))
 				)}
 			</div>
+
+			{afterList}
 
 			{totalDocs > 0 && (
 				<div className="al-pagination">

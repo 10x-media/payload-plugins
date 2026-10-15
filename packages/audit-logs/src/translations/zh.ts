@@ -93,6 +93,7 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.refPlaceholder]: '选择或输入 ID',
 	[keys.impersonated]: '模拟登录',
 	[keys.impersonatedBy]: '模拟者',
+	[keys.aboutUser]: '关于此用户',
 	[keys.deletedUser]: '已删除的用户',
 	[keys.toggleDetails]: '切换详情',
 	[keys.sectionSnapshot]: '快照',

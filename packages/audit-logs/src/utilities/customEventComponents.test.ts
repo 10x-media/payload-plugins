@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
 	collectCustomEventDependencies,
+	collectSlotDependencies,
 	resolveCustomEventComponent,
 } from './customEventComponents'
 
@@ -47,5 +48,28 @@ describe('collectCustomEventDependencies', () => {
 				type: 'component',
 			},
 		})
+	})
+})
+
+describe('collectSlotDependencies', () => {
+	it('registers every slot component, single or listed, by slot and position', () => {
+		expect(
+			collectSlotDependencies({
+				rowBadges: ['/badges#A', { path: '/badges#B', serverProps: { tone: 'quiet' } }],
+				user: '/user#Popover',
+			})
+		).toEqual({
+			'@10x-media/audit-logs:rowBadges:0': { path: '/badges#A', type: 'component' },
+			'@10x-media/audit-logs:rowBadges:1': {
+				path: '/badges#B',
+				serverProps: { tone: 'quiet' },
+				type: 'component',
+			},
+			'@10x-media/audit-logs:user:0': { path: '/user#Popover', type: 'component' },
+		})
+	})
+
+	it('is empty without slots', () => {
+		expect(collectSlotDependencies(undefined)).toEqual({})
 	})
 })

@@ -93,6 +93,12 @@ describe('buildParams', () => {
 		).toBe('documentId=posts%3A42&documentId=7&userId=users%3A1&group=import-7')
 	})
 
+	it('puts declared filters under their prefix', () => {
+		expect(buildParams({ custom: { department: ['a', 'b'] } })).toBe(
+			'f.department=a&f.department=b'
+		)
+	})
+
 	it('leaves page one out of the URL', () => {
 		expect(buildParams({}, 1)).toBe('')
 		expect(buildParams({}, 2)).toBe('page=2')
