@@ -139,6 +139,7 @@
 		"audit-logs-tenant-collections",
 		"audit-logs-user-pill",
 		"audit-logs-user-text-ref",
+		"audit-logs-view-extensions",
 		"automations-locales",
 		"color-linked-alpha",
 		"content-lock-assert-content-unlocked",
