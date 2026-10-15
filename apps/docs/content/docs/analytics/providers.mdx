@@ -278,18 +278,18 @@ This is the providers collection's rule. An install that builds adapters with [`
 
 ### Which provider types a document may have
 
-The **Provider** select offers every type the install can serve: `native` only while `adapters` holds `native()`, since a `native` document grants that adapter and has nothing to grant without it. Its default is the first type it offers. `providers.collection.types` narrows the list and orders it:
+The **Provider** select offers every type the install can serve: `native` only while `adapters` holds `native()`, since a `native` document grants that adapter and has nothing to grant without it. Its default is the first type it offers. `providers.collection.types` narrows the list, and its first type becomes the default:
 
 ```ts
 import type { ProvidersOptions } from '@10x-media/analytics'
 
-// Tenants connect Plausible or Umami, in that order; Plausible is preselected.
+// Tenants connect Plausible or Umami; Plausible is preselected.
 export const providers: ProvidersOptions = {
   collection: { types: ['plausible', 'umami'] },
 }
 ```
 
-A type the list names that is no provider id fails the boot, and so does a list that leaves no type the install serves (`['native']` without `native()`). Saving a document with a type the install does not serve is refused on the **Provider** field with **This website cannot use this analytics tool. Choose another one.**, so a document stored before the list narrowed keeps its type until someone saves it. Every type stays in the collection's schema whatever the list offers, its group of fields and the **Provider** column's values alike, so narrowing the list drops no stored settings and converts no column. When a type other than `native` comes first, the column only loses its `native` database default ([Upgrading](/analytics/upgrading/beta-13#the-provider-column)).
+A type the list names that is no provider id fails the boot, and so does a list that leaves no type the install serves (`['native']` without `native()`). Saving a document with a type the install does not serve is refused on the **Provider** field with **This website cannot use this analytics tool. Choose another one.**, so a document stored before the list narrowed keeps its type until someone saves it. The select lists the types it offers in the same order on every install, since the order of its options is the order of the **Provider** column's values. Every type stays in the collection's schema whatever the list offers, its group of fields and the **Provider** column's values alike, so narrowing the list drops no stored settings and converts no column. When a type other than `native` comes first, the column only loses its `native` database default ([Upgrading](/analytics/upgrading/beta-13#the-provider-column)).
 
 `analyticsProviderFields({ types })` takes the same list for a store of your own; unset, it offers every type, `native` first.
 
