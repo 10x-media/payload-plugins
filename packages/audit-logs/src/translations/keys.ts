@@ -82,6 +82,7 @@ export const keys = {
 	refPlaceholder: 'auditLogs:refPlaceholder',
 	impersonated: 'auditLogs:impersonated',
 	impersonatedBy: 'auditLogs:impersonatedBy',
+	aboutUser: 'auditLogs:aboutUser',
 	deletedUser: 'auditLogs:deletedUser',
 	toggleDetails: 'auditLogs:toggleDetails',
 	sectionSnapshot: 'auditLogs:sectionSnapshot',

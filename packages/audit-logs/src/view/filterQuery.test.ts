@@ -113,3 +113,30 @@ describe('filterConditions', () => {
 		])
 	})
 })
+
+describe('declared filters', () => {
+	const customFilters = [{ name: 'department', path: 'actorDepartments' }]
+
+	it('reads only declared names under the prefix', () => {
+		expect(
+			parseFilters(
+				{ 'f.department': ['a', 'b'], 'f.unknown': 'x' },
+				{ customFilterNames: ['department'] }
+			).custom
+		).toEqual({ department: ['a', 'b'] })
+	})
+
+	it('leaves custom unset when no declared filter has a value', () => {
+		expect(parseFilters({}, { customFilterNames: ['department'] }).custom).toBeUndefined()
+	})
+
+	it('matches the declared path with in, one value or several', () => {
+		expect(filterConditions({ custom: { department: ['a'] } }, { customFilters })).toEqual([
+			{ actorDepartments: { in: ['a'] } },
+		])
+	})
+
+	it('never builds a condition for a name that was not declared', () => {
+		expect(filterConditions({ custom: { other: ['a'] } }, { customFilters })).toEqual([])
+	})
+})

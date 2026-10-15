@@ -1,14 +1,16 @@
 import type { CollectionConfig, Config } from 'payload'
 
 import { buildAuditLogsCollection } from '../collections/AuditLogs'
-import type { AuditPluginConfig } from '../types'
+import type { AuditPluginConfig, ExtendEntryFunction } from '../types'
 import type { PluginContext } from './context'
 
 /**
- * What `createAuditEvent` needs from the plugin options at runtime, which it only reaches
+ * What the write path needs from the plugin options at runtime, which it only reaches
  * through the finished config. Stored on the log collection as `custom.auditLogs`.
  */
 export type AuditLogsCustom = {
+	/** `logs.extend`, applied to every entry by `writeAuditLog`. */
+	extend?: ExtendEntryFunction
 	/** The key the CRUD hooks read the group from, when `logs.group` is on. */
 	groupContextKey: string | undefined
 }
@@ -49,7 +51,10 @@ export const registerLogsCollection = (
 		custom: {
 			...overridden.custom,
 			contentLock: { exempt: true },
-			auditLogs: { groupContextKey: ctx.groupContextKey } satisfies AuditLogsCustom,
+			auditLogs: {
+				...(pluginOptions.logs?.extend && { extend: pluginOptions.logs.extend }),
+				groupContextKey: ctx.groupContextKey,
+			} satisfies AuditLogsCustom,
 		},
 	}
 

@@ -6,6 +6,7 @@ import type {
 	PayloadComponent,
 	PayloadRequest,
 	RelationshipField,
+	StaticLabel,
 	Where,
 } from 'payload'
 
@@ -219,6 +220,146 @@ export type CustomEventComponentProps = {
  * table and JSON block, wildcard included.
  */
 export type CustomEventComponents = Record<string, PayloadComponent | false>
+
+/**
+ * Who an entry ran as, the way the view resolved it. A user that no longer exists keeps
+ * its stored id and slug, with `deleted` set and the id as its label.
+ */
+export type AuditLogUser = {
+	deleted: boolean
+	id: string
+	label: string
+	slug: string
+}
+
+/**
+ * Whatever `view.loadContext` returned for the page, handed unchanged to every slot.
+ * `undefined` when no loader is configured. A client component receives it across the
+ * server boundary, so keep it serializable.
+ */
+export type AuditLogsViewContext = Record<string, unknown> | undefined
+
+/**
+ * Builds a link to the view with one more value added to a filter from `view.filters`,
+ * keeping every filter already applied. Use it to make a badge narrow the list the way
+ * the tenant badge does.
+ */
+export type FilterHrefFunction = (name: string, value: string) => string
+
+/**
+ * Server props every view slot receives on top of its own props. A client component
+ * gets none of these.
+ */
+export type AuditLogsSlotServerProps = {
+	filterHref: FilterHrefFunction
+	payload: PayloadRequest['payload']
+	req: PayloadRequest
+}
+
+/**
+ * Props of the slots rendered once per entry: `user`, `rowBadges`, `beforeRowDetails`
+ * and `afterRowDetails`. A client component in one of them can also read whether its row
+ * is expanded with `useAuditLogRow` from `@10x-media/audit-logs/client`.
+ */
+export type AuditLogsRowSlotProps = {
+	context: AuditLogsViewContext
+	/** The whole entry as the view read it, every field the collection has. */
+	entry: Record<string, unknown>
+	impersonator?: AuditLogUser
+	user?: AuditLogUser
+}
+
+/** What `useAuditLogRow` returns to a client component inside a row slot. */
+export type AuditLogRowState = {
+	/** The row's entry, the same object the slot received as `entry`. */
+	entry: Record<string, unknown>
+	expanded: boolean
+	/** Opens or closes the row, the same as clicking it. */
+	setExpanded: (expanded: boolean) => void
+}
+
+/** Props of the slots rendered once per page: `beforeList` and `afterList`. */
+export type AuditLogsListSlotProps = {
+	context: AuditLogsViewContext
+	/** The entries on the current page, in display order. */
+	entries: Record<string, unknown>[]
+}
+
+/**
+ * Loads data for the page's slots once, so a slot rendered per entry needs no query of
+ * its own. Runs after the page's entries are read.
+ *
+ * @example
+ * // Current department names for every department the page's entries mention
+ * loadContext: async ({ entries, req }) => {
+ *   const ids = [...new Set(entries.flatMap((e) => e.actorDepartments ?? []))]
+ *   const { docs } = await req.payload.find({
+ *     collection: 'departments',
+ *     where: { id: { in: ids } },
+ *     pagination: false,
+ *     depth: 0,
+ *   })
+ *   return { departments: Object.fromEntries(docs.map((d) => [d.id, d])) }
+ * }
+ */
+export type LoadViewContextFunction = (args: {
+	entries: Record<string, unknown>[]
+	req: PayloadRequest
+}) => AuditLogsViewContext | Promise<AuditLogsViewContext>
+
+/** A filter backed by documents of one collection, picked like the User filter. */
+export type RelationshipViewFilter = {
+	type: 'relationship'
+	/** Key in the URL (`?f.<name>=<id>`) and the name `filterHref` takes. Unique among `view.filters`. */
+	name: string
+	label: StaticLabel
+	/**
+	 * Field on the `audit-logs` collection the filter matches with `in`. A text, hasMany
+	 * text or relationship field all work. Must exist once `logs.override` has run.
+	 */
+	path: string
+	/** Collection the drawer lists and the pills take their titles from. */
+	relationTo: CollectionSlug
+}
+
+/**
+ * A filter the view offers beside its own, declared rather than built. Values inside one
+ * filter match any of them, and it combines with the others with AND.
+ */
+export type ViewFilter = RelationshipViewFilter
+
+/**
+ * Adds fields to an entry before it is written. Runs for every entry, CRUD, auth and
+ * custom alike, inside the plugin's own write, so entries still go straight to the
+ * database adapter.
+ *
+ * The returned fields must exist on the collection (add them with `logs.override`).
+ * They cannot replace a field the plugin sets: a built-in key in the result is ignored.
+ * Return `undefined` to add nothing.
+ *
+ * Keep it cheap: it runs inside the audited operation's transaction, once per entry.
+ *
+ * @example
+ * // The departments the acting user belonged to at the time. Checked against
+ * // `data.user`: a refused login has `req.user` but no `user` on the entry, and
+ * // `createAuditEvent` may name someone else.
+ * extend: ({ data, req }) =>
+ *   data.user?.relationTo === 'users' && data.user.value === String(req.user?.id)
+ *     ? { actorDepartments: (req.user.departments ?? []).map(String) }
+ *     : undefined
+ */
+export type ExtendEntryFunction = (args: {
+	/**
+	 * The entry as the plugin built it. Read only. `user` is who the entry is attributed
+	 * to, absent for a refused login or a write with nobody signed in.
+	 */
+	data: Readonly<{
+		operation: 'auth' | 'create' | 'custom' | 'delete' | 'update'
+		user?: { relationTo: string; value: string }
+		[key: string]: unknown
+	}>
+	req: PayloadRequest
+}) => Record<string, unknown> | undefined | Promise<Record<string, unknown> | undefined>
 
 // ---------- Audit Log types ----------
 
@@ -635,6 +776,18 @@ export type AuditPluginConfig = {
 		 */
 		override?: (collection: CollectionConfig) => CollectionConfig
 		/**
+		 * Adds your own fields to every entry before it is written, such as what the acting
+		 * user belonged to at the time. Declare the fields with `override`. Unlike a hook
+		 * attached there, this keeps entries on the direct database write.
+		 *
+		 * @example
+		 * extend: ({ data, req }) =>
+		 *   data.user?.value === String(req.user?.id)
+		 *     ? { actorDepartments: req.user?.departments?.map(String) }
+		 *     : undefined
+		 */
+		extend?: ExtendEntryFunction
+		/**
 		 * Extra values for the `payloadAPI` field, shown in the audit logs view.
 		 *
 		 * `payloadAPI` records which API the audited request came in through. Core sets
@@ -743,9 +896,67 @@ export type AuditPluginConfig = {
 					 */
 					forceWhere?: Where
 					/**
-					 * Custom renderers for parts of an expanded entry.
+					 * Filters the view offers beside its own, over fields you add to the
+					 * collection. They sit under More filters and live in the URL as
+					 * `?f.<name>=<value>`.
+					 *
+					 * @example
+					 * filters: [
+					 *   {
+					 *     type: 'relationship',
+					 *     name: 'department',
+					 *     label: { en: 'Department', de: 'Abteilung' },
+					 *     path: 'actorDepartments',
+					 *     relationTo: 'departments',
+					 *   },
+					 * ]
+					 */
+					filters?: ViewFilter[]
+					/**
+					 * Loads data once per page for the slots in `components`, which receive
+					 * it as `context`.
+					 */
+					loadContext?: LoadViewContextFunction
+					/**
+					 * Custom renderers for parts of the view. Every slot may be a server
+					 * component, which also receives `payload`, `req` and `filterHref`.
 					 */
 					components?: {
+						/**
+						 * Rendered above the list, below the filters. Props: `AuditLogsListSlotProps`.
+						 */
+						beforeList?: PayloadComponent[]
+						/**
+						 * Rendered below the list, above the pagination. Props: `AuditLogsListSlotProps`.
+						 */
+						afterList?: PayloadComponent[]
+						/**
+						 * Extra badges on each row, after the built-in ones (API, locale,
+						 * tenant). Props: `AuditLogsRowSlotProps`. Render nothing to add no badge.
+						 */
+						rowBadges?: PayloadComponent[]
+						/**
+						 * Extra sections at the top of an expanded row, before the request
+						 * details. They do not make a row expandable on their own: the view
+						 * cannot tell whether a server component will render anything until it
+						 * has. Props: `AuditLogsRowSlotProps`.
+						 */
+						beforeRowDetails?: PayloadComponent[]
+						/**
+						 * Extra sections at the bottom of an expanded row, after the diff,
+						 * snapshot and event details. Like `beforeRowDetails`, they do not make
+						 * a row expandable on their own. Props: `AuditLogsRowSlotProps`.
+						 */
+						afterRowDetails?: PayloadComponent[]
+						/**
+						 * The body of a popover the user pill opens from a chevron segment, for
+						 * more about who acted. Under impersonation the chevron follows the
+						 * `impersonated` mark, which keeps its own popover. The pill and its link
+						 * stay the plugin's. Rendered for deleted users
+						 * too, which is where data from `logs.extend` matters most.
+						 * Props: `AuditLogsRowSlotProps`.
+						 */
+						user?: PayloadComponent
 						/**
 						 * Replaces the event table and metadata JSON of custom events
 						 * (`createAuditEvent`). Keyed by `eventType`, `'*'` matches every type.

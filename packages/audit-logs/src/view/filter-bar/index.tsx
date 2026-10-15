@@ -28,6 +28,7 @@ type PillArgs = { id: string; label: string; value: string }
 export function FilterBar({
 	collectionOptions,
 	customEventTypes,
+	customFilters,
 	eventTypeLabels,
 	filters,
 	globalOptions,
@@ -69,6 +70,7 @@ export function FilterBar({
 	)
 
 	const isDirty = JSON.stringify(staged) !== JSON.stringify(filters)
+	// `custom` is kept `undefined` while empty, so an object here always holds a value.
 	const hasActiveFilters = Object.values(staged).some((value) =>
 		Array.isArray(value) ? value.length > 0 : Boolean(value)
 	)
@@ -93,6 +95,7 @@ export function FilterBar({
 		...(staged.changedPaths?.length ? [t(keys.filterChangedPath)] : []),
 		...(staged.groups?.length ? [t(keys.filterGroup)] : []),
 		...(staged.apis?.length ? [t(keys.filterApi)] : []),
+		...customFilters.filter((f) => staged.custom?.[f.name]?.length).map((f) => f.label),
 	].join(', ')
 
 	const handleApply = useCallback(() => {
@@ -176,6 +179,7 @@ export function FilterBar({
 							label,
 							value,
 						}))}
+						customFilters={customFilters}
 						labels={labels}
 						onLabel={onLabel}
 						titleFields={titleFields}

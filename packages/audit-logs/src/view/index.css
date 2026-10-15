@@ -292,8 +292,10 @@
 	color: #f9a8d4;
 }
 /* Context like the locale and filled the same way, but a link: it narrows the
-   list to that tenant. Above the row's stretched toggle so the click lands. */
-.al-badge--tenant {
+   list to that tenant. Above the row's stretched toggle so the click lands.
+   `--context` is the same look for badges a host renders through `rowBadges`. */
+.al-badge--tenant,
+.al-badge--context {
 	position: relative;
 	z-index: 1;
 	gap: calc(var(--base) * 0.2);
@@ -312,7 +314,8 @@
 	color: inherit;
 	text-decoration: none;
 }
-.al-badge--tenant a.al-badge__text:hover {
+.al-badge--tenant a.al-badge__text:hover,
+.al-badge--context a.al-badge__text:hover {
 	color: var(--theme-text);
 	text-decoration: underline;
 	text-underline-offset: 2px;
@@ -468,6 +471,20 @@
 	gap: calc(var(--base) * 0.3);
 	overflow: hidden;
 }
+/* Host badges from `rowBadges`. Like the user pill, above the stretched toggle
+   with only the badges themselves taking clicks. */
+.al-row__slot-badges {
+	position: relative;
+	z-index: 1;
+	display: flex;
+	align-items: center;
+	gap: calc(var(--base) * 0.3);
+	min-width: 0;
+	pointer-events: none;
+}
+.al-row__slot-badges > * {
+	pointer-events: auto;
+}
 /* Above the stretched toggle, but only the pill takes clicks: the empty rest of
    the column still expands the row. */
 .al-row__user {
@@ -524,9 +541,10 @@ a.al-user__name:hover {
 	font-style: italic;
 	color: var(--theme-elevation-500);
 }
-/* The mark is the pill's second segment rather than a chip inside it: flush to
-   the right edge, full height, split from the name by a hairline. */
-.al-user--impersonated {
+/* The popup triggers (the impersonated mark, the chevron of a host `user` slot)
+   are segments of the pill rather than chips inside it: flush to the right edge,
+   full height, each split from the one before by a hairline. */
+.al-user--segmented {
 	--pill-padding-inline-end: 0;
 }
 .al-user__popup,
@@ -534,6 +552,11 @@ a.al-user__name:hover {
 	display: flex;
 	align-self: stretch;
 	flex-shrink: 0;
+	background: none;
+}
+/* Two segments sit flush, the hairline alone between them. */
+.al-user__popup + .al-user__popup {
+	margin-inline-start: calc(var(--base) * -0.4);
 }
 .al-user__impersonated {
 	display: flex;
@@ -546,6 +569,21 @@ a.al-user__name:hover {
 .al-user__trigger:hover .al-user__impersonated,
 .al-user__trigger:focus-visible .al-user__impersonated {
 	background: var(--theme-warning-150);
+}
+.al-user__more {
+	display: flex;
+	align-items: center;
+	padding: 0 calc(var(--base) * 0.3);
+	border-left: 1px solid var(--theme-elevation-250);
+	color: var(--theme-elevation-500);
+}
+.al-user__trigger:hover .al-user__more,
+.al-user__trigger:focus-visible .al-user__more {
+	color: var(--theme-text);
+}
+.al-user__more .icon {
+	width: calc(var(--base) * 0.6);
+	height: calc(var(--base) * 0.6);
 }
 .al-user__popover {
 	display: flex;
@@ -707,4 +745,14 @@ a.al-user__name:hover {
 }
 .al-pagination__info {
 	color: var(--theme-elevation-500);
+}
+
+/* Read by assistive technology, not drawn: names an icon-only control. */
+.al-visually-hidden {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+	clip-path: inset(50%);
+	white-space: nowrap;
 }

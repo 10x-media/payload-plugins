@@ -93,6 +93,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.refPlaceholder]: 'Choisissez ou saisissez un ID',
 	[keys.impersonated]: 'usurpé',
 	[keys.impersonatedBy]: 'Usurpé par',
+	[keys.aboutUser]: 'À propos de cet utilisateur',
 	[keys.deletedUser]: 'Utilisateur supprimé',
 	[keys.toggleDetails]: 'Afficher ou masquer les détails',
 	[keys.sectionSnapshot]: 'Instantané',

@@ -3,12 +3,13 @@
 import { ChevronIcon, ExternalLinkIcon, Link } from '@payloadcms/ui'
 import { useSearchParams } from 'next/navigation'
 import { formatAdminURL } from 'payload/shared'
-import { type ReactNode, useState } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { DiffViewer } from './DiffViewer'
 import { FormattedDate } from './FormattedDate'
-import type { AuditLogDoc } from './types'
+import { AuditLogRowProvider } from './rowContext'
+import type { AuditLogDoc, RenderedRowSlots } from './types'
 import { UserPill } from './UserPill'
 import { apiBadgeClass, apiLabel, GLOBAL_SENTINEL, OPERATION_LABELS, resolveUser } from './utils'
 import { ValueTable } from './ValueTable'
@@ -29,6 +30,8 @@ type Props = {
 	payloadAPILabels: Record<string, string>
 	/** Host renderer for a custom event, replacing the default table and JSON. */
 	renderedEvent?: ReactNode
+	/** Host slots from `view.components`, rendered on the server for this entry. */
+	slots?: RenderedRowSlots
 	/** Tenant names by id, in the all-tenants view only; the tenant view leaves it out. */
 	tenantLabels?: Record<string, string>
 	/** The tenants collection, so the badge can open the tenant. */
@@ -44,12 +47,17 @@ export function LogRow({
 	globalLabels,
 	payloadAPILabels,
 	renderedEvent,
+	slots,
 	tenantLabels,
 	tenantsSlug,
 	userTitleFields,
 }: Props) {
 	const { t } = useTranslation()
 	const [expanded, setExpanded] = useState(false)
+	const rowState = useMemo(
+		() => ({ entry: doc as unknown as Record<string, unknown>, expanded, setExpanded }),
+		[doc, expanded]
+	)
 	const searchParams = useSearchParams()
 	// "Filter by this": the current query plus one value, back on the first page.
 	const filterHref = (key: string, value: string, mode: 'add' | 'set'): string => {
@@ -103,180 +111,194 @@ export function LogRow({
 	const entitySlug = isGlobal ? doc.documentId : doc.relationTo
 
 	return (
-		<div className={`al-row${expanded ? ' al-row--expanded' : ''}`}>
-			{/* A div, not a button: the user pill holds a link and a popup trigger, which a
+		<AuditLogRowProvider value={rowState}>
+			<div className={`al-row${expanded ? ' al-row--expanded' : ''}`}>
+				{/* A div, not a button: the user pill holds a link and a popup trigger, which a
 			    button may not contain. The toggle is stretched over the row underneath them. */}
-			<div className={`al-row__summary${isExpandable ? ' al-row__summary--expandable' : ''}`}>
-				{isExpandable && (
-					<button
-						type="button"
-						className="al-row__hit"
-						aria-expanded={expanded}
-						aria-label={t(keys.toggleDetails)}
-						onClick={() => setExpanded((v) => !v)}
-					/>
-				)}
-				<span
-					aria-hidden
-					className={`al-row__toggle${!isExpandable ? ' al-row__toggle--hidden' : ''}`}
-				>
-					<ChevronIcon direction={expanded ? 'down' : 'right'} className="al-row__toggle-icon" />
-				</span>
-
-				<span className="al-row__op-col">
-					<span className={`al-badge al-badge--op al-badge--${doc.operation}`}>
-						{doc.eventType
-							? (eventTypeLabels[doc.eventType] ?? doc.eventType)
-							: (OPERATION_LABELS[doc.operation] ?? doc.operation)}
+				<div className={`al-row__summary${isExpandable ? ' al-row__summary--expandable' : ''}`}>
+					{isExpandable && (
+						<button
+							type="button"
+							className="al-row__hit"
+							aria-expanded={expanded}
+							aria-label={t(keys.toggleDetails)}
+							onClick={() => setExpanded((v) => !v)}
+						/>
+					)}
+					<span
+						aria-hidden
+						className={`al-row__toggle${!isExpandable ? ' al-row__toggle--hidden' : ''}`}
+					>
+						<ChevronIcon direction={expanded ? 'down' : 'right'} className="al-row__toggle-icon" />
 					</span>
-					{docHref ? (
-						<Link
-							className="al-row__collection al-row__collection--link"
-							href={docHref}
-							rel="noopener"
-							target="_blank"
-							title={`${isGlobal ? t(keys.viewGlobal) : t(keys.viewDocument)}: ${entitySlug}`}
-						>
-							<span className="al-row__collection-name">{entityName}</span>
-							<ExternalLinkIcon />
-						</Link>
-					) : (
-						<span className="al-row__collection" title={entitySlug}>
-							{entityName}
-						</span>
-					)}
-				</span>
 
-				<span className="al-row__user">
-					{user ? (
-						<UserPill adminRoute={adminRoute} impersonator={impersonator} user={user} />
-					) : (
-						<span className="al-row__empty">—</span>
-					)}
-				</span>
-
-				<span className="al-row__badges">
-					{doc.payloadAPI && (
-						<span className={`al-badge al-badge--api ${apiBadgeClass(doc.payloadAPI)}`}>
-							{apiLabel(doc.payloadAPI, payloadAPILabels)}
+					<span className="al-row__op-col">
+						<span className={`al-badge al-badge--op al-badge--${doc.operation}`}>
+							{doc.eventType
+								? (eventTypeLabels[doc.eventType] ?? doc.eventType)
+								: (OPERATION_LABELS[doc.operation] ?? doc.operation)}
 						</span>
-					)}
-					{locale && <span className="al-badge al-badge--locale">{locale}</span>}
-					{tenantHref && tenantId != null && (
-						<span className="al-badge al-badge--tenant">
-							{/* The name narrows the list to the tenant; the arrow opens it, like the
-							    collection link. The text carries the ellipsis a flex box cannot. */}
-							<a
-								className="al-badge__text"
-								href={tenantHref}
-								title={`${t(keys.filterTenant)}: ${tenantLabels?.[String(tenantId)] ?? String(tenantId)}`}
+						{docHref ? (
+							<Link
+								className="al-row__collection al-row__collection--link"
+								href={docHref}
+								rel="noopener"
+								target="_blank"
+								title={`${isGlobal ? t(keys.viewGlobal) : t(keys.viewDocument)}: ${entitySlug}`}
 							>
-								{tenantLabels?.[String(tenantId)] ?? String(tenantId)}
-							</a>
-							{tenantsSlug && (
-								<Link
-									aria-label={t(keys.viewDocument)}
-									className="al-badge__open"
-									href={formatAdminURL({
-										adminRoute,
-										path: `/collections/${tenantsSlug}/${encodeURIComponent(String(tenantId))}`,
-									})}
-									rel="noopener"
-									target="_blank"
-									title={t(keys.viewDocument)}
+								<span className="al-row__collection-name">{entityName}</span>
+								<ExternalLinkIcon />
+							</Link>
+						) : (
+							<span className="al-row__collection" title={entitySlug}>
+								{entityName}
+							</span>
+						)}
+					</span>
+
+					<span className="al-row__user">
+						{user ? (
+							<UserPill
+								adminRoute={adminRoute}
+								impersonator={impersonator}
+								popover={slots?.user}
+								user={user}
+							/>
+						) : (
+							<span className="al-row__empty">—</span>
+						)}
+					</span>
+
+					<span className="al-row__badges">
+						{doc.payloadAPI && (
+							<span className={`al-badge al-badge--api ${apiBadgeClass(doc.payloadAPI)}`}>
+								{apiLabel(doc.payloadAPI, payloadAPILabels)}
+							</span>
+						)}
+						{locale && <span className="al-badge al-badge--locale">{locale}</span>}
+						{tenantHref && tenantId != null && (
+							<span className="al-badge al-badge--tenant">
+								{/* The name narrows the list to the tenant; the arrow opens it, like the
+							    collection link. The text carries the ellipsis a flex box cannot. */}
+								<a
+									className="al-badge__text"
+									href={tenantHref}
+									title={`${t(keys.filterTenant)}: ${tenantLabels?.[String(tenantId)] ?? String(tenantId)}`}
 								>
-									<ExternalLinkIcon />
-								</Link>
-							)}
-						</span>
-					)}
-				</span>
-
-				<span className="al-row__right">
-					{pathCount > 0 && (
-						<span className="al-row__paths-count">
-							{t(pathCount !== 1 ? keys.fieldsChangedPlural : keys.fieldsChanged, {
-								count: pathCount,
-							})}
-						</span>
-					)}
-					<FormattedDate iso={doc.createdAt} />
-				</span>
-			</div>
-
-			<div className="al-row__body">
-				<div className="al-row__detail">
-					<div className="al-row__detail-inner">
-						{(doc.ipAddress || doc.userAgent || locale || groupHref) && (
-							<div className="al-row__meta">
-								{doc.ipAddress && (
-									<span className="al-row__meta-item">
-										<span className="al-row__meta-label">{t(keys.metaIp)}</span>
-										<span>{doc.ipAddress}</span>
-									</span>
-								)}
-								{doc.userAgent && (
-									<span className="al-row__meta-item" title={doc.userAgent}>
-										<span className="al-row__meta-label">{t(keys.metaUa)}</span>
-										<span className="al-row__ua">{doc.userAgent}</span>
-									</span>
-								)}
-								{locale && (
-									<span className="al-row__meta-item">
-										<span className="al-row__meta-label">{t(keys.metaLocale)}</span>
-										<span>{locale}</span>
-									</span>
-								)}
-								{doc.group && groupHref && (
-									<span className="al-row__meta-item">
-										<span className="al-row__meta-label">{t(keys.filterGroup)}</span>
-										<a className="al-row__meta-link" href={groupHref}>
-											{doc.group}
-										</a>
-									</span>
-								)}
-							</div>
-						)}
-
-						{/* A list reads faster than the table's first column; each path also
-						    narrows the view to entries that changed it. */}
-						{doc.changedPaths && doc.changedPaths.length > 0 && (
-							<div className="al-row__changed-paths">
-								{doc.changedPaths.map((p) => (
-									<a
-										className="al-path-tag"
-										href={filterHref('changedPath', p, 'add')}
-										key={p}
-										title={t(keys.filterChangedPath)}
+									{tenantLabels?.[String(tenantId)] ?? String(tenantId)}
+								</a>
+								{tenantsSlug && (
+									<Link
+										aria-label={t(keys.viewDocument)}
+										className="al-badge__open"
+										href={formatAdminURL({
+											adminRoute,
+											path: `/collections/${tenantsSlug}/${encodeURIComponent(String(tenantId))}`,
+										})}
+										rel="noopener"
+										target="_blank"
+										title={t(keys.viewDocument)}
 									>
-										{p}
-									</a>
-								))}
-							</div>
+										<ExternalLinkIcon />
+									</Link>
+								)}
+							</span>
 						)}
+						{slots?.badges != null && <span className="al-row__slot-badges">{slots.badges}</span>}
+					</span>
 
-						{diff && <DiffViewer diff={diff} />}
-
-						{snapshot && (
-							<div className="al-row__section">
-								<div className="al-row__section-label">{t(keys.sectionSnapshot)}</div>
-								<ValueTable value={snapshot} />
-							</div>
+					<span className="al-row__right">
+						{pathCount > 0 && (
+							<span className="al-row__paths-count">
+								{t(pathCount !== 1 ? keys.fieldsChangedPlural : keys.fieldsChanged, {
+									count: pathCount,
+								})}
+							</span>
 						)}
+						<FormattedDate iso={doc.createdAt} />
+					</span>
+				</div>
 
-						{/* Event type, collection and document are already on the row; what is
-						    left is the event's own data. */}
-						{hasEventDetails && (
-							<div className="al-row__section">
-								<div className="al-row__section-label">
-									{doc.operation === 'auth' ? t(keys.sectionAuthEvent) : t(keys.sectionCustomEvent)}
+				<div className="al-row__body">
+					<div className="al-row__detail">
+						<div className="al-row__detail-inner">
+							{slots?.beforeDetails}
+
+							{(doc.ipAddress || doc.userAgent || locale || groupHref) && (
+								<div className="al-row__meta">
+									{doc.ipAddress && (
+										<span className="al-row__meta-item">
+											<span className="al-row__meta-label">{t(keys.metaIp)}</span>
+											<span>{doc.ipAddress}</span>
+										</span>
+									)}
+									{doc.userAgent && (
+										<span className="al-row__meta-item" title={doc.userAgent}>
+											<span className="al-row__meta-label">{t(keys.metaUa)}</span>
+											<span className="al-row__ua">{doc.userAgent}</span>
+										</span>
+									)}
+									{locale && (
+										<span className="al-row__meta-item">
+											<span className="al-row__meta-label">{t(keys.metaLocale)}</span>
+											<span>{locale}</span>
+										</span>
+									)}
+									{doc.group && groupHref && (
+										<span className="al-row__meta-item">
+											<span className="al-row__meta-label">{t(keys.filterGroup)}</span>
+											<a className="al-row__meta-link" href={groupHref}>
+												{doc.group}
+											</a>
+										</span>
+									)}
 								</div>
-								{renderedEvent ?? (metadata && <ValueTable value={metadata} />)}
-							</div>
-						)}
+							)}
+
+							{/* A list reads faster than the table's first column; each path also
+						    narrows the view to entries that changed it. */}
+							{doc.changedPaths && doc.changedPaths.length > 0 && (
+								<div className="al-row__changed-paths">
+									{doc.changedPaths.map((p) => (
+										<a
+											className="al-path-tag"
+											href={filterHref('changedPath', p, 'add')}
+											key={p}
+											title={t(keys.filterChangedPath)}
+										>
+											{p}
+										</a>
+									))}
+								</div>
+							)}
+
+							{diff && <DiffViewer diff={diff} />}
+
+							{snapshot && (
+								<div className="al-row__section">
+									<div className="al-row__section-label">{t(keys.sectionSnapshot)}</div>
+									<ValueTable value={snapshot} />
+								</div>
+							)}
+
+							{/* Event type, collection and document are already on the row; what is
+						    left is the event's own data. */}
+							{hasEventDetails && (
+								<div className="al-row__section">
+									<div className="al-row__section-label">
+										{doc.operation === 'auth'
+											? t(keys.sectionAuthEvent)
+											: t(keys.sectionCustomEvent)}
+									</div>
+									{renderedEvent ?? (metadata && <ValueTable value={metadata} />)}
+								</div>
+							)}
+
+							{slots?.afterDetails}
+						</div>
 					</div>
 				</div>
 			</div>
-		</div>
+		</AuditLogRowProvider>
 	)
 }

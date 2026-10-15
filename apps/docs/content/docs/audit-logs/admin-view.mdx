@@ -33,6 +33,8 @@ A row reads left to right as what happened, to what, by whom, and through what:
 
 Expanding a row shows the request details (IP, user agent, locale, group), the changed paths as links that add them to the Changed field filter, and the diff. A create or delete with a snapshot shows it as the same path and value table, and an auth or custom event its metadata, each with the raw JSON in a collapsible you can copy from. [Custom events](/audit-logs/custom-events#rendering-them-in-the-view) can render their own body instead. A row with none of this does not expand.
 
+To show your own context on rows (badges, a popover on the user, sections in the expanded row) or filter by it, see [Extending](/audit-logs/extending).
+
 ## Filters
 
 The filters sit in one row of pills, each showing its current value. A pill opens its editor in a panel below the row, one at a time, the way the list view opens its columns and filters. Changes are staged and applied together. Filters live in the URL, so any view state is a link you can share or bookmark.

@@ -1,5 +1,6 @@
 import type { PayloadRequest } from 'payload'
 
+import type { AuditLogsCustom } from '../plugin/registerLogsCollection'
 import type { UserRef } from './userRef'
 
 /** The fields the plugin writes onto an `audit-logs` document. */
@@ -23,6 +24,47 @@ export type AuditLogData = {
 }
 
 /**
+ * Every field the plugin owns, whether or not a given entry sets it. `logs.extend` may
+ * add fields but never one of these, so it cannot rewrite who acted or what changed.
+ */
+const BUILT_IN_FIELDS: ReadonlySet<string> = new Set([
+	'archivedAt',
+	'changedPaths',
+	'createdAt',
+	'diff',
+	'documentId',
+	'eventType',
+	'group',
+	'id',
+	'impersonator',
+	'ipAddress',
+	'locale',
+	'metadata',
+	'operation',
+	'payloadAPI',
+	'relationTo',
+	'snapshot',
+	'tenant',
+	'updatedAt',
+	'user',
+	'userAgent',
+] satisfies (keyof AuditLogData | 'archivedAt' | 'createdAt' | 'id' | 'updatedAt')[])
+
+/** `data` plus whatever `logs.extend` adds, built-in keys excepted. */
+const extendData = async (data: AuditLogData, req: PayloadRequest): Promise<AuditLogData> => {
+	const custom = req.payload.collections['audit-logs']?.config.custom?.auditLogs as
+		| AuditLogsCustom
+		| undefined
+	if (!custom?.extend) return data
+	const extra = await custom.extend({ data, req })
+	if (!extra) return data
+	const added = Object.fromEntries(
+		Object.entries(extra).filter(([key]) => !BUILT_IN_FIELDS.has(key))
+	)
+	return { ...added, ...data }
+}
+
+/**
  * Writes one entry, always threading `req` so the write joins the transaction of the
  * operation that triggered it. Without it Postgres takes a second connection and waits
  * on a lock the caller holds.
@@ -31,7 +73,7 @@ export type AuditLogData = {
  * validate, since the plugin assembles the data itself, and access is overridden anyway.
  * It is only safe while the log collection carries no hooks, which is why the caller
  * decides. The adapters still shape the data, default the timestamps, and fill the side
- * tables Postgres keeps for `changedPaths` and the user relationship.
+ * tables Postgres keeps for `changedPaths` and any hasMany field `logs.extend` fills.
  *
  * The cast is unavoidable: the plugin cannot name the host's generated `AuditLog` type.
  */
@@ -45,10 +87,12 @@ export const writeAuditLog = async ({
 	fastWrite: boolean
 	req: PayloadRequest
 }): Promise<void> => {
+	const finalData = await extendData(data, req)
+
 	if (fastWrite) {
 		await req.payload.db.create({
 			collection: 'audit-logs',
-			data: data as never,
+			data: finalData as never,
 			req,
 			returning: false,
 		})
@@ -57,7 +101,7 @@ export const writeAuditLog = async ({
 
 	await req.payload.create({
 		collection: 'audit-logs',
-		data: data as never,
+		data: finalData as never,
 		overrideAccess: true,
 		req,
 	})

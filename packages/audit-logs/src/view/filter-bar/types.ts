@@ -1,4 +1,4 @@
-import type { Filters, SelectOption } from '../types'
+import type { CustomFilterOption, Filters, SelectOption } from '../types'
 
 export type { SelectOption }
 
@@ -7,6 +7,8 @@ export type FilterBarProps = {
 	collectionOptions: SelectOption[]
 	/** Custom event types offered under Event. */
 	customEventTypes: SelectOption[]
+	/** Declared `view.filters`, offered under More filters. */
+	customFilters: CustomFilterOption[]
 	/** Label per event type, auth and custom, for the Event pill and its list. */
 	eventTypeLabels: Record<string, string>
 	filters: Filters

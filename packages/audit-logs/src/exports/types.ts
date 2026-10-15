@@ -18,12 +18,19 @@ export type { AuditLogsPluginOptions, PluginOptions } from '../index'
 /** Callbacks the host implements. */
 /** Hooks into the archive and delete jobs. */
 /** Retention, multi tenancy, and the marker `anonymize` returns. */
+/** View slots, filters and the entry extension, with the props each receives. */
 export type {
 	AnonymizeFunction,
 	ArchiveJobHooks,
 	AuditFieldDefaultOptions,
 	AuditFieldOptions,
 	AuditFieldsCreateOptions,
+	AuditLogRowState,
+	AuditLogsListSlotProps,
+	AuditLogsRowSlotProps,
+	AuditLogsSlotServerProps,
+	AuditLogsViewContext,
+	AuditLogUser,
 	AuditOptions,
 	AuditPluginConfig,
 	AuthEventsOptions,
@@ -33,13 +40,18 @@ export type {
 	DataRetentionConfig,
 	DeleteJobHooks,
 	EventTypeOption,
+	ExtendEntryFunction,
+	FilterHrefFunction,
 	GlobalAuditLogConfig,
 	GlobalAuditOptions,
+	LoadViewContextFunction,
 	MultiTenancyConfig,
 	OverrideFunction,
 	PayloadAPIOption,
 	PayloadAPIOptionObject,
 	RedactedValue,
+	RelationshipViewFilter,
 	ShouldLogFunction,
 	ViewAccess,
+	ViewFilter,
 } from '../types'

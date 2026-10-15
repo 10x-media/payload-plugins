@@ -13,6 +13,9 @@ import { ImpersonationProvider as ImpersonationProvider_59e9dfcbfaee95b3a2ecff56
 import { AuditLogsView as AuditLogsView_d109efa364f92f646cad8031879d6db3 } from '@10x-media/audit-logs/rsc'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 import { RefundEvent as RefundEvent_c5043e5dbb4333de30960340700b913f } from '../../../components/RefundEvent'
+import { RowStateNote as RowStateNote_60e8aa1b793c0e3f84013ce5ea2b1df1 } from '../../../components/audit/RowStateNote'
+import { DepartmentBadges as DepartmentBadges_085a9d145775eca9d68c4c1ff02e6c68 } from '../../../components/audit/DepartmentBadges'
+import { ActorPopover as ActorPopover_bd5bee2e8b2002fa530dbf920f5fce35 } from '../../../components/audit/ActorPopover'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -30,5 +33,8 @@ export const importMap = {
   "@10x-media/impersonation/rsc#ImpersonationProvider": ImpersonationProvider_59e9dfcbfaee95b3a2ecff56d5d216e8,
   "@10x-media/audit-logs/rsc#AuditLogsView": AuditLogsView_d109efa364f92f646cad8031879d6db3,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
-  "/components/RefundEvent#RefundEvent": RefundEvent_c5043e5dbb4333de30960340700b913f
+  "/components/RefundEvent#RefundEvent": RefundEvent_c5043e5dbb4333de30960340700b913f,
+  "/components/audit/RowStateNote#RowStateNote": RowStateNote_60e8aa1b793c0e3f84013ce5ea2b1df1,
+  "/components/audit/DepartmentBadges#DepartmentBadges": DepartmentBadges_085a9d145775eca9d68c4c1ff02e6c68,
+  "/components/audit/ActorPopover#ActorPopover": ActorPopover_bd5bee2e8b2002fa530dbf920f5fce35
 }
