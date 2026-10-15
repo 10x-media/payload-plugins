@@ -340,15 +340,24 @@ export type ViewFilter = RelationshipViewFilter
  * Keep it cheap: it runs inside the audited operation's transaction, once per entry.
  *
  * @example
- * // The departments the acting user belonged to at the time
- * extend: ({ req }) =>
- *   req.user?.collection === 'users'
+ * // The departments the acting user belonged to at the time. Checked against
+ * // `data.user`: a refused login has `req.user` but no `user` on the entry, and
+ * // `createAuditEvent` may name someone else.
+ * extend: ({ data, req }) =>
+ *   data.user?.relationTo === 'users' && data.user.value === String(req.user?.id)
  *     ? { actorDepartments: (req.user.departments ?? []).map(String) }
  *     : undefined
  */
 export type ExtendEntryFunction = (args: {
-	/** The entry as the plugin built it. Read only. */
-	data: Readonly<Record<string, unknown>>
+	/**
+	 * The entry as the plugin built it. Read only. `user` is who the entry is attributed
+	 * to, absent for a refused login or a write with nobody signed in.
+	 */
+	data: Readonly<{
+		operation: 'auth' | 'create' | 'custom' | 'delete' | 'update'
+		user?: { relationTo: string; value: string }
+		[key: string]: unknown
+	}>
 	req: PayloadRequest
 }) => Record<string, unknown> | undefined | Promise<Record<string, unknown> | undefined>
 
@@ -772,7 +781,10 @@ export type AuditPluginConfig = {
 		 * attached there, this keeps entries on the direct database write.
 		 *
 		 * @example
-		 * extend: ({ req }) => ({ actorDepartments: req.user?.departments?.map(String) })
+		 * extend: ({ data, req }) =>
+		 *   data.user?.value === String(req.user?.id)
+		 *     ? { actorDepartments: req.user?.departments?.map(String) }
+		 *     : undefined
 		 */
 		extend?: ExtendEntryFunction
 		/**

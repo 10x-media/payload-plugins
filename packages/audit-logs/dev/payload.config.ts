@@ -131,7 +131,13 @@ export default buildConfig({
 					],
 					indexes: [...(collection.indexes ?? []), { fields: ['actorDepartments', 'createdAt'] }],
 				}),
-				extend: ({ req }) => {
+				// Only for the user the entry is attributed to. A refused login sent from a
+				// signed-in browser has a `req.user` but no `user` on the entry, and
+				// `createAuditEvent` may name someone other than `req.user`.
+				extend: ({ data, req }) => {
+					if (data.user?.relationTo !== 'users' || data.user.value !== String(req.user?.id)) {
+						return undefined
+					}
 					const value = (req.user as { departments?: unknown } | null)?.departments
 					if (!Array.isArray(value) || value.length === 0) return undefined
 					return {

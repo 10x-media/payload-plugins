@@ -31,15 +31,15 @@ auditLogs({
         { fields: ['actorDepartments', 'createdAt'] },
       ],
     }),
-    extend: ({ req }) =>
-      req.user?.collection === 'users'
+    extend: ({ data, req }) =>
+      data.user?.relationTo === 'users' && data.user.value === String(req.user?.id)
         ? { actorDepartments: (req.user.departments ?? []).map(String) }
         : undefined,
   },
 })
 ```
 
-`extend` runs for every entry, CRUD, auth and custom alike, and receives the entry as the plugin built it in `data`. What it returns is merged in; a key the plugin sets itself is ignored, so it cannot rewrite `user`, `diff` or the like. A refused login has no `req.user`, so return `undefined` there. An error it throws fails the write, and with it the audited operation, the same as a failing `shouldLog`.
+`extend` runs for every entry, CRUD, auth and custom alike, and receives the entry as the plugin built it in `data`. What it returns is merged in; a key the plugin sets itself is ignored, so it cannot rewrite `user`, `diff` or the like. Check `data.user` before reading `req.user`: they are not always the same person. A refused login sent from a signed-in browser is written with no `user` while `req.user` is whoever is signed in, and `createAuditEvent` can name a user other than `req.user`. Context taken from `req.user` belongs on the entry only when it is the user the entry names. An error it throws fails the write, and with it the audited operation, the same as a failing `shouldLog`.
 
 Prefer text over a relationship for anything that points at a document. A relationship's foreign key is cleared when the target is deleted on Postgres and SQLite, which is why the plugin stores `user` as text too. Store ids, and names as well if the view should still read well once the documents are gone.
 
