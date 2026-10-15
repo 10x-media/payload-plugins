@@ -2,7 +2,9 @@ import {
 	connectionFieldAccess,
 	PROVIDERS_SLUG,
 	type ProviderCollectionFieldOverrides,
+	servedProviderTypes,
 } from '../providers/collection'
+import { PROVIDER_IDS, type ProviderId } from '../providers/factory'
 import { resolveHostPolicy } from '../providers/hosts'
 import { resolveScopedCollection } from './collectionOption'
 import { keysOf, optionalFunction, optionalList, optionsObject } from './optionChecks'
@@ -18,12 +20,15 @@ const PROVIDERS_COLLECTION_KEYS = keysOf<ProvidersCollectionOptions>({
 	access: true,
 	encryption: true,
 	connectionAccess: true,
+	defaultAccess: true,
+	types: true,
 	sourceAccess: true,
 })
 const PROVIDER_FIELD_KEYS = keysOf<ProviderCollectionFieldOverrides>({
 	name: true,
 	provider: true,
 	enabled: true,
+	isDefault: true,
 })
 const ENCRYPTION_KEYS = keysOf<NonNullable<ProvidersCollectionOptions['encryption']>>({
 	keys: true,
@@ -96,9 +101,14 @@ const assertEncryption = (value: unknown): void => {
 	}
 }
 
+/** A `native` document lends the config native(), so the type is served only beside one. */
+const availableTypes = (adapters: readonly { id: string }[]): ProviderId[] =>
+	PROVIDER_IDS.filter((type) => type !== 'native' || adapters.some((a) => a.id === 'native'))
+
 /** `providers.collection` turned on, with what only that collection takes. */
 const resolveProvidersCollection = (
-	option: ProvidersOptions['collection']
+	option: ProvidersOptions['collection'],
+	available: readonly ProviderId[]
 ): ResolvedOptions['providers']['collection'] => {
 	const collection = resolveScopedCollection(option, {
 		path: 'providers.collection',
@@ -108,25 +118,32 @@ const resolveProvidersCollection = (
 		exampleSlug: 'providers',
 	})
 	if (option === undefined || typeof option === 'boolean') {
-		return collection
+		return { ...collection, types: available }
 	}
 	assertEncryption(option.encryption)
 	const connectionAccess = connectionFieldAccess(
 		'providers.collection.connectionAccess',
 		option.connectionAccess
 	)
+	const defaultAccess = connectionFieldAccess(
+		'providers.collection.defaultAccess',
+		option.defaultAccess
+	)
 	const sourceAccess = optionalFunction(option.sourceAccess, 'providers.collection.sourceAccess')
 	return {
 		...collection,
+		types: servedProviderTypes('providers.collection.types', option.types, available),
 		...(option.encryption ? { encryption: option.encryption } : {}),
 		...(connectionAccess ? { connectionAccess } : {}),
+		...(defaultAccess ? { defaultAccess } : {}),
 		...(sourceAccess ? { sourceAccess } : {}),
 	}
 }
 
 /** `providers`: the collection or `resolve` (never both), and the hosts either may reach. */
 export const resolveProviders = (
-	option: ProvidersOptions | undefined
+	option: ProvidersOptions | undefined,
+	adapters: readonly { id: string }[]
 ): ResolvedOptions['providers'] => {
 	if (option !== undefined) {
 		optionsObject(option, {
@@ -136,7 +153,7 @@ export const resolveProviders = (
 		})
 	}
 	const resolve = optionalFunction(option?.resolve, 'providers.resolve')
-	const collection = resolveProvidersCollection(option?.collection)
+	const collection = resolveProvidersCollection(option?.collection, availableTypes(adapters))
 	if (resolve && collection.enabled) {
 		throw new Error(
 			"analytics: providers.resolve and providers.collection cannot both be set. resolve replaces the collection lookup, so the adapters it returns would be filtered by provider document ids no reader holds, and the collection's sourceAccess and connectionAccess would do nothing. Keep one of them."

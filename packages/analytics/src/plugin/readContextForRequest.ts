@@ -7,8 +7,9 @@ import type { AdapterRegistry } from '../core/registry'
 import {
 	needsUnscopedSourceAccess,
 	resolveRequestedScope,
-	visibleRegistryFor,
+	visibleSourcesFor,
 } from '../core/scopedRead'
+import { sourceRefFor } from '../core/sourceLabel'
 import type { QuerySourceRef } from '../query/response'
 import {
 	type AnalyticsRuntime,
@@ -24,10 +25,17 @@ export interface RequestSource extends QuerySourceRef {
 	capabilities: SerializedCapabilities
 }
 
+/**
+ * What a listing tells its reader about itself: `platformFallback` when a shared source is listed
+ * only because the scope has no source of its own yet (`sources.<id>.tenants: 'fallback'`).
+ */
+export type SourcesNotice = 'platformFallback'
+
 interface RequestSources {
 	/** Wire rows for the resolved scope, in registry order; empty when none resolve. */
 	sources: RequestSource[]
 	defaultId: string | null
+	notice?: SourcesNotice
 	/** The adapters behind `sources`, for callers that read through them. */
 	adapters: ReadonlyMap<string, AnalyticsAdapter>
 	/** Scope the sources were resolved for; null is install-wide, `*` is cross-scope. */
@@ -51,20 +59,21 @@ const empty = (): RequestSources => ({
 	scope: null,
 })
 
-const fromRegistry = (args: {
+const fromRegistry = async (args: {
 	runtime: AnalyticsRuntime
+	req: PayloadRequest
 	registry: AdapterRegistry
 	scope: string | null
-}): RequestSources => {
-	const { runtime, registry, scope } = args
+}): Promise<RequestSources> => {
+	const { runtime, req, registry, scope } = args
 	const adapters = registry.all()
 	return {
-		sources: adapters.map((adapter) => ({
-			id: adapter.id,
-			label: adapter.label,
-			kind: runtime.configAdapterIds.has(adapter.id) ? ('config' as const) : ('runtime' as const),
-			capabilities: serializeCapabilities(adapter.capabilities),
-		})),
+		sources: await Promise.all(
+			adapters.map(async (adapter) => ({
+				...(await sourceRefFor(adapter, { req, scope, configIds: runtime.configAdapterIds })),
+				capabilities: serializeCapabilities(adapter.capabilities),
+			}))
+		),
 		defaultId: registry.default().id,
 		adapters: new Map(adapters.map((adapter) => [adapter.id, adapter])),
 		scope,
@@ -120,8 +129,10 @@ export const resolveSourcesForRequest = async (
 		return empty()
 	}
 	const gates = args.gates ?? scopeGates(runtime, req)
-	const degrade = (): RequestSources =>
-		runtime.scoped ? empty() : fromRegistry({ runtime, registry: runtime.registry, scope: null })
+	const degrade = async (): Promise<RequestSources> =>
+		runtime.scoped
+			? empty()
+			: fromRegistry({ runtime, req, registry: runtime.registry, scope: null })
 	try {
 		let scope: string | null
 		if (args.scope !== undefined) {
@@ -141,10 +152,20 @@ export const resolveSourcesForRequest = async (
 			req,
 			scope: resolvableScope(scope),
 		})
-		const registry = await visibleRegistryFor({ runtime, req, resolved, scope, gates })
-		return registry
-			? narrowToScope(runtime, fromRegistry({ runtime, registry, scope }))
-			: { ...empty(), scope }
+		const { registry, fallbackAdmitted } = await visibleSourcesFor({
+			runtime,
+			req,
+			resolved,
+			scope,
+			gates,
+		})
+		if (!registry) {
+			return { ...empty(), scope }
+		}
+		const listed = narrowToScope(runtime, await fromRegistry({ runtime, req, registry, scope }))
+		return listed.sources.some((source) => fallbackAdmitted.has(source.id))
+			? { ...listed, notice: 'platformFallback' }
+			: listed
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: source resolution failed: ${String(err)}`)
 		return degrade()

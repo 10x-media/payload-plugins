@@ -436,9 +436,22 @@ export interface AdapterSchemaContext {
 	notice?: (message: string) => void
 }
 
+/** Whom a source's label is read for: the request, and the scope its sources were listed for. */
+export interface AdapterLabelArgs {
+	req: PayloadRequest
+	/** Null is install-wide, `*` is cross-scope. */
+	scope: string | null
+}
+
 export interface AnalyticsAdapter {
 	readonly id: string
+	/** The source's name wherever no reader is known (boot-time pickers, logs). */
 	readonly label: string
+	/**
+	 * The source's name for one reader, where it differs by language or by who reads. Read through
+	 * `sourceLabelFor`, which falls back to `label` when this fails.
+	 */
+	readonly labelFor?: (args: AdapterLabelArgs) => string | Promise<string>
 	readonly capabilities: AnalyticsCapabilities
 	/** Browser-tracker proxying/boot descriptor. Absent when no public capture field is set. */
 	readonly capture?: CaptureSupport

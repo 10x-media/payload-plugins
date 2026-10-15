@@ -44,11 +44,16 @@ interface CollectionCallbacks {
 	) => (change: ScopeChange, req: PayloadRequest) => void
 }
 
-/** Who may write a provider's connection fields, when anything narrows the field's own access. */
-const connectionAccessOf = (resolved: ResolvedOptions): ConnectionFieldAccess | undefined => {
-	const own = resolved.providers.collection.connectionAccess
-	// A new document has no stored key to redirect, so only a host's own `connectionAccess`
-	// gates create; an update on a scoped install takes the named cross-scope gate.
+/**
+ * Who may write a guarded provider field (the connection fields, `isDefault`), when anything
+ * narrows the field's own access.
+ */
+const guardedFieldAccessOf = (
+	resolved: ResolvedOptions,
+	own: ConnectionFieldAccess | undefined
+): ConnectionFieldAccess | undefined => {
+	// A new document has no stored key to redirect, so only a host's own option gates create; an
+	// update on a scoped install takes the named cross-scope gate.
 	const update = own?.update ?? (resolved.scoped ? resolved.access.crossScope.named : undefined)
 	const create = own?.create
 	return create || update
@@ -71,7 +76,11 @@ const providersCollectionOf = async (
 			...(source.type === 'text' ? { hint: { suffix: 4 } } : {}),
 			...(keys ? { keys } : {}),
 		})
-	const connectionAccess = connectionAccessOf(resolved)
+	const connectionAccess = guardedFieldAccessOf(resolved, providers.connectionAccess)
+	const defaultAccess = guardedFieldAccessOf(
+		resolved,
+		providers.defaultAccess ?? providers.connectionAccess
+	)
 	const built = buildProvidersCollection({
 		slug: providers.slug,
 		access: providers.access,
@@ -87,7 +96,10 @@ const providersCollectionOf = async (
 		isSealed,
 		allowPrivateNetwork: resolved.providers.hosts.allowPrivateNetwork,
 		...(connectionAccess ? { connectionAccess } : {}),
+		...(defaultAccess ? { defaultAccess } : {}),
+		types: providers.types,
 		staticLabel: context.staticLabel,
+		listNotice: [...resolved.sources.policies.values()].includes('fallback'),
 	})
 	const checked = checkEditorCollection(built, {
 		role: 'providers',

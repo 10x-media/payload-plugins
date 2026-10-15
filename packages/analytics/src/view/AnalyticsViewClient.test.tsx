@@ -268,6 +268,18 @@ describe('AnalyticsViewClient', () => {
 		expect(screen.queryByText(keys.viewNoSources)).toBeNull()
 	})
 
+	it("says a tenant is reading the platform's source until it adds its own", async () => {
+		const listing = props().sources
+		await renderView({ sources: { ...listing, notice: 'platformFallback' } })
+		expect(screen.getByText(keys.sourcesPlatformFallback)).toBeDefined()
+		expect(screen.getByText('1,234')).toBeDefined()
+	})
+
+	it('says nothing about the source for a listing that carries no notice', async () => {
+		await renderView()
+		expect(screen.queryByText(keys.sourcesPlatformFallback)).toBeNull()
+	})
+
 	// A click is a step on the client alone: the router would re-run Payload's whole admin page.
 	it('pushes the charted metric to the history when a card is clicked, not through the router', async () => {
 		await renderView()

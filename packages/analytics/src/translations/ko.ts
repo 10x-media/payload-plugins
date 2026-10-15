@@ -141,6 +141,13 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerErrorHostFormat]:
 		'주소만 입력하세요. 예: https://analytics.example.com 또는 https://example.com/analytics. ? 또는 #로 시작하는 부분과 사용자 이름, 비밀번호는 넣지 마세요.',
 	[keys.providerErrorHostInsecure]: '주소는 https://로 시작해야 합니다.',
+	[keys.providerFieldIsDefault]: '이 사이트의 기본값',
+	[keys.providerFieldIsDefaultHelp]:
+		'독자가 다른 도구를 고르지 않으면 분석이 이 도구로 열립니다. 사이트마다 기본 도구는 하나만 둘 수 있습니다.',
+	[keys.providerErrorDefaultTaken]:
+		'다른 분석 도구가 이미 이 사이트의 기본값입니다. 먼저 그쪽에서 선택을 해제하세요.',
+	[keys.providerErrorTypeUnserved]:
+		'이 웹사이트는 이 분석 도구를 사용할 수 없습니다. 다른 도구를 선택하세요.',
 	[keys.providerNameNative]: 'Payload',
 	[keys.providerNameNativeHelp]:
 		'방문 수를 이 웹사이트의 자체 Payload 데이터베이스에 저장합니다. 외부 서비스는 사용하지 않습니다.',
@@ -393,6 +400,10 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.panelNewItem]: '누군가 이 항목을 보면 여기에 수치가 표시됩니다.',
 	[keys.panelNoVisits]: '이 날짜 범위에는 방문이 없습니다.',
 	[keys.panelNoViews]: '이 날짜 범위에는 노출이 없습니다.',
+	[keys.sourcesPlatformFallback]:
+		'이 사이트가 자체 분석 도구를 추가하기 전까지는 플랫폼의 분석 도구에서 가져온 수치입니다. 도구를 추가하면 그 도구로 전환됩니다.',
+	[keys.stateSourceSubstituted]:
+		'저장된 데이터 소스를 더 이상 사용할 수 없어 기본 데이터 소스를 표시합니다.',
 	[pluralKeys.liveVisitors.other]: '현재 활성 방문자 {{count}}명',
 	[pluralKeys.livePageviews.other]: '최근 {{duration}} 동안 페이지뷰 {{count}}회',
 }

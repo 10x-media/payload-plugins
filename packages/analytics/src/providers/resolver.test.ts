@@ -15,6 +15,26 @@ describe('combineRegistries', () => {
 		expect(registry.all()).toEqual([a])
 	})
 
+	it('names the first flagged document’s adapter the default grant, a duplicate id included', () => {
+		const native = stub('native')
+		const a = stub('posthog:a')
+		const flagged = (adapter: AnalyticsAdapter, docId: string) => ({
+			...doc(adapter, docId),
+			isDefault: true,
+		})
+		expect(combineRegistries({ adapters: [native] }, [doc(a)]).defaultGrant).toBeUndefined()
+		expect(
+			combineRegistries({ adapters: [native] }, [doc(a), flagged(a, 'doc-b')]).defaultGrant
+		).toBe('posthog:a')
+		const second = combineRegistries({ adapters: [native] }, [
+			doc(native, 'n1'),
+			flagged(native, 'n2'),
+			flagged(a, 'doc-a'),
+		])
+		expect(second.defaultGrant).toBe('native')
+		expect(second.grants.get('native')).toBe('n1')
+	})
+
 	it('appends runtime adapters after the base', () => {
 		const base = stub('memory')
 		const instance = stub('posthog:doc1')

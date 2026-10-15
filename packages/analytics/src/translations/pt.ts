@@ -147,6 +147,13 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Digite apenas o endereço, por exemplo https://analytics.example.com ou https://example.com/analytics, sem nenhuma parte que comece com ? ou # e sem nome de usuário ou senha.',
 	[keys.providerErrorHostInsecure]: 'O endereço deve começar com https://.',
+	[keys.providerFieldIsDefault]: 'Padrão para este site',
+	[keys.providerFieldIsDefaultHelp]:
+		'As estatísticas abrem nesta ferramenta, a menos que o leitor escolha outra. Só uma ferramenta por site pode ser a padrão.',
+	[keys.providerErrorDefaultTaken]:
+		'Outra ferramenta de análise já é a padrão para este site. Desmarque-a lá primeiro.',
+	[keys.providerErrorTypeUnserved]:
+		'Este site não pode usar esta ferramenta de análise. Escolha outra.',
 	[keys.providerNameNative]: 'Payload',
 	[keys.providerNameNativeHelp]:
 		'Salva a contagem de visitas no banco de dados Payload do próprio site. Nenhum serviço externo é envolvido.',
@@ -403,6 +410,10 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.panelNewItem]: 'Os números vão aparecer aqui assim que alguém vir este item.',
 	[keys.panelNoVisits]: 'Nenhuma visita neste intervalo de datas.',
 	[keys.panelNoViews]: 'Nenhuma visualização neste intervalo de datas.',
+	[keys.sourcesPlatformFallback]:
+		'Estes números vêm da ferramenta de análises da plataforma até que este site adicione a sua. Ao adicionar uma, ela passa a ser usada.',
+	[keys.stateSourceSubstituted]:
+		'A fonte de dados salva não está mais disponível, então a fonte padrão é exibida.',
 	[pluralKeys.liveVisitors.one]: '{{count}} visitante ativo agora',
 	[pluralKeys.liveVisitors.many]: '{{count}} visitantes ativos agora',
 	[pluralKeys.liveVisitors.other]: '{{count}} visitantes ativos agora',

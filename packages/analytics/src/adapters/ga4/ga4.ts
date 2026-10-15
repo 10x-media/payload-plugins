@@ -17,6 +17,7 @@ import {
 } from '../../core/contract'
 import { vendorReading } from '../../core/metricValues'
 import type { Ga4Client, Ga4ReportResponse, Ga4ReportRow, Ga4Sdk } from '../../core/sdks'
+import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
 import { CURRENCY_PATTERN, currencyOption } from '../../goals/currency'
 import { GA4_SDK_WARNING, isProductionBuild, loadGa4 } from '../../plugin/peers'
 import {
@@ -45,6 +46,11 @@ import { ga4EventName } from './eventName'
 import { MEASUREMENT_ID_PATTERN } from './measurementId'
 
 export interface Ga4Config {
+	/**
+	 * The source's name in pickers and listings: a string, a map by admin language (read like
+	 * `view.navLabel`), or a function naming it per reader and scope. Default `'Google Analytics 4'`.
+	 */
+	label?: AdapterLabelOption
 	/** GA4 property id (numeric), e.g. '123456789'. */
 	propertyId: string
 	/** Service-account credentials. */
@@ -383,7 +389,7 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 	const measurementId = config.measurementId
 	return {
 		id: 'ga4',
-		label: 'Google Analytics 4',
+		...adapterLabel(config.label, 'Google Analytics 4', 'ga4({ label })'),
 		capabilities,
 		// An id that is not a bare token is dropped rather than escaped: it lands in an inline
 		// script and in the tag URL, and no legitimate measurement id needs anything else.

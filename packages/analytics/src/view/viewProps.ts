@@ -152,7 +152,7 @@ const resolveScopes = async (args: {
 	return {
 		current,
 		own,
-		canAggregate: await gates.aggregate(),
+		canAggregate: await gates.aggregate({ scope: PLATFORM_SCOPE }),
 		...(ownLabel === undefined ? {} : { ownLabel }),
 	}
 }
@@ -287,7 +287,11 @@ export const resolveViewProps = async (
 		denied: false,
 		props: {
 			...base,
-			sources: { defaultId: sources.defaultId, sources: sources.sources },
+			sources: {
+				defaultId: sources.defaultId,
+				sources: sources.sources,
+				...(sources.notice ? { notice: sources.notice } : {}),
+			},
 			goals,
 			timezone,
 			scopeKey,

@@ -29,7 +29,7 @@ export {
 	FilterValueField,
 	type FilterValueFieldProps,
 } from '../fields/config/FilterValueField'
-export type { SourcesResponse, WireSource } from '../fields/config/fetchSources'
+export type { SourcesNotice, SourcesResponse, WireSource } from '../fields/config/fetchSources'
 export type { MetricSelectFieldProps } from '../fields/config/MetricSelectField'
 export {
 	FilterDimensionSelectField,
@@ -69,6 +69,7 @@ export {
 	type RoutesConfigSource,
 	routePaths,
 } from '../plugin/routes'
+export { ProvidersListNotice } from '../providers/ProvidersListNotice'
 export {
 	buildQueryUrl,
 	type FetchQueryInit,

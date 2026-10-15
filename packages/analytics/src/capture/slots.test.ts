@@ -121,6 +121,20 @@ describe('resolveSlotAdapter - tenant', () => {
 		expect((await resolveSlotAdapter(runtime, reqWith(), 'tenant'))?.id).toBe('plausible:1')
 	})
 
+	it("follows the scope's document flagged the default over the registry's", async () => {
+		const scoped = createRegistry([capturing('plausible:1'), capturing('plausible:2')])
+		const runtime = runtimeWith({
+			scoped: true,
+			resolveScope: async () => 'tenant-a',
+			resolveRegistry: async () => ({
+				registry: scoped,
+				grants: new Map(),
+				defaultGrant: 'plausible:2',
+			}),
+		})
+		expect((await resolveSlotAdapter(runtime, reqWith(), 'tenant'))?.id).toBe('plausible:2')
+	})
+
 	it('resolves nothing when no source of the scope can capture', async () => {
 		const runtime = runtimeWith({
 			scoped: true,

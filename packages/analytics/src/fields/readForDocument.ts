@@ -33,7 +33,12 @@ import { readFailureOf } from '../surfacing/classifyError'
 import { PEEK_BUDGET_MS, type ReadOptions } from '../surfacing/engine'
 import { resolveTimeframe, type TimeframePreset } from '../timeframe/presets'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
-import { comparisonWindow } from '../widgets/prepareWidgetRead'
+import {
+	comparisonWindow,
+	type StoredSourceRead,
+	type SubstitutedSource,
+	substitutionOf,
+} from '../widgets/prepareWidgetRead'
 import { mergeNotices, type ReadNotices, readMeta } from '../widgets/readMeta'
 import { scopeFromDocument } from './documentScope'
 import { ITEM_READ_METRICS } from './itemReport'
@@ -75,7 +80,7 @@ export interface FieldBreakdown extends Partial<ReadNotices> {
 	provider?: string
 }
 
-export interface FieldReadResult {
+export interface FieldReadResult extends SubstitutedSource {
 	status: FieldReadStatus
 	/** How long until a `busy` read can succeed, when the source or the plugin knows. */
 	retryAfterMs?: number
@@ -121,40 +126,41 @@ export interface FieldReadResult {
  * Without `scope` the read takes the document's scope (binding `scopeField`) else the request's,
  * gated as endpoints gate it; a given `scope` is already cleared, or a job's under `SYSTEM`.
  */
-export type ReadForFieldArgs = ReadPrincipal & {
-	req: PayloadRequest
-	collectionSlug: string
-	data: BindingDoc
-	metrics: MetricKey[]
-	timeframe: TimeframePreset
-	/** Overrides the preset window (custom range). */
-	range?: DateRange
-	adapterId?: string
-	now: Date
-	/**
-	 * Reporting timezone the caller already resolved, reused rather than resolved again so
-	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
-	 */
-	timezone?: string
-	/** Also read the previous comparable window when the adapter supports comparison. */
-	compare?: boolean
-	/** Also read a series for the first supported metric, bucketed to suit the window. */
-	series?: boolean
-	/**
-	 * Metrics the caller added speculatively rather than asked for, so a source that serves none
-	 * of them is not worth a warning on every render.
-	 */
-	optionalMetrics?: MetricKey[]
-	/** Rank these dimensions for the document's own page; each one the source cannot is skipped. */
-	dimensions?: DimensionKey[]
-	/** Rows per breakdown. Default 5. */
-	limit?: number
-	/**
-	 * `item` reads the document as content shown on other pages: its views, clicks and outcomes,
-	 * wherever it appeared. Absent, or `page`, reads the document's own page.
-	 */
-	report?: ReportMode
-}
+export type ReadForFieldArgs = ReadPrincipal &
+	StoredSourceRead & {
+		req: PayloadRequest
+		collectionSlug: string
+		data: BindingDoc
+		metrics: MetricKey[]
+		timeframe: TimeframePreset
+		/** Overrides the preset window (custom range). */
+		range?: DateRange
+		adapterId?: string
+		now: Date
+		/**
+		 * Reporting timezone the caller already resolved, reused rather than resolved again so
+		 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+		 */
+		timezone?: string
+		/** Also read the previous comparable window when the adapter supports comparison. */
+		compare?: boolean
+		/** Also read a series for the first supported metric, bucketed to suit the window. */
+		series?: boolean
+		/**
+		 * Metrics the caller added speculatively rather than asked for, so a source that serves none
+		 * of them is not worth a warning on every render.
+		 */
+		optionalMetrics?: MetricKey[]
+		/** Rank these dimensions for the document's own page; each one the source cannot is skipped. */
+		dimensions?: DimensionKey[]
+		/** Rows per breakdown. Default 5. */
+		limit?: number
+		/**
+		 * `item` reads the document as content shown on other pages: its views, clicks and outcomes,
+		 * wherever it appeared. Absent, or `page`, reads the document's own page.
+		 */
+		report?: ReportMode
+	}
 
 /** Rows per breakdown block: a card-sized list, not a table. */
 const DEFAULT_BREAKDOWN_LIMIT = 5
@@ -326,6 +332,7 @@ export const readFieldWith = async (
 		req,
 		adapterId,
 		...principal,
+		...(args.fallbackWhenUnreadable ? { fallbackWhenUnreadable: true } : {}),
 		// An item read goes through a source that can answer one, wherever the scope has one.
 		...(args.report === 'item'
 			? { prefer: (candidate: AnalyticsAdapter) => candidate.capabilities.perItemQuery === true }
@@ -350,7 +357,8 @@ export const readFieldWith = async (
 		dateRange: range ?? resolveTimeframe(timeframe, now, tz),
 		bindingCtx: { req, locale: req.locale ?? undefined },
 	}
-	return args.report === 'item' ? readItem(resolved) : readPage(resolved)
+	const result = args.report === 'item' ? await readItem(resolved) : await readPage(resolved)
+	return { ...result, ...substitutionOf(ctx) }
 }
 
 /** A field read past every gate: its source chosen, its scope and window resolved. */

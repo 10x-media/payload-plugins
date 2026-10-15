@@ -139,6 +139,11 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerErrorHostFormat]:
 		'只需输入地址，例如 https://analytics.example.com 或 https://example.com/analytics，不要包含以 ? 或 # 开头的部分，也不要包含用户名或密码。',
 	[keys.providerErrorHostInsecure]: '地址必须以 https:// 开头。',
+	[keys.providerFieldIsDefault]: '设为本站默认',
+	[keys.providerFieldIsDefaultHelp]:
+		'除非读者另选，分析数据默认在此工具中打开。每个站点只能有一个默认工具。',
+	[keys.providerErrorDefaultTaken]: '本站已有另一个分析工具设为默认。请先在那里取消勾选。',
+	[keys.providerErrorTypeUnserved]: '本网站无法使用此分析工具。请选择其他工具。',
 	[keys.providerNameNative]: 'Payload',
 	[keys.providerNameNativeHelp]:
 		'把访问次数保存在本网站自己的 Payload 数据库中。不涉及任何外部服务。',
@@ -377,6 +382,9 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.panelNewItem]: '有人看到此内容后，数据就会显示在这里。',
 	[keys.panelNoVisits]: '此日期范围内没有访问。',
 	[keys.panelNoViews]: '此日期范围内没有展示。',
+	[keys.sourcesPlatformFallback]:
+		'在此站点添加自己的分析工具之前，这些数据来自平台的分析工具。添加后将切换为使用它。',
+	[keys.stateSourceSubstituted]: '已保存的数据源不再可用，因此显示默认数据源。',
 	[pluralKeys.liveVisitors.other]: '当前 {{count}} 位访客在线',
 	[pluralKeys.livePageviews.other]: '{{count}} 次页面浏览（最近 {{duration}}）',
 }

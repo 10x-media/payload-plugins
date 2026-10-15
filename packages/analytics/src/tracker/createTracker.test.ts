@@ -1823,6 +1823,102 @@ describe('putting a browser back', () => {
 	})
 })
 
+describe('a platform and a tenant PostHog on one page', () => {
+	const platformSlot: TrackerSlotConfig = {
+		...posthogSlot,
+		slot: 'global',
+		path: '/api/_x/p/global',
+		snippet: { scripts: [{ src: '/api/_x/p/global/static/array.js' }] },
+	}
+	const tenantSlot: TrackerSlotConfig = {
+		...posthogSlot,
+		adapterId: 'posthog:tenant-doc',
+		client: { kind: 'posthog', token: 'tok-tenant' },
+		instance: 'tenant',
+	}
+	let tenant: {
+		capture: ReturnType<typeof vi.fn>
+		opt_out_capturing: ReturnType<typeof vi.fn>
+		opt_in_capturing: ReturnType<typeof vi.fn>
+	}
+
+	beforeEach(() => {
+		tenant = { capture: vi.fn(), opt_out_capturing: vi.fn(), opt_in_capturing: vi.fn() }
+		Object.defineProperty(window, 'posthog', {
+			value: { capture, opt_out_capturing: optOut, opt_in_capturing: optIn, tenant },
+			configurable: true,
+		})
+	})
+
+	const names = (fn: ReturnType<typeof vi.fn>) => fn.mock.calls.map((call) => call[0])
+
+	it('sends one event to each client once, and the pageviews to the named client alone', async () => {
+		const tracker = boot(configWith([platformSlot, tenantSlot]), { gate: true })
+		tracker.track('signup')
+		window.history.pushState(null, '', '/next')
+
+		await vi.waitFor(() => {
+			expect(names(tenant.capture)).toEqual(['$pageview', 'signup', '$pageview'])
+		})
+		expect(names(capture)).toEqual(['signup'])
+		expect(tenant.capture.mock.calls[0]?.[1]).toEqual({
+			$current_url: `${window.location.protocol}//${window.location.hostname}/pricing`,
+			$pathname: '/pricing',
+			$host: window.location.hostname,
+		})
+		expect(tenant.capture.mock.calls[2]?.[1]).toMatchObject({ $pathname: '/next' })
+	})
+
+	it("answers one slot's gate on its own client, leaving the other client alone", async () => {
+		const tracker = boot(configWith([platformSlot, tenantSlot]), { gate: true })
+		expect(optIn).toHaveBeenCalledTimes(1)
+		expect(tenant.opt_in_capturing).toHaveBeenCalledTimes(1)
+		vi.clearAllMocks()
+
+		tracker.setGate({ tenant: false })
+		tracker.track('signup')
+
+		await vi.waitFor(() => {
+			expect(names(capture)).toEqual(['signup'])
+		})
+		expect(tenant.opt_out_capturing).toHaveBeenCalledTimes(1)
+		expect(optOut).not.toHaveBeenCalled()
+		expect(optIn).not.toHaveBeenCalled()
+		expect(tenant.capture).not.toHaveBeenCalled()
+	})
+
+	it('sets the exclusion on each client once, and lifts it only on the open one', () => {
+		const tracker = boot(configWith([platformSlot, tenantSlot]))
+		tracker.setGate({ global: true, tenant: false })
+		optOut.mockClear()
+		tenant.opt_out_capturing.mockClear()
+		optIn.mockClear()
+
+		tracker.exclude(true)
+		expect(optOut).toHaveBeenCalledTimes(1)
+		expect(tenant.opt_out_capturing).toHaveBeenCalledTimes(1)
+
+		tracker.exclude(false)
+		expect(optIn).toHaveBeenCalledTimes(1)
+		expect(tenant.opt_in_capturing).not.toHaveBeenCalled()
+	})
+
+	it('waits for the named client rather than sending into the primary one', async () => {
+		vi.useFakeTimers()
+		Reflect.deleteProperty(tenant, 'capture')
+		const tracker = boot(configWith([{ ...tenantSlot, gated: false }]))
+		tracker.track('signup')
+		await vi.advanceTimersByTimeAsync(VENDOR_GLOBAL_POLL_MS)
+
+		expect(capture).not.toHaveBeenCalled()
+		const late = vi.fn()
+		tenant.capture = late
+		await vi.advanceTimersByTimeAsync(VENDOR_GLOBAL_POLL_MS)
+
+		expect(names(late)).toEqual(['$pageview', 'signup'])
+	})
+})
+
 describe("lifting PostHog's opt-out when its own snippet defines the global", () => {
 	/** A loader standing in for the snippet: the global exists only once it has run. */
 	const definingLoader = (): { load: LoadScript; run: () => void } => {

@@ -24,6 +24,8 @@ export interface VendorTarget {
 	dispatch(event: TrackerEvent): void
 	/** The vendor's own opt-out switch, for the vendors that document one. */
 	exclude?(excluded: boolean): void
+	/** The vendor client counts no pageview itself, so it is handed the tracker's. */
+	pageviews?: boolean
 }
 
 /**
@@ -59,7 +61,7 @@ const whenPresent = (win: TrackerWindow, target: VendorTarget): Promise<boolean>
 
 /**
  * Loads the slot's snippets once, in order, and dispatches when the vendor global exists, since Umami
- * has no stub. Pageviews and engagements are dropped: every vendor measures its own.
+ * has no stub. Engagements are dropped, and pageviews unless the target asks: each vendor measures its own.
  */
 export const createVendorSink = (args: VendorSinkArgs, target: VendorTarget): Sink => {
 	let loading: Promise<void> | null = null
@@ -77,7 +79,7 @@ export const createVendorSink = (args: VendorSinkArgs, target: VendorTarget): Si
 		ready,
 		...(target.exclude ? { exclude: target.exclude } : {}),
 		send(event) {
-			if (event.type === 'pageview' || event.type === 'engagement') {
+			if (event.type === 'engagement' || (event.type === 'pageview' && !target.pageviews)) {
 				return
 			}
 			if (target.has()) {

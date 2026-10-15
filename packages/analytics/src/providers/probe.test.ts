@@ -29,6 +29,7 @@ describe('probeEpoch', () => {
 		expect(probeEpoch([row('1', AT, { scope: 'tenant-b' }), row('2', AT)])).not.toBe(epoch)
 		expect(probeEpoch([...rows, row('3', AT)])).not.toBe(epoch)
 		expect(probeEpoch([row('1', AT)])).not.toBe(epoch)
+		expect(probeEpoch([row('1', AT, { isDefault: true }), row('2', AT)])).not.toBe(epoch)
 	})
 
 	it('is a fixed-length token', () => {
@@ -69,7 +70,7 @@ const stored = (id: number, updatedAt: string) => ({
 
 describe('createCollectionProbe', () => {
 	const setup = () => {
-		const rows = { current: [stored(1, AT)] }
+		const rows: { current: Array<Record<string, unknown>> } = { current: [stored(1, AT)] }
 		const { payload, find } = instance(rows)
 		let now = 0
 		const clock = { advance: (ms: number) => (now += ms) }
@@ -84,14 +85,32 @@ describe('createCollectionProbe', () => {
 		return { probe, find, rows, clock }
 	}
 
-	it('reads ids, save times, the switch, the provider and the scope, never a credential', async () => {
-		const { probe, find } = setup()
+	it('reads ids, save times, the switch, the provider, the default flag and the scope, never a credential', async () => {
+		const { probe, find, rows: held } = setup()
+		held.current = [
+			{ ...stored(1, AT), isDefault: false },
+			{ ...stored(2, AT), isDefault: true },
+		]
 		const { rows } = await probe.read('tenant-a')
 		expect(rows).toEqual([
 			{ id: '1', updatedAt: AT, enabled: true, provider: 'umami', scope: 'tenant-a' },
+			{
+				id: '2',
+				updatedAt: AT,
+				enabled: true,
+				provider: 'umami',
+				isDefault: true,
+				scope: 'tenant-a',
+			},
 		])
 		const args = find.mock.calls[0]?.[0]
-		expect(args?.select).toEqual({ updatedAt: true, enabled: true, scope: true, provider: true })
+		expect(args?.select).toEqual({
+			updatedAt: true,
+			enabled: true,
+			scope: true,
+			provider: true,
+			isDefault: true,
+		})
 		expect(args?.where).toEqual({ scope: { equals: 'tenant-a' } })
 	})
 

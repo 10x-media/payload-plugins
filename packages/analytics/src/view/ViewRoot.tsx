@@ -7,6 +7,7 @@ import type { ItemLabels } from '../query/response'
 import { keys } from '../translations/keys'
 import { isolate } from '../translations/parts'
 import { useTranslation } from '../translations/useTranslation'
+import { SourcesNoticeBanner } from '../ui/components/SourcesNoticeBanner'
 import { mergeNotices, readMeta } from '../widgets/readMeta'
 import { canToggleAggregate, scopeLabel } from './scopeLabel'
 import { NoSources } from './sections/EmptyStates'
@@ -182,6 +183,7 @@ export function ViewRoot({ children, ...props }: ViewRootProps) {
 		>
 			<div className="analytics-view">
 				{heading(scopes === undefined || !canToggleAggregate(scopes))}
+				<SourcesNoticeBanner notice={props.sources.notice} />
 				{children}
 				{exclusion}
 			</div>

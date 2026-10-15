@@ -29,6 +29,7 @@ const view = (Component?: string): ResolvedOptions['view'] => ({
 	path: '/analytics',
 	defaultRange: 'last30days',
 	defaultMetric: 'pageviews',
+	navLink: true,
 	...(Component === undefined ? {} : { Component }),
 })
 

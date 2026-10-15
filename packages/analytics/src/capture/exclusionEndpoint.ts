@@ -131,7 +131,8 @@ export const makeExclusionHandler = (): PayloadHandler => async (req) => {
 			)
 		}
 		// A scoped install's null passed the aggregate gate; another scope's token also takes `named`.
-		const everyScope = runtime.scoped === true && requested.scope === null && (await gates.named())
+		const everyScope =
+			runtime.scoped === true && requested.scope === null && (await gates.named({ scope: null }))
 		const answer: ExclusionResponse = {
 			param: runtime.exclusion.param,
 			token: exclusionToken(req.payload.secret, requested.scope),

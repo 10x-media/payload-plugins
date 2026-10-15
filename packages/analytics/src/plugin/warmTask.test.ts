@@ -38,7 +38,10 @@ interface Refresh {
 const setup = (
 	recipes: ReadRecipe[],
 	answer: (query: AnalyticsQuery) => RefreshOutcome,
-	extra: Partial<WarmTaskOptions> = {}
+	{
+		runtime: runtimeOver = {},
+		...extra
+	}: Partial<WarmTaskOptions> & { runtime?: Partial<AnalyticsRuntime> } = {}
 ) => {
 	const warn = vi.fn()
 	const payload = { config: {}, collections: {}, logger: { warn } } as unknown as Payload
@@ -78,6 +81,7 @@ const setup = (
 				return outcome
 			},
 		},
+		...runtimeOver,
 	}
 	setRuntime(payload, runtime)
 	const task = warmTask({
@@ -257,6 +261,46 @@ describe('warmTask', () => {
 		expect(warn.mock.calls[0]?.[0]).toMatch(
 			/analytics warm: a read from "memory" .* failed: .*vendor down/
 		)
+	})
+
+	// A tenant's policy says which of its users read a shared adapter; the job reads as SYSTEM,
+	// through every shared adapter that narrows and never one that answers for every tenant.
+	it.each([
+		['staff', undefined],
+		['tenant', 'tenant'],
+		['fallback', 'fallback'],
+		['a function', () => false],
+	] as const)('warms a tenant through the same sources under %s', async (_name, policy) => {
+		const shared = {
+			...memoryAdapter(),
+			id: 'posthog',
+			capabilities: { ...memoryAdapter().capabilities, scopedQueries: true },
+		}
+		const tenantRecipe = (adapterRef: string) =>
+			recipe({
+				adapterRef,
+				scope: 'tenant-a',
+				query: { metrics: ['pageviews'], timezone: 'UTC', scope: 'tenant-a' },
+			})
+		const { run, refreshes } = setup(
+			[tenantRecipe('posthog'), tenantRecipe('memory')],
+			() => 'refreshed',
+			{
+				runtime: {
+					scoped: true,
+					resolveTimezone: async () => 'UTC',
+					configAdapterIds: new Set(['posthog', 'memory']),
+					providersCollection: { slug: 'analytics-providers', scopeField: 'tenant' },
+					resolveRegistry: async () => ({
+						registry: createRegistry([shared, memoryAdapter()]),
+						grants: new Map(),
+					}),
+					...(policy === undefined ? {} : { sourcePolicies: new Map([['posthog', policy]]) }),
+				},
+			}
+		)
+		expect(await run()).toMatchObject({ refreshed: 1, skipped: 1, failed: 0 })
+		expect(refreshes.map((refresh) => refresh.adapterId)).toEqual(['posthog'])
 	})
 
 	it('runs nothing on an instance whose runtime keeps no read cache', async () => {

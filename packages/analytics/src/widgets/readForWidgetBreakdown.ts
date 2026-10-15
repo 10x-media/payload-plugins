@@ -23,6 +23,9 @@ import {
 	engineRead,
 	pinnedScope,
 	prepareWidgetRead,
+	type StoredSourceRead,
+	type SubstitutedSource,
+	substitutionOf,
 	type WidgetReadStatus,
 } from './prepareWidgetRead'
 import { type ReadNotices, readMeta } from './readMeta'
@@ -41,7 +44,7 @@ export interface BreakdownRow {
 	metrics?: MetricValues
 }
 
-export interface WidgetBreakdownResult extends Partial<ReadNotices> {
+export interface WidgetBreakdownResult extends Partial<ReadNotices>, SubstitutedSource {
 	status: WidgetReadStatus
 	/** How long until a `busy` read can succeed, when the source or the plugin knows. */
 	retryAfterMs?: number
@@ -64,34 +67,35 @@ export interface WidgetBreakdownResult extends Partial<ReadNotices> {
 }
 
 /** Scoped like `ReadForWidgetArgs`: the request's own scope unless one is pinned. */
-export type ReadForWidgetBreakdownArgs = ReadPrincipal & {
-	req: PayloadRequest
-	metric: MetricKey
-	dimension: DimensionKey
-	timeframe: TimeframePreset
-	limit: number
-	adapterId?: string
-	now: Date
-	range?: DateRange
-	/**
-	 * Reporting timezone the caller already resolved, reused rather than resolved again so
-	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
-	 */
-	timezone?: string
-	filters?: AnalyticsFilter[]
-	/**
-	 * Further metrics read beside the ranked one, narrowed to what the source serves so an
-	 * unsupported one never fails the read. Ranking and status follow `metric` alone.
-	 */
-	extraMetrics?: MetricKey[]
-	/**
-	 * Scope's goal slugs for a `goal` or `conversions` read, or `'unresolved'` if the caller's
-	 * resolver failed. Resolved here when omitted.
-	 */
-	goalSlugs?: string[] | 'unresolved'
-	/** The latent built-in slugs behind that hint; resolved here when omitted. */
-	builtinGoalSlugs?: string[]
-}
+export type ReadForWidgetBreakdownArgs = ReadPrincipal &
+	StoredSourceRead & {
+		req: PayloadRequest
+		metric: MetricKey
+		dimension: DimensionKey
+		timeframe: TimeframePreset
+		limit: number
+		adapterId?: string
+		now: Date
+		range?: DateRange
+		/**
+		 * Reporting timezone the caller already resolved, reused rather than resolved again so
+		 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+		 */
+		timezone?: string
+		filters?: AnalyticsFilter[]
+		/**
+		 * Further metrics read beside the ranked one, narrowed to what the source serves so an
+		 * unsupported one never fails the read. Ranking and status follow `metric` alone.
+		 */
+		extraMetrics?: MetricKey[]
+		/**
+		 * Scope's goal slugs for a `goal` or `conversions` read, or `'unresolved'` if the caller's
+		 * resolver failed. Resolved here when omitted.
+		 */
+		goalSlugs?: string[] | 'unresolved'
+		/** The latent built-in slugs behind that hint; resolved here when omitted. */
+		builtinGoalSlugs?: string[]
+	}
 
 /**
  * Ranked breakdown of one metric by one dimension: `readForWidget` gated on the dimension too,
@@ -116,6 +120,7 @@ export const readForWidgetBreakdown = async (
 		timeframe,
 		adapterId,
 		...readPrincipalOf(args),
+		...(args.fallbackWhenUnreadable ? { fallbackWhenUnreadable: true } : {}),
 		timezone: args.timezone,
 		range,
 		filters,
@@ -197,6 +202,7 @@ export const readForWidgetBreakdown = async (
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
+		...substitutionOf(prepared),
 		...pinnedScope(args, prepared.queryScope),
 		dateRange,
 		timezone: tz,

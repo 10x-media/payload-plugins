@@ -407,6 +407,7 @@ export type {
 	AnalyticsRevenueOptions,
 	AnalyticsRoutesOptions,
 	AnalyticsScopeOptions,
+	AnalyticsSourceOptions,
 	AnalyticsSyncCollectionOptions,
 	AnalyticsSyncOptions,
 	AnalyticsTaskOptions,
@@ -424,8 +425,11 @@ export type {
 	CrossScopeAccess,
 	CurrencyConverter,
 	CurrencyResolver,
+	DefaultSourceFunction,
+	DefaultSourceRule,
 	ExclusionSitesResolver,
 	ItemCaptureOptions,
+	OwnSource,
 	ProviderHostsOptions,
 	ProvidersCollectionOptions,
 	ProvidersOptions,
@@ -436,6 +440,9 @@ export type {
 	ScopeListResolver,
 	ScopeMemberAccess,
 	ScopeResolver,
+	SourcePolicy,
+	SourcePolicyFunction,
+	SourceRef,
 	TimezoneResolver,
 } from './core/options'
 export type {
@@ -601,8 +608,13 @@ export {
 	type TranslationKey,
 } from './translations/keys'
 export type { CustomWidgetDef } from './widgets/customWidget'
+export {
+	type AnalyticsDefaultLayoutOptions,
+	analyticsDefaultLayout,
+} from './widgets/defaultLayout'
 export { analyticsDefaultWidgets } from './widgets/defaults'
 export { widgetFilters } from './widgets/filterField'
+export type { StoredSourceRead, SubstitutedSource } from './widgets/prepareWidgetRead'
 export type {
 	ReadForWidgetArgs,
 	WidgetReadResult,

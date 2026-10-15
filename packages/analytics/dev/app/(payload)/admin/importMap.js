@@ -7,6 +7,7 @@ import { AssignTenantFieldTrigger as AssignTenantFieldTrigger_1d0591e3cf4f332c83
 import { ProtectedCell as ProtectedCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ProtectedField as ProtectedField_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
 import { GoalAmountField as GoalAmountField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
+import { ProvidersListNotice as ProvidersListNotice_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
 import { AnalyticsNavLink as AnalyticsNavLink_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
 import { TenantSelector as TenantSelector_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
 import { MeasurementUnitsProvider as MeasurementUnitsProvider_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
@@ -40,6 +41,7 @@ export const importMap = {
   "@10x-media/fields/rsc#ProtectedCell": ProtectedCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/client#ProtectedField": ProtectedField_02043ee4f38853ef8c4ef9fd50352514,
   "@10x-media/analytics/client#GoalAmountField": GoalAmountField_cf3604008f3ebbc369f9463262b1f9eb,
+  "@10x-media/analytics/client#ProvidersListNotice": ProvidersListNotice_cf3604008f3ebbc369f9463262b1f9eb,
   "@10x-media/analytics/client#AnalyticsNavLink": AnalyticsNavLink_cf3604008f3ebbc369f9463262b1f9eb,
   "@payloadcms/plugin-multi-tenant/rsc#TenantSelector": TenantSelector_d6d5f193a167989e2ee7d14202901e62,
   "@10x-media/fields/client#MeasurementUnitsProvider": MeasurementUnitsProvider_02043ee4f38853ef8c4ef9fd50352514,

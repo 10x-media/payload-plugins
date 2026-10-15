@@ -23,6 +23,7 @@ const VIEW_KEYS = keysOf<AnalyticsViewOptions>({
 	defaultRange: true,
 	defaultMetric: true,
 	navLabel: true,
+	navLink: true,
 	Component: true,
 })
 const WIDGETS_KEYS = keysOf<AnalyticsWidgetsOptions>({
@@ -54,6 +55,7 @@ export const DEFAULT_VIEW: ResolvedView = {
 	path: '/analytics',
 	defaultRange: 'last30days',
 	defaultMetric: 'pageviews',
+	navLink: true,
 }
 
 /** A label as Payload takes one without a function: a string, or a map of strings by language. */
@@ -122,10 +124,15 @@ export const resolveView = (option: AnalyticsPluginOptions['view']): false | Res
 	if (!(defaultMetric in METRIC_KEYS)) {
 		throw new Error(`analytics: unknown view.defaultMetric "${String(defaultMetric)}"`)
 	}
+	const navLink: unknown = option?.navLink ?? DEFAULT_VIEW.navLink
+	if (typeof navLink !== 'boolean') {
+		throw new Error(`analytics: view.navLink must be a boolean, got ${kindOf(navLink)}`)
+	}
 	return {
 		path,
 		defaultRange,
 		defaultMetric,
+		navLink,
 		...(option?.navLabel !== undefined ? { navLabel: option.navLabel } : {}),
 		...(option?.Component !== undefined
 			? { Component: resolveComponent(option.Component, 'view.Component') }

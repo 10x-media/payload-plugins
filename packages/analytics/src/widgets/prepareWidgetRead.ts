@@ -50,7 +50,26 @@ export type WidgetReadStatus =
 const supportsFilters = (caps: AnalyticsCapabilities, filters?: AnalyticsFilter[]): boolean =>
 	!filters || unsupportedFilter(caps, filters) === undefined
 
-interface PrepareWidgetReadBase {
+/** What a read of a stored source (a widget's `dataSource`) may take. */
+export interface StoredSourceRead {
+	/**
+	 * Read the scope's default when `adapterId` names a source this reader cannot read, saying so
+	 * in `substitutedFrom`. For a stored choice only, never a source a caller just picked.
+	 */
+	fallbackWhenUnreadable?: boolean
+}
+
+/** What a read says when it did not read the source it was asked for. */
+export interface SubstitutedSource {
+	/** The source asked for, which this reader cannot read; the scope default answered instead. */
+	substitutedFrom?: string
+}
+
+/** The substitution a prepared read made, spread into the helper's own result. */
+export const substitutionOf = (prepared: SubstitutedSource): SubstitutedSource =>
+	prepared.substitutedFrom === undefined ? {} : { substitutedFrom: prepared.substitutedFrom }
+
+interface PrepareWidgetReadBase extends StoredSourceRead {
 	req: PayloadRequest
 	now: Date
 	adapterId?: string
@@ -84,7 +103,7 @@ export type PrepareWidgetReadArgs = PrepareWidgetReadBase &
 	({ timeframe: TimeframePreset; range?: DateRange } | { timeframe?: undefined; range: DateRange })
 
 export type PreparedWidgetRead =
-	| {
+	| ({
 			ok: true
 			runtime: AnalyticsRuntime
 			adapter: AnalyticsAdapter
@@ -106,7 +125,7 @@ export type PreparedWidgetRead =
 			builtinGoalSlugs: string[]
 			/** The resolved goals' names, when this read resolved the goals itself. */
 			goalNames: Array<{ slug: string; name: string }>
-	  }
+	  } & SubstitutedSource)
 	| {
 			ok: false
 			status: WidgetReadStatus
@@ -176,6 +195,7 @@ export const prepareWidgetRead = async (
 				req,
 				adapterId: args.adapterId,
 				...readPrincipalOf(args),
+				...(args.fallbackWhenUnreadable ? { fallbackWhenUnreadable: true } : {}),
 			})
 		: { ok: false as const }
 	if (!runtime || !ctx.ok) {
@@ -250,6 +270,7 @@ export const prepareWidgetRead = async (
 		pin: ctx.pin,
 		builtinGoalSlugs: args.builtinGoalSlugs ?? resolved?.builtin ?? [],
 		goalNames: resolved?.names ?? [],
+		...substitutionOf(ctx),
 		...(ctx.queryScope === undefined ? {} : { queryScope: ctx.queryScope }),
 		...(goalSlugs === undefined ? {} : { goalSlugs }),
 	}

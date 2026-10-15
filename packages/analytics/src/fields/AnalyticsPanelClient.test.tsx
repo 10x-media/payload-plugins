@@ -298,6 +298,24 @@ describe('AnalyticsPanelClient', () => {
 		expect(container.textContent?.split(keys.statePartial)).toHaveLength(2)
 		expect(screen.getByText(`${keys.statePartial} · ${keys.stateCapped}`)).toBeDefined()
 	})
+
+	it("shows the default's numbers with a note when the saved source is no longer readable", () => {
+		const { container } = renderPanel({
+			initial: panel({ substitutedFrom: 'posthog:65f0c2a9e1' }),
+			seed: 'fresh',
+		})
+		expect(screen.getByText('120')).toBeDefined()
+		expect(container.querySelector('.analytics-panel__notice')?.textContent).toBe(
+			keys.stateSourceSubstituted
+		)
+		expect(container.textContent).not.toContain('posthog:65f0c2a9e1')
+		expect(screen.queryByRole('alert')).toBeNull()
+	})
+
+	it('adds no substitution note to a read of the saved source itself', () => {
+		renderPanel({ initial: panel(), seed: 'fresh' })
+		expect(screen.queryByText(keys.stateSourceSubstituted)).toBeNull()
+	})
 })
 
 describe('AnalyticsPanelClient seeded by the server', () => {

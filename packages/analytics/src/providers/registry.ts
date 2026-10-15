@@ -23,10 +23,12 @@ import {
 	adapterFromProviderDoc,
 	documentAdapterId,
 	failingAdapter,
+	PROVIDER_IDS,
 	type ProviderDoc,
+	type ProviderId,
 } from './factory'
 import type { ProviderHostPolicy } from './hosts'
-import { createCollectionProbe, type Probe, scopeOf, versionOf } from './probe'
+import { createCollectionProbe, type Probe, type ProbeRow, scopeOf, versionOf } from './probe'
 import {
 	combineRegistries,
 	noGuardedConnection,
@@ -52,6 +54,8 @@ export type ProviderPlan =
 			kind: 'collection'
 			slug: string
 			scopeField: string
+			/** Types the install serves, every one when absent; a document of another is no source. */
+			types?: readonly ProviderId[]
 			/** The install's config native adapter, which a `native` document grants to its scope. */
 			nativeAdapter?: AnalyticsAdapter
 	  }
@@ -81,8 +85,9 @@ interface ProviderRegistry {
 	/** The scope's provider configuration epoch, which every cache key carries. */
 	epoch(scope: string | null): Promise<string>
 	/**
-	 * Whether the scope's own enabled documents grant `adapterId`, from the committed rows alone:
-	 * nothing is read beyond them and nothing is decrypted. Only on the providers collection.
+	 * Whether the scope's own available documents grant `adapterId`, as its registry does. The native
+	 * adapter is answered from the committed rows alone, decrypting nothing, so a beacon stays cheap.
+	 * Only on the providers collection.
 	 */
 	granted?(scope: string | null, adapterId: string): Promise<boolean>
 	/** A save on this instance touched these scopes, which it then reads again as soon as it commits. */
@@ -257,6 +262,10 @@ const collectionRegistry = (
 	})
 	// A failing probe keys on the last epoch read, which the registry in use was built from.
 	const fallback = createEpochFallback(clock)
+	const types: readonly string[] = plan.types ?? PROVIDER_IDS
+
+	/** An enabled document of a type the install serves, which its adapter may then make a source. */
+	const servable = (row: ProbeRow): boolean => row.enabled && types.includes(row.provider ?? '')
 
 	/** A probed id as the collection stores it: rows carry every id as text. */
 	const idOf = (id: string): string | number => {
@@ -352,15 +361,18 @@ const collectionRegistry = (
 
 	const build = async (
 		scope: string | null,
-		docs: readonly PooledDocument[]
+		docs: readonly PooledDocument[],
+		flagged: ReadonlySet<string>
 	): Promise<{ registry: ScopeRegistry; failed: boolean }> => {
 		const missing = docs.filter((doc) => pool.get(doc) === undefined).map((doc) => doc.id)
 		const read = missing.length > 0 ? await buildDocuments(scope, missing) : undefined
 		const extras: ProviderAdapter[] = []
 		for (const doc of docs) {
 			const adapter = read?.built.has(doc.id) ? read.built.get(doc.id) : pool.get(doc)
-			if (adapter) {
-				extras.push({ adapter, docId: doc.id })
+			// Lacking what its adapter reads with, a document is no source and grants nothing; a
+			// stand-in for one that failed to decrypt still is, configured but failing.
+			if (adapter?.isConfigured()) {
+				extras.push({ adapter, docId: doc.id, isDefault: flagged.has(doc.id) })
 			}
 		}
 		pool.retain(scope, new Set(docs.map((doc) => doc.id)))
@@ -385,57 +397,63 @@ const collectionRegistry = (
 	const isCurrent = (cached: CachedRegistry, epoch: string): boolean =>
 		cached.epoch === epoch && (cached.retryAt === undefined || clock() < cached.retryAt)
 
-	return {
-		resolve: async (args) => {
-			const scope = scopeOf(args.scope)
-			const key = scope ?? ''
-			const state = await probe.read(scope)
-			fallback.read(scope, state.epoch)
-			const cached = registries.get(key)
-			if (cached && isCurrent(cached, state.epoch)) {
-				pool.touch(cached.ids)
-				return cached.resolved
-			}
-			const docs: PooledDocument[] = state.rows
-				.filter((row) => row.enabled)
-				.map((row) => ({ id: row.id, version: row.updatedAt, scope }))
-			const built = build(scope, docs)
-			const entry: CachedRegistry = {
-				epoch: state.epoch,
-				resolved: built.then((done) => done.registry),
-				ids: docs.map((doc) => doc.id),
-				refs: new Set(docs.map(refOf)),
-			}
-			built.then(
-				(done) => {
-					if (done.failed) {
-						entry.retryAt = clock() + FAILED_DOCUMENT_RETRY_MS
-					}
-				},
-				() => {}
-			)
-			remember(registries, [key, entry])
-			entry.resolved.catch(() => {
-				if (registries.get(key) === entry) {
-					registries.delete(key)
+	const registryOf = async (scope: string | null): Promise<ScopeRegistry> => {
+		const key = scope ?? ''
+		const state = await probe.read(scope)
+		fallback.read(scope, state.epoch)
+		const cached = registries.get(key)
+		if (cached && isCurrent(cached, state.epoch)) {
+			pool.touch(cached.ids)
+			return cached.resolved
+		}
+		const rows = state.rows.filter(servable)
+		const docs: PooledDocument[] = rows.map((row) => ({
+			id: row.id,
+			version: row.updatedAt,
+			scope,
+		}))
+		const flagged = new Set(rows.filter((row) => row.isDefault).map((row) => row.id))
+		const built = build(scope, docs, flagged)
+		const entry: CachedRegistry = {
+			epoch: state.epoch,
+			resolved: built.then((done) => done.registry),
+			ids: docs.map((doc) => doc.id),
+			refs: new Set(docs.map(refOf)),
+		}
+		built.then(
+			(done) => {
+				if (done.failed) {
+					entry.retryAt = clock() + FAILED_DOCUMENT_RETRY_MS
 				}
-			})
-			return entry.resolved
-		},
+			},
+			() => {}
+		)
+		remember(registries, [key, entry])
+		entry.resolved.catch(() => {
+			if (registries.get(key) === entry) {
+				registries.delete(key)
+			}
+		})
+		return entry.resolved
+	}
+
+	return {
+		resolve: (args) => registryOf(scopeOf(args.scope)),
 		epoch: async (raw) => {
 			const scope = scopeOf(raw)
 			const state = await probed(scope)
 			return state ? fallback.read(scope, state.epoch) : fallback.failed(scope)
 		},
-		granted: async (scope, adapterId) => {
-			const { rows } = await probe.read(scopeOf(scope))
-			return rows.some(
-				(row) =>
-					row.enabled &&
-					(row.provider === 'native'
-						? plan.nativeAdapter?.id === adapterId
-						: documentAdapterId(row.provider, row.id) === adapterId)
-			)
+		granted: async (raw, adapterId) => {
+			const scope = scopeOf(raw)
+			const native = plan.nativeAdapter
+			if (native && native.id === adapterId) {
+				const { rows } = await probe.read(scope)
+				return (
+					native.isConfigured() && rows.some((row) => row.provider === 'native' && servable(row))
+				)
+			}
+			return (await registryOf(scope)).grants.has(adapterId)
 		},
 		changed: (scopes) => probe.expedite(scopes),
 		refresh: async (scope) => probe.expedite([scope]),

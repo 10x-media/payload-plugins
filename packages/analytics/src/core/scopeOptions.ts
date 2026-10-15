@@ -94,6 +94,11 @@ export const assertScopedOnlyOptions = (options: AnalyticsPluginOptions): void =
 	if (options.access?.crossScope !== undefined) {
 		paths.push('access.crossScope')
 	}
+	for (const key of ['sources', 'defaultSource'] as const) {
+		if (options[key] !== undefined) {
+			paths.push(key)
+		}
+	}
 	if (typeof options.capture?.slots?.tenant === 'string') {
 		paths.push('capture.slots.tenant')
 	}
@@ -112,6 +117,9 @@ export const assertScopedOnlyOptions = (options: AnalyticsPluginOptions): void =
 	const providersCollection = options.providers?.collection
 	if (isRecord(providersCollection) && providersCollection.scopeField !== undefined) {
 		paths.push('providers.collection.scopeField')
+	}
+	if (isRecord(providersCollection) && providersCollection.fields?.isDefault !== undefined) {
+		paths.push('providers.collection.fields.isDefault')
 	}
 	if (paths.length > 0) {
 		const one = paths.length === 1

@@ -26,6 +26,7 @@ import {
 	type ScopeRegistry,
 } from '../core/registry'
 import type { ServerEventInput, ServerTrackOptions } from '../core/serverEvent'
+import type { DefaultSourceRule, ResolvedSources } from '../core/sourcePolicy'
 import { isRecord } from '../core/values'
 import type { GoalsResolver, ResolvedGoal } from '../goals/resolver'
 import type { Goal } from '../goals/types'
@@ -64,6 +65,13 @@ export interface AnalyticsRuntime {
 	resolveCurrency?: (req: PayloadRequest, scope?: string | null) => Promise<string | undefined>
 	/** Id of the config adapter shared by every scope, when one is designated. */
 	platformAdapterId?: string
+	/**
+	 * `sources`: each shared config adapter whose tenants read under a policy other than `staff`.
+	 * Absent runtimes admit tenants to no shared adapter beyond `unscopedSource`.
+	 */
+	sourcePolicies?: ResolvedSources['policies']
+	/** `defaultSource`: how a tenant scope picks its default source; absent keeps the registry's. */
+	defaultSource?: DefaultSourceRule
 	/** `capture.slots` overrides naming the adapter that fills each capture slot. */
 	captureSlots?: { global?: CaptureSlotOption; tenant?: CaptureSlotOption }
 	/**
@@ -563,23 +571,38 @@ export const goalNamesFor = async (args: {
 /** The three cross-scope decisions `access.crossScope` names. */
 export type ScopeDecision = 'named' | 'aggregate' | 'unscopedSource'
 
+/** What one gate is asked about: the scope (`'*'` or null for every scope) and the adapter. */
+export interface GateContext {
+	scope?: string | null
+	adapterId?: string
+}
+
 /**
- * The three cross-scope decisions for one request, each evaluated at most once per user however
- * many gates and reads consult it.
+ * The three cross-scope decisions for one request, each evaluated at most once per user, scope and
+ * adapter however many gates and reads consult it.
  */
-export type ScopeGates = Record<ScopeDecision, () => Promise<boolean>>
+export type ScopeGates = Record<ScopeDecision, (ctx?: GateContext) => Promise<boolean>>
 
 /**
  * The request's {@link ScopeGates}; a gate `access.crossScope` leaves unset admits the users of the
  * admin collection.
  */
 export const scopeGates = (runtime: AnalyticsRuntime, req: PayloadRequest): ScopeGates => {
-	const gate = (decision: ScopeDecision) => (): Promise<boolean> =>
-		decideOnce(req, {
-			owner: runtime,
-			key: `crossScope:${decision}`,
-			decide: () => runtime.crossScope?.[decision]?.({ req }) ?? isAdminUser({ req }),
-		})
+	const gate =
+		(decision: ScopeDecision) =>
+		(ctx: GateContext = {}): Promise<boolean> => {
+			const { scope, adapterId } = ctx
+			const args = {
+				req,
+				...(scope === undefined ? {} : { scope }),
+				...(adapterId === undefined ? {} : { adapterId }),
+			}
+			return decideOnce(req, {
+				owner: runtime,
+				key: `crossScope:${decision}:${JSON.stringify(scope)}:${adapterId ?? ''}`,
+				decide: () => runtime.crossScope?.[decision]?.(args) ?? isAdminUser({ req }),
+			})
+		}
 	return {
 		named: gate('named'),
 		aggregate: gate('aggregate'),

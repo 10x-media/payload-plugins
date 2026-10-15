@@ -71,6 +71,7 @@ async function TrendWidgetBody(props: AnalyticsWidgetProps) {
 		req: props.req,
 		metric,
 		adapterId: data.dataSource,
+		fallbackWhenUnreadable: true,
 		now,
 		compare,
 		filters,

@@ -18,8 +18,9 @@ export interface RegisterViewArgs {
 }
 
 /**
- * Mounts view and nav link; the link has no access context, so a reader `access.view` denies lands
- * on the no-access message. `meta` titles the tab in fallback language until the view retitles it.
+ * Mounts the view and, unless `navLink` is off, its nav link. The link has no access context, so a
+ * reader `access.view` denies lands on the no-access message. `meta` titles the tab in the fallback
+ * language until the view retitles it.
  */
 export const registerView = (config: Config, args: RegisterViewArgs): void => {
 	const { view, title } = args
@@ -45,16 +46,20 @@ export const registerView = (config: Config, args: RegisterViewArgs): void => {
 					...(metaTitle === undefined ? {} : { meta: { title: metaTitle } }),
 				},
 			},
-			afterNavLinks: [
-				...(config.admin?.components?.afterNavLinks ?? []),
-				{
-					path: NAV_LINK_COMPONENT,
-					clientProps: {
-						href,
-						...(view.navLabel !== undefined ? { label: view.navLabel } : {}),
-					},
-				},
-			],
+			...(view.navLink
+				? {
+						afterNavLinks: [
+							...(config.admin?.components?.afterNavLinks ?? []),
+							{
+								path: NAV_LINK_COMPONENT,
+								clientProps: {
+									href,
+									...(view.navLabel !== undefined ? { label: view.navLabel } : {}),
+								},
+							},
+						],
+					}
+				: {}),
 		},
 	}
 }

@@ -5,6 +5,7 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import { ga4ExcludeGuard } from '../../src/adapters/ga4/disableKey'
+import { posthog } from '../../src/adapters/posthog/posthog'
 import type { FetchLike } from '../../src/core/fetch'
 import type { ProvidersResolveArgs } from '../../src/core/options'
 import { HostRefusedError } from '../../src/core/sourceErrors'
@@ -237,5 +238,78 @@ describeForDb('analytics ga4 capture from a provider document', {}, (db) => {
 			createElement(AnalyticsScripts, { config, gate: { tenant: true } })
 		)
 		expect(opened).toContain(`src="https://www.googletagmanager.com/gtag/js?id=${MEASUREMENT_ID}"`)
+	})
+})
+
+/**
+ * The platform's PostHog fills the global slot and a tenant's PostHog document the tenant slot:
+ * posthog-js runs the tenant's as a named client, so one page captures into both projects.
+ */
+describeForDb('analytics with a platform and a tenant PostHog', {}, (db) => {
+	let booted: BootedPayload
+	const US_INGEST = 'https://us.i.posthog.com'
+	const EU_INGEST = 'https://eu.i.posthog.com'
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			db,
+			plugin: analytics({
+				adapters: [
+					posthog({ projectId: '1', apiKey: 'phx_platform', projectToken: 'phc_platform' }),
+				],
+				platformAdapter: 'posthog',
+				scope: { member: () => true, resolve: ({ req }) => req.headers.get('x-tenant') },
+				providers: {
+					resolve: (args) => {
+						const adapter =
+							args.scope === 'tenant-a'
+								? adapterFromProviderDoc(tenantDoc, { ...args, fetch: viaStubs })
+								: null
+						return adapter ? [adapter] : []
+					},
+				},
+				capture: { gate: 'off', slots: { tenant: 'posthog:tenant-a' } },
+			}),
+		})
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const request = (path: string, init?: { method?: string; body?: string }) =>
+		handleEndpoints({
+			config: booted.payload.config,
+			payloadInstanceCacheKey: booted.cacheKey,
+			request: new Request(`http://localhost:3000/api${path}`, {
+				...init,
+				headers: { 'x-tenant': 'tenant-a' },
+			}),
+		})
+
+	it('fills both slots, the tenant one on the named client "tenant"', async () => {
+		const res = await request('/_x/config')
+		const config = (await res.json()) as TrackerConfig
+		expect(config.slots.map((s) => [s.slot, s.adapterId, s.kind, s.instance])).toEqual([
+			['global', 'posthog', 'posthog', undefined],
+			['tenant', 'posthog:tenant-a', 'posthog', 'tenant'],
+		])
+		const tenant = config.slots[1]?.snippet.scripts.at(-1)?.inline
+		expect(tenant).toContain(`posthog.init("${TOKEN}",{api_host:"/api/_x/p/tenant"`)
+		expect(tenant).toContain('},"tenant")')
+	})
+
+	it("relays each slot's events to its own project's ingest", async () => {
+		const upstream: string[] = []
+		const record = ({ request: relayed }: { request: Request }) => {
+			upstream.push(relayed.url)
+			return HttpResponse.json({ status: 1 })
+		}
+		server.use(http.post(`${US_INGEST}/*`, record), http.post(`${EU_INGEST}/*`, record))
+		const body = JSON.stringify({ event: 'signup' })
+
+		expect((await request('/_x/p/global/e/', { method: 'POST', body })).status).toBe(200)
+		expect((await request('/_x/p/tenant/e/', { method: 'POST', body })).status).toBe(200)
+		expect(upstream).toEqual([`${US_INGEST}/e/`, `${EU_INGEST}/e/`])
 	})
 })

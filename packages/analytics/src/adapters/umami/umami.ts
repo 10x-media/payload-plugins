@@ -16,6 +16,7 @@ import {
 	type MetricValues,
 } from '../../core/contract'
 import type { FetchLike } from '../../core/fetch'
+import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
 import { DEFAULT_TIMEZONE } from '../../timeframe/tz'
 import { emptyGoalBreakdown, goalHint, hintFailed, hintSlugs } from '../goalRead'
 import { hostnameOf, withoutTrailingSlash } from '../http/baseUrl'
@@ -25,6 +26,11 @@ import { dayIso } from '../series'
 import { upstreamJson } from '../upstream'
 
 export interface UmamiConfig {
+	/**
+	 * The source's name in pickers and listings: a string, a map by admin language (read like
+	 * `view.navLabel`), or a function naming it per reader and scope. Default `'Umami'`.
+	 */
+	label?: AdapterLabelOption
 	websiteId: string
 	/** Umami Cloud API key (sent as x-umami-api-key). */
 	apiKey?: string
@@ -304,7 +310,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 
 	return {
 		id: 'umami',
-		label: 'Umami',
+		...adapterLabel(config.label, 'Umami', 'umami({ label })'),
 		capabilities,
 		capture: buildCapture(config, endpoints),
 		isConfigured: () => Boolean(config.websiteId && (config.apiKey || config.token)),

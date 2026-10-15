@@ -16,6 +16,7 @@ import {
 } from '../../core/contract'
 import type { FetchLike } from '../../core/fetch'
 import { vendorReading } from '../../core/metricValues'
+import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
 import { currencyOption } from '../../goals/currency'
 import {
 	emptyGoalBreakdown,
@@ -41,6 +42,11 @@ import { upstreamJson } from '../upstream'
 import { isScriptId } from './scriptId'
 
 export interface PlausibleConfig {
+	/**
+	 * The source's name in pickers and listings: a string, a map by admin language (read like
+	 * `view.navLabel`), or a function naming it per reader and scope. Default `'Plausible'`.
+	 */
+	label?: AdapterLabelOption
 	siteId: string
 	apiKey: string
 	/**
@@ -269,7 +275,7 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 	}
 	return {
 		id: 'plausible',
-		label: 'Plausible',
+		...adapterLabel(config.label, 'Plausible', 'plausible({ label })'),
 		capabilities,
 		...(config.domain || scriptId ? { capture: buildCapture(config, scriptId) } : {}),
 		isConfigured: () => Boolean(config.siteId && config.apiKey),

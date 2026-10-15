@@ -144,6 +144,13 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Введіть лише адресу, наприклад https://analytics.example.com або https://example.com/analytics, без частини, що починається з ? чи #, і без імені користувача та пароля.',
 	[keys.providerErrorHostInsecure]: 'Адреса має починатися з https://.',
+	[keys.providerFieldIsDefault]: 'За замовчуванням для цього сайту',
+	[keys.providerFieldIsDefaultHelp]:
+		'Аналітика відкривається в цьому інструменті, якщо читач не вибере інший. За замовчуванням на сайті може бути лише один інструмент.',
+	[keys.providerErrorDefaultTaken]:
+		'Інший інструмент аналітики вже вибрано за замовчуванням для цього сайту. Спершу зніміть позначку там.',
+	[keys.providerErrorTypeUnserved]:
+		'Цей сайт не може використовувати цей інструмент аналітики. Виберіть інший.',
 	[keys.providerNameNative]: 'Payload',
 	[keys.providerNameNativeHelp]:
 		'Зберігає лічильники відвідувань у власній базі даних Payload цього сайту. Жодні сторонні сервіси не задіяні.',
@@ -399,6 +406,10 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.panelNewItem]: 'Цифри зʼявляться тут, щойно цей елемент хтось побачить.',
 	[keys.panelNoVisits]: 'У цьому діапазоні дат візитів немає.',
 	[keys.panelNoViews]: 'У цьому діапазоні дат показів немає.',
+	[keys.sourcesPlatformFallback]:
+		'Ці цифри беруться із сервісу аналітики платформи, доки сайт не додасть власний. Щойно ви його додасте, дані братимуться з нього.',
+	[keys.stateSourceSubstituted]:
+		'Збережене джерело даних більше недоступне, тому показано джерело за замовчуванням.',
 	[pluralKeys.liveVisitors.one]: '{{count}} відвідувач зараз на сайті',
 	[pluralKeys.liveVisitors.few]: '{{count}} відвідувачі зараз на сайті',
 	[pluralKeys.liveVisitors.many]: '{{count}} відвідувачів зараз на сайті',

@@ -23,7 +23,10 @@ export const createSink = (args: {
 		case 'native':
 			return createNativeSink({ slot: slot.slot, win, url: ingestPath })
 		case 'posthog':
-			return createPosthogSink(vendor)
+			return createPosthogSink({
+				...vendor,
+				...(slot.instance === undefined ? {} : { instance: slot.instance }),
+			})
 		case 'plausible':
 			return createPlausibleSink(vendor)
 		case 'umami':

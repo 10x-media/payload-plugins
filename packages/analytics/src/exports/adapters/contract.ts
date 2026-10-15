@@ -10,6 +10,7 @@ export type {
 } from '../../core/capture'
 export type {
 	AdapterContext,
+	AdapterLabelArgs,
 	AdapterRegisterContext,
 	AdapterSchemaContext,
 	AnalyticsAdapter,
@@ -53,6 +54,7 @@ export type {
 	ServerTrackIdentity,
 	ServerTrackOptions,
 } from '../../core/serverEvent'
+export type { AdapterLabelOption } from '../../core/sourceLabel'
 export type { CurrencyConverter } from '../../goals/currency'
 export type { BrowserAmounts, OrderSignatureMode } from '../../goals/match'
 export type { Goal } from '../../goals/types'

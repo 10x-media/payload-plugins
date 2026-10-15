@@ -33,6 +33,7 @@ export type {
 	AnalyticsRevenueOptions,
 	AnalyticsRoutesOptions,
 	AnalyticsScopeOptions,
+	AnalyticsSourceOptions,
 	AnalyticsSyncCollectionOptions,
 	AnalyticsSyncOptions,
 	AnalyticsViewAccess,
@@ -47,8 +48,11 @@ export type {
 	CaptureSlotOption,
 	CrossScopeAccess,
 	CurrencyResolver,
+	DefaultSourceFunction,
+	DefaultSourceRule,
 	ExclusionSitesResolver,
 	ItemCaptureOptions,
+	OwnSource,
 	ProviderHostsOptions,
 	ProvidersCollectionOptions,
 	ProvidersOptions,
@@ -59,6 +63,9 @@ export type {
 	ScopeListResolver,
 	ScopeMemberAccess,
 	ScopeResolver,
+	SourcePolicy,
+	SourcePolicyFunction,
+	SourceRef,
 	TimezoneResolver,
 } from '../core/options'
 export type {
@@ -72,8 +79,9 @@ export type {
 	MaxmindSdk,
 } from '../core/sdks'
 export type { ServerEventInput, ServerTrack, ServerTrackOptions } from '../core/serverEvent'
+export type { AdapterLabelOption } from '../core/sourceLabel'
 export { BUILT_IN_WIDGET_SLUGS, type BuiltInWidgetSlug } from '../core/widgetSlugs'
-export type { SourcesResponse, WireSource } from '../fields/config/fetchSources'
+export type { SourcesNotice, SourcesResponse, WireSource } from '../fields/config/fetchSources'
 export type {
 	AnalyticsFieldsOptions,
 	AnalyticsMetricLabel,
@@ -107,6 +115,7 @@ export type {
 	ProviderCollectionFieldOverrides,
 	ProviderFieldOverride,
 } from '../providers/collection'
+export type { ProviderId } from '../providers/factory'
 export type { HostPattern, ProviderHostPolicy } from '../providers/hosts'
 export type { QueryError, QueryErrorCode } from '../query/errors'
 export type {

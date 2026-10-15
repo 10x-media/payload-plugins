@@ -316,6 +316,33 @@ describe('scopeGates', () => {
 		expect(await gates.unscopedSource()).toBe(false)
 	})
 
+	it('tells each gate the scope and adapter it decides, once per pair', async () => {
+		const unscopedSource = vi.fn(
+			({ scope, adapterId }: { scope?: string | null; adapterId?: string }) =>
+				scope === 'alpha' && adapterId === 'posthog'
+		)
+		const aggregate = vi.fn(() => true)
+		const gates = scopeGates(runtimeWith({ crossScope: { unscopedSource, aggregate } }), req)
+		expect(await gates.unscopedSource({ scope: 'alpha', adapterId: 'posthog' })).toBe(true)
+		expect(await gates.unscopedSource({ scope: 'alpha', adapterId: 'posthog' })).toBe(true)
+		expect(await gates.unscopedSource({ scope: 'beta', adapterId: 'posthog' })).toBe(false)
+		expect(await gates.unscopedSource({ scope: 'alpha', adapterId: 'ga4' })).toBe(false)
+		expect(unscopedSource).toHaveBeenCalledTimes(3)
+		expect(unscopedSource).toHaveBeenCalledWith({ req, scope: 'alpha', adapterId: 'posthog' })
+		await gates.aggregate({ scope: '*' })
+		await gates.aggregate()
+		expect(aggregate.mock.calls).toEqual([[{ req, scope: '*' }], [{ req }]])
+	})
+
+	// Before the gates were told their scope, a host function took `{ req }` alone.
+	it('keeps a host function reading only req deciding every scope alike', async () => {
+		const named = vi.fn(({ req: asked }: { req: PayloadRequest }) => asked === req)
+		const gates = scopeGates(runtimeWith({ crossScope: { named } }), req)
+		expect(await gates.named({ scope: 'alpha' })).toBe(true)
+		expect(await gates.named({ scope: 'beta' })).toBe(true)
+		expect(await gates.named()).toBe(true)
+	})
+
 	it('admits only the admin collection through a gate the runtime leaves out', async () => {
 		const runtime = runtimeWith({ crossScope: { named: () => true } })
 		const payload = { config: { admin: { user: 'users' } } }

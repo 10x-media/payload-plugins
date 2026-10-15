@@ -1,4 +1,5 @@
 import type { PayloadRequest } from 'payload'
+import { decideOnce } from '../access/decideOnce'
 import { isScopeMember } from '../access/membership'
 import {
 	type GatedScope,
@@ -9,6 +10,7 @@ import {
 } from '../access/principal'
 import { readGate } from '../access/readGate'
 import { readableProviderDocIds } from '../plugin/readableProviders'
+import { requestMemo } from '../plugin/requestMemo'
 import {
 	type AnalyticsRuntime,
 	resolvableScope,
@@ -19,7 +21,14 @@ import {
 } from '../plugin/runtime'
 import { MAX_SCOPE_LENGTH } from '../query/limits'
 import { type AnalyticsAdapter, PLATFORM_SCOPE } from './contract'
-import { type AdapterRegistry, filterRegistry, type ScopeRegistry } from './registry'
+import {
+	type AdapterRegistry,
+	createRegistry,
+	filterRegistry,
+	type ScopeRegistry,
+} from './registry'
+import { sourceLabelFor, sourceRefFor } from './sourceLabel'
+import type { DefaultSourceFunction, SourceRef } from './sourcePolicy'
 
 export type ReadContext =
 	| {
@@ -33,6 +42,8 @@ export type ReadContext =
 			 * keeps every one of them on exactly this scope without deciding it again.
 			 */
 			pin: ReadPrincipal
+			/** The source asked for, which this reader cannot read, when the scope default read instead. */
+			substitutedFrom?: string
 	  }
 	| {
 			ok: false
@@ -52,6 +63,11 @@ type ResolveReadContextArgs = {
 	 * it, else the first visible source it accepts, else the default all the same.
 	 */
 	prefer?: (adapter: AnalyticsAdapter) => boolean
+	/**
+	 * An `adapterId` this reader cannot read is read as if none were named, the substitution
+	 * reported as `substitutedFrom`: for a stored choice, never a caller's explicit one.
+	 */
+	fallbackWhenUnreadable?: boolean
 } & ReadPrincipal
 
 interface QueryScopeArgs {
@@ -104,13 +120,15 @@ export const resolveRequestedScope = async (args: RequestedScopeArgs): Promise<R
 		// The wildcard is never the request's own scope in this sense: it names every scope,
 		// whatever the resolver answered, and stays behind the aggregate gate.
 		if (named === PLATFORM_SCOPE) {
-			return (await gates.aggregate()) ? cleared(named) : { ok: false, reason: 'named' }
+			return (await gates.aggregate({ scope: PLATFORM_SCOPE }))
+				? cleared(named)
+				: { ok: false, reason: 'named' }
 		}
 		// An install without tenants has no scope to name, and no tenant id runs this long.
 		if (runtime.scoped !== true || named.length > MAX_SCOPE_LENGTH) {
 			return { ok: false, reason: 'named' }
 		}
-		if (await gates.named()) {
+		if (await gates.named({ scope: named })) {
 			return cleared(named)
 		}
 		// Only after the gate has said no, so a platform reader still costs one resolution.
@@ -130,11 +148,11 @@ export const resolveRequestedScope = async (args: RequestedScopeArgs): Promise<R
 	}
 	if (scope === PLATFORM_SCOPE || scope === null) {
 		const crossScope = scope === PLATFORM_SCOPE || runtime.scoped === true
-		return crossScope && !(await gates.aggregate())
+		return crossScope && !(await gates.aggregate({ scope }))
 			? { ok: false, reason: 'unresolved' }
 			: cleared(scope)
 	}
-	if ((await isScopeMember(runtime.member, req, scope)) || (await gates.named())) {
+	if ((await isScopeMember(runtime.member, req, scope)) || (await gates.named({ scope }))) {
 		return cleared(scope)
 	}
 	return { ok: false, reason: 'not-member' }
@@ -164,50 +182,233 @@ const SYSTEM_GATES: ScopeGates = {
 	unscopedSource: () => Promise.resolve(false),
 }
 
-/**
- * The adapters a request may read through in one tenant scope, or null for none: the scope's own
- * sources follow the providers' read access (`sourceAccess`), a config adapter `unscopedSource`.
- */
-export const visibleRegistryFor = async (args: {
+interface VisibleArgs {
 	runtime: AnalyticsRuntime
 	req: PayloadRequest
 	resolved: ScopeRegistry
 	scope: string | null
 	gates?: ScopeGates
 	principal?: typeof SYSTEM
-}): Promise<AdapterRegistry | null> => {
+}
+
+/** The adapters one reader sees in a scope, and which of them a `fallback` policy alone admitted. */
+export interface VisibleSources {
+	registry: AdapterRegistry | null
+	/** Shared adapters listed only because a `fallback` policy let a member of the scope in. */
+	fallbackAdmitted: ReadonlySet<string>
+}
+
+const NONE_ADMITTED: ReadonlySet<string> = new Set()
+
+/** A source the reader reads a scope through by one of the scope's own provider documents. */
+interface Granted {
+	adapter: AnalyticsAdapter
+	docId: string
+}
+
+/**
+ * Whether `sources.<id>.tenants` lets this member of `scope` read through a shared adapter none
+ * of its documents grants; asked once per request, scope and adapter. A policy that throws denies.
+ */
+const policyAdmits = async (args: {
+	runtime: AnalyticsRuntime
+	req: PayloadRequest
+	scope: string
+	adapter: AnalyticsAdapter
+	own: readonly Granted[]
+}): Promise<boolean> => {
+	const { runtime, req, scope, adapter, own } = args
+	const policy = runtime.sourcePolicies?.get(adapter.id)
+	// The boot refuses a policy on an adapter that cannot narrow; a tenant must never read totals
+	// spanning every tenant, so a runtime built any other way is held to it too.
+	if (
+		policy === undefined ||
+		!runtime.configAdapterIds.has(adapter.id) ||
+		adapter.capabilities.scopedQueries !== true ||
+		!(await isScopeMember(runtime.member, req, scope))
+	) {
+		return false
+	}
+	return decideOnce(req, {
+		owner: runtime,
+		key: `sourcePolicy:${JSON.stringify(scope)}:${adapter.id}`,
+		decide: async () => {
+			if (policy === 'tenant') {
+				return true
+			}
+			if (policy === 'fallback') {
+				return own.length === 0
+			}
+			try {
+				const ownSources = await Promise.all(
+					own.map(async (granted) => ({
+						id: granted.adapter.id,
+						label: await sourceLabelFor(granted.adapter, { req, scope }),
+						docId: granted.docId,
+					}))
+				)
+				return (await policy({ req, scope, adapterId: adapter.id, ownSources })) === true
+			} catch (err) {
+				req.payload.logger?.warn(
+					`analytics: sources.${adapter.id}.tenants threw for scope "${scope}", which counts as no: ${String(err)}`
+				)
+				return false
+			}
+		},
+	})
+}
+
+const pickedDefaults = requestMemo<string | undefined>('defaultSources')
+
+/** The `defaultSource` function's pick, asked once per request, scope and set of sources. */
+const pickDefault = (args: {
+	runtime: AnalyticsRuntime
+	req: PayloadRequest
+	resolved: ScopeRegistry
+	scope: string
+	visible: AdapterRegistry
+	pick: DefaultSourceFunction
+}): Promise<string | undefined> => {
+	const { runtime, req, resolved, scope, visible, pick } = args
+	const listed = visible.all()
+	return pickedDefaults(req, {
+		owner: pick,
+		key: `${JSON.stringify(scope)}:${listed.map((adapter) => adapter.id).join(',')}`,
+		compute: async () => {
+			try {
+				const sources: SourceRef[] = await Promise.all(
+					listed.map((adapter) =>
+						sourceRefFor(adapter, {
+							req,
+							scope,
+							configIds: runtime.configAdapterIds,
+							docId: resolved.grants.get(adapter.id),
+						})
+					)
+				)
+				return await pick({ req, scope, sources })
+			} catch (err) {
+				req.payload.logger?.warn(
+					`analytics: defaultSource threw for scope "${scope}", which keeps the default: ${String(err)}`
+				)
+				return undefined
+			}
+		},
+	})
+}
+
+interface ScopeDefaultArgs {
+	runtime: AnalyticsRuntime
+	req: PayloadRequest
+	resolved: ScopeRegistry
+	scope: string
+	visible: AdapterRegistry
+}
+
+/**
+ * A tenant scope's default among the sources a reader sees: its document flagged the default, else
+ * the `defaultSource` rule's pick, else undefined for the registry's own.
+ */
+const scopeDefaultId = async (args: ScopeDefaultArgs): Promise<string | undefined> => {
+	const { runtime, resolved, visible } = args
+	const all = visible.all()
+	const sees = (id: string | undefined): id is string =>
+		id !== undefined && all.some((adapter) => adapter.id === id)
+	if (sees(resolved.defaultGrant)) {
+		return resolved.defaultGrant
+	}
+	const rule = runtime.defaultSource
+	if (rule === undefined) {
+		return undefined
+	}
+	if (rule === 'tenantFirst') {
+		return all.find((adapter) => resolved.grants.has(adapter.id))?.id
+	}
+	if (rule === 'platformFirst') {
+		return sees(runtime.platformAdapterId) ? runtime.platformAdapterId : undefined
+	}
+	const picked = await pickDefault({ ...args, pick: rule })
+	return sees(picked) ? picked : undefined
+}
+
+/** `visible` reading through the scope's chosen default; the very registry when it already does. */
+const withScopeDefault = async (
+	args: Omit<ScopeDefaultArgs, 'visible'> & { visible: AdapterRegistry | null }
+): Promise<AdapterRegistry | null> => {
+	const { visible } = args
+	if (!visible) {
+		return null
+	}
+	const chosen = await scopeDefaultId({ ...args, visible })
+	return chosen === undefined || chosen === visible.default().id
+		? visible
+		: createRegistry(visible.all(), chosen)
+}
+
+/**
+ * {@link visibleRegistryFor}, also naming the shared adapters only a `fallback` policy admitted,
+ * which a listing says so about.
+ */
+export const visibleSourcesFor = async (args: VisibleArgs): Promise<VisibleSources> => {
 	const { runtime, req, resolved, scope } = args
 	const { registry, grants } = resolved
 	if (runtime.scoped !== true || scope === null || scope === PLATFORM_SCOPE) {
-		return registry
+		return { registry, fallbackAdmitted: NONE_ADMITTED }
 	}
 	if (args.principal === SYSTEM) {
-		return filterRegistry(
+		const visible = filterRegistry(
 			registry,
 			(adapter) => grants.has(adapter.id) || !needsUnscopedSourceAccess(runtime, adapter, scope)
 		)
+		return {
+			registry: await withScopeDefault({ runtime, req, resolved, scope, visible }),
+			fallbackAdmitted: NONE_ADMITTED,
+		}
 	}
 	const gates = args.gates ?? scopeGates(runtime, req)
 	const readable = await readableProviderDocIds(runtime, req, scope)
-	const keep = new Set<string>()
+	const own: Granted[] = []
 	for (const adapter of registry.all()) {
 		const docId = grants.get(adapter.id)
-		if (docId !== undefined) {
-			if (readable === null || readable.has(docId)) {
-				keep.add(adapter.id)
-			}
+		if (docId !== undefined && (readable === null || readable.has(docId))) {
+			own.push({ adapter, docId })
+		}
+	}
+	const keep = new Set(own.map((granted) => granted.adapter.id))
+	const fallbackAdmitted = new Set<string>()
+	for (const adapter of registry.all()) {
+		if (grants.has(adapter.id)) {
 			continue
 		}
 		if (!runtime.providersCollection && adapter.capabilities.scopedQueries) {
 			keep.add(adapter.id)
 			continue
 		}
-		if (await gates.unscopedSource()) {
+		if (await gates.unscopedSource({ scope, adapterId: adapter.id })) {
 			keep.add(adapter.id)
+			continue
+		}
+		if (await policyAdmits({ runtime, req, scope, adapter, own })) {
+			keep.add(adapter.id)
+			if (runtime.sourcePolicies?.get(adapter.id) === 'fallback') {
+				fallbackAdmitted.add(adapter.id)
+			}
 		}
 	}
-	return filterRegistry(registry, (adapter) => keep.has(adapter.id))
+	const visible = filterRegistry(registry, (adapter) => keep.has(adapter.id))
+	return {
+		registry: await withScopeDefault({ runtime, req, resolved, scope, visible }),
+		fallbackAdmitted,
+	}
 }
+
+/**
+ * The adapters a request may read through in one tenant scope, or null for none: the scope's own
+ * sources follow the providers' read access (`sourceAccess`), a config adapter `unscopedSource` or
+ * its `sources` policy. A tenant scope reads through its chosen default (see `defaultSource`).
+ */
+export const visibleRegistryFor = async (args: VisibleArgs): Promise<AdapterRegistry | null> =>
+	(await visibleSourcesFor(args)).registry
 
 /**
  * The sources a job reads one scope through as {@link SYSTEM}, or null when the scope holds
@@ -236,13 +437,15 @@ export const resolveQueryScope = async (
 	const { runtime, req, scope, adapter } = args
 	const gates = args.gates ?? scopeGates(runtime, req)
 	if (scope === PLATFORM_SCOPE) {
-		return (await gates.aggregate()) ? { ok: true } : { ok: false }
+		return (await gates.aggregate({ scope })) ? { ok: true } : { ok: false }
 	}
 	if (scope === null) {
 		return { ok: true }
 	}
 	if (needsUnscopedSourceAccess(runtime, adapter, scope)) {
-		return (await gates.unscopedSource()) ? { ok: true } : { ok: false }
+		return (await gates.unscopedSource({ scope, adapterId: adapter.id }))
+			? { ok: true }
+			: { ok: false }
 	}
 	return { ok: true, queryScope: scope }
 }
@@ -331,7 +534,12 @@ export const resolveReadContext = async (args: ResolveReadContextArgs): Promise<
 		const fallback = registry.default()
 		const preferred =
 			args.prefer && !args.prefer(fallback) ? registry.all().find(args.prefer) : undefined
-		const adapter = adapterId ? registry.get(adapterId) : (preferred ?? fallback)
+		const substitutedFrom =
+			adapterId && args.fallbackWhenUnreadable && !registry.all().some((a) => a.id === adapterId)
+				? adapterId
+				: undefined
+		const adapter =
+			adapterId && substitutedFrom === undefined ? registry.get(adapterId) : (preferred ?? fallback)
 		const decision = await resolveQueryScope({
 			runtime,
 			req,
@@ -342,7 +550,14 @@ export const resolveReadContext = async (args: ResolveReadContextArgs): Promise<
 		if (!decision.ok) {
 			return { ok: false }
 		}
-		return { ok: true, adapter, scope: registryScope, queryScope: decision.queryScope, pin }
+		return {
+			ok: true,
+			adapter,
+			scope: registryScope,
+			queryScope: decision.queryScope,
+			pin,
+			...(substitutedFrom === undefined ? {} : { substitutedFrom }),
+		}
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: read context resolution failed: ${String(err)}`)
 		return { ok: false }

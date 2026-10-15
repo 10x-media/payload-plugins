@@ -5,11 +5,12 @@ import { intlLocale } from '../translations/intl'
 import { keys } from '../translations/keys'
 import { METRIC_KEYS } from '../translations/metricKeys'
 import { asTranslate, type Translate } from '../translations/server'
+import { widgetNotice } from './notices'
 import { RealtimeCounter } from './RealtimeCounter'
 import { readForWidgetRealtime } from './readForWidgetRealtime'
 import { buildRealtimeEndpoint } from './realtimePoll'
 import { type AnalyticsWidgetProps, widgetLink } from './viewLink'
-import { WidgetCard } from './WidgetCard'
+import { WidgetCard, WidgetNote } from './WidgetCard'
 import { WidgetFrame, WidgetStateCard } from './WidgetFrame'
 import { storedWidgetData } from './widgetData'
 
@@ -63,12 +64,14 @@ async function RealtimeWidgetBody(props: AnalyticsWidgetProps) {
 	// The counter's minute labels are server-rendered and rehydrated, so both sides have to
 	// read them in the install's reporting zone rather than in whatever zone they run in.
 	const timezone = await requestTimezone(props.req)
+	const now = currentDate()
 	const result = await readForWidgetRealtime({
 		req: props.req,
 		metric,
 		windowMinutes,
 		adapterId: data.dataSource,
-		now: currentDate(),
+		fallbackWhenUnreadable: true,
+		now,
 	})
 	const link = widgetLink(props, t, { adapterId: result.adapterId })
 	if (result.status !== 'ok') {
@@ -99,7 +102,7 @@ async function RealtimeWidgetBody(props: AnalyticsWidgetProps) {
 				intervalMs={POLL_INTERVAL_MS}
 				metric={metric}
 				windowMinutes={windowMinutes}
-				dataSource={data.dataSource}
+				dataSource={result.substitutedFrom === undefined ? data.dataSource : result.adapterId}
 				initialActiveNow={result.activeNow}
 				initialSeries={result.series}
 				initialSampled={result.sampled}
@@ -111,6 +114,12 @@ async function RealtimeWidgetBody(props: AnalyticsWidgetProps) {
 				sampledLabel={t(keys.stateSampled)}
 				fill
 			/>
+			<WidgetNote>
+				{widgetNotice(
+					{ substitutedFrom: result.substitutedFrom },
+					{ t, locale, now, timeZone: timezone }
+				)}
+			</WidgetNote>
 		</WidgetCard>
 	)
 }

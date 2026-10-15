@@ -63,6 +63,7 @@ async function MetricWidgetBody(props: AnalyticsWidgetProps) {
 		req: props.req,
 		metrics: [metric],
 		adapterId: data.dataSource,
+		fallbackWhenUnreadable: true,
 		now,
 		filters,
 		...windowReadArgs(window),

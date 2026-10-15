@@ -1,13 +1,15 @@
 import { dateTimeFormat, listFormat, relativeTimeFormat } from '../translations/intl'
 import { keys } from '../translations/keys'
 import type { Translate } from '../translations/server'
+import type { SubstitutedSource } from './prepareWidgetRead'
 import type { ReadNotices } from './readMeta'
 
 /** What a read can carry beyond its numbers, each of which earns a word of caveat. */
-export type WidgetNoticeFlags = Partial<ReadNotices> & {
-	/** The read asked about goals and the scope declared none of its own. */
-	noGoals?: boolean
-}
+export type WidgetNoticeFlags = Partial<ReadNotices> &
+	SubstitutedSource & {
+		/** The read asked about goals and the scope declared none of its own. */
+		noGoals?: boolean
+	}
 
 /** What wording a notice needs beyond its key: the reader's language and the moment it is read. */
 export interface NoticeContext {
@@ -70,6 +72,8 @@ const clampedText = (flags: WidgetNoticeFlags, context: NoticeContext): string =
 export const noticeTexts = (flags: WidgetNoticeFlags, context: NoticeContext): string[] => {
 	const { t } = context
 	const texts: string[] = []
+	// The id is not named: it can be an internal one, such as a provider document's.
+	if (flags.substitutedFrom !== undefined) texts.push(t(keys.stateSourceSubstituted))
 	if (flags.stale) texts.push(t(keys.viewStale))
 	if (flags.hostRefused) texts.push(t(keys.viewErrorHostRefused))
 	else if (flags.sourceError) texts.push(t(keys.viewErrorMisconfigured))
