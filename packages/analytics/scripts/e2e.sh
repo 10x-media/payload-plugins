@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Builds the dev app once, then runs the Playwright suite against each database in E2E_DBS
-# (default every one the plugin supports), in both tenancy modes, plus the slow-source checks.
+# (default every one the plugin supports), in both tenancy modes, plus the slow-source checks and
+# the providers' views on a narrowed Provider select.
 # Extra arguments go to every `playwright test` call.
 #
 #   E2E_DBS=postgres pnpm test:e2e analytics      # one database
@@ -68,7 +69,7 @@ for db in $E2E_DBS; do
 
 	echo "Running Playwright e2e (DEV_DB=${db}, TENANCY=off)..."
 	TENANCY=off E2E_REUSE_SERVER=0 pnpm --filter @10x-media/analytics exec playwright test \
-		--pass-with-no-tests --grep-invert '@tenancy|@slow-source' "$@"
+		--pass-with-no-tests --grep-invert '@tenancy|@slow-source|@narrowed-providers' "$@"
 
 	echo "Running Playwright e2e (DEV_DB=${db}, TENANCY=on)..."
 	TENANCY=on E2E_REUSE_SERVER=0 pnpm --filter @10x-media/analytics exec playwright test \
@@ -78,4 +79,9 @@ for db in $E2E_DBS; do
 	TENANCY=off ANALYTICS_SLOW_SOURCE_MS=10000 E2E_REUSE_SERVER=0 \
 		pnpm --filter @10x-media/analytics exec playwright test \
 		--pass-with-no-tests --grep @slow-source "$@"
+
+	echo "Running Playwright e2e (DEV_DB=${db}, narrowed provider types)..."
+	TENANCY=off ANALYTICS_PROVIDER_TYPES=posthog,plausible,umami E2E_REUSE_SERVER=0 \
+		pnpm --filter @10x-media/analytics exec playwright test \
+		--pass-with-no-tests --grep @narrowed-providers "$@"
 done

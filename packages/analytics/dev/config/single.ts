@@ -5,6 +5,7 @@ import {
 	DEV_REPORTING_TIMEZONE,
 	type DevConfigFragment,
 	devSiteAddress,
+	narrowedProviderTypes,
 	pagesBinding,
 	sharedCustomizing,
 	sharedDashboardLayout,
@@ -19,6 +20,7 @@ import {
 
 const nativeAdapter = native()
 const slowMs = slowSourceMs()
+const providerTypes = narrowedProviderTypes()
 const memorySource = slowMs ? delayedAdapter(devMemoryAdapter, slowMs) : devMemoryAdapter
 
 /** The single-site dev playground: one install, no tenancy plugin. */
@@ -45,7 +47,7 @@ export const singleFragment: DevConfigFragment = {
 				skip: sharedSkip,
 			},
 			goals: { defaults: sharedGoals, collection: true },
-			providers: { collection: true },
+			providers: { collection: providerTypes ? { types: providerTypes } : true },
 			widgets: sharedWidgets,
 			...sharedCustomizing,
 		}),
