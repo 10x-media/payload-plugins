@@ -221,7 +221,7 @@ export interface FieldBreakdownRow {
 }
 
 // @public (undocumented)
-export interface FieldReadResult {
+export interface FieldReadResult extends SubstitutedSource {
     // (undocumented)
     adapterId: string;
     breakdowns?: FieldBreakdown[];
@@ -351,7 +351,7 @@ export const readForField: (args: ReadForFieldArgs) => Promise<FieldReadResult>;
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForFieldArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForFieldArgs = ReadPrincipal & {
+export type ReadForFieldArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     collectionSlug: string;
     data: BindingDoc;
@@ -375,7 +375,7 @@ export const readForWidget: (args: ReadForWidgetArgs) => Promise<WidgetReadResul
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForWidgetArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForWidgetArgs = ReadPrincipal & {
+export type ReadForWidgetArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     metrics: MetricKey[];
     timeframe: TimeframePreset;
@@ -393,7 +393,7 @@ export const readForWidgetBreakdown: (args: ReadForWidgetBreakdownArgs) => Promi
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForWidgetBreakdownArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForWidgetBreakdownArgs = ReadPrincipal & {
+export type ReadForWidgetBreakdownArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     metric: MetricKey;
     dimension: DimensionKey;
@@ -415,7 +415,7 @@ export const readForWidgetGoals: (args: ReadForWidgetGoalsArgs) => Promise<Widge
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForWidgetGoalsArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForWidgetGoalsArgs = ReadPrincipal & {
+export type ReadForWidgetGoalsArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     timeframe: TimeframePreset;
     limit: number; /** Read the previous window too, when the source can compare. */
@@ -432,7 +432,7 @@ export const readForWidgetRealtime: (args: ReadForWidgetRealtimeArgs) => Promise
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForWidgetRealtimeArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForWidgetRealtimeArgs = ReadPrincipal & {
+export type ReadForWidgetRealtimeArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     metric: MetricKey;
     windowMinutes: number;
@@ -448,7 +448,7 @@ export const readForWidgetSeries: (args: ReadForWidgetSeriesArgs) => Promise<Wid
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForWidgetSeriesArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForWidgetSeriesArgs = ReadPrincipal & {
+export type ReadForWidgetSeriesArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     metric: MetricKey;
     timeframe: TimeframePreset;
@@ -534,10 +534,14 @@ export interface SeriesPoint {
 // @beta
 export function SourceSelectFieldServer(props: SelectFieldServerProps): JSX.Element;
 
+// @public
+export type SourcesNotice = 'platformFallback';
+
 // @public (undocumented)
 export interface SourcesResponse {
     // (undocumented)
     defaultId: string | null;
+    notice?: SourcesNotice;
     // (undocumented)
     sources: WireSource[];
 }
@@ -548,6 +552,16 @@ export type StatFieldI18n = {
     language?: string;
     fallbackLanguage?: FallbackLanguage;
 };
+
+// @public
+export interface StoredSourceRead {
+    fallbackWhenUnreadable?: boolean;
+}
+
+// @public
+export interface SubstitutedSource {
+    substitutedFrom?: string;
+}
 
 // @beta
 export const SYSTEM: unique symbol;
@@ -590,7 +604,7 @@ export function WidgetBody(input: {
 }): JSX.Element;
 
 // @public (undocumented)
-export interface WidgetBreakdownResult extends Partial<ReadNotices> {
+export interface WidgetBreakdownResult extends Partial<ReadNotices>, SubstitutedSource {
     // (undocumented)
     adapterId: string;
     // (undocumented)
@@ -632,7 +646,7 @@ export function WidgetEmpty(input: {
 }): JSX.Element;
 
 // @public (undocumented)
-export interface WidgetGoalsResult extends Partial<ReadNotices> {
+export interface WidgetGoalsResult extends Partial<ReadNotices>, SubstitutedSource {
     // (undocumented)
     adapterId: string;
     // (undocumented)
@@ -656,7 +670,7 @@ export function WidgetNote(input: {
 }): JSX.Element | null;
 
 // @public (undocumented)
-export interface WidgetReadResult extends Partial<ReadNotices> {
+export interface WidgetReadResult extends Partial<ReadNotices>, SubstitutedSource {
     // (undocumented)
     adapterId: string;
     comparisonRange?: DateRange;
@@ -677,7 +691,7 @@ export interface WidgetReadResult extends Partial<ReadNotices> {
 export type WidgetReadStatus = 'ok' | 'not-configured' | 'unavailable' | 'busy' | 'invalid' | 'range-too-long' | 'filter-unsupported' | 'no-access' | 'no-scope' | 'misconfigured' | 'host-refused';
 
 // @public (undocumented)
-export interface WidgetRealtimeResult extends Partial<ReadNotices> {
+export interface WidgetRealtimeResult extends Partial<ReadNotices>, SubstitutedSource {
     activeNow: number;
     // (undocumented)
     adapterId: string;
@@ -694,7 +708,7 @@ export interface WidgetRealtimeResult extends Partial<ReadNotices> {
 export type WidgetRealtimeStatus = 'ok' | 'not-configured' | 'unavailable' | 'busy' | 'invalid' | 'no-access' | 'no-scope' | 'misconfigured' | 'host-refused';
 
 // @public (undocumented)
-export interface WidgetSeriesResult extends Partial<ReadNotices> {
+export interface WidgetSeriesResult extends Partial<ReadNotices>, SubstitutedSource {
     // (undocumented)
     adapterId: string;
     comparisonPoints?: SeriesPoint[];

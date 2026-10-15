@@ -223,6 +223,7 @@ export interface TrackerSlotConfig {
         kind: CaptureClientKind;
     } & Record<string, string | number | boolean>;
     gated: boolean;
+    instance?: string;
     // (undocumented)
     kind: CaptureClientKind;
     path: string;

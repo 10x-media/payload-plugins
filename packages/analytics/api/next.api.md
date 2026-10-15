@@ -23,6 +23,16 @@ export interface AdapterContext {
 export type AdapterJobs = false | Readonly<Record<AnalyticsTaskName, ScheduledTask>>;
 
 // @public
+export interface AdapterLabelArgs {
+    // (undocumented)
+    req: PayloadRequest;
+    scope: string | null;
+}
+
+// @public
+export type AdapterLabelOption = string | Record<string, string> | ((args: AdapterLabelArgs) => string | Promise<string>);
+
+// @public
 export interface AdapterRegisterContext {
     adapterGrantedForScope?: (req: PayloadRequest, scope: string | null, adapterId: string) => Promise<boolean>;
     allowedOrigins?: ReadonlySet<string>;
@@ -74,8 +84,8 @@ export interface AnalyticsAdapter {
     };
     // (undocumented)
     isConfigured(): boolean;
-    // (undocumented)
     readonly label: string;
+    readonly labelFor?: (args: AdapterLabelArgs) => string | Promise<string>;
     // (undocumented)
     query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>;
     // (undocumented)
@@ -266,6 +276,7 @@ export interface CaptureSupport {
     snippet(args: {
         path: string;
         scope?: string | null;
+        instance?: string;
     }): CaptureSnippet;
 }
 
@@ -624,6 +635,7 @@ export interface TrackerSlotConfig {
         kind: CaptureClientKind;
     } & Record<string, string | number | boolean>;
     gated: boolean;
+    instance?: string;
     // (undocumented)
     kind: CaptureClientKind;
     path: string;
