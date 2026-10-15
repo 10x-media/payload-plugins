@@ -15,7 +15,7 @@ const mocks = vi.hoisted(() => ({
 	sourceId: undefined as string | undefined,
 	useFieldArgs: [] as Array<Record<string, unknown>>,
 	userId: 'user-0',
-	value: 'eq',
+	value: undefined as string | undefined,
 	withCondition: vi.fn((component: unknown) => component),
 }))
 
@@ -158,7 +158,8 @@ beforeEach(() => {
 	mocks.path = 'filter.operator'
 	mocks.sourceId = undefined
 	mocks.dimension = undefined
-	mocks.value = 'eq'
+	// Nothing stored, so no option renders before the sources answer and every find waits for them.
+	mocks.value = undefined
 	mocks.setValue.mockClear()
 	mocks.useFieldArgs.length = 0
 	fetchMock.mockReset()
