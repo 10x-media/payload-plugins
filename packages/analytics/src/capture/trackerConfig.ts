@@ -125,6 +125,12 @@ const exclusionFor = (
 /** The Payload instances that already logged a vendor filling both slots, so a busy site hears it once. */
 const warnedSharedVendor = new WeakSet<Payload>()
 
+/**
+ * The vendors whose browser SDK runs a second client beside the first, each with its own project,
+ * gate and storage: a second slot of one of these kinds captures through a client named after it.
+ */
+const NAMED_CLIENT_KINDS: ReadonlySet<CaptureClientKind> = new Set<CaptureClientKind>(['posthog'])
+
 /** Why the second slot of one vendor kind is left out, logged once per instance. */
 const warnSharedVendor = (
 	payload: Payload | undefined,
@@ -135,7 +141,7 @@ const warnSharedVendor = (
 	}
 	warnedSharedVendor.add(payload)
 	payload.logger?.warn(
-		`analytics: the ${args.slot} slot resolved to "${args.adapterId}", a second ${args.kind} slot beside "${args.first.adapterId}" on the ${args.first.slot} slot. Two slots of one vendor share its one client in the browser, so neither slot's gate could be answered alone and the ${args.slot} slot's events could land in the other slot's project: the ${args.slot} slot is left out of the tracker config. Logged once.`
+		`analytics: the ${args.slot} slot resolved to "${args.adapterId}", a second ${args.kind} slot beside "${args.first.adapterId}" on the ${args.first.slot} slot. ${args.kind} runs one client per page, so two slots of it would share that client: neither slot's gate could be answered alone and the ${args.slot} slot's events could land in the other slot's project. The ${args.slot} slot is left out of the tracker config; only PostHog runs a second client beside the first. Logged once.`
 	)
 }
 
@@ -167,12 +173,12 @@ export const resolveTrackerConfig = async (args: {
 			continue
 		}
 		const kind = capture.client.kind
-		// Two slots of one vendor share its one browser global, so neither gate could be answered alone.
 		const first = slots.find((entry) => entry.kind === kind)
-		if (first) {
+		if (first && !NAMED_CLIENT_KINDS.has(kind)) {
 			warnSharedVendor(req.payload, { slot, adapterId: adapter.id, kind, first })
 			continue
 		}
+		const instance = first ? slot : undefined
 		const override = runtime.capturePaths?.[slot]
 		const path = override
 			? appPath(normalizeMountPath(override))
@@ -188,8 +194,12 @@ export const resolveTrackerConfig = async (args: {
 				kind,
 				adapterId: adapter.id,
 				path,
-				snippet: withExclusionPrelude(capture.snippet({ path, scope }), exclusion?.param),
+				snippet: withExclusionPrelude(
+					capture.snippet({ path, scope, ...(instance ? { instance } : {}) }),
+					exclusion?.param
+				),
 				client: capture.client,
+				...(instance ? { instance } : {}),
 				gated,
 			})
 			filled.add(adapter.id)

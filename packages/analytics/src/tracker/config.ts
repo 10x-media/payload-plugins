@@ -130,6 +130,11 @@ export interface TrackerSlotConfig {
 	/** What the adapter hands its browser client: public settings only, never a credential. */
 	client: { kind: CaptureClientKind } & Record<string, string | number | boolean>
 	/**
+	 * The named vendor client this slot captures with, beside the other slot's client of the same
+	 * vendor: PostHog's `window.posthog[instance]`. Absent, the vendor's primary client.
+	 */
+	instance?: string
+	/**
 	 * True when `capture.gate` holds this slot until the host's consent manager answers. Was
 	 * `requiresConsent` in 1.0.0-beta.11; the tracker still reads that from a cached config.
 	 */

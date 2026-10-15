@@ -509,6 +509,9 @@ export type MetricValue = number | null;
 // @public
 export type MetricValues = Partial<Record<MetricKey, MetricValue>>;
 
+// @beta
+export function ProvidersListNotice(): JSX.Element;
+
 // @public
 export class QueryFetchError extends Error {
     constructor(status: number, error?: AnalyticsError, retryAfter?: number);
@@ -790,10 +793,14 @@ export type SourceErrorKind = 'misconfigured' | 'host-refused';
 // @beta @deprecated
 export const SourceSelectField: (props: SelectFieldClientProps) => JSX_2.Element;
 
+// @public
+export type SourcesNotice = 'platformFallback';
+
 // @public (undocumented)
 export interface SourcesResponse {
     // (undocumented)
     defaultId: string | null;
+    notice?: SourcesNotice;
     // (undocumented)
     sources: WireSource[];
 }

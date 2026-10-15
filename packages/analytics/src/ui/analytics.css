@@ -1073,6 +1073,11 @@
 		color: var(--analytics-text-muted);
 	}
 
+	/* The view spaces its children by its gap, which Payload's banner margin would double. */
+	.analytics-view > .analytics-sources-notice {
+		margin-block-end: 0;
+	}
+
 	/* The breakdown's tabs, with the filter a row click set beside them. */
 	.analytics-view__breakdown-head {
 		display: flex;

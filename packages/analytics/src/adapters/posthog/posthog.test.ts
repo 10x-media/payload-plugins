@@ -955,7 +955,8 @@ describe('posthog capture', () => {
 		expect(inline).toContain(
 			'p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js"'
 		)
-		expect(inline).toContain('"init capture register')
+		// `init` stays the stub's own, so a second client's init queues for that client.
+		expect(inline).toContain('o="capture register')
 		// The injected tag inherits the inline's nonce, or a nonce CSP blocks the bundle.
 		expect(inline).toContain(
 			'(c=t.currentScript&&(t.currentScript.nonce||t.currentScript.getAttribute("nonce")))&&(p.nonce=c,p.setAttribute("nonce",c))'

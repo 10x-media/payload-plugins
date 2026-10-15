@@ -15,13 +15,16 @@ import {
 	engineRead,
 	pinnedScope,
 	prepareWidgetRead,
+	type StoredSourceRead,
+	type SubstitutedSource,
+	substitutionOf,
 	type WidgetReadStatus,
 } from './prepareWidgetRead'
 import { type ReadNotices, readMeta } from './readMeta'
 
 export type { WidgetReadStatus } from './prepareWidgetRead'
 
-export interface WidgetReadResult extends Partial<ReadNotices> {
+export interface WidgetReadResult extends Partial<ReadNotices>, SubstitutedSource {
 	status: WidgetReadStatus
 	/** How long until a `busy` read can succeed, when the source or the plugin knows. */
 	retryAfterMs?: number
@@ -50,25 +53,26 @@ export interface WidgetReadResult extends Partial<ReadNotices> {
  * Without `scope` the read is the request's own, behind `access.read`. A `scope` must be one
  * already cleared for this request, or a job's own with `principal: SYSTEM`.
  */
-export type ReadForWidgetArgs = ReadPrincipal & {
-	req: PayloadRequest
-	metrics: MetricKey[]
-	timeframe: TimeframePreset
-	adapterId?: string
-	now: Date
-	range?: DateRange
-	/**
-	 * Reporting timezone the caller already resolved, reused rather than resolved again so
-	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
-	 */
-	timezone?: string
-	filters?: AnalyticsFilter[]
-	/**
-	 * Read the previous window too, where the install and the source both allow it. Defaults
-	 * to on; a caller that never renders a delta passes false to save the second read.
-	 */
-	comparison?: boolean
-}
+export type ReadForWidgetArgs = ReadPrincipal &
+	StoredSourceRead & {
+		req: PayloadRequest
+		metrics: MetricKey[]
+		timeframe: TimeframePreset
+		adapterId?: string
+		now: Date
+		range?: DateRange
+		/**
+		 * Reporting timezone the caller already resolved, reused rather than resolved again so
+		 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+		 */
+		timezone?: string
+		filters?: AnalyticsFilter[]
+		/**
+		 * Read the previous window too, where the install and the source both allow it. Defaults
+		 * to on; a caller that never renders a delta passes false to save the second read.
+		 */
+		comparison?: boolean
+	}
 
 /**
  * Totals of `metrics` over a widget's window, beside the previous window's where the install and
@@ -82,6 +86,7 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 		timeframe,
 		adapterId,
 		...readPrincipalOf(args),
+		...(args.fallbackWhenUnreadable ? { fallbackWhenUnreadable: true } : {}),
 		timezone: args.timezone,
 		range,
 		filters,
@@ -122,6 +127,7 @@ export const readForWidget = async (args: ReadForWidgetArgs): Promise<WidgetRead
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
+		...substitutionOf(prepared),
 		...pinnedScope(args, prepared.queryScope),
 		dateRange,
 		timezone: tz,

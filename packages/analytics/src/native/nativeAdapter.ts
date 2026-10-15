@@ -26,6 +26,7 @@ import { type AdapterJobs, DEFAULT_JOBS } from '../core/jobs'
 import { assertNoLegacyOptions, LEGACY_NATIVE_OPTIONS } from '../core/legacyOptions'
 import type { MaxmindSdk } from '../core/sdks'
 import type { IngestHostnameResolver } from '../core/serverEvent'
+import { type AdapterLabelOption, adapterLabel } from '../core/sourceLabel'
 import { isRecord, kindOf } from '../core/values'
 import { dbKind, isD1 } from '../db/kind'
 import { DEFAULT_ORDER_SIGNATURE } from '../goals/match'
@@ -109,6 +110,11 @@ export interface NativeToday {
 }
 
 export interface NativeOptions {
+	/**
+	 * The source's name in pickers and listings: a string, a map by admin language (read like
+	 * `view.navLabel`), or a function naming it per reader and scope. Default `'Payload'`.
+	 */
+	label?: AdapterLabelOption
 	/**
 	 * Where each event's country, region and city come from. One that throws costs the event its
 	 * location, never the event, and is logged at most once an hour while it fails.
@@ -651,7 +657,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 
 	return {
 		id: NATIVE_ADAPTER_ID,
-		label: 'Payload',
+		...adapterLabel(options.label, 'Payload', 'native({ label })'),
 		get capabilities() {
 			return capabilities
 		},

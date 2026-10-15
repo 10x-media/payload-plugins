@@ -109,6 +109,7 @@ async function BreakdownWidgetBody(props: AnalyticsWidgetProps) {
 		dimension: spec.dimension,
 		limit: data.limit ?? DEFAULT_LIMIT,
 		adapterId: data.dataSource,
+		fallbackWhenUnreadable: true,
 		now,
 		filters,
 		...windowReadArgs(window),

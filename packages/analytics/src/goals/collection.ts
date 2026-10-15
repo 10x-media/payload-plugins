@@ -1,12 +1,10 @@
 import type {
 	CollectionBeforeValidateHook,
 	CollectionConfig,
-	CollectionSlug,
 	CompoundIndex,
 	Field,
 	PayloadRequest,
 	TextFieldSingleValidation,
-	Where,
 } from 'payload'
 import { ValidationError } from 'payload'
 import { valueAt } from '../core/values'
@@ -18,7 +16,8 @@ import {
 } from '../plugin/collectionFields'
 import { docScope, type ScopeChange } from '../plugin/scopeChange'
 import type { ProviderAccessArgs } from '../providers/access'
-import { memberScopeOf, providerCreateAccess, providerRowAccess } from '../providers/access'
+import { providerCreateAccess, providerRowAccess } from '../providers/access'
+import { takenInScope } from '../providers/scopeUnique'
 import { stampScope } from '../providers/stampScope'
 import { keys, type TranslationKey } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
@@ -27,7 +26,6 @@ import { amountField } from './amountField'
 import { type AmountOf, amountCurrencyField } from './currency'
 import { hiddenAdmin } from './moneyFields'
 import { MAX_PATTERN_GLOBSTARS, MAX_PATTERN_SEGMENTS, patternProblem } from './pathMatch'
-import { goalScopeWhere } from './resolver'
 import { GOAL_SLUG_PATTERN } from './types'
 
 export const GOALS_SLUG = 'analytics-goals'
@@ -87,34 +85,6 @@ const validatePattern: TextFieldSingleValidation = (value, { req }) =>
 			})
 		: true
 
-const asScope = (value: unknown): string | null =>
-	value === null || value === undefined || value === '' ? null : String(value)
-
-/**
- * The scope the stamp will land the write in. Only a platform admin's declared scope is trusted:
- * anyone else's would turn "slug taken" into an oracle for what another tenant owns.
- */
-const writeScope = async (
-	args: BuildGoalsCollectionArgs,
-	write: {
-		data?: Record<string, unknown>
-		originalDoc?: Record<string, unknown>
-		req: PayloadRequest
-	}
-): Promise<string | null> => {
-	const { data, originalDoc, req } = write
-	try {
-		if (await args.crossScope({ req })) {
-			// No declared scope means an install-wide goal, not one in whatever scope the
-			// admin's own request happens to resolve to.
-			return asScope(data?.[args.scopeField]) ?? asScope(originalDoc?.[args.scopeField])
-		}
-		return await memberScopeOf(args, req)
-	} catch {
-		return null
-	}
-}
-
 const slugError = (collection: string, req: PayloadRequest, key: TranslationKey) =>
 	new ValidationError({
 		collection,
@@ -140,29 +110,7 @@ const checkSlug = (args: BuildGoalsCollectionArgs): CollectionBeforeValidateHook
 		if (!GOAL_SLUG_PATTERN.test(slug)) {
 			throw slugError(args.slug, req, keys.goalErrorSlug)
 		}
-		const where: Where[] = [{ slug: { equals: slug } }]
-		if (args.scoped) {
-			where.push(
-				goalScopeWhere(args.scopeField, await writeScope(args, { data, originalDoc, req }))
-			)
-		}
-		const id = originalDoc?.id
-		if (id !== undefined && id !== null) {
-			where.push({ id: { not_equals: id } })
-		}
-		// pagination:false is load-bearing: a paginated read fires its count and its find in
-		// parallel on one Mongo session, which the write's open transaction refuses.
-		const { docs } = await req.payload.find({
-			// This hook runs on the collection itself, so its slug is registered.
-			collection: args.slug as CollectionSlug,
-			where: { and: where },
-			limit: 1,
-			pagination: false,
-			depth: 0,
-			overrideAccess: true,
-			req,
-		})
-		if (docs.length > 0) {
+		if (await takenInScope(args, { data, originalDoc, req }, { slug: { equals: slug } })) {
 			throw slugError(args.slug, req, keys.goalErrorSlugTaken)
 		}
 		return data

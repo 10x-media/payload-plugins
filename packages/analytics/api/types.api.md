@@ -38,6 +38,16 @@ export interface AdapterContext {
 export type AdapterJobs = false | Readonly<Record<AnalyticsTaskName, ScheduledTask>>;
 
 // @public
+export interface AdapterLabelArgs {
+    // (undocumented)
+    req: PayloadRequest;
+    scope: string | null;
+}
+
+// @public
+export type AdapterLabelOption = string | Record<string, string> | ((args: AdapterLabelArgs) => string | Promise<string>);
+
+// @public
 export interface AdapterRegisterContext {
     adapterGrantedForScope?: (req: PayloadRequest, scope: string | null, adapterId: string) => Promise<boolean>;
     allowedOrigins?: ReadonlySet<string>;
@@ -123,8 +133,8 @@ export interface AnalyticsAdapter {
     };
     // (undocumented)
     isConfigured(): boolean;
-    // (undocumented)
     readonly label: string;
+    readonly labelFor?: (args: AdapterLabelArgs) => string | Promise<string>;
     // (undocumented)
     query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>;
     // (undocumented)
@@ -329,6 +339,8 @@ export type AnalyticsPluginOptions = {
     defaultAdapter?: string;
     platformAdapter?: string; /** Tenancy: how a request maps to its scope. Unset, the whole install is one scope. */
     scope?: AnalyticsScopeOptions;
+    sources?: Record<string, AnalyticsSourceOptions>;
+    defaultSource?: DefaultSourceRule;
     reportingTimezone?: string | TimezoneResolver;
     revenue?: boolean | AnalyticsRevenueOptions;
     trustedProxyHops?: number;
@@ -456,6 +468,11 @@ export interface AnalyticsSdks {
     maxmind?: MaxmindSdk;
 }
 
+// @public
+export interface AnalyticsSourceOptions {
+    tenants?: SourcePolicy;
+}
+
 // @public (undocumented)
 export type AnalyticsStatBaseOptions = {
     timeframe?: TimeframePreset;
@@ -551,6 +568,7 @@ export type AnalyticsViewOptions = {
     defaultRange?: TimeframePreset; /** Metric the cards and the trend open on. Default `pageviews`. */
     defaultMetric?: MetricKey;
     navLabel?: string | Record<string, string>;
+    navLink?: boolean;
     Component?: AnalyticsComponent;
 };
 
@@ -688,6 +706,7 @@ export interface CaptureSupport {
     snippet(args: {
         path: string;
         scope?: string | null;
+        instance?: string;
     }): CaptureSnippet;
 }
 
@@ -721,6 +740,8 @@ export type CountryFlags = boolean | HostCountryFlag;
 // @public
 export type CrossScopeAccess = (args: {
     req: PayloadRequest;
+    scope?: string | null;
+    adapterId?: string;
 }) => boolean | Promise<boolean>;
 
 // @public
@@ -759,6 +780,16 @@ export interface DateRange {
     // (undocumented)
     start: Date;
 }
+
+// @public
+export type DefaultSourceFunction = (args: {
+    req: PayloadRequest;
+    scope: string;
+    sources: SourceRef[];
+}) => string | undefined | Promise<string | undefined>;
+
+// @public
+export type DefaultSourceRule = 'tenantFirst' | 'platformFirst' | DefaultSourceFunction;
 
 // @public
 export const DIMENSION_KEYS: readonly ["page", "referrer", "source", "channel", "medium", "campaign", "utmSource", "utmMedium", "utmCampaign", "utmContent", "utmTerm", "device", "browser", "os", "country", "region", "city", "language", "event", "goal", "currency", "item"];
@@ -1140,6 +1171,10 @@ export const keys: {
     readonly providerErrorScriptId: "analytics:providerErrorScriptId";
     readonly providerErrorHostFormat: "analytics:providerErrorHostFormat";
     readonly providerErrorHostInsecure: "analytics:providerErrorHostInsecure";
+    readonly providerFieldIsDefault: "analytics:providerFieldIsDefault";
+    readonly providerFieldIsDefaultHelp: "analytics:providerFieldIsDefaultHelp";
+    readonly providerErrorDefaultTaken: "analytics:providerErrorDefaultTaken";
+    readonly providerErrorTypeUnserved: "analytics:providerErrorTypeUnserved";
     readonly providerNameNative: "analytics:providerNameNative";
     readonly providerNameNativeHelp: "analytics:providerNameNativeHelp";
     readonly providerNamePlausible: "analytics:providerNamePlausible";
@@ -1362,6 +1397,8 @@ export const keys: {
     readonly panelNewItem: "analytics:panelNewItem";
     readonly panelNoVisits: "analytics:panelNoVisits";
     readonly panelNoViews: "analytics:panelNoViews";
+    readonly sourcesPlatformFallback: "analytics:sourcesPlatformFallback";
+    readonly stateSourceSubstituted: "analytics:stateSourceSubstituted";
 };
 
 // @public
@@ -1399,6 +1436,16 @@ export type MetricValues = Partial<Record<MetricKey, MetricValue>>;
 
 // @public
 export type OrderSignatureMode = 'required' | 'optional';
+
+// @public
+export interface OwnSource {
+    // (undocumented)
+    docId: string;
+    // (undocumented)
+    id: string;
+    // (undocumented)
+    label: string;
+}
 
 // @public
 export interface ParsedQuery {
@@ -1457,6 +1504,7 @@ export type PluralVariant<C extends PluralCategory = PluralCategory> = (typeof p
 export interface ProviderCollectionFieldOverrides {
     // (undocumented)
     enabled?: ProviderFieldOverride;
+    isDefault?: ProviderFieldOverride;
     // (undocumented)
     name?: ProviderFieldOverride;
     // (undocumented)
@@ -1481,6 +1529,9 @@ export type ProviderHostsOptions = {
 };
 
 // @public (undocumented)
+export type ProviderId = 'native' | 'plausible' | 'umami' | 'ga4' | 'posthog';
+
+// @public (undocumented)
 export type ProvidersCollectionOptions = {
     slug?: string;
     scopeField?: string;
@@ -1491,6 +1542,8 @@ export type ProvidersCollectionOptions = {
         keys?: KeysConfig;
     };
     connectionAccess?: ConnectionAccess;
+    defaultAccess?: ConnectionAccess;
+    types?: ProviderId[];
     sourceAccess?: Access;
 };
 
@@ -1846,10 +1899,35 @@ export interface SnippetScript {
 // @public
 export type SourceErrorKind = 'misconfigured' | 'host-refused';
 
+// @public
+export type SourcePolicy = 'staff' | 'tenant' | 'fallback' | SourcePolicyFunction;
+
+// @public
+export type SourcePolicyFunction = (args: {
+    req: PayloadRequest;
+    scope: string;
+    adapterId: string; /** Sources the reader already reads the scope through by its own provider documents. */
+    ownSources: OwnSource[];
+}) => boolean | Promise<boolean>;
+
+// @public
+export interface SourceRef {
+    docId?: string;
+    // (undocumented)
+    id: string;
+    kind: 'config' | 'runtime';
+    // (undocumented)
+    label: string;
+}
+
+// @public
+export type SourcesNotice = 'platformFallback';
+
 // @public (undocumented)
 export interface SourcesResponse {
     // (undocumented)
     defaultId: string | null;
+    notice?: SourcesNotice;
     // (undocumented)
     sources: WireSource[];
 }
@@ -1917,6 +1995,7 @@ export interface TrackerSlotConfig {
         kind: CaptureClientKind;
     } & Record<string, string | number | boolean>;
     gated: boolean;
+    instance?: string;
     // (undocumented)
     kind: CaptureClientKind;
     path: string;

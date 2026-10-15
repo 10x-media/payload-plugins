@@ -172,6 +172,8 @@ const answerDocument = async (
 			...(dimensions.length > 0 ? { dimensions } : {}),
 			...(limit === undefined ? {} : { limit }),
 			adapterId: params.get('dataSource') ?? undefined,
+			// The panel sends the source its field stores until the reader picks another.
+			fallbackWhenUnreadable: true,
 			now: currentDate(),
 			compare: params.get('compare') === '1',
 			series: params.get('series') === '1',

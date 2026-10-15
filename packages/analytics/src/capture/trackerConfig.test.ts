@@ -114,14 +114,68 @@ describe('resolveTrackerConfig slots', () => {
 		expect(config.slots.map((s) => [s.slot, s.adapterId])).toEqual([['global', 'native']])
 	})
 
-	// Two PostHog slots would share one `window.posthog`: the tenant's init would no-op on the
-	// platform's SDK and its events would land in the platform's project.
-	it('leaves out a second slot of the same vendor kind, warning once', async () => {
-		const tenantPosthog: AnalyticsAdapter = { ...posthogSlot(), id: 'tenant-posthog' }
+	// posthog-js runs a named client beside the primary one, each with its own project and opt-out.
+	it('keeps a second PostHog slot as the named client "tenant"', async () => {
+		const tenantPosthog: AnalyticsAdapter = {
+			...posthog({
+				projectId: '2',
+				apiKey: 'phx_tenant',
+				projectToken: 'phc_tenant',
+				scopeProperty: 'site',
+			}),
+			id: 'posthog:tenant-doc',
+		}
 		const runtime = scopedRuntime(
 			[posthogSlot()],
 			{ 'tenant-a': [tenantPosthog] },
-			{ captureSlots: { global: 'posthog', tenant: 'tenant-posthog' } }
+			{ platformAdapterId: 'posthog' }
+		)
+		const warn = vi.fn()
+		const config = await resolveTrackerConfig({
+			runtime,
+			req: req({
+				payload: { config: { routes: { api: '/api' } }, logger: { warn } },
+				headers: new Headers({ 'x-tenant': 'tenant-a' }),
+			}),
+		})
+
+		expect(config.slots.map((s) => [s.slot, s.adapterId, s.instance])).toEqual([
+			['global', 'posthog', undefined],
+			['tenant', 'posthog:tenant-doc', 'tenant'],
+		])
+		const [global, tenant] = config.slots.map((s) => s.snippet.scripts.at(-1)?.inline ?? '')
+		expect(global).toContain('posthog.init("phc_public",{')
+		expect(global).toContain('capture_pageview:"history_change"')
+		expect(global).not.toContain('"tenant"')
+		expect(tenant).toContain('posthog.init("phc_tenant",{api_host:"/api/_x/p/tenant"')
+		expect(tenant).toContain('capture_pageview:false,capture_pageleave:true')
+		expect(tenant).toContain('},"tenant")')
+		expect(tenant).toContain('posthog["tenant"].register({["site"]:"tenant-a"})')
+		expect(config.slots.every((s) => s.gated)).toBe(true)
+		expect(warn).not.toHaveBeenCalled()
+	})
+
+	it('leaves a PostHog slot the global slot does not share on the primary client', async () => {
+		const runtime = scopedRuntime(
+			[native()],
+			{ 'tenant-a': [posthogSlot()] },
+			{ captureSlots: { tenant: 'posthog' }, platformAdapterId: 'native' }
+		)
+		const config = await resolveTrackerConfig({ runtime, req: scopedReq('tenant-a') })
+		const tenant = config.slots.find((s) => s.slot === 'tenant')
+		expect(tenant).not.toHaveProperty('instance')
+		expect(tenant?.snippet.scripts[0]?.inline).toContain(
+			'posthog.init("phc_public",{api_host:"/api/_x/p/tenant",ui_host:"https://us.posthog.com",capture_pageview:"history_change",opt_out_persistence_by_default:true})'
+		)
+	})
+
+	// Every other vendor runs one global per page: the tenant's init would land on the platform's.
+	it('leaves out a second slot of another vendor kind, warning once', async () => {
+		const site = (domain: string) => plausible({ siteId: domain, apiKey: 'k', domain })
+		const runtime = scopedRuntime(
+			[site('platform.test')],
+			{ 'tenant-a': [{ ...site('a.test'), id: 'tenant-plausible' }] },
+			{ captureSlots: { global: 'plausible', tenant: 'tenant-plausible' } }
 		)
 		const warn = vi.fn()
 		const payload = { config: { routes: { api: '/api' } }, logger: { warn } }
@@ -137,11 +191,12 @@ describe('resolveTrackerConfig slots', () => {
 		const config = await visit()
 		await visit()
 
-		expect(config.slots.map((s) => [s.slot, s.adapterId])).toEqual([['global', 'posthog']])
+		expect(config.slots.map((s) => [s.slot, s.adapterId])).toEqual([['global', 'plausible']])
 		expect(warn).toHaveBeenCalledTimes(1)
 		expect(warn.mock.calls[0]?.[0]).toContain(
-			'the tenant slot resolved to "tenant-posthog", a second posthog slot beside "posthog" on the global slot'
+			'the tenant slot resolved to "tenant-plausible", a second plausible slot beside "plausible" on the global slot'
 		)
+		expect(warn.mock.calls[0]?.[0]).toContain('only PostHog runs a second client')
 	})
 
 	it('keeps two slots of different vendor kinds', async () => {

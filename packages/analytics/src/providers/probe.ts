@@ -24,6 +24,8 @@ export interface ProbeRow {
 	enabled: boolean
 	/** The provider type, on rows of the providers collection only. */
 	provider?: string
+	/** Only on a flagged providers row, so the epoch of rows nobody flagged stays as it was. */
+	isDefault?: true
 	scope: string | null
 }
 
@@ -94,7 +96,7 @@ export const createCollectionProbe = (options: CollectionProbeOptions): Collecti
 		updatedAt: true,
 		enabled: true,
 		[scopeField]: true,
-		...(options.provider ? { provider: true } : {}),
+		...(options.provider ? { provider: true, isDefault: true } : {}),
 	}
 	const memo = new Map<string, Memoized>()
 	const expedited = new Map<string, number>()
@@ -104,6 +106,7 @@ export const createCollectionProbe = (options: CollectionProbeOptions): Collecti
 		updatedAt: versionOf(doc.updatedAt),
 		enabled: doc.enabled === true,
 		...(options.provider ? { provider: typeof doc.provider === 'string' ? doc.provider : '' } : {}),
+		...(options.provider && doc.isDefault === true ? { isDefault: true as const } : {}),
 		scope: docScope(doc, scopeField),
 	})
 

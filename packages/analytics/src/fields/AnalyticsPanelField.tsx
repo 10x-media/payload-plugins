@@ -81,6 +81,7 @@ const toPanelData = (result: FieldReadResult): PanelData => ({
 	realtime: result.realtime,
 	breakdowns: result.breakdowns,
 	notices: result.notices,
+	...(result.substitutedFrom === undefined ? {} : { substitutedFrom: result.substitutedFrom }),
 })
 
 /**
@@ -156,6 +157,7 @@ const PanelFieldBody = async (props: AnalyticsPanelFieldProps) => {
 			...(readOptional ? { optionalMetrics: readOptional } : {}),
 			timeframe,
 			adapterId,
+			fallbackWhenUnreadable: true,
 			...(dimensions.length > 0 ? { dimensions: item ? ITEM_PANEL_DIMENSIONS : dimensions } : {}),
 			now: renderedAt,
 			compare: true,

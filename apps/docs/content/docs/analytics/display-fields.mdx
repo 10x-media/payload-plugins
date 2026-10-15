@@ -123,7 +123,7 @@ The reader still has to be able to read the document itself: every read goes thr
 
 ### The panel's source switcher
 
-`sources` decides what the panel's data-source select offers. `'auto'` (the default) is every source the document's own scope holds that this reader may read through, which on a scoped install means that tenant's [provider documents](/analytics/multi-tenancy#which-sources-a-request-sees), plus the platform's own config adapters for a reader `access.crossScope.unscopedSource` allows. A list of adapter ids narrows that further. One surviving source draws no select.
+`sources` decides what the panel's data-source select offers. `'auto'` (the default) is every source the document's own scope holds that this reader may read through, which on a scoped install means that tenant's [provider documents](/analytics/multi-tenancy#which-sources-a-request-sees), plus the platform's own config adapters for a reader `access.crossScope.unscopedSource` allows or [`sources`](/analytics/multi-tenancy#letting-tenants-read-a-shared-source) admits. A list of adapter ids narrows that further. One surviving source draws no select. The panel starts on the scope's [default source](/analytics/multi-tenancy#a-tenants-default-source); a stored source the reader can no longer read gives way to that default, with a note saying so, rather than an error.
 
 ```ts
 analyticsTab({ sources: ['native', 'plausible:42'] })

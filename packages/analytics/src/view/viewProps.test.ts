@@ -5,6 +5,22 @@ import { getRuntime, setRuntime } from '../plugin/runtime'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { resolveViewProps } from './viewProps'
 
+/** A notice the listing is made to carry, as a `fallback` policy would add it. */
+const listing = vi.hoisted(() => ({ notice: undefined as 'platformFallback' | undefined }))
+
+vi.mock('../plugin/readContextForRequest', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('../plugin/readContextForRequest')>()
+	return {
+		...actual,
+		resolveSourcesForRequest: async (
+			...args: Parameters<typeof actual.resolveSourcesForRequest>
+		) => {
+			const resolved = await actual.resolveSourcesForRequest(...args)
+			return listing.notice ? { ...resolved, notice: listing.notice } : resolved
+		},
+	}
+})
+
 const adapter = () => {
 	const base = memoryAdapter()
 	return { ...base, capabilities: { ...base.capabilities, scopedQueries: true } }
@@ -115,6 +131,26 @@ describe('resolveViewProps scope authority', () => {
 		if (result.denied) return
 		expect(result.props.sources.sources).toEqual([])
 		expect(result.props.needsScope).toBe(true)
+	})
+})
+
+describe('resolveViewProps sources notice', () => {
+	afterEach(() => {
+		listing.notice = undefined
+	})
+
+	it("hands the client the listing's notice beside its sources", async () => {
+		listing.notice = 'platformFallback'
+		const result = await resolveViewProps(reqFor(false), options)
+		if (result.denied) return
+		expect(result.props.sources.notice).toBe('platformFallback')
+		expect(result.props.sources.sources).toHaveLength(1)
+	})
+
+	it('adds no notice key for a listing without one', async () => {
+		const result = await resolveViewProps(reqFor(false), options)
+		if (result.denied) return
+		expect(result.props.sources).not.toHaveProperty('notice')
 	})
 })
 

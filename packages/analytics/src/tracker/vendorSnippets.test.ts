@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ga4 } from '../adapters/ga4/ga4'
 import { plausible } from '../adapters/plausible/plausible'
 import { posthog } from '../adapters/posthog/posthog'
@@ -16,10 +16,16 @@ import type { TrackerWindow } from './types'
  * before its loader lands publishes none: only running the snippets in a DOM catches that.
  */
 
+type PosthogStub = unknown[] & {
+	capture?: (name: string, props?: unknown) => void
+	_i?: unknown[]
+	tenant?: PosthogStub
+}
+
 interface VendorRealm {
 	dataLayer?: unknown[]
 	gtag?: (...args: unknown[]) => void
-	posthog?: unknown[] & { capture?: (name: string, props?: unknown) => void; _i?: unknown[] }
+	posthog?: PosthogStub
 	plausible?: ((name: string, options?: unknown) => void) & {
 		q?: unknown[]
 		o?: { endpoint?: string }
@@ -124,6 +130,73 @@ describe('posthog snippet', () => {
 		})
 
 		expect([...(realm.posthog ?? [])]).toContainEqual(['capture', 'signup', {}])
+	})
+})
+
+describe('a platform and a tenant PostHog on one page', () => {
+	const platform = () =>
+		posthog({ projectId: '1', apiKey: 'phx_a', projectToken: 'phc_platform' }).capture?.snippet({
+			path: '/api/_x/p/global',
+		}) ?? { scripts: [] }
+	const tenant = () =>
+		posthog({ projectId: '2', apiKey: 'phx_b', projectToken: 'phc_tenant' }).capture?.snippet({
+			path: '/api/_x/p/tenant',
+			instance: 'tenant',
+		}) ?? { scripts: [] }
+
+	const bundles = () => scriptSources().filter((src) => src?.endsWith('/static/array.js'))
+	const inits = () => (realm.posthog?._i ?? []).map((entry) => [...(entry as unknown[])])
+	const event = { type: 'event' as const, name: 'signup', path: '/', hostname: 'shop.test' }
+
+	it('loads array.js once while it is still loading, and queues each init for its client', async () => {
+		await runSnippet(platform())
+		await runSnippet(tenant())
+
+		expect(bundles()).toEqual(['/api/_x/p/global/static/array.js'])
+		expect(inits().map(([token, , name]) => [token, name])).toEqual([
+			['phc_platform', 'posthog'],
+			['phc_tenant', 'tenant'],
+		])
+		expect(typeof realm.posthog?.tenant?.capture).toBe('function')
+	})
+
+	it('loads it once when the tenant slot opens first', async () => {
+		await runSnippet(tenant())
+		await runSnippet(platform())
+
+		expect(bundles()).toEqual(['/api/_x/p/tenant/static/array.js'])
+		expect(inits().map(([token, , name]) => [token, name])).toEqual([
+			['phc_tenant', 'tenant'],
+			['phc_platform', 'posthog'],
+		])
+	})
+
+	it('inits the named client on a posthog-js already loaded, injecting nothing', async () => {
+		const init = vi.fn()
+		const loaded = { __loaded: true, init, capture: vi.fn() }
+		Reflect.set(realm, 'posthog', loaded)
+
+		await runSnippet(tenant())
+
+		expect(realm.posthog).toBe(loaded)
+		expect(loaded.init).toBe(init)
+		expect(bundles()).toEqual([])
+		expect(init).toHaveBeenCalledTimes(1)
+		expect(init.mock.calls[0]?.[0]).toBe('phc_tenant')
+		expect(init.mock.calls[0]?.[2]).toBe('tenant')
+	})
+
+	it('queues each sink dispatch on its own client', async () => {
+		await runSnippet(platform())
+		await runSnippet(tenant())
+
+		createPosthogSink({ ...sinkArgs(realm), slot: 'global' }).send(event)
+		createPosthogSink({ ...sinkArgs(realm), instance: 'tenant' }).send({ ...event, name: 'buy' })
+
+		const calls = (stub: PosthogStub | undefined) =>
+			[...(stub ?? [])].map((call) => [...(call as unknown[])])
+		expect(calls(realm.posthog)).toEqual([['capture', 'signup', {}]])
+		expect(calls(realm.posthog?.tenant)).toEqual([['capture', 'buy', {}]])
 	})
 })
 

@@ -420,6 +420,10 @@ const WIDGET_DEFS: WidgetDef[] = [
 	),
 ]
 
+/** What a built-in widget asks of every source before the install offers it; none for others. */
+export const builtInWidgetRequires = (slug: string): CapabilityRequirement | undefined =>
+	WIDGET_DEFS.find((def) => def.slug === slug)?.requires
+
 /**
  * The widget's component: the plugin's own, or the host's in its place. Either way it keeps the
  * plugin's server props, which the host's own `serverProps` add to.

@@ -4,13 +4,15 @@ import {
 	createClientField,
 	type Field,
 	type FieldAccess,
+	type PayloadRequest,
 	type TextField,
 } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { keys } from '../translations/keys'
 import { createStaticLabels } from '../translations/staticLabel'
 import type { BuildProvidersCollectionArgs, BuildSecretField } from './collection'
 import { analyticsProviderFields, buildProvidersCollection } from './collection'
+import { PROVIDER_IDS } from './factory'
 import { CONNECTION_PATHS, SECRET_PATHS } from './secrets'
 
 const named = (fields: Field[] | undefined, name: string): Field | undefined =>
@@ -525,5 +527,179 @@ describe('analyticsProviderFields', () => {
 				expect(validate('http://umami:3000', req)).toBe(expected)
 			}
 		}
+	})
+})
+
+type SelectValidate = (value: unknown, options: unknown) => true | string
+
+/** The provider select of a field list, with its validate as the tests call it. */
+const providerSelect = (fields: Field[]) => {
+	const field = named(fields, 'provider')
+	if (field?.type !== 'select') throw new Error('no provider select')
+	const validate = field.validate as SelectValidate | undefined
+	const check = (value: unknown) =>
+		validate?.(value, {
+			req: { t: (key: string) => key },
+			options: field.options,
+			required: true,
+			data: {},
+			siblingData: {},
+		})
+	return {
+		values: field.options.map((option) => (typeof option === 'string' ? option : option.value)),
+		offered: (stored?: string) =>
+			(
+				field.filterOptions?.({
+					data: { provider: stored },
+					options: field.options,
+					req: {} as PayloadRequest,
+					siblingData: {},
+				}) ?? field.options
+			).map((option) => (typeof option === 'string' ? option : option.value)),
+		defaultValue:
+			typeof field.defaultValue === 'function'
+				? field.defaultValue({} as never)
+				: field.defaultValue,
+		validate,
+		check,
+	}
+}
+
+describe('servable provider types', () => {
+	it('offers every type with native first and adds no check of its own by default', () => {
+		for (const fields of [
+			analyticsProviderFields(),
+			buildProvidersCollection({ slug: 'p', onChange: () => {}, ...unscopedArgs }).fields,
+		]) {
+			const select = providerSelect(fields)
+			expect(select.values).toEqual(['native', 'plausible', 'umami', 'ga4', 'posthog'])
+			expect(select.defaultValue).toBe('native')
+			expect(select.validate).toBeUndefined()
+		}
+	})
+
+	it('offers only the served types in their order, the first as the default', () => {
+		const select = providerSelect(
+			buildProvidersCollection({
+				slug: 'p',
+				onChange: () => {},
+				...unscopedArgs,
+				types: ['umami', 'plausible'],
+			}).fields
+		)
+		expect(select.offered()).toEqual(['umami', 'plausible'])
+		expect(select.offered('ga4')).toEqual(['umami', 'plausible', 'ga4'])
+		expect(select.defaultValue).toBe('umami')
+	})
+
+	it('keeps every type in the schema however few are offered, so no column changes', () => {
+		const select = providerSelect(analyticsProviderFields({ types: ['umami'] }))
+		expect(select.values).toEqual([...PROVIDER_IDS])
+	})
+
+	it('refuses a save of a type the install cannot serve by name, and checks the rest as a select', () => {
+		const { check } = providerSelect(analyticsProviderFields({ types: ['plausible', 'umami'] }))
+		expect(check('native')).toBe(keys.providerErrorTypeUnserved)
+		expect(check('ga4')).toBe(keys.providerErrorTypeUnserved)
+		expect(check('umami')).toBe(true)
+		expect(check(undefined)).not.toBe(true)
+	})
+
+	it('checks analyticsProviderFields({ types }) like the plugin option', () => {
+		expect(() => analyticsProviderFields({ types: ['matomo'] as never })).toThrow(
+			/analyticsProviderFields\(\{ types \}\) lists "matomo", which is no provider type/
+		)
+		expect(() => analyticsProviderFields({ types: [] })).toThrow(/leaves no provider type/)
+	})
+})
+
+describe('the default-for-this-site flag', () => {
+	const scopedArgs = {
+		...unscopedArgs,
+		scoped: true,
+		resolveScope: async () => 'tenant-a',
+		member: () => true,
+	}
+	const scoped = (over: Partial<BuildProvidersCollectionArgs> = {}) =>
+		buildProvidersCollection({
+			slug: 'analytics-providers',
+			onChange: () => {},
+			...scopedArgs,
+			...over,
+		})
+
+	const hookOf = (collection: ReturnType<typeof scoped>) => {
+		const hook = collection.hooks?.beforeValidate?.[0] as
+			| ((args: unknown) => Promise<unknown>)
+			| undefined
+		if (!hook) throw new Error('no beforeValidate hook')
+		return hook
+	}
+
+	const reqWith = (docs: unknown[]) => {
+		const find = vi.fn(async (_args: { where: unknown; pagination?: boolean }) => ({ docs }))
+		return { find, req: { t: (key: string) => key, payload: { find } } }
+	}
+
+	it('is a sidebar checkbox after enabled, off by default, on a scoped install only', () => {
+		const fields = scoped().fields
+		const names = fields.map((f) => ('name' in f ? f.name : f.type))
+		expect(names.indexOf('isDefault')).toBe(names.indexOf('enabled') + 1)
+		const flag = named(fields, 'isDefault')
+		expect(flag?.type).toBe('checkbox')
+		expect((flag as { defaultValue?: unknown }).defaultValue).toBe(false)
+		expect(adminOf(flag).position).toBe('sidebar')
+		expect(adminOf(flag).description).toBeDefined()
+		const unscoped = buildProvidersCollection({ slug: 'p', onChange: () => {}, ...unscopedArgs })
+		expect(named(unscoped.fields, 'isDefault')).toBeUndefined()
+		expect(unscoped.hooks?.beforeValidate).toBeUndefined()
+	})
+
+	it('takes defaultAccess as its field access, and is replaceable through fields', () => {
+		const access = { update: () => false }
+		const flagOf = (collection: ReturnType<typeof scoped>) =>
+			named(collection.fields, 'isDefault') as { access?: unknown } | undefined
+		expect(flagOf(scoped({ defaultAccess: access }))?.access).toBe(access)
+		expect(flagOf(scoped())?.access).toBeUndefined()
+		const relabeled = scoped({
+			fields: { isDefault: ({ field }) => ({ ...field, label: 'Main' }) },
+		})
+		expect(labelOf(named(relabeled.fields, 'isDefault'))).toBe('Main')
+	})
+
+	it('refuses a second flagged document in the same scope on the flag itself', async () => {
+		const { find, req } = reqWith([{ id: 'other' }])
+		await expect(
+			hookOf(scoped())({ data: { isDefault: true }, operation: 'create', req })
+		).rejects.toMatchObject({
+			data: { errors: [{ path: 'isDefault', message: keys.providerErrorDefaultTaken }] },
+		})
+		const call = find.mock.calls[0]?.[0]
+		const where = JSON.stringify(call?.where)
+		expect(where).toContain('"isDefault":{"equals":true}')
+		expect(where).toContain('tenant-a')
+		expect(call?.pagination).toBe(false)
+	})
+
+	it('looks nothing up for an unflagged write, and leaves the flagged document itself out', async () => {
+		const hook = hookOf(scoped())
+		const unflagged = reqWith([{ id: 'other' }])
+		await expect(
+			hook({
+				data: { isDefault: false },
+				originalDoc: { isDefault: true },
+				operation: 'update',
+				req: unflagged.req,
+			})
+		).resolves.toEqual({ isDefault: false })
+		expect(unflagged.find).not.toHaveBeenCalled()
+		const self = reqWith([])
+		await hook({
+			data: { name: 'Renamed' },
+			originalDoc: { id: 'self', isDefault: true },
+			operation: 'update',
+			req: self.req,
+		})
+		expect(JSON.stringify(self.find.mock.calls[0]?.[0]?.where)).toContain('"not_equals":"self"')
 	})
 })

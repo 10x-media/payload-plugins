@@ -56,6 +56,8 @@ export interface PanelData {
 	breakdowns?: FieldBreakdown[]
 	/** What the totals' and the series' reads say about their numbers. */
 	notices?: ReadNotices
+	/** The stored source this reader cannot read; the scope's default answered instead. */
+	substitutedFrom?: string
 }
 
 /** The parts of a panel answer the panel reads before it renders. */

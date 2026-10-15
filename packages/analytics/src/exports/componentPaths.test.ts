@@ -47,6 +47,9 @@ const RETIRED = [
 	'@10x-media/analytics/client#SourceSelectField',
 ]
 
+/** Registered beside the frozen set only where tenants read a shared source under `fallback`. */
+const FALLBACK_NOTICE = '@10x-media/analytics/client#ProvidersListNotice'
+
 const COMPONENT_PATH = /^@10x-media\/analytics\/[a-z]+#\w+$/
 
 /** Every plugin component path anywhere in `value`, the way an import map generator walks a config. */
@@ -96,6 +99,28 @@ describe('stable component paths', () => {
 		})(hostConfig())
 		const found = componentPaths([config, trackGoalAction()])
 		expect([...found].sort()).toEqual(REGISTERED)
+	})
+
+	it('adds the providers list notice only to an install with a fallback policy', async () => {
+		const shared = {
+			...memoryAdapter(),
+			id: 'shared',
+			capabilities: { ...memoryAdapter().capabilities, scopedQueries: true },
+		}
+		const install = {
+			adapters: [shared],
+			scope: { resolve: () => 'tenant-a', member: () => true },
+			providers: { collection: true },
+			capture: { gate: 'off' as const },
+		}
+		const staffOnly = await analytics(install)(hostConfig())
+		expect([...componentPaths(staffOnly)]).not.toContain(FALLBACK_NOTICE)
+		const fallback = await analytics({
+			...install,
+			sources: { shared: { tenants: 'fallback' } },
+		})(hostConfig())
+		expect([...componentPaths(fallback)]).toContain(FALLBACK_NOTICE)
+		expect(typeof exported(FALLBACK_NOTICE)).toBe('function')
 	})
 
 	it('exports a component under every registered path', () => {

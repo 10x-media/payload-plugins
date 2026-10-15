@@ -132,13 +132,15 @@ A resolver that throws fails closed the same way everywhere: reads degrade to un
 | `platformAdapter` | Names one config adapter shared by every scope: the platform's own analytics. |
 | `access.read` | Gates every read: the read endpoints (query, document panel, realtime, sources, goals, refresh), the dashboard widgets and the display fields. Defaults to `isAdminUser`, the users of the admin collection (`admin.user`), so a second auth collection (customers, members) reads nothing. |
 | `access.crossScope` | The three cross-scope decisions: `named` (read a tenant you are not), `aggregate` (read every tenant at once), `unscopedSource` (read a tenant through the platform's own shared source). A function grants all three at once. See [Who sees what](#4-who-sees-what). |
+| `sources` | Per shared config adapter, which of a tenant's own users read that tenant through it besides staff. See [Letting tenants read a shared source](#letting-tenants-read-a-shared-source). |
+| `defaultSource` | A tenant's default source when none of its provider documents is flagged **Default for this site**. See [A tenant's default source](#a-tenants-default-source). |
 | `collections.<slug>.scopeField` | The field a bound collection's documents carry their tenant in: `'tenant'` unless set, the field `plugin-multi-tenant` adds. The boot fails when a bound collection has no field of that name; `false` reads the request's own scope instead. See [Whose numbers a document shows](/analytics/display-fields#whose-numbers-a-document-shows). |
 | `posthog({ scopeProperty })` | Lets one PostHog project serve per-scope reads by filtering on an event property. |
 | `capture.slots` | Which adapter captures for the platform (`global`) and for the request's tenant (`tenant`). See [Capture slots per tenant](#capture-slots-per-tenant). |
 | `captureRoute()` | Not a plugin option: a route handler from `@10x-media/analytics/next` that relays one adapter's vendor tracker, when you would rather serve the platform's first-party proxy from a route of your own than through the runtime one. See [A route handler of your own](/analytics/proxy#a-route-handler-of-your-own). |
 | `reportingTimezone` | Aligns daily boundaries to a timezone, per install or per tenant. See [Reporting timezone](/analytics/timezone). |
 
-The options that only mean something on a scoped install fail the boot without `scope.resolve`: `scope.list`, `scope.label`, `scope.member`, `access.crossScope`, an adapter id in `capture.slots.tenant`, `capture.paths.tenant`, a `collections.<slug>.scopeField` other than `false`, and `goals.collection.scopeField` or `providers.collection.scopeField` when set at all. `scope.resolve` in turn fails the boot without `scope.member`.
+The options that only mean something on a scoped install fail the boot without `scope.resolve`: `scope.list`, `scope.label`, `scope.member`, `sources`, `defaultSource`, `access.crossScope`, an adapter id in `capture.slots.tenant`, `capture.paths.tenant`, a `collections.<slug>.scopeField` other than `false`, and `goals.collection.scopeField` or `providers.collection.scopeField` when set at all. `scope.resolve` in turn fails the boot without `scope.member`.
 
 ### What scope guarantees
 
@@ -185,8 +187,10 @@ None of this applies to an install without `scope.resolve`, or to one that never
 
 A request reading one tenant sees:
 
-- on an install running the providers collection, the sources that tenant's own provider documents grant it, **filtered to the documents this user can read**;
-- the config adapters (everything in `adapters`, including `platformAdapter`) that can narrow their query to one scope (`capabilities.scopedQueries`: native, and PostHog with a `scopeProperty`). Without the providers collection every reader sees them. With it, a config adapter the tenant's documents do not grant belongs to the platform rather than to the tenant, and only a reader `access.crossScope.unscopedSource` admits sees it.
+- on an install running the providers collection, the sources that tenant's own [available](/analytics/providers#when-a-document-is-a-source) provider documents grant it, **filtered to the documents this user can read**;
+- the config adapters (everything in `adapters`, including `platformAdapter`) that can narrow their query to one scope (`capabilities.scopedQueries`: native, and PostHog with a `scopeProperty`). Without the providers collection every reader sees them. With it, a config adapter the tenant's documents do not grant belongs to the platform rather than to the tenant: a reader `access.crossScope.unscopedSource` admits sees it, and the tenant's own members see it only where [`sources`](#letting-tenants-read-a-shared-source) lets them.
+
+A provider document is a source only while it is enabled, its type is one the install serves, and it holds the credentials its adapter reads with. One missing a credential is not listed, where 1.0.0-beta.12 listed it with an empty state.
 
 A config adapter that cannot narrow its query to one scope (no `capabilities.scopedQueries`) is left out of every tenant's listing, however privileged the reader. It would answer with every tenant's numbers under a caption naming one, which is not a source for that tenant at all; naming it under a tenant answers `404 unknown_source`. One rule covers the view, `GET /api/_x/sources`, the widget data-source picker and the per-document panel. Install-wide and aggregate listings keep every readable source: there is no tenant to answer about.
 
@@ -254,7 +258,7 @@ analytics({
 })
 ```
 
-`scopeProperty: 'tenant'` closes the loop: the snippet the plugin renders registers the request's scope as a PostHog super-property, so every event carries its tenant, and reads through the shared project filter `properties['tenant']` to the reader's scope. Which readers read a tenant through it depends on the providers collection ([Which sources a request sees](#which-sources-a-request-sees)): without it, every reader of a tenant sees that tenant's slice; with it, the platform's PostHog is not one of the tenant's own sources, so only a reader `access.crossScope.unscopedSource` admits reads through it, and a tenant's own admins read through their own provider documents.
+`scopeProperty: 'tenant'` closes the loop: the snippet the plugin renders registers the request's scope as a PostHog super-property, so every event carries its tenant, and reads through the shared project filter `properties['tenant']` to the reader's scope. Which readers read a tenant through it depends on the providers collection ([Which sources a request sees](#which-sources-a-request-sees)): without it, every reader of a tenant sees that tenant's slice; with it, the platform's PostHog is not one of the tenant's own sources, so only a reader `access.crossScope.unscopedSource` admits reads through it, and a tenant's own admins read through their own provider documents, unless [`sources`](#letting-tenants-read-a-shared-source) lets them read the platform's slice of their tenant too.
 
 ### PostHog for a platform: one organization, a few projects
 
@@ -284,9 +288,9 @@ With it set, the adapter declares `capabilities.scopedQueries`, so a read of one
 
 ### Capture slots per tenant
 
-A scoped install fills two [capture slots](/analytics/capture#capture-slots) per request: `global` from the config registry (the `platformAdapter`, or `capture.slots.global`), and `tenant` from the scope's own provider documents. The platform's slot goes onto every tenant's pages automatically; the tenant's slot is whatever that tenant configured, including the native beacon, which a `native` document is what turns on. So one page can send to the platform's PostHog and to the tenant's own Plausible at once. When both slots resolve to the same adapter, only the global entry survives, so a scoped native install never posts every event twice. A tenant's own provider of the same vendor as the platform's (its own PostHog beside the platform's PostHog) captures nothing: a page runs one copy of that vendor's script, so the tenant slot is left out of the tracker config with a warning in the log, and the tenant's document still serves its dashboard reads.
+A scoped install fills two [capture slots](/analytics/capture#capture-slots) per request: `global` from the config registry (the `platformAdapter`, or `capture.slots.global`), and `tenant` from the scope's own provider documents. The platform's slot goes onto every tenant's pages automatically; the tenant's slot is whatever that tenant configured, including the native beacon, which a `native` document is what turns on. So one page can send to the platform's PostHog and to the tenant's own Plausible at once. When both slots resolve to the same adapter, only the global entry survives, so a scoped native install never posts every event twice. A tenant's own PostHog beside the platform's PostHog captures into both projects from one page: the tenant slot runs as a second PostHog client, named `tenant`, with its own gate and its own opt-out ([Two PostHog projects on one page](/analytics/capture#two-posthog-projects-on-one-page)). Any other vendor runs one client per page, so a tenant's own Plausible, Umami or GA4 beside the platform's of the same vendor captures nothing: the tenant slot is left out of the tracker config with a warning in the log, and the tenant's document still serves its dashboard reads.
 
-The `tenant` slot is empty whenever no scope resolves, and, on an install running the providers collection, whenever the scope's own documents grant nothing that can capture. A provider document fills it only once its **public** capture fields are set, since an adapter declares capture support from those alone: `projectToken` (plus the optional `region`) for PostHog, `domain` or `scriptId` for Plausible, `websiteId` for Umami, and `measurementId` for GA4. The two ids that land in a script's address are validated on save and ignored when malformed: GA4's `measurementId` takes `^[A-Za-z0-9-]+$`, and Plausible's `scriptId` `^[A-Za-z0-9_-]{1,64}$`. They sit beside the sealed credentials in the provider document, unencrypted because the tracker serves them to the browser. A PostHog, Plausible or GA4 document holding only its read settings reads dashboards and captures nothing; an Umami document always captures, since its `websiteId` is both what it reads by and all its capture needs.
+The `tenant` slot is empty whenever no scope resolves, and, on an install running the providers collection, whenever the scope's own documents grant nothing that can capture. A provider document fills it only once its **public** capture fields are set, since an adapter declares capture support from those alone: `projectToken` (plus the optional `region`) for PostHog, `domain` or `scriptId` for Plausible, `websiteId` for Umami, and `measurementId` for GA4. The two ids that land in a script's address are validated on save and ignored when malformed: GA4's `measurementId` takes `^[A-Za-z0-9-]+$`, and Plausible's `scriptId` `^[A-Za-z0-9_-]{1,64}$`. They sit beside the sealed credentials in the provider document, unencrypted because the tracker serves them to the browser. A PostHog, Plausible or GA4 document holding only its read settings reads dashboards and captures nothing; an Umami document captures whenever it is a source, since its `websiteId` is both what it reads by and all its capture needs. A document missing the credentials it reads with is no source, so it fills no slot either, whatever capture fields it holds ([When a document is a source](/analytics/providers#when-a-document-is-a-source)).
 
 <Callout type="warn">
 The tracker endpoint and the capture proxy are **public and unauthenticated**: a visitor's browser calls them, and your `scope.resolve` runs on those requests too, at the `capture` call site. It gets them without a signed-in user, cookies or an authorization header, even when the visitor is signed in to the admin.
@@ -322,7 +326,7 @@ Pair it with an edge that refuses hosts belonging to no tenant. Caddy's on-deman
 |---|---|
 | `named` | Reading a scope this request does not resolve to, by naming it. Provider and goal row access read the same gate, so it also decides who manages another tenant's documents. |
 | `aggregate` | Reading every scope at once: `scope=*`, the view's **All sites** choice in its **Site** select, and a scoped install's request that resolves no tenant. |
-| `unscopedSource` | Reading a tenant's numbers through a config adapter, which belongs to the platform rather than to any tenant. On an install running the providers collection it decides whether a config adapter the tenant's documents do not grant is listed at all; a server read naming a config adapter that cannot narrow its query (no `scopedQueries`) under a tenant reads install-wide numbers only with it. |
+| `unscopedSource` | Reading a tenant's numbers through a config adapter, which belongs to the platform rather than to any tenant. On an install running the providers collection it decides whether a config adapter the tenant's documents do not grant is listed at all, beside the tenant's own members that [`sources`](#letting-tenants-read-a-shared-source) admits; a server read naming a config adapter that cannot narrow its query (no `scopedQueries`) under a tenant reads install-wide numbers only with it. |
 
 ```ts
 import { analytics, type ScopeMemberAccess, type ScopeResolver } from '@10x-media/analytics'
@@ -356,6 +360,145 @@ Splitting them is worth it when the three stop being the same privilege: support
 
 - A tenant's own provider documents are never gated by `access.crossScope`; `providers.collection.sourceAccess` decides them per user, and the providers collection's own read access does when it is unset.
 - A platform admin's own request resolves no scope at all when no tenant is selected (`scope.resolve` returns `null`, the same value an unscoped install always reads with). For a reader `access.crossScope.aggregate` admits, that read is a genuine cross-tenant total: the native adapter applies no `scope` filter then, so every tenant's data is summed, not an isolated "unscoped-only" bucket that happens to exclude tenant data. Anyone else with no tenant selected reads nothing: the endpoints answer `404 unknown_source`, and the view, the widgets and the document panel ask them to choose a site.
+
+### What a gate is told
+
+Each gate is asked with what the read knows beside the request, as `{ req, scope, adapterId }`: `named` gets the scope the reader names, `aggregate` gets `'*'`, or `null` for a scoped request that resolves no tenant, and `unscopedSource` gets the tenant and the id of the config adapter. A gate written for `{ req }` alone keeps working.
+
+```ts
+import type { CrossScopeAccess } from '@10x-media/analytics'
+
+// Support may read any tenant through the platform's PostHog, and through no other shared adapter.
+export const unscopedSource: CrossScopeAccess = ({ req, adapterId }) =>
+  adapterId === 'posthog' && (req.user?.roles?.includes('support') ?? false)
+```
+
+Since the answer may now differ by scope and adapter, a request that reads several tenants or several shared adapters asks a gate once per scope and adapter, where 1.0.0-beta.12 asked it once per request. Keep a gate that looks something up cheap, or memoize the lookup per request. The providers and goals collections still ask `named` with `{ req }` alone, for every document, so a `named` gate that needs `scope` to grant anything locks staff out of other tenants' documents.
+
+### Letting tenants read a shared source
+
+On an install running the providers collection, a shared config adapter belongs to the platform: only a reader `access.crossScope.unscopedSource` admits reads a tenant through it, and the tenant's own users read through their own provider documents. `sources` changes that per adapter, keyed by the adapter's id. Its `tenants` is the policy: who besides staff reads the tenant through that adapter.
+
+```ts
+import { analytics, type ScopeMemberAccess, type ScopeResolver } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import { posthog } from '@10x-media/analytics/adapters/posthog'
+import type { PayloadRequest } from 'payload'
+
+declare const resolveTenant: ScopeResolver
+declare const member: ScopeMemberAccess
+
+const isPlatformStaff = ({ req }: { req: PayloadRequest }) =>
+  req.user?.roles?.includes('platform-admin') ?? false
+
+export const plugin = analytics({
+  adapters: [
+    native(),
+    posthog({
+      projectId: process.env.POSTHOG_PROJECT_ID ?? '',
+      apiKey: process.env.POSTHOG_API_KEY ?? '',
+      projectToken: 'phc_...',
+      scopeProperty: 'tenant',
+    }),
+  ],
+  platformAdapter: 'posthog',
+  scope: { resolve: resolveTenant, member },
+  capture: { gate: 'all' },
+  providers: { collection: { scopeField: 'tenant' } },
+  access: { crossScope: isPlatformStaff },
+  // Each tenant's members read their tenant's slice of the platform PostHog until they add a source.
+  sources: { posthog: { tenants: 'fallback' } },
+})
+```
+
+| Policy | Who reads a tenant through the adapter |
+|---|---|
+| `'staff'` | Readers `access.crossScope.unscopedSource` admits, and nobody else. The default, and what 1.0.0-beta.12 did. |
+| `'tenant'` | Also the tenant's own members, always. |
+| `'fallback'` | Also the tenant's own members, until they read a source of their own. |
+| a function | Also the tenant's own members, while it answers `true`. |
+
+Staff are whoever `unscopedSource` admits, and no policy changes what they read. A member is a user `scope.member` says belongs to the tenant the request resolved, and a member reads the shared adapter narrowed to that tenant. A policy adds members for their own tenant and never widens which scope anyone reads: under every policy a tenant user asking for `scope=*` or another tenant's id gets `400 untrusted_scope`, since the `aggregate` and `named` gates decide those and a policy does not touch them.
+
+A policy other than `'staff'` needs an adapter that narrows a query to one scope (`capabilities.scopedQueries`: native, or PostHog with a `scopeProperty`). On any other a tenant would read every tenant's totals, so the boot fails naming `sources.<id>.tenants`, and a read refuses it as well. Each key must be the id of an adapter in `adapters`, and `sources` fails the boot without `scope.resolve`. Without the providers collection every reader of a tenant already reads a scoped config adapter, so there is nothing for a policy to add.
+
+The examples below share one platform PostHog with `scopeProperty: 'tenant'` and three tenants: Alpha holds no provider documents, Beta holds a Plausible document, and Gamma holds a `native` one.
+
+#### `'staff'`
+
+Alpha's editors see no source at all, and the view tells them none is connected. Beta's editors read their Plausible, Gamma's their own native numbers. Staff read all three tenants through the platform PostHog as well.
+
+#### `'tenant'`
+
+Alpha's editors read Alpha's slice of the platform PostHog. Beta's editors get two sources, their Plausible and the platform's PostHog narrowed to Beta, and Gamma's likewise get native beside PostHog. Which of the two a reader opens on is the tenant's [default source](#a-tenants-default-source).
+
+#### `'fallback'`
+
+Alpha's editors read Alpha's slice of the platform PostHog, and the view and the providers list tell them these are the platform's numbers until they add a source of their own, and that adding one switches to it. `GET /api/_x/sources` answers with `notice: 'platformFallback'` then. Beta's and Gamma's editors do not see the platform PostHog: each reads a source of its own, and a `native` document counts as one.
+
+A source of one's own is an [available](/analytics/providers#when-a-document-is-a-source) provider document of the tenant that grants a source this reader may read under `providers.collection.sourceAccess`. When Alpha's admin saves a Plausible document with its credentials, the next request lists Plausible alone and opens on it, with no cache in between. Where the app runs more than one instance, the others follow within ten seconds, as they do for any provider save ([How a document becomes an adapter](/analytics/providers#how-a-document-becomes-an-adapter)). Switching the document off brings the platform PostHog back the same way.
+
+#### A function
+
+`({ req, scope, adapterId, ownSources }) => boolean`, which may return a promise. `ownSources` lists the reader's own sources as `{ id, label, docId }`. Members read the adapter when it answers `true`; any other answer, or a throw, denies, and a throw is logged. It is asked at most once per request, scope and adapter.
+
+```ts
+import type { SourcePolicyFunction } from '@10x-media/analytics'
+
+// The platform's numbers until the tenant connects a vendor of its own; storing visits in Payload does not count.
+export const untilOwnVendor: SourcePolicyFunction = ({ ownSources }) =>
+  ownSources.every((source) => source.id === 'native')
+```
+
+With `sources: { posthog: { tenants: untilOwnVendor } }`, Alpha's and Gamma's editors read the platform PostHog, Gamma's beside native, and Beta's do not.
+
+#### What a policy leaves alone
+
+- **Jobs.** The sync and warm tasks read as `SYSTEM` and never ask a policy, so they read the same sources under every policy.
+- **The cache.** A cached read is keyed on its source's id and the scope's epoch. A switch changes which source is a reader's default, never what a cached answer for a source says, so nothing has to be invalidated.
+- **Capture.** A policy decides who reads, not what a page sends. The global slot keeps capturing on every tenant's site, and the tenant slot fills from the tenant's own documents ([Capture slots per tenant](#capture-slots-per-tenant)). Alpha switching to Plausible in the admin changes nothing on Alpha's pages until its document carries Plausible's capture fields, and the platform PostHog keeps capturing there either way.
+- **A stored choice.** A widget or a document panel whose stored `dataSource` its reader can no longer read, such as Alpha's widgets saved on the platform PostHog before the switch, reads the scope's default instead and says so in a note rather than failing. The query endpoint does not substitute: a `source` it cannot read still answers `404 unknown_source`.
+
+### A tenant's default source
+
+A reader who names no source reads the default: the view opens on it, a widget with no `dataSource` reads it, the document panel starts on it, the read helpers use it when given no `adapterId`, the warm task reads it, and the sources endpoint names it as `defaultId`. In a tenant scope the first of these that applies picks it:
+
+1. The tenant's provider document flagged **Default for this site**, when it is a source and the reader may read it.
+2. The `defaultSource` rule.
+3. What 1.0.0-beta.12 picked: `defaultAdapter`, else the first config adapter, else the first source the reader may read.
+
+`defaultSource` takes one of three forms, and fails the boot without `scope.resolve`:
+
+| Rule | Picks |
+|---|---|
+| `'tenantFirst'` | The first source the reader reads through the tenant's own documents. |
+| `'platformFirst'` | The `platformAdapter`, when the reader may read it. The boot fails without `platformAdapter`. |
+| a function | `({ req, scope, sources }) => string \| undefined`, which may return a promise: the id of one of `sources`, each a `SourceRef` (`{ id, label, kind, docId? }`, `kind` being `config` or `runtime`). |
+
+A rule that picks nothing, an id the reader cannot read, or a function that throws (logged) leaves the choice to step 3. Under `tenants: 'tenant'` on the platform PostHog, `defaultSource: 'tenantFirst'` opens Beta's editors on their Plausible and Alpha's on the platform PostHog.
+
+The **Default for this site** checkbox sits in the provider document's sidebar on a scoped install, and on no other: an unscoped install has one site and nothing to pick. A scope holds at most one flagged document, so saving a second is refused with **Another analytics tool is already the default for this site. Untick it there first.** Everyone who may read the document sees the checkbox. Who may set it is `providers.collection.defaultAccess`, a field access function or `{ create, update }`; unset, it follows `connectionAccess`, and without that its default: whoever creates the document sets it, and changing it takes `access.crossScope.named`. Map your own "tenant admin" role through it:
+
+```ts
+import type { ProvidersOptions } from '@10x-media/analytics'
+
+export const providers: ProvidersOptions = {
+  collection: {
+    scopeField: 'tenant',
+    defaultAccess: ({ req }) => req.user?.roles?.includes('tenant-admin') ?? false,
+  },
+}
+```
+
+The default decides what reads open on. The checkbox also picks the source that fills the tenant capture slot, when that source captures; the `defaultSource` rule does not ([Capture slots](/analytics/capture#capture-slots)). On Postgres and SQLite the checkbox is an `is_default` column of the providers table: generate a migration for it ([Upgrading](/analytics/upgrading/beta-13#the-is_default-column)).
+
+### Possible follow-ups
+
+Three things the policies and the default do not do yet, which a later release may add:
+
+- **History across a switch.** Once Alpha reads its own source, a window starting before that source existed shows that source's empty days, not the platform's numbers for them.
+- **A subset of tenants.** `aggregate` reads one tenant or every tenant; there is no aggregate over a group, such as the tenants on one continent.
+- **Settings per scope.** `sources` and `defaultSource` are install-wide options. A settings document per tenant, for an admin to decide them in, does not exist.
 
 ### The platform's own site is a tenant
 
@@ -429,7 +572,7 @@ Saving or deleting a provider or goal document retires that document's scope on 
 
 ## 5. Cron tiers
 
-Reads happen per request, but the [sync](/analytics/sync) and [warm](/analytics/cache#warming) tasks run on a schedule with no request to resolve a scope from. Neither has a user to ask about, so neither asks `access.read` or `scope.member`: each reads as the plugin's `SYSTEM` principal, exported from the package root (and from `@10x-media/analytics/rsc`) for a host's own jobs (see [Who a custom read answers to](/analytics/widgets#who-a-custom-read-answers-to)), and reads a tenant through every source that tenant's own provider documents grant it, rather than only the documents some user may open.
+Reads happen per request, but the [sync](/analytics/sync) and [warm](/analytics/cache#warming) tasks run on a schedule with no request to resolve a scope from. Neither has a user to ask about, so neither asks `access.read` or `scope.member`: each reads as the plugin's `SYSTEM` principal, exported from the package root (and from `@10x-media/analytics/rsc`) for a host's own jobs (see [Who a custom read answers to](/analytics/widgets#who-a-custom-read-answers-to)), and reads a tenant through every source that tenant's own provider documents grant it, rather than only the documents some user may open. A job asks no [source policy](#letting-tenants-read-a-shared-source) either, so it reads the same sources whatever `sources` says.
 
 The sync task needs to know which tenants exist. `scope.list` enumerates them, on top of the install-wide pass it always runs:
 

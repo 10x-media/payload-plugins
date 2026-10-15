@@ -204,7 +204,7 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			...(currency ? { currency } : {}),
 			source: {
 				id: adapter.id,
-				label: adapter.label,
+				label: context.sources.find((source) => source.id === adapter.id)?.label ?? adapter.label,
 				kind: runtime.configAdapterIds.has(adapter.id) ? 'config' : 'runtime',
 			},
 			capabilities,

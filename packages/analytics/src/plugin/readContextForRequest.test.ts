@@ -4,7 +4,7 @@ import type { AnalyticsAdapter } from '../core/contract'
 import { createRegistry } from '../core/registry'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { resolveSourcesForRequest } from './readContextForRequest'
-import { setRuntime } from './runtime'
+import { type AnalyticsRuntime, setRuntime } from './runtime'
 
 const withId = (id: string, scopedQueries: boolean): AnalyticsAdapter => {
 	const base = memoryAdapter()
@@ -62,5 +62,67 @@ describe('resolveSourcesForRequest scope narrowing', () => {
 	it('keeps every readable source when no scope resolves', async () => {
 		const listing = await resolveSourcesForRequest(reqFor(null))
 		expect(listing.sources.map((source) => source.id)).toEqual(['native', 'platform'])
+	})
+})
+
+describe('resolveSourcesForRequest source policies', () => {
+	const shared = withId('posthog', true)
+	const own = withId('plausible:doc-1', false)
+
+	/** A member of `alpha` who is not platform staff, reading `docs` of its own. */
+	const tenantReq = (over: Partial<AnalyticsRuntime>, docs: string[]): PayloadRequest => {
+		const registry = createRegistry(docs.length > 0 ? [shared, own] : [shared])
+		const payload = {
+			logger: { warn: () => {} },
+			find: async () => ({ docs: docs.map((id) => ({ id })) }),
+		} as unknown as PayloadRequest['payload']
+		setRuntime(payload, {
+			registry,
+			resolveRegistry: async () => ({
+				registry,
+				grants: new Map(docs.map((id) => [`plausible:${id}`, id])),
+			}),
+			resolveScope: async () => 'alpha',
+			member: ({ scope }) => scope === 'alpha',
+			scoped: true,
+			providersCollection: { slug: 'analytics-providers', scopeField: 'tenant' },
+			configAdapterIds: new Set(['posthog']),
+			crossScope: { named: () => false, aggregate: () => false, unscopedSource: () => false },
+			bindings: {},
+			readAccess: () => true,
+			engine: { read: async (adapter, query) => adapter.query(query, {}) },
+			ttl: {},
+			comparison: true,
+			...over,
+		})
+		return { payload, user: { id: 1 } } as unknown as PayloadRequest
+	}
+
+	it('lists nothing to a tenant without a policy, as before', async () => {
+		const listing = await resolveSourcesForRequest(tenantReq({}, []))
+		expect(listing.sources).toEqual([])
+		expect(listing.notice).toBeUndefined()
+	})
+
+	it('says when the shared source is listed only as the fallback', async () => {
+		const fallback = { sourcePolicies: new Map([['posthog', 'fallback' as const]]) }
+		const alone = await resolveSourcesForRequest(tenantReq(fallback, []))
+		expect(alone.sources.map((source) => source.id)).toEqual(['posthog'])
+		expect(alone.notice).toBe('platformFallback')
+		const owning = await resolveSourcesForRequest(tenantReq(fallback, ['doc-1']))
+		expect(owning.sources.map((source) => source.id)).toEqual(['plausible:doc-1'])
+		expect(owning.notice).toBeUndefined()
+	})
+
+	it('lists a tenant policy without a notice, defaulting where defaultSource points', async () => {
+		const listing = await resolveSourcesForRequest(
+			tenantReq(
+				{ sourcePolicies: new Map([['posthog', 'tenant' as const]]), defaultSource: 'tenantFirst' },
+				['doc-1']
+			)
+		)
+		expect(listing.sources.map((source) => source.id)).toEqual(['posthog', 'plausible:doc-1'])
+		expect(listing.defaultId).toBe('plausible:doc-1')
+		expect(listing.notice).toBeUndefined()
 	})
 })

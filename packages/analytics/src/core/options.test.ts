@@ -288,6 +288,10 @@ describe('resolveOptions options that need scope.resolve', () => {
 		],
 		['goals.collection.scopeField', { goals: { collection: { scopeField: 'tenant' } } }],
 		['providers.collection.scopeField', { providers: { collection: { scopeField: 'tenant' } } }],
+		[
+			'providers.collection.fields.isDefault',
+			{ providers: { collection: { fields: { isDefault: () => ({}) as never } } } },
+		],
 		['capture.slots.tenant', { capture: { slots: { tenant: 'posthog:abc' } } }],
 		['capture.paths.tenant', { capture: { paths: { tenant: '/ph' } } }],
 	])('throws for %s on an unscoped install', (path, options) => {
@@ -446,12 +450,16 @@ describe('resolveOptions access.read and access.view', () => {
 describe('resolveOptions providers', () => {
 	const vendorClouds = { allow: [], allowPrivateNetwork: false }
 
+	/** What an install without native() serves: a `native` document would lend nothing. */
+	const vendorTypes = ['plausible', 'umami', 'ga4', 'posthog']
+
 	it('defaults to a disabled collection with the default slug and scope field', () => {
 		const p = resolveOptions({ adapters }).providers
 		expect(p.collection).toEqual({
 			enabled: false,
 			slug: 'analytics-providers',
 			scopeField: 'scope',
+			types: vendorTypes,
 		})
 		expect(p.hosts).toEqual(vendorClouds)
 		expect(p.resolve).toBeUndefined()
@@ -463,8 +471,48 @@ describe('resolveOptions providers', () => {
 			enabled: true,
 			slug: 'analytics-providers',
 			scopeField: 'scope',
+			types: vendorTypes,
 		})
 		expect(p.hosts).toEqual(vendorClouds)
+	})
+
+	it('serves native only beside native(), narrowed by types in its order', () => {
+		const withNative = [...adapters, { ...memoryAdapter(), id: 'native' }]
+		const typesOf = (types?: unknown, list = withNative) =>
+			resolveOptions({
+				adapters: list,
+				providers: { collection: types === undefined ? true : { types: types as never } },
+			}).providers.collection.types
+		expect(typesOf()).toEqual(['native', 'plausible', 'umami', 'ga4', 'posthog'])
+		expect(typesOf(['umami', 'native', 'umami'])).toEqual(['umami', 'native'])
+		expect(typesOf(['umami', 'native'], adapters)).toEqual(['umami'])
+	})
+
+	it('fails the boot on types naming no provider type, or leaving none the install serves', () => {
+		const withTypes = (types: unknown) => () =>
+			resolveOptions({ adapters, providers: { collection: { types: types as never } } })
+		expect(withTypes('umami')).toThrow(
+			/providers\.collection\.types must be a list of provider types/
+		)
+		expect(withTypes(['umami', 'matomo'])).toThrow(
+			/providers\.collection\.types lists "matomo", which is no provider type/
+		)
+		expect(withTypes([])).toThrow(/providers\.collection\.types leaves no provider type/)
+		expect(withTypes(['native'])).toThrow(/"native" needs native\(\) in adapters/)
+	})
+
+	it('takes defaultAccess as one function or as { create, update }, like connectionAccess', () => {
+		const access = () => true
+		const resolved = (defaultAccess: unknown) =>
+			resolveOptions({
+				adapters,
+				providers: { collection: { defaultAccess: defaultAccess as never } },
+			}).providers.collection.defaultAccess
+		expect(resolved(access)).toEqual({ create: access, update: access })
+		expect(resolved({ update: access })).toEqual({ update: access })
+		expect(() => resolved({ delete: access })).toThrow(
+			/providers\.collection\.defaultAccess\.delete is not an option/
+		)
 	})
 
 	const wideHosts = {
@@ -577,6 +625,7 @@ describe('resolveOptions providers', () => {
 			scopeField: 'tenant',
 			overrides,
 			access,
+			types: vendorTypes,
 		})
 	})
 
@@ -1311,6 +1360,7 @@ describe('resolveOptions view', () => {
 			path: '/analytics',
 			defaultRange: 'last30days',
 			defaultMetric: 'pageviews',
+			navLink: true,
 		})
 	})
 
@@ -1334,7 +1384,16 @@ describe('resolveOptions view', () => {
 			defaultRange: 'last7days',
 			defaultMetric: 'visitors',
 			navLabel: 'Traffic',
+			navLink: true,
 		})
+	})
+
+	it('turns the nav link off and refuses a non-boolean navLink', () => {
+		const view = resolveOptions({ adapters, view: { navLink: false } }).view
+		expect(view !== false && view.navLink).toBe(false)
+		expect(() => resolveOptions({ adapters, view: { navLink: 'no' as never } })).toThrow(
+			/view\.navLink must be a boolean/
+		)
 	})
 
 	it('rejects a path that is not rooted', () => {

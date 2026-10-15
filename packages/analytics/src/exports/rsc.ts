@@ -28,7 +28,7 @@ export {
 export type { FilterDimensionSelectFieldProps } from '../fields/config/FilterDimensionSelectField'
 export type { FilterOperatorSelectFieldProps } from '../fields/config/FilterOperatorSelectField'
 export type { FilterValueFieldProps } from '../fields/config/FilterValueField'
-export type { SourcesResponse, WireSource } from '../fields/config/fetchSources'
+export type { SourcesNotice, SourcesResponse, WireSource } from '../fields/config/fetchSources'
 export type { MetricSelectFieldProps } from '../fields/config/MetricSelectField'
 export {
 	FilterDimensionSelectFieldServer,
@@ -64,6 +64,7 @@ export { default as AnalyticsGoalsWidget } from '../widgets/AnalyticsGoalsWidget
 export { default as AnalyticsMetricWidget } from '../widgets/AnalyticsMetricWidget'
 export { default as AnalyticsRealtimeWidget } from '../widgets/AnalyticsRealtimeWidget'
 export { default as AnalyticsTrendWidget } from '../widgets/AnalyticsTrendWidget'
+export type { StoredSourceRead, SubstitutedSource } from '../widgets/prepareWidgetRead'
 export type {
 	ReadForWidgetArgs,
 	WidgetReadResult,

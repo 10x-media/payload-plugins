@@ -139,25 +139,32 @@ describe('createProviderRegistry: providers.resolve', () => {
 })
 
 describe('createProviderRegistry: providers collection', () => {
-	it('grants from the committed rows alone, reading and decrypting no document', async () => {
-		const rows = [row('n1', 'native'), row('p1', 'plausible'), row('u1', 'umami', false)]
+	it('grants the native adapter from the committed rows alone, reading and decrypting no document', async () => {
+		const rows = [row('n1', 'native'), row('p1', 'plausible')]
 		const { payload, documentFind } = instanceWith(rows)
 		const collection = createProviderRegistry(options(payload, collectionPlan))
 		expect(await collection.granted?.('tenant-a', 'native')).toBe(true)
-		expect(await collection.granted?.('tenant-a', 'plausible:p1')).toBe(true)
-		expect(await collection.granted?.('tenant-a', 'umami:u1')).toBe(false)
-		expect(await collection.granted?.('tenant-a', 'plausible')).toBe(false)
 		expect(documentFind).not.toHaveBeenCalled()
+		const disabled = instanceWith([row('n1', 'native', false)])
+		expect(
+			await createProviderRegistry(options(disabled.payload, collectionPlan)).granted?.(
+				'tenant-a',
+				'native'
+			)
+		).toBe(false)
 	})
 
 	it('grants no native adapter on an install that registered none', async () => {
-		const { payload } = instanceWith([row('n1', 'native')])
+		const { payload, documentFind } = instanceWith([row('n1', 'native')])
 		const { nativeAdapter: _none, ...plan } = collectionPlan as Extract<
 			ProviderPlan,
 			{ kind: 'collection' }
 		>
-		const collection = createProviderRegistry(options(payload, plan))
+		const collection = createProviderRegistry(
+			options(payload, { ...plan, types: ['plausible', 'umami', 'ga4', 'posthog'] })
+		)
 		expect(await collection.granted?.('tenant-a', 'native')).toBe(false)
+		expect(documentFind).not.toHaveBeenCalled()
 	})
 
 	it('keys on the hash of the committed rows', async () => {

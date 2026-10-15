@@ -51,6 +51,16 @@ export const adapterFromProviderDoc: (doc: ProviderDoc, ctx: ProviderFactoryCont
 export type AdapterJobs = false | Readonly<Record<AnalyticsTaskName, ScheduledTask>>;
 
 // @public
+export interface AdapterLabelArgs {
+    // (undocumented)
+    req: PayloadRequest;
+    scope: string | null;
+}
+
+// @public
+export type AdapterLabelOption = string | Record<string, string> | ((args: AdapterLabelArgs) => string | Promise<string>);
+
+// @public
 export interface AdapterRegisterContext {
     adapterGrantedForScope?: (req: PayloadRequest, scope: string | null, adapterId: string) => Promise<boolean>;
     allowedOrigins?: ReadonlySet<string>;
@@ -133,8 +143,8 @@ export interface AnalyticsAdapter {
     };
     // (undocumented)
     isConfigured(): boolean;
-    // (undocumented)
     readonly label: string;
+    readonly labelFor?: (args: AdapterLabelArgs) => string | Promise<string>;
     // (undocumented)
     query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>;
     // (undocumented)
@@ -257,6 +267,16 @@ export type AnalyticsCrossScopeOptions = {
 };
 
 // @beta
+export const analyticsDefaultLayout: (options?: AnalyticsDefaultLayoutOptions) => (input: {
+    req: PayloadRequest;
+}) => Promise<WidgetInstance[]>;
+
+// @beta (undocumented)
+export interface AnalyticsDefaultLayoutOptions {
+    widgets?: WidgetInstance[];
+}
+
+// @beta
 export const analyticsDefaultWidgets: () => WidgetInstance[];
 
 // @public
@@ -366,6 +386,8 @@ type AnalyticsPluginOptions = {
     defaultAdapter?: string;
     platformAdapter?: string; /** Tenancy: how a request maps to its scope. Unset, the whole install is one scope. */
     scope?: AnalyticsScopeOptions;
+    sources?: Record<string, AnalyticsSourceOptions>;
+    defaultSource?: DefaultSourceRule;
     reportingTimezone?: string | TimezoneResolver;
     revenue?: boolean | AnalyticsRevenueOptions;
     trustedProxyHops?: number;
@@ -501,6 +523,11 @@ export interface AnalyticsSdks {
     maxmind?: MaxmindSdk;
 }
 
+// @public
+export interface AnalyticsSourceOptions {
+    tenants?: SourcePolicy;
+}
+
 // @public (undocumented)
 export const analyticsStat: (options: AnalyticsStatOptions) => UIField;
 
@@ -586,6 +613,7 @@ export type AnalyticsViewOptions = {
     defaultRange?: TimeframePreset; /** Metric the cards and the trend open on. Default `pageviews`. */
     defaultMetric?: MetricKey;
     navLabel?: string | Record<string, string>;
+    navLink?: boolean;
     Component?: AnalyticsComponent;
 };
 
@@ -737,6 +765,7 @@ export interface CaptureSupport {
     snippet(args: {
         path: string;
         scope?: string | null;
+        instance?: string;
     }): CaptureSnippet;
 }
 
@@ -771,6 +800,8 @@ export const createGuardedFetch: (options?: GuardedFetchOptions) => GuardedFetch
 // @public
 export type CrossScopeAccess = (args: {
     req: PayloadRequest;
+    scope?: string | null;
+    adapterId?: string;
 }) => boolean | Promise<boolean>;
 
 // @public
@@ -815,6 +846,16 @@ export interface DateRange {
 
 // @public
 export const DEFAULT_ROUTE_BASE: RouteBase;
+
+// @public
+export type DefaultSourceFunction = (args: {
+    req: PayloadRequest;
+    scope: string;
+    sources: SourceRef[];
+}) => string | undefined | Promise<string | undefined>;
+
+// @public
+export type DefaultSourceRule = 'tenantFirst' | 'platformFirst' | DefaultSourceFunction;
 
 // @public
 export const DIMENSION_KEYS: readonly ["page", "referrer", "source", "channel", "medium", "campaign", "utmSource", "utmMedium", "utmCampaign", "utmContent", "utmTerm", "device", "browser", "os", "country", "region", "city", "language", "event", "goal", "currency", "item"];
@@ -870,7 +911,7 @@ export interface FieldBreakdownRow {
 }
 
 // @public (undocumented)
-export interface FieldReadResult {
+export interface FieldReadResult extends SubstitutedSource {
     // (undocumented)
     adapterId: string;
     breakdowns?: FieldBreakdown[];
@@ -1304,6 +1345,10 @@ export const keys: {
     readonly providerErrorScriptId: "analytics:providerErrorScriptId";
     readonly providerErrorHostFormat: "analytics:providerErrorHostFormat";
     readonly providerErrorHostInsecure: "analytics:providerErrorHostInsecure";
+    readonly providerFieldIsDefault: "analytics:providerFieldIsDefault";
+    readonly providerFieldIsDefaultHelp: "analytics:providerFieldIsDefaultHelp";
+    readonly providerErrorDefaultTaken: "analytics:providerErrorDefaultTaken";
+    readonly providerErrorTypeUnserved: "analytics:providerErrorTypeUnserved";
     readonly providerNameNative: "analytics:providerNameNative";
     readonly providerNameNativeHelp: "analytics:providerNameNativeHelp";
     readonly providerNamePlausible: "analytics:providerNamePlausible";
@@ -1526,6 +1571,8 @@ export const keys: {
     readonly panelNewItem: "analytics:panelNewItem";
     readonly panelNoVisits: "analytics:panelNoVisits";
     readonly panelNoViews: "analytics:panelNoViews";
+    readonly sourcesPlatformFallback: "analytics:sourcesPlatformFallback";
+    readonly stateSourceSubstituted: "analytics:stateSourceSubstituted";
 };
 
 // @public
@@ -1566,6 +1613,16 @@ export type MetricValues = Partial<Record<MetricKey, MetricValue>>;
 
 // @public
 export type OrderSignatureMode = 'required' | 'optional';
+
+// @public
+export interface OwnSource {
+    // (undocumented)
+    docId: string;
+    // (undocumented)
+    id: string;
+    // (undocumented)
+    label: string;
+}
 
 // @public
 export const parseRetryAfter: (value: string | null | undefined, now?: number) => number | undefined;
@@ -1612,6 +1669,7 @@ export const PROVIDER_IDS: readonly ["native", "plausible", "umami", "ga4", "pos
 export interface ProviderCollectionFieldOverrides {
     // (undocumented)
     enabled?: ProviderFieldOverride;
+    isDefault?: ProviderFieldOverride;
     // (undocumented)
     name?: ProviderFieldOverride;
     // (undocumented)
@@ -1673,8 +1731,9 @@ export interface ProviderFieldsOptions {
     allowPrivateNetwork?: boolean;
     buildSecret?: BuildSecretField;
     connectionAccess?: ConnectionAccess;
-    fields?: ProviderCollectionFieldOverrides;
+    fields?: Omit<ProviderCollectionFieldOverrides, 'isDefault'>;
     scopeField?: boolean;
+    types?: ProviderId[];
 }
 
 // @public
@@ -1705,7 +1764,7 @@ export class ProviderHttpError extends Error {
 }
 
 // @public (undocumented)
-export type ProviderId = (typeof PROVIDER_IDS)[number];
+export type ProviderId = 'native' | 'plausible' | 'umami' | 'ga4' | 'posthog';
 
 // @public (undocumented)
 export const PROVIDERS_SLUG = "analytics-providers";
@@ -1721,6 +1780,8 @@ export type ProvidersCollectionOptions = {
         keys?: KeysConfig;
     };
     connectionAccess?: ConnectionAccess;
+    defaultAccess?: ConnectionAccess;
+    types?: ProviderId[];
     sourceAccess?: Access;
 };
 
@@ -1858,7 +1919,7 @@ export const readForField: (args: ReadForFieldArgs) => Promise<FieldReadResult>;
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForFieldArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForFieldArgs = ReadPrincipal & {
+export type ReadForFieldArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     collectionSlug: string;
     data: BindingDoc;
@@ -1882,7 +1943,7 @@ export const readForWidget: (args: ReadForWidgetArgs) => Promise<WidgetReadResul
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForWidgetArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForWidgetArgs = ReadPrincipal & {
+export type ReadForWidgetArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     metrics: MetricKey[];
     timeframe: TimeframePreset;
@@ -1900,7 +1961,7 @@ export const readForWidgetBreakdown: (args: ReadForWidgetBreakdownArgs) => Promi
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForWidgetBreakdownArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForWidgetBreakdownArgs = ReadPrincipal & {
+export type ReadForWidgetBreakdownArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     metric: MetricKey;
     dimension: DimensionKey;
@@ -1922,7 +1983,7 @@ export const readForWidgetGoals: (args: ReadForWidgetGoalsArgs) => Promise<Widge
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForWidgetGoalsArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForWidgetGoalsArgs = ReadPrincipal & {
+export type ReadForWidgetGoalsArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     timeframe: TimeframePreset;
     limit: number; /** Read the previous window too, when the source can compare. */
@@ -1939,7 +2000,7 @@ export const readForWidgetRealtime: (args: ReadForWidgetRealtimeArgs) => Promise
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForWidgetRealtimeArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForWidgetRealtimeArgs = ReadPrincipal & {
+export type ReadForWidgetRealtimeArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     metric: MetricKey;
     windowMinutes: number;
@@ -1955,7 +2016,7 @@ export const readForWidgetSeries: (args: ReadForWidgetSeriesArgs) => Promise<Wid
 // Warning: (ae-incompatible-release-tags) The symbol "ReadForWidgetSeriesArgs" is marked as @public, but its signature references "ReadPrincipal" which is marked as @beta
 //
 // @public
-export type ReadForWidgetSeriesArgs = ReadPrincipal & {
+export type ReadForWidgetSeriesArgs = ReadPrincipal & StoredSourceRead & {
     req: PayloadRequest;
     metric: MetricKey;
     timeframe: TimeframePreset;
@@ -2263,7 +2324,38 @@ export interface SnippetScript {
 export type SourceErrorKind = 'misconfigured' | 'host-refused';
 
 // @public
+export type SourcePolicy = 'staff' | 'tenant' | 'fallback' | SourcePolicyFunction;
+
+// @public
+export type SourcePolicyFunction = (args: {
+    req: PayloadRequest;
+    scope: string;
+    adapterId: string; /** Sources the reader already reads the scope through by its own provider documents. */
+    ownSources: OwnSource[];
+}) => boolean | Promise<boolean>;
+
+// @public
+export interface SourceRef {
+    docId?: string;
+    // (undocumented)
+    id: string;
+    kind: 'config' | 'runtime';
+    // (undocumented)
+    label: string;
+}
+
+// @public
 export const STATE_SLUG = "analytics-state";
+
+// @public
+export interface StoredSourceRead {
+    fallbackWhenUnreadable?: boolean;
+}
+
+// @public
+export interface SubstitutedSource {
+    substitutedFrom?: string;
+}
 
 // @public
 export const SYNC_SLUG = "analytics-daily";
@@ -2316,6 +2408,7 @@ export interface TrackerSlotConfig {
         kind: CaptureClientKind;
     } & Record<string, string | number | boolean>;
     gated: boolean;
+    instance?: string;
     // (undocumented)
     kind: CaptureClientKind;
     path: string;
@@ -2359,7 +2452,7 @@ export const VALUE_ATTRIBUTE = "data-analytics-value";
 export type VisitorCounting = 'distinct' | 'sumOfDaily';
 
 // @public (undocumented)
-export interface WidgetBreakdownResult extends Partial<ReadNotices> {
+export interface WidgetBreakdownResult extends Partial<ReadNotices>, SubstitutedSource {
     // (undocumented)
     adapterId: string;
     // (undocumented)
@@ -2395,7 +2488,7 @@ export const widgetFilters: (data: {
 }) => AnalyticsFilter[];
 
 // @public (undocumented)
-export interface WidgetGoalsResult extends Partial<ReadNotices> {
+export interface WidgetGoalsResult extends Partial<ReadNotices>, SubstitutedSource {
     // (undocumented)
     adapterId: string;
     // (undocumented)
@@ -2414,7 +2507,7 @@ export interface WidgetGoalsResult extends Partial<ReadNotices> {
 }
 
 // @public (undocumented)
-export interface WidgetReadResult extends Partial<ReadNotices> {
+export interface WidgetReadResult extends Partial<ReadNotices>, SubstitutedSource {
     // (undocumented)
     adapterId: string;
     comparisonRange?: DateRange;
@@ -2435,7 +2528,7 @@ export interface WidgetReadResult extends Partial<ReadNotices> {
 export type WidgetReadStatus = 'ok' | 'not-configured' | 'unavailable' | 'busy' | 'invalid' | 'range-too-long' | 'filter-unsupported' | 'no-access' | 'no-scope' | 'misconfigured' | 'host-refused';
 
 // @public (undocumented)
-export interface WidgetRealtimeResult extends Partial<ReadNotices> {
+export interface WidgetRealtimeResult extends Partial<ReadNotices>, SubstitutedSource {
     activeNow: number;
     // (undocumented)
     adapterId: string;
@@ -2452,7 +2545,7 @@ export interface WidgetRealtimeResult extends Partial<ReadNotices> {
 export type WidgetRealtimeStatus = 'ok' | 'not-configured' | 'unavailable' | 'busy' | 'invalid' | 'no-access' | 'no-scope' | 'misconfigured' | 'host-refused';
 
 // @public (undocumented)
-export interface WidgetSeriesResult extends Partial<ReadNotices> {
+export interface WidgetSeriesResult extends Partial<ReadNotices>, SubstitutedSource {
     // (undocumented)
     adapterId: string;
     comparisonPoints?: SeriesPoint[];

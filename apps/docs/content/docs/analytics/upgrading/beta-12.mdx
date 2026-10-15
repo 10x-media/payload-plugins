@@ -322,7 +322,7 @@ On Postgres:
 On SQLite:
 
 1. Dropping the second old table fails while `payload_locked_documents_rels` still references the first. Move the three `DROP TABLE` statements for `analytics_events`, `analytics_rollups` and `analytics_seen` below the statements that rebuild `payload_locked_documents_rels`, which end with that table's `CREATE INDEX` statements.
-2. With the providers collection, the rebuild of `analytics_providers` copies two columns the old table does not have. Remove `"ga4_currency"` and `"posthog_scope_property"` from both column lists of the `INSERT INTO __new_analytics_providers` statement.
+2. With the providers collection, the rebuild of `analytics_providers` copies two columns the old table does not have. Remove `"ga4_currency"` and `"posthog_scope_property"` from both column lists of the `INSERT INTO __new_analytics_providers` statement. Upgrading a scoped install straight to 1.0.0-beta.13 or later, remove `"is_default"` there too.
 3. When `payload_jobs` existed before the upgrade (1.0.0-beta.11 registered sync, warming or native retention), delete the queued runs of the old retention task and of the warm task under its old name, which nothing runs any more, with one more statement at the end of `up`:
 
    ```ts partial

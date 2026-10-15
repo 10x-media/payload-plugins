@@ -147,6 +147,13 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Masukkan alamatnya saja, misalnya https://analytics.example.com atau https://example.com/analytics, tanpa bagian yang diawali ? atau # dan tanpa nama pengguna atau kata sandi.',
 	[keys.providerErrorHostInsecure]: 'Alamat harus diawali dengan https://.',
+	[keys.providerFieldIsDefault]: 'Bawaan untuk situs ini',
+	[keys.providerFieldIsDefaultHelp]:
+		'Analitik dibuka dengan alat ini kecuali pembaca memilih yang lain. Hanya satu alat per situs yang bisa menjadi bawaan.',
+	[keys.providerErrorDefaultTaken]:
+		'Alat analitik lain sudah menjadi bawaan untuk situs ini. Hapus centangnya di sana terlebih dahulu.',
+	[keys.providerErrorTypeUnserved]:
+		'Situs web ini tidak dapat menggunakan alat analitik ini. Pilih alat lain.',
 	[keys.providerNameNative]: 'Payload',
 	[keys.providerNameNativeHelp]:
 		'Menyimpan jumlah kunjungan di basis data Payload milik situs ini sendiri. Tidak ada layanan luar yang terlibat.',
@@ -400,6 +407,10 @@ export const id: LocaleBundle<'other'> = {
 	[keys.panelNewItem]: 'Angka akan muncul di sini setelah ada yang melihat item ini.',
 	[keys.panelNoVisits]: 'Tidak ada kunjungan dalam rentang tanggal ini.',
 	[keys.panelNoViews]: 'Tidak ada tayangan dalam rentang tanggal ini.',
+	[keys.sourcesPlatformFallback]:
+		'Angka ini berasal dari alat analitik platform sampai situs ini menambahkan alatnya sendiri. Setelah ditambahkan, angkanya beralih ke alat itu.',
+	[keys.stateSourceSubstituted]:
+		'Sumber data yang tersimpan tidak tersedia lagi, jadi sumber default yang ditampilkan.',
 	[pluralKeys.liveVisitors.other]: '{{count}} pengunjung aktif saat ini',
 	[pluralKeys.livePageviews.other]: '{{count}} tampilan halaman dalam {{duration}} terakhir',
 }

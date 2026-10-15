@@ -147,6 +147,13 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Escribe solo la dirección, por ejemplo https://analytics.example.com o https://example.com/analytics, sin ninguna parte que empiece por ? o # y sin usuario ni contraseña.',
 	[keys.providerErrorHostInsecure]: 'La dirección debe empezar por https://.',
+	[keys.providerFieldIsDefault]: 'Predeterminado para este sitio',
+	[keys.providerFieldIsDefaultHelp]:
+		'Las estadísticas se abren con esta herramienta salvo que el lector elija otra. Solo una herramienta por sitio puede ser la predeterminada.',
+	[keys.providerErrorDefaultTaken]:
+		'Otra herramienta de analítica ya es la predeterminada para este sitio. Desmárcala allí primero.',
+	[keys.providerErrorTypeUnserved]:
+		'Este sitio web no puede usar esta herramienta de analítica. Elige otra.',
 	[keys.providerNameNative]: 'Payload',
 	[keys.providerNameNativeHelp]:
 		'Guarda el recuento de visitas en la base de datos de Payload del propio sitio web. No interviene ningún servicio externo.',
@@ -403,6 +410,10 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.panelNewItem]: 'Las cifras aparecerán aquí cuando alguien vea este elemento.',
 	[keys.panelNoVisits]: 'No hay visitas en este rango de fechas.',
 	[keys.panelNoViews]: 'No hay vistas en este rango de fechas.',
+	[keys.sourcesPlatformFallback]:
+		'Estas cifras vienen de la herramienta de analítica de la plataforma hasta que este sitio añada la suya. Al añadirla, se cambia a ella.',
+	[keys.stateSourceSubstituted]:
+		'La fuente de datos guardada ya no está disponible, así que se muestra la predeterminada.',
 	[pluralKeys.liveVisitors.one]: '{{count}} visitante activo ahora mismo',
 	[pluralKeys.liveVisitors.many]: '{{count}} visitantes activos ahora mismo',
 	[pluralKeys.liveVisitors.other]: '{{count}} visitantes activos ahora mismo',

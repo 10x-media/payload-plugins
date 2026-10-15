@@ -113,6 +113,7 @@ analytics({
     defaultRange: 'last30days',  // timeframe the view opens on
     defaultMetric: 'pageviews',  // metric the cards and trend open on
     navLabel: { en: 'Analytics', de: 'Statistiken' },
+    navLink: true,               // false: no link in the admin nav
     // Component: '/components/MyAnalyticsView#MyAnalyticsView', // your own body, see Customizing
   },
   countryFlags: true,            // flags beside country names (default); false, or { Component }
@@ -124,7 +125,7 @@ analytics({
 
 `defaultRange` takes any timeframe preset. The toolbar offers five of them: `today`, `last7days`, `last30days`, `last90days` and `lastYear` (shown as **Last 12 months**: the year up to today, not the previous calendar year). `thisMonth` and `thisYear` open the view on that window, though the range select does not list them. `allTime` opens on `last30days`, because the query endpoint refuses any window longer than a year.
 
-`view: false` removes the route and the nav link entirely. `navLabel` names the nav link and the view's breadcrumb: a plain string, or a map keyed by admin language code, read in the reader's language, then Payload's `fallbackLanguage`, then `en`; unset, the plugin's own translated label applies, localizable through the [`translations` option](/analytics/reference/translations). The view's heading and its tab title stay `viewTitle`.
+`view: false` removes the route and the nav link entirely. `navLink: false` keeps the view at its path and leaves its link out of the admin nav, for a host that links it from navigation of its own; there is no need to filter `admin.components.afterNavLinks` for it. `navLabel` names the nav link and the view's breadcrumb: a plain string, or a map keyed by admin language code, read in the reader's language, then Payload's `fallbackLanguage`, then `en`; unset, the plugin's own translated label applies, localizable through the [`translations` option](/analytics/reference/translations). The view's heading and its tab title stay `viewTitle`.
 
 `countryFlags` is a top-level option rather than a view option, because the widgets and the per-document panel draw flags too, with or without the view. It takes a boolean or `{ Component }`, and anything else is rejected at config time. It covers the geography rows, the countries widget, the document panel and a country filter chip; `false` removes the flag from all of them and leaves the name alone. The [flag route](/analytics/reference/endpoints#flags-endpoint) is mounted only for `true`: `false` needs none, and a component of your own brings its own artwork ([Country flags](/analytics/customizing#country-flags)). It is public and static by design, reading no database, no user and no scope, so there is nothing behind it to gate.
 
@@ -146,7 +147,9 @@ The one scope decision the view makes for itself is whether to aggregate. A read
 
 Four URL rules follow. That tagged marker is the only scope an address may carry: any other `scope` is dropped on the server. A `source` the resolved scope does not hold, and a metric, grouping or filter the selected source cannot serve, are dropped in the browser. Either way the address is rewritten to what actually answered, with `history.replaceState`, so Back does not undo the correction. A marker tagged with a tenant the request no longer resolves to is dropped as well, so moving the host's own selector drops the **All sites** choice rather than carrying it into another tenant. And a reader the aggregate gate denies who opens an aggregate link gets their own tenant's numbers and an address that says so, rather than a refusal.
 
-The source select lists that request's sources, which on a scoped install are the [provider documents that tenant holds and this reader may read](/analytics/multi-tenancy#which-sources-a-request-sees), each under its document name; another tenant's never appear, and neither does a config adapter whose queries cannot narrow to one tenant. One source draws no select at all. Goal names are resolved per scope too. See [Multi-tenancy](/analytics/multi-tenancy) for how the scope itself is resolved.
+The source select lists that request's sources, which on a scoped install are the [provider documents that tenant holds and this reader may read](/analytics/multi-tenancy#which-sources-a-request-sees), each under its document name; another tenant's never appear, and neither does a config adapter whose queries cannot narrow to one tenant. One source draws no select at all. The view opens on the tenant's [default source](/analytics/multi-tenancy#a-tenants-default-source).
+
+Where a [`fallback` policy](/analytics/multi-tenancy#letting-tenants-read-a-shared-source) lets a tenant's own users read the platform's adapter because they have no source of their own, the view tells them so: these are the platform's numbers until they add a source, and adding one switches to it. The providers list says the same. Goal names are resolved per scope too. See [Multi-tenancy](/analytics/multi-tenancy) for how the scope itself is resolved.
 
 ## Keyboard
 

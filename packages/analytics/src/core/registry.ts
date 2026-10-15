@@ -23,6 +23,11 @@ export interface ScopeRegistry {
 	registry: AdapterRegistry
 	/** Adapter id to the id of the provider document granting it to this scope. */
 	grants: ReadonlyMap<string, string>
+	/**
+	 * Adapter id granted by the scope's enabled, available provider document flagged the default.
+	 * It wins a tenant scope's default over `defaultSource` wherever the reader may read it.
+	 */
+	defaultGrant?: string
 }
 
 /** The grants of a registry no provider document adds to. */

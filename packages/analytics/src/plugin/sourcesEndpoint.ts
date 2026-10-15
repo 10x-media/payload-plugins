@@ -31,6 +31,17 @@ export const makeSourcesHandler = (): PayloadHandler => async (req) => {
 	}
 }
 
+/** The listing on the wire: what the client renders, never the adapters behind it. */
+const listingBody = ({
+	defaultId,
+	sources,
+	notice,
+}: Awaited<ReturnType<typeof resolveSourcesForRequest>>) => ({
+	defaultId,
+	sources,
+	...(notice ? { notice } : {}),
+})
+
 const listSources = async (
 	req: PayloadRequest,
 	runtime: AnalyticsRuntime | undefined
@@ -56,11 +67,7 @@ const listSources = async (
 			gates,
 			...(scope.scope === null ? {} : { scope: scope.gated }),
 		})
-		return Response.json(
-			{ defaultId: listing.defaultId, sources: listing.sources },
-			{ headers: NO_STORE }
-		)
+		return Response.json(listingBody(listing), { headers: NO_STORE })
 	}
-	const { sources, defaultId } = await resolveSourcesForRequest(req)
-	return Response.json({ defaultId, sources }, { headers: NO_STORE })
+	return Response.json(listingBody(await resolveSourcesForRequest(req)), { headers: NO_STORE })
 }

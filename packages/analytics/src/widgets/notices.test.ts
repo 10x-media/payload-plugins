@@ -32,6 +32,14 @@ describe('widgetNotice', () => {
 		)
 	})
 
+	it('leads with a substituted source, worded without naming the source it replaced', () => {
+		const line = widgetNotice({ substitutedFrom: 'posthog:65f0c2a9e1', stale: true }, context)
+		expect(line).toBe(
+			[keys.stateSourceSubstituted, keys.viewStale].map((key) => `t(${key})`).join(NOTICE_SEPARATOR)
+		)
+		expect(line).not.toContain('posthog')
+	})
+
 	it('prefers the unresolved-goals notice over the no-goals one', () => {
 		expect(widgetNotice({ goalsUnresolved: true, noGoals: true }, context)).toBe(
 			`t(${keys.stateGoalsUnresolved})`

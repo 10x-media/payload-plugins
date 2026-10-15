@@ -9,6 +9,9 @@ import {
 	comparisonWindow,
 	pinnedScope,
 	prepareWidgetRead,
+	type StoredSourceRead,
+	type SubstitutedSource,
+	substitutionOf,
 	type WidgetReadStatus,
 } from './prepareWidgetRead'
 import { readForWidget } from './readForWidget'
@@ -26,7 +29,7 @@ export interface GoalRow {
 	previousConversions?: number
 }
 
-export interface WidgetGoalsResult extends Partial<ReadNotices> {
+export interface WidgetGoalsResult extends Partial<ReadNotices>, SubstitutedSource {
 	status: WidgetReadStatus
 	/** How long until a `busy` read can succeed, when the source or the plugin knows. */
 	retryAfterMs?: number
@@ -48,21 +51,22 @@ export interface WidgetGoalsResult extends Partial<ReadNotices> {
 }
 
 /** Scoped like `ReadForWidgetArgs`: the request's own scope unless one is pinned. */
-export type ReadForWidgetGoalsArgs = ReadPrincipal & {
-	req: PayloadRequest
-	timeframe: TimeframePreset
-	limit: number
-	/** Read the previous window too, when the source can compare. */
-	compare: boolean
-	adapterId?: string
-	now: Date
-	range?: DateRange
-	/**
-	 * Reporting timezone the caller already resolved, reused rather than resolved again so
-	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
-	 */
-	timezone?: string
-}
+export type ReadForWidgetGoalsArgs = ReadPrincipal &
+	StoredSourceRead & {
+		req: PayloadRequest
+		timeframe: TimeframePreset
+		limit: number
+		/** Read the previous window too, when the source can compare. */
+		compare: boolean
+		adapterId?: string
+		now: Date
+		range?: DateRange
+		/**
+		 * Reporting timezone the caller already resolved, reused rather than resolved again so
+		 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+		 */
+		timezone?: string
+	}
 
 /**
  * How much wider than the table the previous window is read: each window ranks by its own
@@ -116,6 +120,7 @@ export const readForWidgetGoals = async (
 		timeframe,
 		adapterId,
 		...readPrincipalOf(args),
+		...(args.fallbackWhenUnreadable ? { fallbackWhenUnreadable: true } : {}),
 		timezone: args.timezone,
 		range: args.range,
 	})
@@ -199,6 +204,7 @@ export const readForWidgetGoals = async (
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
+		...substitutionOf(prepared),
 		// The caller's own scope, not the one this pinned onto its sub-reads: those are always
 		// explicitly scoped, so reading their answer back would name every viewer's own scope.
 		...pinnedScope(args, prepared.queryScope),

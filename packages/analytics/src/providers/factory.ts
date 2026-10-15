@@ -6,11 +6,18 @@ import type { AnalyticsAdapter, AnalyticsResult } from '../core/contract'
 import type { FetchLike } from '../core/fetch'
 import type { AnalyticsSdks } from '../core/sdks'
 import { HostRefusedError } from '../core/sourceErrors'
+import { withFixedLabel } from '../core/sourceLabel'
 import { isRecord } from '../core/values'
 import { checkDocumentHost, type DocumentHost, type ProviderHostPolicy } from './hosts'
 
-export const PROVIDER_IDS = ['native', 'plausible', 'umami', 'ga4', 'posthog'] as const
-export type ProviderId = (typeof PROVIDER_IDS)[number]
+export type ProviderId = 'native' | 'plausible' | 'umami' | 'ga4' | 'posthog'
+export const PROVIDER_IDS = [
+	'native',
+	'plausible',
+	'umami',
+	'ga4',
+	'posthog',
+] as const satisfies readonly ProviderId[]
 
 /** The provider-settings document shape the adapter factory reads (depth 0, secrets revealed). */
 export type ProviderDoc = {
@@ -72,7 +79,7 @@ export const documentAdapterId = (provider: unknown, id: unknown): string =>
 
 /** A lent `native` adapter under the document's name, so a source reads as its tenant named it. */
 const withDocumentLabel = (adapter: AnalyticsAdapter, doc: ProviderDoc): AnalyticsAdapter =>
-	doc.name ? { ...adapter, label: doc.name } : adapter
+	doc.name ? withFixedLabel(adapter, doc.name) : adapter
 
 /** Per-document ids keep two projects of one provider type apart in a registry. */
 const withInstanceIdentity = (adapter: AnalyticsAdapter, doc: ProviderDoc): AnalyticsAdapter => {
@@ -80,18 +87,18 @@ const withInstanceIdentity = (adapter: AnalyticsAdapter, doc: ProviderDoc): Anal
 		return adapter
 	}
 	return {
-		...adapter,
+		...withFixedLabel(adapter, doc.name || `${adapter.label} ${shortId(doc.id)}`),
 		id: documentAdapterId(doc.provider, doc.id),
-		label: doc.name || `${adapter.label} ${shortId(doc.id)}`,
 	}
 }
 
 /**
- * Keeps `shape`'s identity and capabilities so the source still lists, but every read throws
- * `error()` and it declares no capture, so its proxy mount answers 404.
+ * Keeps `shape`'s identity, capabilities and `isConfigured` (configured when absent) so the source
+ * still lists, but every read throws `error()` and it declares no capture, so its proxy mount 404s.
  */
 export const failingAdapter = (
-	shape: Pick<AnalyticsAdapter, 'id' | 'label' | 'capabilities' | 'realtime'>,
+	shape: Pick<AnalyticsAdapter, 'id' | 'label' | 'capabilities' | 'realtime'> &
+		Partial<Pick<AnalyticsAdapter, 'isConfigured'>>,
 	error: () => Error
 ): AnalyticsAdapter => {
 	const fail = async (): Promise<AnalyticsResult> => {
@@ -101,7 +108,7 @@ export const failingAdapter = (
 		id: shape.id,
 		label: shape.label,
 		capabilities: shape.capabilities,
-		isConfigured: () => true,
+		isConfigured: shape.isConfigured ?? (() => true),
 		query: fail,
 		...(shape.realtime ? { realtime: fail } : {}),
 	}

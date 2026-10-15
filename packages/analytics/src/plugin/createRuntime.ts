@@ -88,6 +88,7 @@ const providerPlanOf = (resolved: ResolvedOptions): ProviderPlan => {
 		kind: 'collection',
 		slug: collection.slug,
 		scopeField: collection.scopeField,
+		types: collection.types,
 		...(nativeAdapter ? { nativeAdapter } : {}),
 	}
 }
@@ -149,6 +150,8 @@ const settledFieldsOf = (args: RuntimeFactoryArgs) => {
 			? { resolveCurrency: args.resolveCurrency }
 			: {}),
 		platformAdapterId: resolved.platformAdapter,
+		...(resolved.sources.policies.size > 0 ? { sourcePolicies: resolved.sources.policies } : {}),
+		...(resolved.sources.defaultSource ? { defaultSource: resolved.sources.defaultSource } : {}),
 		captureSlots: resolved.capture.slots,
 		capturePaths: resolved.capture.paths,
 		captureProxy: resolved.capture.proxy,

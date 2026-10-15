@@ -144,6 +144,13 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Enter only the address, for example https://analytics.example.com or https://example.com/analytics, with no part starting with ? or # and no user name or password.',
 	[keys.providerErrorHostInsecure]: 'The address must start with https://.',
+	[keys.providerFieldIsDefault]: 'Default for this site',
+	[keys.providerFieldIsDefaultHelp]:
+		'Analytics opens on this tool unless the reader picks another. Only one tool per site can be the default.',
+	[keys.providerErrorDefaultTaken]:
+		'Another analytics tool is already the default for this site. Untick it there first.',
+	[keys.providerErrorTypeUnserved]:
+		'This website cannot use this analytics tool. Choose another one.',
 	[keys.providerNameNative]: 'Payload',
 	[keys.providerNameNativeHelp]:
 		"Keeps visit counts in this website's own Payload database. No outside service is involved.",
@@ -397,6 +404,10 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.panelNewItem]: 'Numbers will show up here once people see this item.',
 	[keys.panelNoVisits]: 'No visits in this date range.',
 	[keys.panelNoViews]: 'No views in this date range.',
+	[keys.sourcesPlatformFallback]:
+		"These numbers come from the platform's analytics tool until this site adds its own. Adding one switches to it.",
+	[keys.stateSourceSubstituted]:
+		'The saved data source is no longer available, so the default one is shown.',
 	[pluralKeys.liveVisitors.one]: '{{count}} visitor active right now',
 	[pluralKeys.liveVisitors.other]: '{{count}} visitors active right now',
 	[pluralKeys.livePageviews.one]: '{{count}} pageview in the last {{duration}}',

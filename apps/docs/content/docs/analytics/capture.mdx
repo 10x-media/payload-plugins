@@ -85,9 +85,9 @@ An install fills at most two slots, in this order:
 | Slot | Filled by |
 |---|---|
 | `global` | `capture.slots.global`, else the designated `platformAdapter`, else the single config adapter when only one is configured. |
-| `tenant` | `capture.slots.tenant`, else the scope's default source when it declares capture, else its first source that does. On an install running provider documents, only a source the scope's documents grant fills it. Empty whenever no scope resolves. |
+| `tenant` | `capture.slots.tenant`, else the scope's document flagged **Default for this site**, else its default source, either only when it declares capture, else its first source that does. On an install running provider documents, only a source the scope's documents grant fills it. Empty whenever no scope resolves. |
 
-One slot, one adapter, and one adapter fills at most one slot: when both slots resolve to the same adapter the global entry keeps it, so a scoped native install never posts every event twice. One vendor fills at most one slot as well. A page runs one copy of a vendor's script, with one global (`posthog`, `gtag`, `plausible`, `umami`), so a tenant slot of the same kind as the global one would init onto the platform's SDK, send into the platform's project and share its gate: it is left out of the config, and the log says so once. An adapter that declares no `capture`, because the public config it needs is unset, fills nothing.
+One slot, one adapter, and one adapter fills at most one slot: when both slots resolve to the same adapter the global entry keeps it, so a scoped native install never posts every event twice. One vendor fills at most one slot as well, PostHog aside. A page runs one copy of a vendor's script, with one global (`gtag`, `plausible`, `umami`), so a tenant slot of Plausible, Umami or GA4 beside a global slot of the same vendor would init onto the platform's SDK, send into the platform's project and share its gate: it is left out of the config, and the log says so once. PostHog runs a second client beside the first, so a tenant slot of PostHog beside a global PostHog captures into its own project ([below](#two-posthog-projects-on-one-page)). An adapter that declares no `capture`, because the public config it needs is unset, fills nothing.
 
 A native-only install renders no snippet at all: the tracker itself is the client, posting to the ingest endpoint.
 
@@ -112,6 +112,26 @@ analytics({
 `false` disables a slot outright: nothing fills it, its proxy mount 404s (bodyless, like every [proxy](/analytics/proxy) refusal, which is the one answer the plugin sends with no [error envelope](/analytics/reference/endpoints#errors)), and the tracker config omits it. An unknown `global` id throws at config time; a `tenant` id may also name a runtime provider instance, so it is resolved per request instead.
 
 `capture.paths` moves a slot's mount off the runtime proxy, for installs relaying the vendor from a route handler of their own with [`captureRoute`](/analytics/proxy#a-route-handler-of-your-own). Pass the path the route is mounted at, without the Next `basePath`: Next serves the route under the base path, and the tracker config puts it in front of every path it hands out, the runtime proxy's and the ingest path included. Next rewrites are not offered: `captureRewrites` and `posthogProxyRewrites` [throw](/analytics/proxy#next-rewrites), since a rewrite forwards the visitor's cookies to the vendor.
+
+### Two PostHog projects on one page
+
+When the global slot is PostHog and the tenant slot resolves to another PostHog, such as a tenant's [provider document](/analytics/providers#provider-documents) holding its read credentials and a `projectToken`, both capture. The global slot's snippet starts posthog-js as usual. The tenant slot's starts a second client, named `tenant`:
+
+```js
+posthog.init(
+  'phc_tenant...',
+  { api_host: '/api/_x/p/tenant', capture_pageview: false, capture_pageleave: true, opt_out_persistence_by_default: true },
+  'tenant',
+)
+```
+
+It is reachable as `window.posthog.tenant`, and posthog-js loads `array.js` once for both. Each slot keeps its own [gate](/analytics/consent), its own opt-out and its own [exclusion](#the-vendor-slots) switch, and PostHog stores each client's state under its own project token, so neither reads or clears the other's.
+
+posthog-js follows history changes for its first client alone, so the two count pageviews differently and each project still counts each pageview once. The global client keeps `capture_pageview: 'history_change'`. The `tenant` client counts none itself: the tracker hands it its own pageviews as `$pageview` events, with `$pathname` and `$host` set to where each happened, and its page leaves are asked for outright.
+
+A posthog-js your own code already loaded on the page is kept: the snippet starts the slot's client on it rather than replacing it.
+
+1.0.0-beta.12 left the tenant slot out in this case, with a warning in the log. To keep that, set `capture.slots.tenant: false`, which empties the tenant slot for every tenant, whatever vendor it uses.
 
 ### GA4
 
@@ -221,7 +241,7 @@ A vendor snippet for a slot that does not wait for the gate (or one the server o
 |---|---|
 | Plausible | `localStorage.plausible_ignore = 'true'` |
 | Umami | `localStorage['umami.disabled'] = '1'` |
-| PostHog | `posthog.opt_out_capturing()`, queued by the snippet's stub |
+| PostHog | `posthog.opt_out_capturing()`, queued by the snippet's stub; a [second client](#two-posthog-projects-on-one-page)'s is `posthog.tenant.opt_out_capturing()` |
 | GA4 | `window['ga-disable-<measurementId>'] = true`, and the rendered snippet sets it from the flag itself; a tag that already ran on the page is also told through consent mode that every storage type is denied |
 
 What an ungated slot can still record, because its snippet ran before the tracker booted:
@@ -368,7 +388,7 @@ Pass your request nonce and every script the tracker renders or injects carries 
 <AnalyticsScripts config={tracker} nonce={nonce} />
 ```
 
-PostHog's stub injects `array.js` itself, so it copies the running inline's nonce onto that tag before inserting it; without that, a nonce CSP without `strict-dynamic` would pass the inline and block the bundle. Replace injection with a framework script loader through `loadScript` on `AnalyticsProvider` or `createTracker`, or leave every vendor script to a consent manager that loads them itself with [`snippets={false}`](/analytics/consent#when-the-manager-loads-the-vendor-scripts-itself).
+A policy that allows the inline snippets by hash needs new hashes whenever a snippet changes, and PostHog's changed in 1.0.0-beta.13 for the [second client](#two-posthog-projects-on-one-page). PostHog's stub injects `array.js` itself, so it copies the running inline's nonce onto that tag before inserting it; without that, a nonce CSP without `strict-dynamic` would pass the inline and block the bundle. Replace injection with a framework script loader through `loadScript` on `AnalyticsProvider` or `createTracker`, or leave every vendor script to a consent manager that loads them itself with [`snippets={false}`](/analytics/consent#when-the-manager-loads-the-vendor-scripts-itself).
 
 ## What the tracker sends to native
 

@@ -146,6 +146,13 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Gib nur die Adresse ein, zum Beispiel https://analytics.example.com oder https://example.com/analytics, ohne einen Teil mit ? oder # und ohne Benutzername oder Passwort.',
 	[keys.providerErrorHostInsecure]: 'Die Adresse muss mit https:// beginnen.',
+	[keys.providerFieldIsDefault]: 'Standard für diese Website',
+	[keys.providerFieldIsDefaultHelp]:
+		'Die Statistiken öffnen mit diesem Tool, solange niemand ein anderes auswählt. Pro Website kann nur ein Tool der Standard sein.',
+	[keys.providerErrorDefaultTaken]:
+		'Ein anderes Analysetool ist bereits der Standard für diese Website. Entfernen Sie dort zuerst das Häkchen.',
+	[keys.providerErrorTypeUnserved]:
+		'Diese Website kann dieses Analysetool nicht verwenden. Wählen Sie ein anderes.',
 	[keys.providerNameNative]: 'Payload',
 	[keys.providerNameNativeHelp]:
 		'Speichert die Besuchszahlen in der eigenen Payload-Datenbank dieser Website. Es ist kein externer Dienst beteiligt.',
@@ -402,6 +409,10 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.panelNewItem]: 'Sobald jemand diesen Inhalt sieht, erscheinen hier die Zahlen.',
 	[keys.panelNoVisits]: 'Keine Besuche in diesem Datumsbereich.',
 	[keys.panelNoViews]: 'Keine Ansichten in diesem Datumsbereich.',
+	[keys.sourcesPlatformFallback]:
+		'Diese Zahlen kommen vom Analysetool der Plattform, bis diese Website ein eigenes hinzufügt. Sobald eines hinzugefügt ist, wird darauf umgestellt.',
+	[keys.stateSourceSubstituted]:
+		'Die gespeicherte Datenquelle ist nicht mehr verfügbar, daher wird die Standardquelle angezeigt.',
 	[pluralKeys.liveVisitors.one]: '{{count}} Besucher gerade aktiv',
 	[pluralKeys.liveVisitors.other]: '{{count}} Besucher gerade aktiv',
 	[pluralKeys.livePageviews.one]: '{{count}} Seitenaufruf in den letzten {{duration}}',

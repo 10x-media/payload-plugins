@@ -350,6 +350,13 @@ describe('adapterFromProviderDoc under a host policy', () => {
 		expect(urls).toEqual([])
 	})
 
+	it('keeps a refused host unconfigured while its credentials are missing', () => {
+		const { fetch } = recording()
+		const doc = plausibleDoc('https://evil.example.org')
+		const adapter = build({ ...doc, plausible: { ...doc.plausible, apiKey: '' } }, { hosts, fetch })
+		expect(adapter?.isConfigured()).toBe(false)
+	})
+
 	it('reads under the base path of an address whose origin is listed', async () => {
 		const { fetch, urls } = recording()
 		const adapter = build(plausibleDoc('https://analytics.example.com/plausible/'), {

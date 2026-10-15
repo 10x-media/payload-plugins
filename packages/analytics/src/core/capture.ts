@@ -39,8 +39,9 @@ export interface CaptureSupport {
 	proxy: ProxyDescriptor
 	/**
 	 * `scope` is the request's resolved scope, which a vendor able to carry it stamps on every event.
-	 * Null when unscoped or unresolved.
+	 * Null when unscoped or unresolved. `instance` names the client the snippet initialises, set
+	 * only for a vendor that runs a second client beside the other slot's (PostHog).
 	 */
-	snippet(args: { path: string; scope?: string | null }): CaptureSnippet
+	snippet(args: { path: string; scope?: string | null; instance?: string }): CaptureSnippet
 	client: TrackerSlotConfig['client']
 }

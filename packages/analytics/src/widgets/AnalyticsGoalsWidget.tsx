@@ -74,6 +74,7 @@ async function GoalsWidgetBody(props: AnalyticsWidgetProps) {
 		limit: resolveGoalRowLimit(data.limit),
 		compare,
 		adapterId: data.dataSource,
+		fallbackWhenUnreadable: true,
 		now,
 		...windowReadArgs(window),
 	})

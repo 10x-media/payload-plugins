@@ -15,6 +15,7 @@ import {
 } from '../../core/contract'
 import type { FetchLike } from '../../core/fetch'
 import { vendorReading } from '../../core/metricValues'
+import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
 import { DEFAULT_TIMEZONE } from '../../timeframe/tz'
 import { emptyGoalBreakdown, goalHint, hintFailed, hintSlugs } from '../goalRead'
 import { hostnameOf, withoutTrailingSlash } from '../http/baseUrl'
@@ -30,6 +31,11 @@ import { dayIso, hourIso } from '../series'
 import { upstreamJson } from '../upstream'
 
 export interface PosthogConfig {
+	/**
+	 * The source's name in pickers and listings: a string, a map by admin language (read like
+	 * `view.navLabel`), or a function naming it per reader and scope. Default `'PostHog'`.
+	 */
+	label?: AdapterLabelOption
 	/** PostHog project id (numeric). */
 	projectId: string
 	/** Personal API key with the "Query Read" scope (phx_...). Never exposed to the browser. */
@@ -77,9 +83,12 @@ const resolveRegion = (config: PosthogConfig): 'us' | 'eu' => {
 /**
  * PostHog's official stub, trimmed: one self-sequencing script whose `init` injects `array.js` from
  * the proxy. Added: the injected tag inherits the inline's nonce, or a nonce CSP blocks the bundle.
+ * Changed for a second slot's named client: `init` stays the stub's own rather than a queued call, so
+ * that client gets its own queue at once; only the first `init` injects `array.js`; and a loaded
+ * posthog-js (no longer an array) is never replaced, so the client is initialised on it.
  */
 const POSTHOG_STUB =
-	'!function(t,e){var o,n,p,r,c;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(c=t.currentScript&&(t.currentScript.nonce||t.currentScript.getAttribute("nonce")))&&(p.nonce=c,p.setAttribute("nonce",c)),(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],o="init capture register register_once identify group alias reset setPersonProperties captureException opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing getFeatureFlag isFeatureEnabled reloadFeatureFlags onFeatureFlags on debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);'
+	'!function(t,e){var o,n,p,r,c;e.__SV||!Array.isArray(e)||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}e.__L||(e.__L=1,(p=t.createElement("script")).type="text/javascript",p.crossOrigin="anonymous",p.async=!0,p.src=s.api_host.replace(".i.posthog.com","-assets.i.posthog.com")+"/static/array.js",(c=t.currentScript&&(t.currentScript.nonce||t.currentScript.getAttribute("nonce")))&&(p.nonce=c,p.setAttribute("nonce",c)),(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r));var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],o="capture register register_once identify group alias reset setPersonProperties captureException opt_in_capturing opt_out_capturing has_opted_in_capturing has_opted_out_capturing getFeatureFlag isFeatureEnabled reloadFeatureFlags onFeatureFlags on debug".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)}(document,window.posthog||[]);'
 
 /** Whether an address is PostHog Cloud's, which serves capture from per-region hosts of its own. */
 const isCloudHost = (address: string): boolean => {
@@ -140,19 +149,26 @@ const dataRoutes = (hosts: CaptureHosts): ProxyRoute[] =>
 
 /**
  * posthog-js's single-page-app mode: without it every navigation after the first page is lost, since
- * the vendor sink forwards no pageview.
+ * the vendor sink forwards no pageview to the primary client.
  */
 const CAPTURE_PAGEVIEW = 'history_change'
+
+/**
+ * A named client counts no pageview itself: posthog-js wraps `history.pushState` for the first
+ * client alone, so the sink hands it the tracker's pageviews. Its pageleave, which PostHog ties to
+ * its own pageviews, is asked for outright.
+ */
+const NAMED_CLIENT_PAGEVIEWS = ['capture_pageview:false', 'capture_pageleave:true']
 
 /**
  * `opt_out_persistence_by_default` makes an opt-out (closed gate, excluded browser) delete PostHog's
  * `ph_<token>_posthog` storage, distinct id included, and keep none while it holds.
  */
-const initOptions = (path: string, ui: string | undefined): string =>
+const initOptions = (path: string, ui: string | undefined, named: boolean): string =>
 	[
 		`api_host:${jsLiteral(path)}`,
 		...(ui === undefined ? [] : [`ui_host:${jsLiteral(ui)}`]),
-		`capture_pageview:${jsLiteral(CAPTURE_PAGEVIEW)}`,
+		...(named ? NAMED_CLIENT_PAGEVIEWS : [`capture_pageview:${jsLiteral(CAPTURE_PAGEVIEW)}`]),
 		'opt_out_persistence_by_default:true',
 	].join(',')
 
@@ -168,17 +184,20 @@ function buildCapture(config: PosthogConfig, token: string): CaptureSupport {
 			],
 			...(config.fetch ? { fetch: config.fetch } : {}),
 		},
-		snippet: ({ path, scope }) => {
+		snippet: ({ path, scope, instance }) => {
+			const named = instance !== undefined
+			const client = named ? `posthog[${jsLiteral(instance)}]` : 'posthog'
 			// A super-property rather than a per-call one, so it rides the events a host
 			// captures itself, which is what `scopeProperty` reads back on.
 			const stamp =
 				config.scopeProperty && scope
-					? `;posthog.register({[${jsLiteral(config.scopeProperty)}]:${jsLiteral(scope)}})`
+					? `;${client}.register({[${jsLiteral(config.scopeProperty)}]:${jsLiteral(scope)}})`
 					: ''
+			const name = named ? `,${jsLiteral(instance)}` : ''
 			return {
 				scripts: [
 					{
-						inline: `${POSTHOG_STUB}posthog.init(${jsLiteral(token)},{${initOptions(path, hosts.ui)}})${stamp}`,
+						inline: `${POSTHOG_STUB}posthog.init(${jsLiteral(token)},{${initOptions(path, hosts.ui, named)}}${name})${stamp}`,
 					},
 				],
 			}
@@ -300,7 +319,7 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 
 	return {
 		id: 'posthog',
-		label: 'PostHog',
+		...adapterLabel(config.label, 'PostHog', 'posthog({ label })'),
 		capabilities,
 		...(config.projectToken ? { capture: buildCapture(config, config.projectToken) } : {}),
 		isConfigured: () => Boolean(config.projectId && config.apiKey),

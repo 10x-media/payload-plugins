@@ -58,6 +58,23 @@ describe('registerView', () => {
 		})
 	})
 
+	it('mounts the view without a nav link when navLink is off', () => {
+		const config = {
+			admin: { components: { afterNavLinks: ['@app/Link'] } },
+		} as unknown as Config
+		register(config, { view: { navLink: false } })
+		expect(viewOf(config)?.path).toBe('/analytics')
+		expect(config.admin?.components?.afterNavLinks).toEqual(['@app/Link'])
+	})
+
+	it('adds the nav link when navLink is on explicitly', () => {
+		const config = bareConfig()
+		register(config, { view: { navLink: true } })
+		expect(config.admin?.components?.afterNavLinks).toEqual([
+			{ path: NAV_LINK_COMPONENT, clientProps: { href: '/admin/analytics' } },
+		])
+	})
+
 	it('registers nothing when the view is disabled', () => {
 		const config = bareConfig()
 		register(config, { view: false })

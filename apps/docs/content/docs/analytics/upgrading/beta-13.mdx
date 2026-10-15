@@ -1,0 +1,94 @@
+---
+title: From 1.0.0-beta.12
+description: Everything 1.0.0-beta.13 changes for an install upgrading from 1.0.0-beta.12, and what to do about each change.
+---
+
+1.0.0-beta.13 lets a tenant's own users read the platform's shared source and lets each tenant pick the source its admin opens on. It lists a provider document only once it can read, runs a tenant's own PostHog beside the platform's, and adds a few options for hosts that build their own admin around the plugin. No option was removed. Most installs need no edit; a scoped install on Postgres or SQLite generates one migration. This page lists every change against 1.0.0-beta.12, grouped by theme, each with what to do.
+
+## Before you start
+
+Work through these in order; each links to its details below. A step that names a kind of install applies to that kind only. The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+1. **On a scoped install running the providers collection, on Postgres or SQLite in migrate mode, generate a migration.** It adds the `is_default` column ([The `is_default` column](#the-is_default-column)). Push mode and MongoDB need nothing.
+2. **On an install running the providers collection without `native()` in `adapters`, or setting `providers.collection.types` with another type first, expect the generated migration to drop the Provider column's default** ([The `provider` column](#the-provider-column)).
+3. **Check provider documents that hold no read credentials.** They are no longer listed as sources and capture nothing ([Documents without credentials](#documents-without-credentials)).
+4. **Where a tenant runs its own PostHog beside the platform's PostHog, decide whether it should capture.** It now does; `capture.slots.tenant: false` keeps what 1.0.0-beta.12 did ([A tenant's own PostHog](#a-tenants-own-posthog)). With `snippets={false}`, start the tenant's project as the named client `tenant`.
+5. **Update a Content Security Policy that allows the PostHog snippet by hash** ([Content Security Policy](#content-security-policy)).
+6. **Check `access.crossScope` functions that do work per call.** A gate may now run once per scope and adapter in a request ([Cross-scope gates](#cross-scope-gates)).
+
+## Storage and the database
+
+### The `is_default` column
+
+On a scoped install running the providers collection, a provider document gains the **Default for this site** checkbox, stored as `isDefault` ([A tenant's default source](/analytics/multi-tenancy#a-tenants-default-source)). An unscoped install gets no such field and nothing changes in its storage.
+
+- **MongoDB:** nothing to do. A document stored before reads as not flagged.
+- **Postgres and SQLite in push mode:** the push adds the column on the next start.
+- **Postgres and SQLite in migrate mode:** generate a migration from the config you run in production, review it and run it:
+
+  ```sh
+  pnpm payload migrate:create analytics_default_source
+  pnpm payload migrate
+  ```
+
+  It adds `is_default` to the providers table (`analytics_providers` unless renamed), a boolean defaulting to false, so every existing document starts unflagged.
+
+  Coming straight from 1.0.0-beta.11 on SQLite, the one migration also rebuilds the providers table: apply [that page's edits](/analytics/upgrading/beta-12#edits-before-you-run-it), which remove `"is_default"` from the rebuild's copy too.
+
+### The `provider` column
+
+This applies only to an install running the providers collection that does not list `native()` in `adapters`, or that sets the new [`providers.collection.types`](/analytics/providers#which-provider-types-a-document-may-have) with a type other than `native` first. The **Provider** select now offers only the types the install serves, and the first of them is the default a new document opens with. The column itself keeps every type, so no stored value is converted; the only schema change is that the column no longer carries `native` as its database default, which a generated migration drops. Documents of a type no longer offered keep it until someone saves them, and that save is refused by name.
+
+## Provider documents
+
+### Documents without credentials
+
+**Behavioral.** A provider document is a source only while it is enabled, its type is served, and it holds the credentials its adapter reads with ([When a document is a source](/analytics/providers#when-a-document-is-a-source)). 1.0.0-beta.12 listed a document missing a credential, and every read through it showed an empty state. Now it is left out of every picker and of the sources endpoint, fills no capture slot whatever capture fields it holds, and does not count as a tenant's own source. A document whose stored credential fails to decrypt is still listed, as a failing source.
+
+What to do: enter the missing credentials, or switch such documents off. An install that builds its adapters with `providers.resolve` decides for itself and is unaffected.
+
+### Which provider types a document may have
+
+**Behavioral.** The **Provider** select offers `native` (**Payload**) only while `adapters` holds `native()`, and its default is the first type it offers rather than always `native`. Saving a document with a type the install does not serve is refused on that field. A stored document keeps its type and its settings until someone saves it.
+
+**Additive.** `providers.collection.types` narrows and orders the types offered, and `analyticsProviderFields({ types })` takes the same list.
+
+## Capture
+
+### A tenant's own PostHog
+
+**Behavioral.** When the global slot is PostHog and the tenant slot resolves to another PostHog, the tenant slot now captures, as a second posthog-js client named `tenant` (`window.posthog.tenant`), with its own gate, opt-out and exclusion. 1.0.0-beta.12 left the tenant slot out with a warning, so a tenant's own PostHog project now receives events it never did, and the platform's project counts the same pageviews it did before ([Two PostHog projects on one page](/analytics/capture#two-posthog-projects-on-one-page)).
+
+What to do: nothing, to capture into both projects. To keep 1.0.0-beta.12's behavior, set `capture.slots.tenant: false`, which empties the tenant slot for every tenant whatever vendor it uses. A second slot of Plausible, Umami or GA4 is still left out with a warning.
+
+A site that loads the vendor scripts itself (`snippets={false}`) starts the tenant's project as the named client, with pageviews off, since the tracker sends them:
+
+```js
+posthog.init('phc_tenant...', { api_host: '/api/_x/p/tenant', capture_pageview: false }, 'tenant')
+```
+
+Without it the tenant slot finds no client and sends nothing ([When the manager loads the vendor scripts itself](/analytics/consent#when-the-manager-loads-the-vendor-scripts-itself)).
+
+**Behavioral.** PostHog's snippet no longer replaces a posthog-js your own code already loaded on the page: it starts the slot's client on it.
+
+### Content Security Policy
+
+PostHog's inline snippet changed for the second client. A policy that allows it by hash needs the new hashes, read from a rendered page; a nonce policy needs nothing ([Content Security Policy](/analytics/capture#content-security-policy)).
+
+## Access and tenancy
+
+### Cross-scope gates
+
+**Behavioral.** The `access.crossScope` gates are now asked with `{ req, scope, adapterId }`: `named` with the scope a reader names, `aggregate` with `'*'` or `null`, and `unscopedSource` with the tenant and the config adapter's id. A gate written for `{ req }` keeps working. Because the answer may differ per scope and adapter, a request can now ask a gate once per scope and adapter, where 1.0.0-beta.12 asked it once per request ([What a gate is told](/analytics/multi-tenancy#what-a-gate-is-told)).
+
+What to do: make sure a gate that queries the database or another service stays cheap when asked several times in one request, or memoize it per request. The providers and goals collections still ask `named` with `{ req }` alone, so a `named` gate must not need `scope` to grant anything.
+
+### Reading a shared source as a tenant
+
+**Additive.** `sources` decides, per shared config adapter, whether a tenant's own users read their tenant through it: `'staff'` (the default, unchanged), `'tenant'`, `'fallback'`, or a function ([Letting tenants read a shared source](/analytics/multi-tenancy#letting-tenants-read-a-shared-source)). `defaultSource` and the **Default for this site** checkbox decide which source a tenant's readers open on ([A tenant's default source](/analytics/multi-tenancy#a-tenants-default-source)), with `providers.collection.defaultAccess` deciding who may set the checkbox. An install that sets none of them reads exactly as before.
+
+A widget or a document panel whose stored source its reader can no longer read now reads the scope's default and says so in a note, where 1.0.0-beta.12 failed the read.
+
+## Added
+
+For reference, what 1.0.0-beta.13 adds beside the changes above, none of which an install has to adopt: `sources` and `defaultSource`; `providers.collection.types`, `providers.collection.defaultAccess` and `providers.collection.fields.isDefault`; `view.navLink`, which mounts the view without its nav link; a `label` option on `native()`, `plausible()`, `umami()`, `ga4()` and `posthog()` ([A source's name](/analytics/providers#a-sources-name)), with the optional `labelFor` on `AnalyticsAdapter`; `analyticsDefaultLayout` (`@beta`), a per-reader dashboard layout ([A layout per reader](/analytics/widgets#a-layout-per-reader)); `notice` on the sources endpoint's answer; `instance` on `TrackerSlotConfig` and on a capture snippet's arguments; and the types `AdapterLabelArgs`, `AdapterLabelOption`, `AnalyticsDefaultLayoutOptions`, `AnalyticsSourceOptions`, `DefaultSourceFunction`, `DefaultSourceRule`, `OwnSource`, `SourcePolicy`, `SourcePolicyFunction` and `SourceRef`.

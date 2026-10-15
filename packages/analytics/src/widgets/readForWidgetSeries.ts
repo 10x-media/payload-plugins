@@ -21,13 +21,16 @@ import {
 	comparisonWindow,
 	engineRead,
 	prepareWidgetRead,
+	type StoredSourceRead,
+	type SubstitutedSource,
+	substitutionOf,
 	type WidgetReadStatus,
 } from './prepareWidgetRead'
 import { type ReadNotices, readMeta } from './readMeta'
 
 export type { SeriesGranularity, SeriesPoint } from '../charts/series'
 
-export interface WidgetSeriesResult extends Partial<ReadNotices> {
+export interface WidgetSeriesResult extends Partial<ReadNotices>, SubstitutedSource {
 	status: WidgetReadStatus
 	/** How long until a `busy` read can succeed, when the source or the plugin knows. */
 	retryAfterMs?: number
@@ -59,22 +62,23 @@ export interface WidgetSeriesResult extends Partial<ReadNotices> {
 }
 
 /** Scoped like `ReadForWidgetArgs`: the request's own scope unless one is pinned. */
-export type ReadForWidgetSeriesArgs = ReadPrincipal & {
-	req: PayloadRequest
-	metric: MetricKey
-	timeframe: TimeframePreset
-	adapterId?: string
-	now: Date
-	range?: DateRange
-	/**
-	 * Reporting timezone the caller already resolved, reused rather than resolved again so
-	 * a caller-supplied `range` is read in the very timezone it was interpreted in.
-	 */
-	timezone?: string
-	filters?: AnalyticsFilter[]
-	/** Also return the previous window's series, for the chart's comparison overlay. */
-	compare?: boolean
-}
+export type ReadForWidgetSeriesArgs = ReadPrincipal &
+	StoredSourceRead & {
+		req: PayloadRequest
+		metric: MetricKey
+		timeframe: TimeframePreset
+		adapterId?: string
+		now: Date
+		range?: DateRange
+		/**
+		 * Reporting timezone the caller already resolved, reused rather than resolved again so
+		 * a caller-supplied `range` is read in the very timezone it was interpreted in.
+		 */
+		timezone?: string
+		filters?: AnalyticsFilter[]
+		/** Also return the previous window's series, for the chart's comparison overlay. */
+		compare?: boolean
+	}
 
 /**
  * Trend read: a zero-filled series plus headline total. A window of a day or two reads by hour
@@ -91,6 +95,7 @@ export const readForWidgetSeries = async (
 		timeframe,
 		adapterId,
 		...readPrincipalOf(args),
+		...(args.fallbackWhenUnreadable ? { fallbackWhenUnreadable: true } : {}),
 		timezone: args.timezone,
 		range,
 		filters,
@@ -149,6 +154,7 @@ export const readForWidgetSeries = async (
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
+		...substitutionOf(prepared),
 		...(prepared.queryScope === undefined ? {} : { scope: prepared.queryScope }),
 		dateRange,
 		timezone: tz,

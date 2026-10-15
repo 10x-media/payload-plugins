@@ -49,7 +49,7 @@ export const resolveSlotAdapterFor = async (args: {
 		if (resolved === null) {
 			return null
 		}
-		const { registry, grants } = await resolveRegistryFor(runtime, {
+		const { registry, grants, defaultGrant } = await resolveRegistryFor(runtime, {
 			payload: req.payload,
 			req: visitor,
 			scope: resolved,
@@ -61,10 +61,11 @@ export const resolveSlotAdapterFor = async (args: {
 		if (configured) {
 			return candidates.find((adapter) => adapter.id === configured) ?? null
 		}
-		// The default source only when it can capture: one that cannot would leave the slot empty.
-		const preferred = registry.default()
+		// The scope's flagged default, else the registry's, only when it can capture: one that
+		// cannot would leave the slot empty.
+		const preferred = defaultGrant ?? registry.default().id
 		return (
-			candidates.find((adapter) => adapter.id === preferred.id && adapter.capture) ??
+			candidates.find((adapter) => adapter.id === preferred && adapter.capture) ??
 			candidates.find((adapter) => adapter.capture) ??
 			null
 		)

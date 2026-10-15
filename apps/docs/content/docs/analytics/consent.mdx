@@ -42,6 +42,8 @@ Only a native slot queues the [engagement](/analytics/capture#what-the-tracker-s
 
 **Opening** a slot clears the vendor's own opt-out switch (unless the browser is [excluded](/analytics/capture#excluding-your-own-visits)), injects the slot's snippet, clears the switch once more after the snippet ran (PostHog's global exists only from then on), then sends what waited, in order. **Closing** a slot drops what waited and stops delivery to it. When the vendor's script may be running, because the slot was open or because the site loads the vendor scripts itself (`snippets={false}`), closing also sets the vendor's own opt-out, the same switches staff exclusion uses (`plausible_ignore`, `umami.disabled`, PostHog's `opt_out_capturing()`, GA4's `ga-disable-<measurementId>`). A slot that waits and never opened on the page ran nothing, so closing it writes nothing; a slot that does not wait counts as open from boot, so closing it by name always sets the vendor's switch. A slot can be opened and closed any number of times.
 
+Where both slots are PostHog, each runs its own client ([Two PostHog projects on one page](/analytics/capture#two-posthog-projects-on-one-page)), and a slot's gate and exclusion touch only its own: `setGate({ tenant: false })` calls `posthog.tenant.opt_out_capturing()` and leaves the platform's client capturing.
+
 A slot the config does not fill, such as the tenant slot of an unscoped install, reads `closed` and no answer opens it: nothing is captured there. Until the tracker has booted, `gate` reads what the answers so far say; a `false` given before the window knows which slots wait reads `pending`, since it closes a slot that waits and leaves one that does not open.
 
 The gate is not stored. The next page load starts pending again, and your consent manager states the decision on every page load, which it does anyway because it reads its own stored answer there. What closing can leave behind is the vendor's own switch, and only for a vendor whose script may have run ([Privacy](/analytics/privacy#no-cookie) lists each). 1.0.0-beta.11 kept a decision under the `analytics:consent` key; the tracker deletes it once a slot opens on a page that is counted, and nothing reads it.
@@ -200,7 +202,13 @@ Some consent managers inject every vendor SDK themselves, from their own list. `
 <AnalyticsScripts config={tracker} snippets={false} />
 ```
 
-The plugin then renders no vendor snippet and injects none either, whatever the gate says. Each vendor slot forwards events once that vendor's own global exists (`posthog`, `plausible`, `umami`, `gtag`), checking for up to 10 seconds per event. The gate still applies: events wait while a slot is pending and are dropped once it is closed, and since the manager may have loaded the vendor whatever the gate said, closing sets that vendor's own switch even for a slot that never opened. `<AnalyticsProvider snippets={false}>` does the same.
+The plugin then renders no vendor snippet and injects none either, whatever the gate says. Each vendor slot forwards events once that vendor's own global exists (`posthog`, `plausible`, `umami`, `gtag`), checking for up to 10 seconds per event. A PostHog tenant slot beside a PostHog global slot forwards to the named client `posthog.tenant` instead, so start the tenant's project as that client, and with `capture_pageview: false`, since the tracker sends it every pageview itself:
+
+```js
+posthog.init('phc_tenant...', { api_host: '/api/_x/p/tenant', capture_pageview: false }, 'tenant')
+```
+
+Started under any other name, or not at all, the tenant slot finds no client and sends nothing. Leave the platform's project as the primary client, `posthog.init(token, config)`. The gate still applies: events wait while a slot is pending and are dropped once it is closed, and since the manager may have loaded the vendor whatever the gate said, closing sets that vendor's own switch even for a slot that never opened. `<AnalyticsProvider snippets={false}>` does the same.
 
 ## Recipe: c15t
 

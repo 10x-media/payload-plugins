@@ -9,6 +9,8 @@ export interface ProviderAdapter {
 	adapter: AnalyticsAdapter
 	/** Document id, or the adapter's own id for a `providers.resolve` adapter with no document. */
 	docId: string
+	/** The document is flagged "Default for this site". */
+	isDefault?: boolean
 }
 
 export interface RegistryBase {
@@ -19,13 +21,17 @@ export interface RegistryBase {
 /**
  * Appends document adapters to the config base and records their grants; one sharing a base id (a
  * `native` document) takes its place, keeping the id, default and grant lookups. The first document
- * per id wins.
+ * per id wins; the first flagged document names `defaultGrant`, its adapter granted either way.
  */
 export const combineRegistries = (base: RegistryBase, extra: ProviderAdapter[]): ScopeRegistry => {
 	const indexById = new Map(base.adapters.map((adapter, index) => [adapter.id, index]))
 	const merged = [...base.adapters]
 	const grants = new Map<string, string>()
-	for (const { adapter, docId } of extra) {
+	let defaultGrant: string | undefined
+	for (const { adapter, docId, isDefault } of extra) {
+		if (isDefault && defaultGrant === undefined) {
+			defaultGrant = adapter.id
+		}
 		if (grants.has(adapter.id)) {
 			continue
 		}
@@ -37,7 +43,11 @@ export const combineRegistries = (base: RegistryBase, extra: ProviderAdapter[]):
 			merged[index] = adapter
 		}
 	}
-	return { registry: createRegistry(merged, base.defaultId), grants }
+	return {
+		registry: createRegistry(merged, base.defaultId),
+		grants,
+		...(defaultGrant === undefined ? {} : { defaultGrant }),
+	}
 }
 
 /**

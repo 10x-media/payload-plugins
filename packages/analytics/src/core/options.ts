@@ -22,6 +22,7 @@ import type {
 	ConnectionFieldAccess,
 	ProviderCollectionFieldOverrides,
 } from '../providers/collection'
+import type { ProviderId } from '../providers/factory'
 import type { ProviderHostPolicy } from '../providers/hosts'
 import type { AfterReadHook } from '../surfacing/afterRead'
 import type { CacheStore } from '../surfacing/cacheStore'
@@ -60,6 +61,12 @@ import {
 import { assertScopedOnlyOptions, resolveAccess, resolveScope } from './scopeOptions'
 import { type AnalyticsSdks, resolveSdks } from './sdks'
 import { assertAdapters, assertNamesAdapter, resolveProviders } from './sourceOptions'
+import {
+	type AnalyticsSourceOptions,
+	type DefaultSourceRule,
+	type ResolvedSources,
+	resolveSources,
+} from './sourcePolicy'
 import { isRecord, kindOf, listOf } from './values'
 import type { BuiltInWidgetSlug } from './widgetSlugs'
 
@@ -69,6 +76,16 @@ export type { AnalyticsCollectionOptions, CollectionOverrides } from './collecti
 export { revenueOffWarning } from './goalOptions'
 export type { AnalyticsJobsOptions, AnalyticsTaskOptions } from './jobs'
 export { allCrossScope } from './scopeOptions'
+export type {
+	AnalyticsSourceOptions,
+	DefaultSourceFunction,
+	DefaultSourceRule,
+	OwnSource,
+	ResolvedSources,
+	SourcePolicy,
+	SourcePolicyFunction,
+	SourceRef,
+} from './sourcePolicy'
 export type { CurrencyConverter }
 
 /** The multi-tenant plugin's own relationship field, which a scoped install almost always has. */
@@ -245,6 +262,16 @@ export type ProvidersCollectionOptions = {
 	 */
 	connectionAccess?: ConnectionAccess
 	/**
+	 * Who may set or change a scoped install's "Default for this site" checkbox; a denied value is
+	 * dropped. Default: `connectionAccess`, else its default (the creator, then `crossScope.named`).
+	 */
+	defaultAccess?: ConnectionAccess
+	/**
+	 * Which provider types documents may have, in the order the select offers them, the first being
+	 * its default. Default: every type, `native` only while `adapters` holds native().
+	 */
+	types?: ProviderId[]
+	/**
 	 * Which provider documents a reader reads analytics through, as collection access ANDed with
 	 * enabled and scope. Default: the collection's own read access.
 	 */
@@ -266,8 +293,15 @@ export type AnalyticsReadAccess = (args: { req: PayloadRequest }) => boolean | P
 /** Access checker for the analytics admin view. */
 export type AnalyticsViewAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
 
-/** Access checker for one of the cross-scope gates under `access.crossScope`. */
-export type CrossScopeAccess = (args: { req: PayloadRequest }) => boolean | Promise<boolean>
+/**
+ * Access checker for one of the cross-scope gates under `access.crossScope`, told what is asked
+ * where the read knows it: the scope (`'*'` or null for every scope) and, for `unscopedSource`, the adapter.
+ */
+export type CrossScopeAccess = (args: {
+	req: PayloadRequest
+	scope?: string | null
+	adapterId?: string
+}) => boolean | Promise<boolean>
 
 /**
  * The three ways a reader on a scoped install reaches past their own scope, each denied by default.
@@ -472,6 +506,11 @@ export type AnalyticsViewOptions = {
 	 */
 	navLabel?: string | Record<string, string>
 	/**
+	 * Whether the view adds its link to the admin sidebar. Default true; false mounts the view
+	 * without one, for a host that links it from its own navigation.
+	 */
+	navLink?: boolean
+	/**
 	 * A client component replacing the view's body under the same server shell, given
 	 * `AnalyticsViewClientProps`; compose it from the sections `@10x-media/analytics/client` exports.
 	 *
@@ -485,6 +524,7 @@ export interface ResolvedView {
 	defaultRange: TimeframePreset
 	defaultMetric: MetricKey
 	navLabel?: string | Record<string, string>
+	navLink: boolean
 	Component?: AnalyticsComponent
 }
 
@@ -660,6 +700,16 @@ export type AnalyticsPluginOptions = {
 	/** Tenancy: how a request maps to its scope. Unset, the whole install is one scope. */
 	scope?: AnalyticsScopeOptions
 	/**
+	 * Per shared config adapter, keyed by its id: which tenant users besides platform staff
+	 * (`access.crossScope.unscopedSource`) read their own tenant through it. Scoped installs only.
+	 */
+	sources?: Record<string, AnalyticsSourceOptions>
+	/**
+	 * A tenant scope's default source when none of its provider documents is flagged the default.
+	 * Unset keeps the registry's own order. Scoped installs only.
+	 */
+	defaultSource?: DefaultSourceRule
+	/**
 	 * IANA timezone days are cut in. Default UTC; a resolver answers per scope. After a change,
 	 * native recounts in the new zone only days whose raw hits it still keeps.
 	 */
@@ -781,6 +831,8 @@ export interface ResolvedOptions {
 	reportingTimezone?: string | TimezoneResolver
 	revenue: ResolvedRevenue
 	platformAdapter?: string
+	/** `sources` and `defaultSource`; no policies and no rule on an unscoped install. */
+	sources: ResolvedSources
 	/** Raw trustedProxyHops option; undefined keeps the leftmost forwarded-for entry. */
 	trustedProxyHops?: number
 	/** The platform whose edge headers are believed; undefined believes none. */
@@ -804,6 +856,9 @@ export interface ResolvedOptions {
 		collection: ResolvedScopedCollection<ProviderCollectionFieldOverrides> & {
 			encryption?: { keys?: KeysConfig }
 			connectionAccess?: ConnectionFieldAccess
+			defaultAccess?: ConnectionFieldAccess
+			/** The types the install serves, `types` applied; filled whether the collection is on or not. */
+			types: readonly ProviderId[]
 			sourceAccess?: Access
 		}
 		resolve?: ProvidersResolve
@@ -852,6 +907,8 @@ const PLUGIN_KEYS = keysOf<AnalyticsPluginOptions>({
 	defaultAdapter: true,
 	platformAdapter: true,
 	scope: true,
+	sources: true,
+	defaultSource: true,
 	reportingTimezone: true,
 	revenue: true,
 	trustedProxyHops: true,
@@ -1067,13 +1124,14 @@ export function resolveOptions(
 		reportingTimezone: options.reportingTimezone,
 		revenue: resolveRevenue(options.revenue),
 		platformAdapter: options.platformAdapter,
+		sources: resolveSources(options),
 		...trust,
 		access,
 		view: resolveView(options.view),
 		countryFlags,
 		capture,
 		...resolveGoals(options.goals),
-		providers: resolveProviders(options.providers),
+		providers: resolveProviders(options.providers, options.adapters),
 		bindings: resolveBindings(options.collections, scoped),
 		cache,
 		widgets: resolveWidgets(options.widgets),

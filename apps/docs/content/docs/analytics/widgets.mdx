@@ -34,6 +34,28 @@ export default buildConfig({
 
 `analyticsDefaultWidgets()` places every built-in widget, in reading order: two small metric cards (pageviews and visitors), a large pageviews trend, the goals table, the realtime counter, and one medium card per breakdown in the table below. Every windowed widget opens on the last 30 days and every breakdown on its top five rows. It is a starting layout: an instance whose widget the capability gate never registered, or that you disabled, has no component to render and leaves an empty card, so drop the ones your sources cannot serve, or compose your own layout by listing `{ widgetSlug, width, data }` instances directly. If you set `widgets: false`, do not spread the helper; its instances would reference unregistered widgets.
 
+### A layout per reader
+
+`analyticsDefaultLayout()` (`@beta`) builds that layout per reader instead. Payload takes a function as `defaultLayout` and asks it with the request, and this one returns the default widgets less those the reader's default source cannot serve: the realtime counter without realtime, the goals table without goals, a breakdown over a dimension the source lacks, and a card on a metric it lacks.
+
+```ts title="payload.config.ts"
+import { analytics, analyticsDefaultLayout } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { buildConfig } from 'payload'
+
+export default buildConfig({
+  db: mongooseAdapter({ url: process.env.DATABASE_URI ?? '' }),
+  secret: process.env.PAYLOAD_SECRET ?? '',
+  admin: {
+    dashboard: { widgets: [], defaultLayout: analyticsDefaultLayout() },
+  },
+  plugins: [analytics({ adapters: [native()], capture: { gate: 'all' } })],
+})
+```
+
+It keeps every widget that is not the plugin's, and every widget whose `data` names its own `dataSource`, as placed. A reader who may read no source gets the whole list. `analyticsDefaultLayout({ widgets })` narrows a list of your own in place of `analyticsDefaultWidgets()`, which itself is unchanged. On a scoped install the default source is the reader's tenant's ([A tenant's default source](/analytics/multi-tenancy#a-tenants-default-source)), so each tenant's admins start on the widgets their own source can fill.
+
 ## The built-in widgets
 
 | Slug | Shows | Dimension | Default metric |
@@ -111,6 +133,8 @@ A read that failed says why, in the words the [analytics view](/analytics/analyt
 | `range-too-long` | **This date range is longer than a year. Choose a shorter one.** A saved custom range over 366 days |
 | `misconfigured`, `host-refused` | The source is not set up correctly, or its address is one the site may not contact, and who can fix it |
 | `unavailable` | **Not available for this data source**: the source cannot serve this metric, breakdown or granularity at all, or no source answers for this request |
+
+A widget whose stored data source its reader can no longer read reads the scope's [default source](/analytics/multi-tenancy#a-tenants-default-source) instead, and its note says so, rather than failing. That happens when a tenant gets a source of its own under a [`fallback` policy](/analytics/multi-tenancy#letting-tenants-read-a-shared-source) and the platform's adapter leaves its listing, or when the provider document a widget named is switched off. The widget keeps its stored choice, so it reads that source again once the reader may. The [query endpoint](/analytics/reference/endpoints#query-endpoint) does not substitute: a `source` it cannot read answers `404 unknown_source`.
 
 ## While the dashboard loads
 

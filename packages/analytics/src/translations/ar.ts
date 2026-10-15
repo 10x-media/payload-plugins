@@ -142,6 +142,13 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerErrorHostFormat]:
 		'أدخل العنوان فقط، مثل https://analytics.example.com أو https://example.com/analytics، من دون جزء يبدأ بـ ? أو # ومن دون اسم مستخدم أو كلمة مرور.',
 	[keys.providerErrorHostInsecure]: 'يجب أن يبدأ العنوان بـ https://.',
+	[keys.providerFieldIsDefault]: 'الافتراضي لهذا الموقع',
+	[keys.providerFieldIsDefaultHelp]:
+		'تُفتح التحليلات على هذه الأداة ما لم يختر القارئ أداة أخرى. يمكن أن تكون أداة واحدة فقط لكل موقع هي الافتراضية.',
+	[keys.providerErrorDefaultTaken]:
+		'أداة تحليلات أخرى هي الافتراضية لهذا الموقع بالفعل. ألغِ تحديدها هناك أولًا.',
+	[keys.providerErrorTypeUnserved]:
+		'لا يمكن لهذا الموقع استخدام أداة التحليلات هذه. اختر أداة أخرى.',
 	[keys.providerNameNative]: 'Payload',
 	[keys.providerNameNativeHelp]:
 		'يحفظ عدد الزيارات في قاعدة بيانات Payload الخاصة بهذا الموقع. ولا تشارك فيه أي خدمة خارجية.',
@@ -390,6 +397,9 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.panelNewItem]: 'ستظهر الأرقام هنا بمجرد أن يرى أحد هذا العنصر.',
 	[keys.panelNoVisits]: 'لا توجد زيارات في نطاق التاريخ هذا.',
 	[keys.panelNoViews]: 'لا توجد مشاهدات في نطاق التاريخ هذا.',
+	[keys.sourcesPlatformFallback]:
+		'تأتي هذه الأرقام من أداة التحليلات الخاصة بالمنصة إلى أن يضيف هذا الموقع أداته الخاصة. عند إضافتها يتم التحويل إليها.',
+	[keys.stateSourceSubstituted]: 'مصدر البيانات المحفوظ لم يعد متاحًا، لذا يُعرض المصدر الافتراضي.',
 	[pluralKeys.liveVisitors.zero]: '{{count}} زائر نشط الآن',
 	[pluralKeys.liveVisitors.one]: '{{count}} زائر نشط الآن',
 	[pluralKeys.liveVisitors.two]: '{{count}} زائران نشطان الآن',

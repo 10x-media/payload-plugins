@@ -106,11 +106,12 @@ export function PanelContent(props: PanelContentProps) {
 	const currency = data.notices?.currency ?? props.currency
 	// One line for the whole panel: the cards, the trend and every list read the same days.
 	const timeZone = data.timezone ?? 'UTC'
+	const substituted = { substitutedFrom: data.substitutedFrom }
 
 	if (isEmptyDocumentRead(data)) {
 		// No cards or lists, so no revenue sum or grouped row needs explaining.
 		const emptyNotice = widgetNotice(
-			{ ...mergeNotices(data.notices), mixedCurrencies: [], capped: false },
+			{ ...mergeNotices(data.notices), ...substituted, mixedCurrencies: [], capped: false },
 			{ t, locale, now: viewerNow(), timeZone }
 		)
 		return (
@@ -123,12 +124,10 @@ export function PanelContent(props: PanelContentProps) {
 		)
 	}
 
-	const notice = widgetNotice(mergeNotices(data.notices, ...(data.breakdowns ?? [])), {
-		t,
-		locale,
-		now: viewerNow(),
-		timeZone,
-	})
+	const notice = widgetNotice(
+		{ ...mergeNotices(data.notices, ...(data.breakdowns ?? [])), ...substituted },
+		{ t, locale, now: viewerNow(), timeZone }
+	)
 	const firstMetric = data.supportedMetrics[0]
 	// An hourly chart needs hourly rows: a source that serves none has a single value for the
 	// window, which the metric cards already show, and a one-point line to nowhere otherwise.

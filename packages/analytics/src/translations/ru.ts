@@ -148,6 +148,13 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Введите только адрес, например https://analytics.example.com или https://example.com/analytics, без части, начинающейся с ? или #, и без имени пользователя и пароля.',
 	[keys.providerErrorHostInsecure]: 'Адрес должен начинаться с https://.',
+	[keys.providerFieldIsDefault]: 'По умолчанию для этого сайта',
+	[keys.providerFieldIsDefaultHelp]:
+		'Аналитика открывается в этом инструменте, если читатель не выберет другой. По умолчанию на сайте может быть только один инструмент.',
+	[keys.providerErrorDefaultTaken]:
+		'Другой инструмент аналитики уже выбран по умолчанию для этого сайта. Сначала снимите отметку там.',
+	[keys.providerErrorTypeUnserved]:
+		'Этот сайт не может использовать этот инструмент аналитики. Выберите другой.',
 	[keys.providerNameNative]: 'Payload',
 	[keys.providerNameNativeHelp]:
 		'Хранит счётчики посещений в собственной базе данных Payload этого сайта. Никакие сторонние сервисы не участвуют.',
@@ -400,6 +407,10 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.panelNewItem]: 'Цифры появятся здесь, как только этот элемент кто-нибудь увидит.',
 	[keys.panelNoVisits]: 'В этом диапазоне дат визитов нет.',
 	[keys.panelNoViews]: 'В этом диапазоне дат показов нет.',
+	[keys.sourcesPlatformFallback]:
+		'Эти цифры берутся из сервиса аналитики платформы, пока у сайта нет своего. Как только вы его добавите, данные будут браться из него.',
+	[keys.stateSourceSubstituted]:
+		'Сохранённый источник данных больше недоступен, поэтому показан источник по умолчанию.',
 	[pluralKeys.liveVisitors.one]: '{{count}} посетитель сейчас на сайте',
 	[pluralKeys.liveVisitors.few]: '{{count}} посетителя сейчас на сайте',
 	[pluralKeys.liveVisitors.many]: '{{count}} посетителей сейчас на сайте',

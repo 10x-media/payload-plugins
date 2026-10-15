@@ -101,6 +101,17 @@ describe('AnalyticsRealtimeWidget card', () => {
 		expect(html).toContain('class="analytics-chart analytics-chart--trend analytics-chart--fill"')
 	})
 
+	it('notes a saved source it could no longer read, counting the default instead', async () => {
+		vi.mocked(readForWidgetRealtime).mockResolvedValueOnce(
+			result({ substitutedFrom: 'posthog:65f0c2a9e1' })
+		)
+		const html = await render({ dataSource: 'posthog:65f0c2a9e1' }, view)
+		expect(html).toContain('>7<')
+		expect(html).toContain(`>${keys.stateSourceSubstituted}<`)
+		expect(html).not.toContain('posthog:65f0c2a9e1')
+		expect(await render({}, view)).not.toContain(keys.stateSourceSubstituted)
+	})
+
 	it('centers the message and leaves the window out when the source cannot count', async () => {
 		vi.mocked(readForWidgetRealtime).mockResolvedValue(result({ status: 'unavailable' }))
 		const html = await render({}, view)

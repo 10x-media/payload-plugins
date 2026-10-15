@@ -24,7 +24,7 @@ const bootFakeRuntime = (adapter: AnalyticsAdapter = unconfigured, comparison = 
 		config: { routes: { admin: '/admin' } },
 	} as unknown as Payload
 	setRuntime(payload, {
-		registry: { default: () => adapter, get: () => adapter },
+		registry: { default: () => adapter, get: () => adapter, all: () => [adapter] },
 		configAdapterIds: new Set<string>(),
 		bindings: {},
 		readAccess: () => true,
@@ -181,6 +181,28 @@ describe('AnalyticsMetricWidget', () => {
 		expect(await renderHtml(req, { metric: 'revenue', timeframe: 'last7days' })).not.toContain(
 			'$12.00'
 		)
+	})
+
+	it('reads the default for a saved source this reader can no longer read, and says so', async () => {
+		const { req } = bootFakeRuntime(filterableAdapter([]))
+		const html = await renderHtml(req, {
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			dataSource: 'posthog:65f0c2a9e1',
+		})
+		expect(html).toContain('>7<')
+		expect(html).toContain(keys.stateSourceSubstituted)
+		expect(html).not.toContain('posthog:65f0c2a9e1')
+	})
+
+	it('adds no substitution note when the saved source is the one that read', async () => {
+		const { req } = bootFakeRuntime(filterableAdapter([]))
+		const html = await renderHtml(req, {
+			metric: 'pageviews',
+			timeframe: 'last7days',
+			dataSource: 'test',
+		})
+		expect(html).not.toContain(keys.stateSourceSubstituted)
 	})
 
 	it('leaves the caption alone when the widget carries no filter', async () => {

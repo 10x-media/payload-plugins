@@ -5,7 +5,12 @@ import type { AnalyticsQuery, AnalyticsResult, MetricKey } from '../core/contrac
 import { cacheEpochsFor } from '../plugin/runtime'
 import { readFailureOf } from '../surfacing/classifyError'
 import { DEFAULT_TIMEZONE } from '../timeframe/tz'
-import { prepareWidgetRead } from './prepareWidgetRead'
+import {
+	prepareWidgetRead,
+	type StoredSourceRead,
+	type SubstitutedSource,
+	substitutionOf,
+} from './prepareWidgetRead'
 import { type ReadNotices, readMeta } from './readMeta'
 
 /**
@@ -28,7 +33,7 @@ export interface RealtimePoint {
 	value: number
 }
 
-export interface WidgetRealtimeResult extends Partial<ReadNotices> {
+export interface WidgetRealtimeResult extends Partial<ReadNotices>, SubstitutedSource {
 	status: WidgetRealtimeStatus
 	/** How long until a `busy` read can succeed, when the source or the plugin knows. */
 	retryAfterMs?: number
@@ -43,17 +48,18 @@ export interface WidgetRealtimeResult extends Partial<ReadNotices> {
 }
 
 /** Scoped like `ReadForWidgetArgs`: the request's own scope unless one is pinned. */
-export type ReadForWidgetRealtimeArgs = ReadPrincipal & {
-	req: PayloadRequest
-	metric: MetricKey
-	windowMinutes: number
-	adapterId?: string
-	now: Date
-	/** Count only the visitors on this path; omitted counts the whole site. */
-	path?: string
-	/** False reads the window's total alone, its `series` left empty. Default true. */
-	series?: boolean
-}
+export type ReadForWidgetRealtimeArgs = ReadPrincipal &
+	StoredSourceRead & {
+		req: PayloadRequest
+		metric: MetricKey
+		windowMinutes: number
+		adapterId?: string
+		now: Date
+		/** Count only the visitors on this path; omitted counts the whole site. */
+		path?: string
+		/** False reads the window's total alone, its `series` left empty. Default true. */
+		series?: boolean
+	}
 
 const empty = (status: WidgetRealtimeStatus, adapterId: string): WidgetRealtimeResult => ({
 	status,
@@ -79,6 +85,7 @@ const readRealtime = async (
 		timezone: DEFAULT_TIMEZONE,
 		adapterId,
 		...readPrincipalOf(args),
+		...(args.fallbackWhenUnreadable ? { fallbackWhenUnreadable: true } : {}),
 		requires: { realtime: true },
 	})
 	if (!prepared.ok) {
@@ -135,6 +142,7 @@ const readRealtime = async (
 	return {
 		status: 'ok',
 		adapterId: adapter.id,
+		...substitutionOf(prepared),
 		activeNow: result.totals?.[metric] ?? 0,
 		series: result.rows.map((r) => ({ date: r.timestamp ?? '', value: r.metrics[metric] ?? 0 })),
 		...(queryScope === undefined ? {} : { scope: queryScope }),

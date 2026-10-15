@@ -139,6 +139,10 @@ export const keys = {
 	providerErrorScriptId: 'analytics:providerErrorScriptId',
 	providerErrorHostFormat: 'analytics:providerErrorHostFormat',
 	providerErrorHostInsecure: 'analytics:providerErrorHostInsecure',
+	providerFieldIsDefault: 'analytics:providerFieldIsDefault',
+	providerFieldIsDefaultHelp: 'analytics:providerFieldIsDefaultHelp',
+	providerErrorDefaultTaken: 'analytics:providerErrorDefaultTaken',
+	providerErrorTypeUnserved: 'analytics:providerErrorTypeUnserved',
 	providerNameNative: 'analytics:providerNameNative',
 	providerNameNativeHelp: 'analytics:providerNameNativeHelp',
 	providerNamePlausible: 'analytics:providerNamePlausible',
@@ -361,6 +365,8 @@ export const keys = {
 	panelNewItem: 'analytics:panelNewItem',
 	panelNoVisits: 'analytics:panelNoVisits',
 	panelNoViews: 'analytics:panelNoViews',
+	sourcesPlatformFallback: 'analytics:sourcesPlatformFallback',
+	stateSourceSubstituted: 'analytics:stateSourceSubstituted',
 } as const
 
 /** A key with one string whatever the numbers around it. */
