@@ -33,6 +33,8 @@ On a scoped install running the providers collection, a provider document gains 
 
   It adds `is_default` to the providers table (`analytics_providers` unless renamed), a boolean defaulting to false, so every existing document starts unflagged.
 
+  Coming straight from 1.0.0-beta.11 on SQLite, the one migration also rebuilds the providers table: apply [that page's edits](/analytics/upgrading/beta-12#edits-before-you-run-it), which remove `"is_default"` from the rebuild's copy too.
+
 ### The `provider` column
 
 This applies only to an install running the providers collection that does not list `native()` in `adapters`, or that sets the new [`providers.collection.types`](/analytics/providers#which-provider-types-a-document-may-have) with a type other than `native` first. The **Provider** select now offers only the types the install serves, and the first of them is the default a new document opens with. The column itself keeps every type, so no stored value is converted; the only schema change is that the column no longer carries `native` as its database default, which a generated migration drops. Documents of a type no longer offered keep it until someone saves them, and that save is refused by name.

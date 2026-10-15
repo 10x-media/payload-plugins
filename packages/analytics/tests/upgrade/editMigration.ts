@@ -168,6 +168,8 @@ const editSqlite = (source: string, edits: EditOptions): string =>
 				}
 				trimmed = trimmed.replaceAll(`, ${column}`, '')
 			}
+			// Only a scoped install's collection has the column, which 1.0.0-beta.13 added.
+			trimmed = trimmed.replaceAll(', "is_default"', '')
 			edited = edited.replace(insert, trimmed)
 			return edits.priorTasks ? `${edited}  await db.run(sql\`${RETIRED_RUNS_SQLITE}\`)\n` : edited
 		})
