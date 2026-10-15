@@ -1,5 +1,72 @@
 # @10x-media/analytics
 
+## 1.0.0-beta.13
+
+### Minor Changes
+
+- **Options for hosts that build their own admin around the plugin: a view without its nav link, a source name per reader, and a dashboard layout per reader.** None changes an install that does not set it ([A source's name](https://docs.10xmedia.de/analytics/providers#a-sources-name), [A layout per reader](https://docs.10xmedia.de/analytics/widgets#a-layout-per-reader), [Options](https://docs.10xmedia.de/analytics/analytics-view#options)).
+
+  **Additive:** `view.navLink` (default `true`). `false` registers the view at its path without its link in the admin nav, in place of filtering `admin.components.afterNavLinks`.
+
+  **Additive:** `label` on `native()`, `plausible()`, `umami()`, `ga4()` and `posthog()`: a string, a map by admin language (read in the reader's language, then `i18n.fallbackLanguage`, then `en`, as `view.navLabel` is), or `({ req, scope }) => string | Promise<string>` naming the source per reader, so staff can read "Platform (PostHog)" where a tenant reads its own site's name. Where no reader is known the name is the string, else the map's `en` or first entry, else the vendor's name; a function that throws or answers blank falls back to it with a warning. A provider document's source keeps the document's name.
+
+  **Additive:** `AnalyticsAdapter.labelFor`, the optional per-reader name a custom adapter can declare, and the types `AdapterLabelOption` and `AdapterLabelArgs`.
+
+  **Additive:** `analyticsDefaultLayout(options?)` (`@beta`) from the package root, for `admin.dashboard.defaultLayout`: the default widgets less those the reader's default source cannot serve (realtime, goals, a breakdown's dimension, a metric). It keeps widgets that are not the plugin's and widgets naming their own `dataSource`, returns the full list when the reader may read no source, and narrows `options.widgets` when given. `analyticsDefaultWidgets()` is unchanged.
+
+- **A tenant's own PostHog captures beside the platform's PostHog.** When both capture slots resolve to PostHog, the tenant slot runs as a second posthog-js client named `tenant`, so one page captures into both projects, each with its own gate, opt-out and exclusion ([Two PostHog projects on one page](https://docs.10xmedia.de/analytics/capture#two-posthog-projects-on-one-page), [From 1.0.0-beta.12](https://docs.10xmedia.de/analytics/upgrading/beta-13#a-tenants-own-posthog)).
+
+  **Upgrade actions**
+
+  1. To keep 1.0.0-beta.12's behavior, set `capture.slots.tenant: false`, which empties the tenant slot for every tenant.
+  2. A site that loads the vendor scripts itself (`snippets={false}`) starts the tenant's project as the named client, with pageviews off: `posthog.init(token, { api_host, capture_pageview: false }, 'tenant')`. Started any other way, the tenant slot finds no client and sends nothing.
+  3. A Content Security Policy that allows the PostHog snippet by hash needs the new hashes.
+
+  **Behavioral:** 1.0.0-beta.12 left the tenant slot out with a warning; it now captures, so a tenant's own PostHog project receives events it never did. The named client starts with `capture_pageview: false` and `capture_pageleave: true` and gets the tracker's own pageviews as `$pageview`; the platform's client keeps `capture_pageview: 'history_change'`. Each project counts each pageview once, and `array.js` loads once.
+
+  **Behavioral:** each PostHog slot opens, closes and is excluded on its own client: `setGate({ tenant: false })` opts out `posthog.tenant` and leaves the platform's client capturing. PostHog stores each client's state under its own project token.
+
+  **Behavioral:** PostHog's snippet no longer replaces a posthog-js already loaded on the page; it starts the slot's client on it. The snippet's text changed, so its CSP hash did.
+
+  **Behavioral:** a second slot of Plausible, Umami or GA4 is still left out of the tracker config with a warning, as before.
+
+  **Additive:** `instance` on `TrackerSlotConfig` and on `CaptureSupport.snippet`'s arguments, naming the client a slot captures with.
+
+- **A provider document is a source only once it can read, and the Provider select offers only the types the install serves.** A document now has to be enabled, of a served type and hold the credentials its adapter reads with; `native` is offered only beside `native()`; `providers.collection.types` narrows the list; and a scoped install's documents get a **Default for this site** checkbox ([When a document is a source](https://docs.10xmedia.de/analytics/providers#when-a-document-is-a-source), [Which provider types a document may have](https://docs.10xmedia.de/analytics/providers#which-provider-types-a-document-may-have), [From 1.0.0-beta.12](https://docs.10xmedia.de/analytics/upgrading/beta-13)).
+
+  **Upgrade actions**
+
+  1. On a scoped install running the providers collection, on Postgres or SQLite in migrate mode, generate a migration (`pnpm payload migrate:create`), review it and run it: it adds the `is_default` column to the providers table. Push mode and MongoDB need nothing ([The `is_default` column](https://docs.10xmedia.de/analytics/upgrading/beta-13#the-is_default-column)).
+  2. On Postgres or SQLite, where the install runs the providers collection without `native()` in `adapters`, or sets `providers.collection.types` with another type first, the generated migration also drops the **Provider** column's `native` default. No stored value changes ([The `provider` column](https://docs.10xmedia.de/analytics/upgrading/beta-13#the-provider-column)).
+  3. Enter the read credentials of any provider document that lacks them, or switch it off.
+
+  **Behavioral:** a provider document missing the credentials its adapter reads with is no longer listed as a source, fills no capture slot whatever capture fields it holds, and is no tenant's own source under a `fallback` policy. 1.0.0-beta.12 listed it and showed an empty state. A document whose credential fails to decrypt is still listed, as a failing source. `providers.resolve` installs decide for themselves.
+
+  **Behavioral:** the **Provider** select offers `native` only while `adapters` holds `native()`, and defaults to the first type it offers rather than `native`. Saving a document with a type the install does not serve is refused with a message on that field; a stored document keeps its type until it is saved.
+
+  **Additive:** `providers.collection.types` lists the types documents may have, in the order the select offers them; an unknown id, or a list leaving no served type, fails the boot. `analyticsProviderFields({ types })` takes the same list.
+
+  **Additive:** on a scoped install, the **Default for this site** checkbox (`isDefault`) in the provider document's sidebar, at most one per scope, a second refused on save. `providers.collection.defaultAccess` (a field access function or `{ create, update }`) decides who may set it, following `connectionAccess` when unset; `providers.collection.fields.isDefault` replaces the field. The flagged document's source also fills the tenant capture slot when it captures.
+
+- **Tenants can read the platform's shared source, and each tenant picks the source its readers open on.** On a scoped install, `sources` decides per shared config adapter whether a tenant's own members read their tenant through it, and `defaultSource` with the provider document's **Default for this site** checkbox decides a tenant's default source ([Letting tenants read a shared source](https://docs.10xmedia.de/analytics/multi-tenancy#letting-tenants-read-a-shared-source), [A tenant's default source](https://docs.10xmedia.de/analytics/multi-tenancy#a-tenants-default-source), [From 1.0.0-beta.12](https://docs.10xmedia.de/analytics/upgrading/beta-13)).
+
+  **Upgrade actions**
+
+  1. Check `access.crossScope` functions that query a database or a service: a gate may now be asked once per scope and adapter in a request, so keep it cheap or memoize it per request.
+  2. Keep a `named` gate able to answer from `{ req }` alone: the providers and goals collections still ask it without `scope`.
+
+  **Behavioral:** the `access.crossScope` gates are asked with `{ req, scope, adapterId }`: `named` with the scope a reader names, `aggregate` with `'*'` or `null`, `unscopedSource` with the tenant and the config adapter's id. A gate written for `{ req }` keeps working, but where 1.0.0-beta.12 asked it once per request it may now run once per scope and adapter.
+
+  **Behavioral:** a widget or a document panel whose stored data source its reader can no longer read reads the scope's default source and says so in a note, rather than failing. The query endpoint does not substitute: a `source` it cannot read still answers `404 unknown_source`.
+
+  **Additive:** `sources: { [adapterId]: { tenants } }`, with `tenants` one of `'staff'` (the default, what 1.0.0-beta.12 did), `'tenant'` (the tenant's members always read it, narrowed to their tenant), `'fallback'` (they read it until they read a source of their own) or `({ req, scope, adapterId, ownSources }) => boolean`. Anything but `'staff'` needs an adapter with `capabilities.scopedQueries`, or the boot fails naming `sources.<id>.tenants`. A policy never widens which scope a user reads: a tenant user still gets `400 untrusted_scope` for `scope=*` or another tenant. Jobs read as `SYSTEM` and ask no policy, and capture is unaffected.
+
+  **Additive:** under `'fallback'` the view and the providers list tell a tenant's users the numbers are the platform's until they add a source, and `GET /api/_x/sources` answers `notice: 'platformFallback'`. A provider save switches the next request to the tenant's own source.
+
+  **Additive:** `defaultSource: 'tenantFirst' | 'platformFirst' | ({ req, scope, sources }) => string | undefined`. A tenant's default is its document flagged **Default for this site**, then this rule, then what 1.0.0-beta.12 picked; the sources endpoint's `defaultId`, the view, widgets without a data source, the document panel, the read helpers and the warm task follow it. `sources` and `defaultSource` fail the boot without `scope.resolve`, and `'platformFirst'` without `platformAdapter`.
+
+  **Additive:** the types `AnalyticsSourceOptions`, `SourcePolicy`, `SourcePolicyFunction`, `OwnSource`, `SourceRef`, `DefaultSourceRule` and `DefaultSourceFunction`; `CrossScopeAccess` takes the optional `scope` and `adapterId`.
+
 ## 1.0.0-beta.12
 
 ### Minor Changes
