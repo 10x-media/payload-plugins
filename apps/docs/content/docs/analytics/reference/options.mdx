@@ -5,7 +5,7 @@ description: Every option of analytics(), with its type, its default and what it
 
 `analytics()` takes one object, `AnalyticsPluginOptions` (also exported as `PluginOptions`). Every path below is checked when the plugin builds the Payload config: a value of the wrong shape, a key no table lists at any level, an id that names no adapter, or a combination the plugin cannot honor fails the boot with a message naming the path. An option an earlier release took and this one no longer does fails the boot too, naming its replacement ([Removed options](/analytics/upgrading#removed-options)).
 
-The [native engine](/analytics/native#options) and each [provider](/analytics/providers) take options of their own, as arguments of `native()`, `plausible()` and the rest. Each of them takes `label`, the source's name in the admin: a string, a map by admin language, or a function per reader ([A source's name](/analytics/providers#a-sources-name)).
+The [native engine](/analytics/native#options) and each [provider](/analytics/providers) take options of their own, as arguments of `native()`, `plausible()` and the rest. Each of them takes `label`, the source's name in the admin: a string, a map by admin language, or a function per reader ([A source's name](/analytics/providers#a-sources-name)); and `withoutConsent`, which beats `capture.withoutConsent` for its own slot ([Without consent](/analytics/providers#without-consent)).
 
 ```ts title="payload.config.ts"
 import { analytics } from '@10x-media/analytics'
@@ -76,6 +76,8 @@ What the browser tracker captures and where it sends it ([Capture](/analytics/ca
 | Option | Type | Default | What it does |
 |---|---|---|---|
 | `capture.gate` | `'all' \| 'off' \| CaptureSlot[] \| ({ slot, adapterId, kind }) => boolean` | none: required whenever a capture slot can fill | Which slots wait for your consent manager ([Consent](/analytics/consent)). A function answers per slot, `true` for one that waits; any answer other than `false`, or a throw, holds the slot. |
+| `capture.withoutConsent` | `'cookieless' \| 'off' \| { pending?, refused? } \| ({ slot, adapterId, kind, phase }) => 'cookieless' \| 'off'` | `'cookieless'` | What a slot `capture.gate` holds does before an answer and after a refusal ([Measuring without consent](/analytics/consent#measuring-without-consent)). `'cookieless'` counts without storing anything on the device, at the level each adapter declares (GA4's is `'off'`); `'off'` sends nothing until consent, as 1.0.0-beta.14 did. A function answers per slot and phase on the server; a throw or any other answer is `'off'`, logged once. An adapter's own `withoutConsent` beats it. Unset, the boot logs one line naming the default while a held slot can count without consent. |
+| `capture.withoutConsent.pending`, `capture.withoutConsent.refused` | `'cookieless' \| 'off'` | `'cookieless'` | The level for one phase: no answer yet, or refused. A phase left out is `'cookieless'`; any other key fails the boot. |
 | `capture.slots` | `{ global?, tenant? }` | | Which adapter fills each [capture slot](/analytics/capture#capture-slots). |
 | `capture.slots.global` | `string \| false` | `platformAdapter`, else the only config adapter | A config adapter's id, which must be in `adapters`, or `false` to leave the slot empty. |
 | `capture.slots.tenant` | `string \| false` | the scope's default source when it captures, else its first source that captures | An adapter id, a runtime provider's included, resolved per request, or `false`. |
@@ -154,9 +156,10 @@ Bindings, keyed by collection slug: how a document's [display fields](/analytics
 | `providers.collection` | `boolean \| ProvidersCollectionOptions` | `false` | The `analytics-providers` collection. `true` uses the defaults. |
 | `providers.collection.slug` | `string` | `'analytics-providers'` | The collection's slug. |
 | `providers.collection.scopeField` | `string` | `'scope'` | The field matched against the scope, such as a tenant plugin's `'tenant'`. Scoped installs only. |
-| `providers.collection.fields` | `{ name?, provider?, enabled?, isDefault? }` | none | Replaces one default field at a time, before `overrides` ([Replacing a field](/analytics/providers#replacing-a-field)). |
+| `providers.collection.fields` | `{ name?, provider?, enabled?, isDefault?, withoutConsent? }` | none | Replaces one default field at a time, before `overrides` ([Replacing a field](/analytics/providers#replacing-a-field)). |
 | `providers.collection.fields.name`, `providers.collection.fields.provider`, `providers.collection.fields.enabled` | `({ field }) => Field` | none | One field each. |
 | `providers.collection.fields.isDefault` | `({ field }) => Field` | none | The **Default for this site** checkbox, which only a scoped install's collection has. |
+| `providers.collection.fields.withoutConsent` | `({ field }) => Field` | none | The **Without consent** select of a vendor document, which follows `capture.withoutConsent` when empty ([What one document holds](/analytics/providers#what-one-document-holds)). |
 | `providers.collection.types` | `ProviderId[]` | every type, `'native'` only while `adapters` holds `native()` | The provider types a document may have; the first is the **Provider** select's default, and the select lists them in a fixed order ([Which provider types a document may have](/analytics/providers#which-provider-types-a-document-may-have)). An unknown id fails the boot, and so does a list that leaves no type the install serves. |
 | `providers.collection.overrides` | `(collection) => CollectionConfig` | none | Reshapes the collection last. It may not rename it or turn off its timestamps. |
 | `providers.collection.access` | `Partial<CollectionConfig['access']>` | admin collection only, narrowed to the scopes the user belongs to | Replaces the default for each operation it sets. |

@@ -1,11 +1,32 @@
 ---
 title: Consent
-description: The gate your consent manager drives. The plugin stores no consent state and decides nothing about consent.
+description: The gate your consent manager drives, and what each slot sends before an answer, after a refusal and once granted. The plugin stores no consent state and makes no legal decision.
 ---
 
-The plugin does not handle consent. It stores no consent state, it has no default, and it does not decide which tracking needs consent. Whether an install needs consent at all, and for which slot, is the site operator's decision, and your consent manager (c15t, Cookiebot, a banner of your own) owns the banner, the categories, the visitor's stored answer and the record of it.
+The plugin does not handle consent. It stores no consent state and it does not decide which tracking needs consent. Whether an install needs consent at all, for which slot, and what may be measured before a visitor answers, is the site operator's decision, and your consent manager (c15t, Cookiebot, a banner of your own) owns the banner, the categories, the visitor's stored answer and the record of it.
 
-What the plugin gives that manager is a gate in front of each [capture slot](/analytics/capture#capture-slots): you say on the server which slots wait, and the manager opens or closes them in the browser. The gate holds what the browser tracker sends; events your server code records are [outside it](#what-the-gate-does-not-cover).
+What the plugin gives that manager is a gate in front of each [capture slot](/analytics/capture#capture-slots): you say on the server which slots wait and what each one does while it has no consent, and the manager answers in the browser. The gate holds what the browser tracker sends; events your server code records are [outside it](#what-the-gate-does-not-cover).
+
+## Phases and modes
+
+A slot the gate holds spends each page load in one of three phases, which the manager moves it through:
+
+| Phase | Gate status | The slot captures in |
+|---|---|---|
+| No answer yet | `pending` | its level for `pending` |
+| Refused | `closed` | its level for `refused` |
+| Granted | `open` | `full` |
+
+What it captures in is its mode, one of four:
+
+| Mode | What the slot sends | What it stores on the device |
+|---|---|---|
+| `off` | nothing; its vendor script is not loaded | nothing |
+| `cookieless` | the vendor's own count without device storage | nothing |
+| `anonymous` | native only: hits with no visitor id, country only, no time on page or scroll ([below](#native-cookieless-and-anonymous)) | nothing |
+| `full` | the vendor's normal tracking | whatever the vendor stores (cookies, `localStorage`) |
+
+`capture.withoutConsent` sets the level for the two phases without consent, `cookieless` unless you say otherwise ([Measuring without consent](#measuring-without-consent)); `'off'` keeps 1.0.0-beta.14's behaviour, where a held slot sends nothing until it is granted ([Strict mode](#strict-mode)). A slot the gate does not hold runs in `full` from page load, whatever `withoutConsent` says.
 
 ## Which slots wait
 
@@ -28,44 +49,148 @@ Pass one of them as `analytics({ capture: { gate } })`.
 
 The function form receives `{ slot, adapterId, kind }` per request and answers `true` for a slot that waits. Any answer other than `false` holds the slot, and so does a function that throws. The answer travels to the browser as each slot's `gated` flag in the [tracker config](/analytics/capture#plain-html-and-other-frameworks).
 
+## Measuring without consent
+
+`capture.withoutConsent` says what a held slot does before an answer (`pending`) and after a refusal (`refused`):
+
+```ts
+import type { WithoutConsentOption } from '@10x-media/analytics'
+
+export const counted: WithoutConsentOption = 'cookieless' // the default: both phases
+export const strict: WithoutConsentOption = 'off' // send nothing without consent
+export const untilRefused: WithoutConsentOption = { refused: 'off' } // a phase left out is 'cookieless'
+export const perSlot: WithoutConsentOption = ({ kind, phase }) =>
+  kind === 'posthog' && phase === 'refused' ? 'off' : 'cookieless'
+```
+
+The function receives `{ slot, adapterId, kind, phase }` and answers `'cookieless'` or `'off'`. It runs on the server, as the tracker config is resolved for a request, so the browser never runs host code: the answer travels as the slot's `withoutConsent` in the config. A function that throws, or answers anything else, gives `off` for that slot, and the log says so once per Payload instance.
+
+Each adapter also takes its own `withoutConsent`, which beats the install's for its slot, in both phases:
+
+```ts
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+export const plugin = analytics({
+  adapters: [native({ withoutConsent: 'anonymous' })],
+  capture: { gate: 'all' },
+})
+```
+
+`plausible()`, `umami()`, `posthog()` and `ga4()` take `'cookieless'` or `'off'`; `native()` takes `'anonymous'` as well. A [provider document](/analytics/providers#what-one-document-holds) of any vendor type has the same choice in its **Without consent** field, and left empty it follows the install. Any other value fails the boot, naming the option.
+
+A slot's level in one phase is decided in this order:
+
+1. An adapter that declares no way to count without consent is `off`. That is a custom adapter's default ([adapter contract](/analytics/reference/adapter-contract#capture-support)).
+2. The adapter's own `withoutConsent`, from its factory or its provider document.
+3. The install's function, when `capture.withoutConsent` is one.
+4. Otherwise `'off'` is `off`, and `'cookieless'` (or unset) is the adapter's own default: `cookieless` for native, Plausible, Umami and PostHog, `off` for GA4.
+
+GA4 therefore sends nothing without consent unless `ga4({ withoutConsent: 'cookieless' })`, its document's field or a function opts it in: its cookieless pings still reach Google ([GA4](#ga4)). On an install whose `capture.withoutConsent` is `'off'`, a provider document left empty is `off` too, and one set to **Count without cookies** counts.
+
+An install that leaves `capture.withoutConsent` unset while some held slot can count without consent logs one line per boot:
+
+```
+analytics: capture.withoutConsent is unset, so held slots measure cookielessly before consent and after a refusal. Set it to 'off' to send nothing without consent.
+```
+
+Setting the option, to any value, ends it.
+
+Cookieless counting tells visitors apart by a hash that includes the client's IP address, computed by native ingest or by the vendor. Behind a proxy that address has to be read from the right header: a production boot warns when a held slot can count cookielessly while neither `trustedProxyHops` nor `trustedPlatform` is set ([Trusted proxies](/analytics/proxy#trusted-proxies)).
+
+<Callout type="info">
+**Legal context.** Whether a site may count without consent is not settled by storing nothing on the device. The [EDPB Guidelines 2/2023 on the technical scope of Art. 5(3) of the ePrivacy Directive](https://www.edpb.europa.eu/system/files/documents/2024-10/edpb_guidelines_202302_technical_scope_art_53_eprivacydirective_v2_en_0.pdf) (version 2.0, 7 October 2024), the CNIL's page [Cookies : solutions pour les outils de mesure d'audience](https://www.cnil.fr/fr/cookies-solutions-pour-les-outils-de-mesure-daudience), and in Germany [§ 25 TDDDG](https://www.gesetze-im-internet.de/ttdsg/__25.html) with the DSK's [Orientierungshilfe Digitale Dienste](https://datenschutzkonferenz-online.de/media/oh/OH_Digitale_Dienste.pdf) (version 1.2, November 2024) can treat a script that sends information from the visitor's device as access to that device, even when it stores nothing. This page describes what the code sends and stores; it does not say whether any mode is allowed for your site. That choice belongs to the operator, and `'off'` is there for an operator who decides against counting without consent.
+</Callout>
+
+## Strict mode
+
+`capture.withoutConsent: 'off'` is 1.0.0-beta.14's behaviour, exactly: the tracker config and every snippet are what that release rendered, no request reaches a vendor or native ingest before `setGate(true)`, and none after `setGate(false)`. A held slot at `off` behaves this way in either phase whatever set its level, GA4's default included.
+
+While such a slot is pending, its events wait in a queue of at most 100 in the page's memory; past that the oldest is dropped. Opening it sends what waited, in order; a refusal drops it. A refusal after a grant stops the plugin's delivery at once, though GA4 and Plausible can still send one last thing of their own ([Revoking](#revoking)). Only a native slot queues the [engagement](/analytics/capture#what-the-tracker-sends-to-native) messages that carry time on page and scroll, since a vendor slot would drop one on delivery, and the items seen on a page are never queued. A slot that counts without consent queues nothing: it delivers at once, in its mode.
+
+## Native: cookieless and anonymous
+
+Native's `cookieless` level is native's ordinary capture. It never stored anything on the device, so before an answer and after a refusal it sends the same beacons with the same [visitor id](/analytics/privacy#the-visitor-id), a hash of the address, user agent and hostname under the day's salt. A visitor who grants consent halfway through a visit stays one visitor in one visit. Granted, it differs in one thing: the tracker reads the [exclusion flag](/analytics/capture#the-flag), so a staff browser stops being counted.
+
+`native({ withoutConsent: 'anonymous' })` stores less for what it counts without consent. Ingest computes no visitor id for such a hit (no hash, no salt fetched), keeps its country but no region or city, and stores no time on page, scroll depth or items seen: the tracker sends no engagement for an anonymous slot and watches no items, and an anonymous engagement posted anyway is answered `202` and stores nothing. Campaign keys, the referrer's host, device, browser, OS, language, props and item clicks are kept. The cost is in the numbers: anonymous hits count toward pageviews, events, goals, sources, pages and countries, and toward no visitor, visit or bounce rate ([Anonymous hits](/analytics/native#anonymous-hits)).
+
+Each beacon says which mode the page measured it in: `m: 'c'` for cookieless, `m: 'a'` for anonymous, none for full. Ingest stores no more than the mode allows, whatever else the beacon carries, and keeps the mode on the hit. The mode is the page's statement, not proof of consent: anyone can post a beacon to the public endpoint, with or without `m`.
+
+## What each vendor sends and stores
+
+What a slot sends and keeps in the browser in each phase, with its level at `cookieless` (GA4 opted in). A slot at `off` sends nothing and stores nothing in that phase, as in [Strict mode](#strict-mode).
+
+| Slot | No answer | Refused | Granted | After a revoke |
+|---|---|---|---|---|
+| native, `cookieless` | beacons with `m: 'c'`; nothing stored | the same | beacons without `m`, same visitor id | `m: 'c'` again; nothing stored |
+| native, `anonymous` | pageviews and events with `m: 'a'`, no engagement; nothing stored | the same | beacons without `m`, engagement included | `m: 'a'` again; nothing stored |
+| Plausible | its script, as always; nothing stored | the same | the same script; `plausible_ignore` cleared if set | unchanged; nothing written |
+| Umami | its script, as always; nothing stored | the same | the same script; `umami.disabled` cleared if set | unchanged; nothing written |
+| PostHog | `$pageview` with `$cookieless_mode: true` and `distinct_id: "$posthog_cookieless"`; nothing stored | the same | full capture: persistent id, `ph_<token>_posthog` cookie, `localStorage` and `sessionStorage`, `ph_<token>_window_id` in `sessionStorage`, `__ph_opt_in_out_<token>` in `localStorage` | cookieless again; left behind: `__ph_opt_in_out_<token>` (`0`) in `localStorage` |
+| GA4 | `page_view` pings with every consent signal denied (`gcs=G100`); nothing stored | the same | `analytics_storage` granted (`gcs=G101`), `_ga` and `_ga_<id without G->` cookies | `analytics_storage` denied, pings continue; the two cookies expired |
+
+After a revoke, PostHog's `__ph_opt_in_out_<token>` is the only key any of these leaves. Every cookieless request still carries the visitor's IP address and user agent: to the vendor through the [first-party proxy](/analytics/proxy#runtime-endpoint), which forwards `User-Agent` and the resolved client address in `X-Forwarded-For`, to Google directly for GA4, and to native ingest, which computes the visitor id from them ([Privacy](/analytics/privacy#modes-without-consent)).
+
+### Plausible and Umami
+
+Neither stores anything on the device, so one script serves every phase: a cookieless slot loads it before any answer and keeps it after a refusal. At `off` the script is held until the slot is granted, and a refusal sets the vendor's own switch as in [Strict mode](#strict-mode) (`plausible_ignore`, `umami.disabled`). A switch set by an exclusion or a strict refusal on an earlier page is cleared only once the slot runs in full, so until then it keeps the vendor silent in cookieless mode too.
+
+### PostHog
+
+A slot that may count without consent starts posthog-js with `cookieless_mode: 'on_reject'` and, while pending, `opt_out_capturing_by_default: true`. Before an answer the first `$pageview` is sent cookieless, and nothing is written to cookies, `localStorage` or `sessionStorage`. A refusal before any grant changes nothing: the client keeps counting cookieless and stores nothing. A grant calls `opt_in_capturing()`, and the next event on the same page is captured in full; a grant given before `array.js` has loaded makes the first pageview full. A revoke calls `opt_out_capturing()`, which returns the client to cookieless and deletes `ph_<token>_posthog`; the sink removes `ph_<token>_window_id`, which posthog-js keeps past an opt-out.
+
+A slot at `off` for a phase stops the client there instead: `set_config({ cookieless_mode: false })` and `opt_out_capturing()`, and a refusal before `array.js` loads stops even the cookieless first pageview. A slot that never counts without consent keeps 1.0.0-beta.14's snippet and switches.
+
+posthog-js keeps a grant in its own storage. On the visitor's next page it starts in full from that storage before your manager answers; a refusal switches it back to cookieless, a pending gate does not. Session replay and surveys start only once the client is opted in. The global client and a tenant's [named client](/analytics/capture#two-posthog-projects-on-one-page) switch independently, each on its own slot's gate.
+
+PostHog drops cookieless events at ingestion unless the project's **Cookieless tracking** setting (Settings, Web analytics) is on; they still show in its Live events. The adapter reads that setting, and the admin says when visits are being dropped ([Without consent](/analytics/providers#without-consent)).
+
+### GA4
+
+GA4 is strict by default. Opted in, its snippet sets Google's [consent mode](https://developers.google.com/tag-platform/security/concepts/consent-mode) defaults before `gtag('config')`: `analytics_storage`, `ad_storage`, `ad_user_data` and `ad_personalization` all denied. The tag then sends cookieless pings, `page_view` included, and stores nothing. A grant updates `analytics_storage` to granted, and the tag sets `_ga` and `_ga_<measurementId without G->`. The three advertising signals stay denied: the plugin grants analytics storage alone, so a site that wants advertising signals updates them from its own bridge with `gtag('consent', 'update', ...)`. A revoke updates `analytics_storage` to denied, and since gtag.js deletes none of its cookies, the sink expires `_ga` and `_ga_<id>` at `/` on the host and on every parent domain. The pings continue.
+
+A cookieless GA4 snippet reads no storage, so it does not check the exclusion flag the way a strict one does: the tracker reads the flag once the slot runs in full.
+
 ## The gate in the browser
 
 Each slot's gate is `pending`, `open` or `closed`, held in memory only:
 
-| | A slot that waits | A slot that does not |
-|---|---|---|
-| At boot | `pending` | `open` |
-| Events | wait in a queue of at most 100 per slot; past that the oldest is dropped | delivered |
-| Its vendor script | not loaded | loaded |
+| | A held slot at `off` | A held slot counting without consent | A slot that does not wait |
+|---|---|---|---|
+| At boot | `pending` | `pending` | `open` |
+| Its mode | `off` | its `pending` level | `full` |
+| Events | wait in a queue of at most 100 | delivered in that mode | delivered |
+| Its vendor script | not loaded | loaded, started in its cookieless variant | loaded |
 
-Only a native slot queues the [engagement](/analytics/capture#what-the-tracker-sends-to-native) messages that carry time on page and scroll: a vendor slot would drop one on delivery anyway. The items seen on a page are never queued.
+**Opening** a slot switches it to `full`: the vendor's own client is switched up (PostHog opts in, GA4's switch is cleared and, on a slot that counted without consent, analytics storage granted, Plausible's and Umami's keys are cleared) unless the browser is [excluded](/analytics/capture#excluding-your-own-visits), the slot's snippet is injected if it is not on the page yet, and what waited is sent, in order. **Closing** a slot moves it to its `refused` level. A slot that counts after a refusal keeps its client cookieless, or switches it back down from full, and goes on sending; anything that waited is sent cookieless. A slot at `off` drops what waited and stops delivery; when its vendor's script may be running, because the slot sent on this page or because the site loads the vendor scripts itself (`snippets={false}`), closing also sets the vendor's own opt-out, the same switches staff exclusion uses (`plausible_ignore`, `umami.disabled`, PostHog's `opt_out_capturing()`, GA4's `ga-disable-<measurementId>`). A slot that never sent on the page ran nothing, so closing it writes nothing; a slot that does not wait counts as open from boot, so closing it by name always sets the vendor's switch, and it then sends nothing whatever `withoutConsent` says. A slot can be opened and closed any number of times.
 
-**Opening** a slot clears the vendor's own opt-out switch (unless the browser is [excluded](/analytics/capture#excluding-your-own-visits)), injects the slot's snippet, clears the switch once more after the snippet ran (PostHog's global exists only from then on), then sends what waited, in order. **Closing** a slot drops what waited and stops delivery to it. When the vendor's script may be running, because the slot was open or because the site loads the vendor scripts itself (`snippets={false}`), closing also sets the vendor's own opt-out, the same switches staff exclusion uses (`plausible_ignore`, `umami.disabled`, PostHog's `opt_out_capturing()`, GA4's `ga-disable-<measurementId>`). A slot that waits and never opened on the page ran nothing, so closing it writes nothing; a slot that does not wait counts as open from boot, so closing it by name always sets the vendor's switch. A slot can be opened and closed any number of times.
+`tracker.mode` and `useAnalytics().mode` say what each slot captures in right now, beside `gate`: `{ global: 'cookieless', tenant: 'off' }`. Both read `off` for every slot before a tracker has booted and during the server render.
 
-Where both slots are PostHog, each runs its own client ([Two PostHog projects on one page](/analytics/capture#two-posthog-projects-on-one-page)), and a slot's gate and exclusion touch only its own: `setGate({ tenant: false })` calls `posthog.tenant.opt_out_capturing()` and leaves the platform's client capturing.
+Where both slots are PostHog, each runs its own client ([Two PostHog projects on one page](/analytics/capture#two-posthog-projects-on-one-page)), and a slot's gate and exclusion touch only its own: `setGate({ tenant: false })` switches `posthog.tenant` and leaves the platform's client as it was.
 
-A slot the config does not fill, such as the tenant slot of an unscoped install, reads `closed` and no answer opens it: nothing is captured there. Until the tracker has booted, `gate` reads what the answers so far say; a `false` given before the window knows which slots wait reads `pending`, since it closes a slot that waits and leaves one that does not open.
+A slot the config does not fill, such as the tenant slot of an unscoped install, reads `closed` and `off`, and no answer opens it: nothing is captured there. Until the tracker has booted, `gate` reads what the answers so far say; a `false` given before the window knows which slots wait reads `pending`, since it closes a slot that waits and leaves one that does not open.
 
-The gate is not stored. The next page load starts pending again, and your consent manager states the decision on every page load, which it does anyway because it reads its own stored answer there. What closing can leave behind is the vendor's own switch, and only for a vendor whose script may have run ([Privacy](/analytics/privacy#no-cookie) lists each). 1.0.0-beta.11 kept a decision under the `analytics:consent` key; the tracker deletes it once a slot opens on a page that is counted, and nothing reads it.
+The gate is not stored. The next page load starts pending again, and your consent manager states the decision on every page load, which it does anyway because it reads its own stored answer there. What a page can leave behind is the vendor's own state: a switch set by a strict refusal, PostHog's opt-in or opt-out key, and whatever a vendor stored while it ran in full ([Privacy](/analytics/privacy#no-cookie) lists each). 1.0.0-beta.11 kept a decision under the `analytics:consent` key; the tracker deletes it once a slot runs in full on a page that is counted, and nothing reads it.
 
 ### Storage before an answer
 
-While every slot that fills waits for an answer, the tracker reads and writes no browser storage. It reads the [exclusion flag](/analytics/capture#the-flag) once a slot opens, at boot for a slot that does not wait, so `tracker.excluded` and `useAnalytics().excluded` read `false` until then. Three things touch `localStorage` before any answer all the same:
+The tracker reads and writes no browser storage until some slot runs in `full`. Only then does it read the [exclusion flag](/analytics/capture#the-flag), at boot for a slot that does not wait, so `tracker.excluded` and `useAnalytics().excluded` read `false` until then, and a staff browser is counted by every slot that counts without consent. A cookieless vendor script stores nothing either ([the table above](#what-each-vendor-sends-and-stores)). These touch the device before any answer all the same:
 
-- **The exclusion link.** A page opened with a valid [exclusion link](/analytics/capture#the-exclusion-link) writes the flag at once, open slot or not, and one opened with `=0` reads it and clears it if set. Only staff are handed the signed link.
-- **A GA4 snippet the server rendered**, for a slot that does not wait, reads the flag itself ahead of its first `gtag()` call, the only place GA4 honours its switch.
-- **A refusal under `snippets={false}`.** The site loads the vendor scripts itself, so closing a slot sets that vendor's opt-out even when the slot never opened: Plausible's and Umami's `localStorage` key, and PostHog's own stored opt-out when its SDK is on the page.
+- **The exclusion link.** A page opened with a valid [exclusion link](/analytics/capture#the-exclusion-link) writes the flag at once, whatever the slots are doing, and one opened with `=0` reads it and clears it if set. Only staff are handed the signed link.
+- **A GA4 snippet the server rendered in full**, for a slot that does not wait, reads the flag itself ahead of its first `gtag()` call, the only place GA4 honours its switch.
+- **A grant PostHog kept from an earlier page.** posthog-js reads it from its own storage and starts in full, cookie and all, before your manager answers.
+- **A refusal under `snippets={false}`** of a slot at `off`. The site loads the vendor scripts itself, so closing the slot sets that vendor's opt-out even when the slot never sent: Plausible's and Umami's `localStorage` key, and PostHog's own stored opt-out when its SDK is on the page.
 
 ## setGate
 
 ```ts partial
-setGate(true)               // open every slot that waits
-setGate(false)              // close every slot that waits
+setGate(true)               // run every slot that waits in full
+setGate(false)              // move every slot that waits to its refused level
 setGate({ tenant: true })   // answer the slots named; a slot left out keeps its gate
 setGate({ global: false })  // naming a slot closes it even when it does not wait
 ```
 
-A boolean answers for the slots `capture.gate` holds and leaves the others alone, so `gate: ['tenant']` with `setGate(false)` keeps the global slot capturing. A record answers for the slots it names, whether they wait or not: it is how you revoke one slot by name, though a slot that does not wait renders its snippet again on the next page load (see [revoking](#revoking)). A slot that does not wait is open from the start, and the first `true` naming it still clears its vendor's switch, as an opening does.
+A boolean answers for the slots `capture.gate` holds and leaves the others alone, so `gate: ['tenant']` with `setGate(false)` keeps the global slot capturing in full. A record answers for the slots it names, whether they wait or not: it is how you revoke one slot by name, though a slot that does not wait renders its snippet again on the next page load (see [revoking](#revoking)). A slot that does not wait is open from the start, and the first `true` naming it still clears its vendor's switch, as an opening does.
 
 From React, `useAnalytics()` carries it, next to the current state:
 
@@ -73,11 +198,12 @@ From React, `useAnalytics()` carries it, next to the current state:
 'use client'
 import { useAnalytics } from '@10x-media/analytics/react'
 
-const { setGate, gate } = useAnalytics()
+const { setGate, gate, mode } = useAnalytics()
 gate // { global: 'open', tenant: 'pending' }; a change re-renders the component
+mode // { global: 'full', tenant: 'cookieless' }
 ```
 
-`setGate` is safe before the tracker exists. A bridge component often answers in an effect that runs before the boot effect of `<AnalyticsScripts />` or `<AnalyticsProvider>`; the answer is kept for the window and the tracker boots with it, so nothing is sent or loaded before it applies. Outside React, the tracker has the same two members:
+`setGate` is safe before the tracker exists. A bridge component often answers in an effect that runs before the boot effect of `<AnalyticsScripts />` or `<AnalyticsProvider>`; the answer is kept for the window and the tracker boots with it, so nothing is sent or loaded before it applies. Outside React, the tracker has the same members:
 
 ```ts
 import { initTracker } from '@10x-media/analytics/tracker'
@@ -85,6 +211,7 @@ import { initTracker } from '@10x-media/analytics/tracker'
 const tracker = await initTracker()
 tracker.setGate(true)
 tracker.gate // { global: 'open', tenant: 'closed' } on an install without tenancy, whose tenant slot nothing fills
+tracker.mode // { global: 'full', tenant: 'off' }
 ```
 
 ## Server render
@@ -92,8 +219,9 @@ tracker.gate // { global: 'open', tenant: 'closed' } on an install without tenan
 `<AnalyticsScripts />` from `@10x-media/analytics/site` renders what may run before any decision:
 
 - a slot that does not wait renders its vendor snippet with the page;
-- a slot that waits renders nothing. Its snippet still reaches the browser, as data inside the tracker config, and the tracker injects it once the slot opens;
-- the tracker itself boots with every waiting slot `pending`.
+- a held slot that counts without consent before an answer renders its snippet with the page too, in its cookieless variant, so the first pageview is counted;
+- a held slot at `off` renders nothing. Its snippet still reaches the browser, as data inside the tracker config, and the tracker injects it once the slot opens;
+- the tracker itself boots with every waiting slot `pending`, and its loader skips a script already on the page.
 
 A server that already knows the decision passes it, in the same shape as `setGate`:
 
@@ -101,24 +229,27 @@ A server that already knows the decision passes it, in the same shape as `setGat
 <AnalyticsScripts config={tracker} gate={{ tenant: true }} />
 ```
 
-A slot it opens renders its snippet and boots open; one it closes renders nothing and boots closed. Pass it only from a decision your own code owns. Do not parse a consent manager's cookie to get one: c15t marks its cookie format `@internal`, so it can change in any release.
+A slot it opens renders its snippet in full and boots open: for PostHog and GA4 that is the full variant (`fullSnippet` in the tracker config), so the consenting visitor's first pageview is counted with consent rather than cookielessly. One it closes boots closed, and renders its snippet only when it counts after a refusal. Pass it only from a decision your own code owns. Do not parse a consent manager's cookie to get one: c15t marks its cookie format `@internal`, so it can change in any release.
 
 `<AnalyticsProvider config={tracker} gate={...}>` from `@10x-media/analytics/react` takes the same `gate`, for a tree that boots the tracker from the provider rather than from `<AnalyticsScripts />`.
 
 ## Revoking
 
-A `setGate(false)` (or `{ tenant: false }`) after an open closes the slot: what was queued is dropped, nothing more is delivered to it, and the vendor's own opt-out is set. A script tag already in the page stays there, and the vendor's switch is what silences it. Vendors keep their own switch across page loads (PostHog persists its opt-out, Plausible and Umami read a `localStorage` key), which is why opening a slot clears that switch again. PostHog's opt-out also deletes its own `ph_<token>_posthog` storage, because the plugin's snippet initialises it with `opt_out_persistence_by_default`.
+A `setGate(false)` (or `{ tenant: false }`) after a grant moves the slot back to its `refused` level, on the same page:
 
-GA4 honours its switch only when it is set before the page's first `gtag()` call, so a GA4 tag that already ran is also told through Google's [consent mode](https://developers.google.com/tag-platform/security/concepts/consent-mode) that `analytics_storage`, `ad_storage`, `ad_user_data` and `ad_personalization` are denied. That stops the tag reading and writing its cookies for the rest of the page, though Google may still send cookieless pings until the page is left, and it applies to every Google tag on that page's `gtag`. Nothing grants consent back on the same page, since your own consent mode setup may hold any of those types: a GA4 slot opened again after a refusal measures fully from the next page load. A bridge that wants a revoke complete at once can reload the page after `setGate(false)`.
+- **Counting without consent**, the slot goes on sending in that mode, and the vendor's client is switched down: native's beacons carry `m` again, PostHog returns to cookieless, GA4's `analytics_storage` is denied and its two cookies are expired, and Plausible and Umami carry on as they were, having stored nothing. After that, PostHog's `__ph_opt_in_out_<token>` is the only key left ([the table above](#what-each-vendor-sends-and-stores)).
+- **At `off`**, what was queued is dropped, nothing more is delivered, and the vendor's own opt-out is set. A script tag already in the page stays there, and the vendor's switch is what silences it. Plausible and Umami read a stored `localStorage` key and PostHog persists its opt-out, which is why opening a slot clears that switch again. PostHog's opt-out also deletes its own `ph_<token>_posthog` storage, because the snippet initialises it with `opt_out_persistence_by_default`. GA4 honours its switch only when it is set before the page's first `gtag()` call, so a tag that already ran is also told through consent mode that all four storage types are denied, and the sink expires `_ga` and `_ga_<id>` when this page had granted them. Google may still send cookieless pings until the page is left, and the update applies to every Google tag on that page's `gtag`.
+
+At `off`, two vendors finish what they started before the refusal, by their own behaviour: GA4 holds its events for about 5 seconds before sending them, so an event recorded while consented can still be sent within about 5 seconds after the refusal, and after that gtag sends nothing more and its `_ga` cookies stay deleted. Plausible's script sends one `engagement` event at the moment of a refusal, for the page viewed while consented, with the time up to the refusal: it sends it before it checks `plausible_ignore`, and the plugin stops every engagement after it. Umami sends nothing after a refusal.
 
 What the next page load does depends on whether `capture.gate` holds the slot:
 
-- **A slot that waits** loads nothing while your manager answers `false`: its snippet is neither rendered nor injected, so the revoke holds from that load on.
-- **A slot that does not wait** renders its snippet with every page, before any answer. Plausible, Umami and PostHog read the switch they stored and stay silent. GA4 has no stored switch: its tag runs, reads and writes its cookies and sends its page view on every load, until your bridge closes the slot by name again. A refusal holds for GA4 only when `capture.gate` holds its slot.
+- **A slot that waits** starts pending and then takes your manager's `false`: at `off` its snippet is neither rendered nor injected, and counting without consent it runs in its cookieless variant, so the revoke holds from that load on.
+- **A slot that does not wait** renders its snippet in full with every page, before any answer. Plausible, Umami and PostHog read the switch they stored and stay silent. GA4 has no stored switch: its tag runs, reads and writes its cookies and sends its page view on every load, until your bridge closes the slot by name again. A refusal holds for GA4 only when `capture.gate` holds its slot.
 
-Closing a slot deletes nothing a vendor stored before it, PostHog's own storage aside: GA4's `_ga` and `_ga_<measurementId>` cookies, and whatever else a vendor's script wrote, stay. Clearing what a vendor stored after a refusal is your consent manager's job, as it is for every script the plugin does not load. Nor does closing delete what native already stored: those hits stay until [raw retention](/analytics/native#retention) deletes them (`retention.rawDays`, 90 days by default), and the daily totals counted from them stay, as counts with no visitor id in them.
+Every refusal of a GA4 slot expires its `_ga` and `_ga_<id>` cookies, on the page's host and each parent domain, including cookies an earlier page's grant left; that write sets no new value and reads nothing. Closing deletes nothing else a vendor stored: whatever a vendor's script wrote while it ran in full stays. Clearing that after a refusal is your consent manager's job, as it is for every script the plugin does not load. Nor does closing delete what native already stored: those hits stay until [raw retention](/analytics/native#retention) deletes them (`retention.rawDays`, 90 days by default), and the daily totals counted from them stay, as counts with no visitor id in them.
 
-A page restored from the back/forward cache comes back as it was left, its gate open, though the visitor may have refused in another tab since. On such a restore the tracker puts every slot `capture.gate` holds back to `pending` and forgets the answers it had, so what the page sends waits in the queue until your consent manager answers again; a slot that does not wait stays as it was. A vendor script already running on the page keeps running until a refusal sets its switch. Answer on `pageshow` when `event.persisted` says the page was restored, from the manager's stored answer:
+A page restored from the back/forward cache comes back as it was left, its gate open, though the visitor may have refused in another tab since. On such a restore the tracker puts every slot `capture.gate` holds back to `pending` and forgets the answers it had: a slot at `off` queues what the page sends until your consent manager answers again, and one counting without consent returns to its pending level. A vendor already running in full keeps running until the manager answers again, so PostHog does not start a new identity on every Back; a slot that does not wait stays as it was. Answer on `pageshow` when `event.persisted` says the page was restored, from the manager's stored answer:
 
 ```ts
 import { initTracker } from '@10x-media/analytics/tracker'
@@ -137,22 +268,32 @@ window.addEventListener('pageshow', (event) => {
 
 The recipes below do the same from React.
 
+## What the numbers lose
+
+Counting without consent costs accuracy, and each source loses something different:
+
+- **PostHog** counts a cookieless visitor per day, from a hash PostHog computes on its server, so visitors over a range are a sum of days: a read that finds cookieless pageviews says so (`meta.visitorsAre: 'sumOfDaily'`, shown as "Visitors, counted per day"). A visitor who grants consent mid-visit is counted twice that day, once cookieless and once under their persistent id. Cookieless events carry no country: PostHog strips the address before it looks one up. posthog-js also drops every event from a browser it takes for a bot (`navigator.webdriver`, HeadlessChrome), whatever the mode.
+- **Hash collisions.** A cookieless visitor is a hash of the address and user agent, so visitors behind one address with the same browser (an office, a school, a mobile carrier's gateway) merge into one, on native and at the vendors alike.
+- **Native anonymous hits have no visitor.** They count as pageviews, events and goals, and toward no visitor, visit, bounce rate or time on page; a read says how many pageviews it holds without a visitor ([Anonymous hits](/analytics/native#anonymous-hits)).
+
+The analytics view shows what share of a read's pageviews was counted without consent, below the overview cards, for native and PostHog: "38% of pageviews were counted without consent."
+
 ## What the gate does not cover
 
 The gate holds what the tracker sends from the browser, and nothing else:
 
 - **Server code.** `trackServerEvent`, the server `purchase` and `refund`, and the form-builder [goal action](/analytics/goals#3-track-a-form-submission) record through the native engine directly. No browser gate sees these calls, and the plugin cannot read your consent manager's answer on the server: their `identity`, below, decides whether the visitor behind the request is in the hit.
-- **A slot that does not wait.** Its snippet runs with the page, before any answer, and counts by that vendor's own rules.
-- **The ingest endpoint.** It is public, so a beacon posted by anything other than the tracker is counted like the tracker's.
+- **A slot that does not wait.** Its snippet runs in full with the page, before any answer, and counts by that vendor's own rules, whatever `capture.withoutConsent` says.
+- **The ingest endpoint.** It is public, so a beacon posted by anything other than the tracker is counted like the tracker's, and the mode a beacon names (`m`) is what the page says, not proof of anything. A beacon that names no mode is stored as full.
 
-A server event's `identity` is `'request'` or `'none'`. `'request'` attributes it to the visitor behind the request (`req`, or `ip` and `userAgent`) as a beacon would: the day's visitor id, and the location, device and language the request carries. `'none'` records it as no visitor's: no visitor id, and no address, agent, language or location read from the request, which still supplies the event's scope, timezone and goals. The event still counts, as a conversion or a sale, under no visitor of its own.
+A server event's `identity` is `'request'` or `'none'`. `'request'` attributes it to the visitor behind the request (`req`, or `ip` and `userAgent`) as a beacon would: the day's visitor id, and the location, device and language the request carries, stored as a full hit. `'none'` records it as no visitor's: no visitor id, and no address, agent, language or location read from the request, not even a country, which still supplies the event's scope, timezone and goals. It is stored as an anonymous hit. The event still counts, as a conversion or a sale, under no visitor of its own.
 
 A call that names no identity gets the install's default:
 
-- **`'none'`** while `capture.gate` holds a slot the native beacon could fill: the global slot when native fills it, and the tenant slot on any scoped install. A call that passes `ip` or `userAgent` anyway has them set aside, and the log says so once.
+- **`'none'`** while `capture.gate` holds a slot the native beacon could fill: the global slot when native fills it, and the tenant slot on any scoped install. A call that passes `ip` or `userAgent` anyway has them set aside, and the log says so once. `capture.withoutConsent` does not change this default.
 - **`'request'`** otherwise, which is what `gate: 'off'` gives.
 
-A sale recorded as no visitor's keeps its place in the visit all the same when the browser recorded it too: the webhook's amount moves onto the browser's record of the order, which carries the visit ([recorded in the browser and by the webhook](/analytics/revenue#recorded-in-the-browser-and-by-the-webhook)), and that record exists only once the native slot's gate opened. Where your own code knows the visitor's answer, pass the identity that matches it:
+A sale recorded as no visitor's keeps its place in the visit all the same when the browser recorded it too: the webhook's amount moves onto the browser's record of the order, which carries the visit ([recorded in the browser and by the webhook](/analytics/revenue#recorded-in-the-browser-and-by-the-webhook)), and that record exists only once the native slot sent it. Where your own code knows the visitor's answer, pass the identity that matches it:
 
 ```ts
 import {
@@ -208,7 +349,11 @@ The plugin then renders no vendor snippet and injects none either, whatever the 
 posthog.init('phc_tenant...', { api_host: '/api/_x/p/tenant', capture_pageview: false }, 'tenant')
 ```
 
-Started under any other name, or not at all, the tenant slot finds no client and sends nothing. Leave the platform's project as the primary client, `posthog.init(token, config)`. The gate still applies: events wait while a slot is pending and are dropped once it is closed, and since the manager may have loaded the vendor whatever the gate said, closing sets that vendor's own switch even for a slot that never opened. `<AnalyticsProvider snippets={false}>` does the same.
+Started under any other name, or not at all, the tenant slot finds no client and sends nothing. Leave the platform's project as the primary client, `posthog.init(token, config)`.
+
+A slot that counts without consent needs its vendor started the way the plugin's own snippet would start it, since the sink only switches a client that can switch. The slot's `snippet.scripts` in the tracker config already carry that variant; a loader of your own starts PostHog with `cookieless_mode: 'on_reject'` and `opt_out_capturing_by_default: true`, and GA4 with `gtag('consent', 'default', ...)` denying `analytics_storage`, `ad_storage`, `ad_user_data` and `ad_personalization` before `gtag('config')`. Started without them, PostHog stores its identity before any answer and an opt-out stops it rather than returning it to cookieless, and GA4 sets its cookies from the first page view.
+
+The gate still applies: a slot at `off` holds its events while pending and drops them once closed, and since the manager may have loaded the vendor whatever the gate said, closing such a slot sets that vendor's own switch even when it never sent. `<AnalyticsProvider snippets={false}>` does the same.
 
 ## Recipe: c15t
 
@@ -224,6 +369,8 @@ analytics({
   capture: { gate: 'all' },
 })
 ```
+
+With `withoutConsent` unset, native counts cookielessly from the first page, before the banner is answered and after a refusal, and the boot says so once. Add `withoutConsent: 'off'` to `capture` to send nothing until the visitor grants `measurement`.
 
 The bridge reads c15t's state through `useConsentManager()` (`consents`, `hasConsented`, `isLoadingConsentInfo`) and answers the gate:
 
@@ -263,7 +410,7 @@ export function AnalyticsGate() {
 }
 ```
 
-Until the visitor decides, the gate stays pending and nothing waits longer than the page: the queue lives in memory. `hasConsented()` is true once c15t holds a saved answer, so a visitor who refused closes the gate on every page load. `resetConsents()` clears that answer without granting or refusing anything, which is why the bridge remembers that it opened the gate and closes it again. On a page restored from the back/forward cache the bridge answers again from its own `pageshow` listener, with the answer c15t holds in that page: nothing in c15t changed, so it reports nothing the bridge could wait for.
+The bridge is the same as for 1.0.0-beta.14; what changed is what each answer does. Until the visitor decides, the gate stays pending, and each held slot captures at its `pending` level: cookieless by default, or nothing under `'off'`, where what the page sends waits in memory and goes no further than the page. `hasConsented()` is true once c15t holds a saved answer. A grant runs every held slot in full on the same page. A visitor who refused closes the gate on every page load, which moves each held slot to its `refused` level, cookieless by default. `resetConsents()` clears that answer without granting or refusing anything, which is why the bridge remembers that it opened the gate and closes it again: the slots go back from full to their refused level. On a page restored from the back/forward cache the bridge answers again from its own `pageshow` listener, with the answer c15t holds in that page: nothing in c15t changed, so it reports nothing the bridge could wait for.
 
 Render the bridge under both providers in the site's root layout, with the tracker config resolved on the server. c15t's `options` (where it keeps answers, which categories it asks for) are its own, and nothing in them changes for the plugin:
 
@@ -355,7 +502,7 @@ export function AnalyticsGate() {
 }
 ```
 
-A manager that can withdraw an answer without refusing (a reset, a consent record that expired) reads as undecided again; the bridge closes a gate it opened rather than leaving it open until the next page load. On a page restored from the back/forward cache it reads the manager's answer again, which picks up a refusal given in another tab when the manager reads its stored answer there. Answer per slot when your manager has more than one category for them, for example `setGate({ global: measurement, tenant: marketing })`. Without React, call `tracker.setGate()` on the tracker `initTracker()` resolved, from the same two hooks.
+The bridge has not changed since 1.0.0-beta.14. While the manager has no answer, each held slot captures at its `pending` level; `'granted'` runs them in full, and `'denied'` moves them to their `refused` level, which is cookieless unless `capture.withoutConsent` says `'off'`. A manager that can withdraw an answer without refusing (a reset, a consent record that expired) reads as undecided again; the bridge then closes a gate it opened, moving the slots to their refused level rather than leaving them in full until the next page load. On a page restored from the back/forward cache it reads the manager's answer again, which picks up a refusal given in another tab when the manager reads its stored answer there. Answer per slot when your manager has more than one category for them, for example `setGate({ global: measurement, tenant: marketing })`. Without React, call `tracker.setGate()` on the tracker `initTracker()` resolved, from the same two hooks.
 
 ## A custom script loader
 

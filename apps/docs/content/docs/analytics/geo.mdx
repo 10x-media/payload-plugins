@@ -33,7 +33,7 @@ analytics({ adapters: [native()], capture: { gate: 'all' }, trustedProxyHops: 1 
 
 The answer covers every place the plugin reads a visitor's address: the native visitor hash, geo, and the address the [capture proxy](/analytics/proxy#runtime-endpoint) forwards to a vendor. A [`captureRoute`](/analytics/proxy#a-route-handler-of-your-own) handler runs outside the plugin, so pass it the same option.
 
-In production (`NODE_ENV=production`), an install that sets neither option logs one warning at boot, saying visitor IP addresses and countries can be spoofed, when it reads them at all: native ingest, a proxied vendor, the providers collection or `providers.resolve`. While neither `trustedPlatform` nor a `trustedProxyHops` of 1 or more is set, the first request whose `x-forwarded-for` lists two or more addresses logs one more warning.
+In production (`NODE_ENV=production`), an install that sets neither option logs one warning at boot, saying visitor IP addresses and countries can be spoofed, when it reads them at all: native ingest, a proxied vendor, the providers collection or `providers.resolve`. While neither `trustedPlatform` nor a `trustedProxyHops` of 1 or more is set, the first request whose `x-forwarded-for` lists two or more addresses logs one more warning. A production install where a slot `capture.gate` holds can count cookielessly also warns at boot while neither option is set, since cookieless counting tells visitors apart by the address ([Trusted proxies](/analytics/proxy#trusted-proxies)).
 
 ## MaxMind (optional)
 
