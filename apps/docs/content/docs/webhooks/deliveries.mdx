@@ -74,10 +74,11 @@ Unset, the log is never pruned.
 | `responseStatus`, `responseBody` | The receiver's HTTP status and body (only the first 2000 characters are read). A redirect is not followed, so a 3xx shows up here as the failure. |
 | `error`, `durationMs`, `jobId` | Failure message, round-trip time, and the Payload job id when queued. |
 | `payload` | The exact JSON body that was sent. |
+| `ownerId`, `ownerCollection` | Who the delivery was made for. Present when [`owner`](/webhooks/multi-tenancy) is configured; empty for code and global subscriptions. |
 
 ## Redelivery
 
-Every delivery row has a **Redeliver** button beside Save, which asks for confirmation first. It is backed by `POST /api/webhook-deliveries/:id/redeliver` (requires read access to that delivery; returns `202` with the new delivery's `id` and its `status`: `pending` when it was queued, `success` or `dead` when it was sent inline, which is what the button reports; a replay that can already be seen to be going nowhere, because its subscription is gone, disabled or off the host allowlist, is `dead` in either mode). Redelivery creates a fresh row and replays the original payload to the subscription's current URL through the configured mode, so a corrected endpoint receives the replay. A disabled or deleted subscription is not sent to; the new row lands as `dead`.
+Every delivery row has a **Redeliver** button beside Save, which asks for confirmation first. It is backed by `POST /api/webhook-deliveries/:id/redeliver` (requires read access to that delivery and to its subscription; returns `202` with the new delivery's `id` and its `status`: `pending` when it was queued, `success` or `dead` when it was sent inline, which is what the button reports; a replay that can already be seen to be going nowhere, because its subscription is gone, disabled or off the host allowlist, is `dead` in either mode). Redelivery creates a fresh row and replays the original payload to the subscription's current URL through the configured mode, so a corrected endpoint receives the replay. A disabled or deleted subscription is not sent to; the new row lands as `dead`. With `owner` configured, a replay whose subscription has changed owner since the original delivery is not sent either and lands as `dead`: the stored body was built for the previous owner.
 
 <Callout>
 A redelivery is a **new** delivery: the fresh row means a fresh `webhook-id`, so a receiver deduplicating on that id treats it as a distinct message rather than a repeat, and will process the payload again. Retries of a *failed* delivery keep the original `webhook-id`, so those do deduplicate. If replaying must not double-process, make your handler idempotent on something inside the body (`data.id`, a version field) rather than on `webhook-id` alone.
@@ -98,3 +99,5 @@ A redelivery is a **new** delivery: the fresh row means a fresh `webhook-id`, so
 ```
 
 `id` is the same string as the `webhook-id` header. A redelivery carries its own, since it is a new delivery.
+
+Under [`enforceOwnerAccess`](/webhooks/multi-tenancy), `data` for an owner-bound subscription is the document as its owner reads it, at depth 0, and `previousData` is omitted.

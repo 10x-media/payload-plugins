@@ -32,8 +32,10 @@ The keys are typed against your generated `CollectionSlug`, so a typo or a globa
 | `includePreviousData` | `boolean` | Add a `previousData` key to the body on `update` events. |
 | `includeDrafts` | `boolean` | Emit for a deliberate save that leaves the document a draft. Default `true`. See [Drafts and autosave](#drafts-and-autosave). |
 | `transform` | `({ doc, previousDoc, operation, req, target }) => unknown` | Reshape or redact before sending. Applied to the body's `data` and, with `includePreviousData`, to `previousData` as well, so redaction covers both. `target` (`'data'` or `'previousData'`) names the slot; on the `previousData` call `doc` is the prior document. |
+| `filter` | `({ doc, previousDoc, operation, subscription, req }) => boolean \| Promise<boolean>` | Decide per subscription whether the document is delivered. `false` leaves no delivery row. `subscription.record` is the stored row, your own fields included. See [Multi-tenancy](/webhooks/multi-tenancy#filtering-and-scale). |
+| `scope` | `({ doc, previousDoc, operation, req }) => Where \| null` | Narrow which subscriptions are loaded for the document. A performance dimension, not a boundary. |
 
-Events are named `<collection>.<created|updated|deleted>`: a create in `posts` emits `posts.created`. The hooks run `afterChange` and `afterDelete`, and a webhook is treated as a side effect of the write: if dispatching throws, a `transform` of yours included, the error is logged and the write still succeeds. `transform` runs once per event, before any delivery row is created, so a throw there leaves nothing half-written.
+Events are named `<collection>.<created|updated|deleted>`: a create in `posts` emits `posts.created`. The hooks run `afterChange` and `afterDelete`, and a webhook is treated as a side effect of the write: if dispatching throws, a `transform` of yours included, the error is logged and the write still succeeds. `transform` runs once per event (once per owner under [`enforceOwnerAccess`](/webhooks/multi-tenancy)), before the delivery row it is for is created, so a throw there leaves nothing half-written.
 
 ### Drafts and autosave
 
@@ -47,7 +49,7 @@ On a collection with drafts enabled:
 
 The **Webhook Subscriptions** collection (slug `webhook-subscriptions` by default) is where operators register receivers:
 
-- `name`, `url`, and an `enabled` toggle. The URL must be absolute `http:` or `https:` with no embedded credentials (put a receiver token in a custom header instead); anything else is rejected on save rather than surfacing later as a dead delivery. The host is not judged unless you configure [`delivery.allowedHosts`](/webhooks/security#operator-supplied-urls-ssrf), so by default localhost and private addresses stay usable
+- `name`, `url`, and an `enabled` toggle. The URL must be absolute, with no embedded credentials (put a receiver token in a custom header instead), `https:`, and must not be or resolve to a private address; anything else is rejected on save rather than surfacing later as a dead delivery. `delivery.allowHttp` and `delivery.allowPrivateAddresses` relax the last two, and [`delivery.allowedHosts`](/webhooks/security#subscription-urls-ssrf) restricts hosts further
 - `events`: a multi-select of every event the opted-in collections can emit
 - `secret`: set on the create form only (generate one or supply your own), then write-only. It is encrypted at rest and stripped from every read; a read carries `secret_set` and `secret_hint` instead. On an existing subscription the form shows the hint, read-only, so you can tell which key it holds, and the **Rotate secret** button beside Save is the only way to change it. See [Signing](/webhooks/signing)
 - `previousSecretExpiresAt`: set while a rotation grace period is open, when deliveries carry two signatures
@@ -78,6 +80,8 @@ webhooks({
 `CodeSubscription` fields: `id`, `url`, `events`, plus optional `secret`, `headers`, and `enabled` (default on). Code and admin subscriptions are merged at delivery time; each matching subscription gets its own delivery row, which records whether it came from code or from the collection, so an `id` that happens to equal a database id cannot be confused with that row.
 
 `secret` must be in `whsec_<base64>` form, the same as an admin-managed one. A malformed value fails at startup, naming the subscription, rather than silently producing signatures no receiver can verify. Code subscriptions are not stored, so they are neither encrypted nor rotatable: change the environment variable and redeploy.
+
+Code subscriptions are trusted configuration: they are exempt from the `https:` and public-address rules (not from `allowedHosts`), always act as the global owner, and still pass through a collection's `filter` with `source: 'code'`.
 
 ## Renaming or hiding the collections
 

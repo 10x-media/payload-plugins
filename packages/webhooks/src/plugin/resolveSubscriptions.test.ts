@@ -8,7 +8,9 @@ import {
 	matchSubscriptions,
 	plaintextSlot,
 	resolveSubscriptionById,
+	rowInfo,
 	type SecretSlot,
+	subscriptionInfo,
 	withReadableHeaders,
 } from './resolveSubscriptions'
 
@@ -16,6 +18,9 @@ import {
 const SEALED = 'pfe1.k0.AAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA.AAAAAAAAAAAAAAAAAAAAAA'
 
 const ABSENT: SecretSlot = { secret: null, state: 'absent' }
+
+/** The open policy: these cases are about everything but where a delivery may go. */
+const OPEN = { allowHttp: true, allowPrivateAddresses: true }
 
 describe('plaintextSlot', () => {
 	it('normalizes a bare base64 secret onto the whsec_ form', () => {
@@ -67,7 +72,47 @@ describe('fromCollectionRow', () => {
 			headers: { 'X-A': '1' },
 			headersUnusable: false,
 			enabled: true,
+			// The row as the application's callbacks see it: no header values.
+			record: { id: 7, url: 'https://x', events: ['posts.created'], enabled: null },
 		})
+	})
+
+	/** `record` is what `filter` and `owner.resolve` are handed, so key material must not be in it. */
+	it('keeps the secrets and header values out of the record, and application fields in', () => {
+		const r = fromCollectionRow(
+			{
+				id: 7,
+				url: 'https://x',
+				secret: 'sealed-secret',
+				previousSecret: 'sealed-previous',
+				headers: [{ key: 'Authorization', value: 'Bearer t0ken' }],
+				headersUnreadable: false,
+				tenant: 'a',
+			},
+			{ active: { secret, state: 'ok' }, retired: ABSENT }
+		)
+		expect(r.record).toEqual({ id: 7, url: 'https://x', tenant: 'a' })
+		expect(JSON.stringify(subscriptionInfo(r))).not.toContain(secret)
+		expect(subscriptionInfo(r)).toEqual({
+			id: '7',
+			source: 'collection',
+			url: 'https://x',
+			events: [],
+			record: { id: 7, url: 'https://x', tenant: 'a' },
+		})
+	})
+
+	it('describes a stored row for a callback without resolving its secrets', () => {
+		expect(
+			rowInfo({ id: 3, url: 'https://x', events: ['posts.created'], secret: 's', owner: 9 })
+		).toEqual({
+			id: '3',
+			source: 'collection',
+			url: 'https://x',
+			events: ['posts.created'],
+			record: { id: 3, url: 'https://x', events: ['posts.created'], owner: 9 },
+		})
+		expect(rowInfo({})).toMatchObject({ id: '', url: '', events: [] })
 	})
 
 	it('carries the active secret first and the retired one after it', () => {
@@ -88,40 +133,59 @@ describe('fromCollectionRow', () => {
 
 describe('decideDelivery', () => {
 	const base = fromCollectionRow(
-		{ id: 1, url: 'u', events: ['posts.created'] },
+		{ id: 1, url: 'https://receiver.test/hook', events: ['posts.created'] },
 		{ active: ABSENT, retired: ABSENT }
 	)
 
 	it('delivers a subscription with no secret at all, unsigned', () => {
-		expect(decideDelivery(base, undefined).deliverable).toBe(true)
+		expect(decideDelivery(base, OPEN).deliverable).toBe(true)
 	})
 
 	/** Enforced at delivery too, for a row saved before the allowlist was configured. */
 	it('refuses a subscription whose host is outside a configured allowlist', () => {
 		const elsewhere = { ...base, url: 'https://elsewhere.test/hook' }
-		const decision = decideDelivery(elsewhere, ['hooks.example.com'])
+		const decision = decideDelivery(elsewhere, { ...OPEN, allowedHosts: ['hooks.example.com'] })
 		expect(decision.deliverable).toBe(false)
 		expect(!decision.deliverable && decision.reason).toMatch(/allowedHosts/)
-		expect(decideDelivery(elsewhere, undefined).deliverable).toBe(true)
-		expect(decideDelivery(elsewhere, ['elsewhere.test']).deliverable).toBe(true)
+		expect(decideDelivery(elsewhere, OPEN).deliverable).toBe(true)
+		expect(
+			decideDelivery(elsewhere, { ...OPEN, allowedHosts: ['elsewhere.test'] }).deliverable
+		).toBe(true)
+	})
+
+	/** A row stored before the policy, or written past the form, is judged when it fires. */
+	it('refuses an endpoint the url policy does not allow, naming the option that would', () => {
+		const strict = { allowHttp: false, allowPrivateAddresses: false }
+		const insecure = decideDelivery({ ...base, url: 'http://receiver.test/hook' }, strict)
+		expect(!insecure.deliverable && insecure.reason).toMatch(/delivery\.allowHttp/)
+		const internal = decideDelivery({ ...base, url: 'https://10.0.0.5/hook' }, strict)
+		expect(!internal.deliverable && internal.reason).toMatch(/delivery\.allowPrivateAddresses/)
+		expect(decideDelivery({ ...base, url: 'not a url' }, strict).deliverable).toBe(false)
+	})
+
+	/** Its URL is the install's own configuration, so only the allowlist judges it. */
+	it('does not hold a code subscription to the scheme or address rules', () => {
+		const strict = { allowHttp: false, allowPrivateAddresses: false }
+		const code = { ...base, source: 'code' as const, url: 'http://10.0.0.5:8080/hook' }
+		expect(decideDelivery(code, strict).deliverable).toBe(true)
 	})
 
 	/** A receiver that authenticates on the header would otherwise be sent the request without it. */
 	it('refuses a subscription whose encrypted header value could not be recovered', () => {
-		const decision = decideDelivery({ ...base, headersUnusable: true }, undefined)
+		const decision = decideDelivery({ ...base, headersUnusable: true }, OPEN)
 		expect(decision.deliverable).toBe(false)
 		expect(!decision.deliverable && decision.reason).toMatch(/custom header value/)
 	})
 
 	it('refuses an unusable active secret, and says which fix it needs', () => {
 		const sub = fromCollectionRow(
-			{ id: 1, url: 'u' },
+			{ id: 1, url: 'https://receiver.test/hook' },
 			{
 				active: { reason: 'the ring is missing its key', secret: null, state: 'unusable' },
 				retired: ABSENT,
 			}
 		)
-		const decision = decideDelivery(sub, undefined)
+		const decision = decideDelivery(sub, OPEN)
 		expect(decision.deliverable).toBe(false)
 		expect(decision.deliverable === false && decision.reason).toContain(
 			'the ring is missing its key'
@@ -130,23 +194,23 @@ describe('decideDelivery', () => {
 
 	it('refuses a secret that was never read for signing rather than sending unsigned', () => {
 		const sub = fromCollectionRow(
-			{ id: 1, url: 'u' },
+			{ id: 1, url: 'https://receiver.test/hook' },
 			{ active: { secret: null, state: 'hidden' }, retired: ABSENT }
 		)
-		const decision = decideDelivery(sub, undefined)
+		const decision = decideDelivery(sub, OPEN)
 		expect(decision.deliverable).toBe(false)
 		expect(decision.deliverable === false && decision.reason).toMatch(/not read for signing/)
 	})
 
 	it('still delivers when only the retired secret is unusable', () => {
 		const sub = fromCollectionRow(
-			{ id: 1, url: 'u' },
+			{ id: 1, url: 'https://receiver.test/hook' },
 			{
 				active: { secret: generateSecret(), state: 'ok' },
 				retired: { reason: 'corrupt', secret: null, state: 'unusable' },
 			}
 		)
-		expect(decideDelivery(sub, undefined).deliverable).toBe(true)
+		expect(decideDelivery(sub, OPEN).deliverable).toBe(true)
 		expect(sub.retiredSecretUnusable).toBe(true)
 	})
 })
@@ -273,6 +337,17 @@ describe('fromCodeSubscription', () => {
 
 	it('yields no secrets when none is configured', () => {
 		expect(fromCodeSubscription({ id: 'c', url: 'u', events: [] }).secrets).toEqual([])
+	})
+
+	it('keeps its secret and headers out of the record', () => {
+		const sub = fromCodeSubscription({
+			id: 'c',
+			url: 'https://x',
+			events: [],
+			secret: generateSecret(),
+			headers: { Authorization: 'Bearer t0ken' },
+		})
+		expect(sub.record).toEqual({ id: 'c', url: 'https://x', events: [] })
 	})
 
 	it('is never hidden: a code secret is already in the clear', () => {

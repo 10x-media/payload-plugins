@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, Field } from 'payload'
 
 import { ADMIN_GROUP } from '../constants'
 import { keys } from '../translations/keys'
@@ -11,6 +11,8 @@ const STATUS_CELL = '@10x-media/webhooks/client#DeliveryStatusCell'
 export const buildDeliveriesCollection = (args: {
 	slug: string
 	hidden: boolean
+	/** Add the owner columns. Only when `owner` is configured. */
+	ownerStamp: boolean
 }): CollectionConfig => ({
 	slug: args.slug,
 	labels: {
@@ -50,5 +52,13 @@ export const buildDeliveriesCollection = (args: {
 		{ name: 'durationMs', type: 'number' },
 		{ name: 'jobId', type: 'text' },
 		{ name: 'payload', type: 'json' },
+		// Present only when `owner` is configured, so an install that does not use ownership gets no
+		// new columns. Text rather than a relationship: the owner can live in any auth collection.
+		...(args.ownerStamp
+			? ([
+					{ name: 'ownerId', type: 'text', index: true, admin: { readOnly: true } },
+					{ name: 'ownerCollection', type: 'text', admin: { readOnly: true } },
+				] satisfies Field[])
+			: []),
 	],
 })
