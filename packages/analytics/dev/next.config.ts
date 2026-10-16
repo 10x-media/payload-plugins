@@ -3,7 +3,7 @@ import type { NextConfig } from 'next'
 
 const config: NextConfig = {
 	reactStrictMode: true,
-	// PostHog's capture endpoints end in a slash, which the docs ask a host proxying it to keep.
+	// A proxied vendor route can end in a slash (PostHog's capture endpoints): keep it, unredirected.
 	skipTrailingSlashRedirect: true,
 }
 
