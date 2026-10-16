@@ -34,6 +34,7 @@ export type AdapterLabelOption = string | Record<string, string> | ((args: Adapt
 
 // @public
 export interface AdapterRegisterContext {
+    adapterCountsWithoutConsent?: boolean;
     adapterGrantedForScope?: (req: PayloadRequest, scope: string | null, adapterId: string) => Promise<boolean>;
     allowedOrigins?: ReadonlySet<string>;
     items?: {
@@ -202,6 +203,13 @@ export interface AnalyticsResult {
         sourceError?: SourceErrorKind;
         unappliedFilters?: AnalyticsFilter[];
         goalsUnresolved?: true;
+        withoutConsent?: {
+            pageviews: number;
+        };
+        withoutVisitor?: {
+            pageviews: number;
+        };
+        withoutConsentDropped?: true;
     };
     // (undocumented)
     rows: AnalyticsRow[];
@@ -257,13 +265,12 @@ export interface CaptureSnippet {
 export interface CaptureSupport {
     // (undocumented)
     client: TrackerSlotConfig['client'];
+    cookieless?: CookielessSupport;
     // (undocumented)
     proxy: ProxyDescriptor;
-    snippet(args: {
-        path: string;
-        scope?: string | null;
-        instance?: string;
-    }): CaptureSnippet;
+    // (undocumented)
+    snippet(args: SnippetArgs): CaptureSnippet;
+    withoutConsent?: HeldSlotMode;
 }
 
 // @public
@@ -271,6 +278,17 @@ export type CardinalityCaps = Readonly<Record<CapKey, number | null>>;
 
 // @public
 export type CollectionOverrides = (collection: CollectionConfig) => CollectionConfig;
+
+// @public
+export type ConsentPhase = 'pending' | 'refused';
+
+// @public
+export interface CookielessSupport {
+    // (undocumented)
+    default?: WithoutConsentLevel;
+    // (undocumented)
+    kind: 'inherent' | 'switched';
+}
 
 // @public
 export type CurrencyConverter = (args: {
@@ -422,6 +440,12 @@ export type GoalMatch = {
 export type Granularity = 'minute' | 'hour' | 'day' | 'week' | 'month';
 
 // @public
+export type HeldSlotMode = Exclude<SlotMode, 'full'>;
+
+// @beta
+export type HitMode = 'c' | 'a' | 'f';
+
+// @public
 export const HITS_SLUG = "analytics-hits";
 
 // @beta
@@ -527,6 +551,7 @@ export interface NativeOptions {
     retention?: NativeRetention;
     sqlite?: NativeSqlite;
     today?: NativeToday;
+    withoutConsent?: NativeWithoutConsent;
 }
 
 // @public
@@ -545,6 +570,9 @@ export interface NativeToday {
     maxAgeMs?: number;
     snapshotAboveHits?: number;
 }
+
+// @public
+export type NativeWithoutConsent = WithoutConsentLevel | 'anonymous';
 
 // @public
 export type OrderSignatureMode = 'required' | 'optional';
@@ -591,6 +619,7 @@ export interface RawEventInput {
     impressions?: unknown;
     item?: string;
     items?: unknown;
+    m?: HitMode;
     name?: string;
     nav?: number;
     orderId?: string;
@@ -703,6 +732,25 @@ export const SESSION_DIMENSIONS: {
 // @public (undocumented)
 export type SessionDimension = keyof typeof SESSION_DIMENSIONS;
 
+// @public
+export type SlotMode = 'off' | 'cookieless' | 'anonymous' | 'full';
+
+// @public
+export type SlotWithoutConsent = Record<ConsentPhase, HeldSlotMode>;
+
+// @public (undocumented)
+export interface SnippetArgs {
+    instance?: string;
+    mode?: SnippetMode;
+    // (undocumented)
+    path: string;
+    scope?: string | null;
+    withoutConsent?: boolean;
+}
+
+// @public
+export type SnippetMode = 'cookieless' | 'full';
+
 // @public (undocumented)
 export interface SnippetScript {
     // (undocumented)
@@ -747,6 +795,7 @@ export interface TrackerSlotConfig {
     client: {
         kind: CaptureClientKind;
     } & Record<string, string | number | boolean>;
+    fullSnippet?: CaptureSnippet;
     gated: boolean;
     instance?: string;
     // (undocumented)
@@ -754,8 +803,8 @@ export interface TrackerSlotConfig {
     path: string;
     // (undocumented)
     slot: CaptureSlot;
-    // (undocumented)
     snippet: CaptureSnippet;
+    withoutConsent?: SlotWithoutConsent;
 }
 
 // @public
@@ -763,6 +812,9 @@ export type TrustedPlatform = 'vercel' | 'cloudflare';
 
 // @public
 export type VisitorCounting = 'distinct' | 'sumOfDaily';
+
+// @public
+export type WithoutConsentLevel = 'cookieless' | 'off';
 
 // @public (undocumented)
 export interface WriteBufferLimits {

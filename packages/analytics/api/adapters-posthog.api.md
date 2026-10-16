@@ -33,6 +33,7 @@ export type AdapterLabelOption = string | Record<string, string> | ((args: Adapt
 
 // @public
 export interface AdapterRegisterContext {
+    adapterCountsWithoutConsent?: boolean;
     adapterGrantedForScope?: (req: PayloadRequest, scope: string | null, adapterId: string) => Promise<boolean>;
     allowedOrigins?: ReadonlySet<string>;
     items?: {
@@ -192,6 +193,13 @@ export interface AnalyticsResult {
         sourceError?: SourceErrorKind;
         unappliedFilters?: AnalyticsFilter[];
         goalsUnresolved?: true;
+        withoutConsent?: {
+            pageviews: number;
+        };
+        withoutVisitor?: {
+            pageviews: number;
+        };
+        withoutConsentDropped?: true;
     };
     // (undocumented)
     rows: AnalyticsRow[];
@@ -238,13 +246,23 @@ export interface CaptureSnippet {
 export interface CaptureSupport {
     // (undocumented)
     client: TrackerSlotConfig['client'];
+    cookieless?: CookielessSupport;
     // (undocumented)
     proxy: ProxyDescriptor;
-    snippet(args: {
-        path: string;
-        scope?: string | null;
-        instance?: string;
-    }): CaptureSnippet;
+    // (undocumented)
+    snippet(args: SnippetArgs): CaptureSnippet;
+    withoutConsent?: HeldSlotMode;
+}
+
+// @public
+export type ConsentPhase = 'pending' | 'refused';
+
+// @public
+export interface CookielessSupport {
+    // (undocumented)
+    default?: WithoutConsentLevel;
+    // (undocumented)
+    kind: 'inherent' | 'switched';
 }
 
 // @public
@@ -368,6 +386,12 @@ export type GoalMatch = {
 // @public (undocumented)
 export type Granularity = 'minute' | 'hour' | 'day' | 'week' | 'month';
 
+// @public
+export type HeldSlotMode = Exclude<SlotMode, 'full'>;
+
+// @beta
+export type HitMode = 'c' | 'a' | 'f';
+
 // @beta
 export type HitType = 'pageview' | 'event' | 'goal' | 'engagement';
 
@@ -429,6 +453,7 @@ export interface PosthogConfig {
     region?: 'us' | 'eu';
     scopeProperty?: string;
     uiHost?: string;
+    withoutConsent?: WithoutConsentLevel;
 }
 
 // @public
@@ -473,6 +498,7 @@ export interface RawEventInput {
     impressions?: unknown;
     item?: string;
     items?: unknown;
+    m?: HitMode;
     name?: string;
     nav?: number;
     orderId?: string;
@@ -548,6 +574,25 @@ export interface ServerTrackOptions {
     req?: PayloadRequest;
 }
 
+// @public
+export type SlotMode = 'off' | 'cookieless' | 'anonymous' | 'full';
+
+// @public
+export type SlotWithoutConsent = Record<ConsentPhase, HeldSlotMode>;
+
+// @public (undocumented)
+export interface SnippetArgs {
+    instance?: string;
+    mode?: SnippetMode;
+    // (undocumented)
+    path: string;
+    scope?: string | null;
+    withoutConsent?: boolean;
+}
+
+// @public
+export type SnippetMode = 'cookieless' | 'full';
+
 // @public (undocumented)
 export interface SnippetScript {
     // (undocumented)
@@ -589,6 +634,7 @@ export interface TrackerSlotConfig {
     client: {
         kind: CaptureClientKind;
     } & Record<string, string | number | boolean>;
+    fullSnippet?: CaptureSnippet;
     gated: boolean;
     instance?: string;
     // (undocumented)
@@ -596,8 +642,8 @@ export interface TrackerSlotConfig {
     path: string;
     // (undocumented)
     slot: CaptureSlot;
-    // (undocumented)
     snippet: CaptureSnippet;
+    withoutConsent?: SlotWithoutConsent;
 }
 
 // @public
@@ -605,6 +651,9 @@ export type TrustedPlatform = 'vercel' | 'cloudflare';
 
 // @public
 export type VisitorCounting = 'distinct' | 'sumOfDaily';
+
+// @public
+export type WithoutConsentLevel = 'cookieless' | 'off';
 
 // Warnings were encountered during analysis:
 //
