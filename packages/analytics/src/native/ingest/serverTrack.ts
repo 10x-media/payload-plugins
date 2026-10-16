@@ -322,6 +322,7 @@ export const makeServerTrack =
 				...(target.items ? { items: target.items } : {}),
 				...(siblings ? { siblings } : {}),
 				orderKey,
+				mode: identity === 'none' ? 'a' : 'f',
 			})
 			// Only the server path can reach this: a public beacon's caller must never be able to
 			// write lines into the host's log.

@@ -1,11 +1,14 @@
 import type { TrackerConfig, TrackerSlotConfig } from './config'
 import { createNoopTracker, createTracker, restoreGate } from './createTracker'
 import {
+	ALL_OFF,
 	ALL_PENDING,
+	answeredModes,
 	answeredSnapshot,
 	appendGateAnswer,
 	GATE_SLOTS,
 	type GateSnapshot,
+	type ModeSnapshot,
 	settleGateAnswers,
 	slotConfigOf,
 	slotIsGated,
@@ -33,6 +36,8 @@ interface WindowGate {
 	answers: GateState[]
 	/** What the answers say while no tracker holds the window. */
 	answered: GateSnapshot
+	/** The modes they give while no tracker holds the window, all off before a config is known. */
+	answeredModes: ModeSnapshot
 	/** The slots of the config the window last booted a tracker with, which say which are held. */
 	slots?: readonly TrackerSlotConfig[]
 	listeners: Set<() => void>
@@ -54,6 +59,7 @@ const notify = (win: TrackerWindow): void => {
 const keepAnswers = (kept: WindowGate, answers: GateState[]): void => {
 	kept.answers = answers
 	kept.answered = answeredSnapshot(answers, kept.slots)
+	kept.answeredModes = answeredModes(answers, kept.slots)
 }
 
 /** Whether an answer names ungated slots alone, which a restored page keeps answered. */
@@ -95,6 +101,7 @@ const windowGate = (win: TrackerWindow): WindowGate => {
 	const kept: WindowGate = {
 		answers: [],
 		answered: ALL_PENDING,
+		answeredModes: ALL_OFF,
 		listeners: new Set(),
 		detach: () => win.removeEventListener('pageshow', onPageShow),
 	}
@@ -135,7 +142,16 @@ export const windowGateSnapshot = (window?: TrackerWindow): GateSnapshot => {
 	return entries.get(win)?.tracker.gate ?? gates.get(win)?.answered ?? ALL_PENDING
 }
 
-/** Calls `listener` whenever the window's gate may have changed. Returns the unsubscribe. */
+/** The window's slot modes: its tracker's, else what the answers given so far give its last config. */
+export const windowModeSnapshot = (window?: TrackerWindow): ModeSnapshot => {
+	const win = currentWindow(window)
+	if (!win) {
+		return ALL_OFF
+	}
+	return entries.get(win)?.tracker.mode ?? gates.get(win)?.answeredModes ?? ALL_OFF
+}
+
+/** Calls `listener` whenever the window's gate or modes may have changed. Returns the unsubscribe. */
 export const subscribeWindowGate = (listener: () => void, window?: TrackerWindow): (() => void) => {
 	const win = currentWindow(window)
 	if (!win) {
@@ -172,6 +188,9 @@ export const leasedTracker = (lease: TrackerLease, window?: TrackerWindow): Trac
 		setGate: (state) => setWindowGate(state, window),
 		get gate() {
 			return tracker.gate
+		},
+		get mode() {
+			return tracker.mode
 		},
 		get excluded() {
 			return tracker.excluded

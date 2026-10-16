@@ -67,6 +67,9 @@ export type {
 	SourcePolicyFunction,
 	SourceRef,
 	TimezoneResolver,
+	WithoutConsentArgs,
+	WithoutConsentFunction,
+	WithoutConsentOption,
 } from '../core/options'
 export type {
 	AnalyticsSdks,
@@ -148,14 +151,19 @@ export type {
 export { TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 export type {
 	AdminDigest,
+	ConsentPhase,
 	GoalMatch,
+	HeldSlotMode,
 	ResolvedAutoCapture,
 	ResolvedItemCapture,
+	SlotMode,
+	SlotWithoutConsent,
 	TrackerConfig,
 	TrackerExclusion,
 	TrackerGoal,
 	TrackerSkip,
 	TrackerSlotConfig,
+	WithoutConsentLevel,
 } from '../tracker/config'
 export type { TranslationsOption } from '../translations'
 export {

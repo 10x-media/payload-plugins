@@ -36,6 +36,10 @@ export interface ReadNotices {
 	 * person who came on two days counts twice. Said by the metric's name and explained in a notice.
 	 */
 	visitorsSummed?: boolean
+	/** The vendor drops the visits counted without consent, so they are missing from the numbers. */
+	withoutConsentDropped?: boolean
+	/** Pageviews recorded without a visitor, which count toward no visitor number; absent when none. */
+	withoutVisitor?: number
 	/** ISO instant the numbers were last brought up to date, set when a snapshot answered. */
 	asOf?: string
 	/** The ISO code the read's revenue is in, when the source or the install says. */
@@ -67,6 +71,10 @@ export const readMeta = (result: AnalyticsResult): WidgetReadMeta => ({
 	failed: (result.meta.failed?.days ?? 0) > 0,
 	timezoneUnresolved: result.meta.timezoneUnresolved === true,
 	visitorsSummed: result.meta.visitorsAre === 'sumOfDaily',
+	withoutConsentDropped: result.meta.withoutConsentDropped === true,
+	...((result.meta.withoutVisitor?.pageviews ?? 0) > 0
+		? { withoutVisitor: result.meta.withoutVisitor?.pageviews }
+		: {}),
 	mixedCurrencies:
 		(result.meta.mixedCurrencies?.length ?? 0) > 1 ? [...(result.meta.mixedCurrencies ?? [])] : [],
 	...(result.meta.asOf ? { asOf: result.meta.asOf } : {}),
@@ -84,7 +92,7 @@ export const mergeNotices = (
 	const anyRead = (
 		flag: Exclude<
 			keyof ReadNotices,
-			'mixedCurrencies' | 'asOf' | 'currency' | 'dataFrom' | 'dataTo'
+			'mixedCurrencies' | 'asOf' | 'currency' | 'dataFrom' | 'dataTo' | 'withoutVisitor'
 		>
 	): boolean => reads.some((read) => read?.[flag] === true)
 	// The narrowest window any read kept: the latest start, the earliest end.
@@ -106,6 +114,8 @@ export const mergeNotices = (
 		undefined
 	)
 	const currency = reads.find((read) => read?.currency !== undefined)?.currency
+	// The reads cover one range, so the widest count is the range's; adding them would double it.
+	const withoutVisitor = Math.max(0, ...reads.map((read) => read?.withoutVisitor ?? 0))
 	return {
 		clamped: anyRead('clamped'),
 		...(dataFrom ? { dataFrom } : {}),
@@ -121,6 +131,8 @@ export const mergeNotices = (
 		failed: anyRead('failed'),
 		timezoneUnresolved: anyRead('timezoneUnresolved'),
 		visitorsSummed: anyRead('visitorsSummed'),
+		withoutConsentDropped: anyRead('withoutConsentDropped'),
+		...(withoutVisitor > 0 ? { withoutVisitor } : {}),
 		mixedCurrencies: [...currencies].sort(),
 		...(asOf ? { asOf } : {}),
 		...(currency ? { currency } : {}),

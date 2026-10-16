@@ -390,6 +390,18 @@ describe('Toolbar controls', () => {
 		expect(screen.getByText(keys.stateSampled)).toBeDefined()
 	})
 
+	it('notes a PostHog project dropping visits counted without consent', () => {
+		renderToolbar({ notices: { withoutConsentDropped: true } })
+		expect(screen.getByText(keys.statePosthogCookielessDropped)).toBeDefined()
+	})
+
+	it('notes how many pageviews were recorded without a visitor', () => {
+		renderToolbar({ notices: { withoutVisitor: 1204 } })
+		expect(
+			screen.getByText(`${keys.stateWithoutVisitor} ${JSON.stringify({ count: '1,204' })}`)
+		).toBeDefined()
+	})
+
 	it('says when revenue adds amounts in several currencies, naming them', () => {
 		renderToolbar({ notices: { mixedCurrencies: ['EUR', 'USD'] } })
 		expect(

@@ -219,6 +219,21 @@ export interface AnalyticsResult {
 		 * an empty result instead, not this flag.
 		 */
 		goalsUnresolved?: true
+		/**
+		 * Pageviews of the read counted without consent, at a cookieless or anonymous level, which
+		 * the view shows as a share of all pageviews. Absent when the source cannot tell or found none.
+		 */
+		withoutConsent?: { pageviews: number }
+		/**
+		 * Pageviews of the read recorded without a visitor (native's anonymous level): they count as
+		 * pageviews, and toward no visitor, visit, bounce rate or time.
+		 */
+		withoutVisitor?: { pageviews: number }
+		/**
+		 * The vendor drops what a slot counts without consent, so those visits are missing from every
+		 * number: PostHog with its project's cookieless tracking setting off.
+		 */
+		withoutConsentDropped?: true
 	}
 }
 
@@ -402,6 +417,12 @@ export interface AdapterRegisterContext {
 	 * only other sites whose pages may send to it from a visitor's browser.
 	 */
 	allowedOrigins?: ReadonlySet<string>
+	/**
+	 * False when this adapter fills no slot `capture.gate` holds that can count without consent, as
+	 * far as the boot can tell, so it need not check its vendor accepts such events. Absent reads as
+	 * true.
+	 */
+	adapterCountsWithoutConsent?: boolean
 	/**
 	 * The collections bound as content items, the only ones whose refs ingest keeps, and whether
 	 * an item is also counted per page it appeared on. Absent means no item is bound.

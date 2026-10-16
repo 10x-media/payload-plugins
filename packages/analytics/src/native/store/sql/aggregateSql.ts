@@ -56,6 +56,8 @@ const AGGREGATE_COLUMNS: { readonly [K in keyof MetricParts]: string } = {
 	revenue: 'revenue',
 	impressions: 'impressions',
 	interactions: 'interactions',
+	pageviewsWithoutVisitor: 'pageviews_without_visitor',
+	pageviewsWithoutConsent: 'pageviews_without_consent',
 }
 
 /** The kind a day's read reports its hit count under, in `pageviews`. */
@@ -129,6 +131,8 @@ const VISIT_TOTALS = new Map<keyof MetricParts, SqlFragment>([
 	['conversions', t('v_conv')],
 	['revenue', t('v_rev')],
 	['interactions', t('v_int')],
+	['pageviewsWithoutVisitor', sql`CASE WHEN ${tField('v')} = '' THEN ${t('s_pv')} ELSE 0 END`],
+	['pageviewsWithoutConsent', t('v_npc')],
 ])
 
 /**

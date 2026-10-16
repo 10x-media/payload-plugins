@@ -46,7 +46,7 @@ import type {
  */
 export const AGGREGATION_VERSION = 4
 
-/** Rows per statement or bulk write: 23 values each, well under SQLite's parameter limit. */
+/** Rows per statement or bulk write: 25 values each, well under SQLite's parameter limit. */
 const AGGREGATE_CHUNK = 500
 
 /**

@@ -1,4 +1,9 @@
 import { jsLiteral } from '../../capture/jsLiteral'
+import {
+	adapterWithoutConsent,
+	cookielessCapture,
+	WITHOUT_CONSENT_LEVELS,
+} from '../../capture/withoutConsent'
 import type { CaptureSupport } from '../../core/capture'
 import {
 	type AdapterContext,
@@ -18,6 +23,7 @@ import type { FetchLike } from '../../core/fetch'
 import { vendorReading } from '../../core/metricValues'
 import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
 import { currencyOption } from '../../goals/currency'
+import type { WithoutConsentLevel } from '../../tracker/config'
 import {
 	emptyGoalBreakdown,
 	type GoalKeyedRow,
@@ -73,6 +79,11 @@ export interface PlausibleConfig {
 	revenueCurrency?: string
 	/** The fetch reads and the capture proxy reach Plausible with. Unset, the global fetch. */
 	fetch?: FetchLike
+	/**
+	 * What this source's held slot does without consent, over `capture.withoutConsent`. Plausible
+	 * stores nothing on the device, so `'cookieless'` loads the script as it is; `'off'` holds it.
+	 */
+	withoutConsent?: WithoutConsentLevel
 }
 
 const PLAUSIBLE_CLOUD = 'https://plausible.io'
@@ -84,7 +95,11 @@ const PLAUSIBLE_CLOUD = 'https://plausible.io'
 const PLAUSIBLE_STUB =
 	'window.plausible=window.plausible||function(){(window.plausible.q=window.plausible.q||[]).push(arguments)},window.plausible.init=window.plausible.init||function(e){window.plausible.o=e||{}};'
 
-function buildCapture(config: PlausibleConfig, scriptId: string | undefined): CaptureSupport {
+function buildCapture(
+	config: PlausibleConfig,
+	scriptId: string | undefined,
+	withoutConsent: WithoutConsentLevel | undefined
+): CaptureSupport {
 	const base = withoutTrailingSlash(config.host ?? PLAUSIBLE_CLOUD)
 	const scripts = (path: string) => {
 		if (config.domain) {
@@ -116,6 +131,7 @@ function buildCapture(config: PlausibleConfig, scriptId: string | undefined): Ca
 		},
 		snippet: ({ path }) => ({ scripts: scripts(path) }),
 		client: { kind: 'plausible' },
+		...cookielessCapture({ kind: 'inherent' }, withoutConsent),
 	}
 }
 
@@ -259,6 +275,11 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 	const revenueGoals = revenueCurrency !== undefined
 	// Dropped rather than escaped, like GA4's measurement id: it lands in the page's script address.
 	const scriptId = isScriptId(config.scriptId) ? config.scriptId : undefined
+	const withoutConsent = adapterWithoutConsent(
+		config.withoutConsent,
+		'plausible({ withoutConsent })',
+		WITHOUT_CONSENT_LEVELS
+	)
 
 	const capabilities: AnalyticsCapabilities = {
 		realtime: false,
@@ -277,7 +298,9 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 		id: 'plausible',
 		...adapterLabel(config.label, 'Plausible', 'plausible({ label })'),
 		capabilities,
-		...(config.domain || scriptId ? { capture: buildCapture(config, scriptId) } : {}),
+		...(config.domain || scriptId
+			? { capture: buildCapture(config, scriptId, withoutConsent) }
+			: {}),
 		isConfigured: () => Boolean(config.siteId && config.apiKey),
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = readTime(ctx)

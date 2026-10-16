@@ -108,6 +108,7 @@ describe('engine store collections', () => {
 			'v:text',
 			'landing:checkbox',
 			'server:checkbox',
+			'mode:text',
 			'name:text',
 			'ref:text',
 			'source:text',

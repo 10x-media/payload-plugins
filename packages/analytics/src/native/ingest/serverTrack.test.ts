@@ -280,12 +280,14 @@ describe('makeServerTrack identity', () => {
 		await track(pageview, { req: visitorReq() })
 		expect(hits[0]?.v).toBe(visitorOf('9.9.9.9', IPHONE_UA))
 		expect(hits[0]?.country).toBe('US')
+		expect(hits[0]?.mode).toBe('f')
 	})
 
 	it("records an event as no visitor's under 'none', reading nothing identifying off the request", async () => {
 		const { track, hits } = setup({}, vercel)
 		await track(pageview, { req: visitorReq(), identity: 'none' })
 		expect(hits[0]?.v).toBe('')
+		expect(hits[0]?.mode).toBe('a')
 		expect(hits[0]?.country).toBeUndefined()
 		expect(hits[0]?.city).toBeUndefined()
 		expect(hits[0]?.device).toBeUndefined()

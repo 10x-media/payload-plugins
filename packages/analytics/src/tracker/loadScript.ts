@@ -1,7 +1,8 @@
 import type { SnippetScript } from './config'
 import type { LoadScript, TrackerWindow } from './types'
 
-const alreadyPresent = (win: TrackerWindow, script: SnippetScript): boolean => {
+/** Whether the page already holds the script: the same `src`, or the same inline text. */
+export const alreadyPresent = (win: TrackerWindow, script: SnippetScript): boolean => {
 	for (const el of win.document.querySelectorAll('script')) {
 		if (script.src && el.getAttribute('src') === script.src) {
 			return true

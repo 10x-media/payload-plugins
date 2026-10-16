@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { CAPTURE_SLOTS } from '../capture/slots'
 import type { TrackerSlotConfig } from './config'
 import {
+	ALL_OFF,
+	answeredModes,
 	answeredSnapshot,
 	appendGateAnswer,
 	createGate,
@@ -14,7 +16,9 @@ import {
 	openAtBoot,
 	queueable,
 	settleGateAnswers,
+	slotCountsWithoutConsent,
 	slotIsGated,
+	slotMode,
 } from './gate'
 import type { TrackerEvent, TrackerWindow } from './types'
 
@@ -265,5 +269,78 @@ describe('forgetLegacyConsent', () => {
 			},
 		} as unknown as TrackerWindow
 		expect(() => forgetLegacyConsent(throwing)).not.toThrow()
+	})
+})
+
+describe('slotMode', () => {
+	const held = slot({ withoutConsent: { pending: 'cookieless', refused: 'anonymous' } })
+
+	it.each([
+		['open', 'full'],
+		['pending', 'cookieless'],
+		['closed', 'anonymous'],
+	] as const)('gives a held slot that is %s the mode %s', (status, mode) => {
+		expect(slotMode(held, status)).toBe(mode)
+	})
+
+	it('sends nothing without consent for a config naming no level, as 1.0.0-beta.14 did', () => {
+		expect(slotMode(slot(), 'pending')).toBe('off')
+		expect(slotMode(slot(), 'closed')).toBe('off')
+		expect(slotMode(slot(), 'open')).toBe('full')
+	})
+
+	it('runs a slot the gate does not hold in full, and ignores its levels once it is closed', () => {
+		const ungated = slot({
+			gated: false,
+			withoutConsent: { pending: 'cookieless', refused: 'cookieless' },
+		})
+		expect(slotMode(ungated, 'open')).toBe('full')
+		expect(slotMode(ungated, 'closed')).toBe('off')
+	})
+
+	it('reads a level it does not know, and a slot the config does not fill, as off', () => {
+		const odd = slot({ withoutConsent: JSON.parse('{"pending":"full","refused":"loud"}') })
+		expect(slotMode(odd, 'pending')).toBe('off')
+		expect(slotMode(odd, 'closed')).toBe('off')
+		expect(slotMode(undefined, 'open')).toBe('off')
+	})
+
+	it('says a slot counts without consent when either phase does', () => {
+		expect(slotCountsWithoutConsent(held)).toBe(true)
+		expect(
+			slotCountsWithoutConsent(slot({ withoutConsent: { pending: 'off', refused: 'cookieless' } }))
+		).toBe(true)
+		expect(
+			slotCountsWithoutConsent(slot({ withoutConsent: { pending: 'off', refused: 'off' } }))
+		).toBe(false)
+		expect(slotCountsWithoutConsent(slot())).toBe(false)
+	})
+})
+
+describe('the gate modes', () => {
+	const slots = [
+		slot({ slot: 'global', withoutConsent: { pending: 'cookieless', refused: 'off' } }),
+		slot({ slot: 'tenant' }),
+	]
+
+	it('follows each answer, and keeps the same snapshot while no mode moves', () => {
+		const gate = createGate(slots)
+		expect(gate.modes).toEqual({ global: 'cookieless', tenant: 'off' })
+		const before = gate.modes
+		gate.answer({ tenant: false })
+		expect(gate.modes).toBe(before)
+		gate.answer(true)
+		expect(gate.modes).toEqual({ global: 'full', tenant: 'full' })
+		gate.answer(false)
+		expect(gate.modes).toEqual({ global: 'off', tenant: 'off' })
+		gate.reset()
+		expect(gate.modes).toEqual({ global: 'cookieless', tenant: 'off' })
+		expect(gate.mode('global')).toBe('cookieless')
+	})
+
+	it('answers for a window as a booting tracker would, and all off before a config', () => {
+		expect(answeredModes([false], slots)).toEqual({ global: 'off', tenant: 'off' })
+		expect(answeredModes([{ global: true }], slots)).toEqual({ global: 'full', tenant: 'off' })
+		expect(answeredModes([true])).toBe(ALL_OFF)
 	})
 })

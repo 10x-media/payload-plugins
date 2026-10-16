@@ -381,6 +381,11 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldScopeProperty]: 'Website-Kennzeichnung',
 	[keys.providerFieldScopePropertyHelp]:
 		'Der Name, unter dem PostHog die einzelnen Websites ablegt, zum Beispiel tenant. Setze ihn, wenn sich mehrere Websites ein PostHog-Projekt teilen.',
+	[keys.providerFieldWithoutConsent]: 'Ohne Einwilligung',
+	[keys.providerFieldWithoutConsentHelp]:
+		'Was dieses Tool bei Besuchern tut, die das Einwilligungsbanner noch nicht beantwortet oder abgelehnt haben. Leer lassen, um der Einstellung der Website zu folgen.',
+	[keys.providerWithoutConsentCookieless]: 'Ohne Cookies zählen',
+	[keys.providerWithoutConsentOff]: 'Nichts senden',
 	[keys.viewScopeSite]: 'Website',
 	[keys.viewScopeAll]: 'Alle Websites',
 	[keys.viewScopeShowing]: 'Angezeigt: {{site}}',
@@ -413,6 +418,10 @@ export const de: LocaleBundle<'one' | 'other'> = {
 		'Diese Zahlen kommen vom Analysetool der Plattform, bis diese Website ein eigenes hinzufügt. Sobald eines hinzugefügt ist, wird darauf umgestellt.',
 	[keys.stateSourceSubstituted]:
 		'Die gespeicherte Datenquelle ist nicht mehr verfügbar, daher wird die Standardquelle angezeigt.',
+	[keys.statePosthogCookielessDropped]:
+		'PostHog verwirft Besuche, die ohne Einwilligung gezählt werden: Aktiviere „Cookieless tracking“ in den Web-Analytics-Einstellungen des Projekts.',
+	[keys.viewWithoutConsentShare]: '{{share}} der Seitenaufrufe wurden ohne Einwilligung gezählt.',
+	[keys.stateWithoutVisitor]: 'Seitenaufrufe ohne Besucher erfasst: {{count}}.',
 	[pluralKeys.liveVisitors.one]: '{{count}} Besucher gerade aktiv',
 	[pluralKeys.liveVisitors.other]: '{{count}} Besucher gerade aktiv',
 	[pluralKeys.livePageviews.one]: '{{count}} Seitenaufruf in den letzten {{duration}}',

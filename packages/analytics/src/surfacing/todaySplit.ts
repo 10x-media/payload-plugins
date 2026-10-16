@@ -76,6 +76,11 @@ const byTimestamp = (a: AnalyticsRow, b: AnalyticsRow): number =>
 const totalDays = (a: { days: number } | undefined, b: { days: number } | undefined): number =>
 	(a?.days ?? 0) + (b?.days ?? 0)
 
+const totalPageviews = (
+	a: { pageviews: number } | undefined,
+	b: { pageviews: number } | undefined
+): number => (a?.pageviews ?? 0) + (b?.pageviews ?? 0)
+
 const filtersOf = (a?: AnalyticsFilter[], b?: AnalyticsFilter[]): AnalyticsFilter[] => {
 	const seen = new Map<string, AnalyticsFilter>()
 	for (const filter of [...(a ?? []), ...(b ?? [])]) {
@@ -115,6 +120,8 @@ export const mergeAtToday = (
 	const partial = (a.partial?.missingDays ?? 0) + (b.partial?.missingDays ?? 0)
 	const capped = totalDays(a.capped, b.capped)
 	const failed = totalDays(a.failed, b.failed)
+	const withoutConsent = totalPageviews(a.withoutConsent, b.withoutConsent)
+	const withoutVisitor = totalPageviews(a.withoutVisitor, b.withoutVisitor)
 	const currencies = new Set([...(a.mixedCurrencies ?? []), ...(b.mixedCurrencies ?? [])])
 	const unapplied = filtersOf(a.unappliedFilters, b.unappliedFilters)
 	const fetchedAt = earlierInstant(a.fetchedAt, b.fetchedAt)
@@ -143,6 +150,11 @@ export const mergeAtToday = (
 			...(sourceError ? { sourceError } : {}),
 			...(unapplied.length > 0 ? { unappliedFilters: unapplied } : {}),
 			...(a.goalsUnresolved || b.goalsUnresolved ? { goalsUnresolved: true } : {}),
+			...(withoutConsent > 0 ? { withoutConsent: { pageviews: withoutConsent } } : {}),
+			...(withoutVisitor > 0 ? { withoutVisitor: { pageviews: withoutVisitor } } : {}),
+			...(a.withoutConsentDropped || b.withoutConsentDropped
+				? { withoutConsentDropped: true }
+				: {}),
 		},
 	}
 }

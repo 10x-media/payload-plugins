@@ -2,12 +2,13 @@
 
 import { useContext, useMemo, useSyncExternalStore } from 'react'
 import { subscribeExclusion } from '../tracker/exclusion'
-import { ALL_PENDING, type GateSnapshot } from '../tracker/gate'
+import { ALL_OFF, ALL_PENDING, type GateSnapshot, type ModeSnapshot } from '../tracker/gate'
 import {
 	liveTracker,
 	setWindowGate,
 	subscribeWindowGate,
 	windowGateSnapshot,
+	windowModeSnapshot,
 } from '../tracker/registry'
 import type { Tracker } from '../tracker/types'
 import { type AnalyticsApi, type AnalyticsCommands, AnalyticsContext } from './AnalyticsProvider'
@@ -15,12 +16,14 @@ import { type AnalyticsApi, type AnalyticsCommands, AnalyticsContext } from './A
 const NO_TRACKER =
 	'analytics: useAnalytics found no tracker. Render <AnalyticsScripts /> (or <AnalyticsProvider>) above this component.'
 
-/** The live tracker's flag, never storage: false until a tracker has read it, once a slot opened. */
+/** The live tracker's flag, never storage: false until a tracker has read it, once a slot ran in full. */
 const exclusionSnapshot = (): boolean => liveTracker()?.excluded ?? false
 
 const serverExclusionSnapshot = (): boolean => false
 
 const serverGateSnapshot = (): GateSnapshot => ALL_PENDING
+
+const serverModeSnapshot = (): ModeSnapshot => ALL_OFF
 
 /**
  * The window's tracker, from `<AnalyticsProvider>` or else whatever `<AnalyticsScripts />` booted.
@@ -34,6 +37,7 @@ export const useAnalytics = (): AnalyticsApi => {
 		serverExclusionSnapshot
 	)
 	const gate = useSyncExternalStore(subscribeWindowGate, windowGateSnapshot, serverGateSnapshot)
+	const mode = useSyncExternalStore(subscribeWindowGate, windowModeSnapshot, serverModeSnapshot)
 	const commands = useMemo<AnalyticsCommands>(() => {
 		if (provided) {
 			return provided
@@ -56,5 +60,8 @@ export const useAnalytics = (): AnalyticsApi => {
 		}
 	}, [provided])
 
-	return useMemo<AnalyticsApi>(() => ({ ...commands, excluded, gate }), [commands, excluded, gate])
+	return useMemo<AnalyticsApi>(
+		() => ({ ...commands, excluded, gate, mode }),
+		[commands, excluded, gate, mode]
+	)
 }

@@ -338,6 +338,10 @@ export const keys = {
 	providerFieldGa4CurrencyHelp: 'analytics:providerFieldGa4CurrencyHelp',
 	providerFieldScopeProperty: 'analytics:providerFieldScopeProperty',
 	providerFieldScopePropertyHelp: 'analytics:providerFieldScopePropertyHelp',
+	providerFieldWithoutConsent: 'analytics:providerFieldWithoutConsent',
+	providerFieldWithoutConsentHelp: 'analytics:providerFieldWithoutConsentHelp',
+	providerWithoutConsentCookieless: 'analytics:providerWithoutConsentCookieless',
+	providerWithoutConsentOff: 'analytics:providerWithoutConsentOff',
 	viewScopeSite: 'analytics:viewScopeSite',
 	viewScopeAll: 'analytics:viewScopeAll',
 	viewScopeShowing: 'analytics:viewScopeShowing',
@@ -367,6 +371,9 @@ export const keys = {
 	panelNoViews: 'analytics:panelNoViews',
 	sourcesPlatformFallback: 'analytics:sourcesPlatformFallback',
 	stateSourceSubstituted: 'analytics:stateSourceSubstituted',
+	statePosthogCookielessDropped: 'analytics:statePosthogCookielessDropped',
+	viewWithoutConsentShare: 'analytics:viewWithoutConsentShare',
+	stateWithoutVisitor: 'analytics:stateWithoutVisitor',
 } as const
 
 /** A key with one string whatever the numbers around it. */

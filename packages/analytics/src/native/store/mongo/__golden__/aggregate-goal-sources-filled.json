@@ -65,6 +65,12 @@
 			"interactions": {
 				"$sum": "$interactions"
 			},
+			"pageviewsWithoutVisitor": {
+				"$sum": "$pageviewsWithoutVisitor"
+			},
+			"pageviewsWithoutConsent": {
+				"$sum": "$pageviewsWithoutConsent"
+			},
 			"visitors_n": {
 				"$sum": {
 					"$cond": [

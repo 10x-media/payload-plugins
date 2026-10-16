@@ -379,6 +379,11 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldScopeProperty]: 'Метка сайта',
 	[keys.providerFieldScopePropertyHelp]:
 		'Имя, под которым PostHog хранит каждый сайт, например tenant. Задайте его, когда несколько сайтов используют один проект PostHog.',
+	[keys.providerFieldWithoutConsent]: 'Без согласия',
+	[keys.providerFieldWithoutConsentHelp]:
+		'Что делает этот инструмент для посетителей, которые ещё не ответили на баннер согласия или отказались. Оставьте пустым, чтобы следовать настройке сайта.',
+	[keys.providerWithoutConsentCookieless]: 'Считать без cookie',
+	[keys.providerWithoutConsentOff]: 'Ничего не отправлять',
 	[keys.viewScopeSite]: 'Сайт',
 	[keys.viewScopeAll]: 'Все сайты',
 	[keys.viewScopeShowing]: 'Показано: {{site}}',
@@ -411,6 +416,10 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 		'Эти цифры берутся из сервиса аналитики платформы, пока у сайта нет своего. Как только вы его добавите, данные будут браться из него.',
 	[keys.stateSourceSubstituted]:
 		'Сохранённый источник данных больше недоступен, поэтому показан источник по умолчанию.',
+	[keys.statePosthogCookielessDropped]:
+		'PostHog отбрасывает визиты, учтённые без согласия: включите «Cookieless tracking» в настройках Web analytics проекта.',
+	[keys.viewWithoutConsentShare]: '{{share}} просмотров страниц учтено без согласия.',
+	[keys.stateWithoutVisitor]: 'Просмотры страниц без посетителя: {{count}}.',
 	[pluralKeys.liveVisitors.one]: '{{count}} посетитель сейчас на сайте',
 	[pluralKeys.liveVisitors.few]: '{{count}} посетителя сейчас на сайте',
 	[pluralKeys.liveVisitors.many]: '{{count}} посетителей сейчас на сайте',

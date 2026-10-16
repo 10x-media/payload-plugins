@@ -5,7 +5,7 @@ import {
 	type VendorSinkArgs,
 	vendorEventName,
 	vendorGlobal,
-	vendorStorageExclusion,
+	vendorStorageSwitch,
 } from './vendor'
 
 /**
@@ -25,7 +25,7 @@ interface UmamiGlobal {
 export const createUmamiSink = (args: VendorSinkArgs): Sink => {
 	const umami = () => vendorGlobal<UmamiGlobal>(args.win, 'umami')
 	return createVendorSink(args, {
-		exclude: vendorStorageExclusion(args.win, UMAMI_DISABLED_KEY, '1'),
+		mode: vendorStorageSwitch(args.win, UMAMI_DISABLED_KEY, '1'),
 		has: () => typeof umami()?.track === 'function',
 		dispatch: (event) => {
 			umami()?.track(vendorEventName(event), flatProps(event))

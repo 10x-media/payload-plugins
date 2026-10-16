@@ -187,6 +187,27 @@ describe('buildProvidersCollection', () => {
 		}
 	})
 
+	it('offers every vendor its own level without consent, empty following the install', () => {
+		const field = named(collection.fields, 'withoutConsent')
+		expect(field?.type).toBe('select')
+		expect(
+			field && 'options' in field
+				? field.options.map((o) => (typeof o === 'string' ? o : o.value))
+				: []
+		).toEqual(['cookieless', 'off'])
+		expect(field && 'required' in field ? field.required : undefined).toBeFalsy()
+		const condition = field?.admin?.condition
+		for (const provider of ['plausible', 'umami', 'ga4', 'posthog']) {
+			expect(condition?.({ provider }, { provider }, {} as never), provider).toBe(true)
+		}
+		expect(condition?.({ provider: 'native' }, { provider: 'native' }, {} as never)).toBe(false)
+		expect(condition?.({}, {}, {} as never)).toBe(false)
+		const help = adminOf(field).description as Record<string, string>
+		expect(Object.keys(help).sort()).toEqual(
+			['ar', 'de', 'en', 'es', 'fr', 'id', 'ko', 'pt', 'ru', 'uk', 'zh'].sort()
+		)
+	})
+
 	it('explains the native choice with a note that stores nothing', () => {
 		const note = collection.fields.find(
 			(field) => field.type === 'group' && !('name' in field && field.name)

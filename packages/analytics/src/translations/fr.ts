@@ -386,6 +386,11 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldScopeProperty]: 'Étiquette du site',
 	[keys.providerFieldScopePropertyHelp]:
 		'Le nom sous lequel PostHog enregistre chaque site, par exemple tenant. À renseigner lorsque plusieurs sites partagent un même projet PostHog.',
+	[keys.providerFieldWithoutConsent]: 'Sans consentement',
+	[keys.providerFieldWithoutConsentHelp]:
+		'Ce que fait cet outil pour les visiteurs qui n’ont pas encore répondu au bandeau de consentement ou l’ont refusé. Laissez vide pour suivre le réglage du site.',
+	[keys.providerWithoutConsentCookieless]: 'Compter sans cookies',
+	[keys.providerWithoutConsentOff]: 'Ne rien envoyer',
 	[keys.viewScopeSite]: 'Site',
 	[keys.viewScopeAll]: 'Tous les sites',
 	[keys.viewScopeShowing]: 'Affichage : {{site}}',
@@ -418,6 +423,10 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 		"Ces chiffres proviennent de l'outil de statistiques de la plateforme tant que ce site n'a pas ajouté le sien. Dès qu'il est ajouté, c'est lui qui est utilisé.",
 	[keys.stateSourceSubstituted]:
 		"La source de données enregistrée n'est plus disponible : la source par défaut est affichée.",
+	[keys.statePosthogCookielessDropped]:
+		'PostHog rejette les visites comptées sans consentement : activez « Cookieless tracking » dans les paramètres Web analytics du projet.',
+	[keys.viewWithoutConsentShare]: '{{share}} des pages vues ont été comptées sans consentement.',
+	[keys.stateWithoutVisitor]: 'Pages vues enregistrées sans visiteur : {{count}}.',
 	[pluralKeys.liveVisitors.one]: '{{count}} visiteur actif en ce moment',
 	[pluralKeys.liveVisitors.many]: '{{count}} visiteurs actifs en ce moment',
 	[pluralKeys.liveVisitors.other]: '{{count}} visiteurs actifs en ce moment',

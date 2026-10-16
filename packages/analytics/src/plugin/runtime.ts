@@ -13,6 +13,7 @@ import type {
 	CrossScopeAccess,
 	ResolvedExclusion,
 	ResolvedOptions,
+	ResolvedWithoutConsent,
 	ScopeCallSite,
 	ScopeLabelResolver,
 	ScopeListResolver,
@@ -84,6 +85,8 @@ export interface AnalyticsRuntime {
 	 * per request-resolved adapter. Absent runtimes hold every slot.
 	 */
 	captureGate?: CaptureGatePolicy
+	/** `capture.withoutConsent`, resolved; absent while unset, which means `'cookieless'`. */
+	captureWithoutConsent?: ResolvedWithoutConsent
 	/** Browser auto-capture toggles handed to the tracker; absent runtimes default all on. */
 	autoCapture?: ResolvedAutoCapture
 	/** `capture.skip`, resolved; absent runtimes skip everything it can. */

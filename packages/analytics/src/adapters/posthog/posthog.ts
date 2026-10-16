@@ -1,5 +1,11 @@
 import { jsLiteral } from '../../capture/jsLiteral'
-import type { CaptureSupport, ProxyRoute } from '../../core/capture'
+import {
+	adapterWithoutConsent,
+	cookielessCapture,
+	WITHOUT_CONSENT_LEVELS,
+} from '../../capture/withoutConsent'
+import type { CaptureSupport, ProxyRoute, SnippetMode } from '../../core/capture'
+import { currentTime } from '../../core/clock'
 import {
 	type AdapterContext,
 	type AnalyticsAdapter,
@@ -17,6 +23,7 @@ import type { FetchLike } from '../../core/fetch'
 import { vendorReading } from '../../core/metricValues'
 import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
 import { DEFAULT_TIMEZONE } from '../../timeframe/tz'
+import type { WithoutConsentLevel } from '../../tracker/config'
 import { emptyGoalBreakdown, goalHint, hintFailed, hintSlugs } from '../goalRead'
 import { hostnameOf, withoutTrailingSlash } from '../http/baseUrl'
 import {
@@ -29,6 +36,7 @@ import {
 import { readTime } from '../readTime'
 import { dayIso, hourIso } from '../series'
 import { upstreamJson } from '../upstream'
+import { createProjectCheck } from './projectCheck'
 
 export interface PosthogConfig {
 	/**
@@ -69,6 +77,12 @@ export interface PosthogConfig {
 	projectToken?: string
 	/** The fetch reads and the capture proxy reach PostHog with. Unset, the global fetch. */
 	fetch?: FetchLike
+	/**
+	 * What this source's held slot does without consent, over `capture.withoutConsent`.
+	 * `'cookieless'` counts with PostHog's cookieless mode until consent, which needs the project's
+	 * "Cookieless tracking" (Web analytics settings); `'off'` keeps PostHog opted out until then.
+	 */
+	withoutConsent?: WithoutConsentLevel
 }
 
 const US_CLOUD = 'https://us.posthog.com'
@@ -161,16 +175,32 @@ const CAPTURE_PAGEVIEW = 'history_change'
 const NAMED_CLIENT_PAGEVIEWS = ['capture_pageview:false', 'capture_pageleave:true']
 
 /**
+ * A slot counting without consent boots in PostHog's cookieless mode, which an opt-out returns to
+ * rather than stopping. Started cookieless, it counts from the first pageview while opted out by
+ * default, storing nothing, until the sink opts it in.
+ */
+const cookielessOptions = (mode: SnippetMode): string[] => [
+	`cookieless_mode:${jsLiteral('on_reject')}`,
+	...(mode === 'cookieless' ? ['opt_out_capturing_by_default:true'] : []),
+]
+
+/**
+ * The scope stamped on each event as it is sent: switching between cookieless and full resets
+ * PostHog's identity and every super-property `register` set with it.
+ */
+const scopeHook = (property: string, scope: string): string =>
+	`before_send:function(e){e&&e.properties&&(e.properties[${jsLiteral(property)}]=${jsLiteral(scope)});return e}`
+
+/**
  * `opt_out_persistence_by_default` makes an opt-out (closed gate, excluded browser) delete PostHog's
  * `ph_<token>_posthog` storage, distinct id included, and keep none while it holds.
  */
-const initOptions = (path: string, ui: string | undefined, named: boolean): string =>
-	[
-		`api_host:${jsLiteral(path)}`,
-		...(ui === undefined ? [] : [`ui_host:${jsLiteral(ui)}`]),
-		...(named ? NAMED_CLIENT_PAGEVIEWS : [`capture_pageview:${jsLiteral(CAPTURE_PAGEVIEW)}`]),
-		'opt_out_persistence_by_default:true',
-	].join(',')
+const initOptions = (path: string, ui: string | undefined, named: boolean): string[] => [
+	`api_host:${jsLiteral(path)}`,
+	...(ui === undefined ? [] : [`ui_host:${jsLiteral(ui)}`]),
+	...(named ? NAMED_CLIENT_PAGEVIEWS : [`capture_pageview:${jsLiteral(CAPTURE_PAGEVIEW)}`]),
+	'opt_out_persistence_by_default:true',
+]
 
 function buildCapture(config: PosthogConfig, token: string): CaptureSupport {
 	const hosts = captureHosts(config)
@@ -184,20 +214,26 @@ function buildCapture(config: PosthogConfig, token: string): CaptureSupport {
 			],
 			...(config.fetch ? { fetch: config.fetch } : {}),
 		},
-		snippet: ({ path, scope, instance }) => {
+		snippet: ({ path, scope, instance, mode = 'full', withoutConsent = false }) => {
 			const named = instance !== undefined
 			const client = named ? `posthog[${jsLiteral(instance)}]` : 'posthog'
-			// A super-property rather than a per-call one, so it rides the events a host
-			// captures itself, which is what `scopeProperty` reads back on.
+			const property = config.scopeProperty && scope ? config.scopeProperty : undefined
+			// Stamped on every event rather than per call, so it rides the events a host captures itself,
+			// which is what `scopeProperty` reads back on.
 			const stamp =
-				config.scopeProperty && scope
-					? `;${client}.register({[${jsLiteral(config.scopeProperty)}]:${jsLiteral(scope)}})`
+				property && scope && !withoutConsent
+					? `;${client}.register({[${jsLiteral(property)}]:${jsLiteral(scope)}})`
 					: ''
+			const options = [
+				...initOptions(path, hosts.ui, named),
+				...(withoutConsent ? cookielessOptions(mode) : []),
+				...(withoutConsent && property && scope ? [scopeHook(property, scope)] : []),
+			].join(',')
 			const name = named ? `,${jsLiteral(instance)}` : ''
 			return {
 				scripts: [
 					{
-						inline: `${POSTHOG_STUB}posthog.init(${jsLiteral(token)},{${initOptions(path, hosts.ui, named)}}${name})${stamp}`,
+						inline: `${POSTHOG_STUB}posthog.init(${jsLiteral(token)},{${options}}${name})${stamp}`,
 					},
 				],
 			}
@@ -234,6 +270,12 @@ const METRIC_SQL_GOAL: Partial<Record<MetricKey, string>> = {
 	sessions: 'count(DISTINCT properties.$session_id)',
 	events: 'count()',
 }
+
+/**
+ * An event counted without consent. Ingestion keeps `$cookieless_mode` while it strips the address;
+ * compared as text, it matches whether the project types the property as a boolean or not.
+ */
+const COOKIELESS_EVENT = "toString(properties.$cookieless_mode) = 'true'"
 
 /**
  * A goal is an event name, so its slug must equal the captured event's. `channel` is PostHog's own
@@ -302,6 +344,11 @@ interface PosthogQueryResponse {
 export function posthog(config: PosthogConfig): AnalyticsAdapter {
 	const host = withoutTrailingSlash(config.host ?? US_CLOUD)
 	const maxLookbackDays = config.maxLookbackDays !== undefined ? config.maxLookbackDays : 730
+	const withoutConsent = adapterWithoutConsent(
+		config.withoutConsent,
+		'posthog({ withoutConsent })',
+		WITHOUT_CONSENT_LEVELS
+	)
 
 	const capabilities: AnalyticsCapabilities = {
 		realtime: false,
@@ -317,22 +364,66 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 		...(config.scopeProperty ? { scopedQueries: true } : {}),
 	}
 
+	let fillsCountingSlot = true
+	const projectDropsCookieless = createProjectCheck({
+		host,
+		projectId: config.projectId,
+		apiKey: config.apiKey,
+		...(config.fetch ? { fetch: config.fetch } : {}),
+	})
+	/**
+	 * Whether a held slot this source fills may count cookielessly, which the project must accept:
+	 * the boot's answer for a config source, the factory's `withoutConsent` for a document's.
+	 */
+	const countsCookieless = (): boolean =>
+		Boolean(config.projectToken) && withoutConsent !== 'off' && fillsCountingSlot
+
 	return {
 		id: 'posthog',
 		...adapterLabel(config.label, 'PostHog', 'posthog({ label })'),
 		capabilities,
-		...(config.projectToken ? { capture: buildCapture(config, config.projectToken) } : {}),
+		...(config.projectToken
+			? {
+					capture: {
+						...buildCapture(config, config.projectToken),
+						...cookielessCapture({ kind: 'switched' }, withoutConsent),
+					},
+				}
+			: {}),
 		isConfigured: () => Boolean(config.projectId && config.apiKey),
+		register(_config, context) {
+			fillsCountingSlot = context?.adapterCountsWithoutConsent !== false
+		},
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = readTime(ctx)
+			const dropped = countsCookieless()
+				? projectDropsCookieless(ctx.now?.().getTime() ?? currentTime())
+				: Promise.resolve(undefined)
 			const breakdown = firstMapped(q.dimensions, DIMENSION_SQL)
 			const goalBreakdown = breakdown?.dimension === 'goal'
 			const hint = goalHint(q)
+			let cookieless = 0
+			/** The result with what the read learnt about events counted without consent. */
+			const withConsentMeta = async (result: AnalyticsResult): Promise<AnalyticsResult> => {
+				const drops = await dropped
+				const counted = cookieless > 0
+				return {
+					...result,
+					meta: {
+						...result.meta,
+						...(counted && q.metrics.includes('visitors') ? { visitorsAre: 'sumOfDaily' } : {}),
+						...(counted && !breakdown && q.metrics.includes('pageviews')
+							? { withoutConsent: { pageviews: cookieless } }
+							: {}),
+						...(drops ? { withoutConsentDropped: true } : {}),
+					},
+				}
+			}
 			const empty = goalBreakdown
 				? emptyGoalBreakdown({ provider: 'posthog', fetchedAt, hint })
 				: null
 			if (empty) {
-				return empty
+				return withConsentMeta(empty)
 			}
 			// These reads scan every event: a `$pageview` WHERE beside an `event = 'x'` filter would
 			// contradict itself and zero every metric, so they switch to conditional aggregation.
@@ -384,6 +475,21 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			}
 			const columns = exprs.map((expr, i) => `${expr} AS m${i}`).join(', ')
 			const from = `FROM events WHERE ${where.join(' AND ')}`
+			// A column on the totals or breakdown query the read runs anyway, never a request of its
+			// own. Visitors are counted on pageviews, except in a goal breakdown, which counts its rows.
+			const cookielessRows =
+				scanAllEvents && !goalBreakdown
+					? `event = '$pageview' AND ${COOKIELESS_EVENT}`
+					: COOKIELESS_EVENT
+			const countsCookielessColumn =
+				q.metrics.includes('visitors') || (!breakdown && q.metrics.includes('pageviews'))
+			const cookielessColumn = countsCookielessColumn ? `, countIf(${cookielessRows}) AS c` : ''
+			/** Adds a result row's count of events counted without consent, after its metric columns. */
+			const tallyCookieless = (row: unknown[], offset: number): void => {
+				if (countsCookielessColumn) {
+					cookieless += vendorReading('pageviews', row[offset + exprs.length]) ?? 0
+				}
+			}
 
 			const runSql = (sql: string): Promise<PosthogQueryResponse> =>
 				upstreamJson<PosthogQueryResponse>(ctx, `${host}/api/projects/${config.projectId}/query/`, {
@@ -407,9 +513,13 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			}
 
 			const fetchTotals = async (): Promise<MetricValues> => {
-				const data = await runSql(`SELECT ${columns} ${from}`)
+				const data = await runSql(`SELECT ${columns}${cookielessColumn} ${from}`)
 				const row = data.results[0]
-				return row ? readRow(row, 0) : {}
+				if (!row) {
+					return {}
+				}
+				tallyCookieless(row, 0)
+				return readRow(row, 0)
 			}
 
 			const unit =
@@ -434,22 +544,25 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 						rows.push({ timestamp, metrics: readRow(row, 1) })
 					}
 				}
-				return { rows, totals, meta }
+				return withConsentMeta({ rows, totals, meta })
 			}
 
 			if (breakdown) {
 				const data = await runSql(
-					`SELECT ${breakdown.field} AS dim, ${columns} ${from} GROUP BY dim ORDER BY m0 DESC LIMIT ${q.limit ?? 100}`
+					`SELECT ${breakdown.field} AS dim, ${columns}${cookielessColumn} ${from} GROUP BY dim ORDER BY m0 DESC LIMIT ${q.limit ?? 100}`
 				)
-				const rows: AnalyticsRow[] = data.results.map((row) => ({
-					dimensions: { [breakdown.dimension]: String(row[0] ?? '') },
-					metrics: readRow(row, 1),
-				}))
-				return { rows, totals: undefined, meta }
+				const rows: AnalyticsRow[] = data.results.map((row) => {
+					tallyCookieless(row, 1)
+					return {
+						dimensions: { [breakdown.dimension]: String(row[0] ?? '') },
+						metrics: readRow(row, 1),
+					}
+				})
+				return withConsentMeta({ rows, totals: undefined, meta })
 			}
 
 			const totals = await fetchTotals()
-			return { rows: [{ metrics: totals }], totals, meta }
+			return withConsentMeta({ rows: [{ metrics: totals }], totals, meta })
 		},
 	}
 }

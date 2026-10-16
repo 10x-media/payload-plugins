@@ -4,9 +4,12 @@
  */
 export type {
 	CaptureSupport,
+	CookielessSupport,
 	ProxyDescriptor,
 	ProxyRoute,
 	ProxyRouteKind,
+	SnippetArgs,
+	SnippetMode,
 } from '../../core/capture'
 export type {
 	AdapterContext,
@@ -59,15 +62,20 @@ export type { CurrencyConverter } from '../../goals/currency'
 export type { BrowserAmounts, OrderSignatureMode } from '../../goals/match'
 export type { Goal } from '../../goals/types'
 export type { RawEventInput } from '../../native/ingest/normalizeEvent'
-export type { HitType } from '../../native/store/types'
+export type { HitMode, HitType } from '../../native/store/types'
 export type { TrustedPlatform } from '../../net/platform'
 export type { RouteBase, RoutePaths } from '../../plugin/routes'
 export type {
 	CaptureClientKind,
 	CaptureSlot,
 	CaptureSnippet,
+	ConsentPhase,
 	GoalMatch,
+	HeldSlotMode,
+	SlotMode,
+	SlotWithoutConsent,
 	SnippetScript,
 	TrackerGoal,
 	TrackerSlotConfig,
+	WithoutConsentLevel,
 } from '../../tracker/config'

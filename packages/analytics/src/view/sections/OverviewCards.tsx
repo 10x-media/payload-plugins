@@ -1,13 +1,14 @@
 'use client'
 
 import type { MetricKey } from '../../core/contract'
-import { formatMetricValue } from '../../fields/format'
+import { formatMetricValue, formatRate } from '../../fields/format'
 import type { QueryResponse } from '../../query/response'
 import { keys } from '../../translations/keys'
 import { metricLabelKey } from '../../translations/metricKeys'
 import { useTranslation } from '../../translations/useTranslation'
 import { MetricCard } from '../../ui/components/MetricCard'
 import { ComparisonDelta } from '../../widgets/ComparisonDelta'
+import { withoutConsentShare } from '../consentShare'
 import type { QueryState } from '../useViewQueries'
 import { QueryError, SectionError, Skeleton } from './EmptyStates'
 
@@ -24,7 +25,8 @@ export interface OverviewCardsProps {
 
 /**
  * Range totals, one card per served metric; clicking a card charts it. Totals stay through the
- * next read, so a range change dims the numbers rather than blanking them.
+ * next read, so a range change dims the numbers rather than blanking them. Under them, the share of
+ * pageviews counted without consent, whenever the source reports one.
  */
 export function OverviewCards({
 	metrics,
@@ -39,6 +41,7 @@ export function OverviewCards({
 	const totals = query.data?.result.totals
 	const previous = query.data?.comparison?.totals
 	const summed = query.data?.result.meta.visitorsAre === 'sumOfDaily'
+	const share = withoutConsentShare(query.data?.result)
 
 	if (query.data === undefined) {
 		return query.status === 'error' ? (
@@ -85,6 +88,11 @@ export function OverviewCards({
 					)
 				})}
 			</div>
+			{share === undefined ? null : (
+				<div className="analytics-view__caption">
+					{t(keys.viewWithoutConsentShare, { share: formatRate(share, locale) })}
+				</div>
+			)}
 		</>
 	)
 }

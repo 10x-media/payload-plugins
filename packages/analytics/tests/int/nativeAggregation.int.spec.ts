@@ -352,6 +352,8 @@ describeForDb('engine day aggregation', {}, (db) => {
 			revenue: 25,
 			impressions: null,
 			interactions: 1,
+			pageviewsWithoutVisitor: 0,
+			pageviewsWithoutConsent: 0,
 		})
 		const window = {
 			scope: 'agg',

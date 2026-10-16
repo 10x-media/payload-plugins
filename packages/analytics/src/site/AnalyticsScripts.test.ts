@@ -108,6 +108,40 @@ describe('AnalyticsScripts', () => {
 		expect(render({ config: config(false), gate: false })).toContain('posthog.init("phc_public"')
 	})
 
+	it('renders a held slot counting without consent at page load, so its first pageview counts', () => {
+		const counting = (pending: 'cookieless' | 'off', refused: 'cookieless' | 'off') => {
+			const held = config(true)
+			const tenant = held.slots[1]
+			if (tenant) {
+				tenant.withoutConsent = { pending, refused }
+			}
+			return held
+		}
+		const init = 'posthog.init("phc_public"'
+		expect(render({ config: counting('cookieless', 'off') })).toContain(init)
+		expect(render({ config: counting('cookieless', 'off'), gate: false })).toBe('')
+		expect(render({ config: counting('off', 'cookieless') })).toBe('')
+		expect(render({ config: counting('off', 'cookieless'), gate: { tenant: false } })).toContain(
+			init
+		)
+		expect(render({ config: counting('off', 'off'), gate: true })).toContain(init)
+	})
+
+	it('renders the full variant for a slot counting without consent the server already opened', () => {
+		const held = config(true)
+		const tenant = held.slots[1]
+		if (tenant) {
+			tenant.withoutConsent = { pending: 'cookieless', refused: 'cookieless' }
+			tenant.snippet = { scripts: [{ inline: 'cookieless()' }] }
+			tenant.fullSnippet = { scripts: [{ inline: 'full()' }] }
+		}
+		expect(render({ config: held, gate: true })).toContain('full()')
+		expect(render({ config: held, gate: true })).not.toContain('cookieless()')
+		expect(render({ config: held })).toContain('cookieless()')
+		expect(render({ config: held, gate: false })).toContain('cookieless()')
+		expect(render({ config: held })).not.toContain('full()')
+	})
+
 	it('renders the exclusion prelude ahead of the vendor init, in document order', () => {
 		const linked = config()
 		const tenant = linked.slots[1]

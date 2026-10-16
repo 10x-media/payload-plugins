@@ -252,7 +252,11 @@ export const checkOrder = (order: RawOrder | undefined): void => {
 	if (order === undefined) {
 		return
 	}
-	if (!isPart(order.part) || (order.per !== undefined && !isPart(order.per))) {
+	if (
+		!isPart(order.part) ||
+		(order.per !== undefined && !isPart(order.per)) ||
+		(order.less !== undefined && (order.per === undefined || !isPart(order.less)))
+	) {
 		refuse('a raw read orders by its parts')
 	}
 	if (order.dir !== 'asc' && order.dir !== 'desc') {
@@ -272,6 +276,8 @@ const HIT_PARTS: ReadonlyArray<keyof MetricParts> = [
 	'durationMs',
 	'scrollSum',
 	'scrollSamples',
+	'pageviewsWithoutVisitor',
+	'pageviewsWithoutConsent',
 ]
 const VISIT_PARTS: ReadonlyArray<keyof MetricParts> = [
 	'sessions',
@@ -499,7 +505,8 @@ export const rankOf = (parts: MetricParts, order: RawOrder): number | null => {
 	if (order.per === undefined) {
 		return part
 	}
-	const per = parts[order.per]
+	const whole = parts[order.per]
+	const per = whole === null || order.less === undefined ? whole : whole - (parts[order.less] ?? 0)
 	return part === null || per === null || per === 0 ? null : part / per
 }
 

@@ -191,6 +191,55 @@ describe('memoryEventStore visits', () => {
 	})
 })
 
+describe('memoryEventStore modes', () => {
+	const anonymous = { v: '', mode: 'a', country: 'DE', device: 'mobile' } as const
+
+	it('counts anonymous pageviews as pageviews of their country and no visitor, visit or time', async () => {
+		const store = await storeWith([
+			hit('10:00:00.000', { ...google, mode: 'f', country: 'DE', durationMs: 3000 }),
+			hit('10:01:00.000', { mode: 'c', country: 'DE', durationMs: 1000 }),
+			hit('10:02:00.000', { ...anonymous, landing: true }),
+			hit('10:03:00.000', anonymous),
+			// Stored before modes: full.
+			hit('10:04:00.000', { v: 'V2', landing: true, country: 'FR' }),
+		])
+		const [total] = await store.readRaw(day())
+		expect(total?.parts).toMatchObject({
+			pageviews: 5,
+			visitors: 2,
+			sessions: 2,
+			entries: 2,
+			durationMs: 4000,
+			pageviewsWithoutVisitor: 2,
+			pageviewsWithoutConsent: 3,
+		})
+		const countries = await store.readRaw(day({ groupBy: 'country' }))
+		expect(
+			pick(countries, [
+				'pageviews',
+				'visitors',
+				'pageviewsWithoutVisitor',
+				'pageviewsWithoutConsent',
+			])
+		).toEqual([
+			{
+				value: 'DE',
+				pageviews: 4,
+				visitors: 1,
+				pageviewsWithoutVisitor: 2,
+				pageviewsWithoutConsent: 3,
+			},
+			{
+				value: 'FR',
+				pageviews: 1,
+				visitors: 1,
+				pageviewsWithoutVisitor: 0,
+				pageviewsWithoutConsent: 0,
+			},
+		])
+	})
+})
+
 describe('memoryEventStore facts and filters', () => {
 	const hits = (): HitRow[] => [
 		hit('10:00:00.000', { ...google, path: '/pricing', country: 'DE', scrollDepth: 0 }),

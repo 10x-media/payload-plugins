@@ -1,11 +1,18 @@
 import { serverTwinOf, wireTwinOf } from './ids'
-import type { HitRow } from './types'
+import type { HitMode, HitRow } from './types'
 
 /**
- * Hits one statement writes, on every database: a row binds at most 40 values, which keeps a
+ * Hits one statement writes, on every database: a row binds at most 41 values, which keeps a
  * chunk well under the 32,766 parameters SQLite allows.
  */
 export const HIT_CHUNK = 500
+
+/** The modes a page measures in before or without consent. */
+export const WITHOUT_CONSENT_MODES: readonly HitMode[] = ['c', 'a']
+
+/** Whether a page measured a hit before or without consent; a hit stored before modes was full. */
+export const isWithoutConsent = (hit: Pick<HitRow, 'mode'>): boolean =>
+	hit.mode !== undefined && WITHOUT_CONSENT_MODES.includes(hit.mode)
 
 /** The sale a hit records, which the server's record of an order hands to the browser's. */
 export const SALE_FIELDS: ReadonlyArray<keyof HitRow> = [

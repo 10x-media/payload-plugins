@@ -81,4 +81,22 @@ describe('mergeAtToday', () => {
 			mixedCurrencies: ['CHF', 'EUR', 'USD'],
 		})
 	})
+
+	it('adds up the pageviews counted without consent or without a visitor', () => {
+		const half = (meta: Partial<Parameters<typeof mergeAtToday>[0]['meta']>) => ({
+			rows: [],
+			meta: { provider: 'native', fetchedAt: '2026-01-01T00:00:00.000Z', ...meta },
+		})
+		const merged = mergeAtToday(
+			half({ withoutConsent: { pageviews: 4 }, withoutVisitor: { pageviews: 1 } }),
+			half({ withoutConsent: { pageviews: 2 }, withoutConsentDropped: true }),
+			query()
+		)
+		expect(merged.meta).toMatchObject({
+			withoutConsent: { pageviews: 6 },
+			withoutVisitor: { pageviews: 1 },
+			withoutConsentDropped: true,
+		})
+		expect(mergeAtToday(half({}), half({}), query()).meta.withoutConsent).toBeUndefined()
+	})
 })

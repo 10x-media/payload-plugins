@@ -379,6 +379,11 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerFieldScopeProperty]: 'Label situs',
 	[keys.providerFieldScopePropertyHelp]:
 		'Nama yang dipakai PostHog untuk menyimpan tiap situs, misalnya tenant. Isi ini bila beberapa situs berbagi satu proyek PostHog.',
+	[keys.providerFieldWithoutConsent]: 'Tanpa persetujuan',
+	[keys.providerFieldWithoutConsentHelp]:
+		'Apa yang dilakukan alat ini untuk pengunjung yang belum menjawab banner persetujuan atau menolaknya. Biarkan kosong untuk mengikuti pengaturan situs.',
+	[keys.providerWithoutConsentCookieless]: 'Hitung tanpa cookie',
+	[keys.providerWithoutConsentOff]: 'Jangan kirim apa pun',
 	[keys.viewScopeSite]: 'Situs',
 	[keys.viewScopeAll]: 'Semua situs',
 	[keys.viewScopeShowing]: 'Menampilkan: {{site}}',
@@ -411,6 +416,10 @@ export const id: LocaleBundle<'other'> = {
 		'Angka ini berasal dari alat analitik platform sampai situs ini menambahkan alatnya sendiri. Setelah ditambahkan, angkanya beralih ke alat itu.',
 	[keys.stateSourceSubstituted]:
 		'Sumber data yang tersimpan tidak tersedia lagi, jadi sumber default yang ditampilkan.',
+	[keys.statePosthogCookielessDropped]:
+		'PostHog membuang kunjungan yang dihitung tanpa persetujuan: aktifkan “Cookieless tracking” di pengaturan Web analytics proyek.',
+	[keys.viewWithoutConsentShare]: '{{share}} tayangan halaman dihitung tanpa persetujuan.',
+	[keys.stateWithoutVisitor]: 'Tayangan halaman yang tercatat tanpa pengunjung: {{count}}.',
 	[pluralKeys.liveVisitors.other]: '{{count}} pengunjung aktif saat ini',
 	[pluralKeys.livePageviews.other]: '{{count}} tampilan halaman dalam {{duration}} terakhir',
 }

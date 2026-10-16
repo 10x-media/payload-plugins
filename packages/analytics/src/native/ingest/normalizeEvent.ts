@@ -16,7 +16,7 @@ import type { TrustedPlatform } from '../../net/platform'
 import { MAX_GEO_LENGTH, MAX_QUERY_LENGTH } from '../../query/limits'
 import type { GeoResolver } from '../geo/geoResolver'
 import { resolveGeo } from '../geo/resolveGeo'
-import type { HitType } from '../store/types'
+import type { HitMode, HitType } from '../store/types'
 import { type BrowserName, classifyBrowser, classifyOs, type OsName } from './browser'
 import { clientIpFromHeaders } from './clientIp'
 import { classifyDevice, type DeviceType, SERVER_USER_AGENT } from './device'
@@ -115,6 +115,11 @@ export interface RawEventInput {
 	 * capped at one beacon's worth.
 	 */
 	impressions?: unknown
+	/**
+	 * How the page measured this beacon; absent is `f`, which a tracker from before modes sends.
+	 * Ingest stores no more than the mode allows, whatever else the beacon carries.
+	 */
+	m?: HitMode
 }
 
 /**
@@ -195,6 +200,8 @@ export interface NormalizedEvent {
 	navigation?: boolean
 	/** Recorded by server code rather than sent by a browser. */
 	server?: boolean
+	/** Absent is `f`. */
+	mode?: HitMode
 }
 
 interface NormalizeArgs {
@@ -238,6 +245,11 @@ interface NormalizeArgs {
 	siblings?: ReadonlySet<string>
 	/** `orderDigestKey` of the instance's secret, which an order's key is digested with. */
 	orderKey?: Buffer
+	/**
+	 * What the event may store: `a` hashes no visitor and keeps country alone, no time, scroll or
+	 * items seen. Absent is `f`, as for a beacon without `m`.
+	 */
+	mode?: HitMode
 }
 
 export interface ItemIngestOptions {
@@ -430,6 +442,15 @@ const fieldsOfType = (raw: RawEventInput): RawEventInput => {
 	return hit
 }
 
+/** An anonymous event keeps no time, scroll or items seen: engagement is a visitor's alone. */
+const fieldsOfMode = (raw: RawEventInput, mode: HitMode): RawEventInput => {
+	if (mode !== 'a') {
+		return raw
+	}
+	const { durationMs: _durationMs, scrollDepth: _scrollDepth, impressions: _seen, ...kept } = raw
+	return kept
+}
+
 /**
  * The ref an item value is kept under: signed by this server (or trusted, or unsigned where
  * signatures are optional), of a bound collection, with an id that collection could hold.
@@ -489,13 +510,16 @@ export async function normalizeEvent({
 	items: itemOptions,
 	siblings,
 	orderKey,
+	mode = 'f',
 }: NormalizeArgs): Promise<NormalizedEvent> {
-	const raw = fieldsOfType(input)
+	const anonymous = mode === 'a'
+	const raw = fieldsOfMode(fieldsOfType(input), mode)
 	const item = itemOptions ? keptItemRef(raw.item, itemOptions, origin) : undefined
 	const impressions = seenItems(raw.impressions, itemOptions, origin)
 	const trust = { trustedProxyHops, trustedPlatform }
 	const geo = await resolveGeo(geoResolver, headers, { trust, warn: warnGeo })
-	const ip = clientIpFromHeaders(headers, trust) ?? ''
+	// An anonymous event's address is read for its country alone, never hashed.
+	const ip = anonymous ? '' : (clientIpFromHeaders(headers, trust) ?? '')
 	const ua = headers.get('user-agent') ?? ''
 	// Every value a daily total is keyed by is capped first: Mongo's index key limit and Postgres'
 	// 2704-byte btree key both fail the write. Geo, name, query and referrer cap below.
@@ -583,8 +607,7 @@ export async function normalizeEvent({
 		...(os ? { os } : {}),
 		...utm,
 		country: geoValue(geo.country),
-		region: geoValue(geo.region),
-		city: geoValue(geo.city),
+		...(anonymous ? {} : { region: geoValue(geo.region), city: geoValue(geo.city) }),
 		...(language ? { language } : {}),
 		props,
 		...(durationMs !== undefined ? { durationMs } : {}),
@@ -611,9 +634,13 @@ export async function normalizeEvent({
 		...(scope !== undefined ? { scope } : {}),
 		...(item !== undefined ? { item } : {}),
 		...(impressions.length > 0 ? { impressions } : {}),
-		visitorId: identifiesVisitor(ip, ua) ? dailyVisitorId({ ip, ua, site: hostname, salt }) : '',
+		visitorId:
+			!anonymous && identifiesVisitor(ip, ua)
+				? dailyVisitorId({ ip, ua, site: hostname, salt })
+				: '',
 		...(clickId ? { clickId } : {}),
 		...(input.type === 'pageview' && isNavigation(input.nav) ? { navigation: true } : {}),
 		...(origin === 'server' ? { server: true } : {}),
+		mode,
 	}
 }

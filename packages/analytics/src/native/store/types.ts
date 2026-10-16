@@ -12,6 +12,15 @@ import type { RawDimension } from './rawRead'
 export type HitType = 'pageview' | 'event' | 'goal' | 'engagement'
 
 /**
+ * How a hit was measured, as the page states it: `c` cookieless, `a` anonymous (no visitor id,
+ * country alone, no engagement), `f` full. A statement of the page, not proof of consent.
+ * @beta
+ */
+export type HitMode = 'c' | 'a' | 'f'
+
+export const HIT_MODES: readonly HitMode[] = ['c', 'a', 'f']
+
+/**
  * One row of `analytics-hits`; an absent field is a null column. An engagement row carries no
  * visitor attributes: its pageview's row has them.
  */
@@ -36,6 +45,8 @@ export interface HitRow {
 	landing: boolean
 	/** Recorded by server code. */
 	server: boolean
+	/** Absent on a hit stored before modes existed, which counts as `f`. */
+	mode?: HitMode
 	name?: string
 	/** The other site a landing came from, as a bare host. */
 	ref?: string
@@ -101,6 +112,8 @@ export interface RawOrder {
 	part: keyof MetricParts
 	/** Ranks by `part / per` instead; a row with none of `per` comes last either way. */
 	per?: keyof MetricParts
+	/** Taken off `per` first, a null one as none: the pageviews time on page does not average over. */
+	less?: keyof MetricParts
 	dir: 'asc' | 'desc'
 }
 

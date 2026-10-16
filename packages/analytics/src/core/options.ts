@@ -31,8 +31,10 @@ import { isValidTimeZone } from '../timeframe/tz'
 import type {
 	CaptureClientKind,
 	CaptureSlot,
+	ConsentPhase,
 	ResolvedAutoCapture,
 	TrackerSkip,
+	WithoutConsentLevel,
 } from '../tracker/config'
 import type { TranslationsOption } from '../translations'
 import { keys, pluralKeys } from '../translations/keys'
@@ -71,7 +73,16 @@ import { isRecord, kindOf, listOf } from './values'
 import type { BuiltInWidgetSlug } from './widgetSlugs'
 
 export { DEFAULT_VIEW } from './adminOptions'
-export { fillableSlots, trackerAutoCapture, untrustedAddressNotice } from './captureOptions'
+export {
+	adapterCountsWithoutConsent,
+	cookielessTrustNotice,
+	documentsFillHeldTenant,
+	fillableSlots,
+	followingCountsWithoutConsent,
+	trackerAutoCapture,
+	untrustedAddressNotice,
+	withoutConsentUnsetNotice,
+} from './captureOptions'
 export type { AnalyticsCollectionOptions, CollectionOverrides } from './collectionOption'
 export { revenueOffWarning } from './goalOptions'
 export type { AnalyticsJobsOptions, AnalyticsTaskOptions } from './jobs'
@@ -360,6 +371,29 @@ export type CaptureGate = 'all' | 'off' | CaptureSlot[] | ((args: CaptureGateArg
 /** `capture.gate` resolved: whether one slot, filled by one adapter, waits. */
 export type CaptureGatePolicy = (args: CaptureGateArgs) => boolean
 
+/** What `capture.withoutConsent` is asked about one held slot in one phase. */
+export interface WithoutConsentArgs extends CaptureGateArgs {
+	phase: ConsentPhase
+}
+
+/** `capture.withoutConsent` as a function: a throw, or any other answer, means `'off'`. */
+export type WithoutConsentFunction = (args: WithoutConsentArgs) => WithoutConsentLevel
+
+/**
+ * What a slot `capture.gate` holds does before an answer (`pending`) and after a refusal
+ * (`refused`): one level for both, one per phase (an omitted phase is `'cookieless'`), or a
+ * function answering per slot and phase.
+ */
+export type WithoutConsentOption =
+	| WithoutConsentLevel
+	| { pending?: WithoutConsentLevel; refused?: WithoutConsentLevel }
+	| WithoutConsentFunction
+
+/** `capture.withoutConsent` checked: a level per phase, or the host's function. */
+export type ResolvedWithoutConsent =
+	| Record<ConsentPhase, WithoutConsentLevel>
+	| WithoutConsentFunction
+
 /** An adapter id to fill a capture slot with, or `false` to leave it deliberately empty. */
 export type CaptureSlotOption = string | false
 
@@ -451,6 +485,13 @@ export type AnalyticsCaptureOptions = {
 	 * whether tracking needs consent is the operator's call, so there is no default.
 	 */
 	gate?: CaptureGate
+	/**
+	 * What a slot `gate` holds does before an answer and after a refusal. Default `'cookieless'`:
+	 * count without storing anything on the device, at the level each adapter declares (GA4's is
+	 * `'off'`). `'off'` sends nothing until consent and nothing after a refusal. An adapter's own
+	 * `withoutConsent` beats this for its slot; a slot the gate does not hold runs in full.
+	 */
+	withoutConsent?: WithoutConsentOption
 	/**
 	 * Exact origins of other sites (`https://shop.example.com`, no path or wildcard) whose pages may
 	 * send to ingest and the capture proxy. Unset, only the site and its subdomains can.
@@ -791,6 +832,12 @@ export interface ResolvedCapture {
 	slots: { global?: CaptureSlotOption; tenant?: CaptureSlotOption }
 	paths: { global?: string; tenant?: string }
 	gate: CaptureGatePolicy
+	/** Absent while the install leaves it unset, which means `'cookieless'` in both phases. */
+	withoutConsent?: ResolvedWithoutConsent
+	/** Slots the gate may hold, judged without calling host code: a function may hold either. */
+	heldSlots: ReadonlySet<CaptureSlot>
+	/** Whether some held slot of the install may count without consent, as far as the boot can tell. */
+	installCountsWithoutConsent: boolean
 	autoCapture: ResolvedAutoCapture
 	proxy: { timeoutMs: number; maxBodyBytes: number }
 	/** `allowedOrigins`, each as a browser writes it in `Origin`. */

@@ -7,10 +7,14 @@ export type {
 	CaptureClientKind,
 	CaptureSlot,
 	CaptureSnippet,
+	ConsentPhase,
 	GoalMatch,
+	HeldSlotMode,
 	ResolvedAutoCapture,
 	ResolvedItemCapture,
 	RevenueItem,
+	SlotMode,
+	SlotWithoutConsent,
 	SnippetScript,
 	TrackerConfig,
 	TrackerExclusion,
@@ -20,6 +24,7 @@ export type {
 } from '../tracker/config'
 export { createTracker } from '../tracker/createTracker'
 export { DEFAULT_EXCLUSION_PARAM, EXCLUSION_STORAGE_KEY } from '../tracker/exclusion'
+export type { ModeSnapshot } from '../tracker/gate'
 export { DEFAULT_TRACKER_ENDPOINT, type InitTrackerArgs, initTracker } from '../tracker/initTracker'
 export type {
 	GateState,

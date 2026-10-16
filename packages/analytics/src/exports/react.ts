@@ -12,10 +12,14 @@ export type {
 	CaptureClientKind,
 	CaptureSlot,
 	CaptureSnippet,
+	ConsentPhase,
 	GoalMatch,
+	HeldSlotMode,
 	ResolvedAutoCapture,
 	ResolvedItemCapture,
 	RevenueItem,
+	SlotMode,
+	SlotWithoutConsent,
 	SnippetScript,
 	TrackerConfig,
 	TrackerExclusion,
@@ -23,6 +27,7 @@ export type {
 	TrackerSkip,
 	TrackerSlotConfig,
 } from '../tracker/config'
+export type { ModeSnapshot } from '../tracker/gate'
 export type {
 	GateState,
 	GateStatus,

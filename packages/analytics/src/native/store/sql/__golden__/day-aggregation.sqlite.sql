@@ -1,4 +1,4 @@
-WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", "duration_ms", "scroll_depth", CASE WHEN substr("hit"."id", 1, 3) = 'ow.' THEN COALESCE((SELECT "item" FROM "analytics_hits" AS "twin"
+WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", "duration_ms", "scroll_depth", "mode", CASE WHEN substr("hit"."id", 1, 3) = 'ow.' THEN COALESCE((SELECT "item" FROM "analytics_hits" AS "twin"
 				WHERE "twin"."id" = 'os.' || substr("hit"."id", 4) AND "twin"."ts" BETWEEN strftime('%Y-%m-%dT%H:%M:%fZ', "hit"."ts", '-86400 seconds') AND strftime('%Y-%m-%dT%H:%M:%fZ', "hit"."ts", '+86400 seconds')), "hit"."item") ELSE "hit"."item" END AS "item", CASE WHEN substr("hit"."id", 1, 3) = 'ow.' AND (SELECT "item" FROM "analytics_hits" AS "twin"
 				WHERE "twin"."id" = 'os.' || substr("hit"."id", 4) AND "twin"."ts" BETWEEN strftime('%Y-%m-%dT%H:%M:%fZ', "hit"."ts", '-86400 seconds') AND strftime('%Y-%m-%dT%H:%M:%fZ', "hit"."ts", '+86400 seconds')) IS NOT NULL THEN ? ELSE "hit"."server" END AS "server", CASE WHEN substr("hit"."id", 1, 3) <> 'ow.' THEN "conversions"
 			WHEN (SELECT 1 FROM "analytics_hits" AS "twin"
@@ -37,6 +37,7 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		SUM(COALESCE("conversions", 0)) OVER whole AS "v_conv",
 		SUM(COALESCE("revenue", 0)) OVER whole AS "v_rev",
 		SUM(CASE WHEN "type" = 'event' AND "name" = 'item_click' AND "item" IS NOT NULL AND "item" <> '' THEN 1 ELSE 0 END) OVER whole AS "v_int",
+		SUM(CASE WHEN "type" = 'pageview' AND "mode" IN ('c', 'a') THEN 1 ELSE 0 END) OVER whole AS "v_npc",
 		SUM(CASE WHEN "type" = 'pageview' THEN 1 ELSE 0 END) OVER whole AS "s_pv",
 		SUM(CASE WHEN "type" IN ('event', 'goal') THEN 1 ELSE 0 END) OVER whole AS "s_int",
 		SUM(COALESCE("duration_ms", 0)) OVER whole AS "s_ms"
@@ -50,6 +51,7 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		"t"."v",
 		"t"."sn",
 		"t"."type",
+		"t"."mode",
 		"t"."eng",
 		"t"."name",
 		"t"."item",
@@ -67,7 +69,8 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		"t"."v_sc",
 		"t"."v_conv",
 		"t"."v_rev",
-		"t"."v_int", 0 AS "w",
+		"t"."v_int",
+		"t"."v_npc", 0 AS "w",
 		CASE WHEN "t"."eng" = 0 AND "t"."landing" = 1 THEN 1 ELSE 0 END AS "landed",
 		"x"."ref" AS "ref",
 		"x"."source" AS "source",
@@ -92,6 +95,7 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		"t"."v",
 		"t"."sn",
 		"t"."type",
+		"t"."mode",
 		"t"."eng",
 		"t"."name",
 		"t"."item",
@@ -109,7 +113,8 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		"t"."v_sc",
 		"t"."v_conv",
 		"t"."v_rev",
-		"t"."v_int", 1, 0,
+		"t"."v_int",
+		"t"."v_npc", 1, 0,
 		"x"."ref" AS "ref",
 		"x"."source" AS "source",
 		"x"."channel" AS "channel",
@@ -134,6 +139,7 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		"v",
 		"sn",
 		"type",
+		"mode",
 		"eng",
 		"name",
 		"item",
@@ -152,6 +158,7 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		"v_conv",
 		"v_rev",
 		"v_int",
+		"v_npc",
 		"w",
 		CASE WHEN "sn" IS NULL THEN "ref" ELSE FIRST_VALUE("ref") OVER land END AS "e_ref",
 		CASE WHEN "sn" IS NULL THEN "source" ELSE FIRST_VALUE("source") OVER land END AS "e_source",
@@ -186,7 +193,9 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		"t"."v_sc" AS "scrollSamples",
 		"t"."v_conv" AS "conversions",
 		"t"."v_rev" AS "revenue",
-		"t"."v_int" AS "interactions"
+		"t"."v_int" AS "interactions",
+		CASE WHEN "t"."v" = '' THEN "t"."s_pv" ELSE 0 END AS "pageviewsWithoutVisitor",
+		"t"."v_npc" AS "pageviewsWithoutConsent"
 			FROM va AS "t" CROSS JOIN ks WHERE "t"."w" = 0) AS "f"
 		WHERE "v1" IS NOT NULL AND ("v1" <> '' OR "k" = 0)),
 	sp AS (SELECT "k", "v1", "hostname", "v",
@@ -202,7 +211,9 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		SUM("scrollSamples") AS "scrollSamples",
 		SUM("conversions") AS "conversions",
 		SUM("revenue") AS "revenue",
-		SUM("interactions") AS "interactions"
+		SUM("interactions") AS "interactions",
+		SUM("pageviewsWithoutVisitor") AS "pageviewsWithoutVisitor",
+		SUM("pageviewsWithoutConsent") AS "pageviewsWithoutConsent"
 		FROM sf GROUP BY "k", "v1", "hostname", "v"),
 	sr AS (SELECT "k", "v1",
 		'' AS "v2",
@@ -219,7 +230,9 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		SUM("scrollSamples") AS "scrollSamples",
 		SUM("conversions") AS "conversions",
 		SUM("revenue") AS "revenue",
-		SUM("interactions") AS "interactions"
+		SUM("interactions") AS "interactions",
+		SUM("pageviewsWithoutVisitor") AS "pageviewsWithoutVisitor",
+		SUM("pageviewsWithoutConsent") AS "pageviewsWithoutConsent"
 		FROM sp GROUP BY "k", "v1", "hostname"),
 	"kg"("k") AS (VALUES (19), (20), (21), (22)),
 	hf AS (SELECT * FROM (SELECT 16 AS "k", "t"."path" AS "v1", '' AS "v2",
@@ -238,7 +251,9 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		CASE WHEN "t"."type" = 'pageview' AND "t"."scroll_depth" IS NOT NULL THEN 1 ELSE 0 END AS "scrollSamples",
 		COALESCE("t"."conversions", 0) AS "conversions",
 		COALESCE("t"."revenue", 0) AS "revenue",
-		CASE WHEN "t"."type" = 'event' AND "t"."name" = 'item_click' AND "t"."item" IS NOT NULL AND "t"."item" <> '' THEN 1 ELSE 0 END AS "interactions"
+		CASE WHEN "t"."type" = 'event' AND "t"."name" = 'item_click' AND "t"."item" IS NOT NULL AND "t"."item" <> '' THEN 1 ELSE 0 END AS "interactions",
+		CASE WHEN "t"."type" = 'pageview' AND "t"."v" = '' THEN 1 ELSE 0 END AS "pageviewsWithoutVisitor",
+		CASE WHEN "t"."type" = 'pageview' AND "t"."mode" IN ('c', 'a') THEN 1 ELSE 0 END AS "pageviewsWithoutConsent"
 			FROM a AS "t"
 		UNION ALL
 		SELECT 17 AS "k", "t"."name" AS "v1", '' AS "v2",
@@ -257,7 +272,9 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		CASE WHEN "t"."type" = 'pageview' AND "t"."scroll_depth" IS NOT NULL THEN 1 ELSE 0 END AS "scrollSamples",
 		COALESCE("t"."conversions", 0) AS "conversions",
 		COALESCE("t"."revenue", 0) AS "revenue",
-		CASE WHEN "t"."type" = 'event' AND "t"."name" = 'item_click' AND "t"."item" IS NOT NULL AND "t"."item" <> '' THEN 1 ELSE 0 END AS "interactions"
+		CASE WHEN "t"."type" = 'event' AND "t"."name" = 'item_click' AND "t"."item" IS NOT NULL AND "t"."item" <> '' THEN 1 ELSE 0 END AS "interactions",
+		CASE WHEN "t"."type" = 'pageview' AND "t"."v" = '' THEN 1 ELSE 0 END AS "pageviewsWithoutVisitor",
+		CASE WHEN "t"."type" = 'pageview' AND "t"."mode" IN ('c', 'a') THEN 1 ELSE 0 END AS "pageviewsWithoutConsent"
 			FROM a AS "t" WHERE "t"."type" = 'event'
 		UNION ALL
 		SELECT 18 AS "k", "t"."sent_currency" AS "v1", '' AS "v2",
@@ -276,7 +293,9 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		CASE WHEN "t"."type" = 'pageview' AND "t"."scroll_depth" IS NOT NULL THEN 1 ELSE 0 END AS "scrollSamples",
 		COALESCE("t"."conversions", 0) AS "conversions",
 		COALESCE("t"."sent_revenue", 0) AS "revenue",
-		CASE WHEN "t"."type" = 'event' AND "t"."name" = 'item_click' AND "t"."item" IS NOT NULL AND "t"."item" <> '' THEN 1 ELSE 0 END AS "interactions"
+		CASE WHEN "t"."type" = 'event' AND "t"."name" = 'item_click' AND "t"."item" IS NOT NULL AND "t"."item" <> '' THEN 1 ELSE 0 END AS "interactions",
+		CASE WHEN "t"."type" = 'pageview' AND "t"."v" = '' THEN 1 ELSE 0 END AS "pageviewsWithoutVisitor",
+		CASE WHEN "t"."type" = 'pageview' AND "t"."mode" IN ('c', 'a') THEN 1 ELSE 0 END AS "pageviewsWithoutConsent"
 			FROM a AS "t" WHERE "t"."sent_currency" IS NOT NULL
 		UNION ALL
 		SELECT "kg"."k", json_extract("gl"."value", '$.slug') AS "v1", CASE "kg"."k" WHEN 19 THEN '' WHEN 20 THEN "t"."e_channel" WHEN 21 THEN "t"."e_source" WHEN 22 THEN "t"."e_utm_campaign" END AS "v2",
@@ -295,7 +314,9 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		CASE WHEN "t"."type" = 'pageview' AND "t"."scroll_depth" IS NOT NULL THEN 1 ELSE 0 END AS "scrollSamples",
 		CASE WHEN COALESCE("t"."conversions", 0) > 0 THEN 1 ELSE 0 END AS "conversions",
 		COALESCE(CAST(json_extract("gl"."value", '$.value') AS REAL), 0) AS "revenue",
-		CASE WHEN "t"."type" = 'event' AND "t"."name" = 'item_click' AND "t"."item" IS NOT NULL AND "t"."item" <> '' THEN 1 ELSE 0 END AS "interactions"
+		CASE WHEN "t"."type" = 'event' AND "t"."name" = 'item_click' AND "t"."item" IS NOT NULL AND "t"."item" <> '' THEN 1 ELSE 0 END AS "interactions",
+		CASE WHEN "t"."type" = 'pageview' AND "t"."v" = '' THEN 1 ELSE 0 END AS "pageviewsWithoutVisitor",
+		CASE WHEN "t"."type" = 'pageview' AND "t"."mode" IN ('c', 'a') THEN 1 ELSE 0 END AS "pageviewsWithoutConsent"
 			FROM va AS "t" CROSS JOIN json_each("t"."goals") AS "gl" CROSS JOIN kg
 			WHERE "t"."w" = 1) AS "f"
 		WHERE "v1" IS NOT NULL AND "v1" <> '' AND "v2" IS NOT NULL AND ("v2" <> '' OR "k" IN (16, 17, 18, 19))),
@@ -312,7 +333,9 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		SUM("scrollSamples") AS "scrollSamples",
 		SUM("conversions") AS "conversions",
 		SUM("revenue") AS "revenue",
-		SUM("interactions") AS "interactions"
+		SUM("interactions") AS "interactions",
+		SUM("pageviewsWithoutVisitor") AS "pageviewsWithoutVisitor",
+		SUM("pageviewsWithoutConsent") AS "pageviewsWithoutConsent"
 		FROM hf GROUP BY "k", "v1", "v2", "hostname", "v", "sn"),
 	hp AS (SELECT "k", "v1", "v2", "hostname", "v",
 		SUM("pageviews") AS "pageviews",
@@ -327,7 +350,9 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		SUM("scrollSamples") AS "scrollSamples",
 		SUM("conversions") AS "conversions",
 		SUM("revenue") AS "revenue",
-		SUM("interactions") AS "interactions"
+		SUM("interactions") AS "interactions",
+		SUM("pageviewsWithoutVisitor") AS "pageviewsWithoutVisitor",
+		SUM("pageviewsWithoutConsent") AS "pageviewsWithoutConsent"
 		FROM hk GROUP BY "k", "v1", "v2", "hostname", "v"),
 	hr AS (SELECT "k", "v1", "v2", "hostname",
 		SUM("pageviews") AS "pageviews",
@@ -342,7 +367,9 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		SUM("scrollSamples") AS "scrollSamples",
 		SUM("conversions") AS "conversions",
 		SUM("revenue") AS "revenue",
-		SUM("interactions") AS "interactions"
+		SUM("interactions") AS "interactions",
+		SUM("pageviewsWithoutVisitor") AS "pageviewsWithoutVisitor",
+		SUM("pageviewsWithoutConsent") AS "pageviewsWithoutConsent"
 		FROM hp GROUP BY "k", "v1", "v2", "hostname"),
 	xi AS (SELECT "t".*, "t"."item" AS "x", 0 AS "imp" FROM a AS "t"
 			WHERE "t"."eng" = 0 AND "t"."item" IS NOT NULL AND "t"."item" <> ''
@@ -378,17 +405,17 @@ WITH h AS (SELECT "id", "scope", "ts", "hostname", "v", "type", "path", "name", 
 		SUM("impressions") AS "impressions",
 		SUM("interactions") AS "interactions"
 		FROM xp GROUP BY "k", "v1", "v2", "hostname"),
-	u AS (SELECT "k", "v1", "v2", "hostname", "pageviews", "events", "visitors", "sessions", "entries", "bounces", "sessionMs", "durationMs", "scrollSum", "scrollSamples", "conversions", "revenue", CAST(NULL AS REAL) AS "impressions", "interactions" FROM sr
-		UNION ALL SELECT "k", "v1", "v2", "hostname", "pageviews", "events", "visitors", "sessions", "entries", "bounces", "sessionMs", "durationMs", "scrollSum", "scrollSamples", "conversions", "revenue", CAST(NULL AS REAL) AS "impressions", "interactions" FROM hr
-		UNION ALL SELECT "k", "v1", "v2", "hostname", CAST(NULL AS REAL) AS "pageviews", "events", "visitors", CAST(NULL AS REAL) AS "sessions", CAST(NULL AS REAL) AS "entries", CAST(NULL AS REAL) AS "bounces", CAST(NULL AS REAL) AS "sessionMs", CAST(NULL AS REAL) AS "durationMs", CAST(NULL AS REAL) AS "scrollSum", CAST(NULL AS REAL) AS "scrollSamples", "conversions", "revenue", "impressions", "interactions" FROM xr),
-	rk AS (SELECT "k", "v1", "v2", "hostname", "pageviews", "events", "visitors", "sessions", "entries", "bounces", "sessionMs", "durationMs", "scrollSum", "scrollSamples", "conversions", "revenue", "impressions", "interactions",
+	u AS (SELECT "k", "v1", "v2", "hostname", "pageviews", "events", "visitors", "sessions", "entries", "bounces", "sessionMs", "durationMs", "scrollSum", "scrollSamples", "conversions", "revenue", CAST(NULL AS REAL) AS "impressions", "interactions", "pageviewsWithoutVisitor", "pageviewsWithoutConsent" FROM sr
+		UNION ALL SELECT "k", "v1", "v2", "hostname", "pageviews", "events", "visitors", "sessions", "entries", "bounces", "sessionMs", "durationMs", "scrollSum", "scrollSamples", "conversions", "revenue", CAST(NULL AS REAL) AS "impressions", "interactions", "pageviewsWithoutVisitor", "pageviewsWithoutConsent" FROM hr
+		UNION ALL SELECT "k", "v1", "v2", "hostname", CAST(NULL AS REAL) AS "pageviews", "events", "visitors", CAST(NULL AS REAL) AS "sessions", CAST(NULL AS REAL) AS "entries", CAST(NULL AS REAL) AS "bounces", CAST(NULL AS REAL) AS "sessionMs", CAST(NULL AS REAL) AS "durationMs", CAST(NULL AS REAL) AS "scrollSum", CAST(NULL AS REAL) AS "scrollSamples", "conversions", "revenue", "impressions", "interactions", CAST(NULL AS REAL) AS "pageviewsWithoutVisitor", CAST(NULL AS REAL) AS "pageviewsWithoutConsent" FROM xr),
+	rk AS (SELECT "k", "v1", "v2", "hostname", "pageviews", "events", "visitors", "sessions", "entries", "bounces", "sessionMs", "durationMs", "scrollSum", "scrollSamples", "conversions", "revenue", "impressions", "interactions", "pageviewsWithoutVisitor", "pageviewsWithoutConsent",
 			ROW_NUMBER() OVER (PARTITION BY "k", "hostname", CASE WHEN "k" IN (20, 21, 22, 24) THEN "v1" ELSE '' END ORDER BY COALESCE("pageviews", "impressions", 0) DESC, COALESCE("events", 0) DESC, "v1" ASC, "v2" ASC) AS "rn",
 			CASE "k" WHEN 1 THEN 500 WHEN 2 THEN 500 WHEN 4 THEN 300 WHEN 5 THEN 300 WHEN 6 THEN 300 WHEN 7 THEN 300 WHEN 8 THEN 300 WHEN 10 THEN 300 WHEN 11 THEN 500 WHEN 12 THEN 200 WHEN 16 THEN 10000 WHEN 17 THEN 300 WHEN 18 THEN 100 WHEN 20 THEN 300 WHEN 21 THEN 300 WHEN 22 THEN 300 WHEN 24 THEN 2000 END AS "cap"
 		FROM u)
-	SELECT "k", "v1", "v2", "hostname", "pageviews", "events", "visitors", "sessions", "entries", "bounces", "sessionMs", "durationMs", "scrollSum", "scrollSamples", "conversions", "revenue", "impressions", "interactions", 0 AS "o" FROM rk WHERE "cap" IS NULL OR "rn" <= "cap"
-	UNION ALL SELECT "k", CASE WHEN "k" IN (20, 21, 22, 24) THEN "v1" ELSE '' END AS "v1", '' AS "v2", "hostname", SUM("pageviews") AS "pageviews", SUM("events") AS "events", CAST(NULL AS REAL) AS "visitors", CAST(NULL AS REAL) AS "sessions", SUM("entries") AS "entries", SUM("bounces") AS "bounces", CAST(NULL AS REAL) AS "sessionMs", SUM("durationMs") AS "durationMs", SUM("scrollSum") AS "scrollSum", SUM("scrollSamples") AS "scrollSamples", SUM("conversions") AS "conversions", SUM("revenue") AS "revenue", SUM("impressions") AS "impressions", SUM("interactions") AS "interactions", 1 AS "o"
+	SELECT "k", "v1", "v2", "hostname", "pageviews", "events", "visitors", "sessions", "entries", "bounces", "sessionMs", "durationMs", "scrollSum", "scrollSamples", "conversions", "revenue", "impressions", "interactions", "pageviewsWithoutVisitor", "pageviewsWithoutConsent", 0 AS "o" FROM rk WHERE "cap" IS NULL OR "rn" <= "cap"
+	UNION ALL SELECT "k", CASE WHEN "k" IN (20, 21, 22, 24) THEN "v1" ELSE '' END AS "v1", '' AS "v2", "hostname", SUM("pageviews") AS "pageviews", SUM("events") AS "events", CAST(NULL AS REAL) AS "visitors", CAST(NULL AS REAL) AS "sessions", SUM("entries") AS "entries", SUM("bounces") AS "bounces", CAST(NULL AS REAL) AS "sessionMs", SUM("durationMs") AS "durationMs", SUM("scrollSum") AS "scrollSum", SUM("scrollSamples") AS "scrollSamples", SUM("conversions") AS "conversions", SUM("revenue") AS "revenue", SUM("impressions") AS "impressions", SUM("interactions") AS "interactions", SUM("pageviewsWithoutVisitor") AS "pageviewsWithoutVisitor", SUM("pageviewsWithoutConsent") AS "pageviewsWithoutConsent", 1 AS "o"
 		FROM rk WHERE "rn" > "cap" GROUP BY "k", "hostname", CASE WHEN "k" IN (20, 21, 22, 24) THEN "v1" ELSE '' END
-	UNION ALL SELECT -1, '', '', '', COUNT(*), NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0 FROM a
+	UNION ALL SELECT -1, '', '', '', COUNT(*), NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 0 FROM a
 
 -- parameters
 -- 1: 1

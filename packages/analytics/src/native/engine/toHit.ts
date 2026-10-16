@@ -26,7 +26,8 @@ export const isLanding = (
 
 /**
  * Where a visit came from: the referrer on a landing alone, tags and click id on any hit. A hit
- * with no visitor claims no source unless it carries one: a webhook is not direct traffic.
+ * with no visitor claims no source unless it carries one, or is a page's landing: a webhook is not
+ * direct traffic, and an anonymous page further into a visit is not either.
  */
 const acquisitionOf = (event: NormalizedEvent, landing: boolean): Partial<HitRow> => {
 	const ref = landing ? event.referrerHost : undefined
@@ -36,7 +37,7 @@ const acquisitionOf = (event: NormalizedEvent, landing: boolean): Partial<HitRow
 		[event.utmSource, event.utmMedium, event.utmCampaign, event.utmContent, event.utmTerm].some(
 			(tag) => tag !== undefined
 		)
-	if (event.visitorId === '' && !tagged) {
+	if (event.visitorId === '' && !tagged && (event.server === true || !landing)) {
 		return {}
 	}
 	return {
@@ -87,6 +88,7 @@ export const toHit = (event: NormalizedEvent, context: HitContext): HitRow => {
 		v: event.visitorId ?? '',
 		landing,
 		server: event.server === true,
+		mode: event.mode ?? 'f',
 		durationMs: event.durationMs,
 		scrollDepth: event.scrollDepth,
 	}

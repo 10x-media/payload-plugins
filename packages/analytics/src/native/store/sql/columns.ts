@@ -12,6 +12,7 @@ export const HIT_COLUMNS: { readonly [K in keyof HitRow]-?: string } = {
 	v: 'v',
 	landing: 'landing',
 	server: 'server',
+	mode: 'mode',
 	name: 'name',
 	ref: 'ref',
 	source: 'source',

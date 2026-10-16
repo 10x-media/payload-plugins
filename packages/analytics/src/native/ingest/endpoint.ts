@@ -268,6 +268,11 @@ export const makeIngestHandler = ({
 		if (param !== undefined) {
 			return invalidField(param)
 		}
+		const mode = raw.m ?? 'f'
+		// Anonymous time and scroll are never stored, so the beacon that carries them costs no more.
+		if (mode === 'a' && raw.type === 'engagement') {
+			return accepted()
+		}
 		const receivedAt = currentDate()
 		const at = eventTime(raw, receivedAt)
 		// The host's resolvers are asked about the visit, never the signed-in editor whose session
@@ -315,15 +320,20 @@ export const makeIngestHandler = ({
 		if (!order.ok) {
 			return drop(req, 'order refused')
 		}
-		const salt = await saltForHit(
-			salts,
-			{
-				scope: scope ?? '',
-				at,
-				zone: () => (resolveTimezone ? resolveTimezone(visitor, scope ?? null) : DEFAULT_TIMEZONE),
-			},
-			() => warnOnce(req, 'timezone unresolved')
-		)
+		// An anonymous hit hashes no visitor, so it needs no salt.
+		const salt =
+			mode === 'a'
+				? ''
+				: await saltForHit(
+						salts,
+						{
+							scope: scope ?? '',
+							at,
+							zone: () =>
+								resolveTimezone ? resolveTimezone(visitor, scope ?? null) : DEFAULT_TIMEZONE,
+						},
+						() => warnOnce(req, 'timezone unresolved')
+					)
 		// Goals resolve under the same scope the event is stamped with, so a tenant's event
 		// can only ever complete that tenant's goals. An engagement completes none.
 		const goals =
@@ -362,6 +372,7 @@ export const makeIngestHandler = ({
 			...(items ? { items } : {}),
 			...(siblings ? { siblings } : {}),
 			orderKey: orderDigestKey(req.payload?.secret),
+			mode,
 		})
 		// Nothing left to add once sanitized: no time, no scroll and no item seen moves no number.
 		if (

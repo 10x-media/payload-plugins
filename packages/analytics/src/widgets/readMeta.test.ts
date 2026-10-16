@@ -22,6 +22,7 @@ describe('readMeta', () => {
 			failed: false,
 			timezoneUnresolved: false,
 			visitorsSummed: false,
+			withoutConsentDropped: false,
 			mixedCurrencies: [],
 			provider: 'native',
 		})
@@ -58,6 +59,24 @@ describe('readMeta', () => {
 		expect(mergeNotices({ visitorsSummed: false }, { visitorsSummed: true }).visitorsSummed).toBe(
 			true
 		)
+	})
+
+	it('says the vendor drops what is counted without consent when any read says so', () => {
+		expect(readMeta(result({ withoutConsentDropped: true })).withoutConsentDropped).toBe(true)
+		expect(readMeta(result()).withoutConsentDropped).toBe(false)
+		expect(
+			mergeNotices({ withoutConsentDropped: false }, { withoutConsentDropped: true })
+				.withoutConsentDropped
+		).toBe(true)
+	})
+
+	it('keeps the range’s pageviews without a visitor once, however many reads carry them', () => {
+		expect(readMeta(result({ withoutVisitor: { pageviews: 1204 } })).withoutVisitor).toBe(1204)
+		expect(readMeta(result()).withoutVisitor).toBeUndefined()
+		expect(mergeNotices({ withoutVisitor: 1204 }, { withoutVisitor: 300 }, {}).withoutVisitor).toBe(
+			1204
+		)
+		expect(mergeNotices({}, undefined).withoutVisitor).toBeUndefined()
 	})
 
 	it('carries clamped, stale and sampled straight through', () => {
@@ -142,6 +161,7 @@ describe('mergeNotices', () => {
 			failed: false,
 			timezoneUnresolved: false,
 			visitorsSummed: false,
+			withoutConsentDropped: false,
 			mixedCurrencies: ['EUR', 'GBP', 'USD'],
 			asOf: '2026-06-24T11:55:00.000Z',
 		})

@@ -1,7 +1,7 @@
 import { PURCHASE_GOAL_SLUG } from '../goals/constants'
 import { sanitizeItems } from '../goals/items'
 import { type AutoCapture, createAutoCapture, itemCaptureOf } from './autoCapture'
-import type { TrackerConfig } from './config'
+import type { SlotMode, TrackerConfig } from './config'
 import { matchesDigest } from './digest'
 import { createEngagement, msSince } from './engagement'
 import { campaignFields, type ItemCall, itemFields, pageContext } from './events'
@@ -14,11 +14,11 @@ import {
 	writeExclusion,
 } from './exclusion'
 import {
+	ALL_OFF,
 	ALL_PENDING,
 	createGate,
 	createGateQueue,
 	forgetLegacyConsent,
-	type GateTransition,
 	queueable,
 } from './gate'
 import { createItemCapture, type ItemCapture } from './itemCapture'
@@ -33,6 +33,7 @@ import type {
 	TrackerEvent,
 	TrackerOptions,
 	TrackGoalOptions,
+	VendorMode,
 } from './types'
 import { currentWindow } from './window'
 
@@ -63,6 +64,14 @@ interface Waiting {
 	at: number
 }
 
+/** How far each mode goes, for a restore that must never lower a vendor already running. */
+const MODE_RANK: Readonly<Record<SlotMode, number>> = {
+	off: 0,
+	anonymous: 1,
+	cookieless: 2,
+	full: 3,
+}
+
 /** How a tracker puts its held slots back to pending after a back/forward cache restore. */
 const restorers = new WeakMap<Tracker, (event: Event) => void>()
 
@@ -83,6 +92,7 @@ export const createNoopTracker = (): Tracker => ({
 	refund: () => undefined,
 	setGate: () => undefined,
 	gate: ALL_PENDING,
+	mode: ALL_OFF,
 	excluded: false,
 	exclude: () => undefined,
 	flush: () => undefined,
@@ -106,6 +116,9 @@ const createSkippedTracker = (config: TrackerConfig, boot: GateState | undefined
 		get gate() {
 			return gate.snapshot
 		},
+		get mode() {
+			return gate.modes
+		},
 	}
 	restorers.set(tracker, () => gate.reset())
 	return tracker
@@ -113,7 +126,8 @@ const createSkippedTracker = (config: TrackerConfig, boot: GateState | undefined
 
 /**
  * The browser tracker: one sink per slot behind a gate the host's consent manager answers, kept in
- * memory alone. No storage is touched before a slot opens, the exclusion link's own write aside.
+ * memory alone, each slot capturing in the mode its gate gives it. No storage is touched before a
+ * slot runs in full, the exclusion link's own aside.
  */
 export const createTracker = (config: TrackerConfig, options: TrackerOptions = {}): Tracker => {
 	const win = currentWindow(options.window)
@@ -131,7 +145,7 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 	const snippets = options.snippets !== false
 	const loadScript = options.loadScript ?? createScriptLoader(win, options.nonce)
 	let auto: AutoCapture | null = null
-	/** False until the stored flag is read, which waits for the first slot to open. */
+	/** False until the stored flag is read, which waits for the first slot to run in full. */
 	let excluded = false
 	/** Whether the stored flag was read, or made moot by an explicit exclusion on this page. */
 	let flagKnown = false
@@ -145,26 +159,31 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 	/** The page turned out to be the live preview: nothing more is sent, and the gate still answers. */
 	let skipped = false
 
+	const gate = createGate(config.slots)
+
 	const entries = config.slots.map((slot) => ({
 		slot: slot.slot,
 		kind: slot.kind,
-		/** What waits while the slot's gate is pending, or while the page is only prerendered. */
+		/** What waits while the slot is pending and sends nothing, or while the page is only prerendered. */
 		queue: createGateQueue<Waiting>(),
-		/**
-		 * Whether an opening or an explicit inclusion cleared this vendor's own opt-out on this page,
-		 * which the slot's scripts having run then clears once more.
-		 */
-		lifted: false,
-		/** Whether the slot was open on this page, so its script may be running whatever its gate says now. */
+		/** Whether the slot's scripts were loaded on this page, so they may be running whatever its mode says now. */
 		ran: false,
-		sink: createSink({ slot, win, loadScript, ingestPath: config.ingestPath, snippets }),
+		sink: createSink({
+			slot,
+			win,
+			loadScript,
+			ingestPath: config.ingestPath,
+			snippets,
+			mode: () => gate.mode(slot.slot),
+		}),
 	}))
 
 	type Entry = (typeof entries)[number]
 
-	const gate = createGate(config.slots)
+	const modeOf = (entry: Entry): SlotMode => gate.mode(entry.slot)
 
-	const allowed = (entry: Entry): boolean => gate.status(entry.slot) === 'open'
+	/** Whether the slot sends what it is given now, in full or without consent. */
+	const sends = (entry: Entry): boolean => modeOf(entry) !== 'off'
 
 	const live = (): boolean => !destroyed && !skipped
 
@@ -199,7 +218,7 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 					return
 				}
 				for (const entry of entries) {
-					if (allowed(entry)) {
+					if (sends(entry)) {
 						load(entry)
 						drain(entry)
 					}
@@ -211,23 +230,13 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 		return true
 	}
 
-	/**
-	 * Injects the slot's scripts, then clears the vendor's opt-out once more when this page lifted
-	 * it: a vendor whose snippet defines its global (PostHog) had none to clear before the snippet ran.
-	 */
+	/** Injects the slot's scripts; its sink switches the vendor once more when they ran. */
 	const load = (entry: Entry) => {
 		if (excluded || held !== null || !live() || waitUntilShown()) {
 			return
 		}
 		entry.ran = true
-		void entry.sink
-			.ready()
-			.then(() => {
-				if (entry.lifted && !excluded && allowed(entry) && live()) {
-					switchVendor(entry, false)
-				}
-			})
-			.catch(() => undefined)
+		void entry.sink.ready().catch(() => undefined)
 	}
 
 	/** The event as sent, with how long it waited when it waited at all. */
@@ -274,10 +283,9 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 			return
 		}
 		for (const entry of entries) {
-			const status = gate.status(entry.slot)
-			if (status === 'open') {
+			if (sends(entry)) {
 				deliver(entry, event, at)
-			} else if (status === 'pending') {
+			} else if (gate.status(entry.slot) === 'pending') {
 				hold(entry, event, at)
 			}
 		}
@@ -296,14 +304,16 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 	})
 
 	/**
-	 * Watches for items while a native slot may receive what it sees, and not otherwise: never
-	 * while the browser is excluded, and never while that slot's gate is not open.
+	 * Watches for items while a native slot may receive what it sees, and not otherwise: never while
+	 * the browser is excluded, and never while that slot sends nothing or keeps no engagement.
 	 */
 	const syncItems = () => {
 		if (!items) {
 			return
 		}
-		if (!excluded && entries.some((entry) => entry.kind === 'native' && allowed(entry))) {
+		const counting = (entry: Entry) =>
+			entry.kind === 'native' && (modeOf(entry) === 'full' || modeOf(entry) === 'cookieless')
+		if (!excluded && entries.some(counting)) {
 			items.start()
 		} else {
 			items.stop()
@@ -403,32 +413,40 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 		warnDropped(BROWSER_REFUND)
 	}
 
-	/** Sets or clears the vendor's own opt-out, noting whether this page lifted it. */
-	const switchVendor = (entry: Entry, optOut: boolean) => {
-		entry.lifted = !optOut
-		guard(() => entry.sink.exclude?.(optOut))
+	/** What the vendor's own client should do now: the slot's mode, or nothing while excluded. */
+	const vendorMode = (entry: Entry): VendorMode => {
+		const mode = modeOf(entry)
+		if (excluded || mode === 'off') {
+			return 'off'
+		}
+		return mode === 'full' ? 'full' : 'cookieless'
+	}
+
+	/** Switches the vendor's own client to what the slot and the exclusion say; `refused` by a refusal. */
+	const switchVendor = (entry: Entry, refused = false) => {
+		guard(() => entry.sink.mode?.({ mode: vendorMode(entry), refused }))
 	}
 
 	/**
-	 * Whether the slot's vendor script may be running: the slot is or was open on this page, or the
+	 * Whether the slot's vendor script may be running: the slot sends or sent on this page, or the
 	 * host loads the vendor scripts itself.
 	 */
-	const mayRun = (entry: Entry, open: boolean): boolean => open || entry.ran || !snippets
+	const mayRun = (entry: Entry, sent: boolean): boolean => sent || entry.ran || !snippets
 
 	/**
-	 * Mirrors the flag into each vendor's own opt-out, which is all a snippet the server rendered
-	 * obeys. Clearing reaches only an open slot: putting a browser back must never undo a refusal.
+	 * Mirrors the flag into each vendor's own client, which is all a snippet the server rendered obeys.
+	 * Clearing reaches only a slot that sends: putting a browser back must never undo a refusal.
 	 */
 	const syncVendors = (next: boolean) => {
 		for (const entry of entries) {
-			if (next || allowed(entry)) {
-				switchVendor(entry, next)
+			if (next || sends(entry)) {
+				switchVendor(entry)
 			}
 		}
 	}
 
 	/**
-	 * Reads the exclusion flag and deletes beta.11's consent key, once a slot is open and never
+	 * Reads the exclusion flag and deletes beta.11's consent key, once a slot runs in full and never
 	 * before, unless the link's `=0` already settled the flag.
 	 */
 	const touchStorage = () => {
@@ -447,43 +465,58 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 		announceExclusion(true)
 		silence()
 		for (const entry of entries) {
-			if (mayRun(entry, allowed(entry))) {
-				switchVendor(entry, true)
+			if (mayRun(entry, sends(entry))) {
+				switchVendor(entry)
 			}
 		}
 	}
 
-	/** Drops what waited, and puts the refusal to the vendor itself whenever its script may be running. */
-	const close = (entry: Entry, from: GateTransition['from']) => {
-		entry.queue.clear()
-		entry.lifted = false
-		if (mayRun(entry, from === 'open')) {
+	/** Injects the slot's snippet and sends what waited, in order. */
+	const release = (entry: Entry) => {
+		load(entry)
+		drain(entry)
+	}
+
+	/**
+	 * A refusal: a slot that counts without consent drops to that level, and any other drops what
+	 * waited and puts the refusal to the vendor itself whenever its script may be running. Either
+	 * way the vendor forgets what an earlier page's consent left on the device.
+	 */
+	const close = (entry: Entry, was: SlotMode) => {
+		const sending = sends(entry)
+		if (sending || mayRun(entry, was !== 'off')) {
 			switchVendor(entry, true)
+		}
+		guard(() => entry.sink.forget?.())
+		if (sending) {
+			release(entry)
+		} else {
+			entry.queue.clear()
 		}
 	}
 
 	/**
-	 * Clears the vendor's own switch unless the browser is excluded (a refusal on an earlier page may
-	 * have set it), then injects the slot's snippet and sends what waited, in order.
+	 * Lifts the vendor's own switch unless the browser is excluded (a refusal on an earlier page may
+	 * have set it), then injects the slot's snippet and sends what waited.
 	 */
 	const open = (entry: Entry) => {
 		touchStorage()
 		if (!excluded) {
-			switchVendor(entry, false)
+			switchVendor(entry)
 		}
-		load(entry)
-		drain(entry)
+		release(entry)
 	}
 
 	const setGate = (state: GateState) => {
 		if (destroyed) {
 			return
 		}
+		const was = gate.modes
 		const moved = gate.answer(state)
 		if (skipped) {
 			return
 		}
-		for (const { slot, from, to } of moved) {
+		for (const { slot, to } of moved) {
 			const entry = entries.find((candidate) => candidate.slot === slot)
 			if (!entry) {
 				continue
@@ -491,7 +524,7 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 			if (to === 'open') {
 				open(entry)
 			} else {
-				close(entry, from)
+				close(entry, was[slot])
 			}
 		}
 		syncItems()
@@ -501,16 +534,25 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 
 	/**
 	 * A page restored from the back/forward cache may have been refused in another tab since: its
-	 * held slots wait for the host to answer again, and what is sent meanwhile is queued.
+	 * held slots return to their pending mode until the host answers again. A vendor already running
+	 * keeps running until that answer, which switches it as any refusal would.
 	 */
 	const restore = (event: Event) => {
 		if (restoredBy === event || !live()) {
 			return
 		}
 		restoredBy = event
-		if (gate.reset()) {
-			syncItems()
+		const was = gate.modes
+		if (!gate.reset()) {
+			return
 		}
+		for (const entry of entries) {
+			if (MODE_RANK[modeOf(entry)] > MODE_RANK[was[entry.slot]]) {
+				switchVendor(entry)
+				release(entry)
+			}
+		}
+		syncItems()
 	}
 
 	const onPageShow = (event: PageTransitionEvent) => {
@@ -549,9 +591,9 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 		}
 	}
 
-	const loadOpenSlots = () => {
+	const loadSendingSlots = () => {
 		for (const entry of entries) {
-			if (allowed(entry)) {
+			if (sends(entry)) {
 				load(entry)
 			}
 		}
@@ -559,10 +601,10 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 
 	/** The boot proper, once whatever the page was opened with is settled. */
 	const start = () => {
-		if (entries.some(allowed)) {
+		if (entries.some((entry) => modeOf(entry) === 'full')) {
 			touchStorage()
 		}
-		loadOpenSlots()
+		loadSendingSlots()
 		page()
 	}
 
@@ -637,6 +679,9 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 		get gate() {
 			return gate.snapshot
 		},
+		get mode() {
+			return gate.modes
+		},
 		get excluded() {
 			return excluded
 		},
@@ -652,7 +697,7 @@ export const createTracker = (config: TrackerConfig, options: TrackerOptions = {
 				silence()
 				return
 			}
-			loadOpenSlots()
+			loadSendingSlots()
 		},
 		destroy() {
 			if (destroyed) {

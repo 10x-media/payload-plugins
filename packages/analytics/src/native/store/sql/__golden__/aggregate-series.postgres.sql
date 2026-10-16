@@ -15,6 +15,8 @@ WITH m AS (SELECT "scope", "day", "gen" FROM "analytics"."analytics_state"
 		SUM("g"."revenue") AS "revenue",
 		SUM("g"."impressions") AS "impressions",
 		SUM("g"."interactions") AS "interactions",
+		SUM("g"."pageviews_without_visitor") AS "pageviewsWithoutVisitor",
+		SUM("g"."pageviews_without_consent") AS "pageviewsWithoutConsent",
 		COUNT(*) AS "n"
 		FROM "analytics"."analytics_aggregates" AS "g"
 			JOIN m ON "m"."scope" = "g"."scope" AND "m"."day" = "g"."day" AND "m"."gen" = "g"."gen"

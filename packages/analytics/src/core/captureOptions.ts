@@ -1,8 +1,13 @@
 import { DEFAULT_PROXY_MAX_BODY_BYTES, DEFAULT_PROXY_TIMEOUT_MS } from '../capture/proxyEndpoint'
 import { resolveAllowedOrigins } from '../capture/requestTrust'
-import { isCaptureSlot } from '../capture/slots'
+import { CAPTURE_SLOTS, isCaptureSlot } from '../capture/slots'
+import {
+	CONSENT_PHASES,
+	slotWithoutConsent,
+	WITHOUT_CONSENT_LEVELS,
+} from '../capture/withoutConsent'
 import { isTrustedPlatform } from '../net/platform'
-import type { CaptureSlot, TrackerSkip } from '../tracker/config'
+import type { CaptureSlot, ConsentPhase, TrackerSkip, WithoutConsentLevel } from '../tracker/config'
 import {
 	DEFAULT_AUTO_CAPTURE,
 	DEFAULT_ITEM_CAPTURE,
@@ -12,6 +17,7 @@ import {
 } from '../tracker/config'
 import { DEFAULT_EXCLUSION_PARAM } from '../tracker/exclusion'
 import { DEFAULT_TRACKER_SKIP } from '../tracker/skip'
+import type { AnalyticsAdapter } from './contract'
 import { keysOf, optionalBoolean, optionsObject, positiveWhole } from './optionChecks'
 import type {
 	AnalyticsCaptureOptions,
@@ -23,13 +29,15 @@ import type {
 	ItemCaptureOptions,
 	ResolvedCapture,
 	ResolvedOptions,
+	ResolvedWithoutConsent,
 } from './options'
 import { siteAddress } from './siteAddress'
 import { assertNamesAdapter } from './sourceOptions'
-import { kindOf } from './values'
+import { isOneOf, kindOf } from './values'
 
 const CAPTURE_KEYS = keysOf<AnalyticsCaptureOptions>({
 	gate: true,
+	withoutConsent: true,
 	allowedOrigins: true,
 	exclusion: true,
 	slots: true,
@@ -139,6 +147,116 @@ const resolveGate = (
 	}
 	throw new Error(
 		`analytics: capture.gate must be 'all', 'off', a list of slots or a function, got ${kindOf(option)}`
+	)
+}
+
+const isLevel = (value: unknown): value is WithoutConsentLevel =>
+	isOneOf(WITHOUT_CONSENT_LEVELS, value)
+
+const resolveWithoutConsent = (
+	option: AnalyticsCaptureOptions['withoutConsent']
+): ResolvedWithoutConsent | undefined => {
+	if (option === undefined || typeof option === 'function') {
+		return option
+	}
+	if (isLevel(option)) {
+		return { pending: option, refused: option }
+	}
+	const phases = optionsObject(option, {
+		path: 'capture.withoutConsent',
+		known: CONSENT_PHASES,
+		example: "'cookieless', 'off', an object such as { refused: 'off' } or a function",
+	})
+	const level = (phase: ConsentPhase): WithoutConsentLevel => {
+		const value = phases[phase]
+		if (value === undefined) {
+			return 'cookieless'
+		}
+		if (!isLevel(value)) {
+			throw new Error(
+				`analytics: capture.withoutConsent.${phase} must be 'cookieless' or 'off', got ${kindOf(value)}`
+			)
+		}
+		return value
+	}
+	return { pending: level('pending'), refused: level('refused') }
+}
+
+/** Slots the gate may hold, judged without calling host code: a function may hold either. */
+const heldAtBoot = (gate: AnalyticsCaptureOptions['gate']): ReadonlySet<CaptureSlot> =>
+	new Set(gate === 'off' ? [] : Array.isArray(gate) ? gate : CAPTURE_SLOTS)
+
+/**
+ * Whether a source following `capture.withoutConsent` may count without consent: unless the option
+ * is `'off'` in both phases, since a function may answer `'cookieless'`.
+ */
+export const followingCountsWithoutConsent = (
+	option: ResolvedWithoutConsent | undefined
+): boolean =>
+	typeof option === 'function' ||
+	CONSENT_PHASES.some((phase) => (option?.[phase] ?? 'cookieless') !== 'off')
+
+/** What the boot knows about which config adapter fills which slot; a resolved install is one. */
+export interface BootFill {
+	adapters: readonly AnalyticsAdapter[]
+	platformAdapter?: string
+	scoped: boolean
+	capture: Pick<ResolvedCapture, 'slots' | 'heldSlots' | 'withoutConsent'>
+}
+
+/** Whether a config adapter may fill `slot`, as far as the boot can tell without a request. */
+const fillsAtBoot = (fill: BootFill, slot: CaptureSlot, adapterId: string): boolean => {
+	const configured = fill.capture.slots[slot]
+	if (configured === false) {
+		return false
+	}
+	if (slot === 'tenant') {
+		return fill.scoped && (configured === undefined || configured === adapterId)
+	}
+	const only = fill.adapters.length === 1 ? fill.adapters[0]?.id : undefined
+	return (configured || fill.platformAdapter || only) === adapterId
+}
+
+/**
+ * Whether a config adapter may count without consent in a slot the gate holds, judged at boot
+ * without calling a host function: a `capture.withoutConsent` function may answer `'cookieless'`.
+ */
+export const adapterCountsWithoutConsent = (fill: BootFill, adapter: AnalyticsAdapter): boolean => {
+	const capture = adapter.capture
+	if (!capture) {
+		return false
+	}
+	const option = fill.capture.withoutConsent
+	const answered = typeof option === 'function' ? () => 'cookieless' as const : option
+	return CAPTURE_SLOTS.some(
+		(slot) =>
+			fill.capture.heldSlots.has(slot) &&
+			fillsAtBoot(fill, slot, adapter.id) &&
+			slotWithoutConsent({
+				slot,
+				adapterId: adapter.id,
+				kind: capture.client.kind,
+				capture,
+				option: answered,
+			}) !== undefined
+	)
+}
+
+/**
+ * Whether a held tenant slot may fall to a runtime provider document's adapter: with providers on,
+ * unless the slot names a config adapter.
+ */
+export const documentsFillHeldTenant = (
+	fill: Pick<BootFill, 'adapters' | 'scoped' | 'capture'>,
+	providersOn: boolean
+): boolean => {
+	const configured = fill.capture.slots.tenant
+	return (
+		providersOn &&
+		fill.scoped &&
+		configured !== false &&
+		fill.capture.heldSlots.has('tenant') &&
+		!fill.adapters.some((adapter) => adapter.id === configured)
 	)
 }
 
@@ -314,10 +432,27 @@ export const resolveCapture = (
 	if (typeof globalSlot === 'string') {
 		assertNamesAdapter(globalSlot, 'capture.slots.global', options.adapters ?? [])
 	}
+	const gate = resolveGate(option?.gate, fillableSlots(options, scoped).length > 0)
+	const withoutConsent = resolveWithoutConsent(option?.withoutConsent)
+	const fill: BootFill = {
+		adapters: options.adapters ?? [],
+		...(options.platformAdapter ? { platformAdapter: options.platformAdapter } : {}),
+		scoped,
+		capture: {
+			slots: { global: globalSlot, tenant: option?.slots?.tenant },
+			heldSlots: heldAtBoot(option?.gate),
+			...(withoutConsent === undefined ? {} : { withoutConsent }),
+		},
+	}
+	const providersOn =
+		Boolean(options.providers?.collection) || options.providers?.resolve !== undefined
 	return {
-		slots: { global: globalSlot, tenant: option?.slots?.tenant },
+		...fill.capture,
 		paths: { global: option?.paths?.global, tenant: option?.paths?.tenant },
-		gate: resolveGate(option?.gate, fillableSlots(options, scoped).length > 0),
+		gate,
+		installCountsWithoutConsent:
+			fill.adapters.some((adapter) => adapterCountsWithoutConsent(fill, adapter)) ||
+			(documentsFillHeldTenant(fill, providersOn) && followingCountsWithoutConsent(withoutConsent)),
 		autoCapture: resolveAutoCapture(option?.autoCapture),
 		proxy: {
 			timeoutMs: positiveWhole(
@@ -392,3 +527,29 @@ export const untrustedAddressNotice = (
 		? "analytics: visitor IP addresses and countries can be spoofed on this install. Neither trustedProxyHops nor trustedPlatform is set, so the plugin reads them from request headers a visitor can write. Set trustedPlatform to 'vercel' or 'cloudflare' when the app runs behind one, or trustedProxyHops to the number of proxies in front of it."
 		: null
 }
+
+/**
+ * The boot line for an install leaving `capture.withoutConsent` unset while a held slot may count
+ * without consent, naming the default in effect; null otherwise.
+ */
+export const withoutConsentUnsetNotice = (
+	resolved: Pick<ResolvedOptions, 'capture'>
+): string | null =>
+	resolved.capture.withoutConsent === undefined && resolved.capture.installCountsWithoutConsent
+		? "analytics: capture.withoutConsent is unset, so held slots measure cookielessly before consent and after a refusal. Set it to 'off' to send nothing without consent."
+		: null
+
+/**
+ * The production boot warning for a held slot counting without consent while nothing says where
+ * the client address comes from, or null: cookieless counting tells visitors apart by its hash.
+ */
+export const cookielessTrustNotice = (
+	resolved: Pick<ResolvedOptions, 'trustedProxyHops' | 'trustedPlatform' | 'capture'>,
+	production: boolean
+): string | null =>
+	production &&
+	resolved.capture.installCountsWithoutConsent &&
+	resolved.trustedProxyHops === undefined &&
+	resolved.trustedPlatform === undefined
+		? "analytics: a held capture slot counts visitors cookielessly, telling them apart by a hash of the client IP address, yet neither trustedProxyHops nor trustedPlatform is set. Behind a proxy, a missing or wrong hop count hashes the proxy's address instead and collapses every visitor into one. Set trustedPlatform to 'vercel' or 'cloudflare', or trustedProxyHops to the number of proxies in front of the app."
+		: null

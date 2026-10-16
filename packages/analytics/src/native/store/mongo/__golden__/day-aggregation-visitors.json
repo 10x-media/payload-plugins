@@ -418,6 +418,9 @@
 			"scrollDepth": {
 				"$ifNull": ["$scrollDepth", null]
 			},
+			"mode": {
+				"$ifNull": ["$mode", null]
+			},
 			"conversions": {
 				"$ifNull": ["$conversions", null]
 			},
@@ -735,6 +738,27 @@
 									},
 									{
 										"$ne": ["$item", ""]
+									}
+								]
+							},
+							1,
+							0
+						]
+					},
+					"window": {
+						"documents": ["unbounded", "unbounded"]
+					}
+				},
+				"v_npc": {
+					"$sum": {
+						"$cond": [
+							{
+								"$and": [
+									{
+										"$eq": ["$type", "pageview"]
+									},
+									{
+										"$in": ["$mode", ["c", "a"]]
 									}
 								]
 							},
@@ -1204,6 +1228,16 @@
 											"revenue": "$v_rev",
 											"impressions": 0,
 											"interactions": "$v_int",
+											"pageviewsWithoutVisitor": {
+												"$cond": [
+													{
+														"$eq": ["$v", ""]
+													},
+													"$s_pv",
+													0
+												]
+											},
+											"pageviewsWithoutConsent": "$v_npc",
 											"once": 1
 										}
 									],
@@ -1273,6 +1307,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -1345,6 +1389,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -1417,6 +1471,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -1489,6 +1553,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -1561,6 +1635,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -1633,6 +1717,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -1705,6 +1799,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -1777,6 +1881,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -1849,6 +1963,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -1921,6 +2045,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -1993,6 +2127,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -2065,6 +2209,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -2137,6 +2291,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -2209,6 +2373,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -2281,6 +2455,16 @@
 													"revenue": "$v_rev",
 													"impressions": 0,
 													"interactions": "$v_int",
+													"pageviewsWithoutVisitor": {
+														"$cond": [
+															{
+																"$eq": ["$v", ""]
+															},
+															"$s_pv",
+															0
+														]
+													},
+													"pageviewsWithoutConsent": "$v_npc",
 													"once": 1
 												}
 											],
@@ -2416,6 +2600,38 @@
 													},
 													{
 														"$ne": ["$item", ""]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"pageviewsWithoutVisitor": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "pageview"]
+													},
+													{
+														"$eq": ["$v", ""]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"pageviewsWithoutConsent": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "pageview"]
+													},
+													{
+														"$in": ["$mode", ["c", "a"]]
 													}
 												]
 											},
@@ -2565,6 +2781,38 @@
 											1,
 											0
 										]
+									},
+									"pageviewsWithoutVisitor": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "pageview"]
+													},
+													{
+														"$eq": ["$v", ""]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"pageviewsWithoutConsent": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "pageview"]
+													},
+													{
+														"$in": ["$mode", ["c", "a"]]
+													}
+												]
+											},
+											1,
+											0
+										]
 									}
 								}
 							],
@@ -2695,6 +2943,38 @@
 													},
 													{
 														"$ne": ["$item", ""]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"pageviewsWithoutVisitor": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "pageview"]
+													},
+													{
+														"$eq": ["$v", ""]
+													}
+												]
+											},
+											1,
+											0
+										]
+									},
+									"pageviewsWithoutConsent": {
+										"$cond": [
+											{
+												"$and": [
+													{
+														"$eq": ["$type", "pageview"]
+													},
+													{
+														"$in": ["$mode", ["c", "a"]]
 													}
 												]
 											},
@@ -2857,6 +3137,38 @@
 																	1,
 																	0
 																]
+															},
+															"pageviewsWithoutVisitor": {
+																"$cond": [
+																	{
+																		"$and": [
+																			{
+																				"$eq": ["$type", "pageview"]
+																			},
+																			{
+																				"$eq": ["$v", ""]
+																			}
+																		]
+																	},
+																	1,
+																	0
+																]
+															},
+															"pageviewsWithoutConsent": {
+																"$cond": [
+																	{
+																		"$and": [
+																			{
+																				"$eq": ["$type", "pageview"]
+																			},
+																			{
+																				"$in": ["$mode", ["c", "a"]]
+																			}
+																		]
+																	},
+																	1,
+																	0
+																]
 															}
 														}
 													],
@@ -2995,6 +3307,38 @@
 																					},
 																					{
 																						"$ne": ["$item", ""]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"pageviewsWithoutVisitor": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "pageview"]
+																					},
+																					{
+																						"$eq": ["$v", ""]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"pageviewsWithoutConsent": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "pageview"]
+																					},
+																					{
+																						"$in": ["$mode", ["c", "a"]]
 																					}
 																				]
 																			},
@@ -3148,6 +3492,38 @@
 																			1,
 																			0
 																		]
+																	},
+																	"pageviewsWithoutVisitor": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "pageview"]
+																					},
+																					{
+																						"$eq": ["$v", ""]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"pageviewsWithoutConsent": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "pageview"]
+																					},
+																					{
+																						"$in": ["$mode", ["c", "a"]]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
 																	}
 																}
 															],
@@ -3295,6 +3671,38 @@
 																			1,
 																			0
 																		]
+																	},
+																	"pageviewsWithoutVisitor": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "pageview"]
+																					},
+																					{
+																						"$eq": ["$v", ""]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
+																	},
+																	"pageviewsWithoutConsent": {
+																		"$cond": [
+																			{
+																				"$and": [
+																					{
+																						"$eq": ["$type", "pageview"]
+																					},
+																					{
+																						"$in": ["$mode", ["c", "a"]]
+																					}
+																				]
+																			},
+																			1,
+																			0
+																		]
 																	}
 																}
 															],
@@ -3400,7 +3808,9 @@
 													1,
 													0
 												]
-											}
+											},
+											"pageviewsWithoutVisitor": 0,
+											"pageviewsWithoutConsent": 0
 										}
 									],
 									{
@@ -3491,7 +3901,9 @@
 															1,
 															0
 														]
-													}
+													},
+													"pageviewsWithoutVisitor": 0,
+													"pageviewsWithoutConsent": 0
 												}
 											],
 											[]
@@ -3597,7 +4009,9 @@
 																			1,
 																			0
 																		]
-																	}
+																	},
+																	"pageviewsWithoutVisitor": 0,
+																	"pageviewsWithoutConsent": 0
 																}
 															],
 															{
@@ -3688,7 +4102,9 @@
 																					1,
 																					0
 																				]
-																			}
+																			},
+																			"pageviewsWithoutVisitor": 0,
+																			"pageviewsWithoutConsent": 0
 																		}
 																	],
 																	[]
@@ -3780,6 +4196,12 @@
 			},
 			"interactions": {
 				"$sum": "$facts.interactions"
+			},
+			"pageviewsWithoutVisitor": {
+				"$sum": "$facts.pageviewsWithoutVisitor"
+			},
+			"pageviewsWithoutConsent": {
+				"$sum": "$facts.pageviewsWithoutConsent"
 			}
 		}
 	},
@@ -3842,6 +4264,12 @@
 			},
 			"interactions": {
 				"$sum": "$interactions"
+			},
+			"pageviewsWithoutVisitor": {
+				"$sum": "$pageviewsWithoutVisitor"
+			},
+			"pageviewsWithoutConsent": {
+				"$sum": "$pageviewsWithoutConsent"
 			}
 		}
 	},
@@ -4112,6 +4540,12 @@
 			},
 			"interactions": {
 				"$sum": "$interactions"
+			},
+			"pageviewsWithoutVisitor": {
+				"$sum": "$pageviewsWithoutVisitor"
+			},
+			"pageviewsWithoutConsent": {
+				"$sum": "$pageviewsWithoutConsent"
 			}
 		}
 	}

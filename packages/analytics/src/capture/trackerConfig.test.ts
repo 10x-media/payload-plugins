@@ -150,7 +150,10 @@ describe('resolveTrackerConfig slots', () => {
 		expect(tenant).toContain('posthog.init("phc_tenant",{api_host:"/api/_x/p/tenant"')
 		expect(tenant).toContain('capture_pageview:false,capture_pageleave:true')
 		expect(tenant).toContain('},"tenant")')
-		expect(tenant).toContain('posthog["tenant"].register({["site"]:"tenant-a"})')
+		// A slot counting without consent stamps its scope on every event: a mode switch drops `register`.
+		expect(tenant).toContain(
+			'before_send:function(e){e&&e.properties&&(e.properties["site"]="tenant-a")'
+		)
 		expect(config.slots.every((s) => s.gated)).toBe(true)
 		expect(warn).not.toHaveBeenCalled()
 	})
@@ -165,7 +168,7 @@ describe('resolveTrackerConfig slots', () => {
 		const tenant = config.slots.find((s) => s.slot === 'tenant')
 		expect(tenant).not.toHaveProperty('instance')
 		expect(tenant?.snippet.scripts[0]?.inline).toContain(
-			'posthog.init("phc_public",{api_host:"/api/_x/p/tenant",ui_host:"https://us.posthog.com",capture_pageview:"history_change",opt_out_persistence_by_default:true})'
+			'posthog.init("phc_public",{api_host:"/api/_x/p/tenant",ui_host:"https://us.posthog.com",capture_pageview:"history_change",opt_out_persistence_by_default:true,cookieless_mode:"on_reject",opt_out_capturing_by_default:true})'
 		)
 	})
 
@@ -365,6 +368,118 @@ describe('resolveTrackerConfig gate', () => {
 		})
 		expect(config.slots[0]?.gated).toBe(true)
 		expect(warn).toHaveBeenCalledWith(expect.stringContaining('capture.gate'))
+	})
+})
+
+describe('resolveTrackerConfig without consent', () => {
+	const holdAll: CaptureGatePolicy = () => true
+	const ga4Slot = (withoutConsent?: 'cookieless' | 'off') =>
+		ga4({
+			propertyId: '1',
+			credentials: { client_email: 'a@b.c', private_key: 'k' },
+			measurementId: 'G-AB12CD34',
+			...(withoutConsent ? { withoutConsent } : {}),
+		})
+
+	/** The adapter with its snippet recording the arguments the config renders it with. */
+	const recording = (adapter: AnalyticsAdapter) => {
+		const capture = adapter.capture
+		if (!capture) {
+			throw new Error('no capture')
+		}
+		const snippet = vi.fn(capture.snippet)
+		return { adapter: { ...adapter, capture: { ...capture, snippet } }, snippet }
+	}
+
+	it('counts a held slot cookielessly in both phases while the option is unset', async () => {
+		const { adapter, snippet } = recording(posthogSlot())
+		const config = await resolveTrackerConfig({
+			runtime: runtimeWith([adapter], { captureGate: holdAll }),
+			req: req(),
+		})
+		expect(config.slots[0]).toMatchObject({
+			gated: true,
+			withoutConsent: { pending: 'cookieless', refused: 'cookieless' },
+		})
+		expect(snippet).toHaveBeenCalledWith(
+			expect.objectContaining({ mode: 'cookieless', withoutConsent: true })
+		)
+	})
+
+	it("serves 1.0.0-beta.14's config for 'off': no level, the same snippet", async () => {
+		const { adapter, snippet } = recording(posthogSlot())
+		const config = await resolveTrackerConfig({
+			runtime: runtimeWith([adapter], {
+				captureGate: holdAll,
+				captureWithoutConsent: { pending: 'off', refused: 'off' },
+			}),
+			req: req(),
+		})
+		const slot = config.slots[0]
+		expect(slot?.gated).toBe(true)
+		expect(slot && 'withoutConsent' in slot).toBe(false)
+		expect(snippet).toHaveBeenCalledWith(
+			expect.objectContaining({ mode: 'full', withoutConsent: false })
+		)
+		expect(slot?.snippet).toEqual(
+			posthogSlot().capture?.snippet({ path: '/api/_x/p/global', scope: null })
+		)
+	})
+
+	it('runs a slot the gate does not hold in full, whatever the option says', async () => {
+		const { adapter, snippet } = recording(posthogSlot())
+		const config = await resolveTrackerConfig({
+			runtime: runtimeWith([adapter], {
+				captureGate: () => false,
+				captureWithoutConsent: () => 'cookieless',
+			}),
+			req: req(),
+		})
+		expect(config.slots[0]?.gated).toBe(false)
+		expect(config.slots[0]?.withoutConsent).toBeUndefined()
+		expect(snippet).toHaveBeenCalledWith(expect.objectContaining({ mode: 'full' }))
+	})
+
+	it('keeps GA4 strict unless its own option or a function opts it in', async () => {
+		const levels = async (adapter: AnalyticsAdapter, partial: Partial<AnalyticsRuntime> = {}) =>
+			(
+				await resolveTrackerConfig({
+					runtime: runtimeWith([adapter], { captureGate: holdAll, ...partial }),
+					req: req(),
+				})
+			).slots[0]?.withoutConsent
+		expect(await levels(ga4Slot())).toBeUndefined()
+		expect(await levels(ga4Slot('cookieless'))).toEqual({
+			pending: 'cookieless',
+			refused: 'cookieless',
+		})
+		expect(
+			await levels(ga4Slot(), {
+				captureWithoutConsent: ({ phase }) => (phase === 'pending' ? 'cookieless' : 'off'),
+			})
+		).toEqual({ pending: 'cookieless', refused: 'off' })
+		expect(
+			await levels(ga4Slot('off'), { captureWithoutConsent: () => 'cookieless' })
+		).toBeUndefined()
+	})
+
+	it('holds a slot whose function throws to nothing, warning once per instance', async () => {
+		const warn = vi.fn()
+		const payload = { config: { routes: { api: '/api' } }, logger: { warn } }
+		const runtime = runtimeWith([native()], {
+			captureGate: holdAll,
+			captureWithoutConsent: () => {
+				throw new Error('policy offline')
+			},
+		})
+		for (let visit = 0; visit < 2; visit++) {
+			const config = await resolveTrackerConfig({ runtime, req: req({ payload }) })
+			expect(config.slots[0]?.withoutConsent).toBeUndefined()
+		}
+		expect(warn).toHaveBeenCalledTimes(1)
+		expect(warn).toHaveBeenCalledWith(
+			expect.stringMatching(/capture\.withoutConsent.*policy offline/)
+		)
 	})
 })
 

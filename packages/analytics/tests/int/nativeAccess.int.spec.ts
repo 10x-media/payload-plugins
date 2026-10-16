@@ -432,6 +432,7 @@ describeForDb('engine store collections', {}, (db) => {
 					'v',
 					'landing',
 					'server',
+					'mode',
 					'name',
 					'ref',
 					'source',
@@ -471,6 +472,7 @@ describeForDb('engine store collections', {}, (db) => {
 			expect(columns.landing).toMatchObject({ type: flag, notNull: true })
 			expect(columns.duration_ms).toMatchObject({ type: number, notNull: false })
 			expect(columns.props).toMatchObject({ type: json, notNull: false })
+			expect(columns.mode).toMatchObject({ type: text, notNull: false })
 			expect(await indexesOf('analytics_hits')).toEqual([['id'], ['scope', 'ts']])
 		})
 
@@ -480,7 +482,14 @@ describeForDb('engine store collections', {}, (db) => {
 				expect(aggregates[key], key).toMatchObject({ type: text, notNull: true })
 			}
 			expect(aggregates.day).toMatchObject({ type: number, notNull: true })
-			for (const part of ['pageviews', 'session_ms', 'scroll_sum', 'interactions']) {
+			for (const part of [
+				'pageviews',
+				'session_ms',
+				'scroll_sum',
+				'interactions',
+				'pageviews_without_visitor',
+				'pageviews_without_consent',
+			]) {
 				expect(aggregates[part], part).toMatchObject({ type: number, notNull: false })
 			}
 			expect(await indexesOf('analytics_aggregates')).toEqual([

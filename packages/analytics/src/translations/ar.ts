@@ -370,6 +370,11 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerFieldScopeProperty]: 'تسمية الموقع',
 	[keys.providerFieldScopePropertyHelp]:
 		'الاسم الذي يحفظ به PostHog كل موقع، مثل tenant. اضبطه عندما تتشارك عدة مواقع مشروع PostHog واحدًا.',
+	[keys.providerFieldWithoutConsent]: 'بدون موافقة',
+	[keys.providerFieldWithoutConsentHelp]:
+		'ما تفعله هذه الأداة مع الزوار الذين لم يجيبوا بعد على شريط الموافقة أو رفضوه. اتركه فارغًا لاتباع إعداد الموقع.',
+	[keys.providerWithoutConsentCookieless]: 'العدّ بدون ملفات تعريف الارتباط',
+	[keys.providerWithoutConsentOff]: 'عدم إرسال أي شيء',
 	[keys.viewScopeSite]: 'الموقع',
 	[keys.viewScopeAll]: 'كل المواقع',
 	[keys.viewScopeShowing]: 'المعروض: {{site}}',
@@ -400,6 +405,10 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.sourcesPlatformFallback]:
 		'تأتي هذه الأرقام من أداة التحليلات الخاصة بالمنصة إلى أن يضيف هذا الموقع أداته الخاصة. عند إضافتها يتم التحويل إليها.',
 	[keys.stateSourceSubstituted]: 'مصدر البيانات المحفوظ لم يعد متاحًا، لذا يُعرض المصدر الافتراضي.',
+	[keys.statePosthogCookielessDropped]:
+		'يتجاهل PostHog الزيارات المحسوبة دون موافقة: فعّل «Cookieless tracking» في إعدادات Web analytics للمشروع.',
+	[keys.viewWithoutConsentShare]: 'حُسبت {{share}} من مشاهدات الصفحة دون موافقة.',
+	[keys.stateWithoutVisitor]: 'مشاهدات الصفحة المسجّلة دون زائر: {{count}}.',
 	[pluralKeys.liveVisitors.zero]: '{{count}} زائر نشط الآن',
 	[pluralKeys.liveVisitors.one]: '{{count}} زائر نشط الآن',
 	[pluralKeys.liveVisitors.two]: '{{count}} زائران نشطان الآن',

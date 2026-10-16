@@ -2,12 +2,14 @@ import { ga4 } from '../adapters/ga4/ga4'
 import { plausible } from '../adapters/plausible/plausible'
 import { posthog } from '../adapters/posthog/posthog'
 import { umami } from '../adapters/umami/umami'
+import { WITHOUT_CONSENT_LEVELS } from '../capture/withoutConsent'
 import type { AnalyticsAdapter, AnalyticsResult } from '../core/contract'
 import type { FetchLike } from '../core/fetch'
 import type { AnalyticsSdks } from '../core/sdks'
 import { HostRefusedError } from '../core/sourceErrors'
 import { withFixedLabel } from '../core/sourceLabel'
-import { isRecord } from '../core/values'
+import { isOneOf, isRecord } from '../core/values'
+import type { WithoutConsentLevel } from '../tracker/config'
 import { checkDocumentHost, type DocumentHost, type ProviderHostPolicy } from './hosts'
 
 export type ProviderId = 'native' | 'plausible' | 'umami' | 'ga4' | 'posthog'
@@ -26,6 +28,8 @@ export type ProviderDoc = {
 	provider?: string | null
 	enabled?: boolean | null
 	scope?: string | null
+	/** A vendor document's own level without consent; unset or blank follows the install. */
+	withoutConsent?: string | null
 	plausible?: {
 		siteId?: string | null
 		apiKey?: string | null
@@ -60,6 +64,11 @@ export type ProviderDoc = {
 
 /** A stored blank reads as unset. */
 const orUndefined = (value: string | null | undefined): string | undefined => value || undefined
+
+/** An unset or unrecognized stored level follows `capture.withoutConsent`. */
+const documentWithoutConsent = (
+	value: string | null | undefined
+): WithoutConsentLevel | undefined => (isOneOf(WITHOUT_CONSENT_LEVELS, value) ? value : undefined)
 
 /** An unset or unrecognized stored region falls back to host-derived detection. */
 const posthogRegion = (value: string | null | undefined): 'us' | 'eu' | undefined =>
@@ -133,6 +142,14 @@ const buildBaseAdapter = (
 	doc: ProviderDoc,
 	ctx: ProviderFactoryContext
 ): AnalyticsAdapter | null => {
+	// Saying off where the slot would resolve off anyway keeps the adapter from acting (or warning)
+	// as if it might count without consent.
+	const withoutConsent =
+		ctx.heldWithoutConsent === false
+			? 'off'
+			: (documentWithoutConsent(doc.withoutConsent) ??
+				(ctx.followingCountsWithoutConsent === false ? 'off' : undefined))
+	const consent = withoutConsent ? { withoutConsent } : {}
 	switch (doc.provider) {
 		case 'native':
 			return ctx.native ?? null
@@ -147,6 +164,7 @@ const buildBaseAdapter = (
 					scriptId: orUndefined(cfg.scriptId),
 					revenueCurrency: orUndefined(cfg.revenueCurrency),
 					fetch: ctx.fetch,
+					...consent,
 				})
 			)
 		}
@@ -159,6 +177,7 @@ const buildBaseAdapter = (
 					token: orUndefined(cfg.token),
 					host,
 					fetch: ctx.fetch,
+					...consent,
 				})
 			)
 		}
@@ -174,6 +193,7 @@ const buildBaseAdapter = (
 				measurementId: orUndefined(cfg.measurementId),
 				currency: orUndefined(cfg.currency),
 				...(ctx.sdks?.ga4 ? { sdk: ctx.sdks.ga4 } : {}),
+				...consent,
 			})
 		}
 		case 'posthog': {
@@ -187,6 +207,7 @@ const buildBaseAdapter = (
 					region: posthogRegion(cfg.region),
 					scopeProperty: orUndefined(cfg.scopeProperty?.trim()),
 					fetch: ctx.fetch,
+					...consent,
 				})
 			)
 		}
@@ -216,6 +237,13 @@ export interface ProviderFactoryContext {
 	native?: AnalyticsAdapter
 	/** The plugin's `sdks`: a GA4 document's adapter reads through `sdks.ga4`. */
 	sdks?: AnalyticsSdks
+	/**
+	 * False when no slot `capture.gate` holds can fall to a document's adapter: it is then off
+	 * without consent, whatever the document says.
+	 */
+	heldWithoutConsent?: boolean
+	/** False when `capture.withoutConsent` is `'off'` in both phases: a document following it is off. */
+	followingCountsWithoutConsent?: boolean
 }
 
 /** Checked at runtime: a JavaScript caller can leave the guards out, which would go out unguarded. */

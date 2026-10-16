@@ -272,6 +272,43 @@ describe('useAnalytics without a provider', () => {
 		expect(latest.api?.gate.global).toBe('closed')
 		expect(fetchMock).not.toHaveBeenCalled()
 	})
+
+	it('reports each slot mode beside its gate, and re-renders the caller on a change', () => {
+		const held: TrackerConfig = {
+			...config,
+			slots: [
+				{
+					...nativeSlot,
+					gated: true,
+					withoutConsent: { pending: 'cookieless', refused: 'anonymous' },
+				},
+			],
+		}
+		const latest: { api: ReturnType<typeof useAnalytics> | null } = { api: null }
+		render(
+			<>
+				<TrackerBoot config={held} />
+				<Probe
+					onApi={(a) => {
+						latest.api = a
+					}}
+				/>
+			</>
+		)
+		expect(latest.api?.gate.global).toBe('pending')
+		expect(latest.api?.mode).toEqual({ global: 'cookieless', tenant: 'off' })
+
+		act(() => {
+			latest.api?.setGate(true)
+		})
+		expect(latest.api?.mode.global).toBe('full')
+
+		act(() => {
+			latest.api?.setGate(false)
+		})
+		expect(latest.api?.gate.global).toBe('closed')
+		expect(latest.api?.mode.global).toBe('anonymous')
+	})
 })
 
 describe('useAnalytics under a provider', () => {

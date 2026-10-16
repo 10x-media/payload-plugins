@@ -25,6 +25,7 @@ import {
 	failingAdapter,
 	PROVIDER_IDS,
 	type ProviderDoc,
+	type ProviderFactoryContext,
 	type ProviderId,
 } from './factory'
 import type { ProviderHostPolicy } from './hosts'
@@ -64,6 +65,11 @@ export type ProviderPlan =
 interface ProviderRegistryOptions {
 	payload: Payload
 	plan: ProviderPlan
+	/** How every document's adapter counts without consent beyond its own setting. */
+	withoutConsent?: Pick<
+		ProviderFactoryContext,
+		'heldWithoutConsent' | 'followingCountsWithoutConsent'
+	>
 	/** The config adapters every scope's registry starts from. */
 	base: RegistryBase
 	/** The config registry as an install without runtime providers hands it out. */
@@ -282,6 +288,7 @@ const collectionRegistry = (
 			hosts: options.hosts,
 			fetch: options.fetch ?? noGuardedConnection,
 			sdks: options.sdks,
+			...options.withoutConsent,
 		})
 
 	const adapterOf = async (

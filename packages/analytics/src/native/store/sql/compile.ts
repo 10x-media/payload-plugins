@@ -1,7 +1,7 @@
 import type { AnalyticsFilter } from '../../../core/contract'
 import { ITEM_CLICK_EVENT } from '../../../goals/constants'
 import type { SqlDialect } from '../dialect'
-import { TWIN_WINDOW_MS } from '../hits'
+import { TWIN_WINDOW_MS, WITHOUT_CONSENT_MODES } from '../hits'
 import { ORDER_PREFIX, SERVER_ORDER_PREFIX, WIRE_ORDER_PREFIX } from '../ids'
 import type { MetricParts } from '../parts'
 import {
@@ -85,7 +85,15 @@ const HIT_FIELDS: ReadonlyArray<keyof HitRow> = [
 	'name',
 	'durationMs',
 	'scrollDepth',
+	'mode',
 ]
+
+/** The modes measured before or without consent, as a list of literals. */
+const WITHOUT_CONSENT = raw(WITHOUT_CONSENT_MODES.map((mode) => `'${mode}'`).join(', '))
+
+/** Whether a row of `field`'s hits is a pageview the page measured before or without consent. */
+const pageviewWithoutConsent = (field: (name: keyof HitRow) => SqlFragment): SqlFragment =>
+	sql`${field('type')} = 'pageview' AND ${field('mode')} IN (${WITHOUT_CONSENT})`
 
 /** A goal completion's amount as sent: before it was converted, else as counted. */
 const SENT_KEYS: readonly string[] = ['sent', 'value']
@@ -381,6 +389,7 @@ const VISIT_SUMS: readonly SqlFragment[] = [
 	raw(
 		`SUM(CASE WHEN "type" = 'event' AND "name" = '${ITEM_CLICK_EVENT}' AND "item" IS NOT NULL AND "item" <> '' THEN 1 ELSE 0 END) OVER whole AS "v_int"`
 	),
+	sql`SUM(CASE WHEN ${pageviewWithoutConsent(column)} THEN 1 ELSE 0 END) OVER whole AS "v_npc"`,
 ]
 
 type Partition = Pick<Chain, 'dialect' | 'visitor'>
@@ -572,6 +581,7 @@ const VISIT_ROW: readonly string[] = [
 	'v',
 	'sn',
 	'type',
+	'mode',
 	'eng',
 	'name',
 	'item',
@@ -590,6 +600,7 @@ const VISIT_ROW: readonly string[] = [
 	'v_conv',
 	'v_rev',
 	'v_int',
+	'v_npc',
 ]
 
 /**
@@ -748,6 +759,11 @@ export const contributionsOf = (
 			'interactions',
 			sql`CASE WHEN ${tField('type')} = 'event' AND ${tField('name')} = ${raw(`'${ITEM_CLICK_EVENT}'`)} AND ${tField('item')} IS NOT NULL AND ${tField('item')} <> '' THEN 1 ELSE 0 END`,
 		],
+		[
+			'pageviewsWithoutVisitor',
+			sql`CASE WHEN ${tField('type')} = 'pageview' AND ${tField('v')} = '' THEN 1 ELSE 0 END`,
+		],
+		['pageviewsWithoutConsent', sql`CASE WHEN ${pageviewWithoutConsent(tField)} THEN 1 ELSE 0 END`],
 	])
 	return new Map([...all].filter(([part]) => counted.has(part)))
 }
@@ -835,10 +851,15 @@ export const rankSql = (
 	if (order.per === undefined) {
 		return sql`${quoted(order.part)} ${direction} NULLS LAST`
 	}
-	if (!counted.has(order.per)) {
+	if (!counted.has(order.per) || (order.less !== undefined && !counted.has(order.less))) {
 		return null
 	}
-	return sql`${dialect.cast(quoted(order.part), 'real')} / NULLIF(${dialect.cast(quoted(order.per), 'real')}, 0) ${direction} NULLS LAST`
+	const whole = dialect.cast(quoted(order.per), 'real')
+	const per =
+		order.less === undefined
+			? whole
+			: sql`(${whole} - COALESCE(${dialect.cast(quoted(order.less), 'real')}, 0))`
+	return sql`${dialect.cast(quoted(order.part), 'real')} / NULLIF(${per}, 0) ${direction} NULLS LAST`
 }
 
 /**

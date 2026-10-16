@@ -36,10 +36,10 @@ const hit = (id: string, overrides: Partial<HitRow> = {}): HitRow => ({
 })
 
 const COLUMNS =
-	'"id", "scope", "ts", "last_at", "type", "hostname", "path", "v", "landing", "server", "name", "ref", "source", "channel", "channel_version", "click_id", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "country", "region", "city", "language", "device", "browser", "os", "duration_ms", "scroll_depth", "value", "original_value", "conversions", "revenue", "currency", "original_currency", "item", "props", "goals", "impressions"'
+	'"id", "scope", "ts", "last_at", "type", "hostname", "path", "v", "landing", "server", "mode", "name", "ref", "source", "channel", "channel_version", "click_id", "utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "country", "region", "city", "language", "device", "browser", "os", "duration_ms", "scroll_depth", "value", "original_value", "conversions", "revenue", "currency", "original_currency", "item", "props", "goals", "impressions"'
 
 /** The rest of a row whose optional fields are all absent: one NULL per column after `server`. */
-const NULLS = Array.from({ length: 30 }, () => 'NULL').join(', ')
+const NULLS = Array.from({ length: 31 }, () => 'NULL').join(', ')
 
 describe('sqlEventStore.append', () => {
 	it('writes a hit in one INSERT that leaves an id already stored alone, on Postgres', async () => {
@@ -102,6 +102,7 @@ describe('sqlEventStore.append', () => {
 			type: 'goal',
 			landing: false,
 			server: true,
+			mode: 'c',
 			name: 'purchase',
 			ref: 'google.com',
 			source: 'google.com',
@@ -137,13 +138,13 @@ describe('sqlEventStore.append', () => {
 		const [statement] = statements
 		// A goal has no reading time to end: its one absent column.
 		expect(statement?.text.match(/NULL/g)).toEqual(['NULL'])
-		expect(statement?.text).toContain('$37::jsonb, $38::jsonb, $39::jsonb)')
+		expect(statement?.text).toContain('$38::jsonb, $39::jsonb, $40::jsonb)')
 		expect(statement?.values.slice(-3)).toEqual([
 			'{"plan":"pro"}',
 			'[{"slug":"purchase","value":49}]',
 			'["offers:2"]',
 		])
-		expect(statement?.values).toHaveLength(39)
+		expect(statement?.values).toHaveLength(40)
 	})
 
 	it('names a column for every field of the hits collection, as Payload names them', () => {

@@ -350,6 +350,27 @@ describe('analytics boot', () => {
 		}
 	})
 
+	it('names the without-consent default once at boot while capture.withoutConsent is unset', async () => {
+		const held = (extra: AnalyticsPluginOptions['capture'] = {}) =>
+			boot({
+				adapters: [posthog({ projectId: '1', apiKey: 'phx_private', projectToken: 'phc_public' })],
+				capture: { gate: 'all', ...extra },
+			})
+		const unset = await held()
+		expect(unset.warn).toHaveBeenCalledTimes(1)
+		expect(unset.warn).toHaveBeenCalledWith(
+			expect.stringMatching(/capture\.withoutConsent is unset, so held slots measure cookielessly/)
+		)
+		expect((await held({ withoutConsent: 'off' })).warn).not.toHaveBeenCalled()
+		vi.stubEnv('NODE_ENV', 'production')
+		try {
+			const { warn } = await held()
+			expect(warn).toHaveBeenCalledWith(expect.stringMatching(/hash of the client IP address/))
+		} finally {
+			vi.unstubAllEnvs()
+		}
+	})
+
 	// libsql opens every connection after a transaction without the busy timeout Payload set.
 	it('warns once at boot when the SQLite adapter sets transactionOptions', async () => {
 		const client = { protocol: 'file', execute: vi.fn(), batch: vi.fn(), transaction: vi.fn() }

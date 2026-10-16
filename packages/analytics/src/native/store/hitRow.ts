@@ -1,7 +1,7 @@
 import { isOneOf, isRecord } from '../../core/values'
 import type { GoalCompletion } from '../../goals/match'
 import { dateOf, jsonOf } from './columnValues'
-import type { HitRow, HitType } from './types'
+import { HIT_MODES, type HitRow, type HitType } from './types'
 
 const HIT_TYPES: readonly HitType[] = ['pageview', 'event', 'goal', 'engagement']
 
@@ -103,6 +103,10 @@ export const hitRowOf = (read: (field: keyof HitRow) => unknown): HitRow | null 
 	const lastAt = dateOf(read('lastAt'))
 	if (lastAt !== null) {
 		hit.lastAt = lastAt
+	}
+	const mode = read('mode')
+	if (isOneOf(HIT_MODES, mode)) {
+		hit.mode = mode
 	}
 	for (const field of TEXT_FIELDS) {
 		const value = read(field)

@@ -8,6 +8,24 @@ export type CaptureSlot = 'global' | 'tenant'
 
 export type CaptureClientKind = 'native' | 'posthog' | 'plausible' | 'umami' | 'ga4'
 
+/** What a held slot does without consent in one phase. */
+export type WithoutConsentLevel = 'cookieless' | 'off'
+
+/** The two phases a held slot spends without consent: no answer yet, and refused. */
+export type ConsentPhase = 'pending' | 'refused'
+
+/**
+ * What a slot captures with right now. `cookieless` counts without storing anything on the device;
+ * `anonymous` (native only) also keeps no visitor id; `full` is the vendor's normal tracking.
+ */
+export type SlotMode = 'off' | 'cookieless' | 'anonymous' | 'full'
+
+/** A held slot's mode in a phase without consent. */
+export type HeldSlotMode = Exclude<SlotMode, 'full'>
+
+/** A held slot's resolved mode per phase without consent. */
+export type SlotWithoutConsent = Record<ConsentPhase, HeldSlotMode>
+
 export interface SnippetScript {
 	src?: string
 	inline?: string
@@ -126,7 +144,13 @@ export interface TrackerSlotConfig {
 	adapterId: string
 	/** Mount the snippet and the sink talk to, relative and behind the Next basePath. */
 	path: string
+	/** For a slot counting without consent, the variant it starts cookieless in. */
 	snippet: CaptureSnippet
+	/**
+	 * The variant a slot counting without consent starts in when it is open at boot, present only
+	 * where it differs from `snippet` (PostHog, GA4). The tracker adopts whichever one is on the page.
+	 */
+	fullSnippet?: CaptureSnippet
 	/** What the adapter hands its browser client: public settings only, never a credential. */
 	client: { kind: CaptureClientKind } & Record<string, string | number | boolean>
 	/**
@@ -139,6 +163,12 @@ export interface TrackerSlotConfig {
 	 * `requiresConsent` in 1.0.0-beta.11; the tracker still reads that from a cached config.
 	 */
 	gated: boolean
+	/**
+	 * What a held slot does before an answer and after a refusal, resolved on the server so the
+	 * browser never runs a host function. Absent (a config cached from 1.0.0-beta.14, or an adapter
+	 * that cannot run cookieless) means `off` in both phases.
+	 */
+	withoutConsent?: SlotWithoutConsent
 }
 
 /**
