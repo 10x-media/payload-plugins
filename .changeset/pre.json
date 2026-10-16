@@ -96,6 +96,7 @@
 		"analytics-provider-adapters",
 		"analytics-provider-availability",
 		"analytics-provider-parity",
+		"analytics-provider-select-fix",
 		"analytics-provider-store",
 		"analytics-provider-time-series",
 		"analytics-query-contract",
