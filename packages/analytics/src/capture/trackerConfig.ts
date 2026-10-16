@@ -1,5 +1,6 @@
 import type { Payload, PayloadRequest, SanitizedConfig } from 'payload'
 import { formatAdminURL } from 'payload/shared'
+import type { SnippetArgs } from '../core/capture'
 import type { ResolvedGoal } from '../goals/resolver'
 import { apiPath, appPath } from '../plugin/apiPath'
 import { analyticsRoutes } from '../plugin/routes'
@@ -12,6 +13,7 @@ import {
 	type AdminDigest,
 	type CaptureClientKind,
 	type CaptureSlot,
+	type CaptureSnippet,
 	DEFAULT_AUTO_CAPTURE,
 	type TrackerConfig,
 	type TrackerExclusion,
@@ -24,6 +26,7 @@ import { withExclusionPrelude } from './exclusionPrelude'
 import { exclusionToken, exclusionTokenHash, publicDigest } from './exclusionToken'
 import { normalizeMountPath } from './mountPath'
 import { CAPTURE_SLOTS, gateHolds, resolveSlotAdapterFor } from './slots'
+import { fullSnippetArgs, slotWithoutConsent, snippetModeArgs } from './withoutConsent'
 
 /**
  * The admin's address as a page reaches it, behind the Next basePath, as digests: its origin only
@@ -145,6 +148,24 @@ const warnSharedVendor = (
 	)
 }
 
+/** The Payload instances that already logged a `capture.withoutConsent` function failing. */
+const warnedWithoutConsent = new WeakSet<Payload>()
+
+/** A `capture.withoutConsent` function that threw or answered nonsense, logged once per instance. */
+const warnWithoutConsent = (
+	payload: Payload | undefined,
+	slot: CaptureSlot,
+	err: unknown
+): void => {
+	if (!payload || warnedWithoutConsent.has(payload)) {
+		return
+	}
+	warnedWithoutConsent.add(payload)
+	payload.logger?.warn(
+		`analytics: capture.withoutConsent failed for the ${slot} slot, which therefore sends nothing without consent: ${err instanceof Error ? err.message : String(err)}. Logged once.`
+	)
+}
+
 /**
  * The per-request tracker config, one entry per capturing slot in slot order. Public and anonymous
  * (the visitor's request, no user or cookies), so any failure drops a slot instead of erroring.
@@ -188,19 +209,42 @@ export const resolveTrackerConfig = async (args: {
 				`analytics: capture.gate threw for the ${slot} slot, which waits: ${String(err)}`
 			)
 		)
+		// A slot the gate does not hold runs in full from page load, whatever withoutConsent says.
+		const withoutConsent = gated
+			? slotWithoutConsent(
+					{
+						slot,
+						adapterId: adapter.id,
+						kind,
+						capture,
+						option: runtime.captureWithoutConsent,
+					},
+					(err) => warnWithoutConsent(req.payload, slot, err)
+				)
+			: undefined
 		try {
+			const snippetFor = (args: Pick<SnippetArgs, 'mode' | 'withoutConsent'>): CaptureSnippet =>
+				withExclusionPrelude(
+					capture.snippet({ path, scope, ...(instance ? { instance } : {}), ...args }),
+					exclusion?.param
+				)
+			const snippet = snippetFor(snippetModeArgs(withoutConsent))
+			const fullArgs = fullSnippetArgs(withoutConsent)
+			const fullSnippet = fullArgs ? snippetFor(fullArgs) : undefined
 			slots.push({
 				slot,
 				kind,
 				adapterId: adapter.id,
 				path,
-				snippet: withExclusionPrelude(
-					capture.snippet({ path, scope, ...(instance ? { instance } : {}) }),
-					exclusion?.param
-				),
+				snippet,
+				// Only where it differs: a vendor that stores nothing renders one snippet in every mode.
+				...(fullSnippet && JSON.stringify(fullSnippet) !== JSON.stringify(snippet)
+					? { fullSnippet }
+					: {}),
 				client: capture.client,
 				...(instance ? { instance } : {}),
 				gated,
+				...(withoutConsent ? { withoutConsent } : {}),
 			})
 			filled.add(adapter.id)
 		} catch (err) {

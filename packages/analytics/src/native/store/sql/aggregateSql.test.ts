@@ -120,6 +120,8 @@ describe('aggregation SQL goldens', () => {
 									revenue: 0,
 									impressions: null,
 									interactions: 0,
+									pageviewsWithoutVisitor: 1,
+									pageviewsWithoutConsent: 2,
 								},
 							},
 						],
@@ -192,6 +194,8 @@ describe('aggregation SQL shape', () => {
 				revenue: 0,
 				impressions: null,
 				interactions: 0,
+				pageviewsWithoutVisitor: 0,
+				pageviewsWithoutConsent: 0,
 			},
 		}
 		const { text: sql, values } = compile(

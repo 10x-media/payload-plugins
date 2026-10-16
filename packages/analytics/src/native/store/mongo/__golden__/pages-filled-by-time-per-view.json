@@ -418,6 +418,9 @@
 			"scrollDepth": {
 				"$ifNull": ["$scrollDepth", null]
 			},
+			"mode": {
+				"$ifNull": ["$mode", null]
+			},
 			"conversions": {
 				"$ifNull": ["$conversions", null]
 			},
@@ -559,6 +562,38 @@
 					1,
 					0
 				]
+			},
+			"pageviewsWithoutVisitor": {
+				"$cond": [
+					{
+						"$and": [
+							{
+								"$eq": ["$type", "pageview"]
+							},
+							{
+								"$eq": ["$v", ""]
+							}
+						]
+					},
+					1,
+					0
+				]
+			},
+			"pageviewsWithoutConsent": {
+				"$cond": [
+					{
+						"$and": [
+							{
+								"$eq": ["$type", "pageview"]
+							},
+							{
+								"$in": ["$mode", ["c", "a"]]
+							}
+						]
+					},
+					1,
+					0
+				]
 			}
 		}
 	},
@@ -596,6 +631,12 @@
 			},
 			"interactions": {
 				"$sum": "$interactions"
+			},
+			"pageviewsWithoutVisitor": {
+				"$sum": "$pageviewsWithoutVisitor"
+			},
+			"pageviewsWithoutConsent": {
+				"$sum": "$pageviewsWithoutConsent"
 			}
 		}
 	},
@@ -630,6 +671,12 @@
 			},
 			"interactions": {
 				"$sum": "$interactions"
+			},
+			"pageviewsWithoutVisitor": {
+				"$sum": "$pageviewsWithoutVisitor"
+			},
+			"pageviewsWithoutConsent": {
+				"$sum": "$pageviewsWithoutConsent"
 			}
 		}
 	},

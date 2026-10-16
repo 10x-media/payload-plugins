@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Builds the dev app once, then runs the Playwright suite against each database in E2E_DBS
-# (default every one the plugin supports), in both tenancy modes, plus the slow-source checks and
-# the providers' views on a narrowed Provider select.
+# (default every one the plugin supports), in both tenancy modes, plus the slow-source checks, the
+# providers' views on a narrowed Provider select, and the consent modes against a mock vendor
+# upstream in each vendor profile.
 # Extra arguments go to every `playwright test` call.
 #
 #   E2E_DBS=postgres pnpm test:e2e analytics      # one database
@@ -30,6 +31,7 @@ offset=$(($(pwd | cksum | cut -d' ' -f1) % 500))
 export MONGO_E2E_PORT="${MONGO_E2E_PORT:-$((37017 + offset))}"
 export PG_E2E_PORT="${PG_E2E_PORT:-$((35432 + offset))}"
 export E2E_NEXT_PORT="${E2E_NEXT_PORT:-$((3100 + offset))}"
+export E2E_UPSTREAM_PORT="${E2E_UPSTREAM_PORT:-$((4100 + offset))}"
 
 # SQLite files live in a folder of this run's own, removed with the containers.
 E2E_SQLITE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/analytics-e2e-sqlite.XXXXXX")"
@@ -69,7 +71,7 @@ for db in $E2E_DBS; do
 
 	echo "Running Playwright e2e (DEV_DB=${db}, TENANCY=off)..."
 	TENANCY=off E2E_REUSE_SERVER=0 pnpm --filter @10x-media/analytics exec playwright test \
-		--pass-with-no-tests --grep-invert '@tenancy|@slow-source|@narrowed-providers' "$@"
+		--pass-with-no-tests --grep-invert '@tenancy|@slow-source|@narrowed-providers|@vendors-' "$@"
 
 	echo "Running Playwright e2e (DEV_DB=${db}, TENANCY=on)..."
 	TENANCY=on E2E_REUSE_SERVER=0 pnpm --filter @10x-media/analytics exec playwright test \
@@ -84,4 +86,12 @@ for db in $E2E_DBS; do
 	TENANCY=off ANALYTICS_PROVIDER_TYPES=posthog,plausible,umami E2E_REUSE_SERVER=0 \
 		pnpm --filter @10x-media/analytics exec playwright test \
 		--pass-with-no-tests --grep @narrowed-providers "$@"
+
+	# One boot per profile (dev/helpers/e2eVendors.ts): each runs the specs tagged with its name.
+	for profile in cookieless strict anonymous pair; do
+		echo "Running Playwright e2e (DEV_DB=${db}, vendors ${profile})..."
+		TENANCY=off ANALYTICS_E2E_VENDORS="$profile" E2E_REUSE_SERVER=0 \
+			pnpm --filter @10x-media/analytics exec playwright test \
+			--pass-with-no-tests --grep "@vendors-${profile}" "$@"
+	done
 done

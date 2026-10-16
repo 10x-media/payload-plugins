@@ -382,6 +382,11 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldScopeProperty]: 'Rótulo do site',
 	[keys.providerFieldScopePropertyHelp]:
 		'O nome com que o PostHog salva cada site, por exemplo tenant. Defina-o quando vários sites compartilham o mesmo projeto do PostHog.',
+	[keys.providerFieldWithoutConsent]: 'Sem consentimento',
+	[keys.providerFieldWithoutConsentHelp]:
+		'O que esta ferramenta faz com visitantes que ainda não responderam ao aviso de consentimento ou o recusaram. Deixe vazio para seguir a configuração do site.',
+	[keys.providerWithoutConsentCookieless]: 'Contar sem cookies',
+	[keys.providerWithoutConsentOff]: 'Não enviar nada',
 	[keys.viewScopeSite]: 'Site',
 	[keys.viewScopeAll]: 'Todos os sites',
 	[keys.viewScopeShowing]: 'Mostrando: {{site}}',
@@ -414,6 +419,11 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 		'Estes números vêm da ferramenta de análises da plataforma até que este site adicione a sua. Ao adicionar uma, ela passa a ser usada.',
 	[keys.stateSourceSubstituted]:
 		'A fonte de dados salva não está mais disponível, então a fonte padrão é exibida.',
+	[keys.statePosthogCookielessDropped]:
+		'O PostHog está descartando as visitas contadas sem consentimento: ative “Cookieless tracking” nas configurações de Web analytics do projeto.',
+	[keys.viewWithoutConsentShare]:
+		'{{share}} das visualizações de página foram contadas sem consentimento.',
+	[keys.stateWithoutVisitor]: 'Visualizações de página registradas sem visitante: {{count}}.',
 	[pluralKeys.liveVisitors.one]: '{{count}} visitante ativo agora',
 	[pluralKeys.liveVisitors.many]: '{{count}} visitantes ativos agora',
 	[pluralKeys.liveVisitors.other]: '{{count}} visitantes ativos agora',

@@ -61,6 +61,7 @@ It takes no `loadScript`: a function cannot cross from a server component.
 | `track`, `trackGoal`, `purchase`, `refund` | The tracker's methods, [below](#the-tracker). |
 | `setGate(state)` | Answers the gate. Safe before the tracker boots: the answer is kept for the window and applied at boot. |
 | `gate` | Each slot's `GateStatus`; a change re-renders the component. |
+| `mode` | Each slot's `SlotMode`, what it captures in right now; `off` for every slot before a tracker boots and during the server render. A change re-renders the component. |
 | `setExcluded(next)`, `excluded` | The tracker's `exclude()` and `excluded`, `false` until the tracker has read the browser's flag. |
 
 The tracker is resolved per call, not per render, so a component that renders before the boot effect runs still works. A call to `track`, `trackGoal`, `purchase`, `refund` or `setExcluded` that finds neither a provider nor a booted tracker throws; `setGate` never does.
@@ -97,9 +98,10 @@ export const tracker = await initTracker()
 | `trackGoal(slug, { value?, currency?, item? })` | Completes a [goal](/analytics/goals). Without a `value`, a vendor slot receives the goal's own fixed value from the config. |
 | `purchase({ value, currency?, orderId?, items?, props?, goal?, item? })` | Records a [sale](/analytics/revenue#recording-a-sale) against `goal`, `purchase` by default. A negative `value` is dropped. |
 | `refund(input)` | Does nothing in the browser, with a warning in development: refunds are recorded from server code. |
-| `setGate(state)` | Opens or closes capture slots: [Consent](/analytics/consent#setgate). |
+| `setGate(state)` | Grants or refuses capture slots: `true` runs a held slot in full, `false` moves it to its refused level ([Consent](/analytics/consent#setgate)). |
 | `gate` | Each slot's gate, `pending`, `open` or `closed`. |
-| `exclude(next)`, `excluded` | Takes this browser out of capture, or puts it back ([Excluding your own visits](/analytics/capture#excluding-your-own-visits)). `excluded` reads `false` until a slot opens and the tracker reads the browser's flag, or the exclusion link sets it. |
+| `mode` | Each slot's `SlotMode`: `full` once open, else its level for the phase from [`capture.withoutConsent`](/analytics/consent#measuring-without-consent). A slot the gate does not hold, closed by name, and a slot the config does not fill read `off`. Replaced whenever one changes. |
+| `exclude(next)`, `excluded` | Takes this browser out of capture, or puts it back ([Excluding your own visits](/analytics/capture#excluding-your-own-visits)). `excluded` reads `false` until a slot runs in full and the tracker reads the browser's flag, or the exclusion link sets it. |
 | `page()` | Sends a pageview for the current address. The tracker calls it itself on boot and on every single-page app navigation. |
 | `flush()` | Sends the open page's [engagement](/analytics/capture#what-the-tracker-sends-to-native) now, when it gained anything since the last one. |
 | `destroy()` | Sends the open page's engagement and ends the tracker: every listener and history patch is detached and nothing more is sent. On the page's shared tracker it gives one hold back, and the tracker ends once nothing holds it. |
@@ -112,6 +114,7 @@ Server code records through other functions of the same names, from `@10x-media/
 |---|---|
 | `GateState` | `boolean \| Partial<Record<CaptureSlot, boolean \| undefined>>`. A boolean answers for every slot `capture.gate` holds; a record for the slots it names, held or not, and a slot left `undefined` keeps its gate. |
 | `GateStatus` | `'pending' \| 'open' \| 'closed'` |
+| `SlotMode` | `'off' \| 'cookieless' \| 'anonymous' \| 'full'`; `anonymous` is native's alone. Exported from `@10x-media/analytics`, with `HeldSlotMode` (the three short of `full`) and `ConsentPhase` (`'pending' \| 'refused'`). |
 | `CaptureSlot` | `'global' \| 'tenant'` |
 | `TrackGoalOptions` | `{ value?, currency?, item? }` |
 | `PurchaseInput` | `{ value, currency?, orderId?, items?, props?, goal?, item? }`. `orderId` keeps a checkout that fires twice counting once, and lets the server's record of the same sale take its place. |
@@ -125,7 +128,7 @@ Server code records through other functions of the same names, from `@10x-media/
 
 | Field | What it holds |
 |---|---|
-| `slots` | One `TrackerSlotConfig` per filled slot: `slot`, `adapterId`, `kind`, `client`, `path` (its proxy mount), `snippet` (the scripts to render or inject) and `gated` (whether it waits for the gate). |
+| `slots` | One `TrackerSlotConfig` per filled slot: `slot`, `adapterId`, `kind`, `client`, `path` (its proxy mount), `snippet` (the scripts to render or inject), `gated` (whether it waits for the gate) and, on a held slot that counts without consent in some phase, `withoutConsent`: `{ pending, refused }`, each `'off'`, `'cookieless'` or `'anonymous'`, resolved on the server. Absent, as in a config cached from 1.0.0-beta.14, means `off` in both. Such a slot also carries `fullSnippet` where its full variant differs (PostHog and GA4), which a page rendered with the slot open uses. |
 | `ingestPath` | Where the native engine takes beacons, behind the app's base path. |
 | `goals` | The scope's goals as a browser may see them: `slug`, `match`, `value` and `currency`, never the admin-facing name. |
 | `autoCapture` | The resolved [auto-capture](/analytics/capture#auto-capture) settings. |

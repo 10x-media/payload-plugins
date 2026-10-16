@@ -13,6 +13,8 @@ import { en } from 'payload/i18n/en'
 import { ctaBlock } from './config/shared'
 import { singleFragment } from './config/single'
 import { tenancyFragment } from './config/tenancy'
+import { vendorsFragment } from './config/vendors'
+import { e2eVendorProfile } from './helpers/e2eVendors'
 import { startMemoryMongo } from './helpers/memoryDb'
 import { seedDev } from './helpers/seed'
 import { migrations as postgresMigrations } from './migrations/postgres/index'
@@ -24,8 +26,14 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 const devDb = process.env.DEV_DB
 const useDb = devDb === 'postgres' || devDb === 'sqlite' ? devDb : 'mongo'
 const autoGenerate = process.env.PAYLOAD_SKIP_AUTOGEN !== '1'
-const tenancy = process.env.TENANCY === 'on'
-const fragment = tenancy ? tenancyFragment : singleFragment
+const vendorProfile = e2eVendorProfile(process.env.ANALYTICS_E2E_VENDORS)
+// The vendor e2e mode is single-site, so it runs on the single-site schema and migrations.
+const tenancy = process.env.TENANCY === 'on' && !vendorProfile
+const fragment = vendorProfile
+	? vendorsFragment(vendorProfile)
+	: tenancy
+		? tenancyFragment
+		: singleFragment
 
 /**
  * A SQL migration carries the schema snapshot of its config, so each tenancy mode keeps its own

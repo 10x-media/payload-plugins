@@ -91,6 +91,39 @@ const DEVICES: ReadonlyArray<Partial<HitRow>> = [
 
 const ITEMS = ['offers:1', 'offers:2', 'offers:3']
 
+/** The fixture's person a visitor id names, `D0aP5...` for day 0, hostname a, person 5. */
+const PERSON = /^D\d[ab]P(\d)/
+
+/**
+ * A hit as the page measured it: person 5 cookieless, person 6 anonymous, so no visitor, region,
+ * city, time, scroll or engagement, and a source on a landing alone. Everyone else is full, or
+ * stored before modes.
+ */
+const asMeasured = (hit: HitRow): HitRow[] => {
+	const person = PERSON.exec(hit.v)?.[1]
+	if (person === '5') {
+		return [{ ...hit, mode: 'c' }]
+	}
+	if (person !== '6') {
+		return [person === undefined || Number(person) % 2 === 0 ? hit : { ...hit, mode: 'f' }]
+	}
+	if (hit.type === 'engagement') {
+		return []
+	}
+	const {
+		region: _region,
+		city: _city,
+		durationMs: _durationMs,
+		scrollDepth: _scrollDepth,
+		...kept
+	} = hit
+	if (hit.landing) {
+		return [{ ...kept, v: '', mode: 'a' }]
+	}
+	const { source: _source, channel: _channel, ...unsourced } = kept
+	return [{ ...unsourced, v: '', mode: 'a' }]
+}
+
 export interface RandomFixture {
 	hits: HitRow[]
 	/** The UTC midnight starting each day the fixture covers, and the one after the last. */
@@ -99,7 +132,7 @@ export interface RandomFixture {
 
 /**
  * A few hundred hits over four days and two hostnames, with gaps of exactly 30 minutes and early
- * engagements; goals are worth whole quarters so every database sums them exactly.
+ * engagements, in every mode; goals are worth whole quarters so every database sums them exactly.
  */
 export const randomFixture = (seed: number, scope: string, other: string): RandomFixture => {
 	const random = seededRandom(seed)
@@ -234,5 +267,5 @@ export const randomFixture = (seed: number, scope: string, other: string): Rando
 			path: '/other',
 		})
 	}
-	return { hits, days }
+	return { hits: hits.flatMap(asMeasured), days }
 }

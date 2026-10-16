@@ -24,7 +24,14 @@ import {
 } from '../aggregate'
 import { OTHER_VALUE } from '../caps'
 import { checkLimit } from '../chunks'
-import { countedHits, distinctHits, holdsVisit, TWIN_WINDOW_MS, tombstoneOf } from '../hits'
+import {
+	countedHits,
+	distinctHits,
+	holdsVisit,
+	isWithoutConsent,
+	TWIN_WINDOW_MS,
+	tombstoneOf,
+} from '../hits'
 import { isOrderHitId } from '../ids'
 import type { MetricParts } from '../parts'
 import {
@@ -285,6 +292,8 @@ const newGroup = (): Group => ({
 		revenue: 0,
 		impressions: 0,
 		interactions: 0,
+		pageviewsWithoutVisitor: 0,
+		pageviewsWithoutConsent: 0,
 	},
 	visitors: new Set(),
 	visits: new Map(),
@@ -306,6 +315,8 @@ const add = (group: Group, fact: Fact, axis: RawAxis): void => {
 	sums.revenue += fact.revenue
 	sums.impressions += fact.impressions
 	sums.interactions += isItemClick(hit) ? 1 : 0
+	sums.pageviewsWithoutVisitor += pageview && hit.v === '' ? 1 : 0
+	sums.pageviewsWithoutConsent += pageview && isWithoutConsent(hit) ? 1 : 0
 	if (hit.v !== '' && (axis === 'item' || !engagement)) {
 		group.visitors.add(visitorKeyOf(hit))
 	}

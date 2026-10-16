@@ -5,6 +5,7 @@ import { getPayload } from 'payload'
 import type { ReactNode } from 'react'
 import { ConsentToggle } from '../../components/ConsentToggle'
 import { PrerenderReady } from '../../components/PrerenderReady'
+import { e2eVendorProfile } from '../../helpers/e2eVendors'
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
 	const payload = await getPayload({ config })
@@ -15,6 +16,8 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 		headers: await headers(),
 		draft: (await draftMode()).isEnabled,
 	})
+	// biome-ignore lint/plugin/noProcessEnv: dev app env boundary
+	const vendorMode = e2eVendorProfile(process.env.ANALYTICS_E2E_VENDORS) !== undefined
 	return (
 		// Canvas/CanvasText follow the declared color-scheme, so the demo stays legible
 		// in a dark-mode browser without a media query.
@@ -31,7 +34,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
 				}}
 			>
 				{children}
-				<ConsentToggle />
+				<ConsentToggle perSlot={vendorMode} remember={!vendorMode} />
 				<AnalyticsScripts config={tracker} />
 				<PrerenderReady />
 			</body>

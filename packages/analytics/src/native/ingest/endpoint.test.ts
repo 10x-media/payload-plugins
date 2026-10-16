@@ -696,6 +696,81 @@ describe('makeIngestHandler engagement', () => {
 	})
 })
 
+describe('makeIngestHandler modes', () => {
+	const located = {
+		'x-vercel-ip-country': 'DE',
+		'x-vercel-ip-country-region': 'BE',
+		'x-vercel-ip-city': 'Berlin',
+		'x-real-ip': '9.9.9.9',
+	}
+
+	const measured = () =>
+		handlerWith({
+			geoResolver: platformHeaderResolver,
+			attribution: { trustedPlatform: 'vercel' },
+		})
+
+	const beacon = (body: Record<string, unknown>): PayloadRequest =>
+		beaconOf(JSON.stringify(body), { headers: located })
+
+	it('stores a beacon without a mode as full, and a cookieless one under the same visitor', async () => {
+		const { handler, hits } = measured()
+		await handler(beacon({ type: 'pageview', path: '/' }))
+		await handler(beacon({ type: 'pageview', path: '/', m: 'c' }))
+		await handler(beacon({ type: 'pageview', path: '/', m: 'f' }))
+		expect(hits.map((hit) => hit.mode)).toEqual(['f', 'c', 'f'])
+		expect(new Set(hits.map((hit) => hit.v)).size).toBe(1)
+		expect(hits[1]).toMatchObject({ country: 'DE', region: 'BE', city: 'Berlin' })
+	})
+
+	it('stores an anonymous pageview with no visitor, country alone, and no time or scroll, whatever it carries', async () => {
+		const { handler, hits, saltDays } = measured()
+		const res = await handler(
+			beacon({
+				type: 'pageview',
+				path: '/pricing',
+				m: 'a',
+				referrer: 'https://news.example/story',
+				query: 'utm_source=newsletter',
+				durationMs: 9000,
+				scrollDepth: 0,
+			})
+		)
+		expect(res.status).toBe(202)
+		expect(hits).toHaveLength(1)
+		expect(hits[0]).toMatchObject({
+			mode: 'a',
+			v: '',
+			country: 'DE',
+			ref: 'news.example',
+			utmSource: 'newsletter',
+		})
+		for (const field of ['region', 'city', 'durationMs', 'scrollDepth']) {
+			expect(hits[0]).not.toHaveProperty(field)
+		}
+		expect(saltDays).toEqual([])
+	})
+
+	it('stores no anonymous engagement, however much time and scroll it reports', async () => {
+		const { handler, hits } = measured()
+		const res = await handler(
+			beacon({ type: 'engagement', path: '/p', m: 'a', durationMs: 4000, scrollDepth: 40 })
+		)
+		expect(res.status).toBe(202)
+		expect(hits).toEqual([])
+	})
+
+	it('400s a mode it does not know, naming m and recording nothing', async () => {
+		const { handler, hits } = measured()
+		for (const m of ['x', 'full', 1, null, true]) {
+			const res = await handler(beacon({ type: 'pageview', path: '/', m }))
+			expect(res.status).toBe(400)
+			expect(await res.json()).toMatchObject({ error: { param: 'm' } })
+		}
+		expect(hits).toEqual([])
+	})
+})
+
 describe('makeIngestHandler content items', () => {
 	const key = itemRefKey('test-secret')
 	const signed = (ref: string): string => `${ref}@${itemRefSignature(key, ref)}`

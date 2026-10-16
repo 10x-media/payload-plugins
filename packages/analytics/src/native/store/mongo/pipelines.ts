@@ -1,6 +1,6 @@
 import type { AnalyticsFilter } from '../../../core/contract'
 import { ITEM_CLICK_EVENT } from '../../../goals/constants'
-import { SALE_FIELDS } from '../hits'
+import { SALE_FIELDS, WITHOUT_CONSENT_MODES } from '../hits'
 import { ORDER_PREFIX, SERVER_ORDER_PREFIX, WIRE_ORDER_PREFIX } from '../ids'
 import { type MetricParts, PART_KEYS } from '../parts'
 import {
@@ -26,6 +26,11 @@ export type Stage = Record<string, unknown>
 export const one = (test: unknown): Record<string, unknown> => ({ $cond: [test, 1, 0] })
 
 export const isPageview = { $eq: ['$type', 'pageview'] }
+
+/** A pageview the page measured before or without consent. */
+export const isPageviewWithoutConsent = {
+	$and: [isPageview, { $in: ['$mode', [...WITHOUT_CONSENT_MODES]] }],
+}
 
 /** An event or a goal completion, as `events` counts them. */
 export const isInteraction = { $in: ['$type', ['event', 'goal']] }
@@ -230,6 +235,8 @@ export const HIT_PARTS: Parts = {
 	revenue: { $ifNull: ['$revenue', 0] },
 	impressions: 0,
 	interactions: one(isItemClick),
+	pageviewsWithoutVisitor: one({ $and: [isPageview, { $eq: ['$v', ''] }] }),
+	pageviewsWithoutConsent: one(isPageviewWithoutConsent),
 }
 
 /** What a read projects beside every read's own fields, as the SQL hits CTE selects. */
@@ -267,6 +274,7 @@ export const projection = (plan: ProjectedFields): Stage => {
 		item: orNull('item'),
 		durationMs: orNull('durationMs'),
 		scrollDepth: orNull('scrollDepth'),
+		mode: orNull('mode'),
 		conversions: orNull('conversions'),
 		revenue: orNull('revenue'),
 		eng: one({ $eq: ['$type', 'engagement'] }),
@@ -322,6 +330,7 @@ const VISIT_SUMS = {
 	v_conv: { $sum: { $ifNull: ['$conversions', 0] }, window: WHOLE },
 	v_rev: { $sum: { $ifNull: ['$revenue', 0] }, window: WHOLE },
 	v_int: { $sum: one(isItemClick), window: WHOLE },
+	v_npc: { $sum: one(isPageviewWithoutConsent), window: WHOLE },
 }
 
 export interface VisitOptions {
@@ -720,16 +729,25 @@ export const orderStages = (
 ): Stage[] => {
 	const stages: Stage[] = []
 	const sort: Record<string, 1 | -1> = {}
-	if (order && counted.has(order.part) && (!order.per || counted.has(order.per))) {
+	if (
+		order &&
+		counted.has(order.part) &&
+		(!order.per || counted.has(order.per)) &&
+		(!order.less || counted.has(order.less))
+	) {
 		const part = `$${order.part}`
+		const per =
+			order.less === undefined
+				? `$${order.per}`
+				: { $subtract: [`$${order.per}`, { $ifNull: [`$${order.less}`, 0] }] }
 		const rank =
 			order.per === undefined
 				? part
 				: {
 						$cond: [
-							{ $or: [{ $eq: [`$${order.per}`, 0] }, { $eq: [`$${order.per}`, null] }] },
+							{ $or: [{ $eq: [per, 0] }, { $eq: [per, null] }] },
 							null,
-							{ $divide: [part, `$${order.per}`] },
+							{ $divide: [part, per] },
 						],
 					}
 		stages.push({ $set: { rank, unranked: one({ $eq: [rank, null] }) } })

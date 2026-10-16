@@ -65,7 +65,9 @@
 			"sessionMs": null,
 			"durationMs": null,
 			"scrollSum": null,
-			"scrollSamples": null
+			"scrollSamples": null,
+			"pageviewsWithoutVisitor": null,
+			"pageviewsWithoutConsent": null
 		}
 	},
 	{

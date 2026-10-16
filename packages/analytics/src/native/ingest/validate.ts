@@ -1,5 +1,6 @@
+import { isOneOf } from '../../core/values'
 import { MAX_SINCE_MS } from '../../goals/constants'
-import type { HitType } from '../store/types'
+import { HIT_MODES, type HitType } from '../store/types'
 import type { RawEventInput } from './normalizeEvent'
 
 const TYPES: ReadonlySet<string> = new Set<HitType>(['pageview', 'event', 'goal', 'engagement'])
@@ -9,7 +10,7 @@ const NAMED: ReadonlySet<string> = new Set<HitType>(['event', 'goal'])
 
 const nonEmptyString = (value: unknown): boolean => typeof value === 'string' && value.length > 0
 
-export type RawEventField = 'type' | 'path' | 'hostname' | 'name' | 'revenue' | 'value'
+export type RawEventField = 'type' | 'path' | 'hostname' | 'name' | 'revenue' | 'value' | 'm'
 
 interface RawEventCheck {
 	/**
@@ -46,6 +47,10 @@ export const rawEventError = (
 	}
 	if (NAMED.has(raw.type) && !nonEmptyString(raw.name)) {
 		return 'name'
+	}
+	// Refused rather than read as some mode: a mode ingest does not know may allow less than any.
+	if (raw.m !== undefined && !isOneOf(HIT_MODES, raw.m)) {
+		return 'm'
 	}
 	if (!check.allowRevenue) {
 		if (raw.revenue !== undefined && raw.revenue !== false) {

@@ -1,3 +1,8 @@
+import {
+	adapterWithoutConsent,
+	cookielessCapture,
+	WITHOUT_CONSENT_LEVELS,
+} from '../../capture/withoutConsent'
 import { filterableDimensions } from '../../core/capabilities'
 import type { CaptureSupport } from '../../core/capture'
 import {
@@ -18,6 +23,7 @@ import {
 import type { FetchLike } from '../../core/fetch'
 import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
 import { DEFAULT_TIMEZONE } from '../../timeframe/tz'
+import type { WithoutConsentLevel } from '../../tracker/config'
 import { emptyGoalBreakdown, goalHint, hintFailed, hintSlugs } from '../goalRead'
 import { hostnameOf, withoutTrailingSlash } from '../http/baseUrl'
 import { declaredFilters, everyOperatorOn, firstMapped, mappedKeys } from '../mapping'
@@ -45,6 +51,11 @@ export interface UmamiConfig {
 	maxLookbackDays?: number | null
 	/** The fetch reads and the capture proxy reach Umami with. Unset, the global fetch. */
 	fetch?: FetchLike
+	/**
+	 * What this source's held slot does without consent, over `capture.withoutConsent`. Umami stores
+	 * nothing on the device, so `'cookieless'` loads the script as it is; `'off'` holds it.
+	 */
+	withoutConsent?: WithoutConsentLevel
 }
 
 /** Where one Umami install answers: its Stats API, its tracker script, and its event sink. */
@@ -95,6 +106,14 @@ function buildCapture(config: UmamiConfig, endpoints: UmamiEndpoints): CaptureSu
 			],
 		}),
 		client: { kind: 'umami' },
+		...cookielessCapture(
+			{ kind: 'inherent' },
+			adapterWithoutConsent(
+				config.withoutConsent,
+				'umami({ withoutConsent })',
+				WITHOUT_CONSENT_LEVELS
+			)
+		),
 	}
 }
 

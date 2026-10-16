@@ -110,6 +110,48 @@ describe('adapterFromProviderDoc', () => {
 		)
 	})
 
+	it("hands the document's level without consent to every vendor, blank or unknown following the install", () => {
+		const levelOf = (doc: ProviderDoc) => build(doc)?.capture?.withoutConsent
+		const docs: ProviderDoc[] = [
+			{ provider: 'plausible', plausible: { siteId: 's', apiKey: 'k', domain: 'example.com' } },
+			{ provider: 'umami', umami: { websiteId: 'w', apiKey: 'k' } },
+			{ provider: 'ga4', ga4: { propertyId: '1', measurementId: 'G-AB12CD34' } },
+			{ provider: 'posthog', posthog: { projectId: '1', apiKey: 'k', projectToken: 'phc_x' } },
+		]
+		for (const doc of docs) {
+			expect(levelOf({ ...doc, withoutConsent: 'off' }), doc.provider ?? '').toBe('off')
+			expect(levelOf({ ...doc, withoutConsent: 'cookieless' })).toBe('cookieless')
+			expect(levelOf({ ...doc, withoutConsent: '' })).toBeUndefined()
+			expect(levelOf({ ...doc, withoutConsent: 'anonymous' })).toBeUndefined()
+			expect(levelOf(doc)).toBeUndefined()
+		}
+	})
+
+	it('turns a following document off on an install that never counts without consent', () => {
+		const doc: ProviderDoc = {
+			provider: 'posthog',
+			posthog: { projectId: '1', apiKey: 'k', projectToken: 'phc_x' },
+		}
+		const strict = { followingCountsWithoutConsent: false }
+		expect(build(doc, strict)?.capture?.withoutConsent).toBe('off')
+		expect(build({ ...doc, withoutConsent: 'cookieless' }, strict)?.capture?.withoutConsent).toBe(
+			'cookieless'
+		)
+		expect(
+			build(doc, { followingCountsWithoutConsent: true })?.capture?.withoutConsent
+		).toBeUndefined()
+	})
+
+	it('turns every document off where no held slot can fall to it, its own level included', () => {
+		const doc: ProviderDoc = {
+			provider: 'posthog',
+			withoutConsent: 'cookieless',
+			posthog: { projectId: '1', apiKey: 'k', projectToken: 'phc_x' },
+		}
+		expect(build(doc, { heldWithoutConsent: false })?.capture?.withoutConsent).toBe('off')
+		expect(build(doc, { heldWithoutConsent: true })?.capture?.withoutConsent).toBe('cookieless')
+	})
+
 	// Without this the adapter supports scoped reads and the document has no way to say so,
 	// so a provider-document PostHog can never serve one tenant's slice of a shared project.
 	it('threads the posthog scope property through, which turns scoped queries on', () => {

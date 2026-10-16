@@ -1,6 +1,11 @@
 import type { Payload } from 'payload'
 import { jsLiteral } from '../../capture/jsLiteral'
-import type { CaptureSupport } from '../../core/capture'
+import {
+	adapterWithoutConsent,
+	cookielessCapture,
+	WITHOUT_CONSENT_LEVELS,
+} from '../../capture/withoutConsent'
+import type { CaptureSupport, SnippetMode } from '../../core/capture'
 import {
 	type AdapterContext,
 	type AnalyticsAdapter,
@@ -20,6 +25,7 @@ import type { Ga4Client, Ga4ReportResponse, Ga4ReportRow, Ga4Sdk } from '../../c
 import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
 import { CURRENCY_PATTERN, currencyOption } from '../../goals/currency'
 import { GA4_SDK_WARNING, isProductionBuild, loadGa4 } from '../../plugin/peers'
+import type { WithoutConsentLevel } from '../../tracker/config'
 import {
 	emptyGoalBreakdown,
 	type GoalKeyedRow,
@@ -74,6 +80,12 @@ export interface Ga4Config {
 	 * but such a code throws when the adapter is built.
 	 */
 	currency?: string
+	/**
+	 * What this source's held slot does without consent, over `capture.withoutConsent`. Unset, GA4
+	 * sends nothing until consent, since its cookieless pings still reach Google. `'cookieless'` loads
+	 * the tag with every consent signal denied (Consent Mode "advanced") and grants on consent.
+	 */
+	withoutConsent?: WithoutConsentLevel
 }
 
 /** How long one report may take when the adapter is called outside the engine, which sets its own. */
@@ -103,17 +115,25 @@ const cancelWhenAborted = (call: Promise<unknown>, signal: AbortSignal | undefin
 }
 
 /**
+ * Consent mode's defaults for a slot counting without consent ("advanced" mode), set before the tag
+ * loads: analytics storage only once in full, and advertising signals never, unless the host grants them.
+ */
+const consentDefault = (mode: SnippetMode): string =>
+	`gtag("consent","default",{analytics_storage:${jsLiteral(mode === 'full' ? 'granted' : 'denied')},ad_storage:"denied",ad_user_data:"denied",ad_personalization:"denied"});`
+
+/**
  * Google's install snippet, inline first as consent mode expects, led by the exclusion guard. The
- * tag loads from Google's CDN, so `routes` stays empty and the slot's proxy mount answers 404.
+ * tag loads from Google's CDN, so `routes` stays empty and the slot's proxy mount answers 404. A
+ * snippet started cookieless reads no storage, so no guard: the tracker reads the flag once in full.
  */
 function buildCapture(measurementId: string): CaptureSupport {
 	const id = jsLiteral(measurementId)
 	return {
 		proxy: { routes: [] },
-		snippet: () => ({
+		snippet: ({ mode = 'full', withoutConsent = false }) => ({
 			scripts: [
 				{
-					inline: `${ga4ExcludeGuard(measurementId)}window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag("js",new Date());gtag("config",${id})`,
+					inline: `${mode === 'cookieless' ? '' : ga4ExcludeGuard(measurementId)}window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}${withoutConsent ? consentDefault(mode) : ''}gtag("js",new Date());gtag("config",${id})`,
 				},
 				{
 					src: `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`,
@@ -352,6 +372,11 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 		upstreamAware: true,
 	}
 	const configCurrency = currencyOption('ga4({ currency })', config.currency)
+	const withoutConsent = adapterWithoutConsent(
+		config.withoutConsent,
+		'ga4({ withoutConsent })',
+		WITHOUT_CONSENT_LEVELS
+	)
 
 	/** One client per Payload instance, so closing one instance's leaves the others' open. */
 	const clients = new WeakMap<object, Promise<Ga4Client>>()
@@ -394,7 +419,12 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 		// An id that is not a bare token is dropped rather than escaped: it lands in an inline
 		// script and in the tag URL, and no legitimate measurement id needs anything else.
 		...(measurementId && MEASUREMENT_ID_PATTERN.test(measurementId)
-			? { capture: buildCapture(measurementId) }
+			? {
+					capture: {
+						...buildCapture(measurementId),
+						...cookielessCapture({ kind: 'switched', default: 'off' }, withoutConsent),
+					},
+				}
 			: {}),
 		isConfigured: () =>
 			Boolean(

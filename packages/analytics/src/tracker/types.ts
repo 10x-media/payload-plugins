@@ -1,4 +1,5 @@
 import type { CaptureSlot, RevenueItem, SnippetScript } from './config'
+import type { ModeSnapshot } from './gate'
 
 /** The browser globals the tracker touches, passed in so a test or another window can stand in. */
 export type TrackerWindow = Window & typeof globalThis
@@ -68,16 +69,32 @@ export interface ItemOptions {
 	item?: string
 }
 
+/** What a vendor's own client should be doing: off, counting without storing anything, or in full. */
+export type VendorMode = 'off' | 'cookieless' | 'full'
+
+/** What the tracker asks of a vendor's own client, which the sink switches to. */
+export interface VendorSwitch {
+	/** The slot's mode, `off` whatever the gate says while the browser is excluded. */
+	mode: VendorMode
+	/** True when a host's refusal asks for `mode`, rather than a pending gate or an exclusion. */
+	refused: boolean
+}
+
 /** One capture slot's delivery target. */
 export interface Sink {
 	readonly slot: CaptureSlot
 	ready(): Promise<void>
 	send(event: TrackerEvent): void
 	/**
-	 * Sets the vendor's own opt-out switch: the only thing that reaches a server-rendered snippet of an
-	 * ungated slot, which counts its pageview before the tracker boots.
+	 * Switches the vendor's own client, the only thing that reaches a snippet the server rendered, which
+	 * counts its pageview before the tracker boots. Repeating the current mode switches nothing.
 	 */
-	exclude?(excluded: boolean): void
+	mode?(next: VendorSwitch): void
+	/**
+	 * On every refusal, whether or not the vendor runs on this page: removes what its script keeps on
+	 * the device from an earlier page's consent, blindly, reading nothing.
+	 */
+	forget?(): void
 }
 
 /**
@@ -162,14 +179,20 @@ export interface Tracker {
 	refund(input: RefundInput): void
 	/**
 	 * Opens or closes capture slots, as the host's consent manager answers on every page load and on
-	 * every change. Nothing is stored: each load, and each back/forward cache restore, starts pending.
+	 * every change: `true` runs a held slot in full, `false` at its refused level. Nothing is stored:
+	 * each load, and each back/forward cache restore, starts pending.
 	 */
 	setGate(state: GateState): void
 	/** Each capture slot's gate, replaced whenever one changes. */
 	readonly gate: Readonly<Record<CaptureSlot, GateStatus>>
 	/**
-	 * True while this browser is excluded from capture. False until a slot opens: the stored flag
-	 * is read no earlier.
+	 * What each capture slot captures with, from its gate and `capture.withoutConsent`: `full` once
+	 * open, else its level for the phase (`off`, `cookieless`, `anonymous`). Replaced whenever one changes.
+	 */
+	readonly mode: ModeSnapshot
+	/**
+	 * True while this browser is excluded from capture. False until a slot runs in full: the stored
+	 * flag is read no earlier.
 	 */
 	readonly excluded: boolean
 	/**

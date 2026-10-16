@@ -57,15 +57,27 @@ An unconfigured adapter (missing credentials) degrades to an empty state and mak
 
 Reading and capturing are separate concerns. An adapter that declares `capture` can also fill a [capture slot](/analytics/capture#capture-slots): the browser tracker boots its snippet, and its tracker traffic is served through the [first-party proxy](/analytics/proxy) rather than the vendor domain, wherever the adapter declares proxy routes. Read credentials are never part of it; only what the browser is allowed to see.
 
-| Adapter | Capture | Extra config it needs |
-|---|---|---|
-| native | Yes | None. The plugin's tracker posts straight to the ingest endpoint; nothing is proxied or injected. |
-| PostHog | Yes | `projectToken` (the public `phc_...` browser key, distinct from the read `apiKey`), and on PostHog Cloud `region` (`us` / `eu`, derived from `host` when omitted); a self-hosted `host` takes capture itself and ignores `region`. |
-| Plausible | Yes | `domain` for the legacy `data-domain` tag, or `scriptId` for the per-site `pa-<id>.js` model: letters, digits, `_` and `-`, up to 64 characters. `domain` wins when both are set; with neither, or with a `scriptId` of anything else and no `domain`, no snippet is emitted. |
-| Umami | Yes | None beyond `websiteId`. `host` doubles as the app origin for capture: a trailing `/api` is stripped, so one value serves the Stats API and the tracker. |
-| GA4 | Yes | `measurementId` (the public `G-XXXXXXX`). The tag loads from googletagmanager.com rather than a first-party proxy, so this is the one capture slot that is not proxied. |
+| Adapter | Capture | Without consent | Extra config it needs |
+|---|---|---|---|
+| native | Yes | `cookieless` (its ordinary capture) or `anonymous` | None. The plugin's tracker posts straight to the ingest endpoint; nothing is proxied or injected. |
+| PostHog | Yes | `cookieless`, with the project's **Cookieless tracking** on | `projectToken` (the public `phc_...` browser key, distinct from the read `apiKey`), and on PostHog Cloud `region` (`us` / `eu`, derived from `host` when omitted); a self-hosted `host` takes capture itself and ignores `region`. |
+| Plausible | Yes | `cookieless`: its script stores nothing | `domain` for the legacy `data-domain` tag, or `scriptId` for the per-site `pa-<id>.js` model: letters, digits, `_` and `-`, up to 64 characters. `domain` wins when both are set; with neither, or with a `scriptId` of anything else and no `domain`, no snippet is emitted. |
+| Umami | Yes | `cookieless`: its script stores nothing | None beyond `websiteId`. `host` doubles as the app origin for capture: a trailing `/api` is stripped, so one value serves the Stats API and the tracker. |
+| GA4 | Yes | `off` unless opted in; then consent mode pings | `measurementId` (the public `G-XXXXXXX`). The tag loads from googletagmanager.com rather than a first-party proxy, so this is the one capture slot that is not proxied. |
 
 Capture support is declared only when the public capture config it needs is actually present, so a PostHog adapter configured for reads alone (no `projectToken`), a Plausible one with neither `domain` nor `scriptId`, or a GA4 one without a `measurementId` declares no `capture` at all: no proxy route, no snippet, and it fills no slot. Reads are unaffected either way. The exact routes and snippets each one declares are on the [proxy page](/analytics/proxy#per-vendor-routes).
+
+### Without consent
+
+The **Without consent** column is what a slot [`capture.gate`](/analytics/consent) holds does before an answer and after a refusal when `capture.withoutConsent` is `'cookieless'`, its default ([Measuring without consent](/analytics/consent#measuring-without-consent)). Each factory takes `withoutConsent` to decide for its own slot, over the install's option: `'cookieless'` or `'off'`, and on `native()` also `'anonymous'`. A [provider document](#what-one-document-holds) has the same choice in its **Without consent** field. [Consent](/analytics/consent#what-each-vendor-sends-and-stores) has what each vendor sends and stores in each phase.
+
+**Native** counts cookielessly by nature: its capture never stored anything on the device. `native({ withoutConsent: 'anonymous' })` stores less instead ([Anonymous hits](/analytics/native#anonymous-hits)).
+
+**Plausible and Umami** store nothing on the device, so the same script serves every phase: a cookieless slot loads it before any answer and keeps it after a refusal.
+
+**PostHog** counts with posthog-js's cookieless mode until consent, and its project has to accept those events: PostHog drops them at ingestion unless the project's **Cookieless tracking** setting (Settings, Web analytics) is on, though they still show in its Live events. The adapter checks the setting with the read `apiKey`, which needs the `project:read` scope for it (`GET /api/projects/<projectId>/`, field `cookieless_server_hash_mode`), at most once an hour, and a failed check is retried after five minutes without a word. While the setting is off, the admin says, where a read's notes show: "PostHog is dropping visits counted without consent: enable Cookieless tracking in the project's Web analytics settings." After it is turned on, the note can stay for up to about an hour, plus however long the read is cached. A key without `project:read` never shows the note. The check runs only for an adapter with a `projectToken` that may count without consent: not under `withoutConsent: 'off'`, its own or the install's.
+
+**GA4** is strict by default: its cookieless pings still reach Google, so `'cookieless'` on the install leaves it `off`. Opt it in with one line, `ga4({ ..., withoutConsent: 'cookieless' })`, or the document's field: its tag then loads with every consent signal denied and sends cookieless pings until consent.
 
 ### Filters
 
@@ -190,7 +202,7 @@ import { posthog } from '@10x-media/analytics/adapters/posthog'
 posthog({ projectId: '123', apiKey: process.env.POSTHOG_API_KEY! })
 ```
 
-Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope and never reaches the browser; capture takes the public `projectToken` (`phc_...`) instead. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted, with the base path when a reverse proxy serves PostHog under one; US Cloud is the default. On PostHog Cloud, `region` pins the proxied capture hosts independently of `host`; a self-hosted `host` takes capture itself, through its capture paths alone, and ignores `region` (see [the proxy routes](/analytics/proxy#posthog)). `uiHost` is the PostHog app the capture snippet's `ui_host` names, for the links PostHog's toolbar shows: PostHog Cloud defaults to its region's app, and a self-hosted instance gets none unless you pass it, so no page publishes the instance's address on its own. Metrics: pageviews, visitors, visits, sessions, events. `events` counts every captured event (matching PostHog's own Events definition); requesting it (or the `event` dimension) switches the read off the `$pageview`-only filter, and the pageview-family metrics stay pageview-scoped through conditional aggregation. Dimensions: `page` (top-pages breakdown), `channel` (`session.$channel_type`, reached through the events table's own `session` join on `$session_id`), `event` (per-event-name breakdown) and `goal`, which is the event name restricted to the read's own goals. A `channel` read stays pageview-scoped, since a session property is not an event name; a pageview captured with no `$session_id` joins nothing and lands in an empty channel, which the admin shows as **Not set**. `conversions` counts those goal events; PostHog serves no revenue. A binding `hostname` filters on `properties.$host`.
+Derives web metrics with HogQL through the Query API. `apiKey` is a personal API key with the Query Read scope, plus `project:read` for the [cookieless tracking check](#without-consent), and never reaches the browser; capture takes the public `projectToken` (`phc_...`) instead. Pass `host` for EU Cloud (`https://eu.posthog.com`) or self-hosted, with the base path when a reverse proxy serves PostHog under one; US Cloud is the default. On PostHog Cloud, `region` pins the proxied capture hosts independently of `host`; a self-hosted `host` takes capture itself, through its capture paths alone, and ignores `region` (see [the proxy routes](/analytics/proxy#posthog)). `uiHost` is the PostHog app the capture snippet's `ui_host` names, for the links PostHog's toolbar shows: PostHog Cloud defaults to its region's app, and a self-hosted instance gets none unless you pass it, so no page publishes the instance's address on its own. Metrics: pageviews, visitors, visits, sessions, events. `events` counts every captured event (matching PostHog's own Events definition); requesting it (or the `event` dimension) switches the read off the `$pageview`-only filter, and the pageview-family metrics stay pageview-scoped through conditional aggregation. Dimensions: `page` (top-pages breakdown), `channel` (`session.$channel_type`, reached through the events table's own `session` join on `$session_id`), `event` (per-event-name breakdown) and `goal`, which is the event name restricted to the read's own goals. A `channel` read stays pageview-scoped, since a session property is not an event name; a pageview captured with no `$session_id` joins nothing and lands in an empty channel, which the admin shows as **Not set**. `conversions` counts those goal events; PostHog serves no revenue. A binding `hostname` filters on `properties.$host`.
 
 Time bounds are sent as `toDateTime('...', 'UTC')`. A bare HogQL date literal parses in the project's timezone, so a project set to anything but UTC used to read a window shifted by its offset; buckets are still cut in the reporting timezone.
 
@@ -261,6 +273,8 @@ The body holds two kinds of field, and the difference is not cosmetic:
 - **Public capture config** (`projectToken`, `domain`, `websiteId`, `scriptId`, `measurementId`, `region`) is plain text on purpose: the tracker serves it to the browser. A PostHog, Plausible or GA4 document holding only its read settings reads dashboards and captures nothing. Umami is the exception: its `websiteId` is what it reads by and all its capture needs, so an Umami document captures whenever it fills a [capture slot](/analytics/capture#capture-slots). The reverse does not hold: a document without its read credentials is [no source at all](#when-a-document-is-a-source), and captures nothing whatever capture fields it holds.
 
 Two more fields say what revenue is in. Plausible's **Revenue currency** (`revenueCurrency`) is the currency of the site's revenue goals and turns its `revenue` metric on. GA4's **Revenue currency** (`currency`) is the property's currency, used only when an answer from GA4 does not name it, which it normally does. Either way the reads report revenue in that currency (`meta.currency`) rather than the install's own.
+
+A PostHog, Plausible, Umami or GA4 document also has **Without consent** (`withoutConsent`): **Count without cookies** (`cookieless`) or **Send nothing** (`off`), what this source's slot does before a visitor answers and after a refusal when `capture.gate` holds it ([Without consent](#without-consent)). Left empty, it follows `capture.withoutConsent`, and on an install whose option is `'off'` an empty field is `off` too. A set value beats the install's option for this source. A `native` document has no such field: `native({ withoutConsent })` decides for every scope.
 
 Every field carries a description saying what to paste into it and where to find it.
 
@@ -436,7 +450,7 @@ analytics({
 })
 ```
 
-`name`, `provider`, `enabled` and, on a scoped install, `isDefault` are overridable. A replacement may be any field type, a `row` or a `collapsible` included, as long as it still puts a field of the same name somewhere inside it.
+`name`, `provider`, `enabled`, `withoutConsent` and, on a scoped install, `isDefault` are overridable. A replacement may be any field type, a `row` or a `collapsible` included, as long as it still puts a field of the same name somewhere inside it.
 
 Order matters: per-field overrides run first, then `overrides` gets the whole config last. It is the same shape [`goals.collection.fields`](/analytics/goals#5-let-editors-manage-goals) uses, so one mental model covers both collections.
 
@@ -671,7 +685,7 @@ When you do want the plugin to own a vendor, move it in this order, one vendor a
 
 5. **Fix the CSP, then re-enforce.** The mount is a path on your own origin, so `'self'` covers it in `connect-src` and `script-src` for most policies; a policy that enumerates paths, or one stricter than `'self'`, needs the mount added. The vendor's own origins can come out at the same time, because nothing fetches them directly any more. Read the report-only violations before you enforce: that is what they are for.
 
-6. **Decide the consent gate.** `capture.gate` says whether the vendor's slot waits, and a slot that waits is not delivered to until your manager opens it with [`setGate`](/analytics/consent#setgate). Wire the gate to your manager's answer, or keep the manager as the gate by leaving the slot behind it. Whichever you choose, **one thing decides**; two independent gates for one vendor is the same class of bug as two loaders.
+6. **Decide the consent gate.** `capture.gate` says whether the vendor's slot waits, and `capture.withoutConsent` (or the adapter's own `withoutConsent`) what a slot that waits sends until your manager grants it with [`setGate`](/analytics/consent#setgate): cookielessly by default, GA4 aside, or nothing at `'off'`. Wire the gate to your manager's answer, or keep the manager as the gate by leaving the slot behind it. Whichever you choose, **one thing decides**; two independent gates for one vendor is the same class of bug as two loaders.
 
 ### What stays with the consent manager
 

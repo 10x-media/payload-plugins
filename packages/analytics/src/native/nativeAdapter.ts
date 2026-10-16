@@ -6,6 +6,7 @@ import {
 	type PayloadRequest,
 } from 'payload'
 import { captureRequest } from '../capture/captureRequest'
+import { adapterWithoutConsent, cookielessCapture } from '../capture/withoutConsent'
 import type { CaptureSupport } from '../core/capture'
 import { currentDate } from '../core/clock'
 import {
@@ -39,6 +40,7 @@ import { DEFAULT_ROUTE_BASE, routePaths } from '../plugin/routes'
 import { getRuntime } from '../plugin/runtime'
 import { addTask, schemaOnlyTask } from '../plugin/schemaOnly'
 import { TASK_SWEEP_BATCHES } from '../surfacing/cacheSweep'
+import type { WithoutConsentLevel } from '../tracker/config'
 import { aggregatesCollection } from './collections/aggregates'
 import { hitsCollection } from './collections/hits'
 import { DEFAULT_STORE_SLUGS, type StoreSlugs } from './collections/slugs'
@@ -163,7 +165,18 @@ export interface NativeOptions {
 	 * change admin settings, access and `dbName`, but no field: the boot checks it.
 	 */
 	collections?: NativeCollections
+	/**
+	 * What this source's held slot does without consent, over `capture.withoutConsent`.
+	 * `'cookieless'` is native's own capture, which stores nothing on the device; `'anonymous'` also
+	 * keeps no visitor id, region, city or engagement for those hits; `'off'` sends nothing.
+	 */
+	withoutConsent?: NativeWithoutConsent
 }
+
+/** Native's levels without consent: the vendor ones, plus `anonymous`. */
+export type NativeWithoutConsent = WithoutConsentLevel | 'anonymous'
+
+const NATIVE_WITHOUT_CONSENT: readonly NativeWithoutConsent[] = ['cookieless', 'anonymous', 'off']
 
 /** The engine's collections, by what they hold; each defaults to its `analytics-` slug. */
 export interface NativeCollections {
@@ -371,6 +384,11 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 	const sqliteThread = sqliteThreadOf(options.sqlite)
 	const platformHostnames = hostnameSet(options.platformHostnames, 'platformHostnames')
 	const collections = storeCollectionsOf(options.collections)
+	const withoutConsent = adapterWithoutConsent(
+		options.withoutConsent,
+		'native({ withoutConsent })',
+		NATIVE_WITHOUT_CONSENT
+	)
 	const slugs: StoreSlugs = {
 		hits: collections.hits.slug,
 		aggregates: collections.aggregates.slug,
@@ -661,7 +679,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 		get capabilities() {
 			return capabilities
 		},
-		capture: nativeCapture,
+		capture: { ...nativeCapture, ...cookielessCapture({ kind: 'inherent' }, withoutConsent) },
 		ingest,
 		isConfigured: () => true,
 		flush: async (payload) => {

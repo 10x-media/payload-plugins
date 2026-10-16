@@ -113,6 +113,13 @@ export interface AnalyticsResult {
         sourceError?: SourceErrorKind;
         unappliedFilters?: AnalyticsFilter[];
         goalsUnresolved?: true;
+        withoutConsent?: {
+            pageviews: number;
+        };
+        withoutVisitor?: {
+            pageviews: number;
+        };
+        withoutConsentDropped?: true;
     };
     // (undocumented)
     rows: AnalyticsRow[];
@@ -610,6 +617,8 @@ export interface ReadNotices {
     stale: boolean;
     timezoneUnresolved: boolean;
     visitorsSummed?: boolean;
+    withoutConsentDropped?: boolean;
+    withoutVisitor?: number;
 }
 
 // @beta

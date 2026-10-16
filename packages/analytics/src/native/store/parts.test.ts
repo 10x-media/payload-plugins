@@ -103,6 +103,25 @@ describe('partsToMetrics', () => {
 		expect(partsToMetrics(parts({ pageviews: 3 }), ['avgDuration'])).toEqual({ avgDuration: null })
 	})
 
+	it('averages time on page over the pageviews with a visitor, and a day without the count over all', () => {
+		const anonymous = parts({ pageviews: 5, durationMs: 6000, pageviewsWithoutVisitor: 2 })
+		const earlier = parts({ pageviews: 3, durationMs: 3000 })
+		expect(partsToMetrics(anonymous, ['pageviews', 'avgDuration'])).toEqual({
+			pageviews: 5,
+			avgDuration: 2000,
+		})
+		expect(partsToMetrics(earlier, ['avgDuration'])).toEqual({ avgDuration: 1000 })
+		// 9000 ms over the 6 timed pageviews of both days.
+		expect(partsToMetrics(addParts(anonymous, earlier), ['avgDuration'])).toEqual({
+			avgDuration: 1500,
+		})
+		expect(
+			partsToMetrics(parts({ pageviews: 2, durationMs: 0, pageviewsWithoutVisitor: 2 }), [
+				'avgDuration',
+			])
+		).toEqual({ avgDuration: null })
+	})
+
 	it('never reads a scroll depth past the whole page', () => {
 		expect(
 			partsToMetrics(parts({ scrollSum: 250, scrollSamples: 2 }), ['scrollDepth']).scrollDepth

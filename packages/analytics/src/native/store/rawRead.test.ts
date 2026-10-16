@@ -41,6 +41,8 @@ describe('planRawRead', () => {
 			'events',
 			'interactions',
 			'pageviews',
+			'pageviewsWithoutConsent',
+			'pageviewsWithoutVisitor',
 			'revenue',
 			'scrollSamples',
 			'scrollSum',
@@ -162,6 +164,20 @@ describe('ordering', () => {
 			rankOf(parts({ durationMs: 30, pageviews: 0 }), {
 				part: 'durationMs',
 				per: 'pageviews',
+				dir: 'asc',
+			})
+		).toBeNull()
+		const timed = { part: 'durationMs', per: 'pageviews', less: 'pageviewsWithoutVisitor' } as const
+		expect(
+			rankOf(parts({ durationMs: 30, pageviews: 5, pageviewsWithoutVisitor: 2 }), {
+				...timed,
+				dir: 'asc',
+			})
+		).toBe(10)
+		expect(rankOf(parts({ durationMs: 30, pageviews: 3 }), { ...timed, dir: 'asc' })).toBe(10)
+		expect(
+			rankOf(parts({ durationMs: 0, pageviews: 2, pageviewsWithoutVisitor: 2 }), {
+				...timed,
 				dir: 'asc',
 			})
 		).toBeNull()

@@ -246,13 +246,13 @@ export const axisOf = (
 	return dimensions.includes('goal') ? 'goal' : dimensions.includes('item') ? 'item' : 'hit'
 }
 
-const ORDER_PARTS: Record<MetricKey, Pick<RawOrder, 'part' | 'per'>> = {
+const ORDER_PARTS: Record<MetricKey, Omit<RawOrder, 'dir'>> = {
 	pageviews: { part: 'pageviews' },
 	visitors: { part: 'visitors' },
 	visits: { part: 'sessions' },
 	sessions: { part: 'sessions' },
 	bounceRate: { part: 'bounces', per: 'entries' },
-	avgDuration: { part: 'durationMs', per: 'pageviews' },
+	avgDuration: { part: 'durationMs', per: 'pageviews', less: 'pageviewsWithoutVisitor' },
 	visitDuration: { part: 'sessionMs', per: 'sessions' },
 	scrollDepth: { part: 'scrollSum', per: 'scrollSamples' },
 	events: { part: 'events' },

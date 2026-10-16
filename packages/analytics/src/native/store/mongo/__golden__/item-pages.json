@@ -418,6 +418,9 @@
 			"scrollDepth": {
 				"$ifNull": ["$scrollDepth", null]
 			},
+			"mode": {
+				"$ifNull": ["$mode", null]
+			},
 			"conversions": {
 				"$ifNull": ["$conversions", null]
 			},

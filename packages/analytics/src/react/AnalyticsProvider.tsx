@@ -10,6 +10,7 @@ import {
 	useRef,
 } from 'react'
 import type { CaptureSlot, TrackerConfig } from '../tracker/config'
+import type { ModeSnapshot } from '../tracker/gate'
 import { acquireTracker, setWindowGate, type TrackerLease } from '../tracker/registry'
 import type { GateState, GateStatus, LoadScript, Tracker } from '../tracker/types'
 
@@ -36,6 +37,11 @@ export interface AnalyticsApi extends AnalyticsCommands {
 	excluded: boolean
 	/** Each capture slot's gate. A change re-renders the caller. */
 	gate: Readonly<Record<CaptureSlot, GateStatus>>
+	/**
+	 * What each capture slot captures with: `full` once open, else its level without consent (`off`,
+	 * `cookieless`, `anonymous`). All `off` until a tracker booted. A change re-renders the caller.
+	 */
+	mode: ModeSnapshot
 }
 
 export const AnalyticsContext = createContext<AnalyticsCommands | null>(null)

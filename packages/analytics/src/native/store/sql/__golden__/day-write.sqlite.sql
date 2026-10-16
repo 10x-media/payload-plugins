@@ -33,8 +33,8 @@ SELECT DISTINCT "gen" FROM "analytics_aggregates"
 -- 27: "utmCampaign"
 -- 28: "page"
 
-INSERT INTO "analytics_aggregates" ("id", "scope", "day", "hostname", "dim", "value", "dim2", "value2", "gen", "pageviews", "events", "visitors", "sessions", "entries", "bounces", "session_ms", "duration_ms", "scroll_sum", "scroll_samples", "conversions", "revenue", "impressions", "interactions")
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)
+INSERT INTO "analytics_aggregates" ("id", "scope", "day", "hostname", "dim", "value", "dim2", "value2", "gen", "pageviews", "events", "visitors", "sessions", "entries", "bounces", "session_ms", "duration_ms", "scroll_sum", "scroll_samples", "conversions", "revenue", "impressions", "interactions", "pageviews_without_visitor", "pageviews_without_consent")
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)
 		ON CONFLICT ("id") DO NOTHING
 
 -- parameters
@@ -60,6 +60,8 @@ INSERT INTO "analytics_aggregates" ("id", "scope", "day", "hostname", "dim", "va
 -- 20: 0
 -- 21: 0
 -- 22: 0
+-- 23: 1
+-- 24: 2
 
 DELETE FROM "analytics_aggregates"
 		WHERE "id" IN (SELECT "id" FROM "analytics_aggregates"

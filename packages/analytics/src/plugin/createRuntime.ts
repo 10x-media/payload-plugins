@@ -6,12 +6,16 @@ import type { AnalyticsResult } from '../core/contract'
 import { TASK_SLUGS } from '../core/jobs'
 import { monotonicMs } from '../core/monotonic'
 import {
+	cookielessTrustNotice,
 	DEFAULT_BINDING_SCOPE_FIELD,
+	documentsFillHeldTenant,
+	followingCountsWithoutConsent,
 	type ResolvedOptions,
 	revenueOffWarning,
 	type ScopeCallSite,
 	trackerAutoCapture,
 	untrustedAddressNotice,
+	withoutConsentUnsetNotice,
 } from '../core/options'
 import { type AdapterRegistry, withoutRevenue } from '../core/registry'
 import { describeWithCauses } from '../core/sourceErrors'
@@ -160,6 +164,9 @@ const settledFieldsOf = (args: RuntimeFactoryArgs) => {
 		allowedOrigins: resolved.capture.allowedOrigins,
 		...(resolved.capture.exclusion ? { exclusion: resolved.capture.exclusion } : {}),
 		captureGate: resolved.capture.gate,
+		...(resolved.capture.withoutConsent
+			? { captureWithoutConsent: resolved.capture.withoutConsent }
+			: {}),
 		autoCapture: trackerAutoCapture(
 			resolved.capture.autoCapture,
 			itemCollectionsOf(resolved.bindings).size > 0
@@ -282,6 +289,12 @@ export const createRuntimeFactory = (
 				hosts: resolved.providers.hosts,
 				fetch: providerConnections?.fetch,
 				sdks: resolved.sdks,
+				withoutConsent: {
+					heldWithoutConsent: documentsFillHeldTenant(resolved, true),
+					followingCountsWithoutConsent: followingCountsWithoutConsent(
+						resolved.capture.withoutConsent
+					),
+				},
 				...(plan.kind === 'resolve'
 					? { tokens: createEpochStore(payload, { now, backend: configTokenBackend(payload) }) }
 					: {}),
@@ -419,6 +432,14 @@ export const createRuntimeFactory = (
 			const spoofable = untrustedAddressNotice(resolved, isProductionBuild())
 			if (spoofable) {
 				warn(spoofable)
+			}
+			const collapsing = cookielessTrustNotice(resolved, isProductionBuild())
+			if (collapsing) {
+				warn(collapsing)
+			}
+			const withoutConsent = withoutConsentUnsetNotice(resolved)
+			if (withoutConsent) {
+				warn(withoutConsent)
 			}
 			const transactions = sqliteTransactionsNotice(payload)
 			if (transactions) {

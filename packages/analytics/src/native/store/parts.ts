@@ -27,6 +27,13 @@ export interface MetricParts {
 	revenue: number | null
 	impressions: number | null
 	interactions: number | null
+	/**
+	 * Pageviews with no visitor (anonymous, or server code's of no one's): they measure no time, so
+	 * time on page leaves them out. Null on a day counted before it existed, read as none.
+	 */
+	pageviewsWithoutVisitor: number | null
+	/** Pageviews the page measured cookielessly or anonymously, before or without consent. */
+	pageviewsWithoutConsent: number | null
 }
 
 export const PART_KEYS: ReadonlyArray<keyof MetricParts> = [
@@ -44,6 +51,8 @@ export const PART_KEYS: ReadonlyArray<keyof MetricParts> = [
 	'revenue',
 	'impressions',
 	'interactions',
+	'pageviewsWithoutVisitor',
+	'pageviewsWithoutConsent',
 ]
 
 /** Nothing counted, the identity of {@link addParts}. */
@@ -62,6 +71,8 @@ export const emptyParts = (): MetricParts => ({
 	revenue: null,
 	impressions: null,
 	interactions: null,
+	pageviewsWithoutVisitor: null,
+	pageviewsWithoutConsent: null,
 })
 
 /** One part of two rows together: a count with nothing beside it stays that count. */
@@ -110,6 +121,10 @@ const ratio = (
 
 const count = (part: number | null): MetricValue | undefined => part ?? undefined
 
+/** The pageviews time on page averages over: those with a visitor. */
+const timedPageviews = (parts: MetricParts): number | null =>
+	parts.pageviews === null ? null : parts.pageviews - (parts.pageviewsWithoutVisitor ?? 0)
+
 const metricOf = (parts: MetricParts, metric: MetricKey): MetricValue | undefined => {
 	switch (metric) {
 		case 'pageviews':
@@ -130,7 +145,7 @@ const metricOf = (parts: MetricParts, metric: MetricKey): MetricValue | undefine
 		case 'interactions':
 			return count(parts.interactions)
 		case 'avgDuration':
-			return ratio(parts.durationMs, parts.pageviews)
+			return ratio(parts.durationMs, timedPageviews(parts))
 		case 'visitDuration':
 			return ratio(parts.sessionMs, parts.sessions)
 		case 'bounceRate':

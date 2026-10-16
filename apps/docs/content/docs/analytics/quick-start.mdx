@@ -43,8 +43,8 @@ export default buildConfig({
   plugins: [
     analytics({
       adapters: [native()],
-      // Required, and the site operator's choice: 'all' holds every capture slot until your
-      // consent manager calls setGate, 'off' captures without waiting. This walkthrough uses
+      // Required, and the site operator's choice: 'all' holds every capture slot for your
+      // consent manager's answer, 'off' captures in full without waiting. This walkthrough uses
       // 'off' so numbers appear at once. The plugin does not decide this; see Consent.
       capture: { gate: 'off' },
       collections: {
@@ -74,10 +74,20 @@ export const db = sqliteAdapter({
 
 | `capture.gate` | Means |
 |---|---|
-| `'all'` | Every capture slot waits until your consent manager opens it with `setGate` ([Consent](/analytics/consent)). Nothing is sent before then, so without a manager wired to the gate nothing is counted. |
-| `'off'` | Nothing waits: capture starts with the page. |
+| `'all'` | Every capture slot waits for your consent manager's answer through `setGate` ([Consent](/analytics/consent)). |
+| `'off'` | Nothing waits: capture starts in full with the page. |
 | `['tenant']`, `['global']` | Only the slots listed wait. |
 | `({ slot, adapterId, kind }) => boolean` | You decide per slot; `({ kind }) => kind !== 'native'` captures native at once and holds every vendor. |
+
+A slot that waits goes through three phases, and `capture.withoutConsent` decides the first two:
+
+| Phase | Default (`withoutConsent` unset) | `capture: { withoutConsent: 'off' }` |
+|---|---|---|
+| No answer yet | counts cookielessly: native as it always does, Plausible, Umami and PostHog without device storage; GA4 sends nothing | sends nothing; events wait in the page, at most 100 per slot |
+| Refused | the same as before an answer | sends nothing; what waited is dropped |
+| Granted | full tracking, on the same page | full tracking, and what waited is sent |
+
+So with `'all'` and no manager wired to the gate, the default still counts cookielessly, and `'off'` counts nothing. Whether counting without consent suits your site is the operator's decision; [Measuring without consent](/analytics/consent#measuring-without-consent) has what each mode sends and stores, and links the regulators' guidance on it.
 
 On Vercel or behind Cloudflare, also set `trustedPlatform: 'vercel'` or `'cloudflare'`, so visitor countries come from the platform's own headers; see [Geo resolution](/analytics/geo#which-headers-to-trust).
 
@@ -132,7 +142,9 @@ Two notices are expected with this config, and neither is an error:
 - **Payload's job controls.** `native()` registers the `analytics-maintain` task, which turns Payload's jobs on, and the plugin restricts every job control your config left unset to the users of the admin collection. The boot names them, on every start: `analytics: Payload's job controls the config left unset now admit users of the "users" collection only: ...`. Set `jobs.access` (`run`, `queue` and `cancel`) and the `access` of `jobs.jobsCollectionOverrides` in your Payload config to choose who may run, queue, cancel and read jobs yourself, which also ends the notice ([Who may run jobs](/analytics/native#who-may-run-jobs)).
 - **Spoofable addresses, in production.** With `NODE_ENV=production`, an install that sets neither `trustedPlatform` nor `trustedProxyHops` logs `analytics: visitor IP addresses and countries can be spoofed on this install. ...` once per start, since it then reads them from headers a visitor can write. Set `trustedPlatform: 'vercel'` or `'cloudflare'` on those platforms, or `trustedProxyHops` to the number of proxies in front of the app ([Which headers to trust](/analytics/geo#which-headers-to-trust)).
 
-Neither prints while `next build` collects page data: the server that serves requests says them. On SQLite without WAL and a busy timeout, the engine also warns once, on its first statement, that it runs on the main thread, naming `sqliteAdapter({ wal: true, busyTimeout: 5000 })`.
+With `capture.gate` holding a slot (`'all'`, say) and `capture.withoutConsent` unset, a third line says which default is in effect, on every start: `analytics: capture.withoutConsent is unset, so held slots measure cookielessly before consent and after a refusal. Set it to 'off' to send nothing without consent.` Setting the option, to any value, ends it. In production such an install also warns while neither `trustedPlatform` nor `trustedProxyHops` is set, since cookieless counting tells visitors apart by their address ([Trusted proxies](/analytics/proxy#trusted-proxies)).
+
+None of them prints while `next build` collects page data: the server that serves requests says them. On SQLite without WAL and a busy timeout, the engine also warns once, on its first statement, that it runs on the main thread, naming `sqliteAdapter({ wal: true, busyTimeout: 5000 })`.
 
 ## Verify
 

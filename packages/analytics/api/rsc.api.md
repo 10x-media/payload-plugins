@@ -479,6 +479,8 @@ export interface ReadNotices {
     stale: boolean;
     timezoneUnresolved: boolean;
     visitorsSummed?: boolean;
+    withoutConsentDropped?: boolean;
+    withoutVisitor?: number;
 }
 
 // @beta

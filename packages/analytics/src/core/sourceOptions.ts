@@ -29,6 +29,7 @@ const PROVIDER_FIELD_KEYS = keysOf<ProviderCollectionFieldOverrides>({
 	provider: true,
 	enabled: true,
 	isDefault: true,
+	withoutConsent: true,
 })
 const ENCRYPTION_KEYS = keysOf<NonNullable<ProvidersCollectionOptions['encryption']>>({
 	keys: true,

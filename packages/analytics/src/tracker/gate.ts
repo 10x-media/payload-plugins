@@ -1,10 +1,10 @@
-import type { CaptureSlot, TrackerSlotConfig } from './config'
+import type { CaptureSlot, HeldSlotMode, SlotMode, TrackerSlotConfig } from './config'
 import { writeStorage } from './storage'
 import type { GateState, GateStatus, TrackerEvent, TrackerWindow } from './types'
 
 /**
- * How many events one slot holds while its gate is pending before the oldest is dropped: a
- * visitor who never answers the banner must not grow the tab's memory without bound.
+ * How many events one slot holds while it is pending and sends nothing before the oldest is dropped:
+ * a visitor who never answers the banner must not grow the tab's memory without bound.
  */
 export const GATE_QUEUE_LIMIT = 100
 
@@ -21,6 +21,36 @@ export type GateSnapshot = Readonly<Record<CaptureSlot, GateStatus>>
 
 /** The snapshot of a window with no tracker and no answer yet, and of the server render. */
 export const ALL_PENDING: GateSnapshot = Object.freeze({ global: 'pending', tenant: 'pending' })
+
+/** What each capture slot captures with, as `tracker.mode` and `useAnalytics().mode` give it. */
+export type ModeSnapshot = Readonly<Record<CaptureSlot, SlotMode>>
+
+/** The modes of a window with no tracker config yet, and of the server render. */
+export const ALL_OFF: ModeSnapshot = Object.freeze({ global: 'off', tenant: 'off' })
+
+const HELD_MODES: readonly HeldSlotMode[] = ['off', 'cookieless', 'anonymous']
+
+const isHeldMode = (value: unknown): value is HeldSlotMode =>
+	HELD_MODES.some((mode) => mode === value)
+
+/**
+ * What a slot captures with under `status`: in full once open, else its level for the phase without
+ * consent. A slot the gate does not hold, and a config naming no level (cached from 1.0.0-beta.14),
+ * send nothing until open.
+ */
+export const slotMode = (config: TrackerSlotConfig | undefined, status: GateStatus): SlotMode => {
+	if (config === undefined) {
+		return 'off'
+	}
+	if (status === 'open') {
+		return 'full'
+	}
+	if (!slotIsGated(config)) {
+		return 'off'
+	}
+	const level: unknown = config.withoutConsent?.[status === 'pending' ? 'pending' : 'refused']
+	return isHeldMode(level) ? level : 'off'
+}
 
 /** Deletes beta.11's consent key. Blocked storage holds none to delete. */
 export const forgetLegacyConsent = (win: TrackerWindow): void => {
@@ -148,8 +178,31 @@ export const answeredSnapshot = (
 }
 
 /**
- * What may wait in a pending slot's queue: an engagement only for a native slot, since a vendor
- * drops one, and never the items seen, which count only while a slot may receive them.
+ * Whether a held slot counts without consent in either phase, which its snippet booted for: PostHog
+ * then switches between cookieless and full rather than stopping.
+ */
+export const slotCountsWithoutConsent = (config: TrackerSlotConfig): boolean =>
+	slotMode(config, 'pending') !== 'off' || slotMode(config, 'closed') !== 'off'
+
+/** The modes a window's answers give `slots`, exactly a booting tracker's; all off before a config. */
+export const answeredModes = (
+	answers: readonly GateState[],
+	slots?: readonly TrackerSlotConfig[]
+): ModeSnapshot => {
+	if (slots === undefined) {
+		return ALL_OFF
+	}
+	const gate = createGate(slots)
+	for (const answer of answers) {
+		gate.answer(answer)
+	}
+	return gate.modes
+}
+
+/**
+ * What may wait in the queue of a slot pending and sending nothing: an engagement only for a
+ * native slot, since a vendor drops one, and never the items seen, which count only while a slot
+ * may receive them.
  */
 export const queueable = (
 	event: TrackerEvent,
@@ -172,7 +225,7 @@ export interface GateQueue<T> {
 	readonly size: number
 }
 
-/** Bounded FIFO buffer holding one slot's events while its gate is pending. */
+/** Bounded FIFO buffer holding one slot's events while it is pending and sends nothing. */
 export const createGateQueue = <T>(limit: number = GATE_QUEUE_LIMIT): GateQueue<T> => {
 	let items: T[] = []
 	return {
@@ -205,8 +258,11 @@ export interface GateTransition {
 
 export interface Gate {
 	status(slot: CaptureSlot): GateStatus
+	mode(slot: CaptureSlot): SlotMode
 	/** Frozen, and the same object until a slot's gate changes. */
 	readonly snapshot: GateSnapshot
+	/** Each slot's mode. Frozen, and the same object until a slot's mode changes. */
+	readonly modes: ModeSnapshot
 	/**
 	 * Applies one answer and returns the slots it moved. A slot's first explicit `true` counts as
 	 * opening even when already open, so a held-open slot clears a refusal from an earlier page.
@@ -233,15 +289,32 @@ export const createGate = (slots: readonly TrackerSlotConfig[]): Gate => {
 		tenant: initial('tenant'),
 	}
 	const answered = new Set<CaptureSlot>()
+	const modesOf = (): ModeSnapshot =>
+		Object.freeze({
+			global: slotMode(slotConfigOf(slots, 'global'), statuses.global),
+			tenant: slotMode(slotConfigOf(slots, 'tenant'), statuses.tenant),
+		})
 	let snapshot: GateSnapshot = Object.freeze({ ...statuses })
+	let modes = modesOf()
+	const changed = () => {
+		snapshot = Object.freeze({ ...statuses })
+		const next = modesOf()
+		if (GATE_SLOTS.some((slot) => next[slot] !== modes[slot])) {
+			modes = next
+		}
+	}
 	return {
 		status: (slot) => statuses[slot],
+		mode: (slot) => modes[slot],
 		get snapshot() {
 			return snapshot
 		},
+		get modes() {
+			return modes
+		},
 		answer(state) {
 			const moved: GateTransition[] = []
-			let changed = false
+			let moving = false
 			for (const slot of GATE_SLOTS) {
 				const config = slotConfigOf(slots, slot)
 				const open = config && gateAnswer(state, slot, slotIsGated(config))
@@ -254,30 +327,30 @@ export const createGate = (slots: readonly TrackerSlotConfig[]): Gate => {
 					continue
 				}
 				answered.add(slot)
-				changed ||= from !== to
+				moving ||= from !== to
 				statuses[slot] = to
 				moved.push({ slot, from, to })
 			}
-			if (changed) {
-				snapshot = Object.freeze({ ...statuses })
+			if (moving) {
+				changed()
 			}
 			return moved
 		},
 		reset() {
-			let changed = false
+			let moving = false
 			for (const slot of GATE_SLOTS) {
 				const config = slotConfigOf(slots, slot)
 				if (config === undefined || !slotIsGated(config)) {
 					continue
 				}
 				answered.delete(slot)
-				changed ||= statuses[slot] !== 'pending'
+				moving ||= statuses[slot] !== 'pending'
 				statuses[slot] = 'pending'
 			}
-			if (changed) {
-				snapshot = Object.freeze({ ...statuses })
+			if (moving) {
+				changed()
 			}
-			return changed
+			return moving
 		},
 	}
 }

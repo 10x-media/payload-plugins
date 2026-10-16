@@ -14,6 +14,7 @@ export {
 	type NativeRetention,
 	type NativeSqlite,
 	type NativeToday,
+	type NativeWithoutConsent,
 	native,
 } from '../../native/nativeAdapter'
 export type { CapKey, CapsOption, CardinalityCaps } from '../../native/store/caps'

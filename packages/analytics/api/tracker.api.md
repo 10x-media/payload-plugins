@@ -23,6 +23,9 @@ export interface CaptureSnippet {
 }
 
 // @public
+export type ConsentPhase = 'pending' | 'refused';
+
+// @public
 export const createTracker: (config: TrackerConfig, options?: TrackerOptions) => Tracker;
 
 // @public
@@ -52,6 +55,9 @@ export type GoalMatch = {
 };
 
 // @public
+export type HeldSlotMode = Exclude<SlotMode, 'full'>;
+
+// @public
 export const initTracker: (args?: InitTrackerArgs) => Promise<Tracker>;
 
 // @public (undocumented)
@@ -67,6 +73,9 @@ export interface ItemOptions {
 
 // @public
 export type LoadScript = (script: SnippetScript) => Promise<void>;
+
+// @public
+export type ModeSnapshot = Readonly<Record<CaptureSlot, SlotMode>>;
 
 // @public
 export interface PurchaseInput extends ItemOptions {
@@ -131,6 +140,12 @@ export interface RevenueItem {
     quantity?: number;
 }
 
+// @public
+export type SlotMode = 'off' | 'cookieless' | 'anonymous' | 'full';
+
+// @public
+export type SlotWithoutConsent = Record<ConsentPhase, HeldSlotMode>;
+
 // @public (undocumented)
 export interface SnippetScript {
     // (undocumented)
@@ -154,6 +169,7 @@ export interface Tracker {
     readonly excluded: boolean;
     flush(): void;
     readonly gate: Readonly<Record<CaptureSlot, GateStatus>>;
+    readonly mode: ModeSnapshot;
     // (undocumented)
     page(): void;
     purchase(input: PurchaseInput): void;
@@ -222,6 +238,7 @@ export interface TrackerSlotConfig {
     client: {
         kind: CaptureClientKind;
     } & Record<string, string | number | boolean>;
+    fullSnippet?: CaptureSnippet;
     gated: boolean;
     instance?: string;
     // (undocumented)
@@ -229,8 +246,8 @@ export interface TrackerSlotConfig {
     path: string;
     // (undocumented)
     slot: CaptureSlot;
-    // (undocumented)
     snippet: CaptureSnippet;
+    withoutConsent?: SlotWithoutConsent;
 }
 
 // @public

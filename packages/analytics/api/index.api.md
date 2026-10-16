@@ -62,6 +62,7 @@ export type AdapterLabelOption = string | Record<string, string> | ((args: Adapt
 
 // @public
 export interface AdapterRegisterContext {
+    adapterCountsWithoutConsent?: boolean;
     adapterGrantedForScope?: (req: PayloadRequest, scope: string | null, adapterId: string) => Promise<boolean>;
     allowedOrigins?: ReadonlySet<string>;
     items?: {
@@ -217,6 +218,7 @@ export interface AnalyticsCapabilities {
 // @public (undocumented)
 export type AnalyticsCaptureOptions = {
     gate?: CaptureGate;
+    withoutConsent?: WithoutConsentOption;
     allowedOrigins?: string[];
     exclusion?: boolean | AnalyticsExclusionOptions;
     slots?: {
@@ -474,6 +476,13 @@ export interface AnalyticsResult {
         sourceError?: SourceErrorKind;
         unappliedFilters?: AnalyticsFilter[];
         goalsUnresolved?: true;
+        withoutConsent?: {
+            pageviews: number;
+        };
+        withoutVisitor?: {
+            pageviews: number;
+        };
+        withoutConsentDropped?: true;
     };
     // (undocumented)
     rows: AnalyticsRow[];
@@ -760,13 +769,12 @@ export interface CaptureSnippet {
 export interface CaptureSupport {
     // (undocumented)
     client: TrackerSlotConfig['client'];
+    cookieless?: CookielessSupport;
     // (undocumented)
     proxy: ProxyDescriptor;
-    snippet(args: {
-        path: string;
-        scope?: string | null;
-        instance?: string;
-    }): CaptureSnippet;
+    // (undocumented)
+    snippet(args: SnippetArgs): CaptureSnippet;
+    withoutConsent?: HeldSlotMode;
 }
 
 // @public
@@ -792,6 +800,17 @@ export interface ConnectionFieldAccess {
     create?: FieldAccess;
     // (undocumented)
     update?: FieldAccess;
+}
+
+// @public
+export type ConsentPhase = 'pending' | 'refused';
+
+// @public
+export interface CookielessSupport {
+    // (undocumented)
+    default?: WithoutConsentLevel;
+    // (undocumented)
+    kind: 'inherent' | 'switched';
 }
 
 // @beta
@@ -1150,6 +1169,12 @@ export interface GuardedFetchOptions {
     now?: () => number;
     warn?: (message: string) => void;
 }
+
+// @public
+export type HeldSlotMode = Exclude<SlotMode, 'full'>;
+
+// @beta
+export type HitMode = 'c' | 'a' | 'f';
 
 // @beta
 export type HitType = 'pageview' | 'event' | 'goal' | 'engagement';
@@ -1544,6 +1569,10 @@ export const keys: {
     readonly providerFieldGa4CurrencyHelp: "analytics:providerFieldGa4CurrencyHelp";
     readonly providerFieldScopeProperty: "analytics:providerFieldScopeProperty";
     readonly providerFieldScopePropertyHelp: "analytics:providerFieldScopePropertyHelp";
+    readonly providerFieldWithoutConsent: "analytics:providerFieldWithoutConsent";
+    readonly providerFieldWithoutConsentHelp: "analytics:providerFieldWithoutConsentHelp";
+    readonly providerWithoutConsentCookieless: "analytics:providerWithoutConsentCookieless";
+    readonly providerWithoutConsentOff: "analytics:providerWithoutConsentOff";
     readonly viewScopeSite: "analytics:viewScopeSite";
     readonly viewScopeAll: "analytics:viewScopeAll";
     readonly viewScopeShowing: "analytics:viewScopeShowing";
@@ -1573,6 +1602,9 @@ export const keys: {
     readonly panelNoViews: "analytics:panelNoViews";
     readonly sourcesPlatformFallback: "analytics:sourcesPlatformFallback";
     readonly stateSourceSubstituted: "analytics:stateSourceSubstituted";
+    readonly statePosthogCookielessDropped: "analytics:statePosthogCookielessDropped";
+    readonly viewWithoutConsentShare: "analytics:viewWithoutConsentShare";
+    readonly stateWithoutVisitor: "analytics:stateWithoutVisitor";
 };
 
 // @public
@@ -1674,6 +1706,7 @@ export interface ProviderCollectionFieldOverrides {
     name?: ProviderFieldOverride;
     // (undocumented)
     provider?: ProviderFieldOverride;
+    withoutConsent?: ProviderFieldOverride;
 }
 
 // @public
@@ -1682,7 +1715,8 @@ export type ProviderDoc = {
     name?: string | null;
     provider?: string | null;
     enabled?: boolean | null;
-    scope?: string | null;
+    scope?: string | null; /** A vendor document's own level without consent; unset or blank follows the install. */
+    withoutConsent?: string | null;
     plausible?: {
         siteId?: string | null;
         apiKey?: string | null;
@@ -1718,6 +1752,8 @@ export type ProviderDoc = {
 // @beta
 export interface ProviderFactoryContext {
     fetch: FetchLike;
+    followingCountsWithoutConsent?: boolean;
+    heldWithoutConsent?: boolean;
     hosts: ProviderHostPolicy;
     native?: AnalyticsAdapter;
     sdks?: AnalyticsSdks;
@@ -1892,6 +1928,7 @@ export interface RawEventInput {
     impressions?: unknown;
     item?: string;
     items?: unknown;
+    m?: HitMode;
     name?: string;
     nav?: number;
     orderId?: string;
@@ -2047,6 +2084,8 @@ export interface ReadNotices {
     stale: boolean;
     timezoneUnresolved: boolean;
     visitorsSummed?: boolean;
+    withoutConsentDropped?: boolean;
+    withoutVisitor?: number;
 }
 
 // @public
@@ -2304,6 +2343,25 @@ export const signOrderId: (payload: Payload, orderId: string, opts?: {
 // @public
 export type SingularKey = (typeof keys)[keyof typeof keys];
 
+// @public
+export type SlotMode = 'off' | 'cookieless' | 'anonymous' | 'full';
+
+// @public
+export type SlotWithoutConsent = Record<ConsentPhase, HeldSlotMode>;
+
+// @public (undocumented)
+export interface SnippetArgs {
+    instance?: string;
+    mode?: SnippetMode;
+    // (undocumented)
+    path: string;
+    scope?: string | null;
+    withoutConsent?: boolean;
+}
+
+// @public
+export type SnippetMode = 'cookieless' | 'full';
+
 // @public (undocumented)
 export interface SnippetScript {
     // (undocumented)
@@ -2407,6 +2465,7 @@ export interface TrackerSlotConfig {
     client: {
         kind: CaptureClientKind;
     } & Record<string, string | number | boolean>;
+    fullSnippet?: CaptureSnippet;
     gated: boolean;
     instance?: string;
     // (undocumented)
@@ -2414,8 +2473,8 @@ export interface TrackerSlotConfig {
     path: string;
     // (undocumented)
     slot: CaptureSlot;
-    // (undocumented)
     snippet: CaptureSnippet;
+    withoutConsent?: SlotWithoutConsent;
 }
 
 // @public
@@ -2574,6 +2633,24 @@ export interface WireGoal {
     // (undocumented)
     source: GoalSource;
 }
+
+// @public
+export interface WithoutConsentArgs extends CaptureGateArgs {
+    // (undocumented)
+    phase: ConsentPhase;
+}
+
+// @public
+export type WithoutConsentFunction = (args: WithoutConsentArgs) => WithoutConsentLevel;
+
+// @public
+export type WithoutConsentLevel = 'cookieless' | 'off';
+
+// @public
+export type WithoutConsentOption = WithoutConsentLevel | {
+    pending?: WithoutConsentLevel;
+    refused?: WithoutConsentLevel;
+} | WithoutConsentFunction;
 
 // Warnings were encountered during analysis:
 //

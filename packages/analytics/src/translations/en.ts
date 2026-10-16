@@ -376,6 +376,11 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldScopeProperty]: 'Site label',
 	[keys.providerFieldScopePropertyHelp]:
 		'The name PostHog stores each site under, for example tenant. Set this when several sites share one PostHog project.',
+	[keys.providerFieldWithoutConsent]: 'Without consent',
+	[keys.providerFieldWithoutConsentHelp]:
+		'What this tool does for visitors who have not answered the consent banner yet, or refused it. Leave it empty to follow the site’s setting.',
+	[keys.providerWithoutConsentCookieless]: 'Count without cookies',
+	[keys.providerWithoutConsentOff]: 'Send nothing',
 	[keys.viewScopeSite]: 'Site',
 	[keys.viewScopeAll]: 'All sites',
 	[keys.viewScopeShowing]: 'Showing: {{site}}',
@@ -408,6 +413,10 @@ export const en: LocaleBundle<'one' | 'other'> = {
 		"These numbers come from the platform's analytics tool until this site adds its own. Adding one switches to it.",
 	[keys.stateSourceSubstituted]:
 		'The saved data source is no longer available, so the default one is shown.',
+	[keys.statePosthogCookielessDropped]:
+		"PostHog is dropping visits counted without consent: enable Cookieless tracking in the project's Web analytics settings.",
+	[keys.viewWithoutConsentShare]: '{{share}} of pageviews were counted without consent.',
+	[keys.stateWithoutVisitor]: 'Pageviews recorded without a visitor: {{count}}.',
 	[pluralKeys.liveVisitors.one]: '{{count}} visitor active right now',
 	[pluralKeys.liveVisitors.other]: '{{count}} visitors active right now',
 	[pluralKeys.livePageviews.one]: '{{count}} pageview in the last {{duration}}',

@@ -49,6 +49,8 @@ export interface ProviderCollectionFieldOverrides {
 	enabled?: ProviderFieldOverride
 	/** The "Default for this site" checkbox, which only a scoped install's collection carries. */
 	isDefault?: ProviderFieldOverride
+	/** What a vendor source does without consent; empty follows `capture.withoutConsent`. */
+	withoutConsent?: ProviderFieldOverride
 }
 
 /** Field access on the fields that decide where a provider document connects (`CONNECTION_PATHS`). */
@@ -337,6 +339,24 @@ const providerField = (
 	}
 }
 
+/**
+ * A vendor document's own `withoutConsent`. Unset follows `capture.withoutConsent`; no option
+ * stands for that, since an empty string is no portable enum value.
+ */
+const withoutConsentField = (staticLabel: StaticLabelFor): SelectField => ({
+	name: 'withoutConsent',
+	type: 'select',
+	label: labelForKey(keys.providerFieldWithoutConsent),
+	options: [
+		{ label: staticLabel(keys.providerWithoutConsentCookieless), value: 'cookieless' },
+		{ label: staticLabel(keys.providerWithoutConsentOff), value: 'off' },
+	],
+	admin: {
+		condition: (data) => isOneOf(PROVIDER_IDS, data?.provider) && data?.provider !== 'native',
+		description: staticLabel(keys.providerFieldWithoutConsentHelp),
+	},
+})
+
 const enabledField = (): Field => ({
 	name: 'enabled',
 	type: 'checkbox',
@@ -564,6 +584,7 @@ const providerFields = (
 			}),
 			hostField(allowPrivateNetwork, access),
 		]),
+		overrideField(withoutConsentField(staticLabel), options.fields?.withoutConsent),
 	]
 }
 

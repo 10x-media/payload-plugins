@@ -1,4 +1,4 @@
-import { dateTimeFormat, listFormat, relativeTimeFormat } from '../translations/intl'
+import { dateTimeFormat, listFormat, numberFormat, relativeTimeFormat } from '../translations/intl'
 import { keys } from '../translations/keys'
 import type { Translate } from '../translations/server'
 import type { SubstitutedSource } from './prepareWidgetRead'
@@ -77,6 +77,7 @@ export const noticeTexts = (flags: WidgetNoticeFlags, context: NoticeContext): s
 	if (flags.stale) texts.push(t(keys.viewStale))
 	if (flags.hostRefused) texts.push(t(keys.viewErrorHostRefused))
 	else if (flags.sourceError) texts.push(t(keys.viewErrorMisconfigured))
+	if (flags.withoutConsentDropped) texts.push(t(keys.statePosthogCookielessDropped))
 	if (flags.timezoneUnresolved) texts.push(t(keys.stateTimezoneUnresolved))
 	if (flags.partial) texts.push(t(keys.statePartial))
 	if (flags.capped) texts.push(t(keys.stateCapped))
@@ -84,6 +85,10 @@ export const noticeTexts = (flags: WidgetNoticeFlags, context: NoticeContext): s
 	if (flags.clamped) texts.push(clampedText(flags, context))
 	if (flags.filtersUnapplied) texts.push(t(keys.stateFiltersUnapplied))
 	if (flags.sampled) texts.push(t(keys.stateSampled))
+	if (flags.withoutVisitor) {
+		const count = numberFormat(context.locale).format(flags.withoutVisitor)
+		texts.push(t(keys.stateWithoutVisitor, { count }))
+	}
 	const currencies = flags.mixedCurrencies ?? []
 	if (currencies.length > 1) {
 		const named = listFormat(context.locale, { type: 'conjunction' }).format(currencies)

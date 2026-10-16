@@ -1,4 +1,4 @@
-WITH h AS (SELECT "id", "scope" COLLATE "C" AS "scope", "ts", "hostname" COLLATE "C" AS "hostname", "v" COLLATE "C" AS "v", "type", "path" COLLATE "C" AS "path", "name" COLLATE "C" AS "name", "duration_ms", "scroll_depth", CASE WHEN substr("hit"."id", 1, 3) = 'ow.' THEN COALESCE((SELECT "item" FROM "analytics"."analytics_hits" AS "twin"
+WITH h AS (SELECT "id", "scope" COLLATE "C" AS "scope", "ts", "hostname" COLLATE "C" AS "hostname", "v" COLLATE "C" AS "v", "type", "path" COLLATE "C" AS "path", "name" COLLATE "C" AS "name", "duration_ms", "scroll_depth", "mode", CASE WHEN substr("hit"."id", 1, 3) = 'ow.' THEN COALESCE((SELECT "item" FROM "analytics"."analytics_hits" AS "twin"
 				WHERE "twin"."id" = 'os.' || substr("hit"."id", 4) AND "twin"."ts" BETWEEN "hit"."ts" - interval '86400 seconds' AND "hit"."ts" + interval '86400 seconds'), "hit"."item") ELSE "hit"."item" END COLLATE "C" AS "item", CASE WHEN substr("hit"."id", 1, 3) = 'ow.' AND (SELECT "item" FROM "analytics"."analytics_hits" AS "twin"
 				WHERE "twin"."id" = 'os.' || substr("hit"."id", 4) AND "twin"."ts" BETWEEN "hit"."ts" - interval '86400 seconds' AND "hit"."ts" + interval '86400 seconds') IS NOT NULL THEN $1 ELSE "hit"."server" END AS "server", CASE WHEN substr("hit"."id", 1, 3) <> 'ow.' THEN "conversions"
 			WHEN (SELECT 1 FROM "analytics"."analytics_hits" AS "twin"
@@ -25,7 +25,9 @@ WITH h AS (SELECT "id", "scope" COLLATE "C" AS "scope", "ts", "hostname" COLLATE
 		CASE WHEN "t"."type" = 'pageview' AND "t"."scroll_depth" IS NOT NULL THEN 1 ELSE 0 END AS "scrollSamples",
 		COALESCE("t"."conversions", 0) AS "conversions",
 		COALESCE("t"."revenue", 0) AS "revenue",
-		CASE WHEN "t"."type" = 'event' AND "t"."name" = 'item_click' AND "t"."item" IS NOT NULL AND "t"."item" <> '' THEN 1 ELSE 0 END AS "interactions"
+		CASE WHEN "t"."type" = 'event' AND "t"."name" = 'item_click' AND "t"."item" IS NOT NULL AND "t"."item" <> '' THEN 1 ELSE 0 END AS "interactions",
+		CASE WHEN "t"."type" = 'pageview' AND "t"."v" = '' THEN 1 ELSE 0 END AS "pageviewsWithoutVisitor",
+		CASE WHEN "t"."type" = 'pageview' AND "t"."mode" IN ('c', 'a') THEN 1 ELSE 0 END AS "pageviewsWithoutConsent"
 		FROM "h" AS "t"
 		WHERE "t"."path" IS NOT NULL AND "t"."path" <> ''
 			AND "t"."path" IN ($5, $6)),
@@ -41,7 +43,9 @@ WITH h AS (SELECT "id", "scope" COLLATE "C" AS "scope", "ts", "hostname" COLLATE
 		SUM("scrollSamples") AS "scrollSamples",
 		SUM("conversions") AS "conversions",
 		SUM("revenue") AS "revenue",
-		SUM("interactions") AS "interactions"
+		SUM("interactions") AS "interactions",
+		SUM("pageviewsWithoutVisitor") AS "pageviewsWithoutVisitor",
+		SUM("pageviewsWithoutConsent") AS "pageviewsWithoutConsent"
 		FROM q GROUP BY "gv", "scope", "hostname", "v"),
 	r AS (SELECT "gv" AS "value",
 		SUM("pageviews") AS "pageviews",
@@ -52,7 +56,9 @@ WITH h AS (SELECT "id", "scope" COLLATE "C" AS "scope", "ts", "hostname" COLLATE
 		SUM("scrollSamples") AS "scrollSamples",
 		SUM("conversions") AS "conversions",
 		SUM("revenue") AS "revenue",
-		SUM("interactions") AS "interactions"
+		SUM("interactions") AS "interactions",
+		SUM("pageviewsWithoutVisitor") AS "pageviewsWithoutVisitor",
+		SUM("pageviewsWithoutConsent") AS "pageviewsWithoutConsent"
 		FROM p GROUP BY "gv")
 	SELECT * FROM r
 	WHERE "pageviews" + "events" > 0

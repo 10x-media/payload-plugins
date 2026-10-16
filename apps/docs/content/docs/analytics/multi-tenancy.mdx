@@ -238,7 +238,7 @@ const relay = captureRoute({
 export { relay as GET, relay as POST, relay as OPTIONS }
 ```
 
-PostHog's capture endpoints end in a slash, so add `skipTrailingSlashRedirect: true` to the object your `next.config` already passes to `withPayload`. Pass the route the plugin's own `trustedProxyHops` or `trustedPlatform` and `allowedOrigins` as well: it runs outside Payload and reads none of them ([A route handler of your own](/analytics/proxy#a-route-handler-of-your-own)).
+PostHog's capture endpoints end in a slash, so add `skipTrailingSlashRedirect: true` to the object your `next.config` already passes to `withPayload`. Pass the route the plugin's own `trustedProxyHops` or `trustedPlatform` and `allowedOrigins` as well: it runs outside Payload and reads none of them ([A route handler of your own](/analytics/proxy#a-route-handler-of-your-own)). The address it forwards is what PostHog tells cookieless visitors apart by, so a wrong one merges them ([Trusted proxies](/analytics/proxy#trusted-proxies)).
 
 Then point the slot at that path so its snippet stops using the runtime mount:
 

@@ -373,6 +373,11 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerFieldScopeProperty]: '사이트 라벨',
 	[keys.providerFieldScopePropertyHelp]:
 		'PostHog이 각 사이트를 저장할 때 쓰는 이름입니다. 예: tenant. 여러 사이트가 하나의 PostHog 프로젝트를 함께 쓸 때 설정하세요.',
+	[keys.providerFieldWithoutConsent]: '동의 없음',
+	[keys.providerFieldWithoutConsentHelp]:
+		'동의 배너에 아직 응답하지 않았거나 거부한 방문자에게 이 도구가 하는 일입니다. 비워 두면 사이트 설정을 따릅니다.',
+	[keys.providerWithoutConsentCookieless]: '쿠키 없이 집계',
+	[keys.providerWithoutConsentOff]: '아무것도 보내지 않음',
 	[keys.viewScopeSite]: '사이트',
 	[keys.viewScopeAll]: '모든 사이트',
 	[keys.viewScopeShowing]: '표시 중: {{site}}',
@@ -404,6 +409,10 @@ export const ko: LocaleBundle<'other'> = {
 		'이 사이트가 자체 분석 도구를 추가하기 전까지는 플랫폼의 분석 도구에서 가져온 수치입니다. 도구를 추가하면 그 도구로 전환됩니다.',
 	[keys.stateSourceSubstituted]:
 		'저장된 데이터 소스를 더 이상 사용할 수 없어 기본 데이터 소스를 표시합니다.',
+	[keys.statePosthogCookielessDropped]:
+		'PostHog가 동의 없이 집계된 방문을 버리고 있습니다. 프로젝트의 Web analytics 설정에서 “Cookieless tracking”을 켜세요.',
+	[keys.viewWithoutConsentShare]: '페이지뷰의 {{share}}가 동의 없이 집계되었습니다.',
+	[keys.stateWithoutVisitor]: '방문자 없이 기록된 페이지뷰: {{count}}.',
 	[pluralKeys.liveVisitors.other]: '현재 활성 방문자 {{count}}명',
 	[pluralKeys.livePageviews.other]: '최근 {{duration}} 동안 페이지뷰 {{count}}회',
 }

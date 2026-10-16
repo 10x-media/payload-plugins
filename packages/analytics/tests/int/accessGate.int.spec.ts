@@ -385,6 +385,8 @@ describeForDb('analytics access: read gate, membership and capture identity', {}
 		expect((await widgetRead(readerReq(platform.user, 'users', betaId))).status).toBe('ok')
 		const jobReq = await createLocalReq({}, booted.payload)
 		expect((await widgetRead(jobReq)).status).toBe('no-access')
+		// A read stores its entry, and the recipe the warm task replays, in the background.
+		await runtime.engine.idle?.()
 
 		const seen: Array<[string, string | undefined]> = []
 		runtime.engine.refresh = (adapter, query, options) => {

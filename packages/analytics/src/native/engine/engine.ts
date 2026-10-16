@@ -2029,6 +2029,8 @@ export const createEngine = (input: EngineInput): NativeEngine => {
 		const failed = Math.max(failedIn(plans), failedIn(totalsBy?.plans ?? []))
 		const missing = Math.max(ofRows.missing.count, ofTotals.missing.count)
 		const visitorsAre: VisitorCounting = dayCount <= 1 ? 'distinct' : 'sumOfDaily'
+		const withoutVisitor = totals.pageviewsWithoutVisitor ?? 0
+		const withoutConsent = totals.pageviewsWithoutConsent ?? 0
 		return {
 			rows,
 			totals: partsToMetrics(totals, query.metrics),
@@ -2045,6 +2047,8 @@ export const createEngine = (input: EngineInput): NativeEngine => {
 				...(asOf ? { asOf: asOf.toISOString() } : {}),
 				...(every.some((plan) => plan.standIn) ? { timezoneUnresolved: true } : {}),
 				...(mixed.length > 1 ? { mixedCurrencies: mixed } : {}),
+				...(withoutVisitor > 0 ? { withoutVisitor: { pageviews: withoutVisitor } } : {}),
+				...(withoutConsent > 0 ? { withoutConsent: { pageviews: withoutConsent } } : {}),
 			},
 		}
 	}

@@ -114,6 +114,25 @@ describe('noticeTexts', () => {
 		expect(noticeTexts({ visitorsSummed: true }, context)).toEqual([])
 	})
 
+	it('says PostHog drops visits counted without consent right after a source failure', () => {
+		expect(
+			noticeTexts({ withoutConsentDropped: true, sourceError: true, sampled: true }, context)
+		).toEqual([
+			`t(${keys.viewErrorMisconfigured})`,
+			`t(${keys.statePosthogCookielessDropped})`,
+			`t(${keys.stateSampled})`,
+		])
+	})
+
+	it('says how many pageviews were recorded without a visitor, as the language writes numbers', () => {
+		expect(noticeTexts({ withoutVisitor: 1204 }, context)).toEqual([
+			`t(${keys.stateWithoutVisitor} ${JSON.stringify({ count: '1,204' })})`,
+		])
+		expect(noticeTexts({ withoutVisitor: 1204 }, { ...context, locale: 'de' })).toEqual([
+			`t(${keys.stateWithoutVisitor} ${JSON.stringify({ count: '1.204' })})`,
+		])
+	})
+
 	it('says last how long ago a snapshot brought the numbers up to date', () => {
 		expect(noticeTexts({ partial: true, asOf: ago(3 * 60_000) }, context)).toEqual([
 			`t(${keys.statePartial})`,

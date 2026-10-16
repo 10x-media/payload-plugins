@@ -378,6 +378,11 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldScopeProperty]: 'Мітка сайту',
 	[keys.providerFieldScopePropertyHelp]:
 		'Імʼя, під яким PostHog зберігає кожен сайт, наприклад tenant. Задайте його, коли кілька сайтів використовують один проєкт PostHog.',
+	[keys.providerFieldWithoutConsent]: 'Без згоди',
+	[keys.providerFieldWithoutConsentHelp]:
+		'Що робить цей інструмент для відвідувачів, які ще не відповіли на банер згоди або відмовилися. Залиште порожнім, щоб діяти за налаштуванням сайту.',
+	[keys.providerWithoutConsentCookieless]: 'Рахувати без cookie',
+	[keys.providerWithoutConsentOff]: 'Нічого не надсилати',
 	[keys.viewScopeSite]: 'Сайт',
 	[keys.viewScopeAll]: 'Усі сайти',
 	[keys.viewScopeShowing]: 'Показано: {{site}}',
@@ -410,6 +415,10 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 		'Ці цифри беруться із сервісу аналітики платформи, доки сайт не додасть власний. Щойно ви його додасте, дані братимуться з нього.',
 	[keys.stateSourceSubstituted]:
 		'Збережене джерело даних більше недоступне, тому показано джерело за замовчуванням.',
+	[keys.statePosthogCookielessDropped]:
+		'PostHog відкидає візити, враховані без згоди: увімкніть «Cookieless tracking» у налаштуваннях Web analytics проєкту.',
+	[keys.viewWithoutConsentShare]: '{{share}} переглядів сторінок враховано без згоди.',
+	[keys.stateWithoutVisitor]: 'Перегляди сторінок без відвідувача: {{count}}.',
 	[pluralKeys.liveVisitors.one]: '{{count}} відвідувач зараз на сайті',
 	[pluralKeys.liveVisitors.few]: '{{count}} відвідувачі зараз на сайті',
 	[pluralKeys.liveVisitors.many]: '{{count}} відвідувачів зараз на сайті',

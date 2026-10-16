@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SlotMode } from '../config'
 import type { TrackerEvent } from '../types'
 import { createNativeSink } from './native'
 
@@ -120,5 +121,39 @@ describe('createNativeSink', () => {
 
 	it('is ready without loading anything', async () => {
 		await expect(sink().ready()).resolves.toBeUndefined()
+	})
+})
+
+describe('the native sink by mode', () => {
+	const engagement: TrackerEvent = { ...pageview, type: 'engagement', durationMs: 4000 }
+	const modal = (mode: SlotMode) =>
+		createNativeSink({ slot: 'global', win: window, url: '/api/_x/e', mode: () => mode })
+
+	it.each([
+		['cookieless', 'c'],
+		['anonymous', 'a'],
+	] as const)('stamps a %s beacon with m: %s', (mode, m) => {
+		modal(mode).send(pageview)
+		expect(sent()).toEqual([{ ...pageview, m }])
+	})
+
+	it('sends a full beacon exactly as a tracker from before modes did', () => {
+		modal('full').send(pageview)
+		expect(sent()).toEqual([pageview])
+	})
+
+	it('reads the mode as each event is sent', () => {
+		let mode: SlotMode = 'cookieless'
+		const live = createNativeSink({ slot: 'global', win: window, url: '/e', mode: () => mode })
+		live.send(pageview)
+		mode = 'full'
+		live.send(pageview)
+		expect(sent()).toEqual([{ ...pageview, m: 'c' }, pageview])
+	})
+
+	it('sends no engagement while anonymous, which keeps none', () => {
+		modal('anonymous').send(engagement)
+		modal('cookieless').send(engagement)
+		expect(sent()).toEqual([{ ...engagement, m: 'c' }])
 	})
 })

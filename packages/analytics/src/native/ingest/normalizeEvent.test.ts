@@ -137,6 +137,103 @@ describe('normalizeEvent', () => {
 	})
 })
 
+describe('normalizeEvent modes', () => {
+	const visit = {
+		'x-vercel-ip-country': 'DE',
+		'x-vercel-ip-country-region': 'BE',
+		'x-vercel-ip-city': 'Berlin',
+		'x-real-ip': '9.9.9.9',
+		'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/120.0',
+		'accept-language': 'de-DE',
+	}
+
+	const measured = (raw: RawEventInput, mode?: 'c' | 'a' | 'f') =>
+		normalizeEvent({
+			raw,
+			hostname: 'site.com',
+			headers: headers(visit),
+			geoResolver: platformHeaderResolver,
+			trustedPlatform: 'vercel',
+			salt: 'salt-1',
+			now: new Date('2026-01-01T10:00:00Z'),
+			...(mode ? { mode } : {}),
+		})
+
+	it('hashes the same visitor cookieless as in full, so a consent mid-visit counts one person', async () => {
+		const page = { type: 'pageview', path: '/', hostname: 'site.com' } as const
+		const full = await measured(page)
+		const cookieless = await measured(page, 'c')
+		expect(full.mode).toBe('f')
+		expect(cookieless.mode).toBe('c')
+		expect(cookieless.visitorId).toBe(full.visitorId)
+		expect(cookieless.visitorId).not.toBe('')
+		expect(cookieless.region).toBe('BE')
+	})
+
+	it('keeps no visitor, region, city, time or scroll for an anonymous pageview, whatever it carries', async () => {
+		const event = await measured(
+			{
+				type: 'pageview',
+				path: '/pricing',
+				hostname: 'site.com',
+				referrer: 'https://news.example/story',
+				query: 'utm_source=newsletter&utm_campaign=spring&gclid=abc',
+				durationMs: 4000,
+				scrollDepth: 0,
+			},
+			'a'
+		)
+		expect(event).toMatchObject({
+			mode: 'a',
+			visitorId: '',
+			country: 'DE',
+			referrerHost: 'news.example',
+			utmSource: 'newsletter',
+			utmCampaign: 'spring',
+			clickId: 'gclid',
+			device: 'desktop',
+			language: 'de-de',
+		})
+		for (const field of ['region', 'city', 'durationMs', 'scrollDepth']) {
+			expect(event).not.toHaveProperty(field)
+		}
+		expect(JSON.stringify(event)).not.toContain('9.9.9.9')
+	})
+
+	it('keeps nothing of an anonymous engagement', async () => {
+		const event = await measured(
+			{
+				type: 'engagement',
+				path: '/pricing',
+				hostname: 'site.com',
+				durationMs: 4000,
+				scrollDepth: 40,
+				impressions: ['offers:1'],
+			},
+			'a'
+		)
+		expect(event).not.toHaveProperty('durationMs')
+		expect(event).not.toHaveProperty('scrollDepth')
+		expect(event).not.toHaveProperty('impressions')
+	})
+
+	it('files an anonymous landing under its source, and an anonymous page further in under none', async () => {
+		const landing = stored(
+			await measured({ type: 'pageview', path: '/', hostname: 'site.com' }, 'a')
+		)
+		const further = stored(
+			await measured(
+				{ type: 'pageview', path: '/next', hostname: 'site.com', referrer: 'https://site.com/' },
+				'a'
+			)
+		)
+		expect(landing).toMatchObject({ v: '', mode: 'a', landing: true, source: 'direct' })
+		expect(further).toMatchObject({ v: '', mode: 'a', landing: false })
+		expect(further).not.toHaveProperty('source')
+		expect(further).not.toHaveProperty('channel')
+	})
+})
+
 describe('normalizeEvent contract growth', () => {
 	const build = async (raw: Record<string, unknown>, goals?: Goal[]) =>
 		normalizeEvent({

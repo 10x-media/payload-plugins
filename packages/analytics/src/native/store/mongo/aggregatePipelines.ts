@@ -61,6 +61,8 @@ const VISIT_PARTS: Parts = {
 	revenue: '$v_rev',
 	impressions: 0,
 	interactions: '$v_int',
+	pageviewsWithoutVisitor: { $cond: [{ $eq: ['$v', ''] }, '$s_pv', 0] },
+	pageviewsWithoutConsent: '$v_npc',
 }
 
 /** What one item clicked (`impressions` 0) or seen (1) adds; parts an item never counts are 0. */
@@ -79,6 +81,8 @@ const itemParts = (seen: 0 | 1): Parts => ({
 	revenue: { $ifNull: ['$revenue', 0] },
 	impressions: seen,
 	interactions: one(isItemClick),
+	pageviewsWithoutVisitor: 0,
+	pageviewsWithoutConsent: 0,
 })
 
 const fact = (kind: AggregateKind, values: [unknown, unknown], parts: Parts): object => ({

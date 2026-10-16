@@ -37,6 +37,9 @@ export interface CaptureSnippet {
 }
 
 // @public
+export type ConsentPhase = 'pending' | 'refused';
+
+// @public
 export type GateState = boolean | Partial<Record<CaptureSlot, boolean | undefined>>;
 
 // @public
@@ -58,6 +61,9 @@ export type GoalMatch = {
 } | {
     kind: 'goal';
 };
+
+// @public
+export type HeldSlotMode = Exclude<SlotMode, 'full'>;
 
 // @public
 export interface ResolvedAutoCapture {
@@ -84,6 +90,12 @@ export interface ResolvedItemCapture {
     // (undocumented)
     pages: boolean;
 }
+
+// @public
+export type SlotMode = 'off' | 'cookieless' | 'anonymous' | 'full';
+
+// @public
+export type SlotWithoutConsent = Record<ConsentPhase, HeldSlotMode>;
 
 // @public (undocumented)
 export interface SnippetScript {
@@ -148,6 +160,7 @@ export interface TrackerSlotConfig {
     client: {
         kind: CaptureClientKind;
     } & Record<string, string | number | boolean>;
+    fullSnippet?: CaptureSnippet;
     gated: boolean;
     instance?: string;
     // (undocumented)
@@ -155,8 +168,8 @@ export interface TrackerSlotConfig {
     path: string;
     // (undocumented)
     slot: CaptureSlot;
-    // (undocumented)
     snippet: CaptureSnippet;
+    withoutConsent?: SlotWithoutConsent;
 }
 
 // (No @packageDocumentation comment for this package)

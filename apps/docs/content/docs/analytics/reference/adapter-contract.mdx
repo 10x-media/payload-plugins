@@ -118,6 +118,9 @@ A source that cannot carry a filter it declared (an API taking one value per par
 | `visitorsAre` | How `visitors` were counted: `distinct` or `sumOfDaily`. |
 | `unappliedFilters` | Filters it could not carry. |
 | `goalsUnresolved` | The goal numbers are absent because resolving them failed. |
+| `withoutConsent` | `{ pageviews }`: how many of the read's pageviews were counted without consent, which the view shows as a share. Leave it out when the source cannot tell or found none. |
+| `withoutVisitor` | `{ pageviews }`: pageviews recorded without a visitor, which count toward no visitor, visit, bounce rate or time. |
+| `withoutConsentDropped` | The vendor drops what slots count without consent, so those visits are missing from every number; the admin shows a note. |
 
 The read engine sets `stale`, `asOf` and `sourceError` on a cached answer; the native engine sets `partial`, `capped`, `failed`, `timezoneUnresolved` and `mixedCurrencies`, and `asOf` when a snapshot answered. [The query endpoint](/analytics/reference/endpoints#response) says what each means. `failed` counts the days whose counting failed again and again until the engine gave up: each is read from an earlier count when it had one, and left out otherwise. The read engine also sets `clamped` and `dataFrom` itself when it narrows a range to the source's `maxLookbackDays`, and narrows a source with no lookback to 1970. The native engine sets `clamped` at either end for a day the range cuts partway once retention has deleted its raw hits: a cut day with no hits is left out silently, and one with hits is left out with `dataFrom` or `dataTo` ([Dates and the reporting timezone](/analytics/reference/endpoints#dates-and-the-reporting-timezone)).
 
@@ -161,6 +164,7 @@ Implement `AnalyticsAdapter` from `@10x-media/analytics/types`: an `id`, a `labe
 | `adapterGrantedForScope(req, scope, adapterId)` | Present only on a scoped install running the providers collection: whether one scope's provider documents grant it this adapter. |
 | `trustedProxyHops`, `trustedPlatform` | How to read a request's client address. |
 | `allowedOrigins` | `capture.allowedOrigins`, for an adapter that registers a public `POST` endpoint. |
+| `adapterCountsWithoutConsent` | `false` when no slot `capture.gate` holds can count through this adapter without consent, as far as the boot can tell, so the adapter need not check that its vendor accepts such events (the PostHog adapter checks its project's setting otherwise). Absent reads as `true`. |
 | `items` | The collections bound as content items, and whether items count per page. |
 | `routes` | The plugin's mounts under `routes.api` (`ingest`, `proxy`, `config` and the rest, under [`routes.base`](/analytics/reference/endpoints#where-the-endpoints-answer)), so an endpoint an adapter registers can sit beside them. |
 | `sdks` | The packages the host passed as [`sdks`](/analytics/providers#ga4), for an adapter that would otherwise load one by name and miss it in a standalone build. |
@@ -213,7 +217,23 @@ What an adapter throws decides how the read fails, so throw what the vendor said
 
 ### Capture support
 
-An adapter that can capture declares `capture`, a `CaptureSupport`: `client` (what the browser tracker boots for it, with its `kind`), `snippet({ path, scope, instance })` (the scripts the page renders or injects, pointed at the slot's mount; `instance` names the client to start, set only for a vendor that runs a [second client](/analytics/capture#two-posthog-projects-on-one-page) beside the other slot's, which only PostHog does), and `proxy` (the routes the [first-party proxy](/analytics/proxy) forwards). Read credentials are never part of it; only what the browser is allowed to see.
+An adapter that can capture declares `capture`, a `CaptureSupport`: `client` (what the browser tracker boots for it, with its `kind`), `snippet(args)` (the scripts the page renders or injects), `proxy` (the routes the [first-party proxy](/analytics/proxy) forwards), and optionally `cookieless` and `withoutConsent`, below. Read credentials are never part of it; only what the browser is allowed to see.
+
+`snippet` receives `SnippetArgs`:
+
+| Field | What it is |
+|---|---|
+| `path` | The slot's mount, which the scripts point at. |
+| `scope` | The request's resolved scope, for a vendor able to stamp it on every event; `null` when unscoped or unresolved. |
+| `instance` | The client to start, set only for a vendor that runs a [second client](/analytics/capture#two-posthog-projects-on-one-page) beside the other slot's, which only PostHog does. |
+| `mode` | `'cookieless'` for a held slot that may count without consent, which starts before any answer; `'full'` otherwise. Absent means `'full'`. |
+| `withoutConsent` | `true` when the slot counts without consent in some phase, so the snippet must start a client the tracker can switch between cookieless and full (PostHog: `cookieless_mode: 'on_reject'`; GA4: consent mode defaults, all denied). Absent means `false`, which is 1.0.0-beta.14's snippet. |
+
+A snippet that ignores `mode` and `withoutConsent` renders as it did in 1.0.0-beta.14.
+
+`cookieless` declares how the vendor counts without consent, a `CookielessSupport`: `{ kind: 'inherent' }` for a vendor that never stores anything on the device, so one snippet serves every phase (native, Plausible, Umami), or `{ kind: 'switched' }` for one whose client the tracker switches between cookieless and full (PostHog, GA4). `default` is the level `capture.withoutConsent: 'cookieless'` gives the slot, `'cookieless'` unless set; GA4 declares `'off'`. An adapter that declares no `cookieless` sends nothing without consent, whatever the install says, which is how a custom adapter written before 1.0.0-beta.15 keeps behaving. `withoutConsent` carries the adapter's own setting (`'off'`, `'cookieless'` or `'anonymous'`), from its factory option or provider document, and beats `capture.withoutConsent` for its slot in both phases; it is ignored without `cookieless`. How a slot's level is resolved is on [Consent](/analytics/consent#measuring-without-consent).
+
+The tracker switches a vendor's client through the sink for its `client.kind`, one of the five built-in kinds, on every grant, refusal and exclusion change: `off`, `cookieless` or `full`, as [The vendor slots](/analytics/capture#the-vendor-slots) lists per vendor. The sinks are the tracker's own, so an adapter declares what its snippet starts and leaves the switching to them.
 
 `proxy.routes` lists each forwarded route as `{ source, upstream, kind }`. `kind` is required and decides how the [runtime proxy](/analytics/proxy#runtime-endpoint) serves the answer: `'script'` for anything the browser runs, always served as JavaScript, and `'data'` for everything else, kept as JSON or plain text, sandboxed and never cached. `proxy.forwardHeaders` names extra request headers to pass on (never cookies or authorization), `proxy.trailingSlashes` keeps a request's trailing slash upstream, and `proxy.fetch` is what the proxy reaches the vendor with.
 

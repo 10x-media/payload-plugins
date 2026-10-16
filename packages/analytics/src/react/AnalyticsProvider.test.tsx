@@ -182,6 +182,7 @@ describe('useAnalytics', () => {
 		expect(Object.keys(api ?? {}).sort()).toEqual([
 			'excluded',
 			'gate',
+			'mode',
 			'purchase',
 			'refund',
 			'setExcluded',

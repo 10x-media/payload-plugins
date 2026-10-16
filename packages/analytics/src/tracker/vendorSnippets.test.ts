@@ -292,6 +292,98 @@ describe('ga4 snippet', () => {
 	})
 })
 
+describe('snippets of a slot counting without consent', () => {
+	const posthogSnippet = (scope?: string) =>
+		posthog({
+			projectId: '1',
+			apiKey: 'phx_private',
+			projectToken: 'phc_public',
+			scopeProperty: 'tenant',
+		}).capture?.snippet({
+			path: '/api/_x/p/tenant',
+			scope: scope ?? null,
+			mode: 'cookieless',
+			withoutConsent: true,
+		}) ?? { scripts: [] }
+
+	const queuedOptions = (): Record<string, unknown> => {
+		const init = realm.posthog?._i?.[0]
+		return (Array.isArray(init) ? init[1] : {}) as Record<string, unknown>
+	}
+
+	it('boots PostHog cookieless and opted out by default, so it counts from the first pageview', async () => {
+		await runSnippet(posthogSnippet())
+
+		expect(queuedOptions()).toEqual({
+			api_host: '/api/_x/p/tenant',
+			ui_host: 'https://us.posthog.com',
+			capture_pageview: 'history_change',
+			opt_out_persistence_by_default: true,
+			cookieless_mode: 'on_reject',
+			opt_out_capturing_by_default: true,
+		})
+	})
+
+	it('stamps the scope as each event is sent, since switching modes drops super-properties', async () => {
+		await runSnippet(posthogSnippet('alpha'))
+
+		const hook = queuedOptions().before_send
+		expect(typeof hook).toBe('function')
+		const event = { event: '$pageview', properties: { $cookieless_mode: true } }
+		expect((hook as (e: unknown) => unknown)(event)).toEqual({
+			event: '$pageview',
+			properties: { $cookieless_mode: true, tenant: 'alpha' },
+		})
+		expect([...(realm.posthog ?? [])].map((call) => (call as unknown[])[0])).not.toContain(
+			'register'
+		)
+	})
+
+	it('turns cookieless off in the queued init on a refusal that lands before posthog-js', async () => {
+		await runSnippet(posthogSnippet())
+
+		createPosthogSink({ ...sinkArgs(realm), cookieless: true }).mode?.({
+			mode: 'off',
+			refused: true,
+		})
+
+		expect(queuedOptions().cookieless_mode).toBe(false)
+		// Opted out by default, it needs no opt-out, which would write PostHog its consent key.
+		expect([...(realm.posthog ?? [])]).not.toContainEqual(['opt_out_capturing'])
+		window.dispatchEvent(new Event('pagehide'))
+	})
+
+	const ga4Snippet = () =>
+		ga4({
+			propertyId: '1',
+			credentials: { client_email: 'sa@x.iam', private_key: 'pk' },
+			measurementId: 'G-AB12CD34',
+		}).capture?.snippet({ path: '/api/_x/p/tenant', mode: 'cookieless', withoutConsent: true }) ?? {
+			scripts: [],
+		}
+
+	it('denies every GA4 consent signal before the tag configures, reading no storage', async () => {
+		const reads = vi.spyOn(Storage.prototype, 'getItem')
+		await runSnippet(ga4Snippet())
+
+		const queued = [...(realm.dataLayer ?? [])].map((args) => [...(args as unknown[])])
+		expect(queued[0]).toEqual([
+			'consent',
+			'default',
+			{
+				analytics_storage: 'denied',
+				ad_storage: 'denied',
+				ad_user_data: 'denied',
+				ad_personalization: 'denied',
+			},
+		])
+		expect(queued[1]?.[0]).toBe('js')
+		expect(queued[2]).toEqual(['config', 'G-AB12CD34'])
+		expect(reads).not.toHaveBeenCalled()
+		reads.mockRestore()
+	})
+})
+
 /**
  * Every vendor reads the address as it loads, and a snippet the server rendered runs before the
  * tracker boots: the exclusion link has to be out of the address before the first vendor call.

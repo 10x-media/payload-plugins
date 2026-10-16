@@ -13,7 +13,13 @@ const sqliteDir = process.env.E2E_SQLITE_DIR
 
 const baseURL = `http://localhost:${nextPort}`
 
-const tenancy = process.env.TENANCY === 'on' ? 'on' : 'off'
+// A vendor profile boots the dev app's single-site vendor mode against the mock upstream the
+// global setup starts (tests/e2e/vendors), so it shares the single-site database.
+const vendorProfile = process.env.ANALYTICS_E2E_VENDORS ?? ''
+const upstreamPort = process.env.E2E_UPSTREAM_PORT ?? String(Number(nextPort) + 1000)
+process.env.E2E_UPSTREAM_PORT = upstreamPort
+
+const tenancy = process.env.TENANCY === 'on' && !vendorProfile ? 'on' : 'off'
 // One mongod/postgres serves both e2e.sh runs, so the two modes get their own database
 // name to keep the off-mode and on-mode seeds from colliding.
 const dbName = `analytics_e2e_${tenancy}`
@@ -43,6 +49,7 @@ export default defineConfig({
 		actionTimeout: 15_000,
 	},
 	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+	...(vendorProfile ? { globalSetup: './tests/e2e/vendors/globalSetup.ts' } : {}),
 	webServer: {
 		command: 'pnpm --filter @10x-media/analytics-dev start',
 		cwd: path.resolve(dirname, '..', '..'),
@@ -59,10 +66,12 @@ export default defineConfig({
 			// no explicit `fields()` keys config is present (single-tenant mode); the fields
 			// plugin requires at least 16 bytes of key material (32+ recommended).
 			PAYLOAD_SECRET: 'e2e-secret-material-32-bytes-minimum!!',
-			TENANCY: process.env.TENANCY ?? '',
+			TENANCY: tenancy,
 			// Playwright's browser reports navigator.webdriver, which capture.skip leaves uncounted.
 			ANALYTICS_COUNT_AUTOMATION: '1',
 			ANALYTICS_SLOW_SOURCE_MS: process.env.ANALYTICS_SLOW_SOURCE_MS ?? '',
+			ANALYTICS_E2E_VENDORS: vendorProfile,
+			...(vendorProfile ? { ANALYTICS_E2E_UPSTREAM: `http://127.0.0.1:${upstreamPort}` } : {}),
 		},
 	},
 })

@@ -29,6 +29,7 @@ export const hitsCollection = (slug: string = HITS_SLUG): CollectionConfig =>
 			{ name: 'v', type: 'text', required: true },
 			flag('landing'),
 			flag('server'),
+			text('mode'),
 			text('name'),
 			text('ref'),
 			text('source'),

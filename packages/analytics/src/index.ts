@@ -6,7 +6,12 @@ import { makeExclusionHandler } from './capture/exclusionEndpoint'
 import { proxyEndpoints } from './capture/proxyEndpoint'
 import { trackerEndpoint } from './capture/trackerEndpoint'
 import { assertMaintainRegistered, TASK_SLUGS } from './core/jobs'
-import { type AnalyticsPluginOptions, resolveOptions, type ScopeCallSite } from './core/options'
+import {
+	type AnalyticsPluginOptions,
+	adapterCountsWithoutConsent,
+	resolveOptions,
+	type ScopeCallSite,
+} from './core/options'
 import { createRegistry, withoutRevenue } from './core/registry'
 import { CURRENCY_PATTERN } from './goals/currency'
 import { makeGoalsHandler } from './goals/goalsEndpoint'
@@ -199,6 +204,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				trustedProxyHops: resolved.trustedProxyHops,
 				trustedPlatform: resolved.trustedPlatform,
 				allowedOrigins: resolved.capture.allowedOrigins,
+				adapterCountsWithoutConsent: adapterCountsWithoutConsent(resolved, adapter),
 				...(itemCollections.size > 0
 					? {
 							items: {
@@ -444,6 +450,9 @@ export type {
 	SourcePolicyFunction,
 	SourceRef,
 	TimezoneResolver,
+	WithoutConsentArgs,
+	WithoutConsentFunction,
+	WithoutConsentOption,
 } from './core/options'
 export type {
 	AnalyticsSdks,

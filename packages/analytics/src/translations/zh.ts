@@ -355,6 +355,11 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerFieldScopeProperty]: '站点标识',
 	[keys.providerFieldScopePropertyHelp]:
 		'PostHog 用来区分各个站点的名称，例如 tenant。多个站点共用一个 PostHog 项目时需要填写。',
+	[keys.providerFieldWithoutConsent]: '未获同意时',
+	[keys.providerFieldWithoutConsentHelp]:
+		'对尚未回应同意横幅或已拒绝的访客，此工具如何处理。留空则沿用站点的设置。',
+	[keys.providerWithoutConsentCookieless]: '不使用 Cookie 计数',
+	[keys.providerWithoutConsentOff]: '不发送任何数据',
 	[keys.viewScopeSite]: '站点',
 	[keys.viewScopeAll]: '所有站点',
 	[keys.viewScopeShowing]: '正在显示：{{site}}',
@@ -385,6 +390,10 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.sourcesPlatformFallback]:
 		'在此站点添加自己的分析工具之前，这些数据来自平台的分析工具。添加后将切换为使用它。',
 	[keys.stateSourceSubstituted]: '已保存的数据源不再可用，因此显示默认数据源。',
+	[keys.statePosthogCookielessDropped]:
+		'PostHog 正在丢弃未经同意统计的访问：请在项目的 Web analytics 设置中启用 “Cookieless tracking”。',
+	[keys.viewWithoutConsentShare]: '{{share}} 的页面浏览量是在未经同意的情况下统计的。',
+	[keys.stateWithoutVisitor]: '未关联访客的页面浏览量：{{count}}。',
 	[pluralKeys.liveVisitors.other]: '当前 {{count}} 位访客在线',
 	[pluralKeys.livePageviews.other]: '{{count}} 次页面浏览（最近 {{duration}}）',
 }

@@ -771,7 +771,10 @@ describe('posthog fetch', () => {
 		const adapter = posthog({ projectId: '1', apiKey: 'phx_k', projectToken: 'phc_t', fetch })
 		const result = await adapter.query(q(), {})
 		expect(result.totals?.pageviews).toBe(11)
-		expect(urls).toEqual(['https://us.posthog.com/api/projects/1/query/'])
+		expect(urls).toEqual([
+			'https://us.posthog.com/api/projects/1/',
+			'https://us.posthog.com/api/projects/1/query/',
+		])
 		expect(adapter.capture?.proxy.fetch).toBe(fetch)
 		expect(
 			posthog({ projectId: '1', apiKey: 'phx_k', projectToken: 'phc_t' }).capture?.proxy.fetch
