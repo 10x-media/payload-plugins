@@ -7,7 +7,9 @@ import {
 	type CurrencyConverter,
 	type Goal,
 	goalField,
+	PROVIDER_IDS,
 } from '@10x-media/analytics'
+import type { ProviderId } from '@10x-media/analytics/types'
 import type { Block, CollectionConfig, Config, PayloadRequest, Plugin } from 'payload'
 
 /** The seeded admin, which the tenancy config also treats as platform staff with every tenant. */
@@ -332,4 +334,17 @@ export interface DevConfigFragment {
 	collections: CollectionConfig[]
 	plugins: Plugin[]
 	dashboard: DashboardConfig
+}
+
+/**
+ * `ANALYTICS_PROVIDER_TYPES` (comma-separated) narrows `providers.collection.types`, for the e2e
+ * check that the providers' create and edit views open with a narrowed Provider select.
+ * Single-site mode only.
+ */
+export const narrowedProviderTypes = (): ProviderId[] | undefined => {
+	const types = (process.env.ANALYTICS_PROVIDER_TYPES ?? '')
+		.split(',')
+		.map((type) => type.trim())
+		.filter((type): type is ProviderId => PROVIDER_IDS.some((id) => id === type))
+	return types.length > 0 ? types : undefined
 }

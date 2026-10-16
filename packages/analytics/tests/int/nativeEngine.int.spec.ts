@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 import type { AnalyticsQuery, MetricKey } from '../../src/core/contract'
 import { analytics } from '../../src/index'
 import { createEngine, type EngineOptions, type NativeEngine } from '../../src/native/engine/engine'
@@ -251,18 +251,27 @@ describeForDb('native engine reads', {}, (db) => {
 	let second: BootedPayload
 	let store: EventStore
 	let state: StateStore
+	/** Every engine a test made: its background counting must not write markers into the next test. */
+	const started: NativeEngine[] = []
 
 	const engineOn = (
 		booted: BootedPayload,
 		options: EngineOptions = {},
 		storeOptions: EventStoreOptions = {}
-	): NativeEngine =>
-		createEngine({
+	): NativeEngine => {
+		const engine = createEngine({
 			payload: booted.payload,
 			store: createEventStore(booted.payload, { now, ...storeOptions }),
 			state: createStateStore(booted.payload, { now }),
 			options: { scoped: true, timezone: zoneOf, now, warn: () => undefined, ...options },
 		})
+		started.push(engine)
+		return engine
+	}
+
+	afterEach(async () => {
+		await Promise.all(started.splice(0).map((engine) => engine.idle()))
+	})
 
 	/** The engine's answer beside the one raw reads alone give, for one question. */
 	const compare = async (engine: NativeEngine, name: string, query: AnalyticsQuery) => {
@@ -528,6 +537,8 @@ describeForDb('native engine reads', {}, (db) => {
 		const meanwhile = await other.read(query)
 		release()
 		const settled = await holdingRead
+		// A read can answer before the aggregation it started releases the day's lease.
+		await Promise.all([holding.idle(), other.idle()])
 		const expected = await rawAnswer(store, query, { scope: 'delta', tz: 'Asia/Tokyo' })
 		expect({ rows: meanwhile.rows, totals: meanwhile.totals }).toEqual(expected)
 		expect({ rows: settled.rows, totals: settled.totals }).toEqual(expected)

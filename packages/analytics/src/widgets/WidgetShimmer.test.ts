@@ -1,7 +1,7 @@
 import type { Payload, PayloadRequest, WidgetServerProps } from 'payload'
 import { createElement, type ReactNode } from 'react'
 import { renderToReadableStream } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter, AnalyticsResult } from '../core/contract'
 import { createRegistry } from '../core/registry'
 import { type AnalyticsRuntime, getRuntime, setRuntime } from '../plugin/runtime'
@@ -11,6 +11,12 @@ import AnalyticsGoalsWidget from './AnalyticsGoalsWidget'
 import AnalyticsMetricWidget from './AnalyticsMetricWidget'
 import AnalyticsRealtimeWidget from './AnalyticsRealtimeWidget'
 import AnalyticsTrendWidget from './AnalyticsTrendWidget'
+
+// Streamed without the admin's providers: a read answering before the stream ends renders the
+// realtime counter, whose translations would otherwise come from no provider at all.
+vi.mock('../translations/useTranslation', () => ({
+	useTranslation: () => ({ i18n: { language: 'en' }, t: (key: string) => key }),
+}))
 
 /** A source whose every read waits until the test lets it answer. */
 const slowSource = () => {

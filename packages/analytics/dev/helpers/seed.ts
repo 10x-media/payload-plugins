@@ -1,4 +1,4 @@
-import { GOALS_SLUG, signItemRef } from '@10x-media/analytics'
+import { GOALS_SLUG, PROVIDER_IDS, signItemRef } from '@10x-media/analytics'
 import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
 import { DEFAULT_JOBS } from '../../src/core/jobs'
 import { getRuntime, resolveTimezoneFor } from '../../src/plugin/runtime'
@@ -7,6 +7,7 @@ import {
 	DEV_ADMIN_EMAIL,
 	DEV_REPORTING_CURRENCY,
 	DEV_REPORTING_TIMEZONE,
+	narrowedProviderTypes,
 	OFFER_GOAL,
 	pagePath,
 } from '../config/shared'
@@ -148,6 +149,40 @@ const seedTenantProviders = async (
 		})
 	}
 	payload.logger.info(`Seeded analytics-providers: ${SEED_PROVIDERS.map((p) => p.name).join(', ')}`)
+}
+
+/** The document the narrowed-select e2e check opens and fails to save. */
+const RETIRED_PROVIDER_NAME = 'Retired provider'
+
+/**
+ * A disabled document of a type the narrowed install no longer serves, written past validation
+ * the way a type the install later stopped serving stays stored.
+ */
+const seedRetiredProvider = async (payload: Payload): Promise<void> => {
+	const types = narrowedProviderTypes()
+	const retired = PROVIDER_IDS.find((id) => !types?.includes(id))
+	if (!types || !retired) {
+		return
+	}
+	const { totalDocs } = await payload.count({
+		collection: 'analytics-providers',
+		where: { name: { equals: RETIRED_PROVIDER_NAME } },
+	})
+	if (totalDocs > 0) {
+		return
+	}
+	const now = new Date().toISOString()
+	await payload.db.create({
+		collection: 'analytics-providers',
+		data: {
+			name: RETIRED_PROVIDER_NAME,
+			provider: retired,
+			enabled: false,
+			createdAt: now,
+			updatedAt: now,
+		},
+	})
+	payload.logger.info(`Seeded a stored ${retired} provider the install no longer serves`)
 }
 
 /**
@@ -440,6 +475,7 @@ export const seedDev = async (
 		scoped = { tenants, offers }
 	} else {
 		await seedGoalPage(payload, SEED_GOAL_PAGE, { platformAdmin })
+		await seedRetiredProvider(payload)
 	}
 
 	const traffic = await seedTraffic(payload, await sitesOf(payload, scoped))

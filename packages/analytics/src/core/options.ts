@@ -267,8 +267,8 @@ export type ProvidersCollectionOptions = {
 	 */
 	defaultAccess?: ConnectionAccess
 	/**
-	 * Which provider types documents may have, in the order the select offers them, the first being
-	 * its default. Default: every type, `native` only while `adapters` holds native().
+	 * Which provider types documents may have, the first being the select's default; the select lists
+	 * them in a fixed order. Default: every type, `native` only while `adapters` holds native().
 	 */
 	types?: ProviderId[]
 	/**

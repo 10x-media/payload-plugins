@@ -51,7 +51,7 @@ What to do: enter the missing credentials, or switch such documents off. An inst
 
 **Behavioral.** The **Provider** select offers `native` (**Payload**) only while `adapters` holds `native()`, and its default is the first type it offers rather than always `native`. Saving a document with a type the install does not serve is refused on that field. A stored document keeps its type and its settings until someone saves it.
 
-**Additive.** `providers.collection.types` narrows and orders the types offered, and `analyticsProviderFields({ types })` takes the same list.
+**Additive.** `providers.collection.types` narrows the types offered and picks the default, and `analyticsProviderFields({ types })` takes the same list.
 
 ## Capture
 
