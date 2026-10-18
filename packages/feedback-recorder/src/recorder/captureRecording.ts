@@ -100,6 +100,23 @@ export interface CaptureRecordingInput {
 }
 
 /**
+ * Chrome leaves the tab that asks out of the share picker unless told
+ * otherwise, and that tab is the CMS page the editor wants to talk about.
+ * `selfBrowserSurface: 'include'` puts it back; browsers that do not know the
+ * option ignore it. TypeScript's DOM types do not list it yet, hence the
+ * local extension.
+ */
+type ScreenShareOptions = DisplayMediaStreamOptions & {
+	selfBrowserSurface?: 'include' | 'exclude'
+}
+
+export const displayMediaOptions: ScreenShareOptions = {
+	video: { frameRate: 30 },
+	audio: true,
+	selfBrowserSurface: 'include',
+}
+
+/**
  * Everything from "ask for the screen" to "hand back two finished blobs",
  * the video (screen, composited with the camera when there is one, plus the
  * mixed screen-and-microphone audio) and the microphone alone, for the
@@ -142,10 +159,7 @@ export const captureRecording = async ({
 	}
 
 	try {
-		const screenStream = await navigator.mediaDevices.getDisplayMedia({
-			video: { frameRate: 30 },
-			audio: true,
-		})
+		const screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions)
 		tracks.push(...screenStream.getTracks())
 
 		const micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
