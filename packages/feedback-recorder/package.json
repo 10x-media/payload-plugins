@@ -94,6 +94,7 @@
 	},
 	"peerDependencies": {
 		"@payloadcms/ui": "^3.83.0",
+		"next": "^15.2.9 || ^16.2.6",
 		"payload": "^3.83.0",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
@@ -112,6 +113,7 @@
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
 		"jsdom": "catalog:",
+		"next": "catalog:",
 		"payload": "catalog:",
 		"playwright": "catalog:",
 		"react": "catalog:",

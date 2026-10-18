@@ -23,6 +23,7 @@ import type { ClientConfig } from '../types'
 import { CameraPlacement } from './CameraPlacement'
 import { RecorderDrawerBody } from './RecorderDrawerBody'
 import { RecordingBar } from './RecordingBar'
+import { useSoftAdminNavigation } from './softNavigation'
 import { userKey } from './userKey'
 import './feedbackRecorder.css'
 
@@ -174,6 +175,11 @@ export const RecorderProvider = ({
 		const timer = setInterval(() => setElapsedSeconds((seconds) => seconds + 1), 1000)
 		return () => clearInterval(timer)
 	}, [state])
+
+	// A plain link would reload the page and end the take, so links into the admin navigate
+	// client-side for as long as there is something to lose. What is left (a reload, a typed URL,
+	// leaving the admin) still gets the browser's leave warning below.
+	useSoftAdminNavigation(LIVE_STATES.has(state) || SENDING_STATES.has(state))
 
 	// Leaving mid-recording or mid-upload loses the take; the browser asks first.
 	useEffect(() => {
