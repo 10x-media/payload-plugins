@@ -1,4 +1,4 @@
 {
 	"title": "Measurement",
-	"pages": ["index", "utils"]
+	"pages": ["index", "standalone", "utils"]
 }
