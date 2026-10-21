@@ -139,6 +139,8 @@ Pick the bump by what a consumer experiences:
 
 The repo is in beta pre-mode (`.changeset/pre.json`, tag `beta`). While in pre-mode every release publishes as `0.x.y-beta.N` regardless of bump type, but the bump you choose is still recorded and determines the version when the project later exits pre-mode and cuts a stable release. Choose the correct bump even during beta.
 
+A release of one plugin does not release the plugins that list it in `peerDependencies` while the new version still satisfies their range (`onlyUpdatePeerDependentsWhenOutOfRange` in `.changeset/config.json`). Without it, changesets gives every peer dependent a major bump on any minor of its peer, so a `fields` feature alone would push `webhooks` from `0.1.0-beta.5` to `1.0.0-beta.6`. A plugin that needs the newer version raises its own peer range in `package.json` and ships a changeset for that, which releases it as usual. A version that leaves a dependent's range still bumps that dependent to major.
+
 ## Comment and style policy
 
 Comments earn their place: explain why, not restate what. Default to no comment; add one only for intent, a non-obvious constraint, or a gotcha the code cannot express.
