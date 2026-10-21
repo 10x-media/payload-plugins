@@ -189,6 +189,7 @@
 		"fields-locales",
 		"fields-measurement-family",
 		"fields-phone-number-family",
+		"fields-standalone-inputs",
 		"fields-v1",
 		"fields-write-only-protection",
 		"folder-picker-drag-and-edit-target",
