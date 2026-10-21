@@ -10,6 +10,10 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.fieldUrl]: 'عنوان URL لنقطة النهاية',
 	[keys.urlInvalid]: 'أدخل عنوان URL مطلقًا يبدأ بـ http:// أو https://.',
 	[keys.urlHostNotAllowed]: 'هذا المضيف غير مدرج في قائمة المضيفين المسموح بهم لـ Webhooks.',
+	[keys.urlNotHttps]:
+		'أدخل عنوان URL يبدأ بـ https://. لا يُسمح باستخدام http:// غير المشفّر لنقاط نهاية الويب هوك.',
+	[keys.urlPrivateAddress]:
+		'هذا العنوان خاص أو محلي أو غير قابل للوصول من الإنترنت، لذلك لا يمكن إرسال الويب هوك إليه.',
 	[keys.fieldEnabled]: 'مفعّل',
 	[keys.fieldEvents]: 'الأحداث',
 	[keys.fieldSecret]: 'مفتاح التوقيع السري',

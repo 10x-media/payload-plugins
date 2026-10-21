@@ -89,10 +89,12 @@ const runBeforeChange = (
 }
 
 describe('buildSubscriptionsCollection', () => {
+	// The open policy, so these cases judge the URL's shape and never reach DNS.
 	const c = buildSubscriptionsCollection({
 		slug: 'webhook-subscriptions',
 		events: ['posts.created'],
 		hidden: false,
+		urlPolicy: { allowHttp: true, allowPrivateAddresses: true },
 	})
 
 	it('uses the given slug and name title', () => {
@@ -208,19 +210,19 @@ describe('buildSubscriptionsCollection', () => {
 			if (!url || !('validate' in url) || !url.validate) {
 				throw new Error('url validate missing')
 			}
-			return (url.validate as (v: unknown, o: unknown) => string | true)(value, {
+			return (url.validate as (v: unknown, o: unknown) => Promise<string | true>)(value, {
 				req: { t: (k: string) => k },
 			})
 		}
 
-		it('accepts absolute http and https urls, localhost included', () => {
-			expect(validateUrl('https://crm.example.com/hooks/orders')).toBe(true)
-			expect(validateUrl('http://localhost:3000/api/webhook-sink')).toBe(true)
-			expect(validateUrl('http://10.0.0.5:8080')).toBe(true)
+		it('accepts absolute http and https urls, localhost included', async () => {
+			expect(await validateUrl('https://crm.example.com/hooks/orders')).toBe(true)
+			expect(await validateUrl('http://localhost:3000/api/webhook-sink')).toBe(true)
+			expect(await validateUrl('http://10.0.0.5:8080')).toBe(true)
 		})
 
 		/** These save fine as text and then make `fetch` throw at delivery time. */
-		it('rejects anything fetch could not POST to', () => {
+		it('rejects anything fetch could not POST to', async () => {
 			const unusable = [
 				'123',
 				'example.com/hook',
@@ -230,43 +232,65 @@ describe('buildSubscriptionsCollection', () => {
 				'https://user:pass@crm.example.com/hook',
 			]
 			for (const value of unusable) {
-				expect(validateUrl(value), value).toBe(keys.urlInvalid)
+				expect(await validateUrl(value), value).toBe(keys.urlInvalid)
 			}
 		})
 
-		it('still rejects an empty value, which required alone no longer covers', () => {
-			expect(validateUrl(undefined)).toBe('validation:required')
-			expect(validateUrl('  ')).toBe('validation:required')
+		it('still rejects an empty value, which required alone no longer covers', async () => {
+			expect(await validateUrl(undefined)).toBe('validation:required')
+			expect(await validateUrl('  ')).toBe('validation:required')
 		})
 
 		/**
 		 * Payload validates the stored fields on every update. A rule added after a row was saved
 		 * must not fail every later write to that row: rotating it, adopting it, switching it off.
 		 */
-		it('does not judge a url the write is not changing', () => {
-			const url = find(c, 'url') as { validate: (v: unknown, o: unknown) => string | true }
+		it('does not judge a url the write is not changing', async () => {
+			const url = find(c, 'url') as { validate: (v: unknown, o: unknown) => Promise<string | true> }
 			const options = (previousValue: unknown) => ({ previousValue, req: { t: (k: string) => k } })
-			expect(url.validate('123', options('123'))).toBe(true)
-			expect(url.validate('123', options('https://was.fine'))).toBe(keys.urlInvalid)
-			expect(url.validate('', options(''))).toBe('validation:required')
+			expect(await url.validate('123', options('123'))).toBe(true)
+			expect(await url.validate('123', options('https://was.fine'))).toBe(keys.urlInvalid)
+			expect(await url.validate('', options(''))).toBe('validation:required')
 		})
 
 		/** Opt-in: with no list every host passes, which is what the cases above rely on. */
-		it('rejects a host outside a configured allowlist', () => {
+		it('rejects a host outside a configured allowlist', async () => {
 			const restricted = buildSubscriptionsCollection({
 				slug: 'webhook-subscriptions',
 				events: [],
 				hidden: false,
-				allowedHosts: ['*.example.com'],
+				urlPolicy: {
+					allowedHosts: ['*.example.com'],
+					allowHttp: true,
+					allowPrivateAddresses: true,
+				},
 			})
 			const url = find(restricted, 'url')
 			const validate = (value: string) =>
-				(url as { validate: (v: unknown, o: unknown) => string | true }).validate(value, {
+				(url as { validate: (v: unknown, o: unknown) => Promise<string | true> }).validate(value, {
 					req: { t: (k: string) => k },
 				})
-			expect(validate('https://crm.example.com/hooks')).toBe(true)
-			expect(validate('http://localhost:3000/hook')).toBe(keys.urlHostNotAllowed)
-			expect(validate('123')).toBe(keys.urlInvalid)
+			expect(await validate('https://crm.example.com/hooks')).toBe(true)
+			expect(await validate('http://localhost:3000/hook')).toBe(keys.urlHostNotAllowed)
+			expect(await validate('123')).toBe(keys.urlInvalid)
+		})
+		/** The default an install gets: a subscription URL is input, so it is held to https and public. */
+		it('holds a url to https and a public address under the default policy', async () => {
+			const strict = buildSubscriptionsCollection({
+				slug: 'webhook-subscriptions',
+				events: [],
+				hidden: false,
+				urlPolicy: { allowHttp: false, allowPrivateAddresses: false },
+			})
+			const url = find(strict, 'url')
+			const validate = (value: string) =>
+				(url as { validate: (v: unknown, o: unknown) => Promise<string | true> }).validate(value, {
+					req: { t: (k: string) => k },
+				})
+			expect(await validate('http://crm.example.com/hooks')).toBe(keys.urlNotHttps)
+			expect(await validate('https://10.0.0.5/hook')).toBe(keys.urlPrivateAddress)
+			expect(await validate('https://[::1]/hook')).toBe(keys.urlPrivateAddress)
+			expect(await validate('https://93.184.216.34/hook')).toBe(true)
 		})
 	})
 

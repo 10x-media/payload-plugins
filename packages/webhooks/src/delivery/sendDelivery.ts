@@ -1,6 +1,7 @@
 import { MESSAGE_ID_PREFIX } from '../constants'
 import type { ResolvedSubscription } from '../plugin/resolveSubscriptions'
 import { type DeliverResult, deliver } from './deliver'
+import type { UrlPolicy } from './destination'
 import { withoutReservedHeaders } from './headers'
 import { signatureHeader, signPayload } from './sign'
 
@@ -29,6 +30,7 @@ export const sendDelivery = (args: {
 	body: string
 	timeoutMs: number
 	now: number
+	urlPolicy: UrlPolicy
 }): Promise<DeliverResult> => {
 	const { subscription, deliveryId, event, body, timeoutMs, now } = args
 	// Backstop for the dispatchers' own refusal check, so no future call site can reintroduce a
@@ -59,5 +61,12 @@ export const sendDelivery = (args: {
 			subscription.secrets.map((secret) => signPayload({ secret, id, timestamp, body }))
 		)
 	}
-	return deliver({ url: subscription.url, body, headers, timeoutMs })
+	return deliver({
+		url: subscription.url,
+		body,
+		headers,
+		timeoutMs,
+		// A code subscription's URL is the install's own configuration, so it may be internal.
+		guarded: subscription.source === 'collection' && !args.urlPolicy.allowPrivateAddresses,
+	})
 }

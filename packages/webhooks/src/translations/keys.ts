@@ -13,6 +13,8 @@ export const keys = {
 	fieldUrl: 'webhooks:fieldUrl',
 	urlInvalid: 'webhooks:urlInvalid',
 	urlHostNotAllowed: 'webhooks:urlHostNotAllowed',
+	urlNotHttps: 'webhooks:urlNotHttps',
+	urlPrivateAddress: 'webhooks:urlPrivateAddress',
 	fieldEnabled: 'webhooks:fieldEnabled',
 	fieldEvents: 'webhooks:fieldEvents',
 	fieldSecret: 'webhooks:fieldSecret',

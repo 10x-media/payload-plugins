@@ -10,6 +10,8 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.fieldUrl]: '端点 URL',
 	[keys.urlInvalid]: '请输入以 http:// 或 https:// 开头的完整 URL。',
 	[keys.urlHostNotAllowed]: '此主机不在允许的 Webhook 主机列表中。',
+	[keys.urlNotHttps]: '请输入 https:// 网址。Webhook 端点不允许使用未加密的 http://。',
+	[keys.urlPrivateAddress]: '该地址是私有、本地或无法公开访问的地址，因此无法向其发送 Webhook。',
 	[keys.fieldEnabled]: '已启用',
 	[keys.fieldEvents]: '事件',
 	[keys.fieldSecret]: '签名密钥',
