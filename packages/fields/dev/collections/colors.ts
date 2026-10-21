@@ -115,5 +115,10 @@ export const colors: CollectionConfig = {
 			presets: tenantSchemePresets,
 		}),
 		colorField({ name: 'schemePresetsFlat', presets: tenantSchemePresets }),
+		{
+			name: 'standaloneColorInputs',
+			type: 'ui',
+			admin: { components: { Field: '/components/standaloneShowcase#ColorInputShowcase' } },
+		},
 	],
 }

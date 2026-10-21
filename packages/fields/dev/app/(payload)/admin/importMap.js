@@ -1,5 +1,6 @@
 import { ColorCell as ColorCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ColorFieldServer as ColorFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
+import { ColorInputShowcase as ColorInputShowcase_6ffc54a163ba5ae3367ff84f3e67cc9a } from '../../../components/standaloneShowcase'
 import { ProtectedCell as ProtectedCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ProtectedField as ProtectedField_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
 import { RscEntryLexicalCell as RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
@@ -31,6 +32,7 @@ import { IconCell as IconCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-medi
 import { IconFieldServer as IconFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { MeasurementCellServer as MeasurementCellServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { MeasurementFieldServer as MeasurementFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
+import { MeasurementInputShowcase as MeasurementInputShowcase_6ffc54a163ba5ae3367ff84f3e67cc9a } from '../../../components/standaloneShowcase'
 import { PhoneNumberCellServer as PhoneNumberCellServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { PhoneNumberFieldServer as PhoneNumberFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { PhoneShowcaseError as PhoneShowcaseError_c7aad2540de198ec058d3310920738ea } from '../../../components/phoneShowcase'
@@ -58,6 +60,7 @@ import { SocialAdapterNodes as SocialAdapterNodes_1d64e85d6e2d4c232079878ca5845e
 export const importMap = {
   "@10x-media/fields/rsc#ColorCell": ColorCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#ColorFieldServer": ColorFieldServer_cf1583332d9c5fb967cd4249af29ce12,
+  "/components/standaloneShowcase#ColorInputShowcase": ColorInputShowcase_6ffc54a163ba5ae3367ff84f3e67cc9a,
   "@10x-media/fields/rsc#ProtectedCell": ProtectedCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/client#ProtectedField": ProtectedField_02043ee4f38853ef8c4ef9fd50352514,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
@@ -89,6 +92,7 @@ export const importMap = {
   "@10x-media/fields/rsc#IconFieldServer": IconFieldServer_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#MeasurementCellServer": MeasurementCellServer_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#MeasurementFieldServer": MeasurementFieldServer_cf1583332d9c5fb967cd4249af29ce12,
+  "/components/standaloneShowcase#MeasurementInputShowcase": MeasurementInputShowcase_6ffc54a163ba5ae3367ff84f3e67cc9a,
   "@10x-media/fields/rsc#PhoneNumberCellServer": PhoneNumberCellServer_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#PhoneNumberFieldServer": PhoneNumberFieldServer_cf1583332d9c5fb967cd4249af29ce12,
   "/components/phoneShowcase#PhoneShowcaseError": PhoneShowcaseError_c7aad2540de198ec058d3310920738ea,

@@ -1,0 +1,47 @@
+---
+title: Standalone input
+description: The color field's input without a form, for custom admin views and components.
+---
+
+`ColorInput` is the same row, picker, preset chip and commit pipeline the field renders, with no `useField` behind it. Use it inside custom admin views, dashboards, drawers or any component where the value lives in your own state rather than in a document form. `ColorField` is `ColorInput` plus `useField`, so both behave identically.
+
+```tsx
+'use client'
+import { ColorInput } from '@10x-media/fields/client'
+import { useState } from 'react'
+
+export const ThemePicker = () => {
+  const [accent, setAccent] = useState<string | null>('#3b82f6')
+  return <ColorInput label="Accent" onChange={setAccent} value={accent} />
+}
+```
+
+`onChange` receives exactly what `colorField` would store: a string normalized to the stored format, a `preset:<key>` reference in linked mode, or `null` when cleared. It fires at commit boundaries (a 250ms typing debounce, blur, a picker or preset pick, the clear button), never per keystroke, and blur salvages a valid color out of dirty input first.
+
+## Options and presets
+
+Nothing is resolved on the server here, so whatever the field would resolve per request is passed in directly:
+
+```tsx
+<ColorInput
+  onChange={setValue}
+  options={{ format: 'rgb', linked: true, alpha: false }}
+  presets={[
+    { key: 'brand', label: 'Brand', value: '#0055ff' },
+    { key: 'surface', label: 'Surface', value: { light: '#ffffff', dark: '#0f172a' } },
+  ]}
+  presetsLabel="Brand colors"
+  value={value}
+/>
+```
+
+- `options` takes the same keys as the field's client options: `format`, `alpha`, `isClearable`, `enableEyedropper`, `linked` and `linkedFallback`. Anything left out takes the factory default (hex, alpha on, clearable, eyedropper on, unlinked). The plugin-level `color.format` default does not apply, since there is no request to read it from; pass `format` explicitly if it differs from hex.
+- `presets` are already resolved: plain-string labels in the viewer's language, and values as CSS strings or `{ light, dark }` pairs. Fetch them however suits the view, for example from the same source a [palette source](/fields/color/palette-sources) reads.
+
+## Label, errors and the rest
+
+The chrome props mirror Payload's own `TextInput`: `label`, `description`, `placeholder`, `required`, `localized`, `readOnly`, `className`, `style`, and `Label`, `Error`, `Description`, `BeforeInput`, `AfterInput` nodes that replace the defaults. `path` names the input (`id`, `name`, the label's `htmlFor`); without it the label pairs with a generated id.
+
+Left alone, the input reports its own format errors: an unparseable color, or in linked mode a missing preset. Pass `error` to show your own message instead, or `showError` to take over the error state entirely. `required` only marks the label and hides the clear button; enforcing it is up to the caller, as with any standalone input.
+
+The input runs inside the Payload admin: it uses Payload's translations (the plugin registers its strings) and Payload's CSS tokens. It is not a frontend website component.
