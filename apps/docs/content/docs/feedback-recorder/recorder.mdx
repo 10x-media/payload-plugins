@@ -1,0 +1,28 @@
+---
+title: Using the recorder elsewhere
+description: The recording engine is a separate, Payload-free entry.
+---
+
+`@10x-media/feedback-recorder/recorder` is the recording engine on its own: React and `tus-js-client`, no Payload, no Next. It is what the plugin's drawer is built on, and what any other app can use with its own server.
+
+```tsx
+'use client'
+import { DEFAULT_BUBBLE, useClipRecorder, type ClipTransport } from '@10x-media/feedback-recorder/recorder'
+
+const transport: ClipTransport<{ title?: string }> = {
+  reserve: async ({ source, durationSeconds, sizeBytes, meta }) => {
+    const response = await fetch('/api/my-clips', { method: 'POST', body: JSON.stringify({ source, durationSeconds, sizeBytes, ...meta }) })
+    return response.json() // { clipId, videoId, upload: { endpoint, libraryId, signature, expires } }
+  },
+  complete: async ({ reserved, durationSeconds }) => {
+    await fetch(`/api/my-clips/${reserved.clipId}/complete`, { method: 'POST', body: JSON.stringify({ durationSeconds }) })
+  },
+}
+
+export const Recorder = () => {
+  const recorder = useClipRecorder({ transport, mode: 'instant', withCamera: false, bubble: DEFAULT_BUBBLE })
+  // recorder.start(), .stop(), .pause(), .resume(), .discard(), then .send(meta) from `review`
+}
+```
+
+The hook's states run `idle → requesting → (placing) → counting → recording ⇄ paused → review → uploading → processing → ready`, with `failed` from any step. A failed send keeps the recording and the reservation, so `send` again resumes. The upload target is a Bunny Stream tus upload presigned by your server.
