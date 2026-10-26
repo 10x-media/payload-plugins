@@ -221,14 +221,36 @@ export const extractComparable = (
 	return out
 }
 
+/**
+ * Whether any excluded path differs from its saved value. Excluded paths stay
+ * out of the history, so landing on the saved entry says nothing about them: a
+ * new password typed before an undo is still unsaved.
+ */
+export const hasIgnoredChanges = (
+	fields: FormState,
+	isIgnored: PathMatcher = isIgnoredPath
+): boolean =>
+	Object.entries(fields).some(
+		([path, field]) => isIgnored(path) && field && !deepEqual(field.value, field.initialValue)
+	)
+
 let nextEntryId = 0
 
+/**
+ * Excluded paths are left out of `fields` as well as `comparable`: a restore
+ * passes them through from the live state, so a copy here would only keep
+ * values such as a typed password around for the life of the history.
+ */
 export const createSnapshot = (
 	fields: FormState,
 	isIgnored: PathMatcher = isIgnoredPath
 ): HistoryEntry => ({
 	id: nextEntryId++,
-	fields: Object.fromEntries(Object.entries(fields).map(([path, field]) => [path, { ...field }])),
+	fields: Object.fromEntries(
+		Object.entries(fields)
+			.filter(([path]) => !isIgnored(path))
+			.map(([path, field]) => [path, { ...field }])
+	),
 	comparable: extractComparable(fields, isIgnored),
 })
 

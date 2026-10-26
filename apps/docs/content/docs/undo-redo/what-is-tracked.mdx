@@ -80,7 +80,7 @@ Types are resolved from the document's schema, since form state carries no type 
 
 `collections: { media: false }`. See [Configuration](/undo-redo/configuration#per-collection-and-per-global-overrides).
 
-Excluded fields are excluded from both halves: their edits create no entries, and undo never writes to them. They are passed through untouched from the live form, not dropped.
+Excluded fields are excluded from both halves: their edits create no entries, and undo never writes to them. They are passed through untouched from the live form, not dropped, and history entries keep no copy of them.
 
 ## Payload's own fields, excluded by default
 
@@ -130,6 +130,6 @@ A JSON field holding a bare string, such as `"hello"` rather than an object, is 
 
 ## The saved baseline
 
-The plugin records the state the document was last persisted from, and reports the form clean when the current entry matches it. This is what keeps the save button and the "leave without saving" prompt truthful in both directions: undoing back onto the saved state leaves nothing to save, and undoing *past* it is a real unsaved change even when the form looks the way it did on load.
+The plugin records the state the document was last persisted from, and reports the form clean when the current entry matches it and every excluded field still holds its saved value. A password typed before an undo keeps the form unsaved. This is what keeps the save button and the "leave without saving" prompt truthful in both directions: undoing back onto the saved state leaves nothing to save, and undoing *past* it is a real unsaved change even when the form looks the way it did on load.
 
 Under autosave the baseline is skipped. Autosave persists continuously, so "differs from what is persisted" is not a state an editor stays in long enough to be worth reporting, and tracking it would produce a marker that moves on every keystroke. Undo and redo work normally there; only the clean/unsaved reporting is dropped.
