@@ -9,6 +9,7 @@ import {
 	diffComparable,
 	extractComparable,
 	type HistoryEntry,
+	hasIgnoredChanges,
 	isAtSavedState,
 	MAX_HISTORY_ENTRIES,
 	markSaved,
@@ -374,6 +375,20 @@ describe('history options', () => {
 		const restored = buildRestoreState(entryAt(history, 0), current, isIgnored)
 		expect(restored.title?.value).toBe('old')
 		expect(restored.slug?.value).toBe('new')
+	})
+
+	it('keeps no copy of an excluded path in the entry', () => {
+		const history = createHistory({ isIgnored: createPathMatcher(['password']) })
+		pushSnapshot(history, { password: textField('typed', ''), title: textField('x') })
+		expect(Object.keys(entryAt(history, 0).fields)).toEqual(['title'])
+	})
+
+	it('reports an excluded path that differs from its saved value', () => {
+		const isIgnored = createPathMatcher(['password'])
+		const unsaved: FormState = { password: textField('typed', ''), title: textField('x') }
+		const untouched: FormState = { password: textField('', ''), title: textField('y', 'x') }
+		expect(hasIgnoredChanges(unsaved, isIgnored)).toBe(true)
+		expect(hasIgnoredChanges(untouched, isIgnored)).toBe(false)
 	})
 
 	it('still ignores Payload internals when no matcher is given', () => {

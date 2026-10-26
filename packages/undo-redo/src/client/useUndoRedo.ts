@@ -16,6 +16,7 @@ import {
 	canRedo,
 	canUndo,
 	createHistory,
+	hasIgnoredChanges,
 	isAtSavedState,
 	MAX_HISTORY_ENTRIES,
 	markSaved,
@@ -284,7 +285,9 @@ export const useUndoRedo = ({
 			// saved entry is a return to clean; anywhere else is a real change,
 			// and marking it also makes the debounced onChange revalidate the
 			// restored state on the server so save and autosave pick it up.
-			const clean = tracksSavedState && isAtSavedState(history)
+			// Excluded paths are not in the history, so they are checked live.
+			const clean =
+				tracksSavedState && isAtSavedState(history) && !hasIgnoredChanges(current, isIgnored)
 			clearedByRestoreRef.current = clean
 			setModified(!clean)
 			refreshFlags()
