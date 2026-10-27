@@ -228,6 +228,7 @@ export default buildConfig({
 			disableJobsQueue: true,
 			// The e2e suite reads the pairs back through the REST API.
 			collectionAccess: { read: ({ req }) => Boolean(req.user) },
+			view: { components: { beforeList: ['/components/QueueSummary#QueueSummary'] } },
 		}),
 		formVariants({ collections: { customers: customerVariants } }),
 	],

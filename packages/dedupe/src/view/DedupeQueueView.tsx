@@ -1,10 +1,12 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
+import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerComponent'
 import { redirect } from 'next/navigation'
-import type { AdminViewServerProps, Params } from 'payload'
+import type { AdminViewServerProps, Params, PayloadComponent } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 
 import { isStatus, pageSize } from '../collections/slugs'
+import type { DedupeQueueSlotProps, DedupeQueueSlotServerProps } from '../options'
 import { getContext, listCollections } from '../plugin/context'
 import { readQueue } from '../queue/pairs'
 import { pendingScans } from '../queue/scanJobs'
@@ -69,6 +71,23 @@ export async function DedupeQueueView({
 			? t(keys.missingParams)
 			: null
 
+	const slotProps: DedupeQueueSlotProps = { collection, status }
+	const slotServerProps: DedupeQueueSlotServerProps = {
+		payload: req.payload,
+		req,
+		searchParams: sp,
+	}
+	const renderSlot = (components: PayloadComponent[] | undefined) =>
+		components?.length
+			? RenderServerComponent({
+					clientProps: slotProps,
+					Component: components,
+					importMap: req.payload.importMap,
+					serverProps: slotServerProps,
+				})
+			: null
+	const slots = ctx.options.view ? ctx.options.view.components : undefined
+
 	return (
 		<DefaultTemplate
 			i18n={req.i18n}
@@ -82,6 +101,7 @@ export async function DedupeQueueView({
 			req={req}
 		>
 			<Gutter>
+				{renderSlot(slots?.beforeList)}
 				{collections.length === 0 ? (
 					<p>{t(keys.noCollections)}</p>
 				) : (
@@ -98,6 +118,7 @@ export async function DedupeQueueView({
 						status={status}
 					/>
 				)}
+				{renderSlot(slots?.afterList)}
 			</Gutter>
 		</DefaultTemplate>
 	)

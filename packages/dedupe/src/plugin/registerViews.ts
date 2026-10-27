@@ -1,4 +1,5 @@
 import type { Config, PayloadComponent } from 'payload'
+import { parsePayloadComponent } from 'payload/shared'
 
 import type { ResolvedOptions } from '../options'
 
@@ -23,6 +24,28 @@ const sectionDependencies = (options: ResolvedOptions): Dependencies => {
 			const path = pathOf(section.Component)
 			if (path) out[`dedupe-section-${entry.slug}-${section.key}`] = { path, type: 'component' }
 		}
+	}
+	return out
+}
+
+/**
+ * The queue page's slot components, in `admin.dependencies` for the same reason as the
+ * merge sections. Keyed by the reference the runtime looks up: `path#exportName`.
+ */
+const slotDependencies = (
+	components: Record<'afterList' | 'beforeList', PayloadComponent[]>
+): Dependencies => {
+	const out: Dependencies = {}
+	for (const [slot, list] of Object.entries(components)) {
+		list.forEach((component, index) => {
+			const parsed = parsePayloadComponent(component)
+			if (parsed) {
+				out[`dedupe-view-${slot}-${index}`] = {
+					path: `${parsed.path}#${parsed.exportName}`,
+					type: 'component',
+				}
+			}
+		})
 	}
 	return out
 }
@@ -53,7 +76,11 @@ export const registerViews = (config: Config, options: ResolvedOptions): void =>
 				},
 			},
 		},
-		dependencies: { ...config.admin?.dependencies, ...sectionDependencies(options) },
+		dependencies: {
+			...config.admin?.dependencies,
+			...sectionDependencies(options),
+			...slotDependencies(options.view.components),
+		},
 	}
 
 	const targets = new Set(options.collections.map((entry) => entry.slug as string))

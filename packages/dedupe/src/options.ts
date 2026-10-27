@@ -2,10 +2,13 @@ import type {
 	Access,
 	CollectionConfig,
 	CollectionSlug,
+	Params,
+	Payload,
 	PayloadComponent,
 	PayloadRequest,
 } from 'payload'
 
+import type { PairStatus } from './collections/slugs'
 import type { DedupeEventSink } from './plugin/events'
 import type { MergeDecision, MergeFieldSpec } from './schema/types'
 import type { DedupeAdapterFactory } from './search/contract'
@@ -139,6 +142,20 @@ export type MergeSectionArgs = {
 	 * the browser, so it names only what the reviewer was shown if the check here says so.
 	 */
 	value: unknown
+}
+
+/** Props of the queue page's slots: what the queue shows. */
+export type DedupeQueueSlotProps = {
+	/** The collection the queue is filtered to; empty for every collection. */
+	collection: string
+	status: PairStatus
+}
+
+/** What a server component in a queue page slot receives on top of `DedupeQueueSlotProps`. */
+export type DedupeQueueSlotServerProps = {
+	payload: Payload
+	req: PayloadRequest
+	searchParams: Params
 }
 
 /**
@@ -297,7 +314,22 @@ export type DedupePluginOptions = {
 	 * Admin views of the queue and the merge screen. `false` removes them; the path defaults
 	 * to `/dedupe`. The plugin adds no link to them: place one where the admin needs it.
 	 */
-	view?: { path?: `/${string}` } | false
+	view?:
+		| {
+				path?: `/${string}`
+				/**
+				 * Components on the queue's page, as a collection's `admin.components` takes them.
+				 * Each may be a server component. Props: `DedupeQueueSlotProps`, and for a server
+				 * component also `DedupeQueueSlotServerProps`.
+				 */
+				components?: {
+					/** Rendered above the queue, before its heading. */
+					beforeList?: PayloadComponent[]
+					/** Rendered below the queue, after its pagination. */
+					afterList?: PayloadComponent[]
+				}
+		  }
+		| false
 	/**
 	 * Adjust the plugin's own collections (labels, admin, access, extra fields). Hooks
 	 * are refused: the plugin writes these collections through the database layer.
@@ -345,7 +377,12 @@ export type ResolvedOptions = {
 	queue: string
 	scanQueue: string
 	scanCron: string | null
-	view: { path: `/${string}` } | false
+	view:
+		| {
+				path: `/${string}`
+				components: { beforeList: PayloadComponent[]; afterList: PayloadComponent[] }
+		  }
+		| false
 	overrides: NonNullable<DedupePluginOptions['overrides']>
 	collectionAccess: { read: Access }
 	tenantFieldName: string | null
@@ -507,7 +544,16 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 		queue: options.queue ?? 'dedupe',
 		scanQueue: options.scanQueue ?? options.queue ?? 'dedupe',
 		scanCron: options.scan?.cron ?? null,
-		view: options.view === false ? false : { path: viewPath(options.view?.path) },
+		view:
+			options.view === false
+				? false
+				: {
+						path: viewPath(options.view?.path),
+						components: {
+							beforeList: options.view?.components?.beforeList ?? [],
+							afterList: options.view?.components?.afterList ?? [],
+						},
+					},
 		overrides: options.overrides ?? {},
 		collectionAccess: { read: options.collectionAccess?.read ?? (() => false) },
 		tenantFieldName: multiTenancy ? (multiTenancy.tenantFieldName ?? 'tenant') : null,

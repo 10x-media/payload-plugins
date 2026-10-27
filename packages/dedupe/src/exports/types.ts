@@ -11,6 +11,8 @@ export type {
 	DedupeAccess,
 	DedupeHooks,
 	DedupePluginOptions,
+	DedupeQueueSlotProps,
+	DedupeQueueSlotServerProps,
 	DocTitle,
 	DocTitleArgs,
 	MatchConfig,

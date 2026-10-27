@@ -39,6 +39,23 @@ describe('registerViews', () => {
 		expect(posts?.admin?.components?.listMenuItems).toBeUndefined()
 	})
 
+	it('registers the queue slot components for the import map', () => {
+		const config = bareConfig()
+		registerViews(
+			config,
+			resolveOptions({
+				view: {
+					components: {
+						beforeList: ['/components/Stats#Stats'],
+						afterList: [{ path: '/components/Footer', exportName: 'QueueFooter' }],
+					},
+				},
+			})
+		)
+		const paths = Object.values(config.admin?.dependencies ?? {}).map((entry) => entry.path)
+		expect(paths).toEqual(['/components/Stats#Stats', '/components/Footer#QueueFooter'])
+	})
+
 	it('registers nothing when the view is disabled', () => {
 		const config = bareConfig()
 		registerViews(config, resolveOptions({ view: false }))

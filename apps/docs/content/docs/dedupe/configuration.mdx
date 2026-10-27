@@ -20,7 +20,9 @@ description: Every option of the plugin and its default.
 | `queue` | `dedupe` | Jobs queue of the `dedupe-check` task. |
 | `scanQueue` | `queue` | Jobs queue of the `dedupe-scan` task, the scheduled scan included. |
 | `scan.cron` | unset | Scan every matched collection on a schedule. Needs a job runner. |
-| `view` | `{ path: '/dedupe' }` | Admin path of the queue and the merge screen; `false` removes the views. |
+| `view.path` | `'/dedupe'` | Admin path of the queue; the merge screen is at `${path}/merge`. |
+| `view.components` | `{}` | Components above and below the queue, see [The queue page](#the-queue-page). |
+| `view` | | `false` removes the queue and the merge screen. |
 | `overrides` | `{}` | `keys`, `pairs`: a function over the plugin's collection. Hooks are refused. |
 | `collectionAccess.read` | nobody | REST and GraphQL read access on the plugin's collections. |
 | `multiTenancy` | off | `true` or `{ tenantFieldName, collections }`, see below. |
@@ -62,6 +64,50 @@ dedupe({
 ```
 
 `title` is the `useAsTitle` value in the reader's locale, or the document's id where it has none or the reader may not read that field. `doc` is the document as the plugin read it, so check any field you show: the merge screen reads documents past field access, and a value the reviewer may not read still reaches the function there. An empty answer keeps `title`.
+
+## The queue page
+
+`view.components` adds components to the queue's page, as a collection's `admin.components` adds them to its list:
+
+| Slot | Where |
+| --- | --- |
+| `beforeList` | Above the queue, before its heading. |
+| `afterList` | Below the queue, after its pagination. |
+
+Each slot takes an array of component paths. A component receives the queue's current filter as `DedupeQueueSlotProps`: `collection` (empty for every collection) and `status` (`open` or `dismissed`). A server component also receives `DedupeQueueSlotServerProps`: `payload`, `req` and `searchParams`. The plugin registers every slot component in `admin.dependencies`, so `generate:importmap` finds it.
+
+```ts
+dedupe({
+  view: {
+    path: '/duplicate-review',
+    components: {
+      beforeList: ['/components/QueueSummary#QueueSummary'],
+    },
+  },
+})
+```
+
+```tsx
+import type { DedupeQueueSlotProps, DedupeQueueSlotServerProps } from '@10x-media/dedupe/types'
+
+export const QueueSummary = async ({
+  collection,
+  req,
+}: DedupeQueueSlotProps & DedupeQueueSlotServerProps) => {
+  const { totalDocs } = await req.payload.count({
+    collection: 'dedupe-pairs',
+    overrideAccess: false,
+    req,
+    where: {
+      status: { equals: 'open' },
+      ...(collection ? { target: { equals: collection } } : {}),
+    },
+  })
+  return <p>{totalDocs} open pairs</p>
+}
+```
+
+Reading `dedupe-pairs` as the reviewer needs `collectionAccess.read` to let them.
 
 ## Multi-tenancy
 
