@@ -166,4 +166,4 @@ A tenant's receiver being slow must not slow your writes. Set `delivery: { mode:
 
 ## Migrating
 
-`owner` adds `ownerId` and `ownerCollection` to the delivery log, and the example adds `owner` to subscriptions. This release also indexes the subscriptions' `events`. On a SQL adapter run a migration (`pnpm payload migrate:create webhook-owner`). Existing subscriptions have no owner and stop delivering under `enforceOwnerAccess` until you assign one, through the Local API or the admin as an operator.
+This release indexes the subscriptions' `events`, which on a SQL adapter adds an index to the events table, so every SQL install needs a migration, `owner` or not. `owner` also adds `ownerId` and `ownerCollection` to the delivery log, and the example adds `owner` to subscriptions. On a SQL adapter run a migration (`pnpm payload migrate:create webhook-multi-tenant`). Existing subscriptions have no owner and stop delivering under `enforceOwnerAccess` until you assign one, through the Local API or the admin as an operator.
