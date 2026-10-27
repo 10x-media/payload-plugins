@@ -10,6 +10,10 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.fieldUrl]: '엔드포인트 URL',
 	[keys.urlInvalid]: 'http:// 또는 https://로 시작하는 절대 URL을 입력하세요.',
 	[keys.urlHostNotAllowed]: '이 호스트는 허용된 웹훅 호스트 목록에 없습니다.',
+	[keys.urlNotHttps]:
+		'https:// URL을 입력하세요. 웹훅 엔드포인트에는 암호화되지 않은 http://를 사용할 수 없습니다.',
+	[keys.urlPrivateAddress]:
+		'이 주소는 사설, 로컬 또는 공개적으로 접근할 수 없는 주소이므로 웹훅을 보낼 수 없습니다.',
 	[keys.fieldEnabled]: '활성화됨',
 	[keys.fieldEvents]: '이벤트',
 	[keys.fieldSecret]: '서명 시크릿',

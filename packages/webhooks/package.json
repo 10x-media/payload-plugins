@@ -74,6 +74,10 @@
 		"migrate:fresh": "pnpm --filter @10x-media/webhooks-dev migrate:fresh",
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
+	"dependencies": {
+		"ipaddr.js": "^2.2.0",
+		"undici": "^7.24.4"
+	},
 	"peerDependencies": {
 		"@10x-media/fields": "^0.1.0-beta.5",
 		"@payloadcms/ui": "^3.83.0",
