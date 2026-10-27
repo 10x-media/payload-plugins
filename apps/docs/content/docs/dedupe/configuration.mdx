@@ -21,7 +21,8 @@ description: Every option of the plugin and its default.
 | `scanQueue` | `queue` | Jobs queue of the `dedupe-scan` task, the scheduled scan included. |
 | `scan.cron` | unset | Scan every matched collection on a schedule. Needs a job runner. |
 | `view.path` | `'/dedupe'` | Admin path of the queue; the merge screen is at `${path}/merge`. |
-| `view.components` | `{}` | Components above and below the queue, see [The queue page](#the-queue-page). |
+| `view.queue.components` | `{}` | Components above and below the queue, see [The queue page](#the-queue-page). |
+| `view.queue` | | `false` leaves the queue's page to you, see [Your own queue page](#your-own-queue-page). The merge screen stays. |
 | `view` | | `false` removes the queue and the merge screen. |
 | `overrides` | `{}` | `keys`, `pairs`: a function over the plugin's collection. Hooks are refused. |
 | `collectionAccess.read` | nobody | REST and GraphQL read access on the plugin's collections. |
@@ -67,7 +68,7 @@ dedupe({
 
 ## The queue page
 
-`view.components` adds components to the queue's page, as a collection's `admin.components` adds them to its list:
+`view.queue.components` adds components to the queue's page, as a collection's `admin.components` adds them to its list:
 
 | Slot | Where |
 | --- | --- |
@@ -80,8 +81,10 @@ Each slot takes an array of component paths. A component receives the queue's cu
 dedupe({
   view: {
     path: '/duplicate-review',
-    components: {
-      beforeList: ['/components/QueueSummary#QueueSummary'],
+    queue: {
+      components: {
+        beforeList: ['/components/QueueSummary#QueueSummary'],
+      },
     },
   },
 })
@@ -108,6 +111,66 @@ export const QueueSummary = async ({
 ```
 
 Reading `dedupe-pairs` as the reviewer needs `collectionAccess.read` to let them.
+
+## Your own queue page
+
+`view.queue: false` mounts only the merge screen. Draw the queue's page yourself as an admin view at `view.path`, with `DedupeQueue` in it: the queue's heading, tabs, search, table and pagination, without a page around them.
+
+```ts title="payload.config.ts"
+export default buildConfig({
+  admin: {
+    components: {
+      views: {
+        duplicateReview: {
+          Component: '/views/DuplicateReview#DuplicateReview',
+          path: '/duplicate-review',
+          exact: true,
+        },
+      },
+    },
+  },
+  plugins: [
+    dedupe({
+      view: {
+        path: '/duplicate-review',
+        queue: false,
+      },
+    }),
+  ],
+})
+```
+
+```tsx title="views/DuplicateReview.tsx"
+import { DedupeQueue } from '@10x-media/dedupe/rsc'
+import { DefaultTemplate } from '@payloadcms/next/templates'
+import { Gutter } from '@payloadcms/ui'
+import type { AdminViewServerProps } from 'payload'
+
+export const DuplicateReview = ({ initPageResult, params, searchParams }: AdminViewServerProps) => {
+  const { req } = initPageResult
+  return (
+    <DefaultTemplate
+      i18n={req.i18n}
+      locale={initPageResult.locale}
+      params={params}
+      payload={req.payload}
+      permissions={initPageResult.permissions}
+      req={req}
+      searchParams={searchParams}
+      user={req.user ?? undefined}
+      visibleEntities={initPageResult.visibleEntities}
+    >
+      <Gutter>
+        <DedupeQueue req={req} searchParams={searchParams} />
+      </Gutter>
+    </DefaultTemplate>
+  )
+}
+```
+
+- The merge screen links back to `view.path`, so mount your page there.
+- The queue keeps its filters and page in the URL of your page.
+- `DedupeQueue` renders nothing for a reader `access.review` refuses. Your page decides what they see instead, and whether to redirect them.
 
 ## Multi-tenancy
 

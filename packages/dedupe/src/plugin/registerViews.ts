@@ -51,12 +51,13 @@ const slotDependencies = (
 }
 
 /**
- * Mounts the queue and the merge screen as admin views, and a "Merge selected" entry in the
- * list menu of every configured collection. A link to the queue is the host's to place.
+ * Mounts the queue (unless the host draws its own) and the merge screen as admin views, and a
+ * "Merge selected" entry in the list menu of every configured collection. A link to the queue
+ * is the host's to place.
  */
 export const registerViews = (config: Config, options: ResolvedOptions): void => {
 	if (options.view === false) return
-	const { path: basePath } = options.view
+	const { path: basePath, queue } = options.view
 
 	config.admin = {
 		...config.admin,
@@ -64,11 +65,13 @@ export const registerViews = (config: Config, options: ResolvedOptions): void =>
 			...config.admin?.components,
 			views: {
 				...config.admin?.components?.views,
-				dedupeQueue: {
-					Component: { path: QUEUE_VIEW, serverProps: { basePath } },
-					path: basePath,
-					exact: true,
-				},
+				...(queue && {
+					dedupeQueue: {
+						Component: { path: QUEUE_VIEW },
+						path: basePath,
+						exact: true,
+					},
+				}),
 				dedupeMerge: {
 					Component: { path: MERGE_VIEW, serverProps: { basePath } },
 					path: `${basePath}/merge`,
@@ -79,7 +82,7 @@ export const registerViews = (config: Config, options: ResolvedOptions): void =>
 		dependencies: {
 			...config.admin?.dependencies,
 			...sectionDependencies(options),
-			...slotDependencies(options.view.components),
+			...(queue && slotDependencies(queue.components)),
 		},
 	}
 

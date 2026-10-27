@@ -1,11 +1,13 @@
 import { expect, test } from '@playwright/test'
 
 import {
+	ADMIN_ROUTE,
 	cleanup,
 	createCustomer,
 	findPair,
 	login,
 	MARK,
+	MERGE_PATH,
 	matchingPair,
 	mergeButton,
 	openMerge,
@@ -319,4 +321,31 @@ test('a row opens its pair on the merge screen', async ({ page, context }) => {
 	await expect(page).toHaveURL(/\/admin\/dedupe\/merge\?/)
 	const docs = new URL(page.url()).searchParams.get('docs')?.split(',') ?? []
 	expect(docs.sort()).toEqual([left.id, right.id].sort())
+})
+
+test("the queue in a page of the host's own links to the plugin's merge screen", async ({
+	page,
+	context,
+}) => {
+	const [a, b] = matchingPair('hotel')
+	await createCustomer(context.request, a)
+	await createCustomer(context.request, b)
+
+	await page.goto(`${ADMIN_ROUTE}/embedded-queue?collection=customers`)
+	await expect(page.getByText("The host's page, with the plugin's queue below.")).toBeVisible()
+	const row = queueRow(page, `${MARK} hotel Kowalska`)
+	await expect(row).toBeVisible()
+	await row.getByRole('link').click()
+	await expect(page).toHaveURL(new RegExp(`^[^?]*${MERGE_PATH}\\?`))
+})
+
+test('the queue page renders the components in its beforeList slot', async ({ page, context }) => {
+	const [a, b] = matchingPair('india')
+	await createCustomer(context.request, a)
+	await createCustomer(context.request, b)
+
+	await openQueue(page)
+	await expect(page.locator('.queue-summary')).toContainText(
+		/\d+ open pairs · \d+ marked not duplicates/
+	)
 })

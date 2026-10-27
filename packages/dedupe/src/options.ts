@@ -311,23 +311,32 @@ export type DedupePluginOptions = {
 	 */
 	scan?: { cron?: string }
 	/**
-	 * Admin views of the queue and the merge screen. `false` removes them; the path defaults
+	 * Admin views of the queue and the merge screen. `false` removes both; the path defaults
 	 * to `/dedupe`. The plugin adds no link to them: place one where the admin needs it.
 	 */
 	view?:
 		| {
 				path?: `/${string}`
 				/**
-				 * Components on the queue's page, as a collection's `admin.components` takes them.
-				 * Each may be a server component. Props: `DedupeQueueSlotProps`, and for a server
-				 * component also `DedupeQueueSlotServerProps`.
+				 * The queue's page. `false` leaves it to the host: render `DedupeQueue` from
+				 * `@10x-media/dedupe/rsc` in an admin view of your own at `path`. The merge screen
+				 * stays at `${path}/merge` and links back to `path`.
 				 */
-				components?: {
-					/** Rendered above the queue, before its heading. */
-					beforeList?: PayloadComponent[]
-					/** Rendered below the queue, after its pagination. */
-					afterList?: PayloadComponent[]
-				}
+				queue?:
+					| {
+							/**
+							 * Components on the queue's page, as a collection's `admin.components` takes
+							 * them. Each may be a server component. Props: `DedupeQueueSlotProps`, and for
+							 * a server component also `DedupeQueueSlotServerProps`.
+							 */
+							components?: {
+								/** Rendered above the queue, before its heading. */
+								beforeList?: PayloadComponent[]
+								/** Rendered below the queue, after its pagination. */
+								afterList?: PayloadComponent[]
+							}
+					  }
+					| false
 		  }
 		| false
 	/**
@@ -380,7 +389,11 @@ export type ResolvedOptions = {
 	view:
 		| {
 				path: `/${string}`
-				components: { beforeList: PayloadComponent[]; afterList: PayloadComponent[] }
+				queue:
+					| {
+							components: { beforeList: PayloadComponent[]; afterList: PayloadComponent[] }
+					  }
+					| false
 		  }
 		| false
 	overrides: NonNullable<DedupePluginOptions['overrides']>
@@ -549,10 +562,15 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 				? false
 				: {
 						path: viewPath(options.view?.path),
-						components: {
-							beforeList: options.view?.components?.beforeList ?? [],
-							afterList: options.view?.components?.afterList ?? [],
-						},
+						queue:
+							options.view?.queue === false
+								? false
+								: {
+										components: {
+											beforeList: options.view?.queue?.components?.beforeList ?? [],
+											afterList: options.view?.queue?.components?.afterList ?? [],
+										},
+									},
 					},
 		overrides: options.overrides ?? {},
 		collectionAccess: { read: options.collectionAccess?.read ?? (() => false) },

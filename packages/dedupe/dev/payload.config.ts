@@ -228,7 +228,7 @@ export default buildConfig({
 			disableJobsQueue: true,
 			// The e2e suite reads the pairs back through the REST API.
 			collectionAccess: { read: ({ req }) => Boolean(req.user) },
-			view: { components: { beforeList: ['/components/QueueSummary#QueueSummary'] } },
+			view: { queue: { components: { beforeList: ['/components/QueueSummary#QueueSummary'] } } },
 		}),
 		formVariants({ collections: { customers: customerVariants } }),
 	],
@@ -241,7 +241,16 @@ export default buildConfig({
 	typescript: { autoGenerate },
 	admin: {
 		// The plugin adds no link to its views; the host places one, as here.
-		components: { afterNavLinks: ['/components/DedupeNav#DedupeNav'] },
+		components: {
+			afterNavLinks: ['/components/DedupeNav#DedupeNav'],
+			views: {
+				embeddedQueue: {
+					Component: '/components/EmbeddedQueue#EmbeddedQueue',
+					path: '/embedded-queue',
+					exact: true,
+				},
+			},
+		},
 		// Any browser opens the admin signed in as the seeded admin. Payload applies it to every
 		// request without a token, the API included, so it stays off unless asked for: the e2e
 		// build checks that anonymous requests are refused.

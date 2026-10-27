@@ -168,9 +168,20 @@ describe('resolveOptions', () => {
 
 	it('leaves the queue page slots empty unless given', () => {
 		expect(resolveOptions({}).view).toMatchObject({
-			components: { beforeList: [], afterList: [] },
+			queue: { components: { beforeList: [], afterList: [] } },
 		})
-		const view = resolveOptions({ view: { components: { beforeList: ['/Stats#Stats'] } } }).view
-		expect(view).toMatchObject({ components: { beforeList: ['/Stats#Stats'], afterList: [] } })
+		const view = resolveOptions({
+			view: { queue: { components: { beforeList: ['/Stats#Stats'] } } },
+		}).view
+		expect(view).toMatchObject({
+			queue: { components: { beforeList: ['/Stats#Stats'], afterList: [] } },
+		})
+	})
+
+	it('leaves the queue page to the host on queue: false, keeping the path', () => {
+		expect(resolveOptions({ view: { path: '/review', queue: false } }).view).toEqual({
+			path: '/review',
+			queue: false,
+		})
 	})
 })
