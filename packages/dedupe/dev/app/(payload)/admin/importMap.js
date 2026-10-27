@@ -41,11 +41,13 @@ import { SectionRowLabel as SectionRowLabel_befe53322146a11bcfa01ada2679535d } f
 import { DedupeNav as DedupeNav_94ddfb8478657067368bca3991301eda } from '../../../components/DedupeNav'
 import { TenantSelector as TenantSelector_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
 import { TenantSelectionProvider as TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
+import { EmbeddedQueue as EmbeddedQueue_7e61aba68189c969711f493e8371f53a } from '../../../components/EmbeddedQueue'
 import { AuditLogsView as AuditLogsView_d109efa364f92f646cad8031879d6db3 } from '@10x-media/audit-logs/rsc'
 import { DedupeQueueView as DedupeQueueView_70ef83bda0633d1fe4fba91d94f29124 } from '@10x-media/dedupe/rsc'
 import { DedupeMergeView as DedupeMergeView_70ef83bda0633d1fe4fba91d94f29124 } from '@10x-media/dedupe/rsc'
 import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
 import { MembershipsSection as MembershipsSection_373a85c26942b02e9287ea02011c0269 } from '../../../components/MembershipsSection'
+import { QueueSummary as QueueSummary_a86ae6ceb474efda2aab83ecc10c5855 } from '../../../components/QueueSummary'
 import { DuplicateCheckStep as DuplicateCheckStep_f00521c9797d130da1438d242599c957 } from '../../../components/DuplicateCheckStep'
 
 /** @type import('payload').ImportMap */
@@ -93,10 +95,12 @@ export const importMap = {
   "/components/DedupeNav#DedupeNav": DedupeNav_94ddfb8478657067368bca3991301eda,
   "@payloadcms/plugin-multi-tenant/rsc#TenantSelector": TenantSelector_d6d5f193a167989e2ee7d14202901e62,
   "@payloadcms/plugin-multi-tenant/rsc#TenantSelectionProvider": TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62,
+  "/components/EmbeddedQueue#EmbeddedQueue": EmbeddedQueue_7e61aba68189c969711f493e8371f53a,
   "@10x-media/audit-logs/rsc#AuditLogsView": AuditLogsView_d109efa364f92f646cad8031879d6db3,
   "@10x-media/dedupe/rsc#DedupeQueueView": DedupeQueueView_70ef83bda0633d1fe4fba91d94f29124,
   "@10x-media/dedupe/rsc#DedupeMergeView": DedupeMergeView_70ef83bda0633d1fe4fba91d94f29124,
   "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
   "/components/MembershipsSection#MembershipsSection": MembershipsSection_373a85c26942b02e9287ea02011c0269,
+  "/components/QueueSummary#QueueSummary": QueueSummary_a86ae6ceb474efda2aab83ecc10c5855,
   "/components/DuplicateCheckStep#DuplicateCheckStep": DuplicateCheckStep_f00521c9797d130da1438d242599c957
 }

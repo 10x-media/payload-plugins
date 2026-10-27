@@ -158,9 +158,30 @@ describe('resolveOptions', () => {
 	})
 
 	it('defaults the view path and validates a custom one', () => {
-		expect(resolveOptions({}).view).toEqual({ path: '/dedupe' })
-		expect(resolveOptions({ view: { path: '/duplicates' } }).view).toEqual({ path: '/duplicates' })
+		expect(resolveOptions({}).view).toMatchObject({ path: '/dedupe' })
+		expect(resolveOptions({ view: { path: '/duplicates' } }).view).toMatchObject({
+			path: '/duplicates',
+		})
 		expect(resolveOptions({ view: false }).view).toBe(false)
 		expect(() => resolveOptions({ view: { path: 'dedupe' as `/${string}` } })).toThrow(/slash/)
+	})
+
+	it('leaves the queue page slots empty unless given', () => {
+		expect(resolveOptions({}).view).toMatchObject({
+			queue: { components: { beforeList: [], afterList: [] } },
+		})
+		const view = resolveOptions({
+			view: { queue: { components: { beforeList: ['/Stats#Stats'] } } },
+		}).view
+		expect(view).toMatchObject({
+			queue: { components: { beforeList: ['/Stats#Stats'], afterList: [] } },
+		})
+	})
+
+	it('leaves the queue page to the host on queue: false, keeping the path', () => {
+		expect(resolveOptions({ view: { path: '/review', queue: false } }).view).toEqual({
+			path: '/review',
+			queue: false,
+		})
 	})
 })

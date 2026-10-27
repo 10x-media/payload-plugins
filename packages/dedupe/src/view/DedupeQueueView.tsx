@@ -1,73 +1,47 @@
 import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
+import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerComponent'
 import { redirect } from 'next/navigation'
-import type { AdminViewServerProps, Params } from 'payload'
-import { formatAdminURL } from 'payload/shared'
+import type { AdminViewServerProps, Params, PayloadComponent } from 'payload'
 
-import { isStatus, pageSize } from '../collections/slugs'
+import type { DedupeQueueSlotProps, DedupeQueueSlotServerProps } from '../options'
 import { getContext, listCollections } from '../plugin/context'
-import { readQueue } from '../queue/pairs'
-import { pendingScans } from '../queue/scanJobs'
-import { keys } from '../translations/keys'
-import { asTranslate } from '../translations/server'
 import { authRedirectUrl } from './authRedirect'
-import { QueueClient } from './QueueClient'
+import { DedupeQueue, queueParams } from './DedupeQueue'
 
+/** The queue's page: `DedupeQueue` in Payload's template, between the `view.queue` slots. */
 export async function DedupeQueueView({
 	initPageResult,
 	params,
 	searchParams,
-	basePath,
-}: AdminViewServerProps & { basePath: `/${string}` }) {
+}: AdminViewServerProps) {
 	const { req } = initPageResult
 	const { user } = req
 	const sp: Params = searchParams ?? {}
-	const t = asTranslate(req.i18n.t)
 
 	const ctx = getContext(req.payload)
 	if (!user || !(await ctx.options.access.review({ req }))) {
 		redirect(authRedirectUrl({ config: req.payload.config, params, searchParams: sp, user }))
 	}
 
-	const collections = listCollections(ctx, req.i18n)
-	const param = (name: string) => [sp[name]].flat()[0]
-	const requested = param('collection')
-	const collection = collections.find((entry) => entry.slug === requested)?.slug ?? ''
-	const requestedStatus = param('status')
-	const status = isStatus(requestedStatus) ? requestedStatus : 'open'
-	const limit = pageSize(param('limit'))
-	const search = param('search') ?? ''
-	const data = await readQueue({
+	const { collection, status } = queueParams(sp, listCollections(ctx, req.i18n))
+	const slotProps: DedupeQueueSlotProps = { collection, status }
+	const slotServerProps: DedupeQueueSlotServerProps = {
+		payload: req.payload,
 		req,
-		ctx,
-		collection: collection || null,
-		status,
-		search,
-		page: Number(param('page')) || 1,
-		limit,
-	})
-	const mayScan = await ctx.options.access.scan({ req })
-	const scanned = collection
-		? [collection]
-		: collections.filter((entry) => entry.hasMatch).map((entry) => entry.slug)
-	const pending =
-		mayScan && !ctx.options.disableJobsQueue
-			? await pendingScans({ req, collections: scanned })
-			: new Map()
-	// Pending only once every collection the button scans has a scan waiting or running.
-	const scanState =
-		scanned.length > 0 && scanned.every((slug) => pending.has(slug))
-			? [...pending.values()].some((scan) => scan.running)
-				? 'running'
-				: 'queued'
+		searchParams: sp,
+	}
+	const renderSlot = (components: PayloadComponent[] | undefined) =>
+		components?.length
+			? RenderServerComponent({
+					clientProps: slotProps,
+					Component: components,
+					importMap: req.payload.importMap,
+					serverProps: slotServerProps,
+				})
 			: null
-	const adminRoute = req.payload.config.routes.admin
-	const notFound = param('notFound')
-	const notice = notFound
-		? req.i18n.t('error:documentNotFound', { id: notFound })
-		: param('missingPair')
-			? t(keys.missingParams)
-			: null
+	const queue = ctx.options.view === false ? false : ctx.options.view.queue
+	const slots = queue === false ? undefined : queue.components
 
 	return (
 		<DefaultTemplate
@@ -82,22 +56,9 @@ export async function DedupeQueueView({
 			req={req}
 		>
 			<Gutter>
-				{collections.length === 0 ? (
-					<p>{t(keys.noCollections)}</p>
-				) : (
-					<QueueClient
-						collection={collection}
-						data={data}
-						limit={limit}
-						maxGroupSize={ctx.options.maxGroupSize}
-						mayScan={Boolean(mayScan)}
-						scanState={scanState}
-						mergePath={formatAdminURL({ adminRoute, path: `${basePath}/merge` })}
-						notice={notice}
-						search={search}
-						status={status}
-					/>
-				)}
+				{renderSlot(slots?.beforeList)}
+				<DedupeQueue req={req} searchParams={sp} />
+				{renderSlot(slots?.afterList)}
 			</Gutter>
 		</DefaultTemplate>
 	)

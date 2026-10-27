@@ -1,4 +1,5 @@
 import type { Config, PayloadComponent } from 'payload'
+import { parsePayloadComponent } from 'payload/shared'
 
 import type { ResolvedOptions } from '../options'
 
@@ -28,12 +29,35 @@ const sectionDependencies = (options: ResolvedOptions): Dependencies => {
 }
 
 /**
- * Mounts the queue and the merge screen as admin views, and a "Merge selected" entry in the
- * list menu of every configured collection. A link to the queue is the host's to place.
+ * The queue page's slot components, in `admin.dependencies` for the same reason as the
+ * merge sections. Keyed by the reference the runtime looks up: `path#exportName`.
+ */
+const slotDependencies = (
+	components: Record<'afterList' | 'beforeList', PayloadComponent[]>
+): Dependencies => {
+	const out: Dependencies = {}
+	for (const [slot, list] of Object.entries(components)) {
+		list.forEach((component, index) => {
+			const parsed = parsePayloadComponent(component)
+			if (parsed) {
+				out[`dedupe-view-${slot}-${index}`] = {
+					path: `${parsed.path}#${parsed.exportName}`,
+					type: 'component',
+				}
+			}
+		})
+	}
+	return out
+}
+
+/**
+ * Mounts the queue (unless the host draws its own) and the merge screen as admin views, and a
+ * "Merge selected" entry in the list menu of every configured collection. A link to the queue
+ * is the host's to place.
  */
 export const registerViews = (config: Config, options: ResolvedOptions): void => {
 	if (options.view === false) return
-	const { path: basePath } = options.view
+	const { path: basePath, queue } = options.view
 
 	config.admin = {
 		...config.admin,
@@ -41,11 +65,13 @@ export const registerViews = (config: Config, options: ResolvedOptions): void =>
 			...config.admin?.components,
 			views: {
 				...config.admin?.components?.views,
-				dedupeQueue: {
-					Component: { path: QUEUE_VIEW, serverProps: { basePath } },
-					path: basePath,
-					exact: true,
-				},
+				...(queue && {
+					dedupeQueue: {
+						Component: { path: QUEUE_VIEW },
+						path: basePath,
+						exact: true,
+					},
+				}),
 				dedupeMerge: {
 					Component: { path: MERGE_VIEW, serverProps: { basePath } },
 					path: `${basePath}/merge`,
@@ -53,7 +79,11 @@ export const registerViews = (config: Config, options: ResolvedOptions): void =>
 				},
 			},
 		},
-		dependencies: { ...config.admin?.dependencies, ...sectionDependencies(options) },
+		dependencies: {
+			...config.admin?.dependencies,
+			...sectionDependencies(options),
+			...(queue && slotDependencies(queue.components)),
+		},
 	}
 
 	const targets = new Set(options.collections.map((entry) => entry.slug as string))
