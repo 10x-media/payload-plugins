@@ -1,5 +1,11 @@
 # @10x-media/impersonation
 
+## 0.1.0-beta.2
+
+### Patch Changes
+
+- The admin bar no longer throws a hydration error on page load: its session countdown appears once the bar has mounted. The bar's text, button labels and exit errors now take overrides from the `translations` option and from `i18n.translations`, as the plugin's other admin strings do.
+
 ## 0.1.0-beta.1
 
 ### Patch Changes
