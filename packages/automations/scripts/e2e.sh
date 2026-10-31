@@ -9,7 +9,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Starting e2e DBs (mongo:8 replSet + postgres:16)..."
+echo "Starting e2e DBs (mongo:8.2.12 replSet + postgres:16)..."
 docker compose -f docker-compose.test.yml up -d --wait
 
 # Everything the dev app imports from the workspace, not just this plugin: a fresh
