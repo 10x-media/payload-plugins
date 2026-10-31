@@ -2,8 +2,8 @@
 
 import type { FailureCode } from '../endpoints/codes'
 import { CLIENT_FETCH_TIMEOUT_MS } from '../plugin/constants'
-import { keys } from '../translations/keys'
 
+export { errorKey } from '../translations/errorKey'
 export type { FailureCode }
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
@@ -46,25 +46,4 @@ export const goAfterSwitch = (redirect?: string) => {
 		return
 	}
 	window.location.assign(next)
-}
-
-export const errorKey = (code: string) => {
-	const map: Record<string, (typeof keys)[keyof typeof keys]> = {
-		alreadyImpersonating: keys.errorAlreadyImpersonating,
-		failed: keys.errorFailed,
-		forbidden: keys.errorForbidden,
-		impersonatorGone: keys.errorImpersonatorGone,
-		impersonatorSessionExpired: keys.errorImpersonatorSessionExpired,
-		invalidBody: keys.errorInvalidBody,
-		notImpersonating: keys.errorNotImpersonating,
-		origin: keys.errorOrigin,
-		reasonRequired: keys.errorReasonRequired,
-		selfTarget: keys.errorSelfTarget,
-		targetNotFound: keys.errorTargetNotFound,
-		targetTrashed: keys.errorTargetTrashed,
-		targetUnverified: keys.errorTargetUnverified,
-		unsupportedAuth: keys.errorUnsupportedAuth,
-		unsupportedCollection: keys.errorUnsupportedCollection,
-	}
-	return map[code] ?? keys.errorFailed
 }
