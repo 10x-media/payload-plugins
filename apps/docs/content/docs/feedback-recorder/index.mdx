@@ -1,0 +1,23 @@
+---
+title: Feedback Recorder
+description: Let the people using a client's CMS record their screen, talk it through, and send it to the 10x Media system.
+---
+
+`@10x-media/feedback-recorder` puts a record button in the Payload admin. An editor picks what the recording is about, records their screen (with their microphone and, if they like, a camera bubble), watches it back, adds a title and a note, and sends it. It arrives in the 10x Media system under the client's project, in the inbox of whoever owns the site's key, ready to watch, transcribe and turn into a task.
+
+## What it does
+
+- **Records in the browser.** Screen, microphone and an optional camera bubble composited into one video. The recording keeps running while the editor moves around the admin to show what they mean.
+- **Review before sending.** Nothing leaves the browser until the editor presses send. A failed upload keeps the recording, so retrying resumes instead of starting over, and there is always a "save a copy" link.
+- **Sends context with it.** The page, the collection and document, the browser, the screen size, the site's version and, if switched on, the browser console's errors during the recording.
+- **The key stays on the server.** The browser talks only to this plugin's endpoints, which forward to the 10x system with the site's key. The video itself goes straight from the browser to Bunny Stream.
+- **My recordings.** Editors see what they sent and where each one stands: received, seen, in progress or done.
+- **Hidden when unconfigured.** Without a URL and key (a preview or demo environment) the admin renders exactly as without the plugin.
+
+## Next
+
+- [Quick start](/feedback-recorder/quick-start)
+- [Configuration](/feedback-recorder/configuration)
+- [How it works](/feedback-recorder/how-it-works)
+- [Privacy](/feedback-recorder/privacy)
+- [Using the recorder elsewhere](/feedback-recorder/recorder)

@@ -1,0 +1,54 @@
+---
+title: Quick start
+description: Install the plugin, create a recording key in the 10x system, and set two environment variables.
+---
+
+## 1. Create a recording key
+
+In the 10x system, open **Settings → Clients → Recording keys** and create a key:
+
+- **Project**: the client project the recordings belong to.
+- **Owner**: the colleague who is notified and in whose clips the recordings appear. Everybody on the team can watch and triage them.
+
+Save, then press **Generate key**. The key is shown once, with the two lines to copy:
+
+```bash
+TENX_RECORDINGS_URL=https://system.10xmedia.de
+TENX_RECORDINGS_KEY=rec_...
+```
+
+Put both in the client site's environment. Pressing **Replace key** later retires the old key immediately; switching **Enabled** off refuses it without deleting it.
+
+## 2. Install
+
+```bash
+pnpm add @10x-media/feedback-recorder@beta
+```
+
+```ts
+// payload.config.ts
+import { buildConfig } from 'payload'
+import { feedbackRecorder } from '@10x-media/feedback-recorder'
+
+export default buildConfig({
+  plugins: [
+    feedbackRecorder({
+      url: process.env.TENX_RECORDINGS_URL,
+      apiKey: process.env.TENX_RECORDINGS_KEY,
+      appVersion: process.env.SOURCE_COMMIT,
+    }),
+  ],
+})
+```
+
+Then regenerate the import map:
+
+```bash
+pnpm payload generate:importmap
+```
+
+## 3. Check it
+
+Sign in to the admin. A camera icon appears in the header; it opens the recorder. **My recordings** answers with an empty list when the key works, and with an error when it does not.
+
+If the site sends a `Content-Security-Policy`, allow `connect-src https://video.bunnycdn.com` for the upload. If it sends a `Permissions-Policy`, allow `display-capture`, `microphone` and `camera` for the site's own origin.
