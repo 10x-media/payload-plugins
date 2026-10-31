@@ -19,7 +19,7 @@ cleanup() {
 trap cleanup EXIT
 
 echo "Starting e2e DBs (mongo:8 replSet + postgres:16)..."
-docker compose -f docker-compose.test.yml up -d --wait
+docker compose -f docker-compose.test.yml up -d --wait || { docker compose -f docker-compose.test.yml logs mongo; exit 1; }
 
 # Everything the dev app imports from the workspace, not just this plugin: a fresh
 # checkout has no dist/ for any of it.
