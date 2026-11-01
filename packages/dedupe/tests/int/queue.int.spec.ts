@@ -7,7 +7,8 @@ import { pairKeyFor } from '../../src/match/keys'
 import { applyMerge } from '../../src/merge/apply'
 import { buildPlanResponse } from '../../src/merge/planResponse'
 import { getCollectionContext, getContext } from '../../src/plugin/context'
-import { findPairByKey, type QueueResponse, readQueue } from '../../src/queue/pairs'
+import { decidePair, findPairByKey, type PairRow } from '../../src/queue/pairs'
+import { type QueueResponse, readQueue } from '../../src/queue/readQueue'
 import type { ScanSummary } from '../../src/queue/scan'
 import { bootDedupe, type Doc, LEADS, reqFor, VAULTS } from './fixtures'
 
@@ -24,15 +25,19 @@ describeForDb('dedupe queue', {}, (db) => {
 		return response.json()
 	}
 
-	const queue = (collection: string | null, search?: string) =>
+	const queue = (
+		collection: string | null,
+		search?: string,
+		page: { status?: 'dismissed' | 'open'; page?: number; limit?: number } = {}
+	) =>
 		readQueue({
 			req: fixture.req,
 			ctx: getContext(fixture.booted.payload),
 			collection,
-			status: 'open',
+			status: page.status ?? 'open',
 			search,
-			page: 1,
-			limit: 25,
+			page: page.page ?? 1,
+			limit: page.limit ?? 25,
 		})
 
 	const pairRow = (target: string, [a, b]: [Doc, Doc], score = 0.5) =>
@@ -536,6 +541,26 @@ describeForDb('dedupe queue', {}, (db) => {
 			expect(result.counts).toEqual({ open: 1, dismissed: 0 })
 		})
 
+		it("asks the adapter's own search where it has one", async () => {
+			const [a, b] = [await lead('typo-a@search.test'), await lead('typo-b@search.test')]
+			await pairRow('leads', [a, b])
+			const { adapter } = getCollectionContext(fixture.booted.payload, 'leads')
+			const asked: string[] = []
+			adapter.search = async ({ search }) => {
+				asked.push(search)
+				return [{ id: String(b.id) }]
+			}
+			try {
+				const result = await queue('leads', 'tpyo')
+				expect(asked).toEqual(['tpyo'])
+				expect(result.docs.map((row) => row.docs.map((doc) => doc.id).sort())).toEqual([
+					[a, b].map((doc) => String(doc.id)).sort(),
+				])
+			} finally {
+				delete adapter.search
+			}
+		})
+
 		it("searches the fields the collection's listSearchableFields names", async () => {
 			const twin = (email: string) =>
 				fixture.customer({ name: 'Search Twin', email, phone: '0151 4444 5555' })
@@ -637,6 +662,60 @@ describeForDb('dedupe queue', {}, (db) => {
 				).leftOut
 			expect(await leftOut('admin-rest@example.com')).toBe(1)
 			expect(await leftOut('owner-rest@example.com')).toBe(0)
+		})
+
+		it('pages through groups, the strongest first, one lead each', async () => {
+			const made: Doc[][] = []
+			for (const score of [0.81, 0.82, 0.83]) {
+				const pair = [
+					await lead(`page-${score}-a@group.test`),
+					await lead(`page-${score}-b@group.test`),
+				]
+				await pairRow('leads', pair as [Doc, Doc], score)
+				made.push(pair)
+			}
+			const first = await queue('leads', undefined, { limit: 1 })
+			const second = await queue('leads', undefined, { limit: 1, page: 2 })
+			expect(first.totalPages).toBe(first.counts.open)
+			expect(second.page).toBe(2)
+			expect([first, second].map((result) => result.docs[0]?.score)).toEqual(
+				[...first.docs, ...second.docs].map((row) => row.score).sort((x, y) => y - x)
+			)
+			const { totalDocs } = await fixture.booted.payload.db.count({
+				collection: PAIRS_SLUG,
+				where: {
+					and: [
+						{ docA: { in: made.flat().map((doc) => String(doc.id)) } },
+						{ lead: { equals: true } },
+					],
+				},
+			})
+			expect(totalDocs).toBe(3)
+		})
+
+		it('moves a lead when a pair of a chain is marked not duplicates', async () => {
+			const [a, b, c] = [
+				await lead('split-a@group.test'),
+				await lead('split-b@group.test'),
+				await lead('split-c@group.test'),
+			]
+			await pairRow('leads', [a, b], 0.7)
+			await pairRow('leads', [b, c], 0.75)
+			expect(rowsWith(await queue('leads'), a)[0]?.docs).toHaveLength(3)
+
+			const pair = (await findPairByKey(fixture.req, pairKeyFor('leads', b.id, c.id))) as PairRow
+			await decidePair({
+				req: fixture.req,
+				ctx: getContext(fixture.booted.payload),
+				pair,
+				status: 'dismissed',
+			})
+
+			const open = rowsWith(await queue('leads'), a)
+			expect(open.map((row) => row.docs.map((doc) => doc.id).sort())).toEqual([ids([a, b])])
+			expect(open[0]?.score).toBe(0.7)
+			const dismissed = rowsWith(await queue('leads', undefined, { status: 'dismissed' }), c)
+			expect(dismissed.map((row) => row.docs.map((doc) => doc.id).sort())).toEqual([ids([b, c])])
 		})
 
 		it('keeps a group whole past one page of pairs', async () => {

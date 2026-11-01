@@ -13,6 +13,7 @@ import {
 	tenantOf,
 } from '../plugin/context'
 import type { AdapterDoc } from '../search/contract'
+import { regroup } from './groups'
 import { type PairRow, upsertPair } from './pairs'
 
 /**
@@ -100,13 +101,15 @@ export const findDuplicates = async (args: {
 
 /**
  * The check behind a save: ask the adapter for candidates, score the real field values,
- * and record what qualifies.
+ * record what qualifies, and settle the groups it touched. `regroup: false` leaves the groups
+ * to a caller that settles them all at the end, as the scan does.
  */
 export const checkDocument = async (args: {
 	req: PayloadRequest
 	ctx: PluginContext
 	col: CollectionContext
 	doc: LoadedDoc
+	regroup?: boolean
 }): Promise<{ compared: string[]; open: string[] }> => {
 	const { req, ctx, col, doc } = args
 	const seenAt = new Date().toISOString()
@@ -171,6 +174,15 @@ export const checkDocument = async (args: {
 		})
 		keys.push(row.pairKey)
 		if (kept?.status === 'open') open.push(kept.pairKey)
+	}
+	if (args.regroup !== false) {
+		// A pair it held before may have gone, splitting a group. Seeding with every look-alike
+		// settles a group of direct matches in one read.
+		await regroup({
+			req,
+			target: col.slug,
+			docIds: [id, ...stored.map(otherOf), ...scored.map(({ candidate }) => candidate.id)],
+		})
 	}
 	return { compared: keys, open }
 }

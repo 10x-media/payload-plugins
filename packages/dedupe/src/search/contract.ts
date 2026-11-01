@@ -32,6 +32,15 @@ export type ScanArgs = {
 	limit: number
 }
 
+export type SearchArgs = {
+	req: PayloadRequest
+	collection: string
+	/** What the reviewer typed in the queue's search. */
+	search: string
+	/** Documents at most. */
+	limit: number
+}
+
 export type ScanPage = {
 	buckets: KeyBucket[]
 	/** Null when the last bucket has been returned. */
@@ -60,6 +69,11 @@ export type DedupeAdapter = {
 	 * calls `findCandidates` once per document.
 	 */
 	scanBuckets?(args: ScanArgs): Promise<ScanPage>
+	/**
+	 * The documents the queue's search finds, the best match first: its groups holding one of
+	 * them are shown. Without it the queue searches as the collection's list view does.
+	 */
+	search?(args: SearchArgs): Promise<CandidateHit[]>
 	/** Config-time hook to add collections or endpoints of its own. */
 	register?(config: Config): void
 }

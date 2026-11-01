@@ -46,4 +46,5 @@ export type {
 	RemoveArgs,
 	ScanArgs,
 	ScanPage,
+	SearchArgs,
 } from '../search/contract'

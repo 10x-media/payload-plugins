@@ -41,11 +41,15 @@ export const registerViews = (config: Config, options: ResolvedOptions): void =>
 			...config.admin?.components,
 			views: {
 				...config.admin?.components?.views,
-				dedupeQueue: {
-					Component: { path: QUEUE_VIEW, serverProps: { basePath } },
-					path: basePath,
-					exact: true,
-				},
+				...(options.view.queue
+					? {
+							dedupeQueue: {
+								Component: { path: QUEUE_VIEW, serverProps: { basePath } },
+								path: basePath,
+								exact: true,
+							},
+						}
+					: {}),
 				dedupeMerge: {
 					Component: { path: MERGE_VIEW, serverProps: { basePath } },
 					path: `${basePath}/merge`,

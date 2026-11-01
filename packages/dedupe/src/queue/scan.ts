@@ -6,6 +6,7 @@ import { isLive, type LoadedDoc, loadDocs, localRequest } from '../merge/load'
 import { type CollectionContext, type PluginContext, tenantOf } from '../plugin/context'
 import { emitEvent } from '../plugin/events'
 import type { KeyBucket, ScanPage } from '../search/contract'
+import { regroupAll } from './groups'
 import { checkDocument } from './live'
 import { upsertPair } from './pairs'
 
@@ -233,7 +234,7 @@ const scan = async (
 		const compared = new Set<string>()
 		const found = new Set<string>()
 		await eachDocument(args, async (doc) => {
-			const result = await checkDocument({ req, ctx, col, doc })
+			const result = await checkDocument({ req, ctx, col, doc, regroup: false })
 			for (const key of result.compared) compared.add(key)
 			for (const key of result.open) found.add(key)
 		})
@@ -252,6 +253,7 @@ const scan = async (
 		await req.payload.db.count({ collection: PAIRS_SLUG, where: unseen, req })
 	).totalDocs
 	await req.payload.db.deleteMany({ collection: PAIRS_SLUG, where: unseen, req })
+	await regroupAll({ req, target: col.slug })
 	summary.finishedAt = new Date().toISOString()
 	await emitEvent(ctx.options.events, { type: 'scan.finished', collection: col.slug, summary }, req)
 	return summary

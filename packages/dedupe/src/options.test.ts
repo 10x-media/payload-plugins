@@ -158,8 +158,15 @@ describe('resolveOptions', () => {
 	})
 
 	it('defaults the view path and validates a custom one', () => {
-		expect(resolveOptions({}).view).toEqual({ path: '/dedupe' })
-		expect(resolveOptions({ view: { path: '/duplicates' } }).view).toEqual({ path: '/duplicates' })
+		expect(resolveOptions({}).view).toEqual({ path: '/dedupe', queue: true })
+		expect(resolveOptions({ view: { path: '/duplicates' } }).view).toEqual({
+			path: '/duplicates',
+			queue: true,
+		})
+		expect(resolveOptions({ view: { queue: false } }).view).toEqual({
+			path: '/dedupe',
+			queue: false,
+		})
 		expect(resolveOptions({ view: false }).view).toBe(false)
 		expect(() => resolveOptions({ view: { path: 'dedupe' as `/${string}` } })).toThrow(/slash/)
 	})

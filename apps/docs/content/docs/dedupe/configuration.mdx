@@ -20,7 +20,7 @@ description: Every option of the plugin and its default.
 | `queue` | `dedupe` | Jobs queue of the `dedupe-check` task. |
 | `scanQueue` | `queue` | Jobs queue of the `dedupe-scan` task, the scheduled scan included. |
 | `scan.cron` | unset | Scan every matched collection on a schedule. Needs a job runner. |
-| `view` | `{ path: '/dedupe' }` | Admin path of the queue and the merge screen; `false` removes the views. |
+| `view` | `{ path: '/dedupe', queue: true }` | Admin path of the queue and the merge screen; `false` removes the views. `queue: false` mounts only the merge screen, for a host that renders the queue in a page of its own with `DedupeQueue` from `@10x-media/dedupe/rsc` (`<DedupeQueue req={req} searchParams={searchParams} basePath="/dedupe" />`). |
 | `overrides` | `{}` | `keys`, `pairs`: a function over the plugin's collection. Hooks are refused. |
 | `collectionAccess.read` | nobody | REST and GraphQL read access on the plugin's collections. |
 | `multiTenancy` | off | `true` or `{ tenantFieldName, collections }`, see below. |
