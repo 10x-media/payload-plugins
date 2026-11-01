@@ -157,6 +157,7 @@
 		"dedupe-access-and-scans",
 		"dedupe-initial",
 		"dedupe-merge-sections",
+		"dedupe-paged-queue",
 		"dedupe-title",
 		"document-preview-initial-beta",
 		"dual-session-initial-beta",
