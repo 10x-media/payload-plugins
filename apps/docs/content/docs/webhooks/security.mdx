@@ -3,19 +3,34 @@ title: Security model
 description: Trust boundaries, secret storage, key management, and SSRF exposure.
 ---
 
-The plugin's security posture is simple to state: **admin access is the trust boundary**. Everything below follows from it.
+The plugin's security posture starts from one statement: **whoever may create a subscription decides where your documents go**. By default that is your admins. If it is your customers, read [Multi-tenancy](/webhooks/multi-tenancy) first.
 
-## Operator-supplied URLs (SSRF)
+## Subscription URLs (SSRF)
 
-Deliveries POST to whatever URL a subscription specifies, including private and internal hosts. That is the feature working as designed for trusted admins, and an SSRF vector if your admins are not fully trusted. The subscription form checks only that the URL is absolute `http:` or `https:`; it does not judge the host, because localhost and private addresses are what development and internal receivers look like. If your admins are not fully trusted:
+A delivery is an HTTP request made from inside your network to a URL somebody typed. Admin-managed subscriptions are therefore held to a policy, on by default:
 
-- set `delivery.allowedHosts` (below), or
-- restrict outbound egress from the Payload host at the network layer, or
-- drop admin-managed subscriptions entirely and use only [code subscriptions](/webhooks/subscriptions#code-subscriptions), whose URLs live in your repository and environment.
+- **`https:` only.** `delivery.allowHttp: true` lifts it.
+- **Public addresses only.** Loopback, private (RFC 1918), link-local (which includes the cloud metadata address `169.254.169.254`), carrier-grade NAT, unique-local, multicast and reserved ranges are refused, in IPv4 and IPv6, including IPv4-mapped, NAT64, 6to4 and Teredo forms. `delivery.allowPrivateAddresses: true` lifts it.
+
+It is enforced three times. On save, the URL is parsed (which folds decimal, hex, octal and short spellings of an address into one form) and its hostname resolved, so the form says why. When a delivery is decided, the stored URL is judged again, so a row saved earlier or written past the form is refused as `dead` without spending retries. And when the socket opens: the request goes through a dispatcher whose DNS lookup refuses any non-public address, with every address in the answer having to pass. That last check uses the lookup the connection itself uses, so there is no gap between checking a name and connecting to it for a rebinding name to exploit. Redirects are never followed.
+
+```ts title="payload.config.ts"
+// Local development, where the receiver is on localhost:
+webhooks({
+  delivery: {
+    allowHttp: process.env.NODE_ENV !== 'production',
+    allowPrivateAddresses: process.env.NODE_ENV !== 'production',
+  },
+})
+```
+
+[Code subscriptions](/webhooks/subscriptions#code-subscriptions) are exempt from both rules. Their URLs are in your repository, and an internal receiver is a normal thing for one to point at.
+
+**Limits.** The policy does not stop a tenant pointing a webhook at someone else's public server; rate limits on subscription creation are yours to set. A receiver reachable only through NAT64 or 6to4 is refused. With `allowPrivateAddresses` on, the first 2,000 characters of whatever an internal address answers are stored in the delivery log, readable by whoever may read that row, so pair it with `allowedHosts`. An egress firewall remains the stronger control if you have one.
 
 ### Allowing only named hosts
 
-`delivery.allowedHosts` turns the open default into an allowlist:
+`delivery.allowedHosts` restricts deliveries further, to hosts you name:
 
 ```ts title="payload.config.ts"
 webhooks({
@@ -24,17 +39,18 @@ webhooks({
 })
 ```
 
-An entry is an exact hostname, or `*.example.com` for any subdomain (not `example.com` itself); the port is not part of the match. Once set, a subscription for any other host is rejected on save, a code subscription for one fails at startup, and a row that already points at one is refused at delivery time and marked `dead`. Leave it unset in development, where the receiver is usually localhost. An entry that is not a bare hostname (a URL, a port, a path) fails at startup, and an empty list allows no host at all.
+An entry is an exact hostname, or `*.example.com` for any subdomain (not `example.com` itself); the port is not part of the match. Once set, a subscription for any other host is rejected on save, a code subscription for one fails at startup, and a row that already points at one is refused at delivery time and marked `dead`. An entry that is not a bare hostname (a URL, a port, a path) fails at startup, and an empty list allows no host at all.
 
 The list is checked against the URL a save sets, not the one already stored. A subscription saved before the list existed can still be renamed, rotated or switched off; what it cannot do is deliver, or be pointed at another host that is not on the list.
 
-It is an allowlist rather than a block on private addresses on purpose. A name on the list is one you chose, whereas blocking private ranges would have to resolve DNS and pin the result to mean anything, since a public name can point at an internal address. Because deliveries do not follow redirects, an allowed host cannot hand the request on to one that is not.
+The allowlist and the address rules are independent: a listed host still has to be public unless `allowPrivateAddresses` is on. For an internal receiver, set both, and list exact hostnames rather than a wildcard a tenant could add a record under.
 
 ## Access defaults
 
 - Both collections require a **user of the admin collection** (`admin.user`) for every permitted operation; delivery rows additionally refuse create and update from any user (server-only writes). "Any logged-in user" would be too wide here: an app with a second auth collection (customers, members) would let each of those accounts read the delivery log, which stores the full body of every document a watched collection emitted, and register a subscription pointing wherever it liked. If your operators live in another collection, widen the rule through the overrides below.
 - **Rotate secret** runs the subscriptions collection's configured `update` access for the target document. Overriding that access, including scoping it per tenant, governs the endpoint as well, so rotation cannot outlive the rule that guards ordinary writes.
-- **Redeliver** runs the deliveries collection's configured `read` access for the target delivery: whoever may read a delivery may replay it. The collection denies create and update to everyone by design, so `read` is the rule there is to defer to, and an override that scopes the log per tenant scopes the replay with it. A delivery the caller cannot read answers 403 or 404, exactly as reading it would.
+- **Redeliver** runs the deliveries collection's `read` access for the target delivery, then the subscriptions collection's `read` access for the subscription behind it. A delivery or subscription the caller cannot read answers 403 or 404. A delivery made for a code subscription has no row behind it, so the delivery's own `read` rule decides.
+- With `enforceOwnerAccess`, the plugin refuses to start unless `read`, `create`, `update` and `delete` on subscriptions and `read` and `delete` on deliveries are set explicitly. See [Multi-tenancy](/webhooks/multi-tenancy).
 
 Tighten either through the plugin's own [collection overrides](/webhooks/subscriptions#collection-overrides), which is also the supported way to add role-based or tenant-scoped rules:
 
@@ -50,7 +66,7 @@ webhooks({
 
 ### Outbound requests
 
-A delivery does not follow redirects. A 3xx would re-send the signed request, custom headers included, to an address nobody entered in the subscription, and it is how a public URL reaches an internal host. The redirect is recorded as the failed delivery it is; enter the final URL instead. Only the first 2,000 characters of a response are read, so a receiver cannot make the server buffer an arbitrarily large body.
+A delivery does not follow redirects. A 3xx would re-send the signed request, custom headers included, to an address nobody entered in the subscription, and it is how a public URL reaches an internal host past the [URL policy](#subscription-urls-ssrf). The redirect is recorded as the failed delivery it is; enter the final URL instead. Only the first 2,000 characters of a response are read, so a receiver cannot make the server buffer an arbitrarily large body.
 
 ### Cross-site requests
 

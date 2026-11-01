@@ -11,6 +11,10 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.urlInvalid]: 'Saisissez une URL absolue en http:// ou https://.',
 	[keys.urlHostNotAllowed]:
 		'Cet hôte ne figure pas dans la liste des hôtes autorisés pour les webhooks.',
+	[keys.urlNotHttps]:
+		'Saisissez une URL https://. Le http:// non chiffré n’est pas autorisé pour les endpoints de webhook.',
+	[keys.urlPrivateAddress]:
+		'Cette adresse est privée, locale ou non routable publiquement, aucun webhook ne peut donc y être envoyé.',
 	[keys.fieldEnabled]: 'Activé',
 	[keys.fieldEvents]: 'Événements',
 	[keys.fieldSecret]: 'Secret de signature',

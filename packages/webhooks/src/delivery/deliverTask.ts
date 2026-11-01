@@ -1,9 +1,11 @@
 import type { CollectionSlug, JsonObject, TaskConfig } from 'payload'
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
-import type { CodeSubscription } from '../options'
+import type { CodeSubscription, SubscriptionOwnership } from '../options'
+import { ANOTHER_OWNER_REASON, madeForAnotherOwner } from '../plugin/owner'
 import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
 import { deriveDeliveryStatus } from './deriveDeliveryStatus'
+import type { UrlPolicy } from './destination'
 import { sendDelivery } from './sendDelivery'
 
 /** Shared dependencies the delivery task closes over. */
@@ -13,7 +15,9 @@ export type DeliverTaskDeps = {
 	codeSubscriptions: CodeSubscription[]
 	timeoutMs: number
 	retries: number
-	allowedHosts?: string[]
+	urlPolicy: UrlPolicy
+	/** Set when `owner` is configured: an attempt is then held to the owner the row was made for. */
+	ownership?: SubscriptionOwnership
 }
 
 /** Native Payload jobs task that performs one queued delivery attempt. */
@@ -42,12 +46,31 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 			})
 			// Includes an undecryptable secret: retrying cannot fix a key problem, so the row dies
 			// here rather than throwing, and is never POSTed unsigned.
-			const decision = decideDelivery(subscription, deps.allowedHosts)
+			const decision = decideDelivery(subscription, deps.urlPolicy)
 			if (!decision.deliverable) {
 				await payload.update({
 					collection: deps.deliveriesSlug as CollectionSlug,
 					id: deliveryId,
 					data: { status: 'dead', error: decision.reason },
+					overrideAccess: true,
+					req,
+				})
+				return { output: {} }
+			}
+			// Between the write that queued this and the attempt running, or between two attempts, the
+			// subscription may have been handed to another owner. The body is the previous owner's view.
+			if (
+				await madeForAnotherOwner({
+					ownership: deps.ownership,
+					subscription: decision.subscription,
+					row: delivery,
+					req,
+				})
+			) {
+				await payload.update({
+					collection: deps.deliveriesSlug as CollectionSlug,
+					id: deliveryId,
+					data: { status: 'dead', error: ANOTHER_OWNER_REASON },
 					overrideAccess: true,
 					req,
 				})
@@ -62,6 +85,7 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 				body: JSON.stringify(delivery.payload),
 				timeoutMs: deps.timeoutMs,
 				now: Date.now(),
+				urlPolicy: deps.urlPolicy,
 			})
 			const status = deriveDeliveryStatus({ ok: result.ok, attempt, maxRetries: deps.retries })
 			await payload.update({

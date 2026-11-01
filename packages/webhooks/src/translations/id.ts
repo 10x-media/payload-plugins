@@ -10,6 +10,10 @@ export const id: Record<TranslationKey, string> = {
 	[keys.fieldUrl]: 'URL endpoint',
 	[keys.urlInvalid]: 'Masukkan URL absolut dengan http:// atau https://.',
 	[keys.urlHostNotAllowed]: 'Host ini tidak ada dalam daftar host webhook yang diizinkan.',
+	[keys.urlNotHttps]:
+		'Masukkan URL https://. http:// tanpa enkripsi tidak diizinkan untuk endpoint webhook.',
+	[keys.urlPrivateAddress]:
+		'Alamat ini bersifat privat, lokal, atau tidak dapat dijangkau secara publik, sehingga webhook tidak dapat dikirim ke sana.',
 	[keys.fieldEnabled]: 'Aktif',
 	[keys.fieldEvents]: 'Event',
 	[keys.fieldSecret]: 'Secret penandatanganan',
