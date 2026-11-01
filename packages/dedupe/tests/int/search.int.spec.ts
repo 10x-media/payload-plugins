@@ -105,8 +105,9 @@ describeForDb('dedupe search', {}, (db) => {
 			collection: PAIRS_SLUG,
 			where: { target: { equals: 'customers' } },
 		})
-		// One look-up per pair that matched, not one per pair compared.
-		expect(pairFinds).toBeLessThanOrEqual(stored.totalDocs)
+		// One look-up per pair that matched, not one per pair compared, and one read to settle
+		// the groups at the end.
+		expect(pairFinds).toBeLessThanOrEqual(stored.totalDocs + 1)
 	})
 
 	it('deletes and counts the pairs a scan no longer finds', async () => {
@@ -351,7 +352,8 @@ describeForDb('dedupe search', {}, (db) => {
 				phone: `02211${n}4455`,
 			})
 		)
-		expect(pairFinds).toBeLessThanOrEqual(1)
+		// One read of the save's stored pairs, and one to settle the group they form.
+		expect(pairFinds).toBeLessThanOrEqual(2)
 	})
 
 	it('merges rows that hold rows of their own, which the database keys by id', async () => {

@@ -47,6 +47,8 @@ A scan is one `dedupe-scan` job per collection. "Scan now" and the schedule queu
 
 Both need a job worker for the `dedupe` queue (and for `scanQueue`, when set), for example `jobs.autoRun: [{ cron: '* * * * *', queue: 'dedupe' }]`. Without one, set `disableJobsQueue: true` and both run inside the request. The check then runs inside the save's transaction: a check that fails, such as on an adapter that is down, is logged and the save goes through. Across servers, set `jobs.enableConcurrencyControl`.
 
+Every group of pairs keeps its strongest pair marked as its lead, settled after each write that adds, removes, rescores or decides a pair, and for the whole collection at the end of a scan. The queue reads a page of leads and walks only the groups it shows, so a page costs about the same however many pairs are stored. Pairs stored by an earlier version get their leads the first time the queue opens.
+
 ### Bulk writes
 
 An import or a seed through the Local API would queue a check per document. Mark its writes to skip the plugin, and scan once it is done:
@@ -107,6 +109,7 @@ Implement `DedupeAdapter` from `@10x-media/dedupe/types`. Only `findCandidates` 
 - `index({ req, collection, doc })`: on a save, a merge and the scan.
 - `remove({ req, collection, id })`: when a document is deleted, trashed, unpublished or merged.
 - `scanBuckets({ req, collection, cursor, limit })`: key buckets for the scan. Without it, the scan calls `findCandidates` per document.
+- `search({ req, collection, search, limit })`: the documents the queue's search box finds, best match first, as `{ id }`. The queue shows the groups holding one of them. Without it, the queue searches the collection as its list view does, the first 250 documents found.
 - `register(config)`: adds collections or endpoints at config time.
 
 Over an index the project already keeps current, such as its site search, `findCandidates` is enough. An adapter with an index of its own also writes it in `index` and `remove`.

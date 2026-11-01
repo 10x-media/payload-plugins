@@ -18,6 +18,7 @@ export const buildCollections = (read: Access): CollectionConfig[] => [
 		disableDuplicate: true,
 		indexes: [
 			{ fields: ['target', 'status', 'score'] },
+			{ fields: ['target', 'status', 'lead', 'score'] },
 			{ fields: ['target', 'tenant', 'status'] },
 			{ fields: ['target', 'docA'] },
 			{ fields: ['target', 'docB'] },
@@ -38,6 +39,8 @@ export const buildCollections = (read: Access): CollectionConfig[] => [
 				index: true,
 				options: PAIR_STATUSES.map((value) => ({ label: value, value })),
 			},
+			// The strongest pair of its group, set by `queue/groups.ts`: the queue pages by these.
+			{ name: 'lead', type: 'checkbox', index: true },
 			{ name: 'lastSeenAt', type: 'date', index: true },
 			{ name: 'decidedAt', type: 'date' },
 			{ name: 'decidedBy', type: 'text' },

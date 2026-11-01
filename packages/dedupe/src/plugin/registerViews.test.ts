@@ -26,6 +26,14 @@ describe('registerViews', () => {
 		expect(views.dedupeMerge?.path).toBe('/duplicates/merge')
 	})
 
+	it('leaves the queue page to the host with queue: false', () => {
+		const config = bareConfig()
+		registerViews(config, resolveOptions({ view: { path: '/duplicates', queue: false } }))
+		const views = config.admin?.components?.views as Record<string, { path: string }>
+		expect(Object.keys(views)).toEqual(['dedupeMerge'])
+		expect(views.dedupeMerge?.path).toBe('/duplicates/merge')
+	})
+
 	it('adds the list menu item only to configured collections', () => {
 		const config = {
 			collections: [

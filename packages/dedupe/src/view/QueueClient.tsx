@@ -19,7 +19,7 @@ import './index.css'
 
 import { PAGE_SIZE, PAIR_STATUSES, type PairStatus } from '../collections/slugs'
 import type { ScanResponse } from '../plugin/registerEndpoints'
-import type { QueueGroup, QueueResponse } from '../queue/pairs'
+import type { QueueGroup, QueueResponse } from '../queue/readQueue'
 import { keys, type TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { callApi, mergeUrl } from './api'

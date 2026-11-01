@@ -296,8 +296,11 @@ export type DedupePluginOptions = {
 	/**
 	 * Admin views of the queue and the merge screen. `false` removes them; the path defaults
 	 * to `/dedupe`. The plugin adds no link to them: place one where the admin needs it.
+	 * `queue: false` leaves the queue's page to the host, which renders `DedupeQueue` (from
+	 * `@10x-media/dedupe/rsc`) in a page of its own at `path`; the merge screen stays at
+	 * `${path}/merge`.
 	 */
-	view?: { path?: `/${string}` } | false
+	view?: { path?: `/${string}`; queue?: boolean } | false
 	/**
 	 * Adjust the plugin's own collections (labels, admin, access, extra fields). Hooks
 	 * are refused: the plugin writes these collections through the database layer.
@@ -345,7 +348,7 @@ export type ResolvedOptions = {
 	queue: string
 	scanQueue: string
 	scanCron: string | null
-	view: { path: `/${string}` } | false
+	view: { path: `/${string}`; queue: boolean } | false
 	overrides: NonNullable<DedupePluginOptions['overrides']>
 	collectionAccess: { read: Access }
 	tenantFieldName: string | null
@@ -507,7 +510,10 @@ export const resolveOptions = (options: DedupePluginOptions): ResolvedOptions =>
 		queue: options.queue ?? 'dedupe',
 		scanQueue: options.scanQueue ?? options.queue ?? 'dedupe',
 		scanCron: options.scan?.cron ?? null,
-		view: options.view === false ? false : { path: viewPath(options.view?.path) },
+		view:
+			options.view === false
+				? false
+				: { path: viewPath(options.view?.path), queue: options.view?.queue !== false },
 		overrides: options.overrides ?? {},
 		collectionAccess: { read: options.collectionAccess?.read ?? (() => false) },
 		tenantFieldName: multiTenancy ? (multiTenancy.tenantFieldName ?? 'tenant') : null,
