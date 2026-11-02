@@ -272,6 +272,7 @@
 		"settings-overlay-initial",
 		"settings-overlay-provider-after-login",
 		"unbundled-plugin-builds",
+		"undo-redo-ignored-fields-unsaved",
 		"undo-redo-initial-controls",
 		"undo-redo-locales",
 		"undo-redo-malformed-json",
