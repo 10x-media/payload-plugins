@@ -19,6 +19,7 @@
 		"form-variants",
 		"content-lock",
 		"conversations",
+		"feedback-recorder",
 		"impersonation",
 		"document-preview"
 	]

@@ -1,0 +1,25 @@
+---
+title: How it works
+description: What happens between pressing record and the recording arriving in the 10x system.
+---
+
+1. **Capture.** The browser asks which screen, window or tab to share, then records it with the microphone mixed in. With the camera on, the editor first places the camera bubble against the real shared screen. A second, microphone-only track is recorded alongside for transcription.
+2. **Context.** When recording starts, the plugin notes the page, the collection and document, the browser, the language, the time zone and the screen size.
+3. **Review.** After stopping, the editor watches the recording back, picks what it is about, adds a title and a note, and sends it, or throws it away. Nothing has left the browser yet.
+4. **Reserve.** The browser asks this plugin's endpoint to reserve the recording. The endpoint adds the signed-in user, the site's URL and version, and forwards it to the 10x system with the site's key. The 10x system creates the clip under the key's project and answers with a short-lived Bunny Stream upload target.
+5. **Upload.** The browser uploads the video straight to Bunny over tus, in resumable chunks. It never passes through either server.
+6. **Complete.** The endpoint tells the 10x system the upload finished. The key's owner gets an inbox notification; Bunny encodes the video.
+7. **Transcript.** The microphone track goes up through the endpoint last. It is best-effort: a lost transcript never costs the recording.
+
+In the 10x system the recording appears under **Client recordings**, which the whole team can triage, and on the clip's own page with the editor's note, the page link, the browser details and any console errors. **Create task** files it in the project's primary task list. Once encoded it is also visible in the client's portal.
+
+## When something fails
+
+| Where | What the editor sees | What is kept |
+| --- | --- | --- |
+| Reserve (10x unreachable, key wrong) | "The 10x Media system could not be reached." | The recording; try again or save a copy. |
+| Upload interrupted | "The upload was interrupted." | The recording and the reservation; trying again resumes the upload. |
+| Complete | "The upload finished but could not be confirmed." | Everything; trying again only repeats the confirmation. |
+| Audio | Nothing | The recording. Only the transcript is missing. |
+
+A recording reserved but never completed is removed by the 10x system after 48 hours.
