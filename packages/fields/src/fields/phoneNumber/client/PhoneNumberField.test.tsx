@@ -81,7 +81,7 @@ vi.mock('@payloadcms/ui', () => ({
 	FieldError: FieldErrorDouble,
 	FieldLabel: FieldLabelDouble,
 	RenderCustomComponent: RenderCustomComponentDouble,
-	XIcon: () => <svg data-testid="x-icon" />,
+	CircledXIcon: () => <svg data-testid="x-icon" />,
 	fieldBaseClass: 'field-type',
 	useField: () => fieldStub.current,
 	useForm: () => ({ dispatchFields, setModified }),

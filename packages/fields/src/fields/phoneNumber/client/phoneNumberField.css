@@ -1,93 +1,60 @@
-/* Mirrors Payload's formInput mixin (packages/ui/src/scss/vars.scss) so the composite
-   row reads as one native text input; focus rides :focus-within.
-   Dimensions are static px on purpose: Payload compiles scss base() to literal px
-   (native inputs stay 40px tall at every breakpoint), while the runtime --base var
-   is rem-based and shrinks with the responsive html font-size. */
-.fields-phone__container {
+.fields-phone > .field-type__wrap {
 	display: flex;
+	flex-direction: column;
+	gap: var(--spacer-2);
+}
+
+/* Payload's .form-input-group (on the same element) owns the border, background, radius,
+   height and the hover, focus, error and disabled states; this only lays out the row. */
+.fields-phone__container {
 	align-items: center;
-	gap: 6px;
-	width: 100%;
-	height: 40px;
-	padding: 0 8px 0 4px;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-input-bg);
-	color: var(--theme-elevation-800);
+	gap: var(--spacer-1-5);
+	padding-inline: var(--spacer-1);
+	color: var(--field-color-text);
 	font-family: var(--font-body);
-	font-size: 1rem;
-	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
-	transition-property: border, box-shadow, background-color;
-	transition-duration: 100ms, 100ms, 500ms;
-	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
+	line-height: var(--text-body-medium-line-height);
 }
 
-.fields-phone__container:hover {
-	border-color: var(--theme-elevation-250);
-	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
+/* Native read-only inputs are disabled inputs on v4, so the row takes the disabled look.
+   A read-only input still takes focus here; Payload's .form-input:read-only:focus answers
+   that with the hover border, and so does this. */
+.fields-phone.read-only .fields-phone__container {
+	border-color: var(--field-color-border-disabled);
+	background: var(--field-color-bg-disabled);
+	color: var(--field-color-text-disabled);
 }
 
-.fields-phone__container:focus-within {
-	border-color: var(--theme-elevation-400);
-	outline: 0;
-}
-
-html[data-theme="light"] .fields-phone.error .fields-phone__container {
-	background-color: var(--theme-error-50);
-	border-color: var(--theme-error-500);
-}
-
-html[data-theme="dark"] .fields-phone.error .fields-phone__container {
-	background-color: var(--theme-error-100);
-	border-color: var(--theme-error-400);
-}
-
-html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
-	border-color: var(--theme-error-500);
-}
-
-.fields-phone.read-only .fields-phone__container,
-.fields-phone.read-only .fields-phone__container:hover {
-	border-color: var(--theme-elevation-150);
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-400);
-	box-shadow: none;
+.fields-phone.read-only .fields-phone__container:focus-within {
+	border-color: var(--field-color-border-hover);
 }
 
 /* Popup's own root. The trigger is inset rather than stretched, so its hover fill clears the
-   container's border by the same 4px on the left, top and bottom instead of bleeding into it. */
+   container's border by the same 4px at the start, top and bottom instead of bleeding into it. */
 .fields-phone__picker {
 	display: flex;
+	flex-shrink: 0;
 	align-self: center;
 }
 
-/* 10px of padding puts the flag on the 15px text column every native input starts at. */
+/* With the container's 4px, 4px of padding puts the flag on the text column every native
+   input starts at. Payload's .popup-button paints the hover and pressed fills. */
 .fields-phone__trigger {
-	display: inline-flex;
 	flex-shrink: 0;
 	align-items: center;
-	gap: 4px;
-	height: 30px;
-	padding: 0 10px;
-	border: 0;
-	border-radius: var(--style-radius-s);
-	background: transparent;
-	color: var(--theme-elevation-500);
-	cursor: pointer;
+	gap: var(--spacer-1);
+	height: var(--spacer-4);
+	padding-inline: var(--spacer-1);
+	color: var(--color-icon-secondary);
 }
 
-.fields-phone__trigger:hover {
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-800);
+.fields-phone__trigger:not(.popup-button--disabled):hover {
+	color: var(--color-icon);
 }
 
 .fields-phone__trigger:focus-visible {
 	outline: var(--accessibility-outline);
-}
-
-.fields-phone__trigger:disabled {
-	background: transparent;
-	cursor: not-allowed;
 }
 
 .fields-phone__caret {
@@ -95,14 +62,15 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	flex-shrink: 0;
 	align-items: center;
 	justify-content: center;
-	width: 12px;
-	height: 12px;
 }
 
 .fields-phone__code {
-	color: var(--theme-elevation-800);
-	font-size: 0.85rem;
+	color: var(--field-color-text);
 	white-space: nowrap;
+}
+
+.fields-phone.read-only .fields-phone__code {
+	color: inherit;
 }
 
 /* A calling code is LTR wherever it is shown: under an RTL page the leading + is a neutral and
@@ -114,26 +82,18 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	white-space: nowrap;
 }
 
-/* Chrome-less: the container owns the border, background and focus ring */
+/* Chrome-less: the container owns the border, background and focus state */
 .fields-phone__input {
 	flex: 1;
+	align-self: stretch;
 	min-width: 0;
-	height: 100%;
-	padding: 0;
-	border: 0;
-	background: transparent;
 	color: inherit;
-	font-family: var(--font-body);
-	font-size: 1rem;
-	line-height: 20px;
 	outline: 0;
 	-webkit-appearance: none;
 }
 
 .fields-phone__input::placeholder {
-	color: var(--theme-elevation-400);
-	font-weight: normal;
-	font-size: 1rem;
+	color: var(--field-color-placeholder);
 }
 
 /* Matches the native select's clear indicator: bare icon, no button chrome */
@@ -141,15 +101,15 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	display: flex;
 	flex-shrink: 0;
 	align-items: center;
-	padding: 0;
-	border: 0;
-	background: transparent;
-	color: var(--theme-elevation-500);
+	justify-content: center;
+	min-width: var(--spacer-4);
+	min-height: var(--spacer-4);
+	color: var(--color-icon-secondary);
 	cursor: pointer;
 }
 
 .fields-phone__clear:hover {
-	color: var(--theme-elevation-800);
+	color: var(--color-icon);
 }
 
 .fields-phone__clear:focus-visible {
@@ -183,102 +143,104 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 	border-width: 0;
 }
 
-/* Payload portals popup content to document.body, and caps that scroll container at
-   calc(var(--base) * 10); a country list is taller than that and would be clipped behind
-   a hidden scrollbar. The panel already bounds its own height, so the outer cap comes off
-   entirely rather than being kept in step with it by arithmetic. */
+/* Payload portals popup content to document.body and caps that scroll container at
+   min(320px, 100vh - 16px); on a short viewport the cap would clip the list behind a hidden
+   scrollbar while the search scrolls away with it. The panel already bounds its own height,
+   so the outer cap comes off entirely rather than being kept in step with it by arithmetic. */
 .popup__scroll-container:has(> .fields-phone__panel) {
 	max-height: none;
 }
 
-/* The gap matches Popup's own content padding, so the search clears the panel edge by the
-   same 10px on all four sides. */
+/* Laid out as Payload's Combobox: a search above a separator, then the list. */
 .fields-phone__panel {
 	display: flex;
 	flex-direction: column;
-	gap: 10px;
+	gap: var(--spacer-2);
 	width: 260px;
 }
 
-/* Native input size: Payload's scale carries nothing smaller than 40px at 1rem */
 .fields-phone__search {
 	display: flex;
 	flex-shrink: 0;
 	align-items: center;
-	gap: 6px;
-	height: 40px;
-	padding: 0 8px;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-input-bg);
+	gap: var(--spacer-1);
+	margin-inline: var(--spacer-2);
+	padding-inline: var(--spacer-1) var(--spacer-2);
+	border-radius: var(--button-radius);
+	background: var(--color-bg-secondary);
 }
 
 .fields-phone__search:focus-within {
-	border-color: var(--theme-elevation-400);
+	background: var(--color-bg-secondary-hover);
 }
 
 .fields-phone__search-icon {
 	display: flex;
 	flex-shrink: 0;
-	width: 14px;
-	height: 14px;
-	color: var(--theme-elevation-400);
+	color: var(--color-icon-secondary);
+}
+
+.fields-phone__search-icon svg {
+	width: var(--spacer-4);
+	height: var(--spacer-4);
 }
 
 .fields-phone__search-input {
 	flex: 1;
 	min-width: 0;
-	border: 0;
-	background: transparent;
-	color: inherit;
-	font-family: var(--font-body);
-	font-size: 1rem;
+	padding-block: var(--spacer-1);
+	color: var(--color-text);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
 	outline: 0;
 }
 
 .fields-phone__search-input::placeholder {
-	color: var(--theme-elevation-400);
+	color: var(--color-text-tertiary);
 }
 
-/* max-height comes from the component, off the same row height the virtualizer measures with. */
+/* max-height comes from the component, off the same row height the virtualizer measures with,
+   so the separator above the rows sits outside the box it caps. Payload's .popup-button-list
+   (on the same element) supplies the inline padding. */
 .fields-phone__list {
+	display: block;
+	box-sizing: content-box;
+	padding-block-start: var(--spacer-2);
+	border-block-start: var(--stroke-width-small) solid var(--color-border);
 	overflow-y: auto;
 }
 
+/* The heading reads as Payload's .popup-list-group-label; the empty row is the divider
+   between the priority countries and the rest, drawn as .popup-divider. */
 .fields-phone__group {
 	display: flex;
 	align-items: center;
-	padding: 0 8px;
-	border-top: 1px solid var(--theme-elevation-100);
-	/* elevation-500 fails 4.5:1 at this font size against the panel background */
-	color: var(--theme-elevation-700);
-	font-size: 0.7rem;
-	letter-spacing: 0.06em;
-	text-transform: uppercase;
+	padding-inline: var(--spacer-1);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
 }
 
+.fields-phone__group:empty::before {
+	content: "";
+	flex: 1;
+	height: var(--stroke-width-small);
+	background: var(--color-border);
+}
+
+/* Payload's .popup-button-list__button (on the same element) supplies the item type, radius,
+   hover and selected fills. data-active is the keyboard cursor and reads as hover, but only
+   while the pointer is off the list, so hover and cursor never paint two rows at once. */
 .fields-phone__option {
-	display: flex;
 	align-items: center;
-	gap: 8px;
-	padding: 0 8px;
-	border: 0;
-	border-radius: var(--style-radius-s);
-	background: transparent;
-	color: var(--theme-elevation-800);
-	font-family: var(--font-body);
-	font-size: 0.9rem;
-	text-align: left;
-	cursor: pointer;
+	gap: var(--spacer-2);
+	padding-inline: var(--spacer-1);
+	text-align: start;
 }
 
-.fields-phone__option:hover,
-.fields-phone__option[data-active="true"] {
-	background: var(--theme-elevation-100);
-}
-
-.fields-phone__option[aria-selected="true"] {
-	background: var(--theme-elevation-150);
+.fields-phone__list:not(:hover) .fields-phone__option[data-active="true"] {
+	background-color: var(--popup-item-bg-hover, var(--color-bg-selected-strong));
+	color: var(--popup-item-color-hover, var(--color-text-onselected-strong));
 }
 
 .fields-phone__option-name {
@@ -292,14 +254,19 @@ html[data-theme="dark"] .fields-phone.error .fields-phone__container:hover {
 .fields-phone__option-code {
 	flex-shrink: 0;
 	direction: ltr;
-	/* elevation-500 fails 4.5:1 at this font size against the panel background */
-	color: var(--theme-elevation-700);
+	color: var(--color-text-secondary);
 	font-variant-numeric: tabular-nums;
 }
 
+.fields-phone__option:is(:hover, [aria-selected="true"]) .fields-phone__option-code,
+.fields-phone__list:not(:hover)
+	.fields-phone__option[data-active="true"]
+	.fields-phone__option-code {
+	color: inherit;
+}
+
 .fields-phone__empty {
-	padding: 12px 8px;
-	color: var(--theme-elevation-700);
-	font-size: 0.9rem;
+	padding: var(--spacer-2-5) var(--spacer-2);
+	color: var(--color-text-secondary);
 	text-align: center;
 }

@@ -103,6 +103,8 @@ export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 		[field, fieldPatch]
 	)
 
+	const readOnly = props.readOnly === true || patchedField.admin?.readOnly === true
+
 	const Native = NATIVE[componentKey] ?? (TextField as AnyFieldComponent)
 	const nativeProps = { ...(props as unknown as Record<string, unknown>), field: patchedField }
 
@@ -119,6 +121,7 @@ export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 				nativeProps={nativeProps}
 				path={path}
 				placement={placementFor(componentKey, fieldPatch.hasMany === true)}
+				readOnly={readOnly}
 				setPath={`${path}_set`}
 			/>
 		)
@@ -139,12 +142,15 @@ export const ProtectedField: React.FC<ProtectedFieldProps> = (props) => {
 				kind={componentKey as 'email' | 'number' | 'text'}
 				maskDots={maskDots}
 				path={path}
+				readOnly={readOnly}
 			/>
 		)
 	}
 
 	if (placement === 'corner') {
-		return <EncryptedTextarea field={faceField} maskDots={maskDots} path={path} />
+		return (
+			<EncryptedTextarea field={faceField} maskDots={maskDots} path={path} readOnly={readOnly} />
+		)
 	}
 
 	return (

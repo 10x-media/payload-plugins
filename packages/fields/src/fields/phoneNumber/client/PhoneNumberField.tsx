@@ -1,6 +1,7 @@
 'use client'
 
 import {
+	CircledXIcon,
 	FieldDescription,
 	FieldError,
 	FieldLabel,
@@ -9,7 +10,6 @@ import {
 	useField,
 	useForm,
 	useFormFields,
-	XIcon,
 } from '@payloadcms/ui'
 import { mergeFieldStyles } from '@payloadcms/ui/shared'
 import type { GroupFieldClientProps, StaticLabel, TextFieldClientProps } from 'payload'
@@ -62,7 +62,7 @@ export type PhoneNumberFieldProps = {
 } & Omit<GroupFieldClientProps, 'field'>
 
 /**
- * One 40px row holding the country trigger, the calling-code prefix, a borderless entry and
+ * One native-height row holding the country trigger, the calling-code prefix, a borderless entry and
  * a clear affordance. `phoneOptions` must already be resolved through `resolvePhoneOptionsSafe`:
  * the field's own stamped layer carries no defaults and would render the wrong chrome.
  */
@@ -322,7 +322,15 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 					Fallback={<FieldError path={path} showError={hasError} />}
 				/>
 				{BeforeInput}
-				<div className={`${baseClass}__container`}>
+				<div
+					className={[
+						`${baseClass}__container`,
+						'form-input-group',
+						hasError && 'form-input-group-error',
+					]
+						.filter(Boolean)
+						.join(' ')}
+				>
 					<CountryPicker
 						disabled={isReadOnly || metadata === null}
 						flags={flags}
@@ -352,7 +360,7 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 							onClick={onClear}
 							type="button"
 						>
-							<XIcon />
+							<CircledXIcon size={24} />
 						</button>
 					) : null}
 				</div>

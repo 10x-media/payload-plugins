@@ -190,7 +190,8 @@ test.describe('measurement field', () => {
 
 	test('scalar and compound rows match the native number field height', async ({ page }) => {
 		await openShowcaseDoc(page)
-		const nativeBox = await page.locator('#field-nativeNumber').boundingBox()
+		// The native id sits on the inner input; the 32px chrome is its input group.
+		const nativeBox = await page.locator('.form-input-group:has(#field-nativeNumber)').boundingBox()
 		const container = (name: string) =>
 			page
 				.locator('.fields-measurement')
@@ -199,10 +200,6 @@ test.describe('measurement field', () => {
 		const scalarBox = await container('weight').boundingBox()
 		await pickUnit(page, 'height', /^ft in$/i)
 		const compoundBox = await container('height').boundingBox()
-		for (const box of [scalarBox, compoundBox]) {
-			expect(box?.height).toBeGreaterThanOrEqual(39)
-			expect(box?.height).toBeLessThanOrEqual(41)
-		}
 		expect(scalarBox?.height).toBe(nativeBox?.height)
 		expect(compoundBox?.height).toBe(nativeBox?.height)
 	})

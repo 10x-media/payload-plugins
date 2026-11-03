@@ -230,14 +230,13 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 						</div>
 					) : null}
 					<div className="tenx-icon-drawer__header">
-						{/* Bordered control mirrors Payload's list-view search: SearchIcon inside-left, borderless input. */}
-						<div className="tenx-icon-drawer__search">
+						<div className="tenx-icon-drawer__search form-input-group">
 							<span aria-hidden="true" className="tenx-icon-drawer__search-icon">
 								<SearchIcon />
 							</span>
 							<input
 								aria-label={t(keys.searchIcons)}
-								className="tenx-icon-drawer__search-input"
+								className="form-input tenx-icon-drawer__search-input"
 								onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
 									setQuery(event.target.value)
 								}

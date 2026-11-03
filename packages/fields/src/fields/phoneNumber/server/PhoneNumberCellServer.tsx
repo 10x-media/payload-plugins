@@ -73,7 +73,16 @@ export const PhoneNumberCellServer = async (props: PhoneNumberCellServerComponen
 	const country = parsed?.country ?? storedCountry
 
 	return (
-		<span style={{ alignItems: 'center', display: 'inline-flex', gap: 6 }}>
+		// An inline-flex box takes its baseline from the flag, which lifts the number above the
+		// row's other cells; aligning the box to the line top keeps the text on their line.
+		<span
+			style={{
+				alignItems: 'center',
+				display: 'inline-flex',
+				gap: 'var(--spacer-1-5)',
+				verticalAlign: 'top',
+			}}
+		>
 			{renderFlag({
 				apiRoute: payload.config.routes.api,
 				code: country,

@@ -53,6 +53,18 @@ import { QueryPresetsWhereField as QueryPresetsWhereField_3817bf644402e67bfe6577
 import { CollectionQuerySortField as CollectionQuerySortField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { ActivityWidget as ActivityWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
 import { CollectionFilter as CollectionFilter_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { LucideAdapterIcon as LucideAdapterIcon_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
+import { LucideAdapterAssets as LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
+import { LucideAdapterNodes as LucideAdapterNodes_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
+import { RadixAdapterIcon as RadixAdapterIcon_623eadea8fd172c162e441429619d241 } from '@10x-media/fields/icon/adapters/radix'
+import { RadixAdapterAssets as RadixAdapterAssets_623eadea8fd172c162e441429619d241 } from '@10x-media/fields/icon/adapters/radix'
+import { RadixAdapterNodes as RadixAdapterNodes_623eadea8fd172c162e441429619d241 } from '@10x-media/fields/icon/adapters/radix'
+import { TablerAdapterIcon as TablerAdapterIcon_06944727e7d257f3bfff2c407b2bc913 } from '@10x-media/fields/icon/adapters/tabler'
+import { TablerAdapterAssets as TablerAdapterAssets_06944727e7d257f3bfff2c407b2bc913 } from '@10x-media/fields/icon/adapters/tabler'
+import { TablerAdapterNodes as TablerAdapterNodes_06944727e7d257f3bfff2c407b2bc913 } from '@10x-media/fields/icon/adapters/tabler'
+import { SocialAdapterIcon as SocialAdapterIcon_1d64e85d6e2d4c232079878ca5845e09 } from '../../../../dev/icon-adapters/social/client'
+import { SocialAdapterAssets as SocialAdapterAssets_1d64e85d6e2d4c232079878ca5845e09 } from '../../../../dev/icon-adapters/social/client'
+import { SocialAdapterNodes as SocialAdapterNodes_1d64e85d6e2d4c232079878ca5845e09 } from '../../../../dev/icon-adapters/social/client'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -110,5 +122,17 @@ export const importMap = {
   "@payloadcms/ui#QueryPresetsWhereField": QueryPresetsWhereField_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/ui#CollectionQuerySortField": CollectionQuerySortField_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/ui/rsc#ActivityWidget": ActivityWidget_ab83ff7e88da8d3530831f296ec4756a,
-  "@payloadcms/ui#CollectionFilter": CollectionFilter_3817bf644402e67bfe6577f60ef982de
+  "@payloadcms/ui#CollectionFilter": CollectionFilter_3817bf644402e67bfe6577f60ef982de,
+  "@10x-media/fields/icon/adapters/lucide#LucideAdapterIcon": LucideAdapterIcon_7e91801d7dc297269e57a0aeaa5a9087,
+  "@10x-media/fields/icon/adapters/lucide#LucideAdapterAssets": LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087,
+  "@10x-media/fields/icon/adapters/lucide#LucideAdapterNodes": LucideAdapterNodes_7e91801d7dc297269e57a0aeaa5a9087,
+  "@10x-media/fields/icon/adapters/radix#RadixAdapterIcon": RadixAdapterIcon_623eadea8fd172c162e441429619d241,
+  "@10x-media/fields/icon/adapters/radix#RadixAdapterAssets": RadixAdapterAssets_623eadea8fd172c162e441429619d241,
+  "@10x-media/fields/icon/adapters/radix#RadixAdapterNodes": RadixAdapterNodes_623eadea8fd172c162e441429619d241,
+  "@10x-media/fields/icon/adapters/tabler#TablerAdapterIcon": TablerAdapterIcon_06944727e7d257f3bfff2c407b2bc913,
+  "@10x-media/fields/icon/adapters/tabler#TablerAdapterAssets": TablerAdapterAssets_06944727e7d257f3bfff2c407b2bc913,
+  "@10x-media/fields/icon/adapters/tabler#TablerAdapterNodes": TablerAdapterNodes_06944727e7d257f3bfff2c407b2bc913,
+  "/icon-adapters/social/client#SocialAdapterIcon": SocialAdapterIcon_1d64e85d6e2d4c232079878ca5845e09,
+  "/icon-adapters/social/client#SocialAdapterAssets": SocialAdapterAssets_1d64e85d6e2d4c232079878ca5845e09,
+  "/icon-adapters/social/client#SocialAdapterNodes": SocialAdapterNodes_1d64e85d6e2d4c232079878ca5845e09
 }

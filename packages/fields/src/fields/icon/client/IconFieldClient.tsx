@@ -1,6 +1,7 @@
 'use client'
 
 import {
+	CircledXIcon,
 	Drawer,
 	FieldDescription,
 	FieldError,
@@ -11,7 +12,6 @@ import {
 	useEditDepth,
 	useField,
 	useModal,
-	XIcon,
 } from '@payloadcms/ui'
 import { mergeFieldStyles } from '@payloadcms/ui/shared'
 import type { TextFieldClientProps } from 'payload'
@@ -29,7 +29,7 @@ const IconDrawerContent = React.lazy(() => import('./IconDrawerContent'))
 
 /** Muted grid glyph shown in the square when the field has no value: a picker affordance, not a value. */
 const PlaceholderGlyph: React.FC = () => (
-	<svg aria-hidden="true" fill="currentColor" height={20} viewBox="0 0 20 20" width={20}>
+	<svg aria-hidden="true" fill="currentColor" height={16} viewBox="0 0 20 20" width={16}>
 		<rect height="6" rx="1.5" width="6" x="3" y="3" />
 		<rect height="6" rx="1.5" width="6" x="11" y="3" />
 		<rect height="6" rx="1.5" width="6" x="3" y="11" />
@@ -142,7 +142,7 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 	const glyphClass = `tenx-icon-field__glyph${hasGlyph ? '' : ' tenx-icon-field__glyph--empty'}`
 	const glyph =
 		resolved && previewEntry ? (
-			<previewEntry.Icon name={resolved.name} size={20} />
+			<previewEntry.Icon name={resolved.name} size={16} />
 		) : (
 			<PlaceholderGlyph />
 		)
@@ -157,7 +157,14 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 		.filter(Boolean)
 		.join(' ')
 
-	const controlClasses = `tenx-icon-field__control${isUnavailable ? ' tenx-icon-field__control--warning' : ''}`
+	const controlClasses = [
+		'tenx-icon-field__control',
+		'form-input-group',
+		showError ? 'form-input-group-error' : null,
+		isUnavailable ? 'tenx-icon-field__control--warning' : null,
+	]
+		.filter(Boolean)
+		.join(' ')
 
 	return (
 		<div className={wrapperClasses} id={`field-${path.replace(/\./g, '__')}`} style={styles}>
@@ -194,7 +201,7 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 							</button>
 							<input
 								aria-label={t(keys.fieldIconLabel)}
-								className="tenx-icon-field__value tenx-icon-field__value--input"
+								className="form-input tenx-icon-field__value tenx-icon-field__value--input"
 								onBlur={() => setEditing(false)}
 								onChange={(event) => setValue(event.target.value || null)}
 								onFocus={() => setEditing(true)}
@@ -241,7 +248,7 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 							}}
 							type="button"
 						>
-							<XIcon />
+							<CircledXIcon size={24} />
 						</button>
 					) : null}
 				</div>

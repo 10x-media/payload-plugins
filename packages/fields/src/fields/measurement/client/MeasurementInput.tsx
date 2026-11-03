@@ -269,11 +269,21 @@ export const MeasurementInputView: React.FC<MeasurementInputViewProps> = (props)
 	const isUnitInteractive = units.length > 1 && !isReadOnly
 
 	const renderUnitPanel = ({ close }: { close: () => void }) => (
-		<div aria-label={t(keys.selectUnit)} className={`${baseClass}__unit-panel`} role="listbox">
+		<div
+			aria-label={t(keys.selectUnit)}
+			className={`${baseClass}__unit-panel popup-button-list`}
+			role="listbox"
+		>
 			{units.map((unit) => (
 				<button
 					aria-selected={unit === displayUnit}
-					className={`${baseClass}__unit-option`}
+					className={[
+						`${baseClass}__unit-option`,
+						'popup-button-list__button',
+						unit === displayUnit && 'popup-button-list__button--selected',
+					]
+						.filter(Boolean)
+						.join(' ')}
 					key={unit}
 					onClick={() => {
 						selectUnit(unit)
@@ -354,7 +364,16 @@ export const MeasurementInputView: React.FC<MeasurementInputViewProps> = (props)
 				/>
 				{BeforeInput}
 				{/* biome-ignore lint/a11y/noStaticElementInteractions: mousedown only refocuses an inner input, it adds no control and changes no semantics */}
-				<div className={`${baseClass}__container`} onMouseDown={focusNearestInput}>
+				<div
+					className={[
+						`${baseClass}__container`,
+						'form-input-group',
+						showError && 'form-input-group-error',
+					]
+						.filter(Boolean)
+						.join(' ')}
+					onMouseDown={focusNearestInput}
+				>
 					{isCompound && compoundDef ? (
 						// biome-ignore lint/a11y/noStaticElementInteractions: same as the container, refocuses whichever inner input is nearest
 						<span className={`${baseClass}__compound`} onMouseDown={focusNearestInput}>

@@ -49,10 +49,12 @@ const heightOf = async (locator: Locator): Promise<number> => {
 	return Math.round(box.height)
 }
 
-/** Native Payload inputs and react-select controls render at 40px; allow 1px of rounding. */
-const expectNativeFieldHeight = (height: number): void => {
-	expect(height).toBeGreaterThanOrEqual(39)
-	expect(height).toBeLessThanOrEqual(41)
+/** The native text input on the showcase doc, the height every encrypted row must match. */
+const nativeInputHeight = (page: Page): Promise<number> => heightOf(page.locator('#field-label'))
+
+/** Matches the native input height, allowing 1px of rounding. */
+const expectNativeFieldHeight = (height: number, native: number): void => {
+	expect(Math.abs(height - native)).toBeLessThanOrEqual(1)
 }
 
 const openShowcaseDoc = async (page: Page): Promise<void> => {
@@ -143,46 +145,43 @@ test.describe('encrypted field', () => {
 		await expect(field.locator(`#field-${FIXTURES.apiKey.name}`)).toHaveValue(FIXTURES.apiKey.seed)
 	})
 
-	test('keeps native-consistent 40px heights, so revealing never grows the field', async ({
-		page,
-	}) => {
+	test('keeps native-consistent heights, so revealing never grows the field', async ({ page }) => {
 		await openShowcaseDoc(page)
+		const native = await nativeInputHeight(page)
 
-		// Attached text: the masked input and its eye both sit at height:100% inside the
-		// bordered 40px row (ProtectedField.css, `.tenx-protected-field__attached-row`),
-		// so both render at 38px by design; only these two checks get the wider floor.
+		// Attached text: the bordered row is the input (`.form-input-group`), the eye sits
+		// inside it like the native password toggle.
 		const text = protectedField(page, FIXTURES.fullName.label)
-		const maskedHeight = await heightOf(text.locator('.tenx-protected-field__masked-input'))
-		expect(maskedHeight).toBeGreaterThanOrEqual(38)
-		expect(maskedHeight).toBeLessThanOrEqual(41)
-		const eyeHeight = await heightOf(eyeOf(text))
-		expect(eyeHeight).toBeGreaterThanOrEqual(38)
-		expect(eyeHeight).toBeLessThanOrEqual(41)
+		expectNativeFieldHeight(
+			await heightOf(text.locator('.tenx-protected-field__attached-row')),
+			native
+		)
+		expect(await heightOf(eyeOf(text))).toBeLessThan(native)
 
 		// Select: the concealed masked face and the revealed native react-select control are
-		// both 40px, so the field does not grow taller when the eye reveals it.
+		// both native height, so the field does not grow taller when the eye reveals it.
 		const select = protectedField(page, FIXTURES.tier.label)
 		const face = select.locator('.tenx-protected-field__rs-control')
 		const concealedHeight = await heightOf(face)
-		expectNativeFieldHeight(concealedHeight)
+		expectNativeFieldHeight(concealedHeight, native)
 
 		await eyeOf(select).click()
 		await expect(face).toHaveCount(0)
 		const revealedHeight = await heightOf(select.locator('.rs__control'))
-		expectNativeFieldHeight(revealedHeight)
+		expectNativeFieldHeight(revealedHeight, native)
 		expect(revealedHeight).toBeLessThanOrEqual(concealedHeight + 1)
 
 		// hasMany select: react-select is height:auto and renders multi-value chips a
-		// couple px shorter than a single value, so the 40px floor is what keeps a
+		// couple px shorter than a single value, so the native floor is what keeps a
 		// hasMany field from shrinking on reveal.
 		const multi = protectedField(page, FIXTURES.channels.label)
 		const multiFace = multi.locator('.tenx-protected-field__rs-control')
 		const multiConcealed = await heightOf(multiFace)
-		expectNativeFieldHeight(multiConcealed)
+		expectNativeFieldHeight(multiConcealed, native)
 		await eyeOf(multi).click()
 		await expect(multiFace).toHaveCount(0)
 		const multiRevealed = await heightOf(multi.locator('.rs__control'))
-		expectNativeFieldHeight(multiRevealed)
+		expectNativeFieldHeight(multiRevealed, native)
 		expect(Math.abs(multiRevealed - multiConcealed)).toBeLessThanOrEqual(1)
 	})
 
@@ -193,15 +192,16 @@ test.describe('encrypted field', () => {
 		const field = protectedField(page, FIXTURES.fullName.label)
 		await eyeOf(field).click()
 		const input = field.locator('.tenx-protected-field__revealed-input')
-		await input.focus()
+		const row = field.locator('.tenx-protected-field__attached-row')
 		const borderTop = (loc: Locator): Promise<string> =>
 			loc.evaluate((el) => getComputedStyle(el).borderTopColor)
-		// Once the focus border transition settles the eye matches the input, so the
-		// highlight is one continuous border with no seam. Poll past the 100ms transition
-		// rather than asserting on a single mid-animation frame.
-		await expect
-			.poll(async () => (await borderTop(eyeOf(field))) === (await borderTop(input)))
-			.toBe(true)
+		const idle = await borderTop(row)
+		// One border around input and eye: the row takes the focus color from either.
+		await input.focus()
+		await expect.poll(() => borderTop(row)).not.toBe(idle)
+		const focused = await borderTop(row)
+		await eyeOf(field).focus()
+		await expect.poll(() => borderTop(row)).toBe(focused)
 	})
 
 	test('create route renders every encrypted field native, with no dots or eye', async ({

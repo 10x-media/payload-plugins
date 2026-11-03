@@ -1,5 +1,15 @@
 'use client'
-import { CheckboxInput, FieldDescription, FieldError, FieldLabel } from '@payloadcms/ui'
+import {
+	CalendarIcon,
+	CheckboxInput,
+	ChevronIcon,
+	FieldDescription,
+	FieldError,
+	FieldLabel,
+	InputStepper,
+	useTranslation,
+} from '@payloadcms/ui'
+import type { StaticLabel } from 'payload'
 import type React from 'react'
 import { dotString, MaskDots } from './MaskDots'
 import type { EncryptedFieldConfig } from './placement'
@@ -7,7 +17,7 @@ import type { EncryptedFieldConfig } from './placement'
 /**
  * Display-only concealed faces. Each reuses real Payload field markup with a
  * fixed run of dots so the masked state is pixel-native and inherits the global
- * `payload-default` styles (40px inputs, icon strokes). None of them call
+ * `payload-default` styles (`.form-input` rows, Payload's own icons). None of them call
  * `useField` or hold `setValue`, so they are mechanically incapable of writing
  * the plaintext already sitting in form state.
  */
@@ -17,35 +27,18 @@ interface FaceProps {
 	path: string
 }
 
-const noToggle = (): undefined => undefined
+const noop = (): undefined => undefined
 
-/** Chevron matching react-select's dropdown indicator (inherits `.icon--chevron`). */
-const ChevronGlyph: React.FC = () => (
-	<svg
-		aria-hidden="true"
-		className="icon icon--chevron"
-		viewBox="0 0 20 20"
-		xmlns="http://www.w3.org/2000/svg"
-	>
-		<path className="stroke" d="M14 8L10 12L6 8" strokeLinecap="square" />
-	</svg>
-)
-
-/** Calendar glyph matching the datepicker (inherits `.icon--calendar` position). */
-const CalendarGlyph: React.FC = () => (
-	<svg
-		aria-hidden="true"
-		className="icon icon--calendar"
-		viewBox="0 0 20 20"
-		xmlns="http://www.w3.org/2000/svg"
-	>
-		<path
-			className="stroke"
-			d="M7.33333 3.33334V6M12.6667 3.33334V6M4 8.66667H16M5.33333 4.66667H14.6667C15.403 4.66667 16 5.26362 16 6V15.3333C16 16.0697 15.403 16.6667 14.6667 16.6667H5.33333C4.59695 16.6667 4 16.0697 4 15.3333V6C4 5.26362 4.59695 4.66667 5.33333 4.66667Z"
-			strokeLinecap="square"
-		/>
-	</svg>
-)
+/** A static label in the admin's language, the way Payload's own fields resolve one. */
+const labelText = (label: StaticLabel | undefined, language: string): string => {
+	if (typeof label === 'string') {
+		return label
+	}
+	if (!label) {
+		return ''
+	}
+	return label[language] ?? Object.values(label)[0] ?? ''
+}
 
 export const CheckboxFace: React.FC<FaceProps> = ({ field, path }) => (
 	<div className="field-type checkbox tenx-protected-field__face">
@@ -54,7 +47,7 @@ export const CheckboxFace: React.FC<FaceProps> = ({ field, path }) => (
 			checked={false}
 			label={field.label}
 			name={path}
-			onToggle={noToggle}
+			onToggle={noop}
 			partialChecked
 			readOnly
 			required={field.required}
@@ -64,7 +57,7 @@ export const CheckboxFace: React.FC<FaceProps> = ({ field, path }) => (
 )
 
 export const SelectFace: React.FC<FaceProps> = ({ field, maskDots, path }) => (
-	<div className="field-type select tenx-protected-field__face">
+	<div className="field-type select tenx-protected-field__face" data-size="large">
 		<FieldLabel
 			label={field.label}
 			localized={field.localized}
@@ -73,15 +66,20 @@ export const SelectFace: React.FC<FaceProps> = ({ field, maskDots, path }) => (
 		/>
 		<div className="field-type__wrap">
 			<FieldError path={path} />
-			<div className="react-select-container react-select">
-				<div className="rs__control tenx-protected-field__rs-control">
-					<div className="rs__value-container">
-						<MaskDots count={maskDots} />
-					</div>
-					<div className="rs__indicators">
-						<span className="rs__indicator rs__dropdown-indicator">
-							<ChevronGlyph />
-						</span>
+			<div className="react-select-container">
+				<div className="react-select">
+					<div className="rs__control tenx-protected-field__rs-control">
+						<div className="value-container">
+							<div className="rs__value-container">
+								<MaskDots count={maskDots} />
+							</div>
+						</div>
+						<div className="rs__indicators">
+							<span className="rs__indicator-separator" />
+							<div aria-hidden="true" className="dropdown-indicator">
+								<ChevronIcon className="dropdown-indicator__icon" size={16} />
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -93,12 +91,14 @@ export const SelectFace: React.FC<FaceProps> = ({ field, maskDots, path }) => (
 export const RadioFace: React.FC<FaceProps> = ({ field, maskDots, path }) => (
 	<div className="field-type radio-group radio-group--layout-horizontal tenx-protected-field__face">
 		<FieldError path={path} />
-		<FieldLabel
-			label={field.label}
-			localized={field.localized}
-			path={path}
-			required={field.required}
-		/>
+		<div>
+			<FieldLabel
+				label={field.label}
+				localized={field.localized}
+				path={path}
+				required={field.required}
+			/>
+		</div>
 		<div className="field-type__wrap">
 			<ul className="radio-group--group">
 				<li>
@@ -129,9 +129,6 @@ export const DateFace: React.FC<FaceProps> = ({ field, maskDots, path }) => (
 		<div className="field-type__wrap">
 			<FieldError path={path} />
 			<div className="date-time-picker date-time-picker__appearance--default">
-				<div className="date-time-picker__icon-wrap">
-					<CalendarGlyph />
-				</div>
 				<div className="date-time-picker__input-wrapper">
 					<div className="react-datepicker-wrapper">
 						<div className="react-datepicker__input-container">
@@ -143,6 +140,7 @@ export const DateFace: React.FC<FaceProps> = ({ field, maskDots, path }) => (
 							/>
 						</div>
 					</div>
+					<CalendarIcon />
 				</div>
 			</div>
 		</div>
@@ -181,36 +179,38 @@ export const JsonFace: React.FC<FaceProps> = (props) => (
 	<EditorFace {...props} baseClass="json-field" />
 )
 
-export const PointFace: React.FC<FaceProps> = ({ field, maskDots, path }) => (
-	<div className="field-type point tenx-protected-field__face">
-		<FieldLabel
-			label={field.label}
-			localized={field.localized}
-			path={path}
-			required={field.required}
-		/>
-		<ul className="point__wrap">
-			<li>
-				<div className="input-wrapper">
-					<input
-						className="tenx-protected-field__masked-input"
-						readOnly
-						tabIndex={-1}
-						value={dotString(maskDots)}
-					/>
-				</div>
-			</li>
-			<li>
-				<div className="input-wrapper">
-					<input
-						className="tenx-protected-field__masked-input"
-						readOnly
-						tabIndex={-1}
-						value={dotString(maskDots)}
-					/>
-				</div>
-			</li>
-		</ul>
-		<FieldDescription description={field.admin?.description} path={path} />
-	</div>
-)
+/**
+ * Point renders no field label of its own on v4: each coordinate carries
+ * "<label> - Longitude" / "<label> - Latitude", so the face does the same.
+ */
+export const PointFace: React.FC<FaceProps> = ({ field, maskDots, path }) => {
+	const { i18n, t } = useTranslation()
+	const fieldLabel = labelText(field.label, i18n.language)
+	const coordinate = (suffix: string): string => `${fieldLabel}${fieldLabel ? ' - ' : ''}${suffix}`
+	return (
+		<div className="field-type point tenx-protected-field__face">
+			<ul className="point__wrap">
+				{[t('fields:longitude'), t('fields:latitude')].map((suffix) => (
+					<li key={suffix}>
+						<FieldLabel
+							label={coordinate(suffix)}
+							localized={field.localized}
+							path={path}
+							required={field.required}
+						/>
+						<div className="form-input-group">
+							<input
+								className="form-input tenx-protected-field__masked-input"
+								readOnly
+								tabIndex={-1}
+								value={dotString(maskDots)}
+							/>
+							<InputStepper disabled onDecrement={noop} onIncrement={noop} />
+						</div>
+					</li>
+				))}
+			</ul>
+			<FieldDescription description={field.admin?.description} path={path} />
+		</div>
+	)
+}

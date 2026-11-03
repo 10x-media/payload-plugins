@@ -140,6 +140,25 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			expect(unsetDoc?.apiKey_set).toBe(false)
 		})
 
+		it('selecting a write-only field also returns its set and hint siblings (list view columns)', async () => {
+			const created = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'credentials',
+				data: { hintedKey: 'sk_demo_a1b2c3d4e5f6a7b8c9d0e1f2a3b49d3f', title: 'selected' },
+			})
+			const list = await booted.payload.find({
+				overrideAccess: true,
+				collection: 'credentials',
+				select: { hintedKey: true, title: true },
+				where: { id: { equals: created.id } },
+			})
+			const [doc] = list.docs as Array<Record<string, unknown>>
+			expect(doc?.hintedKey).toBeUndefined()
+			expect(doc?.hintedKey_set).toBe(true)
+			expect(doc?.hintedKey_hint).toBe('sk_d····9d3f')
+			expect(doc?.apiKey_set).toBeUndefined()
+		})
+
 		it('strips write-only and richText ciphertext paths from global reads', async () => {
 			await booted.payload.updateGlobal({
 				overrideAccess: true,

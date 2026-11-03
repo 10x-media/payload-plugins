@@ -78,7 +78,7 @@ export const RichTextRevealGate: React.FC<{
 					<div className="field-type__wrap">
 						<div
 							aria-label={t(keys.encryptedValue)}
-							className="tenx-protected-field__editor-box"
+							className="tenx-protected-field__editor-box tenx-protected-field__editor-box--rich-text"
 							role="img"
 						>
 							<MaskDots count={MASK_DOTS} />

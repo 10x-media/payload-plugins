@@ -33,6 +33,7 @@ export interface WriteOnlyFieldProps {
 	nativeProps: Record<string, unknown>
 	path: string
 	placement: Placement
+	readOnly?: boolean
 	setPath: string
 }
 
@@ -46,7 +47,8 @@ export interface WriteOnlyFieldProps {
  * value. Clear is the isClearable × inside the input; an undo arrow follows a
  * clear because the cleared secret cannot be retyped from memory. Every action
  * lives inside the input row (or the label row for structural types), so the
- * field never grows past its native height.
+ * field never grows past its native height. Read-only disables the input and
+ * drops every action, as a native read-only field offers no edit affordance.
  */
 export const WriteOnlyField: React.FC<WriteOnlyFieldProps> = (props) => {
 	if (props.placement === 'label-row') {
@@ -64,6 +66,7 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 	maskDots,
 	path,
 	placement,
+	readOnly,
 	setPath,
 }) => {
 	const { t } = useTranslation()
@@ -164,7 +167,7 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 	const inputId = `field-${path.replace(/\./g, '__')}`
 	const displayValue = typed ? String(value) : ''
 
-	const actions = (
+	const actions = readOnly ? null : (
 		<>
 			{generate ? (
 				<ActionButton
@@ -199,11 +202,13 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 	const inputProps = {
 		autoComplete: 'off',
 		className: [
+			'form-input',
 			'tenx-protected-field__wo-input',
 			!typed && isSet && !cleared && 'tenx-protected-field__wo-input--set',
 		]
 			.filter(Boolean)
 			.join(' '),
+		disabled: readOnly,
 		id: inputId,
 		name: path,
 		onBlur: handleBlur,
@@ -222,6 +227,7 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 				placement === 'attached'
 					? 'tenx-protected-field--attached'
 					: 'tenx-protected-field--corner',
+				readOnly && 'read-only',
 			]
 				.filter(Boolean)
 				.join(' ')}
@@ -236,7 +242,7 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 			<div className="field-type__wrap">
 				<FieldError path={path} />
 				{isTextarea ? (
-					<>
+					<div className="textarea-outer">
 						<textarea
 							{...inputProps}
 							ref={(el) => {
@@ -247,9 +253,17 @@ const InlineWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 						<div className="tenx-protected-field__eye-wrap tenx-protected-field__eye-wrap--corner tenx-protected-field__actions--corner">
 							{actions}
 						</div>
-					</>
+					</div>
 				) : (
-					<div className="tenx-protected-field__attached-row">
+					<div
+						className={[
+							'form-input-group',
+							showFieldError && 'form-input-group-error',
+							'tenx-protected-field__attached-row',
+						]
+							.filter(Boolean)
+							.join(' ')}
+					>
 						<input
 							{...inputProps}
 							ref={(el) => {
@@ -283,6 +297,7 @@ const StructuralWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 	Native,
 	nativeProps,
 	path,
+	readOnly,
 	setPath,
 }) => {
 	const { t } = useTranslation()
@@ -348,7 +363,15 @@ const StructuralWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 					/>
 					<div className="field-type__wrap">
 						<FieldError path={path} />
-						<div className="tenx-protected-field__wo-face-box">
+						<div
+							className={[
+								'form-input',
+								'tenx-protected-field__wo-face-box',
+								readOnly && 'tenx-protected-field__wo-face-box--disabled',
+							]
+								.filter(Boolean)
+								.join(' ')}
+						>
 							{mode === 'cleared' ? (
 								<span className="tenx-protected-field__wo-face-msg">{t(keys.clearedOnSave)}</span>
 							) : (
@@ -366,7 +389,7 @@ const StructuralWriteOnly: React.FC<WriteOnlyFieldProps> = ({
 				</div>
 			)}
 			<div className="tenx-protected-field__eye-wrap tenx-protected-field__eye-wrap--label-row">
-				{mode === 'cleared' ? (
+				{readOnly ? null : mode === 'cleared' ? (
 					<ActionButton kind="undo" label={t(keys.undoClear)} onClick={undoClear} />
 				) : (
 					<>
