@@ -2,6 +2,9 @@
 
 # @10x-media/jobs
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/jobs` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/jobs` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/jobs).
+
 An ops dashboard plus reliability, worker, and queue-control layers for Payload v3's built-in jobs queue. See what the queue is doing, recover jobs that die mid-run, run a proper worker process with graceful drain, and pause or drive the queue from the outside. Every layer is opt-in.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/jobs?style=flat-square)](https://www.npmjs.com/package/@10x-media/jobs)

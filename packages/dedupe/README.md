@@ -2,6 +2,9 @@
 
 # @10x-media/dedupe
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/dedupe` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/dedupe` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/dedupe).
+
 Find duplicate documents in any Payload collection and merge a group of them into one from the admin.
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection.

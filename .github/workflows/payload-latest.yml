@@ -15,7 +15,7 @@ concurrency:
 
 env:
   PAYLOAD_SKIP_AUTOGEN: '1'
-  NODE_VERSION: '22'
+  NODE_VERSION: '24'
 
 jobs:
   analytics:

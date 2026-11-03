@@ -2,6 +2,9 @@
 
 # @10x-media/admin-wiki
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/admin-wiki` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/admin-wiki` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/admin-wiki).
+
 A living wiki inside the Payload v3 admin panel. Editors write guides as Payload documents, attach each one to the collections, globals, fields, and blocks it explains, and the admin renders it exactly there: under the field, inside the block, in the document sidebar, above the list table.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/admin-wiki?style=flat-square)](https://www.npmjs.com/package/@10x-media/admin-wiki)

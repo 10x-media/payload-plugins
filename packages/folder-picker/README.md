@@ -2,6 +2,9 @@
 
 # @10x-media/folder-picker
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/folder-picker` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/folder-picker` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/folder-picker).
+
 Folder browsing inside Payload's list drawer, so any field picks documents by folder. Payload has had folders since 3.39, but only on the collection route: open the same collection from an upload field's "choose from existing" and you get a flat, paginated list. This plugin puts the folders back, for every field that opens a drawer.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/folder-picker?style=flat-square)](https://www.npmjs.com/package/@10x-media/folder-picker)

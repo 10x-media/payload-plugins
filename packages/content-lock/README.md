@@ -2,6 +2,9 @@
 
 # @10x-media/content-lock
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/content-lock` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/content-lock` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/content-lock).
+
 Planned and unplanned maintenance windows for Payload v3. While a window is active, every write to the frozen collections and globals is rejected with a 503 on every channel, the admin turns read-only, and a banner tells editors why and until when.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/content-lock?style=flat-square)](https://www.npmjs.com/package/@10x-media/content-lock)

@@ -2,6 +2,9 @@
 
 # @10x-media/document-preview
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/document-preview` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/document-preview` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/document-preview).
+
 Read-only previews of upload documents in the Payload v3 admin. Images, video, audio, PDF, CSV, text and code, Markdown, Word, Excel and PowerPoint open in viewers styled like the admin, from a button beside the document controls, inline above the fields, or a list column. Everything renders in the browser and loads only when a file of its kind is opened.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/document-preview?style=flat-square)](https://www.npmjs.com/package/@10x-media/document-preview)

@@ -2,6 +2,9 @@
 
 # @10x-media/conversations
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/conversations` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/conversations` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/conversations).
+
 Conversations for Payload: messages bound to any document, global or custom key, with channels that decide who reads what, one-level threads, mentions and per-user read state. Comments on documents, reactions and file attachments ship as extensions; support tickets, chat rooms and website chats are built from the same primitives.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/conversations?style=flat-square)](https://www.npmjs.com/package/@10x-media/conversations)

@@ -2,6 +2,9 @@
 
 # @10x-media/form-variants
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/form-variants` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/form-variants` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/form-variants).
+
 Alternative edit forms for a Payload collection. A variant is a sequence of steps drawn over Payload's own form state, rendered with Payload's own fields, saved by Payload's own save. The native form is one of the variants, so accounts with access can switch back and forth.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/form-variants?style=flat-square)](https://www.npmjs.com/package/@10x-media/form-variants)

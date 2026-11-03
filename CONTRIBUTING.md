@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Node 22.18+ (the floor for native `.ts` config support; `.nvmrc` pins the line, run `nvm use` or `fnm use`)
+- Node 24.22.1+ (the floor Payload 4 declares; `.nvmrc` pins the line, run `nvm use` or `fnm use`)
 - pnpm 10 (`corepack enable && corepack prepare pnpm@10 --activate`)
 - Docker (required for `test:matrix`, `test:container`, and `test:e2e` tiers)
 

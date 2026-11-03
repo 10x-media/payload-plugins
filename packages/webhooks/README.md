@@ -2,6 +2,9 @@
 
 # @10x-media/webhooks
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/webhooks` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/webhooks` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/webhooks).
+
 Outbound webhook subscriptions for Payload v3. Opt collections in, let subscribers register URLs in the admin panel (or in code), and deliver signed HTTP POSTs on every create, update, and delete, inline or through Payload's jobs queue, with retries and an append-only delivery log.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/webhooks?style=flat-square)](https://www.npmjs.com/package/@10x-media/webhooks)

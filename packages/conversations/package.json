@@ -20,7 +20,7 @@
 	],
 	"author": "10x-media",
 	"engines": {
-		"node": ">=22.18.0"
+		"node": ">=24.22.1"
 	},
 	"type": "module",
 	"sideEffects": false,
@@ -120,9 +120,9 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@payloadcms/richtext-lexical": "^3.83.0",
-		"@payloadcms/ui": "^3.83.0",
-		"payload": "^3.83.0",
+		"@payloadcms/richtext-lexical": "^4.0.0-beta.6",
+		"@payloadcms/ui": "^4.0.0-beta.6",
+		"payload": "^4.0.0-beta.6",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},

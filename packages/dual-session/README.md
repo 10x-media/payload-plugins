@@ -2,6 +2,9 @@
 
 # @10x-media/dual-session
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/dual-session` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/dual-session` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/dual-session).
+
 Give each Payload auth collection its own session cookie, so an admin session and a frontend session can coexist. Payload signs every collection's token into one config-wide `payload-token`, which means a customer logging in on your website overwrites the editor's admin session in the same browser, and back again. This plugin moves the collections you name onto cookies of their own.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/dual-session?style=flat-square)](https://www.npmjs.com/package/@10x-media/dual-session)

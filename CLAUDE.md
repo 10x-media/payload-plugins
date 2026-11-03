@@ -2,7 +2,7 @@
 
 This is a Turborepo of public `@10x-media/*` Payload plugins maintained by 10x Media GmbH. This is the `v4` branch, the Payload 4 line: forked once from `main` (Payload 3), never merged with it; fixes are ported between them by hand (see Release flow). See `CONTRIBUTING.md` for the contributor workflow, plugin anatomy, and release flow.
 
-**Toolchain:** Node 22.18+ and pnpm 10 for development; every package declares `engines.node >=22.18.0` (22.18 is the floor for Node's native `.ts` support, which the vitest configs rely on). Docker is required for the Postgres, container, and e2e test tiers. Shared dependency versions are centralized in a pnpm `catalog:` in `pnpm-workspace.yaml`, so a Payload or React bump is a one-line change. Cacheable tasks (build, lint, typecheck, test) run through Turborepo.
+**Toolchain:** Node 24.22.1+ and pnpm 10 for development; every package declares `engines.node >=24.22.1`, the floor Payload 4 itself declares (Node's native `.ts` support, which the vitest configs rely on, came earlier). Docker is required for the Postgres, container, and e2e test tiers. Shared dependency versions are centralized in a pnpm `catalog:` in `pnpm-workspace.yaml`, so a Payload or React bump is a one-line change. Cacheable tasks (build, lint, typecheck, test) run through Turborepo.
 
 ## Layout
 

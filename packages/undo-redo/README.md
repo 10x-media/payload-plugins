@@ -2,6 +2,9 @@
 
 # @10x-media/undo-redo
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/undo-redo` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/undo-redo` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/undo-redo).
+
 Client-side undo/redo for Payload v3 admin forms. Snapshots the document form state as the editor works and steps back and forth through it, independent of Payload's document versions: nothing reaches the server until the editor saves.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/undo-redo?style=flat-square)](https://www.npmjs.com/package/@10x-media/undo-redo)

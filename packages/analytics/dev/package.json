@@ -34,7 +34,7 @@
 	"devDependencies": {
 		"@10x-media/fields": "workspace:*",
 		"@10x-media/tsconfig": "workspace:*",
-		"@payloadcms/plugin-multi-tenant": "3.85.0",
+		"@payloadcms/plugin-multi-tenant": "catalog:",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",

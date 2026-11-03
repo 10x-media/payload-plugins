@@ -2,6 +2,9 @@
 
 # @10x-media/audit-logs
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/audit-logs` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/audit-logs` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/audit-logs).
+
 Audit logging for Payload v3. Stamps `createdBy` and `lastModifiedBy` on the documents you choose, and records a separate entry with a field-level diff for every change, in a queryable collection with its own admin view.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/audit-logs?style=flat-square)](https://www.npmjs.com/package/@10x-media/audit-logs)

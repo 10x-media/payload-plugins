@@ -1,6 +1,9 @@
 # @10x-media/payload-plugins
 
-Open-source plugins for [Payload v3](https://payloadcms.com) maintained by [10x-media](https://github.com/10x-media). Documentation: [docs.10xmedia.de](https://docs.10xmedia.de).
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** Plugins are being ported to Payload `4.0.0-beta` one at a time and released as `4.0.0-alpha.N` under the `alpha` tag (`pnpm add @10x-media/<plugin>@alpha`); each plugin's README says whether it has been ported. The Payload v3 versions live on [`main`](https://github.com/10x-media/payload-plugins/tree/main) and are released as `latest`. The documentation site covers Payload v3.
+
+Open-source plugins for [Payload](https://payloadcms.com) maintained by [10x-media](https://github.com/10x-media). Documentation: [docs.10xmedia.de](https://docs.10xmedia.de).
 
 ## Packages
 

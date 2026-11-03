@@ -2,6 +2,9 @@
 
 # @10x-media/form-builder
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/form-builder` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/form-builder` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/form-builder).
+
 An end-to-end forms platform for Payload v3: author forms in the admin, validate server-side, render headless on your frontend, collect typed submissions, aggregate results, and act on them. Simple by default for editors, with a definition seam (`defineFormField`, `defineValidationRule`, `defineAction`, and friends) wherever developers need depth, and 100% native to Payload.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/form-builder?style=flat-square)](https://www.npmjs.com/package/@10x-media/form-builder)

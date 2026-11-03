@@ -20,7 +20,7 @@
 	],
 	"author": "10x-media",
 	"engines": {
-		"node": ">=22.18.0"
+		"node": ">=24.22.1"
 	},
 	"type": "module",
 	"sideEffects": false,
@@ -86,9 +86,9 @@
 		"jose": "^5.10.0"
 	},
 	"peerDependencies": {
-		"@payloadcms/ui": "^3.83.0",
-		"next": "^15.0.0 || ^16.0.0",
-		"payload": "^3.83.0",
+		"@payloadcms/ui": "^4.0.0-beta.6",
+		"next": "^16.4.0",
+		"payload": "^4.0.0-beta.6",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},

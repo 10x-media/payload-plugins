@@ -2,6 +2,9 @@
 
 # @10x-media/fields
 
+> [!IMPORTANT]
+> **This is the Payload v4 branch.** `@10x-media/fields` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/fields` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/fields).
+
 Reusable fields for Payload v3 that look and behave native: a full color picker in a constant-height row, a searchable icon picker over pluggable icon libraries, encrypted fields with key rotation and opt-in exact-match querying, and a unit-aware measurement field. Built from `@payloadcms/ui` primitives on Payload design tokens, indistinguishable from Payload's own fields.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/fields?style=flat-square)](https://www.npmjs.com/package/@10x-media/fields)
