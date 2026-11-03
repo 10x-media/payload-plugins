@@ -44,6 +44,7 @@ describeForDb('seedWiki', { dbs: ['mongo'] }, (db) => {
 	const guideBySlug = async (slug: string, locale?: string) => {
 		const result = await booted.payload.find({
 			collection: PAGES,
+			overrideAccess: true,
 			depth: 0,
 			draft: true,
 			pagination: false,
@@ -246,10 +247,41 @@ describeForDb('seedWiki', { dbs: ['mongo'] }, (db) => {
 
 		const published = await booted.payload.find({
 			collection: PAGES,
+			overrideAccess: true,
 			pagination: false,
 			where: { and: [{ slug: { equals: 'draft-guide' } }, { _status: { equals: 'published' } }] },
 		})
 		expect(published.docs).toHaveLength(0)
+	})
+
+	it('publishes a guide only in the locales it writes', async () => {
+		await seed([
+			{ content: { markdown: 'English body.' }, slug: 'english-seed', title: 'English seed' },
+			{
+				content: { markdown: 'English body.' },
+				slug: 'translated-seed',
+				title: { de: 'Übersetzt', en: 'Translated seed' },
+			},
+		])
+
+		const publishedIn = async (locale: 'de' | 'en') => {
+			const result = await booted.payload.find({
+				collection: PAGES,
+				depth: 0,
+				locale,
+				overrideAccess: true,
+				pagination: false,
+				where: {
+					and: [
+						{ slug: { in: ['english-seed', 'translated-seed'] } },
+						{ _status: { equals: 'published' } },
+					],
+				},
+			})
+			return result.docs.map((doc) => (doc as { slug?: string }).slug).sort()
+		}
+		expect(await publishedIn('en')).toEqual(['english-seed', 'translated-seed'])
+		expect(await publishedIn('de')).toEqual(['translated-seed'])
 	})
 
 	it('resolves a guide link to a guide seeded later in the same run', async () => {
@@ -323,7 +355,7 @@ describeForDb('seedWiki', { dbs: ['mongo'] }, (db) => {
 				// The whole reason the function form exists: a value that is not known
 				// until something has been read off the instance.
 				additionalData: async (instance) => {
-					const { totalDocs } = await instance.count({ collection: PAGES })
+					const { totalDocs } = await instance.count({ collection: PAGES, overrideAccess: true })
 					return { audience: totalDocs > 0 ? 'not the first guide' : 'the first guide' }
 				},
 				content: { markdown: 'Body.' },

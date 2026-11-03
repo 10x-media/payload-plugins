@@ -25,7 +25,7 @@ export const buildOrphanedTargetsEndpoint = ({
 	pagesSlug,
 }: BuildOrphanedTargetsEndpointArgs): Endpoint => ({
 	handler: async (req) => {
-		const canUpdate = Boolean(await access.update({ req }))
+		const canUpdate = Boolean(await access.update({ req, slug: pagesSlug }))
 		if (!canUpdate) {
 			return Response.json({ orphans: [] satisfies WikiOrphanedGuide[] }, { status: 403 })
 		}

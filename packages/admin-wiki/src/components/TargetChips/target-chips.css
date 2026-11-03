@@ -2,12 +2,12 @@
 	align-items: center;
 	display: inline-flex;
 	flex-wrap: wrap;
-	gap: calc(var(--base) / 5);
+	gap: var(--spacer-1);
 	min-width: 0;
 }
 
 .wiki-target-chips__chip {
-	max-width: 16rem;
+	max-width: 13rem;
 }
 
 .wiki-target-chips__chip .pill__label {

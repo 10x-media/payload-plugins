@@ -56,7 +56,7 @@ describe('registerTriggers', () => {
 							path: '@10x-media/admin-wiki/client#WikiDocumentGuides',
 						},
 					},
-					disableListColumn: true,
+					disabled: { column: true },
 					position: 'sidebar',
 				},
 			})

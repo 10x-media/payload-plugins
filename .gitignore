@@ -46,6 +46,7 @@ packages/document-preview/dev/.seed-cache/
 
 # admin-wiki wiki media uploads
 packages/admin-wiki/dev/wiki-media/
+packages/admin-wiki/dev-tanstack/wiki-media/
 
 # env
 .env

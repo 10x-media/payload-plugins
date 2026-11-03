@@ -1,21 +1,21 @@
 /* Orphan banner ------------------------------------------------------------ */
 
-/* Payload's Banner carries the error surface, radius and spacing; the content
+/* Payload's Banner carries the danger surface, radius and spacing; the content
    here is a heading plus a list, which its single-line default does not lay out. */
 .wiki-orphan-banner {
 	align-items: flex-start;
-	gap: calc(var(--base) / 2);
+	gap: var(--spacer-2);
 }
 
 .wiki-orphan-banner__body {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) / 4);
+	gap: var(--spacer-1);
 	min-width: 0;
 }
 
 .wiki-orphan-banner__heading {
-	font-weight: 600;
+	font-weight: var(--text-body-medium-bold-font-weight);
 }
 
 .wiki-orphan-banner__intro {
@@ -25,9 +25,9 @@
 .wiki-orphan-banner__list {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) / 4);
+	gap: var(--spacer-1);
 	list-style: none;
-	margin: calc(var(--base) / 4) 0 0;
+	margin: var(--spacer-1) 0 0;
 	padding: 0;
 }
 
@@ -35,7 +35,7 @@
 	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
-	gap: calc(var(--base) / 3);
+	gap: var(--spacer-1-5);
 }
 
 .wiki-orphan-banner__link {

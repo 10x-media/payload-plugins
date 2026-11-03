@@ -2,11 +2,11 @@
 
 import {
 	AnimateHeight,
+	Button,
 	ChevronIcon,
-	Pill,
+	Gutter,
+	ListSearchFilter,
 	PillSelector,
-	SearchFilter,
-	SearchIcon,
 	useConfig,
 } from '@payloadcms/ui'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
@@ -34,7 +34,7 @@ export type WikiIndexClientProps = {
 	entries: WikiTargetEntry[]
 }
 
-/** Ties the toggle pill to the panel it opens, for assistive tech. */
+/** Ties the filters toggle to the panel it opens, for assistive tech. */
 const FILTERS_ID = 'wiki-index-filters'
 
 const matches = (entry: WikiTargetEntry, query: string): boolean =>
@@ -48,11 +48,14 @@ const matches = (entry: WikiTargetEntry, query: string): boolean =>
  * active. Data arrives fully resolved from the server view.
  *
  * The controls reproduce `ListControls` structurally, not just visually: the
- * same `list-controls` wrapper, `SearchFilter` inside `search-bar`, a toggle
- * pill in `search-bar__actions`, and the panel behind `AnimateHeight`. Payload's
- * stylesheet then does the rest, including the rule that spaces a `pill-selector`
- * below the bar. A panel that is always open and labelled is the one thing a
- * Payload list never shows, which is why the earlier version read as foreign.
+ * same `list-controls` wrapper and search row, `ListSearchFilter` on the left,
+ * a secondary "Filters" button on the right that reads as selected while open
+ * or filtering, and the panel behind `AnimateHeight`. Payload's stylesheet then
+ * does the rest: the full-bleed band with its rule below, and the spacing of a
+ * `pill-selector` under the row. Everything after the controls sits in a
+ * `Gutter`, as a list's table does. A panel that is always open and labelled
+ * is the one thing a Payload list never shows, which is why the earlier
+ * version read as foreign.
  *
  * Filtering is `PillSelector` rather than a where-builder because guides attach
  * to whole surfaces: picking among those surfaces is the entire query a reader
@@ -140,7 +143,7 @@ export const WikiIndexClient = ({
 
 	if (linkable.length === 0) {
 		return (
-			<div className="wiki-index">
+			<Gutter className="wiki-index wiki-index__body">
 				{renderSlot(beforeTable, 'before-table')}
 				<div className="wiki-index__empty">
 					<BookIcon className="wiki-index__empty-icon" />
@@ -148,29 +151,35 @@ export const WikiIndexClient = ({
 					<p className="wiki-index__empty-hint">{t(keys.wikiEmptyHint)}</p>
 				</div>
 				{renderSlot(afterTable, 'after-table')}
-			</div>
+			</Gutter>
 		)
 	}
 
 	return (
 		<div className="wiki-index">
 			<div className="list-controls wiki-index__controls">
-				<div className="search-bar">
-					<SearchIcon />
-					<SearchFilter handleChange={onSearchChange} label={t(keys.wikiSearchPlaceholder)} />
+				<div className="list-controls__search-row">
+					<div className="list-controls__left">
+						<ListSearchFilter
+							label={t(keys.wikiSearchPlaceholder)}
+							onSearchChange={onSearchChange}
+						/>
+					</div>
+					<div className="list-controls__spacer" />
 					{hasFilters ? (
-						<div className="search-bar__actions">
-							<Pill
-								aria-controls={FILTERS_ID}
-								aria-expanded={filtersOpen}
+						<div className="list-controls__actions">
+							<Button
+								buttonStyle="secondary"
 								className="list-controls__toggle-where"
-								icon={<ChevronIcon direction={filtersOpen ? 'up' : 'down'} />}
+								extraButtonProps={{ 'aria-controls': FILTERS_ID, 'aria-expanded': filtersOpen }}
+								icon={<ChevronIcon direction={filtersOpen ? 'up' : 'down'} size={16} />}
+								margin={false}
 								onClick={() => setFiltersOpen((open) => !open)}
-								pillStyle="light"
-								size="small"
+								selected={filtersOpen || selectedTargets.length > 0}
+								size="medium"
 							>
 								{t(keys.wikiFilterLabel)}
-							</Pill>
+							</Button>
 						</div>
 					) : null}
 				</div>
@@ -187,49 +196,51 @@ export const WikiIndexClient = ({
 					</AnimateHeight>
 				) : null}
 			</div>
-			{renderSlot(beforeTable, 'before-table')}
-			{!isFiltering && featured.length > 0 ? (
+			<Gutter className="wiki-index__body">
+				{renderSlot(beforeTable, 'before-table')}
+				{!isFiltering && featured.length > 0 ? (
+					<section className="wiki-index__section">
+						<h2 className="wiki-index__heading">{t(keys.wikiFeaturedHeading)}</h2>
+						<div className="wiki-index__cards">
+							{featured.map((entry) => (
+								<a className="wiki-index__card" href={`${baseUrl}/${entry.slug}`} key={entry.id}>
+									<span className="wiki-index__card-title">
+										<StarIcon size="small" />
+										{entry.title}
+									</span>
+									{entry.summary ? (
+										<span className="wiki-index__card-summary">{entry.summary}</span>
+									) : null}
+									<TargetChips
+										className="wiki-index__card-chips"
+										limit={3}
+										targetKeys={entry.targetKeys}
+									/>
+								</a>
+							))}
+						</div>
+					</section>
+				) : null}
 				<section className="wiki-index__section">
-					<h2 className="wiki-index__heading">{t(keys.wikiFeaturedHeading)}</h2>
-					<div className="wiki-index__cards">
-						{featured.map((entry) => (
-							<a className="wiki-index__card" href={`${baseUrl}/${entry.slug}`} key={entry.id}>
-								<span className="wiki-index__card-title">
-									<StarIcon size="small" />
-									{entry.title}
-								</span>
-								{entry.summary ? (
-									<span className="wiki-index__card-summary">{entry.summary}</span>
-								) : null}
-								<TargetChips
-									className="wiki-index__card-chips"
-									limit={3}
-									targetKeys={entry.targetKeys}
-								/>
-							</a>
-						))}
-					</div>
+					<h2 className="wiki-index__heading">
+						{isFiltering ? t(keys.wikiResultsHeading) : t(keys.wikiAllGuidesHeading)}
+						<span className="wiki-index__count">
+							{listed.length === 1
+								? t(keys.guideCountOne)
+								: t(keys.guideCount, { count: listed.length })}
+						</span>
+					</h2>
+					{listed.length === 0 ? (
+						<div className="wiki-index__empty wiki-index__empty--inline">
+							<p className="wiki-index__empty-title">{t(keys.wikiNoResults)}</p>
+							<p className="wiki-index__empty-hint">{t(keys.wikiNoResultsHint)}</p>
+						</div>
+					) : (
+						<ul className="wiki-index__list">{listed.map(renderRow)}</ul>
+					)}
 				</section>
-			) : null}
-			<section className="wiki-index__section">
-				<h2 className="wiki-index__heading">
-					{isFiltering ? t(keys.wikiResultsHeading) : t(keys.wikiAllGuidesHeading)}
-					<span className="wiki-index__count">
-						{listed.length === 1
-							? t(keys.guideCountOne)
-							: t(keys.guideCount, { count: listed.length })}
-					</span>
-				</h2>
-				{listed.length === 0 ? (
-					<div className="wiki-index__empty wiki-index__empty--inline">
-						<p className="wiki-index__empty-title">{t(keys.wikiNoResults)}</p>
-						<p className="wiki-index__empty-hint">{t(keys.wikiNoResultsHint)}</p>
-					</div>
-				) : (
-					<ul className="wiki-index__list">{listed.map(renderRow)}</ul>
-				)}
-			</section>
-			{renderSlot(afterTable, 'after-table')}
+				{renderSlot(afterTable, 'after-table')}
+			</Gutter>
 		</div>
 	)
 }

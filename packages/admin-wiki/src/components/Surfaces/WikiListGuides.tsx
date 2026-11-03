@@ -15,19 +15,13 @@ import { WikiGuideCard } from './WikiGuideCard'
 import './surfaces.css'
 
 /**
- * Payload renders `beforeList` and `afterList` outside the list's own `Gutter`
- * and the two table slots inside it, so the band has to supply the horizontal
- * padding in exactly the two cases where nothing else does.
+ * Payload 4 renders all four list slots edge to edge, between full-width rows
+ * of its own, so the band supplies the horizontal padding in every slot.
  */
-const OUTSIDE_LIST_GUTTER: ReadonlySet<WikiListBandSlot> = new Set<WikiListBandSlot>([
-	'afterList',
-	'beforeList',
-])
-
 export type WikiListGuidesProps = {
 	/** Lead with the collection's featured guides as cards. */
 	featured: boolean
-	/** The list slot this instance was registered in, which decides the gutter. */
+	/** The list slot this instance was registered in, which decides the spacing. */
 	slot: WikiListBandSlot
 	/** The collection being listed, as a wiki target key. */
 	targetKey: string
@@ -79,5 +73,5 @@ export const WikiListGuides = ({ featured, slot, targetKey }: WikiListGuidesProp
 			</div>
 		)
 
-	return OUTSIDE_LIST_GUTTER.has(slot) ? <Gutter>{band}</Gutter> : band
+	return <Gutter>{band}</Gutter>
 }

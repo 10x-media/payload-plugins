@@ -19,7 +19,7 @@ One kind of field is skipped: a field that already declares its own `Description
 
 Every block reachable from any blocks field gets its guides as a UI field, **appended after the block's own fields**. It is not the block's row label, so it does not compete with an `admin.components.Label` of your own.
 
-Shared block configs (`config.blocks` and `blockReferences`) are handled once, so a block used in six places carries one guide surface, not six. The same holds for the help on the block's **own fields**: they are [targeted through the block](/admin-wiki/targets#fields-inside-blocks), not through whichever collection is on screen, so one guide covers every usage.
+Shared block configs (`config.blocks`, referenced by slug) are handled once, so a block used in six places carries one guide surface, not six. The same holds for the help on the block's **own fields**: they are [targeted through the block](/admin-wiki/targets#fields-inside-blocks), not through whichever collection is on screen, so one guide covers every usage.
 
 "Reachable" means through a field of type `blocks`, plus everything in `config.blocks`. A block declared only inside a rich text editor's `BlocksFeature` is not walked and carries no surfaces; see [Blocks in lexical editors](/admin-wiki/targets#blocks-in-lexical-editors).
 
@@ -59,12 +59,12 @@ adminWiki({
 
 | Slot | Position |
 |---|---|
-| `beforeList` | Above the list, outside its gutter |
-| `beforeListTable` | Above the table, inside the gutter |
-| `afterListTable` | Below the table, inside the gutter. **Default** |
-| `afterList` | Below the list, outside its gutter |
+| `beforeList` | Above the list header |
+| `beforeListTable` | Between the list controls and the table |
+| `afterListTable` | Below the table, above the pagination. **Default** |
+| `afterList` | Directly after `afterListTable` |
 
-Payload renders `beforeList` and `afterList` outside the list's own `Gutter`; the band supplies its own horizontal padding there, so all four slots line up with the table.
+Payload renders all four slots edge to edge; the band supplies its own horizontal padding, so it lines up with the table in every slot.
 
 `triggers: { list: false }` removes the band. The other surfaces take no slot option.
 

@@ -103,20 +103,18 @@ describe('walkAndInjectFieldHelp', () => {
 		expect(result.warnings).toEqual([])
 	})
 
-	it('resolves blockReferences and roots a nested block at its own slug', () => {
+	it('resolves block slugs and roots a nested block at its own slug', () => {
 		const innerBlock = { slug: 'inner', fields: [{ name: 'text', type: 'text' }] as Field[] }
 		const outerBlock = {
 			slug: 'outer',
-			fields: [
-				{ name: 'children', type: 'blocks', blocks: [], blockReferences: ['inner'] },
-			] as Field[],
+			fields: [{ name: 'children', type: 'blocks', blocks: ['inner'] }] as Field[],
 		}
 		const config = {
 			blocks: [innerBlock, outerBlock],
 			collections: [
 				{
 					slug: 'pages',
-					fields: [{ name: 'layout', type: 'blocks', blocks: [], blockReferences: ['outer'] }],
+					fields: [{ name: 'layout', type: 'blocks', blocks: ['outer'] }],
 				},
 			],
 		} as unknown as Config

@@ -9,6 +9,7 @@ import { registerTriggers } from './plugin/registerTriggers'
 import { setWikiRegistry } from './plugin/registry'
 import { resolveOptions } from './plugin/resolveOptions'
 import { walkAndInjectFieldHelp } from './plugin/walker'
+import { WIKI_EDIT_GUIDE_ACTION } from './shared/editGuideAction'
 import { customTargetKey } from './shared/targetKeys'
 
 declare module 'payload' {
@@ -57,15 +58,25 @@ const componentImportPath = (component: PayloadComponent): string | undefined =>
 }
 
 /**
- * Admin Wiki plugin for Payload v3: a living wiki inside the admin panel.
+ * The plugin's `order`. Payload runs plugins sorted by it (ascending, default
+ * `0`), and the config walk documents the config as it stands when the plugin
+ * runs, so the wiki goes after every plugin that keeps the default. A plugin
+ * that has to see the wiki's collections sets a higher order of its own.
+ */
+export const ADMIN_WIKI_PLUGIN_ORDER = 1000
+
+/**
+ * Admin Wiki plugin for Payload: a living wiki inside the admin panel.
  * Registers the wiki collections (guide pages + media), the plugin registry,
- * and translations. Must run after any plugin that adds collections or fields,
- * so guides can target them. Authored with `definePlugin` so sibling plugins
- * can detect it by slug.
+ * and translations. Runs after the plugins that add collections or fields
+ * (see `ADMIN_WIKI_PLUGIN_ORDER`), so guides can target them. Authored with
+ * `definePlugin` so sibling plugins can detect it by slug.
  */
 export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 	slug: '@10x-media/admin-wiki',
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	order: ADMIN_WIKI_PLUGIN_ORDER,
+	// Payload passes `options` as undefined when the plugin is registered without any.
+	plugin: ({ config, options = {} }): Config => {
 		if (options.disabled === true) {
 			return config
 		}
@@ -87,7 +98,7 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 		if (walk.injectedFieldCount === 0) {
 			warnings.push(
 				'@10x-media/admin-wiki: the config walker found no fields to attach help to. ' +
-					'Register adminWiki() after any plugin that adds collections or fields.'
+					'A plugin that adds collections or fields needs an order below ADMIN_WIKI_PLUGIN_ORDER.'
 			)
 		}
 		if (warnings.length > 0) {
@@ -142,6 +153,12 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 		for (const component of consumerComponents) {
 			config.admin.dependencies[`admin-wiki:${component}`] = {
 				path: component,
+				type: 'component',
+			}
+		}
+		if (resolved.wikiView) {
+			config.admin.dependencies[`admin-wiki:${WIKI_EDIT_GUIDE_ACTION}`] = {
+				path: WIKI_EDIT_GUIDE_ACTION,
 				type: 'component',
 			}
 		}

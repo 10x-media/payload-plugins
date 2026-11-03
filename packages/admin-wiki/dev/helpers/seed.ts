@@ -110,10 +110,11 @@ The **accent color** and **icon** in the branding group come from the
  * loudly but never blocks the dev boot.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ collection: 'users', overrideAccess: true })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
 			collection: 'users',
+			overrideAccess: true,
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)

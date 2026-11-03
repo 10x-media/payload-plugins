@@ -1,10 +1,10 @@
 /* Mirrors packages/ui/src/icons/*: currentColor strokes and fills, a
-   non-scaling stroke so the 1px weight survives any box size, and --base as the
-   default so the glyphs track Payload's own icon sizing at every breakpoint. */
+   non-scaling stroke so the 1px weight survives any box size, and 16px by
+   default, the box Payload 4 draws its inline icons in. */
 .wiki-icon {
 	flex-shrink: 0;
-	height: var(--base);
-	width: var(--base);
+	height: 16px;
+	width: 16px;
 }
 
 .wiki-icon--small {

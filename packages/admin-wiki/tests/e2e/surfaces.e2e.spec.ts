@@ -155,7 +155,7 @@ test.describe('wiki surfaces', () => {
 		postId = await createDoc(page, 'posts', { title: 'Edit mode' })
 
 		await page.goto(`/admin/collections/${PAGES}`)
-		await page.locator('.wiki-edit-mode__pill').click()
+		await page.locator('.wiki-edit-mode__toggle').click()
 
 		await page.goto(`/admin/collections/posts/${postId}`)
 		// `tagline` is the one branding field no seeded guide targets. The

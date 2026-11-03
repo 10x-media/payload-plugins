@@ -57,6 +57,7 @@ describeForDb('adminWiki cross-db', {}, (db) => {
 		const read = async (locale: string) => {
 			const result = await booted.payload.find({
 				collection: PAGES,
+				overrideAccess: true,
 				depth: 0,
 				locale,
 				pagination: false,

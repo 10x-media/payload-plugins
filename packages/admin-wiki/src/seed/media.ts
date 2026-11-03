@@ -87,6 +87,7 @@ export const ensureSeedMedia = async ({
 		const file = await loadMediaFile(def)
 		const existing = await payload.find({
 			collection: mediaSlug as CollectionSlug,
+			overrideAccess: true,
 			depth: 0,
 			limit: 1,
 			pagination: false,
@@ -98,6 +99,7 @@ export const ensureSeedMedia = async ({
 			if (alt.base !== undefined) {
 				await payload.update({
 					collection: mediaSlug as CollectionSlug,
+					overrideAccess: true,
 					data: { alt: alt.base },
 					id,
 				})
@@ -105,6 +107,7 @@ export const ensureSeedMedia = async ({
 		} else {
 			const created = await payload.create({
 				collection: mediaSlug as CollectionSlug,
+				overrideAccess: true,
 				data: { alt: alt.base ?? def.key },
 				file: { ...file, size: file.data.length },
 			})
@@ -113,6 +116,7 @@ export const ensureSeedMedia = async ({
 		for (const [locale, value] of Object.entries(alt.rest)) {
 			await payload.update({
 				collection: mediaSlug as CollectionSlug,
+				overrideAccess: true,
 				data: { alt: value },
 				id,
 				locale: asLocale(locale),

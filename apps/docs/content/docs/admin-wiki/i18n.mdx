@@ -47,7 +47,9 @@ adminWiki({
 })
 ```
 
-Resolution order is the mapped locale, then the admin language itself when it happens to be a content locale, then the default locale. A guide with no translation for the resolved locale falls back to the default locale rather than rendering empty.
+Resolution order is the mapped locale, then the admin language itself when it happens to be a content locale, then the default locale.
+
+A guide reaches a reader only when it is published in the reader's resolved locale: Payload 4 tracks publication status per locale, so a guide published in English alone is absent from every surface for a German reader, rather than shown in English. Once it is published there, a field left without a translation (an empty German summary, say) falls back to the default locale rather than rendering empty.
 
 ## No dependency on @payloadcms/translations
 

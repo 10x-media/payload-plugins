@@ -169,14 +169,16 @@ The media collection takes only the function form. An upload collection is one `
 
 ## Plugin order
 
-The plugin documents the config as it stands when it runs, so it belongs **last** in the `plugins` array, after anything that adds collections or fields:
+The plugin documents the config as it stands when it runs, so it has to run after anything that adds collections or fields. It declares `order: 1000` (exported as `ADMIN_WIKI_PLUGIN_ORDER`), and Payload runs plugins sorted by `order`, ascending, with `0` as the default. Its place in the `plugins` array therefore does not matter:
 
 ```ts
 plugins: [
-  fields({ /* ... */ }),
   adminWiki({}),
+  fields({ /* ... */ }), // order 0, runs first anyway
 ]
 ```
+
+A plugin that sets an `order` of its own above `1000` runs after the wiki, and its collections and fields are not documented. A plugin that has to see the wiki's own collections (to extend them, say) sets a higher order on purpose.
 
 If the walk finds no fields at all, the plugin logs a warning on boot rather than failing. In practice that means the plugin ran before the config had any fields to document.
 
@@ -212,6 +214,6 @@ Both send `cache-control: no-store` and honor your read access. Paths follow `sl
 
 ## Requirements
 
-Payload `^3.83.0`, React 19, Node 22.18 or newer. `@payloadcms/richtext-lexical` and `@payloadcms/ui` are required peers; `@payloadcms/next` and `next` are optional peers, needed only for the [wiki view](/admin-wiki/wiki-view).
+Payload `^4.0.0-beta.6` on Next.js or TanStack Start, React 19, Node 24.22.1 or newer. `@payloadcms/richtext-lexical` and `@payloadcms/ui` are required peers; nothing in the plugin imports a framework, so the [wiki view](/admin-wiki/wiki-view) works on both.
 
 Run `payload generate:importmap` after installing and after upgrading. The plugin's surfaces are import-map component references, and a stale map is the most common reason nothing renders.

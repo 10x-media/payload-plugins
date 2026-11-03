@@ -84,7 +84,7 @@ const traverse = ({
 				})
 				break
 			case 'blocks': {
-				const declared = field.blockReferences ?? field.blocks ?? []
+				const declared = field.blocks ?? []
 				for (const entry of declared) {
 					const fromRegistry = typeof entry === 'string'
 					const block = fromRegistry ? context.blocksMap[entry] : entry

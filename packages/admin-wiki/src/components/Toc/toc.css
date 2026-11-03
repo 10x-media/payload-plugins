@@ -3,15 +3,15 @@
 .wiki-toc {
 	align-self: start;
 	position: sticky;
-	top: var(--base);
+	top: var(--spacer-4);
 }
 
 .wiki-toc__heading {
-	color: var(--theme-elevation-450);
-	font-size: 1rem;
-	letter-spacing: 0.04em;
-	margin: 0 0 calc(var(--base) / 2);
-	text-transform: uppercase;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-bold-font-size);
+	font-weight: var(--text-body-medium-bold-font-weight);
+	line-height: var(--text-body-medium-bold-line-height);
+	margin: 0 0 var(--spacer-2);
 }
 
 /* Positioned so the track and the list items share one coordinate space: the
@@ -22,7 +22,7 @@
 }
 
 .wiki-toc__list {
-	border-inline-start: 1px solid var(--theme-elevation-100);
+	border-inline-start: var(--stroke-width-small) solid var(--color-border);
 	list-style: none;
 	margin: 0;
 	padding: 0;
@@ -36,7 +36,7 @@
    `transform` rather than `top` because it is the one of the two the compositor
    can animate without laying the column out again on every scroll tick. */
 .wiki-toc__track {
-	background: var(--theme-elevation-800);
+	background: var(--color-border-strong);
 	border-radius: 1px;
 	height: var(--wiki-toc-track-height, 0);
 	inset-inline-start: -1px;
@@ -56,25 +56,25 @@
 }
 
 .wiki-toc__link {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 	display: block;
-	font-size: 1rem;
-	line-height: 1.4;
-	padding: calc(var(--base) / 4) calc(var(--base) / 2);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
+	padding: var(--spacer-1) var(--spacer-2-5);
 	text-decoration: none;
 	transition: color 0.15s ease;
 }
 
 .wiki-toc__item--h3 .wiki-toc__link {
-	padding-inline-start: calc(var(--base) * 1.25);
+	padding-inline-start: var(--spacer-5);
 }
 
 .wiki-toc__link:hover {
-	color: var(--theme-text);
+	color: var(--color-text);
 }
 
 .wiki-toc__link[data-active] {
-	color: var(--theme-text);
+	color: var(--color-text);
 }
 
 @media (prefers-reduced-motion: reduce) {

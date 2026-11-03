@@ -1,10 +1,10 @@
 .wiki-video {
-	margin-block: 1rem;
+	margin-block: 1em;
 }
 
 .wiki-video__player {
-	background: var(--theme-elevation-100);
-	border-radius: 6px;
+	background: var(--color-bg-secondary);
+	border-radius: var(--radius-medium);
 	display: block;
 	max-width: 100%;
 	width: 100%;
@@ -16,12 +16,12 @@
 
 .wiki-video__iframe {
 	border: 0;
-	border-radius: 6px;
+	border-radius: var(--radius-medium);
 	height: 100%;
 	width: 100%;
 }
 
 .wiki-video__status {
-	color: var(--theme-elevation-600);
-	font-size: 0.875rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 }

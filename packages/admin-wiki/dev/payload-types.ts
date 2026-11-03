@@ -60,13 +60,48 @@ export type SupportedTimezones =
   | 'Pacific/Noumea'
   | 'Pacific/Auckland'
   | 'Pacific/Fiji';
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "LexicalNodes_ADBB0923".
+ */
+export type LexicalNodes_ADBB0923 =
+  | SerializedTextNode
+  | SerializedTabNode
+  | SerializedLineBreakNode
+  | SerializedParagraphNode<LexicalNodes_ADBB0923>
+  | SerializedBlockNode<WikiVideoEmbedBlock>
+  | SerializedInlineBlockNode<DevStatusChip>
+  | SerializedUploadNode<'wiki-media'>
+  | SerializedAutoLinkNode<LexicalNodes_ADBB0923, LexicalLinkFields>
+  | SerializedLinkNode<LexicalNodes_ADBB0923, LexicalLinkFields>
+  | SerializedListNode<LexicalNodes_ADBB0923>
+  | SerializedListItemNode<LexicalNodes_ADBB0923>;
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "LexicalNodes_8F8075BC".
+ */
+export type LexicalNodes_8F8075BC =
+  | SerializedTextNode
+  | SerializedTabNode
+  | SerializedLineBreakNode
+  | SerializedParagraphNode<LexicalNodes_8F8075BC>
+  | SerializedBlockNode<WikiCalloutBlock | WikiVideoEmbedBlock | DevTip>
+  | SerializedInlineBlockNode<DevStatusChip>
+  | SerializedHorizontalRuleNode
+  | SerializedQuoteNode<LexicalNodes_8F8075BC>
+  | SerializedHeadingNode<LexicalNodes_8F8075BC, 'h2' | 'h3' | 'h4'>
+  | SerializedUploadNode<'wiki-media'>
+  | SerializedAutoLinkNode<LexicalNodes_8F8075BC, LexicalLinkFields>
+  | SerializedLinkNode<LexicalNodes_8F8075BC, LexicalLinkFields>
+  | SerializedListNode<LexicalNodes_8F8075BC>
+  | SerializedListItemNode<LexicalNodes_8F8075BC>;
 
 export interface Config {
   auth: {
     users: UserAuthOperations;
   };
   blocks: {
-    cta: Cta;
+    cta: Cta_3EE9F07D;
     heroBanner: HeroBanner;
   };
   collections: {
@@ -79,6 +114,7 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
+    'payload-llm-instructions': PayloadLlmInstruction;
   };
   collectionsJoins: {};
   collectionsSelect: {
@@ -91,6 +127,7 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
+    'payload-llm-instructions': PayloadLlmInstructionsSelect<false> | PayloadLlmInstructionsSelect<true>;
   };
   db: {
     defaultIDType: string;
@@ -104,7 +141,11 @@ export interface Config {
   };
   locale: 'en' | 'de';
   widgets: {
+    welcome: WelcomeWidget;
     collections: CollectionsWidget;
+    'collection-query': CollectionQueryWidget;
+    activity: ActivityWidget;
+    'upload-dropzone': UploadDropzoneWidget;
   };
   user: User;
   jobs: {
@@ -131,10 +172,12 @@ export interface UserAuthOperations {
   };
 }
 /**
+ * Multiple blocks resolve to the `Cta` interface with different fields, so a content hash is appended to keep the generated types stable and unambiguous. Set a unique `interfaceName` on the block to choose the name yourself. See https://payloadcms.com/docs/typescript/generating-types#block-interface-name-collisions
+ *
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "cta".
+ * via the `definition` "Cta_3EE9F07D".
  */
-export interface Cta {
+export interface Cta_3EE9F07D {
   label?: string | null;
   style?: ('primary' | 'secondary') | null;
   id?: string | null;
@@ -143,7 +186,7 @@ export interface Cta {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "heroBanner".
+ * via the `definition` "HeroBanner".
  */
 export interface HeroBanner {
   heading?: string | null;
@@ -203,19 +246,14 @@ export interface Post {
         }[]
       | null;
   };
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "products".
- */
-export interface Product {
-  id: string;
-  name: string;
-  price?: number | null;
-  description?: string | null;
-  layout?: (HeroBanner | Cta)[] | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -225,6 +263,14 @@ export interface Product {
  */
 export interface User {
   id: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -232,6 +278,7 @@ export interface User {
   resetPasswordExpiration?: string | null;
   salt?: string | null;
   hash?: string | null;
+  resetPasswordRequestedAt?: string | null;
   loginAttempts?: number | null;
   lockUntil?: string | null;
   sessions?:
@@ -246,27 +293,34 @@ export interface User {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "products".
+ */
+export interface Product {
+  id: string;
+  name: string;
+  price?: number | null;
+  description?: string | null;
+  layout?: (HeroBanner | Cta_3EE9F07D)[] | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "wiki-pages".
  */
 export interface WikiPage {
   id: string;
   title: string;
   summary?: string | null;
-  content?: {
-    root: {
-      type: string;
-      children: {
-        type: any;
-        version: number;
-        [k: string]: unknown;
-      }[];
-      direction: ('ltr' | 'rtl') | null;
-      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
-      indent: number;
-      version: number;
-    };
-    [k: string]: unknown;
-  } | null;
+  content?: LexicalRichText<LexicalNodes_8F8075BC> | null;
   targetCollections?: string[] | null;
   targetGlobals?: string[] | null;
   targetFields?: string[] | null;
@@ -277,6 +331,14 @@ export interface WikiPage {
   featured?: boolean | null;
   featuredOrder?: number | null;
   users?: (string | User)[] | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   _status?: ('draft' | 'published') | null;
@@ -288,6 +350,14 @@ export interface WikiPage {
 export interface WikiMedia {
   id: string;
   alt?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -297,6 +367,16 @@ export interface WikiMedia {
   filesize?: number | null;
   width?: number | null;
   height?: number | null;
+  original?: {
+    filename?: string | null;
+    url?: string | null;
+    mimeType?: string | null;
+    filesize?: number | null;
+    width?: number | null;
+    height?: number | null;
+    prefix?: string | null;
+    _objectKey?: string | null;
+  };
   focalX?: number | null;
   focalY?: number | null;
 }
@@ -388,6 +468,28 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions".
+ */
+export interface PayloadLlmInstruction {
+  id: string;
+  entitySlug: string;
+  title?: string | null;
+  entityType: 'collection' | 'global';
+  additionalInstructions?: string | null;
+  systemInstructions?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "posts_select".
  */
 export interface PostsSelect<T extends boolean = true> {
@@ -433,6 +535,8 @@ export interface PostsSelect<T extends boolean = true> {
               id?: T;
             };
       };
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -445,6 +549,8 @@ export interface ProductsSelect<T extends boolean = true> {
   price?: T;
   description?: T;
   layout?: T | {};
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -453,6 +559,8 @@ export interface ProductsSelect<T extends boolean = true> {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -460,6 +568,7 @@ export interface UsersSelect<T extends boolean = true> {
   resetPasswordExpiration?: T;
   salt?: T;
   hash?: T;
+  resetPasswordRequestedAt?: T;
   loginAttempts?: T;
   lockUntil?: T;
   sessions?:
@@ -488,6 +597,8 @@ export interface WikiPagesSelect<T extends boolean = true> {
   featured?: T;
   featuredOrder?: T;
   users?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -498,6 +609,8 @@ export interface WikiPagesSelect<T extends boolean = true> {
  */
 export interface WikiMediaSelect<T extends boolean = true> {
   alt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -507,6 +620,18 @@ export interface WikiMediaSelect<T extends boolean = true> {
   filesize?: T;
   width?: T;
   height?: T;
+  original?:
+    | T
+    | {
+        filename?: T;
+        url?: T;
+        mimeType?: T;
+        filesize?: T;
+        width?: T;
+        height?: T;
+        prefix?: T;
+        _objectKey?: T;
+      };
   focalX?: T;
   focalY?: T;
 }
@@ -552,6 +677,22 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions_select".
+ */
+export interface PayloadLlmInstructionsSelect<T extends boolean = true> {
+  id?: T;
+  entitySlug?: T;
+  title?: T;
+  entityType?: T;
+  additionalInstructions?: T;
+  systemInstructions?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "settings".
  */
 export interface Setting {
@@ -564,17 +705,28 @@ export interface Setting {
         id?: string | null;
       }[]
     | null;
-  sections?:
-    | {
-        label?: string | null;
-        url?: string | null;
-        id?: string | null;
-        blockName?: string | null;
-        blockType: 'cta';
-      }[]
-    | null;
+  sections?: Cta[] | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt?: string | null;
   createdAt?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Cta".
+ */
+export interface Cta {
+  label?: string | null;
+  url?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'cta';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -601,9 +753,21 @@ export interface SettingsSelect<T extends boolean = true> {
               blockName?: T;
             };
       };
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "welcome_widget".
+ */
+export interface WelcomeWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -617,38 +781,87 @@ export interface CollectionsWidget {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collection-query_widget".
+ */
+export interface CollectionQueryWidget {
+  data?: {
+    title?: string | null;
+    relatedCollection: 'posts' | 'products' | 'users' | 'wiki-pages' | 'wiki-media';
+    where?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    sortField?: string | null;
+    sortDirection?: ('asc' | 'desc') | null;
+    limit?: number | null;
+  };
+  width: 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "activity_widget".
+ */
+export interface ActivityWidget {
+  data?: {
+    excludedCollections?: ('posts' | 'products' | 'users' | 'wiki-pages' | 'wiki-media')[] | null;
+  };
+  width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "upload-dropzone_widget".
+ */
+export interface UploadDropzoneWidget {
+  data?: {
+    excludedCollections?: 'wiki-media'[] | null;
+  };
+  width: 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "WikiVideoEmbedBlock".
  */
 export interface WikiVideoEmbedBlock {
-  url: string;
-  id?: string | null;
-  blockName?: string | null;
+  id: string;
   blockType: 'wikiVideoEmbed';
+  url: string;
+  blockName?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "DevStatusChip".
+ */
+export interface DevStatusChip {
+  id: string;
+  blockType: 'devStatusChip';
+  tone: 'new' | 'deprecated';
+  label: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "WikiCalloutBlock".
  */
 export interface WikiCalloutBlock {
-  variant: 'info' | 'tip' | 'warning' | 'danger';
-  body?: {
-    root: {
-      type: string;
-      children: {
-        type: any;
-        version: number;
-        [k: string]: unknown;
-      }[];
-      direction: ('ltr' | 'rtl') | null;
-      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
-      indent: number;
-      version: number;
-    };
-    [k: string]: unknown;
-  } | null;
-  id?: string | null;
-  blockName?: string | null;
+  id: string;
   blockType: 'wikiCallout';
+  variant: 'info' | 'tip' | 'warning' | 'danger';
+  body?: LexicalRichText<LexicalNodes_ADBB0923> | null;
+  blockName?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "DevTip".
+ */
+export interface DevTip {
+  id: string;
+  blockType: 'devTip';
+  tip: string;
+  blockName?: string | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -656,6 +869,150 @@ export interface WikiCalloutBlock {
  */
 export interface Auth {
   [k: string]: unknown;
+}
+
+/** @internal Core Lexical types — see @payloadcms/richtext-lexical. */
+export type LexicalElementFormat = 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+export type LexicalElementDirection = ('ltr' | 'rtl') | null;
+
+export interface SerializedLexicalElementBase<TChildren> {
+  children: TChildren[];
+  direction: LexicalElementDirection;
+  format: LexicalElementFormat;
+  indent: number;
+  textFormat?: number;
+  textStyle?: string;
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+}
+
+export type LexicalTextMode = 'normal' | 'token' | 'segmented';
+
+export interface SerializedTextNode {
+  type: 'text';
+  detail: number;
+  format: number;
+  mode: LexicalTextMode;
+  style: string;
+  text: string;
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+}
+
+export interface SerializedTabNode {
+  type: 'tab';
+  detail: number;
+  format: number;
+  mode: LexicalTextMode;
+  style: string;
+  text: string;
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+}
+
+export interface SerializedLineBreakNode {
+  type: 'linebreak';
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+}
+
+export interface SerializedParagraphNode<TChildren> extends SerializedLexicalElementBase<TChildren> {
+  type: 'paragraph';
+  textFormat: number;
+  textStyle: string;
+}
+
+export type SerializedBlockNode<TFields extends { blockType: string }> = TFields extends unknown ? {
+  type: 'block';
+  format: LexicalElementFormat;
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+  fields: { id: string; blockName?: string | null } & Omit<TFields, 'id' | 'blockName'>;
+} : never;
+export type SerializedInlineBlockNode<TFields extends { blockType: string }> = TFields extends unknown ? {
+  type: 'inlineBlock';
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+  fields: { id: string } & Omit<TFields, 'id'>;
+} : never;
+
+export type SerializedUploadNode<TSlugs extends keyof Config['collections'], TFields = { [k: string]: unknown }> = {
+  type: 'upload';
+  format: LexicalElementFormat;
+  id: string;
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+  fields: TFields;
+} & {
+  [TSlug in TSlugs]: {
+    relationTo: TSlug;
+    value: Config['collections'][TSlug]['id'] | Config['collections'][TSlug];
+  };
+}[TSlugs];
+
+export interface LexicalLinkFields {
+  [k: string]: unknown;
+  doc?: {
+    relationTo: string;
+    value: Config['db']['defaultIDType'] | { [k: string]: unknown; id: Config['db']['defaultIDType'] };
+  } | null;
+  linkType: 'custom' | 'internal';
+  newTab: boolean;
+  url?: string;
+}
+export interface SerializedLinkNode<TChildren, TFields = LexicalLinkFields> extends SerializedLexicalElementBase<TChildren> {
+  type: 'link';
+  fields: TFields;
+  id?: string;
+}
+export interface SerializedAutoLinkNode<TChildren, TFields = LexicalLinkFields> extends SerializedLexicalElementBase<TChildren> {
+  type: 'autolink';
+  fields: TFields;
+}
+
+export interface SerializedListNode<TChildren> extends SerializedLexicalElementBase<TChildren> {
+  type: 'list';
+  checked?: boolean;
+  listType: 'number' | 'bullet' | 'check';
+  start: number;
+  tag: 'ul' | 'ol';
+}
+
+export interface SerializedListItemNode<TChildren> extends SerializedLexicalElementBase<TChildren> {
+  type: 'listitem';
+  checked?: boolean;
+  value: number;
+}
+
+/** Shape of a Lexical `richText` field. */
+export interface LexicalRichText<TNode> {
+  root: {
+    children: TNode[];
+    direction: LexicalElementDirection;
+    format: LexicalElementFormat;
+    indent: number;
+    type: 'root';
+    /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+    version: number;
+  };
+}
+
+export interface SerializedHorizontalRuleNode {
+  type: 'horizontalrule';
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+}
+
+export interface SerializedQuoteNode<TChildren> extends SerializedLexicalElementBase<TChildren> {
+  type: 'quote';
+}
+
+export interface SerializedHeadingNode<
+  TChildren,
+  TTag extends 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6',
+> extends SerializedLexicalElementBase<TChildren> {
+  type: 'heading';
+  tag: TTag;
 }
 
 

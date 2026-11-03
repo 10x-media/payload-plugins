@@ -125,7 +125,7 @@ export const GuideDrawer = ({ entries, initialGuideId, slug }: GuideDrawerProps)
 						{wikiHref || editHref ? (
 							<div className="wiki-guide-drawer__actions">
 								{wikiHref ? (
-									<Button buttonStyle="pill" el="link" margin={false} size="small" to={wikiHref}>
+									<Button buttonStyle="pill" el="link" margin={false} size="medium" to={wikiHref}>
 										{t(keys.wikiOpenInWiki)}
 									</Button>
 								) : null}
@@ -135,9 +135,8 @@ export const GuideDrawer = ({ entries, initialGuideId, slug }: GuideDrawerProps)
 										el="link"
 										icon="edit"
 										iconPosition="left"
-										iconStyle="none"
 										margin={false}
-										size="small"
+										size="medium"
 										to={editHref}
 									>
 										{t(keys.drawerEditGuide)}

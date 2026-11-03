@@ -21,11 +21,10 @@ export const WikiViewLink = () => {
 			<Button
 				buttonStyle="pill"
 				el="link"
-				icon={<BookIcon size="small" />}
+				icon={<BookIcon size="medium" />}
 				iconPosition="left"
-				iconStyle="none"
 				margin={false}
-				size="small"
+				size="medium"
 				to={`${config.routes.admin}/wiki`}
 			>
 				{t(keys.wikiOpenWiki)}

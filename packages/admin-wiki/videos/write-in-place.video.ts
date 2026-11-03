@@ -37,7 +37,7 @@ export default defineVideo({
 		await s.goto('/admin/collections/wiki-pages')
 		await s.snapshot('write-in-place')
 
-		await s.click('.wiki-edit-mode__pill')
+		await s.click('.wiki-edit-mode__toggle')
 		await s.wait(800)
 
 		await s.goto(`/admin/collections/posts/${postId}`)

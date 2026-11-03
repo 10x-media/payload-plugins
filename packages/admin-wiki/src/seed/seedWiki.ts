@@ -88,6 +88,10 @@ const resolveContent = (
  * added to the collection itself are reached through each guide's
  * `additionalData`. Failures throw with the offending guide or media key in the
  * message; nothing is silently skipped.
+ *
+ * Every read and write runs with `overrideAccess: true`: seeding is trusted
+ * server code, usually called from `onInit` with no user, and Payload 4's Local
+ * API would otherwise apply the wiki's access rules and refuse it.
  */
 export const seedWiki = async (
 	payload: Payload,
@@ -151,6 +155,7 @@ export const seedWiki = async (
 		try {
 			const existing = await payload.find({
 				collection: pagesSlug as CollectionSlug,
+				overrideAccess: true,
 				depth: 0,
 				draft: true,
 				limit: 1,
@@ -164,6 +169,7 @@ export const seedWiki = async (
 				const title = titles.get(def.slug)
 				const created = await payload.create({
 					collection: pagesSlug as CollectionSlug,
+					overrideAccess: true,
 					// `draft: true` is what sets `_status`; the collection always has
 					// drafts enabled, so passing it here as well is redundant. The data
 					// is asserted because a host that generated its types narrows draft
@@ -223,6 +229,7 @@ export const seedWiki = async (
 			const action = actions[def.slug] ?? 'updated'
 			await payload.update({
 				collection: pagesSlug as CollectionSlug,
+				overrideAccess: true,
 				data: baseData,
 				draft: false,
 				id,
@@ -236,6 +243,7 @@ export const seedWiki = async (
 				const localeContent = content.rest[locale]
 				await payload.update({
 					collection: pagesSlug as CollectionSlug,
+					overrideAccess: true,
 					data: {
 						_status: status,
 						...(title.rest[locale] !== undefined ? { title: title.rest[locale] } : {}),

@@ -1,7 +1,6 @@
-import { DefaultTemplate } from '@payloadcms/next/templates'
 import type { SerializedEditorState } from '@payloadcms/richtext-lexical/lexical'
 import { Gutter, SetStepNav } from '@payloadcms/ui'
-import { redirect } from 'next/navigation'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps, CollectionSlug } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 
@@ -9,7 +8,7 @@ import { GuideArticle } from '../components/GuideArticle/GuideArticle'
 import { StarIcon } from '../components/icons'
 import { TargetChips } from '../components/TargetChips/TargetChips'
 import { WikiToc } from '../components/Toc/WikiToc'
-import { WikiViewActions } from '../components/WikiView/WikiViewActions'
+import { WIKI_EDIT_GUIDE_ACTION } from '../shared/editGuideAction'
 import { collectGuideHeadings, hasTocHeadings } from '../shared/headings'
 import { targetKeysForDoc, type WikiGuideDoc, type WikiTargetDoc } from '../shared/targetKeys'
 import { chipTargetKeys } from '../shared/targetLabels'
@@ -31,7 +30,9 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 	const segments = Array.isArray(params?.segments) ? params.segments : []
 	const slug = typeof segments[1] === 'string' ? decodeURIComponent(segments[1]) : ''
 	if (!req.user) {
-		redirect(wikiLoginRedirectUrl(props, slug ? `${context.wikiPath}/${slug}` : context.wikiPath))
+		props.server.redirect(
+			wikiLoginRedirectUrl(props, slug ? `${context.wikiPath}/${slug}` : context.wikiPath)
+		)
 	}
 	const t = asTranslate(i18n.t)
 	let doc: null | (WikiGuideDoc & WikiTargetDoc & { featured?: unknown }) = null
@@ -86,8 +87,15 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 			permissions={permissions}
 			req={req}
 			searchParams={searchParams}
-			user={req.user}
-			viewActions={props.viewActions}
+			user={props.user}
+			viewActions={
+				doc && context.canUpdate && editUrl
+					? [
+							...(props.viewActions ?? []),
+							{ clientProps: { editUrl }, path: WIKI_EDIT_GUIDE_ACTION },
+						]
+					: props.viewActions
+			}
 			visibleEntities={{
 				collections: visibleEntities?.collections,
 				globals: visibleEntities?.globals,
@@ -112,7 +120,6 @@ export const WikiPageView = async (props: AdminViewServerProps) => {
 							: []),
 					]}
 				/>
-				{doc && context.canUpdate && editUrl ? <WikiViewActions editUrl={editUrl} /> : null}
 				<div
 					className={['wiki-guide-layout', showToc ? 'wiki-guide-layout--with-toc' : null]
 						.filter(Boolean)
