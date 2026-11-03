@@ -5,9 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"build": "vite build",
-		"build": "vite build",
 		"dev": "vite dev",
-		"start": "srvx --prod --dir=. --static=dist/client --entry=dist/server/server.js",
 		"start": "srvx --prod --dir=. --static=dist/client --entry=dist/server/server.js",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"generate:importmap": "bash ../../../scripts/payload.sh . generate:importmap"
@@ -23,7 +21,6 @@
 		"payload": "catalog:",
 		"react": "catalog:",
 		"react-dom": "catalog:",
-		"srvx": "catalog:",
 		"srvx": "catalog:",
 		"vite": "catalog:"
 	},
