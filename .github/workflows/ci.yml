@@ -270,10 +270,11 @@ jobs:
   # change reaches analytics through the package graph; the scope fallback always runs it. The
   # full history checkout also brings the beta.11 tag it checks out. The `no_e2e` label does not
   # skip it: it boots no browser, and it is the only check of the upgrading page's migration edits.
+  # Off on the v4 line: beta.11 is a Payload 3 release, so it cannot upgrade onto Payload 4.
   analytics-upgrade:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    if: github.event_name != 'push'
+    if: github.event_name != 'push' && github.base_ref != 'v4' && github.ref != 'refs/heads/v4'
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 0 }
