@@ -141,6 +141,20 @@ describeForDb('fields color', {}, (db) => {
 		expect(doc.opaque).toBe('#ff0000')
 	})
 
+	it('selecting a linked field also returns its resolved sibling (list view columns)', async () => {
+		const doc = await create({ linkedStatic: 'preset:brand' })
+		const found = await booted.payload.find({
+			overrideAccess: true,
+			collection: 'swatches',
+			select: { linkedStatic: true },
+			where: { id: { equals: doc.id } },
+		})
+		const [row] = found.docs as Array<Record<string, unknown>>
+		expect(row?.linkedStatic).toBe('preset:brand')
+		expect(row?.linkedStaticResolved).toBe('#7c3aed')
+		expect(row?.linkedBrandResolved).toBeUndefined()
+	})
+
 	it('rejects unparseable values', async () => {
 		await expect(create({ hex: 'not-a-color' })).rejects.toThrow()
 	})

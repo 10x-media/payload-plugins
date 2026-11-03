@@ -195,6 +195,10 @@ test.describe('encrypted field', () => {
 		const row = field.locator('.tenx-protected-field__attached-row')
 		const borderTop = (loc: Locator): Promise<string> =>
 			loc.evaluate((el) => getComputedStyle(el).borderTopColor)
+		// The reveal click leaves focus on the eye, inside the row; measure the idle border without it.
+		await eyeOf(field).evaluate((el) => (el as HTMLElement).blur())
+		await page.mouse.move(0, 0)
+		await expect.poll(() => borderTop(row)).not.toBe('rgb(13, 153, 255)')
 		const idle = await borderTop(row)
 		// One border around input and eye: the row takes the focus color from either.
 		await input.focus()

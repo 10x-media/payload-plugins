@@ -92,9 +92,12 @@ const CountryPanel: React.FC<CountryPanelProps> = ({
 	const listId = useId()
 
 	// The panel is portalled to the body and absolutely positioned, so a plain focus scrolls
-	// the page to it and drags the row the viewer is reading out from under them.
+	// the page to it and drags the row the viewer is reading out from under them. Deferred a
+	// frame: this effect runs before Popup's own, which is what shows the popover, and an
+	// element in a hidden popover cannot take focus.
 	useEffect(() => {
-		searchRef.current?.focus({ preventScroll: true })
+		const frame = requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }))
+		return () => cancelAnimationFrame(frame)
 	}, [])
 
 	const rows = useMemo(

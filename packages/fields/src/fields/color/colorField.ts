@@ -1,5 +1,6 @@
 import type { FieldHook, JSONField, PayloadRequest, TextField, TextFieldValidation } from 'payload'
 import { text } from 'payload/shared'
+import { withCompanions } from '../../plugin/companionSelect'
 import { keys } from '../../translations/keys'
 import { asTranslate } from '../../translations/server'
 import type { ColorFormat, ColorSchemeValue } from '../../types'
@@ -218,5 +219,6 @@ export function colorField(
 					virtual: true,
 				}
 
-	return [field, resolvedField]
+	// The list Cell renders a linked value from its resolved sibling.
+	return [withCompanions(field, [resolvedField.name]), resolvedField]
 }

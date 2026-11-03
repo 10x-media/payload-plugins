@@ -43,6 +43,10 @@ const pickUnit = async (page: Page, name: string, shortLabel: RegExp): Promise<v
 		.locator('.fields-measurement__unit-option:visible')
 		.filter({ has: page.locator('.fields-measurement__unit-symbol', { hasText: shortLabel }) })
 		.click()
+	// Payload's Popup hands focus back to its trigger a frame after closing; typing into the
+	// field before that lands half the keystrokes in an input that is about to blur.
+	await expect(page.locator('.fields-measurement__unit-panel:visible')).toHaveCount(0)
+	await expect(unitBadge(page, name)).toBeFocused()
 }
 
 test.describe('measurement field', () => {

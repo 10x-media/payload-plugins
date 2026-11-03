@@ -7,6 +7,7 @@ import type {
 	PayloadRequest,
 	Where,
 } from 'payload'
+import { type CompanionEntry, companionSelect, siblingPath } from '../../plugin/companionSelect'
 import { computeBidx } from './crypto/bidx'
 import type { KeyRing } from './crypto/keys'
 import { contextMode, ringForRequest } from './hooks'
@@ -192,71 +193,19 @@ const stripPathsFor = (markers: ReadonlyMap<string, EncryptedFieldMarker>): stri
 	return paths
 }
 
-/** Dot paths of the stored write-only fields, each with the virtual siblings that report on it. */
+/** Each stored write-only field with the virtual siblings that report on it. */
 const writeOnlySiblingsFor = (
 	markers: ReadonlyMap<string, EncryptedFieldMarker>
-): Array<{ path: string; siblings: string[] }> => {
-	const out: Array<{ path: string; siblings: string[] }> = []
+): CompanionEntry[] => {
+	const out: CompanionEntry[] = []
 	for (const [path, marker] of markers) {
 		if (!marker.writeOnly) continue
 		const siblings = [marker.setName, marker.hintName]
 			.filter((name): name is string => Boolean(name))
-			.map((name) => bidxPathFor(path, name))
+			.map((name) => siblingPath(path, name))
 		if (siblings.length > 0) out.push({ path, siblings })
 	}
 	return out
-}
-
-type SelectNode = { [key: string]: SelectNode | boolean }
-
-type SelectFunction = (
-	args: Parameters<NonNullable<CollectionConfig['select']>>[0]
-) => Parameters<NonNullable<CollectionConfig['select']>>[0]['select']
-
-const selectedAt = (select: SelectNode, path: string): boolean => {
-	let node: SelectNode | boolean | undefined = select
-	for (const segment of path.split('.')) {
-		if (!node || typeof node !== 'object') return false
-		node = node[segment]
-	}
-	return node === true || (typeof node === 'object' && node !== null)
-}
-
-const withSelectedAt = (select: SelectNode, path: string): SelectNode => {
-	const [head, ...rest] = path.split('.') as [string, ...string[]]
-	if (rest.length === 0) return { ...select, [head]: true }
-	const child = select[head]
-	if (child === true) return select
-	return {
-		...select,
-		[head]: withSelectedAt(typeof child === 'object' ? child : {}, rest.join('.')),
-	}
-}
-
-/**
- * Selecting a write-only field also selects its `_set` and `_hint` siblings: the list view
- * queries only its visible columns, and the write-only cell reads set-ness and the hint
- * from those siblings, since the stored value itself never leaves the server. An exclude-mode
- * select already returns them unless it excludes them by name.
- */
-const makeWriteOnlySelect = (
-	entries: Array<{ path: string; siblings: string[] }>,
-	prior: CollectionConfig['select']
-): NonNullable<CollectionConfig['select']> => {
-	const selectFn: SelectFunction = (args) => {
-		const resolved = prior ? prior(args) : undefined
-		const select = (resolved === undefined ? args.select : resolved) as SelectNode | undefined
-		if (!select || Object.values(select).some((value) => value === false)) return resolved
-		let next = select
-		for (const { path, siblings } of entries) {
-			if (!selectedAt(next, path)) continue
-			for (const sibling of siblings) next = withSelectedAt(next, sibling)
-		}
-		return next === select ? resolved : (next as typeof args.select)
-	}
-	// A collection typed against generated types narrows the return to its include shape;
-	// adding sibling keys keeps an include select an include select.
-	return selectFn as NonNullable<CollectionConfig['select']>
 }
 
 /**
@@ -283,7 +232,9 @@ export const withEncryptedQueryRewrite = (collection: CollectionConfig): Collect
 	}
 	const writeOnly = writeOnlySiblingsFor(allMarkers)
 	if (writeOnly.length > 0) {
-		return { ...collection, hooks, select: makeWriteOnlySelect(writeOnly, collection.select) }
+		// The list view selects only visible columns; the write-only cell reads set-ness and
+		// the hint from these siblings, since the stored value never leaves the server.
+		return { ...collection, hooks, select: companionSelect(writeOnly, collection.select) }
 	}
 	return { ...collection, hooks }
 }
