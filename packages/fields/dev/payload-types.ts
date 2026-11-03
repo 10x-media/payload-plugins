@@ -835,7 +835,25 @@ export interface Reference {
   selectReadOnly?: ('alpha' | 'beta' | 'gamma') | null;
   radio?: ('alpha' | 'beta' | 'gamma') | null;
   radioHorizontal?: ('alpha' | 'beta' | 'gamma') | null;
+  /**
+   * A radio group with a description.
+   */
+  radioDescribed?: ('alpha' | 'beta' | 'gamma') | null;
+  /**
+   * A horizontal radio group with a description.
+   */
+  radioHorizontalDescribed?: ('alpha' | 'beta' | 'gamma') | null;
+  radioRequired: 'alpha' | 'beta' | 'gamma';
   checkbox?: boolean | null;
+  /**
+   * A checkbox with a description.
+   */
+  checkboxDescribed?: boolean | null;
+  /**
+   * A longer description that also wraps, to see how it lines up with the label and the box.
+   */
+  checkboxLongDescribed?: boolean | null;
+  checkboxRequired: boolean;
   checkboxReadOnly?: boolean | null;
   relationship?: (string | null) | Tenant;
   relationshipHasMany?: (string | Tenant)[] | null;
@@ -1461,7 +1479,13 @@ export interface ReferenceSelect<T extends boolean = true> {
   selectReadOnly?: T;
   radio?: T;
   radioHorizontal?: T;
+  radioDescribed?: T;
+  radioHorizontalDescribed?: T;
+  radioRequired?: T;
   checkbox?: T;
+  checkboxDescribed?: T;
+  checkboxLongDescribed?: T;
+  checkboxRequired?: T;
   checkboxReadOnly?: T;
   relationship?: T;
   relationshipHasMany?: T;

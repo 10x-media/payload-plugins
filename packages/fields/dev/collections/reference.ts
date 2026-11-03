@@ -108,7 +108,38 @@ export const reference: CollectionConfig = {
 							options,
 							admin: { layout: 'horizontal' },
 						},
+						{
+							name: 'radioDescribed',
+							type: 'radio',
+							options,
+							admin: { description: 'A radio group with a description.' },
+						},
+						{
+							name: 'radioHorizontalDescribed',
+							type: 'radio',
+							options,
+							admin: {
+								description: 'A horizontal radio group with a description.',
+								layout: 'horizontal',
+							},
+						},
+						{ name: 'radioRequired', type: 'radio', options, required: true },
 						{ name: 'checkbox', type: 'checkbox' },
+						{
+							name: 'checkboxDescribed',
+							type: 'checkbox',
+							admin: { description: 'A checkbox with a description.' },
+						},
+						{
+							name: 'checkboxLongDescribed',
+							type: 'checkbox',
+							label: 'Checkbox with a long label that wraps onto a second line in a narrow column',
+							admin: {
+								description:
+									'A longer description that also wraps, to see how it lines up with the label and the box.',
+							},
+						},
+						{ name: 'checkboxRequired', type: 'checkbox', required: true },
 						{
 							name: 'checkboxReadOnly',
 							type: 'checkbox',
