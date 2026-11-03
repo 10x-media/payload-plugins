@@ -39,7 +39,7 @@ pnpm test:matrix [name]
 pnpm test:container [name]
 pnpm test:e2e <name>
 E2E_DBS=postgres pnpm test:e2e analytics   # analytics e2e on some databases (default: mongo postgres sqlite)
-E2E_FRAMEWORK=tanstack pnpm test:e2e <name>  # the same suite on the TanStack Start dev app (vite dev)
+E2E_FRAMEWORK=tanstack pnpm test:e2e <name>  # the same suite on the TanStack Start dev app's build (srvx)
 pnpm test:upgrade analytics                # upgrade 1.0.0-beta.11 installs (UPGRADE_DBS, UPGRADE_VARIANTS select)
 
 # Docs showcase clips (needs `pnpm dev <name>` already running)
@@ -120,7 +120,7 @@ Every plugin in `packages/<slug>/` follows the same shape (`packages/automations
 - `src/exports/`: public sub-path entry points wired through the package `exports` map: `.` (factory), `./types`, `./client` (client/React-only code), `./i18n`. Server code must not import from `./exports/client`.
 - `src/translations/`: i18n. Keys live in `translations/keys.ts` as a typed constant; look them up with `t(keys.someKey)`, never a string literal.
 - `dev/`: a private, per-plugin Next.js app (`@10x-media/<slug>-dev`) that mounts Payload admin so you can exercise the plugin by hand (`pnpm dev <slug>`) and run e2e against a production build. Integration tests do not use it; they boot Payload directly via the harness.
-- `dev-tanstack/`: the same app on TanStack Start (`@10x-media/<slug>-dev-tanstack`, `pnpm dev:tanstack <slug>`, port 3001). Payload 4 runs on both frameworks, so plugin admin UI must too. It imports `dev/payload.config.ts` and only moves the import map next to its own routes (`pnpm generate:importmap:tanstack <slug>`). Its own package keeps Vite 8 apart from Next and vitest. Every file but `package.json` and `importMap.js` is shared verbatim from the template.
+- `dev-tanstack/`: the same app on TanStack Start (`@10x-media/<slug>-dev-tanstack`, `pnpm dev:tanstack <slug>`, port 3001). Payload 4 runs on both frameworks, so plugin admin UI must too. It imports `dev/payload.config.ts` and only moves the import map next to its own routes (`pnpm generate:importmap:tanstack <slug>`). Its own package keeps Vite 8 apart from Next and vitest. A plugin ported to Payload 4 adds `build` (`vite build`) and `start` (`srvx`) from the template's `dev-tanstack/package.json`, which give the e2e TanStack leg a production build. Every file but `package.json` and `importMap.js` is shared verbatim from the template.
 - unit tests co-located with their source (`src/**/*.test.ts`, pure functions, no DB), `tests/int` (boot Payload via the harness), `tests/e2e` (Playwright against the dev app).
 
 Only `dist/` is published (built by tsdown). The `development` export condition points at `src/` so tests and typecheck never need a build; `publishConfig.exports` rewrites the map to `dist/` at publish time.
