@@ -8,6 +8,8 @@ export type ActionKind = 'clear' | 'edit' | 'generate' | 'undo'
 /**
  * Payload's upload-editor reset arrow, which `@payloadcms/ui` draws but does not
  * export (beta.6), redrawn from its 24px path.
+ *
+ * @todo Import `ResetIcon` from `@payloadcms/ui` once it is exported, and drop this copy.
  */
 const UndoIcon: React.FC = () => (
 	<svg
