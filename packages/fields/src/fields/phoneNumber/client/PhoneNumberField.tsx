@@ -229,6 +229,24 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 	}, [])
 	useEffect(() => cancelPending, [cancelPending])
 
+	// Typed or pasted before the lazy metadata landed, the draft went in unformatted; format it
+	// once on arrival, but only with the caret at the end, so the reformat cannot move it.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the metadata arrival is the trigger, not every keystroke
+	useEffect(() => {
+		const input = inputRef.current
+		if (!metadata || !editingRef.current || !input || draft === '') return
+		if (input.selectionStart !== null && input.selectionStart !== draft.length) return
+		const formatted = formatDraft({
+			atEnd: true,
+			callingCode,
+			country,
+			metadata,
+			previous: '',
+			raw: draft,
+		})
+		if (formatted !== null && formatted !== draft) setDraft(formatted)
+	}, [metadata])
+
 	const onChange = useCallback(
 		(event: React.ChangeEvent<HTMLInputElement>) => {
 			const input = event.target
