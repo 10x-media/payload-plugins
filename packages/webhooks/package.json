@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/webhooks",
-	"version": "0.1.0-beta.5",
+	"version": "4.0.0-alpha.0",
 	"description": "Outbound webhook subscriptions for Payload v3",
 	"license": "MIT",
 	"repository": {
@@ -75,7 +75,7 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@10x-media/fields": "^0.1.0-beta.5",
+		"@10x-media/fields": "^4.0.0-alpha.0",
 		"@payloadcms/ui": "^3.83.0",
 		"next": "^15.0.0 || ^16.0.0",
 		"payload": "^3.83.0",
