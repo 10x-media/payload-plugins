@@ -67,7 +67,7 @@
 	padding: 0;
 	cursor: pointer;
 	border: 0;
-	border-radius: var(--radius-small);
+	border-radius: var(--radius-medium);
 	background: transparent;
 }
 
@@ -82,7 +82,7 @@
 	height: 1.25rem;
 	overflow: hidden;
 	border: var(--stroke-width-small) solid var(--field-color-border);
-	border-radius: var(--radius-small);
+	border-radius: var(--radius-medium);
 }
 
 .fields-color__swatch-button:hover .fields-color__swatch {
@@ -165,7 +165,7 @@
 	height: 12px;
 	overflow: hidden;
 	border: var(--stroke-width-small) solid var(--field-color-border);
-	border-radius: var(--radius-small);
+	border-radius: var(--radius-chip);
 }
 
 .fields-color__chip-color {
@@ -272,6 +272,9 @@
 	border-radius: var(--radius-full);
 	appearance: none;
 	-webkit-appearance: none;
+	/* The gradient is sized to the padding box and repeats under the border, which painted
+	   the alpha track's opaque end as a strip at its transparent start. */
+	background-clip: padding-box;
 	background-size: 100% 100%;
 }
 
@@ -319,60 +322,16 @@
 	gap: var(--spacer-1);
 }
 
-/* Ghost buttons with the selected state, as Payload's Button renders them */
+/* Payload Buttons: ghost when idle, pill for the active format (the pill's own fill, not its
+   selected state, whose text falls short of 4.5:1 at this size). Layout only here: equal
+   segments across the row. */
 .fields-color__format {
 	flex: 1 1 0;
-	height: var(--button-height);
-	padding: 0;
-	border: 0;
-	border-radius: var(--button-radius);
-	background: transparent;
-	color: var(--color-text);
-	font-size: var(--text-body-small-bold-font-size);
-	font-weight: var(--text-body-small-bold-font-weight);
-	line-height: var(--text-body-small-bold-line-height);
-	letter-spacing: 0.05em;
-	text-transform: uppercase;
-	cursor: pointer;
-}
-
-.fields-color__format:hover {
-	background: var(--color-bg-transparent-hover);
-}
-
-.fields-color__format:active {
-	background: var(--color-bg-transparent-pressed);
-}
-
-/* Payload's selected ghost pairs --color-text-selected with --color-bg-selected,
-   which falls short of 4.5:1 at this size (3.8 light, 4.0 dark); the selected
-   background alone carries the state here */
-.fields-color__format[aria-pressed="true"] {
-	background: var(--color-bg-selected);
+	justify-content: center;
 }
 
 .fields-color__eyedropper {
-	display: flex;
 	flex-shrink: 0;
-	align-items: center;
-	justify-content: center;
-	width: var(--button-height);
-	height: var(--button-height);
-	padding: 0;
-	border: 0;
-	border-radius: var(--button-radius);
-	background: transparent;
-	color: var(--color-icon-secondary);
-	cursor: pointer;
-}
-
-.fields-color__eyedropper:hover {
-	background: var(--color-bg-transparent-hover);
-	color: var(--color-icon);
-}
-
-.fields-color__eyedropper:active {
-	background: var(--color-bg-transparent-pressed);
 }
 
 .fields-color__presets-label {
@@ -395,13 +354,15 @@
 	gap: var(--spacer-1);
 }
 
+/* About 27px across, so the field swatch's 5px on 20px scales to 7px here; Payload has no
+   token between medium (5px) and large (13px). */
 .fields-color__preset {
 	position: relative;
 	overflow: hidden;
 	aspect-ratio: 1;
 	padding: 0;
 	border: var(--stroke-width-small) solid var(--field-color-border);
-	border-radius: var(--radius-small);
+	border-radius: calc(var(--radius-medium) + var(--radius-small));
 	cursor: pointer;
 }
 

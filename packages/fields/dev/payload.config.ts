@@ -17,6 +17,7 @@ import { encrypted } from './collections/encrypted'
 import { icons } from './collections/icons'
 import { measurements } from './collections/measurements'
 import { phoneNumbers } from './collections/phoneNumbers'
+import { reference } from './collections/reference'
 import { tenants } from './collections/tenants'
 import { writeOnlyStories } from './collections/writeOnlyStories'
 import { smtpSettings } from './globals/smtpSettings'
@@ -74,8 +75,9 @@ export default buildConfig({
 		],
 	}),
 	// Payload orders the admin sidebar by this array. Field-example collections
-	// (colors, icons) come first so a reviewer lands on them; infrastructure
-	// collections (tenants, users) sit at the bottom. Each group is alphabetical.
+	// (colors, icons) come first so a reviewer lands on them, then the native
+	// reference collection; infrastructure collections (tenants, users) sit at the
+	// bottom. Each group is alphabetical.
 	collections: [
 		colors,
 		encrypted,
@@ -83,6 +85,7 @@ export default buildConfig({
 		measurements,
 		phoneNumbers,
 		writeOnlyStories,
+		reference,
 		tenants,
 		users,
 	],

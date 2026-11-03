@@ -311,6 +311,8 @@ export const MeasurementInputView: React.FC<MeasurementInputViewProps> = (props)
 		if (!isUnitInteractive) return null
 		const shortLabel = engine.unitLabel(displayUnit, locale, 'short')
 		return (
+			// @todo Payload 4's Popup pins its panel to the viewport edge once the field scrolls out of
+			// view (v3 let it scroll away with the field). Adopt the option if Payload adds one.
 			<Popup
 				button={
 					<>

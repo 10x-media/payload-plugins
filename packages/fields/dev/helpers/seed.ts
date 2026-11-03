@@ -198,6 +198,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 							{
 								children: [
 									{
+										detail: 0,
+										format: 0,
+										mode: 'normal',
+										style: '',
 										text: 'Draft body, protection none, encrypted at rest.',
 										type: 'text',
 										version: 1,
@@ -207,6 +211,8 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 								format: '',
 								indent: 0,
 								type: 'paragraph',
+								textFormat: 0,
+								textStyle: '',
 								version: 1,
 							},
 						],
@@ -227,11 +233,23 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 					root: {
 						children: [
 							{
-								children: [{ text: 'Extremely private rich text.', type: 'text', version: 1 }],
+								children: [
+									{
+										detail: 0,
+										format: 0,
+										mode: 'normal',
+										style: '',
+										text: 'Extremely private rich text.',
+										type: 'text',
+										version: 1,
+									},
+								],
 								direction: null,
 								format: '',
 								indent: 0,
 								type: 'paragraph',
+								textFormat: 0,
+								textStyle: '',
 								version: 1,
 							},
 						],

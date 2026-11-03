@@ -121,7 +121,7 @@
 	flex-shrink: 0;
 	width: 20px;
 	height: 15px;
-	border-radius: 1px;
+	border-radius: var(--radius-small);
 	object-fit: cover;
 }
 

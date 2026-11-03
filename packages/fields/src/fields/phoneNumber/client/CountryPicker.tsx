@@ -320,6 +320,8 @@ export const CountryPicker: React.FC<CountryPickerProps> = ({
 	}
 
 	return (
+		// @todo Payload 4's Popup pins its panel to the viewport edge once the field scrolls out of
+		// view (v3 let it scroll away with the field). Adopt the option if Payload adds one.
 		<Popup
 			button={
 				<>

@@ -1,4 +1,5 @@
 'use client'
+import { Button } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
@@ -275,21 +276,25 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 				{/* biome-ignore lint/a11y/useSemanticElements: fieldset breaks flex layout in Safari; this is a toggle-button group, not a form fieldset */}
 				<div aria-label={t(keys.format)} className={`${baseClass}__formats`} role="group">
 					{FORMATS.map((entry) => (
-						<button
+						<Button
 							aria-pressed={entry === displayFormat}
+							buttonStyle={entry === displayFormat ? 'pill' : 'ghost'}
 							className={`${baseClass}__format`}
 							key={entry}
+							margin={false}
 							onClick={() => setDisplayFormat(entry)}
-							type="button"
 						>
-							{entry}
-						</button>
+							{entry.toUpperCase()}
+						</Button>
 					))}
 				</div>
 				{enableEyedropper && eyeDropperSupported ? (
-					<button
+					<Button
 						aria-label={t(keys.eyedropperPick)}
+						buttonStyle="ghost"
 						className={`${baseClass}__eyedropper`}
+						icon={<EyedropperIcon />}
+						margin={false}
 						onClick={() => {
 							const EyeDropper = getEyeDropper()
 							if (!EyeDropper) return
@@ -299,10 +304,7 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 								() => undefined
 							)
 						}}
-						type="button"
-					>
-						<EyedropperIcon />
-					</button>
+					/>
 				) : null}
 			</div>
 

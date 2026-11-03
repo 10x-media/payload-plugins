@@ -10,7 +10,7 @@
 	height: 16px;
 	overflow: hidden;
 	border: var(--stroke-width-small) solid var(--field-color-border);
-	border-radius: var(--radius-small);
+	border-radius: var(--radius-chip);
 	background-image: conic-gradient(
 		var(--color-bg-tertiary) 0 25%,
 		transparent 0 50%,
